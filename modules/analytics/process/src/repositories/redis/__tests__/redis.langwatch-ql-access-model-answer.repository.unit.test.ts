@@ -31,7 +31,7 @@ describe("RedisLangWatchQLAccessModelAnswerRepository", () => {
 
       expect(await repository.findAnswer({ origin: ORIGIN })).toBe("not_provisioned");
       expect(store.expiries.get(KEY)).toBe(LWQL_ACCESS_MODEL_ANSWER_TTL_MS);
-      expect(LWQL_ACCESS_MODEL_ANSWER_TTL_MS).toBe(5 * 60_000);
+      expect(LWQL_ACCESS_MODEL_ANSWER_TTL_MS).toBe(15 * 60_000);
     });
 
     it("never answers for another server", async () => {

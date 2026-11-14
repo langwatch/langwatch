@@ -1,5 +1,4 @@
-import type { QueryRequest } from "@langwatch/clickhouse-client";
-import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
+import type { ReaderReadStatement } from "@langwatch/clickhouse-client/builder";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
@@ -8,20 +7,26 @@ import { ClickHouseAnalyticsRecencyRepository } from "../clickhouse.analytics-re
 const SINCE = Temporal.Instant.from("2026-09-24T12:00:00Z");
 
 function createRepository(rows: unknown[]) {
-  const queries: QueryRequest[] = [];
-  const clickhouse = clickHouseQueryClientDouble({
-    async query(request: QueryRequest): Promise<{ rows: unknown[] }> {
-      queries.push(request);
+  const statements: ReaderReadStatement[] = [];
+  const clickhouse = {
+    read: async ({ statement }: { statement: ReaderReadStatement }) => {
+      statements.push(statement);
       return { rows };
     },
-  });
-  return { queries, repository: ClickHouseAnalyticsRecencyRepository.create(clickhouse) };
+  } as never;
+  return { statements, repository: ClickHouseAnalyticsRecencyRepository.create(clickhouse) };
 }
+
+/** The values a statement binds, without the tenant the scope binds itself. */
+const boundValues = (statement: ReaderReadStatement | undefined) =>
+  Object.entries(statement?.params ?? {})
+    .filter(([name]) => name !== "tenantId")
+    .map(([, value]) => value);
 
 describe("ClickHouseAnalyticsRecencyRepository", () => {
   describe("given a trace-sourced recency read", () => {
-    it("reads trace_analytics scoped to the tenant, from the bound onwards", async () => {
-      const { queries, repository } = createRepository([{ lastMs: null }]);
+    it("reads trace_analytics as the reader for the one tenant, from the bound onwards", async () => {
+      const { statements, repository } = createRepository([{ lastMs: null }]);
 
       await repository.findLastOccurredAt({
         projectId: "project-1",
@@ -29,20 +34,22 @@ describe("ClickHouseAnalyticsRecencyRepository", () => {
         since: SINCE,
       });
 
-      expect(queries).toHaveLength(1);
-      expect(queries[0]?.tenantId).toBe("project-1");
-      expect(queries[0]?.sql).toContain("FROM trace_analytics");
-      expect(queries[0]?.sql).toContain("TraceId");
-      expect(queries[0]?.params).toEqual({
+      expect(statements).toHaveLength(1);
+      expect(statements[0]).toMatchObject({
+        identity: "reader",
+        kind: "tenant",
         tenantId: "project-1",
-        startMs: SINCE.epochMilliseconds,
       });
+      expect(statements[0]?.settings).toMatchObject({ SQL_langwatch_tenant_ids: "project-1" });
+      expect(statements[0]?.sql).toContain("FROM trace_analytics");
+      expect(statements[0]?.sql).toContain("GROUP BY TenantId, TraceId");
+      expect(boundValues(statements[0])).toEqual([SINCE.epochMilliseconds]);
     });
   });
 
   describe("given a trace-sourced recency read that leaves origins out", () => {
     it("leaves those origins out of the newest versions, bound as a parameter", async () => {
-      const { queries, repository } = createRepository([{ lastMs: null }]);
+      const { statements, repository } = createRepository([{ lastMs: null }]);
 
       await repository.findLastOccurredAt({
         projectId: "project-1",
@@ -51,16 +58,15 @@ describe("ClickHouseAnalyticsRecencyRepository", () => {
         excludeOrigins: ["langy"],
       });
 
-      expect(queries[0]?.sql).toContain("Origin NOT IN ({excludeOrigins:Array(String)})");
-      expect(queries[0]?.params).toEqual({
-        tenantId: "project-1",
-        startMs: SINCE.epochMilliseconds,
-        excludeOrigins: ["langy"],
-      });
+      const sql = statements[0]?.sql ?? "";
+      const election = sql.slice(sql.indexOf("IN (SELECT"));
+      expect(sql).toMatch(/NOT \(Origin IN \(\{v\d+:Array\(String\)\}\)\)/);
+      expect(election).not.toContain("Origin");
+      expect(boundValues(statements[0])).toEqual([SINCE.epochMilliseconds, ["langy"]]);
     });
 
     it("leaves no origin out of an evaluation read", async () => {
-      const { queries, repository } = createRepository([{ lastMs: null }]);
+      const { statements, repository } = createRepository([{ lastMs: null }]);
 
       await repository.findLastOccurredAt({
         projectId: "project-1",
@@ -69,14 +75,14 @@ describe("ClickHouseAnalyticsRecencyRepository", () => {
         excludeOrigins: ["langy"],
       });
 
-      expect(queries[0]?.sql).not.toContain("Origin");
-      expect(queries[0]?.params).not.toHaveProperty("excludeOrigins");
+      expect(statements[0]?.sql).not.toContain("Origin");
+      expect(boundValues(statements[0])).toEqual([SINCE.epochMilliseconds]);
     });
   });
 
   describe("given an evaluation-sourced recency read", () => {
-    it("reads evaluation_analytics keyed by EvaluationId", async () => {
-      const { queries, repository } = createRepository([{ lastMs: null }]);
+    it("reads evaluation_analytics keyed by EvaluationId, as the reader for the one tenant", async () => {
+      const { statements, repository } = createRepository([{ lastMs: null }]);
 
       await repository.findLastOccurredAt({
         projectId: "project-1",
@@ -84,9 +90,15 @@ describe("ClickHouseAnalyticsRecencyRepository", () => {
         since: SINCE,
       });
 
-      expect(queries[0]?.sql).toContain("FROM evaluation_analytics");
-      expect(queries[0]?.sql).toContain("EvaluationId");
-      expect(queries[0]?.sql).not.toContain("trace_analytics");
+      expect(statements[0]).toMatchObject({
+        identity: "reader",
+        kind: "tenant",
+        tenantId: "project-1",
+      });
+      expect(statements[0]?.settings).toMatchObject({ SQL_langwatch_tenant_ids: "project-1" });
+      expect(statements[0]?.sql).toContain("FROM evaluation_analytics");
+      expect(statements[0]?.sql).toContain("GROUP BY TenantId, EvaluationId");
+      expect(statements[0]?.sql).not.toContain("trace_analytics");
     });
   });
 

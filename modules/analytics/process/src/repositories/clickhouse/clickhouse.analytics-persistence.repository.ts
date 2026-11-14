@@ -25,12 +25,12 @@ import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 
 import { AnalyticsEvaluationRepository } from "../analytics-persistence.repository.ts";
+import { latestEvaluationRead } from "./clickhouse.analytics-latest-reads.mapper.ts";
+import { translatingQueryFailures } from "./clickhouse.query-error-translation.mapper.ts";
 
 const SLIM_TABLE = "evaluation_analytics";
 const ROLLUP_TABLE = "evaluation_analytics_rollup";
 /** The newest version first; a tie keeps the one with the most applied events. */
-const LATEST_ORDER = `ORDER BY OccurredAt DESC, CompletedAt DESC, StartedAt DESC,
-          length(AppliedEventIds) DESC`;
 const INSERT_SETTINGS = {
   async_insert: 1,
   wait_for_async_insert: 1,
@@ -74,7 +74,7 @@ type AnalyticsEvaluationRepositoryOptions = {
   defaultRetentionDays: () => number;
   readMetrics?: AnalyticsEvaluationReadMetrics;
   /** The routed client every read by id goes through, bounded by the evaluation id index. */
-  clickhouse?: ClickHouseQueryClient;
+  clickhouse?: Pick<ClickHouseQueryClient, "read">;
 };
 
 export class ClickHouseAnalyticsEvaluationRepository extends AnalyticsEvaluationRepository {
@@ -87,7 +87,7 @@ export class ClickHouseAnalyticsEvaluationRepository extends AnalyticsEvaluation
   private readonly resolveClient: AnalyticsEvaluationRepositoryOptions["resolveClient"];
   private readonly defaultRetentionDays: () => number;
   private readonly readMetrics: AnalyticsEvaluationReadMetrics | undefined;
-  private readonly clickhouse: ClickHouseQueryClient | undefined;
+  private readonly clickhouse: Pick<ClickHouseQueryClient, "read"> | undefined;
 
   private constructor(options: AnalyticsEvaluationRepositoryOptions) {
     super();
@@ -214,32 +214,13 @@ export class ClickHouseAnalyticsEvaluationRepository extends AnalyticsEvaluation
     parsed: AnalyticsEvaluationReadInput;
     window: WindowFragment | null;
   }): Promise<Record<string, unknown>[]> {
-    const client = await this.clientFor(parsed.tenantId);
-    const result = await client.query({
-      // ID_BOUND_SKIP: a fold read-back's own window, on the outer read only (ADR-071).
-      query: `
-        SELECT * FROM ${SLIM_TABLE}
-        WHERE TenantId = {tenantId:String}
-          AND EvaluationId = {evaluationId:String}
-          ${window?.sqlFor("OccurredAt") ?? ""}
-          AND (TenantId, EvaluationId, UpdatedAt) IN (
-            SELECT TenantId, EvaluationId, max(UpdatedAt)
-            FROM ${SLIM_TABLE}
-            WHERE TenantId = {tenantId:String}
-              AND EvaluationId = {evaluationId:String}
-            GROUP BY TenantId, EvaluationId
-          )
-        ${LATEST_ORDER}
-        LIMIT 1
-      `,
-      query_params: {
-        tenantId: parsed.tenantId,
-        evaluationId: parsed.evaluationId,
-        ...window?.params,
-      },
-      format: "JSONEachRow",
-    });
-    return result.json();
+    const { rows } = await translatingQueryFailures(() =>
+      this.routed().read({
+        statement: latestEvaluationRead({ parsed, window }),
+        table: SLIM_TABLE,
+      }),
+    );
+    return rows;
   }
 
   /** The latest row by id, bounded by the evaluation id index once ready (id-index plan §4). */
@@ -250,32 +231,15 @@ export class ClickHouseAnalyticsEvaluationRepository extends AnalyticsEvaluation
     parsed: AnalyticsEvaluationReadInput;
     idBound: IdBoundOptions;
   }): Promise<Record<string, unknown>[]> {
-    const { rows } = await this.routed().query<Record<string, unknown>>({
-      tenantId: parsed.tenantId,
-      sql: `
-        SELECT * FROM ${SLIM_TABLE}
-        WHERE TenantId = {tenantId:String}
-          AND EvaluationId = {evaluationId:String}
-          {{idBound:evaluation_analytics.EvaluationId:evaluationId}}
-          AND (TenantId, EvaluationId, UpdatedAt) IN (
-            SELECT TenantId, EvaluationId, max(UpdatedAt)
-            FROM ${SLIM_TABLE}
-            WHERE TenantId = {tenantId:String}
-              AND EvaluationId = {evaluationId:String}
-              {{idBound:evaluation_analytics.EvaluationId:evaluationId}}
-            GROUP BY TenantId, EvaluationId
-          )
-        ${LATEST_ORDER}
-        LIMIT 1
-      `,
-      params: { tenantId: parsed.tenantId, evaluationId: parsed.evaluationId },
+    const { rows } = await this.routed().read({
+      statement: latestEvaluationRead({ parsed, window: "idBound" }),
       table: SLIM_TABLE,
       idBound,
     });
     return rows;
   }
 
-  private routed(): ClickHouseQueryClient {
+  private routed(): Pick<ClickHouseQueryClient, "read"> {
     if (this.clickhouse === undefined) {
       throw new Error("This analytics repository was composed without a routed ClickHouse client");
     }

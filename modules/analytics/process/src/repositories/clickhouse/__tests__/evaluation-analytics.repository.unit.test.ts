@@ -12,6 +12,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ZodError } from "zod";
 
 import { ANALYTICS_ID_INDEXES } from "../clickhouse.analytics-id-indexes.database.ts";
+import { latestEvaluationRead } from "../clickhouse.analytics-latest-reads.mapper.ts";
 import { ClickHouseAnalyticsEvaluationRepository } from "../clickhouse.analytics-persistence.repository.ts";
 import type { EvaluationAnalyticsClickHouseClient } from "../clickhouse.analytics-persistence.repository.ts";
 
@@ -232,7 +233,7 @@ describe("AnalyticsEvaluationRepository", () => {
     expect(client.query).toHaveBeenCalledWith(
       expect.objectContaining({
         query: expect.stringContaining(
-          "ORDER BY OccurredAt DESC, CompletedAt DESC, StartedAt DESC,\n          length(AppliedEventIds) DESC",
+          "ORDER BY OccurredAt DESC, CompletedAt DESC, StartedAt DESC, length(AppliedEventIds) DESC",
         ),
       }),
     );
@@ -268,6 +269,30 @@ describe("AnalyticsEvaluationRepository", () => {
     const inner = query.slice(innerStart, query.indexOf("GROUP BY"));
     expect(outer).toContain("fromUnixTimestamp64Milli");
     expect(inner).not.toContain("fromUnixTimestamp64Milli");
+  });
+
+  it.each([
+    ["a caller's window", { fromMs: row.occurredAtMs - 1, toMs: row.occurredAtMs + 1 }],
+    ["the id index", "idBound"],
+    ["no bound", null],
+  ] as const)("reads the latest row under %s as the reader for its one tenant", (_, window) => {
+    const statement = latestEvaluationRead({
+      parsed: { tenantId: row.tenantId, evaluationId: row.evaluationId },
+      window,
+    });
+
+    expect(statement).toMatchObject({ identity: "reader", kind: "tenant", tenantId: row.tenantId });
+    expect(statement.settings).toMatchObject({ SQL_langwatch_tenant_ids: row.tenantId });
+    expect(statement.sql).toContain("GROUP BY TenantId, EvaluationId");
+  });
+
+  it("bounds a read without a window by the evaluation id index, inner election included", () => {
+    const { sql } = latestEvaluationRead({
+      parsed: { tenantId: row.tenantId, evaluationId: row.evaluationId },
+      window: "idBound",
+    });
+
+    expect(sql.match(/\{\{idBound:evaluation_analytics\.EvaluationId:/g)).toHaveLength(2);
   });
 
   /** @scenario "An evaluation analytics write failure beneath the queue is a warning" */
