@@ -2,7 +2,7 @@
  * @vitest-environment node
  * Spec: packages/eventing/specs/projection-cursor-reads.feature
  */
-import { Instance, Ksuid } from "@langwatch/ksuid";
+import { Instance, Ksuid, type KsuidLayout } from "@langwatch/ksuid";
 import { describe, expect, it } from "vitest";
 
 import { freshnessOf } from "../freshnessOf.ts";
@@ -11,10 +11,12 @@ function eventId({
   second,
   writer,
   sequenceId = 0,
+  layout = "v2",
 }: {
   second: number;
   writer: number;
   sequenceId?: number;
+  layout?: KsuidLayout;
 }): string {
   const instance = new Instance(Instance.schemes.RANDOM, new Uint8Array(8).fill(writer));
   return new Ksuid({
@@ -23,6 +25,7 @@ function eventId({
     timestamp: second,
     instance,
     sequenceId,
+    layout,
   }).toString();
 }
 
@@ -42,9 +45,10 @@ describe("freshnessOf", () => {
 
     /** @scenario "An answer in a later second is fresh even when its id sorts below the hint's" */
     it("is fresh when the ids' string order disagrees with their time", () => {
+      // Stored v1-legacy ids sort out of time order across a 65536-second wrap (#9575).
       const wrap = NOW - (NOW % 65536) + 65536;
-      const hintId = eventId({ second: wrap - 1, writer: 1 });
-      const answerId = eventId({ second: wrap, writer: 1 });
+      const hintId = eventId({ second: wrap - 1, writer: 1, layout: "v1-legacy" });
+      const answerId = eventId({ second: wrap, writer: 1, layout: "v1-legacy" });
       expect(answerId < hintId).toBe(true);
       expect(caughtUp({ answerId, hintId })).toBe(true);
     });
