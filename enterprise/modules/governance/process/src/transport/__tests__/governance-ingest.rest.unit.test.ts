@@ -582,14 +582,17 @@ describe("the ingestion-source receivers", () => {
     it("records it at receive time, where a budget period counts it", async () => {
       const api = mountIngest({ source: COSTED_SOURCE });
 
-      await api.post(
+      const response = await api.post(
         `/api/ingest/otel/${SOURCE_ID}/v1/logs`,
         costedLogs(costRecord({ timeUnixNano: "0" })),
       );
 
+      expect(response.status).toBe(202);
+      expect(api.recorded).toHaveLength(1);
       const [fact] = api.recorded;
-      expect(fact?.data.occurredAtMs).toBe(fact?.data.observedAtMs);
-      expect(fact?.occurredAt).toBe(fact?.data.observedAtMs);
+      if (!fact) throw new Error("expected one recorded cost fact");
+      expect(fact.data.occurredAtMs).toBe(fact.data.observedAtMs);
+      expect(fact.occurredAt).toBe(fact.data.observedAtMs);
     });
   });
 
