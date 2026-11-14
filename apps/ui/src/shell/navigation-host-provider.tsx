@@ -75,6 +75,7 @@ function rememberScope({
       ...(write.organizationId !== void 0
         ? [{ key: "organizationId" as const, value: write.organizationId }]
         : []),
+      ...(write.teamId !== void 0 ? [{ key: "teamId" as const, value: write.teamId }] : []),
       ...(write.projectSlug !== void 0
         ? [{ key: "projectSlug" as const, value: write.projectSlug }]
         : []),
@@ -365,6 +366,7 @@ function useNavigationHostReading({
           waiting: <LoadingScreen />,
           notFound: <UiPageNotFound />,
           hasPermission: (permission) => session.hasPermission(permission),
+          hasOrganizationPermission: (permission) => session.hasOrganizationPermission(permission),
           featureFlag: (flag) => flags.flag(flag),
         },
         {

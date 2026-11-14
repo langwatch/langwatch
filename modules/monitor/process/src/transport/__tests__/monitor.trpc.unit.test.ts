@@ -1,4 +1,4 @@
-import { createTrpcRuntime } from "@langwatch/api/trpc";
+import { createTrpcRuntime, isAuditLogExempt } from "@langwatch/api/trpc";
 /**
  * @vitest-environment node
  * The `monitors.*` procedures over the real runtime and the real application:
@@ -6,7 +6,7 @@ import { createTrpcRuntime } from "@langwatch/api/trpc";
  * that reach the wire.
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { MonitorWithEvaluator } from "@langwatch/monitor-contract";
+import { type MonitorWithEvaluator, monitorTrpc } from "@langwatch/monitor-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
 import { initTRPC } from "@trpc/server";
@@ -156,6 +156,23 @@ describe("the monitors tRPC namespace", () => {
     });
   });
 
+  describe("when a user copies a monitor into another project", () => {
+    /** @scenario "Copying a monitor records the user who copied it as the replica's creator" */
+    it("records them as the replica's creator", async () => {
+      const evaluators = new FakeMonitorEvaluators(["evaluator-1", "evaluator-2"]);
+      const { caller, repository } = mount({ seed: [seeded], evaluators });
+
+      const replica = await caller.copy({
+        monitorId: "monitor-1",
+        projectId: "target",
+        sourceProjectId: PROJECT_ID,
+      });
+
+      const [stored] = await repository.findAll({ projectId: "target" });
+      expect(stored).toMatchObject({ id: replica.id, createdById: "user-1" });
+    });
+  });
+
   describe("when copying a monitor out of a project the caller cannot manage", () => {
     it("refuses before the source monitor is read", async () => {
       const { caller, replication } = mount({
@@ -198,5 +215,15 @@ describe("the monitors tRPC namespace", () => {
         { workflowId: "workflow-2", projectId: "target" },
       ]);
     });
+  });
+});
+
+describe("auditing monitor changes", () => {
+  /** @scenario "Monitor changes are audited" */
+  it("declares every monitor write as a mutation the tRPC host audits", () => {
+    for (const name of ["create", "update", "toggle", "delete", "copy"] as const) {
+      expect(monitorTrpc.members[name]?.kind).toBe("mutation");
+      expect(isAuditLogExempt(`monitors.${name}`)).toBe(false);
+    }
   });
 });

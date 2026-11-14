@@ -37,7 +37,7 @@ the grant or role aggregate ID.
 
 ## Installation
 
-`defineProcessModule("authz").withRepositories(authzRepositories).withApi(AuthzModule).withTransports(authzGrantRest, authzRoleBindingRest, authzTrpcTransport).provideMiddlewareContext(…).withEventing(authzEventing).withEventing(authzAggregateReadEventing).withEventing(authzMemberOffboardedEventing).withMigrations(…)`, `src/authz.module.ts:30`.
+`defineProcessModule("authz").withRepositories(authzRepositories).withChannels(authzChannels).withApi(AuthzModule).withTransports(authzGrantRest, authzRoleBindingRest, authzTrpcTransport).provideMiddlewareContext(…).withEventing(authzEventing).withEventing(authzAggregateReadEventing).withEventing(authzMemberOffboardedEventing).withMigrations(…)`, `src/authz.module.ts:31`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -45,7 +45,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The complete callable authorization boundary. This is deliberately a structural interface: callers can use an installed AuthzModule without receiving its services, repositories, or transport adapters.
 
-Peers call these through the token, declared at `../contract/src/authz.api.ts:48`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/authz.api.ts:52`; nothing else in this package is public.
 
 #### `isDemoProject`
 
@@ -379,6 +379,110 @@ Revokes a reader's live shared reads (all, or those on `memberProjectIds`); answ
 revokeSharedProjectGrants(args: Commands.AuthzRevokeSharedProjectGrantsInput): Promise<string[]>;
 ```
 
+#### `listBraids`
+
+ADR-201: the live braids out of a project and into it; a downgraded organisation lists too.
+
+```typescript
+listBraids(args: Braids.AuthzListBraidsInput): Promise<Braids.AuthzProjectBraids>;
+```
+
+#### `listBraidsForScreen`
+
+The Braids screen's list: refuses `braids_not_enabled` while `release_braids` is off.
+
+```typescript
+listBraidsForScreen(args: Braids.AuthzListBraidsInput): Promise<Braids.AuthzProjectBraids>;
+```
+
+#### `createBraid`
+
+A braid from the owner (`projectId`) into the reader, its condition compiled on save.
+
+```typescript
+createBraid(args: Braids.AuthzCreateBraidInput): Promise<Braids.AuthzBraid>;
+```
+
+#### `changeBraid`
+
+Attaches the changed braid naming the one it replaces, then revokes that one.
+
+```typescript
+changeBraid(args: Braids.AuthzChangeBraidInput): Promise<Braids.AuthzBraid>;
+```
+
+#### `removeBraid`
+
+Revokes a braid touching `projectId` with reason `braid_removed`.
+
+```typescript
+removeBraid(args: Braids.AuthzRemoveBraidInput): Promise<Braids.AuthzBraidRemoved>;
+```
+
+#### `recordBraidedSpansView`
+
+ADR-201 §8: one `braided_spans.viewed` audit row per actor, reader and owner per five minutes, naming the braids and never a span. Never fails the read that calls it.
+
+```typescript
+recordBraidedSpansView(args: Braids.AuthzRecordBraidedSpansViewInput): Promise<void>;
+```
+
+#### `getOrganizationPolicy`
+
+The organisation's authz settings; one with no stored row has every setting off.
+
+```typescript
+getOrganizationPolicy(args: Braids.AuthzOrganizationInput): Promise<Braids.AuthzOrganizationPolicy>;
+```
+
+#### `getOrganizationPolicyForScreen`
+
+The Braids screen's policy: refuses `braids_not_enabled` while `release_braids` is off.
+
+```typescript
+getOrganizationPolicyForScreen(args: Braids.AuthzOrganizationInput): Promise<Braids.AuthzOrganizationPolicy>;
+```
+
+#### `setBraidsPolicy`
+
+Keeps braids to organisation admins or opens them again; audited, and bumps the epoch.
+
+```typescript
+setBraidsPolicy(args: Braids.AuthzSetBraidsPolicyInput): Promise<Braids.AuthzOrganizationPolicy>;
+```
+
+#### `listOrganizationBraids`
+
+Every live braid in the organisation.
+
+```typescript
+listOrganizationBraids(args: Braids.AuthzOrganizationInput): Promise<Braids.AuthzOrganizationBraids>;
+```
+
+#### `countProjectMembersHolding`
+
+ADR-201 §7: the organisation's active members holding `permission` at the project.
+
+```typescript
+countProjectMembersHolding(args: Braids.AuthzCountProjectMembersHoldingInput): Promise<Braids.AuthzProjectMembersHolding>;
+```
+
+#### `countProjectMembersHoldingForScreen`
+
+The braid dialog's count: refuses `braids_not_enabled` while `release_braids` is off.
+
+```typescript
+countProjectMembersHoldingForScreen(args: Braids.AuthzCountProjectMembersHoldingInput): Promise<Braids.AuthzProjectMembersHolding>;
+```
+
+#### `listBraidTargets`
+
+The braid dialog's picker: which projects the caller may braid into, one batched decision.
+
+```typescript
+listBraidTargets(args: Braids.AuthzListBraidTargetsInput): Promise<Braids.AuthzBraidTargets>;
+```
+
 #### `changeBindingRole`
 
 ```typescript
@@ -517,6 +621,22 @@ Every live platform operator, oldest first.
 
 ```typescript
 listPlatformOperators(): Promise<Platform.AuthzListPlatformOperatorsOutput>;
+```
+
+#### `listBillingMembers`
+
+Who holds the Billing role on an enabled membership, oldest grant first.
+
+```typescript
+listBillingMembers(args: Billing.AuthzListBillingMembersInput): Promise<readonly Billing.AuthzBillingMember[]>;
+```
+
+#### `setBillingRole`
+
+Grants or revokes the Billing role; idempotent. Refuses a person with no membership.
+
+```typescript
+setBillingRole(args: Billing.AuthzSetBillingRoleInput): Promise<void>;
 ```
 
 #### `findPermissionsBeyondCaller`
@@ -779,33 +899,45 @@ interface Response {
 
 ### `authz`
 
-Contract `src/transport/authz.trpc.ts:30`, router `src/transport/authz.trpc.ts:81`.
+Contract `src/transport/authz.trpc.ts:49`, router `src/transport/authz.trpc.ts:151`.
 
-| Procedure                    | Kind     | Gate                                                                                                                                                                       | Input                                                | Output                                                |
-| ---------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- | ----------------------------------------------------- |
-| `authz.effectivePermissions` | query    | Service-authorized: resolves the caller's OWN effective permissions at the project or organization scope named; a non-member resolves to the empty set (no default access) | `authzOwnStandingInputSchema`                        | `authzOwnStandingSchema`                              |
-| `authz.listGrants`           | query    | Permission `organization:manage`                                                                                                                                           | `authzListGrantsInputSchema`                         | `grantPageSchema`                                     |
-| `authz.createGrant`          | mutation | Permission `organization:manage`; Entitlement `enterprise` (feature `RBAC`)                                                                                                | inline                                               | `grantSchema`                                         |
-| `authz.changeGrantRole`      | mutation | Permission `organization:manage`; Entitlement `enterprise` (feature `RBAC`)                                                                                                | inline                                               | `grantSchema`                                         |
-| `authz.revokeGrant`          | mutation | Permission `organization:manage`                                                                                                                                           | inline                                               | `grantRevokedSchema`                                  |
-| `authz.listManagedGrants`    | query    | Permission `organization:manage`                                                                                                                                           | `authzListManagedBindingsForOrganizationInputSchema` | `authzListManagedBindingsForOrganizationOutputSchema` |
-| `authz.listMemberGrants`     | query    | Permission `organization:manage`                                                                                                                                           | `authzListManagedBindingsForUserInputSchema`         | `authzListManagedBindingsForUserOutputSchema`         |
-| `authz.applyMemberGrants`    | mutation | Permission `organization:manage`; Entitlement `enterprise` (feature `RBAC`)                                                                                                | inline                                               | `authzBindingMutationSuccessSchema`                   |
+| Procedure                        | Kind     | Gate                                                                                                                                                                       | Input                                                | Output                                                |
+| -------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- | ----------------------------------------------------- |
+| `authz.effectivePermissions`     | query    | Service-authorized: resolves the caller's OWN effective permissions at the project or organization scope named; a non-member resolves to the empty set (no default access) | `authzOwnStandingInputSchema`                        | `authzOwnStandingSchema`                              |
+| `authz.listGrants`               | query    | Permission `organization:manage`                                                                                                                                           | `authzListGrantsInputSchema`                         | `grantPageSchema`                                     |
+| `authz.createGrant`              | mutation | Permission `organization:manage`; Entitlement `enterprise` (feature `RBAC`)                                                                                                | inline                                               | `grantSchema`                                         |
+| `authz.changeGrantRole`          | mutation | Permission `organization:manage`; Entitlement `enterprise` (feature `RBAC`)                                                                                                | inline                                               | `grantSchema`                                         |
+| `authz.revokeGrant`              | mutation | Permission `organization:manage`                                                                                                                                           | inline                                               | `grantRevokedSchema`                                  |
+| `authz.listManagedGrants`        | query    | Permission `members:view`                                                                                                                                                  | `authzListManagedBindingsForOrganizationInputSchema` | `authzListManagedBindingsForOrganizationOutputSchema` |
+| `authz.listMemberGrants`         | query    | Permission `members:view`                                                                                                                                                  | `authzListManagedBindingsForUserInputSchema`         | `authzListManagedBindingsForUserOutputSchema`         |
+| `authz.applyMemberGrants`        | mutation | Permission `organization:manage`; Entitlement `enterprise` (feature `RBAC`)                                                                                                | inline                                               | `authzBindingMutationSuccessSchema`                   |
+| `authz.listBraids`               | query    | Permission `project:view`                                                                                                                                                  | `authzListBraidsInputSchema`                         | `authzProjectBraidsSchema`                            |
+| `authz.createBraid`              | mutation | Permission `traces:view`; Entitlement `enterprise` (feature `BRAIDS`)                                                                                                      | inline                                               | `authzBraidSchema`                                    |
+| `authz.changeBraid`              | mutation | Permission `traces:view`; Entitlement `enterprise` (feature `BRAIDS`)                                                                                                      | inline                                               | `authzBraidSchema`                                    |
+| `authz.removeBraid`              | mutation | Permission `braids:manage`                                                                                                                                                 | inline                                               | `authzBraidRemovedSchema`                             |
+| `authz.getBraidsPolicy`          | query    | Permission `organization:view`                                                                                                                                             | `authzOrganizationInputSchema`                       | `authzOrganizationPolicySchema`                       |
+| `authz.setBraidsPolicy`          | mutation | Permission `organization:manage`; Entitlement `enterprise` (feature `BRAIDS`)                                                                                              | inline                                               | `authzOrganizationPolicySchema`                       |
+| `authz.listOrganizationBraids`   | query    | Permission `organization:manage`                                                                                                                                           | `authzOrganizationInputSchema`                       | `authzOrganizationBraidsSchema`                       |
+| `authz.countProjectTraceViewers` | query    | Permission `traces:view`                                                                                                                                                   | inline                                               | `authzProjectMembersHoldingSchema`                    |
+| `authz.listBraidTargets`         | query    | Permission `braids:manage`                                                                                                                                                 | inline                                               | `authzBraidTargetsSchema`                             |
+| `authz.listBillingMembers`       | query    | Permission `members:view`                                                                                                                                                  | `authzListBillingMembersInputSchema`                 | inline                                                |
+| `authz.setMemberBillingRole`     | mutation | Permission `organization:manage`                                                                                                                                           | inline                                               | inline                                                |
 
 ```typescript
 // authz.effectivePermissions
-// Input: authzOwnStandingInputSchema, ../contract/src/authz.queries.ts:670
+// Input: authzOwnStandingInputSchema, ../contract/src/authz.queries.ts:671
 interface Input {
   projectId?: string;
   organizationId?: string;
 }
-// Output: authzOwnStandingSchema, ../contract/src/authz.queries.ts:654
+// Output: authzOwnStandingSchema, ../contract/src/authz.queries.ts:655
 interface Output {
   scope: {
     type: "project" | "team" | "organization" | "resource";
     id: string;
   } | null;
   permissions: string[];
+  organizationPermissions: string[];
 }
 
 // authz.listGrants
@@ -813,11 +945,11 @@ type Input = z.infer<typeof authzListGrantsInputSchema>; // ../contract/src/auth
 type Output = z.infer<typeof grantPageSchema>; // ../contract/src/authz-grants-rest.schemas.ts:115
 
 // authz.createGrant
-// Input: authzCreateGrantInputSchema.omit(IMPLIED_BY_SESSION) (inline, src/transport/authz.trpc.ts:40)
+// Input: authzCreateGrantInputSchema.omit(IMPLIED_BY_SESSION) (inline, src/transport/authz.trpc.ts:59)
 type Output = z.infer<typeof grantSchema>; // ../contract/src/authz-grants-rest.schemas.ts:64
 
 // authz.changeGrantRole
-// Input: inline, src/transport/authz.trpc.ts:44
+// Input: inline, src/transport/authz.trpc.ts:63
 interface Input {
   organizationId: string;
   grantId: string;
@@ -826,7 +958,7 @@ interface Input {
 type Output = z.infer<typeof grantSchema>; // ../contract/src/authz-grants-rest.schemas.ts:64
 
 // authz.revokeGrant
-// Input: inline, src/transport/authz.trpc.ts:48
+// Input: inline, src/transport/authz.trpc.ts:67
 interface Input {
   organizationId: string;
   grantId: string;
@@ -860,7 +992,7 @@ type Output = {
 }[];
 
 // authz.applyMemberGrants
-// Input: inline, src/transport/authz.trpc.ts:60
+// Input: inline, src/transport/authz.trpc.ts:79
 interface Input {
   organizationId: string;
   userId: string;
@@ -873,6 +1005,138 @@ interface Input {
   }[];
 }
 // Output: authzBindingMutationSuccessSchema, ../contract/src/authz.grant-management.ts:278
+interface Output {
+  success: true;
+}
+
+// authz.listBraids
+// Input: authzListBraidsInputSchema, ../contract/src/authz-braids.commands.ts:76
+interface Input {
+  projectId: string;
+}
+type Output = z.infer<typeof authzProjectBraidsSchema>; // ../contract/src/authz-braids.commands.ts:167
+
+// authz.createBraid
+// Input: inline, src/transport/authz.trpc.ts:87
+interface Input {
+  projectId: string;
+  readerProjectId: string;
+  where?: string;
+  fromMs: number;
+  expiresAtMs?: number;
+}
+// Output: authzBraidSchema, ../contract/src/authz-braids.commands.ts:153
+interface Output {
+  braidId: string;
+  ownerProjectId: string;
+  readerProjectId: string;
+  where: string | null;
+  fromMs: number;
+  expiresAtMs: number | null;
+  createdByUserId: string | null;
+  createdAtMs: number;
+}
+
+// authz.changeBraid
+// Input: inline, src/transport/authz.trpc.ts:91
+interface Input {
+  projectId: string;
+  readerProjectId: string;
+  braidId: string;
+  where?: string;
+  fromMs: number;
+  expiresAtMs?: number;
+}
+type Output = z.infer<typeof authzBraidSchema>; // ../contract/src/authz-braids.commands.ts:153
+
+// authz.removeBraid
+// Input: inline, src/transport/authz.trpc.ts:95
+interface Input {
+  projectId: string;
+  braidId: string;
+}
+// Output: authzBraidRemovedSchema, ../contract/src/authz-braids.commands.ts:172
+interface Output {
+  braidId: string;
+}
+
+// authz.getBraidsPolicy
+// Input: authzOrganizationInputSchema, ../contract/src/authz-braids.commands.ts:217
+interface Input {
+  organizationId: string;
+}
+// Output: authzOrganizationPolicySchema, ../contract/src/authz-braids.commands.ts:209
+interface Output {
+  organizationId: string;
+  braidsOrganizationAdminsOnly: boolean;
+  updatedByUserId: string | null;
+  updatedAtMs: number | null;
+}
+
+// authz.setBraidsPolicy
+// Input: inline, src/transport/authz.trpc.ts:103
+interface Input {
+  organizationId: string;
+  braidsOrganizationAdminsOnly: boolean;
+}
+type Output = z.infer<typeof authzOrganizationPolicySchema>; // ../contract/src/authz-braids.commands.ts:209
+
+// authz.listOrganizationBraids
+type Input = z.infer<typeof authzOrganizationInputSchema>; // ../contract/src/authz-braids.commands.ts:217
+// Output: authzOrganizationBraidsSchema, ../contract/src/authz-braids.commands.ts:240
+type Output = {
+  braidId: string;
+  ownerProjectId: string;
+  readerProjectId: string;
+  where: string | null;
+  fromMs: number;
+  expiresAtMs: number | null;
+  createdByUserId: string | null;
+  createdAtMs: number;
+}[];
+
+// authz.countProjectTraceViewers
+// Input: inline, src/transport/authz.trpc.ts:111
+interface Input {
+  projectId: string;
+}
+// Output: authzProjectMembersHoldingSchema, ../contract/src/authz-braids.commands.ts:100
+interface Output {
+  count: number;
+  exact: boolean;
+}
+
+// authz.listBraidTargets
+// Input: inline, src/transport/authz.trpc.ts:115
+interface Input {
+  projectId: string;
+  projectIds: string[];
+}
+// Output: authzBraidTargetsSchema, ../contract/src/authz-braids.commands.ts:136
+type Output = {
+  projectId: string;
+  selectable: boolean;
+  reason?: "this_project" | "aggregate";
+}[];
+
+// authz.listBillingMembers
+// Input: authzListBillingMembersInputSchema, ../contract/src/authz-billing-role.commands.ts:18
+interface Input {
+  organizationId: string;
+}
+// Output: inline, src/transport/authz.trpc.ts:120
+type Output = {
+  userId: string;
+}[];
+
+// authz.setMemberBillingRole
+// Input: inline, src/transport/authz.trpc.ts:124
+interface Input {
+  organizationId: string;
+  userId: string;
+  holds: boolean;
+}
+// Output: inline, src/transport/authz.trpc.ts:126
 interface Output {
   success: true;
 }
@@ -894,27 +1158,28 @@ Declared at `src/eventing/authz-aggregate-read.pipeline.ts:18`. Events: `authzAg
 
 ### Pipeline `authz_grant` (aggregate `authz_grant`)
 
-Declared at `src/eventing/authz-grant.pipeline.ts:66`. Events: `authzGrantEventSchemas`.
+Declared at `src/eventing/authz-grant.pipeline.ts:89`. Events: `authzGrantEventSchemas`.
 
-The chain builds early when `!sessionVersions` (`src/eventing/authz-grant.pipeline.ts:147`); the rows built only past that return say so. The caller's arguments decide which role gets which build.
+The chain builds early when `!sessionVersions` (`src/eventing/authz-grant.pipeline.ts:189`); the rows built only past that return say so. The caller's arguments decide which role gets which build.
 
 | Kind                      | Name                                                           | Handles                                                               | Declared at                                | Built                |
 | ------------------------- | -------------------------------------------------------------- | --------------------------------------------------------------------- | ------------------------------------------ | -------------------- |
-| command                   | `attachGrant`                                                  | –                                                                     | `src/eventing/authz-grant.pipeline.ts:82`  | always               |
-| command                   | `changeGrantRole`                                              | –                                                                     | `src/eventing/authz-grant.pipeline.ts:86`  | always               |
-| command                   | `revokeGrant`                                                  | –                                                                     | `src/eventing/authz-grant.pipeline.ts:90`  | always               |
-| command                   | `defineRole`                                                   | –                                                                     | `src/eventing/authz-grant.pipeline.ts:94`  | always               |
-| command                   | `changeRolePermissions`                                        | –                                                                     | `src/eventing/authz-grant.pipeline.ts:95`  | always               |
-| command                   | `deleteRole`                                                   | –                                                                     | `src/eventing/authz-grant.pipeline.ts:96`  | always               |
-| subscriber                | `auditTrail`                                                   | –                                                                     | `src/eventing/authz-grant.pipeline.ts:74`  | always               |
-| peer subscriber           | `engineMigrationRolledBack`                                    | `lw.ops.tenant_migration.rolled_back` from [ops](../../ops/README.md) | `src/eventing/authz-grant.pipeline.ts:100` | always               |
-| peer subscriber           | `projectMoved`                                                 | `lw.project.moved` from [project](../../project/README.md)            | `src/eventing/authz-grant.pipeline.ts:117` | always               |
-| peer subscriber           | `projectArchived`                                              | `lw.project.archived` from [project](../../project/README.md)         | `src/eventing/authz-grant.pipeline.ts:122` | always               |
-| peer subscriber           | `userDeactivated`                                              | `lw.user.deactivated` from [user](../../user/README.md)               | `src/eventing/authz-grant.pipeline.ts:131` | always               |
-| peer subscriber           | `userReactivated`                                              | `lw.user.reactivated` from [user](../../user/README.md)               | `src/eventing/authz-grant.pipeline.ts:136` | always               |
-| peer subscriber           | `userErased`                                                   | `lw.identity.user_erased` from [identity](../../identity/README.md)   | `src/eventing/authz-grant.pipeline.ts:141` | always               |
-| ClickHouse map projection | `≈ AuthzGrantProjection.create(options.authzGrantsWriteStore)` | –                                                                     | `src/eventing/authz-grant.pipeline.ts:73`  | always               |
-| projection subscriber     | `sessionVersion`                                               | –                                                                     | `src/eventing/authz-grant.pipeline.ts:151` | past the early build |
+| command                   | `attachGrant`                                                  | –                                                                     | `src/eventing/authz-grant.pipeline.ts:106` | always               |
+| command                   | `changeGrantRole`                                              | –                                                                     | `src/eventing/authz-grant.pipeline.ts:110` | always               |
+| command                   | `revokeGrant`                                                  | –                                                                     | `src/eventing/authz-grant.pipeline.ts:114` | always               |
+| command                   | `defineRole`                                                   | –                                                                     | `src/eventing/authz-grant.pipeline.ts:118` | always               |
+| command                   | `changeRolePermissions`                                        | –                                                                     | `src/eventing/authz-grant.pipeline.ts:119` | always               |
+| command                   | `deleteRole`                                                   | –                                                                     | `src/eventing/authz-grant.pipeline.ts:120` | always               |
+| subscriber                | `auditTrail`                                                   | –                                                                     | `src/eventing/authz-grant.pipeline.ts:97`  | always               |
+| subscriber                | `braidChangeRevoke`                                            | `lw.authz.grant.attached` from [authz](../README.md)                  | `src/eventing/authz-grant.pipeline.ts:124` | always               |
+| peer subscriber           | `engineMigrationRolledBack`                                    | `lw.ops.tenant_migration.rolled_back` from [ops](../../ops/README.md) | `src/eventing/authz-grant.pipeline.ts:142` | always               |
+| peer subscriber           | `projectMoved`                                                 | `lw.project.moved` from [project](../../project/README.md)            | `src/eventing/authz-grant.pipeline.ts:159` | always               |
+| peer subscriber           | `projectArchived`                                              | `lw.project.archived` from [project](../../project/README.md)         | `src/eventing/authz-grant.pipeline.ts:164` | always               |
+| peer subscriber           | `userDeactivated`                                              | `lw.user.deactivated` from [user](../../user/README.md)               | `src/eventing/authz-grant.pipeline.ts:173` | always               |
+| peer subscriber           | `userReactivated`                                              | `lw.user.reactivated` from [user](../../user/README.md)               | `src/eventing/authz-grant.pipeline.ts:178` | always               |
+| peer subscriber           | `userErased`                                                   | `lw.identity.user_erased` from [identity](../../identity/README.md)   | `src/eventing/authz-grant.pipeline.ts:183` | always               |
+| ClickHouse map projection | `≈ AuthzGrantProjection.create(options.authzGrantsWriteStore)` | –                                                                     | `src/eventing/authz-grant.pipeline.ts:96`  | always               |
+| projection subscriber     | `sessionVersion`                                               | –                                                                     | `src/eventing/authz-grant.pipeline.ts:193` | past the early build |
 
 ### Pipeline `authz_member_offboarded` (aggregate `authz_member_offboarded`)
 

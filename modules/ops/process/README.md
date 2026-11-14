@@ -6,13 +6,13 @@ The server half of [ops](../README.md). Platform administration for every deploy
 
 ## Installation
 
-`defineProcessModule("ops").withRepositories(opsRepositories).withChannels(opsChannels).withApi(OpsModule).withTransports(adminRest, opsBugReportRest, opsClickHouseExplainRest, opsTrpcTransport, opsUpgradeTrpcTransport, opsBugReportTrpcTransport, checkupTrpcTransport, checkupRest).provideMiddlewareBindings(…).provideMiddlewareContext(…).withEventing(usageReportEventing).withEventing(anomalyDetectionEventing).withEventing(storageStatsEventing).withEventing(groupQueueReaperEventing).withEventing(upgradeAlertsEventing).withEventing(projectionReplayEventing).withEventing(systemMigrationsEventing).withEventing(platformOperatorSeedEventing).withTasks(…).withMigrations(…).withIdIndexes(…, …)`, `src/ops.module.ts:45`.
+`defineProcessModule("ops").withRepositories(opsRepositories).withChannels(opsChannels).withApi(OpsModule).withTransports(adminRest, opsBugReportRest, opsClickHouseExplainRest, opsTrpcTransport, opsUpgradeTrpcTransport, opsBugReportTrpcTransport, checkupTrpcTransport, checkupRest).provideMiddlewareBindings(…).provideMiddlewareContext(…).withEventing(usageReportEventing).withEventing(anomalyDetectionEventing).withEventing(storageStatsEventing).withEventing(seatSharingEventing).withEventing(groupQueueReaperEventing).withEventing(upgradeAlertsEventing).withEventing(projectionReplayEventing).withEventing(systemMigrationsEventing).withEventing(platformOperatorSeedEventing).withTasks(…).withMigrations(…).withIdIndexes(…, …)`, `src/ops.module.ts:46`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
 ## Module API (`OpsApi`)
 
-Peers call these through the token, declared at `../contract/src/ops.api.ts:440`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/ops.api.ts:441`; nothing else in this package is public.
 
 #### `startAdminImpersonation`
 
@@ -606,6 +606,22 @@ revokePlatformOperator(input: { grantId: string; operator: OpsOperator | null })
 
 ```typescript
 featureFlagCatalogue(): Promise<OperatorFeatureFlagCatalogue>;
+```
+
+#### `findSeatSharingChecks`
+
+The last seat sharing check, empty before the first; not found without Cloud admin.
+
+```typescript
+findSeatSharingChecks(): Promise<SeatSharingCheck[]>;
+```
+
+#### `runSeatSharingCheck`
+
+Runs the seat sharing check over every organization on a paid plan and keeps the result.
+
+```typescript
+runSeatSharingCheck(): Promise<void>;
 ```
 
 #### `setFeatureFlagEnabled`
@@ -1613,18 +1629,19 @@ interface Output {
 
 Contract `../contract/src/ops-platform.trpc.ts:29`, router `src/transport/ops-platform.trpc.ts:15`.
 
-| Procedure                 | Kind     | Gate                             | Input                               | Output                               |
-| ------------------------- | -------- | -------------------------------- | ----------------------------------- | ------------------------------------ |
-| `ops.listFeatureFlags`    | query    | Platform permission `ops:view`   | inline                              | `operatorFeatureFlagCatalogueSchema` |
-| `ops.setFeatureFlag`      | mutation | Platform permission `ops:manage` | `opsSetFeatureFlagInputSchema`      | `opsOkOutputSchema`                  |
-| `ops.setFeatureFlagRules` | mutation | Platform permission `ops:manage` | `opsSetFeatureFlagRulesInputSchema` | `opsOkOutputSchema`                  |
-| `ops.clearFeatureFlag`    | mutation | Platform permission `ops:manage` | `opsFeatureFlagKeyInputSchema`      | `opsOkOutputSchema`                  |
-| `ops.listBlobQueues`      | query    | Platform permission `ops:view`   | inline                              | `opsQueueNameListSchema`             |
-| `ops.getBlobStoreStats`   | query    | Platform permission `ops:view`   | inline                              | `opsBlobStoreStatsSchema`            |
-| `ops.listBlobs`           | query    | Platform permission `ops:view`   | `listBlobsInputSchema`              | `opsBlobPageSchema`                  |
-| `ops.getBlob`             | query    | Platform permission `ops:view`   | `getBlobInputSchema`                | inline                               |
-| `ops.runBlobCleanup`      | mutation | Platform permission `ops:manage` | `runBlobCleanupOperatorInputSchema` | `blobSweepReportSchema`              |
-| `ops.deleteBlob`          | mutation | Platform permission `ops:manage` | `deleteBlobOperatorInputSchema`     | `deleteBlobResultSchema`             |
+| Procedure                   | Kind     | Gate                             | Input                               | Output                               |
+| --------------------------- | -------- | -------------------------------- | ----------------------------------- | ------------------------------------ |
+| `ops.listFeatureFlags`      | query    | Platform permission `ops:view`   | inline                              | `operatorFeatureFlagCatalogueSchema` |
+| `ops.setFeatureFlag`        | mutation | Platform permission `ops:manage` | `opsSetFeatureFlagInputSchema`      | `opsOkOutputSchema`                  |
+| `ops.setFeatureFlagRules`   | mutation | Platform permission `ops:manage` | `opsSetFeatureFlagRulesInputSchema` | `opsOkOutputSchema`                  |
+| `ops.clearFeatureFlag`      | mutation | Platform permission `ops:manage` | `opsFeatureFlagKeyInputSchema`      | `opsOkOutputSchema`                  |
+| `ops.listBlobQueues`        | query    | Platform permission `ops:view`   | inline                              | `opsQueueNameListSchema`             |
+| `ops.getBlobStoreStats`     | query    | Platform permission `ops:view`   | inline                              | `opsBlobStoreStatsSchema`            |
+| `ops.listBlobs`             | query    | Platform permission `ops:view`   | `listBlobsInputSchema`              | `opsBlobPageSchema`                  |
+| `ops.getBlob`               | query    | Platform permission `ops:view`   | `getBlobInputSchema`                | inline                               |
+| `ops.runBlobCleanup`        | mutation | Platform permission `ops:manage` | `runBlobCleanupOperatorInputSchema` | `blobSweepReportSchema`              |
+| `ops.deleteBlob`            | mutation | Platform permission `ops:manage` | `deleteBlobOperatorInputSchema`     | `deleteBlobResultSchema`             |
+| `ops.findSeatSharingChecks` | query    | Platform permission `ops:view`   | inline                              | inline                               |
 
 ```typescript
 // ops.listFeatureFlags
@@ -1722,6 +1739,22 @@ interface Input {
 interface Output {
   deleted: boolean;
 }
+
+// ops.findSeatSharingChecks
+// Input: inline, ../contract/src/ops-platform.trpc.ts:77
+type Input = unknown;
+// Output: inline, ../contract/src/ops-platform.trpc.ts:78
+type Output = {
+  checkedAt: number;
+  windowDays: number;
+  readings: {
+    organizationId: string;
+    planName: string;
+    seats: number;
+    activePeople: number;
+    flagged: boolean;
+  }[];
+}[];
 ```
 
 ### `ops`
@@ -2579,6 +2612,14 @@ Declared at `src/eventing/ops-projection-replay.pipeline.ts:43`. Events: `projec
 | command         | `requestProjectionReplay` | –                          | `src/eventing/ops-projection-replay.pipeline.ts:48` |
 | process manager | `projectionReplay`        | intents `execute` (outbox) | `src/eventing/ops-projection-replay.pipeline.ts:49` |
 
+### Pipeline `ops_seat_sharing` (aggregate `global`)
+
+Declared at `src/eventing/ops-seat-sharing.pipeline.ts:25`.
+
+| Kind            | Name          | Handles                                                                                | Declared at                                    |
+| --------------- | ------------- | -------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| process manager | `seatSharing` | every 1 h (`SEAT_SHARING_WAKE_INTERVAL_MS = 60 * 60 * 1000`); intents `check` (outbox) | `src/eventing/ops-seat-sharing.pipeline.ts:30` |
+
 ### Pipeline `ops_storage_stats` (aggregate `global`)
 
 Declared at `src/eventing/ops-storage-stats.pipeline.ts:27`.
@@ -2629,30 +2670,31 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                                 | Environment variable                    | Declared at                        |
 | ------ | ------------------------------------ | --------------------------------------- | ---------------------------------- |
-| secret | `licensePrivateKey`                  | `LANGWATCH_LICENSE_PRIVATE_KEY`         | `src/app/ops.app.ts:821`           |
-| secret | `slackBugReportsBotToken`            | `SLACK_BUG_REPORTS_BOT_TOKEN`           | `src/app/ops.app.ts:822`           |
-| secret | `credentials`                        | `CREDENTIALS_SECRET`                    | `src/app/ops.app.ts:824`           |
-| secret | `credentialsFallback`                | `NEXTAUTH_SECRET`                       | `src/app/ops.app.ts:825`           |
-| secret | `credentialsPrevious`                | `CREDENTIALS_SECRET_PREVIOUS`           | `src/app/ops.app.ts:826`           |
+| secret | `licensePrivateKey`                  | `LANGWATCH_LICENSE_PRIVATE_KEY`         | `src/app/ops.app.ts:827`           |
+| secret | `slackBugReportsBotToken`            | `SLACK_BUG_REPORTS_BOT_TOKEN`           | `src/app/ops.app.ts:828`           |
+| secret | `credentials`                        | `CREDENTIALS_SECRET`                    | `src/app/ops.app.ts:830`           |
+| secret | `credentialsFallback`                | `NEXTAUTH_SECRET`                       | `src/app/ops.app.ts:831`           |
+| secret | `credentialsPrevious`                | `CREDENTIALS_SECRET_PREVIOUS`           | `src/app/ops.app.ts:832`           |
 | config | `apiKey`                             | `LANGWATCH_OPS_API_KEY`                 | `../contract/src/ops.config.ts:30` |
 | config | `clickhouseOpsUrl`                   | `CLICKHOUSE_OPS_URL`                    | `../contract/src/ops.config.ts:32` |
-| config | `usageStats.disabled`                | `DISABLE_USAGE_STATS`                   | `../contract/src/ops.config.ts:34` |
-| config | `usageStats.installMethod`           | `INSTALL_METHOD`                        | `../contract/src/ops.config.ts:35` |
-| config | `usageStats.chartVersion`            | `LANGWATCH_CHART_VERSION`               | `../contract/src/ops.config.ts:37` |
-| config | `noticesDisabled`                    | `DISABLE_LANGWATCH_NOTICES`             | `../contract/src/ops.config.ts:40` |
-| config | `upgradeDiagnosticsAutoSendDisabled` | `DISABLE_UPGRADE_DIAGNOSTICS_AUTO_SEND` | `../contract/src/ops.config.ts:42` |
-| config | `collectClickHouseBackupMetrics`     | `CLICKHOUSE_BACKUP_METRICS_ENABLED`     | `../contract/src/ops.config.ts:46` |
-| config | `productAnalytics.key`               | `POSTHOG_KEY`                           | `../contract/src/ops.config.ts:53` |
-| config | `productAnalytics.host`              | `POSTHOG_HOST`                          | `../contract/src/ops.config.ts:53` |
-| config | `grafana`                            | `GRAFANA_BASE_URL`                      | `../contract/src/ops.config.ts:55` |
-| config | `bugReportSlackChannel`              | `SLACK_BUG_REPORTS_CHANNEL`             | `../contract/src/ops.config.ts:57` |
-| config | `slackApiBase`                       | `SLACK_API_BASE`                        | `../contract/src/ops.config.ts:59` |
-| config | `cloudOps`                           | `LANGWATCH_CLOUD_OPS`                   | `../contract/src/ops.config.ts:61` |
-| config | `adminEmails`                        | `ADMIN_EMAILS`                          | `../contract/src/ops.config.ts:63` |
-| config | `nodeEnvironment`                    | `NODE_ENV`                              | `../contract/src/ops.config.ts:65` |
-| config | `isSaas`                             | `IS_SAAS`                               | `../contract/src/ops.config.ts:66` |
-| config | `publicBaseUrl`                      | `BASE_HOST`                             | `../contract/src/ops.config.ts:67` |
-| config | `serviceVersion`                     | `SERVICE_VERSION`                       | `../contract/src/ops.config.ts:69` |
-| config | `otelResourceAttributes`             | `OTEL_RESOURCE_ATTRIBUTES`              | `../contract/src/ops.config.ts:70` |
+| config | `clickhouseOpsPasswordFile`          | `CLICKHOUSE_OPS_PASSWORD_FILE`          | `../contract/src/ops.config.ts:34` |
+| config | `usageStats.disabled`                | `DISABLE_USAGE_STATS`                   | `../contract/src/ops.config.ts:42` |
+| config | `usageStats.installMethod`           | `INSTALL_METHOD`                        | `../contract/src/ops.config.ts:43` |
+| config | `usageStats.chartVersion`            | `LANGWATCH_CHART_VERSION`               | `../contract/src/ops.config.ts:45` |
+| config | `noticesDisabled`                    | `DISABLE_LANGWATCH_NOTICES`             | `../contract/src/ops.config.ts:48` |
+| config | `upgradeDiagnosticsAutoSendDisabled` | `DISABLE_UPGRADE_DIAGNOSTICS_AUTO_SEND` | `../contract/src/ops.config.ts:50` |
+| config | `collectClickHouseBackupMetrics`     | `CLICKHOUSE_BACKUP_METRICS_ENABLED`     | `../contract/src/ops.config.ts:54` |
+| config | `productAnalytics.key`               | `POSTHOG_KEY`                           | `../contract/src/ops.config.ts:61` |
+| config | `productAnalytics.host`              | `POSTHOG_HOST`                          | `../contract/src/ops.config.ts:61` |
+| config | `grafana`                            | `GRAFANA_BASE_URL`                      | `../contract/src/ops.config.ts:63` |
+| config | `bugReportSlackChannel`              | `SLACK_BUG_REPORTS_CHANNEL`             | `../contract/src/ops.config.ts:65` |
+| config | `slackApiBase`                       | `SLACK_API_BASE`                        | `../contract/src/ops.config.ts:67` |
+| config | `cloudOps`                           | `LANGWATCH_CLOUD_OPS`                   | `../contract/src/ops.config.ts:69` |
+| config | `adminEmails`                        | `ADMIN_EMAILS`                          | `../contract/src/ops.config.ts:71` |
+| config | `nodeEnvironment`                    | `NODE_ENV`                              | `../contract/src/ops.config.ts:73` |
+| config | `isSaas`                             | `IS_SAAS`                               | `../contract/src/ops.config.ts:74` |
+| config | `publicBaseUrl`                      | `BASE_HOST`                             | `../contract/src/ops.config.ts:75` |
+| config | `serviceVersion`                     | `SERVICE_VERSION`                       | `../contract/src/ops.config.ts:77` |
+| config | `otelResourceAttributes`             | `OTEL_RESOURCE_ATTRIBUTES`              | `../contract/src/ops.config.ts:78` |
 
 <!-- readme:generated:end -->

@@ -119,8 +119,7 @@ export function createAgentConnectRest(relayMaxPayloadMb?: number): Readonly<{
       .withAudit("agents.register")
       .withInput(agentConnectRegisterInputSchema)
       .withCredential("project", { keyKinds: CONNECT_KEY_KINDS })
-      .withPermission(CONNECT_PERMISSION)
-      .withLegacyKeyScope(CONNECT_LEGACY_KEY_SCOPE)
+      .withPermission(CONNECT_PERMISSION, { legacyKey: CONNECT_LEGACY_KEY_SCOPE })
       .withResponse("protocol", {
         produces: JSON_MEDIA_TYPE,
         because: BECAUSE,
@@ -150,8 +149,7 @@ export function createAgentConnectRest(relayMaxPayloadMb?: number): Readonly<{
       .get("/connect/poll", "pollConnectedAgentInstance")
       .withQuery(agentConnectPollQuerySchema)
       .withCredential("project", { keyKinds: CONNECT_KEY_KINDS })
-      .withPermission(CONNECT_PERMISSION)
-      .withLegacyKeyScope(CONNECT_LEGACY_KEY_SCOPE)
+      .withPermission(CONNECT_PERMISSION, { legacyKey: CONNECT_LEGACY_KEY_SCOPE })
       .withResponse("protocol", {
         produces: JSON_MEDIA_TYPE,
         because: BECAUSE,
@@ -179,8 +177,7 @@ export function createAgentConnectRest(relayMaxPayloadMb?: number): Readonly<{
       .withoutAudit("agent connection protocol frame")
       .withInput(agentConnectFramesInputSchema)
       .withCredential("project", { keyKinds: CONNECT_KEY_KINDS })
-      .withPermission(CONNECT_PERMISSION)
-      .withLegacyKeyScope(CONNECT_LEGACY_KEY_SCOPE)
+      .withPermission(CONNECT_PERMISSION, { legacyKey: CONNECT_LEGACY_KEY_SCOPE })
       .withResponse("protocol", {
         produces: JSON_MEDIA_TYPE,
         because: BECAUSE,

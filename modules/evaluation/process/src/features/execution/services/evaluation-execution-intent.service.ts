@@ -10,6 +10,7 @@ import type { TraceApi } from "@langwatch/trace-contract";
 import type { EvaluationCommandDispatcherService } from "../../../services/evaluation-command-dispatcher.service.ts";
 import { EvaluationReportedEventService } from "../../../services/evaluation-reported-event.service.ts";
 import type { AzureSafetyCredentialsService } from "../../evaluators/services/azure-safety-credentials.service.ts";
+import type { MonitorErrorRateService } from "../../monitors/services/monitor-error-rate.service.ts";
 import { EvaluationExecutionOutcomeService } from "./evaluation-execution-outcome.service.ts";
 import {
   EvaluationExecutionPreparationService,
@@ -33,6 +34,7 @@ export class EvaluationExecutionIntentService {
         reportedEvents,
         retries: deps.retries,
         retryWindowMs: deps.retryWindowMs,
+        ...(deps.monitorErrorRates ? { monitorErrorRates: deps.monitorErrorRates } : {}),
       }),
       reportedEvents,
     );
@@ -100,4 +102,6 @@ export interface ExecuteEvaluationCommandDeps {
   retryWindowMs: number;
   /** Sends the next attempt when the evaluator service was not up. */
   retries: Pick<EvaluationCommandDispatcherService, "retryEvaluation">;
+  /** Counts each settled run toward its monitor's error rate; absent where nothing counts. */
+  monitorErrorRates?: Pick<MonitorErrorRateService, "observe">;
 }

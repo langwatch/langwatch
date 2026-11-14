@@ -10,13 +10,13 @@ import type { Readable } from "node:stream";
 import { clearTimeout, setTimeout } from "node:timers";
 import { fileURLToPath } from "node:url";
 
-import { type ClickHouseClient, createClient } from "@clickhouse/client";
+import { type ClickHouseClient, ClickHouseLogLevel, createClient } from "@clickhouse/client";
 import type { LangWatchQLResourceLimits } from "@langwatch/analytics-contract/langwatch-ql-limits";
-import { TEST_CLICKHOUSE_IMAGE } from "@langwatch/clickhouse-client/testing";
+import { testClickHouseProfilePins } from "@langwatch/clickhouse-client/testing";
 import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
 import { ClickHouseContainer, type StartedClickHouseContainer } from "@testcontainers/clickhouse";
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
-import { expect } from "vitest";
+import { expect, vi } from "vitest";
 
 import type { DerivedPostgresView } from "../../features/lwql-catalogue/rules/lwql-postgres-catalog-model.rules.ts";
 import { LWQL_POSTGRES_CATALOG } from "../../features/lwql-catalogue/rules/lwql-postgres-view-catalog.rules.ts";
@@ -26,6 +26,7 @@ import {
 } from "../../features/provisioning/services/langwatch-ql-postgres-mapping.service.ts";
 import { LangWatchQLPostgresViewsService } from "../../features/provisioning/services/langwatch-ql-postgres-views.service.ts";
 import { CLICKHOUSE_CONFIG_STORE_ERROR_CODE } from "../../rules/langwatch-ql-config-store.rules.ts";
+import { withTenantCapability } from "../../rules/langwatch-ql-tenant-capability.rules.ts";
 import { LWQL_PRISMA_MANIFEST } from "../../rules/lwql-prisma-manifest.rules.ts";
 import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
 import { LangWatchQLAccessModelDefinitionService } from "../../services/langwatch-ql-access-model-definition.service.ts";
@@ -68,8 +69,11 @@ export const TEST_POSTGRES_IMAGE = "postgres:17";
  * container sets `CLICKHOUSE_USER`, and the official image's entrypoint then *removes*
  * `default` and creates this user instead.
  */
-const ADMIN_USER = "test";
-const ADMIN_PASSWORD = "test";
+export const ADMIN_USER = "test";
+export const ADMIN_PASSWORD = "test";
+
+/** The 26.2 setting behind NAMED_COLLECTION_IS_USED; absent on older servers. */
+const NAMED_COLLECTION_DEPENDENCY_CHECK = "check_named_collection_dependencies";
 
 /** Password of the restricted identity. Never leaves the harness. */
 const RESTRICTED_PASSWORD = "lwql-reader-test-password";
@@ -231,7 +235,10 @@ export interface LangWatchQLClickHouseHarness {
    * setting at all, which is the path that exercises the profile default. Passing `""` sends an
    * explicit empty one. The two are different requests and the proof pins both.
    */
-  restrictedClient(options?: { keyHash?: string }): Promise<ClickHouseClient>;
+  restrictedClient(options?: {
+    keyHash?: string;
+    projectIds?: readonly string[];
+  }): Promise<ClickHouseClient>;
   /**
    * The restricted identity's credentials, for a caller that must build its own client rather
    * than borrow one — the REST endpoint suite, which drives the shipped executor and therefore
@@ -244,6 +251,11 @@ export interface LangWatchQLClickHouseHarness {
   };
   /** Runs statements as the administrator, in order. */
   applyAsAdmin(statements: string[]): Promise<void>;
+  /**
+   * Drops a SQL named collection even while engine tables use it, as a config store unmounting
+   * one does. From 26.2 a plain DROP with dependents fails with NAMED_COLLECTION_IS_USED.
+   */
+  dropNamedCollection(collection: string): Promise<void>;
   /**
    * Renders the whole access model from one definition and applies it, exactly
    * as production does (#8258). Run after the views exist. `views` overrides the
@@ -282,6 +294,50 @@ function writeConfigFile(directory: string, name: string, contents: string): str
 }
 
 /**
+ * A statement ending in its own SETTINGS clause probes the server's settings constraints, and is
+ * sent as written, without the capability. A test of the tenant setting itself goes through the
+ * executor, which always appends the capability's clause.
+ */
+const OWN_SETTINGS_CLAUSE = /\bSETTINGS\s+[A-Za-z_]\w*\s*=[^()]*$/i;
+
+/**
+ * Sends every query with the capability in the executor's own trailing SETTINGS clause, so each
+ * suite runs the production transport (ADR-200) and never a URL setting.
+ */
+function carryCapability({
+  client,
+  setting,
+  capability,
+  projectIds,
+}: {
+  client: ClickHouseClient;
+  setting: string;
+  capability: string;
+  projectIds: readonly string[];
+}): void {
+  const query = client.query.bind(client);
+  client.query = ((params: Parameters<ClickHouseClient["query"]>[0]) =>
+    query({
+      ...params,
+      query: OWN_SETTINGS_CLAUSE.test(params.query)
+        ? params.query
+        : withTenantCapability({ sql: params.query, setting, capability, projectIds }),
+    })) as ClickHouseClient["query"];
+}
+
+/**
+ * The ClickHouse every LangWatchQL suite runs: the version the LangWatchQL server image builds on
+ * (`infra/clickhouse-serverless/Dockerfile`, #9458), not the repo-wide test default (ADR-200).
+ */
+export const LWQL_CLICKHOUSE_TEST_IMAGE = "clickhouse/clickhouse-server:26.8.34.13";
+
+/**
+ * A well-formed capability no key-map row holds. The executor refuses anything but lowercase hex
+ * before it sends, so this is the only garbage that can reach the server.
+ */
+export const UNMAPPED_KEY_HASH = "0".repeat(64);
+
+/**
  * Starts ClickHouse with the server-level prerequisites installed, then applies
  * the shipped provisioning and seeds two tenants' rows.
  */
@@ -289,9 +345,12 @@ export async function startLangWatchQLClickHouse({
   suite,
   facts = "fixture",
   extraConfigFiles = [],
+  image = LWQL_CLICKHOUSE_TEST_IMAGE,
 }: {
   suite: string;
   facts?: LangWatchQLFactTableMode;
+  /** The server image; LangWatchQL's own 26.8 unless a suite pins another. */
+  image?: string;
   /** Extra server config files to install before ClickHouse starts. */
   extraConfigFiles?: { name: string; target: string; contents: string }[];
 }): Promise<LangWatchQLClickHouseHarness> {
@@ -299,18 +358,20 @@ export async function startLangWatchQLClickHouse({
   const accessManagementXml = serverConfig.accessManagementConfigXml({
     administrativeUser: ADMIN_USER,
   });
+  const pins = testClickHouseProfilePins();
   const configDigest = extraConfigFiles
     .reduce(
       (hash, file) => hash.update(file.target).update(file.contents),
       createHash("sha256")
         .update(CLICKHOUSE_CUSTOM_SETTINGS_PREFIX_CONFIG_XML)
-        .update(accessManagementXml),
+        .update(accessManagementXml)
+        .update(pins.file.content),
     )
     .digest("hex")
     .slice(0, 16);
 
   const configDirectory = mkdtempSync(join(tmpdir(), "lwql-config-"));
-  const container = await new ClickHouseContainer(TEST_CLICKHOUSE_IMAGE)
+  const container = await new ClickHouseContainer(image)
     .withUsername(ADMIN_USER)
     .withPassword(ADMIN_PASSWORD)
     .withLabels({
@@ -332,6 +393,11 @@ export async function startLangWatchQLClickHouse({
       {
         source: writeConfigFile(configDirectory, "access-management.xml", accessManagementXml),
         target: CLICKHOUSE_ACCESS_MANAGEMENT_CONFIG_PATH,
+      },
+      // The image's default-profile pins, so these suites run the query behaviour it ships.
+      {
+        source: writeConfigFile(configDirectory, "profile-pins.yaml", pins.file.content),
+        target: pins.file.target,
       },
       ...extraConfigFiles.map((file) => ({
         source: writeConfigFile(configDirectory, file.name, file.contents),
@@ -426,16 +492,35 @@ export async function startLangWatchQLClickHouse({
     container,
     applyAsAdmin,
     applyAccessModel,
+    async dropNamedCollection(collection) {
+      const known = await selectRows<{ name: string }>(
+        admin,
+        `SELECT name FROM system.settings WHERE name = '${NAMED_COLLECTION_DEPENDENCY_CHECK}'`,
+      );
+      await admin.command({
+        query: `DROP NAMED COLLECTION IF EXISTS ${collection}`,
+        ...(known.length > 0
+          ? { clickhouse_settings: { [NAMED_COLLECTION_DEPENDENCY_CHECK]: 0 } }
+          : {}),
+      });
+    },
     async restrictedClient(options) {
       const keyHash = options?.keyHash;
       const client = createClient({
         url: httpUrl,
         username: names.restrictedUser,
         password: RESTRICTED_PASSWORD,
-        ...(keyHash === undefined
-          ? {}
-          : { clickhouse_settings: { [names.tenantSetting]: keyHash } }),
+        // As the executor: the driver never prints a restricted statement's server text.
+        log: { level: ClickHouseLogLevel.OFF },
       });
+      if (keyHash !== undefined) {
+        carryCapability({
+          client,
+          setting: names.tenantSetting,
+          capability: keyHash,
+          projectIds: options?.projectIds ?? ["lwql-harness"],
+        });
+      }
       openedClients.push(client);
       await expectRestrictedIdentity({ client, names });
       return client;
@@ -1089,6 +1174,9 @@ export async function seedEveryCatalogSource({
             row[column.name] = tenant.tenantId;
           } else if (column.name === "_retention_days") {
             row[column.name] = 0;
+          } else if (column.name === view.dedup.signColumn) {
+            // A settled view keeps a key only while its signs sum above zero.
+            row[column.name] = 1;
           } else if (column.type.startsWith("DateTime")) {
             row[column.name] = now;
           } else if (sortKey.has(column.name) && SEEDABLE_KEY_TYPE.test(column.type)) {
@@ -1427,28 +1515,35 @@ export async function measureQuery({
 }): Promise<LangWatchQLQueryMeasurement> {
   const queryId = `lwql-measure-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   await selectRows(client, query, { query_id: queryId });
-  await harness.applyAsAdmin(["SYSTEM FLUSH LOGS"]);
 
-  const entries = await selectRows<{
-    read_rows: string;
-    read_bytes: string;
-    result_rows: string;
-    query_duration_ms: string;
-  }>(
-    harness.admin,
-    `SELECT read_rows, read_bytes, result_rows, query_duration_ms ` +
-      `FROM system.query_log WHERE query_id = '${queryId}' AND type = 'QueryFinish'`,
+  // The server queues QueryFinish after the last byte is sent, so one flush can race it.
+  const entry = await vi.waitFor(
+    async () => {
+      await harness.applyAsAdmin(["SYSTEM FLUSH LOGS"]);
+      const [found] = await selectRows<{
+        read_rows: string;
+        read_bytes: string;
+        result_rows: string;
+        query_duration_ms: string;
+      }>(
+        harness.admin,
+        `SELECT read_rows, read_bytes, result_rows, query_duration_ms ` +
+          `FROM system.query_log WHERE query_id = '${queryId}' AND type = 'QueryFinish'`,
+      );
+      if (!found) {
+        throw new Error(
+          "no query_log entry for the measured query — the numbers below would be invented",
+        );
+      }
+      return found;
+    },
+    { timeout: 10_000, interval: 200 },
   );
-  const entry = entries[0];
-  expect(
-    entry,
-    `no query_log entry for the measured query — the numbers below would be invented`,
-  ).toBeDefined();
   return {
-    rowsRead: Number(entry!.read_rows),
-    bytesRead: Number(entry!.read_bytes),
-    resultRows: Number(entry!.result_rows),
-    durationMs: Number(entry!.query_duration_ms),
+    rowsRead: Number(entry.read_rows),
+    bytesRead: Number(entry.read_bytes),
+    resultRows: Number(entry.result_rows),
+    durationMs: Number(entry.query_duration_ms),
   };
 }
 
@@ -2186,6 +2281,7 @@ export async function mapPostgresIntoClickHouse({
     ...postgresViews.engineTableStatements({
       names: harness.names,
       collection,
+      schema: PG_SCHEMA,
     }),
   ]);
   return lwqlTables;
@@ -2262,4 +2358,54 @@ export function expectPostgresError(
   expect(sqlState, `${context}: wrong rejection — "${result.stderr.trim()}"`).toBe(
     expectedSqlState,
   );
+}
+
+/** The values a named collection holds; the stand-in for the config store's file writes these. */
+export interface NamedCollectionFileValues {
+  host: string;
+  port: number;
+  database: string;
+  user: string;
+  password: string;
+}
+
+function namedCollectionFilePath(collection: string): string {
+  return `/etc/clickhouse-server/config.d/zz-${collection}.xml`;
+}
+
+/** The config store's stand-in: one named collection in a config.d file, loaded by a reload. */
+export async function writeNamedCollectionFile({
+  harness,
+  collection,
+  values,
+}: {
+  harness: LangWatchQLClickHouseHarness;
+  collection: string;
+  values: NamedCollectionFileValues;
+}): Promise<void> {
+  const escaped = (text: string) =>
+    text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+  const keys = Object.entries(values)
+    .map(([key, value]) => `<${key}>${escaped(String(value))}</${key}>`)
+    .join("");
+  await harness.container.copyContentToContainer([
+    {
+      content: `<clickhouse><named_collections><${collection}>${keys}</${collection}></named_collections></clickhouse>`,
+      target: namedCollectionFilePath(collection),
+      mode: 0o644,
+    },
+  ]);
+  await harness.admin.command({ query: "SYSTEM RELOAD CONFIG" });
+}
+
+/** Deletes the stand-in's file and reloads: 26.8 drops the collection even while tables use it. */
+export async function removeNamedCollectionFile({
+  harness,
+  collection,
+}: {
+  harness: LangWatchQLClickHouseHarness;
+  collection: string;
+}): Promise<void> {
+  await harness.container.exec(["rm", "-f", namedCollectionFilePath(collection)]);
+  await harness.admin.command({ query: "SYSTEM RELOAD CONFIG" });
 }

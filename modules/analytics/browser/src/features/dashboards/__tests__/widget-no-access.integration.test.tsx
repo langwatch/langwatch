@@ -25,17 +25,16 @@ vi.mock("../../dashboard-widget/ui/sections/sandboxed-chart-frame.tsx", () => ({
 
 import { StubAnalyticsHost } from "../../../testing.tsx";
 import type { SandboxedChartFrameProps } from "../../dashboard-widget/ui/sections/sandboxed-chart-frame.tsx";
-import type { BoardQueryContext } from "../model/board-period.ts";
+import type { BoardPeriod } from "../model/board-period.ts";
 import type { BoardWidget } from "../model/board-widgets.ts";
 import { BoardWidgetCard, type WidgetCardLangy } from "../ui/sections/board-widget-card.tsx";
 import { CuratedWidgetCard } from "../ui/sections/curated-widget-card.tsx";
 import { renderDashboards } from "./render-dashboards.test-helpers.tsx";
 
-const PERIOD: BoardQueryContext = {
+const PERIOD: BoardPeriod = {
   periodStart: 1_000,
   periodEnd: 2_000,
   granularitySeconds: 3600,
-  excludeOrigins: ["langy"],
 };
 const DEFINITION = {
   version: 1 as const,
@@ -114,6 +113,7 @@ function storedCard({
         dashboardId="board-1"
         boardName="Weekly review"
         period={PERIOD}
+        periodKey="30d:auto"
         isWriting={false}
         langy={langy}
         onEdit={vi.fn()}
@@ -188,11 +188,11 @@ describe("given a stored board's widget whose query reads cost", () => {
   });
 
   describe("when the server refuses it for the query's shape", () => {
-    it("fails the widget by name with Retry, and keeps every action", async () => {
+    it("fails the widget with Retry, and keeps every action", async () => {
       storedCard({ answer: refusedForShape });
       await frameRunsItsQuery();
 
-      expect(screen.getByText("Couldn't load Cost per trace")).toBeInTheDocument();
+      expect(screen.getByText("Couldn't load")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
       expect(
         screen.getByRole("button", { name: "Ask Langy about Cost per trace" }),
@@ -238,13 +238,14 @@ describe("given a From LangWatch board's widget whose query reads cost", () => {
               layout: { gridColumn: 0, gridRow: 0, colSpan: 4, rowSpan: 4 },
             }}
             frameId="costs-cost"
+            templateId="costs"
             boardName="Running costs"
             projectId="proj-1"
             projectSlug="test-project"
             rowSpan={4}
             timeWindow={{ start: 1_000, end: 2_000 }}
             granularitySeconds={3600}
-            excludeOrigins={PERIOD.excludeOrigins}
+            periodKey="30d:auto"
             onAskLangy={vi.fn()}
           />
         ),

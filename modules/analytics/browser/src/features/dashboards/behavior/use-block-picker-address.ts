@@ -8,6 +8,11 @@ import { useAnalyticsHost } from "../../../model/analytics-host.ts";
 export const WIDGET_PICKER_QUERY_KEY = "addBlock";
 const OPEN = "open";
 
+/** A board's address with "Add a widget" open on arrival. */
+export function withBlockPickerOpen(path: string): string {
+  return `${path}?${WIDGET_PICKER_QUERY_KEY}=${OPEN}`;
+}
+
 export function useBlockPickerAddress() {
   const host = useAnalyticsHost();
   const query = host.route().query;

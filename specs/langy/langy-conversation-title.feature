@@ -88,6 +88,13 @@ Feature: Langy conversation titles are derived, then generated once by a cheap m
     When the title is generated
     Then no title is produced and nothing is retried
 
+  @regression
+  Scenario: A title model this deployment cannot execute is not retried
+    Given the project's model for titles is a codex model this deployment cannot execute
+    When the title is generated
+    Then the placeholder title is kept
+    And nothing is raised, so the process outbox does not retry it
+
   @unit
   Scenario: A conversation with nothing to read is not retried
     Given a conversation whose transcript holds no text

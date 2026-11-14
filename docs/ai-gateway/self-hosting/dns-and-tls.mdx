@@ -82,7 +82,7 @@ kubectl -n ingress-nginx get svc ingress-nginx-controller \
   -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
 ```
 
-```
+```text
 Type:   CNAME
 Name:   gateway
 Target: <load balancer hostname>

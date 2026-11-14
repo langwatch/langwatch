@@ -37,7 +37,7 @@ export function IngestionKeysSection({
   if (keys.length === 0) return null;
 
   return (
-    <VStack gap={4} width="full" align="start">
+    <VStack gap={4} width="full" align="stretch">
       <VStack gap={1} align="start">
         <SectionTitle>Ingestion keys</SectionTitle>
         <Text textStyle="bodySm" color="fg.muted">

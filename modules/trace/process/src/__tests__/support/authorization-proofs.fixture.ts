@@ -1,5 +1,12 @@
 // Sealed proofs for tests that read ClickHouse through the authorized client (ADR-177 block C).
-import { type Authorization, sealAuthorization } from "@langwatch/authorization";
+import {
+  type Authorization,
+  BRAID_CONDITION_EVERY_SPAN,
+  type CompiledWhere,
+  honourSpanBraids,
+  sealAuthorization,
+  SPAN_BRAID_PERMISSION,
+} from "@langwatch/authorization";
 import {
   expandFragment,
   expandStatement,
@@ -62,6 +69,49 @@ export function aggregateProof({
     expiresAt: now + TEST_PROOF_LIFETIME_MS,
     purpose: { kind: "route", route: "test" },
   });
+}
+
+/**
+ * A reader's proof carrying braids (ADR-201): own on the reader, one `span` grant per braid,
+ * honoured as the Enterprise plan check honours it unless `honoured` is false.
+ */
+export function braidedProof({
+  projectId,
+  braids,
+  honoured = true,
+  now = Date.now(),
+}: {
+  projectId: string;
+  braids: { owner: string; compiledWhere?: CompiledWhere; from?: number; until?: number | null }[];
+  honoured?: boolean;
+  now?: number;
+}): Authorization {
+  const authorization = sealAuthorization({
+    actor: TEST_ACTOR,
+    principal: TEST_ACTOR,
+    scope: { organizationId: TEST_ORGANIZATION_ID },
+    grants: [
+      { projectId, permissions: [...TEST_PERMISSIONS], via: [], kind: "own" },
+      ...braids.map((braid, index) => ({
+        projectId: braid.owner,
+        permissions: [SPAN_BRAID_PERMISSION],
+        via: [`braid_${index}`],
+        kind: "shared" as const,
+        condition: {
+          type: "span" as const,
+          // A braid with no condition carries every span, stated, as the minter gives it.
+          ...(braid.compiledWhere === undefined
+            ? { compiledWhere: BRAID_CONDITION_EVERY_SPAN }
+            : { where: "compiled", compiledWhere: braid.compiledWhere }),
+          from: braid.from ?? 0,
+          until: braid.until ?? null,
+        },
+      })),
+    ],
+    expiresAt: now + TEST_PROOF_LIFETIME_MS,
+    purpose: { kind: "route", route: "test" },
+  });
+  return honoured ? honourSpanBraids({ authorization }) : authorization;
 }
 
 /** A statement with markers, expanded for one own project, for a test with a raw client. */

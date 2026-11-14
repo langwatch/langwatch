@@ -29,11 +29,16 @@ import {
   organizationMemberRoleChangedSchema,
   organizationUserRowsSchema,
   organizationWriteAckSchema,
+  organizationApiRemoveMemberInputSchema,
+  organizationHeldSeatsSchema,
+  organizationMemberRemovedSchema,
+  organizationSeatRemovalPreviewSchema,
 } from "./organization.responses.ts";
 import {
   organizationApiAuditLogsInputSchema,
   organizationApiGetAllInputSchema,
   organizationApiMemberScopeSchema,
+  organizationApiSaveDocsPlaygroundPolicyInputSchema,
   organizationApiScopeSchema,
   organizationApiSetMemberDisabledInputSchema,
   organizationApiUpdateInputSchema,
@@ -41,7 +46,7 @@ import {
   organizationApiUpdateTeamMemberRoleInputSchema,
   organizationApiWithMembersInputSchema,
 } from "./organization.trpc-schemas.ts";
-import { organizationIntentSchema } from "./organization.ts";
+import { docsPlaygroundPolicySchema, organizationIntentSchema } from "./organization.ts";
 import { organizationApiScopeGraphInputSchema, scopeGraphSchema } from "./scope-graph.ts";
 
 /** The first organization a person creates, and the name they gave it. */
@@ -91,9 +96,20 @@ export const organizationTrpc = defineTrpcContract("organization")
   .withInput(organizationApiCreateAndAssignInputSchema)
   .withOutput(organizationCreatedSchema)
 
+  /** Removes a member; may give their freed seat to a person waiting (seat-rotation.feature). */
   .mutation("deleteMember")
+  .withInput(organizationApiRemoveMemberInputSchema)
+  .withOutput(organizationMemberRemovedSchema)
+
+  /** What removing a member does to their seat, and who waits for it: the remove dialog. */
+  .query("getSeatRemovalPreview", { invalidatedBy: MEMBERSHIP_CHANGED })
   .withInput(organizationApiMemberScopeSchema)
-  .withOutput(organizationWriteAckSchema)
+  .withOutput(organizationSeatRemovalPreviewSchema)
+
+  /** The seats removed, disabled or demoted people still hold: the Users list's greyed rows. */
+  .query("listHeldSeats", { invalidatedBy: MEMBERSHIP_CHANGED })
+  .withInput(organizationApiScopeSchema)
+  .withOutput(organizationHeldSeatsSchema)
 
   /**
    * Disables or re-enables a membership so an organization can reconcile down
@@ -157,6 +173,15 @@ export const organizationTrpc = defineTrpcContract("organization")
   .mutation("updateMemberRole")
   .withInput(organizationApiUpdateMemberRoleInputSchema)
   .withOutput(organizationMemberRoleChangedSchema)
+
+  /** Whether members may connect the docs playground to their own access (ADR-185). */
+  .query("getDocsPlaygroundPolicy")
+  .withInput(organizationApiScopeSchema)
+  .withOutput(docsPlaygroundPolicySchema)
+
+  .mutation("saveDocsPlaygroundPolicy")
+  .withInput(organizationApiSaveDocsPlaygroundPolicyInputSchema)
+  .withOutput(organizationWriteAckSchema)
 
   .query("getAuditLogs")
   .withInput(organizationApiAuditLogsInputSchema)

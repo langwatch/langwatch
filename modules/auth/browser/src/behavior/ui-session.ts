@@ -26,6 +26,7 @@ import { useEffect, useLayoutEffect } from "react";
 import {
   keepAnsweredReaderOnFailedReread,
   readUiActor,
+  signOutUi,
   uiAuthClient,
   UI_SESSION_QUERY_KEY,
   type UiSessionReading as UiSessionResponse,
@@ -127,6 +128,11 @@ export class BrowserUiSession extends UiSession {
   override refresh(): Promise<void> {
     if (!this.state.refresh) return super.refresh();
     return this.state.refresh();
+  }
+
+  /** Auth owns sign-out, so every screen with the control asks this port for it. */
+  override signOut(): Promise<void> {
+    return signOutUi();
   }
 }
 
@@ -246,19 +252,23 @@ function readSession(query: UseQueryResult<UiSessionResponse>): UiSessionReading
 }
 
 /**
- * One grant read answers both, as on main: organization permissions follow it
- * (scope knot Q2). A project write on an aggregate is refused (ADR-177 decision 8).
+ * One grant read answers both: organization permissions also hold its organization set, so a
+ * member with no project grant keeps the organization floor. A project write on an aggregate is
+ * refused (ADR-177 decision 8).
  */
 function readPermissions(
   scope: UiActiveScopeReading,
   grantRead: UseQueryResult<UiEffectivePermissionsRead>,
 ): UiSessionSnapshot["permissions"] {
   const status = permissionStatus(scope.status, grantRead);
-  const grants = new Set(grantRead.isError ? [] : grantRead.data?.permissions);
+  const read = grantRead.isError ? undefined : grantRead.data;
+  const grants = new Set(read?.permissions);
+  const organizationGrants = new Set([...grants, ...(read?.organizationPermissions ?? [])]);
   const canInOrganization = (requested: string) =>
-    scope.status === "ready" && permissionSatisfiedBy({ granted: grants, requested });
+    scope.status === "ready" && permissionSatisfiedBy({ granted: organizationGrants, requested });
   const can = (requested: string) =>
-    canInOrganization(requested) &&
+    scope.status === "ready" &&
+    permissionSatisfiedBy({ granted: grants, requested }) &&
     !(
       isRegistryPermission(requested) &&
       refusedOnAggregate({ kind: scope.project?.kind, permission: requested })

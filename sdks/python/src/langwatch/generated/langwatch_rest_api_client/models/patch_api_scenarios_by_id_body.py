@@ -27,9 +27,9 @@ class PatchApiScenariosByIdBody:
             name, each with an optional description and default. A run supplies values for these names, readable from the
             scenario's own text as params.NAME. A parameter marked secret carries no default: its value is supplied per run,
             encrypted, delivered to the target as secrets.NAME, and never readable from the scenario's own text.
-        simulator_model (None | str | Unset): Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the
+        simulator_model (None | str | Unset): Model for the simulated user, e.g. openai/gpt-6-luna. Null uses the
             project default.
-        judge_model (None | str | Unset): Model for the judge, e.g. openai/gpt-5-mini. Null uses the project default.
+        judge_model (None | str | Unset): Model for the judge, e.g. openai/gpt-6-luna. Null uses the project default.
         max_turns (int | None | Unset): Maximum conversation turns for a run of this scenario. Null uses the default.
         min_turns (int | None | Unset): Minimum conversation turns before the judge may end the run. Null uses the
             default.

@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from ..models.post_api_v1_query_response_200_columns_item import PostApiV1QueryResponse200ColumnsItem
     from ..models.post_api_v1_query_response_200_completeness import PostApiV1QueryResponse200Completeness
     from ..models.post_api_v1_query_response_200_diagnostics_item import PostApiV1QueryResponse200DiagnosticsItem
+    from ..models.post_api_v1_query_response_200_params import PostApiV1QueryResponse200Params
     from ..models.post_api_v1_query_response_200_rows_item import PostApiV1QueryResponse200RowsItem
     from ..models.post_api_v1_query_response_200_statistics import PostApiV1QueryResponse200Statistics
 
@@ -31,6 +32,7 @@ class PostApiV1QueryResponse200:
         granularity_seconds (float | Unset):
         coarsened_from_seconds (float | Unset):
         completeness (PostApiV1QueryResponse200Completeness | Unset):
+        params (PostApiV1QueryResponse200Params | Unset):
     """
 
     columns: list[PostApiV1QueryResponse200ColumnsItem]
@@ -42,6 +44,7 @@ class PostApiV1QueryResponse200:
     granularity_seconds: float | Unset = UNSET
     coarsened_from_seconds: float | Unset = UNSET
     completeness: PostApiV1QueryResponse200Completeness | Unset = UNSET
+    params: PostApiV1QueryResponse200Params | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         columns = []
@@ -73,6 +76,10 @@ class PostApiV1QueryResponse200:
         if not isinstance(self.completeness, Unset):
             completeness = self.completeness.to_dict()
 
+        params: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.params, Unset):
+            params = self.params.to_dict()
+
         field_dict: dict[str, Any] = {}
 
         field_dict.update(
@@ -91,6 +98,8 @@ class PostApiV1QueryResponse200:
             field_dict["coarsenedFromSeconds"] = coarsened_from_seconds
         if completeness is not UNSET:
             field_dict["completeness"] = completeness
+        if params is not UNSET:
+            field_dict["params"] = params
 
         return field_dict
 
@@ -99,6 +108,7 @@ class PostApiV1QueryResponse200:
         from ..models.post_api_v1_query_response_200_columns_item import PostApiV1QueryResponse200ColumnsItem
         from ..models.post_api_v1_query_response_200_completeness import PostApiV1QueryResponse200Completeness
         from ..models.post_api_v1_query_response_200_diagnostics_item import PostApiV1QueryResponse200DiagnosticsItem
+        from ..models.post_api_v1_query_response_200_params import PostApiV1QueryResponse200Params
         from ..models.post_api_v1_query_response_200_rows_item import PostApiV1QueryResponse200RowsItem
         from ..models.post_api_v1_query_response_200_statistics import PostApiV1QueryResponse200Statistics
 
@@ -141,6 +151,13 @@ class PostApiV1QueryResponse200:
         else:
             completeness = PostApiV1QueryResponse200Completeness.from_dict(_completeness)
 
+        _params = d.pop("params", UNSET)
+        params: PostApiV1QueryResponse200Params | Unset
+        if isinstance(_params, Unset):
+            params = UNSET
+        else:
+            params = PostApiV1QueryResponse200Params.from_dict(_params)
+
         post_api_v1_query_response_200 = cls(
             columns=columns,
             rows=rows,
@@ -151,6 +168,7 @@ class PostApiV1QueryResponse200:
             granularity_seconds=granularity_seconds,
             coarsened_from_seconds=coarsened_from_seconds,
             completeness=completeness,
+            params=params,
         )
 
         return post_api_v1_query_response_200

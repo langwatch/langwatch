@@ -1,7 +1,7 @@
 /**
- * One board in the Dashboards sidebar: a star that toggles it, one truncated line linking to
- * it with its scope mark, and a "⋮" menu. A stored board offers Star and its order, then what
- * this reader may do with it; a From LangWatch board offers Star and Duplicate to edit.
+ * One board in the Dashboards sidebar: a pin that toggles it, one truncated line linking to
+ * it with its scope mark, and a "⋮" menu. A stored board offers Pin and its order, then what
+ * this reader may do with it; a From LangWatch board offers Pin and Duplicate to edit.
  */
 
 import type { DashboardScope } from "@langwatch/dashboard-contract";
@@ -19,9 +19,9 @@ import {
   Copy,
   MoreVertical,
   Pencil,
+  Pin,
+  PinOff,
   Sparkles,
-  Star,
-  StarOff,
   Trash2,
 } from "lucide-react";
 import type { ReactNode } from "react";
@@ -64,6 +64,7 @@ export function SavedDashboardRow({
   href,
   isActive,
   mark,
+  icon,
   actions,
 }: {
   name: string;
@@ -71,12 +72,14 @@ export function SavedDashboardRow({
   isActive: boolean;
   /** The scope mark after the name: a lock or a building, none on a Project board. */
   mark?: ReactNode;
+  /** Stands in for the pin button where the list is already the pinned ones. */
+  icon?: ReactNode;
   actions: SavedDashboardRowActions;
 }) {
   if (actions.isRenaming) return <RenameField name={name} actions={actions} />;
   const { scope, rename, duplicate, remove } = actions;
   return (
-    <SidebarRow name={name} href={href} isActive={isActive} star={actions} mark={mark}>
+    <SidebarRow name={name} href={href} isActive={isActive} star={actions} mark={mark} icon={icon}>
       <StarItems name={name} actions={actions} />
       {scope && (
         <>
@@ -139,8 +142,8 @@ function StarItems({ name, actions }: { name: string; actions: StarActions }) {
   return (
     <>
       <Menu.Item value="star" onClick={actions.onToggleStar}>
-        <MenuRow icon={actions.isStarred ? <StarOff size={13} /> : <Star size={13} />}>
-          {actions.isStarred ? "Unstar" : "Star"}
+        <MenuRow icon={actions.isStarred ? <PinOff size={13} /> : <Pin size={13} />}>
+          {actions.isStarred ? "Unpin" : "Pin"}
         </MenuRow>
       </Menu.Item>
       {actions.move && (
@@ -173,6 +176,7 @@ function SidebarRow({
   isActive,
   star,
   mark,
+  icon,
   children,
 }: {
   name: string;
@@ -180,6 +184,7 @@ function SidebarRow({
   isActive: boolean;
   star: StarActions;
   mark?: ReactNode;
+  icon?: ReactNode;
   /** The menu's items. */
   children: ReactNode;
 }) {
@@ -216,7 +221,7 @@ function SidebarRow({
         }}
       >
         <Box as="span" display="flex" flexShrink={0}>
-          <BoardStar isStarred={star.isStarred} onToggle={star.onToggleStar} size={14} />
+          {icon ?? <BoardStar isStarred={star.isStarred} onToggle={star.onToggleStar} size={14} />}
         </Box>
         <Text as="span" truncate minWidth={0}>
           {name}

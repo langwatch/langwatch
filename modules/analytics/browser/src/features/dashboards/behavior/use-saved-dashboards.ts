@@ -4,11 +4,19 @@
  * boards other projects own. Failures travel raw to the host (#5984).
  */
 
+import { useUiAnalytics } from "@langwatch/browser-host/analytics";
 import type { DashboardProject, DashboardScope } from "@langwatch/dashboard-contract";
+import { useRef, useState } from "react";
 
 import { analyticsApi } from "../../../behavior/analytics-api.ts";
 import { useAnalyticsHost } from "../../../model/analytics-host.ts";
 import { dashboardsPath, untitledBoardName } from "../model/boards.ts";
+import {
+  dashboardCreated,
+  dashboardDeleted,
+  dashboardEdited,
+} from "../model/dashboard-usage-events.ts";
+import { withBlockPickerOpen } from "./use-block-picker-address.ts";
 
 /** One stored board, as the list answers it. */
 export type SavedBoard = {
@@ -56,18 +64,27 @@ function savedBoardOf({
   };
 }
 
+/** How a new board starts: pinned for its maker, and with "Add a widget" open. */
+export type CreateBoardOptions = { pin?: boolean; addWidget?: boolean };
+
 export function useSavedDashboards() {
   const host = useAnalyticsHost();
+  const analytics = useUiAnalytics();
   const project = host.project();
   const projectId = project?.id ?? "";
   const projectSlug = project?.slug ?? "";
   const utils = analyticsApi.useUtils();
+  // A ref, not the mutation's pending flag: two clicks in one tick, or one landing between the
+  // create answering and the pin starting, would each see "idle" and make a second board.
+  const creating = useRef(false);
+  const [isMakingBoard, setIsMakingBoard] = useState(false);
 
   const list = analyticsApi.boards.getAll.useQuery(
     { projectId, includeOrganization: true },
     { enabled: !!projectId },
   );
   const create = analyticsApi.boards.create.useMutation();
+  const star = analyticsApi.boards.star.useMutation();
   const rename = analyticsApi.boards.update.useMutation();
   const remove = analyticsApi.boards.delete.useMutation();
 
@@ -80,15 +97,42 @@ export function useSavedDashboards() {
       utils.boards.listStarred.invalidate({ projectId }),
     ]);
 
-  const createBoard = () => {
+  /**
+   * Makes a blank board and opens it. `pin` stars it in this project for the maker; a failed
+   * pin still opens the board. `addWidget` opens it with "Add a widget" open.
+   */
+  const createBoard = ({ pin = false, addWidget = false }: CreateBoardOptions = {}) => {
+    if (creating.current) return;
+    creating.current = true;
+    setIsMakingBoard(true);
+    const settle = () => {
+      creating.current = false;
+      setIsMakingBoard(false);
+    };
     create.mutate(
       { projectId, name: untitledBoardName({ existingCount: boards.length }) },
       {
-        onSuccess: (created) => {
-          void refresh();
-          host.navigate(dashboardsPath({ projectSlug, dashboardId: created.id }));
+        onSuccess: async (created) => {
+          analytics.track(dashboardCreated({ createdFrom: "blank" }));
+          try {
+            if (pin) {
+              await star
+                .mutateAsync({ projectId, star: { kind: "board", dashboardId: created.id } })
+                .catch((error: unknown) =>
+                  host.failed({ error, fallbackTitle: "Couldn't pin the dashboard" }),
+                );
+            }
+            void refresh();
+            const path = dashboardsPath({ projectSlug, dashboardId: created.id });
+            host.navigate(addWidget ? withBlockPickerOpen(path) : path);
+          } finally {
+            settle();
+          }
         },
-        onError: (error) => host.failed({ error, fallbackTitle: "Couldn't create the dashboard" }),
+        onError: (error) => {
+          settle();
+          host.failed({ error, fallbackTitle: "Couldn't create the dashboard" });
+        },
       },
     );
   };
@@ -97,7 +141,10 @@ export function useSavedDashboards() {
     rename.mutate(
       { projectId, dashboardId, name },
       {
-        onSuccess: () => void refresh(),
+        onSuccess: () => {
+          analytics.track(dashboardEdited({ change: "rename" }));
+          void refresh();
+        },
         onError: (error) => host.failed({ error, fallbackTitle: "Couldn't rename the dashboard" }),
       },
     );
@@ -114,6 +161,7 @@ export function useSavedDashboards() {
       { projectId, dashboardId },
       {
         onSuccess: () => {
+          analytics.track(dashboardDeleted());
           void refresh();
           // The plan limit counts dashboards, so a delete frees an allowance.
           void utils.licenseEnforcement.checkLimit.invalidate();
@@ -133,7 +181,7 @@ export function useSavedDashboards() {
     /** True until the first list answer arrives, so a board lookup never reads "missing" early. */
     isLoading: list.data === void 0 && !list.isError,
     loadError: list.error,
-    isCreating: create.isPending,
+    isCreating: isMakingBoard || create.isPending || star.isPending,
     isDeleting: remove.isPending,
     createBoard,
     renameBoard,

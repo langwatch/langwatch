@@ -76,6 +76,11 @@ describe("consoleLinks", () => {
           href: "https://mail-room.feat-x.langwatch.localhost:1355",
           group: "Tools",
         },
+        {
+          label: "Docs",
+          href: "https://docs.feat-x.langwatch.localhost:1355",
+          group: "Tools",
+        },
       ]);
     });
 

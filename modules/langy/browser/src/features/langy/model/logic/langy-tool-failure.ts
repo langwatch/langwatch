@@ -13,6 +13,7 @@ import { explainHandledError } from "@langwatch/handled-error/presentation";
 import { parseCliJson } from "@langwatch/langy-contract";
 
 import { LIMIT_TYPE_LABELS } from "../../../../model/limit-type-labels.ts";
+import { cleanTerminalText, readShellFailure } from "./langy-terminal-output.ts";
 
 /** The plan allowance a failure ran into, in the customer's own words. */
 export interface LangyToolFailureLimit {
@@ -49,6 +50,8 @@ export interface LangyToolErrorPresentation {
   limit?: LangyToolFailureLimit;
   /** True when no retry and no different arguments will change the answer. */
   terminal?: boolean;
+  /** The HTTP status the platform answered with, when the failure was a handled one. */
+  httpStatus?: number;
   /** What the user can do about it, in the platform's own words. */
   tips?: string[];
   docsUrl?: string;
@@ -105,7 +108,7 @@ function rawFailureText(errorText: unknown): string | undefined {
   const value = asRecord(errorText);
   const text = readFailureText({ errorText, value });
   if (!text) return undefined;
-  const cleaned = text.replace(/\p{Cc}\[[0-9;]*m/gu, "").trim();
+  const cleaned = cleanTerminalText(text).trim();
   return cleaned.length > 0 ? cleaned : undefined;
 }
 
@@ -157,9 +160,37 @@ const ACCESS_DENIAL_CODES = new Set([
   "api_key_permission_denied",
   "api_key_not_owned",
   "api_key_scope_violation",
-  // The CLI's own status-derived codes, for a 401/403 that carried no body.
-  "unauthorized",
+  "permission_denied",
+  "project_permission_denied",
+  // From the governance CLI client; a body-less 403 becomes "unauthorized" in codeForStatus.
   "forbidden",
+]);
+
+/**
+ * The denial reasons that mean the reader's own access was removed or reduced since the key
+ * was minted.
+ */
+const ACCESS_REMOVED_REASONS = new Set(["owner-ceiling", "no-membership", "membership-disabled"]);
+
+/** The denial reasons that mean the reader's seat does not include this; a grant cannot lift it. */
+const SEAT_LIMIT_REASONS = new Set(["developer-restricted", "lite-member-restricted"]);
+
+/** owner-ceiling is also a role change: it speaks of one action, never the whole project. */
+function removedAccessMessage({ reason, needed }: { reason: string; needed: string | undefined }) {
+  if (reason !== "owner-ceiling") return "You no longer have access to this project.";
+  if (needed) return `You can no longer ${needed} in this project.`;
+  return "This action isn't available to you any more in this project.";
+}
+
+/**
+ * The codes that mean a CLI credential was missing or refused. In the sandbox that is
+ * Langy's own key: an internal failure, never the reader's to sign in to.
+ */
+const CREDENTIAL_CODES = new Set([
+  "missing_api_key",
+  "unauthorized",
+  // The CLI's local "Not logged in" check, which never reaches the server.
+  "not_authenticated",
 ]);
 
 /**
@@ -167,11 +198,62 @@ const ACCESS_DENIAL_CODES = new Set([
  */
 const PLAN_LIMIT_CODES = new Set(["resource_limit_exceeded"]);
 
-const normalizedCode = (domain: LangWatchHandledErrorShape): string =>
-  domain.code.trim().toLowerCase();
+const normalizeCode = (code: string): string => code.trim().toLowerCase();
 
 const isAccessDenial = (domain: LangWatchHandledErrorShape): boolean =>
-  ACCESS_DENIAL_CODES.has(normalizedCode(domain));
+  ACCESS_DENIAL_CODES.has(normalizeCode(domain.code));
+
+/** The code of the failure that says the LangWatch GitHub App is not installed. */
+const GITHUB_NOT_CONNECTED_CODE = "langy_github_not_connected";
+
+/** Statuses only the person can fix: they lack access, or are not signed in. */
+const ACCESS_STATUSES = new Set([401, 403]);
+
+/**
+ * Tools that run in the folder the developer shared from their own machine
+ * (ADR-129), with their own git identity and their own `gh` login. The same
+ * carve-out the manager's GitHub gate makes.
+ */
+const LOCAL_TOOL_PREFIX = "local_";
+
+/**
+ * Whose CLI credential a failure is: "sandbox" is Langy's own key (ours to fix), "local"
+ * is the reader's own login on their machine. `null` when it is no credential failure.
+ */
+const credentialFault = ({
+  code,
+  toolName,
+}: {
+  code: string | undefined;
+  toolName: string | undefined;
+}): "sandbox" | "local" | null => {
+  if (code === undefined) return null;
+  const known = CREDENTIAL_CODES.has(normalizeCode(code));
+  if (!known) return null;
+  return toolName?.startsWith(LOCAL_TOOL_PREFIX) ? "local" : "sandbox";
+};
+
+/**
+ * Whether the reader has to act, so the failure keeps its card. A credential failure
+ * keeps it on a local tool and folds in the sandbox; an access-denial code, a terminal
+ * github-not-connected, 401 or 403 keep it. A terminal not-found folds.
+ */
+export const readerMustAct = ({
+  presentation,
+  toolName,
+}: {
+  presentation: LangyToolErrorPresentation;
+  toolName: string | undefined;
+}): boolean => {
+  const { code, httpStatus, terminal } = presentation;
+  const fault = credentialFault({ code, toolName });
+  if (fault !== null) return fault === "local";
+  const normalised = code === undefined ? undefined : normalizeCode(code);
+  if (normalised !== undefined && ACCESS_DENIAL_CODES.has(normalised)) return true;
+  if (!terminal) return false;
+  if (normalised === GITHUB_NOT_CONNECTED_CODE) return true;
+  return httpStatus !== undefined && ACCESS_STATUSES.has(httpStatus);
+};
 
 const asCount = (value: unknown): number | undefined =>
   typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : undefined;
@@ -186,7 +268,7 @@ function limitLabel(limitType: unknown): string | undefined {
 
 /** The plan allowance behind a failure, or null when it was not one. */
 function readPlanLimit(domain: LangWatchHandledErrorShape): LangyToolFailureLimit | null {
-  const code = normalizedCode(domain);
+  const code = normalizeCode(domain.code);
   if (!PLAN_LIMIT_CODES.has(code)) return null;
   const label = limitLabel(domain.meta.limitType);
   if (!label) return null;
@@ -214,7 +296,13 @@ function limitSentence(limit: LangyToolFailureLimit): string {
 /**
  * What to SAY about a failure.
  */
-function describeFailure(domain: LangWatchHandledErrorShape): {
+function describeFailure({
+  domain,
+  toolName,
+}: {
+  domain: LangWatchHandledErrorShape;
+  toolName: string | undefined;
+}): {
   message: string;
   detail?: string;
   limit?: LangyToolFailureLimit;
@@ -229,9 +317,35 @@ function describeFailure(domain: LangWatchHandledErrorShape): {
     return { message: limitSentence(limit), limit, remediationApplies: false };
   }
 
+  // The CLI's own text and tips say "run langwatch login": true on a laptop
+  // (a local tool), a dead end in a sandbox the reader cannot open.
+  if (credentialFault({ code: domain.code, toolName }) === "sandbox") {
+    return {
+      message: "Langy hit an internal error and couldn't complete this step.",
+      detail: "This is on our side, not your access. There is nothing for you to set up.",
+      remediationApplies: false,
+    };
+  }
+
   if (isAccessDenial(domain)) {
-    // ONE sentence for the fact, one for what to do.
     const needed = humanPermission(domain.meta.permission);
+    const reason = domain.meta.denialReason;
+    if (typeof reason === "string" && ACCESS_REMOVED_REASONS.has(reason)) {
+      return {
+        message: removedAccessMessage({ reason, needed }),
+        detail: "Ask whoever manages access for your team if you need it back.",
+        remediationApplies: false,
+      };
+    }
+    // The server's sentence already names the seat, so it stays; a grant cannot lift a seat limit.
+    if (typeof reason === "string" && SEAT_LIMIT_REASONS.has(reason)) {
+      return {
+        message: domain.message,
+        detail: "Ask whoever manages seats for your team if you need it.",
+        remediationApplies: false,
+      };
+    }
+    // ONE sentence for the fact, one for what to do.
     return {
       message: needed
         ? `You can't ${needed} in this project.`
@@ -250,13 +364,6 @@ function describeFailure(domain: LangWatchHandledErrorShape): {
 }
 
 /**
- * Tools that run in the folder the developer shared from their own machine
- * (ADR-129), with their own git identity and their own `gh` login. The same
- * carve-out the manager's GitHub gate makes.
- */
-const LOCAL_TOOL_PREFIX = "local_";
-
-/**
  * Rewrites `gh`'s "please run: gh auth login" from the sandbox — telling the customer to log
  * into a machine they cannot open — into the real fix: install the LangWatch GitHub App. Local
  * tools are left alone, since gh's own instruction is correct on the developer's own machine.
@@ -273,7 +380,7 @@ function githubAppNotInstalled({
   if (!/\bgh auth login\b/i.test(raw)) return null;
 
   const copy = explainHandledError({
-    code: "langy_github_not_connected",
+    code: GITHUB_NOT_CONNECTED_CODE,
     meta: {},
     httpStatus: 409,
     fault: "customer",
@@ -288,7 +395,7 @@ function githubAppNotInstalled({
     title: copy.title,
     message: copy.description,
     tips: ["Install it from Settings, under Integrations."],
-    code: "langy_github_not_connected",
+    code: GITHUB_NOT_CONNECTED_CODE,
     terminal: true,
     raw,
   };
@@ -315,12 +422,43 @@ function buildNoDomainPresentation(
   };
 }
 
+/**
+ * A shell command on the developer's own machine that exited non-zero. Keyed on the text,
+ * which only the worker's local shell path writes: a folder-bound `bash` arrives named
+ * `bash`. The reader wrote that code, so its last error line, an exception too, is theirs.
+ */
+function buildShellPresentation({
+  title,
+  raw,
+}: {
+  title: string;
+  raw: string | undefined;
+}): LangyToolErrorPresentation | null {
+  const failure = raw ? readShellFailure(raw) : null;
+  if (!failure) return null;
+  return {
+    title: `${title} failed`,
+    message:
+      failure.exitCode === null
+        ? "The command stopped without an exit code."
+        : `The command stopped with exit code ${failure.exitCode}.`,
+    ...(failure.lastErrorLine ? { detail: failure.lastErrorLine } : {}),
+    raw,
+  };
+}
+
 /** Levels 1 and 2: a domain error document, structured into card copy. */
-function buildDomainPresentation(
-  title: string,
-  domain: LangWatchHandledErrorShape,
-  raw: string | undefined,
-): LangyToolErrorPresentation {
+function buildDomainPresentation({
+  title,
+  domain,
+  raw,
+  toolName,
+}: {
+  title: string;
+  domain: LangWatchHandledErrorShape;
+  raw: string | undefined;
+  toolName: string | undefined;
+}): LangyToolErrorPresentation {
   // New-CLI documents carry the trace links top-level on the error; documents
   // written by an older CLI keep them nested under `meta.trace` (the shared
   // REST handler's wire shape). Prefer the top-level fields, fall back to the
@@ -331,7 +469,7 @@ function buildDomainPresentation(
   const traceUrl = safeHttpUrl(domain.traceUrl) ?? safeHttpUrl(trace?.traceUrl);
   const logsUrl = safeHttpUrl(domain.logsUrl) ?? safeHttpUrl(trace?.logsUrl);
   const docsUrl = safeHttpUrl(domain.docUrl);
-  const { message, detail, limit, remediationApplies } = describeFailure(domain);
+  const { message, detail, limit, remediationApplies } = describeFailure({ domain, toolName });
 
   return {
     title: `${title} failed`,
@@ -340,6 +478,7 @@ function buildDomainPresentation(
     // Levels 1 and 2 alike. A code we have copy for still names itself, so the
     // reader can quote it; a code we do not is the only handle anyone has.
     code: domain.code,
+    ...(domain.httpStatus ? { httpStatus: domain.httpStatus } : {}),
     ...(limit ? { limit } : {}),
     ...(isTerminalFailure(domain) ? { terminal: true } : {}),
     // The platform's own next steps (ADR-045's remediation channel), shown as written —
@@ -367,8 +506,9 @@ export function presentLangyToolError({
   title: string;
   errorText: unknown;
   /**
-   * The tool that failed. Only used to tell the sandbox's `gh` apart from the
-   * developer's own — see {@link githubAppNotInstalled}.
+   * The tool that failed. Tells the sandbox's `gh` apart from the developer's
+   * own (see {@link githubAppNotInstalled}), and a `local_*` tool keeps the
+   * CLI's own credential words instead of the sandbox copy.
    */
   toolName?: string;
 }): LangyToolErrorPresentation {
@@ -378,9 +518,11 @@ export function presentLangyToolError({
 
   const notInstalled = githubAppNotInstalled({ toolName, raw });
   if (notInstalled) return notInstalled;
+  const shell = domain ? null : buildShellPresentation({ title, raw });
+  if (shell) return shell;
 
   return domain
-    ? buildDomainPresentation(title, domain, raw)
+    ? buildDomainPresentation({ title, domain, raw, toolName })
     : buildNoDomainPresentation(title, raw);
 }
 
@@ -393,7 +535,8 @@ const TRACEBACK_SIGNALS = [
   /^\s*Traceback \(most recent call last\)/m,
   /^\s*File "[^"]+", line \d+/m,
   /^\s*at [\w$.<>[\] ]+ \(?[^\s]+:\d+:\d+\)?$/m,
-  /^[A-Za-z_][\w.]*(?:Error|Exception|Warning)\s*:/m,
+  // Warnings are not here: uv and Python print them on runs that went fine.
+  /^[A-Za-z_][\w.]*(?:Error|Exception)\s*:/m,
 ];
 
 /** Whether raw failure text is a stack trace rather than a sentence. */

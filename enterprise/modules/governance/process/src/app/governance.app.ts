@@ -27,7 +27,10 @@ import { AuthApi, type BrowserSessionInventoryEntry } from "@langwatch/auth-cont
  * That is what lets one operation serve a browser session, an API key and the
  * CLI without knowing which it is serving.
  */
-import { type AuthzPermission, PermissionDeniedError } from "@langwatch/authorization";
+import {
+  type AuthzPermission,
+  ImpersonationCannotMintCredentialError,
+} from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contract";
@@ -134,6 +137,13 @@ import {
   type IdentityMatchRun,
   type OrganizationSessionPolicyShape,
   type GovernanceAgentRow,
+  type AgentRegistryEntry,
+  type AgentRegistryEventPage,
+  type AgentRegistryPage,
+  type AgentRegistryStatus,
+  type ArdManifest,
+  type ArdSearchRequest,
+  type ArdSearchResponse,
   type GovernanceCostDayRecords,
   type GovernanceCostModelBreakdown,
   type GovernanceCostPeriodRecordsInput,
@@ -289,6 +299,16 @@ import { PersonalIngestionKeyService } from "../features/personal/services/perso
 import { PersonalUsageDashboardService } from "../features/personal/services/personal-usage-dashboard.service.ts";
 import { PersonalUsageKeyService } from "../features/personal/services/personal-usage-key.service.ts";
 import { DefaultGovernancePersonalUsageService } from "../features/personal/services/personal-usage.service.ts";
+import {
+  OutboxAgentRegistryDelivery,
+  requestAgentRegistryDelivery,
+} from "../features/registry/eventing/agent-registry-delivery.intent.ts";
+import type { AgentRegistryDeliveryIntent } from "../features/registry/eventing/agent-registry-delivery.process.ts";
+import { AgentRegistryReadsService } from "../features/registry/services/agent-registry-reads.service.ts";
+import {
+  AgentRegistryService,
+  type AgentRegistryTrafficPass,
+} from "../features/registry/services/agent-registry.service.ts";
 import type { GovernanceRepositories } from "../repositories/governance.repositories.ts";
 import { governanceOperatorReads } from "../repositories/prisma/prisma.suppression-snapshot.repository.ts";
 import { anomalyRuleConfigComplaint } from "../rules/anomaly-rule-config-error.rules.ts";
@@ -323,7 +343,7 @@ type EventingSenders = Readonly<Record<string, EventingCommandSender<unknown>>>;
 /** The peers this application reads, resolved from {@link GovernanceModule.dependencies}. */
 interface GovernanceAppDependencies {
   /** Anomaly alerts to a rule's registered endpoints, and the endpoints W-11's step creates. */
-  webhooks: Pick<WebhookApi, "requestDelivery" | "create" | "archive">;
+  webhooks: Pick<WebhookApi, "requestDelivery" | "create" | "archive" | "getAll">;
   /**
    * The organization a project belongs to, for the project-scoped REST family,
    * and the organization's hidden governance project, which is the tenant an
@@ -351,9 +371,10 @@ interface GovernanceAppDependencies {
     | "findLiveAggregateIds"
     | "findPersonalProjectIds"
     | "findReadableProjectIds"
+    | "listNamesByIds"
   >;
   /** Agent owns the Agent table: the organization's connected agents, read by project. */
-  agents: Pick<AgentApi, "findConnectedInProjects">;
+  agents: Pick<AgentApi, "findConnectedInProjects" | "list" | "platformUrl">;
   /** The release flag that decides whether an organization's pulled usage carries a cost. */
   featureFlags: Pick<FeatureFlagApi, "isEnabled">;
   /** Where a pulled Genie/Copilot conversation lands as a trace: the OTLP door main routed through. */
@@ -366,6 +387,7 @@ interface GovernanceAppDependencies {
     | "findModelSpend"
     | "hasTraceWithAttribute"
     | "findTraceCountsByAttribute"
+    | "findAgentsSeen"
     | "compileLangWatchQLTraceFilter"
     | "listTraceSummaries"
     | keyof ActivityMonitorTraces
@@ -681,6 +703,28 @@ export class GovernanceModule implements GovernanceRestApi {
       organizations: dependencies.organizations,
       discoveredAgents: repositories.discoveredAgents,
     });
+    this.agentRegistry = AgentRegistryService.create({
+      registry: repositories.agentRegistry,
+      discoveredAgents: repositories.discoveredAgents,
+      agents: dependencies.agents,
+      projects: dependencies.projects,
+      organizations: dependencies.organizations,
+      traces: dependencies.traces,
+      webhooks: dependencies.webhooks,
+      entitlements: {
+        hasEnterprisePlan: async (organizationId) =>
+          isEnterpriseTier(
+            (await dependencies.entitlements.getActivePlan({ organizationId })).type,
+          ),
+      },
+      outbox: () => this.#agentRegistryOutbox,
+      publicBaseUrl: publicBaseUrl ?? "",
+    });
+    this.agentRegistryReads = AgentRegistryReadsService.create({
+      registry: repositories.agentRegistry,
+      publicBaseUrl: publicBaseUrl ?? "",
+      now: nowInstant,
+    });
     this.costSummary = GovernanceCostSummaryService.create({
       costRollup: repositories.costRollup,
       projects: dependencies.projects,
@@ -829,6 +873,7 @@ export class GovernanceModule implements GovernanceRestApi {
       secrets: ingestionSecrets,
       destinations: PullDestinationService.create({
         configuredBase: vendorBases.databricksWorkspace,
+        dataverseEnvironmentBase: vendorBases.dataverseEnvironment,
       }),
       providerAccounts: HttpProviderAccountChannel.create({ vendorBases }),
       diagnostics: { warn: (message, context) => logger.warn(context, message) },
@@ -858,6 +903,7 @@ export class GovernanceModule implements GovernanceRestApi {
       signIn,
       genieSpaces: channels.genieSpaces.create({ http }),
       copilotBots: channels.copilotBots.create({ http, vendorBases }),
+      registry: this.agentRegistry,
     });
     this.personListing = PersonListingService.create({
       sourceCredentials,
@@ -979,6 +1025,9 @@ export class GovernanceModule implements GovernanceRestApi {
   readonly anomalyWebhookMigration: AnomalyWebhookDestinationMigrationService;
   private readonly people: GovernancePeopleScreenService;
   private readonly agentsScreen: GovernanceAgentsScreenService;
+  /** The organisation's agent registry, its ARD view and change feed (specs/agent-registry.feature). */
+  readonly agentRegistry: AgentRegistryService;
+  private readonly agentRegistryReads: AgentRegistryReadsService;
   private readonly costBreakdown: GovernanceCostBreakdownService;
   private readonly costSummary: GovernanceCostSummaryService;
   private readonly aiTools: DefaultGovernanceAiToolCatalogService;
@@ -1077,6 +1126,24 @@ export class GovernanceModule implements GovernanceRestApi {
   }
 
   #anomalyAlertOutbox: OutboxAnomalyAlertDelivery | undefined;
+  #agentRegistryOutbox: OutboxAgentRegistryDelivery | undefined;
+
+  /** A built pipeline means an outbox: registry change events fan out through it from here on. */
+  connectAgentRegistryOutbox({
+    processStore,
+  }: {
+    processStore: Pick<ProcessStore, "appendIntents">;
+  }): void {
+    this.#agentRegistryOutbox = OutboxAgentRegistryDelivery.create(processStore);
+  }
+
+  /** The registry delivery intent's handler: one WebhookApi.requestDelivery per intent. */
+  requestAgentRegistryDelivery(
+    intent: AgentRegistryDeliveryIntent,
+    context: IntentContext,
+  ): Promise<void> {
+    return requestAgentRegistryDelivery(this.dependencies.webhooks)(intent, context);
+  }
 
   /** A built pipeline means an outbox: endpoint deliveries are recorded in it from here on. */
   connectAnomalyAlertOutbox({
@@ -1534,11 +1601,7 @@ export class GovernanceModule implements GovernanceRestApi {
     const { impersonatorId, ...rotate } = input;
     // An operator acting as a member holds no grant to issue credentials as them (F05).
     if (impersonatorId) {
-      throw new PermissionDeniedError({
-        permission: "ingestionSources:manage",
-        scope: { type: "organization", id: rotate.organizationId },
-        denialReason: "no-grant",
-      });
+      throw new ImpersonationCannotMintCredentialError();
     }
     const rotated = await this.ingestionSources.rotateSecret(rotate);
     return {
@@ -1627,7 +1690,7 @@ export class GovernanceModule implements GovernanceRestApi {
     input: PersonalIngestionKeyMint & { impersonatorId?: string | undefined },
   ): Promise<IssuedIngestionKey> {
     const { impersonatorId, ...mint } = input;
-    refuseImpersonatedKeyMint({ impersonatorId, organizationId: mint.organizationId });
+    refuseImpersonatedKeyMint({ impersonatorId });
     return this.ingestionKeys.install(mint);
   }
 
@@ -1635,7 +1698,7 @@ export class GovernanceModule implements GovernanceRestApi {
     input: PersonalIngestionKeyMint & { impersonatorId?: string | undefined },
   ): Promise<RotatedIngestionKey> {
     const { impersonatorId, ...mint } = input;
-    refuseImpersonatedKeyMint({ impersonatorId, organizationId: mint.organizationId });
+    refuseImpersonatedKeyMint({ impersonatorId });
     return this.ingestionKeys.rotate(mint);
   }
 
@@ -1673,6 +1736,65 @@ export class GovernanceModule implements GovernanceRestApi {
   }): Promise<AgentListingRequestResult> {
     this.agentListingSender();
     return this.agentSync.requestListing(input);
+  }
+
+  /** An agent's lifecycle fact: its project's organisation is reconciled (worker only). */
+  async reconcileAgentRegistryForProject({ projectId }: { projectId: string }): Promise<void> {
+    const organizationId = await this.dependencies.projects.getOrganizationId(projectId);
+    await this.agentRegistry.reconcileOrganization({ organizationId });
+  }
+
+  /** The scheduled traffic pass: the organisations the registry holds, or a walk over every one. */
+  reconcileAgentRegistryTraffic(
+    input: AgentRegistryTrafficPass = {},
+  ): Promise<{ organizations: number; complete: boolean }> {
+    return this.agentRegistry.reconcileTraffic(input);
+  }
+
+  listRegistryAgents(input: {
+    organizationId: string;
+    limit: number;
+    cursor?: string;
+    updatedSince?: string;
+    status?: AgentRegistryStatus;
+  }): Promise<AgentRegistryPage> {
+    return this.agentRegistryReads.listEntries(input);
+  }
+
+  getRegistryAgent(input: { organizationId: string; id: string }): Promise<AgentRegistryEntry> {
+    return this.agentRegistryReads.getEntry(input);
+  }
+
+  listRegistryAgentVersions(input: {
+    organizationId: string;
+    id: string;
+    cursor?: string;
+    limit: number;
+  }): Promise<AgentRegistryEventPage> {
+    return this.agentRegistryReads.listVersions(input);
+  }
+
+  listRegistryEvents(input: {
+    organizationId: string;
+    after?: string;
+    limit: number;
+  }): Promise<AgentRegistryEventPage> {
+    return this.agentRegistryReads.listEvents({
+      organizationId: input.organizationId,
+      limit: input.limit,
+      ...(input.after ? { cursor: input.after } : {}),
+    });
+  }
+
+  getRegistryArdManifest(input: { organizationId: string }): Promise<ArdManifest> {
+    return this.agentRegistryReads.ardManifest(input);
+  }
+
+  searchRegistryArd(input: {
+    organizationId: string;
+    request: ArdSearchRequest;
+  }): Promise<ArdSearchResponse> {
+    return this.agentRegistryReads.ardSearch(input);
   }
 
   governanceAgentsList(input: { organizationId: string }): Promise<GovernanceAgentRow[]> {
@@ -2271,16 +2393,9 @@ export class GovernanceModule implements GovernanceRestApi {
  * instead, and it has to be one string, decided once.
  */
 /** An operator acting as a member holds no grant to issue a key as them (F05). */
-function refuseImpersonatedKeyMint(input: {
-  impersonatorId: string | undefined;
-  organizationId: string;
-}): void {
+function refuseImpersonatedKeyMint(input: { impersonatorId: string | undefined }): void {
   if (!input.impersonatorId) return;
-  throw new PermissionDeniedError({
-    permission: "organization:view",
-    scope: { type: "organization", id: input.organizationId },
-    denialReason: "no-grant",
-  });
+  throw new ImpersonationCannotMintCredentialError();
 }
 
 function attributedUserId(by: GovernanceProjectCaller): string {

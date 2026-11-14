@@ -10,6 +10,10 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  ADMIT_EVERY_PLACEMENT,
+  TEST_RUN_TELEMETRY,
+} from "../../app/__tests__/analytics.fixture.ts";
+import {
   catalogueWithout,
   EVERY_CATALOGUE_PERMISSION,
 } from "../../services/__tests__/lwql-catalogue-access.fixture.ts";
@@ -17,7 +21,12 @@ import { LangWatchQLValidationReportService } from "../../services/langwatch-ql-
 import { LangWatchQLService } from "../../services/langwatch-ql.service.ts";
 import { analyticsLwqlTrpcTransport, type AnalyticsLwqlApi } from "../analytics-lwql.trpc.ts";
 
-const lwql = LangWatchQLService.create({ executor: null, database: "analytics" });
+const lwql = LangWatchQLService.create({
+  runTelemetry: TEST_RUN_TELEMETRY,
+  placement: ADMIT_EVERY_PLACEMENT,
+  executor: null,
+  database: "analytics",
+});
 
 type Handler = (args: {
   input: unknown;

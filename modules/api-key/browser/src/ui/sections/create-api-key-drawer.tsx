@@ -1,14 +1,15 @@
 /**
- * "Create new secret key": decides what a key will be able to do. Every
- * level offered is bounded by what the caller holds at the selected
- * scope — the mint refuses (`api_key_scope_violation`) rather than dropping one.
+ * "Create new secret key": key type, name, scope and expiry up front; the rest under Advanced.
+ * Every level offered is bounded by what the caller holds at the selected scope — the
+ * mint refuses (`api_key_scope_violation`) rather than dropping one.
  */
 
 import { computePermissionsFromSelections } from "@langwatch/api-key-contract";
-import type { ApiKeyRole, ApiKeyTrpcGrant } from "@langwatch/api-key-contract";
+import type { ApiKeyRole } from "@langwatch/api-key-contract";
 import { Banner, BannerAction } from "@langwatch/design-system/banner";
 import { Drawer } from "@langwatch/design-system/drawer";
 import {
+  Accordion,
   Box,
   createListCollection,
   HStack,
@@ -21,24 +22,22 @@ import { ScopeChipPicker, type ScopeTriadEntry } from "@langwatch/design-system/
 import { RawSegmentGroup as SegmentGroup } from "@langwatch/design-system/segmented-control";
 import { Select } from "@langwatch/design-system/select";
 import { SettingsField } from "@langwatch/design-system/settings-field";
-import type { Instant } from "@langwatch/time";
-import { TriangleAlert } from "lucide-react";
-import { type RefObject, useEffect, useMemo, useRef, useState } from "react";
+import { SmallLabel } from "@langwatch/design-system/small-label";
+import { ChevronDown, TriangleAlert } from "lucide-react";
+import { type ReactNode, type RefObject, useEffect, useMemo, useRef, useState } from "react";
 
 import { apiKeyApi } from "../../behavior/api-key-api.ts";
+import { useGrantablePermissions } from "../../behavior/use-grantable-permissions.ts";
 import {
   earliestCustomExpiration,
+  EXPIRATION_NEVER,
   EXPIRATION_OPTIONS,
-  EXPIRATION_UNCHOSEN,
+  type CreateApiKeyInput,
   isExpirationChosen,
   resolveExpiresAt,
 } from "../../model/api-key-form.ts";
 import { useApiKeyHost } from "../../model/api-key-host.ts";
-import {
-  deriveBindingRole,
-  getUserPermissionsAtScope,
-  type PermissionMode,
-} from "../../model/api-key-permissions.ts";
+import { deriveBindingRole, type PermissionMode } from "../../model/api-key-permissions.ts";
 import {
   PermissionCategoryList,
   PermissionCounter,
@@ -54,19 +53,6 @@ type MyBindings = {
 
 type OrgProject = { id: string; name: string; teamId: string };
 type OrgTeam = { id: string; name: string };
-
-export type CreateApiKeyInput = {
-  name: string;
-  description: string;
-  expiresAt: Instant | undefined;
-  permissionMode: PermissionMode;
-  keyType: "personal" | "service";
-  assignedToUserId?: string;
-  scopeType: string;
-  scopeId: string;
-  permissions?: string[];
-  bindings: ApiKeyTrpcGrant[];
-};
 
 type CreateKeyForm = {
   name: string;
@@ -143,6 +129,11 @@ const ACCESS_NOTE_ID = "api-key-access-note";
 
 type KeyField = "name" | "scope" | "permissions" | "expiration";
 
+/** The fields that sit under Advanced: a gap in one opens it before focus moves there. */
+const ADVANCED_FIELDS: readonly KeyField[] = ["permissions"];
+
+const ADVANCED_SECTION = "advanced";
+
 /** The unmet requirements, in the order the form shows them. */
 function missingFields(input: {
   name: string;
@@ -153,8 +144,8 @@ function missingFields(input: {
   const missing: KeyField[] = [];
   if (!input.name.trim()) missing.push("name");
   if (!input.hasScope) missing.push("scope");
-  if (!input.hasAnySelection) missing.push("permissions");
   if (!input.expirationChosen) missing.push("expiration");
+  if (!input.hasAnySelection) missing.push("permissions");
   return missing;
 }
 
@@ -174,7 +165,11 @@ function focusKeyField({
   fallback: RefObject<HTMLElement | null>;
 }) {
   const target = targets[field].current ?? fallback.current;
-  if (field === "name") target?.focus();
+  if (field === "name") return target?.focus();
+  // A missing expiry means Custom with no date: the date input, not the select trigger.
+  const dateInput =
+    field === "expiration" ? target?.querySelector<HTMLElement>("input[type='date']") : null;
+  if (dateInput) dateInput.focus();
   else focusWithin(target);
 }
 
@@ -239,7 +234,7 @@ function ExpirationHint({ chosen, attempted }: { chosen: boolean; attempted: boo
       color={attempted ? "fg.error" : "fg.muted"}
       data-testid="api-key-expiration-hint"
     >
-      Choose when this key expires, or select No expiration.
+      Pick a date, or select No expiration.
     </Text>
   );
 }
@@ -377,6 +372,161 @@ function PermissionsField({
   );
 }
 
+function scopeName({
+  scope,
+  orgProjects,
+  orgTeams,
+  organizationName,
+}: {
+  scope: ScopeTriadEntry;
+  orgProjects: OrgProject[];
+  orgTeams: OrgTeam[];
+  organizationName: string | undefined;
+}): string | undefined {
+  if (scope.scopeType === "PROJECT") return orgProjects.find((p) => p.id === scope.scopeId)?.name;
+  if (scope.scopeType === "TEAM") return orgTeams.find((t) => t.id === scope.scopeId)?.name;
+  return organizationName;
+}
+
+/**
+ * Moves focus to a field with a gap, a frame after the request: Advanced unhides its content in
+ * its own render, and a hidden field cannot take focus. A fresh request object per submit lets a
+ * second submit with the same gap refocus it.
+ */
+function useGapFocus() {
+  const [request, setRequest] = useState<{ field: KeyField } | null>(null);
+  const refs = {
+    name: useRef<HTMLInputElement>(null),
+    scope: useRef<HTMLDivElement>(null),
+    permissions: useRef<HTMLDivElement>(null),
+    expiration: useRef<HTMLDivElement>(null),
+    permissionsField: useRef<HTMLDivElement>(null),
+  };
+  useEffect(() => {
+    if (!request) return;
+    const frame = requestAnimationFrame(() =>
+      focusKeyField({ field: request.field, targets: refs, fallback: refs.permissionsField }),
+    );
+    return () => cancelAnimationFrame(frame);
+    // The refs are stable; only a new request moves focus.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [request]);
+  return {
+    refs,
+    request: (field: KeyField) => setRequest({ field }),
+    clear: () => setRequest(null),
+  };
+}
+
+/** What the key will carry, said in one line so a closed Advanced section hides nothing. */
+function keySummary({
+  keyType,
+  permissionMode,
+  selectedScopes,
+  orgProjects,
+  orgTeams,
+  organizationName,
+}: {
+  keyType: "personal" | "service";
+  permissionMode: PermissionMode;
+  selectedScopes: ScopeTriadEntry[];
+  orgProjects: OrgProject[];
+  orgTeams: OrgTeam[];
+  organizationName: string | undefined;
+}): string {
+  const kind = keyType === "service" ? "Service key" : "Personal key";
+  const access = permissionMode === "all" ? "all permissions" : "restricted permissions";
+  const [only] = selectedScopes;
+  if (!only) return `${kind} with ${access}, no scope chosen yet.`;
+  if (selectedScopes.length > 1)
+    return `${kind} with ${access} on ${selectedScopes.length} scopes.`;
+  const named = scopeName({ scope: only, orgProjects, orgTeams, organizationName });
+  return `${kind} with ${access} on ${named ?? "the selected scope"}.`;
+}
+
+function AdvancedSection({
+  open,
+  onOpenChange,
+  summary,
+  children,
+}: {
+  open: boolean;
+  onOpenChange: (next: boolean) => void;
+  summary: string;
+  children: ReactNode;
+}) {
+  return (
+    <Accordion.Root
+      collapsible
+      width="full"
+      value={open ? [ADVANCED_SECTION] : []}
+      onValueChange={(details) => onOpenChange(details.value.includes(ADVANCED_SECTION))}
+    >
+      <Accordion.Item value={ADVANCED_SECTION} width="full">
+        <Accordion.ItemTrigger paddingY={2} data-testid="api-key-advanced-toggle">
+          <HStack width="full" justify="space-between">
+            <VStack gap={0} align="start">
+              <SmallLabel>Advanced</SmallLabel>
+              <Text textStyle="caption" color="fg.muted" data-testid="api-key-advanced-summary">
+                {summary}
+              </Text>
+            </VStack>
+            <Accordion.ItemIndicator>
+              <ChevronDown size={16} aria-hidden="true" />
+            </Accordion.ItemIndicator>
+          </HStack>
+        </Accordion.ItemTrigger>
+        <Accordion.ItemContent>
+          <VStack gap={5} align="start" width="full" paddingTop={2}>
+            {children}
+          </VStack>
+        </Accordion.ItemContent>
+      </Accordion.Item>
+    </Accordion.Root>
+  );
+}
+
+/**
+ * The ceiling the mint checks (every selected scope, for the key's owner), and the reader's
+ * access as one load: the form is judged only once both the bindings and the ceiling land.
+ */
+function useKeyCeiling({
+  organizationId,
+  selectedScopes,
+  primaryScope,
+  owner,
+  isServiceKey,
+  enabled,
+  myBindings,
+}: {
+  organizationId: string;
+  selectedScopes: ScopeTriadEntry[];
+  primaryScope: ScopeTriadEntry;
+  owner: { isAdmin: boolean; selectedUserId: string; currentUserId: string };
+  isServiceKey: boolean;
+  enabled: boolean;
+  myBindings: MyBindings;
+}): { userPermissions: string[]; access: MyBindings } {
+  const assignsOther =
+    owner.isAdmin && !!owner.selectedUserId && owner.selectedUserId !== owner.currentUserId;
+  const grantable = useGrantablePermissions({
+    organizationId,
+    scopes: selectedScopes.length > 0 ? selectedScopes : [primaryScope],
+    ownerUserId: assignsOther ? owner.selectedUserId : void 0,
+    isServiceKey,
+    enabled,
+  });
+  return {
+    userPermissions: grantable.permissions,
+    access: {
+      data: myBindings.data,
+      isLoading: myBindings.isLoading || grantable.isLoading,
+      isError: myBindings.isError || grantable.isError,
+      refetch: () => Promise.all([myBindings.refetch(), grantable.refetch()]),
+    },
+  };
+}
+
 export function CreateApiKeyDrawer({
   isOpen,
   isCreating,
@@ -387,6 +537,8 @@ export function CreateApiKeyDrawer({
   organizationName,
   currentTeamId,
   currentProjectId,
+  prefill,
+  notice,
   onClose,
   onCreate,
 }: {
@@ -399,6 +551,10 @@ export function CreateApiKeyDrawer({
   organizationName: string | undefined;
   currentTeamId?: string;
   currentProjectId?: string;
+  /** The key the form opens filled with, such as a legacy key's replacement; no expiry. */
+  prefill?: Pick<CreateApiKeyInput, "name" | "description" | "scopeId" | "keyType">;
+  /** A warning over the form, such as that the key being replaced already stopped working. */
+  notice?: ReactNode;
   onClose: () => void;
   onCreate: (input: CreateApiKeyInput) => void;
 }) {
@@ -407,7 +563,7 @@ export function CreateApiKeyDrawer({
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [expirationPreset, setExpirationPreset] = useState(EXPIRATION_UNCHOSEN);
+  const [expirationPreset, setExpirationPreset] = useState(EXPIRATION_NEVER);
   const [customDate, setCustomDate] = useState("");
   const [selectedScopes, setSelectedScopes] = useState<ScopeTriadEntry[]>([]);
   const [permissionMode, setPermissionMode] = useState<"all" | "restricted">("all");
@@ -442,45 +598,33 @@ export function CreateApiKeyDrawer({
     scopeId: currentProjectId ?? "",
   };
 
-  const userPermissions = useMemo(
-    () =>
-      getUserPermissionsAtScope({
-        myBindings: myBindings.data,
-        scopeType: primaryScope.scopeType,
-        scopeId: primaryScope.scopeId,
-        organizationId,
-        orgProjects,
-        isServiceKey: keyType === "service",
-      }),
-    [
-      myBindings.data,
-      primaryScope.scopeType,
-      primaryScope.scopeId,
-      organizationId,
-      orgProjects,
-      keyType,
-    ],
-  );
+  const { userPermissions, access } = useKeyCeiling({
+    organizationId,
+    selectedScopes,
+    primaryScope,
+    owner: { isAdmin, selectedUserId, currentUserId },
+    isServiceKey: keyType === "service",
+    enabled: isOpen,
+    myBindings,
+  });
 
   const [attempted, setAttempted] = useState(false);
-  const nameRef = useRef<HTMLInputElement>(null);
-  const scopeRef = useRef<HTMLDivElement>(null);
-  const permissionsRef = useRef<HTMLDivElement>(null);
-  const permissionListRef = useRef<HTMLDivElement>(null);
-  const expirationRef = useRef<HTMLDivElement>(null);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const gapFocus = useGapFocus();
 
   const resetForm = () => {
     setAttempted(false);
-    setName("");
-    setDescription("");
-    setExpirationPreset(EXPIRATION_UNCHOSEN);
+    setAdvancedOpen(false);
+    gapFocus.clear();
+    setName(prefill?.name ?? "");
+    setDescription(prefill?.description ?? "");
+    setExpirationPreset(EXPIRATION_NEVER);
     setCustomDate("");
-    setSelectedScopes(
-      currentProjectId ? [{ scopeType: "PROJECT", scopeId: currentProjectId }] : [],
-    );
+    const scopeId = prefill?.scopeId ?? currentProjectId;
+    setSelectedScopes(scopeId ? [{ scopeType: "PROJECT", scopeId }] : []);
     setPermissionMode("all");
     setCategorySelections({});
-    setKeyType("personal");
+    setKeyType(prefill?.keyType ?? "personal");
     setSelectedUserId(currentUserId);
   };
 
@@ -497,16 +641,8 @@ export function CreateApiKeyDrawer({
     const [firstMissing] = missing;
     if (firstMissing) {
       setAttempted(true);
-      focusKeyField({
-        field: firstMissing,
-        targets: {
-          name: nameRef,
-          scope: scopeRef,
-          permissions: permissionListRef,
-          expiration: expirationRef,
-        },
-        fallback: permissionsRef,
-      });
+      if (missing.some((field) => ADVANCED_FIELDS.includes(field))) setAdvancedOpen(true);
+      gapFocus.request(firstMissing);
       return;
     }
     onCreate(
@@ -534,7 +670,7 @@ export function CreateApiKeyDrawer({
   });
   const showError = (field: Exclude<KeyField, "expiration">) =>
     attempted && missing.includes(field) ? FIELD_ERROR[field] : undefined;
-  const accessBlocked = myBindings.isLoading || myBindings.isError;
+  const accessBlocked = access.isLoading || access.isError;
 
   return (
     <Drawer
@@ -552,13 +688,14 @@ export function CreateApiKeyDrawer({
           label: "Create secret key",
           onClick: handleCreate,
           loading: isCreating,
-          disabledReason: accessBlocked ? accessReason(myBindings) : void 0,
+          disabledReason: accessBlocked ? accessReason(access) : void 0,
           "data-testid": "api-key-create-submit",
         },
       }}
     >
       <VStack gap={5} align="start">
-        {accessBlocked && <AccessNote myBindings={myBindings} />}
+        {accessBlocked && <AccessNote myBindings={access} />}
+        {notice}
         {/* Key type — only admins can create service keys */}
         {isAdmin && (
           <KeyTypeField
@@ -570,10 +707,9 @@ export function CreateApiKeyDrawer({
           />
         )}
 
-        {/* Name */}
         <SettingsField label="Name" error={showError("name")}>
           <Input
-            ref={nameRef}
+            ref={gapFocus.refs.name}
             placeholder="e.g., CI Pipeline, Local Dev"
             data-testid="api-key-name"
             value={name}
@@ -581,21 +717,8 @@ export function CreateApiKeyDrawer({
           />
         </SettingsField>
 
-        {/* Description */}
-        <SettingsField label="Description (optional)">
-          <Textarea
-            placeholder="What is this key used for?"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            maxLength={500}
-            rows={3}
-            resize="vertical"
-          />
-        </SettingsField>
-
-        {/* Scope */}
         <SettingsField label="Scope" error={showError("scope")}>
-          <Box ref={scopeRef} width="full">
+          <Box ref={gapFocus.refs.scope} width="full">
             <ScopeChipPicker
               value={selectedScopes}
               onChange={(next) => {
@@ -615,34 +738,18 @@ export function CreateApiKeyDrawer({
           </Box>
         </SettingsField>
 
-        {/* Permissions */}
-        <PermissionsField
-          error={showError("permissions")}
-          permissionMode={permissionMode}
-          onModeChange={(mode) => {
-            setPermissionMode(mode);
-            if (mode === "all") setCategorySelections({});
-          }}
-          selections={categorySelections}
-          userPermissions={userPermissions}
-          onSelectionsChange={setCategorySelections}
-          containerRef={permissionsRef}
-          listRef={permissionListRef}
-        />
-
-        {/* Expiration */}
         <SettingsField label="Expiration">
-          <VStack ref={expirationRef} gap={1} align="start" width="full">
+          <VStack ref={gapFocus.refs.expiration} gap={1} align="start" width="full">
             <Select.Root
               collection={expirationCollection}
               value={[expirationPreset]}
               onValueChange={(details) => {
-                const val = details.value[0] ?? EXPIRATION_UNCHOSEN;
+                const val = details.value[0] ?? EXPIRATION_NEVER;
                 setExpirationPreset(val);
                 if (val !== "custom") setCustomDate("");
               }}
             >
-              <Select.Trigger width="full">
+              <Select.Trigger width="full" data-testid="api-key-expiration">
                 <Select.ValueText placeholder="Choose when this key expires" />
               </Select.Trigger>
               <Select.Content width="300px" paddingY={2}>
@@ -656,6 +763,7 @@ export function CreateApiKeyDrawer({
             {expirationPreset === "custom" && (
               <Input
                 type="date"
+                aria-label="Expiry date"
                 value={customDate}
                 min={minCustomDate}
                 onChange={(e) => setCustomDate(e.target.value)}
@@ -664,6 +772,44 @@ export function CreateApiKeyDrawer({
             <ExpirationHint chosen={expirationChosen} attempted={attempted} />
           </VStack>
         </SettingsField>
+
+        <AdvancedSection
+          open={advancedOpen}
+          onOpenChange={setAdvancedOpen}
+          summary={keySummary({
+            keyType,
+            permissionMode,
+            selectedScopes,
+            orgProjects,
+            orgTeams,
+            organizationName,
+          })}
+        >
+          <SettingsField label="Description (optional)">
+            <Textarea
+              placeholder="What is this key used for?"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              maxLength={500}
+              rows={3}
+              resize="vertical"
+            />
+          </SettingsField>
+
+          <PermissionsField
+            error={showError("permissions")}
+            permissionMode={permissionMode}
+            onModeChange={(mode) => {
+              setPermissionMode(mode);
+              if (mode === "all") setCategorySelections({});
+            }}
+            selections={categorySelections}
+            userPermissions={userPermissions}
+            onSelectionsChange={setCategorySelections}
+            containerRef={gapFocus.refs.permissionsField}
+            listRef={gapFocus.refs.permissions}
+          />
+        </AdvancedSection>
       </VStack>
     </Drawer>
   );

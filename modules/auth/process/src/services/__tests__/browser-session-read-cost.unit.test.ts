@@ -44,6 +44,7 @@ function harness() {
     rules: vi.spyOn(fixture.organizations, "findConfiguredSignInSecurityPolicies"),
   };
   const service = BrowserSessionService.create({
+    docsKeys: { revokeDocsSessionKeys: async () => ({ revoked: true as const }) },
     sessions: rows,
     cache: null,
     identityEmails: void 0,

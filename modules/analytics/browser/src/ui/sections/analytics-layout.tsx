@@ -12,6 +12,7 @@ import { useAnalyticsHost } from "../../model/analytics-host.ts";
 import { AnalyticsHeader } from "./analytics-header.tsx";
 import { AnalyticsTabs } from "./analytics-tabs.tsx";
 import { DashboardTitleRow, type DashboardTitleRowProps } from "./dashboard-title-row.tsx";
+import { LegacyAnalyticsBanner } from "./legacy-analytics-banner.tsx";
 import { SavedViewsScope } from "./saved-views-scope.tsx";
 
 /** Which header tab the page being rendered is; `reports` lights the Dashboards menu tab. */
@@ -44,6 +45,7 @@ export default function AnalyticsLayout({
           overflowY="auto"
           overflowX="hidden"
         >
+          <LegacyAnalyticsBanner />
           <AnalyticsHeader
             tabs={
               project?.slug ? (

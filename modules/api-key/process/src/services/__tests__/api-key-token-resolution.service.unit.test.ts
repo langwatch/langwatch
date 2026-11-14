@@ -73,9 +73,17 @@ function serviceWith(fakes: Fakes = {}) {
         if (fakes.upgradeFails) throw new Error("write failed");
       },
       findLivenessById: async () =>
-        fakes.parentLiveness === undefined
-          ? { revokedAt: null, expiresAt: null }
-          : fakes.parentLiveness,
+        fakes.parentLiveness === null
+          ? null
+          : {
+              revokedAt: null,
+              expiresAt: null,
+              createdAt: fromDate(new Date()),
+              name: "CLI login",
+              isSystemManaged: false,
+              parentApiKeyId: null,
+              ...fakes.parentLiveness,
+            },
     },
     tokens: {
       findTokenParts: (token: string) =>

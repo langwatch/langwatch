@@ -60,6 +60,7 @@ type FlagRead = Parameters<FeatureFlagApi["isEnabled"]>;
 const FULL_ACCESS = "legacy_project_key_full_access";
 const PROMPTS_READ = "legacy_project_key_prompts_read";
 const TRACES_READ = "legacy_project_key_traces_read";
+const ANNOTATIONS_READ = "legacy_project_key_annotations_read";
 const CONNECTED_AGENTS = "legacy_project_key_connected_agents";
 const ENFORCED = "legacy_project_key_scope_enforced";
 
@@ -152,6 +153,9 @@ const OPERATIONS = [
   "keyIdentified",
   "keyPrompts",
   "promptById",
+  "annotations",
+  "annotationsCreate",
+  "annotationsManage",
 ] as const;
 type Operation = (typeof OPERATIONS)[number];
 type ProbeApi = Record<Operation, () => Promise<{ ok: boolean }>>;
@@ -176,8 +180,7 @@ const projectRoutes = defineRestRouter(ProbeApi)
   .handle(({ app }) => app.ingest())
   .post("/prompts", "prompts")
   .keepsRecords()
-  .withPermission("prompts:view")
-  .withLegacyKeyScope(PROMPTS_READ)
+  .withPermission("prompts:view", { legacyKey: PROMPTS_READ })
   .withOutput(ANSWER)
   .withoutAudit("test route")
   .handle(({ app }) => app.prompts())
@@ -190,43 +193,37 @@ const projectRoutes = defineRestRouter(ProbeApi)
   .handle(({ app }) => app.promptById())
   .post("/traces", "traces")
   .keepsRecords()
-  .withPermission("traces:view")
-  .withLegacyKeyScope(TRACES_READ)
+  .withPermission("traces:view", { legacyKey: TRACES_READ })
   .withOutput(ANSWER)
   .withoutAudit("test route")
   .handle(({ app }) => app.traces())
   .post("/evaluations", "evaluations")
   .keepsRecords()
-  .withPermission("evaluations:view")
-  .withLegacyKeyScope("legacy_project_key_evaluations")
+  .withPermission("evaluations:view", { legacyKey: "legacy_project_key_evaluations" })
   .withOutput(ANSWER)
   .withoutAudit("test route")
   .handle(({ app }) => app.evaluations())
   .post("/datasets", "datasets")
   .keepsRecords()
-  .withPermission("datasets:view")
-  .withLegacyKeyScope("legacy_project_key_experiments")
+  .withPermission("datasets:view", { legacyKey: "legacy_project_key_experiments" })
   .withOutput(ANSWER)
   .withoutAudit("test route")
   .handle(({ app }) => app.datasets())
   .post("/prompts-update", "promptsUpdate")
   .keepsRecords()
-  .withPermission("prompts:update")
-  .withLegacyKeyScope("legacy_project_key_prompts_write")
+  .withPermission("prompts:update", { legacyKey: "legacy_project_key_prompts_write" })
   .withOutput(ANSWER)
   .withoutAudit("test route")
   .handle(({ app }) => app.promptsUpdate())
   .post("/connect", "connect")
   .keepsRecords()
-  .withPermission("scenarios:manage")
-  .withLegacyKeyScope(CONNECTED_AGENTS)
+  .withPermission("scenarios:manage", { legacyKey: CONNECTED_AGENTS })
   .withOutput(ANSWER)
   .withoutAudit("test route")
   .handle(({ app }) => app.connect())
   .post("/model-providers", "modelProviders")
   .keepsRecords()
-  .withPermission("project:view")
-  .withLegacyKeyScope(CONNECTED_AGENTS)
+  .withPermission("project:view", { legacyKey: CONNECTED_AGENTS })
   .withOutput(ANSWER)
   .withoutAudit("test route")
   .handle(({ app }) => app.modelProviders())
@@ -248,6 +245,24 @@ const projectRoutes = defineRestRouter(ProbeApi)
   .withOutput(ANSWER)
   .withoutAudit("test route")
   .handle(({ app }) => app.identified())
+  .post("/annotations", "annotations")
+  .keepsRecords()
+  .withPermission("annotations:view", { legacyKey: ANNOTATIONS_READ })
+  .withOutput(ANSWER)
+  .withoutAudit("test route")
+  .handle(({ app }) => app.annotations())
+  .post("/annotations-create", "annotationsCreate")
+  .keepsRecords()
+  .withPermission("annotations:create")
+  .withOutput(ANSWER)
+  .withoutAudit("test route")
+  .handle(({ app }) => app.annotationsCreate())
+  .post("/annotations-manage", "annotationsManage")
+  .keepsRecords()
+  .withPermission("annotations:manage")
+  .withOutput(ANSWER)
+  .withoutAudit("test route")
+  .handle(({ app }) => app.annotationsManage())
   .build()
   .router();
 
@@ -348,6 +363,24 @@ describe("a legacy project key on a project that is not enforced", () => {
           fields: expect.objectContaining({ grantedBy: "report_only" }),
         }),
       ]);
+    });
+  });
+
+  describe("when it calls annotation routes on no flag", () => {
+    /** @scenario "An unenforced project's legacy key on no flag still reads and writes annotations" */
+    it.each([
+      ["annotations", "annotations:view"],
+      ["annotations-create", "annotations:create"],
+      ["annotations-manage", "annotations:manage"],
+    ] as const)("is answered at /%s and logged", async (path, permission) => {
+      const { response, ran, lines } = await call({ enabled: [], path });
+
+      expect(response.status).toBe(200);
+      expect(ran).toEqual([path]);
+      expect(lines[0]).toMatchObject({
+        message: "legacy project key outside its scopes",
+        fields: { permission, enforced: false },
+      });
     });
   });
 
@@ -494,6 +527,27 @@ describe("a legacy project key on an enforced project with scope flags", () => {
     });
   });
 
+  describe("given the annotations-read flag only", () => {
+    const enabled = [ANNOTATIONS_READ, ENFORCED];
+
+    /** @scenario "The annotations-read flag opens annotation reads and no annotation writes" */
+    it("reads annotations and is refused annotation writes", async () => {
+      const reads = await call({ enabled, path: "annotations" });
+      expect(reads.response.status).toBe(200);
+      expect(reads.ran).toEqual(["annotations"]);
+      expect(reads.lines).toEqual([
+        expect.objectContaining({
+          level: "info",
+          fields: expect.objectContaining({ grantedBy: ANNOTATIONS_READ }),
+        }),
+      ]);
+
+      await refused(await call({ enabled, path: "annotations-create" }));
+      await refused(await call({ enabled, path: "annotations-manage" }));
+      await refused(await call({ enabled, path: "traces" }));
+    });
+  });
+
   describe("given the connected-agents flag only", () => {
     const enabled = [CONNECTED_AGENTS, ENFORCED];
 
@@ -557,8 +611,7 @@ describe("a legacy project key on an enforced project with scope flags", () => {
         .withVersion(VERSION)
         .post("/prompts", "prompts")
         .keepsRecords()
-        .withPermission("prompts:view")
-        .withLegacyKeyScope("legacy_project_key_everything")
+        .withPermission("prompts:view", { legacyKey: "legacy_project_key_everything" })
         .withOutput(ANSWER)
         .withoutAudit("test route")
         .handle(({ app }) => app.prompts())

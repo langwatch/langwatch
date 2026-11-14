@@ -18,10 +18,12 @@ import {
   joinRequestReminderTemplate,
 } from "./join-request-emails.tsx";
 import { licenseEmailTemplate } from "./license-email.tsx";
+import { monitorAutoPausedEmailTemplate } from "./monitor-auto-paused-email.tsx";
 import { organizationMfaRequirementEmailTemplate } from "./organization-mfa-requirement-email.tsx";
 import { platformOperatorChangeEmailTemplate } from "./platform-operator-change-email.tsx";
 import type { MailTemplate } from "./registry.ts";
 import { resetPasswordEmailTemplate } from "./reset-password-email.tsx";
+import { idpRefusedSignInTemplate, seatRequestTemplate } from "./seat-request-emails.tsx";
 import { signUpVerificationEmailTemplate } from "./sign-up-verification-email.tsx";
 import {
   ssoDomainProofLapsedTemplate,
@@ -47,6 +49,8 @@ export const mailTemplates: readonly MailTemplate[] = [
   joinRequestRejectedTemplate,
   joinRequestExpiredTemplate,
   domainAutoJoinedTemplate,
+  seatRequestTemplate,
+  idpRefusedSignInTemplate,
   ssoDomainProofWaveringTemplate,
   ssoDomainProofLapsedTemplate,
   organizationMfaRequirementEmailTemplate,
@@ -57,6 +61,7 @@ export const mailTemplates: readonly MailTemplate[] = [
   budgetIncreaseRequestEmailTemplate,
   usageLimitEmailTemplate,
   automationLimitEmailTemplate,
+  monitorAutoPausedEmailTemplate,
   triggerDigestEmailTemplate,
   digestPlanPressureTemplate,
   digestScenariosTrendTemplate,

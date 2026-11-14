@@ -5,8 +5,6 @@ export const LICENSING_FEATURE_ID = "licensing" as const;
 
 export const CONTACT_SALES_URL = "https://langwatch.ai/get-a-demo";
 
-export const DEFAULT_LICENSE_PURCHASE_URL = "https://buy.stripe.com/dRm3cwaIDgXs6yK6sX0480f";
-
 /**
  * Default limit for fields not present in older licenses. Using a large number instead of
  * Infinity for JSON serialization safety. Note: Infinity cannot be serialized to JSON (becomes
@@ -18,6 +16,12 @@ export const DEFAULT_LIMIT = UNLIMITED;
  * Default value for maxMembersLite when not specified in license.
  */
 export const DEFAULT_MEMBERS_LITE = 1;
+
+/**
+ * Developer seats when the licence states none: a Developer seat is sold per seat,
+ * so a licence signed before the field existed sells none.
+ */
+export const DEFAULT_MEMBERS_DEVELOPER = 0;
 
 /**
  * Free-tier read-path visibility window: trace content older than this many

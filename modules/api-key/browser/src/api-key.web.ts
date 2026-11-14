@@ -1,12 +1,15 @@
 /**
- * What a browser installs when it installs api-key: the API Keys settings
- * screen, the CLI device-flow authorize screen and the two handoff consent
- * screens (project authorize, MCP authorize).
+ * What a browser installs when it installs api-key: the API Keys settings screen, the CLI
+ * device-flow authorize screen and the three handoff consent screens (project authorize, MCP
+ * authorize, docs connect); it lends the Braids page its signing keys panel.
  */
 
+import { SigningKeysPanelToken } from "@langwatch/api-key-client";
+import { apiKeyWebConfigSchema } from "@langwatch/api-key-contract";
 import { defineBrowserModule } from "@langwatch/browser";
 
 export const apiKeyWeb = defineBrowserModule("api-key")
+  .withConfig({ "api-key": apiKeyWebConfigSchema }, (slices) => slices["api-key"])
   .withHosts({
     requires: ["ApiKeyHostApi", "AuthorizeHostApi"],
     mounts: {
@@ -23,6 +26,10 @@ export const apiKeyWeb = defineBrowserModule("api-key")
       path: "/mcp/authorize",
       load: () => import("./ui/sections/mcp-authorize-screen.tsx"),
     },
+    "pages/connect/docs": {
+      path: "/connect/docs",
+      load: () => import("./ui/sections/docs-connect-screen.tsx"),
+    },
     "pages/cli/auth": {
       path: "/cli/auth",
       load: () => import("./ui/sections/cli-auth-screen.tsx"),
@@ -35,4 +42,10 @@ export const apiKeyWeb = defineBrowserModule("api-key")
       label: "API keys",
       load: () => import("./ui/sections/api-keys-screen.tsx"),
     },
+  })
+  /** A project's braid signing keys, mounted by the Braids page (ADR-201 §4). */
+  .lends(SigningKeysPanelToken, {
+    load: async () => ({
+      default: (await import("./ui/sections/signing-keys-panel.tsx")).SigningKeysPanel,
+    }),
   });

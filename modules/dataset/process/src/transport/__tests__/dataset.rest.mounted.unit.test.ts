@@ -292,12 +292,78 @@ describe("the mounted dataset REST family", () => {
         projectId: "project-1",
         name: "User Feedback",
         columnTypes: [{ name: "input", type: "string" }],
+        editedBy: { kind: "user", id: "user-1" },
       });
       await expect(response.json()).resolves.toMatchObject({
         id: "dataset_1",
         slug: "my-dataset",
         platformUrl: "https://app.langwatch.test/project-one/datasets/dataset_1",
       });
+    });
+
+    /** @scenario "A dataset is created over REST with its columns and first rows in one call" */
+    it("hands the entries to the same create, so columns and rows land together", async () => {
+      const { send, stub } = mount();
+      const columnTypes = [
+        { name: "case_id", type: "string" },
+        { name: "input", type: "string" },
+      ];
+      const entries = [
+        { case_id: "c-1", input: "hello" },
+        { case_id: "c-2", input: "bye" },
+      ];
+
+      const response = await send("POST", "/api/dataset", { name: "QA", columnTypes, entries });
+
+      expect(response.status).toBe(201);
+      expect(stub.upsertDataset).toHaveBeenCalledTimes(1);
+      expect(stub.upsertDataset).toHaveBeenCalledWith({
+        projectId: "project-1",
+        name: "QA",
+        columnTypes,
+        datasetRecords: entries,
+        enforceBatchBound: true,
+        editedBy: { kind: "user", id: "user-1" },
+      });
+      expect(stub.batchCreateRecords).not.toHaveBeenCalled();
+    });
+
+    it("answers an unknown column with the 400 an append gets", async () => {
+      const refuse = vi.fn(async () => {
+        throw new InvalidColumnError({
+          columnName: "expected",
+          datasetName: "QA",
+          validColumns: ["input"],
+        });
+      });
+      const entries = [{ input: "hello", expected: "hi" }];
+
+      const create = await mount({ upsertDataset: refuse as never }).send("POST", "/api/dataset", {
+        name: "QA",
+        columnTypes: [{ name: "input", type: "string" }],
+        entries,
+      });
+      const append = await mount({ batchCreateRecords: refuse as never }).send(
+        "POST",
+        "/api/dataset/qa/records",
+        { entries },
+      );
+
+      expect(create.status).toBe(400);
+      expect(create.status).toBe(append.status);
+    });
+
+    it("refuses more entries than the batch ceiling", async () => {
+      const { send, stub } = mount();
+
+      const response = await send("POST", "/api/dataset", {
+        name: "QA",
+        columnTypes: [{ name: "input", type: "string" }],
+        entries: Array.from({ length: 4001 }, (_, index) => ({ input: `item-${index}` })),
+      });
+
+      expect(response.status).toBe(422);
+      expect(stub.upsertDataset).not.toHaveBeenCalled();
     });
 
     /** @scenario "Create a dataset requires a name" */
@@ -435,6 +501,24 @@ describe("the mounted dataset REST family", () => {
         slug: "old-name",
         columnTypes: [{ name: "question", type: "string" }],
       });
+    });
+
+    /** @scenario "A save that deletes one column and renames another keeps the renamed column's values" */
+    it("hands the column renames it was sent to the application", async () => {
+      const { send, stub } = mount({ upsertDataset: vi.fn(async () => dataset) as never });
+
+      const response = await send("PATCH", "/api/dataset/old-name", {
+        columnTypes: [{ name: "reference", type: "string" }],
+        columnRenames: [{ from: "expected_output", to: "reference" }],
+      });
+
+      expect(response.status).toBe(200);
+      expect(stub.upsertDataset).toHaveBeenCalledWith(
+        expect.objectContaining({
+          columnTypes: [{ name: "reference", type: "string" }],
+          columnRenames: [{ from: "expected_output", to: "reference" }],
+        }),
+      );
     });
 
     /** @scenario "Update dataset does not enforce plan limits" */
@@ -658,6 +742,7 @@ describe("the mounted dataset REST family", () => {
         slugOrId: "my-dataset",
         projectId: "project-1",
         entries: [{ input: "hello" }],
+        editedBy: { kind: "user", id: "user-1" },
       });
       await expect(response.json()).resolves.toMatchObject({
         data: [{ id: "rec-1", entry: { input: "hello" } }],
@@ -672,6 +757,7 @@ describe("the mounted dataset REST family", () => {
         slugOrId: "dataset_xyz",
         projectId: "project-1",
         entries: [{ input: "x" }],
+        editedBy: { kind: "user", id: "user-1" },
       });
     });
 
@@ -770,6 +856,7 @@ describe("the mounted dataset REST family", () => {
         slugOrId: "my-dataset",
         projectId: "project-1",
         recordIds: ["rec-1", "rec-2"],
+        editedBy: { kind: "user", id: "user-1" },
       });
     });
 
@@ -888,6 +975,7 @@ describe("the mounted dataset REST family", () => {
         projectId: "project-1",
         recordId: "rec-1",
         updatedRecord: { input: "updated" },
+        editedBy: { kind: "user", id: "user-1" },
       });
     });
 

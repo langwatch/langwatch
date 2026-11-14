@@ -25,6 +25,10 @@ export function buildShimScript(): string {
   var buffered = [];
   var nextRequestId = 1;
   var pending = {};
+  // Keyed by our own ids, not timer handles: a handle need not be a valid key.
+  var nextRetryWaitId = 1;
+  var retryWaits = {};
+  var authorMounted = false;
   var dashboardContextCallbacks = [];
   var resolveReady;
   var ready = new Promise(function (resolve) { resolveReady = resolve; });
@@ -38,6 +42,11 @@ export function buildShimScript(): string {
     Object.keys(context.colors || {}).forEach(function (name) {
       document.documentElement.style.setProperty("--chakra-colors-" + name.split(".").join("-"), context.colors[name]);
     });
+  }
+
+  // Only the frame knows a query waits behind a retry timer or code not yet loaded.
+  function isIdle() {
+    return authorMounted && Object.keys(pending).length === 0 && Object.keys(retryWaits).length === 0;
   }
 
   function post(message) {
@@ -211,8 +220,18 @@ export function buildShimScript(): string {
             random: Math.random
           });
         },
-        setTimer: function (callback, delayMs) { return setTimeout(callback, delayMs); },
-        clearTimer: function (timer) { clearTimeout(timer); }
+        setTimer: function (callback, delayMs) {
+          var id = nextRetryWaitId++;
+          retryWaits[id] = setTimeout(function () {
+            delete retryWaits[id];
+            callback();
+          }, delayMs);
+          return id;
+        },
+        clearTimer: function (id) {
+          clearTimeout(retryWaits[id]);
+          delete retryWaits[id];
+        }
       });
 
       runRef.current = runner.run;
@@ -324,6 +343,9 @@ export function buildShimScript(): string {
   // before this script runs; whatever runtime it wires up (today: the
   // author-runtime that compiles and mounts a React file) is what actually
   // runs the author's code.
+  // The author runtime calls this once the widget's first effects ran, so its first queries are open.
+  window.__lwAuthorMounted = function () { authorMounted = true; };
+
   function activateAuthor() {
     if (typeof window.__lwActivateAuthor === "function") {
       try {
@@ -355,7 +377,7 @@ export function buildShimScript(): string {
     buffered.forEach(function (message) { port.postMessage(message); });
     buffered = [];
     setInterval(function () {
-      port.postMessage({ type: "lw:heartbeat" });
+      port.postMessage({ type: "lw:heartbeat", idle: isIdle() });
     }, ${CHART_FRAME_HEARTBEAT_INTERVAL_MS});
     resolveReady();
     activateAuthor();

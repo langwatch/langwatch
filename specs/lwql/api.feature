@@ -154,11 +154,11 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     Then none is present, because dictionaries are not subject to row policies
 
   @integration
-  Scenario: Key hash is auditable in the query log without exposing the raw key
+  Scenario: The query log names the tenant without the raw key or its hash
     Given the restricted identity ran a query carrying tenant-a's key-hash context
     When the server's query log is inspected for that query
-    Then the log entry carries the key hash
-    And the raw API key appears nowhere in the log entry
+    Then the log entry's comment names tenant-a's project
+    And neither the key hash nor the raw API key appears anywhere in the log entry
 
   @integration
   Scenario: Revoking a key hash from the key map takes effect within the stated revocation bound
@@ -254,7 +254,7 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     When a view whose source sorts by a column its write path moves is inspected
     Then it declares that one row is one record rather than one sort key
     And a view that declares a grain narrower than its engine's key declares a strategy that can deliver it
-    And the views whose sort keys hold still keep the shipped default
+    And the views whose sort keys hold still keep the shipped default, read their latest version in order without FINAL, read rows written once as written, or settle retraction pairs without FINAL
 
   @integration
   Scenario: A pre-aggregated view returns one merged row per bucket
@@ -304,6 +304,12 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     When the restricted identity selects that record through the LangWatchQL view
     Then one row is returned
     And it carries the newer version's values
+
+  @integration
+  Scenario: A plain span_metrics read counts a residual duplicate span
+    Given span_analytics holds two copies of one span, a residual duplicate ADR-034 accepts
+    When the restricted identity selects that span through the span_metrics view
+    Then both copies are returned, because a plain read does not deduplicate
 
   @integration
   Scenario: A column no LangWatchQL view exposes is unreachable, not merely unselected
@@ -509,6 +515,22 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     When it submits native ClickHouse SQL using joins, window functions, comparisons, percentiles, aliases, math, CTEs, and subqueries
     Then the query executes and returns tabular results
 
+  @regression @integration
+  Scenario: A Langy session key runs a LangWatchQL query and reads its schema and reference
+    Given an API key that Langy minted for a chat session, scoped to one project
+    When it runs a LangWatchQL query
+    And it calls the schema discovery endpoint
+    And it calls the query reference endpoint
+    Then each call answers 200
+    And the query reaches the database with the key's own reach
+
+  @regression @integration
+  Scenario: An organization key whose credential carries no Langy flag still runs a query
+    Given an organization API key whose resolved credential names no Langy session flag
+    When it runs a LangWatchQL query
+    Then the query answers 200
+    And the query reaches the database with the key's own reach
+
   @integration
   Scenario: Results carry typed columns, rows, execution statistics, and diagnostics
     Given an authenticated API client
@@ -547,9 +569,22 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
   @unit
   Scenario: A parameter value that does not fit its declared type is refused with the parameter named
     Given a query declaring {start:DateTime64(3)}
-    When the request binds start to a value the server cannot read as that type, such as an ISO string ending in Z
+    When the request binds start to a value the server cannot read as that type, such as "last tuesday"
     Then the query is refused with error code lwql_parameter_invalid at HTTP 400, a customer fault
     And the refusal names the parameter and nothing else from the server's message
+
+  @unit
+  Scenario: An ISO instant bound to a date-time parameter is sent as the same moment the server can read
+    Given a query declaring {start:DateTime64(3, 'UTC')} and {day:DateTime}
+    When the request binds start to "2026-11-01T00:00:00Z" and day to "2026-11-01T02:00:00+02:00"
+    Then the server receives each as Unix seconds for that moment, start with its fraction and day whole
+    And a value that is not an ISO instant with an offset is sent exactly as the caller bound it
+
+  @unit
+  Scenario: Placeholder text inside a string literal or comment does not change a bound value
+    Given a query declaring {s:String} that also holds the text {s:DateTime} in a string literal and in a comment
+    When the request binds s to "2026-11-01T00:00:00Z"
+    Then the server receives s exactly as the caller bound it
 
   @unit
   Scenario: A missing column passed to a function is named in the refusal
@@ -966,10 +1001,41 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
   # every other stack's engine tables at its own PostgreSQL database.
   @unit
   Scenario: Each ClickHouse database provisions its own named collection
-    Given two LangWatchQL databases on the same ClickHouse server
+    Given two LangWatchQL databases on the same ClickHouse server, in sql mode
     When the self-provisioning statements are rendered for each
     Then each creates a named collection whose name carries its own database
     And each database's PostgreSQL-engine tables read only through its own collection
+
+  # A config store belongs to one server, and released chart installs bound their engine
+  # tables to lwql_postgres. ClickHouse refuses to attach a table whose collection is gone,
+  # and the upgrade converges before the ClickHouse pods roll onto the new config.
+  @unit
+  Scenario: Rendered mode keeps the named collection released chart installs bound their engine tables to
+    Given LWQL_ACCESS_MODEL_MODE is unset or "rendered"
+    When the access config is rendered and the provisioning statements run
+    Then the delivered collection and every PostgreSQL-engine table name lwql_postgres
+    And an upgrade's converge that runs before the ClickHouse pods roll finds that collection already mounted
+    And the rolled pods attach every engine table the previous release created
+
+  # A server whose previous config delivered only lwql_postgres_<database> keeps its tables
+  # bound to that name through the pre-roll converge, so the new config must deliver it too.
+  # Only a hand-made SQL collection of that name on a chart ClickHouse would clash (670).
+  @unit
+  Scenario: Rendered mode also delivers the per-database collection name a previous config bound tables to
+    Given LWQL_ACCESS_MODEL_MODE is unset or "rendered"
+    When the access config is rendered
+    Then config.d delivers lwql_postgres_<database> beside lwql_postgres with the same connection
+    And a table bound to either name still attaches once the ClickHouse pods roll
+
+  # One catalog read per converge.
+  @unit
+  Scenario: A rendered converge binds each engine table to a collection the server holds
+    Given LWQL_ACCESS_MODEL_MODE is unset or "rendered"
+    And the server may hold lwql_postgres, lwql_postgres_<database>, or both
+    When a converge or the reconvergence check creates or replaces an engine table
+    Then the table keeps its current binding while that collection exists on the server
+    And otherwise it binds to lwql_postgres when the server holds it, else to lwql_postgres_<database>
+    And with neither on the server it binds to lwql_postgres and fails with 669, as before
 
   # A 669 outside a NAMED COLLECTION statement means the collection is absent: the
   # engine table was never created, and every view over it would fail later as
@@ -1067,17 +1133,57 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     And a PostgreSQL that cannot be read is unknown: a warning, no converge, and its last alert left as it was
 
   # During a rollout old and new workers run the check side by side. The check
-  # never compares columns, so a newer deploy that added a column or removed one
-  # looks healthy to an older worker, which leaves the newer view alone. Its
-  # grants are additive and never revoke, so a view only the newer catalog has
-  # keeps its SELECT. Column changes converge on a deploy only.
+  # counts a view as drift only when it lacks a column this worker's catalog
+  # declares, never for an extra one, so a newer deploy that added a column looks
+  # healthy to an older worker, which leaves the newer view alone. Its grants are
+  # additive and never revoke, so a view only the newer catalog has keeps its
+  # SELECT. A newer deploy that only removed a column is put back to the older
+  # view by an older worker, and the newer worker accepts the extra column: the
+  # view settles on the union of the columns both catalogs need, so it stops
+  # flapping until the next deploy. The check compares column names
+  # only, and a repair rewrites the whole view from the older worker's catalog,
+  # so it can also revert a newer deploy's type, expression, dedup or filter
+  # change, which the newer worker does not detect. Ship such a change in two
+  # deploys too: the second only once no older worker runs.
+  # A deploy that removes one column and adds another (a rename included) is not
+  # settled by the union: a worker that needs the removed column and one that
+  # needs the added column would each replace the other's view at every check
+  # while both run. So such a deploy ships in two: first add the new column and
+  # keep the old one, then drop the old one once no older worker runs.
   @unit
-  Scenario: An older worker never rewrites a newer view
-    Given a newer deploy has converged views and approved views that added or removed columns this worker's catalog declares
+  Scenario: An older worker never rewrites a newer view for columns it does not declare
+    Given a newer deploy has converged views and approved views that added columns this worker's catalog does not declare
     When this worker's reconvergence check runs
     Then it finds no drift and runs no DDL
     And repairing a missing or ungranted approved view grants SELECT on that view alone and never revokes
     And a deploy's converge still revokes and grants the reader role's whole set
+
+  # A deploy converges views after the engine tables and stops at the first
+  # failing statement, so a deploy whose PostgreSQL bridge fails never replaces
+  # the views over fact tables. The check is the backstop (#9245).
+  @unit
+  Scenario: The reconvergence check replaces a view a deploy left on an older definition
+    Given a view is present but lacks a column this worker's catalog declares
+    When the reconvergence check runs
+    Then it names that view as drift, and the converge replaces it with CREATE OR REPLACE VIEW
+    And it does so even when the named collection cannot be confirmed, before raising that
+
+  # A PostgreSQL-backed view reads the columns of its engine table, which a deploy
+  # whose bridge failed left on the older catalog under current credentials.
+  @unit
+  Scenario: The reconvergence check rebuilds the engine table under a PostgreSQL-backed view that lacks a column
+    Given a PostgreSQL-backed view lacks a column this worker's catalog declares
+    And its engine table is stamped with the current credentials
+    When the reconvergence check runs
+    Then it names that engine table as drift along with the view
+    And the converge rebuilds the engine table before the view, only once the named collection is confirmed
+    And while the collection is unconfirmed it replaces neither, and still raises the unconfirmed collection
+
+  @unit
+  Scenario: The reconvergence check reads a present view with no column data as unknown, not as drift
+    Given a view is present but the column read returns no columns for it
+    When the reconvergence check runs
+    Then it does not name that view as drift
 
   @unit
   Scenario: The reconvergence check skips the PostgreSQL half when the reader role and approved views are in place
@@ -1130,6 +1236,101 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     When a full converge runs again, and then a check's converge of one engine table
     Then both succeed, each engine table replaced under the views that read it
     And every view still answers
+
+  # Issue #8858: ClickHouse builds each PostgreSQL engine table's connection pool once, at
+  # CREATE or ATTACH, so a reloaded named collection never reaches it. Each engine table's
+  # COMMENT carries a fingerprint of the collection values it was built on, and a table whose
+  # fingerprint is not the current one is drift. A config store can load the new collection
+  # after a converge has run, so a table is stamped only once two reads show ClickHouse holds
+  # the app's values: one through the collection, one with the app's own values (the reader
+  # role has one password, so both succeeding means the collection carries the app's).
+  @unit
+  Scenario: An engine table carries a fingerprint of the named collection's values, never the password
+    Given the PostgreSQL host, port, database, reader and password the app renders into the named collection
+    When an engine table is stamped with them
+    Then its comment carries a short fingerprint of those values
+    And the same values always give the same fingerprint
+    And a changed password, or any other changed value, gives a different one
+    And the comment never contains the password
+
+  @unit
+  Scenario: The reconvergence check rebuilds an engine table built on other credentials
+    Given LWQL_ACCESS_MODEL_MODE is unset or "rendered"
+    And an engine table's comment carries another credential fingerprint, or none as a table from before #8858 does
+    When the reconvergence check runs
+    Then it names that engine table as drift
+    And once ClickHouse is shown to hold the app's values it replaces that table and the views over it, stamped
+    And the task gates a sql-mode check the same way, so the next check finds that table converged
+
+  @unit
+  Scenario: No engine table is rebuilt until ClickHouse holds the app's collection values
+    Given an engine table built on other credentials
+    When a read through the named collection fails, or a read with the app's own values does not authenticate
+    Then the check leaves that engine table in place, logs at warn which read failed with no secret, and fails the converge
+    And it still creates an absent engine table, unstamped
+    And a deploy's converge replaces the engine tables unstamped, so a later check rebuilds them
+    And a sql-mode deploy stamps them unprobed only once its own batch rewrote the collection, and reads first where that rewrite was skipped
+    And the next check reads again
+
+  # An unqualified relation resolves through the reader role's search_path, which provisioning never
+  # sets, so a probe without a schema can fail UNKNOWN_TABLE where the views live elsewhere.
+  @unit
+  Scenario: The collection probe reads the approved view in the app's PostgreSQL schema
+    Given the approved views live in a PostgreSQL schema other than public
+    When the check reads through the named collection and with the app's own values
+    Then both reads bind that schema as a query parameter, so neither fails for the schema alone
+
+  # The reader role's search_path is never set and its default can exclude the app schema, so an
+  # engine table names it itself.
+  @unit
+  Scenario: Engine tables read the app's PostgreSQL schema
+    Given the app's PostgreSQL schema is langwatch_db
+    When the engine table statements are built
+    Then every engine table names that schema in its ENGINE clause
+
+  @unit
+  Scenario: The reconvergence check rebuilds an engine table built before the schema was pinned
+    Given an engine table stamped by a fingerprint that did not include the schema
+    When the reconvergence check runs
+    Then it names that engine table as drift
+
+  # A replica that has not loaded the new collection would build its copy of a replaced table on
+  # the old values, so on a cluster (CLICKHOUSE_CLUSTER, set by the chart past one replica) each
+  # read runs on every replica.
+  @unit
+  Scenario: The credential reads cover every replica of a cluster
+    Given CLICKHOUSE_CLUSTER names the ClickHouse cluster
+    When the check reads through the named collection and with the app's own values
+    Then each read runs on every replica of that cluster and reads no row
+    And it passes only when every replica passes
+    And with no cluster named each read runs on the server the app reaches
+
+  # The first failure's time is kept in Redis, shared by every worker, so the alert does not wait
+  # for one worker to run several checks in a row.
+  @unit
+  Scenario: A collection that stays unconfirmed alerts 15 minutes after the first failed check
+    Given a check left engine tables on their old credentials because the reads did not pass
+    When later checks find the same, on any worker
+    Then each logs a warning until a check runs 15 minutes or more after the first, which logs the ClickHouse alert at error with its error_signature
+    And while it holds the alert repeats hourly, like any other failed converge
+    And a check that converges the tables starts the clock again
+    And a PostgreSQL failure in the same checks leaves the clock running
+
+  @integration
+  Scenario: A rotated reader password reaches the engine tables without a ClickHouse restart
+    Given a rendered install on a ClickHouse cluster whose engine tables were built on the reader's first password
+    When the password changes and a deploy converges before ClickHouse loads the new collection
+    Then the check leaves the engine tables in place while the collection still holds the old password
+    And once the collection holds the new password the check rebuilds them, stamped
+    And they answer after every reader connection is ended, so no pool keeps the old password
+    And a worker still on the old password rebuilds nothing
+
+  @integration
+  Scenario: An sql-mode deploy rotates the reader password while engine tables use the collection
+    Given an sql-mode install whose engine tables read through the app's named collection
+    When the reader's password changes and a second deploy converges
+    Then the deploy writes the collection in place, never dropping one the tables use
+    And the engine tables answer on the new password
 
   @e2e
   Scenario: A three-replica deployment reconverges LangWatchQL after provisioning failed during a ClickHouse outage
@@ -1201,8 +1402,8 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
 # AC "empty/garbage key context yields zero rows, never all rows"
 #   → Scenario: Empty key context yields zero rows, never all rows
 #   → Scenario: Garbage key context yields zero rows, never all rows
-# AC "key-hash appears in query_log without exposing the raw key"
-#   → Scenario: Key hash is auditable in the query log without exposing the raw key
+# AC "key-hash appears in query_log without exposing the raw key" (ADR-200: the project, not the hash)
+#   → Scenario: The query log names the tenant without the raw key or its hash
 # AC "key-map refresh has a bounded revocation lag"
 #   → Scenario: Revoking a key hash from the key map takes effect within the stated revocation bound
 # (supporting invariants of the same proof: baseline read, key-map hygiene, multi-statement)
@@ -1255,6 +1456,7 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
 #  views are usable at scale)
 #   → Scenario: A LangWatchQL view returns only the calling tenant's rows
 #   → Scenario: A LangWatchQL view returns one row per logical record, the latest version
+#   → Scenario: A plain span_metrics read counts a residual duplicate span
 #   → Scenario: A column no LangWatchQL view exposes is unreachable, not merely unselected
 #   → Scenario: Reading the physical fact table directly is policed the same way
 #   → Scenario: Row policies leave the application's own reads untouched

@@ -222,7 +222,6 @@ describe("InstanceAdminService writes on an operator's account", () => {
       ]);
     });
 
-    /** @scenario "Where operating is not kept to staff, an operator changes their own address" */
     it.each<[string, Record<string, unknown>, string]>([
       [
         "another edit to their own account",

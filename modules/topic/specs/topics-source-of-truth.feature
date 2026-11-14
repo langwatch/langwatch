@@ -99,3 +99,62 @@ Feature: Topic clustering owns the topic model
     When the worker runs the background step "topic:seed-clustering-schedules"
     Then each of those projects is asked for a bootstrap clustering run
     And projects that already have a scheduled wake are skipped
+
+  @unit
+  Scenario: A large topic model is stored without one long transaction
+    Given a clustering run that recorded hundreds of topics, each with a centroid
+    When the projection stores the model
+    Then the topics are written in bounded chunks, parents before subtopics
+    And no single database transaction spans the whole model
+    And the projection cursor moves only after every topic is written
+
+  @unit
+  Scenario: A store that fails partway leaves the cursor for a replay
+    Given the projection has stored an earlier model
+    When storing the next model fails after some topics were written
+    Then the projection cursor still names the earlier event
+    And no stale topic has been deleted
+
+  @integration
+  Scenario: Replaying a store that failed partway converges to the new model
+    Given storing a replace or a merge event failed after some topics were written
+    When the worker replays the event, folding it over the stored model
+    Then the stored topics are exactly the model a clean fold produces
+    And the projection cursor names the replayed event
+
+  @integration
+  Scenario: A stored topic model reads back exactly as recorded
+    When the projection stores a model of hundreds of topics
+    Then every topic reads back with the same fields, centroid and recorded time
+
+  @unit
+  Scenario: A topic id recorded twice in one model is stored once
+    When the projection stores a model that lists one topic id twice
+    Then the topic is written once, with its last entry
+
+  @integration
+  Scenario: Recorded times are stored the same in any session time zone
+    Given a database session in a time zone other than UTC
+    When the projection stores a model
+    Then each topic's recorded time reads back unshifted
+
+  @unit
+  Scenario: Stale subtopics are removed before their parents
+    When the projection stores a model that drops some topics
+    Then the dropped subtopics are deleted before the dropped parents
+    And a model with no topics deletes nothing
+
+  @unit
+  Scenario: A topic id another project owns is refused before anything is written
+    Given another project owns one of the model's topic ids
+    When the projection stores the model
+    Then the store fails before any topic is written or deleted
+    And the projection cursor does not move
+
+  @integration
+  Scenario: A topic id from another project never overwrites that project's topic
+    Given another project holds a topic with a given id
+    When this project's model carries a topic with the same id
+    Then the store fails before any of this project's topics is written
+    And the projection cursor does not move
+    And the other project's topic is unchanged

@@ -3,12 +3,12 @@ import { DesignSystemProvider } from "@langwatch/design-system/provider";
  * @vitest-environment jsdom
  */
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import type { AvailableSource } from "@langwatch/design-system/variable-mapping";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { forwardRef, useReducer } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { AvailableSource } from "../../variable-mapping-input.tsx";
 import type { Variable } from "../../variables-section.tsx";
 import { PromptTextAreaWithVariables } from "../prompt-textarea-with-variables.tsx";
 

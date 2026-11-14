@@ -25,6 +25,7 @@
     "@langwatch/api": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/clickhouse-client": "workspace:*",
+    "@langwatch/data-privacy-contract": "workspace:*",
     "@langwatch/enterprise-billing-contract": "workspace:*",
     "@langwatch/enterprise-connect-contract": "workspace:*",
     "@langwatch/enterprise-licensing-contract": "workspace:*",

@@ -2,6 +2,7 @@ import type { SignInMethod } from "@langwatch/identity-contract";
 import { useRef, useState } from "react";
 
 import { authClient, navigate, safeRedirectTarget } from "../../behavior/auth-client.tsx";
+import { forgetHeldAddressProof } from "../../behavior/held-address-proof.ts";
 import { endPasskeyCeremony, startPasskeyCeremony } from "../../behavior/passkey-ceremony.store.ts";
 import { rememberLastUsedMethod } from "../../model/last-used-method.ts";
 import { isCeremonyAbandoned, passkeyFailure } from "../../model/passkey-failure.ts";
@@ -157,6 +158,7 @@ export function PasskeySignUpButton({
     if (current.abandoned) return;
     endPasskeyCeremony();
     if (outcome === "created") {
+      forgetHeldAddressProof();
       // Busy stays on: the session is open and the next thing to happen is a
       // navigation, so releasing the button first only flashes it back.
       rememberLastUsedMethod({ id: "passkey" });

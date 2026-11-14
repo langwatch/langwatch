@@ -43,6 +43,11 @@ describe("the routes each legacy project key scope flag opens", () => {
   it("is exactly the pinned list", () => {
     expect(routesByScope()).toMatchInlineSnapshot(`
       {
+        "legacy_project_key_annotations_read": [
+          "GET annotations /",
+          "GET annotations /:id",
+          "GET annotations /trace/:id",
+        ],
         "legacy_project_key_connected_agents": [
           "GET agents /connect/poll",
           "GET model-providers /",
@@ -51,6 +56,7 @@ describe("the routes each legacy project key scope flag opens", () => {
         ],
         "legacy_project_key_evaluations": [
           "GET evaluators /",
+          "GET evaluators /:evaluatorId/versions",
           "GET evaluators /:idOrSlug",
           "POST evaluations-legacy /api/evaluations/:evaluator/:subpath/evaluate",
           "POST evaluations-legacy /api/evaluations/:evaluator/evaluate",
@@ -61,6 +67,8 @@ describe("the routes each legacy project key scope flag opens", () => {
           "GET dataset /:datasetSlug/entries",
           "GET dataset /:slugOrId",
           "GET dataset /:slugOrId/records",
+          "GET dataset /:slugOrId/versions",
+          "GET dataset /:slugOrId/versions/:version",
           "GET evaluations /:evaluationSlug/versions",
           "GET evaluations /:evaluationSlug/workbench-state",
           "GET evaluations /runs",

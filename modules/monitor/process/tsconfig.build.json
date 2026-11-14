@@ -27,7 +27,13 @@
       "path": "../../workflow/contract/tsconfig.build.json"
     },
     {
+      "path": "../../user/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/time/tsconfig.build.json"
+    },
+    {
+      "path": "../../project/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/process/tsconfig.build.json"
@@ -39,7 +45,13 @@
       "path": "../../../packages/observability/tsconfig.build.json"
     },
     {
+      "path": "../../notification/contract/tsconfig.build.json"
+    },
+    {
       "path": "../contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/mail/tsconfig.build.json"
     },
     {
       "path": "../../../packages/ksuid/tsconfig.build.json"

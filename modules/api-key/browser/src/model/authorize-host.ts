@@ -1,6 +1,12 @@
 // Handoff screen port (/authorize + /mcp/authorize). Switcher is consent control; key asked via
 // port; MCP exchange is app's REST call; redirect-scheme check stays on screen.
 
+import type {
+  DocsSessionKeyAccess,
+  DocsSessionKeyLifetimeMinutes,
+  DocsSessionKeyMinted,
+  DocsSessionMessage,
+} from "@langwatch/api-key-contract";
 import type { Instant } from "@langwatch/time";
 import { createContext, useContext, type ReactNode } from "react";
 
@@ -53,6 +59,17 @@ export type AuthorizeSuccessNotice = {
   readonly description?: string;
 };
 
+/**
+ * The window that opened the consent popup: the docs session frame on this app's own origin
+ * (ADR-185, amendment of 2026-10-28). It hears only at the origin named.
+ */
+export type DocsOpener = {
+  readonly post: (input: { message: DocsSessionMessage; targetOrigin: string }) => void;
+};
+
+/** The organization's docs playground switch, as the consent page reads it. */
+export type DocsSessionAvailabilityReading = "loading" | "enabled" | "disabled";
+
 export abstract class AuthorizeHostApi {
   abstract scope(): AuthorizeScope;
 
@@ -92,6 +109,32 @@ export abstract class AuthorizeHostApi {
   abstract succeeded(notice: AuthorizeSuccessNotice): void;
 
   abstract failed(failure: AuthorizeFailureNotice): void;
+
+  /** The documentation sites this deployment lets connect (ADR-185), as the page's config says. */
+  abstract docsOrigins(): readonly string[];
+
+  /** Whether an operator is acting as this member: no docs key is handed on then. */
+  abstract actingAsAnother(): boolean;
+
+  /** The window that opened this one, or null when the page was not opened as a popup. */
+  abstract docsOpener(): DocsOpener | null;
+
+  /** This app's own origin, the only one the consent answer is posted to. */
+  abstract appOrigin(): string;
+
+  /** Mints the docs session key for the chosen project, access and lifetime; on Allow only. */
+  abstract mintDocsSessionKey(input: {
+    projectId: string;
+    docsOrigin: string;
+    access: DocsSessionKeyAccess;
+    lifetimeMinutes: DocsSessionKeyLifetimeMinutes;
+  }): Promise<DocsSessionKeyMinted>;
+
+  /** Whether the chosen project's organization lets the docs connect, while it is being read. */
+  abstract docsSessionAvailability(): DocsSessionAvailabilityReading;
+
+  /** Closes the consent popup once its answer is posted. */
+  abstract closeWindow(): void;
 
   /** Writes to the clipboard and says the right thing either way. */
   abstract copyToClipboard(input: {

@@ -2,6 +2,8 @@ import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
 import type { LwqlAppOwnedDrift } from "../features/provisioning/services/langwatch-ql-self-provisioning.service.ts";
+import type { LwqlUnconfirmedSinceRepository } from "../repositories/langwatch-ql-unconfirmed-since.repository.ts";
+import { isCollectionUnconfirmed } from "../rules/langwatch-ql-collection-probe.rules.ts";
 import {
   clickHouseErrorCodeFields,
   clickHouseErrorSummary,
@@ -24,6 +26,9 @@ const CONVERGE_FAILED_MESSAGES: Record<LwqlStore, string> = {
 /** An unchanged failure is logged at error again after this, so a lapsed alert fires anew. */
 const REALERT_AFTER_MS = 60 * 60_000;
 
+/** How long after the fleet's first failed check an unconfirmed collection alerts. */
+export const LWQL_UNCONFIRMED_ALERT_AFTER_MS = 15 * 60_000;
+
 interface LwqlReconvergenceRunDeps {
   /** Throws when ClickHouse is unreachable; the next check probes again. */
   readonly probe: () => Promise<LwqlAccessModelOwner>;
@@ -35,6 +40,8 @@ interface LwqlReconvergenceRunDeps {
   readonly convergeAppOwned: (drift: LwqlAppOwnedDrift) => Promise<void>;
   /** Writes each project's missing key-map row; level-triggered, so a rerun inserts nothing. */
   readonly fillKeyMap: () => Promise<unknown>;
+  /** The fleet's shared time of the first check that left tables on old credentials. */
+  readonly unconfirmedSince: LwqlUnconfirmedSinceRepository;
   /** Epoch ms; the wall clock unless a test pins it. */
   readonly now?: () => number;
 }
@@ -111,12 +118,14 @@ async function convergeStore({
   drift,
   convergeAppOwned,
   alerts,
+  unconfirmedSince,
   now,
 }: {
   store: LwqlStore;
   drift: LwqlAppOwnedDrift;
   convergeAppOwned: LwqlReconvergenceRunDeps["convergeAppOwned"];
   alerts: LwqlAlerts;
+  unconfirmedSince: LwqlUnconfirmedSinceRepository;
   now: () => number;
 }): Promise<boolean> {
   const only = driftIn(store, drift);
@@ -125,17 +134,97 @@ async function convergeStore({
   if (pending === "unknown") return false;
   if (pending.length === 0) {
     alerts.delete(store);
+    if (store === "clickHouse") await endUnconfirmedRun(unconfirmedSince);
     return true;
   }
   logger.info(driftFields(only), "lwql reconvergence check found app-owned objects to converge");
   try {
     await convergeAppOwned(only);
     alerts.delete(store);
+    if (store === "clickHouse") await endUnconfirmedRun(unconfirmedSince);
     return true;
   } catch (error) {
-    logConvergeFailure({ store, error, drift: only, alerts, at: now() });
+    const at = now();
+    const run = await readUnconfirmedRun({ store, error, unconfirmedSince, at });
+    if (run.open && at - run.since < LWQL_UNCONFIRMED_ALERT_AFTER_MS) {
+      logger.warn(
+        { ...failureCodeFields(store, error), ...driftFields(only), unconfirmedSince: run.since },
+        "lwql left engine tables on their current credentials while ClickHouse has not shown it holds the new ones; the check retries in 5 minutes",
+      );
+      return false;
+    }
+    logConvergeFailure({ store, error, drift: only, alerts, at });
     return false;
   }
+}
+
+/** How long the check waits on the shared clock before it treats Redis as down. */
+export const LWQL_UNCONFIRMED_CLOCK_TIMEOUT_MS = 2_000;
+
+/**
+ * The Redis client queues commands while offline and retries without end, so a down Redis would
+ * stall the check; past the timeout the call fails like any other Redis error.
+ */
+async function withinClockTimeout<T>(call: Promise<T>): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`no answer within ${LWQL_UNCONFIRMED_CLOCK_TIMEOUT_MS} ms`)),
+      LWQL_UNCONFIRMED_CLOCK_TIMEOUT_MS,
+    );
+  });
+  try {
+    return await Promise.race([call, timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** A shared run of unconfirmed checks, open since its first failure; closed alerts at once. */
+type LwqlUnconfirmedRun =
+  | { readonly open: false }
+  | { readonly open: true; readonly since: number };
+
+/**
+ * Extends the shared run when this ClickHouse failure is an unconfirmed collection; otherwise
+ * ends it. The run is ClickHouse's alone, so a PostgreSQL failure leaves it as it is.
+ * An unreadable run reads as closed, so the check alerts rather than stays silent.
+ */
+async function readUnconfirmedRun({
+  store,
+  error,
+  unconfirmedSince,
+  at,
+}: {
+  store: LwqlStore;
+  error: unknown;
+  unconfirmedSince: LwqlUnconfirmedSinceRepository;
+  at: number;
+}): Promise<LwqlUnconfirmedRun> {
+  if (store !== "clickHouse") return { open: false };
+  if (!isCollectionUnconfirmed(error)) {
+    await endUnconfirmedRun(unconfirmedSince);
+    return { open: false };
+  }
+  try {
+    return { open: true, since: await withinClockTimeout(unconfirmedSince.mark(at)) };
+  } catch (markError) {
+    logger.warn(
+      { error: clickHouseErrorSummary(markError) },
+      "lwql could not read when ClickHouse first failed to show the new collection; alerting now",
+    );
+    return { open: false };
+  }
+}
+
+/** A failed clear leaves the run to expire; the alert then fires early, never late. */
+async function endUnconfirmedRun(unconfirmedSince: LwqlUnconfirmedSinceRepository) {
+  await withinClockTimeout(unconfirmedSince.clear()).catch((error: unknown) => {
+    logger.warn(
+      { error: clickHouseErrorSummary(error) },
+      "lwql could not clear the unconfirmed-collection clock",
+    );
+  });
 }
 
 /** Fills the key map, or throws the failure with its ClickHouse error kept as the cause. */
@@ -155,6 +244,22 @@ async function fillKeyMapOrThrow(
   }
 }
 
+/**
+ * Whether this check's converge left the key map in place where it was missing. A converge that
+ * failed on another object may still have created it, so the catalog is read again.
+ */
+async function isKeyMapRebuilt({
+  findDrift,
+  clickHouseConverged,
+}: {
+  findDrift: LwqlReconvergenceRunDeps["findDrift"];
+  clickHouseConverged: boolean;
+}): Promise<boolean> {
+  if (clickHouseConverged) return true;
+  const after = await findDrift().catch((): undefined => undefined);
+  return after !== undefined && !after.isKeyMapMissing;
+}
+
 /** The SQL-mode owner probe: re-provisions once neither store owns the access model. */
 async function probeAccessModel({
   probe,
@@ -170,7 +275,7 @@ const FIRST_DELIVERY = { attempt: 1 };
 
 /**
  * One check: read which app-owned objects are absent, converge PostgreSQL then ClickHouse where
- * either does, fill the key map when asked or once a converge repaired it, then the SQL-mode
+ * either does, fill the key map when asked or once a converge rebuilt it, then the SQL-mode
  * owner probe. Any worker may run any check; the closure only rates the failure log's level.
  */
 export function runLwqlReconvergence(
@@ -179,7 +284,14 @@ export function runLwqlReconvergence(
   const now = deps.now ?? (() => nowInstant().epochMilliseconds);
   const alerts: LwqlAlerts = new Map();
   const converge = (store: LwqlStore, drift: LwqlAppOwnedDrift) =>
-    convergeStore({ store, drift, convergeAppOwned: deps.convergeAppOwned, alerts, now });
+    convergeStore({
+      store,
+      drift,
+      convergeAppOwned: deps.convergeAppOwned,
+      alerts,
+      unconfirmedSince: deps.unconfirmedSince,
+      now,
+    });
 
   return async ({ fillKeyMap }, { attempt } = FIRST_DELIVERY): Promise<void> => {
     // Only a failed fill throws, so a redelivery owes that fill alone. The next wake's check
@@ -195,9 +307,12 @@ export function runLwqlReconvergence(
     // Unread is not converged: an unreadable catalog leaves the last alert as it was.
     if (drift !== undefined) await converge("postgres", drift);
     const clickHouseConverged = drift === undefined || (await converge("clickHouse", drift));
-    const keyMapRepaired = drift?.isKeyMapMissing === true;
+    const isKeyMapMissing = drift?.isKeyMapMissing === true;
     try {
-      if ((fillKeyMap || keyMapRepaired) && (!keyMapRepaired || clickHouseConverged)) {
+      const keyMapRepaired =
+        isKeyMapMissing &&
+        (await isKeyMapRebuilt({ findDrift: deps.findDrift, clickHouseConverged }));
+      if ((fillKeyMap && !isKeyMapMissing) || keyMapRepaired) {
         await fillKeyMapOrThrow(deps.fillKeyMap);
       }
     } finally {

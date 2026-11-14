@@ -25,13 +25,16 @@ const {
   hardRedirectMock,
   invalidateMock,
   navigatingAwayRef,
+  invitationsRef,
 } = vi.hoisted(() => {
   const lookup: { current: ReadState } = { current: {} };
   const mine: { current: ReadState } = { current: {} };
+  const invitations: { current: ReadState & { isLoading?: boolean } } = { current: {} };
   const navigating: { current: boolean } = { current: false };
   return {
     lookupRef: lookup,
     mineRef: mine,
+    invitationsRef: invitations,
     requestMock: vi.fn(),
     dismissMock: vi.fn(),
     hardRedirectMock: vi.fn(),
@@ -54,6 +57,10 @@ vi.mock("@langwatch/identity-client", () => ({
   },
 }));
 
+vi.mock("../../../behavior/auth-api.ts", () => ({
+  authApi: { invite: { pendingForMe: { useQuery: () => invitationsRef.current } } },
+}));
+
 vi.mock("../../../behavior/use-required-session.ts", () => ({
   useRequiredSession: () => ({ data: { user: { id: "user_sam", email: "sam@acme.com" } } }),
 }));
@@ -74,9 +81,52 @@ beforeEach(() => {
   navigatingAwayRef.current = false;
   lookupRef.current = { data: { outcome: "ask", organizations: [acme] } };
   mineRef.current = { data: [] };
+  invitationsRef.current = { data: [] };
 });
 
 afterEach(() => cleanup());
+
+describe("given a new account whose proven address has an invitation waiting", () => {
+  describe("when sign-up reaches the join step", () => {
+    /** @scenario "The join step sends a person with a waiting invitation to it" */
+    it("sends the browser to the invitation and offers nothing", async () => {
+      invitationsRef.current = {
+        data: [
+          { inviteCode: "inv abc", organizationName: "Acme", inviterName: null, role: "MEMBER" },
+        ],
+      };
+      renderScreen();
+
+      await vi.waitFor(() =>
+        expect(hardRedirectMock).toHaveBeenCalledWith("/invite/accept?inviteCode=inv%20abc"),
+      );
+      expect(screen.queryByRole("button")).toBeNull();
+      expect(requestMock).not.toHaveBeenCalled();
+      expect(dismissMock).not.toHaveBeenCalled();
+    });
+
+    it("waits for the invitation read before offering anything", () => {
+      invitationsRef.current = { isLoading: true };
+      renderScreen();
+
+      expect(screen.queryByRole("button")).toBeNull();
+      expect(hardRedirectMock).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("given the read of waiting invitations fails", () => {
+  describe("when sign-up reaches the join step", () => {
+    /** @scenario "The join step carries on as before when the invitation read fails" */
+    it("offers what it offered before", async () => {
+      invitationsRef.current = { isError: true, error: new Error("unavailable") };
+      renderScreen();
+
+      expect((await screen.findAllByRole("button"))[0]?.textContent).toMatch(/Join Acme/);
+      expect(hardRedirectMock).not.toHaveBeenCalled();
+    });
+  });
+});
 
 describe("given a verified address an organization is open to", () => {
   describe("when sign-up reaches the join step", () => {

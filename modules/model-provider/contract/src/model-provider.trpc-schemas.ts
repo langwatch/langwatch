@@ -159,6 +159,8 @@ const modelProviderValidateApiKeyTrpcInputSchemaDefinition = z
     ...modelProviderTenantAnchorFields,
     provider: z.string(),
     customKeys: z.record(z.string(), z.string()),
+    // The model about to run on the credential; Azure probes this deployment.
+    model: z.string().min(1).optional(),
     // The scopes the credential is being set up for. Required on the
     // no-project path, where they are what the probe is authorized
     // against — see the process's credential-probe policy.
@@ -309,6 +311,17 @@ export interface ModelDefaultInheritedValuesTrpcInputSchema extends Named<
 > {}
 export const modelDefaultInheritedValuesTrpcInputSchema: ModelDefaultInheritedValuesTrpcInputSchema =
   modelDefaultInheritedValuesTrpcInputSchemaDefinition;
+
+const decisionModelsForScopesTrpcInputSchemaDefinition = z.object({
+  projectId: z.string(),
+  scopes: modelDefaultScopedConfigInputSchema,
+});
+export interface DecisionModelsForScopesTrpcInputSchema extends Named<
+  typeof decisionModelsForScopesTrpcInputSchemaDefinition
+> {}
+/** The scopes a Default models config is being written for, anchored on the page's project. */
+export const decisionModelsForScopesTrpcInputSchema: DecisionModelsForScopesTrpcInputSchema =
+  decisionModelsForScopesTrpcInputSchemaDefinition;
 
 /**
  * What the two reads the studio and the dock borrow answer, both this contract's own

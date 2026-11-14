@@ -40,6 +40,7 @@ import {
 import {
   bindTrpcMiddlewareContext,
   browserSessionContext,
+  browserSessionWindowContext,
   callerAddressContext,
   createTrpcErrorFormatter,
   createTrpcRuntime,
@@ -72,6 +73,9 @@ export type TrpcSession = Readonly<{
   user: TrpcSessionUser;
   /** The browser session's own id, where the deployment tracks one. */
   sessionId?: string;
+  /** When that session began and when it ends, as ISO instants, where auth reports them. */
+  startedAt?: string;
+  expiresAt?: string;
 }>;
 
 /** The one context every procedure on this root is resolved against. */
@@ -184,7 +188,10 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
       },
       audit: { record: (entry) => this.#record(entry) },
       errorReporting: {
-        capture: (failure: unknown) => this.#logger.error({ error: failure }, "tRPC call failed"),
+        // The "trpc call" record already carries the failure at error level
+        // (path, status, duration, error). A second "tRPC call failed" line for the
+        // same call only doubled the volume, so reporting adds nothing here.
+        capture: () => void 0,
         asError: (failure: unknown): Error =>
           failure instanceof Error ? failure : new Error(String(failure)),
       },
@@ -338,6 +345,15 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
         browserSessionContext,
         (ctx: TrpcRequestContext) => ctx.session?.sessionId ?? null,
       ),
+      bindTrpcMiddlewareContext(browserSessionWindowContext, (ctx: TrpcRequestContext) =>
+        ctx.session?.sessionId
+          ? {
+              id: ctx.session.sessionId,
+              startedAt: ctx.session.startedAt ?? null,
+              expiresAt: ctx.session.expiresAt ?? null,
+            }
+          : null,
+      ),
       bindTrpcMiddlewareContext(
         callerAddressContext,
         (ctx: TrpcRequestContext) => ctx.clientIp() ?? null,
@@ -390,7 +406,8 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
         ...this.#organizationOf(options.audit),
       },
       errors: {
-        report: (failure) => this.#logger.error({ error: failure }, "tRPC call failed"),
+        // Same as the legacy host: the "trpc call" record carries the failure.
+        report: () => void 0,
         asError: (failure) => (failure instanceof Error ? failure : new Error(String(failure))),
         translate: () => void 0,
       },
@@ -525,6 +542,8 @@ function sessionOf(caller: SessionCaller | null): TrpcSession | null {
         : {}),
     },
     ...(caller.sessionId ? { sessionId: caller.sessionId } : {}),
+    ...(caller.sessionStartedAt ? { startedAt: caller.sessionStartedAt } : {}),
+    ...(caller.sessionExpiresAt ? { expiresAt: caller.sessionExpiresAt } : {}),
   };
 }
 

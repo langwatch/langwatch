@@ -78,9 +78,6 @@ const UNDOCUMENTED_SAVED_WORKBENCH_CHARTS =
 const UNDOCUMENTED_CHECKUP =
   "Not yet documented in the API reference: the checkup routes back Settings, Checkup and langwatch doctor on a self-hosted install, and the CLI documentation covers that flow.";
 
-const UNDOCUMENTED_DASHBOARD_WIDGETS =
-  "Live surface gated behind the release_dashboards and release_lwql_workbench feature flags, deliberately undocumented until release.";
-
 const RETIRED_LEGACY_AGENTS =
   "Retired surface, intentionally undocumented: superseded by /api/v1/agents (see the Agents family below); this bare form answers every request with a deprecation notice naming the successor.";
 
@@ -107,6 +104,8 @@ const SKIP_PATHS: Record<string, string> = {
     "Retired surface, intentionally undocumented: superseded by /api/traces/search.",
   "/api/trace/{id}":
     "Retired surface, intentionally undocumented: superseded by /api/traces/{traceId}.",
+  "/api/docs-session":
+    "Live surface, intentionally undocumented: the docs playground's own revoke call for its session key (ADR-185), not an API for integrations.",
   "/api/checkup": UNDOCUMENTED_CHECKUP,
   "/api/checkup/run": UNDOCUMENTED_CHECKUP,
   "/api/gateway/v1/providers": RETIRED_GATEWAY_PROVIDER_BINDINGS,
@@ -133,11 +132,6 @@ const SKIP_PATHS: Record<string, string> = {
   "/api/v1/projects/{projectId}/analytics/charts/{chartId}": UNDOCUMENTED_SAVED_WORKBENCH_CHARTS,
   "/api/v1/projects/{projectId}/analytics/charts/{chartId}/placement":
     UNDOCUMENTED_SAVED_WORKBENCH_CHARTS,
-  "/api/v1/projects/{projectId}/analytics/dashboard-widgets": UNDOCUMENTED_DASHBOARD_WIDGETS,
-  "/api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}":
-    UNDOCUMENTED_DASHBOARD_WIDGETS,
-  "/api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}/dashboard":
-    UNDOCUMENTED_DASHBOARD_WIDGETS,
   "/api/auth/logout": UNDOCUMENTED_APP_INTERNAL,
   "/api/auth/session": UNDOCUMENTED_APP_INTERNAL,
   "/api/auth/validate": UNDOCUMENTED_APP_INTERNAL,
@@ -345,6 +339,13 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
       "Manage AI agent configurations. Create, update, and organize agents that are tracked and evaluated in LangWatch.",
   },
   {
+    name: "Agent Registry",
+    dirName: "governance-agent-registry",
+    pathPrefixes: ["/api/governance/registry"],
+    overviewDescription:
+      "Read every AI agent in your organization with its endpoints, model, instructions, tools and owner, as JSON or as an ARD v0.91 manifest, and follow its changes through the change feed. Needs an organization API key.",
+  },
+  {
     name: "Coding Agents",
     dirName: "coding-agents",
     pathPrefixes: ["/api/v1/coding-agent", "/api/coding-agent"],
@@ -380,7 +381,14 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
     dirName: "dashboards",
     pathPrefixes: ["/api/dashboards"],
     overviewDescription:
-      "Manage custom analytics dashboards. Create, reorder, and organize dashboards with custom graphs.",
+      "Create and manage dashboards and the widgets on them. Each widget holds a LangWatchQL query and a chart setup.",
+  },
+  {
+    name: "Reports",
+    dirName: "reports",
+    pathPrefixes: ["/api/analytics/reports"],
+    overviewDescription:
+      "Manage the Analytics Reports dashboards. Create, reorder, and organize dashboards with custom graphs.",
   },
   {
     name: "Graphs",
@@ -592,6 +600,9 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
   },
 ];
 
+/** Longer summary slugs are cut at a whole word: a cut mid-word published `...-fields-ho`. */
+const SLUG_MAX = 48;
+
 function slugify(text: string): string {
   return text
     .toLowerCase()
@@ -634,7 +645,7 @@ function getResourceName(apiPath: string): string {
 function generateFileName(method: string, apiPath: string, op: OpenAPIOperation): string {
   if (op.summary) {
     const s = slugify(op.summary);
-    return s.length > 40 ? s.substring(0, 40).replace(/-$/, "") : s;
+    return s.length > SLUG_MAX ? s.slice(0, SLUG_MAX + 1).replace(/-[^-]*$/, "") : s;
   }
 
   const resource = getResourceName(apiPath);

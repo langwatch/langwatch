@@ -7,19 +7,23 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { Card, CardGrid } from "../src/components/layout/card.tsx";
 import { LoadMore } from "../src/components/layout/load-more.tsx";
 import { ResourceTile } from "../src/components/layout/resource-tile.tsx";
-import { SettingsCard } from "../src/components/layout/settings-card.tsx";
+import { SettingList, SettingRow, SettingsCard } from "../src/components/layout/settings-card.tsx";
 import { NoDataInfoBlock } from "../src/components/states/no-data-info-block.tsx";
 import { renderWithDesignSystem } from "../src/testing/index.tsx";
 
 afterEach(cleanup);
 
-/** jsdom resolves no cascade layers, so read the rules a node's classes were given. */
-function rulesOf(element: Element): string {
+/**
+ * jsdom resolves no cascade layers, so read the rules a node's classes were given.
+ * `nested` reads the rules for a descendant selector part instead.
+ */
+function rulesOf(element: Element, nested?: string): string {
   const css = Array.from(document.querySelectorAll("style"))
     .map((style) => style.textContent ?? "")
     .join("\n");
+  const selector = nested ? `[^{]*${nested}[^{]*` : "";
   return Array.from(element.classList)
-    .flatMap((name) => css.match(new RegExp(`\\.${name}\\{[^}]*\\}`, "g")) ?? [])
+    .flatMap((name) => css.match(new RegExp(`\\.${name}${selector}\\{[^}]*\\}`, "g")) ?? [])
     .join("");
 }
 
@@ -50,6 +54,54 @@ describe("Card", () => {
       expect(card.querySelector("[aria-hidden='true']")).toBeTruthy();
       const text = card.textContent ?? "";
       expect(text.indexOf("Okta")).toBeLessThan(text.indexOf("Test connection"));
+    });
+  });
+
+  describe("given a badge beside the title and a divided footer", () => {
+    /** @scenario "A card can set its badge beside the title and rule off its footer" */
+    it("draws the badge right after the title and a rule above the footer", () => {
+      renderWithDesignSystem(
+        <Card
+          title="Free plan"
+          badge={<span data-testid="chip">Current</span>}
+          badgePlacement="title"
+          footerDivider
+          footer={<button type="button">Upgrade</button>}
+          data-testid="plan"
+        >
+          <p>Usage</p>
+        </Card>,
+      );
+
+      const heading = screen.getByRole("heading", { name: "Free plan" });
+      expect(heading.nextElementSibling).toBe(screen.getByTestId("chip"));
+      const footer = found(screen.getByTestId("plan").querySelector("[data-card-footer-divider]"));
+      expect(rulesOf(footer)).toContain("border-top-width:1px");
+    });
+  });
+
+  describe("given a boxed setting list", () => {
+    /** @scenario "A boxed setting list is a small bordered table with values at the right end" */
+    it("borders the rows and puts each row's values at the right end", () => {
+      renderWithDesignSystem(
+        <SettingList variant="boxed" data-testid="rows">
+          <SettingRow label="Events this month">
+            <span>0</span>
+          </SettingRow>
+          <SettingRow label="Members / seats">
+            <span>1 / 2</span>
+          </SettingRow>
+        </SettingList>,
+      );
+
+      const list = screen.getByTestId("rows");
+      expect(list.dataset.settingList).toBe("boxed");
+      expect(rulesOf(list)).toContain("border-width:1px");
+      const separator = found(list.querySelector(":scope > [data-setting-row] + *"));
+      expect(rulesOf(list)).toContain("border-color:var(--chakra-colors-border)");
+      expect(rulesOf(separator)).toContain("background:var(--chakra-colors-border)");
+      const valueRule = rulesOf(list, "data-setting-value");
+      expect(valueRule).toContain("justify-content:flex-end");
     });
   });
 

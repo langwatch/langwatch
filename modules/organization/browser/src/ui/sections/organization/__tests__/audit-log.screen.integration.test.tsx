@@ -11,7 +11,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { FakeOrganizationHost, renderWithOrganizationHost } from "../../../../testing.tsx";
-import AuditLogScreen from "../audit-log.screen.tsx";
+import AuditLogScreen, { Forbidden } from "../audit-log.screen.tsx";
 
 const { state } = vi.hoisted(() => ({
   state: {
@@ -127,17 +127,21 @@ afterEach(() => cleanup());
 
 describe("given an organization below the Enterprise plan", () => {
   describe("when the audit page is opened", () => {
-    /** @scenario A deployment below the plan is told what the audit trail would show */
-    it("says what the capability covers instead of hiding it", async () => {
+    /**
+     * @scenario A deployment below the plan is told what the audit trail would show
+     * @scenario "Each Enterprise page names its feature in the shared lock"
+     */
+    it("says what the capability covers and leads a self-hosted admin to the License page", async () => {
       state.planType = "LAUNCH";
       renderWithOrganizationHost(<AuditLogScreen />, planHost());
 
       expect(screen.getByRole("heading", { name: "Audit log" })).toBeInTheDocument();
-      expect(screen.getByText("Audit log is included in Enterprise")).toBeInTheDocument();
-      expect(screen.getByRole("link", { name: "See plans" })).toHaveAttribute(
+      expect(screen.getByText("Audit log is part of LangWatch Enterprise")).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Activate a license" })).toHaveAttribute(
         "href",
-        "/settings/plans",
+        "/settings/license",
       );
+      expect(screen.queryByRole("link", { name: "See plans" })).toBeNull();
     });
 
     /** @scenario A deployment below the plan is told what the audit trail would show */
@@ -147,6 +151,38 @@ describe("given an organization below the Enterprise plan", () => {
       renderWithOrganizationHost(<AuditLogScreen />, planHost());
 
       expect(screen.queryByText("Timestamp")).not.toBeInTheDocument();
+    });
+  });
+});
+
+describe("given a member the route refuses for lack of auditLog:view", () => {
+  describe("when the organization has no Enterprise license", () => {
+    /** @scenario "A member whose role cannot open the audit log still sees the lock on a self-hosted install" */
+    it("shows the lock with the ask-an-admin line instead of a missing permission page", () => {
+      state.planType = "LAUNCH";
+      renderWithOrganizationHost(
+        <Forbidden permission="auditLog:view" />,
+        planHost({ grants: new Set() }),
+      );
+
+      expect(screen.getByText("Audit log is part of LangWatch Enterprise")).toBeInTheDocument();
+      expect(
+        screen.getByText(/Ask an organization admin to activate a license\./),
+      ).toBeInTheDocument();
+      expect(screen.queryByRole("link")).toBeNull();
+      expect(screen.queryByText(/Missing permission/)).toBeNull();
+    });
+  });
+
+  describe("when the organization is on Enterprise", () => {
+    /** @scenario "A member without permission to view the audit log on a licensed install is told what is missing" */
+    it("names the missing permission", () => {
+      renderWithOrganizationHost(
+        <Forbidden permission="auditLog:view" />,
+        planHost({ grants: new Set() }),
+      );
+
+      expect(screen.getByText("Missing permission: auditLog:view")).toBeInTheDocument();
     });
   });
 });
@@ -570,6 +606,68 @@ describe("given more rows than one page holds", () => {
       await userEvent.click(screen.getByRole("button", { name: "Go to next page" }));
 
       expect(host.queries.at(-1)).toMatchObject({ pageOffset: "25" });
+    });
+  });
+});
+
+describe("given the reader switches organization without leaving the audit page", () => {
+  describe("when the page re-renders under the new organization", () => {
+    /** @scenario The audit page re-reads the whole trail after an organization switch */
+    it("reads the whole new organization rather than the project it was filtered by", () => {
+      state.auditLogs = [auditRow()];
+      state.totalCount = 1;
+      const { rerenderWithHost } = renderWithOrganizationHost(
+        <AuditLogScreen />,
+        planHost({ scope: { organizationId: "org-1", projectId: "proj-1" } }),
+      );
+
+      expect(calls.listQuery).toHaveBeenLastCalledWith(
+        expect.objectContaining({ organizationId: "org-1", projectId: "proj-1" }),
+      );
+
+      rerenderWithHost(planHost({ scope: { organizationId: "org-2", projectId: void 0 } }));
+
+      expect(calls.listQuery).toHaveBeenLastCalledWith(
+        expect.objectContaining({ organizationId: "org-2", projectId: void 0 }),
+      );
+    });
+
+    /** @scenario The audit page re-reads the whole trail after an organization switch */
+    it("exports the whole new organization, not the project the filter named", async () => {
+      state.auditLogs = [auditRow()];
+      state.totalCount = 1;
+      state.fetchPages = [{ auditLogs: [auditRow()], totalCount: 1 }];
+      const { rerenderWithHost } = renderWithOrganizationHost(
+        <AuditLogScreen />,
+        planHost({ scope: { organizationId: "org-1", projectId: "proj-1" } }),
+      );
+
+      rerenderWithHost(planHost({ scope: { organizationId: "org-2", projectId: void 0 } }));
+      await exportVia("Current view (filters as shown)");
+
+      await waitFor(() => expect(calls.exportFetch).toHaveBeenCalled());
+      expect(calls.exportFetch).toHaveBeenCalledWith(
+        expect.objectContaining({ organizationId: "org-2", projectId: void 0 }),
+      );
+    });
+  });
+
+  describe("when they switch back to the organization they started in", () => {
+    /** @scenario The audit page re-reads the whole trail after an organization switch */
+    it("leaves the old project forgotten rather than reviving it", () => {
+      state.auditLogs = [auditRow()];
+      state.totalCount = 1;
+      const { rerenderWithHost } = renderWithOrganizationHost(
+        <AuditLogScreen />,
+        planHost({ scope: { organizationId: "org-1", projectId: "proj-1" } }),
+      );
+
+      rerenderWithHost(planHost({ scope: { organizationId: "org-2", projectId: void 0 } }));
+      rerenderWithHost(planHost({ scope: { organizationId: "org-1", projectId: void 0 } }));
+
+      expect(calls.listQuery).toHaveBeenLastCalledWith(
+        expect.objectContaining({ organizationId: "org-1", projectId: void 0 }),
+      );
     });
   });
 });

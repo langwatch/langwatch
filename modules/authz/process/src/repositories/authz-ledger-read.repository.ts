@@ -1,9 +1,27 @@
+import type { GrantCondition } from "@langwatch/authorization";
 import type { AuthzSharedProjectGrant, OffboardCounts } from "@langwatch/authz-contract";
 import type { Instant } from "@langwatch/time";
 
 import type { AuthzReadRepository } from "./authz-read.repository.ts";
 import type { GrantRowShape } from "./prisma/prisma.authz-grant.mapper.ts";
 import type { AuthzGrantFilter } from "./prisma/prisma.authz-ledger.mapper.ts";
+
+/** One braid's grant (ADR-201 §1); `condition` is null when its stored window no longer parses. */
+export type LedgerBraidRow = Readonly<{
+  grantId: string;
+  ownerProjectId: string;
+  readerProjectId: string;
+  condition: GrantCondition | null;
+  expiresAt: Instant | null;
+  createdByUserId: string | null;
+  occurredAt: Instant;
+  revokedReason: string | null;
+  isLive: boolean;
+  /** The braid a change replaced; null on a created braid or one older than the column. */
+  replacesGrantId: string | null;
+  /** Some braid, live or revoked, names this one as replaced: it never reads or lists again. */
+  isReplaced: boolean;
+}>;
 
 /** A binding's identity as the canonical Grant head stores it. */
 export type LedgerGrantIdentity = Readonly<{
@@ -74,6 +92,15 @@ export abstract class AuthzLedgerReadRepository {
     readerProjectId: string;
   }): Promise<AuthzSharedProjectGrant[]>;
 
+  /** Braid grants touching `projectId` (either side) or named by `grantId`; revoked ones only
+   *  when `includeRevoked`, so a repeated removal can tell a removed braid from a changed one. */
+  abstract findBraids(input: {
+    organizationId: string;
+    projectId?: string;
+    grantId?: string;
+    includeRevoked?: boolean;
+  }): Promise<LedgerBraidRow[]>;
+
   /** The ids of the live grants a translated compat filter names. */
   abstract findLiveGrantIds(input: { where: AuthzGrantFilter }): Promise<string[]>;
 
@@ -122,5 +149,5 @@ export abstract class AuthzLedgerReadRepository {
     organizationId: string;
     revoke: (grantIds: string[]) => Promise<void>;
     prove: (reader: AuthzReadRepository) => Promise<void>;
-  }): Promise<Omit<OffboardCounts, "bindings">>;
+  }): Promise<Omit<OffboardCounts, "bindings"> & { heldFullSeat: boolean }>;
 }

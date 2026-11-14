@@ -21,7 +21,7 @@ import {
   startTestClickHouseEndpoints,
 } from "@langwatch/clickhouse-client/testing";
 import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
-import { nowInstant } from "@langwatch/time";
+import { nowInstant, Temporal, toDate } from "@langwatch/time";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { GATEWAY_SPEND_PROJECTION_VERSION_LATEST } from "../../../rules/gateway-spend-projection.rules.ts";
@@ -72,14 +72,13 @@ function recordingDriver(client: ClickHouseClient): ScriptedStatements {
   };
 }
 
+/**
+ * The parts left once the time bound has pruned partitions (EXPLAIN's Partition stage). Not
+ * EXPLAIN ESTIMATE: from 26.4 that also counts column-statistics pruning, which can narrow an
+ * unbounded read to the same part and hide what the bound saves.
+ */
 async function partsReached(request: QueryRequest): Promise<number> {
-  const result = await ch.query({
-    query: `EXPLAIN ESTIMATE ${request.sql}`,
-    format: "JSONEachRow",
-    ...(request.params === undefined ? {} : { query_params: request.params }),
-  });
-  const rows = await result.json<{ parts: number | string }>();
-  return rows.reduce((total, row) => total + Number(row.parts), 0);
+  return partsAfterPartitionPruning({ query: queryRows, request });
 }
 
 /** One query on the test server, its rows as JSONEachRow parses them. */
@@ -109,7 +108,8 @@ function spendRow({ id, occurredAtMs }: { id: string; occurredAtMs: number }) {
     Model: "openai/gpt-5",
     Status: "confirmed",
     Version: GATEWAY_SPEND_PROJECTION_VERSION_LATEST,
-    OccurredAt: occurredAtMs,
+    // A Date, as the fold writes it: 26.8 reads an unquoted integer here as seconds (#108091).
+    OccurredAt: toDate(Temporal.Instant.fromEpochMilliseconds(occurredAtMs)),
     CreatedAt: occurredAtMs,
     LastEventOccurredAt: occurredAtMs,
     EventTimestamp: occurredAtMs,

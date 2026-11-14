@@ -6,8 +6,10 @@ export {
   assertVersionLabel,
   basePathOf,
   canonicalV1Path,
+  DASHBOARDS_API_VERSION,
   isDateVersion,
   MANAGEMENT_API_VERSION,
+  pinnedVersionPath,
   RestVersionSelector,
   restVersionSelectorMiddleware,
   undescribedStack,
@@ -38,7 +40,9 @@ export {
   type FeatureApiWitness,
   type RestDeprecation,
   type RestDoorCredential,
+  type RestLegacyKeyScopes,
   type RestMethodName,
+  type RestPermissionOptions,
   type RestPermissionPlatform,
   type RestPermissionReach,
   type RestPermissionTarget,
@@ -105,8 +109,10 @@ export {
 } from "./idempotency.ts";
 export type {
   IdempotencyReceiptCreateInput,
+  IdempotencyReceiptFence,
   IdempotencyReceiptPersistence,
   IdempotencyReceiptRecord,
+  IdempotencyReceiptUpdate,
 } from "./repositories/prisma/prisma.idempotency-receipt.ts";
 
 export { recordRequestPrincipal } from "./request-principal.ts";
@@ -176,6 +182,7 @@ export {
   projectOf,
   type ProjectScopedContext,
   recordBrowserCaller,
+  keyPrincipalOfApiKey,
   recordKeyCredential,
   recordOrganizationCredential,
   recordProjectCredential,
@@ -333,6 +340,7 @@ export {
 export {
   assertKeyKind,
   keyCredentialOf,
+  keyCredentialOfDoor,
   REST_KEY_KINDS,
   type RestKeyCredential,
   type RestKeyDoor,

@@ -22,8 +22,8 @@ T = TypeVar("T", bound="PostApiTracesSearchBody")
 class PostApiTracesSearchBody:
     """
     Attributes:
-        start_date (float | str):
-        end_date (float | str):
+        start_date (float | str): Epoch milliseconds, or an ISO 8601 date string.
+        end_date (float | str): Epoch milliseconds, or an ISO 8601 date string.
         query (str | Unset):
         filters (PostApiTracesSearchBodyFilters | Unset):
         trace_ids (list[str] | Unset):
@@ -45,7 +45,8 @@ class PostApiTracesSearchBody:
         format_ (PostApiTracesSearchBodyFormat | Unset): Output format: 'digest' (AI-readable trace digest) or 'json'
             (full raw data)
         include_spans (bool | Unset): When true, fetches full span data for each trace. Useful for bulk export. Default
-            false.
+            false. A page with spans holds at most 100 traces, and that is its default; a larger `pageSize` is refused with
+            422 `trace_page_size_too_large`. When a response carries a `scrollId`, send it to fetch the next page.
         llm_mode (bool | Unset):
         date_field (PostApiTracesSearchBodyDateField | Unset): Which timestamp the startDate/endDate window filters on.
             'occurred' (default) selects traces by when they happened. 'updated' selects traces by when they were last

@@ -29,7 +29,7 @@ After sign-in you'll land on `/governance` (the org governance home, see the [co
 
 [Routing Policies](/ai-gateway/governance/routing-policies) are the gateway's per-virtual-key behaviour bundle: which providers to try first, what fallback chain to follow on outage, what models are allowed, what tools `policy_rules` denies. Every Personal Virtual Key minted on first developer sign-in binds to your org's **default** routing policy, so without a default policy, `langwatch login` returns:
 
-```
+```text
 HTTP 409, error: "no_default_routing_policy"
 Ask your admin to publish a default routing policy at Gateway → Routing Policies.
 ```

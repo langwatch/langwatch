@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { StubAuthzEpoch } from "../../repositories/__tests__/support/authz-epoch.stub.ts";
 import { StubAuthzManagedGrantRepository } from "../../repositories/__tests__/support/authz-managed-grant.stub.ts";
 import { EventingAuthzGrantRepository } from "../../repositories/eventing/eventing.authz-grant.repository.ts";
+import { MemoryAuthzOrganizationPolicyRepository } from "../../repositories/memory/memory.authz-organization-policy.repository.ts";
 import { permissiveGrantGuards } from "../../services/__tests__/support/grant-guards.stub.ts";
 import { AuthzGrantsService } from "../../services/authz-grants.service.ts";
 import { ORG_ID, harness, storedGrantRow } from "./support/eventing.authz-ledger-fork.harness.ts";
@@ -22,6 +23,7 @@ function service() {
   db.grant.count.mockResolvedValue(1);
   const repository = EventingAuthzGrantRepository.create({ reads, lineage, writer });
   const grants = AuthzGrantsService.create({
+    policies: MemoryAuthzOrganizationPolicyRepository.create(),
     permissions: permissiveGrantGuards,
     repository,
     ledger: writer,

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 /**
- * The judge's picker offers Instant Evals only when the server releases the project, whatever
- * the flag says; the stand-in for the lent picker lists exactly the options this field hands it.
+ * The picker offers Instant Evals only when the server releases LangWatch's model, and own
+ * decision models either way; the stand-in picker lists exactly the options it is handed.
  * @see modules/instant-eval/specs/instant-eval-judge-model.feature
  */
 
@@ -11,10 +11,20 @@ import { cleanup, screen } from "@testing-library/react";
 import { FormProvider, useForm } from "react-hook-form";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+const OWN_DECISION_MODEL = {
+  value: "openai/decisions:gpt-6-luna",
+  label: "gpt-6-luna",
+};
+const HOSTED_DECISION_MODEL = {
+  value: "langwatch/instant-evals",
+  label: "Evals Preview",
+};
+
 const state = vi.hoisted(() => ({
   flagReleased: false,
   released: false,
   providers: [] as unknown[],
+  decisionModels: [] as { value: string; label: string }[],
 }));
 
 vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
@@ -38,11 +48,14 @@ vi.mock("../../../../behavior/evaluator-api.ts", () => ({
       listAllForProjectForFrontend: {
         useQuery: () => ({ data: state.providers, isLoading: false }),
       },
+      listDecisionModelsForProject: {
+        useQuery: () => ({ data: state.decisionModels, isLoading: false }),
+      },
     },
     instantEval: {
       access: {
         useQuery: () => ({
-          data: { released: state.released, offer: "enable" },
+          data: { released: state.released, hostedReleased: state.released, offer: "enable" },
           isLoading: false,
         }),
       },
@@ -72,6 +85,7 @@ beforeEach(() => {
   state.flagReleased = false;
   state.released = false;
   state.providers = [];
+  state.decisionModels = [];
 });
 afterEach(() => cleanup());
 
@@ -89,6 +103,10 @@ function renderField() {
 
 function offersInstantEvals(): boolean {
   return screen.queryByText("Instant Evals") !== null;
+}
+
+function offeredLabels(): string[] {
+  return screen.queryAllByRole("listitem").map((option) => option.textContent ?? "");
 }
 
 describe("EvaluatorLLMConfigField", () => {
@@ -129,6 +147,41 @@ describe("EvaluatorLLMConfigField", () => {
 
         expect(screen.queryByLabelText("model options")).not.toBeNull();
         expect(offersInstantEvals()).toBe(false);
+      });
+    });
+
+    describe("when the server answers with Instant Evals and an own decision model", () => {
+      beforeEach(() => {
+        state.released = true;
+        state.decisionModels = [HOSTED_DECISION_MODEL, OWN_DECISION_MODEL];
+      });
+
+      /** @scenario "The judge model picker offers the project's own decision models" */
+      it("offers Instant Evals first, then the own decision model", () => {
+        renderField();
+
+        expect(offeredLabels()).toEqual(["Instant Evals", OWN_DECISION_MODEL.label]);
+      });
+    });
+
+    describe("when the server answers with the hosted model only", () => {
+      /** @scenario "The picker offers Instant Evals alone when the server offers no own model" */
+      it("offers Instant Evals and nothing else", () => {
+        state.released = true;
+        state.decisionModels = [HOSTED_DECISION_MODEL];
+        renderField();
+
+        expect(offeredLabels()).toEqual(["Instant Evals"]);
+      });
+    });
+
+    describe("when the server does not release Instant Evals but answers with an own model", () => {
+      /** @scenario "The picker offers own decision models when Instant Evals are not released" */
+      it("offers the own decision model but not Instant Evals", () => {
+        state.decisionModels = [HOSTED_DECISION_MODEL, OWN_DECISION_MODEL];
+        renderField();
+
+        expect(offeredLabels()).toEqual([OWN_DECISION_MODEL.label]);
       });
     });
   });

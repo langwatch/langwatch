@@ -8,17 +8,9 @@
 import type { SavedDashboardsProps } from "@langwatch/analytics-client";
 import type { DashboardStar } from "@langwatch/dashboard-contract";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
-import {
-  Box,
-  Button,
-  HStack,
-  IconButton,
-  Spinner,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Box, Button, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 import { HandledErrorAlert } from "@langwatch/error-views";
-import { ChevronRight, Plus } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
@@ -55,6 +47,7 @@ import {
 } from "../blocks/saved-dashboard-row.tsx";
 import { ScopeConfirmDialog } from "../blocks/scope-confirm-dialog.tsx";
 import { WidgetInfoTip } from "../blocks/widget-info-tip.tsx";
+import { NewDashboardButton } from "../elements/new-dashboard-button.tsx";
 import { ScopeMark } from "../elements/scope-mark.tsx";
 
 const GROUP_LABEL_STYLE = {
@@ -64,7 +57,7 @@ const GROUP_LABEL_STYLE = {
 
 type Favourites = ReturnType<typeof useFavourites>;
 
-/** A row's star, and its Move up / Move down while it sits in the Starred group. */
+/** A row's star, and its Move up / Move down while it sits in the Pinned group. */
 function starActionsFor({
   favourites,
   star,
@@ -73,7 +66,7 @@ function starActionsFor({
 }: {
   favourites: Favourites;
   star: DashboardStar;
-  /** Its place among the shown stars; absent outside the Starred group. */
+  /** Its place among the shown stars; absent outside the Pinned group. */
   index: number | undefined;
   shown: readonly DashboardStar[];
 }): StarActions {
@@ -174,7 +167,7 @@ function CuratedRow({ curated, place, shown, index }: RowPlace & { curated: Cura
   );
 }
 
-/** "Your dashboards", "Starred" and the organization's boards, or their loading or error state. */
+/** "Your dashboards", "Pinned" and the organization's boards, or their loading or error state. */
 function BoardGroups({
   groups,
   place,
@@ -245,8 +238,8 @@ function BoardGroups({
       </RowList>
       {groups.starred.length > 0 && (
         <>
-          <GroupLabel>Starred</GroupLabel>
-          <RowList label="Starred dashboards">{groups.starred.map(starredRow)}</RowList>
+          <GroupLabel>Pinned</GroupLabel>
+          <RowList label="Pinned dashboards">{groups.starred.map(starredRow)}</RowList>
         </>
       )}
       {groups.fromOrganization.length > 0 && (
@@ -298,8 +291,9 @@ export function SavedDashboardsSection({ openPath }: SavedDashboardsProps) {
     <VStack align="stretch" gap={0.5} width="full" marginTop={3.5}>
       <HStack paddingX={2} marginBottom={0.5} gap={1}>
         <Text {...GROUP_LABEL_STYLE}>Your dashboards</Text>
+        {/* A blank board at once: the new board offers the templates, so no menu is needed. */}
         {mayCreate && (
-          <NewDashboardButton isCreating={saved.isCreating} onCreate={saved.createBoard} />
+          <NewDashboardButton isCreating={saved.isCreating} onCreate={() => saved.createBoard()} />
         )}
       </HStack>
 
@@ -384,36 +378,5 @@ function RowList({ label, children }: { label: string; children: ReactNode }) {
     <VStack as="ul" aria-label={label} align="stretch" gap={0.5} margin={0} padding={0}>
       {children}
     </VStack>
-  );
-}
-
-/**
- * The "+" anchored to the heading creates a blank board at once. Templates stay one step away:
- * the new board offers them, so the sidebar needs no menu or library link.
- */
-function NewDashboardButton({
-  isCreating,
-  onCreate,
-}: {
-  isCreating: boolean;
-  onCreate: () => void;
-}) {
-  return (
-    <Box marginLeft="auto" display="flex">
-      <IconButton
-        size="2xs"
-        variant="ghost"
-        minWidth={0}
-        boxSize={4}
-        color="fg.subtle"
-        _hover={{ color: "fg", background: "border/60" }}
-        aria-label="New dashboard"
-        title="New dashboard"
-        loading={isCreating}
-        onClick={onCreate}
-      >
-        <Plus size={12} aria-hidden />
-      </IconButton>
-    </Box>
   );
 }

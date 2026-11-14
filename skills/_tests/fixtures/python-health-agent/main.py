@@ -19,7 +19,7 @@ IMPORTANT BOUNDARIES:
 
 def chat(message: str) -> str:
     response = client.chat.completions.create(
-        model="gpt-5-mini",
+        model="gpt-6-luna",
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": message},

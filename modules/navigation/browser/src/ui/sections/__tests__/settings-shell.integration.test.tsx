@@ -38,6 +38,7 @@ const commandBarOpenMock = vi.fn();
 
 function renderSettingsSidebar({
   pathname = "/settings",
+  search = "",
   isLiteMember = false,
   isEnterprise = true,
   hasOpsAccess = false,
@@ -45,10 +46,13 @@ function renderSettingsSidebar({
   isSaaS = false,
   hasCloudOps = false,
   permissions = ["organization:view", "auditLog:view", "triggers:view", "sso:view"],
+  organizationPermissions = [],
   surface = "settings",
 }: {
   surface?: "settings" | "admin";
+  organizationPermissions?: string[];
   pathname?: string;
+  search?: string;
   isLiteMember?: boolean;
   isEnterprise?: boolean;
   hasOpsAccess?: boolean;
@@ -63,10 +67,14 @@ function renderSettingsSidebar({
         organization: ORGANIZATION,
         organizations: [ORGANIZATION],
         pathname,
+        search,
         permissions,
+        organizationPermissions,
         plan: { isEnterprise, isLoading: false, isLiteMember },
         opsAccess: { hasAccess: hasOpsAccess, isAdmin: isOpsAdmin },
         deployment: { isSaaS, hasCloudOps },
+        // Braids released, so the menu's Braids entry renders as the organisation would see it.
+        flags: { release_braids: { enabled: true, isLoading: false } },
         commandBar: { shortcut: "⌘K", open: commandBarOpenMock, trigger: null },
       }}
     >
@@ -115,6 +123,14 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
 });
+
+/** The sidebar entries marked as the page on screen. */
+function markedEntries() {
+  return within(screen.getByTestId("sidebar-scroll-region"))
+    .getAllByRole("link")
+    .filter((link) => link.getAttribute("aria-current") === "page")
+    .map((link) => link.textContent?.trim());
+}
 
 /** Organization and Project each have a General entry, so the href picks the one meant. */
 function generalLink(href: string) {
@@ -177,7 +193,7 @@ describe("the settings shell in a new navigation mode", () => {
       expect(screen.getByText("People & access")).toBeInTheDocument();
       expect(generalLink("/settings")).toHaveAttribute("href", "/settings");
       expect(generalLink("/settings/project")).toBeInTheDocument();
-      expect(screen.getByRole("link", { name: "Directory" })).toHaveAttribute(
+      expect(screen.getByRole("link", { name: "Users" })).toHaveAttribute(
         "href",
         "/settings/directory",
       );
@@ -242,7 +258,7 @@ describe("the settings shell in a new navigation mode", () => {
       expect(
         within(organizationGroup!).getByRole("link", { name: /^Authentication/ }),
       ).toHaveAttribute("href", "/settings/authentication");
-      expect(within(peopleGroup!).getByRole("link", { name: "Directory" })).toHaveAttribute(
+      expect(within(peopleGroup!).getByRole("link", { name: "Users" })).toHaveAttribute(
         "href",
         "/settings/directory",
       );
@@ -255,24 +271,22 @@ describe("the settings shell in a new navigation mode", () => {
       }
     });
 
-    it("lights Directory and Roles on the old addresses that forward onto them", () => {
+    it("lights Users and Roles on the old addresses that forward onto them", () => {
       renderSettingsSidebar({ pathname: "/settings/members" });
-      expect(screen.getByRole("link", { name: "Directory" })).toHaveAttribute(
-        "aria-current",
-        "page",
-      );
+      expect(screen.getByRole("link", { name: "Users" })).toHaveAttribute("aria-current", "page");
       cleanup();
 
       renderSettingsSidebar({ pathname: "/settings/role-bindings" });
       expect(screen.getByRole("link", { name: /^Roles/ })).toHaveAttribute("aria-current", "page");
     });
 
-    /** @scenario "A plan with Enterprise sees its entries marked ENT, not locked" */
-    it("marks the enterprise entries ENT on a plan that includes them", () => {
+    /** @scenario "A plan with Enterprise sees its entries as plain entries" */
+    it("draws the enterprise entries plainly on a plan that includes them", () => {
       renderSettingsSidebar();
 
       const roles = screen.getByRole("link", { name: /^Roles/ });
-      expect(within(roles).getByText("ENT")).toBeInTheDocument();
+      expect(within(roles).queryByLabelText("Enterprise")).not.toBeInTheDocument();
+      expect(roles.querySelector(".lucide-lock")).toBeNull();
       expect(screen.queryByLabelText("Included in Enterprise")).not.toBeInTheDocument();
     });
 
@@ -285,8 +299,8 @@ describe("the settings shell in a new navigation mode", () => {
         const link = screen.getByRole("link", { name });
         expect(within(link).getByLabelText("Included in Enterprise")).toBeInTheDocument();
       }
-      expect(screen.queryByText("ENT")).not.toBeInTheDocument();
-      for (const name of [/^Directory/, /^Authentication/]) {
+      expect(screen.queryByLabelText("Enterprise")).not.toBeInTheDocument();
+      for (const name of [/^Users/, /^Authentication/]) {
         const link = screen.getByRole("link", { name });
         expect(within(link).queryByLabelText("Included in Enterprise")).not.toBeInTheDocument();
       }
@@ -300,6 +314,15 @@ describe("the settings shell in a new navigation mode", () => {
       expect(screen.queryByRole("link", { name: /^Authentication/ })).not.toBeInTheDocument();
     });
 
+    /** @scenario "A branded feature's entries wear its mark" */
+    it("draws the Braids entry with the braids mark, not a stock icon", () => {
+      renderSettingsSidebar();
+
+      const braids = screen.getByRole("link", { name: /^Braids/ });
+      expect(braids.querySelector('[data-feature="braids"]')).not.toBeNull();
+      expect(braids.querySelector(".lucide")).toBeNull();
+    });
+
     /** @scenario "Settings groups read in sentence case" */
     it("labels its groups in sentence case", () => {
       renderSettingsSidebar();
@@ -309,12 +332,69 @@ describe("the settings shell in a new navigation mode", () => {
     });
 
     /** @scenario "A detail page keeps its owning entry lit" */
-    it("lights Directory on a team's own page", () => {
-      renderSettingsSidebar({ pathname: "/settings/teams/platform" });
-      expect(screen.getByRole("link", { name: "Directory" })).toHaveAttribute(
-        "aria-current",
-        "page",
+    it("lights Teams & projects on a team's own page", () => {
+      renderSettingsSidebar({
+        pathname: "/settings/teams/platform",
+        permissions: ["organization:manage"],
+      });
+      expect(markedEntries()).toEqual(["Teams & projects"]);
+    });
+
+    /** @scenario "A team page lights Users for whoever may not manage the organization" */
+    it("lights Users on a team's own page when Teams & projects is not offered", () => {
+      renderSettingsSidebar({
+        pathname: "/settings/teams/platform",
+        permissions: ["team:view", "members:view"],
+      });
+      expect(markedEntries()).toEqual(["Users"]);
+    });
+
+    /** @scenario "Teams & projects has its own entry under Users" */
+    it("offers Teams & projects right after Users, opening the Users page on its tab", () => {
+      renderSettingsSidebar({ permissions: ["organization:manage"] });
+
+      const peopleGroup = screen.getByRole("button", {
+        name: "Collapse People & access",
+      }).parentElement;
+      const entries = within(peopleGroup!)
+        .getAllByRole("link")
+        .map((link) => link.textContent?.trim());
+      expect(entries.indexOf("Teams & projects")).toBe(entries.indexOf("Users") + 1);
+      expect(screen.getByRole("link", { name: "Teams & projects" })).toHaveAttribute(
+        "href",
+        "/settings/directory?tab=teams",
       );
+    });
+
+    /** @scenario "Teams & projects asks who may manage the organization the way its tab does" */
+    it("offers Teams & projects to a manager whose open project does not grant it", () => {
+      renderSettingsSidebar({
+        permissions: ["members:view"],
+        organizationPermissions: ["organization:manage"],
+      });
+      expect(screen.getByRole("link", { name: "Teams & projects" })).toHaveAttribute(
+        "href",
+        "/settings/directory?tab=teams",
+      );
+    });
+
+    /** @scenario "Teams & projects has its own entry under Users" */
+    it("marks only Teams & projects on its tab, and only Users on the other tabs", () => {
+      const permissions = ["organization:manage"];
+      renderSettingsSidebar({ pathname: "/settings/directory", search: "?tab=teams", permissions });
+      expect(markedEntries()).toEqual(["Teams & projects"]);
+      cleanup();
+
+      renderSettingsSidebar({
+        pathname: "/settings/directory",
+        search: "?tab=groups",
+        permissions,
+      });
+      expect(markedEntries()).toEqual(["Users"]);
+      cleanup();
+
+      renderSettingsSidebar({ pathname: "/settings/directory", permissions });
+      expect(markedEntries()).toEqual(["Users"]);
     });
 
     /** @scenario "The settings groups fold, and start open" */
@@ -325,11 +405,11 @@ describe("the settings shell in a new navigation mode", () => {
       // A folded group reads "Expand <name>", so none of them means all open.
       expect(screen.queryAllByRole("button", { name: /^Expand / })).toEqual([]);
       expect(screen.getAllByRole("button", { name: /^Collapse / }).length).toBeGreaterThan(1);
-      expect(screen.getByRole("link", { name: "Directory" })).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Users" })).toBeInTheDocument();
 
       await user.click(screen.getByRole("button", { name: "Collapse People & access" }));
 
-      expect(screen.queryByRole("link", { name: "Directory" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "Users" })).not.toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Collapse Organization" })).toHaveAttribute(
         "aria-expanded",
         "true",
@@ -343,7 +423,7 @@ describe("the settings shell in a new navigation mode", () => {
         "aria-expanded",
         "false",
       );
-      expect(screen.queryByRole("link", { name: "Directory" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "Users" })).not.toBeInTheDocument();
       expect(generalLink("/settings")).toBeInTheDocument();
     });
 
@@ -355,7 +435,7 @@ describe("the settings shell in a new navigation mode", () => {
       const region = screen.getByTestId("sidebar-scroll-region");
       expect(row).toContainElement(search);
       expect(region).not.toContainElement(search);
-      expect(region).toContainElement(screen.getByRole("link", { name: "Directory" }));
+      expect(region).toContainElement(screen.getByRole("link", { name: "Users" }));
       expect(getComputedStyle(row).borderBottomWidth).not.toBe("1px");
       const back = screen.getByRole("link", { name: /^Back/ });
       expect(region).not.toContainElement(back);
@@ -374,19 +454,13 @@ describe("the settings shell in a new navigation mode", () => {
 
       expect(entries.filter((entry) => entry === "API keys")).toHaveLength(1);
       expect(entries.indexOf("API keys")).toBe(entries.indexOf("General") + 1);
-      expect(entries.indexOf("API keys")).toBeLessThan(entries.indexOf("Directory"));
+      expect(entries.indexOf("API keys")).toBeLessThan(entries.indexOf("Users"));
     });
 
     /** @scenario The menu marks the page that is open */
     it("marks the entry of the page on screen, and only that one", () => {
       renderSettingsSidebar({ pathname: "/settings/email-suppressions" });
-
-      const marked = within(screen.getByTestId("sidebar-scroll-region"))
-        .getAllByRole("link")
-        .filter((link) => link.getAttribute("aria-current") === "page")
-        .map((link) => link.textContent?.trim());
-
-      expect(marked).toEqual(["Email suppressions"]);
+      expect(markedEntries()).toEqual(["Email suppressions"]);
     });
 
     /** @scenario A lite member sees no restricted settings entries */

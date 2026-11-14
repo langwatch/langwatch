@@ -72,6 +72,12 @@
       "path": "../contract/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/config/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/aws-client/tsconfig.build.json"
+    },
+    {
       "path": "../../authz/contract/tsconfig.build.json"
     },
     {

@@ -62,7 +62,7 @@ async function bootThread({
 
 const urlOf = (address: AddressInfo | string | null, path: string): string => {
   if (address === null || typeof address === "string") throw new Error("door bound no IP port");
-  return `http://127.0.0.1:${address.port}${path}`;
+  return `http://localhost:${address.port}${path}`;
 };
 
 describe("the liveness thread", () => {
@@ -258,7 +258,7 @@ describe("Server", () => {
 /** Writes raw bytes to a door and reads everything it answers until it closes. */
 function rawExchange(port: number, bytes: string): Promise<string> {
   return new Promise((resolve, reject) => {
-    const socket = net.connect(port, "127.0.0.1", () => socket.write(bytes));
+    const socket = net.connect(port, "localhost", () => socket.write(bytes));
     let answer = "";
     socket.setEncoding("latin1");
     socket.on("data", (chunk: string) => {
@@ -337,7 +337,7 @@ describe("given the liveness thread is serving the process port", () => {
       const ask = (path: string) =>
         new Promise<http.IncomingMessage>((resolve, reject) => {
           const headers = { connection: "close" };
-          const request = http.request({ host: "127.0.0.1", port, path, headers, agent }, (r) => {
+          const request = http.request({ host: "localhost", port, path, headers, agent }, (r) => {
             r.resume();
             r.on("end", () => resolve(r));
           });

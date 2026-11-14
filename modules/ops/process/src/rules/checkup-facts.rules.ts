@@ -25,7 +25,8 @@ export type CanaryName = "collector" | "processor" | "evaluations" | "scenarios"
 export interface CheckupConnectView {
   readonly deployment: "off" | "on";
   readonly licensed: boolean;
-  readonly entitledServices: string[];
+  /** What the license names; null when the entitlement read failed, so it is unknown. */
+  readonly entitledServices: string[] | null;
   readonly lastSyncAt?: string;
   readonly lastSyncError?: string;
   readonly licenseHost: string;

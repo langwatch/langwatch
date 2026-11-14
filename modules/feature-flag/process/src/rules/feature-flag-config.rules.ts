@@ -23,5 +23,21 @@ export function assembleFeatureFlagConfig(config: FeatureFlagServerConfig): Feat
     if (value !== undefined) overrides.set(definition.key, value);
   }
 
-  return { overrides, forceEnabled: new Set<FeatureFlagKey>(config.forceEnable) };
+  return {
+    overrides,
+    forceEnabled: new Set<FeatureFlagKey>(config.forceEnable),
+    isSaas: config.isSaas,
+  };
+}
+
+/** The registry default this deployment resolves to when nothing overrides the flag. */
+export function deploymentDefaultOf({
+  definition,
+  isSaas,
+}: {
+  definition: Pick<FeatureFlagDefinition, "defaultValue" | "selfHostedDefaultValue">;
+  isSaas: boolean;
+}): boolean {
+  if (isSaas) return definition.defaultValue;
+  return definition.selfHostedDefaultValue ?? definition.defaultValue;
 }

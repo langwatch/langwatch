@@ -87,6 +87,12 @@ export type {
   ClickHouseVendorClient,
   ClickHouseVendorClientOptions,
 } from "./managed-client.ts";
+export {
+  coalesceKeyOf,
+  DEFAULT_INSERT_COALESCE_MAX_ROWS,
+  InsertCoalescer,
+} from "./insert-coalescing.ts";
+export type { CoalescedInsertRunner } from "./insert-coalescing.ts";
 export type { RoutableStatementClient } from "./routingDriver.ts";
 export { PrivateTargetSchemaError, routingDriver } from "./routingDriver.ts";
 export type { PoolSizeSource, PoolSizingDecision, PoolSizingInput } from "./pool.ts";
@@ -127,6 +133,8 @@ export type {
   RoutingTable,
   TenantDirectory,
   TenantRoute,
+  ClickHouseTenantPlacement,
+  TenantPlacement,
   TenantRouter,
   TenantRouterOptions,
 } from "./tenancy.ts";
@@ -288,10 +296,18 @@ export type {
   IdIndexRegistryStatements,
 } from "./idBound.ts";
 export { hasIdBound, ID_BOUND_MARKER, idBoundOf, IdIndexRegistry, readIdBound } from "./idBound.ts";
-export type { TenantScopeTimeColumn } from "@langwatch/clickhouse-markers";
-export { tenantScope, tenantSet } from "@langwatch/clickhouse-markers";
+export type { HeldTraceBound, TenantScopeTimeColumn } from "@langwatch/clickhouse-markers";
+export {
+  tenantScope,
+  tenantScopeForLatestVersion,
+  tenantScopeWithConditions,
+  tenantSet,
+} from "@langwatch/clickhouse-markers";
+export { refuseOverBudget, STATEMENT_BYTE_BUDGET } from "./statementBudget.ts";
 export {
   AuthorizedClickHouse,
+  braidConditionExpression,
+  conditionsExpression,
   expandFragment,
   expandStatement,
   fenceExpression,

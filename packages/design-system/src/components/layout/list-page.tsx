@@ -137,7 +137,7 @@ function ListPageView({
         )}
         <PageLayout.Heading>{title}</PageLayout.Heading>
       </PageLayout.Header>
-      <PageLayout.Container width="fill" {...(description ? { paddingTop: 0 } : {})}>
+      <PageLayout.Container width="fill">
         <Stack
           gap={4}
           minWidth={0}
@@ -229,7 +229,7 @@ function LegacyListPage({
       <PageLayout.Header actions={actions} description={subtitle}>
         <PageLayout.Heading>{title}</PageLayout.Heading>
       </PageLayout.Header>
-      <PageLayout.Container width="fill" {...(subtitle ? { paddingTop: 0 } : {})}>
+      <PageLayout.Container width="fill">
         <Stack gap={4} minWidth={0}>
           {toolbar && <Box minWidth={0}>{toolbar}</Box>}
           {refreshing && !loading && (

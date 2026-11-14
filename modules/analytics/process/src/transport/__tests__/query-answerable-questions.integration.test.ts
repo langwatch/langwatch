@@ -10,6 +10,10 @@ import { MAX_LWQL_LENGTH } from "@langwatch/analytics-contract";
 import { Temporal } from "@langwatch/time";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import {
+  ADMIT_EVERY_PLACEMENT,
+  TEST_RUN_TELEMETRY,
+} from "../../app/__tests__/analytics.fixture.ts";
 import { LangWatchQLViewProvisioningService } from "../../features/provisioning/services/langwatch-ql-view-provisioning.service.ts";
 import { SHIPPED_LWQL_DEDUP } from "../../features/provisioning/services/langwatch-ql-view-statements.service.ts";
 import {
@@ -669,6 +673,8 @@ describe("given the /api/v1/query REST door and a seed with known answers", () =
 
   const shippedService = () =>
     LangWatchQLService.create({
+      runTelemetry: TEST_RUN_TELEMETRY,
+      placement: ADMIT_EVERY_PLACEMENT,
       executor: ClickHouseLangWatchQLExecutorRepository.create({
         connection: {
           ...harness.restrictedConnection(),
@@ -1316,6 +1322,8 @@ describe("given the /api/v1/query REST door and a seed with known answers", () =
       // for: the claim is about the relationship between the result and the
       // instant, and a wall clock would make it true only once.
       service = LangWatchQLService.create({
+        runTelemetry: TEST_RUN_TELEMETRY,
+        placement: ADMIT_EVERY_PLACEMENT,
         executor: ClickHouseLangWatchQLExecutorRepository.create({
           connection: {
             ...harness.restrictedConnection(),
@@ -1353,7 +1361,7 @@ describe("given the /api/v1/query REST door and a seed with known answers", () =
       expect(Number(result.rows[0].value)).toBeGreaterThan(0);
       expect(codes(result)).toEqual(["UNBOUNDED_TIME_RANGE"]);
       expect(diagnostic(result, "UNBOUNDED_TIME_RANGE").meta).toEqual({
-        view: `${database}.traces`,
+        view: "traces",
         timeColumn: "OccurredAt",
       });
 

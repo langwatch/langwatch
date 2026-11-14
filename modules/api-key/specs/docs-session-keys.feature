@@ -1,0 +1,155 @@
+Feature: Docs session keys for the documentation playground
+  A signed-in member lets the docs playground act as them in one project for five
+  minutes, without the docs ever holding their session. See ADR-185.
+
+  @integration
+  Scenario: A member grants the docs their access to one project
+    Given a member signed in to the app with access to two projects
+    And the docs origin that opened the consent page is registered
+    When they choose one project and allow access
+    Then a docs session key is minted for that project only
+    And it expires within five minutes, or sooner when their session or the organisation's session ceiling ends first
+    And it is hidden from the API keys page and refuses customer edits
+
+  @integration
+  Scenario: A docs session key can do exactly what the member can do in its project
+    Given a docs session key for a project
+    When it calls an endpoint the member may call in that project
+    Then the call succeeds
+    When it calls an endpoint the member may not call, or any endpoint for another project
+    Then the call is refused with status 403
+    When the member loses a permission or leaves the project
+    Then the key's next call that needs it is refused
+
+  @integration
+  Scenario: The consent page refuses an unregistered docs origin
+    Given a consent request from an origin that is not registered for docs
+    When the consent page loads
+    Then it explains that this site cannot connect to LangWatch
+    And no key can be minted for that origin
+
+  @integration
+  Scenario: No docs session key is minted while an operator acts as another member
+    Given an operator impersonating a member
+    When the consent page asks to mint a docs session key
+    Then impersonation_cannot_mint_credential is returned with status 403
+    And no key is minted
+
+  @integration
+  Scenario: The consent page answers only the session frame that opened it
+    Given the consent page was opened from the session frame on the app's origin
+    When the member allows or denies access
+    Then the answer is posted to the opener at the app's own origin, never at the docs origin
+
+  @integration
+  Scenario: A member who denies access mints nothing
+    Given the consent page is open
+    When the member denies access
+    Then no key is minted
+    And the docs are told the request was denied
+
+  @integration
+  Scenario: Disconnecting revokes the docs session key
+    Given a member's docs session key
+    When the docs ask to revoke it with the key itself
+    Then the key stops authenticating
+    And revoking it again succeeds without saying whether it existed
+
+  @integration
+  Scenario: Signing out of the app revokes every docs session key the session minted
+    Given two docs session keys minted by one browser session
+    When the member signs out, or the session is revoked
+    Then both keys stop authenticating
+    And keys minted by the member's other sessions keep working until they expire
+
+  @integration
+  Scenario: The API answers cross-origin calls only from registered docs origins
+    Given a registered docs origin and an unregistered origin
+    When each sends a preflight for a REST call with an X-Auth-Token header
+    Then the registered origin is allowed, without credentials
+    And the unregistered origin gets no CORS allowance
+
+  @integration
+  Scenario: A member grants read-only access
+    Given a member on the consent page
+    When they choose "Read only" and allow access
+    Then the docs session key passes operations that only read
+    And an operation that changes anything is refused with status 403
+
+  @integration
+  Scenario: A member chooses how long the key lasts, up to one hour
+    Given a member on the consent page
+    When they choose 30 minutes and allow access
+    Then the key expires within 30 minutes, or sooner when their session or the organisation's session ceiling ends first
+    When a mint request asks for more than one hour
+    Then it is refused and no key is minted
+
+  @integration
+  Scenario: An organisation turns the playground session off
+    Given an organisation admin turned off docs playground sessions
+    When a member of that organisation opens the consent page
+    Then it says their organisation turned this off
+    And no key can be minted
+    And docs session keys already minted for that organisation stop authenticating
+
+  @unit
+  Scenario: Turning the playground session off revokes the organisation's docs session keys
+    Given live docs session keys in an organisation, and a run key minted under one of them
+    When an organisation admin turns docs playground sessions off
+    Then organization records that the playground session was turned off
+    And every live docs session key of that organisation is revoked, with the keys minted under it
+    And docs session keys of other organisations keep working
+
+  @integration
+  Scenario: Turning the playground session on again does not revive revoked keys
+    Given an organisation admin turned docs playground sessions off and its keys were revoked
+    When the admin turns them on again
+    Then the revoked keys still do not authenticate
+    And a member can connect again with a new key
+
+  @unit
+  Scenario: Turning the playground session off records when, in the same write
+    Given an organisation admin turns docs playground sessions off
+    Then organization stores the time it was turned off with the switch itself
+    And turning it on again keeps that time
+
+  @integration
+  Scenario: Turning it on again before revocation runs revives no key minted before
+    Given an organisation admin turned docs playground sessions off and on again
+    And api-key has not revoked any key yet, because the record was late or never sent
+    Then a docs session key minted before it was turned off does not authenticate
+    And neither does a key minted under one
+    And a key minted after it was turned on again works
+
+  @integration
+  Scenario: A key minted under a docs session key stops when the playground is turned off
+    Given a run key minted under a docs session key, and a key minted under that run key
+    When an organisation admin turns docs playground sessions off
+    Then both stop authenticating at once, before any cleanup revokes them
+
+  @integration
+  Scenario: A docs session key minted while the playground is turned off is never handed out
+    Given a member is connecting the docs playground
+    When an organisation admin turns docs playground sessions off before the key is written
+    Then the new key is revoked and the member is told the playground is turned off
+
+  @integration
+  Scenario: A late revocation leaves keys minted after the switch came back on
+    Given an organisation admin turned docs playground sessions off and then on again
+    And a member connected with a new key after it was turned on again
+    When api-key revokes for the earlier turn-off only now
+    Then the keys minted before the turn-off are revoked
+    And the new key keeps working
+
+  @integration
+  Scenario: Closing the turned-off consent page tells the frame why
+    Given an organisation admin turned off docs playground sessions
+    When the member closes the consent page
+    Then the frame is told the organisation turned this off, not that the member declined
+
+  @integration
+  Scenario: A member of two organisations switches to a project whose organisation allows it
+    Given the consent page opened on a project whose organisation turned docs playground sessions off
+    Then it says that organisation turned this off, keeps the project picker and holds Allow
+    When the member picks a project in an organisation that allows it
+    Then Allow mints a key for that project

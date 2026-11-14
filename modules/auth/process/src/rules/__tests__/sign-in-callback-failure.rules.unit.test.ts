@@ -3,6 +3,7 @@ import { GENERIC_SIGN_IN_ERROR_CODE } from "@langwatch/auth-contract";
 import { describe, expect, it } from "vitest";
 
 import {
+  extractRefusalPageConnection,
   isSignInCallbackPath,
   signInErrorRedirectOf,
   signInFailureLocation,
@@ -70,6 +71,26 @@ describe("signInErrorRedirectOf", () => {
     });
   });
 
+  describe("given an identity provider that refused the person", () => {
+    /** @scenario "A provider's access_denied refusal crosses and is logged as a warning" */
+    it("keeps the code and callbackUrl, and drops the description from the Location", () => {
+      const redirect = redirectTo(
+        `${errorPageUrl}?error=access_denied&error_description=AADSTS50105+User+is+not+assigned&callbackUrl=%2Fp&error_uri=https%3A%2F%2Fidp.example`,
+      );
+
+      expect(redirect.kind).toBe("provider_refused");
+      const location = new URL(redirect.kind === "provider_refused" ? redirect.location : "");
+      expect([...location.searchParams.keys()].toSorted()).toEqual([
+        "callbackUrl",
+        "error",
+        "trace",
+      ]);
+      expect(location.searchParams.get("error")).toBe("access_denied");
+      expect(location.searchParams.get("callbackUrl")).toBe("/p");
+      expect(location.searchParams.get("trace")).toBe("trace_1");
+    });
+  });
+
   describe("given a sign-in that failed for a reason we have not written down", () => {
     /** @scenario "An unhandled failure crosses as one generic code" */
     it("sends the generic code with no description, keeping callbackUrl", () => {
@@ -122,5 +143,78 @@ describe("signInErrorRedirectOf", () => {
         { kind: "pass" },
       );
     });
+  });
+
+  describe("given a callback whose failure Better Auth sent somewhere other than the error page", () => {
+    const fromCallback = (location: string, providerRefused = false) =>
+      signInErrorRedirectOf({
+        status: 302,
+        location,
+        errorPageUrl,
+        traceId: "trace_1",
+        isCallback: true,
+        providerRefused,
+      });
+
+    /** @scenario "A callback failure always lands on the sign-in error screen" */
+    it("moves an unwritten code onto the error page as the generic failure", () => {
+      const redirect = fromCallback(
+        "https://app.test/?error=saml_no_assertion&error_description=SAML+response+contains+no+assertions",
+      );
+
+      expect(redirect.kind).toBe("withhold");
+      const location = new URL((redirect as { location: string }).location);
+      expect(location.pathname).toBe("/auth/error");
+      expect(location.searchParams.get("error")).toBe("sign_in_failed");
+      expect(location.searchParams.get("error_description")).toBeNull();
+    });
+
+    /** @scenario "A callback failure always lands on the sign-in error screen" */
+    it("moves an admitted code onto the error page as itself", () => {
+      const redirect = fromCallback("https://app.test/?error=state_mismatch");
+
+      expect(redirect).toEqual({
+        kind: "misdirected",
+        location: expect.stringContaining("https://app.test/auth/error?"),
+      });
+      expect(new URL((redirect as { location: string }).location).searchParams.get("error")).toBe(
+        "state_mismatch",
+      );
+    });
+
+    /** @scenario "A callback failure always lands on the sign-in error screen" */
+    it("treats a posted refusal as the provider's refusal", () => {
+      expect(fromCallback("https://app.test/?error=saml_no_assertion", true).kind).toBe(
+        "provider_refused",
+      );
+    });
+
+    it("leaves another site, another page and a redirect without an error alone", () => {
+      expect(fromCallback("https://elsewhere.test/?error=x")).toEqual({ kind: "pass" });
+      expect(fromCallback("https://app.test/settings/sso?error=invalid_provider")).toEqual({
+        kind: "pass",
+      });
+      expect(fromCallback("https://app.test/")).toEqual({ kind: "pass" });
+    });
+  });
+});
+
+describe("extractRefusalPageConnection", () => {
+  /** @scenario "A provider's access error page can send the person to our refusal card" */
+  it("reads the connection off a GET of its refusal page", () => {
+    expect(
+      extractRefusalPageConnection({ pathname: "/api/auth/sso/refused/ssoc%20a", method: "GET" }),
+    ).toBe("ssoc a");
+  });
+
+  /** @scenario "A provider's access error page can send the person to our refusal card" */
+  it.each([
+    ["/api/auth/sso/refused/ssoc_a", "POST"],
+    ["/api/auth/sso/refused/", "GET"],
+    ["/api/auth/sso/refused/a/b", "GET"],
+    ["/api/auth/sso/refused/%E0%A4%A", "GET"],
+    ["/api/auth/sso/callback/ssoc_a", "GET"],
+  ])("names no connection for %s over %s", (pathname, method) => {
+    expect(extractRefusalPageConnection({ pathname, method })).toBeUndefined();
   });
 });

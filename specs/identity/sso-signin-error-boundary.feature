@@ -78,6 +78,12 @@ Feature: What a failed single sign-on is allowed to say
     # single sign-on shipped.
 
   @unit
+  Scenario: The logged cause names the provider's code
+    Given a sign-in that failed with a provider code we have not written down
+    When the failure is logged
+    Then the record's cause is a sign-in refusal carrying that code
+
+  @unit
   Scenario: A description supplied by the caller is never echoed
     Given somebody opens the sign-in error screen with an error description of their own
     When the screen renders
@@ -114,3 +120,20 @@ Feature: What a failed single sign-on is allowed to say
     Then the code crosses as itself, and the cause is not logged as an unknown failure
     And the screen says the sign-in expired or was started in another tab or browser
     And it offers to start again from the sign-in page
+
+  # An identity provider answers `access_denied` when it turns the person away, e.g. Microsoft
+  # Entra ID AADSTS50105 ("User is not assigned to the client application") when the enterprise
+  # app requires assignment, and also when the person cancels a consent screen. Neither is a
+  # fault of ours, so it neither becomes the generic code nor pages on-call. The provider's
+  # description is neither logged nor left in the address bar. The same code arrives from social
+  # and SSO providers alike, so the screen's advice about an IT administrator is conditional.
+  @unit
+  Scenario: A provider's access_denied refusal crosses and is logged as a warning
+    Given a provider sign-in that the identity provider refuses with "access_denied"
+    When the person is sent to the sign-in error screen
+    Then the code crosses as itself
+    And the refusal is logged at warn with its reference, not at error
+    And the provider's description is neither logged nor kept on the redirect
+    And the screen says their company sign-in refused it, not LangWatch
+    And it tells them their IT team can assign them the LangWatch app, or to try again if they cancelled
+    # What the refusal names and when it becomes a seat limit: specs/identity/idp-refused-sign-in.feature

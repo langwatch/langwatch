@@ -31,7 +31,11 @@ export const instantEvalTrpc = defineTrpcContract("instantEval")
   .withOutput(explorerInstantEvalProgressSchema)
 
   .query("get", {
-    invalidatedBy: [INSTANT_EVAL_EVENT_TYPES.PAGE_JUDGED, INSTANT_EVAL_EVENT_TYPES.FINISHED],
+    invalidatedBy: [
+      INSTANT_EVAL_EVENT_TYPES.PAGE_JUDGED,
+      INSTANT_EVAL_EVENT_TYPES.FINISHED,
+      INSTANT_EVAL_EVENT_TYPES.LATE_PAGE_BILLED,
+    ],
   })
   .withInput(explorerInstantEvalRunIdSchema)
   .withOutput(explorerInstantEvalProgressSchema)

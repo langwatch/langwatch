@@ -1,4 +1,4 @@
-import { PermissionDeniedError } from "@langwatch/authorization";
+import { ImpersonationCannotMintCredentialError } from "@langwatch/authorization";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -12,9 +12,12 @@ import { MemorySharedCredentialStore } from "@langwatch/secrets/shared-credentia
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
+import { MemoryApiKeyChannels } from "../../channels/memory/memory.api-key.channels.ts";
 import { MemoryApiKeyAnswerCacheRepository } from "../../repositories/memory/memory.api-key-answer-cache.repository.ts";
 import { MemoryApiKeyDatabase } from "../../repositories/memory/memory.api-key.database.ts";
 import { MemoryApiKeyRepository } from "../../repositories/memory/memory.api-key.repository.ts";
+import { MemorySigningKeyUsageRepository } from "../../repositories/memory/memory.signing-key-usage.repository.ts";
+import { MemorySigningKeyRepository } from "../../repositories/memory/memory.signing-key.repository.ts";
 import { ApiKeyModule } from "../api-key.app.ts";
 
 const ORG_ID = "organization-1";
@@ -31,7 +34,10 @@ async function appOver() {
       answers: MemoryApiKeyAnswerCacheRepository.create(),
       sandboxKeys: MemorySharedCredentialStore.create(),
       runKeys: MemorySharedCredentialStore.create(),
+      signingKeys: MemorySigningKeyRepository.create(),
+      signingKeyUsage: MemorySigningKeyUsageRepository.create(),
     },
+    channels: MemoryApiKeyChannels.create(),
     dependencies: {
       authorization: createApiFixture<AuthzApi>({ hasPermission }),
       organizations: createApiFixture<OrganizationApi>({}),
@@ -53,7 +59,7 @@ const request: Parameters<ApiKeyModule["createKey"]>[0] = {
 
 describe("given an operator acting as a member", () => {
   /** @scenario "No API key is minted while an operator acts as another member" */
-  it("refuses the mint with permission_denied before any check or write", async () => {
+  it("refuses the mint with impersonation_cannot_mint_credential before any check or write", async () => {
     const { app, hasPermission } = await appOver();
 
     for (const keyType of ["personal", "service"] as const) {
@@ -61,8 +67,8 @@ describe("given an operator acting as a member", () => {
         { ...request, keyType },
         { id: "member-1", impersonatorId: "operator-1" },
       );
-      await expect(minting).rejects.toBeInstanceOf(PermissionDeniedError);
-      await expect(minting).rejects.toMatchObject({ code: "permission_denied" });
+      await expect(minting).rejects.toBeInstanceOf(ImpersonationCannotMintCredentialError);
+      await expect(minting).rejects.toMatchObject({ code: "impersonation_cannot_mint_credential" });
     }
     expect(hasPermission).not.toHaveBeenCalled();
   });
@@ -74,7 +80,7 @@ describe("given a member acting as themselves", () => {
     const { app, hasPermission } = await appOver();
 
     await expect(app.createKey(request, { id: "member-1" })).rejects.not.toBeInstanceOf(
-      PermissionDeniedError,
+      ImpersonationCannotMintCredentialError,
     );
     expect(hasPermission).toHaveBeenCalledWith(expect.objectContaining({ userId: "member-1" }));
   });

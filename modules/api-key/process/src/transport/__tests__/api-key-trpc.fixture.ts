@@ -11,7 +11,12 @@ import type {
   TrpcRuntimeAuditEntry,
   TrpcRuntimeMembers,
 } from "@langwatch/api/trpc";
-import { createTrpcRuntime, redactAuditArgs } from "@langwatch/api/trpc";
+import {
+  bindTrpcMiddlewareContext,
+  browserSessionWindowContext,
+  createTrpcRuntime,
+  redactAuditArgs,
+} from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authorization";
 import type { TrpcContract } from "@langwatch/module";
 import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
@@ -78,6 +83,7 @@ export function apiKeyTrpcCaller<Api, Contract extends TrpcContract>(options: {
   declaration: TrpcRouterDeclaration<Api, Contract>;
   app: Api;
   actor?: TestActor | null;
+  browserSession?: { id: string; startedAt: string | null; expiresAt: string | null } | null;
 }) {
   const root = initTRPC.context<TestContext>().create();
   const audit = { entries: [] as TrpcRuntimeAuditEntry[] };
@@ -92,7 +98,17 @@ export function apiKeyTrpcCaller<Api, Contract extends TrpcContract>(options: {
 
   // Nested under the namespace, as the process mounts it: the path — and so
   // the audit row's action — is `apiKey.<procedure>`, never the bare name.
-  const router = root.router({ apiKey: options.declaration.router(runtime, () => options.app) });
+  // The browser session a session caller arrives on, as the tRPC host binds it.
+  const browserSession = bindTrpcMiddlewareContext(browserSessionWindowContext, () =>
+    options.browserSession === undefined
+      ? { id: "session-1", startedAt: null, expiresAt: null }
+      : options.browserSession,
+  );
+  const router = root.router({
+    apiKey: runtime.mount(options.declaration, () => options.app, {
+      middlewareContext: [browserSession],
+    }),
+  });
 
   return { audit, router, caller: router.createCaller({}).apiKey };
 }

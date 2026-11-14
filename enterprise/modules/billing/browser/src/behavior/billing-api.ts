@@ -11,7 +11,12 @@ import type {
   subscriptionTrpc,
 } from "@langwatch/enterprise-billing-contract";
 import type { LicenseStatus } from "@langwatch/enterprise-licensing-contract";
-import type { Plan, SeatLimitInfo } from "@langwatch/entitlement-contract";
+import type {
+  MessageLimitInfo,
+  Plan,
+  SeatLimitInfo,
+  usageLimitsTrpc,
+} from "@langwatch/entitlement-contract";
 
 import type { OrganizationUserRole, PricingModel, TeamUserRole } from "../model/prisma-types.ts";
 
@@ -30,9 +35,12 @@ export type UsageRead = {
   usageUnit?: string;
   membersCount: number;
   membersLiteCount: number;
+  membersDeveloperCount: number;
   currentMonthMessagesCount: number | null;
   /** Seats used against the plan, counted the way enforcement counts them. */
   seatLimitInfo?: SeatLimitInfo;
+  /** This month's events against the plan's allowance, with pre-formatted figures. */
+  messageLimitInfo?: MessageLimitInfo;
 };
 
 /** A member row, as the seat count and the seat drawer read it. */
@@ -51,14 +59,10 @@ export type PendingInviteRead = {
   displayStatus: string;
 };
 
-/** Procedures from features not yet split: plan, limits, license, organization, invite. */
+/** Procedures from features not yet split: plan, license, organization, invite. */
 type BorrowedProcedures = {
   plan: {
     getActivePlan: { query: { input: OrganizationScope; output: ActivePlan } };
-  };
-
-  limits: {
-    getUsage: { query: { input: OrganizationScope; output: UsageRead } };
   };
 
   license: {
@@ -85,6 +89,14 @@ type BorrowedProcedures = {
       query: {
         input: OrganizationScope & { includeDeactivated: boolean };
         output: { members: OrganizationMemberRead[] };
+      };
+    };
+
+    /** Full seats still held after their person was removed, disabled or demoted. */
+    listHeldSeats: {
+      query: {
+        input: OrganizationScope;
+        output: { heldSeats: { userId: string; email: string | null; seatFreesAt: string }[] };
       };
     };
   };
@@ -121,9 +133,10 @@ type BorrowedProcedures = {
   };
 };
 
-/** Everything this family calls: the declared namespaces plus the borrowed five. */
+/** Everything this family calls: its namespaces, entitlement's `limits` and the borrowed four. */
 export type BillingApiMap = ContractApiMap<typeof subscriptionTrpc> &
   ContractApiMap<typeof currencyTrpc> &
+  ContractApiMap<typeof usageLimitsTrpc> &
   BorrowedProcedures;
 
 /**

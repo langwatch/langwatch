@@ -281,7 +281,8 @@ describe("given a worker installing SCIM over identity's connection log", () => 
         signal: new AbortController().signal,
       });
 
-      const committed = saved.find((save) => Object.keys(save).length === 2);
+      // Only the commit between passes saves neither batch progress nor a tenant cursor.
+      const committed = saved.find((save) => !("done" in save) && !("runReplaysThrough" in save));
       expect(committed?.replayedThrough).toEqual(expect.any(String));
       expect(committed?.replayedThrough).not.toBe("1970-01-01T00:00:00Z");
       expect(closed).toEqual(["engine", "engine"]);

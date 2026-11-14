@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The complete callable Evaluation capability shared by process peers.
 
-Peers call these through the token, declared at `../contract/src/evaluation.api.ts:52`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/evaluation.api.ts:54`; nothing else in this package is public.
 
 #### `listEvaluators`
 
@@ -82,6 +82,14 @@ findRunByEvaluationId(input: EvaluationRunLookup): Promise<EvaluationRunData | n
 
 ```typescript
 findRunsByTraceId(input: EvaluationRunsByTraceQuery): Promise<EvaluationRunData[]>;
+```
+
+#### `listEvaluationOutcomes`
+
+A page of one project's finished evaluations on a trace, oldest first; for backfills.
+
+```typescript
+listEvaluationOutcomes(input: EvaluationOutcomesQuery): Promise<EvaluationOutcomePage>;
 ```
 
 #### `findInputs`
@@ -249,7 +257,7 @@ interface Params {
 }
 // Body: inline, src/transport/evaluations-legacy.rest.ts:189
 type Body = Record<string, unknown>;
-// Response: inline, src/transport/evaluations-legacy.rest.ts:193
+// Response: inline, src/transport/evaluations-legacy.rest.ts:194
 type Response = unknown;
 ```
 
@@ -257,7 +265,7 @@ type Response = unknown;
 
 Run a namespaced evaluator
 
-Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.rest.ts:217`.
+Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.rest.ts:218`.
 
 Answers at `/api/evaluations/:evaluator/:subpath/evaluate`, `/api/v1/evaluations/:evaluator/:subpath/evaluate`.
 
@@ -267,9 +275,9 @@ interface Params {
   evaluator: string;
   subpath: string;
 }
-// Body: inline, src/transport/evaluations-legacy.rest.ts:225
+// Body: inline, src/transport/evaluations-legacy.rest.ts:226
 type Body = Record<string, unknown>;
-// Response: inline, src/transport/evaluations-legacy.rest.ts:229
+// Response: inline, src/transport/evaluations-legacy.rest.ts:231
 type Response = unknown;
 ```
 
@@ -277,15 +285,15 @@ type Response = unknown;
 
 Run an evaluator as a guardrail
 
-Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.rest.ts:253`.
+Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.rest.ts:255`.
 
 Answers at `/api/guardrails/:evaluator/evaluate`, `/api/v1/guardrails/:evaluator/evaluate`.
 
 ```typescript
 type Params = z.infer<typeof evaluatorParamsSchema>; // ../contract/src/evaluation-legacy.schemas.ts:17
-// Body: inline, src/transport/evaluations-legacy.rest.ts:257
+// Body: inline, src/transport/evaluations-legacy.rest.ts:259
 type Body = Record<string, unknown>;
-// Response: inline, src/transport/evaluations-legacy.rest.ts:261
+// Response: inline, src/transport/evaluations-legacy.rest.ts:262
 type Response = unknown;
 ```
 
@@ -310,7 +318,7 @@ Contract `../contract/src/evaluation.trpc.ts:26`, router `src/transport/evaluati
 interface Input {
   projectId: string;
 }
-type Output = z.infer<typeof evaluatorCatalogueSchema>; // ../contract/src/evaluation.responses.ts:49
+type Output = z.infer<typeof evaluatorCatalogueSchema>; // ../contract/src/evaluation.responses.ts:51
 
 // evaluations.availableCustomEvaluators
 type Input = z.infer<typeof evaluationProjectScopeSchema>; // ../contract/src/evaluation-trpc.schemas.ts:15
@@ -324,7 +332,7 @@ type Output = {
 
 // evaluations.runEvaluation
 type Input = z.infer<typeof runTraceEvaluationInputSchema>; // ../contract/src/evaluation-trpc.schemas.ts:76
-type Output = z.infer<typeof evaluationRunOutcomeSchema>; // ../contract/src/evaluation.responses.ts:66
+type Output = z.infer<typeof evaluationRunOutcomeSchema>; // ../contract/src/evaluation.responses.ts:68
 
 // evaluations.warmupLambda
 // Input: warmupEvaluatorsInputSchema, ../contract/src/evaluation-trpc.schemas.ts:87
@@ -332,7 +340,7 @@ interface Input {
   projectId: string;
   count?: number;
 }
-// Output: evaluationWarmupSchema, ../contract/src/evaluation.responses.ts:72
+// Output: evaluationWarmupSchema, ../contract/src/evaluation.responses.ts:74
 interface Output {
   success: boolean;
   count: number;
@@ -372,13 +380,14 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `evaluation_lifecycle` (aggregate `evaluation_lifecycle`)
 
-Declared at `src/eventing/evaluation-lifecycle.pipeline.ts:42`. Events: `evaluationRanEventSchema`, `evaluationLifecycleCompletedEventSchema`.
+Declared at `src/eventing/evaluation-lifecycle.pipeline.ts:49`. Events: `evaluationRanEventSchema`, `evaluationLifecycleCompletedEventSchema`, `evaluationMonitorErrorRateExceededEventSchema`.
 
 | Kind      | Name                                 | Handles | Declared at                                        |
 | --------- | ------------------------------------ | ------- | -------------------------------------------------- |
-| command   | `recordEvaluationRan`                | –       | `src/eventing/evaluation-lifecycle.pipeline.ts:47` |
-| command   | `recordEvaluationLifecycleCompleted` | –       | `src/eventing/evaluation-lifecycle.pipeline.ts:48` |
-| retention | `≈ retention`                        | –       | `src/eventing/evaluation-lifecycle.pipeline.ts:49` |
+| command   | `recordEvaluationRan`                | –       | `src/eventing/evaluation-lifecycle.pipeline.ts:58` |
+| command   | `recordEvaluationLifecycleCompleted` | –       | `src/eventing/evaluation-lifecycle.pipeline.ts:59` |
+| command   | `recordMonitorErrorRateExceeded`     | –       | `src/eventing/evaluation-lifecycle.pipeline.ts:60` |
+| retention | `≈ retention`                        | –       | `src/eventing/evaluation-lifecycle.pipeline.ts:61` |
 
 ### Pipeline `evaluation_processing` (aggregate `evaluation`)
 
@@ -404,8 +413,8 @@ Declared at `src/eventing/evaluation-processing-definition.pipeline.ts:150`. Eve
 
 | Kind   | Leaf                             | Environment variable                       | Declared at                               |
 | ------ | -------------------------------- | ------------------------------------------ | ----------------------------------------- |
-| secret | `openAi`                         | `OPENAI_API_KEY`                           | `src/app/evaluation.app.ts:275`           |
-| secret | `azureContentSafety`             | `AZURE_CONTENT_SAFETY_KEY`                 | `src/app/evaluation.app.ts:276`           |
+| secret | `openAi`                         | `OPENAI_API_KEY`                           | `src/app/evaluation.app.ts:281`           |
+| secret | `azureContentSafety`             | `AZURE_CONTENT_SAFETY_KEY`                 | `src/app/evaluation.app.ts:282`           |
 | config | `langevalsEndpoint`              | `LANGEVALS_ENDPOINT`                       | `../contract/src/evaluation.config.ts:43` |
 | config | `stagingThresholdBytes`          | `LANGEVALS_STAGING_THRESHOLD_BYTES`        | `../contract/src/evaluation.config.ts:44` |
 | config | `stagingTtlSeconds`              | `LANGEVALS_STAGING_TTL_SECONDS`            | `../contract/src/evaluation.config.ts:45` |

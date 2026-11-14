@@ -73,6 +73,14 @@ Feature: Evaluator service boundary
     And the evaluator that wrapped it is archived, if one did
 
   @unit
+  Scenario: Switching off a workflow whose evaluator is deployed needs the deploy permission
+    Given a workflow published as an evaluator with a "production" label
+    And a caller without "evaluators:deploy"
+    When the caller switches it off as an evaluator
+    Then it is refused with code "evaluator_deployed_label_protected"
+    And the workflow keeps its evaluator flag and the evaluator stays live
+
+  @unit
   Scenario: A workflow's archive preview names its evaluators at the workflow's grain
     Given a member who may view workflows but not evaluations
     When the archive dialog asks which evaluators the workflow backs

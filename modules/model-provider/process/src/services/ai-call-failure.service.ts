@@ -1,5 +1,6 @@
 import {
   AiCallFailedError,
+  ModelExecutionUnavailableError,
   ModelNotConfiguredError,
   ModelProviderDisabledError,
   type ModelRole,
@@ -17,8 +18,8 @@ export class AiCallFailureService {
 
   /**
    * Rethrows an unnamed AI-call failure as a typed `AiCallFailedError` carrying the feature
-   * context. `ModelNotConfiguredError` and `ModelProviderDisabledError` pass through with
-   * their own remediation copy, which the generic ai_call_failed message would bury.
+   * context. `ModelNotConfiguredError`, `ModelProviderDisabledError` and
+   * `ModelExecutionUnavailableError` pass through with their own remediation copy.
    */
   async wrapAiCall<T>(
     feature: { key: string; role: ModelRole; displayName: string },
@@ -32,6 +33,10 @@ export class AiCallFailureService {
       }
 
       if (err instanceof ModelProviderDisabledError) {
+        throw err;
+      }
+
+      if (err instanceof ModelExecutionUnavailableError) {
         throw err;
       }
 

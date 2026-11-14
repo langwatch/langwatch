@@ -31,6 +31,12 @@ vi.mock("../../../behavior/licensing-api.ts", () => ({
   },
 }));
 
+vi.mock("../../../behavior/connect-api.ts", () => ({
+  connectApi: {
+    connect: { status: { useQuery: () => ({ data: undefined, refetch: vi.fn() }) } },
+  },
+}));
+
 vi.mock("../use-license-actions.ts", () => ({
   useLicenseActions: () => ({
     upload,

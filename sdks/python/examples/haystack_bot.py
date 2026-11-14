@@ -104,7 +104,7 @@ class TrackedOpenAIChatGenerator(OpenAIChatGenerator):
 
 
 llm = TrackedOpenAIChatGenerator(
-    api_key=Secret.from_token(os.environ["OPENAI_API_KEY"]), model="gpt-5-mini"
+    api_key=Secret.from_token(os.environ["OPENAI_API_KEY"]), model="gpt-6-luna"
 )
 
 rag_pipeline = Pipeline()

@@ -166,6 +166,7 @@ function testPlan(plan: Readonly<{ free: boolean; type: string }>): Plan {
     free: plan.free,
     maxMembers: 0,
     maxMembersLite: 0,
+    maxMembersDeveloper: 0,
     maxMessagesPerMonth: 0,
     canPublish: true,
     prices: { USD: 0, EUR: 0 },

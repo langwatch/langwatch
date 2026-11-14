@@ -1,13 +1,15 @@
 // Screens ask application port; plan for Enterprise surfaces; the query holds the open tab.
 
-import { createContext, useContext } from "react";
+import type { UiDrawerToken } from "@langwatch/browser-host/declarations";
+import { createContext, useContext, type ReactNode } from "react";
 
 // Route and writes guard on organization:manage; prevents leaked organization data.
 export const AUTHZ_MANAGE_PERMISSION = "organization:manage";
 
-/** The organization these two pages are about. */
+/** The organization these pages are about, and the project a project settings page is about. */
 export type AuthzHostScope = {
   organizationId: string | undefined;
+  projectId?: string | undefined;
 };
 
 /**
@@ -47,7 +49,8 @@ export type AuthzFailureNotice = {
 export type AuthzOrganizationStructure = {
   organizationName: string | undefined;
   teams: readonly { id: string; name: string }[];
-  projects: readonly { id: string; name: string; teamId: string }[];
+  /** `slug` addresses a project's pages; a host that has not read it leaves it out. */
+  projects: readonly { id: string; name: string; teamId: string; slug?: string }[];
 };
 
 /** The one thing the screens are handed. */
@@ -72,9 +75,18 @@ export abstract class AuthzHostApi {
     options?: { replace?: boolean },
   ): void;
 
+  /** Opens one of this module's routed drawers; the address carries its props. */
+  abstract openOverlay<Props>(drawer: UiDrawerToken<Props>, props?: Partial<Props>): void;
+
+  /** Closes the open drawer. */
+  abstract closeOverlay(): void;
+
   abstract succeeded(notice: AuthzSuccessNotice): void;
 
   abstract failed(failure: AuthzFailureNotice): void;
+
+  /** The project switcher the project module lends; null when none is lent. */
+  abstract projectSwitcher(): ReactNode | null;
 }
 
 const AuthzHostContext = createContext<AuthzHostApi | undefined>(void 0);

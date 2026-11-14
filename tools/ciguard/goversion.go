@@ -249,11 +249,12 @@ func goVersionLiterals(repoRoot string) ([]string, error) {
 func workflowLiterals(workflow *ciscan.Workflow) []string {
 	var problems []string
 	for _, job := range workflow.JobNames() {
-		for _, step := range workflow.Jobs[job].Steps {
-			if !strings.HasPrefix(step.Uses, "actions/setup-go@") {
+		steps := workflow.Jobs[job].Steps
+		for i := range steps {
+			if !strings.HasPrefix(steps[i].Uses, "actions/setup-go@") {
 				continue
 			}
-			problems = append(problems, setupGoStep(workflow.Path, job, step)...)
+			problems = append(problems, setupGoStep(workflow.Path, job, steps[i])...)
 		}
 	}
 

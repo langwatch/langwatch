@@ -11,6 +11,7 @@ import React from "react";
 
 import { InsightsNavCount } from "../../behavior/lent-insights.tsx";
 import { navigationApi } from "../../behavior/navigation-api.ts";
+import { useAnalyticsEntry } from "../../behavior/use-analytics-entry.ts";
 import {
   type CodingAgentLinks,
   useCodingAgentLinks,
@@ -49,6 +50,7 @@ export const MainMenuSections = function MainMenuSections({
     { enabled: !!project?.id && navigation.test },
   );
   const codingAgentLinks = useCodingAgentLinks();
+  const analyticsEntry = useAnalyticsEntry();
 
   const sectionProps = { showExpanded, project, pathname };
 
@@ -70,6 +72,7 @@ export const MainMenuSections = function MainMenuSections({
         {...sectionProps}
         codingAgentLinks={codingAgentLinks}
         showAnalytics={navigation.analytics}
+        analyticsEntry={analyticsEntry}
         showOnlineEvaluations={navigation.onlineEvaluations}
       />
       {navigation.test && (
@@ -115,21 +118,24 @@ function ObserveSection({
   pathname,
   codingAgentLinks,
   showAnalytics,
+  analyticsEntry,
   showOnlineEvaluations,
 }: ProjectSectionProps & {
   codingAgentLinks: CodingAgentLinks;
   showAnalytics: boolean;
+  analyticsEntry: ReturnType<typeof useAnalyticsEntry>;
   showOnlineEvaluations: boolean;
 }) {
   return (
     <SidebarSection id="observe" label="Observe" showExpanded={showExpanded}>
-      {showAnalytics && (
+      {showAnalytics && analyticsEntry.isSettled && (
         <PageMenuLink
-          path={projectNavItems.analytics.path}
+          path={analyticsEntry.path}
           icon={featureIcons.analytics.icon}
           label={projectNavItems.analytics.title}
           project={project}
-          isActive={pathname.includes("/analytics")}
+          // Dashboards draws its own sidebar: an entry leading there is never active on /analytics.
+          isActive={!analyticsEntry.leadsToDashboards && pathname.includes("/analytics")}
           showLabel={showExpanded}
         />
       )}

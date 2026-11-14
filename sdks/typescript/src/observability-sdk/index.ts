@@ -50,3 +50,13 @@ export {
 } from "./semconv";
 
 export * as attributes from "./semconv/attributes";
+
+export {
+  BraidBaggageSpanProcessor,
+  type BraidOptions,
+  BraidSigningError,
+  type BraidSigningErrorCode,
+  BRAID_ENTRY_KEY_PATTERN,
+  BRAID_SIGNATURE_DOMAIN,
+  BRAID_SIGNATURE_KEY,
+} from "./braids";

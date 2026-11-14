@@ -51,7 +51,6 @@ function establishedAccount({
         userId: "user_1",
         providerId: "google",
         accountId: "google-sub-1",
-        issuer: "https://google.issuer.test",
         idToken,
         createdAt: now,
         updatedAt: now,

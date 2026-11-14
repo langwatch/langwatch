@@ -113,6 +113,61 @@ describe("the dataset limits an application answers", () => {
     });
   });
 
+  describe("given a free-plan caller creating a dataset with its first rows", () => {
+    const create = (app: ReturnType<typeof createDatasetTestApp>, rows: number) =>
+      app.upsertDataset({
+        projectId: "project-1",
+        name: "Seeded",
+        columnTypes: [{ name: "text", type: "string" }],
+        datasetRecords: Array.from({ length: rows }, (_, row) => ({ text: `row ${row}` })),
+        enforceBatchBound: true,
+        editedBy: { kind: "user", id: "user-1" },
+      });
+
+    /** @scenario "Creating a dataset over REST refuses more first rows than the plan's batch bound" */
+    it("refuses 1001 rows before the dataset exists", async () => {
+      const app = createDatasetTestApp();
+
+      await expect(create(app, 1001)).rejects.toMatchObject({
+        code: "dataset_batch_too_large",
+        meta: { count: 1001, maxEntries: 1000 },
+      });
+      const listed = await app.listDatasets({ projectId: "project-1" });
+      expect(listed.data).toHaveLength(0);
+    });
+
+    /** @scenario "Creating a dataset over REST refuses a row with a column the dataset does not define" */
+    it("refuses a row naming a column the column types lack, before the dataset exists", async () => {
+      const app = createDatasetTestApp();
+
+      await expect(
+        app.upsertDataset({
+          projectId: "project-1",
+          name: "Seeded",
+          columnTypes: [{ name: "text", type: "string" }],
+          datasetRecords: [{ text: "row", expected: "hi" }],
+          enforceBatchBound: true,
+          editedBy: { kind: "user", id: "user-1" },
+        }),
+      ).rejects.toMatchObject({ code: "dataset_invalid_column" });
+      const listed = await app.listDatasets({ projectId: "project-1" });
+      expect(listed.data).toHaveLength(0);
+    });
+
+    it("writes exactly 1000 rows", async () => {
+      const app = createDatasetTestApp();
+
+      const dataset = await create(app, 1000);
+
+      const page = await app.listRecords({
+        projectId: "project-1",
+        slugOrId: dataset.id,
+        limit: 1,
+      });
+      expect(page.pagination.total).toBe(1000);
+    });
+  });
+
   describe("given one organization with a raised per-file limit and one on the defaults", () => {
     describe("when each asks for its dataset limits", () => {
       /** @scenario "A project answers the limits of its own organization" */
