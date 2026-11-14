@@ -1,6 +1,10 @@
 /** Spec: specs/clickhouse/single-client-access.feature */
 import { describe, expect, it, vi } from "vitest";
 
+import { column } from "../builder/expression.ts";
+import { clickhouseRead } from "../builder/read.ts";
+import { tenantScope } from "../builder/scope.ts";
+import { defineClickHouseTable } from "../builder/table.ts";
 import { ClickHouseQueryClient } from "../client.ts";
 import { ClickHouseConfigService } from "../config.ts";
 import { ClickHouseConnection } from "../connection.ts";
@@ -56,7 +60,24 @@ async function collect<Row>(batches: AsyncIterable<Row[]>): Promise<Row[][]> {
   return collected;
 }
 
-const TENANT_READ = "SELECT EventId FROM event_log WHERE TenantId = {tenantId:String}";
+const eventLog = defineClickHouseTable({
+  name: "event_log",
+  tenantColumn: "TenantId",
+  timeColumn: "EventOccurredAt",
+  sortKey: ["TenantId", "AggregateId"],
+  columns: {
+    TenantId: column.string(),
+    AggregateId: column.string(),
+    EventId: column.string(),
+    EventOccurredAt: column.dateTime64({ precision: 3 }),
+  },
+});
+
+const tenantRead = () =>
+  clickhouseRead({ scope: tenantScope.single({ tenantId: "project-a" }) })
+    .from(eventLog)
+    .select({ EventId: eventLog.EventId })
+    .build();
 
 describe("ClickHouseQueryClient.stream()", () => {
   describe("given a tenant whose organization has a private endpoint", () => {
@@ -65,13 +86,7 @@ describe("ClickHouseQueryClient.stream()", () => {
       const { client, shared, isolated, connection } = routed();
 
       try {
-        const batches = await collect(
-          client.stream<{ EventId: string }>({
-            tenantId: "project-a",
-            sql: TENANT_READ,
-            params: { tenantId: "project-a" },
-          }),
-        );
+        const batches = await collect(client.stream({ statement: tenantRead() }));
 
         expect(batches).toEqual([
           [{ EventId: "private-1" }, { EventId: "private-2" }],
@@ -93,10 +108,14 @@ describe("ClickHouseQueryClient.stream()", () => {
       try {
         const batches = await collect(
           client.stream({
-            tenantId: "",
-            sql: "SELECT EventId FROM event_log",
-            // A replay discovery reads across every tenant.
-            SKIP_TENANT_CHECK: true,
+            statement: clickhouseRead({
+              scope: tenantScope.allTenants({
+                reason: "replay discovers every tenant's aggregates",
+              }),
+            })
+              .from(eventLog)
+              .select({ EventId: eventLog.EventId })
+              .build(),
           }),
         );
 
@@ -116,7 +135,11 @@ describe("ClickHouseQueryClient.stream()", () => {
 
       try {
         await expect(
-          collect(client.stream({ tenantId: "project-a", sql: "SELECT EventId FROM event_log" })),
+          collect(
+            client.stream({
+              statement: { ...tenantRead(), sql: "SELECT EventId FROM event_log" },
+            }),
+          ),
         ).rejects.toMatchObject({ name: "TenantScopeError" });
         expect(shared.query).not.toHaveBeenCalled();
         expect(isolated.query).not.toHaveBeenCalled();
@@ -138,9 +161,7 @@ describe("ClickHouseQueryClient.stream()", () => {
 
       const batches = await collect(
         new ClickHouseQueryClient({ tenantGuard: new TenantGuard(), driver }).stream({
-          tenantId: "project-a",
-          sql: TENANT_READ,
-          params: { tenantId: "project-a" },
+          statement: tenantRead(),
         }),
       );
 

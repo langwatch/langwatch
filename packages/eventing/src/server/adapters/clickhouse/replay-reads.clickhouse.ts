@@ -240,3 +240,34 @@ export function aggregateEventsPageRead({
       .build(),
   };
 }
+
+/** Every event of a batch's aggregates in per-aggregate replay order, streamed batch by batch. */
+export function streamedEventsRead({
+  tenantId,
+  aggregateIds,
+  eventTypes,
+  occurredAtBounds,
+}: {
+  tenantId: string;
+  aggregateIds: readonly string[];
+  eventTypes: readonly string[];
+  occurredAtBounds: OccurredAtBounds | undefined;
+}) {
+  const read = clickhouseRead({ scope: tenantScope.single({ tenantId }) })
+    .from(eventLog)
+    .select(REPLAY_ROW)
+    .where(({ and, oneOf }) =>
+      and(oneOf(eventLog.EventType, eventTypes), oneOf(eventLog.AggregateId, aggregateIds)),
+    );
+  const pruned =
+    occurredAtBounds === undefined
+      ? read
+      : read.where((ops) => occurredWithin(ops, occurredAtBounds));
+  return {
+    statement: pruned
+      .orderBy(eventLog.AggregateId)
+      .orderBy(eventLog.EventTimestamp)
+      .orderBy(eventLog.EventId)
+      .build(),
+  };
+}

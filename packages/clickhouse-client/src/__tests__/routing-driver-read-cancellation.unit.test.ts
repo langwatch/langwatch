@@ -1,6 +1,10 @@
 /** Spec: specs/clickhouse/single-client-access.feature; ADR-197. */
 import { describe, expect, it, vi } from "vitest";
 
+import { column } from "../builder/expression.ts";
+import { clickhouseRead } from "../builder/read.ts";
+import { tenantScope } from "../builder/scope.ts";
+import { defineClickHouseTable } from "../builder/table.ts";
 import { ClickHouseQueryClient } from "../client.ts";
 import { ClickHouseConfigService } from "../config.ts";
 import { ClickHouseConnection } from "../connection.ts";
@@ -70,6 +74,25 @@ const tenantRead = {
   settings: { max_execution_time: 20, max_memory_usage: "4000000000" },
 };
 
+const metricDataPoints = defineClickHouseTable({
+  name: "metric_data_points",
+  tenantColumn: "TenantId",
+  timeColumn: "TimeUnix",
+  sortKey: ["TenantId", "SeriesId"],
+  columns: {
+    TenantId: column.string(),
+    SeriesId: column.string(),
+    TimeUnix: column.dateTime64({ precision: 3 }),
+  },
+});
+
+/** The same tenant read, built, as a stream sends it. */
+const builtTenantRead = () =>
+  clickhouseRead({ scope: tenantScope.single({ tenantId: "project-a" }) })
+    .from(metricDataPoints)
+    .select({ SeriesId: metricDataPoints.SeriesId })
+    .build();
+
 describe("routingDriver read cancellation", () => {
   describe("when a repository reads through the routed client", () => {
     /** @scenario "A routed read is sent read-only, so the server cancels it when the app leaves" */
@@ -109,12 +132,13 @@ describe("routingDriver read cancellation", () => {
       const { client, connection, server } = routed();
 
       try {
-        for await (const _batch of client.stream(tenantRead)) {
+        const statement = builtTenantRead();
+        for await (const _batch of client.stream({ statement })) {
           // Drained only so the request is sent.
         }
 
         expect(settingsOf(server.query.mock.calls[0]?.[0])).toEqual({
-          ...tenantRead.settings,
+          ...statement.settings,
           ...CANCELLED_ON_CLOSE,
         });
       } finally {

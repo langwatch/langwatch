@@ -1,6 +1,10 @@
 /** Spec: specs/clickhouse/single-client-access.feature */
 import { describe, expect, it, vi } from "vitest";
 
+import { column } from "../builder/expression.ts";
+import { clickhouseRead } from "../builder/read.ts";
+import { tenantScope } from "../builder/scope.ts";
+import { defineClickHouseTable } from "../builder/table.ts";
 import { ClickHouseQueryClient } from "../client.ts";
 import { ClickHouseConfigService } from "../config.ts";
 import { ClickHouseConnection } from "../connection.ts";
@@ -15,6 +19,25 @@ const MEMORY_LIMIT_ROW = {
 
 const TENANT_READ =
   "SELECT SeriesId, PointId, BucketCounts FROM metric_data_points WHERE TenantId = {tenantId:String}";
+
+const metricDataPoints = defineClickHouseTable({
+  name: "metric_data_points",
+  tenantColumn: "TenantId",
+  timeColumn: "TimeUnix",
+  sortKey: ["TenantId", "SeriesId"],
+  columns: {
+    TenantId: column.string(),
+    SeriesId: column.string(),
+    TimeUnix: column.dateTime64({ precision: 3 }),
+  },
+});
+
+/** The same tenant read, built, as a stream sends it. */
+const builtTenantRead = () =>
+  clickhouseRead({ scope: tenantScope.single({ tenantId: "project-a" }) })
+    .from(metricDataPoints)
+    .select({ SeriesId: metricDataPoints.SeriesId })
+    .build();
 
 /** A server that sends `batches` after its 200, the last ending in whatever the server wrote. */
 function routedTo(batches: Record<string, unknown>[][]) {
@@ -87,7 +110,9 @@ describe("routingDriver", () => {
       try {
         await expect(
           (async () => {
-            for await (const batch of client.stream(tenantRead)) received.push(batch);
+            for await (const batch of client.stream({ statement: builtTenantRead() })) {
+              received.push(batch);
+            }
           })(),
         ).rejects.toMatchObject({ code: "241" });
         expect(received).toEqual([[{ SeriesId: "s1", PointId: "p1", BucketCounts: ["1"] }]]);

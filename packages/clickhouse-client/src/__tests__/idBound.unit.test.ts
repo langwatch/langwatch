@@ -6,6 +6,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { TenantScopedReader } from "../authorized-reads.ts";
+import { column } from "../builder/expression.ts";
+import { clickhouseRead } from "../builder/read.ts";
+import { tenantScope } from "../builder/scope.ts";
+import { defineClickHouseTable } from "../builder/table.ts";
 import { ClickHouseQueryClient } from "../client.ts";
 import { defineIdIndex, type IdIndexDeclaration, idIndexName } from "../idIndexFlags.ts";
 import { ID_INDEX_WIDEN_MS } from "../indexedRead.ts";
@@ -346,11 +350,25 @@ describe("a read carrying {{idBound}}", () => {
       const server = serverWith({ ready: false, rows: [{ SpanId: "s1" }] });
 
       const batches: unknown[][] = [];
-      for await (const batch of server.client.stream({
-        tenantId: "p1",
-        sql: READ,
-        params: { tenantId: "p1", traceId: "t1" },
-      })) {
+      const storedSpans = defineClickHouseTable({
+        name: "stored_spans",
+        tenantColumn: "TenantId",
+        timeColumn: "StartTime",
+        sortKey: ["TenantId", "TraceId", "SpanId"],
+        columns: {
+          TenantId: column.string(),
+          TraceId: column.string(),
+          SpanId: column.string(),
+          StartTime: column.dateTime64({ precision: 3 }),
+        },
+      });
+      const statement = clickhouseRead({ scope: tenantScope.single({ tenantId: "p1" }) })
+        .from(storedSpans)
+        .select({ SpanId: storedSpans.SpanId })
+        .where(({ idBound }) => idBound(storedSpans.TraceId, "t1"))
+        .build();
+      expect(statement.sql).toContain("{{idBound");
+      for await (const batch of server.client.stream({ statement })) {
         batches.push(batch);
       }
 

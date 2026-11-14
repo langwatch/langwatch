@@ -14,6 +14,7 @@ import {
   discoveredEventCountRead,
   occurredAtBoundsRead,
   replayTenantsRead,
+  streamedEventsRead,
 } from "./replay-reads.clickhouse.ts";
 
 /** ClickHouse event_log row shape. */
@@ -249,27 +250,6 @@ export async function getBoundedCutoffs({
 }
 
 /**
- * The stream's optional occurred-at pruning text: the client streams no built statement yet, so
- * this one read stays raw. Rows with no occurred time (0) are always kept.
- */
-function occurredAtPredicate(bounds?: OccurredAtBounds): {
-  sql: string;
-  params: Record<string, unknown>;
-} {
-  if (!bounds) return { sql: "", params: {} };
-  return {
-    sql: `AND (
-          EventOccurredAt = 0
-          OR (
-            EventOccurredAt >= {minOccurredAtMs:UInt64}
-            AND EventOccurredAt <= {maxOccurredAtMs:UInt64}
-          )
-        )`,
-    params: { minOccurredAtMs: bounds.minMs, maxOccurredAtMs: bounds.maxMs },
-  };
-}
-
-/**
  * Stream every event a replay batch must apply for a set of aggregates, in a single ClickHouse
  * query, invoking `onEvent` per row in per-aggregate `(EventTimestamp, EventId)` order.
  */
@@ -294,27 +274,9 @@ export async function streamEventsForAggregatesBulk({
 }): Promise<{ eventsApplied: number }> {
   if (aggregateIds.length === 0) return { eventsApplied: 0 };
 
-  const pruning = occurredAtPredicate(occurredAtBounds);
-  const batches = client.stream<ClickHouseEventRow>({
-    tenantId,
-    sql: `
-      SELECT EventId, EventTimestamp, EventOccurredAt, EventType, EventPayload,
-             EventVersion, TenantId, AggregateType, AggregateId, ProcessingTraceparent,
-             IdempotencyKey
-      FROM event_log
-      WHERE TenantId = {tenantId:String}
-        AND EventType IN ({eventTypes:Array(String)})
-        AND AggregateId IN ({aggregateIds:Array(String)})
-        ${pruning.sql}
-      ORDER BY AggregateId, EventTimestamp ASC, EventId ASC
-    `,
-    params: {
-      tenantId,
-      eventTypes: [...eventTypes],
-      aggregateIds,
-      ...pruning.params,
-    },
-  });
+  const batches = client.stream(
+    streamedEventsRead({ tenantId, aggregateIds, eventTypes, occurredAtBounds }),
+  );
 
   let eventsApplied = 0;
   for await (const rows of batches) {

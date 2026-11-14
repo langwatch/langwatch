@@ -1,6 +1,5 @@
 import {
   createEventingRetentionConfiguration,
-  EVENT_LOG_SELECT_COLUMNS,
   EventingClickHouseEventRepository,
   type EventingClickHouseClient,
 } from "@langwatch/eventing/server";
@@ -9,6 +8,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { EventNotFoundError } from "../../../../services/errorHandling.ts";
 import { readEventRecord } from "../../../../stores/eventReadSeat.ts";
+import { EVENT_LOG_SELECT_COLUMNS } from "../event-repository.clickhouse.ts";
 
 const retention = createEventingRetentionConfiguration({ defaultRetentionDays: 49 });
 

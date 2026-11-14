@@ -39,7 +39,6 @@ export interface EventingClickHouseReplayStatement {
  * streamed rows (a batch's memory stays bounded by the accumulators rather than its event count),
  * and `command` for the post-replay `OPTIMIZE TABLE`.
  */
-export type EventingClickHouseReplayClient = Pick<ClickHouseQueryClient, "read"> & {
-  stream<Row>(request: EventingClickHouseReplayStatement): AsyncIterable<Row[]>;
+export type EventingClickHouseReplayClient = Pick<ClickHouseQueryClient, "read" | "stream"> & {
   command(request: EventingClickHouseReplayStatement): Promise<void>;
 };

@@ -57,7 +57,7 @@ function normalizePayloadValue(value: unknown): unknown {
   return value;
 }
 
-/** The event_log columns the row mapper reads, for a raw reader outside this repository. */
+/** The event_log columns the row mapper reads; the tests hold the built reads to main's list. */
 const EVENT_LOG_COLUMNS = [
   "EventId",
   "EventTimestamp",

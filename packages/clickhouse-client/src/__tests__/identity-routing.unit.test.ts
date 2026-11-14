@@ -4,6 +4,10 @@
  */
 import { describe, expect, it } from "vitest";
 
+import { column } from "../builder/expression.ts";
+import { clickhouseRead } from "../builder/read.ts";
+import { tenantScope } from "../builder/scope.ts";
+import { defineClickHouseTable } from "../builder/table.ts";
 import { ClickHouseQueryClient } from "../client.ts";
 import { SystemIdentityAbsentError } from "../identity/statementIdentity.ts";
 import { TENANT_IDS_SETTING, TenantSettingError } from "../identity/tenantSetting.ts";
@@ -50,6 +54,31 @@ const SET_READ: QueryRequest = {
   params: { tenants: ["project_a", "project_b"] },
   table: "trace_summaries",
 };
+
+const traceSummaries = defineClickHouseTable({
+  name: "trace_summaries",
+  tenantColumn: "TenantId",
+  timeColumn: "OccurredAt",
+  sortKey: ["TenantId", "TraceId"],
+  columns: {
+    TenantId: column.string(),
+    TraceId: column.string(),
+    OccurredAt: column.dateTime64({ precision: 3 }),
+  },
+});
+
+/** The stream of a built statement, as replay sends it: a tenant set, or every tenant. */
+const SET_STREAM = () =>
+  clickhouseRead({ scope: tenantScope.set({ tenantIds: ["project_a", "project_b"] }) })
+    .from(traceSummaries)
+    .select({ TraceId: traceSummaries.TraceId })
+    .build();
+
+const ALL_TENANTS_STREAM = () =>
+  clickhouseRead({ scope: tenantScope.allTenants({ reason: "the test's own cross-tenant read" }) })
+    .from(traceSummaries)
+    .select({ TraceId: traceSummaries.TraceId })
+    .build();
 
 const SKIP_READ: QueryRequest = {
   tenantId: "project_a",
@@ -208,7 +237,7 @@ describe("ClickHouseQueryClient identities", () => {
       const { client, reader, system } = bothIdentities();
 
       await client.query(SKIP_READ);
-      await drain(client.stream(SKIP_READ));
+      await drain(client.stream({ statement: ALL_TENANTS_STREAM() }));
       await client.command(COMMAND);
       await client.insert(INSERT);
 
@@ -225,7 +254,7 @@ describe("ClickHouseQueryClient identities", () => {
     it("streams a tenant read on the reader with its tenant setting", async () => {
       const { client, reader, system } = bothIdentities();
 
-      await drain(client.stream(SET_READ));
+      await drain(client.stream({ statement: SET_STREAM() }));
 
       expect(system.sent).toEqual([]);
       expect(reader.sent.map(({ kind }) => kind)).toEqual(["stream"]);
@@ -241,8 +270,9 @@ describe("ClickHouseQueryClient identities", () => {
       ["read", "system.columns", (client: ClickHouseQueryClient) => client.query(SKIP_READ)],
       [
         "stream",
-        "system.columns",
-        (client: ClickHouseQueryClient) => drain(client.stream(SKIP_READ)),
+        undefined,
+        (client: ClickHouseQueryClient) =>
+          drain(client.stream({ statement: ALL_TENANTS_STREAM() })),
       ],
     ])("refuses the %s by name, naming its table", async (operation, table, run) => {
       const reader = recordingDriver();

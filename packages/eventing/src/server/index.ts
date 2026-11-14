@@ -1,6 +1,5 @@
 export {
   EventingClickHouseEventRepository,
-  EVENT_LOG_SELECT_COLUMNS,
   mapEventLogRows,
 } from "./adapters/clickhouse/event-repository.clickhouse.ts";
 export {

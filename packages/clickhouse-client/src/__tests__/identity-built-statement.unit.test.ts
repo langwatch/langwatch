@@ -275,3 +275,138 @@ describe("ClickHouseQueryClient.read() of a built statement", () => {
     });
   });
 });
+
+/** A driver that streams the given batches, pausing between them, and records what it was sent. */
+function streamingDriver({
+  batches = [[]],
+  pauseMs = 0,
+}: { batches?: unknown[][]; pauseMs?: number } = {}): QueryDriver & { sent: QueryRequest[] } {
+  const sent: QueryRequest[] = [];
+  const refuse = () => Promise.reject(new Error("not a stream"));
+  return {
+    sent,
+    execute: refuse,
+    command: refuse,
+    insert: refuse,
+    stream: async function* <Row>(request: QueryRequest) {
+      sent.push(request);
+      for (const [index, batch] of batches.entries()) {
+        if (index > 0) await new Promise((resolve) => setTimeout(resolve, pauseMs));
+        yield batch as Row[];
+      }
+    },
+  };
+}
+
+function streamingClient({
+  system = true,
+  ...answers
+}: { system?: boolean; batches?: unknown[][]; pauseMs?: number } = {}) {
+  const reader = streamingDriver(answers);
+  const systemDriver = streamingDriver(answers);
+  const client = new ClickHouseQueryClient({
+    ...(system ? { driver: systemDriver } : {}),
+    readerDriver: reader,
+    tenantGuard: new TenantGuard(),
+  });
+  return { client, reader, system: systemDriver };
+}
+
+async function collect<Row>(batches: AsyncIterable<Row[]>): Promise<Row[][]> {
+  const collected: Row[][] = [];
+  for await (const batch of batches) collected.push(batch);
+  return collected;
+}
+
+describe("ClickHouseQueryClient.stream() of a built statement", () => {
+  describe("given a reader statement", () => {
+    /** @scenario "A built reader statement is sent on the reader with its own settings" */
+    it("streams it on the reader with its settings as built, and a declared full scan", async () => {
+      const { client, reader, system } = streamingClient({ batches: [[{ TraceId: "t1" }]] });
+      const statement = setRead();
+
+      const batches = await collect(client.stream({ statement, declaresFullScan: true }));
+
+      expect(batches).toEqual([[{ TraceId: "t1" }]]);
+      expect(system.sent).toEqual([]);
+      expect(reader.sent).toHaveLength(1);
+      expect(reader.sent[0]).toMatchObject({
+        tenantId: statement.tenantId,
+        tenantIds: statement.tenantIds,
+        sql: statement.sql,
+        settings: statement.settings,
+        SKIP_COLD_SCAN_CHECK: true,
+      });
+    });
+
+    /** @scenario "A built statement whose tenant setting is not its tenant set is refused" */
+    it("refuses one whose tenant setting is wider than its tenant set, before it is sent", async () => {
+      const { client, reader } = streamingClient();
+      const built = setRead();
+      const statement = {
+        ...built,
+        settings: { ...built.settings, [TENANT_IDS_SETTING]: "project_a,project_b,project_c" },
+      } as ReaderReadStatement;
+
+      const error = await refusalOf(() => collect(client.stream({ statement })));
+
+      expect(error).toBeInstanceOf(TenantSettingError);
+      expect((error as TenantSettingError).violation).toMatchObject({ kind: "setting-mismatch" });
+      expect(reader.sent).toEqual([]);
+    });
+
+    /** @scenario "A braided built read is cut to its proof's expiry" */
+    it("refuses it once its proof has expired, before it is sent", async () => {
+      const { client, reader } = streamingClient();
+      const statement = { ...setRead(), expiresAt: Date.now() - 1 };
+
+      const error = await refusalOf(() => collect(client.stream({ statement })));
+
+      expect(error).toBeInstanceOf(AuthorizationExpiredError);
+      expect(reader.sent).toEqual([]);
+    });
+
+    /** @scenario "A braided built read is cut to its proof's expiry" */
+    it("refuses a batch that arrives after its proof has expired", async () => {
+      const { client } = streamingClient({
+        batches: [[{ TraceId: "t1" }], [{ TraceId: "t2" }]],
+        pauseMs: 150,
+      });
+      const statement = { ...setRead(), expiresAt: Date.now() + 100 };
+      const received: unknown[][] = [];
+
+      const error = await refusalOf(async () => {
+        for await (const batch of client.stream({ statement })) received.push(batch);
+      });
+
+      expect(error).toBeInstanceOf(AuthorizationExpiredError);
+      expect(received).toEqual([[{ TraceId: "t1" }]]);
+    });
+  });
+
+  describe("given an all-tenants statement", () => {
+    /** @scenario "A built all-tenants statement is sent as the system" */
+    it("streams it on the system identity, without a tenant setting", async () => {
+      const { client, reader, system } = streamingClient();
+      const statement = allTenantsRead();
+
+      await collect(client.stream({ statement }));
+
+      expect(reader.sent).toEqual([]);
+      expect(system.sent).toHaveLength(1);
+      expect(system.sent[0]).toMatchObject({ tenantId: "", sql: statement.sql });
+      expect(system.sent[0]?.settings?.[TENANT_IDS_SETTING]).toBeUndefined();
+    });
+
+    /** @scenario "A built all-tenants statement is sent as the system" */
+    it("is refused by name in a reader-only process", async () => {
+      const { client, reader } = streamingClient({ system: false });
+
+      const error = await refusalOf(() => collect(client.stream({ statement: allTenantsRead() })));
+
+      expect(error).toBeInstanceOf(SystemIdentityAbsentError);
+      expect(error).toMatchObject({ operation: "stream" });
+      expect(reader.sent).toEqual([]);
+    });
+  });
+});

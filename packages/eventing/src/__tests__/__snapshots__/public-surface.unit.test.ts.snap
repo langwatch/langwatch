@@ -207,7 +207,6 @@ exports[`the @langwatch/eventing public surface > given the ./server entry > exp
   "DEAD_OUTBOX_RETENTION_MS: number",
   "DISPATCHED_OUTBOX_RETENTION_MS: number",
   "EVENT_LOG_ID_INDEX: object",
-  "EVENT_LOG_SELECT_COLUMNS: string",
   "EVENT_TABLES: object",
   "EVENT_TABLE_DECLARATIONS: object",
   "EventLogRetention: class [aggregateTypesWhere, assertCategory, categoryOfMutation, finiteEventTypeGuard, holdsIdIndex, indefiniteEventTypeTerms, indefinitePredicate, keepIndefiniteIndexRows, keepIndefiniteRows, raiseIdIndexRetention, retainCategory]",

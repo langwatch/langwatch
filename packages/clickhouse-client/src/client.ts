@@ -165,6 +165,21 @@ const guardedColumnsOf = ({
 }) => (origin === "built" ? request.builtTenantColumns : undefined);
 
 /** One statement as it leaves: the identity's driver, and the request that driver receives. */
+/** A statement the typed builder built, and how `read` sends it. */
+type BuiltRead<Row> = {
+  statement: ClickHouseReadStatement<Row> | MetadataReadStatement<Row>;
+  table?: string | undefined;
+  /** Sends an all-tenants statement to this organisation's server rather than the shared one. */
+  organizationId?: string | undefined;
+  /** Sends a server-metadata statement to this tenant's server rather than the shared one. */
+  tenantId?: string | undefined;
+  /** How the statement's `{{idBound}}` marker reads its window, as `query()` takes it. */
+  idBound?: IdBoundOptions | undefined;
+  /** The read scans every partition on purpose; sent as `SKIP_COLD_SCAN_CHECK`. */
+  declaresFullScan?: true | undefined;
+  signal?: QueryRequest["signal"];
+};
+
 interface Sending {
   driver: QueryDriver;
   request: QueryRequest;
@@ -385,7 +400,45 @@ export class ClickHouseQueryClient {
    * settings. A reader statement routes by its route tenant, its tenant setting must be exactly
    * its tenant set, and a braided proof's expiry refuses it and caps its time limit, as the fence.
    */
-  async read<Row>({
+  async read<Row>(built: BuiltRead<Row>): Promise<QueryResult<Row>> {
+    const { request, origin, expiresAt } = this.builtRequestOf(built);
+    if (origin === "metadata") return this.statement<Row>(request, origin);
+    const result = await this.boundedOrPlain<Row>({ request, origin });
+    // A slow statement or a retry may outlast the proof: its rows are refused, never released.
+    refuseExpired({ expiresAt });
+    return result;
+  }
+
+  /**
+   * Streams a built read batch by batch (replay's event reads), on the identity, tenant setting
+   * and guard `read` gives it. The slot and retries do not apply: the reader sets how long it runs
+   * and a retried stream would repeat rows. A driver that cannot stream answers it as one batch.
+   */
+  async *stream<Row>({
+    statement,
+    declaresFullScan,
+  }: Pick<BuiltRead<Row>, "declaresFullScan"> & {
+    statement: ClickHouseReadStatement<Row>;
+  }): AsyncGenerator<Row[]> {
+    const { request, origin, expiresAt } = this.builtRequestOf({ statement, declaresFullScan });
+    // A bounded read expands its marker per window, so it is answered whole, as one batch.
+    const sending = hasIdBound(request)
+      ? null
+      : this.checkedSending({ operation: "stream", request, origin });
+    if (sending?.driver.stream === undefined) {
+      const { rows } = await this.boundedOrPlain<Row>({ request, origin });
+      refuseExpired({ expiresAt });
+      yield rows;
+      return;
+    }
+    for await (const rows of sending.driver.stream<Row>(sending.request)) {
+      refuseExpired({ expiresAt });
+      yield rows;
+    }
+  }
+
+  /** The request a built statement leaves as, refused first when its proof has expired. */
+  private builtRequestOf<Row>({
     statement,
     table,
     organizationId,
@@ -393,19 +446,11 @@ export class ClickHouseQueryClient {
     idBound,
     declaresFullScan,
     signal,
-  }: {
-    statement: ClickHouseReadStatement<Row> | MetadataReadStatement<Row>;
-    table?: string | undefined;
-    /** Sends an all-tenants statement to this organisation's server rather than the shared one. */
-    organizationId?: string | undefined;
-    /** Sends a server-metadata statement to this tenant's server rather than the shared one. */
-    tenantId?: string | undefined;
-    /** How the statement's `{{idBound}}` marker reads its window, as `query()` takes it. */
-    idBound?: IdBoundOptions | undefined;
-    /** The read scans every partition on purpose; sent as `SKIP_COLD_SCAN_CHECK`. */
-    declaresFullScan?: true | undefined;
-    signal?: QueryRequest["signal"];
-  }): Promise<QueryResult<Row>> {
+  }: BuiltRead<Row>): {
+    request: SentRequest;
+    origin: StatementOrigin;
+    expiresAt: number | undefined;
+  } {
     const sent = {
       sql: statement.sql,
       params: { ...statement.params },
@@ -416,13 +461,14 @@ export class ClickHouseQueryClient {
     };
     if (statement.kind === "metadata") {
       refuseMetadataOutsideAllowList({ sql: statement.sql });
-      return this.statement<Row>(
-        { ...sent, tenantId: tenantId ?? "", settings: { ...statement.settings } },
-        "metadata",
-      );
+      return {
+        request: { ...sent, tenantId: tenantId ?? "", settings: { ...statement.settings } },
+        origin: "metadata",
+        expiresAt: undefined,
+      };
     }
     if (statement.identity === "system") {
-      return this.boundedOrPlain<Row>({
+      return {
         request: {
           ...sent,
           tenantId: "",
@@ -432,10 +478,11 @@ export class ClickHouseQueryClient {
           SKIP_TENANT_CHECK: true,
         },
         origin: "built",
-      });
+        expiresAt: undefined,
+      };
     }
     refuseExpired({ expiresAt: statement.expiresAt });
-    const result = await this.boundedOrPlain<Row>({
+    return {
       request: {
         ...sent,
         tenantId: statement.tenantId,
@@ -447,10 +494,8 @@ export class ClickHouseQueryClient {
         }),
       },
       origin: "built",
-    });
-    // A slow statement or a retry may outlast the proof: its rows are refused, never released.
-    refuseExpired({ expiresAt: statement.expiresAt });
-    return result;
+      expiresAt: statement.expiresAt,
+    };
   }
 
   /** A statement bounded by its id index, each attempt run as its own statement. */
@@ -487,12 +532,7 @@ export class ClickHouseQueryClient {
     request: SentRequest,
     origin: StatementOrigin = "raw",
   ): Promise<QueryResult<Row>> {
-    // A metadata read names only allow-listed system tables (checked in `read`), no tenant rows.
-    if (origin !== "metadata") {
-      this.tenantGuard.assert(request, { tenantColumns: guardedColumnsOf({ request, origin }) });
-    }
-    refuseUnexpandedIdBound({ request });
-    const sending = this.sendingOf({ operation: "read", request, origin });
+    const sending = this.checkedSending({ operation: "read", request, origin });
 
     const runOnce = () => sending.driver.execute<Row>(sending.request);
     const withRetries = () =>
@@ -539,20 +579,22 @@ export class ClickHouseQueryClient {
     }
   }
 
-  /**
-   * Streams one read batch by batch (replay's event reads). The tenant guard applies; the slot and
-   * retries do not, since the reader sets how long it runs and a retried stream would repeat rows.
-   * A driver that cannot stream answers the whole result, under every policy, as one batch.
-   */
-  async *stream<Row>(request: QueryRequest): AsyncGenerator<Row[]> {
-    this.tenantGuard.assert(request);
-    // A bounded read expands its marker per window, so it is answered whole, as one batch.
-    const sending = hasIdBound(request) ? null : this.sendingOf({ operation: "stream", request });
-    if (sending?.driver.stream === undefined) {
-      yield (await this.query<Row>(request)).rows;
-      return;
+  /** The checks every read and stream passes before it leaves, then the identity it leaves on. */
+  private checkedSending({
+    operation,
+    request,
+    origin,
+  }: {
+    operation: "read" | "stream";
+    request: SentRequest;
+    origin: StatementOrigin;
+  }): Sending {
+    // A metadata read names only allow-listed system tables (checked in `read`), no tenant rows.
+    if (origin !== "metadata") {
+      this.tenantGuard.assert(request, { tenantColumns: guardedColumnsOf({ request, origin }) });
     }
-    yield* sending.driver.stream<Row>(sending.request);
+    refuseUnexpandedIdBound({ request });
+    return this.sendingOf({ operation, request, origin });
   }
 
   /**

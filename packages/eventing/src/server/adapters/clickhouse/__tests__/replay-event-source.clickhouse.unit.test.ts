@@ -70,10 +70,35 @@ describe("EventingClickHouseReplayEventSource", () => {
 
       expect(applied).toEqual(["event_1", "event_2", "event_3"]);
       expect(eventsApplied).toBe(3);
-      expect(client.stream).toHaveBeenCalledWith(
-        expect.objectContaining({ tenantId: "project_a" }),
-      );
+      expect(client.stream).toHaveBeenCalledWith({
+        statement: expect.objectContaining(SCOPED_TO_PROJECT_A),
+      });
       expect(client.read).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A replay batch reads its events streamed rather than held whole" */
+    it("streams a built read of the batch's tenant, pruned by its occurred-at bounds", async () => {
+      const { client, source } = member();
+      client.stream.mockImplementation(async function* () {
+        yield [row("event_1", 1)];
+      });
+
+      await source.streamEventsForAggregates({
+        tenantId: "project_a",
+        aggregateIds: ["trace_1"],
+        eventTypes: ["lw.span.received"],
+        cutoffs: new Map(),
+        occurredAtBounds: { minMs: 5, maxMs: 9 },
+        onEvent: () => undefined,
+      });
+
+      const [sent] = client.stream.mock.calls[0] ?? [];
+      const { statement } = sent as { statement: { sql: string; params: object } };
+      expect(statement).toMatchObject(SCOPED_TO_PROJECT_A);
+      expect(statement.sql).toContain("FROM event_log WHERE TenantId = {tenantId:String}");
+      expect(statement.sql).toMatch(/EventOccurredAt = \{v\d+:\w+\} OR/);
+      expect(statement.sql).toMatch(/ORDER BY AggregateId ASC, EventTimestamp ASC, EventId ASC$/);
+      expect(Object.values(statement.params)).toEqual(expect.arrayContaining([5, 9]));
     });
   });
 
