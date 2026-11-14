@@ -74,11 +74,11 @@ Feature: Settings shell
     And the old page addresses forward to the corresponding consolidated tabs
 
   @integration
-  Scenario: A plan with Enterprise sees its entries marked ENT, not locked
+  Scenario: A plan with Enterprise sees its entries as plain entries
     Given my plan includes Enterprise
     When the settings sidebar renders
-    Then the Enterprise entries carry a quiet grey "ENT" chip
-    And no entry carries a lock
+    Then the Enterprise entries carry no badge and no lock, like any entry the plan includes
+    And no entry carries the "Included in Enterprise" lock
 
   @integration
   Scenario: A plan without Enterprise sees its entries locked
@@ -88,6 +88,18 @@ Feature: Settings shell
     And the lock reads "Included in Enterprise"
     And an entry I lack the permission for stays hidden
     And opening a locked entry shows its page title and an Enterprise upsell, never the feature
+
+  @unit @integration
+  Scenario: A branded feature's entries wear its mark
+    Given the settings menu offers the Braids page
+    Then Braids appears once, under Project, never also under People & access
+    And the entry draws the Braids mark, the one its pages' titles and empty states draw
+
+  @unit
+  Scenario: The organization's braids page lights the one Braids entry
+    Given the settings menu offers the Braids page
+    When I open the organization's braids page
+    Then the one Braids entry is the active entry
 
   @unit @integration
   Scenario: Authentication is offered unlocked on every plan

@@ -13,6 +13,7 @@ import { LogRecordStorageClickHouseRepository } from "../clickhouse/log-record-s
 import { SessionGroupsClickHouseRepository } from "../clickhouse/session-groups.repository.ts";
 import { SpanAnalyticsClickHouseRepository } from "../clickhouse/span-analytics.repository.ts";
 import { SpanStorageClickHouseRepository } from "../clickhouse/span-storage.repository.ts";
+import { TraceAgentTrafficClickHouseRepository } from "../clickhouse/trace-agent-traffic.repository.ts";
 import { TraceAnalyticsRollupClickHouseRepository } from "../clickhouse/trace-analytics-rollup.repository.ts";
 import { TraceDerivationSpanClickHouseRepository } from "../clickhouse/trace-derivation-span.repository.ts";
 import { TraceEvaluationAnalyticsClickHouseRepository } from "../clickhouse/trace-evaluation-analytics.repository.ts";
@@ -110,6 +111,7 @@ export class PostgresTraceRepositories {
         resolveClient: traceClickHouse,
       }),
       usageCount: TraceUsageCountClickHouseRepository.create(members.clickhouse),
+      agentTraffic: TraceAgentTrafficClickHouseRepository.create(members.clickhouse),
       indexMaterialisation: ClickHouseTraceIndexMaterialisationRepository.create(
         members.clickhouse,
       ),

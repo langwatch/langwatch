@@ -463,6 +463,7 @@ export class AuthModule implements AuthApiContract {
     priorSessions,
     twoStep,
     passwordResetMarks,
+    operatorAddressesFixed,
   }: {
     sessions: BrowserSessionService;
     cliSessions: CliDeviceSessionService;
@@ -481,6 +482,8 @@ export class AuthModule implements AuthApiContract {
     priorSessions: PriorSessionService;
     twoStep: TwoStepVerificationService;
     passwordResetMarks: PasswordResetMarks;
+    /** The hosted service keeps operating to staff, so an operator's address is fixed there. */
+    operatorAddressesFixed: boolean;
   }) {
     this.#sessions = sessions;
     this.#cliSessions = cliSessions;
@@ -509,6 +512,7 @@ export class AuthModule implements AuthApiContract {
     });
     this.#accounts = AccountLifecycleService.create({
       users: dependencies.users,
+      operatorAddressesFixed,
       credentials: {
         revokeAllBrowserSessions: (input) => this.revokeAllBrowserSessions(input),
         revokeCliTokens: (input) => this.revokeCliTokens(input),
@@ -620,6 +624,7 @@ export class AuthModule implements AuthApiContract {
 
     const app = new AuthModule({
       passwordResetMarks: accountRows,
+      operatorAddressesFixed: config.isSaas && config.nodeEnvironment !== "development",
       sessions,
       cliSessions,
       cliDeviceFlow: {

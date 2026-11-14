@@ -25,7 +25,7 @@ export default function LicenseScreen() {
           </Link>
         </PageLayout.HeaderButton>
       </PageLayout.Header>
-      <VStack gap={6} width="full" align="start" paddingTop={4}>
+      <VStack gap={6} width="full" align="start">
         <Text color="fg.muted">
           What your license covers: the seats you bought and the enterprise capabilities it unlocks,
           such as single sign-on, SCIM provisioning and audit logs. Running LangWatch, commercial

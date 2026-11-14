@@ -30,6 +30,7 @@ export class TestApiKeyService implements ApiKeyApi {
   revokeDocsSessionKeys = unsupported<ApiKeyApi["revokeDocsSessionKeys"]>();
   mintStaffAccessKey = unsupported<ApiKeyApi["mintStaffAccessKey"]>();
   revokeStaffAccessKey = unsupported<ApiKeyApi["revokeStaffAccessKey"]>();
+  getDocsSessionAvailability = unsupported<ApiKeyApi["getDocsSessionAvailability"]>();
   getOrgMembers = unsupported<ApiKeyApi["getOrgMembers"]>();
   getOrgProjects = unsupported<ApiKeyApi["getOrgProjects"]>();
   getOrgTeams = unsupported<ApiKeyApi["getOrgTeams"]>();

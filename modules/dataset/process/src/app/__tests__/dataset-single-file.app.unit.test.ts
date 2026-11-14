@@ -311,7 +311,7 @@ describe.each(storages)("a single-file dataset in $name", (storage) => {
   describe("when it is copied", () => {
     /**
      * @scenario "A single-file dataset copies its records into the new dataset"
-     * @scenario "A copy of a dataset is created directly in object storage"
+     * @scenario "Copying a legacy single-file dataset"
      */
     it("copies every entry from the file", async () => {
       const { app, repositories, datasetId } = await setup(storage);

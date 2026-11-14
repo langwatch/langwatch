@@ -236,6 +236,18 @@ export class MemoryAuthzLedgerReadRepository extends AuthzLedgerReadRepository {
       .map((row) => row.id);
   }
 
+  async findStoredGrantIds({
+    organizationId,
+    grantIds,
+  }: {
+    organizationId: string;
+    grantIds: readonly string[];
+  }): Promise<string[]> {
+    return this.memory.grants
+      .filter((row) => row.organizationId === organizationId && grantIds.includes(row.id))
+      .map((row) => row.id);
+  }
+
   async findLiveRole({
     roleId,
     organizationId,

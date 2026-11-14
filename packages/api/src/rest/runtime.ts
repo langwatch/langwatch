@@ -130,6 +130,7 @@ import {
   loggerMiddleware,
   multipartMiddleware,
   readRequestBody,
+  recordForwardedFailure,
   refusingMalformedBody,
   requestValidationErrorFrom,
   restCacheKey,
@@ -1589,12 +1590,7 @@ function handlerMiddleware<Api>({
       const decision = await decideRouteCaller({ route, ports, options, context, caller, input });
 
       if (route.mintsCredential) {
-        refuseImpersonatedMint({
-          permission: route.mintsCredential,
-          actor: decision.actor,
-          scope: decision.scope,
-          address: `REST ${family}.${route.operation}`,
-        });
+        refuseImpersonatedMint({ actor: decision.actor });
       }
 
       // Plan first (Q31): the door only identified, so the plan is asked at its scope.
@@ -2285,10 +2281,20 @@ async function answerWith<Api>({
   result: unknown;
 }): Promise<Response | undefined> {
   if (route.response) {
-    if (!isDeclined(result)) return respondProduced({ context, route, result });
+    if (!isDeclined(result)) {
+      const produced = respondProduced({ context, route, result });
+      // A forwarded 5xx is the answer of whatever the route passed through; say so in the log.
+      if (isProducedAnswer(result) && result.body.form === "response") {
+        recordForwardedFailure(context, produced);
+      }
+
+      return produced;
+    }
   } else if (!route.rawResponse) {
     return respond({ context, route, result });
   } else if (!isDeclined(result)) {
+    if (result instanceof Response) recordForwardedFailure(context, result);
+
     return respondRaw({ context, route, result });
   }
 

@@ -7,13 +7,13 @@ const meta = {
   title: "Brand/Feature illustration",
   parameters: {
     usage: {
-      use: "A branded feature's art: its empty state, its Enterprise upsell and its docs or landing hero. Decorative; the copy beside it carries the meaning.",
-      avoid: "Explaining something only in the art; replaying the hero on every render.",
+      use: "A branded feature's art: its empty state and its Enterprise upsell. Decorative; the copy beside it carries the meaning.",
+      avoid: "Explaining something only in the art.",
     },
   },
   component: FeatureIllustration,
   tags: ["autodocs"],
-  args: { feature: "braids", name: "hero" },
+  args: { feature: "braids", name: "empty-state" },
   decorators: [
     (Story) => (
       <Box maxWidth="760px">
@@ -26,12 +26,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Each project's strand weaves in once and lands on its spans; still under reduced motion. */
-export const Hero: Story = {};
-
-export const HeroStill: Story = { args: { animate: false } };
-
-export const EmptyState: Story = { args: { name: "empty-state" } };
+export const EmptyState: Story = {};
 
 export const Enterprise: Story = { args: { name: "enterprise" } };
 

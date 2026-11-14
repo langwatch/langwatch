@@ -2920,6 +2920,7 @@ export const LWQL_CLICKHOUSE_CATALOGUE = defineLwqlCatalog({
     access: { allOf: ["analytics:view", "traces:view"] },
     columns: {
       ProjectionId: "omit",
+      IdLayout: "omit",
       TenantId: "inherit",
       TraceId: "inherit",
       SpanId: "inherit",
@@ -2963,6 +2964,7 @@ export const LWQL_CLICKHOUSE_CATALOGUE = defineLwqlCatalog({
     access: { allOf: ["analytics:view", "evaluations:view"] },
     columns: {
       ProjectionId: "omit",
+      IdLayout: "omit",
       TenantId: "inherit",
       EvaluationId: "inherit",
       Version: "omit",
@@ -3450,6 +3452,7 @@ export const LWQL_CLICKHOUSE_CATALOGUE = defineLwqlCatalog({
     access: { allOf: ["analytics:view", "traces:view"] },
     columns: {
       ProjectionId: "omit",
+      IdLayout: "omit",
       TenantId: "inherit",
       TraceId: "inherit",
       SpanId: "inherit",

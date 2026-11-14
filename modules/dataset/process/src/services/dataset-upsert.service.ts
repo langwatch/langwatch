@@ -21,7 +21,6 @@ type DatasetUpsertDeps = {
   options: DatasetServiceOptions;
   getBySlugOrId: (input: { projectId: string; slugOrId: string }) => Promise<Dataset>;
   assertReady: (dataset: Dataset) => void;
-  generateId: () => string;
 };
 
 type ParsedUpsert = ReturnType<typeof upsertDatasetInputSchema.parse>;
@@ -84,7 +83,7 @@ export class DatasetUpsertService {
     }
     const movesValues = columnEditMovesValues(columnEdit);
     const rewrites = columnsChanged || movesValues;
-    if (existing.contentLayout === "s3_jsonl" && options.content && rewrites) {
+    if (existing.contentLayout === "s3_jsonl" && rewrites) {
       return options.content.updateColumns({
         dataset: existing,
         projectId: parsed.projectId,
@@ -226,36 +225,13 @@ export class DatasetUpsertService {
       });
     }
 
-    if (options.content) {
-      return options.content.createDataset({
-        projectId: parsed.projectId,
-        name,
-        slug,
-        columnTypes: parsed.columnTypes,
-        rows: (parsed.datasetRecords ?? []).map(({ id, ...entry }) => ({ id, entry })),
-      });
-    }
-
-    // Only a composition with no object storage (a unit test) still makes a
-    // Postgres-layout dataset.
-    const created = await options.repository.create({
+    return options.content.createDataset({
       projectId: parsed.projectId,
       name,
       slug,
       columnTypes: parsed.columnTypes,
+      rows: (parsed.datasetRecords ?? []).map(({ id, ...entry }) => ({ id, entry })),
     });
-    if (parsed.datasetRecords && parsed.datasetRecords.length > 0) {
-      await options.records.createMany({
-        datasetId: created.id,
-        projectId: parsed.projectId,
-        entries: parsed.datasetRecords.map((entry) => ({
-          ...entry,
-          id: entry.id ?? this.deps.generateId(),
-        })),
-      });
-    }
-
-    return created;
   }
 
   /**

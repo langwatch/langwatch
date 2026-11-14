@@ -66,7 +66,8 @@ export class SessionClaimsService {
     providerId: string;
     evidence: SessionCallbackEvidence | undefined;
   }): Promise<string | null> {
-    const heads = Object.values((await this.deps.heads.findHeads({ userId })).identifiers);
+    const stored = (await this.deps.heads.findHeads({ userId })).identifiers;
+    const heads = Object.values(stored);
     const live = heads
       .filter((head) => isAttributable({ head, providerId, evidence }))
       .toSorted((left, right) => right.attachedAtMs - left.attachedAtMs)[0];
@@ -80,6 +81,7 @@ export class SessionClaimsService {
       providerAccountId: evidence.providerAccountId,
       normalizedValue: normalizeIdentifierValue(account.email),
       occurredAtMs: account.createdAtMs,
+      storedIdentifierIds: new Set(Object.keys(stored)),
     });
     const claimed = heads.some(
       (head) => head.identifierId === derived || head.accountId === account.accountId,

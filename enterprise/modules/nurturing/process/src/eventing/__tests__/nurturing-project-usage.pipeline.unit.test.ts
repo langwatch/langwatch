@@ -339,6 +339,7 @@ describe("the trace syncs", () => {
       },
       clock: { nowMs: () => OCCURRED_AT + 60_000 },
       logger: createTestLogger().logger,
+      syncs: { inc: () => {} },
     });
     const { firstTrace } = nurturingTraceUsageSyncSubscribers((input) =>
       usage.tracesChanged(input),

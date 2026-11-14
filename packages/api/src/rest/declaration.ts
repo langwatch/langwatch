@@ -640,8 +640,8 @@ export type RestTransportRoute<Api> = Readonly<{
   readonly cache?: RestCachePolicy;
   /** Present exactly when the route asks the tenant to hold an entitlement. */
   readonly entitlement?: EntitlementGate;
-  /** Present exactly when the route mints a credential: the permission its refusal names. */
-  readonly mintsCredential?: AuthzPermission;
+  /** Present exactly when the route mints a credential. */
+  readonly mintsCredential?: true;
   /** Present exactly when the route is refused on an aggregate though its permission is exempt. */
   readonly refusedOnAggregate?: true;
   /** Present exactly when the route starts a run that spends the organization's money. */
@@ -736,7 +736,7 @@ type RouteState = Readonly<{
   rateLimit?: RestRateLimitPolicy;
   cache?: RestCachePolicy;
   entitlement?: EntitlementGate;
-  mintsCredential?: AuthzPermission;
+  mintsCredential?: true;
   refusedOnAggregate?: true;
   spends?: true;
   spendExempt?: string;
@@ -1156,10 +1156,10 @@ class RouteBuilder<in out Api, in out S extends RouteShape> {
 
   /**
    * The route mints a credential (a key, token or secret). The runtime refuses it with
-   * PermissionDeniedError naming `permission` whenever the actor carries an impersonatorId,
+   * ImpersonationCannotMintCredentialError whenever the actor carries an impersonatorId,
    * after access and before the handler.
    */
-  mintsCredential(permission: AuthzPermission): RouteBuilder<Api, S> {
+  mintsCredential(): RouteBuilder<Api, S> {
     if (this.state.mintsCredential)
       throw new Error("REST route already declared mintsCredential()");
 
@@ -1168,7 +1168,7 @@ class RouteBuilder<in out Api, in out S extends RouteShape> {
       method: this.method,
       path: this.path,
       operation: this.operation,
-      state: { ...this.state, mintsCredential: permission },
+      state: { ...this.state, mintsCredential: true },
     });
   }
 

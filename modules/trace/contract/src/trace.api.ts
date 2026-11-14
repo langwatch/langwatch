@@ -3,6 +3,7 @@ import type { InstantEvalRunReference } from "@langwatch/instant-eval-contract";
 import { moduleApi } from "@langwatch/module";
 
 import type { ConversationView } from "./conversation/conversation-steps.ts";
+import type { TraceAgentSeen } from "./features/analytics/trace-agent-traffic.ts";
 import type {
   TraceAttributedRecency,
   TraceAttributedSpendComparison,
@@ -121,6 +122,7 @@ import type {
   TraceResourceInfoDto,
 } from "./trace-view.contract.ts";
 import type { Protections } from "./trace-viewer-protections.contract.ts";
+import type { TracePageSizeBound } from "./trace.errors.ts";
 import type {
   SpanTreeDeltaInput,
   SpanTreeInput,
@@ -272,8 +274,8 @@ export interface TraceApi extends TraceOtlpIngestApi {
       filterWhere?: { sql: string; params: Record<string, unknown> };
       /** The proof `filterWhere`'s tenant markers expand into (ADR-177 block C). */
       authorization?: Authorization;
-      /** Refuse above this plan bound instead of clamping to the list bound. */
-      refuseAbove?: "tracesPageSizeMax" | "tracesDownloadPageSizeMax";
+      /** Refuse above this plan bound instead of clamping; a spans read takes the spans bound. */
+      refuseAbove?: TracePageSizeBound;
     };
   }): Promise<TracesForProjectResult>;
   /**
@@ -1075,6 +1077,12 @@ export interface TraceApi extends TraceOtlpIngestApi {
     attribute: TraceAttributeMatch;
     groupByKey: string;
   }): Promise<{ value: string; count: number }[]>;
+  /** Distinct `gen_ai.agent.name` values in the project's spans since `sinceMs`, busiest first. */
+  findAgentsSeen(input: {
+    projectId: string;
+    sinceMs: number;
+    limit: number;
+  }): Promise<TraceAgentSeen[]>;
 }
 
 export type TracePreconditionSampleInput = {

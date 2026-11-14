@@ -134,26 +134,6 @@ export function withSignedCalls({ where, on, key }: { where: string; on: boolean
     .trim();
 }
 
-/** Inserts `attributes["k"] == ""` at the cursor, joined by `and`; the caret in its quotes. */
-export function insertAttribute({
-  where,
-  cursor,
-  key,
-}: {
-  where: string;
-  cursor: number;
-  key: string;
-}) {
-  const at = Math.max(0, Math.min(cursor, where.length));
-  const before = where.slice(0, at);
-  const after = where.slice(at);
-  const needsAnd = before.trim().length > 0 && !/\b(and|not)\s*$/.test(before);
-  const lead = needsAnd ? `${before.replace(/\s*$/, "")} and ` : before;
-  const comparison = `attributes["${key.replace(/["\\]/g, "\\$&")}"] == ""`;
-  const tail = after.trim().length > 0 && !/^\s/.test(after) ? ` ${after}` : after;
-  return { where: `${lead}${comparison}${tail}`, caret: lead.length + comparison.length - 1 };
-}
-
 export type BraidTargetOption = {
   projectId: string;
   name: string;
@@ -167,7 +147,7 @@ const TARGET_REASONS = {
   aggregate: "Aggregate projects can't be braided",
 } as const;
 
-/** The picker's entries in the host's order, and whether any project was left out. */
+/** The picker's entries in the host's order, the braid's own project last; any left out? */
 export function braidTargetOptions({
   projects,
   targets,
@@ -176,18 +156,19 @@ export function braidTargetOptions({
   targets: AuthzBraidTargets;
 }): { options: BraidTargetOption[]; someLeftOut: boolean } {
   const decided = new Map(targets.map((target) => [target.projectId, target]));
-  const options = projects.flatMap((project): BraidTargetOption[] => {
+  const listed = projects.flatMap((project) => {
     const target = decided.get(project.id);
-    if (!target) return [];
-    return [
-      {
-        projectId: project.id,
-        name: project.name,
-        selectable: target.selectable,
-        ...(target.reason ? { reason: TARGET_REASONS[target.reason] } : {}),
-      },
-    ];
+    return target ? [{ project, target }] : [];
   });
+  const isOwn = ({ target }: (typeof listed)[number]) => target.reason === "this_project";
+  const options = [...listed.filter((entry) => !isOwn(entry)), ...listed.filter(isOwn)].map(
+    ({ project, target }): BraidTargetOption => ({
+      projectId: project.id,
+      name: project.name,
+      selectable: target.selectable,
+      ...(target.reason ? { reason: TARGET_REASONS[target.reason] } : {}),
+    }),
+  );
   return { options, someLeftOut: options.length < projects.length };
 }
 

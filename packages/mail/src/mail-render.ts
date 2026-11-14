@@ -1,4 +1,5 @@
 import type { MonitorAutoPausedEmailProps } from "./templates/monitor-auto-paused-email.tsx";
+import type { PlatformOperatorChangeEmailProps } from "./templates/platform-operator-change-email.tsx";
 import type { StaffAccessNoticeEmailProps } from "./templates/staff-access-notice-email.tsx";
 import type { TriggerDigestMail } from "./templates/trigger-digest-email.tsx";
 import type { UpgradeAlertEmailProps } from "./templates/upgrade-alert-email.tsx";
@@ -38,5 +39,10 @@ export abstract class MailRender {
   /** What one platform operator did with staff access, sent to each of the other operators. */
   abstract renderStaffAccessNotice(
     input: StaffAccessNoticeEmailProps,
+  ): Promise<{ subject: string; html: string }>;
+
+  /** Someone was given or lost the platform-operator role, sent to every operator. */
+  abstract renderPlatformOperatorChange(
+    input: PlatformOperatorChangeEmailProps,
   ): Promise<{ subject: string; html: string }>;
 }

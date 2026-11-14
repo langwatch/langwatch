@@ -19,8 +19,9 @@ import type {
   TraceEvaluationOutcome,
 } from "../../eventing/trace-derived.projection.ts";
 import {
-  type TraceAnalyticsMetadataColumns,
+  type TraceAnalyticsWrittenMetadataColumns,
   traceAnalyticsMetadataColumns,
+  traceAnalyticsWrittenMetadataColumns,
 } from "../../rules/trace-widget-columns.rules.ts";
 import {
   TraceAnalyticsProjectionRepository,
@@ -52,8 +53,8 @@ const READ_BACK_FOLD_INSERT_SETTINGS = {
   async_insert: 1,
   wait_for_async_insert: 1,
   input_format_skip_unknown_fields: 0,
-  // Goose 00126's metadata columns stay MATERIALIZED for older writers until the contract step;
-  // the fold writes them itself, which takes this and a named column list (analytics ADR-006).
+  // The fold no longer sends goose 00126's MATERIALIZED columns (see
+  // traceAnalyticsWrittenMetadataColumns). Kept for when it writes them again (ADR-006 step 4).
   insert_allow_materialized_columns: 1,
 } as const;
 
@@ -100,7 +101,7 @@ type ClickHouseTraceAnalyticsWriteRecord = {
   Attributes: Record<string, string>;
 
   // ── The stock widgets' metadata columns (migrations 00126, 00128) ──────
-} & TraceAnalyticsMetadataColumns & {
+} & TraceAnalyticsWrittenMetadataColumns & {
     // ── Read-back state (ADR-066, migration 00056) ─────────────────────────
     SpanCount: number;
     AnnotationIds: string[];
@@ -127,7 +128,7 @@ type ClickHouseTraceAnalyticsWriteRecord = {
     _retention_days: number;
   };
 
-/** Every column the fold writes, named: ClickHouse takes a MATERIALIZED column only when listed. */
+/** Every column the fold writes, named, so a column the row lacks is never defaulted silently. */
 function writeColumns(
   records: readonly ClickHouseTraceAnalyticsWriteRecord[],
 ): [string, ...string[]] {
@@ -552,7 +553,9 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
       HasAnnotation: row.hasAnnotation,
 
       Attributes: row.attributes,
-      ...(row.metadataColumns ?? traceAnalyticsMetadataColumns(row.attributes)),
+      ...traceAnalyticsWrittenMetadataColumns(
+        row.metadataColumns ?? traceAnalyticsMetadataColumns(row.attributes),
+      ),
 
       SpanCount: Math.max(0, Math.round(row.spanCount)),
       AnnotationIds: row.annotationIds,

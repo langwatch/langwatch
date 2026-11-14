@@ -83,6 +83,8 @@ export interface ObjectStorage {
   ): Promise<ObjectDigest>;
   /** The object's bytes; an absent object refuses with StoredObjectNotFoundError. */
   read(at: StoredObjectAddress): Promise<AsyncIterable<Uint8Array>>;
+  /** Whether an object is stored at the address, asked of its headers alone: no body is opened. */
+  exists(at: StoredObjectAddress): Promise<boolean>;
   /** The backend's SHA-256 where it holds one, else the object streamed back through the hash. */
   digest(at: StoredObjectAddress): Promise<ObjectDigest>;
   /** Removes the object; an absent one is already removed. */

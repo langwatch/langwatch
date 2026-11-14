@@ -8,6 +8,10 @@ import {
   renderMonitorAutoPausedEmail,
 } from "../templates/monitor-auto-paused-email.tsx";
 import {
+  type PlatformOperatorChangeEmailProps,
+  renderPlatformOperatorChangeEmail,
+} from "../templates/platform-operator-change-email.tsx";
+import {
   renderStaffAccessNoticeEmail,
   type StaffAccessNoticeEmailProps,
 } from "../templates/staff-access-notice-email.tsx";
@@ -63,5 +67,11 @@ export class ReactEmailMailRenderer extends MailRender {
     input: StaffAccessNoticeEmailProps,
   ): Promise<{ subject: string; html: string }> {
     return renderStaffAccessNoticeEmail(input);
+  }
+
+  renderPlatformOperatorChange(
+    input: PlatformOperatorChangeEmailProps,
+  ): Promise<{ subject: string; html: string }> {
+    return renderPlatformOperatorChangeEmail(input);
   }
 }

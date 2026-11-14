@@ -7,7 +7,7 @@ Feature: Shared Dataset service
     When a caller creates a dataset for a project with columns and records
     Then the service validates the input with the Dataset contract
     And it returns a portable Dataset value
-    And the records are written through the Dataset record repository
+    And the records are written to object storage
 
   @unit
   Scenario: Dataset names remain unique within a project
@@ -32,8 +32,8 @@ Feature: Shared Dataset service
   @unit
   Scenario: Dataset copy remains a Dataset operation
     When a caller copies a dataset to another project
-    Then the service creates the target through its own repository
-    And it copies records through the Dataset record repository
+    Then the service creates the target in object storage
+    And it reads the source records through the Dataset record repository
     And it does not construct a Dataset Record feature
 
   @unit

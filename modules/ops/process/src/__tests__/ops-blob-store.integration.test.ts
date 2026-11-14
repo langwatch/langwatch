@@ -90,6 +90,7 @@ describe.skipIf(!hasRedis)("Ops blob store delete", () => {
         anomalyState: RedisAnomalyStateRepository.create(redis),
       },
       authz: createApiFixture<AuthzApi>(),
+      operatorAddressesFixed: true,
       audit: { record: async () => undefined },
       memberships: createApiFixture<OrganizationApi>(),
       sessions: createApiFixture<AuthApi>(),

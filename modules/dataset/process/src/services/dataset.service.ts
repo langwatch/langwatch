@@ -62,7 +62,7 @@ export type DatasetServiceOptions = {
   records: DatasetRecordRepository;
   uploads?: DatasetUpload;
   queue?: DatasetNormalizeQueue;
-  content?: DatasetContent;
+  content: DatasetContent;
   /** The previous release's single-file datasets, served where that release kept them. */
   singleFile?: DatasetSingleFileService;
   generateId?: () => string;
@@ -113,7 +113,6 @@ export class DatasetService {
       options,
       getBySlugOrId: (input) => this.getBySlugOrId(input),
       assertReady: (dataset) => this.assertReady(dataset),
-      generateId: () => this.generateId(),
     });
     this.copies = DatasetCopyService.create({
       options,
@@ -121,7 +120,6 @@ export class DatasetService {
       findNextAvailableName: (input) => this.findNextAvailableName(input),
       upsertDataset: (input) => this.upsertDataset(input),
       createWithStoredRows: (input) => this.upserts.createWithStoredRows(input),
-      generateId: () => this.generateId(),
     });
     this.records = DatasetRecordService.create({
       options,

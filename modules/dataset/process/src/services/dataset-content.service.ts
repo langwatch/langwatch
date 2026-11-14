@@ -316,7 +316,7 @@ export class DatasetContentService implements DatasetContent {
     dataset: Dataset;
     input: CreateDatasetRecordsInput;
   }): Promise<DatasetRecord[]> {
-    // Ids are minted here, not in the append, so the records returned carry the stored ids.
+    // Minted here, not in the chunk write, so each answered row carries the id it was stored under.
     const forcedIds = input.entries.map(
       (entry) => entry.id ?? generate(RECORD_KSUID_RESOURCE).toString(),
     );

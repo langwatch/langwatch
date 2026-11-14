@@ -407,6 +407,8 @@ export interface LwqlPrismaRows {
     readonly privateDataplaneSeenAt: "DateTime?";
     readonly maxSessionDurationDays: "Int";
     readonly mfaRequired: "Boolean";
+    readonly docsPlaygroundSessionsEnabled: "Boolean";
+    readonly docsPlaygroundSessionsDisabledAt: "DateTime?";
     readonly lockoutAfterFailedAttempts: "Int";
     readonly lockoutMinutes: "Int";
     readonly sessionIdleTimeoutMinutes: "Int";
@@ -456,6 +458,7 @@ export interface LwqlPrismaRows {
     readonly maxMembers: "Int";
     readonly maxMembersLite: "Int?";
     readonly liteSeatsUnlimited: "Boolean";
+    readonly maxMembersDeveloper: "Int?";
     readonly issuedAt: "DateTime";
     readonly expiresAt: "DateTime";
     readonly source: "IssuedLicenseSource";
@@ -501,6 +504,7 @@ export interface LwqlPrismaRows {
     readonly maxMembers: "Int";
     readonly maxMembersLite: "Int?";
     readonly liteSeatsUnlimited: "Boolean";
+    readonly maxMembersDeveloper: "Int?";
     readonly licenseTermDays: "Int";
     readonly services: "String[]";
     readonly expiresAt: "DateTime";
@@ -2627,6 +2631,37 @@ export interface LwqlPrismaRows {
     readonly lastSeenAt: "DateTime";
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
+  };
+  readonly AgentRegistryEntry: {
+    readonly id: "String";
+    readonly organizationId: "String";
+    readonly sourceKey: "String";
+    readonly source: "String";
+    readonly status: "String";
+    readonly version: "Int";
+    readonly fingerprint: "String";
+    readonly entry: "Json";
+    readonly firstSeenAt: "DateTime";
+    readonly lastSeenAt: "DateTime?";
+    readonly removedAt: "DateTime?";
+    readonly createdAt: "DateTime";
+    readonly updatedAt: "DateTime";
+  };
+  readonly AgentRegistryEvent: {
+    readonly id: "String";
+    readonly organizationId: "String";
+    readonly sequence: "BigInt";
+    readonly type: "String";
+    readonly entryId: "String";
+    readonly fromVersion: "Int?";
+    readonly toVersion: "Int?";
+    readonly payload: "Json";
+    readonly occurredAt: "DateTime";
+    readonly deliveryRecordedAt: "DateTime?";
+  };
+  readonly AgentRegistryBaseline: {
+    readonly organizationId: "String";
+    readonly baselinedAt: "DateTime";
   };
   readonly IdentityMatch: {
     readonly id: "String";

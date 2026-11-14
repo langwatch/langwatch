@@ -16,7 +16,7 @@ export default function RolesScreen() {
     return (
       <>
         <RolesHeader />
-        <VStack gap={6} width="full" align="stretch" paddingTop={4}>
+        <VStack gap={6} width="full" align="stretch">
           <Skeleton height="20px" width="320px" />
           <Skeleton height="200px" borderRadius="xl" />
         </VStack>
