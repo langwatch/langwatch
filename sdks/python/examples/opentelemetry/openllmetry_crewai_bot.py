@@ -6,7 +6,7 @@ This file demonstrates how to integrate CrewAI with LangWatch using OpenLLMetry 
 Installation Requirements:
     pip install crewai
     pip install opentelemetry-instrumentation-crewai
-    pip install langwatch
+    pip install "langwatch>=1.3.0"
 
 For more information, see: https://docs.langwatch.ai/integration/python/integrations/crew-ai
 """

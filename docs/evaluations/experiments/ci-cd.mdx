@@ -90,7 +90,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install LangWatch
-        run: pip install langwatch
+        run: pip install "langwatch>=1.3.0"
 
       - name: Run experiment
         env:
@@ -294,7 +294,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install langwatch openai  # Add your LLM SDK
+          pip install "langwatch>=1.3.0" openai  # Add your LLM SDK
 
       - name: Run experiment
         env:
@@ -396,7 +396,7 @@ evaluate:
   stage: test
   image: python:3.11
   script:
-    - pip install langwatch
+    - pip install "langwatch>=1.3.0"
     - python -c "
       import langwatch
       result = langwatch.experiment.run('my-experiment')
@@ -412,7 +412,7 @@ evaluate:
   stage: test
   image: python:3.11
   script:
-    - pip install langwatch openai
+    - pip install "langwatch>=1.3.0" openai
     - python scripts/run_evaluation.py
   variables:
     LANGWATCH_API_KEY: $LANGWATCH_API_KEY
@@ -437,7 +437,7 @@ jobs:
       - run:
           name: Run experiment
           command: |
-            pip install langwatch
+            pip install "langwatch>=1.3.0"
             python -c "
             import langwatch
             result = langwatch.experiment.run('my-experiment')
@@ -457,7 +457,7 @@ jobs:
       - checkout
       - run:
           name: Install dependencies
-          command: pip install langwatch openai
+          command: pip install "langwatch>=1.3.0" openai
       - run:
           name: Run experiment
           command: python scripts/run_evaluation.py
