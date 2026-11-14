@@ -61,6 +61,8 @@ async function boot() {
         blockLocalHttpCalls: false,
         allowedProxyHosts: [],
         runConcurrency: 10,
+        projectCellBudget: 24,
+        globalCellBudget: undefined,
         publicBaseUrl: undefined,
         legacyPublicBaseUrl: undefined,
         isSaas: false,

@@ -55,3 +55,10 @@ Feature: Run via API dialog for workflows and evaluations-v3
     Then the snippet runs with a concurrency of 1
     When I choose parallel execution with a concurrency of 3
     Then the snippet runs with a concurrency of 3
+
+  @integration
+  Scenario: An experiment with no saved concurrency starts on Auto and its snippets name none
+    Given an evaluations-v3 experiment saved without a concurrency
+    When I open its Run via API dialog and choose CLI
+    Then the execution choice is Auto
+    And the snippet names no concurrency, so the server picks the default

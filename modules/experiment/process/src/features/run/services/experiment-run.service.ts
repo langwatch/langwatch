@@ -15,6 +15,7 @@ import type { TraceApi } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 
 import { experimentAttachmentLinkChannels } from "../../../channels/experiment-attachment-link-channels.registry.ts";
+import { createExperimentRunActivitySubscriber } from "../../../eventing/experiment-run-activity.subscriber.ts";
 import { ExecuteExperimentCellCommand } from "../../../eventing/experiment-run-cell.commands.ts";
 import {
   completeRun,
@@ -52,6 +53,7 @@ import { ExperimentWorkflowSourceService } from "../../workflow/services/experim
 import { ExperimentRunBoardWriteBackService } from "./experiment-run-board-write-back.service.ts";
 import { ExperimentRunCellService } from "./experiment-run-cell.service.ts";
 import type { ExperimentRunCommandDispatcherService } from "./experiment-run-command-dispatcher.service.ts";
+import { ExperimentRunConcurrencyService } from "./experiment-run-concurrency.service.ts";
 import { ExperimentRunModelCostService } from "./experiment-run-model-cost.service.ts";
 import { ExperimentRunSandboxCredentialService } from "./experiment-run-sandbox-credential.service.ts";
 
@@ -72,8 +74,8 @@ export type ExperimentRunProcessing = Readonly<{
   services: ExecutionDataServices;
   /** Refuses a run against someone else's personal development agent before it starts. */
   ownership: Pick<ExperimentAgentOwnershipService, "assertConnectedAgentsRunnable">;
-  /** Cells in flight at once when a run names no limit of its own. */
-  concurrency: number;
+  /** The cells in flight at once a run starts with when it names no limit of its own. */
+  concurrency: Pick<ExperimentRunConcurrencyService, "resolve" | "release">;
   /** What this process refuses of a run, for want of Redis or a public address. */
   refusals: ExperimentRunRefusals;
 }>;
@@ -106,6 +108,8 @@ type ExperimentRunDeps = Readonly<{
     | "blockLocalHttpCalls"
     | "allowedProxyHosts"
     | "runConcurrency"
+    | "projectCellBudget"
+    | "globalCellBudget"
     | "publicBaseUrl"
     | "legacyPublicBaseUrl"
     | "isSaas"
@@ -130,6 +134,10 @@ export class ExperimentRunService {
       defaultRetentionDays: () => retention.getPlatformDefaultRetentionDays(),
     });
     const { folds, abort, stream } = repositories;
+    const concurrency = ExperimentRunConcurrencyService.create({
+      activity: repositories.activity,
+      config,
+    });
     const refusals = runRefusalsOf({
       // Both tiers share a run across the deployment: live in Redis, memory in its one process.
       sharedStore: true,
@@ -149,7 +157,7 @@ export class ExperimentRunService {
       experiments,
       workflowSource: services.workflows,
       services,
-      concurrency: config.runConcurrency,
+      concurrency,
       folds,
       refusals,
       requests: commands,
@@ -171,6 +179,7 @@ export class ExperimentRunService {
           cells,
           boardWriteBack,
           stream,
+          concurrency,
         }),
         commands,
         idLookup: repositories.idLookup,
@@ -180,7 +189,7 @@ export class ExperimentRunService {
         publicBaseUrl,
         services,
         ownership: ExperimentAgentOwnershipService.create(peers.agents),
-        concurrency: config.runConcurrency,
+        concurrency,
         refusals,
       },
     });
@@ -270,6 +279,7 @@ function buildRunPipeline({
   cells,
   boardWriteBack,
   stream,
+  concurrency,
 }: {
   deps: ExperimentRunDeps;
   repositories: ExperimentRunRepositories;
@@ -277,6 +287,7 @@ function buildRunPipeline({
   cells: ExperimentRunCellService;
   boardWriteBack: ExperimentRunBoardWriteBackService;
   stream: ExperimentRunEventStreamRepository;
+  concurrency: ExperimentRunConcurrencyService;
 }): ExperimentRunProcessingPipeline {
   const { folds } = repositories;
   return buildExperimentRunProcessingPipeline({
@@ -292,6 +303,7 @@ function buildRunPipeline({
       complete: completeRun({ commands, boardWriteBack }),
     },
     runFrames: createExperimentRunFramesSubscriber({ stream }),
+    runActivity: createExperimentRunActivitySubscriber(concurrency),
     traceMetricsSync: createExperimentTraceMetricsSyncHandler({
       findSummary: (input) => peers.traces.findSummary(input),
       findExperimentId: (input) => repositories.idLookup.findExperimentId(input),
