@@ -1,5 +1,6 @@
 import {
   adminEmails,
+  clickhouseCluster,
   Config,
   environmentOneOrTrueSchema,
   grafana,
@@ -56,7 +57,7 @@ export const opsConfig = Config.define((c) => ({
    * already sets it for replicated or named external ClickHouse, so those installs read across
    * replicas from the upgrade on.
    */
-  clickhouseCluster: c.env("CLICKHOUSE_CLUSTER", z.string().optional()),
+  clickhouseCluster,
   collectClickHouseBackupMetrics: c.env(
     "CLICKHOUSE_BACKUP_METRICS_ENABLED",
     z
