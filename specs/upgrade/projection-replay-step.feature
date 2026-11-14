@@ -174,6 +174,31 @@ Feature: A module fills a new read model at deploy by replaying a projection lan
     When the worker runs it
     Then every report it saves and returns names the instant its first run replayed from
 
+  # A batch's event read sorts every row it returns, payloads included, before the first row
+  # leaves the server, so one read of a heavy batch can outgrow a small server's memory. The
+  # source sizes each aggregate first (event count, payload bytes) and reads the batch in slices
+  # within a budget, an aggregate always whole within one.
+
+  @integration
+  Scenario: A batch's events are read in slices sized by their payload
+    Given a batch whose events' payloads outgrow the ClickHouse server's memory for one read
+    When the step replays the lane
+    Then the batch's events are read in slices within the read budget, each aggregate whole within one
+    And every event is applied once, each aggregate's in the order it was recorded
+
+  @integration
+  Scenario: A slice over the server's memory before it applied an event is read as halves
+    Given a slice whose read hits a ClickHouse memory limit, the server-wide one included, before it applied an event
+    When the step replays the lane
+    Then the slice is read again as two halves, each halved again until it fits
+    And every event is applied once, each aggregate's in the order it was recorded
+
+  @unit
+  Scenario: A slice over the server's memory after it applied an event fails without halving
+    Given a slice whose read hits a ClickHouse memory limit after it handed an event on
+    When the step replays the lane
+    Then the read fails with that error and no half is read
+
   # A heavy tenant's batch can outgrow ClickHouse's per-query memory limit on its event query.
   # That is a size failure: a fold lane splits its batch in halves down to one aggregate.
   # Unlike the group queue's bisection (LANGWATCH_GQ_BISECTION_SPLIT_BUDGET), it has no budget;
