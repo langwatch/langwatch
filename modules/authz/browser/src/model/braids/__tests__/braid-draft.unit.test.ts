@@ -8,8 +8,8 @@ import {
   braidDraftChanged,
   braidDraftOf,
   braidTargetLabel,
+  braidTargetOptions,
   braidsOnPair,
-  insertAttribute,
   pairBraidsPhrase,
   testTraceRows,
   withSignedCalls,
@@ -43,41 +43,6 @@ describe("withSignedCalls", () => {
     ])("takes Verified out of %s", (where, expected) => {
       expect(withSignedCalls({ where, on: false, key: "team" })).toBe(expected);
     });
-  });
-});
-
-describe("insertAttribute", () => {
-  it("inserts into an empty condition with the caret inside the quotes", () => {
-    const next = insertAttribute({ where: "", cursor: 0, key: "team" });
-    expect(next.where).toBe('attributes["team"] == ""');
-    expect(next.caret).toBe(next.where.length - 1);
-  });
-
-  it("joins a comparison after written text with and", () => {
-    const where = 'name == "n"';
-    const next = insertAttribute({ where, cursor: where.length, key: "team" });
-    expect(next.where).toBe('name == "n" and attributes["team"] == ""');
-    expect(next.where[next.caret - 1]).toBe('"');
-    expect(next.where[next.caret]).toBe('"');
-  });
-
-  it("does not add a second and after a trailing one", () => {
-    const where = 'name == "n" and ';
-    expect(insertAttribute({ where, cursor: where.length, key: "team" }).where).toBe(
-      'name == "n" and attributes["team"] == ""',
-    );
-  });
-
-  it("escapes a quote or backslash in the key", () => {
-    expect(insertAttribute({ where: "", cursor: 0, key: 'a"b\\c' }).where).toBe(
-      'attributes["a\\"b\\\\c"] == ""',
-    );
-  });
-
-  it("keeps a cursor past the end at the end", () => {
-    expect(insertAttribute({ where: "", cursor: 99, key: "team" }).where).toBe(
-      'attributes["team"] == ""',
-    );
   });
 });
 
@@ -190,5 +155,47 @@ describe("braidDraftChanged", () => {
     const draft = { ...braidDraftOf(saved), ...edit };
 
     expect(braidDraftChanged({ draft, braid: saved, nowMs })).toBe(true);
+  });
+});
+
+describe("braidTargetOptions", () => {
+  describe("when the braid's own project sits early in the host's list", () => {
+    /** @scenario The braid starts from this project and picks where it goes */
+    it("lists it last, the others in the host's order", () => {
+      const { options } = braidTargetOptions({
+        projects: [
+          { id: "p-a", name: "alpha" },
+          { id: "p-own", name: "specialists" },
+          { id: "p-b", name: "beta" },
+        ],
+        targets: [
+          { projectId: "p-a", selectable: true },
+          { projectId: "p-own", selectable: false, reason: "this_project" },
+          { projectId: "p-b", selectable: true },
+        ],
+      });
+
+      expect(options.map((option) => option.projectId)).toEqual(["p-a", "p-b", "p-own"]);
+    });
+  });
+
+  describe("when another project is refused for a different reason", () => {
+    /** @scenario The braid starts from this project and picks where it goes */
+    it("moves only the braid's own project, by its reason key rather than its words", () => {
+      const { options } = braidTargetOptions({
+        projects: [
+          { id: "p-own", name: "specialists" },
+          { id: "p-agg", name: "everything" },
+          { id: "p-a", name: "alpha" },
+        ],
+        targets: [
+          { projectId: "p-own", selectable: false, reason: "this_project" },
+          { projectId: "p-agg", selectable: false, reason: "aggregate" },
+          { projectId: "p-a", selectable: true },
+        ],
+      });
+
+      expect(options.map((option) => option.projectId)).toEqual(["p-agg", "p-a", "p-own"]);
+    });
   });
 });

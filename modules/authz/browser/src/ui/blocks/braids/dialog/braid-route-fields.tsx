@@ -1,14 +1,21 @@
-// From and Into: the project the braid starts from is fixed; the picker offers the projects the
-// viewer can read, the braid's own project and aggregates disabled with the reason.
+// From and Into: the project the braid starts from is fixed, so it reads as plain text; the picker
+// offers the projects the viewer can read, the braid's own project and aggregates disabled.
 
 import { Banner, BannerAction } from "@langwatch/design-system/banner";
-import { Menu } from "@langwatch/design-system/menu";
-import { Box, Button, Field, HStack, Stack, Text } from "@langwatch/design-system/primitives";
-import { ArrowRight, Check, ChevronDown, Lock } from "lucide-react";
+import {
+  createListCollection,
+  Field,
+  HStack,
+  Stack,
+  Text,
+} from "@langwatch/design-system/primitives";
+import { ProjectAvatar } from "@langwatch/design-system/project-avatar";
+import { Select } from "@langwatch/design-system/select";
+import { ArrowRight } from "lucide-react";
+import type { Ref } from "react";
 
 import { type BraidTargetOption, braidTargetLabel } from "../../../../model/braids/braid-draft.ts";
 import type { BraidProject } from "../../../../model/braids/braids.ts";
-import { BraidProjectBadge } from "../../../elements/braid-project.tsx";
 
 export type BraidRouteFieldsProps = {
   owner: BraidProject;
@@ -24,18 +31,9 @@ export type BraidRouteFieldsProps = {
   /** Edit keeps the reader: a braid into another project is a new braid. */
   readerFixed: boolean;
   onPick: (projectId: string) => void;
+  /** The picker's trigger, so the dialog can open with focus on it rather than on From. */
+  intoRef?: Ref<HTMLButtonElement>;
 };
-
-function OptionEnd({ option, picked }: { option: BraidTargetOption; picked: boolean }) {
-  if (option.reason) {
-    return (
-      <Text fontSize="xs" color="fg.muted">
-        {option.reason}
-      </Text>
-    );
-  }
-  return picked ? <Check size={14} aria-label="Picked" /> : null;
-}
 
 /** The arrow between From and Into, under a hidden label so it centres on the controls. */
 function RouteArrow() {
@@ -49,86 +47,90 @@ function RouteArrow() {
   );
 }
 
+/** The loaded options, plus the braid's reader when the list did not load it (edit keeps it). */
+function pickerOptions({ options, reader }: BraidRouteFieldsProps): readonly BraidTargetOption[] {
+  if (!reader || options.some((option) => option.projectId === reader.id)) return options;
+  return [...options, { projectId: reader.id, name: reader.name, selectable: false }];
+}
+
+function IntoPicker(props: BraidRouteFieldsProps) {
+  const collection = createListCollection({
+    items: pickerOptions(props).map((option) => ({
+      value: option.projectId,
+      label: option.name,
+      disabled: !option.selectable,
+      option,
+    })),
+  });
+  const placeholder = props.isLoading ? "Loading projects" : "Pick a project";
+  return (
+    <Select.Root
+      collection={collection}
+      value={props.reader ? [props.reader.id] : []}
+      onValueChange={({ value }) => {
+        if (value[0]) props.onPick(value[0]);
+      }}
+      // Loading keeps it focusable, so the dialog can open on it; the list fills in when read.
+      disabled={props.readerFixed}
+    >
+      <Select.Trigger ref={props.intoRef}>
+        <Select.ValueText placeholder={placeholder}>
+          {() =>
+            props.reader ? (
+              <HStack gap={2} minWidth={0}>
+                <ProjectAvatar name={props.reader.name} />
+                <Text as="span" truncate>
+                  {props.reader.name}
+                </Text>
+              </HStack>
+            ) : null
+          }
+        </Select.ValueText>
+      </Select.Trigger>
+      <Select.Content>
+        {collection.items.map((item) => (
+          <Select.Item
+            key={item.value}
+            item={item}
+            aria-label={braidTargetLabel(item.option)}
+            data-testid="braid-target"
+          >
+            <HStack gap={2} minWidth={0} flex={1}>
+              <ProjectAvatar name={item.option.name} />
+              <Text as="span" truncate>
+                {item.option.name}
+              </Text>
+            </HStack>
+            {item.option.reason ? (
+              <Text as="span" textStyle="xs" color="fg.muted">
+                {item.option.reason}
+              </Text>
+            ) : null}
+          </Select.Item>
+        ))}
+      </Select.Content>
+    </Select.Root>
+  );
+}
+
 export function BraidRouteFields(props: BraidRouteFieldsProps) {
   return (
     <Stack gap={2}>
       <HStack gap={3} align="start">
         <Field.Root flex={1} minWidth={0}>
           <Field.Label>From</Field.Label>
-          <HStack
-            gap={2}
-            width="full"
-            paddingX={3}
-            height="10"
-            borderWidth="1px"
-            borderColor="border"
-            borderRadius="l2"
-            bg="bg.muted"
-            data-testid="braid-from"
-          >
-            <BraidProjectBadge project={props.owner} size="sm" />
-            <Text textStyle="sm" flex={1} truncate>
+          <HStack gap={2} height="10" minWidth={0} data-testid="braid-from">
+            <ProjectAvatar name={props.owner.name} />
+            <Text as="span" textStyle="body" truncate>
               {props.owner.name}
             </Text>
-            <Box color="fg.muted" display="inline-flex">
-              <Lock size={12} aria-label="Fixed" />
-            </Box>
           </HStack>
           <Field.HelperText>Owns the spans</Field.HelperText>
         </Field.Root>
         <RouteArrow />
         <Field.Root flex={1} minWidth={0}>
           <Field.Label>Into</Field.Label>
-          <Menu.Root>
-            <Menu.Trigger asChild>
-              <Button
-                variant="outline"
-                size="md"
-                width="full"
-                justifyContent="space-between"
-                fontWeight="normal"
-                textStyle="sm"
-                disabled={props.readerFixed || props.isLoading}
-                aria-label={`Into, ${
-                  props.reader?.name ?? (props.isLoading ? "loading projects" : "pick a project")
-                }`}
-                data-testid="braid-into"
-              >
-                <HStack gap={2} minWidth={0}>
-                  {props.reader ? <BraidProjectBadge project={props.reader} size="sm" /> : null}
-                  <Text truncate color={props.reader ? "fg" : "fg.muted"}>
-                    {props.reader?.name ??
-                      (props.isLoading ? "Loading projects" : "Pick a project")}
-                  </Text>
-                </HStack>
-                {props.readerFixed ? (
-                  <Lock size={12} aria-hidden />
-                ) : (
-                  <ChevronDown size={14} aria-hidden />
-                )}
-              </Button>
-            </Menu.Trigger>
-            <Menu.Content minWidth="280px">
-              {props.options.map((option) => (
-                <Menu.Item
-                  key={option.projectId}
-                  value={option.projectId}
-                  disabled={!option.selectable}
-                  onClick={() => props.onPick(option.projectId)}
-                  aria-label={braidTargetLabel(option)}
-                  data-testid="braid-target"
-                >
-                  <HStack justify="space-between" width="full" gap={4}>
-                    <HStack gap={2} minWidth={0}>
-                      <BraidProjectBadge project={option} size="sm" />
-                      <Text truncate>{option.name}</Text>
-                    </HStack>
-                    <OptionEnd option={option} picked={option.projectId === props.reader?.id} />
-                  </HStack>
-                </Menu.Item>
-              ))}
-            </Menu.Content>
-          </Menu.Root>
+          <IntoPicker {...props} />
           <Field.HelperText>Sees them in its traces</Field.HelperText>
         </Field.Root>
       </HStack>
@@ -143,12 +145,12 @@ export function BraidRouteFields(props: BraidRouteFieldsProps) {
         </Banner>
       ) : null}
       {props.someLeftOut && !props.loadFailed ? (
-        <Text fontSize="xs" color="fg.muted" data-testid="braid-targets-note">
+        <Text textStyle="xs" color="fg.muted" data-testid="braid-targets-note">
           A braid can only go into a project whose traces you can read.
         </Text>
       ) : null}
       {props.listedOnly ? (
-        <Text fontSize="xs" color="fg.muted" data-testid="braid-targets-limit-note">
+        <Text textStyle="xs" color="fg.muted" data-testid="braid-targets-limit-note">
           Only the first {props.listedOnly} projects of the organisation are listed.
         </Text>
       ) : null}

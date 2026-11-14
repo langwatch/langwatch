@@ -47,3 +47,16 @@ Feature: Admitted spans are handed to the trace pipeline together
     Given a multi-span export where the queue staged one span but its answer was lost
     When the exporter resends the batch
     Then the first answer is retryable and the resend reaches the pipeline with the same span identity
+
+  @unit
+  Scenario: Spans refused because shutdown closed queue staging are logged once per request
+    Given a request whose spans the pipeline refuses because shutdown closed queue staging
+    When the receiver collects them
+    Then each span fails and releases its claim
+    And the request logs one warning naming how many spans were refused, not an error per span
+
+  @unit
+  Scenario: Spans the pipeline fails for any other reason are each logged as an error
+    Given a request whose hand-off fails for a reason other than closed queue staging
+    When the receiver collects it
+    Then each failed span is logged as an error of its own

@@ -2,7 +2,6 @@
 import { chakra } from "@chakra-ui/react";
 import { useId } from "react";
 
-import { useReducedMotion } from "../../use-reduced-motion.ts";
 import {
   BRAIDS_ART_CROSSINGS,
   BRAIDS_ART_DIVIDER_PATH,
@@ -15,36 +14,13 @@ import {
 import { type FeatureName, svgIdBase } from "./feature-brands.ts";
 import { colorModeClass, type LogoColorMode } from "./logo-icon.tsx";
 
-export type FeatureIllustrationName = "empty-state" | "enterprise" | "hero";
+export type FeatureIllustrationName = "empty-state" | "enterprise";
 
 export interface FeatureIllustrationProps {
   feature: FeatureName;
   name: FeatureIllustrationName;
-  /** The hero weaves in once on mount; `false`, or a reader asking for less motion, holds it
-   * still. */
-  animate?: boolean;
   forceColorMode?: LogoColorMode;
 }
-
-const EASE_OUT = "cubic-bezier(0.22, 1, 0.36, 1)";
-
-const WEAVE_IN = {
-  animation: `feature-weave-in 650ms ${EASE_OUT} both`,
-  "@keyframes feature-weave-in": {
-    from: { strokeDashoffset: 1 },
-    to: { strokeDashoffset: 0 },
-  },
-};
-
-const SPAN_IN = {
-  transformBox: "fill-box",
-  transformOrigin: "left",
-  animation: `feature-span-in 360ms ${EASE_OUT} both`,
-  "@keyframes feature-span-in": {
-    from: { transform: "scaleX(0)", opacity: 0 },
-    to: { transform: "none", opacity: 1 },
-  },
-};
 
 /** The example projects, by project 1 to 3; the canvas lists them by name. */
 const PROJECTS = [
@@ -58,15 +34,11 @@ const STRAND_WIDTH = 3;
 const STRAND_GAP = STRAND_WIDTH + 6;
 
 const CANVAS_WIDTH = 760;
-const CANVAS_HEIGHT = { captioned: 280, bare: 256 } as const;
+const CANVAS_HEIGHT = 256;
 
-const COPY: Record<FeatureIllustrationName, { summary: string; caption: string }> = {
-  "empty-state": { summary: "One trace, three projects", caption: "" },
-  enterprise: { summary: "One trace across your organisation", caption: "" },
-  hero: {
-    summary: "One trace, every project",
-    caption: "Illustrative projects. Spans stay in the project that sent them.",
-  },
+const SUMMARY: Record<FeatureIllustrationName, string> = {
+  "empty-state": "One trace, three projects",
+  enterprise: "One trace across your organisation",
 };
 
 const project = (index: number) => `feature.braids.project.${index}`;
@@ -105,10 +77,10 @@ function ProjectChip({ index }: { index: number }) {
   );
 }
 
-type ArtState = { playing: boolean; maskId: (index: number) => string };
+type MaskId = (index: number) => string;
 
 /** Cuts the gap at every crossing where this project's strand passes under another. */
-function UnderMask({ index, maskId }: { index: number; maskId: ArtState["maskId"] }) {
+function UnderMask({ index, maskId }: { index: number; maskId: MaskId }) {
   return (
     <mask
       id={maskId(index)}
@@ -116,10 +88,10 @@ function UnderMask({ index, maskId }: { index: number; maskId: ArtState["maskId"
       x="0"
       y="0"
       width={CANVAS_WIDTH}
-      height={CANVAS_HEIGHT.captioned}
+      height={CANVAS_HEIGHT}
     >
       {/* Mask luminance, not paint: white keeps, black cuts the gap. */}
-      <rect width={CANVAS_WIDTH} height={CANVAS_HEIGHT.captioned} fill="white" />
+      <rect width={CANVAS_WIDTH} height={CANVAS_HEIGHT} fill="white" />
       {BRAIDS_ART_CROSSINGS.filter((crossing) => crossing.under === index).map((crossing) => (
         <path key={crossing.d} d={crossing.d} fill="none" stroke="black" strokeWidth={STRAND_GAP} />
       ))}
@@ -127,7 +99,7 @@ function UnderMask({ index, maskId }: { index: number; maskId: ArtState["maskId"
   );
 }
 
-function ArtStrand({ index, state }: { index: number; state: ArtState }) {
+function ArtStrand({ index, maskId }: { index: number; maskId: MaskId }) {
   return (
     <chakra.path
       d={BRAIDS_ART_STRANDS[index - 1]}
@@ -136,12 +108,8 @@ function ArtStrand({ index, state }: { index: number; state: ArtState }) {
       strokeWidth={STRAND_WIDTH}
       strokeLinecap="round"
       strokeLinejoin="round"
-      strokeDasharray={state.playing ? "1" : undefined}
-      pathLength={state.playing ? 1 : undefined}
-      mask={`url(#${state.maskId(index)})`}
+      mask={`url(#${maskId(index)})`}
       data-strand={index}
-      css={state.playing ? WEAVE_IN : undefined}
-      style={state.playing ? { animationDelay: `${(index - 1) * 90}ms` } : undefined}
     />
   );
 }
@@ -156,7 +124,7 @@ function StrandEnds({ index }: { index: number }) {
   );
 }
 
-function ArtSpan({ index, state }: { index: number; state: ArtState }) {
+function ArtSpan({ index }: { index: number }) {
   const span = BRAIDS_ART_SPANS[index];
   if (!span) return null;
   return (
@@ -168,8 +136,6 @@ function ArtSpan({ index, state }: { index: number; state: ArtState }) {
       rx={4}
       fill={project(span.project)}
       data-span={span.project}
-      css={state.playing ? SPAN_IN : undefined}
-      style={state.playing ? { animationDelay: `${520 + index * 70}ms` } : undefined}
     />
   );
 }
@@ -203,32 +169,20 @@ function SignedCallsPill() {
 
 const STRAND_INDEXES = [1, 2, 3] as const;
 
-function BraidsArt({
-  name,
-  idBase,
-  playing,
-}: {
-  name: FeatureIllustrationName;
-  idBase: string;
-  playing: boolean;
-}) {
-  const copy = COPY[name];
-  const state: ArtState = {
-    playing,
-    maskId: (index) => `${idBase}-under-${index}`,
-  };
+function BraidsArt({ name, idBase }: { name: FeatureIllustrationName; idBase: string }) {
+  const maskId: MaskId = (index) => `${idBase}-under-${index}`;
   return (
     <>
       <defs>
         {STRAND_INDEXES.map((index) => (
-          <UnderMask key={index} index={index} maskId={state.maskId} />
+          <UnderMask key={index} index={index} maskId={maskId} />
         ))}
       </defs>
       {STRAND_INDEXES.map((index) => (
         <ProjectChip key={index} index={index} />
       ))}
       {STRAND_INDEXES.map((index) => (
-        <ArtStrand key={index} index={index} state={state} />
+        <ArtStrand key={index} index={index} maskId={maskId} />
       ))}
       <chakra.rect
         x={508.5}
@@ -243,21 +197,16 @@ function BraidsArt({
         POST /checkout
       </chakra.text>
       <chakra.text x={524} y={67} fontSize="11px" fill="fg.muted">
-        {copy.summary}
+        {SUMMARY[name]}
       </chakra.text>
       <chakra.path d={BRAIDS_ART_DIVIDER_PATH} stroke="border" strokeWidth={1} />
       {BRAIDS_ART_SPANS.map((span, index) => (
-        <ArtSpan key={`${span.x}-${span.y}`} index={index} state={state} />
+        <ArtSpan key={`${span.x}-${span.y}`} index={index} />
       ))}
       {STRAND_INDEXES.map((index) => (
         <StrandEnds key={index} index={index} />
       ))}
       {name === "enterprise" ? <SignedCallsPill /> : null}
-      {copy.caption ? (
-        <chakra.text x={32} y={262} fontSize="12px" fill="fg.muted">
-          {copy.caption}
-        </chakra.text>
-      ) : null}
     </>
   );
 }
@@ -266,20 +215,13 @@ function BraidsArt({
 const ART: Record<FeatureName, typeof BraidsArt> = { braids: BraidsArt };
 
 /** Decorative: the page copy beside it carries the meaning, so the art is hidden from readers. */
-export function FeatureIllustration({
-  feature,
-  name,
-  animate = true,
-  forceColorMode,
-}: FeatureIllustrationProps) {
+export function FeatureIllustration({ feature, name, forceColorMode }: FeatureIllustrationProps) {
   const idBase = svgIdBase(useId());
-  const reduceMotion = useReducedMotion();
-  const playing = name === "hero" && animate && !reduceMotion;
   const Art = ART[feature];
   return (
     <chakra.svg
       xmlns="http://www.w3.org/2000/svg"
-      viewBox={`0 0 ${CANVAS_WIDTH} ${COPY[name].caption ? CANVAS_HEIGHT.captioned : CANVAS_HEIGHT.bare}`}
+      viewBox={`0 0 ${CANVAS_WIDTH} ${CANVAS_HEIGHT}`}
       width="100%"
       height="auto"
       maxWidth="760px"
@@ -288,9 +230,8 @@ export function FeatureIllustration({
       className={colorModeClass(forceColorMode)}
       data-feature={feature}
       data-illustration={name}
-      data-motion={playing ? "play" : "still"}
     >
-      <Art name={name} idBase={idBase} playing={playing} />
+      <Art name={name} idBase={idBase} />
     </chakra.svg>
   );
 }

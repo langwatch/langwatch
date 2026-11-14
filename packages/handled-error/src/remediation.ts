@@ -479,6 +479,13 @@ const registry = {
     docsPath: "/platform/scim",
   },
 
+  braids_not_enabled: {
+    tips: [
+      "Braid management is not switched on for this organisation yet; retrying will not help",
+      "Braids that already exist keep applying to trace reads; ask LangWatch to switch braids on to create or change them",
+    ],
+  },
+
   // ---- personal workspace reads ----
   // Both are hit almost entirely by agents and CLIs, which have no UI to fall
   // back on, so the tips have to name the key to swap in rather than restate

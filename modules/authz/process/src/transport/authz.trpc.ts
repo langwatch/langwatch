@@ -202,7 +202,7 @@ export const authzTrpcTransport: TrpcRouterDeclaration<AuthzApi, typeof authzTrp
     /** Members of either project list the braids touching it (ADR-201 §2). */
     .procedure("listBraids")
     .withPermission("project:view", { via: "projectId" })
-    .handle(async ({ app, input }) => app.listBraids(input))
+    .handle(async ({ app, input }) => app.listBraidsForScreen(input))
 
     /** The owner is the first target: braids:manage there, traces:view at the reader. */
     .procedure("createBraid")
@@ -231,7 +231,7 @@ export const authzTrpcTransport: TrpcRouterDeclaration<AuthzApi, typeof authzTrp
     /** Any member reads whether project admins may braid (ADR-201 §2). */
     .procedure("getBraidsPolicy")
     .withPermission("organization:view")
-    .handle(async ({ app, input }) => app.getOrganizationPolicy(input))
+    .handle(async ({ app, input }) => app.getOrganizationPolicyForScreen(input))
 
     /** Keeping braids to organisation admins is theirs alone, and Enterprise. */
     .procedure("setBraidsPolicy")
@@ -250,7 +250,7 @@ export const authzTrpcTransport: TrpcRouterDeclaration<AuthzApi, typeof authzTrp
     .procedure("countProjectTraceViewers")
     .withPermission("traces:view", { via: "projectId" })
     .handle(async ({ app, input }) =>
-      app.countProjectMembersHolding({ ...input, permission: "traces:view" }),
+      app.countProjectMembersHoldingForScreen({ ...input, permission: "traces:view" }),
     )
 
     /** ADR-201 §2: the braid dialog's picker, decided for the viewer in one batch. */

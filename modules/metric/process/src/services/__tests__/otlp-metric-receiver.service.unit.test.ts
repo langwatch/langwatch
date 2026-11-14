@@ -125,6 +125,7 @@ describe("OtlpMetricReceiverService", () => {
       await expect(post("/api/otel/v1/metrics")).resolves.toEqual({
         status: 503,
         body: { error: "failed to record data point" },
+        headers: { "Retry-After": "5" },
       });
     });
   });

@@ -258,7 +258,7 @@ export function PlansComparisonPage({
           </HStack>
         </Link>
       </PageLayout.Header>
-      <VStack gap={6} width="full" align="stretch" paddingTop={4}>
+      <VStack gap={6} width="full" align="stretch">
         <VStack align="start" gap={1}>
           <Text color="fg.muted">
             Compare plans and choose the right tier for your organization.

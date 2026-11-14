@@ -30,5 +30,8 @@ export type ApiKeyOutputs = OutputsFromMap<ApiKeyApiMap>;
 /** What the keys panel needs from whoever mounts it: the project whose keys it manages. */
 export type SigningKeysPanelProps = Readonly<{ projectId: string }>;
 
+/** The Braids page writes `?signingKey=new`; the signing keys panel opens its create form on it. */
+export const SIGNING_KEY_QUERY_KEY = "signingKey";
+
 export const SigningKeysPanelToken =
   uiTokens("api-key").component<SigningKeysPanelProps>("signingKeysPanel");

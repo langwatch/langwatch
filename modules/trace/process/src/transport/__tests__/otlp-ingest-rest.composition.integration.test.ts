@@ -357,12 +357,13 @@ describe("given the trace module as a process composes it", () => {
 
   describe("when the pipeline handoff fails for every span of the batch", () => {
     /** @scenario "A failed pipeline handoff answers the OTLP export as retryable" */
-    it("answers 503 without a partial success, so the exporter retries", async () => {
+    it("answers 503 with Retry-After and no partial success, so the exporter retries", async () => {
       const { post, recordedSpans } = deployment({}, { fails: true });
 
       const response = await post("/api/otel/v1/traces", otlpTraceBody());
 
       expect(response.status).toBe(503);
+      expect(response.headers.get("retry-after")).toBe("5");
       expect(await response.json()).not.toHaveProperty("partialSuccess");
       expect(recordedSpans).toHaveLength(0);
     });

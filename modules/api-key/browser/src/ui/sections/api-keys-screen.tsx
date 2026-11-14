@@ -613,7 +613,7 @@ export default function ApiKeysScreen() {
           Create new secret key
         </PageLayout.HeaderButton>
       </PageLayout.Header>
-      <VStack gap={6} width="full" align="stretch" paddingTop={4}>
+      <VStack gap={6} width="full" align="stretch">
         <Text color="fg.muted">
           Keys that let your code and tools talk to LangWatch. Do not share your API keys or expose
           them in the browser or other client-side code.

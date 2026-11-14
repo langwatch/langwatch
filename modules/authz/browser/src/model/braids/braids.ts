@@ -10,6 +10,8 @@ export type BraidSide = "into" | "from";
 export type BraidProject = {
   id: string;
   name: string;
+  /** Addresses the project's pages; absent when the host has not read it. */
+  slug?: string;
 };
 
 export type BraidRow = {
@@ -37,7 +39,7 @@ export type OrganizationBraidRow = {
   createdAtMs: number;
 };
 
-type KnownProject = { id: string; name: string };
+type KnownProject = { id: string; name: string; slug?: string };
 
 /** A project the viewer cannot see by name is still a project, never a blank. */
 export function braidProject({
@@ -47,8 +49,11 @@ export function braidProject({
   projectId: string;
   projects: readonly KnownProject[];
 }): BraidProject {
-  const name = projects.find((project) => project.id === projectId)?.name ?? "Another project";
-  return { id: projectId, name };
+  const known = projects.find((project) => project.id === projectId);
+  if (!known) return { id: projectId, name: "Another project" };
+  return known.slug
+    ? { id: projectId, name: known.name, slug: known.slug }
+    : { id: projectId, name: known.name };
 }
 
 function conditionOf(braid: AuthzBraid): string | null {
@@ -176,30 +181,44 @@ export function braidAffordances({
   };
 }
 
-/** A braid's From day, with the time when another braid on its pair starts the same day. */
-export function braidFromText({ fromMs, showsTime }: { fromMs: number; showsTime: boolean }) {
-  return `From ${format(fromMs, showsTime ? "d MMM yyyy, HH:mm" : "d MMM yyyy")}`;
-}
-
-/** Where the audit log opens on one braid's history: its entries name the braid as target. */
-export function braidAuditHref(braidId: string): string {
-  const query = new URLSearchParams({ targetKind: BRAID_AUDIT_TARGET_KIND, targetId: braidId });
-  return `/settings/audit-log?${query.toString()}`;
+/**
+ * Where the audit log opens on one braid's history, its chip naming both projects. The entries
+ * live in the owner's project, so a known owner slug switches there first.
+ */
+export function braidAuditHref({
+  braidId,
+  ownerName,
+  readerName,
+  ownerSlug,
+}: {
+  braidId: string;
+  ownerName: string;
+  readerName: string;
+  ownerSlug?: string | undefined;
+}): string {
+  const query = new URLSearchParams({
+    targetKind: BRAID_AUDIT_TARGET_KIND,
+    targetId: braidId,
+    targetLabel: `${ownerName} → ${readerName}`,
+  });
+  const log = `/settings/audit-log?${query.toString()}`;
+  if (!ownerSlug) return log;
+  return `/${encodeURIComponent(ownerSlug)}?return_to=${encodeURIComponent(log)}`;
 }
 
 export const BRAIDS_GUIDE_HREF = "https://langwatch.ai/docs/features/braids";
 
-/** The Braids page's tabs; `tab` in the query opens one, so a link can land on Signing keys. */
-export const BRAIDS_TABS = ["into", "from", "keys"] as const;
-export type BraidsTab = (typeof BRAIDS_TABS)[number];
-export const BRAIDS_TAB_QUERY_KEY = "tab";
+/** The Braids page's sections; `section` in the query scrolls to one, as Signing keys links do. */
+export const BRAIDS_SECTIONS = ["into", "from", "keys"] as const;
+export type BraidsSection = (typeof BRAIDS_SECTIONS)[number];
+export const BRAIDS_SECTION_QUERY_KEY = "section";
 
-export function braidsTabOf(value: string | undefined): BraidsTab {
-  return BRAIDS_TABS.find((tab) => tab === value) ?? "into";
+export function braidsSectionOf(value: string | undefined): BraidsSection | undefined {
+  return BRAIDS_SECTIONS.find((section) => section === value);
 }
 
-/** Another project's Signing keys tab: the shell switches to the project, then returns here. */
+/** Another project's Signing keys section: the shell switches to the project, then returns here. */
 export function braidsSigningKeysHref({ projectSlug }: { projectSlug: string }): string {
-  const keys = `/settings/braids?${BRAIDS_TAB_QUERY_KEY}=keys`;
+  const keys = `/settings/braids?${BRAIDS_SECTION_QUERY_KEY}=keys`;
   return `/${encodeURIComponent(projectSlug)}?return_to=${encodeURIComponent(keys)}`;
 }

@@ -5806,6 +5806,9 @@ importers:
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../../packages/eventing
+      '@langwatch/feature-flag-contract':
+        specifier: workspace:*
+        version: link:../../feature-flag/contract
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -6302,12 +6305,21 @@ importers:
       '@langwatch/enterprise-billing-contract':
         specifier: workspace:*
         version: link:../../../enterprise/modules/billing/contract
+      '@langwatch/feature-flag-contract':
+        specifier: workspace:*
+        version: link:../../feature-flag/contract
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../packages/module
+      '@langwatch/project-client':
+        specifier: workspace:*
+        version: link:../../project/client
+      '@langwatch/project-contract':
+        specifier: workspace:*
+        version: link:../../project/contract
       '@langwatch/role-contract':
         specifier: workspace:*
         version: link:../../role/contract
@@ -6317,9 +6329,15 @@ importers:
       '@langwatch/trace-client':
         specifier: workspace:*
         version: link:../../trace/client
+      '@monaco-editor/react':
+        specifier: 'catalog:'
+        version: 4.7.0(monaco-editor@0.55.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       lucide-react:
         specifier: 'catalog:'
         version: 1.22.0(react@19.2.8)
+      monaco-editor:
+        specifier: 'catalog:'
+        version: 0.55.1
       react-feather:
         specifier: 'catalog:'
         version: 2.0.10(react@19.2.8)
@@ -6421,6 +6439,9 @@ importers:
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../../packages/eventing
+      '@langwatch/feature-flag-contract':
+        specifier: workspace:*
+        version: link:../../feature-flag/contract
       '@langwatch/identity-contract':
         specifier: workspace:*
         version: link:../../identity/contract
@@ -15965,6 +15986,9 @@ importers:
       '@langwatch/feature-flag-contract':
         specifier: workspace:*
         version: link:../../feature-flag/contract
+      '@langwatch/group-queue':
+        specifier: workspace:*
+        version: link:../../../packages/group-queue
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error

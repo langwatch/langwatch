@@ -47,6 +47,7 @@
     "@langwatch/evaluator-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
+    "@langwatch/group-queue": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/instant-eval-contract": "workspace:*",
     "@langwatch/ksuid": "workspace:*",

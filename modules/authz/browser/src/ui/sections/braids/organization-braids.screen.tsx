@@ -6,13 +6,13 @@
 
 import { Link } from "@langwatch/browser-host/link";
 import { Banner } from "@langwatch/design-system/banner";
+import { FeatureMark } from "@langwatch/design-system/feature-mark";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Box, Button, Skeleton, Stack } from "@langwatch/design-system/primitives";
-import { SettingsField } from "@langwatch/design-system/settings-field";
 import { SettingsSection } from "@langwatch/design-system/settings-section";
 import { Switch } from "@langwatch/design-system/switch";
-import { ShieldCheck, Waypoints } from "lucide-react";
+import { ToggleRow } from "@langwatch/design-system/toggle-row";
 
 import {
   useBraidsPolicy,
@@ -22,24 +22,24 @@ import {
 import { useAuthzHost } from "../../../model/authz-host.ts";
 import { BRAIDS_GUIDE_HREF, organizationBraidRows } from "../../../model/braids/braids.ts";
 import { OrganizationBraidsTable } from "../../blocks/braids/organization-braids-table.tsx";
+import { BraidsPageLinks } from "../../elements/braids-page-links.tsx";
 import { BraidsTitle } from "../../elements/braids-title.tsx";
+import { NO_RULE_UNDER_HEADER } from "../../elements/no-rule-under-header.ts";
 import { SectionErrorNotice } from "../../elements/section-error-notice.tsx";
 
 const KEEP_TO_ADMINS = "Keep braids to organisation admins";
 
-function OrganizationBraidsHeader() {
+function OrganizationBraidsHeader({ locked = false }: { locked?: boolean }) {
   return (
     <PageLayout.Header
-      description="Every braid in your organisation, and who may create, change or remove them."
-      actions={
-        <PageLayout.HeaderButton asChild>
-          <Link href={BRAIDS_GUIDE_HREF} isExternal>
-            How braids work
-          </Link>
-        </PageLayout.HeaderButton>
+      description={
+        <>
+          Every braid in your organisation, and who may create, change or remove them.
+          <BraidsPageLinks />
+        </>
       }
     >
-      <BraidsTitle />
+      <BraidsTitle locked={locked} />
     </PageLayout.Header>
   );
 }
@@ -58,14 +58,12 @@ function WhoMayBraid({
   const setting = useSetBraidsPolicy({ organizationId });
   return (
     <SettingsSection
-      icon={<ShieldCheck size={18} />}
       title="Who may braid"
       hint="Who can create, change or remove braids in this organisation's projects."
     >
-      <SettingsField
+      <ToggleRow
         label={KEEP_TO_ADMINS}
-        controlAlign="end"
-        layout="inline"
+        on={isEnterprise && keptToAdmins}
         hint={
           isEnterprise
             ? "While this is off, project admins can braid their projects. Turn it on and only organisation admins can."
@@ -86,7 +84,7 @@ function WhoMayBraid({
             <Link href="/settings/plans">See plans</Link>
           </Button>
         )}
-      </SettingsField>
+      </ToggleRow>
     </SettingsSection>
   );
 }
@@ -105,7 +103,7 @@ function OrganizationBraidsList({
   return (
     <NoDataInfoBlock
       size="inline"
-      icon={<Waypoints size={24} />}
+      icon={<FeatureMark feature="braids" size={24} variant="mono" />}
       title="No braids yet"
       description="When a project braids its spans into another, the braid is listed here."
       docsHref={BRAIDS_GUIDE_HREF}
@@ -124,7 +122,7 @@ export default function OrganizationBraidsScreen() {
     return (
       <>
         <OrganizationBraidsHeader />
-        <Stack gap={4} paddingTop={4} data-testid="organization-braids-loading">
+        <Stack gap={4} data-testid="organization-braids-loading">
           <Skeleton height="72px" borderRadius="md" />
           <Skeleton height="160px" borderRadius="md" />
         </Stack>
@@ -140,10 +138,10 @@ export default function OrganizationBraidsScreen() {
 
   return (
     <>
-      <OrganizationBraidsHeader />
-      <Stack gap={0}>
+      <OrganizationBraidsHeader locked={!isEnterprise} />
+      <Stack gap={0} css={NO_RULE_UNDER_HEADER}>
         {paused ? (
-          <Box paddingY={4}>
+          <Box paddingBottom={4}>
             <Banner status="warning" title="Braids are paused">
               Braids need the Enterprise plan. They are kept and start working again when you
               upgrade.
@@ -157,7 +155,6 @@ export default function OrganizationBraidsScreen() {
           isReading={policy.isLoading}
         />
         <SettingsSection
-          icon={<Waypoints size={18} />}
           title="Braids in this organisation"
           hint="Each braid shows a project's matching spans inside another project's traces."
           data-testid="organization-braids"

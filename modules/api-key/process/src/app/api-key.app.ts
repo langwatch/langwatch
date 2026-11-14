@@ -73,6 +73,7 @@ import {
 } from "@langwatch/secrets";
 import type { Instant } from "@langwatch/time";
 
+import type { ApiKeyChannels } from "../channels/api-key.channels.ts";
 import {
   buildDocsPlaygroundRevocationPipeline,
   type DocsPlaygroundRevocationPipeline,
@@ -119,6 +120,8 @@ type ApiKeySetup = Readonly<{
     projects: ProjectApi;
   }>;
   secrets: ScopedSecrets;
+  /** Built by the container from the channel registry; the release flags braid keys sit behind. */
+  channels: ApiKeyChannels;
   /** The docs origins a docs session key may be handed to (ADR-185); absent registers none. */
   config?: ApiKeyServerConfig | undefined;
 }>;
@@ -262,6 +265,7 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrg
       keys: setup.repositories.signingKeys,
       usage: setup.repositories.signingKeyUsage,
       projects: setup.dependencies.projects,
+      flags: setup.channels.flags,
       braidSignatures,
     });
 

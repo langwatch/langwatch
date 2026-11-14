@@ -34,9 +34,10 @@ function addressOf(server: Server): AddressInfo {
   return address;
 }
 
+/** `localhost`: on macOS another process can hold 127.0.0.1 on the door's wildcard port. */
 function fetchFrom(server: Server, path: string, authorization?: string): Promise<Response> {
   const address = addressOf(server);
-  return fetch(`http://127.0.0.1:${address.port}${path}`, {
+  return fetch(`http://localhost:${address.port}${path}`, {
     headers: authorization === undefined ? {} : { authorization },
   });
 }
@@ -170,7 +171,7 @@ describe("Server", () => {
 
         await server.close();
 
-        await expect(fetch(`http://127.0.0.1:${address.port}/healthz`)).rejects.toThrow(TypeError);
+        await expect(fetch(`http://localhost:${address.port}/healthz`)).rejects.toThrow(TypeError);
       });
     });
 
@@ -381,7 +382,7 @@ describe("Server", () => {
           closed: boolean;
         }>((resolve, reject) => {
           const request = http.get(
-            { host: "127.0.0.1", port: addressOf(server).port, path: "/api/things", agent },
+            { host: "localhost", port: addressOf(server).port, path: "/api/things", agent },
             (response) => {
               response.resume();
               response.socket.once("close", () =>

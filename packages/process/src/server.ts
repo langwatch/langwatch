@@ -23,7 +23,11 @@ import {
   type UpgradeConsole,
 } from "./lifecycle/liveness-thread.ts";
 import { NOT_HANDLED_DRAINING, NOT_HANDLED_HEADER } from "./lifecycle/not-handled.ts";
-import { HTTP_CLOSE_PHASE_MS, HTTP_DRAIN_GRACE_MS } from "./lifecycle/shutdown-deadline.ts";
+import {
+  HANDLER_UNWIND_MS,
+  HTTP_CLOSE_PHASE_MS,
+  HTTP_DRAIN_GRACE_MS,
+} from "./lifecycle/shutdown-deadline.ts";
 import { ResourceScope } from "./resource-scope.ts";
 
 /** A parse failure as Node reports it on `clientError`. */
@@ -159,6 +163,8 @@ export class Server {
   private readonly inFlight = new Set<ServerResponse>();
   /** Event streams: they end only when closed, so the drain closes them rather than waits. */
   private readonly streams = new Set<ServerResponse>();
+  /** Application handlers not yet settled: one may still run after its response closed. */
+  private readonly handlers = new Set<Promise<unknown>>();
   private onIdle: (() => void) | undefined;
   /** 1 once every component started and answered ready; shared with the liveness thread. */
   private readonly readiness = new Int32Array(new SharedArrayBuffer(4));
@@ -370,6 +376,7 @@ export class Server {
       response
         .writeHead(503, {
           "Content-Type": "text/plain",
+          "Retry-After": "5",
           Connection: "close",
           [NOT_HANDLED_HEADER]: NOT_HANDLED_DRAINING,
         })
@@ -394,29 +401,45 @@ export class Server {
       return;
     }
 
-    this.track(request, response);
-    void this.answer(
+    const kind = this.track(request, response);
+    const handling = this.answer(
       "application",
       () => this.whenStarted(application, request, response),
       response,
     );
+    // An event stream is closed, not waited on, so its handler does not hold the drain either.
+    if (kind === "request") this.holdUntilSettled(handling);
   }
 
-  private track(request: IncomingMessage, response: ServerResponse): void {
+  /** A closed response is not a finished handler: the drain waits on both. */
+  private holdUntilSettled(handling: Promise<unknown>): void {
+    this.handlers.add(handling);
+    void handling.finally(() => {
+      this.handlers.delete(handling);
+      this.notifyIfIdle();
+    });
+  }
+
+  private notifyIfIdle(): void {
+    if (this.inFlight.size === 0 && this.handlers.size === 0) this.onIdle?.();
+  }
+
+  private track(request: IncomingMessage, response: ServerResponse): "stream" | "request" {
     if (request.headers.accept?.includes("text/event-stream")) {
       this.streams.add(response);
       response.once("close", () => this.streams.delete(response));
-      return;
+      return "stream";
     }
     this.inFlight.add(response);
     response.once("close", () => {
       this.inFlight.delete(response);
-      if (this.inFlight.size === 0) this.onIdle?.();
+      this.notifyIfIdle();
     });
+    return "request";
   }
 
   private whenIdle(): Promise<void> {
-    if (this.inFlight.size === 0) return Promise.resolve();
+    if (this.inFlight.size === 0 && this.handlers.size === 0) return Promise.resolve();
     return new Promise((resolve) => {
       this.onIdle = resolve;
     });
@@ -438,12 +461,29 @@ export class Server {
     const drained = await Promise.race([this.whenIdle().then(() => true as const), graceExpired]);
     if (!drained) {
       this.logger.info(
-        { graceMs: HTTP_DRAIN_GRACE_MS, requests: this.inFlight.size },
+        {
+          graceMs: HTTP_DRAIN_GRACE_MS,
+          requests: this.inFlight.size,
+          handlers: this.handlers.size,
+        },
         `${this.name}: requests outlived the drain grace, cutting them before the stores close`,
       );
+      // A cut response aborts its handler's request signal; the stores stay open while it unwinds.
       for (const response of this.inFlight) response.destroy();
+      await this.whenHandlersSettle();
     }
     await sessions;
+  }
+
+  private async whenHandlersSettle(): Promise<void> {
+    if (this.handlers.size === 0) return;
+    const settled = Promise.allSettled(this.handlers).then(() => true as const);
+    const unwindExpired = delay(HANDLER_UNWIND_MS, false as const, { ref: false });
+    if (await Promise.race([settled, unwindExpired])) return;
+    const fields = { unwindMs: HANDLER_UNWIND_MS, handlers: this.handlers.size };
+    const line = `${this.name}: handlers still running after their requests were cut; the stores close under them`;
+    if (this.logger.warn) this.logger.warn(fields, line);
+    else this.logger.info(fields, line);
   }
 
   /**
