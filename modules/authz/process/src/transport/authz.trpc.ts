@@ -202,7 +202,7 @@ export const authzTrpcTransport: TrpcRouterDeclaration<AuthzApi, typeof authzTrp
     /** Members of either project list the braids touching it (ADR-201 §2). */
     .procedure("listBraids")
     .withPermission("project:view", { via: "projectId" })
-    .handle(async ({ app, input }) => app.listBraids(input))
+    .handle(async ({ app, input }) => app.listBraidsForScreen(input))
 
     /** The owner is the first target: braids:manage there, traces:view at the reader. */
     .procedure("createBraid")

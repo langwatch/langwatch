@@ -19,6 +19,7 @@ import {
 const ANA = "user_ana";
 const SAM = "user_sam";
 const FROM_MS = Date.UTC(2026, 9, 1);
+const WEB = 'attributes["orchestrator"] == "web"';
 
 type World = Awaited<ReturnType<typeof braidWorld>>;
 let worlds: World[] = [];
@@ -110,6 +111,27 @@ describe("braid management behind release_braids", () => {
       await expect(
         refusalOf(made.as(ANA).removeBraid({ projectId: SPECIALISTS, braidId: braid.braidId })),
       ).resolves.toBe("braids_not_enabled");
+    });
+
+    /** @scenario "A trace read still shows an existing braid's matched conditions while braids are off" */
+    it("answers the trace read's listBraids with the braid and its condition, while the screen's route refuses", async () => {
+      const made = await world();
+      const braid = await made.as(ANA).createBraid({ ...braidInput, where: WEB });
+
+      made.flags.withhold({ flag: BRAIDS_FLAG });
+
+      await expect(made.app.listBraids({ projectId: ORCHESTRATOR })).resolves.toMatchObject({
+        fromOtherProjects: [
+          expect.objectContaining({
+            braidId: braid.braidId,
+            ownerProjectId: SPECIALISTS,
+            where: WEB,
+          }),
+        ],
+      });
+      await expect(refusalOf(made.as(ANA).listBraids({ projectId: ORCHESTRATOR }))).resolves.toBe(
+        "braids_not_enabled",
+      );
     });
   });
 });

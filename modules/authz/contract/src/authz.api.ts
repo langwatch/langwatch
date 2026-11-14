@@ -195,6 +195,8 @@ export interface AuthzApi {
   revokeSharedProjectGrants(args: Commands.AuthzRevokeSharedProjectGrantsInput): Promise<string[]>;
   /** ADR-201: the live braids out of a project and into it; a downgraded organisation lists too. */
   listBraids(args: Braids.AuthzListBraidsInput): Promise<Braids.AuthzProjectBraids>;
+  /** The Braids screen's list: refuses `braids_not_enabled` while `release_braids` is off. */
+  listBraidsForScreen(args: Braids.AuthzListBraidsInput): Promise<Braids.AuthzProjectBraids>;
   /** A braid from the owner (`projectId`) into the reader, its condition compiled on save. */
   createBraid(args: Braids.AuthzCreateBraidInput): Promise<Braids.AuthzBraid>;
   /** Attaches the changed braid naming the one it replaces, then revokes that one. */

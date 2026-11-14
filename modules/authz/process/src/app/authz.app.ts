@@ -708,8 +708,10 @@ export class AuthzModule implements AuthzApi {
     return this.#memberships;
   }
 
-  // Braid management asks `release_braids` first; the read path below it never does.
-  listBraids: AuthzApi["listBraids"] = async (a) => {
+  // Braid management asks `release_braids` first. `listBraids` does not: trace reads ask it
+  // for an existing braid's matched conditions, and existing braids keep working.
+  listBraids: AuthzApi["listBraids"] = (a) => this.braids().listBraids(a);
+  listBraidsForScreen: AuthzApi["listBraidsForScreen"] = async (a) => {
     await this.braidRelease().assertEnabledForProject(a);
     return this.braids().listBraids(a);
   };

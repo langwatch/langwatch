@@ -387,6 +387,14 @@ ADR-201: the live braids out of a project and into it; a downgraded organisation
 listBraids(args: Braids.AuthzListBraidsInput): Promise<Braids.AuthzProjectBraids>;
 ```
 
+#### `listBraidsForScreen`
+
+The Braids screen's list: refuses `braids_not_enabled` while `release_braids` is off.
+
+```typescript
+listBraidsForScreen(args: Braids.AuthzListBraidsInput): Promise<Braids.AuthzProjectBraids>;
+```
+
 #### `createBraid`
 
 A braid from the owner (`projectId`) into the reader, its condition compiled on save.

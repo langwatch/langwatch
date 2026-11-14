@@ -70,3 +70,11 @@ Feature: Braid management behind the release_braids flag
       And release_braids is then switched off for the organisation
       When a member of "orchestrator" reads its traces
       Then the read still carries "specialists" through the braid
+
+    @integration
+    Scenario: A trace read still shows an existing braid's matched conditions while braids are off
+      Given a live braid from "specialists" into "orchestrator" with a condition
+      And release_braids is then switched off for the organisation
+      When a trace read in "orchestrator" asks which braids arrive in it
+      Then the braid and its condition are answered, as the span panel shows them
+      And the Braids screen's list of the same project is refused with braids_not_enabled
