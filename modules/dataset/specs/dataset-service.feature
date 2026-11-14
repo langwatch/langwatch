@@ -249,3 +249,19 @@ Feature: Shared Dataset service
     When its records are read, listed or copied
     Then it reads as an empty dataset
     And only a dataset with no chunk count recorded is refused as drift
+
+  @unit @integration
+  Scenario: A verified retry is atomic and compares complete normalized entries
+    Given a dataset in any storage layout with rows from an earlier attempt
+    When a retry reuses an id with changed content
+    Then the entire batch is refused as dataset_record_conflict
+    And no new rows from that batch remain
+    And columns removed from the mapping are included in the comparison
+    And identical normalized entries remain safe to retry
+
+  @unit
+  Scenario: Identical IDs in one batch are stored once in every layout
+    Given an empty dataset in any storage layout
+    When a batch contains two identical rows with the same id and skips duplicates
+    Then exactly one row is stored and counted
+    And this holds with and without existing-content verification

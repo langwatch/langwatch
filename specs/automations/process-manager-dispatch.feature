@@ -122,6 +122,24 @@ Feature: Automation dispatch on the process-manager substrate
     Then the page is retried for the failed trace
     And the dispatched trace can run again instead of being lost
 
+  # The deterministic row ids make a re-run of a trace an idempotent retry: the
+  # second write must not fail the whole page and dead-letter it (#8542).
+  @unit
+  Scenario: A dataset row that already exists counts as added
+    Given an automation that adds matched traces to a dataset
+    And a trace whose rows already landed in the dataset
+    When the automation adds the same trace's rows again
+    Then the second write skips the row ids that already exist
+    And the write does not fail
+
+  @unit
+  Scenario: A retry of a page writes the rows that already landed once
+    Given a page of matched traces whose dataset writes may be retried
+    And one trace's rows already exist in the dataset
+    When the page is retried
+    Then the retry asks the dataset to skip the row ids that already exist
+    And the page keeps its retry independence
+
   # A retryable failure is rethrown into the outbox, and the outbox redacts an
   # error message before it logs the attempt. The page's own retry line was the
   # only place the cause could still be named, and it carried a count alone, so

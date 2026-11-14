@@ -30,6 +30,7 @@ import type { DatasetContent } from "../app/dataset.app.ts";
 import type { LockedDatasetRecords } from "../repositories/dataset-record.repository.ts";
 import { assertColumnsCurrent } from "../rules/dataset-columns.rules.ts";
 import { onceMaxBytes } from "../rules/dataset-inline-file.rules.ts";
+import { datasetRecordReadback } from "../rules/dataset-record-retry.rules.ts";
 import {
   assertPageWithinLimit,
   assertWholeReadWithinLimits,
@@ -397,16 +398,28 @@ export class DatasetRecordService {
       return content.batchCreateRecords({ dataset, input: parsed });
     }
 
-    return this.lockedRecords({ dataset, columns }, (records) =>
-      records.createMany({
+    return this.lockedRecords({ dataset, columns }, async (records) => {
+      const written = await records.createMany({
         datasetId: dataset.id,
         projectId: parsed.projectId,
         entries: parsed.entries.map((entry) => ({
           id: entry.id ?? this.deps.generateId(),
           ...sanitizedEntry(Object.fromEntries(columns.map((c) => [c, entry[c] ?? null]))),
         })),
-      }),
-    );
+        skipDuplicates: parsed.skipDuplicates ?? false,
+        verifyExisting: parsed.verifyExisting ?? false,
+      });
+      const readback = datasetRecordReadback(parsed);
+      if (readback.kind === "written") {
+        return written;
+      }
+
+      return records.findByIds({
+        datasetId: dataset.id,
+        projectId: parsed.projectId,
+        ids: readback.ids,
+      });
+    });
   }
 
   async createRecords(input: CreateDatasetRecordsInput): Promise<DatasetRecord[]> {
