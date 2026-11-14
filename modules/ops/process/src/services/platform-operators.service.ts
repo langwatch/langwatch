@@ -1,5 +1,5 @@
 import type { LedgerActor } from "@langwatch/authorization";
-import type { AuthzApi } from "@langwatch/authz-contract";
+import type { AuthzApi, PlatformOperator } from "@langwatch/authz-contract";
 import type { MailRender, PlatformOperatorChangeEmailProps } from "@langwatch/mail";
 import {
   isEmailUnconfigured,
@@ -124,14 +124,14 @@ export class PlatformOperatorsService {
   }): Promise<OpsPlatformOperator> {
     const granter = signedInOperator(operator);
     const user = await this.#eligibleUserOf(email);
-    const alreadyHeld = await this.#holds(user.id);
+    const holding = await this.#holdingBeforeChange(user.id);
     const held = await this.options.authz.grantPlatformOperator({
       principal: { type: "user", id: user.id },
       caller: { type: "user", id: granter.id },
       actor: { type: "user", id: granter.id },
       source: "grants-service",
     });
-    if (!alreadyHeld) {
+    if (holding === "not-held") {
       await this.#tellOperators({
         change: "granted",
         grantId: held.grantId,
@@ -150,14 +150,14 @@ export class PlatformOperatorsService {
     operator: OpsOperator | null;
   }): Promise<void> {
     const revoker = signedInOperator(operator);
-    const target = (await this.options.authz.listPlatformOperators()).find(
-      (holder) => holder.grantId === grantId,
-    );
+    const holders = await this.#holdersBeforeChange();
     await this.options.authz.revokePlatformOperator({
       grantId,
       caller: { type: "user", id: revoker.id },
       actor: { type: "user", id: revoker.id },
     });
+    if (holders === "unknown") return;
+    const target = holders.find((holder) => holder.grantId === grantId);
     // The revoke already stands: a failed lookup only costs the notice, as a failed send does.
     let subject: UserProfile | null = null;
     try {
@@ -184,14 +184,14 @@ export class PlatformOperatorsService {
     const user = await this.#eligibleUserOf(email, {
       canGrantUnverified: await this.#isEmailUnconfigured(),
     });
-    const alreadyHeld = await this.#holds(user.id);
+    const holding = await this.#holdingBeforeChange(user.id);
     const held = await this.options.authz.grantPlatformOperator({
       principal: { type: "user", id: user.id },
       caller: { type: "system" },
       actor: PLATFORM_OPERATOR_TASK_ACTOR,
       source: "grants-service",
     });
-    if (!alreadyHeld) {
+    if (holding === "not-held") {
       await this.#tellOperators({
         change: "granted",
         grantId: held.grantId,
@@ -391,10 +391,20 @@ export class PlatformOperatorsService {
       .toSorted((a, b) => a.createdAt.getTime() - b.createdAt.getTime())[0]?.id;
   }
 
-  async #holds(userId: string): Promise<boolean> {
-    return (await this.options.authz.listPlatformOperators()).some(
-      (holder) => holder.userId === userId,
-    );
+  /** Read only for the notice, so a failed read skips the notice and never the change itself. */
+  async #holdersBeforeChange(): Promise<PlatformOperator[] | "unknown"> {
+    try {
+      return await this.options.authz.listPlatformOperators();
+    } catch (error) {
+      logger.error({ error }, "the platform operators will not be told of this role change");
+      return "unknown";
+    }
+  }
+
+  async #holdingBeforeChange(userId: string): Promise<"held" | "not-held" | "unknown"> {
+    const holders = await this.#holdersBeforeChange();
+    if (holders === "unknown") return "unknown";
+    return holders.some((holder) => holder.userId === userId) ? "held" : "not-held";
   }
 
   /**

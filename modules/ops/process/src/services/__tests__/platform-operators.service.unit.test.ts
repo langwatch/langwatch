@@ -66,6 +66,7 @@ function world({
   deployment = SELF_HOSTED,
   mailFails = false,
   lookupFails = false,
+  holdersReadFails = false,
   isEmailUnconfigured = false,
   erasedAccountsCreatedAt = [],
 }: {
@@ -76,6 +77,7 @@ function world({
   deployment?: { cloud: boolean; isLocalDevelopment: boolean };
   mailFails?: boolean;
   lookupFails?: boolean;
+  holdersReadFails?: boolean;
   isEmailUnconfigured?: boolean;
   /** The creation times user's erasure records keep of accounts whose rows are gone. */
   erasedAccountsCreatedAt?: Date[];
@@ -85,7 +87,10 @@ function world({
     AuthzApi,
     "grantPlatformOperator" | "revokePlatformOperator" | "listPlatformOperators"
   > = {
-    listPlatformOperators: async () => [...holders],
+    listPlatformOperators: async () => {
+      if (holdersReadFails) throw new Error("grant ledger unavailable");
+      return [...holders];
+    },
     grantPlatformOperator: async (input) => {
       granted.push(input);
       const held = holder(input.principal.id ?? "anyone");
@@ -845,6 +850,26 @@ describe("PlatformOperatorsService", () => {
       await expect(service.revoke({ grantId: "grant_bo", operator })).resolves.toBeUndefined();
       expect(authz.revokePlatformOperator).toHaveBeenCalledTimes(1);
       expect(warn).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A notice that cannot be sent leaves the change standing" */
+    it("grants, and tells nobody, when the holders cannot be read for the notice", async () => {
+      const { service, granted, told } = world({ users: [user("bo")], holdersReadFails: true });
+
+      await expect(service.grant({ email: "bo@acme.com", operator })).resolves.toMatchObject({
+        userId: "bo",
+      });
+      expect(granted).toHaveLength(1);
+      expect(told).toEqual([]);
+    });
+
+    /** @scenario "A notice that cannot be sent leaves the change standing" */
+    it("revokes, and tells nobody, when the holders cannot be read for the notice", async () => {
+      const { service, told, authz } = world({ users: [user("bo")], holdersReadFails: true });
+
+      await expect(service.revoke({ grantId: "grant_bo", operator })).resolves.toBeUndefined();
+      expect(authz.revokePlatformOperator).toHaveBeenCalledTimes(1);
+      expect(told).toEqual([]);
     });
 
     it("tells nobody, and says so, when the revoked holder is no longer active", async () => {
