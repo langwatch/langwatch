@@ -10,10 +10,11 @@ import { useMemo } from "react";
 
 import { type InsightHostProject, useInsightHost } from "../model/insight-host.ts";
 import { insightApi } from "./insight-api.ts";
+import { useInsightsUnavailable } from "./use-insights-shown.ts";
 
 export type InsightInboxReading = Readonly<{
-  /** False while the flag, the grant or the project is missing: draw nothing. */
-  available: boolean;
+  /** Why nothing is available: the page names an aggregate project; "off" is left to the route. */
+  unavailable: "aggregate" | "off" | undefined;
   project: InsightHostProject | undefined;
   inbox: InsightInbox | undefined;
   /** The clock the folders were derived with, so rows print the same "today". */
@@ -26,8 +27,8 @@ export type InsightInboxReading = Readonly<{
 export function useInsightInbox(): InsightInboxReading {
   const host = useInsightHost();
   const project = host.project();
-  const available =
-    project !== undefined && host.isEnabled() === true && host.hasPermission("analytics:view");
+  const unavailable = useInsightsUnavailable();
+  const available = unavailable === undefined;
   const query = insightApi.insights.getAll.useQuery(
     { projectId: project?.id ?? "" },
     { enabled: available },
@@ -36,17 +37,20 @@ export function useInsightInbox(): InsightInboxReading {
     const now = nowInstant().epochMilliseconds;
     return {
       now,
-      inbox: query.data ? deriveInsightInbox({ entries: query.data, now }) : undefined,
+      inbox: available && query.data ? deriveInsightInbox({ entries: query.data, now }) : undefined,
     };
-  }, [query.data]);
+  }, [available, query.data]);
 
   return {
-    available,
+    unavailable,
     project,
     inbox: derived.inbox,
     now: derived.now,
     isLoading: available && query.isLoading,
-    error: query.error,
-    retry: () => void query.refetch(),
+    error: available ? query.error : null,
+    // refetch ignores `enabled`, so a closed rule must not read through it.
+    retry: () => {
+      if (available) void query.refetch();
+    },
   };
 }

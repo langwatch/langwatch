@@ -4,12 +4,19 @@
  * @see modules/insight/specs/insight-inbox.feature
  */
 
+import type { UiProcedureAnswer } from "@langwatch/browser/testing-transport";
 import { nowInstant } from "@langwatch/time";
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { useReducer } from "react";
+import { describe, expect, it, type Mock, vi } from "vitest";
 
-import { insightEntry, renderWithInsightHost } from "../../../testing.tsx";
+import {
+  flushReads,
+  insightEntry,
+  renderWithInsightHost,
+  StubInsightHost,
+} from "../../../testing.tsx";
 import { InsightsBell } from "../insights-bell.tsx";
 
 const HOUR_MS = 3_600_000;
@@ -78,6 +85,120 @@ describe("given 2 insights in the inbox, both already seen", () => {
       await userEvent.click(screen.getByRole("button", { name: "Open inbox" }));
 
       expect(host.navigations).toEqual(["/acme/insights"]);
+    });
+  });
+});
+
+async function expectNoBellAndNoRead({ read }: { read: Mock<UiProcedureAnswer> }) {
+  await flushReads();
+  expect(screen.queryByRole("button", { name: "Inbox: new insights" })).not.toBeInTheDocument();
+  expect(read).not.toHaveBeenCalled();
+}
+
+describe("given 2 unseen insights in the inbox", () => {
+  describe("when release_dashboards is off", () => {
+    /** @scenario "Insights shows nothing while release_dashboards is off" */
+    it("shows no bell and reads nothing", async () => {
+      const read = vi.fn<UiProcedureAnswer>(() => Promise.resolve(UNSEEN.slice(0, 2)));
+      const { host } = renderWithInsightHost({
+        element: <InsightsBell />,
+        host: new StubInsightHost({ enabled: false }),
+        answer: read,
+      });
+
+      await expectNoBellAndNoRead({ read });
+      expect(host.navigations).toEqual([]);
+    });
+  });
+
+  describe("when a release flag has not answered yet", () => {
+    /** @scenario "The top bar holds no insights bell while a release flag has not answered yet" */
+    it("shows no bell and reads nothing", async () => {
+      const read = vi.fn<UiProcedureAnswer>(() => Promise.resolve(UNSEEN.slice(0, 2)));
+      const { host } = renderWithInsightHost({
+        element: <InsightsBell />,
+        host: new StubInsightHost({ enabled: undefined }),
+        answer: read,
+      });
+
+      await expectNoBellAndNoRead({ read });
+      expect(host.navigations).toEqual([]);
+    });
+  });
+
+  describe("when insight is on", () => {
+    /** @scenario "Insights shows nothing while release_dashboards is off" */
+    it("shows the bell with the unread count, so the absence cases would see a read", async () => {
+      const read = vi.fn<UiProcedureAnswer>(() => Promise.resolve(UNSEEN.slice(0, 2)));
+      renderWithInsightHost({
+        element: <InsightsBell />,
+        host: new StubInsightHost({ enabled: true }),
+        answer: read,
+      });
+
+      await flushReads();
+      expect(read).toHaveBeenCalled();
+      expect(
+        await screen.findByRole("button", { name: "Inbox: new insights" }),
+      ).toBeInTheDocument();
+      expect(await screen.findByLabelText("2 unread")).toBeInTheDocument();
+    });
+  });
+
+  describe("when the project is an aggregate, which files no insight", () => {
+    /** @scenario "An aggregate project's top bar holds no insights bell" */
+    it("shows no bell and reads nothing, as its side menu holds no Insights entry", async () => {
+      const read = vi.fn<UiProcedureAnswer>(() => Promise.resolve(UNSEEN.slice(0, 2)));
+      renderWithInsightHost({
+        element: <InsightsBell />,
+        host: new StubInsightHost({
+          enabled: true,
+          project: { id: "project-1", slug: "acme", kind: "aggregate" },
+        }),
+        answer: read,
+      });
+
+      await expectNoBellAndNoRead({ read });
+    });
+  });
+
+  describe("when the rule turns false after the inbox was read", () => {
+    /** @scenario "Insights shows nothing while release_dashboards is off" */
+    it("drops the bell instead of drawing the cached inbox", async () => {
+      class FlippableHost extends StubInsightHost {
+        on = true;
+        override isEnabled() {
+          return this.on;
+        }
+      }
+      const host = new FlippableHost();
+      function Switch() {
+        const [, redraw] = useReducer((count: number) => count + 1, 0);
+        return (
+          <>
+            <InsightsBell />
+            <button
+              type="button"
+              onClick={() => {
+                host.on = false;
+                redraw();
+              }}
+            >
+              Turn flag off
+            </button>
+          </>
+        );
+      }
+      renderWithInsightHost({
+        element: <Switch />,
+        host,
+        answer: () => Promise.resolve(UNSEEN.slice(0, 2)),
+      });
+      expect(await screen.findByLabelText("2 unread")).toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole("button", { name: "Turn flag off" }));
+
+      expect(screen.queryByRole("button", { name: "Inbox: new insights" })).not.toBeInTheDocument();
     });
   });
 });

@@ -165,9 +165,10 @@ export function productFromPathname(pathname: string): ProductId | null {
     return null;
   }
   // Everything else is a /:project page (including the next-router
-  // "/[project]/*" pattern spelling); its Dashboards area is its own product.
+  // "/[project]/*" pattern spelling); its Dashboards area is its own product,
+  // and Insights sits inside it so opening the inbox keeps the Dashboards menu.
   const [, , area] = pathname.split("/");
-  return area === "dashboards" ? "dashboards" : "llm-ops";
+  return area === "dashboards" || area === "insights" ? "dashboards" : "llm-ops";
 }
 
 /** The operator console: not a product, so it sits apart in the switcher and its own sidebar. */

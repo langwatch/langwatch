@@ -114,6 +114,19 @@ export const gatewayNavItems: readonly SectionNavItemData[] = [
   },
 ];
 
+/**
+ * Governance's own Insights page; the shared sidebar entry steps aside while it is listed.
+ */
+export const governanceInsightsNavItem: SectionNavItemData = {
+  label: "Insights",
+  keywords: ["brief"],
+  href: "/governance/insights",
+  includePath: "/governance/insights",
+  icon: Inbox,
+  featureFlag: "release_ui_governance_billed_cost_enabled",
+  group: "Platform",
+};
+
 export const governanceNavItems: readonly SectionNavItemData[] = [
   {
     label: "Overview",
@@ -157,15 +170,7 @@ export const governanceNavItems: readonly SectionNavItemData[] = [
   // rule registry that the cost work leads into. They ride the billed-cost
   // flag so the audience previewing Costs previews these too.
   // Spec: specs/governance/governance-platform-placeholders.feature
-  {
-    label: "Insights",
-    keywords: ["brief"],
-    href: "/governance/insights",
-    includePath: "/governance/insights",
-    icon: Inbox,
-    featureFlag: "release_ui_governance_billed_cost_enabled",
-    group: "Platform",
-  },
+  governanceInsightsNavItem,
   {
     label: "Analytics",
     keywords: ["explore"],

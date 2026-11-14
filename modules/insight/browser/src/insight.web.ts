@@ -1,16 +1,25 @@
 /**
  * What a browser installs when it installs insight: the inbox screen behind
- * `release_insights`, and what it lends the shell, Langy and a board's header (the bell, the
- * sidebar count, "Save as insight" and "Daily insights"). All lazy; none is on first paint.
+ * `release_insights` and `release_dashboards`, and what it lends the shell and a board's
+ * header (the bell, the menu entry's rule and count, "Daily insights"). Only the rule is eager.
  */
 
 import { BoardHeaderActionToken } from "@langwatch/analytics-client";
 import { defineBrowserModule } from "@langwatch/browser";
 import { FrontendFlags } from "@langwatch/feature-flag-contract";
-import { InsightsBellToken, InsightsNavCountToken, insightTrpc } from "@langwatch/insight-contract";
-import { LangyAnswerActionToken } from "@langwatch/langy-contract";
+import {
+  type InsightsEntry,
+  InsightsBellToken,
+  InsightsEntryToken,
+  InsightsNavCountToken,
+  insightTrpc,
+} from "@langwatch/insight-contract";
 
 import { insightApi } from "./behavior/insight-api.ts";
+import { useInsightsShown } from "./behavior/use-insights-shown.ts";
+
+/** What insight lends through `InsightsEntryToken`. */
+const insightsEntry: InsightsEntry = { useIsShown: useInsightsShown };
 
 export const insightWeb = defineBrowserModule("insight")
   .withApi(insightApi, { contracts: [insightTrpc] })
@@ -23,7 +32,8 @@ export const insightWeb = defineBrowserModule("insight")
       path: "/:project/insights",
       within: "project",
       label: "Insights",
-      flags: [FrontendFlags.release_insights],
+      // The page lives in the Dashboards product, so it is closed while either flag is off.
+      flags: [FrontendFlags.release_insights, FrontendFlags.release_dashboards],
       requires: "analytics:view",
       load: () => import("./ui/sections/insights.screen.tsx"),
     },
@@ -33,14 +43,10 @@ export const insightWeb = defineBrowserModule("insight")
       default: (await import("./ui/sections/insights-bell.tsx")).InsightsBell,
     }),
   })
+  .lends(InsightsEntryToken, { value: insightsEntry })
   .lends(InsightsNavCountToken, {
     load: async () => ({
       default: (await import("./ui/sections/insights-nav-count.tsx")).InsightsNavCount,
-    }),
-  })
-  .lends(LangyAnswerActionToken, {
-    load: async () => ({
-      default: (await import("./ui/sections/save-as-insight-action.tsx")).SaveAsInsightAction,
     }),
   })
   .lends(BoardHeaderActionToken, {
