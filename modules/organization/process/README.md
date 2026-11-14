@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`OrganizationApi`)
 
-Peers call these through the token, declared at `../contract/src/organization.api.ts:264`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/organization.api.ts:275`; nothing else in this package is public.
 
 #### `createAndAssign`
 
@@ -1140,6 +1140,22 @@ Organization ids on this install ordered by id, a page at a time for fleet-wide 
 
 ```typescript
 listAllIds(input?: OrganizationIdPageInput): Promise<OrganizationIdPage>;
+```
+
+#### `searchForOperators`
+
+Organizations whose name, slug or id holds the query; system organizations left out.
+
+```typescript
+searchForOperators(input: Readonly<{ query: string; limit: number }>): Promise<OrganizationOperatorSummary[]>;
+```
+
+#### `findForOperators`
+
+The same summaries for these ids; an id with no organization is left out.
+
+```typescript
+findForOperators(input: Readonly<{ organizationIds: readonly string[] }>): Promise<OrganizationOperatorSummary[]>;
 ```
 
 ## REST transport
@@ -2577,7 +2593,7 @@ Declared at `src/eventing/seat-peak.pipeline.ts:66`. Events: `seatChangedEventSc
 
 | Kind   | Leaf                          | Environment variable      | Declared at                                 |
 | ------ | ----------------------------- | ------------------------- | ------------------------------------------- |
-| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`   | `src/app/organization.app.ts:333`           |
+| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`   | `src/app/organization.app.ts:335`           |
 | config | `signUp.mode`                 | `SIGN_UP_MODE`            | `../contract/src/organization.config.ts:18` |
 | config | `signUp.allowedDomains`       | `SIGN_UP_ALLOWED_DOMAINS` | `../contract/src/organization.config.ts:19` |
 | config | `signUp.adminEmails`          | `ADMIN_EMAILS`            | `../contract/src/organization.config.ts:20` |

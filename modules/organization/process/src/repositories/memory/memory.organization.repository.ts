@@ -32,6 +32,8 @@ import {
   type StoredOrganizationSettings,
   type OrganizationTeamProject,
   type OrganizationPresenceSettingRow,
+  type OrganizationOperatorQuery,
+  type OrganizationOperatorRow,
 } from "../organization.repository.ts";
 import type {
   MemoryOrganizationDatabase,
@@ -68,6 +70,31 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
     if (limit === undefined || ids.length <= limit) return { ids, next: null };
     const page = ids.slice(0, limit);
     return { ids: page, next: page[page.length - 1] ?? null };
+  }
+
+  async findOperatorRows(input: OrganizationOperatorQuery): Promise<OrganizationOperatorRow[]> {
+    const needle = "query" in input ? input.query.toLowerCase() : "";
+    const matches = (row: MemoryOrganizationRow) =>
+      "organizationIds" in input
+        ? input.organizationIds.includes(row.id)
+        : [row.id, row.name, row.slug].some((value) => value.toLowerCase().includes(needle));
+    const rows = [...this.memory.organizations.values()]
+      .filter((row) => row.kind !== ORGANIZATION_KIND.SYSTEM && matches(row))
+      .toSorted(
+        (left, right) =>
+          left.name.localeCompare(right.name) ||
+          left.createdAt.epochMilliseconds - right.createdAt.epochMilliseconds,
+      )
+      .slice(0, "limit" in input ? input.limit : undefined);
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      slug: row.slug,
+      createdAt: row.createdAt,
+      memberCount: this.memory.organizationUsers.filter(
+        (member) => member.organizationId === row.id,
+      ).length,
+    }));
   }
 
   async findPresenceSettingPage({
