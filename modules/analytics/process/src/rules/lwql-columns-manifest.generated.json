@@ -352,6 +352,70 @@
       ]
     },
     {
+      "name": "coding_agent_session_events_id_index",
+      "engine": "AggregatingMergeTree",
+      "sortingKey": "TenantId, SessionId",
+      "columns": [
+        {
+          "name": "TenantId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "SessionId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "FromAt",
+          "type": "SimpleAggregateFunction(min, DateTime64(3))",
+          "comment": ""
+        },
+        {
+          "name": "ToAt",
+          "type": "SimpleAggregateFunction(max, DateTime64(3))",
+          "comment": ""
+        },
+        {
+          "name": "_retention_days",
+          "type": "SimpleAggregateFunction(max, UInt16)",
+          "comment": ""
+        }
+      ]
+    },
+    {
+      "name": "coding_agent_session_events_id_index_mv",
+      "engine": "MaterializedView",
+      "sortingKey": "",
+      "columns": [
+        {
+          "name": "TenantId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "SessionId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "FromAt",
+          "type": "DateTime64(3)",
+          "comment": ""
+        },
+        {
+          "name": "ToAt",
+          "type": "DateTime64(3)",
+          "comment": ""
+        },
+        {
+          "name": "_retention_days",
+          "type": "UInt16",
+          "comment": ""
+        }
+      ]
+    },
+    {
       "name": "coding_agent_sessions",
       "engine": "ReplacingMergeTree",
       "sortingKey": "TenantId, StartedAt, SessionId",
@@ -854,6 +918,70 @@
       ]
     },
     {
+      "name": "coding_agent_sessions_id_index",
+      "engine": "AggregatingMergeTree",
+      "sortingKey": "TenantId, SessionId",
+      "columns": [
+        {
+          "name": "TenantId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "SessionId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "FromAt",
+          "type": "SimpleAggregateFunction(min, DateTime64(3))",
+          "comment": ""
+        },
+        {
+          "name": "ToAt",
+          "type": "SimpleAggregateFunction(max, DateTime64(3))",
+          "comment": ""
+        },
+        {
+          "name": "_retention_days",
+          "type": "SimpleAggregateFunction(max, UInt16)",
+          "comment": ""
+        }
+      ]
+    },
+    {
+      "name": "coding_agent_sessions_id_index_mv",
+      "engine": "MaterializedView",
+      "sortingKey": "",
+      "columns": [
+        {
+          "name": "TenantId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "SessionId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "FromAt",
+          "type": "DateTime64(3)",
+          "comment": ""
+        },
+        {
+          "name": "ToAt",
+          "type": "DateTime64(3)",
+          "comment": ""
+        },
+        {
+          "name": "_retention_days",
+          "type": "UInt16",
+          "comment": ""
+        }
+      ]
+    },
+    {
       "name": "coding_agent_trace_sessions",
       "engine": "ReplacingMergeTree",
       "sortingKey": "TenantId, TraceId",
@@ -880,6 +1008,70 @@
         },
         {
           "name": "UpdatedAt",
+          "type": "DateTime64(3)",
+          "comment": ""
+        },
+        {
+          "name": "_retention_days",
+          "type": "UInt16",
+          "comment": ""
+        }
+      ]
+    },
+    {
+      "name": "coding_agent_trace_sessions_id_index",
+      "engine": "AggregatingMergeTree",
+      "sortingKey": "TenantId, TraceId",
+      "columns": [
+        {
+          "name": "TenantId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "TraceId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "FromAt",
+          "type": "SimpleAggregateFunction(min, DateTime64(3))",
+          "comment": ""
+        },
+        {
+          "name": "ToAt",
+          "type": "SimpleAggregateFunction(max, DateTime64(3))",
+          "comment": ""
+        },
+        {
+          "name": "_retention_days",
+          "type": "SimpleAggregateFunction(max, UInt16)",
+          "comment": ""
+        }
+      ]
+    },
+    {
+      "name": "coding_agent_trace_sessions_id_index_mv",
+      "engine": "MaterializedView",
+      "sortingKey": "",
+      "columns": [
+        {
+          "name": "TenantId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "TraceId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "FromAt",
+          "type": "DateTime64(3)",
+          "comment": ""
+        },
+        {
+          "name": "ToAt",
           "type": "DateTime64(3)",
           "comment": ""
         },
@@ -998,6 +1190,80 @@
         {
           "name": "_size_bytes",
           "type": "UInt32",
+          "comment": ""
+        }
+      ]
+    },
+    {
+      "name": "dspy_steps_id_index",
+      "engine": "AggregatingMergeTree",
+      "sortingKey": "TenantId, ExperimentId, RunId",
+      "columns": [
+        {
+          "name": "TenantId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "ExperimentId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "RunId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "FromAt",
+          "type": "SimpleAggregateFunction(min, DateTime64(3))",
+          "comment": ""
+        },
+        {
+          "name": "ToAt",
+          "type": "SimpleAggregateFunction(max, DateTime64(3))",
+          "comment": ""
+        },
+        {
+          "name": "_retention_days",
+          "type": "SimpleAggregateFunction(max, UInt16)",
+          "comment": ""
+        }
+      ]
+    },
+    {
+      "name": "dspy_steps_id_index_mv",
+      "engine": "MaterializedView",
+      "sortingKey": "",
+      "columns": [
+        {
+          "name": "TenantId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "ExperimentId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "RunId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "FromAt",
+          "type": "DateTime64(3)",
+          "comment": ""
+        },
+        {
+          "name": "ToAt",
+          "type": "DateTime64(3)",
+          "comment": ""
+        },
+        {
+          "name": "_retention_days",
+          "type": "UInt16",
           "comment": ""
         }
       ]
@@ -1140,6 +1406,70 @@
         {
           "name": "AppliedEventIds",
           "type": "Array(String)",
+          "comment": ""
+        }
+      ]
+    },
+    {
+      "name": "evaluation_analytics_id_index",
+      "engine": "AggregatingMergeTree",
+      "sortingKey": "TenantId, EvaluationId",
+      "columns": [
+        {
+          "name": "TenantId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "EvaluationId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "FromAt",
+          "type": "SimpleAggregateFunction(min, DateTime64(3))",
+          "comment": ""
+        },
+        {
+          "name": "ToAt",
+          "type": "SimpleAggregateFunction(max, DateTime64(3))",
+          "comment": ""
+        },
+        {
+          "name": "_retention_days",
+          "type": "SimpleAggregateFunction(max, UInt16)",
+          "comment": ""
+        }
+      ]
+    },
+    {
+      "name": "evaluation_analytics_id_index_mv",
+      "engine": "MaterializedView",
+      "sortingKey": "",
+      "columns": [
+        {
+          "name": "TenantId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "EvaluationId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "FromAt",
+          "type": "DateTime64(3)",
+          "comment": ""
+        },
+        {
+          "name": "ToAt",
+          "type": "DateTime64(3)",
+          "comment": ""
+        },
+        {
+          "name": "_retention_days",
+          "type": "UInt16",
           "comment": ""
         }
       ]
@@ -1390,6 +1720,159 @@
           "name": "_size_bytes",
           "type": "UInt32",
           "comment": ""
+        },
+        {
+          "name": "IdLayout",
+          "type": "LowCardinality(Nullable(String))",
+          "comment": ""
+        }
+      ]
+    },
+    {
+      "name": "evaluation_runs_by_trace_id_index",
+      "engine": "AggregatingMergeTree",
+      "sortingKey": "TenantId, TraceId",
+      "columns": [
+        {
+          "name": "TenantId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "TraceId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "FromAt",
+          "type": "SimpleAggregateFunction(min, DateTime64(3))",
+          "comment": ""
+        },
+        {
+          "name": "ToAt",
+          "type": "SimpleAggregateFunction(max, DateTime64(3))",
+          "comment": ""
+        },
+        {
+          "name": "RetainAt",
+          "type": "SimpleAggregateFunction(max, DateTime64(3))",
+          "comment": ""
+        },
+        {
+          "name": "_retention_days",
+          "type": "SimpleAggregateFunction(max, UInt16)",
+          "comment": ""
+        }
+      ]
+    },
+    {
+      "name": "evaluation_runs_by_trace_id_index_mv",
+      "engine": "MaterializedView",
+      "sortingKey": "",
+      "columns": [
+        {
+          "name": "TenantId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "TraceId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "FromAt",
+          "type": "DateTime64(3)",
+          "comment": ""
+        },
+        {
+          "name": "ToAt",
+          "type": "DateTime64(3)",
+          "comment": ""
+        },
+        {
+          "name": "RetainAt",
+          "type": "DateTime64(3)",
+          "comment": ""
+        },
+        {
+          "name": "_retention_days",
+          "type": "UInt16",
+          "comment": ""
+        }
+      ]
+    },
+    {
+      "name": "evaluation_runs_id_index",
+      "engine": "AggregatingMergeTree",
+      "sortingKey": "TenantId, EvaluationId",
+      "columns": [
+        {
+          "name": "TenantId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "EvaluationId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "FromAt",
+          "type": "SimpleAggregateFunction(min, DateTime64(3))",
+          "comment": ""
+        },
+        {
+          "name": "ToAt",
+          "type": "SimpleAggregateFunction(max, DateTime64(3))",
+          "comment": ""
+        },
+        {
+          "name": "RetainAt",
+          "type": "SimpleAggregateFunction(max, DateTime64(3))",
+          "comment": ""
+        },
+        {
+          "name": "_retention_days",
+          "type": "SimpleAggregateFunction(max, UInt16)",
+          "comment": ""
+        }
+      ]
+    },
+    {
+      "name": "evaluation_runs_id_index_mv",
+      "engine": "MaterializedView",
+      "sortingKey": "",
+      "columns": [
+        {
+          "name": "TenantId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "EvaluationId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "FromAt",
+          "type": "DateTime64(3)",
+          "comment": ""
+        },
+        {
+          "name": "ToAt",
+          "type": "DateTime64(3)",
+          "comment": ""
+        },
+        {
+          "name": "RetainAt",
+          "type": "DateTime64(3)",
+          "comment": ""
+        },
+        {
+          "name": "_retention_days",
+          "type": "UInt16",
+          "comment": ""
         }
       ]
     },
@@ -1466,6 +1949,80 @@
         {
           "name": "_size_bytes",
           "type": "UInt32",
+          "comment": ""
+        }
+      ]
+    },
+    {
+      "name": "event_log_id_index",
+      "engine": "AggregatingMergeTree",
+      "sortingKey": "TenantId, AggregateType, AggregateId",
+      "columns": [
+        {
+          "name": "TenantId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "AggregateType",
+          "type": "LowCardinality(String)",
+          "comment": ""
+        },
+        {
+          "name": "AggregateId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "FromAt",
+          "type": "SimpleAggregateFunction(min, UInt64)",
+          "comment": ""
+        },
+        {
+          "name": "ToAt",
+          "type": "SimpleAggregateFunction(max, UInt64)",
+          "comment": ""
+        },
+        {
+          "name": "_retention_days",
+          "type": "SimpleAggregateFunction(max, UInt16)",
+          "comment": ""
+        }
+      ]
+    },
+    {
+      "name": "event_log_id_index_mv",
+      "engine": "MaterializedView",
+      "sortingKey": "",
+      "columns": [
+        {
+          "name": "TenantId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "AggregateType",
+          "type": "LowCardinality(String)",
+          "comment": ""
+        },
+        {
+          "name": "AggregateId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "FromAt",
+          "type": "UInt64",
+          "comment": ""
+        },
+        {
+          "name": "ToAt",
+          "type": "UInt64",
+          "comment": ""
+        },
+        {
+          "name": "_retention_days",
+          "type": "UInt16",
           "comment": ""
         }
       ]
@@ -1785,6 +2342,134 @@
       ]
     },
     {
+      "name": "experiment_runs_by_experiment_id_index",
+      "engine": "AggregatingMergeTree",
+      "sortingKey": "TenantId, ExperimentId",
+      "columns": [
+        {
+          "name": "TenantId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "ExperimentId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "FromAt",
+          "type": "SimpleAggregateFunction(min, DateTime64(3))",
+          "comment": ""
+        },
+        {
+          "name": "ToAt",
+          "type": "SimpleAggregateFunction(max, DateTime64(3))",
+          "comment": ""
+        },
+        {
+          "name": "_retention_days",
+          "type": "SimpleAggregateFunction(max, UInt16)",
+          "comment": ""
+        }
+      ]
+    },
+    {
+      "name": "experiment_runs_by_experiment_id_index_mv",
+      "engine": "MaterializedView",
+      "sortingKey": "",
+      "columns": [
+        {
+          "name": "TenantId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "ExperimentId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "FromAt",
+          "type": "DateTime64(3)",
+          "comment": ""
+        },
+        {
+          "name": "ToAt",
+          "type": "DateTime64(3)",
+          "comment": ""
+        },
+        {
+          "name": "_retention_days",
+          "type": "UInt16",
+          "comment": ""
+        }
+      ]
+    },
+    {
+      "name": "experiment_runs_id_index",
+      "engine": "AggregatingMergeTree",
+      "sortingKey": "TenantId, RunId",
+      "columns": [
+        {
+          "name": "TenantId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "RunId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "FromAt",
+          "type": "SimpleAggregateFunction(min, DateTime64(3))",
+          "comment": ""
+        },
+        {
+          "name": "ToAt",
+          "type": "SimpleAggregateFunction(max, DateTime64(3))",
+          "comment": ""
+        },
+        {
+          "name": "_retention_days",
+          "type": "SimpleAggregateFunction(max, UInt16)",
+          "comment": ""
+        }
+      ]
+    },
+    {
+      "name": "experiment_runs_id_index_mv",
+      "engine": "MaterializedView",
+      "sortingKey": "",
+      "columns": [
+        {
+          "name": "TenantId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "RunId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "FromAt",
+          "type": "DateTime64(3)",
+          "comment": ""
+        },
+        {
+          "name": "ToAt",
+          "type": "DateTime64(3)",
+          "comment": ""
+        },
+        {
+          "name": "_retention_days",
+          "type": "UInt16",
+          "comment": ""
+        }
+      ]
+    },
+    {
       "name": "gateway_budget_ledger_events",
       "engine": "ReplacingMergeTree",
       "sortingKey": "TenantId, BudgetId, GatewayRequestId",
@@ -1897,6 +2582,70 @@
         {
           "name": "AmountNanoUSD",
           "type": "Int64",
+          "comment": ""
+        }
+      ]
+    },
+    {
+      "name": "gateway_budget_ledger_events_id_index",
+      "engine": "AggregatingMergeTree",
+      "sortingKey": "TenantId, GatewayRequestId",
+      "columns": [
+        {
+          "name": "TenantId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "GatewayRequestId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "FromAt",
+          "type": "SimpleAggregateFunction(min, DateTime64(3))",
+          "comment": ""
+        },
+        {
+          "name": "ToAt",
+          "type": "SimpleAggregateFunction(max, DateTime64(3))",
+          "comment": ""
+        },
+        {
+          "name": "_retention_days",
+          "type": "SimpleAggregateFunction(max, UInt16)",
+          "comment": ""
+        }
+      ]
+    },
+    {
+      "name": "gateway_budget_ledger_events_id_index_mv",
+      "engine": "MaterializedView",
+      "sortingKey": "",
+      "columns": [
+        {
+          "name": "TenantId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "GatewayRequestId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "FromAt",
+          "type": "DateTime64(3)",
+          "comment": ""
+        },
+        {
+          "name": "ToAt",
+          "type": "DateTime64(3)",
+          "comment": ""
+        },
+        {
+          "name": "_retention_days",
+          "type": "UInt16",
           "comment": ""
         }
       ]
@@ -2263,6 +3012,70 @@
         {
           "name": "WebSearchRequests",
           "type": "UInt64",
+          "comment": ""
+        }
+      ]
+    },
+    {
+      "name": "gateway_spend_id_index",
+      "engine": "AggregatingMergeTree",
+      "sortingKey": "TenantId, GatewayRequestId",
+      "columns": [
+        {
+          "name": "TenantId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "GatewayRequestId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "FromAt",
+          "type": "SimpleAggregateFunction(min, DateTime64(3))",
+          "comment": ""
+        },
+        {
+          "name": "ToAt",
+          "type": "SimpleAggregateFunction(max, DateTime64(3))",
+          "comment": ""
+        },
+        {
+          "name": "_retention_days",
+          "type": "SimpleAggregateFunction(max, UInt16)",
+          "comment": ""
+        }
+      ]
+    },
+    {
+      "name": "gateway_spend_id_index_mv",
+      "engine": "MaterializedView",
+      "sortingKey": "",
+      "columns": [
+        {
+          "name": "TenantId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "GatewayRequestId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "FromAt",
+          "type": "DateTime64(3)",
+          "comment": ""
+        },
+        {
+          "name": "ToAt",
+          "type": "DateTime64(3)",
+          "comment": ""
+        },
+        {
+          "name": "_retention_days",
+          "type": "UInt16",
           "comment": ""
         }
       ]
@@ -4507,6 +5320,198 @@
       ]
     },
     {
+      "name": "simulation_runs_by_batch_run_id_index",
+      "engine": "AggregatingMergeTree",
+      "sortingKey": "TenantId, BatchRunId",
+      "columns": [
+        {
+          "name": "TenantId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "BatchRunId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "FromAt",
+          "type": "SimpleAggregateFunction(min, DateTime64(3))",
+          "comment": ""
+        },
+        {
+          "name": "ToAt",
+          "type": "SimpleAggregateFunction(max, DateTime64(3))",
+          "comment": ""
+        },
+        {
+          "name": "_retention_days",
+          "type": "SimpleAggregateFunction(max, UInt16)",
+          "comment": ""
+        }
+      ]
+    },
+    {
+      "name": "simulation_runs_by_batch_run_id_index_mv",
+      "engine": "MaterializedView",
+      "sortingKey": "",
+      "columns": [
+        {
+          "name": "TenantId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "BatchRunId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "FromAt",
+          "type": "DateTime64(3)",
+          "comment": ""
+        },
+        {
+          "name": "ToAt",
+          "type": "DateTime64(3)",
+          "comment": ""
+        },
+        {
+          "name": "_retention_days",
+          "type": "UInt16",
+          "comment": ""
+        }
+      ]
+    },
+    {
+      "name": "simulation_runs_by_scenario_set_id_index",
+      "engine": "AggregatingMergeTree",
+      "sortingKey": "TenantId, ScenarioSetId",
+      "columns": [
+        {
+          "name": "TenantId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "ScenarioSetId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "FromAt",
+          "type": "SimpleAggregateFunction(min, DateTime64(3))",
+          "comment": ""
+        },
+        {
+          "name": "ToAt",
+          "type": "SimpleAggregateFunction(max, DateTime64(3))",
+          "comment": ""
+        },
+        {
+          "name": "_retention_days",
+          "type": "SimpleAggregateFunction(max, UInt16)",
+          "comment": ""
+        }
+      ]
+    },
+    {
+      "name": "simulation_runs_by_scenario_set_id_index_mv",
+      "engine": "MaterializedView",
+      "sortingKey": "",
+      "columns": [
+        {
+          "name": "TenantId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "ScenarioSetId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "FromAt",
+          "type": "DateTime64(3)",
+          "comment": ""
+        },
+        {
+          "name": "ToAt",
+          "type": "DateTime64(3)",
+          "comment": ""
+        },
+        {
+          "name": "_retention_days",
+          "type": "UInt16",
+          "comment": ""
+        }
+      ]
+    },
+    {
+      "name": "simulation_runs_id_index",
+      "engine": "AggregatingMergeTree",
+      "sortingKey": "TenantId, ScenarioRunId",
+      "columns": [
+        {
+          "name": "TenantId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "ScenarioRunId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "FromAt",
+          "type": "SimpleAggregateFunction(min, DateTime64(3))",
+          "comment": ""
+        },
+        {
+          "name": "ToAt",
+          "type": "SimpleAggregateFunction(max, DateTime64(3))",
+          "comment": ""
+        },
+        {
+          "name": "_retention_days",
+          "type": "SimpleAggregateFunction(max, UInt16)",
+          "comment": ""
+        }
+      ]
+    },
+    {
+      "name": "simulation_runs_id_index_mv",
+      "engine": "MaterializedView",
+      "sortingKey": "",
+      "columns": [
+        {
+          "name": "TenantId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "ScenarioRunId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "FromAt",
+          "type": "DateTime64(3)",
+          "comment": ""
+        },
+        {
+          "name": "ToAt",
+          "type": "DateTime64(3)",
+          "comment": ""
+        },
+        {
+          "name": "_retention_days",
+          "type": "UInt16",
+          "comment": ""
+        }
+      ]
+    },
+    {
       "name": "span_analytics",
       "engine": "ReplacingMergeTree",
       "sortingKey": "TenantId, TraceId, SpanId",
@@ -5018,6 +6023,75 @@
           "name": "_size_bytes",
           "type": "UInt32",
           "comment": ""
+        },
+        {
+          "name": "IdLayout",
+          "type": "LowCardinality(Nullable(String))",
+          "comment": ""
+        }
+      ]
+    },
+    {
+      "name": "stored_spans_id_index",
+      "engine": "AggregatingMergeTree",
+      "sortingKey": "TenantId, TraceId",
+      "columns": [
+        {
+          "name": "TenantId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "TraceId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "FromAt",
+          "type": "SimpleAggregateFunction(min, DateTime64(3))",
+          "comment": ""
+        },
+        {
+          "name": "ToAt",
+          "type": "SimpleAggregateFunction(max, DateTime64(3))",
+          "comment": ""
+        },
+        {
+          "name": "_retention_days",
+          "type": "SimpleAggregateFunction(max, UInt16)",
+          "comment": ""
+        }
+      ]
+    },
+    {
+      "name": "stored_spans_id_index_mv",
+      "engine": "MaterializedView",
+      "sortingKey": "",
+      "columns": [
+        {
+          "name": "TenantId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "TraceId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "FromAt",
+          "type": "DateTime64(3)",
+          "comment": ""
+        },
+        {
+          "name": "ToAt",
+          "type": "DateTime64(3)",
+          "comment": ""
+        },
+        {
+          "name": "_retention_days",
+          "type": "UInt16",
+          "comment": ""
         }
       ]
     },
@@ -5139,6 +6213,70 @@
         {
           "name": "_size_bytes",
           "type": "UInt32",
+          "comment": ""
+        }
+      ]
+    },
+    {
+      "name": "suite_runs_id_index",
+      "engine": "AggregatingMergeTree",
+      "sortingKey": "TenantId, BatchRunId",
+      "columns": [
+        {
+          "name": "TenantId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "BatchRunId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "FromAt",
+          "type": "SimpleAggregateFunction(min, DateTime64(3))",
+          "comment": ""
+        },
+        {
+          "name": "ToAt",
+          "type": "SimpleAggregateFunction(max, DateTime64(3))",
+          "comment": ""
+        },
+        {
+          "name": "_retention_days",
+          "type": "SimpleAggregateFunction(max, UInt16)",
+          "comment": ""
+        }
+      ]
+    },
+    {
+      "name": "suite_runs_id_index_mv",
+      "engine": "MaterializedView",
+      "sortingKey": "",
+      "columns": [
+        {
+          "name": "TenantId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "BatchRunId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "FromAt",
+          "type": "DateTime64(3)",
+          "comment": ""
+        },
+        {
+          "name": "ToAt",
+          "type": "DateTime64(3)",
+          "comment": ""
+        },
+        {
+          "name": "_retention_days",
+          "type": "UInt16",
           "comment": ""
         }
       ]
@@ -5416,6 +6554,70 @@
         {
           "name": "EvaluationRowsDigest",
           "type": "String",
+          "comment": ""
+        }
+      ]
+    },
+    {
+      "name": "trace_analytics_id_index",
+      "engine": "AggregatingMergeTree",
+      "sortingKey": "TenantId, TraceId",
+      "columns": [
+        {
+          "name": "TenantId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "TraceId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "FromAt",
+          "type": "SimpleAggregateFunction(min, DateTime64(3))",
+          "comment": ""
+        },
+        {
+          "name": "ToAt",
+          "type": "SimpleAggregateFunction(max, DateTime64(3))",
+          "comment": ""
+        },
+        {
+          "name": "_retention_days",
+          "type": "SimpleAggregateFunction(max, UInt16)",
+          "comment": ""
+        }
+      ]
+    },
+    {
+      "name": "trace_analytics_id_index_mv",
+      "engine": "MaterializedView",
+      "sortingKey": "",
+      "columns": [
+        {
+          "name": "TenantId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "TraceId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "FromAt",
+          "type": "DateTime64(3)",
+          "comment": ""
+        },
+        {
+          "name": "ToAt",
+          "type": "DateTime64(3)",
+          "comment": ""
+        },
+        {
+          "name": "_retention_days",
+          "type": "UInt16",
           "comment": ""
         }
       ]
@@ -5902,6 +7104,75 @@
         {
           "name": "EarliestSpanStartMs",
           "type": "UInt64",
+          "comment": ""
+        },
+        {
+          "name": "IdLayout",
+          "type": "LowCardinality(Nullable(String))",
+          "comment": ""
+        }
+      ]
+    },
+    {
+      "name": "trace_summaries_id_index",
+      "engine": "AggregatingMergeTree",
+      "sortingKey": "TenantId, TraceId",
+      "columns": [
+        {
+          "name": "TenantId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "TraceId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "FromAt",
+          "type": "SimpleAggregateFunction(min, DateTime64(3))",
+          "comment": ""
+        },
+        {
+          "name": "ToAt",
+          "type": "SimpleAggregateFunction(max, DateTime64(3))",
+          "comment": ""
+        },
+        {
+          "name": "_retention_days",
+          "type": "SimpleAggregateFunction(max, UInt16)",
+          "comment": ""
+        }
+      ]
+    },
+    {
+      "name": "trace_summaries_id_index_mv",
+      "engine": "MaterializedView",
+      "sortingKey": "",
+      "columns": [
+        {
+          "name": "TenantId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "TraceId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "FromAt",
+          "type": "DateTime64(3)",
+          "comment": ""
+        },
+        {
+          "name": "ToAt",
+          "type": "DateTime64(3)",
+          "comment": ""
+        },
+        {
+          "name": "_retention_days",
+          "type": "UInt16",
           "comment": ""
         }
       ]
