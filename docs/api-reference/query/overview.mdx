@@ -24,11 +24,11 @@ Send your LangWatch API key in any one of these forms:
 | Bearer | `Authorization: Bearer <token>` |
 | Basic | `Authorization: Basic base64(projectId:token)` |
 
-Any LangWatch API key works here: project, organization, or personal. Rows come from every project the key holds the `analytics:view` permission on: a project key reaches its one project, an organization or personal key reaches every project it can read. No project header is required.
+Any LangWatch API key works here: project, organization, or personal. A project key reads its one project, and so does any key that can read exactly one project. A key that reaches several must name the projects a run reads. A run reads only projects the key holds the `analytics:view` permission on, and `GET /api/v1/query/schema` answers for every project the key can read. No project header is required.
 
-To run `POST /api/v1/query` over one project only, send its id as `projectId` in the request body: the run then reads that project's rows alone, under that project's own content protections. Without `projectId` the run covers every project the key can read.
+To choose the projects for `POST /api/v1/query`, send `projects` in the request body: a list of project ids, or `"all"`. To read one project, you can send its id as `projectId` instead: the run then reads that project's rows alone, under that project's own content protections. A request that sends both is refused with `422 validation_error`. A key that reaches several projects and names none is refused with `422 projects_required`.
 
-You can also filter inside the statement itself with `WHERE TenantId = '<project id>'`, but the result is then redacted by the strictest protection across all the projects the key can read.
+You can also filter inside the statement itself with `WHERE TenantId = '<project id>'`, but the result is then redacted by the strictest protection across all the projects the run reads.
 
 A result that mixes rows from more than one project carries the `MULTI_PROJECT_RESULT` diagnostic, so a caller who expected a single project can tell.
 
@@ -38,14 +38,16 @@ Both endpoints answer with the standard LangWatch error envelope and a real HTTP
 
 | Status | `code` | When |
 |--------|--------|------|
-| `400` | `validation_error` | The request body failed validation. |
+| `400` | `malformed_request` | The request body cannot be read, for example it is not valid JSON. |
 | `400` | `lwql_unparseable` | The statement is not valid LangWatchQL. |
 | `400` | `lwql_not_permitted` | The statement is valid but calls something the policy withholds, for example a function outside the allowlist, or a `LIMIT` above 10,000 rows (`meta.violations` names it `LIMIT_TOO_HIGH` or `LIMIT_REQUIRED_PER_BRANCH`). |
 | `401` | `missing_credentials` | No supported authentication credential was sent. |
 | `401` | `invalid_credentials` | The API key is unknown, revoked, or has the wrong secret. |
-| `403` | `api_key_permission_denied` | The key lacks the `analytics:view` permission on any project. |
-| `404` | `project_not_found` | The body's `projectId` names a project the key cannot read with `analytics:view`, or one that does not exist. The two cases get the same answer. |
+| `404` | `project_not_found` | The body's `projectId` or `projects` names a project the key cannot read with `analytics:view`, or one that does not exist. The cases get the same answer. |
 | `413` | `lwql_result_too_large` | The result body exceeds about 8,000,000 bytes. |
+| `422` | `validation_error` | The request body does not match the expected shape, for example it sends both `projectId` and `projects`. |
+| `422` | `projects_required` | `POST` only. The key reaches several projects and the request names none. |
+| `422` | `projects_unreadable` | `POST` only. The key reads no project and the request names none or sends `"all"`. `GET /api/v1/query/schema` answers such a key with an empty scope. |
 | `422` | `query_scan_limit_exceeded` | The statement is valid but would scan more data than the key allows. |
 
 ## Queryable views

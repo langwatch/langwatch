@@ -1,0 +1,96 @@
+---
+title: LangWatchQL limits, rate limits and cost
+sidebarTitle: Limits and cost
+keywords: langwatch, langwatchql, lwql, row limit, 10000 rows, timeout, rate limit, queries per minute, result too large, billing, cost
+description: How many rows a query returns, how large and long it can be, how many queries a plan runs per minute, and what is charged.
+---
+
+## Limits
+
+{/* lwql-limits-start */}
+| What | Limit | Over the limit |
+| --- | --- | --- |
+| Rows per response | 10,000. A statement with no `LIMIT` gets `LIMIT 10000` added: after the last clause, or before its `OFFSET` if it has one. | A `LIMIT` above 10,000 is refused with 400 `lwql_not_permitted`, `LIMIT_TOO_HIGH` |
+| Result size | About 8,000,000 bytes | 413 `lwql_result_too_large`, with no partial result |
+| Response size with extraction functions | About 32,000,000 bytes after the content is read | Trailing rows are dropped, and the response includes the `APP_FUNCTION_RESULT_TRUNCATED` diagnostic |
+| Statement length | 50,000 characters | 422 `validation_error` |
+| Run time | 10 seconds | 504 `query_timeout` |
+| Memory | 1 GB | 422 `query_memory_exceeded` |
+| Data read | 1,000,000,000 rows or 10,000,000,000 bytes | 422 `query_scan_limit_exceeded` |
+| Threads | 4 per query | |
+| Queries running at once | 10, shared by the whole deployment, not per project or per key | 503 `lwql_busy` |
+{/* lwql-limits-end */}
+
+Adding `LIMIT 10000` is the only change LangWatch makes to your statement, with one exception: on an aggregate project whose member has a dated window, each view is also replaced by a subquery that keeps rows inside that window. The server limits are the shipped defaults, which LangWatch Cloud uses. LangWatchQL refuses a `SETTINGS` clause that changes them.
+
+## How many queries can I run per minute
+
+{/* lwql-rates-start */}
+| Plan | Queries per minute, per project |
+| --- | --- |
+| Free, and Launch billed monthly | 30 |
+| Other paid plans, including Launch billed annually | 60 |
+| Enterprise, and self-hosted open source | 120 |
+{/* lwql-rates-end */}
+
+The window is a fixed 60 seconds. Over the limit the answer is 429 `lwql_rate_limited`, and `meta.retryAfterSeconds` in the error tells you how long to wait.
+
+## How do I get more than 10,000 rows
+
+Page through the result. Order by a time column and an id, alias those two columns to the cursor parameter names `after_ts` and `after_id`, and let the CLI rebind them for each page:
+
+```sql
+SELECT OccurredAt AS after_ts, TraceId AS after_id, CapturedInput, CapturedOutput
+FROM langwatch.traces
+WHERE OccurredAt >= subtractDays(now(), 7)
+  AND (OccurredAt, TraceId) > ({after_ts:DateTime64(3)}, {after_id:String})
+ORDER BY OccurredAt, TraceId
+LIMIT 1000
+```
+
+```bash
+langwatch query --sql-file export.sql --projects <project id> --page-by keyset --format jsonl --out export.jsonl
+```
+
+From the REST API, page with `LIMIT` and `OFFSET` and an `ORDER BY`. In a `UNION`, give every branch its own `LIMIT`, or the query is refused with `LIMIT_REQUIRED_PER_BRANCH`.
+
+## What does a query cost
+
+Eval functions (`eval`, `eval_passed`, `eval_score` and the others) are metered and charged per query. The [extraction functions reference](/api-reference/query/extraction-functions#what-one-query-costs) has the details.
+
+## Error codes
+
+{/* lwql-error-codes-start */}
+| Status | Code | What it means |
+| --- | --- | --- |
+| 400 | `malformed_request` | The request body cannot be read, for example it is not valid JSON |
+| 400 | `lwql_unparseable` | The statement is not valid ClickHouse SQL |
+| 400 | `lwql_not_permitted` | The statement uses something LangWatchQL does not allow, such as a second statement, a view or a function |
+| 400 | `lwql_unknown_identifier` | The statement uses a column that does not exist |
+| 400 | `lwql_invalid_query` | The database rejected the statement as written, for example an aggregate in `WHERE` or a type clash |
+| 400 | `lwql_parameter_missing` | The statement declares a parameter the request has no value for. `meta.parameters` lists them: send each under `parameters` |
+| 400 | `lwql_parameter_invalid` | A parameter value does not match its declared type. `meta.parameter` names it: send a `DateTime` as `YYYY-MM-DD HH:MM:SS` in UTC |
+| 401 | `missing_credentials`, `invalid_credentials` | No API key, or a key LangWatch does not know |
+| 403 | `lwql_not_enabled` | LangWatchQL is not enabled for this project. Ask an administrator to enable it |
+| 404 | `project_not_found` | A project named in `projectId` or `projects` does not exist, or the key cannot read it with `analytics:view` |
+| 413 | `lwql_result_too_large` | The result is over the result size limit in [Limits](#limits) |
+| 422 | `validation_error` | The request body does not match the expected shape, for example it sends both `projectId` and `projects` |
+| 422 | `projects_required` | The key reaches several projects. Send `projects`, a list of project ids, or `"all"` |
+| 422 | `projects_unreadable` | The key reads no project. Ask an admin to grant it `analytics:view` on one |
+| 422 | `query_scan_limit_exceeded`, `query_memory_exceeded` | The query reads too much data or uses too much memory |
+| 422 | `lwql_too_many_members` | The aggregate project has too many members for one query. `meta.maxMembers` gives the limit |
+| 422 | `lwql_member_grant_closed` | A member project of the aggregate is shared up to an end date, so the query does not run. `meta.projectNames` lists these projects |
+| 422 | `lwql_app_function_key_cap` | An extraction function needs more distinct keys than its cap |
+| 422 | `lwql_app_function_read_budget` | The query asks for more trace content than one run may read. Use a smaller `LIMIT` or run it in pages |
+| 422 | `instant_eval_query_budget_exceeded` | The eval functions in the query are over their token budget |
+| 429 | `lwql_rate_limited` | Too many queries this minute for this project |
+| 503 | `lwql_busy` | Too many queries are running at once |
+| 503 | `lwql_app_function_hydration_failed` | The query ran, but the conversation or trace content could not be read |
+| 503 | `lwql_app_function_unavailable` | The functions this query uses are not set up on this deployment yet. Contact support, or your administrator if you self-host |
+| 503 | `lwql_provisioning_incomplete` | LangWatchQL could not read one of the datasets the query needs. Contact support, or your administrator if you self-host |
+| 503 | `lwql_unavailable` | LangWatchQL is not set up on this deployment. Contact support, or your administrator if you self-host |
+| 503 | `clickhouse_unavailable` | The database is down for a moment. Retry in a few seconds |
+| 504 | `query_timeout` | The query ran past the run time limit in [Limits](#limits) |
+{/* lwql-error-codes-end */}
+
+[Common questions](/features/langwatchql/common-questions) has the exact messages and how to fix each one.

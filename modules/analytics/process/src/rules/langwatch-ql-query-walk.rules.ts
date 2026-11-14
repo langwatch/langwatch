@@ -405,7 +405,7 @@ function appFunctionPositionMessage(name: string): string {
 const APP_FUNCTION_ALIAS_EVAL_ADVICE =
   "Its answer is decided after the query runs, so this clause would read the text it judges instead. " +
   "Run the statement as an Instant Eval first, then sort, group or filter the answers " +
-  "with a second query over analytics.judgments.";
+  "with a second query over the judgments view.";
 
 const APP_FUNCTION_ALIAS_EXTRACTION_ADVICE =
   "Its value is filled in after the query runs, so this clause would read the key it was called with instead. " +
@@ -787,7 +787,7 @@ function admitAppFunctionCall({
   if (definition.kind === "eval" && !ctx.policy.isInstantEvalsEnabled) {
     return refuse(
       "APP_FUNCTION_GATED",
-      `The function "${echoIdentifier(definition.name)}" is not available to you. A judgement is charged to one project, so it needs Instant Evals switched on for a key that reads a single project; ask an administrator to enable them, use a project key, or remove the call.`,
+      `The function "${echoIdentifier(definition.name)}" is not available to you. A judgement is charged to one project, so it runs only in a query from one project, and only where Instant Evals is switched on for the organization. Run the query from one project, switch Instant Evals on for the organization, or remove the call.`,
     );
   }
 

@@ -175,11 +175,11 @@ describe("given nesting the validator does not allow", () => {
     }
 
     /** @scenario "Sorting by an eval's alias is refused rather than sorting by the text it judges" */
-    it("refuses ORDER BY the alias and names the two-step pattern over analytics.judgments", () => {
+    it("refuses ORDER BY the alias and names the two-step pattern over the judgments view", () => {
       const result = withTail("ORDER BY s DESC");
 
       expect(codesOf(result)).toContain("APP_FUNCTION_POSITION");
-      expect(messagesOf(result)).toContain("analytics.judgments");
+      expect(messagesOf(result)).toContain("the judgments view");
     });
 
     /** @scenario "Sorting by an eval's alias is refused rather than sorting by the text it judges" */
@@ -326,11 +326,11 @@ describe("given arguments that do not match a signature", () => {
 describe("given a project the feature is not open to", () => {
   describe("when an eval function is called", () => {
     /** @scenario "An eval function is refused while Instant Evals are not enabled for the project" */
-    it("refuses it and says the feature is not switched on", () => {
+    it("refuses it and says Instant Evals is not switched on", () => {
       const result = validate("eval(CapturedOutput, 'a') AS x", { isInstantEvalsEnabled: false });
 
       expect(codesOf(result)).toContain("APP_FUNCTION_GATED");
-      expect(messagesOf(result)).toContain("Instant Evals switched on");
+      expect(messagesOf(result)).toContain("Instant Evals is switched on for the organization");
     });
 
     it("still admits an extraction function, which is not gated on it", () => {

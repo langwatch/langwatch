@@ -699,6 +699,11 @@
 /features/instant-evals/questions
 /features/instant-evals/results
 /features/instant-evals/targets
+/features/langwatchql/common-questions
+/features/langwatchql/extraction-functions
+/features/langwatchql/first-query
+/features/langwatchql/limits-and-cost
+/features/langwatchql/overview
 /features/querying-your-data
 /features/topic-clustering
 /features/webhooks
