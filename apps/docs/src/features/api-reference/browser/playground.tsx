@@ -55,7 +55,10 @@ async function syncEdit({ operation, inForm }: { operation: Operation; inForm: b
 async function editBody({ operation, button }: { operation: Operation; button: Element }) {
   const { setBodyMode, editRows } = await loadRequestTools();
   const mode = button.getAttribute("data-body-mode-button");
-  if (mode === "form" || mode === "json") setBodyMode({ operation, mode });
+  if (mode === "form" || mode === "json") {
+    setBodyMode({ operation, mode });
+    await syncEdit({ operation, inForm: false });
+  }
   if (editRows({ button })) await syncEdit({ operation, inForm: true });
 }
 

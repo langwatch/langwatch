@@ -131,13 +131,6 @@ export class ApiKeyService {
     return this.lifecycle.revokeSystemManaged(input);
   }
 
-  /** Retires the live keys minted under one key; how many it retired. */
-  async revokeChildren(
-    input: Parameters<ApiKeyLifecycleService["revokeChildren"]>[0],
-  ): Promise<number> {
-    return this.lifecycle.revokeChildren(input);
-  }
-
   async updateAsCaller(input: UpdateApiKeyInput): Promise<ApiKey> {
     try {
       return await this.lifecycle.update(input);

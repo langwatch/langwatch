@@ -120,6 +120,12 @@ Feature: Actionable documentation and restrained reading surfaces
     Then the prerendered page hides its panel as hidden until found, not as plain hidden
     And panels that are not collapsible keep plain hidden
 
+  @integration
+  Scenario: A panel find-in-page opens shows as open
+    Given find-in-page opened a collapsed accordion panel or an unselected tab's panel
+    Then the accordion's trigger reports it expanded, and the tab strip selects that panel's tab
+    And a panel opened before the page's script loaded is marked the same way once it loads
+
   @unit
   Scenario: Hand a coding agent a prompt for the request
     Given an API operation with an API key scheme and a JSON body
