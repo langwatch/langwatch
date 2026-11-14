@@ -9,8 +9,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // Hoisted mocks
 // ---------------------------------------------------------------------------
 
-const { mockQuery, mockRead } = vi.hoisted(() => ({
-  mockQuery: vi.fn(),
+const { mockRead } = vi.hoisted(() => ({
   mockRead: vi.fn(),
 }));
 
@@ -38,7 +37,7 @@ import { ClickHouseStoredObjectsRepository } from "../stored-objects.repository.
 /** The routed connection, as this suite's one project resolves it. */
 class FakeStoredObjectsClickHouse implements StoredObjectsClickHouse {
   async resolveClient() {
-    return { read: mockRead, query: mockQuery };
+    return { read: mockRead };
   }
 }
 
@@ -85,7 +84,6 @@ describe("StoredObjectsRepository", () => {
           expect.arrayContaining(["proj-1", "test-id"]),
         );
         expect(statement.sql).toContain("project_id");
-        expect(mockQuery).not.toHaveBeenCalled();
 
         expect(result).not.toBeNull();
         expect(result!.id).toBe("test-id");

@@ -14,17 +14,8 @@ import { storedObjectsTable as t } from "./clickhouse.stored-objects.table.ts";
 
 const TABLE_NAME = "stored_objects" as const;
 
-/** The legacy index's operations: the built lookup by id, and the import's raw page query. */
-type StoredObjectsClickHouseClient = Readonly<{
-  read: ClickHouseQueryClient["read"];
-  query(input: {
-    query: string;
-    query_params: Record<string, unknown>;
-    format: "JSONEachRow";
-    SKIP_TENANT_CHECK?: true;
-    SKIP_COLD_SCAN_CHECK?: true;
-  }): Promise<{ json<Result>(): Promise<Result[]> }>;
-}>;
+/** The legacy index's one operation: built reads, the lookup by id and the import's page. */
+type StoredObjectsClickHouseClient = Pick<ClickHouseQueryClient, "read">;
 
 /** Resolves the client one project's stored-object rows live on. */
 export interface StoredObjectsClickHouse {
@@ -42,21 +33,9 @@ export class RoutedStoredObjectsClickHouse implements StoredObjectsClickHouse {
 
   private constructor(private readonly clickhouse: ClickHouseQueryClient) {}
 
-  async resolveClient(projectId: string): Promise<StoredObjectsClickHouseClient> {
+  async resolveClient(_projectId: string): Promise<StoredObjectsClickHouseClient> {
     const clickhouse = this.clickhouse;
-    return {
-      read: (request) => clickhouse.read(request),
-      async query(input) {
-        const result = await clickhouse.query({
-          tenantId: projectId,
-          sql: input.query,
-          params: input.query_params,
-          SKIP_TENANT_CHECK: input.SKIP_TENANT_CHECK,
-          SKIP_COLD_SCAN_CHECK: input.SKIP_COLD_SCAN_CHECK,
-        });
-        return { json: async <Result>() => result.rows as Result[] };
-      },
-    };
+    return { read: (request) => clickhouse.read(request) };
   }
 }
 

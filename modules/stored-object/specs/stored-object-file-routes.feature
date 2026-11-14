@@ -35,10 +35,11 @@ Feature: File reads answer through the installed stored-object module
     Then the read fails as stored_object_not_found, which the route answers 404
 
   @regression
-  Scenario: The legacy index import declares itself unscoped
-    Given the stored_objects table has no TenantId column
+  Scenario: The legacy index import is a reader statement bounded by its project
+    Given the stored_objects table's tenant column is project_id
     When the import pages a project's legacy index
-    Then the tenant guard refuses it unless it declares why it is unscoped
+    Then the page is a reader statement whose tenant setting is that project
+    And it declares no skip-check flag
 
   @regression
   Scenario: The legacy index lookup is a reader statement bounded by its project
