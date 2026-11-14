@@ -4,7 +4,10 @@ import { findDecisionModel, isOwnDecisionModelId } from "./catalog/decision-mode
 import { allLitellmModels } from "./catalog/model-catalog.ts";
 import type { ModelOption } from "./model-options.ts";
 import { buildCustomModelDisplayNames, modelDisplayLabel } from "./model-provider-display-names.ts";
-import type { ModelProviderEditorValue as MaybeStoredModelProvider } from "./model-provider-registry.ts";
+import {
+  findModelProviderDefinition,
+  type ModelProviderEditorValue as MaybeStoredModelProvider,
+} from "./model-provider-registry.ts";
 
 export type ModelOptionGroup = {
   provider: string;
@@ -75,9 +78,36 @@ const scopeRank = (scopeType?: string): number =>
   SCOPE_RANK[scopeType as keyof typeof SCOPE_RANK] ?? 0;
 
 /**
+ * Whether this row sends its provider's traffic to an endpoint of the operator's own (a base-URL
+ * override, such as an Azure OpenAI resource under "OpenAI") AND names the models that endpoint
+ * serves for `mode`. Only then is the registry catalogue known to be the wrong list: the endpoint
+ * can serve only what it deploys, and the operator has said what that is. An override with no
+ * models of its own keeps the registry list, since nothing says which of it the endpoint serves.
+ */
+const servesOnlyItsOwnModels = (
+  row: {
+    provider: string;
+    customKeys?: Record<string, unknown> | null | undefined;
+    customModels?: readonly unknown[] | null | undefined;
+    customEmbeddingsModels?: readonly unknown[] | null | undefined;
+  },
+  mode: "chat" | "embedding",
+): boolean => {
+  const definition = findModelProviderDefinition(row.provider);
+  const endpointKey = definition?.endpointKey;
+  // Only an optional endpoint is an override of the provider's default one; a provider whose
+  // endpoint is its whole identity (Azure's resource, a custom OpenAI-compatible server) is not.
+  if (!endpointKey || !definition.optionalKeys?.includes(endpointKey)) return false;
+  const endpoint = row.customKeys?.[endpointKey];
+  if (typeof endpoint !== "string" || endpoint.trim() === "") return false;
+  const ownModels = mode === "chat" ? row.customModels : row.customEmbeddingsModels;
+  return (ownModels?.length ?? 0) > 0;
+};
+/**
  * Provider keys whose registry models in `mode` must not be offered, because the row
  * `resolveServingRow` actually picks (its scope-collapse winner, not the union of rows) cannot
- * serve them.
+ * serve them: its credential reaches a door without that capability (Gemini's Agent Platform has
+ * no embeddings), or its base URL points at an endpoint that serves only the models the row names.
  */
 export const providersWithoutRegistryModels = (
   rows: {
@@ -85,12 +115,13 @@ export const providersWithoutRegistryModels = (
     enabled: boolean;
     scopeType?: string | undefined;
     embeddingsUnsupported?: boolean | undefined;
+    customKeys?: Record<string, unknown> | null | undefined;
+    customModels?: readonly unknown[] | null | undefined;
+    customEmbeddingsModels?: readonly unknown[] | null | undefined;
   }[],
   mode: "chat" | "embedding",
 ): Set<string> => {
   const unavailable = new Set<string>();
-  if (mode !== "embedding") return unavailable;
-
   const byProvider = new Map<string, typeof rows>();
   for (const row of rows) {
     if (!row.enabled) continue;
@@ -101,17 +132,16 @@ export const providersWithoutRegistryModels = (
       byProvider.set(row.provider, [row]);
     }
   }
-
   for (const [provider, group] of byProvider) {
     const topTier = Math.max(...group.map((r) => scopeRank(r.scopeType)));
     const contenders = group.filter((r) => scopeRank(r.scopeType) === topTier);
-    if (contenders.some((r) => r.embeddingsUnsupported)) {
+    const cannotServeMode = mode === "embedding" && contenders.some((r) => r.embeddingsUnsupported);
+    if (cannotServeMode || contenders.some((r) => servesOnlyItsOwnModels(r, mode))) {
       unavailable.add(provider);
     }
   }
   return unavailable;
 };
-
 /**
  * A real union by model id: the first row that declares a model wins.
  * Concatenating instead put one model in the picker twice.
@@ -246,8 +276,9 @@ export function modelSelectionFrom({
 }): { selectOptions: ModelOption[]; groupedByProvider: GroupedModelOptions } {
   const providersByKey = mergeProviderRowsByKey(providers);
   const customModelIdSet = allCustomModelIds(providersByKey, mode);
-  // Gemini's Agent Platform door serves chat but not embeddings (404 on :batchEmbedContents),
-  // so registry embedding models are dropped; explicit custom models stay.
+  // A door that cannot serve the mode (Gemini's Agent Platform has no embeddings, 404 on
+  // :batchEmbedContents) or an endpoint that serves only the models its row names (an Azure URL
+  // under "OpenAI", #9440): registry models are dropped; explicit custom models stay.
   const withoutRegistryModels = providersWithoutRegistryModels([...providers], mode);
   const allModels = filterRestrictedModels({
     models: getCustomModels(providersByKey, options, mode),
