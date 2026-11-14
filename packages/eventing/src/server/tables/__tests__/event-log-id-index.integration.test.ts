@@ -265,8 +265,10 @@ describe("the event log's aggregate index", () => {
 
       expect(occurredAtBounds).toEqual({ minMs: daysAgo(365), maxMs: daysAgo(351) });
       expect(applied).toHaveLength(4);
-      const [bounded] = statements;
-      if (bounded === undefined) throw new Error("the replay sent no read");
+      const bounded = statements.find((statement) =>
+        statement.sql.includes("ORDER BY AggregateId"),
+      );
+      if (bounded === undefined) throw new Error("the replay sent no event read");
       const unbounded = {
         ...bounded,
         sql: bounded.sql.replace(/AND \(\s*EventOccurredAt = 0[\s\S]*?\)\s*\)/, ""),

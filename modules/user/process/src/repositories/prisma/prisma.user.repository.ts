@@ -304,6 +304,21 @@ export class PrismaUserRepository
     return row ? userProfileSchema.parse(row) : null;
   }
 
+  async searchProfiles({ query, limit }: { query: string; limit: number }): Promise<UserProfile[]> {
+    const rows = await this.prisma.user.findMany({
+      where: {
+        OR: (["id", "name", "email"] as const).map((field) => ({
+          [field]: { contains: literalSubstring(query), mode: "insensitive" as const },
+        })),
+      },
+      select: userProfileSelect,
+      orderBy: [{ email: "asc" }, { id: "asc" }],
+      take: limit,
+    });
+
+    return rows.map((row) => userProfileSchema.parse(row));
+  }
+
   async findByEmailAnyCase(email: string): Promise<UserProfile[]> {
     const rows = await this.prisma.user.findMany({
       where: { email: { equals: email, mode: "insensitive" } },
@@ -731,4 +746,9 @@ function domainCounts(emails: readonly string[]): Record<string, number> {
     if (domain) counts[domain] = (counts[domain] ?? 0) + 1;
   }
   return counts;
+}
+
+/** The query as a literal substring: LIKE reads `%`, `_` and `\\` as patterns otherwise. */
+function literalSubstring(query: string): string {
+  return query.replace(/[\\%_]/g, (character) => `\\${character}`);
 }
