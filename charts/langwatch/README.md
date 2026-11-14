@@ -320,6 +320,24 @@ Argo CD keeps the completed Job in sync and a changed spec gets a new Job.
 | `access_control_improvements.settings_constraints_replace_previous` is `true`                        | The settings profile marks `custom_api_key_hash` `CHANGEABLE_IN_READONLY`; without this server-level setting, ClickHouse rejects that constraint on the profile.                                                                                                                               | Rendered by `renderAccessControl` into `config.d/access-control.yaml` in `infra/clickhouse-serverless/internal/render/access.go`.                                                                                                                                                                  |
 | `query_masking_rules` hide the `custom_api_key_hash` value and sha256 hex values                     | Each LangWatchQL statement carries its tenant capability as `SETTINGS custom_api_key_hash = '…'`. ClickHouse also logs it as a bare sha256 hex value. Without the rules the server log file, `system.text_log` and `system.query_log` keep it. The rules are in the self-hosting docs.         | Rendered from `CLICKHOUSE_MASKED_SETTINGS` (default `custom_api_key_hash`) into `config.d/query-masking.yaml`.                                                                                                                                                                                     |
 
+**App reader prerequisites (ADR-202).** With `CLICKHOUSE_READER_URL` set, the app
+sends tenant reads as a restricted user whose row policies bound each read to its
+tenants. This release provisions it in shadow: the policies admit every row, and
+the switch the profile pins (`SQL_langwatch_tenancy_enforce`) stays `0`. An install
+that sets no reader URL upgrades exactly as before. In `sql` mode,
+`pnpm task upgrade lwql-provision` creates the readers on the server `CLICKHOUSE_URL`
+names and on every `CLICKHOUSE_URL__<label>__<orgId>` whose
+`CLICKHOUSE_READER_URL__<label>__<orgId>` is set, always in `sql` mode there, with
+the password each reader URL carries. The rendered access config does not carry the
+readers yet, so leave `CLICKHOUSE_READER_URL` unset on chart-managed ClickHouse.
+
+| Prerequisite                                                                                       | Why                                                                                                                                                                                                                                                                      |
+| -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `custom_settings_prefixes` includes `SQL_`, beside `custom_`                                       | The `langwatch_app_reader_profile` carries `SQL_langwatch_tenant_ids` (the tenant set the app sends with each read) and `SQL_langwatch_tenancy_enforce`. Without the prefix the profile fails with `UNKNOWN_SETTING` (115). The `langwatch/clickhouse-serverless` image declares it from its next release. |
+| The app reader `langwatch_app_reader`, when `CLICKHOUSE_READER_URL` is set                         | One row policy per tenant table and a `USING 0` policy on `system.user_query_log`; `SELECT` only. An organisation with a system route and no reader route has its reader reads refused, naming `CLICKHOUSE_READER_URL__<label>__<orgId>`; they never fall back to another identity.                       |
+| The enforcing reader `langwatch_app_reader_enforcing`, when `CLICKHOUSE_ENFORCING_READER_URL` is set | The shadow sampler re-runs a share of reads (`CLICKHOUSE_SHADOW_SAMPLE_RATE`, default `0`) as this user, whose profile pins enforcement on, and counts the rows the policy would hide. Shared server only.                                                                 |
+| The administrative user of every target holds `access_management: 1` globally and `SELECT` with grant option on the app database | The upgrade creates both readers, their profiles and policies, and grants `SELECT` on each tenant table, on the shared server and on each routed one. Where it cannot, the upgrade fails naming the organisation, and that organisation's reader reads fail closed.          |
+
 **AC9 — `sql` mode is fail-closed on clusters.** In `sql` mode the app reads
 `system.user_directories` and `system.clusters` before any access statement. If
 access storage is not `replicated` and the server belongs to a cluster with more

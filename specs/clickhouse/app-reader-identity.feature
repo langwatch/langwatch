@@ -217,3 +217,49 @@ Feature: The ClickHouse client sends reads as the app reader and everything else
     When its stores build the eventing member
     Then it sends no statement that skips the tenant check
     And a draining role over the same client checks the index, which the api no longer sends
+
+  # Distribution (ADR-202 slice 4, Decided 4 and 6): the upgrade walks every server the router knows.
+
+  @unit
+  Scenario: An install that sets no reader credential provisions no reader and upgrades as before
+    Given no "CLICKHOUSE_READER_URL" and no "CLICKHOUSE_READER_URL__<label>__<orgId>" variable
+    When "pnpm task upgrade lwql-provision" runs
+    Then it opens no ClickHouse connection for the reader
+    And the upgrade completes as it did before the reader existed
+
+  @unit
+  Scenario: The upgrade provisions the app reader in shadow on the shared server
+    Given "CLICKHOUSE_URL" and "CLICKHOUSE_READER_URL" set, in sql mode
+    When "pnpm task upgrade lwql-provision" runs
+    Then "langwatch_app_reader" is created with the hash of the password its reader URL carries
+    And its profile pins "SQL_langwatch_tenancy_enforce" to 0
+    And with "CLICKHOUSE_ENFORCING_READER_URL" set, "langwatch_app_reader_enforcing" is created with it pinned to 1
+
+  @unit
+  Scenario: The upgrade provisions the app reader on every routed server, as goose reaches them
+    Given a "CLICKHOUSE_URL__<label>__<orgId>" route with its "CLICKHOUSE_READER_URL__<label>__<orgId>" route
+    When "pnpm task upgrade lwql-provision" runs
+    Then the reader is created on that server in sql mode, on the database its route names
+    And the shared server in rendered mode is left to its rendered access config
+    And the enforcing reader is created on the shared server only
+
+  @unit
+  Scenario: A routed server without the reader is named, and the client refuses its reader reads by that name
+    Given a process holding the reader and a "CLICKHOUSE_URL__<label>__<orgId>" route with no reader route
+    When "pnpm task upgrade lwql-provision" runs
+    Then nothing is provisioned on that server
+    And the upgrade warns naming "CLICKHOUSE_READER_URL__<label>__<orgId>", the variable the client refuses its reads by
+
+  @unit
+  Scenario: A server the upgrade cannot reach is named by the variable to set
+    Given a reader route with no system route, or two organisations on one server with different reader passwords
+    When the upgrade plans its walk
+    Then each server it cannot provision is named with the variable that would let it
+    And no reader login on a shared server is replaced by another organisation's
+
+  @unit
+  Scenario: A routed server the reader cannot be provisioned on fails the upgrade by name
+    Given a routed server on a cluster without replicated access storage
+    When the upgrade's reconciler runs "lwql-provision"
+    Then no reader statement runs on that server and the other servers are still provisioned
+    And the run fails naming the organisation

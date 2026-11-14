@@ -4,8 +4,11 @@
  * @see specs/lwql/api.feature
  */
 
+import { createHash } from "node:crypto";
+
 import { parseConnectionUrl } from "@langwatch/clickhouse-migrations";
 import { createLogger } from "@langwatch/observability";
+import { clickhouseRoutesOf } from "@langwatch/process-stores";
 import { PROJECT_ID_PAGE_LIMIT, type ProjectApi } from "@langwatch/project-contract";
 import { Task } from "@langwatch/task";
 
@@ -35,6 +38,7 @@ import type {
   SkippedProvisioningStatement,
 } from "../repositories/langwatch-ql-provisioning.repository.ts";
 import { PrismaLangWatchQLPostgresRepository } from "../repositories/prisma/prisma.langwatch-ql-postgres.repository.ts";
+import { APP_READER_NAMES } from "../rules/app-reader-access.rules.ts";
 import { collectionUnconfirmedError } from "../rules/langwatch-ql-collection-probe.rules.ts";
 import {
   clickHouseErrorCodeFields,
@@ -42,6 +46,10 @@ import {
   postgresErrorCodeFields,
   statementKind,
 } from "../rules/langwatch-ql-config-store.rules.ts";
+import {
+  APP_READER_ENFORCING_NAMES,
+  LangWatchQLAccessModelDefinitionService,
+} from "../services/langwatch-ql-access-model-definition.service.ts";
 import type { LangWatchQLNames } from "../services/langwatch-ql-access-model.service.ts";
 import { LangWatchQLSqlModeClusterGuardService } from "../services/langwatch-ql-sql-mode-cluster-guard.service.ts";
 
@@ -49,6 +57,7 @@ const lwqlProvisioning = LangWatchQLProductionProvisioningService.create();
 const clusterGuard = LangWatchQLSqlModeClusterGuardService.create();
 const selfProvisioning = LangWatchQLSelfProvisioningService.create();
 const collectionBinding = LangWatchQLCollectionBindingService.create();
+const accessModelDefinition = LangWatchQLAccessModelDefinitionService.create();
 
 /** One global key: the self-provision convergence is a singleton, not per tenant. */
 const LWQL_SELF_PROVISION_LOCK_KEY = "lwql:self-provision";
@@ -722,6 +731,257 @@ export async function findLwqlAppOwnedDrift({
   return { clickHouse: clickHouse.objects, postgres, isKeyMapMissing: clickHouse.isKeyMapMissing };
 }
 
+/** The stores' route families: `PRIVATE_ROUTE_ENV_PREFIX` and `READER_ROUTE_ENV_PREFIX`. */
+const SYSTEM_ROUTE_PREFIX = "CLICKHOUSE_URL__";
+const READER_ROUTE_PREFIX = "CLICKHOUSE_READER_URL__";
+const SHARED_TARGET = "shared";
+
+/** The reader identities a config store may already define, for the statements to yield to. */
+const APP_READER_IDENTITY_NAMES = [APP_READER_NAMES, APP_READER_ENFORCING_NAMES].map((names) => ({
+  restrictedUser: names.user,
+  settingsProfile: names.settingsProfile,
+}));
+
+/** One server the app reader is provisioned on (ADR-202 Decided 6). */
+export interface AppReaderTarget {
+  /** `shared`, or the organization a private route serves. */
+  readonly target: string;
+  readonly adminUrl: string;
+  readonly readerPassword: string;
+  /** The shadow sampler's reader: the shared server only. */
+  readonly enforcingPassword?: string;
+  /** The shared server follows `LWQL_ACCESS_MODEL_MODE`; a private route is always `sql`. */
+  readonly mode: LwqlAccessModelMode;
+}
+
+interface UnprovisionedAppReader {
+  readonly target: string;
+  readonly variable: string;
+}
+
+export interface AppReaderWalk {
+  readonly targets: readonly AppReaderTarget[];
+  /** A server the walk cannot provision, by the variable that would let it. */
+  readonly unprovisioned: readonly UnprovisionedAppReader[];
+}
+
+interface AppReaderCandidate {
+  readonly target: AppReaderTarget;
+  readonly variable: string;
+}
+
+function passwordOf(url: string | undefined): string {
+  try {
+    return url ? decodeURIComponent(new URL(url).password) : "";
+  } catch {
+    return "";
+  }
+}
+
+/** One family's routes by organization, parsed by the stores' own parser under its prefix. */
+function routesOf({
+  source,
+  prefix,
+}: {
+  source: Readonly<Record<string, string | undefined>>;
+  prefix: string;
+}): ReadonlyMap<string, { readonly url: string; readonly label?: string }> {
+  const family = new Map(
+    Object.entries(source).flatMap(([name, value]): [string, string][] =>
+      name.startsWith(prefix) && value
+        ? [[`${SYSTEM_ROUTE_PREFIX}${name.slice(prefix.length)}`, value]]
+        : [],
+    ),
+  );
+  return new Map(clickhouseRoutesOf(family).map((route) => [route.organizationId, route]));
+}
+
+function variableOf({
+  prefix,
+  organizationId,
+  label,
+}: {
+  prefix: string;
+  organizationId: string;
+  label: string | undefined;
+}): string {
+  return `${prefix}${label ?? "<label>"}__${organizationId}`;
+}
+
+function sharedReader({ source }: { source: Readonly<Record<string, string | undefined>> }): {
+  candidates: AppReaderCandidate[];
+  unprovisioned: UnprovisionedAppReader[];
+} {
+  if (!source.CLICKHOUSE_READER_URL) return { candidates: [], unprovisioned: [] };
+  const readerPassword = passwordOf(source.CLICKHOUSE_READER_URL);
+  if (!source.CLICKHOUSE_URL || !readerPassword) {
+    const variable = source.CLICKHOUSE_URL ? "CLICKHOUSE_READER_URL" : "CLICKHOUSE_URL";
+    return { candidates: [], unprovisioned: [{ target: SHARED_TARGET, variable }] };
+  }
+  const enforcingPassword = passwordOf(source.CLICKHOUSE_ENFORCING_READER_URL);
+  const target: AppReaderTarget = {
+    target: SHARED_TARGET,
+    adminUrl: source.CLICKHOUSE_URL,
+    readerPassword,
+    ...(enforcingPassword ? { enforcingPassword } : {}),
+    mode: selfProvisioning.accessModelMode({ source: { ...source } }),
+  };
+  return { candidates: [{ target, variable: "CLICKHOUSE_READER_URL" }], unprovisioned: [] };
+}
+
+function routedReaders({
+  system,
+  reader,
+}: {
+  system: ReturnType<typeof routesOf>;
+  reader: ReturnType<typeof routesOf>;
+}): { candidates: AppReaderCandidate[]; unprovisioned: UnprovisionedAppReader[] } {
+  const candidates: AppReaderCandidate[] = [];
+  const unprovisioned: UnprovisionedAppReader[] = [];
+  for (const [organizationId, { url, label }] of system) {
+    const variable = variableOf({ prefix: READER_ROUTE_PREFIX, organizationId, label });
+    const readerPassword = passwordOf(reader.get(organizationId)?.url);
+    if (!readerPassword) unprovisioned.push({ target: organizationId, variable });
+    else {
+      const target: AppReaderTarget = {
+        target: organizationId,
+        adminUrl: url,
+        readerPassword,
+        mode: "sql",
+      };
+      candidates.push({ target, variable });
+    }
+  }
+  for (const [organizationId, { label }] of reader) {
+    if (system.has(organizationId)) continue;
+    const variable = variableOf({ prefix: SYSTEM_ROUTE_PREFIX, organizationId, label });
+    unprovisioned.push({ target: organizationId, variable });
+  }
+  return { candidates, unprovisioned };
+}
+
+/** One server holds one reader password: a second would replace the first one's login. */
+function onePerServer(candidates: readonly AppReaderCandidate[]): AppReaderWalk {
+  const targets: AppReaderTarget[] = [];
+  const unprovisioned: UnprovisionedAppReader[] = [];
+  for (const { target, variable } of candidates) {
+    const held = targets.find((other) => other.adminUrl === target.adminUrl);
+    if (!held) targets.push(target);
+    else if (held.readerPassword !== target.readerPassword) {
+      unprovisioned.push({ target: target.target, variable });
+    }
+  }
+  return { targets, unprovisioned };
+}
+
+/**
+ * Every server the router knows, as goose walks them: the shared one and each private route,
+ * once per admin URL. A process holding no reader walks none, so its upgrade is unchanged.
+ */
+export function planAppReaderWalk({
+  source,
+}: {
+  source: Readonly<Record<string, string | undefined>>;
+}): AppReaderWalk {
+  const reader = routesOf({ source, prefix: READER_ROUTE_PREFIX });
+  if (!source.CLICKHOUSE_READER_URL && reader.size === 0) return { targets: [], unprovisioned: [] };
+  const shared = sharedReader({ source });
+  const routed = routedReaders({
+    system: routesOf({ source, prefix: SYSTEM_ROUTE_PREFIX }),
+    reader,
+  });
+  const walk = onePerServer([...shared.candidates, ...routed.candidates]);
+  return {
+    targets: walk.targets,
+    unprovisioned: [...shared.unprovisioned, ...routed.unprovisioned, ...walk.unprovisioned],
+  };
+}
+
+function sha256Hex(password: string): string {
+  return createHash("sha256").update(password).digest("hex");
+}
+
+/** The reader's DDL on one server, in shadow (ADR-202 Decided 4); rendered files own it there. */
+async function convergeAppReaderTarget({
+  target,
+  source,
+  open,
+}: {
+  target: AppReaderTarget;
+  source: Readonly<Record<string, string | undefined>>;
+  open: (url: string) => LangWatchQLProvisioningRepository;
+}): Promise<void> {
+  if (target.mode === "rendered") {
+    logger.info({ target: target.target }, "app reader is delivered by the rendered access config");
+    return;
+  }
+  const shared = target.target === SHARED_TARGET;
+  const { database: sourceDatabase } = parseConnectionUrl({
+    connectionUrl: target.adminUrl,
+    clusterName: shared ? source.CLICKHOUSE_CLUSTER : undefined,
+  });
+  const statements = accessModelDefinition.renderAppReaderDdl({
+    sourceDatabase,
+    appReader: {
+      passwordSha256Hex: sha256Hex(target.readerPassword),
+      ...(target.enforcingPassword
+        ? { enforcing: { passwordSha256Hex: sha256Hex(target.enforcingPassword) } }
+        : {}),
+    },
+  });
+  await withProvisioningRepository({
+    open: () => open(target.adminUrl),
+    fn: async (repository) => {
+      // The single-node bypass is the shared server's; a private route is judged by its topology.
+      await clusterGuard.assertSafe({
+        query: (sql) => repository.queryRows(sql),
+        source: shared ? { ...source } : {},
+      });
+      const configStoreEntities = (
+        await Promise.all(
+          APP_READER_IDENTITY_NAMES.map((names) => repository.inventoryConfigStore({ names })),
+        )
+      ).flat();
+      await repository.runStatements({ configStoreEntities, failureLevel: "error", statements });
+    },
+  });
+  logger.info({ target: target.target, sourceDatabase }, "app reader provisioned in shadow");
+}
+
+/**
+ * Provisions the app reader on every server the walk finds and never throws; returns the servers
+ * it failed on. A server it cannot reach by configuration is named with the variable to set: the
+ * client refuses that organisation's reader reads by the same name (clickhouse-identities.ts).
+ */
+export async function convergeAppReaders({
+  source,
+  open = (url) => ClickHouseLangWatchQLProvisioningRepository.open({ url }),
+}: {
+  source: Readonly<Record<string, string | undefined>>;
+  open?: (url: string) => LangWatchQLProvisioningRepository;
+}): Promise<readonly string[]> {
+  const walk = planAppReaderWalk({ source });
+  for (const { target, variable } of walk.unprovisioned) {
+    logger.warn(
+      { target, variable },
+      "app reader not provisioned on this server; its reader reads are refused by name until the variable is set and the upgrade runs again",
+    );
+  }
+  const failed: string[] = [];
+  for (const target of walk.targets) {
+    try {
+      await convergeAppReaderTarget({ target, source, open });
+    } catch (error) {
+      failed.push(target.target);
+      logger.error(
+        { target: target.target, error: clickHouseErrorSummary(error) },
+        "app reader provisioning failed on this server; its reader reads fail closed until a later upgrade converges",
+      );
+    }
+  }
+  return failed;
+}
+
 /** The pool size `DATABASE_URL` names, as plan fields: empty where it names none. */
 function connectionLimitFields(databaseUrl: string | undefined): { connectionLimit?: number } {
   try {
@@ -732,6 +992,7 @@ function connectionLimitFields(databaseUrl: string | undefined): { connectionLim
   }
 }
 
+/** The app reader on every server, then LangWatchQL; a reader failure fails the upgrade too. */
 async function runLwqlProvisioningTask({
   database,
   source,
@@ -740,6 +1001,22 @@ async function runLwqlProvisioningTask({
   database: LwqlProvisioningDatabase;
   failOnError: boolean;
   /** The environment the launching process was configured with. */
+  source: Record<string, string | undefined>;
+}): Promise<void> {
+  const readersFailed = await convergeAppReaders({ source });
+  await runLangWatchQLProvisioning({ database, source, failOnError });
+  if (failOnError && readersFailed.length > 0) {
+    throw new Error(`app reader provisioning failed on: ${readersFailed.join(", ")}`);
+  }
+}
+
+async function runLangWatchQLProvisioning({
+  database,
+  source,
+  failOnError,
+}: {
+  database: LwqlProvisioningDatabase;
+  failOnError: boolean;
   source: Record<string, string | undefined>;
 }): Promise<void> {
   const selfProvision = selfProvisioning.request({ source });

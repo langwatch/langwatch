@@ -22,7 +22,7 @@ clickhouse:
 # chart-managed default is "rendered").
 #
 # Prerequisites for sql mode: your ClickHouse must already have
-# custom_settings_prefixes including "custom_",
+# custom_settings_prefixes including "custom_" and "SQL_" (the app reader, ADR-202),
 # access_control_improvements.settings_constraints_replace_previous set to true,
 # and the app's administrative user granted access_management +
 # named_collection_control. See "LangWatchQL (LWQL) prerequisites"

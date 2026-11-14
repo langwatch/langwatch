@@ -85,7 +85,7 @@ export interface LwqlAccessModelDefinition extends LwqlAccessIdentity {
 }
 
 /** The shadow sampler's identity (ADR-202 Rollout 3), named after the app reader it checks. */
-const APP_READER_ENFORCING_NAMES = {
+export const APP_READER_ENFORCING_NAMES = {
   user: `${APP_READER_NAMES.user}_enforcing`,
   settingsProfile: `${APP_READER_NAMES.user}_enforcing_profile`,
 } as const;
@@ -275,6 +275,31 @@ export class LangWatchQLAccessModelDefinitionService {
   /** Per identity, LangWatchQL's first: profile, user, row policies, then grants. */
   renderDdl(definition: LwqlAccessModelDefinition): string[] {
     return identitiesOf(definition).flatMap((identity) => this.#identityDdl(identity));
+  }
+
+  /**
+   * The app reader alone, and its enforcing twin when given: what a target LangWatchQL is not
+   * provisioned on still needs (ADR-202 Decided 6). The same DDL `renderDdl` renders for them.
+   */
+  renderAppReaderDdl({
+    sourceDatabase,
+    appReader,
+  }: {
+    sourceDatabase: string;
+    appReader: {
+      passwordSha256Hex: string;
+      enforce?: boolean;
+      enforcing?: { passwordSha256Hex: string };
+    };
+  }): string[] {
+    sqlText.assertIdentifier(sourceDatabase, "database");
+    const identities = [
+      this.#appReader({ ...appReader, sourceDatabase }),
+      ...(appReader.enforcing
+        ? [this.#appReaderEnforcing({ ...appReader.enforcing, sourceDatabase })]
+        : []),
+    ];
+    return identities.flatMap((identity) => this.#identityDdl(identity));
   }
 
   /** Profile, user, row policies, then grants — the order a SQL access store needs. */
