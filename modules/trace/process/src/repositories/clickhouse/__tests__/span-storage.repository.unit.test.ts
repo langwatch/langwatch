@@ -692,26 +692,37 @@ describe("SpanStorageClickHouseRepository.listSpansPaginated", () => {
   const SPAN_MS = 1_700_000_000_000;
   const DAY_MS = 24 * 60 * 60 * 1000;
 
+  type Statement = { sql: string; params: Record<string, unknown> };
+
+  /** The value a statement binds `StartTime <op>` to, found by the parameter its text names. */
+  const startTimeBound = (statement: Statement, op: ">=" | "<=") => {
+    const pattern = new RegExp(`StartTime ${op} fromUnixTimestamp64Milli\\(\\{(\\w+):Int64\\}\\)`);
+    const name = pattern.exec(statement.sql)?.[1];
+    return name === undefined ? undefined : statement.params[name];
+  };
+
   /** A source holding one span at SPAN_MS, answering each statement only inside its bound. */
   function pagedRepository() {
-    const statements: { sql: string; params: Record<string, unknown> }[] = [];
-    const reaches = (params: Record<string, unknown>) => {
-      const from = params.idBound_fromMs ?? params.spanFromMs;
-      const to = params.idBound_toMs ?? params.spanToMs;
+    const statements: Statement[] = [];
+    const reaches = (statement: Statement) => {
+      const from = statement.params.idBound_fromMs ?? startTimeBound(statement, ">=");
+      const to = statement.params.idBound_toMs ?? startTimeBound(statement, "<=");
       return (
         (typeof from !== "number" || from <= SPAN_MS) && (typeof to !== "number" || SPAN_MS <= to)
       );
     };
     const execute = vi.fn<ScriptedStatements["execute"]>(async (request) => {
-      const params = request.params ?? {};
-      statements.push({ sql: request.sql, params });
+      const statement = { sql: request.sql, params: request.params ?? {} };
+      statements.push(statement);
       if (request.sql.includes("occurredAtMs")) return { rows: [{ occurredAtMs: SPAN_MS }] };
-      if (request.sql.includes("count(DISTINCT SpanId)")) {
-        if (reaches(params)) return { rows: [{ Total: "1", FromMs: SPAN_MS, ToMs: SPAN_MS }] };
+      if (request.sql.includes("countDistinct(SpanId)")) {
+        if (reaches(statement)) {
+          return { rows: [{ Total: "1", FromMs: SPAN_MS, ToMs: SPAN_MS }] };
+        }
         // `count()` with no GROUP BY answers one row of zeroes unless HAVING drops it.
         return { rows: request.sql.includes("HAVING") ? [] : [{ Total: "0" }] };
       }
-      return { rows: reaches(params) ? [storedRow()] : [] };
+      return { rows: reaches(statement) ? [storedRow()] : [] };
     });
     // One client sends both the built reads and the raw ones still on the authorized handle.
     const client = idIndexedClientDouble({ indexes: TRACE_ID_INDEXES, driver: { execute } });
@@ -739,7 +750,8 @@ describe("SpanStorageClickHouseRepository.listSpansPaginated", () => {
       expect(page.total).toBe(1);
       expect(page.spans).toHaveLength(1);
       const pageRead = statements.at(-1);
-      expect(pageRead?.params).toMatchObject({ spanFromMs: SPAN_MS, spanToMs: SPAN_MS });
+      expect(pageRead && startTimeBound(pageRead, ">=")).toBe(SPAN_MS);
+      expect(pageRead && startTimeBound(pageRead, "<=")).toBe(SPAN_MS);
     });
   });
 

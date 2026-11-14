@@ -23,8 +23,10 @@ const WEB: CompiledWhere = {
   tree: { kind: "attributeEquals", on: "span", key: "orchestrator", value: "web" },
 };
 
-/** A reader answering `rows`, keeping each request it was sent; the raw client refuses. */
-function reader(rows: Record<string, unknown>[] = []) {
+type Rows = Record<string, unknown>[];
+
+/** A reader answering `rows` (or each request's), keeping each request; the raw client refuses. */
+function reader(rows: Rows | ((request: ReadRequest) => Rows) = []) {
   const requests: ReadRequest[] = [];
   const refuse = () => Promise.reject(new Error("a built read never reaches the raw client"));
   const repository = SpanStorageClickHouseRepository.create({
@@ -33,7 +35,7 @@ function reader(rows: Record<string, unknown>[] = []) {
     reader: clickHouseQueryClientDouble({
       async read(request: ReadRequest) {
         requests.push(request);
-        return { rows };
+        return { rows: typeof rows === "function" ? rows(request) : rows };
       },
     }),
   });
@@ -363,6 +365,143 @@ describe("SpanStorageClickHouseRepository built reads", () => {
       expect(sql.match(/SpanId = \{v\d+:String\}/g)).toHaveLength(2);
       expect(sql).not.toContain(OWNER);
       expect(sql).not.toContain("'web'");
+    });
+  });
+});
+
+describe("SpanStorageClickHouseRepository page, rollup and model-sample reads", () => {
+  const range = { Total: "1", FromMs: at.occurredAtMs, ToMs: at.occurredAtMs + 250 };
+  /** The range read answers the range; the page read, no rows. */
+  const rangeThenEmpty = (request: ReadRequest, tenants?: string[]) =>
+    request.statement.sql.includes("countDistinct") ? [{ ...range, Tenants: tenants }] : [];
+
+  describe("given a page of a trace's spans", () => {
+    /** @scenario "A trace's span page is counted and read within the reader's proof" */
+    it("counts within the id bound, then reads the page's latest spans within the range found", async () => {
+      const { repository, requests } = reader((request) => rangeThenEmpty(request));
+
+      const page = await repository.listSpansPaginated({
+        authorization,
+        ...at,
+        limit: 10,
+        offset: 20,
+      });
+
+      expect(page.total).toBe(1);
+      expect(requests).toHaveLength(2);
+      const [count, rows] = requests;
+      expectReaderFence(count);
+      expectReaderFence(rows);
+      expect(count?.statement.sql).toContain("countDistinct(SpanId)");
+      expect(count?.statement.sql).toMatch(/HAVING count\(\) > \{v\d+:UInt64\}$/);
+      expect(count?.statement.sql).not.toContain("max(UpdatedAt)");
+      expect(count?.idBound).toMatchObject({
+        occurredAtHint: at.occurredAtMs,
+        fallback: "unbounded",
+      });
+      const sql = rows?.statement.sql ?? "";
+      expect(sql.match(/StartTime >= fromUnixTimestamp64Milli\(\{v\d+:Int64\}\)/g)).toHaveLength(2);
+      expect(sql.match(/StartTime <= fromUnixTimestamp64Milli\(\{v\d+:Int64\}\)/g)).toHaveLength(2);
+      expect(sql).toContain("max(UpdatedAt)");
+      expect(sql).toMatch(/ORDER BY StartTime ASC LIMIT 10 OFFSET 20$/);
+      expect(Object.values(rows?.statement.params ?? {})).toEqual(
+        expect.arrayContaining([range.FromMs, range.ToMs]),
+      );
+      expect(rows?.idBound).toBeUndefined();
+    });
+  });
+
+  describe("given a page of a trace's spans read through a braid", () => {
+    /** @scenario "A trace's span page is counted and read within the reader's proof" */
+    it("counts each project's latest spans under the braid's condition and names the projects", async () => {
+      const braided = braidedProof({
+        projectId: PROJECT,
+        braids: [{ owner: OWNER, compiledWhere: WEB }],
+      });
+      const { repository, requests } = reader((request) => rangeThenEmpty(request, [PROJECT]));
+
+      await repository.listSpansPaginated({
+        authorization: braided,
+        reads: "spans",
+        ...at,
+        limit: 10,
+        offset: 0,
+      });
+
+      const sql = requests[0]?.statement.sql ?? "";
+      expect(sql).toContain("countDistinct(tuple(TenantId, SpanId))");
+      expect(sql).toContain("groupUniqArray(TenantId) AS Tenants");
+      expect(sql).toContain("max(UpdatedAt)");
+      expect(sql).toContain("{tenantScope_c0_ids:Array(String)}");
+      expect(sql).not.toContain(OWNER);
+      expect(sql).not.toContain("'web'");
+    });
+  });
+
+  describe("given the event rollups of a page of traces", () => {
+    /** @scenario "A page of traces' event rollups and a model's recent spans are read within the reader's proof" */
+    it("elects over the page's traces, keeps spans whose latest version has events and unrolls after", async () => {
+      const { repository, requests } = reader([
+        {
+          TenantId: PROJECT,
+          TraceId: at.traceId,
+          name: "click",
+          nameCount: "2",
+          firstTimestamp: "5",
+          totalCount: "3",
+          distinctCount: "2",
+        },
+      ]);
+
+      const rollups = await repository.findTraceEventRollupsByTraceIds({
+        authorization,
+        traceIds: [at.traceId, "trace-2"],
+        timeRange: { from: at.occurredAtMs, to: at.occurredAtMs },
+      });
+
+      expect(requests).toHaveLength(1);
+      expectReaderFence(requests[0]);
+      const sql = requests[0]?.statement.sql ?? "";
+      const [unroll = "", ...stored] = sql.split("FROM stored_spans");
+      expect(unroll).toContain("arrayJoin(SpanEvents)");
+      expect(stored.join("")).not.toContain("arrayJoin");
+      expect(sql.match(/TraceId IN \(\{v\d+:Array\(String\)\}\)/g)).toHaveLength(2);
+      expect(sql.match(/notEmpty\(`Events\.Name`\)/g)).toHaveLength(1);
+      expect(sql.split("max(UpdatedAt)")[1]).not.toContain("notEmpty");
+      expect(sql).toContain("OVER (PARTITION BY TenantId, TraceId)");
+      expect(sql).toMatch(/LIMIT \d+ BY TenantId, TraceId$/);
+      expect(Object.values(rollups)).toEqual([
+        {
+          names: [{ name: "click", count: 2, firstTimestamp: 5 }],
+          totalCount: 3,
+          distinctCount: 2,
+        },
+      ]);
+    });
+  });
+
+  describe("given recent spans sampled for a list of models", () => {
+    /** @scenario "A page of traces' event rollups and a model's recent spans are read within the reader's proof" */
+    it("reads the candidate traces from the summaries under the same fence", async () => {
+      const { repository, requests } = reader();
+
+      await repository.findRecentSpansByModels({
+        authorization,
+        models: ["gpt-4"],
+        fromMs: at.occurredAtMs,
+        perModelLimit: 3,
+        limit: 30,
+      });
+
+      expect(requests).toHaveLength(1);
+      expectReaderFence(requests[0]);
+      const sql = requests[0]?.statement.sql ?? "";
+      expect(sql).toMatch(
+        /^WITH candidate_traces AS \(SELECT TraceId FROM trace_summaries WHERE \(TenantId IN \(\{tenantScope_own:Array\(String\)\}\)\)/,
+      );
+      expect(sql).toContain("TraceId IN candidate_traces");
+      expect(sql).toMatch(/LIMIT 3 BY coalesce\([^]*\) LIMIT 30$/);
+      expect(sql).not.toContain("gpt-4");
     });
   });
 });

@@ -14,6 +14,7 @@ import {
 } from "@langwatch/clickhouse-client";
 import {
   clickhouseRead,
+  type Expression,
   fn,
   param,
   tenantScope as builtTenantScope,
@@ -111,39 +112,6 @@ const SPAN_INSERT_SETTINGS = {
 const STORED_SPANS_ID_BOUND = "{{idBound:stored_spans.TraceId:traceId}}";
 
 /**
- * Full-span column projection used by every reader that returns `Span[]`. Defined
- * once so a column rename in `stored_spans` lands in one place.
- */
-const FULL_SPAN_SELECT = `
-  SpanId,
-  TraceId,
-  TenantId,
-  ParentSpanId,
-  ParentTraceId,
-  ParentIsRemote,
-  Sampled,
-  toUnixTimestamp64Milli(StartTime) AS StartTimeMs,
-  toUnixTimestamp64Milli(EndTime) AS EndTimeMs,
-  DurationMs,
-  SpanName,
-  SpanKind,
-  ResourceAttributes,
-  SpanAttributes,
-  StatusCode,
-  StatusMessage,
-  ScopeName,
-  ScopeVersion,
-  Cost,
-  NonBilledCost,
-  arrayMap(x -> toUnixTimestamp64Milli(x), \`Events.Timestamp\`) AS Events_Timestamp,
-  \`Events.Name\` AS Events_Name,
-  \`Events.Attributes\` AS Events_Attributes,
-  \`Links.TraceId\` AS Links_TraceId,
-  \`Links.SpanId\` AS Links_SpanId,
-  \`Links.Attributes\` AS Links_Attributes
-`;
-
-/**
  * The full-span projection minus the `Events.*` / `Links.*` nested columns, for internal
  * derivation consumers that read scalar span/resource attributes, never events or links.
  */
@@ -170,7 +138,7 @@ const DERIVATION_SPAN_SELECTION = {
   NonBilledCost: storedSpans.NonBilledCost,
 };
 
-/** {@link FULL_SPAN_SELECT} as the builder selects it, for the reads already built. */
+/** The full-span projection every reader returning `Span[]` selects, defined once. */
 const FULL_SPAN_SELECTION = {
   ...DERIVATION_SPAN_SELECTION,
   Events_Timestamp: fn.arrayMap(
@@ -509,6 +477,226 @@ function spanEventsStatement({
   return statement.build();
 }
 
+/** The StartTime range a trace's spans lie in, as epoch milliseconds. */
+const SPAN_RANGE_SELECTION = {
+  FromMs: fn.toUnixTimestamp64Milli(fn.min(storedSpans.StartTime)),
+  ToMs: fn.toUnixTimestamp64Milli(fn.max(storedSpans.StartTime)),
+};
+
+/**
+ * A page's count and range. Braided, each owner span's latest version under its braid's
+ * condition, one per project holding a span id, with the projects counted (ADR-201 §8).
+ */
+function spanRangeStatement({
+  authorization,
+  braided,
+  traceId,
+}: {
+  authorization: Authorization;
+  braided: boolean;
+  traceId: string;
+}) {
+  const read = traceSpansFrom({ scope: traceScope({ authorization, braided }), braided, traceId });
+  if (!braided) {
+    return read
+      .select({ Total: fn.countDistinct(storedSpans.SpanId), ...SPAN_RANGE_SELECTION })
+      .where(({ idBound }) => idBound(storedSpans.TraceId, traceId))
+      .having(({ gt }) => gt(fn.count(), 0))
+      .build();
+  }
+  return read
+    .select({
+      Total: fn.countDistinct(fn.tuple(storedSpans.TenantId, storedSpans.SpanId)),
+      Tenants: fn.groupUniqArray(storedSpans.TenantId),
+      ...SPAN_RANGE_SELECTION,
+    })
+    .where(({ idBound }) => idBound(storedSpans.TraceId, traceId))
+    .latestVersion()
+    .having(({ gt }) => gt(fn.count(), 0))
+    .build();
+}
+
+/** One page of a trace's latest full spans, bounded by the exact range the range read found. */
+function spanPageStatement({
+  authorization,
+  braided,
+  traceId,
+  fromMs,
+  toMs,
+  limit,
+  offset,
+}: {
+  authorization: Authorization;
+  braided: boolean;
+  traceId: string;
+  fromMs: number;
+  toMs: number;
+  limit: number;
+  offset: number;
+}) {
+  return traceSpansFrom({ scope: traceScope({ authorization, braided }), braided, traceId })
+    .select(FULL_SPAN_SELECTION)
+    .where(({ and, eq, gte, lte }) =>
+      and(
+        eq(storedSpans.TraceId, traceId),
+        gte(storedSpans.StartTime, fromMs),
+        lte(storedSpans.StartTime, toMs),
+      ),
+    )
+    .latestVersion()
+    .orderBy(storedSpans.StartTime, "ASC")
+    .limit(limit)
+    .offset(offset)
+    .build();
+}
+
+/**
+ * One row per (tenant, trace, event name) for a page of traces, first-recorded name first. A
+ * trace is its tenant and id together: a proof may fence tenants sharing a trace id.
+ */
+function traceEventRollupStatement({
+  authorization,
+  traceIds,
+  fromMs,
+  toMs,
+}: {
+  authorization: Authorization;
+  traceIds: string[];
+  fromMs: number;
+  toMs: number;
+}) {
+  const scope = builtTenantScope.fromProof({ authorization, reads: "traces" });
+  const latest = clickhouseRead({ scope })
+    .from(storedSpans)
+    .withinWindows()
+    .select({
+      TenantId: storedSpans.TenantId,
+      TraceId: storedSpans.TraceId,
+      SpanEvents: fn.arrayZip(storedSpans["Events.Timestamp"], storedSpans["Events.Name"]),
+    })
+    .where(({ and, gte, lte, oneOf }) =>
+      and(
+        oneOf(storedSpans.TraceId, param.strings(traceIds)),
+        gte(storedSpans.StartTime, fromMs),
+        lte(storedSpans.StartTime, toMs),
+      ),
+    )
+    // Outside the election, as main's: a latest version without events drops its span.
+    .where(() => fn.notEmpty(storedSpans["Events.Name"]), { inElection: false })
+    .latestVersion()
+    .as("latest");
+  const events = clickhouseRead({ scope })
+    .from(latest)
+    .select({
+      TenantId: latest.TenantId,
+      TraceId: latest.TraceId,
+      Event: fn.arrayJoin(latest.SpanEvents),
+    })
+    .as("events");
+  const eventName = fn.tupleElement(events.Event, "1");
+  const names = clickhouseRead({ scope })
+    .from(events)
+    .select({
+      TenantId: events.TenantId,
+      TraceId: events.TraceId,
+      name: eventName,
+      nameCount: fn.count(),
+      firstTimestamp: fn.toUnixTimestamp64Milli(fn.min(fn.tupleElement(events.Event, "0"))),
+    })
+    .groupBy(events.TenantId, events.TraceId, eventName)
+    .as("names");
+  const perTrace = { partitionBy: [names.TenantId, names.TraceId] };
+  return clickhouseRead({ scope })
+    .from(names)
+    .select({
+      TenantId: names.TenantId,
+      TraceId: names.TraceId,
+      name: names.name,
+      nameCount: names.nameCount,
+      firstTimestamp: names.firstTimestamp,
+      totalCount: fn.over(fn.sum(names.nameCount), perTrace),
+      distinctCount: fn.over(fn.count(), perTrace),
+    })
+    .orderBy(names.TenantId, "ASC")
+    .orderBy(names.TraceId, "ASC")
+    .orderBy(names.firstTimestamp, "ASC")
+    .orderBy(names.name, "ASC")
+    .limitBy(MAX_EVENT_NAMES_PER_TRACE, names.TenantId, names.TraceId)
+    .build();
+}
+
+/** A recent span per model sample, from candidate traces whose summaries name the models. */
+function recentModelSpansStatement({
+  authorization,
+  models,
+  fromMs,
+  perModelLimit,
+  limit,
+}: {
+  authorization: Authorization;
+  models: string[];
+  fromMs: number;
+  perModelLimit: number;
+  limit: number;
+}) {
+  const model = attributeOr("gen_ai.response.model", "gen_ai.request.model");
+  const modelList = param.strings(models);
+  const latest = <V, T extends string>(value: Expression<V, T>) =>
+    fn.argMax(value, storedSpans.UpdatedAt);
+  const inputTokens = latest(attribute("gen_ai.usage.input_tokens"));
+  const promptTokens = latest(attribute("gen_ai.usage.prompt_tokens"));
+  const outputTokens = latest(attribute("gen_ai.usage.output_tokens"));
+  const completionTokens = latest(attribute("gen_ai.usage.completion_tokens"));
+  return clickhouseRead({ scope: builtTenantScope.fromProof({ authorization, reads: "traces" }) })
+    .from(storedSpans)
+    .withinWindows()
+    .with("candidate_traces", (sub) =>
+      sub
+        .from(traceSummaries)
+        .withinWindows()
+        .select({ TraceId: traceSummaries.TraceId })
+        .where(({ and, gte }) =>
+          and(gte(traceSummaries.OccurredAt, fromMs), fn.hasAny(traceSummaries.Models, modelList)),
+        )
+        .groupBy(traceSummaries.TraceId)
+        .orderBy(fn.max(traceSummaries.OccurredAt), "DESC")
+        .limit(SAMPLE_CANDIDATE_TRACE_POOL),
+    )
+    .select(({ ne, or }) => ({
+      TraceId: storedSpans.TraceId,
+      SpanId: storedSpans.SpanId,
+      Model: model,
+      LatestSpanName: latest(storedSpans.SpanName),
+      InputTokensRaw: inputTokens,
+      PromptTokensRaw: promptTokens,
+      OutputTokensRaw: outputTokens,
+      CompletionTokensRaw: completionTokens,
+      CacheReadTokensRaw: latest(attribute("gen_ai.usage.cache_read.input_tokens")),
+      CacheCreationTokensRaw: latest(attribute("gen_ai.usage.cache_creation.input_tokens")),
+      CacheCreation1hTokensRaw: latest(attribute("gen_ai.usage.cache_creation_1h.input_tokens")),
+      StartTimeMs: latest(fn.toUnixTimestamp64Milli(storedSpans.StartTime)),
+      HasTokens: or(
+        ne(inputTokens, ""),
+        ne(promptTokens, ""),
+        ne(outputTokens, ""),
+        ne(completionTokens, ""),
+      ),
+    }))
+    .where(({ and, gte, oneOf }) =>
+      and(
+        gte(storedSpans.StartTime, fromMs),
+        oneOf(storedSpans.TraceId, { cte: "candidate_traces" }),
+        oneOf(model, modelList),
+      ),
+    )
+    .groupBy(storedSpans.TraceId, storedSpans.SpanId, model)
+    .orderBy("HasTokens", "DESC")
+    .orderBy("StartTimeMs", "DESC")
+    .limitBy(perModelLimit, model)
+    .limit(limit)
+    .build();
+}
+
 /**
  * Canonical model-name expression: response model wins over request model.
  */
@@ -587,25 +775,6 @@ function dedupInTuple(extraInnerWhere: string): string {
   )`;
 }
 
-/**
- * A braided page's count and range: each span's latest version under its braid's condition, one
- * per project holding a span id, so an owner span the condition dropped is never counted. The
- * projects counted come back too, so a total reached past the last page is audited (ADR-201 §8).
- */
-const BRAIDED_SPAN_RANGE_QUERY = `
-  SELECT
-    count(DISTINCT TenantId, SpanId) AS Total,
-    groupUniqArray(TenantId) AS Tenants,
-    toUnixTimestamp64Milli(min(StartTime)) AS FromMs,
-    toUnixTimestamp64Milli(max(StartTime)) AS ToMs
-  FROM ${TABLE_NAME}
-  WHERE ${tenantScopeWithConditions("StartTime", { traceId: "traceId" })}
-    AND TraceId = {traceId:String}
-    ${STORED_SPANS_ID_BOUND}
-    AND ${dedupInTuple(STORED_SPANS_ID_BOUND)}
-  HAVING count() > 0
-`;
-
 /** The outer select's fence: under braids it carries the conditions, beside a bare election. */
 function outerScope(braided: boolean): string {
   return braided
@@ -638,74 +807,7 @@ function ownedSpansOf({
 }
 
 /**
- * {@link dedupInTuple} for a batch of traces — same election, same caveat
- * about which predicates may be pushed into the subquery, `IN` over the page's
- * ids instead of one `TraceId`.
- */
-function dedupInTupleForTraceIds(extraInnerWhere: string): string {
-  // ID_BOUND_SKIP: a dedup subquery fragment; its statement carries its own window.
-  return `(TenantId, TraceId, SpanId, UpdatedAt) IN (
-    SELECT TenantId, TraceId, SpanId, max(UpdatedAt)
-    FROM ${TABLE_NAME}
-    WHERE ${tenantScope("StartTime")}
-      AND TraceId IN {traceIds:Array(String)}
-      ${extraInnerWhere}
-    GROUP BY TenantId, TraceId, SpanId
-  )`;
-}
-
-/**
- * One row per (tenant, trace, event name) for a page of traces, first-recorded name
- * first. A trace is its tenant and id together: an aggregate's proof fences several
- * tenants that may share a trace id, so every grouping and trim runs per tenant too.
- */
-function traceEventRollupQuery(): string {
-  const partitionAnd =
-    "AND StartTime >= fromUnixTimestamp64Milli({fromMs:Int64}) " +
-    "AND StartTime <= fromUnixTimestamp64Milli({toMs:Int64})";
-
-  // ID_BOUND_SKIP: a page rollup, bounded by the page's own time range.
-  return `
-    SELECT
-      TenantId,
-      TraceId,
-      name,
-      nameCount,
-      firstTimestamp,
-      sum(nameCount) OVER (PARTITION BY TenantId, TraceId) AS totalCount,
-      count() OVER (PARTITION BY TenantId, TraceId) AS distinctCount
-    FROM (
-      SELECT
-        TenantId,
-        TraceId,
-        event_name AS name,
-        count() AS nameCount,
-        toUnixTimestamp64Milli(min(event_timestamp)) AS firstTimestamp
-      FROM (
-        SELECT
-          TenantId,
-          TraceId,
-          "Events.Timestamp" AS Events_Timestamp,
-          "Events.Name" AS Events_Name
-        FROM ${TABLE_NAME}
-        WHERE ${tenantScope("StartTime")}
-          AND TraceId IN {traceIds:Array(String)}
-          AND notEmpty("Events.Name")
-          ${partitionAnd}
-          AND ${dedupInTupleForTraceIds(partitionAnd)}
-      )
-      ARRAY JOIN
-        Events_Timestamp AS event_timestamp,
-        Events_Name AS event_name
-      GROUP BY TenantId, TraceId, name
-    )
-    ORDER BY TenantId ASC, TraceId ASC, firstTimestamp ASC, name ASC
-    LIMIT {maxNames:UInt32} BY TenantId, TraceId
-  `;
-}
-
-/**
- * Gather {@link traceEventRollupQuery}'s flat rows into one rollup per trace,
+ * Gather {@link traceEventRollupStatement}'s flat rows into one rollup per trace,
  * keyed by {@link listedTraceKey} so two tenants holding the same trace id
  * each keep their own rollup.
  */
@@ -1595,22 +1697,15 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     if (traceIds.length === 0) return {};
 
     try {
-      const client = this.reader(authorization);
       // Pad time range by partition window to cover all spans within list traces.
       const fromMs = timeRange.from - DEFAULT_PARTITION_WINDOW_MS;
       const toMs = timeRange.to + DEFAULT_PARTITION_WINDOW_MS;
-      const result = await client.query({
-        query: traceEventRollupQuery(),
-        query_params: {
-          traceIds,
-          fromMs,
-          toMs,
-          maxNames: MAX_EVENT_NAMES_PER_TRACE,
-        },
-        format: "JSONEachRow",
+      const result = await this.deps.reader.read({
+        statement: traceEventRollupStatement({ authorization, traceIds, fromMs, toMs }),
+        table: storedSpans.$table.name,
       });
 
-      return toTraceEventRollups(traceEventRollupRowsSchema.parse(await result.json()));
+      return toTraceEventRollups(traceEventRollupRowsSchema.parse(result.rows));
     } catch (error) {
       logger.warn(
         {
@@ -1834,55 +1929,29 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     return this.readTraceSpans<PagedOwnedSpans>(
       { authorization, traceId, occurredAtMs },
       async (idBound) => {
-        const client = this.readerOf(authorization, braided);
         // One bounded read counts the spans and finds their range, so the page reads that range.
-        const rangeResult = await client.query({
-          query: braided
-            ? BRAIDED_SPAN_RANGE_QUERY
-            : `
-            SELECT
-              count(DISTINCT SpanId) AS Total,
-              toUnixTimestamp64Milli(min(StartTime)) AS FromMs,
-              toUnixTimestamp64Milli(max(StartTime)) AS ToMs
-            FROM ${TABLE_NAME}
-            WHERE ${tenantScope("StartTime")}
-              AND TraceId = {traceId:String}
-              ${STORED_SPANS_ID_BOUND}
-            HAVING count() > 0
-          `,
-          query_params: { traceId },
-          format: "JSONEachRow",
+        const rangeResult = await this.deps.reader.read({
+          statement: spanRangeStatement({ authorization, braided, traceId }),
+          table: storedSpans.$table.name,
           idBound,
         });
-        const [range] = spanRangeRowsSchema.parse(await rangeResult.json());
+        const [range] = spanRangeRowsSchema.parse(rangeResult.rows);
         if (range === undefined) return { spans: [], total: 0, totalOwnerProjectIds: [] };
 
-        const spanRange =
-          "AND StartTime >= fromUnixTimestamp64Milli({spanFromMs:Int64}) " +
-          "AND StartTime <= fromUnixTimestamp64Milli({spanToMs:Int64})";
-        const pageResult = await client.query({
-          // ID_BOUND_SKIP: bounded by the exact span range the index-bounded read above found.
-          query: `
-            SELECT ${FULL_SPAN_SELECT}
-            FROM ${TABLE_NAME}
-            WHERE ${outerScope(braided)}
-              AND TraceId = {traceId:String}
-              ${spanRange}
-              AND ${dedupInTuple(spanRange)}
-            ORDER BY StartTime ASC
-            LIMIT {limit:UInt32}
-            OFFSET {offset:UInt32}
-          `,
-          query_params: {
+        // Bounded by the exact span range the index-bounded read above found.
+        const pageResult = await this.deps.reader.read({
+          statement: spanPageStatement({
+            authorization,
+            braided,
             traceId,
+            fromMs: Number(range.FromMs),
+            toMs: Number(range.ToMs),
             limit,
             offset,
-            spanFromMs: Number(range.FromMs),
-            spanToMs: Number(range.ToMs),
-          },
-          format: "JSONEachRow",
+          }),
+          table: storedSpans.$table.name,
         });
-        const pageRows = fullSpanRowsSchema.parse(await pageResult.json());
+        const pageRows = fullSpanRowsSchema.parse(pageResult.rows);
         // A braided total names the projects it counts, or its owners would go unaudited.
         if (braided && range.Tenants === undefined) {
           throw new Error("A braided span count came back without the projects it counts");
@@ -1980,56 +2049,13 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
   }): Promise<ModelSpanSampleRow[]> {
     if (models.length === 0) return [];
 
-    const client = this.reader(authorization);
     // Narrow to candidate traces via Models, then scan their spans.
-    const result = await client.query({
-      query: `
-        WITH candidate_traces AS (
-          SELECT TraceId
-          FROM trace_summaries
-          WHERE ${tenantScope("OccurredAt")}
-            AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
-            AND hasAny(Models, {models:Array(String)})
-          GROUP BY TraceId
-          ORDER BY max(OccurredAt) DESC
-          LIMIT {candidatePool:UInt32}
-        )
-        SELECT
-          TraceId,
-          SpanId,
-          ${MODEL_ATTR_SELECT} AS Model,
-          argMax(SpanName, UpdatedAt) AS LatestSpanName,
-          argMax(SpanAttributes['gen_ai.usage.input_tokens'], UpdatedAt) AS InputTokensRaw,
-          argMax(SpanAttributes['gen_ai.usage.prompt_tokens'], UpdatedAt) AS PromptTokensRaw,
-          argMax(SpanAttributes['gen_ai.usage.output_tokens'], UpdatedAt) AS OutputTokensRaw,
-          argMax(SpanAttributes['gen_ai.usage.completion_tokens'], UpdatedAt) AS CompletionTokensRaw,
-          argMax(SpanAttributes['gen_ai.usage.cache_read.input_tokens'], UpdatedAt) AS CacheReadTokensRaw,
-          argMax(SpanAttributes['gen_ai.usage.cache_creation.input_tokens'], UpdatedAt) AS CacheCreationTokensRaw,
-          argMax(SpanAttributes['gen_ai.usage.cache_creation_1h.input_tokens'], UpdatedAt) AS CacheCreation1hTokensRaw,
-          argMax(toUnixTimestamp64Milli(StartTime), UpdatedAt) AS StartTimeMs,
-          (InputTokensRaw != '' OR PromptTokensRaw != ''
-            OR OutputTokensRaw != '' OR CompletionTokensRaw != '') AS HasTokens
-        FROM ${TABLE_NAME}
-        WHERE ${tenantScope("StartTime")}
-          AND StartTime >= fromUnixTimestamp64Milli({fromMs:Int64})
-          AND TraceId IN (SELECT TraceId FROM candidate_traces)
-          AND Model IN {models:Array(String)}
-        GROUP BY TraceId, SpanId, Model
-        ORDER BY HasTokens DESC, StartTimeMs DESC
-        LIMIT {perModelLimit:UInt32} BY Model
-        LIMIT {limit:UInt32}
-      `,
-      query_params: {
-        models,
-        fromMs,
-        perModelLimit,
-        limit,
-        candidatePool: SAMPLE_CANDIDATE_TRACE_POOL,
-      },
-      format: "JSONEachRow",
+    const result = await this.deps.reader.read({
+      statement: recentModelSpansStatement({ authorization, models, fromMs, perModelLimit, limit }),
+      table: storedSpans.$table.name,
     });
 
-    const rows = modelSpanSampleQueryRowsSchema.parse(await result.json());
+    const rows = modelSpanSampleQueryRowsSchema.parse(result.rows);
     return rows.map(mapModelSpanSampleRow);
   }
 

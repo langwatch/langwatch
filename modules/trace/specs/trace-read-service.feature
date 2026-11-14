@@ -185,3 +185,19 @@ Feature: Trace span-tree read service
     Then each statement is a reader statement over the proof's tenants with the tenant setting
     And the poll is bounded by its own since-time, repeated in the election, and not by the id index
     And the time lookup reads the earliest occurrence of the trace's summary, recent window first
+
+  @unit
+  Scenario: A trace's span page is counted and read within the reader's proof
+    Given a reader whose proof covers its own project, or a braid through which it reads the owner's spans
+    When a page of a trace's spans is listed
+    Then the count and the page are reader statements over the proof's tenants with the tenant setting
+    And the count is bounded by the stored_spans id index; a braided count elects each span's latest version and names the projects it counts
+    And the page elects each span's latest version within the exact range the count found, the range repeated in the election
+
+  @unit
+  Scenario: A page of traces' event rollups and a model's recent spans are read within the reader's proof
+    Given a reader whose proof covers its own project
+    When the event names of a page of traces are rolled up, or recent spans are sampled for a list of models
+    Then each statement is a reader statement over the proof's tenants with the tenant setting
+    And the rollup elects each span's latest version over the page's traces and time range, keeps only spans whose latest version has events, and unrolls the events after the election
+    And the model sample reads its candidate traces from the trace summaries under the same fence

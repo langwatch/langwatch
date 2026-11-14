@@ -644,6 +644,89 @@ describe.skipIf(!clickHouseConfigured)(
       });
     });
 
+    describe("given recent spans sampled for a model", () => {
+      const sampleTenantId = `test-model-sample-${nanoid()}`;
+      const neighbourTenantId = `${sampleTenantId}-neighbour`;
+      const sampleTraceId = `trace-${nanoid()}`;
+      const modelSpan = (spanId: string, attrs: Record<string, string>, extra = {}) => ({
+        ...makeEventRow(spanId, []),
+        TenantId: sampleTenantId,
+        TraceId: sampleTraceId,
+        SpanAttributes: attrs,
+        ...extra,
+      });
+
+      beforeAll(async () => {
+        const settings = { async_insert: 0, wait_for_async_insert: 0 } as const;
+        await ch.insert({
+          table: "stored_spans",
+          values: [
+            modelSpan("tokened", {
+              "gen_ai.request.model": "gpt-4",
+              "gen_ai.usage.input_tokens": "10",
+            }),
+            modelSpan(
+              "tokened",
+              { "gen_ai.request.model": "gpt-4", "gen_ai.usage.input_tokens": "12" },
+              { SpanName: "latest", UpdatedAt: new Date(base + 1) },
+            ),
+            modelSpan("untokened", { "gen_ai.response.model": "gpt-4" }),
+            modelSpan(
+              "neighbours",
+              { "gen_ai.request.model": "gpt-4" },
+              { TenantId: neighbourTenantId },
+            ),
+          ],
+          format: "JSONEachRow",
+          clickhouse_settings: settings,
+        });
+        await ch.insert({
+          table: "trace_summaries",
+          values: [sampleTenantId, neighbourTenantId].map((tenant) => ({
+            ProjectionId: `proj-${nanoid()}`,
+            TenantId: tenant,
+            TraceId: sampleTraceId,
+            Version: "v1",
+            Models: ["gpt-4"],
+            OccurredAt: new Date(base),
+            CreatedAt: new Date(base),
+            UpdatedAt: new Date(base),
+          })),
+          format: "JSONEachRow",
+          clickhouse_settings: settings,
+        });
+      });
+
+      afterAll(async () => {
+        for (const table of ["stored_spans", "trace_summaries"]) {
+          for (const tenant of [sampleTenantId, neighbourTenantId]) {
+            await ch.exec({
+              query: `ALTER TABLE ${table} DELETE WHERE TenantId = {tenantId:String}`,
+              query_params: { tenantId: tenant },
+            });
+          }
+        }
+      });
+
+      /** @scenario "A page of traces' event rollups and a model's recent spans are read within the reader's proof" */
+      it("returns the reader's own latest spans, those reporting tokens first", async () => {
+        const samples = await repo.findRecentSpansByModels({
+          authorization: ownProof({ projectId: sampleTenantId }),
+          models: ["gpt-4"],
+          fromMs: base - 60_000,
+          perModelLimit: 5,
+          limit: 10,
+        });
+
+        expect(
+          samples.map(({ spanId, spanName, inputTokens }) => [spanId, spanName, inputTokens]),
+        ).toEqual([
+          ["tokened", "latest", 12],
+          ["untokened", "events-span", null],
+        ]);
+      });
+    });
+
     // The single-trace span readers fire from hint-dropping entry points and
     // worker callers. Without a hint they used to walk every weekly partition
     // (incl. cold S3). They now seed the partition window from trace_summaries
