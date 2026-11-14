@@ -626,6 +626,7 @@ export class GovernanceModule implements GovernanceRestApi {
     });
     this.activityMonitor = ActivityMonitorService.create({
       repository: repositories.activityMonitor,
+      events: repositories.ingestionSourceEvents,
       projects: dependencies.projects,
       traces: dependencies.traces,
     });

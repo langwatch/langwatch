@@ -8,7 +8,7 @@
 import type { ReaderReadStatement } from "@langwatch/clickhouse-client/builder";
 import { describe, expect, it } from "vitest";
 
-import { PrismaActivityMonitorRepository } from "../prisma.ingestion-source-activity.repository.ts";
+import { ClickHouseIngestionSourceEventsRepository } from "../clickhouse.ingestion-source-events.repository.ts";
 
 const TENANT = "governance-project";
 
@@ -21,10 +21,7 @@ function recordingRepository() {
     },
     insert: async () => undefined,
   };
-  const repository = PrismaActivityMonitorRepository.create({
-    prisma: {} as never,
-    clickhouse: async () => client as never,
-  });
+  const repository = ClickHouseIngestionSourceEventsRepository.create(async () => client as never);
   return { repository, statements };
 }
 
@@ -36,19 +33,19 @@ describe("the activity monitor's ClickHouse reads as built reads", () => {
       {
         name: "the logged and pulled counts by source",
         reads: 2,
-        run: (r: PrismaActivityMonitorRepository) =>
+        run: (r: ClickHouseIngestionSourceEventsRepository) =>
           r.countLoggedAndPulledEventsBySource({ ...COMMON, sourceIds: ["s-1"], sinceMs: 1 }),
       },
       {
         name: "a source's pulled events",
         reads: 1,
-        run: (r: PrismaActivityMonitorRepository) =>
+        run: (r: ClickHouseIngestionSourceEventsRepository) =>
           r.findPulledEventsForSource({ ...COMMON, sourceId: "s-1", beforeMs: 2, limit: 5 }),
       },
       {
         name: "the logged and pulled event windows",
         reads: 2,
-        run: (r: PrismaActivityMonitorRepository) =>
+        run: (r: ClickHouseIngestionSourceEventsRepository) =>
           r.findLoggedAndPulledEventWindows({
             ...COMMON,
             sourceId: "s-1",

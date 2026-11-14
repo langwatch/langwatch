@@ -26,6 +26,7 @@ import type { IdentityMatchSuggestionRepository } from "./identity-match-suggest
 import type { IdentityMatchRepository } from "./identity-match.repository.ts";
 import type { IngestionPullLifecycleRepository } from "./ingestion-pull-lifecycle.repository.ts";
 import type { IngestionPullRunRepository } from "./ingestion-pull-run.repository.ts";
+import type { IngestionSourceEventsRepository } from "./ingestion-source-events.repository.ts";
 import type { IngestionSourceRepository } from "./ingestion-source.repository.ts";
 import type { IngestionTemplateRepository } from "./ingestion-template.repository.ts";
 import type { OrganizationSupportContactRepository } from "./organization-support-contact.repository.ts";
@@ -145,6 +146,8 @@ export interface GovernanceRepositories {
   readonly ingestionPullLifecycle: IngestionPullLifecycleRepository;
   readonly ingestionPullRuns: IngestionPullRunRepository;
   readonly ingestionSources: IngestionSourceRepository;
+  /** A source's pulled OCSF events and pushed log records in ClickHouse. */
+  readonly ingestionSourceEvents: IngestionSourceEventsRepository;
   readonly ingestionTemplates: IngestionTemplateRepository;
   readonly costRollup: GovernanceCostRollupRepository;
   /** The per-charge record the drift check holds the rollup against. */

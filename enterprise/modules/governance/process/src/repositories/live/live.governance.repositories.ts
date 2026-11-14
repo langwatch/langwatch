@@ -7,6 +7,7 @@ import { ClickHouseAnomalySpendRepository } from "../clickhouse/clickhouse.anoma
 import { memberClickHouseResolver } from "../clickhouse/clickhouse.governance-clickhouse.repositories.ts";
 import { ClickHouseGovernanceCostChargeRepository } from "../clickhouse/clickhouse.governance-cost-charge.repository.ts";
 import { ClickHouseGovernanceCostRollupRepository } from "../clickhouse/clickhouse.governance-cost-rollup.repository.ts";
+import { ClickHouseIngestionSourceEventsRepository } from "../clickhouse/clickhouse.ingestion-source-events.repository.ts";
 import { ClickHouseOcsfEventsRepository } from "../clickhouse/clickhouse.ocsf-events.repository.ts";
 import { ClickHouseRollupErasureRepository } from "../clickhouse/clickhouse.rollup-erasure.repository.ts";
 import type { GovernanceRepositories } from "../governance.repositories.ts";
@@ -18,7 +19,7 @@ import {
 } from "../prisma/prisma.suppression-snapshot.repository.ts";
 import { RedisGovernanceRateLimitRepository } from "../redis/redis.governance-rate-limit.repository.ts";
 
-/** Governance's live stores: its rows in Prisma; in ClickHouse, OCSF events, KPI rows and the rollups an erasure rewrites. */
+/** Governance's live stores: its rows in Prisma; in ClickHouse, OCSF events, a source's logged events, KPI rows and the rollups an erasure rewrites. */
 export class LiveGovernanceRepositories {
   static readonly requires = [
     "prisma",
@@ -46,10 +47,10 @@ export class LiveGovernanceRepositories {
       ...PostgresGovernanceRepositories.create({ prisma, encryption }),
       rateLimits: RedisGovernanceRateLimitRepository.create(rateLimiter),
       suppressionSnapshot: PrismaSuppressionSnapshotRepository.create({ operatorReads }),
-      activityMonitor: PrismaActivityMonitorRepository.create({
-        prisma,
-        clickhouse: memberClickHouseResolver(clickhouse),
-      }),
+      activityMonitor: PrismaActivityMonitorRepository.create({ prisma }),
+      ingestionSourceEvents: ClickHouseIngestionSourceEventsRepository.create(
+        memberClickHouseResolver(clickhouse),
+      ),
       costRollup: ClickHouseGovernanceCostRollupRepository.create(
         memberClickHouseResolver(clickhouse),
       ),

@@ -41,6 +41,7 @@ export class PostgresGovernanceRepositories {
     | "costRollup"
     | "rollupErasure"
     | "ocsfEvents"
+    | "ingestionSourceEvents"
     | "suppressionSnapshot"
     | "rateLimits"
   > {

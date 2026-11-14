@@ -17,6 +17,7 @@ import {
   ActivityMonitorService,
   type ActivityMonitorTraces,
 } from "../features/ingestion-source/services/ingestion-source-activity.service.ts";
+import { ClickHouseIngestionSourceEventsRepository } from "../repositories/clickhouse/clickhouse.ingestion-source-events.repository.ts";
 import type { GovernanceClickHouseReadResolver } from "../repositories/governance.repositories.ts";
 import {
   PrismaDepartmentRepository,
@@ -82,7 +83,8 @@ export function createActivityMonitorTestService(options: {
   traces?: Partial<ActivityMonitorTraces>;
 }): ActivityMonitorService {
   return ActivityMonitorService.create({
-    repository: PrismaActivityMonitorRepository.create(options),
+    repository: PrismaActivityMonitorRepository.create({ prisma: options.prisma }),
+    events: ClickHouseIngestionSourceEventsRepository.create(options.clickhouse),
     traces: createApiFixture<TraceApi>(options.traces ?? {}),
     projects: createApiFixture<ProjectApi>({
       findInternal: async ({ organizationId, kind }) => {

@@ -25,6 +25,7 @@ import { MemoryIdentityMatchSuggestionRepository } from "./memory.identity-match
 import { MemoryIdentityMatchRepository } from "./memory.identity-match.repository.ts";
 import { MemoryIngestionPullLifecycleRepository } from "./memory.ingestion-pull-lifecycle.repository.ts";
 import { MemoryIngestionPullRunRepository } from "./memory.ingestion-pull-run.repository.ts";
+import { MemoryIngestionSourceEventsRepository } from "./memory.ingestion-source-events.repository.ts";
 import { MemoryIngestionSourceRepository } from "./memory.ingestion-source.repository.ts";
 import { MemoryIngestionTemplateRepository } from "./memory.ingestion-template.repository.ts";
 import { MemoryOcsfEventsRepository } from "./memory.ocsf-events.repository.ts";
@@ -63,6 +64,7 @@ export class MemoryGovernanceRepositories {
 
     return {
       activityMonitor: MemoryActivityMonitorRepository.create(),
+      ingestionSourceEvents: MemoryIngestionSourceEventsRepository.create(),
       aggregateReconcileLock: MemoryAggregateReconcileLockRepository.create(),
       aiTools: MemoryAiToolCatalogRepository.create(),
       anomalyRules: MemoryAnomalyRuleRepository.create(store),

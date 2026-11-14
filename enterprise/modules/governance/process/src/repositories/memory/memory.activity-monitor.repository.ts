@@ -1,11 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import type {
-  ActivityEventDetailRow,
   IngestionSourceHealthRow,
   RecentAnomalyRow,
 } from "@langwatch/enterprise-governance-contract";
-import { toEpochMs } from "@langwatch/time";
 
 import type {
   DepartmentDirectory,
@@ -14,7 +12,6 @@ import type {
 import type {
   ActivityMonitorRepository,
   AnomalyBreakdown,
-  SourceEventWindows,
 } from "../activity-monitor.repository.ts";
 
 type SourceDataCoverage = Awaited<ReturnType<ActivityMonitorRepository["sourceDataCoverage"]>>;
@@ -26,9 +23,6 @@ export interface ActivityMonitorSnapshot {
   departmentDirectory: DepartmentDirectory;
   teamBySource: Record<string, SourceTeam>;
   activeSources: Omit<IngestionSourceHealthRow, "eventsLast24h">[];
-  loggedAndPulledCountsBySource: Record<string, number>;
-  pulledEventsBySource: Record<string, ActivityEventDetailRow[]>;
-  loggedAndPulledWindowsBySource: Record<string, SourceEventWindows[]>;
   coverageBySource: Record<string, SourceDataCoverage>;
 }
 
@@ -44,9 +38,6 @@ function emptySnapshot(): ActivityMonitorSnapshot {
     },
     teamBySource: {},
     activeSources: [],
-    loggedAndPulledCountsBySource: {},
-    pulledEventsBySource: {},
-    loggedAndPulledWindowsBySource: {},
     coverageBySource: {},
   };
 }
@@ -117,34 +108,5 @@ export class MemoryActivityMonitorRepository implements ActivityMonitorRepositor
     organizationId: string;
   }): Promise<Omit<IngestionSourceHealthRow, "eventsLast24h">[]> {
     return this.of(input.organizationId).activeSources;
-  }
-
-  async countLoggedAndPulledEventsBySource(input: {
-    organizationId: string;
-    sourceIds: readonly string[];
-  }): Promise<{ sourceId: string; count: number }[]> {
-    const counts = this.of(input.organizationId).loggedAndPulledCountsBySource;
-    return input.sourceIds
-      .filter((sourceId) => counts[sourceId] !== undefined)
-      .map((sourceId) => ({ sourceId, count: counts[sourceId]! }));
-  }
-
-  async findPulledEventsForSource(input: {
-    organizationId: string;
-    sourceId: string;
-    beforeMs: number;
-    limit: number;
-  }): Promise<ActivityEventDetailRow[]> {
-    const events = this.of(input.organizationId).pulledEventsBySource[input.sourceId] ?? [];
-    return events
-      .filter((e) => toEpochMs(e.eventTimestampIso) < input.beforeMs)
-      .slice(0, input.limit);
-  }
-
-  async findLoggedAndPulledEventWindows(input: {
-    organizationId: string;
-    sourceId: string;
-  }): Promise<SourceEventWindows[]> {
-    return this.of(input.organizationId).loggedAndPulledWindowsBySource[input.sourceId] ?? [];
   }
 }

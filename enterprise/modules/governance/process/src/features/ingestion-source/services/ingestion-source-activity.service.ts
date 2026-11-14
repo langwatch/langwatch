@@ -19,6 +19,7 @@ import { nowInstant, toEpochMs } from "@langwatch/time";
 import type { TraceApi, TraceDailySpendGroup } from "@langwatch/trace-contract";
 
 import type { ActivityMonitorRepository } from "../../../repositories/activity-monitor.repository.ts";
+import type { IngestionSourceEventsRepository } from "../../../repositories/ingestion-source-events.repository.ts";
 import {
   emptyDenseBuckets,
   isoOf,
@@ -66,32 +67,28 @@ const SPEND_OVER_TIME_GROUP: Record<SpendOverTimeGroupBy, TraceDailySpendGroup> 
   model: { kind: "firstModel" },
 };
 
+/** The activity monitor's Postgres rows, its ClickHouse events, and the two peers it reads. */
+type ActivityMonitorDependencies = {
+  repository: ActivityMonitorRepository;
+  events: IngestionSourceEventsRepository;
+  projects: Pick<ProjectApi, "findInternal">;
+  traces: ActivityMonitorTraces;
+};
+
 /**
- * The activity monitor: trace spend and pushed events through TraceApi, scoped to the
- * organisation's hidden governance project; pulled and logged events, sources, teams and
- * departments from its own repository. No governance project short-circuits to empty.
+ * The activity monitor: trace spend and pushed events through TraceApi, scoped to the hidden
+ * governance project; pulled and logged events and Postgres rows from its own repositories.
+ * No governance project short-circuits to empty.
  */
 export class ActivityMonitorService {
-  private constructor(
-    private readonly repository: ActivityMonitorRepository,
-    private readonly projects: Pick<ProjectApi, "findInternal">,
-    private readonly traces: ActivityMonitorTraces,
-  ) {}
+  private constructor(private readonly deps: ActivityMonitorDependencies) {}
 
-  static create({
-    repository,
-    projects,
-    traces,
-  }: {
-    repository: ActivityMonitorRepository;
-    projects: Pick<ProjectApi, "findInternal">;
-    traces: ActivityMonitorTraces;
-  }): ActivityMonitorService {
-    return new ActivityMonitorService(repository, projects, traces);
+  static create(deps: ActivityMonitorDependencies): ActivityMonitorService {
+    return new ActivityMonitorService(deps);
   }
 
   private async findGovProjectId(organizationId: string): Promise<string | null> {
-    const project = await this.projects.findInternal({
+    const project = await this.deps.projects.findInternal({
       organizationId,
       kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
     });
@@ -105,7 +102,7 @@ export class ActivityMonitorService {
     organizationId: string;
     sourceIds: readonly string[];
   }): Promise<Map<string, SourceTeam>> {
-    const rows = await this.repository.findSourceTeams({
+    const rows = await this.deps.repository.findSourceTeams({
       organizationId,
       sourceIds: [...new Set(sourceIds.filter((id) => id !== ""))],
     });
@@ -117,11 +114,11 @@ export class ActivityMonitorService {
     sourceId: string;
     windowDays: number;
   }): ReturnType<ActivityMonitorRepository["sourceDataCoverage"]> {
-    return this.repository.sourceDataCoverage(input);
+    return this.deps.repository.sourceDataCoverage(input);
   }
 
   async summary(input: ActivityMonitorWindowQuery): Promise<ActivityMonitorSummary> {
-    const anomalyBreakdown = await this.repository.getOpenAnomalyBreakdown({
+    const anomalyBreakdown = await this.deps.repository.getOpenAnomalyBreakdown({
       organizationId: input.organizationId,
     });
     const openAnomalyCount =
@@ -131,7 +128,7 @@ export class ActivityMonitorService {
 
     const now = nowInstant().epochMilliseconds;
     const windowMs = input.windowDays * DAY_MS;
-    const spend = await this.traces.getAttributedSpendComparison({
+    const spend = await this.deps.traces.getAttributedSpendComparison({
       projectId: govProjectId,
       matches: GOVERNANCE_ORIGIN,
       actorKey: GOVERNANCE_ATTR.USER_ID,
@@ -157,7 +154,7 @@ export class ActivityMonitorService {
     const govProjectId = await this.findGovProjectId(input.organizationId);
     if (!govProjectId) return [];
     const now = nowInstant().epochMilliseconds;
-    const rows = await this.traces.findAttributedSpendByValue({
+    const rows = await this.deps.traces.findAttributedSpendByValue({
       projectId: govProjectId,
       matches: GOVERNANCE_ORIGIN,
       valueKey: GOVERNANCE_ATTR.USER_ID,
@@ -188,7 +185,7 @@ export class ActivityMonitorService {
     if (!govProjectId) return [];
     const now = nowInstant().epochMilliseconds;
     const windowMs = input.windowDays * DAY_MS;
-    const rows = await this.traces.findAttributedSpendComparisonByValue({
+    const rows = await this.deps.traces.findAttributedSpendComparisonByValue({
       projectId: govProjectId,
       matches: GOVERNANCE_ORIGIN,
       valueKey: GOVERNANCE_ATTR.INGESTION_SOURCE_ID,
@@ -217,12 +214,12 @@ export class ActivityMonitorService {
    * Spec: specs/ai-gateway/governance/departments.feature (the @birds-eye scenarios)
    */
   async spendByDepartment(input: ActivityMonitorWindowQuery): Promise<SpendByDepartmentRow[]> {
-    const directory = await this.repository.getDepartmentDirectory({
+    const directory = await this.deps.repository.getDepartmentDirectory({
       organizationId: input.organizationId,
     });
     if (directory.projectDepartmentById.size === 0) return [];
     const now = nowInstant().epochMilliseconds;
-    const rows = await this.traces.findSpendByProjectAndValue({
+    const rows = await this.deps.traces.findSpendByProjectAndValue({
       projectIds: [...directory.projectDepartmentById.keys()],
       valueKey: GOVERNANCE_ATTR.USER_ID,
       window: { startMs: now - input.windowDays * DAY_MS, endMs: now },
@@ -247,7 +244,7 @@ export class ActivityMonitorService {
     const govProjectId = await this.findGovProjectId(input.organizationId);
     if (!govProjectId) return { buckets: emptyDenseBuckets({ windowStartMs, windowDays }) };
 
-    const rows = await this.traces.findDailyAttributedSpend({
+    const rows = await this.deps.traces.findDailyAttributedSpend({
       projectId: govProjectId,
       matches: GOVERNANCE_ORIGIN,
       groupBy: SPEND_OVER_TIME_GROUP[input.groupBy],
@@ -264,14 +261,14 @@ export class ActivityMonitorService {
   }
 
   recentAnomalies(input: { organizationId: string; limit?: number }): Promise<RecentAnomalyRow[]> {
-    return this.repository.recentAnomalies(input);
+    return this.deps.repository.recentAnomalies(input);
   }
 
   /** Each source's events in the last 24h: pushed traces, pushed logs and pulled rows summed. */
   async ingestionSourcesHealth(input: {
     organizationId: string;
   }): Promise<IngestionSourceHealthRow[]> {
-    const sources = await this.repository.findActiveSources(input);
+    const sources = await this.deps.repository.findActiveSources(input);
     if (sources.length === 0) return [];
 
     const govProjectId = await this.findGovProjectId(input.organizationId);
@@ -280,14 +277,14 @@ export class ActivityMonitorService {
       const sourceIds = sources.map((s) => s.id);
       const sinceMs = nowInstant().epochMilliseconds - DAY_MS;
       const [traced, untraced] = await Promise.all([
-        this.traces.countAttributedTracesByValue({
+        this.deps.traces.countAttributedTracesByValue({
           projectId: govProjectId,
           matches: GOVERNANCE_ORIGIN,
           valueKey: GOVERNANCE_ATTR.INGESTION_SOURCE_ID,
           values: sourceIds,
           sinceMs,
         }),
-        this.repository.countLoggedAndPulledEventsBySource({
+        this.deps.events.countLoggedAndPulledEventsBySource({
           organizationId: input.organizationId,
           tenantId: govProjectId,
           sourceIds,
@@ -317,7 +314,7 @@ export class ActivityMonitorService {
     const limit = input.limit ?? 50;
     const beforeMs = input.beforeIso ? toEpochMs(input.beforeIso) : nowInstant().epochMilliseconds;
     const [pushed, pulledEvents] = await Promise.all([
-      this.traces.findAttributedTracesBefore({
+      this.deps.traces.findAttributedTracesBefore({
         projectId: govProjectId,
         matches: [
           ...GOVERNANCE_ORIGIN,
@@ -327,7 +324,7 @@ export class ActivityMonitorService {
         beforeMs,
         limit,
       }),
-      this.repository.findPulledEventsForSource({
+      this.deps.events.findPulledEventsForSource({
         organizationId: input.organizationId,
         tenantId: govProjectId,
         sourceId: input.sourceId,
@@ -376,7 +373,7 @@ export class ActivityMonitorService {
     const since7d = now - 7 * DAY_MS;
     const since30d = now - 30 * DAY_MS;
     const [recency, untraced] = await Promise.all([
-      this.traces.getAttributedTraceRecency({
+      this.deps.traces.getAttributedTraceRecency({
         projectId: govProjectId,
         matches: [
           ...GOVERNANCE_ORIGIN,
@@ -384,7 +381,7 @@ export class ActivityMonitorService {
         ],
         countSinceMs: [since24h, since7d, since30d],
       }),
-      this.repository.findLoggedAndPulledEventWindows({
+      this.deps.events.findLoggedAndPulledEventWindows({
         organizationId: input.organizationId,
         tenantId: govProjectId,
         sourceId: input.sourceId,
