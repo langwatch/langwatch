@@ -161,7 +161,18 @@ spec:
               containerPort: {{ .Values.app.service.port }}
               protocol: TCP
           env:
+            {{- /* Reader and writer on: the api gets no system URL or password (ADR-202 Decided 3, 14). */}}
+            {{- $readerWriterOnly := and .Values.clickhouse.chartManaged .Values.clickhouse.appReader.enabled .Values.clickhouse.appWriter.enabled }}
+            {{- $systemEnv := list "CLICKHOUSE_URL" "CLICKHOUSE_PASSWORD" "CLICKHOUSE_PASSWORD_FILE" }}
+            {{- if $readerWriterOnly }}
+            {{- range (include "langwatch.sharedEnv" . | fromYamlArray) }}
+            {{- if not (has .name $systemEnv) }}
+            {{- toYaml (list .) | nindent 12 }}
+            {{- end }}
+            {{- end }}
+            {{- else }}
             {{- include "langwatch.sharedEnv" . | nindent 12 }}
+            {{- end }}
             {{- include "langwatch.shutdownEnv" (dict "component" .Values.app "name" "app") | nindent 12 }}
 
             # Names this process in telemetry. It becomes the OTel resource
@@ -201,9 +212,10 @@ spec:
             {{- with .Values.app.extraEnvs}}
             {{- include "langwatch.assertNoReservedTimeoutEnvs" (dict "envs" . "path" "app.extraEnvs") }}
             {{- /* CLICKHOUSE_OPS_URL reads every tenant: the worker container keeps it, the api never
-                   holds it (ADR-202 Decided 14). Dropped by name, as the workers drop a shadowed one. */}}
+                   holds it (ADR-202 Decided 14). With the reader and the writer on, the system URL,
+                   its password and its CLICKHOUSE_URL__* routes are dropped by name too. */}}
             {{- range . }}
-            {{- if ne .name "CLICKHOUSE_OPS_URL" }}
+            {{- if not (or (eq .name "CLICKHOUSE_OPS_URL") (and $readerWriterOnly (or (has .name $systemEnv) (hasPrefix "CLICKHOUSE_URL__" .name)))) }}
             {{- toYaml (list .) | nindent 12 }}
             {{- end }}
             {{- end }}

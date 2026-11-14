@@ -39,6 +39,7 @@ const LWQL_RECONVERGENCE_PIPELINE_NAME = "lwql_reconvergence";
 /** The operations this pipeline calls; absent LangWatchQL, all are no-ops. */
 interface LwqlReconvergenceApp {
   probeLwqlAccessModelOwner(): Promise<LwqlAccessModelOwner>;
+  refreshLwqlAccessModelAnswer(): Promise<void>;
   convergeLwqlAccessModel(): Promise<void>;
   findLwqlAppOwnedDrift(): Promise<LwqlAppOwnedDrift>;
   convergeLwqlAppOwnedObjects(drift: LwqlAppOwnedDrift): Promise<void>;
@@ -74,6 +75,7 @@ export function buildLwqlReconvergence({
           lwqlReconvergenceSchema,
           runLwqlReconvergence({
             probe: () => app.probeLwqlAccessModelOwner(),
+            refreshAnswer: () => app.refreshLwqlAccessModelAnswer(),
             converge: () => app.convergeLwqlAccessModel(),
             findDrift: () => app.findLwqlAppOwnedDrift(),
             convergeAppOwned: (drift) => app.convergeLwqlAppOwnedObjects(drift),
@@ -99,6 +101,7 @@ function isReconvergenceApp(app: unknown): app is LwqlReconvergenceApp {
     typeof app === "object" &&
     app !== null &&
     "probeLwqlAccessModelOwner" in app &&
+    "refreshLwqlAccessModelAnswer" in app &&
     "convergeLwqlAccessModel" in app &&
     "findLwqlAppOwnedDrift" in app &&
     "convergeLwqlAppOwnedObjects" in app &&

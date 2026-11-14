@@ -24,6 +24,8 @@ export type LangWatchQlSupply = Readonly<{
         target: Readonly<{ url: string; database: string }>;
         statements: ClickHouseAdminStatements;
       }
+    /** The target alone, where the process holds no system credential (ADR-202 Decided 3). */
+    | { configured: true; target: Readonly<{ url: string; database: string }>; statements: null }
   >;
   /** The PostgreSQL endpoint the named collection dials, without credentials. */
   postgres: Readonly<

@@ -146,6 +146,12 @@ export type ClickHouseAdmin =
       /** The server origin (no credentials, path or query) and the database its path named. */
       target: Readonly<{ url: string; database: string }>;
       statements: ClickHouseAdminStatements;
+    }>
+  /** No `CLICKHOUSE_URL`: the target from the reader's URL, nothing to send (ADR-202 Decided 3). */
+  | Readonly<{
+      configured: true;
+      target: Readonly<{ url: string; database: string }>;
+      statements: null;
     }>;
 
 /** Untenanted statements on the shared server: DDL, `system.*` reads, the key-map writes. */

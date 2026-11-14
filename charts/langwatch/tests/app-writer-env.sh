@@ -45,15 +45,17 @@ has_env() {
   printf '%s\n' "$1" | grep -qxF "$2"
 }
 
-# The secretKeyRef name and key of `- name: <var>` in one Source block, as "name/key".
+# The secretKeyRef name and key of `- name: <var>` in one Source block, as "name/key", in
+# either order: the api's env is re-rendered with sorted keys once the reader and writer are on.
 secret_ref_of() {
   local render="$1" src="$2" var="$3"
   awk -v want="$src" -v v="$var" '
     /^# Source:/ { insrc = (index($0, want) > 0); found=0 }
-    insrc && $0 ~ "- name: " v "$" { found=1; next }
+    insrc && $0 ~ "- name: " v "$" { found=1; n=""; k=""; next }
     insrc && found && /^[[:space:]]*- name:[[:space:]]/ { found=0 }
     found && /^[[:space:]]*name:[[:space:]]/ { sub(/^[[:space:]]*name:[[:space:]]*/, ""); n=$0 }
-    found && /^[[:space:]]*key:[[:space:]]/ { sub(/^[[:space:]]*key:[[:space:]]*/, ""); print n "/" $0; exit }
+    found && /^[[:space:]]*key:[[:space:]]/ { sub(/^[[:space:]]*key:[[:space:]]*/, ""); k=$0 }
+    found && n != "" && k != "" { print n "/" k; exit }
   ' "$render"
 }
 
@@ -160,10 +162,93 @@ test_existing_secret_carries_writer() {
     fail "existing-ref" "the app does not read CLICKHOUSE_WRITER_URL from secrets.existingSecret."
 }
 
+# How many `- name: <var>` entries one Source block holds, across its containers.
+env_count_in() {
+  env_names_in "$1" "$2" | grep -cxF "$3" || true
+}
+
+SYSTEM_ENV=(CLICKHOUSE_URL CLICKHOUSE_PASSWORD CLICKHOUSE_PASSWORD_FILE)
+
+# @scenario "The chart gives the api no system credential once the reader and the writer are on"
+test_api_drops_system_credential() {
+  local out="${TMPDIR:-/tmp}/api-credentials-on.yaml" err="${TMPDIR:-/tmp}/api-credentials-on.err"
+  local reader_only="${TMPDIR:-/tmp}/api-credentials-reader.yaml"
+  if ! render_to "$out" "$err" --set autogen.enabled=true --set clickhouse.appReader.enabled=true \
+    --set clickhouse.appWriter.enabled=true; then
+    fail "api-on-render" "render with the reader and the writer on failed: $(cat "$err")"
+    return
+  fi
+  local app var
+  app="$(env_names_in "$out" "app/deployment.yaml")"
+  for var in "${SYSTEM_ENV[@]}"; do
+    has_env "$app" "$var" && fail "api-on-$var" "the app holds $var with the reader and the writer on."
+  done
+  for var in CLICKHOUSE_READER_URL CLICKHOUSE_WRITER_URL; do
+    has_env "$app" "$var" || fail "api-on-keeps-$var" "the app lost $var."
+  done
+  local workload
+  for workload in "workers/deployment.yaml" "clickhouse/lwql-access-render.yaml"; do
+    has_env "$(env_names_in "$out" "$workload")" CLICKHOUSE_URL ||
+      fail "api-on-$workload" "$workload lost CLICKHOUSE_URL when the api's was dropped."
+  done
+  if ! render_to "$reader_only" "$err" --set autogen.enabled=true --set clickhouse.appReader.enabled=true; then
+    fail "api-reader-render" "render with the reader alone failed: $(cat "$err")"
+    return
+  fi
+  local expected
+  expected="$(env_names_in "$reader_only" "app/deployment.yaml" | grep -vxF CLICKHOUSE_URL; echo CLICKHOUSE_WRITER_URL)"
+  [[ "$(sort <<<"$expected")" == "$(sort <<<"$app")" ]] ||
+    fail "api-on-names" "the app's env is not the reader-only render's plus the writer, minus CLICKHOUSE_URL."
+  if ! render_to "$out" "$err" --set autogen.enabled=true --set clickhouse.appReader.enabled=true \
+    --set clickhouse.appWriter.enabled=true --set workers.enabled=false; then
+    fail "api-sidecar-render" "render with the workers off failed: $(cat "$err")"
+    return
+  fi
+  [[ "$(env_count_in "$out" "app/deployment.yaml" CLICKHOUSE_URL)" == "1" ]] ||
+    fail "api-sidecar" "with the workers off, CLICKHOUSE_URL is not held by the worker sidecar alone."
+}
+
+# @scenario "The api's own extra env cannot hand it the system credential back"
+test_api_extra_env_cannot_restore_system_credential() {
+  local out="${TMPDIR:-/tmp}/api-credentials-extra.yaml" err="${TMPDIR:-/tmp}/api-credentials-extra.err"
+  if ! render_to "$out" "$err" --set autogen.enabled=true --set clickhouse.appReader.enabled=true \
+    --set clickhouse.appWriter.enabled=true \
+    --set 'app.extraEnvs[0].name=CLICKHOUSE_URL' --set 'app.extraEnvs[0].value=http://system@clickhouse:8123/langwatch' \
+    --set 'app.extraEnvs[1].name=CLICKHOUSE_PASSWORD_FILE' --set 'app.extraEnvs[1].value=/secrets/clickhouse' \
+    --set 'app.extraEnvs[2].name=CLICKHOUSE_URL__eu__org1' --set 'app.extraEnvs[2].value=http://system@eu:8123/langwatch' \
+    --set 'app.extraEnvs[3].name=KEPT_EXTRA' --set 'app.extraEnvs[3].value=kept'; then
+    fail "api-extra-render" "render with system entries in app.extraEnvs failed: $(cat "$err")"
+    return
+  fi
+  local app var
+  app="$(env_names_in "$out" "app/deployment.yaml")"
+  for var in CLICKHOUSE_URL CLICKHOUSE_PASSWORD_FILE CLICKHOUSE_URL__eu__org1; do
+    has_env "$app" "$var" && fail "api-extra-$var" "app.extraEnvs handed the app $var with the reader and the writer on."
+  done
+  has_env "$app" KEPT_EXTRA || fail "api-extra-kept" "the app lost an unrelated app.extraEnvs entry."
+}
+
+# @scenario "With the reader or the writer off the chart gives the api what it gave before"
+test_api_keeps_system_credential_without_writer() {
+  local out="${TMPDIR:-/tmp}/api-credentials-off.yaml" err="${TMPDIR:-/tmp}/api-credentials-off.err"
+  if ! render_to "$out" "$err" --set autogen.enabled=true --set clickhouse.appReader.enabled=true \
+    --set 'app.extraEnvs[0].name=CLICKHOUSE_URL__eu__org1' --set 'app.extraEnvs[0].value=http://system@eu:8123/langwatch'; then
+    fail "api-off-render" "render with the writer off failed: $(cat "$err")"
+    return
+  fi
+  local app
+  app="$(env_names_in "$out" "app/deployment.yaml")"
+  has_env "$app" CLICKHOUSE_URL || fail "api-off-url" "the app lost CLICKHOUSE_URL with the writer off."
+  has_env "$app" CLICKHOUSE_URL__eu__org1 || fail "api-off-route" "the app lost its CLICKHOUSE_URL__* route with the writer off."
+}
+
 test_default_renders_as_before
 test_enabled_wires_writer
 test_writer_needs_reader
 test_existing_secret_carries_writer
+test_api_drops_system_credential
+test_api_extra_env_cannot_restore_system_credential
+test_api_keeps_system_credential_without_writer
 
 if [[ $failures -gt 0 ]]; then
   echo
@@ -171,4 +256,4 @@ if [[ $failures -gt 0 ]]; then
   exit 1
 fi
 
-echo "PASS: the app writer is off by default and renders as before; enabled beside the reader, a pre-install/pre-upgrade hook Secret holds its URL for the app, the workers and the render Job, with LangWatchQL on or off; enabled without the reader the chart refuses to render; an operator Secret is read instead of generated"
+echo "PASS: the app writer is off by default and renders as before; enabled beside the reader, a pre-install/pre-upgrade hook Secret holds its URL for the app, the workers and the render Job, with LangWatchQL on or off; enabled without the reader the chart refuses to render; an operator Secret is read instead of generated; with both on, the api holds no system URL, password or route"

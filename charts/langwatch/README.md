@@ -346,7 +346,13 @@ roll ClickHouse, so run `kubectl rollout restart statefulset` on it afterwards.
 does the same for the insert-only writer `langwatch_app_writer`: a hook Secret,
 `<release>-clickhouse-app-writer`, and `CLICKHOUSE_WRITER_URL` on the app, the workers and
 the render Job. With `secrets.existingSecret`, or autogen off, that Secret carries
-`CLICKHOUSE_WRITER_URL` itself. The api uses it only once its `CLICKHOUSE_URL` is removed.
+`CLICKHOUSE_WRITER_URL` itself. With both the reader and the writer on, the app container
+gets no `CLICKHOUSE_URL`, `CLICKHOUSE_PASSWORD` or `CLICKHOUSE_PASSWORD_FILE`, and
+`app.extraEnvs` cannot add them or a `CLICKHOUSE_URL__*` route back; the workers, the
+worker sidecar and the Jobs keep them. A Secret in `app.extraEnvFrom` that carries one
+still reaches the api, which then logs a warning naming the variable (ADR-202 Decided 14).
+LangWatchQL's server is then read from the reader's URL, and the worker answers whether its
+access model is provisioned.
 
 The enforce switch is `CLICKHOUSE_TENANCY_ENFORCE` for the shared server and
 `CLICKHOUSE_TENANCY_ENFORCE__<label>__<orgId>` for each route: `true` or `false`, default
