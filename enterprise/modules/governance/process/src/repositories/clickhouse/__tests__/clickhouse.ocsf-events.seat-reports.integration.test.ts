@@ -8,18 +8,16 @@
  *
  * Spec: specs/governance/governance-cost-screen.feature
  */
-import { createClient, type ClickHouseClient } from "@clickhouse/client";
-import {
-  migrateTestClickHouseOnce,
-  startTestClickHouseEndpoints,
-} from "@langwatch/clickhouse-client/testing";
-import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
+import type { ClickHouseClient } from "@clickhouse/client";
+import { vendorQueryClient } from "@langwatch/clickhouse-client/testing";
 import { Temporal } from "@langwatch/time";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { startMigratedClickHouse } from "../../../__tests__/migrated-clickhouse.harness.ts";
 import { OCSF_ACTIVITY, OCSF_SEVERITY } from "../../../rules/ocsf-codes.rules.ts";
 import type { GovernanceOcsfEvent } from "../../governance.repositories.ts";
+import { memberClickHouseResolver } from "../clickhouse.governance-clickhouse.repositories.ts";
 import { ClickHouseOcsfEventsRepository } from "../clickhouse.ocsf-events.repository.ts";
 
 const enabled = Boolean(
@@ -94,38 +92,11 @@ describe.skipIf(!enabled)("the seat read against a real ClickHouse", () => {
   const tenants = { pool: `gov-pool-${run}`, twice: `gov-twice-${run}` };
 
   beforeAll(async () => {
-    const [endpoint] = await startTestClickHouseEndpoints({
-      suite: "governance-seat-reports",
-      names: ["seats"],
-      environment: process.env,
-    });
-    if (!endpoint) throw new Error("No ClickHouse endpoint was provisioned for the seat suite");
-
-    await migrateTestClickHouseOnce({
-      url: endpoint.url,
-      migrate: async () => {
-        // CLICKHOUSE_CLUSTER switches every engine to a Replicated form no test server can run.
-        const previousCluster = process.env.CLICKHOUSE_CLUSTER;
-        delete process.env.CLICKHOUSE_CLUSTER;
-        try {
-          await ClickHouseMigrateTask.createFromConfig({
-            config: {
-              buildTime: false,
-              sharedUrl: endpoint.url,
-              privateEndpoints: [],
-            },
-          }).execute();
-        } finally {
-          if (previousCluster !== undefined) process.env.CLICKHOUSE_CLUSTER = previousCluster;
-        }
-      },
-    });
-
-    client = createClient({
-      url: endpoint.url,
-      clickhouse_settings: { date_time_input_format: "best_effort" },
-    });
-    repository = ClickHouseOcsfEventsRepository.create(async () => client);
+    client = await startMigratedClickHouse({ suite: "governance-seat-reports" });
+    // The process's client over the suite's connection: built reads carry the tenant setting.
+    repository = ClickHouseOcsfEventsRepository.create(
+      memberClickHouseResolver(vendorQueryClient({ vendor: client, indexes: [] })),
+    );
     await client.command({ query: "SYSTEM STOP MERGES governance_ocsf_events" });
   }, 180_000);
 

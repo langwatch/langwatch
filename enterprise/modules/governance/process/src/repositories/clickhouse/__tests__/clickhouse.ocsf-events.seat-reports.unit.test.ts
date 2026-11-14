@@ -13,15 +13,22 @@
  *
  * Spec: specs/governance/governance-cost-screen.feature
  */
-import { describe, expect, it, vi } from "vitest";
+import type { ReaderReadStatement } from "@langwatch/clickhouse-client/builder";
+import { describe, expect, it } from "vitest";
 
 import { ClickHouseOcsfEventsRepository } from "../clickhouse.ocsf-events.repository.ts";
 
 const SEAT_REPORT_ACTION = "seat_report";
 
+/** A client answering every built read with `rows`, recording each statement it is sent. */
 function makeClient(rows: unknown[]) {
+  const statements: ReaderReadStatement[] = [];
   return {
-    query: vi.fn().mockResolvedValue({ json: async () => rows }),
+    statements,
+    read: async ({ statement }: { statement: ReaderReadStatement }) => {
+      statements.push(statement);
+      return { rows };
+    },
   };
 }
 
@@ -91,16 +98,16 @@ describe("ClickHouseOcsfEventsRepository.findLatestSeatReports", () => {
 
       await repository.findLatestSeatReports({ tenantId: "gov-1", actionName: SEAT_REPORT_ACTION });
 
-      const call = client.query.mock.calls[0]?.[0];
-      expect(call.query_params).toEqual({
-        tenantId: "gov-1",
-        actionName: "seat_report",
-      });
+      const [statement] = client.statements;
+      expect(statement).toMatchObject({ identity: "reader", kind: "tenant", tenantId: "gov-1" });
+      expect(statement?.settings).toMatchObject({ SQL_langwatch_tenant_ids: "gov-1" });
+      expect(statement?.params).toEqual({ tenantId: "gov-1", v0: "seat_report" });
       // TenantId leads the predicate — nothing else here is unique across
       // tenants — and neither value is spliced into the SQL text.
-      expect(call.query).toContain("WHERE TenantId = {tenantId:String}");
-      expect(call.query).not.toContain("gov-1");
-      expect(call.query).not.toContain("'seat_report'");
+      expect(statement?.sql).toContain("WHERE TenantId = {tenantId:String}");
+      expect(statement?.sql).toMatch(/ActionName = \{\w+:String\}/);
+      expect(statement?.sql).not.toContain("gov-1");
+      expect(statement?.sql).not.toContain("'seat_report'");
     });
   });
 

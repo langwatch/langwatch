@@ -3,8 +3,8 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 
 import type {
+  GovernanceClickHouseReadClient,
   GovernanceClickHouseRepositories,
-  GovernanceClickHouseTenantResolver,
 } from "../governance.repositories.ts";
 import { ClickHouseAnomalySpendRepository } from "./clickhouse.anomaly-spend.repository.ts";
 import { ClickHouseOcsfEventsRepository } from "./clickhouse.ocsf-events.repository.ts";
@@ -34,12 +34,17 @@ export interface GovernanceClickHouseResolver {
  * per resolution, exactly as the tables' own rule requires: every statement
  * names its tenant. Same convention as `modules/trace/process`'s
  * `ClickHouseTraceClientsRepository` (`repositories/clickhouse/clickhouse.trace-member-client.repository.ts`).
+ * A built read names its own tenant, so `read` goes straight to the member.
  */
-class MemberGovernanceClickHouseClient {
+class MemberGovernanceClickHouseClient implements GovernanceClickHouseReadClient {
+  readonly read: ClickHouseQueryClient["read"];
+
   constructor(
     private readonly clickhouse: ClickHouseQueryClient,
     private readonly tenantId: string,
-  ) {}
+  ) {
+    this.read = (input) => clickhouse.read(input);
+  }
 
   async query<Row>(input: {
     query: string;
@@ -58,14 +63,14 @@ class MemberGovernanceClickHouseClient {
 
   async insert(input: {
     table: string;
-    values: readonly unknown[];
+    values: readonly Record<string, unknown>[];
     format: "JSONEachRow";
     clickhouse_settings?: Record<string, number>;
   }): Promise<unknown> {
     return this.clickhouse.insert({
       tenantId: this.tenantId,
       table: input.table,
-      rows: input.values as readonly Record<string, unknown>[],
+      rows: input.values,
       ...(input.clickhouse_settings ? { settings: input.clickhouse_settings } : {}),
     });
   }
@@ -73,13 +78,12 @@ class MemberGovernanceClickHouseClient {
 
 /**
  * The member, as the tenant-keyed resolver every ClickHouse-tier governance
- * repository takes. The resolver's client type is narrowed to `query` and
- * `insert`, which is all any repository behind it calls, so the member-backed
- * wrapper satisfies it directly.
+ * repository takes: raw `query` for the repositories not yet on the typed
+ * builder, `read` for those that are, `insert` for both.
  */
 function memberClickHouseResolver(
   clickhouse: ClickHouseQueryClient,
-): GovernanceClickHouseTenantResolver {
+): (tenantId: string) => Promise<MemberGovernanceClickHouseClient> {
   const resolve = (tenantId: string) =>
     Promise.resolve(new MemberGovernanceClickHouseClient(clickhouse, tenantId));
   return resolve;

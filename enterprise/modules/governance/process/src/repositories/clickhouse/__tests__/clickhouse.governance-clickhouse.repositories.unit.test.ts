@@ -72,6 +72,8 @@ describe("ClickHouseGovernanceRepositories.create", () => {
       expect(request?.tenantId).toBe("org_test");
       expect(request?.params?.tenantId).toBe("org_test");
       expect(request?.sql).toContain("TenantId = {tenantId:String}");
+      // A built read: the reader's tenant setting names exactly that tenant.
+      expect(request?.settings).toMatchObject({ SQL_langwatch_tenant_ids: "org_test" });
     });
 
     it("reads an empty result as zero spend", async () => {

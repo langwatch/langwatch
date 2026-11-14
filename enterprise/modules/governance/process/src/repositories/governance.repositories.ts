@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { GovernanceOcsfExportRow } from "@langwatch/enterprise-governance-contract";
 import type { Instant } from "@langwatch/time";
 
@@ -205,3 +206,11 @@ interface GovernanceClickHouseTenantClient {
 export type GovernanceClickHouseTenantResolver = (
   tenantId: string,
 ) => Promise<GovernanceClickHouseTenantClient>;
+
+/** A typed-builder repository's client: built reads, plus the inserts it owns (ADR-202). */
+export type GovernanceClickHouseReadClient = Pick<ClickHouseQueryClient, "read"> &
+  Pick<GovernanceClickHouseTenantClient, "insert">;
+
+export type GovernanceClickHouseReadResolver = (
+  tenantId: string,
+) => Promise<GovernanceClickHouseReadClient>;

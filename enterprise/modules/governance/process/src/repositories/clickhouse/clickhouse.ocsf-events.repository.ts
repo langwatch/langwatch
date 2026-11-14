@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { clickhouseRead, fn, param, tenantScope } from "@langwatch/clickhouse-client/builder";
 import type { GovernanceOcsfExportRow } from "@langwatch/enterprise-governance-contract";
 import { createLogger } from "@langwatch/observability";
 import { toDate } from "@langwatch/time";
@@ -8,8 +9,9 @@ import type {
   GovernanceOcsfEvent,
   GovernanceOcsfEventsReader,
   GovernanceOcsfEventWriter,
-  GovernanceClickHouseTenantResolver,
+  GovernanceClickHouseReadResolver,
 } from "../governance.repositories.ts";
+import { governanceOcsfEvents as events } from "./clickhouse.governance-ocsf-events.table.ts";
 
 /**
  * ClickHouseOcsfEventsRepository — read and write side of the
@@ -27,7 +29,7 @@ import type {
  *       + specs/ai-gateway/governance/siem-export.feature
  * Migration: 00023_create_governance_ocsf_events.sql
  */
-const TABLE_NAME = "governance_ocsf_events" as const;
+const TABLE_NAME = events.$table.stored;
 
 /**
  * Rows per INSERT. A run's kept events arrive as one array and each carries
@@ -82,27 +84,6 @@ export interface OcsfSeatReportReader {
     tenantId: string;
     actionName: string;
   }): Promise<GovernanceSeatReportRow[]>;
-}
-
-interface OcsfExportCHRow {
-  EventId: string;
-  OcsfSchemaVersion: string;
-  TraceId: string;
-  SourceId: string;
-  SourceType: string;
-  ClassUid: number | string;
-  CategoryUid: number | string;
-  ActivityId: number | string;
-  TypeUid: number | string;
-  SeverityId: number | string;
-  EventTimeMs: string;
-  ActorUserId: string;
-  ActorEmail: string;
-  ActorEnduserId: string;
-  ActionName: string;
-  TargetName: string;
-  AnomalyAlertId: string;
-  RawOcsfJson: string;
 }
 
 /**
@@ -228,9 +209,9 @@ export class ClickHouseOcsfEventsRepository
     OcsfEventBatchWriter,
     OcsfSeatReportReader
 {
-  private constructor(private readonly resolveClient: GovernanceClickHouseTenantResolver) {}
+  private constructor(private readonly resolveClient: GovernanceClickHouseReadResolver) {}
 
-  static create(resolveClient: GovernanceClickHouseTenantResolver): ClickHouseOcsfEventsRepository {
+  static create(resolveClient: GovernanceClickHouseReadResolver): ClickHouseOcsfEventsRepository {
     return new ClickHouseOcsfEventsRepository(resolveClient);
   }
 
@@ -295,50 +276,41 @@ export class ClickHouseOcsfEventsRepository
    */
   async findAll(input: FindOcsfEventsInput): Promise<GovernanceOcsfExportRow[]> {
     const client = await this.resolveClient(input.tenantId);
-    const result = await client.query({
-      query: `
-        SELECT
-          EventId,
-          OcsfSchemaVersion,
-          TraceId,
-          SourceId,
-          SourceType,
-          ClassUid,
-          CategoryUid,
-          ActivityId,
-          TypeUid,
-          SeverityId,
-          toString(toUnixTimestamp64Milli(EventTime)) AS EventTimeMs,
-          ActorUserId,
-          ActorEmail,
-          ActorEnduserId,
-          ActionName,
-          TargetName,
-          AnomalyAlertId,
-          RawOcsfJson
-        FROM ${TABLE_NAME}
-        WHERE TenantId = {tenantId:String}
-          AND (EventTime, EventId) > (fromUnixTimestamp64Milli({sinceMs:UInt64}), {sinceEventId:String})
-          AND (TenantId, EventId, LastUpdatedAt) IN (
-            SELECT TenantId, EventId, max(LastUpdatedAt)
-            FROM ${TABLE_NAME}
-            WHERE TenantId = {tenantId:String}
-              AND (EventTime, EventId) > (fromUnixTimestamp64Milli({sinceMs:UInt64}), {sinceEventId:String})
-            GROUP BY TenantId, EventId
-          )
-        ORDER BY EventTime ASC, EventId ASC
-        LIMIT {limit:UInt32}
-      `,
-      query_params: {
-        tenantId: input.tenantId,
-        sinceMs: input.sinceMs,
-        sinceEventId: input.sinceEventId,
-        limit: input.limit,
-      },
-      format: "JSONEachRow",
-    });
-
-    const rows = (await result.json()) as OcsfExportCHRow[];
+    const statement = clickhouseRead({ scope: tenantScope.single({ tenantId: input.tenantId }) })
+      .from(events)
+      .select({
+        EventId: events.EventId,
+        OcsfSchemaVersion: events.OcsfSchemaVersion,
+        TraceId: events.TraceId,
+        SourceId: events.SourceId,
+        SourceType: events.SourceType,
+        ClassUid: events.ClassUid,
+        CategoryUid: events.CategoryUid,
+        ActivityId: events.ActivityId,
+        TypeUid: events.TypeUid,
+        SeverityId: events.SeverityId,
+        EventTimeMs: fn.toString(fn.toUnixTimestamp64Milli(events.EventTime)),
+        ActorUserId: events.ActorUserId,
+        ActorEmail: events.ActorEmail,
+        ActorEnduserId: events.ActorEnduserId,
+        ActionName: events.ActionName,
+        TargetName: events.TargetName,
+        AnomalyAlertId: events.AnomalyAlertId,
+        RawOcsfJson: events.RawOcsfJson,
+      })
+      .where(({ gt }) =>
+        gt(
+          fn.tuple(events.EventTime, events.EventId),
+          fn.tuple(param.epochMs(input.sinceMs), param.string(input.sinceEventId)),
+        ),
+      )
+      // An event's replays carry its one EventTime, so the election repeats the cursor, as before.
+      .latestVersion({ repeat: [events.EventTime] })
+      .orderBy(events.EventTime, "ASC")
+      .orderBy(events.EventId, "ASC")
+      .limit(input.limit)
+      .build();
+    const { rows } = await client.read({ statement });
     return rows.map((r) => ({
       eventId: r.EventId,
       ocsfSchemaVersion: r.OcsfSchemaVersion,
@@ -386,27 +358,23 @@ export class ClickHouseOcsfEventsRepository
     actionName: string;
   }): Promise<GovernanceSeatReportRow[]> {
     const client = await this.resolveClient(input.tenantId);
-    const result = await client.query({
-      query: `
-        SELECT
-          SourceId,
-          TargetName                                      AS SkuPartNumber,
-          toDate(max(EventTime))                          AS Day,
-          argMax(RawOcsfJson, (EventTime, LastUpdatedAt)) AS LatestRawOcsfJson
-        FROM ${TABLE_NAME}
-        WHERE TenantId = {tenantId:String}
-          AND ActionName = {actionName:String}
-        GROUP BY SourceId, TargetName
-        ORDER BY SourceId, TargetName
-      `,
-      query_params: {
-        tenantId: input.tenantId,
-        actionName: input.actionName,
-      },
-      format: "JSONEachRow",
-    });
-
-    const rows = (await result.json()) as SeatReportCHRow[];
+    const statement = clickhouseRead({ scope: tenantScope.single({ tenantId: input.tenantId }) })
+      .from(events)
+      .select({
+        SourceId: events.SourceId,
+        SkuPartNumber: events.TargetName,
+        Day: fn.toDate(fn.max(events.EventTime)),
+        LatestRawOcsfJson: fn.argMax(
+          events.RawOcsfJson,
+          fn.tuple(events.EventTime, events.LastUpdatedAt),
+        ),
+      })
+      .where(({ eq }) => eq(events.ActionName, input.actionName))
+      .groupBy(events.SourceId, events.TargetName)
+      .orderBy(events.SourceId, "ASC")
+      .orderBy(events.TargetName, "ASC")
+      .build();
+    const { rows } = await client.read({ statement });
     return rows.flatMap((row) => findSeatReport(row) ?? []);
   }
 }

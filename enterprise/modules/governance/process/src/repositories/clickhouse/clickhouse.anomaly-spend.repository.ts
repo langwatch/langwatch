@@ -1,5 +1,13 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import {
+  clickhouseRead,
+  type Condition,
+  type ConditionOps,
+  fn,
+  param,
+  tenantScope,
+} from "@langwatch/clickhouse-client/builder";
 import { createLogger } from "@langwatch/observability";
 import { type Instant, toDate } from "@langwatch/time";
 
@@ -8,8 +16,9 @@ import type {
   AnomalySpendSourceFilter,
   GovernanceKpiContribution,
   GovernanceKpiContributionWriter,
-  GovernanceClickHouseTenantResolver,
+  GovernanceClickHouseReadResolver,
 } from "../governance.repositories.ts";
+import { governanceKpis as kpis } from "./clickhouse.governance-kpis.table.ts";
 
 /**
  * ClickHouseAnomalySpendRepository — reads and writes the
@@ -31,18 +40,18 @@ import type {
  * Spec: specs/ai-gateway/governance/folds.feature
  * Migration: 00031_create_governance_kpis.sql
  */
-const TABLE_NAME = "governance_kpis" as const;
+const TABLE_NAME = kpis.$table.stored;
+
+type KpisTable = "governance_kpis";
 
 const logger = createLogger("langwatch:governance:clickhouse-anomaly-spend-repository");
 
 export class ClickHouseAnomalySpendRepository
   implements AnomalySpendReader, GovernanceKpiContributionWriter
 {
-  private constructor(private readonly resolveClient: GovernanceClickHouseTenantResolver) {}
+  private constructor(private readonly resolveClient: GovernanceClickHouseReadResolver) {}
 
-  static create(
-    resolveClient: GovernanceClickHouseTenantResolver,
-  ): ClickHouseAnomalySpendRepository {
+  static create(resolveClient: GovernanceClickHouseReadResolver): ClickHouseAnomalySpendRepository {
     return new ClickHouseAnomalySpendRepository(resolveClient);
   }
 
@@ -130,40 +139,39 @@ export class ClickHouseAnomalySpendRepository
     sourceFilter: AnomalySpendSourceFilter;
   }): Promise<{ currentSpend: number; baselineSpend: number }> {
     const client = await this.resolveClient(input.tenantId);
-    const sourceFilter = toClickHouseSourceFilter(input.sourceFilter);
-    const result = await client.query({
-      query: `
-        SELECT
-          sumIf(LatestSpendUsd, HourBucket >= fromUnixTimestamp64Milli({windowStartMs:UInt64})) AS currentSpend,
-          sumIf(LatestSpendUsd, HourBucket < fromUnixTimestamp64Milli({windowStartMs:UInt64}) AND HourBucket >= fromUnixTimestamp64Milli({baselineStartMs:UInt64})) AS baselineSpend
-        FROM (
-          SELECT
-            TenantId,
-            SourceId,
-            HourBucket,
-            TraceId,
-            argMax(SpendUsd, LastEventOccurredAt) AS LatestSpendUsd
-          FROM ${TABLE_NAME}
-          WHERE TenantId = {tenantId:String}
-            AND HourBucket >= fromUnixTimestamp64Milli({baselineStartMs:UInt64})
-            AND HourBucket < fromUnixTimestamp64Milli({windowEndMs:UInt64})
-            ${sourceFilter.sql}
-          GROUP BY TenantId, SourceId, HourBucket, TraceId
-        )
-      `,
-      query_params: {
-        tenantId: input.tenantId,
-        windowStartMs: input.windowStart.epochMilliseconds,
-        windowEndMs: input.windowEnd.epochMilliseconds,
-        baselineStartMs: input.baselineStart.epochMilliseconds,
-        ...sourceFilter.params,
-      },
-      format: "JSONEachRow",
-    });
-    const rows = (await result.json()) as {
-      currentSpend: number | string | null;
-      baselineSpend: number | string | null;
-    }[];
+    const scope = tenantScope.single({ tenantId: input.tenantId });
+    const windowStart = param.epochMs(input.windowStart.epochMilliseconds);
+    const baselineStart = param.epochMs(input.baselineStart.epochMilliseconds);
+    const windowEnd = param.epochMs(input.windowEnd.epochMilliseconds);
+    const latest = clickhouseRead({ scope })
+      .from(kpis)
+      .select({
+        TenantId: kpis.TenantId,
+        SourceId: kpis.SourceId,
+        HourBucket: kpis.HourBucket,
+        TraceId: kpis.TraceId,
+        LatestSpendUsd: fn.argMax(kpis.SpendUsd, kpis.LastEventOccurredAt),
+      })
+      .where((ops) =>
+        ops.and(
+          ops.gte(kpis.HourBucket, baselineStart),
+          ops.lt(kpis.HourBucket, windowEnd),
+          ...sourceConditionsOf({ filter: input.sourceFilter, eq: ops.eq }),
+        ),
+      )
+      .groupBy(kpis.TenantId, kpis.SourceId, kpis.HourBucket, kpis.TraceId)
+      .as("latest");
+    const statement = clickhouseRead({ scope })
+      .from(latest)
+      .select(({ and, gte, lt }) => ({
+        currentSpend: fn.sumIf(latest.LatestSpendUsd, gte(latest.HourBucket, windowStart)),
+        baselineSpend: fn.sumIf(
+          latest.LatestSpendUsd,
+          and(lt(latest.HourBucket, windowStart), gte(latest.HourBucket, baselineStart)),
+        ),
+      }))
+      .build();
+    const { rows } = await client.read({ statement });
     const row = rows[0];
     return {
       currentSpend: Number(row?.currentSpend ?? 0),
@@ -172,21 +180,15 @@ export class ClickHouseAnomalySpendRepository
   }
 }
 
-function toClickHouseSourceFilter(filter: AnomalySpendSourceFilter): {
-  sql: string;
-  params: Record<string, string>;
-} {
-  if (filter.type === "source") {
-    return {
-      sql: "AND SourceId = {sourceId:String}",
-      params: { sourceId: filter.id },
-    };
-  }
-  if (filter.type === "source_type") {
-    return {
-      sql: "AND SourceType = {sourceType:String}",
-      params: { sourceType: filter.id },
-    };
-  }
-  return { sql: "", params: {} };
+/** The rule's source narrowing, pruned before the grouping; none for an org-wide rule. */
+function sourceConditionsOf({
+  filter,
+  eq,
+}: {
+  filter: AnomalySpendSourceFilter;
+  eq: ConditionOps<KpisTable, Record<never, never>>["eq"];
+}): Condition<KpisTable>[] {
+  if (filter.type === "source") return [eq(kpis.SourceId, filter.id)];
+  if (filter.type === "source_type") return [eq(kpis.SourceType, filter.id)];
+  return [];
 }
