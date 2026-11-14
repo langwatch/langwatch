@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/langwatch/langwatch/compare/agent-plugin@v1.2.0...agent-plugin@v1.3.0) (2026-11-14)
+
+
+### Features
+
+* **coding-agent:** capture Grok CLI sessions through its native OpenTelemetry ([#9224](https://github.com/langwatch/langwatch/issues/9224)) ([34c0f70](https://github.com/langwatch/langwatch/commit/34c0f700c4ff679717de20ad9bd15647631b8cec))
+
 ## [1.2.0](https://github.com/langwatch/langwatch/compare/agent-plugin@v1.1.0...agent-plugin@v1.2.0) (2026-09-13)
 
 
