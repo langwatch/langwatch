@@ -39,31 +39,36 @@ let cached: {
   success: boolean;
 } | null = null;
 let lastSuccessAt = 0;
-let inFlight: Promise<ProcessFleetMetricsRow[]> | null = null;
+let readGeneration = 0;
+let inFlight: { generation: number; promise: Promise<ProcessFleetMetricsRow[]> } | null = null;
 const CACHE_TTL_MS = 10_000;
 
 async function readCounts(): Promise<ProcessFleetMetricsRow[]> {
   const read = readFleet;
+  const generation = readGeneration;
   if (!read) return [];
   if (cached && nowInstant().epochMilliseconds - cached.at < CACHE_TTL_MS) return cached.rows;
-  if (inFlight !== null) return inFlight;
-  inFlight = Promise.resolve()
+  if (inFlight?.generation === generation) return inFlight.promise;
+  const promise = Promise.resolve()
     .then(read)
     .then((rows) => {
+      if (generation !== readGeneration) return [];
       lastSuccessAt = nowInstant().epochMilliseconds;
       cached = { at: lastSuccessAt, rows, success: true };
       return rows;
     })
     .catch(() => {
+      if (generation !== readGeneration) return [];
       // Retain unresolved work, but never advance its freshness on failure.
       const rows = cached?.rows ?? [];
       cached = { at: nowInstant().epochMilliseconds, rows, success: false };
       return rows;
     })
     .finally(() => {
-      inFlight = null;
+      if (inFlight?.promise === promise) inFlight = null;
     });
-  return inFlight;
+  inFlight = { generation, promise };
+  return promise;
 }
 
 /**
@@ -72,7 +77,16 @@ async function readCounts(): Promise<ProcessFleetMetricsRow[]> {
  * the gauges report nothing.
  */
 export function bindProcessFleetMetricsSource(read: FleetReader): void {
+  readGeneration += 1;
   readFleet = read;
+  cached = null;
+  lastSuccessAt = 0;
+}
+
+/** Drop the source on shutdown so the stopped graph's store is not kept reachable by the gauges. */
+export function unbindProcessFleetMetricsSource(): void {
+  readGeneration += 1;
+  readFleet = null;
   cached = null;
   lastSuccessAt = 0;
 }

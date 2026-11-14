@@ -1,13 +1,19 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import { createLogger } from "@langwatch/observability";
 
+import { isPlainClusterName, isUnknownClusterError } from "../../rules/cluster-name.rules.ts";
 import {
   type BackupStatusRow,
   StorageFootprintRepository,
 } from "../storage-footprint.repository.ts";
 import type { StorageStatsReading } from "../storage-stats-readings.repository.ts";
 
+const logger = createLogger("langwatch:ops:storage-footprint");
+
 /** One endpoint's system tables, read unscoped (`tenantId: ""`): none carries a tenant column. */
 export class ClickHouseStorageFootprintRepository extends StorageFootprintRepository {
+  private warnedUnknownCluster = false;
+
   private constructor(private readonly clickhouse: ClickHouseQueryClient) {
     super();
   }
@@ -80,9 +86,60 @@ export class ClickHouseStorageFootprintRepository extends StorageFootprintReposi
     }));
   }
 
-  /** Read from `system.backup_log` rather than `system.backups`. */
-  async findBackupStatuses(): Promise<BackupStatusRow[]> {
-    if (!(await this.hasBackupLog())) return [];
+  /**
+   * Read from `system.backup_log` rather than `system.backups`. With a cluster, every replica's
+   * log is read and merged: the backup runs on one replica, the app may be connected to another.
+   */
+  async findBackupStatuses({ cluster }: { cluster?: string | undefined } = {}): Promise<
+    BackupStatusRow[]
+  > {
+    const named = await this.orLocal({
+      cluster,
+      read: (source) => this.hasBackupLog({ cluster: source }),
+    });
+    if (!named.answer) return [];
+    const { answer: rows } = await this.orLocal({
+      cluster: named.cluster,
+      read: (source) => this.readBackupRows({ cluster: source }),
+    });
+    return rows.map((row) => ({
+      status: row.status,
+      count: Number.parseInt(row.cnt, 10),
+      lastSuccessTime: row.last_success_time,
+      lastSuccessSizeBytes: Number.parseInt(row.last_success_size, 10),
+    }));
+  }
+
+  /**
+   * The read across the cluster, or on the local node when ClickHouse does not know the cluster;
+   * that degradation is logged once per streak. Any other failure goes to the collector.
+   */
+  private async orLocal<T>({
+    cluster,
+    read,
+  }: {
+    cluster: string | undefined;
+    read: (cluster: string | undefined) => Promise<T>;
+  }): Promise<{ answer: T; cluster: string | undefined }> {
+    if (!plainClusterName(cluster)) return { answer: await read(void 0), cluster: void 0 };
+    try {
+      const answer = await read(cluster);
+      this.warnedUnknownCluster = false;
+      return { answer, cluster };
+    } catch (error) {
+      if (!isUnknownClusterError(error)) throw error;
+      // Once per streak: the setting stays wrong until an operator fixes it.
+      const level = this.warnedUnknownCluster ? "debug" : "warn";
+      this.warnedUnknownCluster = true;
+      logger[level](
+        { cluster, error },
+        "ClickHouse does not know the configured cluster; reading the local node's backup log",
+      );
+      return { answer: await read(void 0), cluster: void 0 };
+    }
+  }
+
+  private async readBackupRows({ cluster }: { cluster: string | undefined }) {
     const result = await this.clickhouse.query<{
       status: string;
       cnt: string;
@@ -96,28 +153,46 @@ export class ClickHouseStorageFootprintRepository extends StorageFootprintReposi
           count() as cnt,
           maxIf(end_time, status = 'BACKUP_CREATED') as last_success_time,
           argMaxIf(total_size, end_time, status = 'BACKUP_CREATED') as last_success_size
-        FROM system.backup_log
+        FROM ${backupLogSource(cluster)}
         GROUP BY status
+        ${clusterSettings(cluster)}
       `,
       // System.backup_log carries no tenant column: this is the instance's backup history.
       SKIP_TENANT_CHECK: true,
     });
-    return result.rows.map((row) => ({
-      status: row.status,
-      count: Number.parseInt(row.cnt, 10),
-      lastSuccessTime: row.last_success_time,
-      lastSuccessSizeBytes: Number.parseInt(row.last_success_size, 10),
-    }));
+    return result.rows;
   }
 
   /** Asked first: a server without the table would log an HTTP error for the query. */
-  private async hasBackupLog(): Promise<boolean> {
+  private async hasBackupLog({ cluster }: { cluster?: string | undefined }): Promise<boolean> {
     const result = await this.clickhouse.query<{ present: string }>({
       tenantId: "",
-      sql: "SELECT count() AS present FROM system.tables WHERE database = 'system' AND name = 'backup_log'",
+      sql: `SELECT count() AS present FROM ${systemTablesSource(cluster)}
+        WHERE database = 'system' AND name = 'backup_log' ${clusterSettings(cluster)}`,
       // System.tables carries no tenant column: this asks what the server has.
       SKIP_TENANT_CHECK: true,
     });
     return Number.parseInt(result.rows[0]?.present ?? "0", 10) > 0;
   }
+}
+
+/** The trusted cluster name, or an empty string where none is named or it is not plain. */
+function plainClusterName(cluster: string | undefined): string {
+  const name = cluster?.trim() ?? "";
+  return isPlainClusterName(name) ? name : "";
+}
+
+function backupLogSource(cluster: string | undefined): string {
+  const name = plainClusterName(cluster);
+  return name ? `clusterAllReplicas('${name}', system.backup_log)` : "system.backup_log";
+}
+
+function systemTablesSource(cluster: string | undefined): string {
+  const name = plainClusterName(cluster);
+  return name ? `clusterAllReplicas('${name}', system.tables)` : "system.tables";
+}
+
+/** One unreachable replica must not blank the reading the others can still answer. */
+function clusterSettings(cluster: string | undefined): string {
+  return plainClusterName(cluster) ? "SETTINGS skip_unavailable_shards = 1" : "";
 }

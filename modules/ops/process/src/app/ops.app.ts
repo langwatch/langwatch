@@ -36,6 +36,10 @@ import type {
   RegisteredStateProjection,
   ReplayService as EventingReplayService,
 } from "@langwatch/eventing";
+import {
+  bindProcessFleetMetricsSource,
+  unbindProcessFleetMetricsSource,
+} from "@langwatch/eventing";
 import { ExperimentApi } from "@langwatch/experiment-contract";
 import {
   FeatureFlagApi,
@@ -362,6 +366,7 @@ import {
   type PlatformOperatorSeedSettings,
 } from "../services/platform-operators.service.ts";
 import { ProcessAuditService } from "../services/process-audit.service.ts";
+import { ProcessFleetCollectionService } from "../services/process-fleet-collection.service.ts";
 import { QueueAuditService } from "../services/queue-audit.service.ts";
 import { QueueService } from "../services/queue.service.ts";
 import { SchedulerAuditService } from "../services/scheduler-audit.service.ts";
@@ -734,6 +739,7 @@ type OpsRuntimeDependencies = Readonly<{
   anomalies: AnomalyDetectorService | undefined;
   /** The measurement `ops_storage_stats` runs; absent where a composition built none. */
   storageStats: StorageStatsCollectionService | undefined;
+  processFleet: ProcessFleetCollectionService | undefined;
   /** The daily check `ops_seat_sharing` runs; absent where a composition built none. */
   seatSharing: SeatSharingCheckService | undefined;
   /** The stranded-group reap `ops_group_queue_reaper` and the operator action run. */
@@ -852,6 +858,7 @@ export class OpsModule implements OpsApi {
       declaredMigrationSteps: setup.declaredMigrationSteps,
       // Only the worker runs listed work; a tasks pass keeps reading the whole queue's depth.
       runListedWork: setup.role === "worker" ? setup.runListedWork : undefined,
+      reportsFleetGauges: setup.role === "worker",
       logger,
       config: setup.config,
       resources: setup.resources,
@@ -913,6 +920,13 @@ export class OpsModule implements OpsApi {
       resolveInstances: async () => [sharedStorageStatsInstance(repositories.storageFootprint)],
       readings: storageReadings,
       collectBackups: setup.config.collectClickHouseBackupMetrics,
+      clusterName: setup.config.clickhouseCluster,
+      logger,
+    });
+
+    const processFleet = ProcessFleetCollectionService.create({
+      fleet: repositories.processFleet,
+      readings: repositories.processFleetReadings,
       logger,
     });
 
@@ -956,6 +970,7 @@ export class OpsModule implements OpsApi {
       checkup,
       anomalies,
       storageStats,
+      processFleet,
       seatSharing,
       signUpHealth: SignUpHealthService.create({
         organizations: dependencies.organizations,
@@ -987,6 +1002,7 @@ export class OpsModule implements OpsApi {
     checkup?: OpsCheckupService;
     anomalies?: AnomalyDetectorService;
     storageStats?: StorageStatsCollectionService;
+    processFleet?: ProcessFleetCollectionService;
     seatSharing?: SeatSharingCheckService;
     signUpHealth?: SignUpHealthService;
     platformOperators?: PlatformOperatorsService;
@@ -1038,6 +1054,7 @@ export class OpsModule implements OpsApi {
       }),
       anomalies: setup.anomalies,
       storageStats: setup.storageStats,
+      processFleet: setup.processFleet,
       seatSharing: setup.seatSharing,
       groupQueueReaper: GroupQueueReaperService.create({
         repository: repositories.groupQueueReaper,
@@ -2240,11 +2257,15 @@ export class OpsModule implements OpsApi {
     await upgradeAlerts.check(input);
   }
 
-  /** One pass of `ops_storage_stats`: measures every endpoint and saves the readings. */
-  measureStorage(): Promise<void> {
-    const { storageStats } = this.#dependencies;
+  /**
+   * One pass of `ops_storage_stats`: measures every endpoint and saves the readings, then
+   * counts the process-manager fleet and shares those counts for the pm_* gauges.
+   */
+  async measureStorage(): Promise<void> {
+    const { storageStats, processFleet } = this.#dependencies;
     if (!storageStats) throw new OpsCapabilityUnavailableError("storage stats");
-    return storageStats.collect();
+    await storageStats.collect();
+    await processFleet?.collect();
   }
 
   /** The last seat sharing check, Cloud admin only; empty before the first one. */
@@ -2471,6 +2492,8 @@ function buildOpsInfrastructure(input: {
   /** The kernel's feed (S6-FEED); ops keeps only the tenant steps. */
   declaredMigrationSteps: (() => readonly unknown[]) | undefined;
   runListedWork: SystemMigrationRunnerDeps["runListedWork"];
+  /** Only the worker binds the pm_* gauges, so api and tasks pods never read the fleet counts. */
+  reportsFleetGauges: boolean;
 }): OpsAppInfrastructure {
   const { logger, config, resources, repositories } = input;
   const introspection = EventingIntrospectionService.create(() =>
@@ -2503,6 +2526,18 @@ function buildOpsInfrastructure(input: {
     },
     stop: () => queueMetricsWriter.stop(),
   });
+
+  // pm_instances / pm_outbox_* report nothing until a source is bound. The source reads the
+  // counts `ops_storage_stats` shares, never the tables, and refuses them once stale.
+  if (input.reportsFleetGauges) {
+    const fleetReadings = ProcessFleetCollectionService.create({
+      fleet: repositories.processFleet,
+      readings: repositories.processFleetReadings,
+      logger,
+    });
+    bindProcessFleetMetricsSource(() => fleetReadings.currentReadings());
+    resources.own("process fleet metrics source", () => unbindProcessFleetMetricsSource());
+  }
 
   const explainRuntime = OpsClickHouseRuntime.create({
     url: config.clickhouseOpsUrl,

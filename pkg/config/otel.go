@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 
+	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
+
 	"github.com/langwatch/langwatch/pkg/otelsetup"
 )
 
@@ -502,7 +504,8 @@ func (o *OTel) PrimaryOTLP() (endpoint string, headers map[string]string) {
 
 // Configure initializes the OTel provider from the resolved config, returning
 // a Provider whose Shutdown method flushes pending telemetry. Requires Resolve.
-func (o *OTel) Configure(ctx context.Context, nodeID string) (*otelsetup.Provider, error) {
+// producers are extra metric sources pulled on every OTLP metrics export.
+func (o *OTel) Configure(ctx context.Context, nodeID string, producers ...sdkmetric.Producer) (*otelsetup.Provider, error) {
 	o.mustBeResolved()
 	debugEndpoint, debugHeaders := o.DebugCollector()
 	return otelsetup.New(ctx, otelsetup.Options{
@@ -514,6 +517,7 @@ func (o *OTel) Configure(ctx context.Context, nodeID string) (*otelsetup.Provide
 		DebugCollectorEndpoint: debugEndpoint,
 		DebugCollectorHeaders:  debugHeaders,
 		MetricsDisabled:        o.MetricsExportDisabled(),
+		MetricProducers:        producers,
 	})
 }
 

@@ -50,20 +50,20 @@ recordCanonicalMetricDataPoints(points: readonly CanonicalMetricDataPoint[]): Pr
 
 |             |                                          |
 | ----------- | ---------------------------------------- |
-| Declared at | `src/transport/otlp-metrics.rest.ts:117` |
+| Declared at | `src/transport/otlp-metrics.rest.ts:127` |
 | Base URL    | none: each route's path is its address   |
 | Addressing  | literal                                  |
 | Credential  | otlp_ingest                              |
 
 #### `POST /api/otel/v1/metrics` · `ingestOtlpMetrics`
 
-Authenticated: the OTLP ingest door's resolved key is the whole gate, as on main. Credential `otlp_ingest`. Hidden from the OpenAPI document. Declared at `src/transport/otlp-metrics.rest.ts:123`.
+Authenticated: the OTLP ingest door's resolved key is the whole gate, as on main. Credential `otlp_ingest`. Hidden from the OpenAPI document. Declared at `src/transport/otlp-metrics.rest.ts:133`.
 
 Answers at `/api/otel/v1/metrics`.
 
 ```typescript
-// Rawbody: "bytes" (inline, src/transport/otlp-metrics.rest.ts:127)
-// Response: inline, src/transport/otlp-metrics.rest.ts:130
+// Rawbody: "bytes" (inline, src/transport/otlp-metrics.rest.ts:137)
+// Response: inline, src/transport/otlp-metrics.rest.ts:140
 type Response = unknown;
 ```
 
