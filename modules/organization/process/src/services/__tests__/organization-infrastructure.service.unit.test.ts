@@ -57,6 +57,10 @@ class StubRepository extends OrganizationRepository {
     return [];
   }
 
+  async findOperatorRows(): Promise<[]> {
+    return [];
+  }
+
   async countUsage(): Promise<{ members: number; teams: number; ssoProviders: string[] }> {
     return { members: 0, teams: 0, ssoProviders: [] };
   }

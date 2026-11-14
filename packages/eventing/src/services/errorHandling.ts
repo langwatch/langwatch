@@ -700,23 +700,43 @@ const QUERY_MEMORY_LIMIT_FRAGMENTS = [
  * reasons. The server-wide `(total)` limit and the client's own shedding are load, not size.
  */
 export function isQueryMemoryLimitExceeded(error: unknown): boolean {
-  return queryMemoryLimitAt({ error, depth: 0 });
+  return memoryLimitAt({ error, fragments: QUERY_MEMORY_LIMIT_FRAGMENTS, depth: 0 });
 }
 
-function queryMemoryLimitAt({ error, depth }: { error: unknown; depth: number }): boolean {
+/** Any ClickHouse memory limit, in every wording the server uses, the `(total)` one included. */
+const ANY_MEMORY_LIMIT_FRAGMENTS = [
+  "memory limit exceeded",
+  "Memory limit (for query) exceeded",
+  "Memory limit (total) exceeded",
+] as const;
+
+/**
+ * Whether a statement stopped on any memory limit, the server-wide one included: what a reader
+ * that sent nothing on yet may answer by reading less at a time.
+ */
+export function isAnyMemoryLimitExceeded(error: unknown): boolean {
+  return memoryLimitAt({ error, fragments: ANY_MEMORY_LIMIT_FRAGMENTS, depth: 0 });
+}
+
+function memoryLimitAt({
+  error,
+  fragments,
+  depth,
+}: {
+  error: unknown;
+  fragments: readonly string[];
+  depth: number;
+}): boolean {
   if (depth > MAX_CAUSE_DEPTH || error === null || typeof error !== "object") return false;
   const message = Reflect.get(error, "message");
-  if (
-    typeof message === "string" &&
-    QUERY_MEMORY_LIMIT_FRAGMENTS.some((fragment) => message.includes(fragment))
-  ) {
+  if (typeof message === "string" && fragments.some((fragment) => message.includes(fragment))) {
     return true;
   }
   const reasons: unknown = HandledError.isHandled(error) ? error.reasons : undefined;
   if (Array.isArray(reasons)) {
     for (const reason of reasons) {
-      if (queryMemoryLimitAt({ error: reason, depth: depth + 1 })) return true;
+      if (memoryLimitAt({ error: reason, fragments, depth: depth + 1 })) return true;
     }
   }
-  return queryMemoryLimitAt({ error: Reflect.get(error, "cause"), depth: depth + 1 });
+  return memoryLimitAt({ error: Reflect.get(error, "cause"), fragments, depth: depth + 1 });
 }
