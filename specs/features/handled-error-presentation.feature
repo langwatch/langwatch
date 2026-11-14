@@ -120,6 +120,22 @@ Feature: Handled errors — what the customer actually reads
     Then the description says to check the model name or pick another model
 
   @unit @bdd @handled-errors @presentation
+  Scenario: A model the endpoint has no deployment of says so
+    Given a handled error carries the code "llm_upstream_error"
+    And its reason is Azure's deployment-not-found code
+    When the client surfaces it
+    Then the title says the model isn't available on this provider
+    And the description says it isn't deployed on the endpoint and what to do about it
+
+  @unit @bdd @handled-errors @presentation
+  Scenario: A setting the model does not take is not blamed on the customer's model choice
+    Given a handled error carries the code "llm_upstream_error"
+    And its reason says the model does not accept a setting the request carried
+    When the client surfaces it
+    Then the title says the model can't take a setting Langy sent
+    And the description says it is a LangWatch problem and not the customer's choice of model
+
+  @unit @bdd @handled-errors @presentation
   Scenario: A provider rate limit gets its own remediation copy
     Given a handled error carries the code "llm_upstream_error"
     And its reason says the provider rate-limited the call
