@@ -54,6 +54,23 @@ Feature: Durable hand-off from an append to its lanes
     And the projection holds what the live lane would have written, the re-send's time included
 
   @unit
+  Scenario: A fold that does not depend on event order rebuilds a page at a time
+    Given a fold that does not depend on event order and can read its history in pages
+    And an aggregate whose history spans many pages, including events after the missed one
+    When the rebuild of the aggregate runs
+    Then the rebuild reads the history one page at a time, never all of it at once
+    And the fold's state equals a full replay of the log
+
+  @unit
+  Scenario: A paged rebuild retries a history that lags behind what the fold applied
+    Given a fold that does not depend on event order and can read its history in pages
+    And the fold already applied an event the log does not return yet
+    When the rebuild of the aggregate runs
+    Then the rebuild re-reads the history from its first page instead of folding the gap
+    And once the log returns the event, the fold's state equals a full replay, nothing folded twice
+    And if the log never returns it, the rebuild refuses the incomplete history and leaves the job to retry
+
+  @unit
   Scenario: The rebuild job runs in the aggregate's own ordered lane
     Given a fold's queued lanes
     When a rebuild is requested for one aggregate

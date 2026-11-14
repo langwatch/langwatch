@@ -16,6 +16,7 @@ import {
   TEST_CONSTANTS,
 } from "../../services/__tests__/testHelpers.ts";
 import { type JobRegistryEntry, QueueManager } from "../../services/queues/queueManager.ts";
+import { MAX_APPLIED_EVENT_IDS } from "../foldCache/foldCacheEntry.ts";
 import { FoldProjectionExecutor } from "../foldProjectionExecutor.ts";
 import type { ProjectionStoreContext } from "../projectionStoreContext.ts";
 
@@ -129,6 +130,167 @@ describe("rebuilding a fold's aggregate for a missed hand-off", () => {
           "read an incomplete history; retrying",
         );
         expect(current()?.state.seen).toEqual([original.id]);
+      });
+    });
+  });
+
+  describe("given a fold that does not depend on event order and reads its history in pages", () => {
+    /**
+     * A paged reader that serves the log like the real store: (createdAt, id)
+     * order, the strict `after` cursor, the `limit`, and the `upToEvent` bound.
+     */
+    function pagedReader({ log }: { log: () => Event[] }) {
+      return vi.fn(
+        async (ctx: {
+          upToEvent: Event;
+          after: { timestamp: number; eventId: string } | undefined;
+          limit: number;
+        }): Promise<Event[]> => {
+          const ordered = log()
+            .filter(
+              (e) =>
+                e.createdAt < ctx.upToEvent.createdAt ||
+                (e.createdAt === ctx.upToEvent.createdAt && e.id <= ctx.upToEvent.id),
+            )
+            .toSorted((a, b) => a.createdAt - b.createdAt || (a.id < b.id ? -1 : 1));
+          const { after } = ctx;
+          const start = after
+            ? ordered.findIndex(
+                (e) =>
+                  e.createdAt > after.timestamp ||
+                  (e.createdAt === after.timestamp && e.id > after.eventId),
+              )
+            : 0;
+          return start === -1 ? [] : ordered.slice(start, start + ctx.limit);
+        },
+      );
+    }
+
+    function pagedCountingFold({ log }: { log: () => Event[] }) {
+      const counting = countingFold({ log });
+      const wholeHistory = vi.fn(async () => log());
+      counting.fold.eventLoader = wholeHistory;
+      const paged = pagedReader({ log });
+      counting.fold.eventLoaderUpToPaged = paged;
+      counting.fold.options = { ...counting.fold.options, refoldOnOutOfOrder: false };
+      return { ...counting, wholeHistory, paged };
+    }
+
+    describe("when the aggregate's history spans many pages, with events after the missed one", () => {
+      /** @scenario "A fold that does not depend on event order rebuilds a page at a time" */
+      it("reads the history a page at a time and ends equal to a full replay", async () => {
+        const log = Array.from({ length: 7 }, (_, i) => at(1_000 * (i + 1)));
+        const missed = log[3]!;
+        const { fold, current, wholeHistory, paged } = pagedCountingFold({ log: () => log });
+        const pagesOfTwo = new FoldProjectionExecutor({ refoldPageSize: 2 });
+        await pagesOfTwo.execute(fold, log[0]!, context);
+
+        await pagesOfTwo.rebuild(fold, missed, context);
+
+        expect(wholeHistory).not.toHaveBeenCalled();
+        expect(paged.mock.calls.length).toBeGreaterThan(1);
+        for (const [request] of paged.mock.calls) expect(request.limit).toBe(2);
+        expect(current()?.state.seen).toEqual(log.map((e) => e.id));
+      });
+
+      /** @scenario "A fold that does not depend on event order rebuilds a page at a time" */
+      it("stores only the newest applied ids once the history outgrows the applied set", async () => {
+        const log = Array.from({ length: 2 * MAX_APPLIED_EVENT_IDS + 1 }, (_, i) => at(i + 1));
+        const { fold, current } = pagedCountingFold({ log: () => log });
+        await executor.execute(fold, log[0]!, context);
+
+        await executor.rebuild(fold, log[1]!, context);
+
+        expect(current()?.state.count).toBe(log.length);
+        expect(current()?.applied).toEqual(log.slice(-MAX_APPLIED_EVENT_IDS).map((e) => e.id));
+      });
+
+      /** @scenario "A live event arriving during the rebuild is not lost" */
+      it("skips a queued live job the rebuild already read", async () => {
+        const log = Array.from({ length: 5 }, (_, i) => at(1_000 * (i + 1)));
+        const live = log[4]!;
+        const { fold, current } = pagedCountingFold({ log: () => log });
+        const pagesOfTwo = new FoldProjectionExecutor({ refoldPageSize: 2 });
+        await pagesOfTwo.execute(fold, log[0]!, context);
+
+        await pagesOfTwo.rebuild(fold, log[2]!, context);
+        await pagesOfTwo.execute(fold, live, context);
+
+        expect(current()?.state.seen).toEqual(log.map((e) => e.id));
+      });
+    });
+
+    describe("when the fold already applied an event the first read does not return", () => {
+      /** @scenario "A paged rebuild retries a history that lags behind what the fold applied" */
+      it("re-reads from the first page and ends equal to a full replay, folding nothing twice", async () => {
+        const log = Array.from({ length: 5 }, (_, i) => at(1_000 * (i + 1)));
+        const [applied, missed] = [log[0]!, log[2]!];
+        let lagging = true;
+        const { fold, current, paged } = pagedCountingFold({
+          log: () => (lagging ? log.slice(1) : log),
+        });
+        const retrying = new FoldProjectionExecutor({
+          refoldPageSize: 2,
+          refoldHistoryRetryDelaysMs: [0, 0],
+        });
+        await retrying.execute(fold, applied, context);
+        paged.mockClear();
+        paged.mockImplementationOnce(async (request) => {
+          const page = await pagedReader({ log: () => log.slice(1) })(request);
+          lagging = false;
+          return page;
+        });
+
+        await retrying.rebuild(fold, missed, context);
+
+        const passStarts = paged.mock.calls.filter(([request]) => request.after === undefined);
+        expect(passStarts).toHaveLength(2);
+        expect(current()?.state.seen).toEqual(log.map((e) => e.id));
+      });
+    });
+
+    describe("when the missed event redelivers a key the fold applied and the first read lags", () => {
+      const keyed = (createdAt: number, id: string) => ({
+        ...at(createdAt),
+        id,
+        idempotencyKey: "span-key",
+      });
+
+      /** @scenario "A rebuild for a redelivered key folds the event log's copy, not the redelivery" */
+      it("retries until the log returns its copy and folds that copy, not the redelivery", async () => {
+        const original = keyed(1_000, "evt-original");
+        const redelivery = keyed(2_000, "evt-redelivery");
+        const reads: Event[][] = [[], [original]];
+        let read = 0;
+        const { fold, current, paged } = pagedCountingFold({ log: () => [original] });
+        const retrying = new FoldProjectionExecutor({ refoldHistoryRetryDelaysMs: [0] });
+        await retrying.execute(fold, original, context);
+        paged.mockClear();
+        paged.mockImplementation(async (request) =>
+          pagedReader({ log: () => reads[Math.min(read++, reads.length - 1)]! })(request),
+        );
+
+        await retrying.rebuild(fold, redelivery, context);
+
+        expect(read).toBeGreaterThan(1);
+        expect(current()?.state.seen).toEqual([original.id]);
+      });
+    });
+
+    describe("when the fold already applied an event the log never returns", () => {
+      /** @scenario "A paged rebuild retries a history that lags behind what the fold applied" */
+      it("refuses the incomplete history and leaves the job to retry", async () => {
+        const [applied, missed] = [at(1_000), at(2_000)];
+        const log: Event[] = [applied];
+        const { fold, current } = pagedCountingFold({ log: () => log });
+        const strict = new FoldProjectionExecutor({ refoldHistoryRetryDelaysMs: [] });
+        await strict.execute(fold, applied, context);
+        log.length = 0;
+
+        await expect(strict.rebuild(fold, missed, context)).rejects.toThrow(
+          "read an incomplete history; retrying",
+        );
+        expect(current()?.state.seen).toEqual([applied.id]);
       });
     });
   });
