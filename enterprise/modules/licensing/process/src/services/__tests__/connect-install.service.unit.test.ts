@@ -34,7 +34,7 @@ const ORGANIZATION = "org-acme";
 const cryptography = NodeLicenseCryptographyService.create({ publicKey: TEST_PUBLIC_KEY });
 
 /** A license signed here, so the services it names are part of the signature. */
-function licenseNaming(services: string[]): string {
+function licenseNaming(services: string[], organizationId: string = ORGANIZATION): string {
   return cryptography.encodeLicenseKey(
     cryptography.signLicense(
       {
@@ -51,7 +51,7 @@ function licenseNaming(services: string[]): string {
           maxMessagesPerMonth: 1_000_000,
           canPublish: true,
         },
-        organizationId: ORGANIZATION,
+        organizationId,
         ...(services.length > 0 ? { connectServices: services } : {}),
       },
       TEST_PRIVATE_KEY,
@@ -139,7 +139,7 @@ describe("what a self-hosted install may call", () => {
     expect(await service.findEnabledServices(ORGANIZATION)).toEqual([]);
 
     const status = await service.getStatus(ORGANIZATION);
-    expect(status).toMatchObject({ deployment: "on", licensed: true });
+    expect(status).toMatchObject({ deployment: "on", licensed: false });
     expect(gateway.classifications).toEqual([]);
   });
 
@@ -448,6 +448,23 @@ describe("the hosted provider slot of the install's own gateway", () => {
         instanceId: "instance-1",
       },
     ]);
+  });
+
+  /** @scenario An environment licence for another organization gives this one no hosted services */
+  it("ignores an instance-wide licence bound to another organization", async () => {
+    const gateway = MemoryConnectGatewayChannel.create();
+    const { service, upstream } = install({
+      license: null,
+      gateway,
+      instanceLicense: licenseNaming(["managed_models"], "org-other"),
+    });
+
+    await service.publishUpstream(ORGANIZATION);
+
+    expect(upstream.last).toBe("cleared");
+    expect(await service.findCredential(ORGANIZATION)).toEqual([]);
+    expect(await service.findEntitledServices(ORGANIZATION)).toEqual([]);
+    expect(await service.getStatus(ORGANIZATION)).toMatchObject({ licensed: false });
   });
 
   it("serves no upstream where Connect is off or no licence is held", async () => {

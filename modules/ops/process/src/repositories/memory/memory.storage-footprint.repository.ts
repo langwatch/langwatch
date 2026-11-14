@@ -31,7 +31,7 @@ export class MemoryStorageFootprintRepository implements StorageFootprintReposit
     return [...this.disks];
   }
 
-  async findBackupStatuses(): Promise<BackupStatusRow[]> {
+  async findBackupStatuses(_input?: { cluster?: string | undefined }): Promise<BackupStatusRow[]> {
     if (this.refusals.backups) throw this.refusals.backups();
     return [...this.backupStatuses];
   }

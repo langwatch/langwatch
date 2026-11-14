@@ -853,3 +853,78 @@ describe("recording that a customer's contract terms moved", () => {
     expect(contractBudgets.synced).toEqual([]);
   });
 });
+
+describe("the Developer seats a license sells", () => {
+  const signedDevelopers = (
+    cryptography: NodeLicenseCryptographyService,
+    licenseKey: string,
+  ): number | undefined => cryptography.parseLicenseKey(licenseKey)?.data.plan.maxMembersDeveloper;
+
+  /** @scenario An operator issues a licence with Developer seats */
+  it("signs the Developer seats stated and records them on the row", async () => {
+    const { registry, repository, cryptography } = harness();
+
+    const { licenseKey, license } = await registry.issue(issueInput({ maxMembersDeveloper: 4 }));
+
+    expect(signedDevelopers(cryptography, licenseKey)).toBe(4);
+    expect(license.maxMembersDeveloper).toBe(4);
+    expect((await repository.findById(license.id))?.maxMembersDeveloper).toBe(4);
+  });
+
+  /** @scenario A licence issued with no Developer seats, or 0, signs none and its row holds none */
+  it.each([{ stated: undefined }, { stated: 0 }])(
+    "signs no Developer seat field and records none when $stated are stated",
+    async ({ stated }) => {
+      const { registry, cryptography } = harness();
+
+      const { licenseKey, license } = await registry.issue(
+        issueInput(stated === undefined ? {} : { maxMembersDeveloper: stated }),
+      );
+
+      const plan = cryptography.parseLicenseKey(licenseKey)?.data.plan ?? {};
+      expect("maxMembersDeveloper" in plan).toBe(false);
+      expect(license.maxMembersDeveloper).toBeNull();
+    },
+  );
+
+  /** @scenario A replacement keeps the Developer seats of the licence it replaces */
+  it("keeps them on a reissue and a seat change that do not name them", async () => {
+    const { registry, cryptography } = harness();
+    const { license } = await registry.issue(issueInput({ maxMembersDeveloper: 4 }));
+
+    const reissued = await registry.reissue({
+      id: license.id,
+      expiresAt: Temporal.Instant.from("2028-01-01T00:00:00.000Z"),
+      operatorId: "operator-3",
+    });
+    const changed = await registry.changeSeats({
+      id: reissued.license.id,
+      maxMembers: 60,
+      operatorId: "operator-3",
+    });
+
+    expect(signedDevelopers(cryptography, reissued.licenseKey)).toBe(4);
+    expect(reissued.license.maxMembersDeveloper).toBe(4);
+    expect(signedDevelopers(cryptography, changed.licenseKey)).toBe(4);
+    expect(changed.license.maxMembersDeveloper).toBe(4);
+  });
+
+  /** @scenario A reissue that names Developer seats signs the new count */
+  it.each([
+    { stated: 7, signed: 7, stored: 7 },
+    { stated: 0, signed: undefined, stored: null },
+  ])("signs $signed when a reissue names $stated", async ({ stated, signed, stored }) => {
+    const { registry, cryptography } = harness();
+    const { license } = await registry.issue(issueInput({ maxMembersDeveloper: 4 }));
+
+    const reissued = await registry.reissue({
+      id: license.id,
+      maxMembersDeveloper: stated,
+      expiresAt: Temporal.Instant.from("2028-01-01T00:00:00.000Z"),
+      operatorId: "operator-3",
+    });
+
+    expect(signedDevelopers(cryptography, reissued.licenseKey)).toBe(signed);
+    expect(reissued.license.maxMembersDeveloper).toBe(stored);
+  });
+});

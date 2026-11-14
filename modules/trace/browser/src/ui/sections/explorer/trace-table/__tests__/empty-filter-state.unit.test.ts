@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { AGGREGATE_HISTORY_NOTE, emptyContent } from "../empty-filter-state.tsx";
+import { AGGREGATE_HISTORY_NOTE, emptyContent, emptyStateActions } from "../empty-filter-state.tsx";
 
 describe("emptyContent", () => {
   describe("given an Instant Eval that is still judging", () => {
@@ -50,6 +50,44 @@ describe("emptyContent", () => {
         // A chip can arrive with no run at all, from a shared link or a saved
         // lens, so the sentence must not assert that one ran over another scope.
         expect(content.description).not.toContain("covered a different");
+      });
+    });
+  });
+
+  describe("given an eval chip whose run failed", () => {
+    describe("when the table has no rows", () => {
+      /** @scenario "An empty table under a failed run says the run failed" */
+      it("says the eval did not finish, with the reason", () => {
+        const content = emptyContent({
+          activeLensId: "all-traces",
+          hasFilters: true,
+          rangeHours: 24,
+          isJudging: false,
+          failedEvalMessage: "Instant Evals could not reach LangWatch. Nothing was charged.",
+        });
+        expect(content.title).toBe("The Instant Eval did not finish");
+        expect(content.description).toContain("could not reach LangWatch");
+        expect(content.title).not.toContain("Nothing matches");
+        expect(content.description).not.toContain("still judging");
+      });
+
+      /** @scenario "An empty table under a failed run says the run failed" */
+      it("offers Retry first", () => {
+        const retry = () => {};
+        const actions = emptyStateActions({
+          activeLensId: "all-traces",
+          hasFilters: true,
+          isJudging: false,
+          rangeHours: 24 * 30,
+          unjudgedChip: null,
+          clearAll: () => {},
+          selectLens: () => {},
+          setTimeRange: () => {},
+          judgeTheseResults: () => {},
+          retryFailedEval: retry,
+        });
+        expect(actions[0]).toMatchObject({ label: "Retry", primary: true, onClick: retry });
+        expect(actions.find((action) => action.label === "Clear filters")?.primary).toBe(false);
       });
     });
   });

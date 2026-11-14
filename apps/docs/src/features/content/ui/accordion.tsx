@@ -47,7 +47,7 @@ export function Accordion({ title, description, icon, defaultOpen, children }: A
           </Flex>
           <ChakraAccordion.ItemIndicator />
         </ChakraAccordion.ItemTrigger>
-        <ChakraAccordion.ItemContent data-docs-panel="">
+        <ChakraAccordion.ItemContent data-docs-panel="" data-docs-findable="">
           <ChakraAccordion.ItemBody paddingX="4" paddingTop="1" paddingBottom="4">
             {children}
           </ChakraAccordion.ItemBody>

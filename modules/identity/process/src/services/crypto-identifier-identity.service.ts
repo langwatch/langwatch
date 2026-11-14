@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 
 import type { IdentifierProvider } from "@langwatch/identity-contract";
-import { Instance, Ksuid } from "@langwatch/ksuid";
+import { Instance, Ksuid, type KsuidLayout } from "@langwatch/ksuid";
 
 /** The fact an identifier id is derived from. */
 type DeriveIdentifierIdInput = {
@@ -12,17 +12,24 @@ type DeriveIdentifierIdInput = {
   occurredAtMs: number;
 };
 
+/** The two ids one fact derives: "v2", and the "v1-legacy" bytes rows stored before #9575 carry. */
+export type IdentifierIdCandidates = Readonly<{ v2: string; legacy: string }>;
+
 /**
  * Where an identifier fact's identity comes from.
  */
 export interface IdentifierIdentity {
-  /** The deterministic id this fact always derives, on any pass. */
-  deriveIdentifierId(fact: DeriveIdentifierIdInput): string;
+  /** Both ids this fact derives, on any pass. Reads nothing. */
+  deriveIdentifierIdCandidates(fact: DeriveIdentifierIdInput): IdentifierIdCandidates;
+  /** The candidate already stored (legacy first), else v2: a stored id never changes. */
+  deriveIdentifierId(
+    fact: DeriveIdentifierIdInput & { storedIdentifierIds: ReadonlySet<string> },
+  ): string;
 }
 
 /**
  * Pinned, never read from the ambient environment - the grants ledger's
- * `deriveGrantId` rationale verbatim (ADR-092 S13): the environment lands in
+ * grant id rationale verbatim (ADR-092 S13): the environment lands in
  */
 const IDENTIFIER_ID_ENVIRONMENT = "prod";
 
@@ -36,11 +43,27 @@ export class CryptoIdentifierIdentityService implements IdentifierIdentity {
 
   private constructor() {}
 
-  deriveIdentifierId(fact: DeriveIdentifierIdInput): string {
+  deriveIdentifierIdCandidates(fact: DeriveIdentifierIdInput): IdentifierIdCandidates {
+    return {
+      v2: this.derive({ fact, layout: "v2" }),
+      legacy: this.derive({ fact, layout: "v1-legacy" }),
+    };
+  }
+
+  deriveIdentifierId({
+    storedIdentifierIds,
+    ...fact
+  }: DeriveIdentifierIdInput & { storedIdentifierIds: ReadonlySet<string> }): string {
+    const { v2, legacy } = this.deriveIdentifierIdCandidates(fact);
+    if (storedIdentifierIds.has(legacy)) return legacy;
+    return v2;
+  }
+
+  private derive({ fact, layout }: { fact: DeriveIdentifierIdInput; layout: KsuidLayout }): string {
     const { userId, provider, providerAccountId, normalizedValue, occurredAtMs } = fact;
     const parts = [userId, provider, providerAccountId ?? normalizedValue];
     // ASCII unit separator, not a space: no part may smuggle a boundary
-    // character (the same choice deriveGrantId makes, for the same reason).
+    // character (the same choice the grant id makes, for the same reason).
     const digest = createHash("sha256").update(parts.join("\u001f")).digest();
     const instance = new Instance(
       Instance.schemes.RANDOM,
@@ -54,6 +77,7 @@ export class CryptoIdentifierIdentityService implements IdentifierIdentity {
       timestamp: timestampSeconds,
       instance,
       sequenceId,
+      layout,
     }).toString();
   }
 }

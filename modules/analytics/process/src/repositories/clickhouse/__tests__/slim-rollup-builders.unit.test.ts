@@ -139,8 +139,11 @@ describe("buildSlimTimeseriesQuery", () => {
     expect(sql).not.toMatch(/SELECT\s+\*/);
   });
 
-  it("fences both the dedup and the outer read on OccurredAt", () => {
-    expect(sql.match(/\{\{tenantScope:OccurredAt\}\}/g)).toHaveLength(2);
+  it("fences the dedup on OccurredAt and the outer read on the tenant set alone", () => {
+    expect(sql.match(/\{\{tenantScope:OccurredAt\}\}/g)).toHaveLength(1);
+    expect(sql).toMatch(/WHERE \{\{tenantSet\}\}\s+AND \(/);
+    expect(sql).toContain("tupleElement(__latest, 1) AS LatestOccurredAt");
+    expect(sql).toContain("ta.LatestOccurredAt >= {currentStart:DateTime64(3)}");
     expect(sql).not.toMatch(/TenantId\s*=/);
   });
 

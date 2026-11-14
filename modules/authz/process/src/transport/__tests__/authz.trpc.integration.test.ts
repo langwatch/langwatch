@@ -27,16 +27,22 @@ type Procedure = (input: unknown) => Promise<unknown>;
 function harness(
   overrides: {
     getScope?: AuthzService["getScope"];
-    effectivePermissions?: AuthzService["effectivePermissions"];
+    effectivePermissions?: AuthzService["effectivePermissionsWithOrganization"];
   } = {},
 ) {
   const getScope = vi.fn(overrides.getScope ?? (async () => PROJECT_SCOPE));
   const effectivePermissions = vi.fn(
-    overrides.effectivePermissions ?? (async () => ["project:view" as const]),
+    overrides.effectivePermissions ??
+      (async () => ({
+        permissions: ["project:view" as const],
+        organizationPermissions: ["organization:view" as const],
+      })),
   );
   // Nobody here holds the platform grant, so the answer carries no ops permissions.
   const can = vi.fn(async () => false);
-  const app = createAuthzTestApp({ permissions: { getScope, effectivePermissions, can } });
+  const app = createAuthzTestApp({
+    permissions: { getScope, effectivePermissionsWithOrganization: effectivePermissions, can },
+  });
 
   const procedures: Record<string, Procedure> = {};
   const accesses: string[] = [];
@@ -62,7 +68,7 @@ function harness(
 
   authzTrpcTransport.router(runtime, () => app);
 
-  return { getScope, effectivePermissions, procedures, accesses };
+  return { app, getScope, effectivePermissions, procedures, accesses };
 }
 
 describe("the application's AuthZ tRPC adapter", () => {
@@ -82,6 +88,7 @@ describe("the application's AuthZ tRPC adapter", () => {
       expect(answer).toEqual({
         scope: { type: "project", id: PROJECT_ID },
         permissions: ["project:view"],
+        organizationPermissions: ["organization:view"],
       });
     });
 
@@ -114,8 +121,26 @@ describe("the application's AuthZ tRPC adapter", () => {
 
       const answer = await procedures.effectivePermissions!({ projectId: "project_missing" });
 
-      expect(answer).toEqual({ scope: null, permissions: [] });
+      expect(answer).toEqual({ scope: null, permissions: [], organizationPermissions: [] });
       expect(effectivePermissions).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when an administrator grants the Billing role", () => {
+    /** @scenario "Granting or revoking Billing never reaches beyond the caller" */
+    it("passes the session as the caller the escalation ceiling bounds", async () => {
+      const { app, procedures } = harness();
+      const setBillingRole = vi.spyOn(app, "setBillingRole").mockResolvedValue(undefined);
+
+      await procedures.setMemberBillingRole!({
+        organizationId: ORGANIZATION_ID,
+        userId: "user_2",
+        holds: true,
+      });
+
+      expect(setBillingRole).toHaveBeenCalledWith(
+        expect.objectContaining({ caller: { type: "user", id: USER_ID } }),
+      );
     });
   });
 
@@ -132,6 +157,17 @@ describe("the application's AuthZ tRPC adapter", () => {
         "listManagedGrants",
         "listMemberGrants",
         "applyMemberGrants",
+        "listBraids",
+        "createBraid",
+        "changeBraid",
+        "removeBraid",
+        "getBraidsPolicy",
+        "setBraidsPolicy",
+        "listOrganizationBraids",
+        "countProjectTraceViewers",
+        "listBraidTargets",
+        "listBillingMembers",
+        "setMemberBillingRole",
       ];
 
       expect(Object.keys(authzTrpc.members)).toEqual(declared);
@@ -146,8 +182,8 @@ describe("the application's AuthZ tRPC adapter", () => {
     it("declares the read service-authorized", () => {
       const { accesses } = harness();
 
-      // The grant procedures beside it sit at organization:manage.
-      expect(accesses).toEqual(["service-authorized", ...Array(7).fill("permission")]);
+      // The grant, braid and billing procedures beside it each declare a permission.
+      expect(accesses).toEqual(["service-authorized", ...Array(18).fill("permission")]);
     });
   });
 });

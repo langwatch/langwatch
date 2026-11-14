@@ -12,9 +12,10 @@ vi.hoisted(() => {
 describe("when the docs are served from an origin the app does not frame", () => {
   /** @scenario "Offer only the pasted key where the app would refuse to be framed" */
   it("does not embed the session frame, so the browser reports no framing refusal", () => {
-    const container = document.createElement("div");
-    document.body.append(container);
-    mountFrame({ container });
-    expect(container.querySelector("iframe")).toBeNull();
+    const room = document.createElement("div");
+    room.dataset.docsSessionFrame = "";
+    document.body.append(room);
+    mountFrame();
+    expect(document.querySelector("iframe")).toBeNull();
   });
 });

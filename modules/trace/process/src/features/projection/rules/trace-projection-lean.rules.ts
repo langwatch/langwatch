@@ -19,6 +19,7 @@ import {
   capOversizedAttributes,
   hasOversizedAttribute,
 } from "../../../rules/trace-attribute-cap.rules.ts";
+import { otlpAttributesKeepingHeldMarks } from "../../span/rules/span-verified-mark.rules.ts";
 
 type LeanableEvent = { id: string; type: string; data: unknown };
 
@@ -125,6 +126,11 @@ function leanSpanReceivedEvent(event: LeanableEvent): LeanableEvent {
 
   // Previewed attributes are already under the cap, so it never touches them.
   capOversizedAttributes(clonedSpan, clonedResource);
+  // A signed entry previewed or capped here is no longer the value signed: its mark goes.
+  clonedSpan.attributes = otlpAttributesKeepingHeldMarks({
+    before: data.span.attributes,
+    after: clonedSpan.attributes,
+  });
 
   return { ...event, data: { ...data, span: clonedSpan, resource: clonedResource } };
 }
