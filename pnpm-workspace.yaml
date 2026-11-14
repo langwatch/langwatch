@@ -187,7 +187,7 @@ catalog:
   tsup: ^8.5.0
   typescript: ^7.0.2
   typescript-eslint: ^8.55.0
-  undici: ^8.10.2
+  undici: ^8.12.2
   unified: ^11.0.5
   use-debounce: ^10.1.1
   usehooks-ts: ^3.1.1
