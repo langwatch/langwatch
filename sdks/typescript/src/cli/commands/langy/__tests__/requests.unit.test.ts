@@ -793,6 +793,33 @@ describe("given the share-control command", () => {
       expect(waiting).toHaveBeenCalledTimes(1);
       expect(slept).toEqual([5_000, 5_000]);
     });
+
+    /** @scenario "Nothing arriving for thirty seconds names the login and how to switch" */
+    it("says nothing has arrived once, after thirty seconds, and keeps waiting", async () => {
+      let read = 0;
+      const api: ControlApi = {
+        list: async () => (read++ < 10 ? [] : [requestNamed("req_1", "Instrument tracing")]),
+        approve: async () => {
+          throw new Error("not used");
+        },
+        cancel: async () => undefined,
+      };
+      const nothingYet = vi.fn();
+      let slept = 0;
+
+      const requests = await waitForRequests({
+        api,
+        intervalMs: 5_000,
+        onNothingYet: () => nothingYet(slept),
+        sleep: async (ms) => {
+          slept += ms;
+        },
+      });
+
+      expect(nothingYet).toHaveBeenCalledTimes(1);
+      expect(nothingYet).toHaveBeenCalledWith(30_000);
+      expect(requests).toHaveLength(1);
+    });
   });
 });
 

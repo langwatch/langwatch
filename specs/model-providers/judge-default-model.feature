@@ -77,3 +77,22 @@ Feature: Judge column in Default models
     Given I picked a Default model in the drawer
     When I look at the Judge row
     Then it inherits that Default model
+
+  # --- The Judge picker ---
+
+  @unit
+  Scenario: The Judge picker lists no decision model
+    Given the judge router flag is on for my organization
+    And own decision models are on for my organization
+    When the Judge picker's choices are built
+    Then no LangWatch decision model and no own decision model is listed
+    And the LLMs are the choices
+
+  @integration
+  Scenario: The Judge picker offers only models that can judge a scenario
+    Given the judge router flag is on for my organization
+    And own decision models are on for my organization
+    When I open the Judge picker
+    Then no decision model is listed
+    And the inherit row comes first, then the LLMs
+    And every LLM reads as its provider icon and model id, with no description and no provider heading

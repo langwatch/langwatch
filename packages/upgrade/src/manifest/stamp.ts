@@ -15,6 +15,11 @@ export interface DeclaredStepSource {
 const GOOSE_FILE = /^(\d+)_(.+)\.sql$/;
 const PRISMA_FOLDER = /^\d{14}_(.+)$/;
 
+/** A Prisma migration folder (`<14-digit timestamp>_<name>`), never `0_init` or the lock file. */
+export function isPrismaMigrationFolder({ name }: { name: string }): boolean {
+  return PRISMA_FOLDER.test(name);
+}
+
 export function prismaStepId({ folder }: { folder: string }): string {
   return `prisma:${folder}`;
 }

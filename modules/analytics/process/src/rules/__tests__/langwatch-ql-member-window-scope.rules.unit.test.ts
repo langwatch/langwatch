@@ -220,6 +220,18 @@ describe("scopeLangWatchQL with member windows", () => {
       );
     });
 
+    /** @scenario "An aggregate reads a dated member's trace evaluations only for traces inside its window" */
+    it.each(["trace_evaluation_metrics", "trace_evaluation_checks"])(
+      "reads %s only when its trace is inside the window",
+      (view) => {
+        expect(scope({ sql: `SELECT count() FROM ${view}`, memberWindows: [DATED_B] })).toBe(
+          `SELECT count() FROM (SELECT * FROM ${view} WHERE ((TenantId = 'project_b' AND ` +
+            `OccurredAt >= fromUnixTimestamp64Milli(toInt64(${SHARED_FROM})) AND ${traceInside()}))) ` +
+            `AS ${view}`,
+        );
+      },
+    );
+
     it("bounds the trace lookup by the statement's period, as the origin lookup is bounded", () => {
       const windowStart = "toDateTime('2026-03-10 00:00:00', 'UTC')";
       const windowEnd = "toDateTime('2026-03-13 00:00:00', 'UTC')";

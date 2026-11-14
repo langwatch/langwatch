@@ -18,6 +18,7 @@ import {
   useModelProvidersSettings,
 } from "@langwatch/model-provider-client";
 import {
+  lookUpMappedDeployment,
   skipListToInput,
   type ModelProviderEditorValue,
   modelProviders as modelProvidersRegistry,
@@ -102,6 +103,21 @@ function countEnabledProviders({
 }
 
 /** Enabled with no stored credentials means the environment supplies them. */
+/** A stored deployment mapping wins, read the same way execution reads it. */
+function mappedDeployment({
+  provider,
+  model,
+}: {
+  provider: ModelProviderEditorValue;
+  model: string;
+}): string {
+  const mapped = lookUpMappedDeployment({
+    deploymentMapping: provider.deploymentMapping,
+    qualifiedModel: `${provider.provider}/${model}`,
+  });
+  return mapped.kind === "mapped" ? mapped.deployment : model;
+}
+
 function readsCredentialsFromEnvironment(provider: ModelProviderEditorValue): boolean {
   if (!provider.enabled) return false;
 
@@ -810,10 +826,15 @@ export const EditModelProviderForm = ({
     guided,
     providerKey: provider.provider,
     chatModel: guidedSave.chatModel,
+    registersModel: guidedSave.registersModel,
     state,
     actions,
     storedRow: provider,
   });
+  // Only the guided panel names the model up front; the drawer probes without one.
+  const chatModel = guidedSave.chatModel;
+  const probedModel =
+    guided && chatModel ? mappedDeployment({ provider, model: chatModel }) : undefined;
 
   // Same answer the credential fields render their required markers from.
   const requiredKeys = useRequiredCredentialKeys({
@@ -839,6 +860,7 @@ export const EditModelProviderForm = ({
   } = useModelProviderApiKeyValidation({
     provider: provider.provider,
     customKeys: state.customKeys,
+    model: probedModel,
     projectId,
     organizationId: organization?.id,
     scopes: state.scopes,
@@ -848,6 +870,7 @@ export const EditModelProviderForm = ({
   // end of the road on one surface and a hard block on the next.
   const { probeRequired, recordRefusal, clearRefusal, saveLabel } = useCredentialProbeGate({
     customKeys: state.customKeys,
+    model: probedModel,
     resetKey: providerId,
   });
 
@@ -933,6 +956,7 @@ export const EditModelProviderForm = ({
         fieldErrors={fieldErrors}
         setFieldErrors={setFieldErrors}
         refusal={apiKeyValidationError}
+        refusalCode={apiKeyValidationErrorCode}
         clearRefusal={clearApiKeyError}
         connectLabel={probeRequired ? "Connect" : saveLabel}
         onConnect={() => void handleSave()}

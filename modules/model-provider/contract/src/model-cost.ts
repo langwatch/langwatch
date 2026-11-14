@@ -62,6 +62,8 @@ export const computeCost = (input: {
   outputImageTokens?: number;
   inputCharacters?: number;
   audioSeconds?: number;
+  /** Web search tool calls, each billed a flat rate on top of the tokens. */
+  webSearchRequests?: number;
 }): number | undefined => {
   const rate = input.rate;
   const hasAnyRate =
@@ -75,7 +77,8 @@ export const computeCost = (input: {
     !!rate.inputAudioCostPerToken ||
     !!rate.outputAudioCostPerToken ||
     !!rate.inputImageCostPerToken ||
-    !!rate.outputImageCostPerToken;
+    !!rate.outputImageCostPerToken ||
+    !!rate.webSearchCostPerQuery;
   if (!hasAnyRate) return undefined;
 
   const inputRate = rate.inputCostPerToken ?? 0;
@@ -99,7 +102,8 @@ export const computeCost = (input: {
     cacheWrite1h * cacheCreation1hRate +
     (cacheWriteTotal - cacheWrite1h) * cacheCreationRate +
     (input.inputCharacters ?? 0) * (rate.inputCostPerCharacter ?? 0) +
-    (input.audioSeconds ?? 0) * (rate.inputCostPerSecond ?? 0)
+    (input.audioSeconds ?? 0) * (rate.inputCostPerSecond ?? 0) +
+    (input.webSearchRequests ?? 0) * (rate.webSearchCostPerQuery ?? 0)
   );
 };
 
@@ -141,6 +145,25 @@ const buildSafeRegex = (pattern: string): RegExp | null => {
   return compiled;
 };
 
+/**
+ * The winning rate (`null` for none) per model name, kept per cost list and keyed by the list
+ * itself. A cost list is immutable once passed in: build a new array to change a price.
+ */
+type RememberedMatches = Map<string, ModelCostRate | null>;
+const costListMatches = new WeakMap<readonly ModelCostRate[], RememberedMatches>();
+const MATCHES_PER_COST_LIST_MAX_ENTRIES = 2_000;
+/** Longer names are matched but not remembered, so span-supplied names cannot grow the memory. */
+const REMEMBERED_MODEL_NAME_MAX_LENGTH = 256;
+
+const matchesFor = (costs: readonly ModelCostRate[]): RememberedMatches => {
+  let matches = costListMatches.get(costs);
+  if (!matches) {
+    matches = new Map();
+    costListMatches.set(costs, matches);
+  }
+  return matches;
+};
+
 const findModelCost = (
   model: string,
   costs: readonly ModelCostRate[],
@@ -172,10 +195,26 @@ export const findMatchingModelCost = (
   model: string,
   costs: readonly ModelCostRate[],
 ): ModelCostRate[] => {
-  const match =
-    findCandidateModelCost({ candidate: model, costs }) ??
-    findSubtypeStrippedModelCost({ model, costs }) ??
-    findBedrockModelCost({ model, costs });
+  const matches = matchesFor(costs);
+  // `null` remembers a miss, so an unknown model is not rescanned on every span.
+  let match = matches.get(model);
+  if (match !== undefined) {
+    // Re-insert on a hit, so the least recently used name is the one a full list drops.
+    matches.delete(model);
+    matches.set(model, match);
+  } else {
+    match =
+      findCandidateModelCost({ candidate: model, costs }) ??
+      findSubtypeStrippedModelCost({ model, costs }) ??
+      findBedrockModelCost({ model, costs }) ??
+      null;
+    if (model.length > REMEMBERED_MODEL_NAME_MAX_LENGTH) return match ? [match] : [];
+    // Drop the least recently used name only, so a burst of new names never flushes busy ones.
+    const oldest =
+      matches.size >= MATCHES_PER_COST_LIST_MAX_ENTRIES ? matches.keys().next() : undefined;
+    if (oldest && !oldest.done) matches.delete(oldest.value);
+    matches.set(model, match);
+  }
   return match ? [match] : [];
 };
 

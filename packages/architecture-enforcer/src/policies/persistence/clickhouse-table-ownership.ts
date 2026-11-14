@@ -154,6 +154,13 @@ export const DECLARED_OWNERSHIP: DeclaredOwnership = {
       reason: "trace folds it from its facts for analytics' dashboards to read (EF-5, 2026-10-07)",
     },
     {
+      table: "trace_evaluation_analytics",
+      owner: "trace",
+      readers: ["analytics"],
+      reason:
+        "trace folds each evaluation beside its trace's columns for analytics' stock widgets (trace ADR-003)",
+    },
+    {
       table: "trace_analytics_rollup",
       owner: "trace",
       readers: ["analytics"],

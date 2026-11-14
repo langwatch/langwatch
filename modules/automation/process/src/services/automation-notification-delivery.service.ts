@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 
 import { EMAIL_RX, type AlertType, type SlackPayload } from "@langwatch/automation-contract";
+import { ALERT_LINK_MARKER } from "@langwatch/automation-contract/alert-link";
 import { toDispatchError } from "@langwatch/eventing";
 import type { MailRender, TriggerDigestEntry } from "@langwatch/mail";
 import type { NotificationService } from "@langwatch/notification-contract";
@@ -202,6 +203,7 @@ export class AutomationNotificationDeliveryService extends AutomationNotificatio
         projectSlug: input.projectSlug,
         baseHost: this.baseHost,
         entries: input.triggerData.map(toDigestEntry),
+        linkMarker: ALERT_LINK_MARKER,
       });
     } catch (error) {
       throw toDispatchError(error, {
