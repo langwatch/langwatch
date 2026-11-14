@@ -11,7 +11,10 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { braidedProof } from "../../../__tests__/support/authorization-proofs.fixture.ts";
 import type { TraceViewRead } from "../../span-storage.repository.ts";
 import { SpanStorageClickHouseRepository } from "../span-storage.repository.ts";
-import { authorizedClickHouseFor } from "./support/authorized-clickhouse.support.ts";
+import {
+  authorizedClickHouseFor,
+  traceQueryClientFor,
+} from "./support/authorized-clickhouse.support.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
@@ -83,6 +86,7 @@ beforeAll(async () => {
       throw new Error("this test reads only");
     },
     clickhouse: authorizedClickHouseFor(ch),
+    reader: traceQueryClientFor(ch),
   });
   for (const row of [
     spanRow({ tenantId: reader, spanId: "reader-root", offsetMs: 0, attributes: MATCHING }),

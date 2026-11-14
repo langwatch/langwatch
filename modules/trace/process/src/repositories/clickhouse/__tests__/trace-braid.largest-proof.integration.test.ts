@@ -173,6 +173,7 @@ beforeAll(async () => {
       throw new Error("this test reads only");
     },
     clickhouse,
+    reader: traceQueryClientFor(ch),
   });
   totals = TraceBraidedTotalsService.create({
     reads: ClickHouseTraceBraidReadsRepository.create({ clickhouse }),

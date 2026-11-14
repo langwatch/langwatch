@@ -138,3 +138,11 @@ Feature: Trace span-tree read service
     When the trace's evaluation spans and events, its project's ingest lag and its occurrence are read
     Then each read returns only the reader's latest version, events newest first without exceptions
     And the occurrence is the trace summary's own time
+
+  @unit
+  Scenario: Every full-span read of a trace is fenced by the reader's proof
+    Given a reader whose proof covers its own project, or a braid it reads spans through
+    When the trace's full, normalized and stored spans are read
+    Then each statement is a reader statement over the proof's tenants with the tenant setting
+    And it elects each span's latest version within the stored_spans id bound and the memory ceiling
+    And a braided read applies the owner's condition without naming the owner

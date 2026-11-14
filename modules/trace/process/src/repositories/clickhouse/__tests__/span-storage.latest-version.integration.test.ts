@@ -8,7 +8,10 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { ownProof } from "../../../__tests__/support/authorization-proofs.fixture.ts";
 import { SpanStorageClickHouseRepository } from "../span-storage.repository.ts";
-import { authorizedClickHouseFor } from "./support/authorized-clickhouse.support.ts";
+import {
+  authorizedClickHouseFor,
+  traceQueryClientFor,
+} from "./support/authorized-clickhouse.support.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
@@ -66,6 +69,7 @@ beforeAll(async () => {
   repo = SpanStorageClickHouseRepository.create({
     resolveClient: async () => ch,
     clickhouse: authorizedClickHouseFor(ch),
+    reader: traceQueryClientFor(ch),
   });
 
   // Separate inserts leave three unmerged parts; the newest is inserted first

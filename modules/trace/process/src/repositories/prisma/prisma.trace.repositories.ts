@@ -85,7 +85,10 @@ export class PostgresTraceRepositories {
         reader: members.clickhouse,
       }),
       spanAnalyticsFloor: PrismaSpanAnalyticsFloorRepository.create(members.prisma),
-      spanStorage: SpanStorageClickHouseRepository.create(storage),
+      spanStorage: SpanStorageClickHouseRepository.create({
+        ...storage,
+        reader: members.clickhouse,
+      }),
       spanTree: ClickHouseTraceSpanRepository.create({ clickhouse: members.clickhouse }),
       braidReads: ClickHouseTraceBraidReadsRepository.create({ clickhouse }),
       existence: ClickHouseTraceExistenceRepository.create({ clickhouse: members.clickhouse }),

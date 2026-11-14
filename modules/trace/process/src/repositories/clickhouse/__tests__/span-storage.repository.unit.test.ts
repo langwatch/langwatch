@@ -99,6 +99,7 @@ function repository() {
     clickhouse: new AuthorizedClickHouse({
       resolveClient: async () => clickHouseQueryClientDouble(),
     }),
+    reader: { read: () => Promise.reject(new Error("this test sends no built read")) },
   });
   return { clickhouse, repo };
 }
@@ -458,6 +459,7 @@ function readRepository() {
   const repo = SpanStorageClickHouseRepository.create({
     resolveClient: new RecordingClickHouse().resolve,
     clickhouse: clickhouse.authorized,
+    reader: { read: () => Promise.reject(new Error("this test sends no built read")) },
   });
   return { clickhouse, repo };
 }
@@ -716,6 +718,7 @@ describe("SpanStorageClickHouseRepository.listSpansPaginated", () => {
         resolveClient: async () =>
           idIndexedClientDouble({ indexes: TRACE_ID_INDEXES, driver: { execute } }),
       }),
+      reader: { read: () => Promise.reject(new Error("this test sends no built read")) },
     });
     return { repo, statements };
   }

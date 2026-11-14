@@ -333,7 +333,8 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
     occurredAtMs?: number;
   }): Promise<TraceSpanSummaryRecord[]> {
     // `UpdatedAt` is not the partition key, so the trace-id bound bounds the read from below
-    // only: a live trace can run past any upper bound. The election repeats the since filter.
+    // only: a live trace can run past any upper bound.
+    // `repeat` keeps main's election; the since filter is monotone in the version, so rows match.
     const statement = clickhouseRead({ scope: fenced(input.authorization, "spans") })
       .from(spans)
       .braided({ heldTrace: { traceId: input.traceId } })

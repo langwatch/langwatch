@@ -42,6 +42,7 @@ function spanRepository(rows: Record<string, unknown>[] = []) {
       throw new Error("this test writes nothing");
     },
     clickhouse,
+    reader: { read: () => Promise.reject(new Error("this test sends no built read")) },
   });
   const spanReads = () => statements.filter(({ sql }) => sql.includes("FROM stored_spans"));
   return { repo, spanReads };

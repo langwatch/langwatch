@@ -144,6 +144,7 @@ beforeAll(async () => {
   repo = SpanStorageClickHouseRepository.create({
     resolveClient: async () => ch,
     clickhouse: authorizedClickHouseFor(ch),
+    reader: traceQueryClientFor(ch),
   });
   spanTree = ClickHouseTraceSpanRepository.create({ clickhouse: traceQueryClientFor(ch) });
 

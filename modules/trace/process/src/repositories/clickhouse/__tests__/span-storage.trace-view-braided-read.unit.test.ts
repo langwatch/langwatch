@@ -19,9 +19,9 @@ import { SpanStorageClickHouseRepository } from "../span-storage.repository.ts";
 const READER = "proj_orchestrator";
 const OWNER = "proj_specialists";
 const LATEST_VERSION = "SELECT TenantId, TraceId, SpanId, max(UpdatedAt)";
+/** Captures the trace id's parameter: `traceId` on a raw read, `v<n>` on a built one. */
 const HELD_IN_TRACE =
-  "TraceId IN (SELECT TraceId FROM stored_spans WHERE TenantId IN ({tenantScope_own:Array(String)})" +
-  " AND StartTime >= fromUnixTimestamp64Milli({tenantScope_heldFrom:Int64}) AND TraceId = {traceId:String})";
+  /TraceId IN \(SELECT TraceId FROM stored_spans WHERE TenantId IN \(\{tenantScope_own:Array\(String\)\}\) AND StartTime >= fromUnixTimestamp64Milli\(\{tenantScope_heldFrom:Int64\}\) AND TraceId = \{(traceId|v\d+):String\}\)/;
 const WEB: CompiledWhere = {
   version: 1,
   tree: { kind: "attributeEquals", on: "span", key: "orchestrator", value: "web" },
@@ -31,26 +31,23 @@ type Statement = { sql: string; params: Record<string, unknown> };
 
 function spanRepository({ countsOwners = true }: { countsOwners?: boolean } = {}) {
   const statements: Statement[] = [];
-  const clickhouse = new AuthorizedClickHouse({
-    resolveClient: async () =>
-      idIndexedClientDouble({
-        indexes: TRACE_ID_INDEXES,
-        driver: {
-          execute: vi.fn<ScriptedStatements["execute"]>(async (request) => {
-            statements.push({ sql: request.sql, params: request.params ?? {} });
-            const counts = request.sql.includes("AS Total");
-            const owners =
-              countsOwners && request.sql.includes("AS Tenants") ? { Tenants: [] } : {};
-            return { rows: counts ? [{ Total: 1, FromMs: 1, ToMs: 2, ...owners }] : [] };
-          }),
-        },
+  const client = idIndexedClientDouble({
+    indexes: TRACE_ID_INDEXES,
+    driver: {
+      execute: vi.fn<ScriptedStatements["execute"]>(async (request) => {
+        statements.push({ sql: request.sql, params: request.params ?? {} });
+        const counts = request.sql.includes("AS Total");
+        const owners = countsOwners && request.sql.includes("AS Tenants") ? { Tenants: [] } : {};
+        return { rows: counts ? [{ Total: 1, FromMs: 1, ToMs: 2, ...owners }] : [] };
       }),
+    },
   });
   const repo = SpanStorageClickHouseRepository.create({
     resolveClient: async () => {
       throw new Error("this test writes nothing");
     },
-    clickhouse,
+    clickhouse: new AuthorizedClickHouse({ resolveClient: async () => client }),
+    reader: client,
   });
   const spanReads = () => statements.filter(({ sql }) => sql.includes("FROM stored_spans"));
   return { repo, spanReads };
@@ -121,8 +118,9 @@ describe("SpanStorageClickHouseRepository trace-view reads", () => {
 
         for (const { sql, params } of statements) {
           const [outer = ""] = sql.split(LATEST_VERSION);
-          expect(outer).toContain(HELD_IN_TRACE);
-          expect(params).toMatchObject({ tenantScope_own: [READER], traceId: at.traceId });
+          const [traceParam = ""] = HELD_IN_TRACE.exec(outer)?.slice(1) ?? [];
+          expect(traceParam).not.toBe("");
+          expect(params).toMatchObject({ tenantScope_own: [READER], [traceParam]: at.traceId });
         }
       });
 

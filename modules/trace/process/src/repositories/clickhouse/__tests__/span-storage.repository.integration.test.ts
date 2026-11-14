@@ -13,7 +13,10 @@ import { ownProof } from "../../../__tests__/support/authorization-proofs.fixtur
 import { MAX_EVENT_NAMES_PER_TRACE } from "../../span-storage.repository.ts";
 import { SpanStorageClickHouseRepository } from "../span-storage.repository.ts";
 import { recordStoredSpansQueries } from "./fixtures/recording-clickhouse-client.ts";
-import { authorizedClickHouseFor } from "./support/authorized-clickhouse.support.ts";
+import {
+  authorizedClickHouseFor,
+  traceQueryClientFor,
+} from "./support/authorized-clickhouse.support.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
@@ -28,6 +31,7 @@ function repoOver(client: ClickHouseClient): SpanStorageClickHouseRepository {
   return SpanStorageClickHouseRepository.create({
     resolveClient: async () => client,
     clickhouse: authorizedClickHouseFor(client),
+    reader: traceQueryClientFor(client),
   });
 }
 const traceId = `trace-${nanoid()}`;
@@ -538,6 +542,7 @@ describe.skipIf(!clickHouseConfigured)(
         const failingRepo = SpanStorageClickHouseRepository.create({
           resolveClient: refuse,
           clickhouse: new AuthorizedClickHouse({ resolveClient: refuse }),
+          reader: { read: refuse },
         });
 
         await expect(

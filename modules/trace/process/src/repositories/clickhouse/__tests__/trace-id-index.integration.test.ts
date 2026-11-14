@@ -44,9 +44,10 @@ let outcomes: { table: string; outcome: WindowedReadOutcome }[];
  * The test ClickHouse behind the fence, recording every statement the reads send, with trace's
  * indexes read as filled (no marker row is written to the shared server).
  */
-async function recordingAuthorizedClickHouse(
-  client: ClickHouseClient,
-): Promise<AuthorizedClickHouse> {
+async function recordingAuthorizedClickHouse(client: ClickHouseClient): Promise<{
+  clickhouse: AuthorizedClickHouse;
+  reader: Awaited<ReturnType<typeof readyIdIndexedClientDouble>>;
+}> {
   const queryClient = await readyIdIndexedClientDouble({
     indexes: TRACE_ID_INDEXES,
     driver: {
@@ -61,7 +62,10 @@ async function recordingAuthorizedClickHouse(
       },
     },
   });
-  return new AuthorizedClickHouse({ resolveClient: async () => queryClient });
+  return {
+    clickhouse: new AuthorizedClickHouse({ resolveClient: async () => queryClient }),
+    reader: queryClient,
+  };
 }
 
 /** A span kept forever by default, so no TTL merge can drop an eight-week-old fixture. */
@@ -198,8 +202,12 @@ beforeAll(async () => {
     await insertSpans([spanRow({ traceId, startMs: Date.now() - daysAgo * DAY_MS })]);
     await insertSummary({ traceId, occurredAtMs: Date.now() - daysAgo * DAY_MS });
   }
-  const clickhouse = await recordingAuthorizedClickHouse(ch);
-  spans = SpanStorageClickHouseRepository.create({ resolveClient: async () => ch, clickhouse });
+  const { clickhouse, reader } = await recordingAuthorizedClickHouse(ch);
+  spans = SpanStorageClickHouseRepository.create({
+    resolveClient: async () => ch,
+    clickhouse,
+    reader,
+  });
   summaries = TraceSummaryClickHouseRepository.create({
     resolveClient: async () => ch,
     clickhouse,

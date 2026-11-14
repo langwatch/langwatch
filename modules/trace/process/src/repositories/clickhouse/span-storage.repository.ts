@@ -1,6 +1,7 @@
 import type { Authorization } from "@langwatch/authorization";
 import {
   type AuthorizedClickHouse,
+  type ClickHouseQueryClient,
   DEFAULT_PARTITION_WINDOW_MS,
   type IdBoundOptions,
   RESOLVER_RECENT_WINDOW_MS,
@@ -11,6 +12,11 @@ import {
   tenantScopeWithConditions,
   type WindowFallback,
 } from "@langwatch/clickhouse-client";
+import {
+  clickhouseRead,
+  fn,
+  tenantScope as builtTenantScope,
+} from "@langwatch/clickhouse-client/builder";
 import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { ATTR_KEYS } from "@langwatch/span-normalisation";
@@ -56,6 +62,7 @@ type WithDateWrites<T, K extends keyof T> = {
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "@langwatch/data-retention-contract";
 import { z } from "zod";
 
+import { storedSpans } from "./clickhouse.stored-spans.table.ts";
 import {
   chNumber,
   chString,
@@ -161,6 +168,102 @@ const DERIVATION_SPAN_SELECT = `
   Cost,
   NonBilledCost
 `;
+
+/** {@link FULL_SPAN_SELECT} as the builder selects it, for the reads already built. */
+const FULL_SPAN_SELECTION = {
+  SpanId: storedSpans.SpanId,
+  TraceId: storedSpans.TraceId,
+  TenantId: storedSpans.TenantId,
+  ParentSpanId: storedSpans.ParentSpanId,
+  ParentTraceId: storedSpans.ParentTraceId,
+  ParentIsRemote: storedSpans.ParentIsRemote,
+  Sampled: storedSpans.Sampled,
+  StartTimeMs: fn.toUnixTimestamp64Milli(storedSpans.StartTime),
+  EndTimeMs: fn.toUnixTimestamp64Milli(storedSpans.EndTime),
+  DurationMs: storedSpans.DurationMs,
+  SpanName: storedSpans.SpanName,
+  SpanKind: storedSpans.SpanKind,
+  ResourceAttributes: storedSpans.ResourceAttributes,
+  SpanAttributes: storedSpans.SpanAttributes,
+  StatusCode: storedSpans.StatusCode,
+  StatusMessage: storedSpans.StatusMessage,
+  ScopeName: storedSpans.ScopeName,
+  ScopeVersion: storedSpans.ScopeVersion,
+  Cost: storedSpans.Cost,
+  NonBilledCost: storedSpans.NonBilledCost,
+  Events_Timestamp: fn.arrayMap(
+    (at) => fn.toUnixTimestamp64Milli(at),
+    storedSpans["Events.Timestamp"],
+  ),
+  Events_Name: storedSpans["Events.Name"],
+  Events_Attributes: storedSpans["Events.Attributes"],
+  Links_TraceId: storedSpans["Links.TraceId"],
+  Links_SpanId: storedSpans["Links.SpanId"],
+  Links_Attributes: storedSpans["Links.Attributes"],
+};
+
+/** The stored-attribute projection the prompt playground reads. */
+const STORED_SPAN_SELECTION = {
+  SpanId: storedSpans.SpanId,
+  TraceId: storedSpans.TraceId,
+  ParentSpanId: storedSpans.ParentSpanId,
+  SpanName: storedSpans.SpanName,
+  SpanAttributes: storedSpans.SpanAttributes,
+  StartTimeMs: fn.toUnixTimestamp64Milli(storedSpans.StartTime),
+  EndTimeMs: fn.toUnixTimestamp64Milli(storedSpans.EndTime),
+  DurationMs: storedSpans.DurationMs,
+  StatusCode: storedSpans.StatusCode,
+  StatusMessage: storedSpans.StatusMessage,
+};
+
+/**
+ * One trace's latest full spans under the proof: braided, the owners' spans under their
+ * conditions beside a bare election; otherwise the reader's own windows (ADR-201 §5).
+ */
+function fullSpansStatement({
+  authorization,
+  braided,
+  traceId,
+  limit,
+}: {
+  authorization: Authorization;
+  braided: boolean;
+  traceId: string;
+  limit: number;
+}) {
+  const scope = builtTenantScope.fromProof({ authorization, reads: braided ? "spans" : "traces" });
+  const read = clickhouseRead({ scope }).from(storedSpans);
+  return (braided ? read.braided({ heldTrace: { traceId } }) : read.withinWindows())
+    .select(FULL_SPAN_SELECTION)
+    .where(({ idBound }) => idBound(storedSpans.TraceId, traceId))
+    .latestVersion()
+    .orderBy("StartTimeMs", "ASC")
+    .limit(limit)
+    .settings(SINGLE_TRACE_READ_SETTINGS)
+    .build();
+}
+
+/** One trace's latest spans with their attributes as stored, in the reader's own windows. */
+function storedSpansStatement({
+  authorization,
+  traceId,
+  limit,
+}: {
+  authorization: Authorization;
+  traceId: string;
+  limit: number;
+}) {
+  return clickhouseRead({ scope: builtTenantScope.fromProof({ authorization, reads: "traces" }) })
+    .from(storedSpans)
+    .withinWindows()
+    .select(STORED_SPAN_SELECTION)
+    .where(({ idBound }) => idBound(storedSpans.TraceId, traceId))
+    .latestVersion()
+    .orderBy("StartTimeMs", "ASC")
+    .limit(limit)
+    .settings(SINGLE_TRACE_READ_SETTINGS)
+    .build();
+}
 
 /**
  * Per-query memory ceiling for the single-trace full-attribute reads below.
@@ -821,9 +924,11 @@ function storedTraceSpanOf(row: z.infer<typeof storedSpanRowSchema>): StoredTrac
  * authorized client, which fences every statement by the proof (ADR-177 block C).
  */
 export class SpanStorageClickHouseRepository implements SpanStorageRepository {
+  /** `reader` sends the reads already built; `clickhouse` the ones still raw, until they are. */
   static create(deps: {
     resolveClient: ClickHouseClientResolver;
     clickhouse: AuthorizedClickHouse;
+    reader: Pick<ClickHouseQueryClient, "read">;
   }): SpanStorageClickHouseRepository {
     return new SpanStorageClickHouseRepository(deps);
   }
@@ -832,6 +937,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     private readonly deps: {
       resolveClient: ClickHouseClientResolver;
       clickhouse: AuthorizedClickHouse;
+      reader: Pick<ClickHouseQueryClient, "read">;
     },
   ) {}
 
@@ -945,28 +1051,18 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       return await this.readTraceSpans<OwnedSpan[]>(
         { authorization, traceId, occurredAtMs },
         async (idBound) => {
-          const client = this.readerOf(authorization, braided);
-          const result = await client.query({
-            query: `
-              SELECT ${FULL_SPAN_SELECT}
-              FROM ${TABLE_NAME}
-              WHERE ${outerScope(braided)}
-                AND TraceId = {traceId:String}
-                ${STORED_SPANS_ID_BOUND}
-                AND ${dedupInTuple(STORED_SPANS_ID_BOUND)}
-              ORDER BY StartTimeMs ASC
-              LIMIT {limit:UInt32}
-            `,
-            query_params: {
+          const result = await this.deps.reader.read({
+            statement: fullSpansStatement({
+              authorization,
+              braided,
               traceId,
               limit: effectiveLimit,
-            },
-            clickhouse_settings: SINGLE_TRACE_READ_SETTINGS,
-            format: "JSONEachRow",
+            }),
+            table: storedSpans.$table.name,
             idBound,
           });
 
-          const rows = fullSpanRowsSchema.parse(await result.json());
+          const rows = fullSpanRowsSchema.parse(result.rows);
           return ownedSpansOf({ rows, authorization, braided });
         },
       );
@@ -1006,28 +1102,18 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       return await this.readTraceSpans<NormalizedSpan[]>(
         { authorization, traceId, occurredAtMs },
         async (idBound) => {
-          const client = this.readerOf(authorization, braided);
-          const result = await client.query({
-            query: `
-              SELECT ${FULL_SPAN_SELECT}
-              FROM ${TABLE_NAME}
-              WHERE ${outerScope(braided)}
-                AND TraceId = {traceId:String}
-                ${STORED_SPANS_ID_BOUND}
-                AND ${dedupInTuple(STORED_SPANS_ID_BOUND)}
-              ORDER BY StartTimeMs ASC
-              LIMIT {limit:UInt32}
-            `,
-            query_params: {
+          const result = await this.deps.reader.read({
+            statement: fullSpansStatement({
+              authorization,
+              braided,
               traceId,
               limit: effectiveLimit,
-            },
-            clickhouse_settings: SINGLE_TRACE_READ_SETTINGS,
-            format: "JSONEachRow",
+            }),
+            table: storedSpans.$table.name,
             idBound,
           });
 
-          const rows = fullSpanRowsSchema.parse(await result.json());
+          const rows = fullSpanRowsSchema.parse(result.rows);
           return rows.map(mapChRowToNormalized);
         },
       );
@@ -1063,38 +1149,13 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       return await this.readTraceSpans<StoredTraceSpan[]>(
         { authorization, traceId, occurredAtMs },
         async (idBound) => {
-          const client = this.reader(authorization);
-          const result = await client.query({
-            query: `
-              SELECT
-                SpanId,
-                TraceId,
-                ParentSpanId,
-                SpanName,
-                SpanAttributes,
-                toUnixTimestamp64Milli(StartTime) AS StartTimeMs,
-                toUnixTimestamp64Milli(EndTime) AS EndTimeMs,
-                DurationMs,
-                StatusCode,
-                StatusMessage
-              FROM ${TABLE_NAME}
-              WHERE ${tenantScope("StartTime")}
-                AND TraceId = {traceId:String}
-                ${STORED_SPANS_ID_BOUND}
-                AND ${dedupInTuple(STORED_SPANS_ID_BOUND)}
-              ORDER BY StartTimeMs ASC
-              LIMIT {limit:UInt32}
-            `,
-            query_params: {
-              traceId,
-              limit: effectiveLimit,
-            },
-            clickhouse_settings: SINGLE_TRACE_READ_SETTINGS,
-            format: "JSONEachRow",
+          const result = await this.deps.reader.read({
+            statement: storedSpansStatement({ authorization, traceId, limit: effectiveLimit }),
+            table: storedSpans.$table.name,
             idBound,
           });
 
-          return storedSpanRowsSchema.parse(await result.json()).map(storedTraceSpanOf);
+          return storedSpanRowsSchema.parse(result.rows).map(storedTraceSpanOf);
         },
       );
     } catch (error) {

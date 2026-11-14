@@ -3,7 +3,7 @@ import { column, defineClickHouseTable } from "@langwatch/clickhouse-client/buil
 /**
  * Trace's spans (goose 00002 onward), one row per span version. The engine merges on
  * `StartTime`, but every read elects the latest `UpdatedAt`, as the fenced reader's election did.
- * Of the nested groups only `Events.*` is declared: no read selects `Links.*`.
+ * `Links.*` is read only by span storage's full-span reads.
  */
 export const storedSpans = defineClickHouseTable({
   name: "stored_spans",
@@ -40,6 +40,11 @@ export const storedSpans = defineClickHouseTable({
     "Events.Timestamp": column.array(column.dateTime64({ precision: 3 })),
     "Events.Name": column.array(column.lowCardinality(column.string())),
     "Events.Attributes": column.array(
+      column.map({ key: column.lowCardinality(column.string()), value: column.string() }),
+    ),
+    "Links.TraceId": column.array(column.string()),
+    "Links.SpanId": column.array(column.string()),
+    "Links.Attributes": column.array(
       column.map({ key: column.lowCardinality(column.string()), value: column.string() }),
     ),
     CreatedAt: column.dateTime64({ precision: 3 }),
