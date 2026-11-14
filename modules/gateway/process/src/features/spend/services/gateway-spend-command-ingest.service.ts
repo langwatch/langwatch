@@ -6,8 +6,12 @@ import {
   type GatewayInternalSpendSubmission,
   type GatewayPricedSpend,
   type GatewayPricedSpendResult,
+  type GatewayProviderUsage,
+  type GatewayProviderUsageResult,
+  spendUsageSchema,
   type SpendUsage,
 } from "@langwatch/gateway-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
@@ -22,6 +26,7 @@ import {
   asString,
   attributedIdentity,
   pricedSpendCommandData,
+  providerUsageCommandData,
   rejectedRecordIdentity,
 } from "../../../rules/gateway-spend-command.rules.ts";
 import type {
@@ -36,7 +41,9 @@ const logger = createLogger("langwatch:gateway-internal");
 type GatewaySpendCommandIngestMembers = Readonly<{
   spend: GatewayInternalSpendPipeline | undefined;
   store: GatewayInternalStoreRepository;
-  projects: Pick<ProjectApi, "listNamesByIds">;
+  projects: Pick<ProjectApi, "listNamesByIds" | "findWithTeam">;
+  /** The stored provider row a platform call ran on, when its caller did not name one. */
+  providerRows?: Pick<ModelProviderApi, "findRowServingModel" | "getExecutionProviders">;
 }>;
 
 export class GatewaySpendCommandIngestService {
@@ -74,6 +81,61 @@ export class GatewaySpendCommandIngestService {
     await sender.send(pricedSpendCommandData(input));
 
     return { status: "recorded" } as const;
+  }
+
+  /**
+   * Appends one call LangWatch made with stored provider credentials. Rated here, at the same
+   * seam that prices a drained outcome, and attributed to the project's team and organization so
+   * the debit writer charges every budget it falls under (ADR-193).
+   */
+  async recordProviderUsage(input: GatewayProviderUsage): Promise<GatewayProviderUsageResult> {
+    const pipeline = this.members.spend;
+    const sender = pipeline?.commands.confirmSpend;
+    if (!pipeline || !sender) return { status: "unavailable" } as const;
+    const project = await this.members.projects.findWithTeam(input.projectId);
+    if (!project) {
+      logger.error(
+        { projectId: input.projectId, requestId: input.requestId, model: input.model },
+        "provider usage not written to the ledger: the project has no team",
+      );
+      return { status: "unattributed" } as const;
+    }
+    const usage = spendUsageSchema.parse(input.usage);
+    const rated = pipeline.rating.rate({ model: input.model, usage });
+    await sender.send(
+      providerUsageCommandData({
+        input,
+        usage,
+        rated,
+        organizationId: project.team.organizationId,
+        teamId: project.team.id,
+        modelProviderId: input.modelProviderId ?? (await this.servingProviderId(input)),
+      }),
+    );
+
+    return { status: "recorded" } as const;
+  }
+
+  /** The row the execution path would pick: the one serving the model, else the provider's. */
+  private async servingProviderId({ projectId, model }: GatewayProviderUsage): Promise<string> {
+    const rows = this.members.providerRows;
+    const [provider = "", ...rest] = model.split("/");
+    const modelName = rest.join("/");
+    if (!rows || !provider || !modelName) return "";
+    try {
+      const serving = await rows.findRowServingModel({
+        projectId,
+        provider,
+        model: modelName,
+      });
+      if (serving) return serving.id;
+      const providers = await rows.getExecutionProviders({ projectId });
+      return providers[provider]?.id ?? "";
+    } catch (error) {
+      // The spend still lands under every budget that covers all providers.
+      logger.warn({ projectId, model, error }, "provider usage could not name its provider row");
+      return "";
+    }
   }
 }
 

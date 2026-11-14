@@ -229,6 +229,80 @@ export class ModelRestrictedForExecutionError extends HandledError {
   }
 }
 
+/**
+ * A model this process has no road to execute: a codex model where no gateway handle was
+ * composed. Permanent, so background callers stop instead of retrying it.
+ */
+export class ModelExecutionUnavailableError extends HandledError {
+  declare readonly code: "model_execution_unavailable";
+
+  readonly model: string;
+  readonly featureKey: string;
+
+  constructor(input: { model: string; featureKey: string }) {
+    super(
+      "model_execution_unavailable",
+      `"${input.model}" cannot be executed by this process for "${input.featureKey}".`,
+      {
+        httpStatus: 400,
+        // The remedy is a settings change (another model for this feature), and no retry helps.
+        fault: "customer",
+        meta: { model: input.model, featureKey: input.featureKey },
+      },
+    );
+    this.name = "ModelExecutionUnavailableError";
+    this.model = input.model;
+    this.featureKey = input.featureKey;
+  }
+}
+
+/**
+ * A named model whose provider this project has not added, or has turned off. Distinct from
+ * `model_provider_disabled`, which carries the cascade scope its swap toast reads.
+ */
+export class ModelProviderUnavailableError extends HandledError {
+  declare readonly code: "model_provider_unavailable";
+
+  constructor(input: { providerKey: string; reason: "not_configured" | "disabled" }) {
+    super(
+      "model_provider_unavailable",
+      input.reason === "disabled"
+        ? `Model provider "${input.providerKey}" is configured but disabled.`
+        : `Model provider "${input.providerKey}" is not configured for this project.`,
+      {
+        httpStatus: 400,
+        // The project's provider settings decide it: a settings change fixes it, no retry does.
+        fault: "customer",
+        meta: { reason: input.reason },
+        ...remediation("model_provider_unavailable"),
+      },
+    );
+    this.name = "ModelProviderUnavailableError";
+  }
+}
+
+/** Configuration refusals: the project's settings decide them, so no retry can succeed. */
+const PERMANENT_AI_CALL_CODES: ReadonlySet<string> = new Set([
+  "model_execution_unavailable",
+  "model_not_configured",
+  "model_provider_disabled",
+  "model_provider_unavailable",
+  "model_restricted_for_execution",
+  "model_restricted_for_feature",
+]);
+
+/**
+ * Whether an AI call failed for a reason no retry can fix: a configuration refusal, or a
+ * provider rejection (`ai_call_failed`, not retryable) anywhere in the reason chain.
+ */
+export function isPermanentAiCallFailure(error: unknown): boolean {
+  if (!HandledError.isHandled(error)) return false;
+  if (PERMANENT_AI_CALL_CODES.has(error.code)) return true;
+  if (error.code === "ai_call_failed" && !error.retryable) return true;
+
+  return error.reasons.some(isPermanentAiCallFailure);
+}
+
 export class ModelProviderNotFoundError extends HandledError {
   declare readonly code: "model_provider_not_found";
 
@@ -565,6 +639,17 @@ export class ProviderRefusedError extends HandledError {
   }
 }
 
+/** The key and endpoint answered, but no deployment by this name lives there. */
+export class ProviderDeploymentNotFoundError extends HandledError {
+  constructor({ provider, deployment }: { provider: string; deployment: string }) {
+    super("provider_deployment_not_found", `${provider} has no deployment named ${deployment}`, {
+      fault: "customer",
+      httpStatus: 400,
+      meta: { provider, deployment },
+    });
+  }
+}
+
 /** The account behind the credential cannot pay for a call. */
 export class ProviderOutOfCreditError extends HandledError {
   constructor({ provider }: { provider: string }) {
@@ -723,15 +808,23 @@ export class AiCallFailedError extends HandledError {
     role,
     featureDisplayName,
     originalErrorMessage,
+    retryable = true,
+    reasons,
   }: {
     featureKey: string;
     role: ModelRole;
     featureDisplayName: string;
     originalErrorMessage: string;
+    /** False when the provider refused the request itself (a 4xx): a retry gets the same answer. */
+    retryable?: boolean;
+    /** The wrapped failure, so a handled cause keeps its code on the chain. */
+    reasons?: readonly Error[];
   }) {
     super("ai_call_failed", `AI call failed for "${featureKey}".`, {
       httpStatus: 400,
       fault: "provider",
+      retryable,
+      ...(reasons ? { reasons } : {}),
       // Read by the missing-model/AI-failure toast surface. Carried on the
       // handled payload (not only on the legacy `data.cause` sidecar) so the
       // bespoke `aiCallFailedCause` block in `trpc.ts` can be deleted without

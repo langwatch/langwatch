@@ -27,6 +27,7 @@ export type { EgressTlsPolicy, FencedFetchOptions } from "./ssrf/fenced-fetch.ts
  * how). Every HTTPS caller resolves it the same way, so no bypass via a second `no_proxy` copy.
  */
 export {
+  globalFetchUsesEnvProxy,
   hostnameOf,
   isProxyBypassed,
   parseOutboundProxyConfig,

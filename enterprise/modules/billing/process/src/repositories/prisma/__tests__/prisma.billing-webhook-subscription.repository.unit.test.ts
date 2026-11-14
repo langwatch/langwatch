@@ -22,8 +22,11 @@ const SUBSCRIPTION: BillingSubscriptionRecord = {
   endDate: null,
   maxMembers: null,
   maxMembersLite: null,
+  maxMembersDeveloper: null,
   maxMessagesPerMonth: null,
   lastPaymentFailedDate: null,
+  seatsKept: null,
+  seatsKeptUntil: null,
 };
 
 const WITH_ORGANIZATION: BillingSubscriptionWithOrganization = {

@@ -70,6 +70,9 @@ type UsagePayload struct {
 	// Audio duration in whole MILLISECONDS. Every quantity on this wire is
 	// an integer, and the rating seam divides by 1000 once.
 	AudioMS int `json:"audio_ms"`
+	// WebSearchRequests is the server-side web searches the call ran, which
+	// providers price per query.
+	WebSearchRequests int `json:"web_search_requests"`
 }
 
 // AdmittedPayload records that a request entered the gateway: identity and
@@ -176,6 +179,7 @@ func usageFromDomain(u domain.Usage) UsagePayload {
 		ImageCount:            u.ImageCount,
 		InputChars:            u.InputChars,
 		AudioMS:               audioMillis(u.AudioSeconds),
+		WebSearchRequests:     u.WebSearchRequests,
 	}
 }
 

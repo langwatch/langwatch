@@ -6,6 +6,7 @@ import {
   logCorrectedOtlpPath,
   otlpBodyForensics,
   parseOtlpMetrics,
+  withClientFaultSpan,
   type OtlpDoorRequest,
 } from "@langwatch/otlp";
 import { type OtlpIngestCredential } from "@langwatch/otlp/door";
@@ -51,9 +52,9 @@ export class OtlpMetricReceiverService {
       return Promise.resolve({ outcome: "not-found" });
     }
 
-    return this.#tracer.withActiveSpan(
-      "[POST] /api/otel/v1/metrics",
-      { kind: SpanKind.SERVER },
+    return withClientFaultSpan<Span, MetricOtlpDoorResult>(
+      (run) =>
+        this.#tracer.startActiveSpan("[POST] /api/otel/v1/metrics", { kind: SpanKind.SERVER }, run),
       (span) => this.#receive({ request, credential, span }),
     );
   }

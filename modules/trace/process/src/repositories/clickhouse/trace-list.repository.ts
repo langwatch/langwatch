@@ -85,13 +85,13 @@ const listSummaryRowSchema = z.looseObject({
   AttrLabels: chString,
   AttrInputMediaRefs: chString,
   AttrOutputMediaRefs: chString,
-  OccurredAt: chNumber,
-  /** The row's projection stamp; see the OccurredAt decode in `toTraceListRow`. */
+  OccurredAtMs: chNumber,
+  /** The row's projection stamp; see the OccurredAtMs decode in `toTraceListRow`. */
   Version: chString.optional(),
   /** The span timing baseline column added by migration 00072 (ADR-087). */
   EarliestSpanStartMs: chNumber.optional(),
   CreatedAt: chNumber,
-  UpdatedAt: chNumber,
+  UpdatedAtMs: chNumber,
   ComputedIOSchemaVersion: chString,
   ComputedInput: chString.nullable(),
   ComputedOutput: chString.nullable(),
@@ -170,6 +170,24 @@ function buildWhereClause({
 
   return { sql: parts.join(" AND "), baseSql, params };
 }
+
+/** Seconds a sidebar facet read may run before ClickHouse stops it. */
+const FACET_READ_MAX_EXECUTION_SECONDS = 20;
+
+/**
+ * Every sidebar facet read: stopped on the server at its time cap and not run again, under a
+ * 2 GiB memory cap. The sidebar omits a stopped facet. specs/traces-v2/search.feature
+ */
+const FACET_READ = {
+  clickhouse_settings: {
+    // ClickHouse settings are string-typed over the wire.
+    max_execution_time: String(FACET_READ_MAX_EXECUTION_SECONDS),
+    timeout_overflow_mode: "throw",
+    max_memory_usage: String(2 * 1024 * 1024 * 1024),
+  } as Record<string, string>,
+  retryOnTimeout: false,
+  format: "JSONEachRow",
+} as const;
 
 function buildWhereClauseForTable({
   timeRange,
@@ -290,11 +308,11 @@ export class TraceListClickHouseRepository implements TraceListRepository {
           AttrReasoningTokens,
           AttrContextSizeTokens,
           AttrLabels,
-          toUnixTimestamp64Milli(OccurredAt) AS OccurredAt,
+          toUnixTimestamp64Milli(OccurredAt) AS OccurredAtMs,
           Version,
           EarliestSpanStartMs,
           toUnixTimestamp64Milli(CreatedAt) AS CreatedAt,
-          toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAt,
+          toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAtMs,
           ComputedIOSchemaVersion,
           ComputedInput,
           ComputedOutput,
@@ -641,7 +659,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
         offset: params.offset,
         ...(params.prefix ? { prefix: params.prefix } : {}),
       },
-      format: "JSONEachRow",
+      ...FACET_READ,
     });
 
     const rows = facetRowsSchema.parse(await result.json());
@@ -694,7 +712,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
         LIMIT {limit:UInt32}
       `,
       query_params: { ...filter.params, ...queryParams, limit: params.limit },
-      format: "JSONEachRow",
+      ...FACET_READ,
     });
 
     const rows = discreteValueRowsSchema.parse(await result.json());
@@ -719,10 +737,14 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     const result = await client.query({
       query: params.query.sql,
       query_params: params.query.params,
-      // Per-query guard (e.g. the key-discovery facets' memory ceiling); absent
-      // for facets that don't set one.
-      ...(params.query.settings ? { clickhouse_settings: params.query.settings } : {}),
-      format: "JSONEachRow",
+      ...FACET_READ,
+      // A facet's own memory ceiling overrides the shared one; never the time cap.
+      clickhouse_settings: {
+        ...FACET_READ.clickhouse_settings,
+        ...params.query.settings,
+        max_execution_time: String(FACET_READ_MAX_EXECUTION_SECONDS),
+        timeout_overflow_mode: "throw",
+      },
     });
 
     const rows = facetRowsSchema.parse(await result.json());
@@ -772,7 +794,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
           ${filter.sql}
       `,
       query_params: { ...filter.params, ...queryParams },
-      format: "JSONEachRow",
+      ...FACET_READ,
     });
 
     const rows = rangeRowsSchema.parse(await result.json());
@@ -836,7 +858,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     const result = await client.query({
       query,
       query_params: { ...queryParams, topN },
-      format: "JSONEachRow",
+      ...FACET_READ,
     });
 
     const rows = keyedFacetRowsSchema.parse(await result.json());
@@ -894,7 +916,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     const result = await client.query({
       query,
       query_params: queryParams,
-      format: "JSONEachRow",
+      ...FACET_READ,
     });
 
     const rows = rangeFacetRowsSchema.parse(await result.json());
@@ -1220,12 +1242,12 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       // `EarliestSpanStartMs` is the span timing baseline it used to double as.
       // A row at an older stamp predates the split and carries both in the one
       // column, which is why this is version-gated rather than a bare read.
-      storageAnchorMs: Number(row.OccurredAt),
+      storageAnchorMs: Number(row.OccurredAtMs),
       occurredAt: isStorageAnchoredVersion(row.Version)
         ? Number(row.EarliestSpanStartMs ?? 0)
-        : Number(row.OccurredAt),
+        : Number(row.OccurredAtMs),
       createdAt: Number(row.CreatedAt),
-      updatedAt: Number(row.UpdatedAt),
+      updatedAt: Number(row.UpdatedAtMs),
       LastEventOccurredAt: Number(row.LastEventOccurredAt ?? 0),
     };
   }

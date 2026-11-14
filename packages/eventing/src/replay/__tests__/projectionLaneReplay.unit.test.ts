@@ -1,17 +1,18 @@
 /** Spec: specs/upgrade/projection-replay-step.feature. */
-import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
+import { memoryRedisDouble, memoryRedisStore } from "@langwatch/test-harness/client-doubles/redis";
 import { describe, expect, it } from "vitest";
 
 import type { Event } from "../../domain/types.ts";
 import type { FoldProjectionDefinition } from "../../projections/foldProjection.types.ts";
-import { sealFoldProjection } from "../../projections/sealedProjection.ts";
+import type { MapProjectionDefinition } from "../../projections/mapProjection.types.ts";
+import { sealFoldProjection, sealMapProjection } from "../../projections/sealedProjection.ts";
 import type { RetentionPolicyResolver } from "../../runtime.types.ts";
 import {
   ProjectionLaneNotFoundError,
   projectionLaneReplayer,
   unionReplayTenants,
 } from "../projectionLaneReplay.ts";
-import { REPLAY_CURSOR_SKEW_MARGIN_MS } from "../replayConstants.ts";
+import { CUTOFF_KEY_PREFIX, REPLAY_CURSOR_SKEW_MARGIN_MS } from "../replayConstants.ts";
 import type {
   CutoffInfo,
   DiscoveredAggregateWithEventTypes,
@@ -22,13 +23,16 @@ import type {
 import { aggregateKey } from "../replayMarkers.ts";
 import type { ReplayProjections } from "../replayProjections.ts";
 import { ReplayService } from "../replayService.ts";
-import type { RegisteredFoldProjection } from "../types.ts";
+import type { RegisteredFoldProjection, RegisteredMapProjection } from "../types.ts";
 
 const PAUSED_SET_KEY = "{event-sourcing/jobs}:gq:paused-jobs";
 const LANE = "directoryMembers";
 const PAUSE_KEY = `global/projection/${LANE}`;
+const MAP_LANE = "directoryMemberRows";
 const FROM_START = "1970-01-01T00:00:00Z";
 const BASE_MS = 1_700_000_000_000;
+/** Rows a map accumulator buffers before it drains mid-stream (replayExecutor write batch). */
+const MAP_DRAIN_ROWS = 5000;
 
 type Matching = { eventTypes: readonly string[]; sinceMs?: number; tenantId?: string };
 
@@ -222,6 +226,36 @@ function foldLane({
   };
 }
 
+/** A map lane appending one row per member added, in the order it writes them. */
+function mapLane({
+  rows,
+  appendFailure,
+}: {
+  rows: string[];
+  appendFailure?: () => Error;
+}): RegisteredMapProjection {
+  const definition: MapProjectionDefinition<string, Event> = {
+    name: MAP_LANE,
+    eventTypes: ["directory.member_added"],
+    map: (event) => event.id,
+    store: {
+      append: async (row) => {
+        if (appendFailure) throw appendFailure();
+        rows.push(row);
+      },
+    },
+  };
+  return {
+    projectionName: MAP_LANE,
+    pipelineName: "global",
+    aggregateType: "directory",
+    source: "global",
+    pauseKey: `global/handler/${MAP_LANE}`,
+    kind: "map",
+    ...sealMapProjection(definition),
+  };
+}
+
 /** Two tenants' events, a log that lists them, and a lane whose pipeline declares retention. */
 function setUpTwoTenants({
   sharedTenants,
@@ -274,13 +308,20 @@ function setUpTwoTenants({
   return { redis, readModel, stamped, log, replayer, tenantsDone, onTenantComplete };
 }
 
-function setUp() {
+function setUp({ mapAppendFailure }: { mapAppendFailure?: () => Error } = {}) {
+  const store = memoryRedisStore();
+  const hdel = async (key: unknown, ...fields: unknown[]) => {
+    const hash = store.hashes.get(String(key));
+    return fields.filter((field) => hash?.delete(String(field))).length;
+  };
   const redis = memoryRedisDouble({
-    script: { hdel: async () => 0, hlen: async () => 0, lpush: async () => 0 },
+    store,
+    script: { hdel, hlen: async () => 0, lpush: async () => 0 },
   });
   const readModel = new Map<string, number>();
   const otherReadModel = new Map<string, number>();
   const writes = { count: 0 };
+  const mapRows: string[] = [];
   const log = new SeededLog(
     [
       seededEvent({ n: 1, aggregateId: "directory-a" }),
@@ -299,14 +340,74 @@ function setUp() {
         writes: { count: 0 },
       }),
     ],
-    mapProjections: [],
+    mapProjections: [mapLane({ rows: mapRows, appendFailure: mapAppendFailure })],
     stateProjections: [],
   };
   const replayer = projectionLaneReplayer({
     service: new ReplayService({ eventSource: log, redis }),
     projections,
   });
-  return { redis, readModel, otherReadModel, writes, log, replayer };
+  return { redis, store, readModel, otherReadModel, writes, mapRows, log, replayer };
+}
+
+/** Three more aggregates of one event each, so a batch of five splits unevenly. */
+function seedThreeMore(log: SeededLog): void {
+  log.events.push(
+    seededEvent({ n: 4, aggregateId: "directory-c" }),
+    seededEvent({ n: 5, aggregateId: "directory-d" }),
+    seededEvent({ n: 6, aggregateId: "directory-e" }),
+  );
+}
+
+/** Tenant 1's one event and tenant 2's more than a drain's worth, so both share one batch. */
+function seedHeavyTenantBesideLight(log: SeededLog): void {
+  log.events.length = 0;
+  log.events.push(
+    seededEvent({ n: 1, aggregateId: "directory-a", tenantId: "tenant-1" }),
+    ...Array.from({ length: MAP_DRAIN_ROWS + 10 }, (_, i) =>
+      seededEvent({ n: 2 + i, aggregateId: "directory-b", tenantId: "tenant-2" }),
+    ),
+  );
+}
+
+/** ClickHouse's refusal for one statement over its own memory limit, as the client raises it. */
+const queryMemoryLimitError = () =>
+  Object.assign(
+    new Error(
+      "Query memory limit exceeded: would use 4.76 GiB (attempt to allocate chunk of 4.00 MiB), maximum: 4.66 GiB",
+    ),
+    { code: "241" },
+  );
+
+/** Fails the log's event query for any batch over `maxAggregates`, after `eventsFirst` events. */
+function failStreamsAbove({
+  log,
+  maxAggregates,
+  eventsFirst = 0,
+  failure = queryMemoryLimitError,
+}: {
+  log: SeededLog;
+  maxAggregates: number;
+  eventsFirst?: number;
+  failure?: () => Error;
+}): { streamed: number[] } {
+  const stream = log.streamEventsForAggregates.bind(log);
+  const streamed: number[] = [];
+  log.streamEventsForAggregates = async (input) => {
+    streamed.push(input.aggregateIds.length);
+    if (input.aggregateIds.length <= maxAggregates) return stream(input);
+    let yielded = 0;
+    await stream({
+      ...input,
+      onEvent: async (event) => {
+        if (yielded >= eventsFirst) throw failure();
+        yielded++;
+        await input.onEvent(event);
+      },
+    });
+    throw failure();
+  };
+  return { streamed };
 }
 
 describe("projectionLaneReplayer", () => {
@@ -550,6 +651,237 @@ describe("projectionLaneReplayer", () => {
 
       expect(second.aggregatesReplayed).toBe(1);
       expect(readModel.get("directory-a")).toBe(2);
+    });
+  });
+
+  describe("given a batch whose event query outgrows ClickHouse's per-query memory limit", () => {
+    /** @scenario "A batch over the query memory limit is split until it fits" */
+    it("replays the batch as halves and folds each aggregate as a clean replay does", async () => {
+      const clean = setUp();
+      await clean.replayer.replayLane({ lane: LANE, since: FROM_START, dryRun: false });
+      const { log, readModel, replayer } = setUp();
+      const { streamed } = failStreamsAbove({ log, maxAggregates: 1 });
+
+      const result = await replayer.replayLane({ lane: LANE, since: FROM_START, dryRun: false });
+
+      expect(streamed).toEqual([2, 1, 1]);
+      expect(Object.fromEntries(readModel)).toEqual(Object.fromEntries(clean.readModel));
+      expect(result).toMatchObject({ aggregatesReplayed: 2, totalEvents: 3 });
+    });
+
+    /** @scenario "A batch over the query memory limit is split until it fits" */
+    it("splits an odd batch again until every part fits, larger half first", async () => {
+      const clean = setUp();
+      seedThreeMore(clean.log);
+      await clean.replayer.replayLane({ lane: LANE, since: FROM_START, dryRun: false });
+      const { log, readModel, replayer } = setUp();
+      seedThreeMore(log);
+      const { streamed } = failStreamsAbove({ log, maxAggregates: 1 });
+
+      const result = await replayer.replayLane({ lane: LANE, since: FROM_START, dryRun: false });
+
+      expect(streamed).toEqual([5, 3, 2, 1, 1, 1, 2, 1, 1]);
+      expect(Object.fromEntries(readModel)).toEqual(Object.fromEntries(clean.readModel));
+      expect(result).toMatchObject({ aggregatesReplayed: 5, totalEvents: 6 });
+    });
+
+    /** @scenario "A batch over the query memory limit is split until it fits" */
+    it("clears the failed batch's markers before its halves run", async () => {
+      const { log, store, replayer } = setUp();
+      failStreamsAbove({ log, maxAggregates: 1 });
+      const stream = log.streamEventsForAggregates.bind(log);
+      const markedAtStream: string[][] = [];
+      log.streamEventsForAggregates = async (input) => {
+        markedAtStream.push([...(store.hashes.get(`${CUTOFF_KEY_PREFIX}${LANE}`)?.keys() ?? [])]);
+        return stream(input);
+      };
+
+      await replayer.replayLane({ lane: LANE, since: FROM_START, dryRun: false });
+
+      expect(markedAtStream).toEqual([
+        ["tenant-1:directory:directory-a", "tenant-1:directory:directory-b"],
+        ["tenant-1:directory:directory-a"],
+        ["tenant-1:directory:directory-b"],
+      ]);
+    });
+
+    /** @scenario "A worker stop between the halves of a split batch ends the replay" */
+    it("stops before the second half once the first half completes", async () => {
+      const { redis, log, readModel, replayer } = setUp();
+      const { streamed } = failStreamsAbove({ log, maxAggregates: 1 });
+      const stop = new AbortController();
+
+      await expect(
+        replayer.replayLane({
+          lane: LANE,
+          since: FROM_START,
+          dryRun: false,
+          signal: stop.signal,
+          onBatchComplete: () => stop.abort(new Error("worker stopping")),
+        }),
+      ).rejects.toThrow("worker stopping");
+
+      expect(streamed).toEqual([2, 1]);
+      expect(Object.fromEntries(readModel)).toEqual({ "directory-a": 2 });
+      expect(await redis.smembers(PAUSED_SET_KEY)).not.toContain(PAUSE_KEY);
+    });
+
+    /** @scenario "A batch that hits the query memory limit mid-stream is not applied twice" */
+    it("writes nothing of the failed attempt when the limit lands after some events", async () => {
+      const clean = setUp();
+      await clean.replayer.replayLane({ lane: LANE, since: FROM_START, dryRun: false });
+      const { log, readModel, writes, replayer } = setUp();
+      failStreamsAbove({ log, maxAggregates: 1, eventsFirst: 1 });
+
+      await replayer.replayLane({ lane: LANE, since: FROM_START, dryRun: false });
+
+      expect(Object.fromEntries(readModel)).toEqual(Object.fromEntries(clean.readModel));
+      expect(writes.count).toBe(clean.writes.count);
+    });
+
+    /** @scenario "A single aggregate still over the query memory limit fails the lane by name" */
+    it("fails the lane with the original error, naming the aggregate but not its tenant", async () => {
+      const { log, replayer } = setUp();
+      const { streamed } = failStreamsAbove({ log, maxAggregates: 0 });
+
+      const failure: unknown = await replayer
+        .replayLane({ lane: LANE, since: FROM_START, dryRun: false })
+        .catch((error: unknown) => error);
+
+      expect(streamed).toEqual([2, 1]);
+      expect(failure).toBeInstanceOf(Error);
+      const message = failure instanceof Error ? failure.message : "";
+      expect(message).toContain(`Replaying "${LANE}" failed in 1 batch(es): `);
+      expect(message).toContain(queryMemoryLimitError().message);
+      expect(message).toContain("directory directory-a");
+      expect(message).not.toContain("tenant-1");
+    });
+  });
+
+  describe("given a batch whose event query fails for another reason", () => {
+    /** @scenario "A batch failing for any other reason fails the lane without splitting" */
+    it("fails the lane on that batch without replaying a half", async () => {
+      const { log, readModel, replayer } = setUp();
+      const { streamed } = failStreamsAbove({
+        log,
+        maxAggregates: 0,
+        failure: () => new Error("the log's connection dropped"),
+      });
+
+      await expect(
+        replayer.replayLane({ lane: LANE, since: FROM_START, dryRun: false }),
+      ).rejects.toThrow(`Replaying "${LANE}" failed in 1 batch(es): the log's connection dropped`);
+
+      expect(streamed).toEqual([2]);
+      expect(readModel.size).toBe(0);
+    });
+
+    /** @scenario "A batch failing for any other reason fails the lane without splitting" */
+    it("does not split on the server-wide total memory limit, which is load, not size", async () => {
+      const { log, replayer } = setUp();
+      const totalLimit =
+        "Memory limit (total) exceeded: would use 14.90 GiB (attempt to allocate chunk of 4.00 MiB), maximum: 14.90 GiB";
+      const { streamed } = failStreamsAbove({
+        log,
+        maxAggregates: 0,
+        failure: () => Object.assign(new Error(totalLimit), { code: "241" }),
+      });
+
+      await expect(
+        replayer.replayLane({ lane: LANE, since: FROM_START, dryRun: false }),
+      ).rejects.toThrow(`Replaying "${LANE}" failed in 1 batch(es): ${totalLimit}`);
+
+      expect(streamed).toEqual([2]);
+    });
+  });
+
+  describe("given a map lane whose event query outgrows the per-query memory limit", () => {
+    /** @scenario "A map lane over the query memory limit before writing a row is split until it fits" */
+    it("replays the batch as halves and writes each row once", async () => {
+      const clean = setUp();
+      await clean.replayer.replayLane({ lane: MAP_LANE, since: FROM_START, dryRun: false });
+      const { log, mapRows, replayer } = setUp();
+      const { streamed } = failStreamsAbove({ log, maxAggregates: 1, eventsFirst: 1 });
+
+      const result = await replayer.replayLane({
+        lane: MAP_LANE,
+        since: FROM_START,
+        dryRun: false,
+      });
+
+      expect(streamed).toEqual([2, 1, 1]);
+      expect(mapRows).toEqual(clean.mapRows);
+      expect(result).toMatchObject({ aggregatesReplayed: 2, totalEvents: 3 });
+    });
+
+    /** @scenario "A map lane over the query memory limit after writing rows fails without splitting" */
+    it("fails the lane on that batch without replaying a half once a drain wrote rows", async () => {
+      const { log, mapRows, replayer } = setUp();
+      log.events.push(
+        ...Array.from({ length: MAP_DRAIN_ROWS }, (_, i) =>
+          seededEvent({ n: 4 + i, aggregateId: "directory-a" }),
+        ),
+      );
+      const { streamed } = failStreamsAbove({ log, maxAggregates: 1, eventsFirst: MAP_DRAIN_ROWS });
+
+      await expect(
+        replayer.replayLane({ lane: MAP_LANE, since: FROM_START, dryRun: false }),
+      ).rejects.toThrow(
+        `Replaying "${MAP_LANE}" failed in 1 batch(es): ${queryMemoryLimitError().message}`,
+      );
+
+      expect(streamed).toEqual([2]);
+      expect(mapRows).toHaveLength(MAP_DRAIN_ROWS);
+    });
+
+    /** @scenario "A map lane over the query memory limit while flushing its rows fails without splitting" */
+    it("fails the lane on that batch without replaying a half when the final flush hits the limit", async () => {
+      const { log, replayer } = setUp({ mapAppendFailure: queryMemoryLimitError });
+      const stream = log.streamEventsForAggregates.bind(log);
+      const streamed: number[] = [];
+      log.streamEventsForAggregates = async (input) => {
+        streamed.push(input.aggregateIds.length);
+        return stream(input);
+      };
+
+      await expect(
+        replayer.replayLane({ lane: MAP_LANE, since: FROM_START, dryRun: false }),
+      ).rejects.toThrow(
+        `Replaying "${MAP_LANE}" failed in 1 batch(es): ${queryMemoryLimitError().message}`,
+      );
+
+      expect(streamed).toEqual([2]);
+    });
+  });
+
+  describe("given a map lane batch spanning two tenants whose streams run side by side", () => {
+    /** @scenario "A tenant stream still running when another hits the query memory limit writes no row of its own" */
+    it("stops the other tenant's stream before splitting, so each row is written once", async () => {
+      const clean = setUp();
+      seedHeavyTenantBesideLight(clean.log);
+      await clean.replayer.replayLane({ lane: MAP_LANE, since: FROM_START, dryRun: false });
+      const { log, mapRows, replayer } = setUp();
+      seedHeavyTenantBesideLight(log);
+      const stream = log.streamEventsForAggregates.bind(log);
+      let tenantOneFailed = false;
+      log.streamEventsForAggregates = async (input) => {
+        if (input.tenantId !== "tenant-1" || tenantOneFailed) return stream(input);
+        tenantOneFailed = true;
+        await Promise.resolve();
+        throw queryMemoryLimitError();
+      };
+
+      const result = await replayer.replayLane({
+        lane: MAP_LANE,
+        since: FROM_START,
+        dryRun: false,
+      });
+      // A stream left running by the failed attempt would write its rows once the loop is free.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(mapRows.length - new Set(mapRows).size).toBe(0);
+      expect(mapRows.toSorted()).toEqual(clean.mapRows.toSorted());
+      expect(result).toMatchObject({ aggregatesReplayed: 2, totalEvents: MAP_DRAIN_ROWS + 11 });
     });
   });
 });

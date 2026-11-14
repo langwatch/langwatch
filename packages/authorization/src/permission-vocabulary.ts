@@ -120,6 +120,10 @@ export const Resources = {
   AGENTS: "agents",
   EVALUATORS: "evaluators",
   SUBSCRIPTION: "subscription",
+  SEAT_REQUESTS: "seatRequests",
+  MEMBERS: "members",
+  // Who may share matching spans into another project's traces (ADR-201 §2).
+  BRAIDS: "braids",
 } as const;
 
 export type Resource = (typeof Resources)[keyof typeof Resources];

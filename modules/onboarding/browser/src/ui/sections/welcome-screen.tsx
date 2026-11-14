@@ -4,7 +4,7 @@ import { Box, HStack, VStack } from "@langwatch/design-system/primitives";
 import { guidedPathLanding } from "@langwatch/onboarding-contract";
 import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
-import { type ComponentProps, useEffect, useMemo, useRef, useState } from "react";
+import { type ComponentProps, useEffect, useRef, useState } from "react";
 
 import { api } from "../../behavior/onboarding-api.ts";
 import { registerOnboardingExperiment } from "../../behavior/onboarding-experiment-registration.ts";
@@ -13,6 +13,7 @@ import {
   type OnboardingFormData,
   OnboardingScreenIndex,
 } from "../../behavior/types.ts";
+import { useNewOrganizationRequest } from "../../behavior/use-new-organization-request.ts";
 import { useOnboardingFlow } from "../../behavior/use-onboarding-flow.ts";
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
 import { useRequiredSession } from "../../behavior/use-required-session.ts";
@@ -224,6 +225,26 @@ const SCREEN_SLIDE_VARIANTS = {
   }),
 };
 
+/**
+ * A guided organization whose takeover is unfinished resumes from the durable state instead of
+ * being sent into the product. A member asking for a new organization resumes only the one this
+ * page created, never one they already had.
+ */
+function resolveWelcomeResume({
+  organizations,
+  wantsNewOrganization,
+  createdOrganizationId,
+}: {
+  organizations: Parameters<typeof resolveGuidedResume>[0]["organizations"];
+  wantsNewOrganization: boolean;
+  createdOrganizationId: string | undefined;
+}) {
+  if (!wantsNewOrganization) return resolveGuidedResume({ organizations });
+  return resolveGuidedResume({
+    organizations: organizations?.filter((org) => org.id === createdOrganizationId),
+  });
+}
+
 function splitGuidedResume(resume: ReturnType<typeof resolveGuidedResume>) {
   if (resume?.phase !== "landing") return { takeover: resume, landing: null };
   return {
@@ -274,15 +295,23 @@ export const WelcomeScreen: React.FC = () => {
   const { created, leavingCard, isCreating, createGuidedOrganization } =
     useGuidedOrganizationCreate({ getFormData, navigation, fadeMs: TAKEOVER_FADE_MS });
 
-  // A guided organization whose takeover is unfinished resumes from the durable state instead of
-  // being sent into the product; with the provider recorded, the resume is the landing.
-  const resume = useMemo(() => resolveGuidedResume({ organizations }), [organizations]);
-  const { takeover, landing } = splitGuidedResume(resume);
-
   // Same-origin continuation (e.g. the CLI device-approval page sends a
   // fresh signup here with return_to=/cli/auth?user_code=… so the approval
   // survives onboarding). Only relative in-app paths are honored.
   const returnTo = getSafeReturnToPath(router.query.return_to);
+  const {
+    wantsNewOrganization,
+    asksForNewOrganizationForm,
+    createdOrganizationId,
+    landAfterCreate,
+  } = useNewOrganizationRequest({ created });
+
+  const resume = resolveWelcomeResume({
+    organizations,
+    wantsNewOrganization,
+    createdOrganizationId,
+  });
+  const { takeover, landing } = splitGuidedResume(resume);
 
   useEffect(() => {
     // Nothing is decided while the org data loads, nor for the organization this page just
@@ -294,6 +323,7 @@ export const WelcomeScreen: React.FC = () => {
       : resolveWelcomeRedirect({
           organizations,
           currentProjectSlug: project?.slug ?? null,
+          wantsNewOrganization: asksForNewOrganizationForm,
         });
 
     if (decision.kind === "onboard") {
@@ -313,6 +343,7 @@ export const WelcomeScreen: React.FC = () => {
     takeover,
     landing,
     router,
+    asksForNewOrganizationForm,
   ]);
 
   function handleFinalizeSubmit() {
@@ -336,13 +367,12 @@ export const WelcomeScreen: React.FC = () => {
           // analytics is the application's, and a port method the host could only
           // answer with nothing is worse than its absence.
 
-          host.hardRedirect(
-            initializedLandingPath({
-              returnTo,
-              isGovernanceTrack,
-              projectSlug: response.projectSlug,
-            }),
-          );
+          const landing = initializedLandingPath({
+            returnTo,
+            isGovernanceTrack,
+            projectSlug: response.projectSlug,
+          });
+          landAfterCreate({ landing, organizationId: response.organizationId });
         },
         // Through the registry, not a hardcoded sentence. This threw the error away and told
         // everyone to "try again or contact support" — advice that cannot resolve a plan limit,

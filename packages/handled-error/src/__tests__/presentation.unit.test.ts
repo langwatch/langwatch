@@ -1142,6 +1142,25 @@ describe("instant_eval_opt_in_not_offered", () => {
       );
     });
   });
+
+  describe("when LangWatch's hosted model is switched off for the organization", () => {
+    /** @scenario "A hosted-off refusal never sends the reader to the enterprise plan" */
+    it("says the hosted model is off and names the own decision model, never the plan", () => {
+      const { title, description } = explainHandledError(
+        shape({
+          code: "instant_eval_opt_in_not_offered",
+          httpStatus: 403,
+          meta: { deployment: "hosted_off" },
+        }),
+      );
+
+      expect(title).toBe("LangWatch's hosted model is off for this organization");
+      expect(description).toBe(
+        "Run Instant Evals on your own decision model: pick one in the Instant Evals column of Default models.",
+      );
+      expect(description).not.toMatch(/enterprise/i);
+    });
+  });
 });
 
 describe("agent_test_refused", () => {
@@ -1283,5 +1302,63 @@ describe("budget_exceeded", () => {
         "Requests are blocked until the limit is raised. An admin can raise it in AI Gateway budgets.",
       );
     });
+  });
+});
+
+describe("provider_refused", () => {
+  const refused = (status: number) =>
+    explainHandledError(
+      shape({ code: "provider_refused", fault: "provider", meta: { provider: "azure", status } }),
+    );
+
+  describe("when the provider answered 404", () => {
+    it("points at the address instead of calling it temporary", () => {
+      const copy = refused(404);
+
+      expect(copy.title).toBe("Nothing answers at that address");
+      expect(copy.description).toContain("Check the endpoint");
+      expect(copy.description).not.toContain("temporary");
+    });
+  });
+
+  describe("when the provider refused with any other status", () => {
+    it("keeps the try-again copy", () => {
+      const copy = refused(503);
+
+      expect(copy.title).toBe("The provider refused the check");
+      expect(copy.description).toContain("try again");
+    });
+  });
+});
+
+describe("activation_code_already_redeemed", () => {
+  const describeUsed = (meta: Record<string, unknown>) =>
+    explainHandledError(shape({ code: "activation_code_already_redeemed", meta, httpStatus: 403 }))
+      .description;
+
+  /** @scenario "A used code is explained in words that match where it was used" */
+  it("says where the code was used, or that it was used when the host does not say", () => {
+    expect(describeUsed({ sameInstall: true })).toBe(
+      "This code was already used on this install. Ask LangWatch for a new one.",
+    );
+    expect(describeUsed({ sameInstall: false })).toBe(
+      "This code was already used on another install. Ask LangWatch for a new one.",
+    );
+    expect(describeUsed({})).toBe("This code was already used. Ask LangWatch for a new one.");
+  });
+});
+
+describe("connect_unreachable", () => {
+  const describeUnreachable = (meta: Record<string, unknown>) =>
+    explainHandledError(shape({ code: "connect_unreachable", meta, httpStatus: 503 })).description;
+
+  /** @scenario "A refresh that cannot reach LangWatch names the host and port to allow" */
+  it("names the host and port the install could not reach", () => {
+    expect(describeUnreachable({ host: "connect.langwatch.ai", port: 443 })).toBe(
+      "LangWatch-hosted services could not be reached. Allow outbound access to connect.langwatch.ai on port 443.",
+    );
+    expect(describeUnreachable({})).toBe(
+      "LangWatch-hosted services could not be reached. Allow outbound access from this install to LangWatch.",
+    );
   });
 });

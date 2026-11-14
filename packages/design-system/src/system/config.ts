@@ -504,6 +504,26 @@ export const designSystemConfig = defineConfig({
           wordmarkMuted: { value: { _light: "#314158", _dark: "{colors.gray.300}" } },
         },
 
+        // A branded feature's colour roles: feature.<name>.*. The lead strand is the app orange
+        // by reference, never a second orange. See docs/feature-branding.md.
+        feature: {
+          braids: {
+            lead: { value: { _light: "{colors.orange.solid}", _dark: "{colors.orange.solid}" } },
+            weave: { value: { _light: "#3D3D4D", _dark: "#E7ECF2" } },
+            // Fictional example projects in the illustrations, in the app's avatar hues.
+            project: {
+              1: { value: { _light: "{colors.orange.solid}", _dark: "{colors.orange.300}" } },
+              2: { value: { _light: "{colors.blue.400}", _dark: "{colors.blue.300}" } },
+              3: { value: { _light: "{colors.purple.400}", _dark: "{colors.purple.300}" } },
+            },
+            projectInk: {
+              1: { value: { _light: "#141417", _dark: "#141417" } },
+              2: { value: { _light: "white", _dark: "#141417" } },
+              3: { value: { _light: "white", _dark: "#141417" } },
+            },
+          },
+        },
+
         // Data series, in the order `rotatingColors` hands out hues.
         chart: {
           1: { value: { _light: "{colors.orange.500}", _dark: "{colors.orange.300}" } },

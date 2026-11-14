@@ -60,10 +60,21 @@ vi.mock("../../../behavior/organization-api.ts", () => ({
 
 import { MemberSeatUsage } from "../../sections/member-seat-usage.tsx";
 
-const planWith = ({ maxMembers, maxMembersLite }: { maxMembers: number; maxMembersLite: number }) =>
-  ({ maxMembers, maxMembersLite }) as any;
+type SeatPlan = {
+  maxMembers: number;
+  maxMembersLite: number;
+  maxMembersDeveloper?: number;
+  planSource?: "license" | "subscription" | "free";
+};
 
-const renderSeatUsage = (plan: { maxMembers: number; maxMembersLite: number }) =>
+const planWith = ({
+  maxMembers,
+  maxMembersLite,
+  maxMembersDeveloper = 0,
+  planSource = "subscription",
+}: SeatPlan) => ({ maxMembers, maxMembersLite, maxMembersDeveloper, planSource }) as any;
+
+const renderSeatUsage = (plan: SeatPlan) =>
   renderWithDesignSystem(<MemberSeatUsage organizationId="org_1" activePlan={planWith(plan)} />);
 
 describe("given an organization with a seat allowance of each kind", () => {
@@ -91,13 +102,71 @@ describe("given an organization with a seat allowance of each kind", () => {
       expect(await screen.findByText("membersLite: 1 / 3")).toBeInTheDocument();
     });
 
-    /** @scenario Developers are counted and never capped */
-    it("shows the Developer seats with no limit beside them", async () => {
-      mockUsageData.current = { membersCount: 5, membersLiteCount: 5, membersDeveloperCount: 10 };
+    /** @scenario The member list shows Developer seats against the Developer seats paid for */
+    it("shows the Developer seats in use against the plan's Developer cap", async () => {
+      mockUsageData.current = { membersCount: 5, membersLiteCount: 5, membersDeveloperCount: 3 };
 
-      renderSeatUsage({ maxMembers: 5, maxMembersLite: 5 });
+      renderSeatUsage({ maxMembers: 5, maxMembersLite: 5, maxMembersDeveloper: 4 });
 
-      expect(await screen.findByText("Developers: 10 / none")).toBeInTheDocument();
+      expect(await screen.findByText("Developers: 3 / 4")).toBeInTheDocument();
+    });
+  });
+
+  describe("when the plan has no Lite Member seats", () => {
+    /** @scenario A plan without Lite Member seats shows no Lite card on the member list */
+    it("shows no Lite card rather than zero of zero", async () => {
+      mockUsageData.current = { membersCount: 2, membersLiteCount: 0, membersDeveloperCount: 0 };
+
+      renderSeatUsage({ maxMembers: 2, maxMembersLite: 0 });
+
+      expect(await screen.findByText("members: 2 / 2")).toBeInTheDocument();
+      expect(screen.queryByText(/membersLite/)).toBeNull();
+    });
+
+    it("still shows Lite Members someone holds over the plan", async () => {
+      mockUsageData.current = { membersCount: 2, membersLiteCount: 1, membersDeveloperCount: 0 };
+
+      renderSeatUsage({ maxMembers: 2, maxMembersLite: 0 });
+
+      expect(await screen.findByText("membersLite: 1 / 0")).toBeInTheDocument();
+    });
+  });
+
+  describe("when the plan allows as many Lite Member seats as the organization wants", () => {
+    /** @scenario Uncapped Lite Member seats read as Unlimited on the member list */
+    it("shows the Lite Member seats in use against an unlimited cap, not 9,999", async () => {
+      mockUsageData.current = { membersCount: 3, membersLiteCount: 4, membersDeveloperCount: 0 };
+
+      renderSeatUsage({ maxMembers: 3, maxMembersLite: 9_999 });
+
+      expect(await screen.findByText("membersLite: 4 / Infinity")).toBeInTheDocument();
+      expect(screen.queryByText(/9999/)).toBeNull();
+    });
+
+    it("keeps a real Lite cap as the number it is", async () => {
+      mockUsageData.current = { membersCount: 3, membersLiteCount: 4, membersDeveloperCount: 0 };
+
+      renderSeatUsage({ maxMembers: 3, maxMembersLite: 9_998 });
+
+      expect(await screen.findByText("membersLite: 4 / 9998")).toBeInTheDocument();
+    });
+
+    it("keeps a finite licence cap above the stand-in as the number it is", async () => {
+      mockUsageData.current = { membersCount: 3, membersLiteCount: 4, membersDeveloperCount: 0 };
+
+      renderSeatUsage({ maxMembers: 10_000, maxMembersLite: 9_999 });
+
+      expect(await screen.findByText("members: 3 / 10000")).toBeInTheDocument();
+      expect(screen.getByText("membersLite: 4 / Infinity")).toBeInTheDocument();
+    });
+
+    it("keeps a licence's 9,999 as a real cap", async () => {
+      mockUsageData.current = { membersCount: 3, membersLiteCount: 4, membersDeveloperCount: 0 };
+
+      renderSeatUsage({ maxMembers: 9_999, maxMembersLite: 9_999, planSource: "license" });
+
+      expect(await screen.findByText("members: 3 / 9999")).toBeInTheDocument();
+      expect(screen.getByText("membersLite: 4 / 9999")).toBeInTheDocument();
     });
   });
 

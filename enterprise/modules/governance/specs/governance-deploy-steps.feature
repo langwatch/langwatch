@@ -32,6 +32,17 @@ Feature: Governance's deploy steps
       When it runs again from the start
       Then each organisation's billed facts state the same answers as after the first run
 
+    # A completed step never reruns, so the source types added after it shipped get a step of
+    # their own; without a fact, trace counts their usage as not billed.
+
+    @unit
+    Scenario: The ingest source billing seed records the sources added after the first seed
+      Given an install where the first billing seed already completed
+      And an organisation with an enabled GitHub Copilot config off a bundled plan
+      When the ingest source billing seed runs
+      Then the organisation records a billed fact for each Copilot ingest source type
+      And the step is a background data step that needs the old writers gone
+
     @unit
     Scenario: A dry run of the coding-assistant billing seed records nothing
       When the seed runs as a dry run

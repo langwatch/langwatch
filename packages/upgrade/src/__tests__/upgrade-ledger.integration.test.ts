@@ -397,6 +397,7 @@ describe.skipIf(!DB_URL || !CH_URL)("the upgrade ledger", () => {
         "_langwatch_upgrade_step.description",
         "_langwatch_upgrade_step.owner",
         "_langwatch_upgrade_target.step_id",
+        "_langwatch_upgrade_tenant_state.step_id",
       ]);
     });
 
