@@ -1,18 +1,13 @@
-import type { ClickHouseClient, ClickHouseSettings } from "@clickhouse/client";
+import type { ClickHouseClient } from "@clickhouse/client";
 
-/** Which client an EXPLAIN resolved to, and whether it is the dedicated one. */
+/** The dedicated `langwatch_ops` client an EXPLAIN runs on; there is no fallback (ADR-202). */
 export interface OpsExplainClientResolution {
   client: ClickHouseClient;
-  /**
-   * True when the dedicated `langwatch_ops` readonly user is not configured on
-   * this instance and the call fell back to the default-user shared client.
-   */
-  usingFallback: boolean;
 }
 
 /**
- * The ClickHouse account an EXPLAIN runs as, as the PROCESS resolves it. Null
- * where neither the dedicated user nor a shared client is configured.
+ * The ClickHouse account an EXPLAIN runs as, as the worker resolves it. Null where
+ * `CLICKHOUSE_OPS_URL` is unset, and always in the api role.
  */
 export interface OpsExplainClients {
   findClient(): OpsExplainClientResolution | null;
@@ -26,7 +21,6 @@ export interface OpsExplainQueryClient {
   query(input: {
     query: string;
     format: "JSONEachRow";
-    clickhouse_settings?: ClickHouseSettings;
     SKIP_TENANT_CHECK?: true;
   }): Promise<{ json(): Promise<unknown[]> }>;
 }
@@ -35,21 +29,12 @@ export interface OpsExplainQueryClient {
  * Resolving and running the operator-only EXPLAIN, as the service asks for it.
  */
 export abstract class OpsExplainRepository {
-  /**
-   * The dedicated `langwatch_ops` readonly user when `CLICKHOUSE_OPS_URL`
-   * is configured, else the injected shared client as a fallback.
-   * Null when neither is configured on this instance.
-   */
+  /** The dedicated `langwatch_ops` readonly user, or null where it is not configured. */
   abstract findClient(): OpsExplainClientResolution | null;
 
-  /**
-   * Runs the (already server-wrapped) EXPLAIN query. `guardrails` are
-   * ClickHouse settings sent only for the fallback client - the
-   * `langwatch_ops` user's profile already enforces the same caps server-side.
-   */
+  /** Runs the (already server-wrapped) EXPLAIN; the ops user's profile enforces the caps. */
   abstract runExplain(params: {
     client: OpsExplainQueryClient;
     wrappedQuery: string;
-    guardrails?: ClickHouseSettings;
   }): Promise<unknown[]>;
 }

@@ -293,13 +293,31 @@ export class LangWatchQLAccessModelDefinitionService {
     };
   }): string[] {
     sqlText.assertIdentifier(sourceDatabase, "database");
-    const identities = [
+    return this.#appReaderIdentities({ sourceDatabase, appReader }).flatMap((identity) =>
+      this.#identityDdl(identity),
+    );
+  }
+
+  /** The readers alone as users.d, for a config store LangWatchQL is off on (ADR-202 Decided 6). */
+  renderAppReaderUsersD(
+    input: Parameters<LangWatchQLAccessModelDefinitionService["renderAppReaderDdl"]>[0],
+  ): string {
+    sqlText.assertIdentifier(input.sourceDatabase, "database");
+    return this.#usersD(this.#appReaderIdentities(input));
+  }
+
+  #appReaderIdentities({
+    sourceDatabase,
+    appReader,
+  }: Parameters<
+    LangWatchQLAccessModelDefinitionService["renderAppReaderDdl"]
+  >[0]): LwqlAccessIdentity[] {
+    return [
       this.#appReader({ ...appReader, sourceDatabase }),
       ...(appReader.enforcing
         ? [this.#appReaderEnforcing({ ...appReader.enforcing, sourceDatabase })]
         : []),
     ];
-    return identities.flatMap((identity) => this.#identityDdl(identity));
   }
 
   /** Profile, user, row policies, then grants — the order a SQL access store needs. */
@@ -361,9 +379,13 @@ export class LangWatchQLAccessModelDefinitionService {
 
   /** One profile and one user per identity, LangWatchQL's first, in a single users.d document. */
   renderUsersD(definition: LwqlAccessModelDefinition): string {
+    return this.#usersD(identitiesOf(definition));
+  }
+
+  #usersD(identities: readonly LwqlAccessIdentity[]): string {
     const profiles: Record<string, YamlValue> = {};
     const users: Record<string, YamlValue> = {};
-    for (const identity of identitiesOf(definition)) {
+    for (const identity of identities) {
       const settings: Record<string, YamlValue> = {};
       const constraints: Record<string, YamlValue> = {};
       for (const setting of identity.profile.settings) {

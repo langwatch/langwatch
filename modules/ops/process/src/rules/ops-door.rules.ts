@@ -1,7 +1,9 @@
 import type { OpsDoorAnswer, OpsDoorStatus, OpsExplainAnswer } from "@langwatch/ops-contract";
 
+import type { OpsExplainRecord } from "../repositories/ops-explain-results.repository.ts";
+
 const DOOR_STATUSES: readonly OpsDoorStatus[] = [
-  200, 201, 400, 401, 403, 404, 409, 413, 422, 429, 500, 502, 503,
+  200, 201, 202, 400, 401, 403, 404, 409, 413, 422, 429, 500, 502, 503,
 ];
 
 /**
@@ -17,24 +19,41 @@ export function toDoorStatus(httpStatus: number): OpsDoorStatus {
   return DOOR_STATUSES.find((status) => status === httpStatus) ?? 500;
 }
 
-/** One EXPLAIN answer, in the exact body the operator tool already parses. */
+/** An accepted EXPLAIN is a request id the tool polls; a refused one answers at once. */
 export function toExplainDoorAnswer(answer: OpsExplainAnswer): OpsDoorAnswer {
   switch (answer.status) {
-    case "ok":
-      return { status: 200, body: { type: answer.type, rows: answer.rows } };
+    case "accepted":
+      return { status: 202, body: { requestId: answer.requestId } };
     case "refused":
       return { status: 400, body: { message: answer.reason } };
-    case "not_configured_in_production":
+  }
+}
+
+/** One request's answer on `GET /api/ops/clickhouse/explain/:requestId` (ADR-202 Decided 14). */
+export function toExplainResultDoorAnswer(record: OpsExplainRecord | undefined): OpsDoorAnswer {
+  switch (record?.status) {
+    case undefined:
       return {
-        status: 503,
+        status: 404,
+        body: { message: "No EXPLAIN request has that id, or its result has expired" },
+      };
+    case "pending":
+      return { status: 200, body: { status: "pending" } };
+    case "done":
+      return { status: 200, body: { status: "done", type: record.type, rows: record.rows } };
+    case "failed":
+      return {
+        status: 200,
         body: {
-          message:
-            "ClickHouse ops user is not configured on this instance (CLICKHOUSE_OPS_URL unset in production).",
+          status: "failed",
+          error:
+            record.reason === "not_configured"
+              ? {
+                  code: "clickhouse_ops_not_configured",
+                  message: "ClickHouse ops user is not configured on this instance",
+                }
+              : { code: "clickhouse_explain_refused", message: "ClickHouse refused the EXPLAIN" },
         },
       };
-    case "unavailable":
-      return { status: 503, body: { message: "ClickHouse is not configured on this instance" } };
-    case "failed":
-      return { status: 502, body: { message: "ClickHouse refused the EXPLAIN" } };
   }
 }

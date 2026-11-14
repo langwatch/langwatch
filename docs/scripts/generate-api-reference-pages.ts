@@ -141,6 +141,7 @@ const SKIP_PATHS: Record<string, string> = {
   "/api/v1/admin/{resource}": UNDOCUMENTED_APP_INTERNAL,
   "/api/v1/bug-reports": UNDOCUMENTED_APP_INTERNAL,
   "/api/v1/ops/clickhouse/explain": UNDOCUMENTED_APP_INTERNAL,
+  "/api/v1/ops/clickhouse/explain/{requestId}": UNDOCUMENTED_APP_INTERNAL,
   "/api/v1/platform-health": UNDOCUMENTED_APP_INTERNAL,
   "/api/v1/platform-health/{check}": UNDOCUMENTED_APP_INTERNAL,
   "/api/v1/unsubscribe": UNDOCUMENTED_APP_INTERNAL,

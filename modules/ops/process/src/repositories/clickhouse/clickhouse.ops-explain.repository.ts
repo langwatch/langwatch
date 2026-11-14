@@ -1,4 +1,4 @@
-import { createClient, type ClickHouseClient, type ClickHouseSettings } from "@clickhouse/client";
+import { createClient, type ClickHouseClient } from "@clickhouse/client";
 
 import { findOpsConnection } from "../../rules/ops-clickhouse-explain.rules.ts";
 import {
@@ -21,33 +21,22 @@ export class OpsExplainClickHouseRepository extends OpsExplainRepository {
     super();
   }
 
-  /**
-   * The dedicated `langwatch_ops` readonly user when `CLICKHOUSE_OPS_URL`
-   * is configured, else the injected shared client as a fallback.
-   * Null when neither is configured on this instance.
-   */
+  /** The dedicated `langwatch_ops` readonly user, or null where it is not configured. */
   findClient(): OpsExplainClientResolution | null {
     return this.resolver.findClient();
   }
 
-  /**
-   * Runs the (already server-wrapped) EXPLAIN query. `guardrails` are
-   * ClickHouse settings sent only for the fallback client - the
-   * `langwatch_ops` user's profile already enforces the same caps server-side.
-   */
+  /** Runs the (already server-wrapped) EXPLAIN; the ops user's profile enforces the caps. */
   async runExplain({
     client,
     wrappedQuery,
-    guardrails,
   }: {
     client: OpsExplainQueryClient;
     wrappedQuery: string;
-    guardrails?: ClickHouseSettings;
   }): Promise<unknown[]> {
     const result = await client.query({
       query: wrappedQuery,
       format: "JSONEachRow",
-      ...(guardrails ? { clickhouse_settings: guardrails } : {}),
       // Operator EXPLAIN: the fleet-wide query-plan endpoint runs as the read-only ops user and is
       // deliberately outside the tenant-scoped access pattern.
       SKIP_TENANT_CHECK: true,
@@ -74,7 +63,7 @@ export class OpsClickHouseRuntime implements OpsExplainClients {
   findClient(): OpsExplainClientResolution | null {
     const configured = !this.closed && !this.buildTime && (this.url?.trim() ?? "") !== "";
     if (!configured || this.url === undefined) return null;
-    return { client: this.openClient(this.url), usingFallback: false };
+    return { client: this.openClient(this.url) };
   }
 
   private openClient(url: string): ClickHouseClient {

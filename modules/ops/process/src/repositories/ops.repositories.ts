@@ -23,6 +23,7 @@ import type { GroupQueueReaperRepository } from "./group-queue-reaper.repository
 import type { ImpersonationRepository } from "./impersonation.repository.ts";
 import type { InstanceAdminRepository } from "./instance-admin.repository.ts";
 import type { MigrationMembershipRepository } from "./migration-membership.repository.ts";
+import type { OpsExplainResultsRepository } from "./ops-explain-results.repository.ts";
 import type { OpsMetricsRepository } from "./ops-metrics.repository.ts";
 import type { OpsMigrationRepository } from "./ops-migration.repository.ts";
 import type { OpsSnapshotRepository } from "./ops-snapshot.repository.ts";
@@ -90,6 +91,8 @@ export interface OpsRepositories {
   /** One per process: the queue-metrics writer records into it, the detector reads it. */
   readonly rateTracker: AnomalyRateTrackerRepository;
   readonly storageReadings: StorageStatsReadingsRepository;
+  /** Operator EXPLAIN requests and their answers, kept for a short time to live. */
+  readonly explainResults: OpsExplainResultsRepository;
   /** The newest release cloud named in the last usage-report reply. */
   readonly cloudLatestRelease: CloudLatestReleaseRepository;
   /** The notices cloud named in the last usage-report reply. */

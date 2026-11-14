@@ -299,4 +299,24 @@ describe("given the access-model definition built with the enforcing reader's cr
       ),
     ).toBe("'1'");
   });
+
+  /** @scenario "The DDL and users.d emitters render the same app reader" */
+  it("renders the readers alone as users.d with the entries the full users.d gives them", () => {
+    const alone = load(
+      accessModelDefinition.renderAppReaderUsersD({
+        sourceDatabase: NAMES.database,
+        appReader: {
+          passwordSha256Hex: READER_HASH,
+          enforcing: { passwordSha256Hex: ENFORCING_HASH },
+        },
+      }),
+    ) as UsersD;
+    const readerNames = [APP_READER_NAMES.user, "langwatch_app_reader_enforcing"];
+    expect(Object.keys(alone.users)).toEqual(readerNames);
+    for (const name of readerNames) expect(alone.users[name]).toEqual(usersD.users[name]);
+    for (const profile of Object.keys(alone.profiles)) {
+      expect(alone.profiles[profile]).toEqual(usersD.profiles[profile]);
+    }
+    expect(alone.users[NAMES.restrictedUser]).toBeUndefined();
+  });
 });

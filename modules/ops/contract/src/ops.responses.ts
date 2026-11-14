@@ -478,22 +478,27 @@ export interface OpsExplainRequestSchema extends Named<typeof opsExplainRequestS
 export const opsExplainRequestSchema: OpsExplainRequestSchema = opsExplainRequestSchemaDefinition;
 export type OpsExplainRequest = z.infer<typeof opsExplainRequestSchema>;
 
+/** The path of one EXPLAIN request's answer, `GET /api/ops/clickhouse/explain/:requestId`. */
+const opsExplainResultParamsSchemaDefinition = z.object({ requestId: z.string().min(1).max(64) });
+export interface OpsExplainResultParamsSchema extends Named<
+  typeof opsExplainResultParamsSchemaDefinition
+> {}
+export const opsExplainResultParamsSchema: OpsExplainResultParamsSchema =
+  opsExplainResultParamsSchemaDefinition;
+
 /**
- * What one EXPLAIN answers. `refused` is the guardrail pass, named so the
- * operator can fix it. `failed` deliberately carries no engine prose - the
- * cluster's own message names internals, so the service logs it instead.
+ * What posting one EXPLAIN answers: a request id the worker answers (ADR-202 Decided 14), or
+ * `refused`, the guardrail pass, named so the operator can fix it.
  */
 export type OpsExplainAnswer =
-  | Readonly<{ status: "ok"; type: OpsExplainType; rows: unknown[] }>
-  | Readonly<{ status: "refused"; reason: string }>
-  | Readonly<{ status: "not_configured_in_production" }>
-  | Readonly<{ status: "unavailable" }>
-  | Readonly<{ status: "failed" }>;
+  | Readonly<{ status: "accepted"; requestId: string }>
+  | Readonly<{ status: "refused"; reason: string }>;
 
 /** A status a literal door answers with, in the codes its released callers read. */
 export type OpsDoorStatus =
   | 200
   | 201
+  | 202
   | 400
   | 401
   | 403

@@ -13,6 +13,7 @@ import {
 
 import type { CloudLatestRelease } from "../cloud-latest-release.repository.ts";
 import type { ImpersonationTarget } from "../impersonation.repository.ts";
+import type { OpsExplainRecord } from "../ops-explain-results.repository.ts";
 import type { StorageStatsReading } from "../storage-stats-readings.repository.ts";
 
 /** One event as the in-memory event log keeps it, with the columns the explorer reads by. */
@@ -80,6 +81,8 @@ export class MemoryOpsStore {
   readonly seatSharingChecks: SeatSharingCheck[] = [];
   readonly storageReadings = new Map<string, Omit<StorageStatsReading, "lastBackup">>();
   readonly storageLastBackups = new Map<string, NonNullable<StorageStatsReading["lastBackup"]>>();
+  /** Operator EXPLAIN requests by id, each with the moment it expires. */
+  readonly explainResults = new Map<string, { record: OpsExplainRecord; expiresAtMs: number }>();
   /** The published snapshots and the writer lease over them; a lease here never lapses. */
   readonly snapshots: {
     live?: LiveSnapshot;

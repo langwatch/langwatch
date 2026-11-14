@@ -35,6 +35,7 @@ import { MemoryGroupQueueReaperRepository } from "./memory.group-queue-reaper.re
 import { MemoryImpersonationRepository } from "./memory.impersonation.repository.ts";
 import { MemoryInstanceAdminRepository } from "./memory.instance-admin.repository.ts";
 import { MemoryMigrationLeaseRepository } from "./memory.migration-lease.repository.ts";
+import { MemoryOpsExplainResultsRepository } from "./memory.ops-explain-results.repository.ts";
 import { MemoryOpsMetricsRepository } from "./memory.ops-metrics.repository.ts";
 import { MemoryOpsMigrationRepository } from "./memory.ops-migration.repository.ts";
 import { MemoryOpsSnapshotRepository } from "./memory.ops-snapshot.repository.ts";
@@ -191,6 +192,7 @@ export class MemoryOpsRepositories {
       anomalyState: MemoryAnomalyStateRepository.create({ store }),
       rateTracker: MemoryAnomalyRateTrackerRepository.create({ store }),
       storageReadings: MemoryStorageStatsReadingsRepository.create({ store }),
+      explainResults: MemoryOpsExplainResultsRepository.create({ store }),
       cloudLatestRelease: MemoryCloudLatestReleaseRepository.create({ store }),
       cloudNotices: MemoryCloudNoticeRepository.create({ store }),
       seatSharingChecks: MemorySeatSharingCheckRepository.create({ store }),

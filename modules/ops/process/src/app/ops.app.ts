@@ -298,7 +298,10 @@ import { toCallerKey, toDoorStatus, toExplainDoorAnswer } from "#rules/ops-door.
 import { OPS_OPERATOR_DOOR } from "#rules/ops-intake-refusal.rules";
 import { BugReportInboxService } from "#services/bug-report-inbox.service";
 import { BugReportIntakeService } from "#services/bug-report-intake.service";
-import { OpsExplainService } from "#services/ops-clickhouse-explain.service";
+import {
+  type ClickHouseExplainRequestSender,
+  OpsExplainService,
+} from "#services/ops-clickhouse-explain.service";
 
 import type { OpsChannels } from "../channels/ops.channels.ts";
 import type { AnomalyDetectionTickResult } from "../eventing/ops-anomaly-detection.intent.ts";
@@ -852,6 +855,8 @@ export class OpsModule implements OpsApi {
       declaredMigrationSteps: setup.declaredMigrationSteps,
       // Only the worker runs listed work; a tasks pass keeps reading the whole queue's depth.
       runListedWork: setup.role === "worker" ? setup.runListedWork : undefined,
+      // Only the worker runs an EXPLAIN: the api holds no cross-tenant identity (ADR-202 D14).
+      opensOpsClickHouse: setup.role === "worker",
       logger,
       config: setup.config,
       resources: setup.resources,
@@ -1027,6 +1032,7 @@ export class OpsModule implements OpsApi {
         repository: OpsExplainClickHouseRepository.create({
           resolver: members.explainClients,
         }),
+        results: repositories.explainResults,
       }),
       checkup: setup.checkup,
       upgrades: OpsUpgradeService.create({
@@ -1638,23 +1644,35 @@ export class OpsModule implements OpsApi {
       return { status: "refused", reason: built.reason ?? "invalid query" };
     }
 
-    const outcome = await this.#dependencies.explain.explain({
+    const { requestId } = await this.#dependencies.explain.request({
       wrappedQuery: built.wrapped,
       type: built.type,
-      isProduction: this.#dependencies.isProduction,
       auditFields: redactQueryForAudit(input.query),
     });
 
-    if (outcome.status === "ok") return { status: "ok", type: built.type, rows: outcome.rows };
-    // The engine's own prose names cluster internals; the explain service logs it.
-    if (outcome.status === "error") return { status: "failed" };
-
-    return outcome;
+    return { status: "accepted", requestId };
   }
 
   /** The operator door's answer, once the secret and the body passed the route. */
   async explainClickHouseRequest(input: { request: OpsExplainRequest }): Promise<OpsDoorAnswer> {
     return toExplainDoorAnswer(await this.explainClickHouseQuery(input.request));
+  }
+
+  /** The operator door's answer for one accepted EXPLAIN, polled by its request id. */
+  explainClickHouseResultRequest(input: { requestId: string }): Promise<OpsDoorAnswer> {
+    return this.#dependencies.explain.result(input);
+  }
+
+  /** One accepted EXPLAIN of `ops_clickhouse_explain`, on its worker; not on {@link OpsApi}. */
+  runClickHouseExplain(request: { requestId: string }): Promise<void> {
+    return this.#dependencies.explain.run(request);
+  }
+
+  /** Opens the EXPLAIN command once `ops_clickhouse_explain` has registered and answered. */
+  connectClickHouseExplain(commands: {
+    requestClickHouseExplain: ClickHouseExplainRequestSender;
+  }): void {
+    this.#dependencies.explain.connect(commands.requestClickHouseExplain);
   }
 
   // -- the process's own readings --------------------------------------------
@@ -2471,6 +2489,7 @@ function buildOpsInfrastructure(input: {
   /** The kernel's feed (S6-FEED); ops keeps only the tenant steps. */
   declaredMigrationSteps: (() => readonly unknown[]) | undefined;
   runListedWork: SystemMigrationRunnerDeps["runListedWork"];
+  opensOpsClickHouse: boolean;
 }): OpsAppInfrastructure {
   const { logger, config, resources, repositories } = input;
   const introspection = EventingIntrospectionService.create(() =>
@@ -2505,10 +2524,10 @@ function buildOpsInfrastructure(input: {
   });
 
   const explainRuntime = OpsClickHouseRuntime.create({
-    url: config.clickhouseOpsUrl,
+    url: input.opensOpsClickHouse ? config.clickhouseOpsUrl : undefined,
     buildTime: false,
   });
-  resources.own("api ops explain client", () => explainRuntime.close());
+  resources.own("worker ops explain client", () => explainRuntime.close());
 
   return {
     createCapability: (dependencies: OpsAppDependencies): OpsCapability => {

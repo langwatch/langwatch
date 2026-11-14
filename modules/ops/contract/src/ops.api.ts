@@ -522,10 +522,12 @@ export interface OpsApi {
   admitCloudAdmin(operator: OpsOperator | null): Promise<OpsOperator>;
   /** Whether Cloud admin is on here: the one answer the browser's public config projects. */
   offersCloudOps(): boolean;
-  /** One operator EXPLAIN, guardrails and fail-closed rule included. */
+  /** Accepts one operator EXPLAIN for a worker to run, guardrails included. */
   explainClickHouseQuery(input: OpsExplainRequest): Promise<OpsExplainAnswer>;
   /** One EXPLAIN as the operator door received it, answered in the bodies the tool parses. */
   explainClickHouseRequest(input: { request: OpsExplainRequest }): Promise<OpsDoorAnswer>;
+  /** One accepted EXPLAIN's answer by its request id: pending, the rows, failed, or 404. */
+  explainClickHouseResultRequest(input: { requestId: string }): Promise<OpsDoorAnswer>;
   listPipelineRegistrations(): OpsPipelineRegistrations;
   getEventLogSearchWindow(): OpsEventLogSearchWindow;
   /** Null when no Grafana is configured: callers render no link, not a dead one. */

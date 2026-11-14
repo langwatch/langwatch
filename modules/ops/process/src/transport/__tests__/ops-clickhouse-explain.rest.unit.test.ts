@@ -14,8 +14,11 @@ const SECRET = "operator-secret";
 const UNAUTHORIZED = { message: "Unauthorized" };
 
 /** The route as the ops module mounts it, its door built from `findOpsApiKey`. */
-function mountApp(configured: string | null = SECRET) {
+function mountApp(configured: string | null = SECRET, sent: unknown[] = []) {
   const { app } = createOpsTestApp({ members: { findOpsApiKey: () => configured } });
+  app.connectClickHouseExplain({
+    requestClickHouseExplain: { send: async (input) => void sent.push(input) },
+  });
   const closed = BearerIdentity.create({ name: "unbound", token: void 0 });
   const host = RestHost.create({
     authz: restTestAuthorization().forRequest(),
@@ -126,6 +129,58 @@ describe("POST /api/ops/clickhouse/explain", () => {
 
         expect(invalid.status, authorization).toBe(422);
       }
+    });
+  });
+
+  describe("when the caller presents the secret and a query the guardrails judge", () => {
+    const authorized = { "content-type": "application/json", authorization: `Bearer ${SECRET}` };
+
+    /** @scenario "An accepted EXPLAIN answers 202 with a request id and runs on the worker" */
+    it("answers 202 with a request id, then pending on the poll until a worker runs it", async () => {
+      const sent: unknown[] = [];
+      const host = mountApp(SECRET, sent);
+      const accepted = await host.request("/api/ops/clickhouse/explain", {
+        method: "POST",
+        headers: authorized,
+        body: JSON.stringify({ query: "SELECT 1", type: "PLAN" }),
+      });
+
+      expect(accepted.status).toBe(202);
+      const { requestId } = (await accepted.json()) as { requestId: string };
+      expect(sent).toEqual([expect.objectContaining({ requestId })]);
+      const polled = await host.request(`/api/ops/clickhouse/explain/${requestId}`, {
+        headers: authorized,
+      });
+      expect(polled.status).toBe(200);
+      await expect(polled.json()).resolves.toEqual({ status: "pending" });
+    });
+
+    /** @scenario "A query the guardrails refuse is answered at once and sends nothing" */
+    it("answers 400 at once to a query that is not a single SELECT, sending nothing", async () => {
+      const sent: unknown[] = [];
+      const refused = await mountApp(SECRET, sent).request("/api/ops/clickhouse/explain", {
+        method: "POST",
+        headers: authorized,
+        body: JSON.stringify({ query: "DROP TABLE stored_spans" }),
+      });
+
+      expect(refused.status).toBe(400);
+      await expect(refused.json()).resolves.toEqual({ message: expect.any(String) });
+      expect(sent).toEqual([]);
+    });
+
+    /** @scenario "An unknown request id answers 404" */
+    it("answers 404 on the poll for an id it never accepted, and 401 without the secret", async () => {
+      const host = mountApp();
+      const unknown = await host.request("/api/ops/clickhouse/explain/never-accepted", {
+        headers: authorized,
+      });
+      const anonymous = await host.request("/api/ops/clickhouse/explain/never-accepted");
+
+      expect(unknown.status).toBe(404);
+      await expect(unknown.json()).resolves.toEqual({ message: expect.any(String) });
+      expect(anonymous.status).toBe(401);
+      await expect(anonymous.json()).resolves.toEqual(UNAUTHORIZED);
     });
   });
 });

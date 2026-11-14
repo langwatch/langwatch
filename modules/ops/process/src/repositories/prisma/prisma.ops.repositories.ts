@@ -70,6 +70,7 @@ type NotPostgres =
   | "anomalyState"
   | "rateTracker"
   | "storageReadings"
+  | "explainResults"
   | "redisHealth"
   | "clickhouseHealth"
   | "events"

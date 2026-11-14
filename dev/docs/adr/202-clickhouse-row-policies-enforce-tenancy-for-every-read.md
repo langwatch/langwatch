@@ -157,7 +157,7 @@ Migration path: about 139 non-test TypeScript files under ClickHouse repository 
 12. The api's three ClickHouse inserts move to the worker: the governance OTLP spend debit, `POST /api/dspy/log_steps` and instant-eval run create. The api becomes a pure reader with no write credential. DSPy step logging becomes asynchronous and spend debits reach the ledger through the queue (Alex, 2026-11-14).
 13. Data retention's api writes move to the worker too: applying a retention change to existing rows (`ALTER TABLE ... UPDATE`), cancelling it (`KILL MUTATION`) and reading its progress (`system.mutations`). Apply and cancel return once accepted; the worker keeps a progress status per project that the api reads. The governance workspace-view audit insert follows the same principle through its existing worker path (Alex, 2026-11-14).
 
-14. Staff-only Ops reads across tenants run in the worker: the Ops event explorer's search and Ops EXPLAIN are sent as commands, the worker runs them on its own credential, and the screen receives the result through a read hint. The api holds no credential that reads every tenant, `CLICKHOUSE_OPS_URL` included (Alex, 2026-11-14).
+14. Staff-only Ops reads across tenants run in the worker: the Ops event explorer's search and Ops EXPLAIN are sent as commands, the worker runs them on its own credential, and the screen receives the result through a read hint. The api holds no credential that reads every tenant, `CLICKHOUSE_OPS_URL` included (Alex, 2026-11-14). The EXPLAIN route answers `202 { requestId }` and a new `GET /api/ops/clickhouse/explain/:requestId` returns `pending` or the rows; the operator agent polls it (Alex, 2026-11-14).
 
 ## Open questions for Alex
 

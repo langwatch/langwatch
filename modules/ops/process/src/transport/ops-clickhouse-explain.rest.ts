@@ -8,15 +8,24 @@ import {
   MANAGEMENT_API_VERSION,
   type RestProtocolRefusal,
 } from "@langwatch/api/rest";
-import { OpsApi, opsExplainRequestSchema } from "@langwatch/ops-contract";
+import {
+  OpsApi,
+  opsExplainRequestSchema,
+  opsExplainResultParamsSchema,
+} from "@langwatch/ops-contract";
 import { resolveRequestBound } from "@langwatch/plans";
 
 import { operatorExplainRefusal } from "#rules/ops-intake-refusal.rules";
 
 /** Every body this route writes, in the sentences the operator tool parses. */
 const OPERATOR_ANSWERS =
-  "the operator tool reads a status and a message: 401, 400, 502 and 503 and the EXPLAIN " +
-  "rows all keep the exact bodies the agent already parses";
+  "the operator tool reads a status and a message: 401 and 400 keep main's bodies; an accepted " +
+  "EXPLAIN answers 202 with a request id the tool polls, as the worker runs it (ADR-202 Decided 14)";
+
+/** The poll's bodies: pending, the rows, a failure with its code, or 404 for an unknown id. */
+const OPERATOR_RESULT_ANSWERS =
+  "200 with status pending, done (type and rows) or failed (error code and message); 404 when " +
+  "the request id is unknown or its result expired; 401 without the operator secret";
 
 const BODY_LIMIT_JSON_BYTES = resolveRequestBound("bodyLimitJsonBytes", "ENTERPRISE");
 
@@ -60,6 +69,35 @@ export const opsClickHouseExplainRest = defineRestRouter(OpsApi)
   })
   .handle(async ({ app, input, response }) => {
     const answer = await app.explainClickHouseRequest({ request: input });
+
+    return response.write({
+      status: answer.status,
+      mediaType: "application/json",
+      body: JSON.stringify(answer.body),
+    });
+  })
+
+  .get("/api/ops/clickhouse/explain/:requestId", "getClickHouseExplainResult")
+  .withParams(opsExplainResultParamsSchema)
+  .withDocs({
+    summary: "Read one accepted ClickHouse EXPLAIN's answer by its request id",
+    description: OPERATOR_RESULT_ANSWERS,
+  })
+  .withCredential("internal_secret")
+  .withAccess(
+    anyAuthenticated({
+      reason:
+        "the deployment's operator secret is the bearer this door compares in constant time, as " +
+        "on the EXPLAIN it polls; operator is not an RBAC grain",
+    }),
+  )
+  .withResponse("protocol", {
+    produces: "application/json",
+    because: OPERATOR_RESULT_ANSWERS,
+    refusal: operatorRefusal,
+  })
+  .handle(async ({ app, input, response }) => {
+    const answer = await app.explainClickHouseResultRequest({ requestId: input.requestId });
 
     return response.write({
       status: answer.status,

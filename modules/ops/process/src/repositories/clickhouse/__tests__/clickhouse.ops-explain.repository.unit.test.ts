@@ -33,7 +33,7 @@ describe("OpsClickHouseRuntime", () => {
     });
     const a = runtime.findClient();
     const b = runtime.findClient();
-    expect(a).toEqual({ client: expect.anything(), usingFallback: false });
+    expect(a).toEqual({ client: expect.anything() });
     expect(b?.client).toBe(a?.client);
     await runtime.close();
     expect(clickHouseMocks.close).toHaveBeenCalledOnce();
