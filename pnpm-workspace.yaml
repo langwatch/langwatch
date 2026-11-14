@@ -35,7 +35,7 @@ catalog:
   '@elevenlabs/client': 1.23.0
   '@elevenlabs/elevenlabs-js': 2.58.0
   '@emotion/react': ^11.14.0
-  '@hono/node-server': ^2.0.6
+  '@hono/node-server': ^2.1.6
   '@hookform/resolvers': ^5.4.0
   '@langwatch/scenario': 1.7.0-dev.voice10
   '@mdx-js/react': ^3.1.0
