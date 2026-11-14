@@ -214,7 +214,7 @@ describe.skipIf(!clickHouseUrl)("a lookup of an evaluation run by id alone", () 
 
       expect(runs.map((run) => run.evaluationId)).toEqual([tracedId]);
       const read = statements.find(
-        (statement) => statement.sql.includes("FROM evaluation_runs AS runs") && statement.params,
+        (statement) => statement.sql.includes("FROM evaluation_runs ") && statement.params,
       );
       expect(read?.params).toMatchObject({
         idBound_fromMs: twoDaysAgoMs - DAY_MS,
@@ -252,7 +252,7 @@ describe.skipIf(!clickHouseUrl)("a lookup of an evaluation run by id alone", () 
 
       expect(found.map((run) => run.evaluationId)).toEqual([tracedId]);
       const read = statements.find(
-        (statement) => statement.sql.includes("FROM evaluation_runs AS runs") && statement.params,
+        (statement) => statement.sql.includes("FROM evaluation_runs ") && statement.params,
       );
       expect(read?.params).toMatchObject({
         idBound_fromMs: expect.any(Number),
@@ -272,9 +272,7 @@ describe.skipIf(!clickHouseUrl)("a lookup of an evaluation run by id alone", () 
       });
 
       expect(found.map((run) => run.evaluationId)).toEqual([tracedId]);
-      const read = statements.find((statement) =>
-        statement.sql.includes("FROM evaluation_runs AS runs"),
-      );
+      const read = statements.find((statement) => statement.sql.includes("FROM evaluation_runs "));
       expect(read?.sql).not.toContain("idBound_fromMs");
     });
   });

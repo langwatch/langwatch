@@ -45,7 +45,9 @@ export class LiveEvaluationRepositories {
         resolveClient,
         resolveQueryClient: async () => clickhouse,
       }),
-      monitorPerformance: ClickHouseMonitorPerformanceRepository.create({ resolveClient }),
+      monitorPerformance: ClickHouseMonitorPerformanceRepository.create({
+        resolveQueryClient: async () => clickhouse,
+      }),
       analyticsFoldCache: RedisEvaluationAnalyticsFoldCacheRepository.create({
         redis,
         ttlSeconds: config.foldCacheTtlSeconds,

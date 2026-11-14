@@ -34,10 +34,10 @@ const row = {
   Label: "mid",
   Details: "details",
   Error: null,
-  Inputs: '{"query":"hello"}',
+  InputsText: '{"query":"hello"}',
   ScheduledAtMs: "1700000000000",
   StartedAtMs: "1700000000100",
-  CompletedAt: null,
+  CompletedAtMs: null,
 };
 
 async function readerOver({
@@ -84,8 +84,8 @@ describe("the runs on a batch of traces", () => {
 
     expect(statements).toHaveLength(1);
     expect(statements[0]?.sql.match(/idBound_fromMs/g)).toHaveLength(2);
+    expect(Object.values(statements[0]?.params ?? {})).toContainEqual(["trace_1", "trace_2"]);
     expect(statements[0]?.params).toMatchObject({
-      traceIds: ["trace_1", "trace_2"],
       idBound_fromMs: FROM_MS - DAY_MS,
       idBound_toMs: TO_MS + DAY_MS,
     });
@@ -124,9 +124,9 @@ describe("the runs on a batch of traces", () => {
   it("retries without the inputs when the read hits the memory limit", async () => {
     const { repository, statements } = await readerOver({
       answers: (request) =>
-        request.sql.includes(", Inputs")
+        request.sql.includes("Inputs AS InputsText")
           ? new Error("Memory limit (for query) exceeded")
-          : [{ ...row, Inputs: undefined }],
+          : [{ ...row, InputsText: null }],
     });
 
     const found = await repository.findTraceEvaluations({ authorization, traceIds: ["trace_1"] });

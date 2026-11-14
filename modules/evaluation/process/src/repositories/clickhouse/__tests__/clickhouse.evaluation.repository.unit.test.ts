@@ -413,11 +413,13 @@ describe("ClickHouseEvaluationRepository", () => {
           retention: new TestRetention(),
         }),
       ).rejects.toMatchObject({ code: "evaluation_not_found" });
+      await repository.findByTraceId({ authorization, traceId: "trace_1" });
+      await repository.findTraceEvaluations({ authorization, traceIds: ["trace_1", "trace_2"] });
 
-      // Inputs, outcomes, the ScheduledAt probes and the run read: every one built.
-      // The column list for the attempt columns is server metadata, not a run read.
+      // Inputs, outcomes, the ScheduledAt probes, the run read and both by-trace reads: every
+      // one built. The column list for the attempt columns is server metadata, not a run read.
       const runReads = read.mock.calls.filter(([{ statement }]) => statement.kind !== "metadata");
-      expect(runReads.length).toBeGreaterThanOrEqual(5);
+      expect(runReads.length).toBeGreaterThanOrEqual(7);
       for (const [{ statement }] of runReads) {
         expect(statement).toMatchObject({ identity: "reader", kind: "tenant", tenantId: "org_1" });
         expect(statement.settings).toMatchObject({ SQL_langwatch_tenant_ids: "org_1" });

@@ -17,7 +17,6 @@ import {
   startMigratedClickHouse,
 } from "../../../__tests__/support/monitor-performance.fixtures.ts";
 import { MonitorPerformanceService } from "../../../features/monitors/services/monitor-performance.service.ts";
-import { ClickHouseEvaluationSession } from "../clickhouse.evaluation-session.store.ts";
 import { ClickHouseMonitorPerformanceRepository } from "../monitor-performance.repository.ts";
 
 const clickHouseUrl =
@@ -100,7 +99,7 @@ describe.skipIf(!clickHouseUrl)("online evaluation monitor performance", () => {
     const routed = countingQueryClient(clickHouse);
     service = MonitorPerformanceService.create({
       repository: ClickHouseMonitorPerformanceRepository.create({
-        resolveClient: (tenant) => Promise.resolve(new ClickHouseEvaluationSession(routed, tenant)),
+        resolveQueryClient: async () => routed,
       }),
     });
   }, 180_000);
