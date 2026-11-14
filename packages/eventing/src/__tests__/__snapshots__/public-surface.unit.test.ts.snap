@@ -135,6 +135,7 @@ exports[`the @langwatch/eventing public surface > given the . entry > exports ex
   "handBackUnroutable: function",
   "handleError: function",
   "hasPreviousRun: function",
+  "isAnyMemoryLimitExceeded: function",
   "isAtOrBeforeCutoff: function",
   "isAtOrBeforeCutoffMarker: function",
   "isDispatchError: function",
