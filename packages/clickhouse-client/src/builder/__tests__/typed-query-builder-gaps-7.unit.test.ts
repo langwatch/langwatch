@@ -235,6 +235,41 @@ describe("typed query builder gaps, seventh census", () => {
     });
   });
 
+  describe("given an approximate distinct count over one or more expressions", () => {
+    /** @scenario "An approximate distinct count takes one or more expressions of any type" */
+    it("renders uniq of every expression given, counted as a UInt64", () => {
+      const statement = clickhouseRead({ scope: single })
+        .from(spans)
+        .select({
+          Spans: fn.uniq(spans.TraceId, spans.SpanId),
+          Traces: fn.uniq(spans.TraceId),
+          Durations: fn.uniq(spans.DurationMs),
+        })
+        .build();
+
+      expect(statement.sql).toMatch(
+        /^SELECT uniq\(TraceId, SpanId\) AS Spans, uniq\(TraceId\) AS Traces, uniq\(DurationMs\) AS Durations FROM stored_spans WHERE /,
+      );
+      expect(fn.uniq(spans.TraceId, spans.SpanId).binding).toEqual({ paramType: "UInt64" });
+    });
+
+    /** @scenario "An approximate distinct count takes one or more expressions of any type" */
+    it("keeps a count over a table the read does not read out, at compile time and at build", () => {
+      const read = () =>
+        clickhouseRead({ scope: single })
+          .from(spans)
+          // @ts-expect-error trace_summaries is not a table this read reads
+          .select({ Foreign: fn.uniq(spans.TraceId, summaries.TraceId) })
+          .build();
+
+      expect(violationOf(read)).toEqual({
+        kind: "foreign-column",
+        table: "trace_summaries",
+        column: "TraceId",
+      });
+    });
+  });
+
   describe("given trace's LangWatch signals read built from an array literal and conditions", () => {
     /** @scenario "Trace's LangWatch signals read binds every value and passes the tenant guard" */
     it("binds every bucket name and key, and carries its tenant's predicate and setting", () => {

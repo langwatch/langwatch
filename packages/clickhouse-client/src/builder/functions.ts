@@ -266,7 +266,13 @@ export const fn = {
       args: [value.node, by.node, when.node],
       binding: value.binding,
     }),
-  uniq: numeric("uniq", UINT64),
+  /** `uniq(a, b, …)`: the approximate count of distinct values, or of distinct tuples of them. */
+  uniq: <const Of extends readonly [E<unknown, string>, ...E<unknown, string>[]]>(...of: Of) =>
+    call<number, TablesOfExpression<Of[number]>>({
+      name: "uniq",
+      args: nodesOf(of),
+      binding: UINT64,
+    }),
   uniqExact: <T extends string>(of: E<unknown, T>) =>
     call<number, T>({ name: "uniqExact", args: [of.node], binding: UINT64 }),
   uniqExactIf: <T extends string, U extends string>(of: E<unknown, T>, when: Condition<U>) =>

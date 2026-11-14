@@ -472,3 +472,10 @@ Feature: A typed ClickHouse read builder renders the tenant predicate and the te
     Given ClickHouse 26.8, the reader identity, spans whose keys fill each bucket, a span whose latest version drops its signal, and another tenant holding every key
     When the signals read is built from an array literal and conditions, and sent
     Then it returns the rows main's raw query returns, also when the setting lists every tenant
+
+  @unit
+  Scenario: An approximate distinct count takes one or more expressions of any type
+    Given a read counting distinct trace and span id pairs, as main's model usage stats do
+    When it selects uniq of both columns, and of one string or numeric column
+    Then each renders uniq of every expression given, counted as a UInt64
+    And a count over a column of a table the read does not read does not compile and is refused at build
