@@ -202,6 +202,18 @@ export function TraceTree({
 export function TestTrace({ test, onTest, ownerName, readerName }: TestTraceProps) {
   const [traceId, setTraceId] = useState("");
   const blocked = test.state === "blocked" ? test.reason : undefined;
+  const testButton = (
+    <Button
+      size="sm"
+      type="submit"
+      variant="outline"
+      disabled={!!blocked}
+      loading={test.state === "loading"}
+      data-testid="braid-test"
+    >
+      Test
+    </Button>
+  );
   return (
     <Stack gap={3}>
       <HStack
@@ -220,18 +232,16 @@ export function TestTrace({ test, onTest, ownerName, readerName }: TestTraceProp
           onChange={(event) => setTraceId(event.target.value)}
           fontFamily={traceId ? "mono" : "body"}
         />
-        <Tooltip content={blocked} disabled={!blocked}>
-          <Button
-            size="sm"
-            type="submit"
-            variant="outline"
-            disabled={!!blocked}
-            loading={test.state === "loading"}
-            data-testid="braid-test"
-          >
-            Test
-          </Button>
-        </Tooltip>
+        {blocked ? (
+          // A disabled button takes no pointer events, so the reason hangs on a focusable wrapper.
+          <Tooltip content={blocked}>
+            <Box as="span" display="inline-flex" tabIndex={0} aria-label={blocked}>
+              {testButton}
+            </Box>
+          </Tooltip>
+        ) : (
+          testButton
+        )}
       </HStack>
       {test.state === "not-found" ? (
         <Text textStyle="bodySm" color="fg.muted">

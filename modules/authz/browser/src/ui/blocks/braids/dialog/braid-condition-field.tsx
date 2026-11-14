@@ -8,7 +8,7 @@ import { Alert, Box, Field, HStack, Stack, Text } from "@langwatch/design-system
 import { TYPE_SCALE_PX } from "@langwatch/design-system/typography";
 import type { OnMount } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
-import { lazy, type ReactNode, Suspense, useEffect, useId, useState } from "react";
+import { lazy, type ReactNode, Suspense, useId, useState } from "react";
 
 import {
   closeSuggestionsOnEscape,
@@ -30,8 +30,6 @@ const PADDING_PX = 6;
 const MIN_HEIGHT = 2 * LINE_PX + 2 * PADDING_PX;
 const MAX_HEIGHT = 4 * LINE_PX + 2 * PADDING_PX;
 const BORDER_PX = 1;
-/** How long typing must pause before a refusal is marked, so a half-typed key is not refused. */
-const SETTLE_MS = 600;
 const NO_LIGATURES = { fontVariantLigatures: "none", fontFeatureSettings: '"liga" 0, "calt" 0' };
 
 const EDITOR_OPTIONS: editor.IStandaloneEditorConstructionOptions = {
@@ -77,7 +75,10 @@ function editorOptions(overflowing: boolean): editor.IStandaloneEditorConstructi
 export type BraidConditionFieldProps = {
   value: string;
   onChange: (value: string) => void;
+  /** The check to mark: a refusal only once typing has settled (`useConditionCheck`). */
   check: BraidConditionCompileResult;
+  /** Settles the text at once, on blur, so a refusal is marked without waiting. */
+  onSettle?: (value: string) => void;
   ownerName: string;
   readerName: string;
   verified: boolean;
@@ -159,14 +160,7 @@ export function BraidConditionField(props: BraidConditionFieldProps) {
   const [mounted, setMounted] = useState<BraidConditionMountedEditor | null>(null);
   const [contentHeight, setContentHeight] = useState(MIN_HEIGHT);
   const height = Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, contentHeight));
-  // The value a refusal may be marked against: set once typing pauses, or on blur.
-  const [settledValue, setSettledValue] = useState(props.value);
-  useEffect(() => {
-    const timer = setTimeout(() => setSettledValue(props.value), SETTLE_MS);
-    return () => clearTimeout(timer);
-  }, [props.value]);
-  const check: BraidConditionCompileResult =
-    settledValue === props.value || props.check.ok ? props.check : { ok: true };
+  const check = props.check;
   // The no-condition warning waits until the field has been used, so it never greets a new braid.
   const [touched, setTouched] = useState(false);
   const modelPath = `inmemory://braid-condition/${useId().replaceAll(":", "")}.ottl`;
@@ -191,7 +185,7 @@ export function BraidConditionField(props: BraidConditionFieldProps) {
     mountedEditor.onDidContentSizeChange((event) => setContentHeight(event.contentHeight));
     mountedEditor.onDidBlurEditorText(() => {
       setTouched(true);
-      setSettledValue(mountedEditor.getValue());
+      props.onSettle?.(mountedEditor.getValue());
     });
     mountedEditor.onDidDispose(closeSuggestionsOnEscape(mountedEditor));
     if (props.focusOnLoad) mountedEditor.focus();

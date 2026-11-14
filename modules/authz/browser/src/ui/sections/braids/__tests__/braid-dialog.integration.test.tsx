@@ -296,8 +296,10 @@ describe("the braid dialog", () => {
 
       await writeCondition(user, `${CONDITION} or attributes["team"] == "a"`);
 
-      // Marked once typing pauses, never mid-word.
+      // Marked once typing pauses, never mid-word; Save waits on it meanwhile.
       expect(screen.queryByTestId("braid-condition-check")).toBeNull();
+      expect(screen.queryByTestId("braid-preview-refused")).toBeNull();
+      expect(screen.getByTestId("braid-save")).toBeDisabled();
       expect(
         await screen.findByTestId("braid-condition-check", {}, { timeout: 2000 }),
       ).toHaveAttribute("role", "alert");
@@ -580,6 +582,10 @@ describe("the braid dialog", () => {
 
       const test = screen.getByTestId("braid-test");
       expect(test).toBeDisabled();
+      // A disabled button takes no pointer events: the reason sits on a focusable wrapper.
+      const reason = screen.getByLabelText("Fix the condition to test a trace.");
+      expect(reason).toContainElement(test);
+      expect(reason).toHaveAttribute("tabindex", "0");
       expect(test).not.toHaveAttribute("data-loading");
       await user.click(test);
       expect(braidTraces.state.testTraceAsked).not.toHaveBeenCalled();

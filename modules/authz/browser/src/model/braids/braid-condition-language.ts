@@ -3,6 +3,7 @@
  * design system's `tokeniseExpression`, and the completions offered at a cursor.
  */
 
+import { BRAID_CONDITION_VOCABULARY } from "@langwatch/authz-contract/braid-condition-compiler";
 import type { ExpressionTokenKind } from "@langwatch/design-system/highlighted-expression";
 import type { languages } from "monaco-editor";
 
@@ -55,32 +56,54 @@ export type BraidConditionCompletions = {
   replaceTo: number;
 };
 
-const ATTRIBUTE_OPEN = /attributes\s*\[\s*(?:"((?:[^"\\]|\\.)*))?$/;
-const KEY_REST = /^(?:[^"\\\]]|\\.)*/;
+// A key never spans a line break: Monaco drops a list whose range crosses lines.
+const ATTRIBUTE_OPEN = /attributes\s*\[\s*(?:"((?:[^"\\\r\n]|\\.)*))?$/;
+const KEY_REST = /^(?:[^"\\\]\r\n]|\\.)*/;
 
+const DETAIL: Readonly<Record<string, string>> = {
+  attributes: "A span attribute",
+  "resource.attributes": "An attribute of the span's resource",
+  name: "The span's name",
+  Verified: "Calls signed by a project's key",
+  nil: "With !=, the attribute is set",
+};
+
+const { indexedPaths, paths, functions, operators, words } = BRAID_CONDITION_VOCABULARY;
+
+/** The compiler's vocabulary as completions, so the list never offers a refused construct. */
 const TOP_LEVEL: readonly Omit<BraidConditionCompletion, "sortText" | "filterText">[] = [
-  {
-    label: 'attributes[""]',
-    kind: "snippet",
-    insertText: 'attributes["$0"]',
+  ...indexedPaths.map((path) => ({
+    label: `${path}[""]`,
+    kind: "snippet" as const,
+    insertText: `${path}["$0"]`,
     isSnippet: true,
     retrigger: true,
-    detail: "A span attribute",
-  },
-  {
-    label: 'Verified("")',
-    kind: "snippet",
-    insertText: 'Verified("$0")',
+    detail: DETAIL[path],
+  })),
+  ...paths.map((path) => ({
+    label: path,
+    kind: "field" as const,
+    insertText: path,
+    detail: DETAIL[path],
+  })),
+  ...functions.map((name) => ({
+    label: `${name}("")`,
+    kind: "snippet" as const,
+    insertText: `${name}("$0")`,
     isSnippet: true,
-    detail: "Calls signed by a project's key",
-  },
-  { label: "==", kind: "operator", insertText: "==" },
-  { label: "!=", kind: "operator", insertText: "!=" },
-  { label: "and", kind: "keyword", insertText: "and" },
-  { label: "or", kind: "keyword", insertText: "or" },
-  { label: "not", kind: "keyword", insertText: "not" },
-  { label: "true", kind: "keyword", insertText: "true" },
-  { label: "false", kind: "keyword", insertText: "false" },
+    detail: DETAIL[name],
+  })),
+  ...operators.map((operator) => ({
+    label: operator,
+    kind: "operator" as const,
+    insertText: operator,
+  })),
+  ...words.map((word) => ({
+    label: word,
+    kind: "keyword" as const,
+    insertText: word,
+    detail: DETAIL[word],
+  })),
 ];
 
 const sortTextOf = (index: number) => String(index).padStart(4, "0");

@@ -17,6 +17,7 @@ import {
   useBraidPreview,
   useBraidTargets,
   useBraidTestTrace,
+  useConditionCheck,
   useOwnerAttributeKeys,
   useReaderSigning,
   useSaveBraid,
@@ -30,7 +31,6 @@ import {
   braidsOnPair,
   braidDraftReady,
   braidTargetOptions,
-  checkCondition,
   expiresAtMsOf,
   newBraidDraft,
   signedEntryKey,
@@ -75,14 +75,17 @@ function signingOf(signing: ReturnType<typeof useReaderSigning>): ReaderSigning 
 function previewStateOf({
   hasReader,
   conditionOk,
+  refusalShown,
   preview,
 }: {
   hasReader: boolean;
   conditionOk: boolean;
+  refusalShown: boolean;
   preview: ReturnType<typeof useBraidPreview>;
 }): BraidPreviewPanelProps["preview"] {
   if (!hasReader) return { state: "no-reader" };
-  if (!conditionOk || preview.data?.refusal) return { state: "refused" };
+  if (refusalShown || preview.data?.refusal) return { state: "refused" };
+  if (!conditionOk) return { state: "loading" };
   if (preview.isError) return { state: "error" };
   if (!preview.data || preview.isSettling) return { state: "loading" };
   const { live, spans, example } = preview.data;
@@ -220,14 +223,20 @@ export function BraidDialog({
     projects: targetProjects,
     targets: targets.data ?? [],
   });
-  const check = checkCondition(draft.where);
+  // `check` blocks Save and Test as typed; the preview says refused only once it has settled.
+  const { check, shown, settle } = useConditionCheck(draft.where);
   const verifiedKey = verifiedKeyIn(draft.where);
   const entryKey =
     verifiedKey ?? signedEntryKey({ where: draft.where, readerName: reader?.name ?? "" });
   const setSignedCalls = (on: boolean) =>
     change({ where: withSignedCalls({ where: draft.where, on, key: entryKey }) });
 
-  const previewState = previewStateOf({ hasReader: !!reader, conditionOk: check.ok, preview });
+  const previewState = previewStateOf({
+    hasReader: !!reader,
+    conditionOk: check.ok,
+    refusalShown: !shown.ok,
+    preview,
+  });
   const testState = testStateOf({
     traceId: testedTraceId,
     tested,
@@ -306,7 +315,8 @@ export function BraidDialog({
             <BraidConditionField
               value={draft.where}
               onChange={(where) => change({ where })}
-              check={check}
+              check={shown}
+              onSettle={settle}
               ownerName={owner.name}
               readerName={reader?.name ?? "the other project"}
               verified={verifiedKey !== undefined}
