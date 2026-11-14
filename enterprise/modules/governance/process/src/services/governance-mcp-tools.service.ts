@@ -60,7 +60,7 @@ type GovernanceMcpOperations = Pick<
   GovernanceRestApi,
   | "templateListForUser"
   | "templateListForOrgAdmin"
-  | "templateGetByIdForOrg"
+  | "templateGetByIdForMember"
   | "templateCreateOrg"
   | "templateUpdateOttlRules"
   | "templateCloneFromPlatform"
@@ -124,7 +124,7 @@ export class GovernanceMcpToolsService {
   /** A cross-organization probe answers null, as on main, rather than naming the template. */
   private async templateOrNull(input: { id: string; organizationId: string }) {
     try {
-      return await this.governance.templateGetByIdForOrg(input);
+      return await this.governance.templateGetByIdForMember(input);
     } catch (error) {
       if (error instanceof TemplateNotFoundError) return null;
       throw error;

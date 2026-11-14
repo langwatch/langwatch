@@ -2144,7 +2144,10 @@ export class GovernanceModule implements GovernanceRestApi {
     return this.templates.listForOrgAdmin(input);
   }
 
-  templateGetByIdForOrg(input: { id: string; organizationId: string }): Promise<IngestionTemplate> {
+  templateGetByIdForMember(input: {
+    id: string;
+    organizationId: string;
+  }): Promise<IngestionTemplate> {
     return this.templates.getByIdForMember(input);
   }
 

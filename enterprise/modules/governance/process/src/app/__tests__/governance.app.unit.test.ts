@@ -32,12 +32,11 @@ import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import type { WebhookApi } from "@langwatch/webhook-contract";
 import { describe, expect, it, vi } from "vitest";
-import { z } from "zod";
 
 import { governanceProcessModule } from "../../governance.module.ts";
 import type { GovernanceRepositories } from "../../repositories/governance.repositories.ts";
 import { MemoryGovernanceRepositories } from "../../repositories/memory/memory.governance.repositories.ts";
-import type { GovernanceMcpServer } from "../../services/governance-mcp-tools.service.ts";
+import { recordingServer } from "../../services/__tests__/support/recording-mcp-server.fixture.ts";
 import { governanceCliRest } from "../../transport/governance-cli.rest.ts";
 import { GovernanceModule } from "../governance.app.ts";
 
@@ -150,7 +149,7 @@ describe("GovernanceModule ingestion templates", () => {
     it("answers the member read with the rules empty and the admin read with them", async () => {
       const { app, template } = await withTemplate();
 
-      const member = await app.templateGetByIdForOrg({
+      const member = await app.templateGetByIdForMember({
         id: template.id,
         organizationId: ORGANIZATION_ID,
       });
@@ -163,16 +162,7 @@ describe("GovernanceModule ingestion templates", () => {
     /** @scenario "A project API key's MCP session never reads a template's OTTL rules" */
     it("answers a project-key MCP session's list and get without the rules", async () => {
       const { app, template } = await withTemplate();
-      const tools = new Map<
-        string,
-        (args: Record<string, unknown>) => Promise<{ content: { text: string }[] }>
-      >();
-      const server: GovernanceMcpServer = {
-        tool(name, _description, schema, cb) {
-          tools.set(name, (args) => cb(z.object(schema).parse(args)));
-          return undefined;
-        },
-      };
+      const { server, tools } = recordingServer();
       app.registerMcpTools({ server, projectId: PROJECT_ID, callerUserId: undefined });
 
       const listed = await tools.get("governance_ingestion_templates_list")!({});
