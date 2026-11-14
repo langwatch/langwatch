@@ -94,7 +94,24 @@ Feature: The process boundary's built-in health door
       Given an application request is still running when the server closes
       When a new product request arrives during the drain
       Then the response is 503 saying the process is shutting down
+      And it carries "Retry-After: 5", so the client resends to a pod still serving
       And "/healthz" still answers 200
+
+    @unit
+    Scenario: A request whose client went away still holds the drain until its handler finishes
+      Given an application request is still running when the server closes
+      And its client has disconnected, so its response is already closed
+      When its handler finishes afterwards
+      Then no hosted component has heard shutdown begin or stopped before it finished
+      # A closed response is not a finished handler: an OTLP handler still sending spans
+      # met closed queue staging and logged an error per span.
+
+    @unit
+    Scenario: A handler cut at the drain grace gets a short unwind before the stores close
+      Given an application request outlives the drain grace
+      When the server cuts its response
+      Then the handler sees its response closed
+      And the components stop only once the handler settles, or the unwind budget runs out
 
     @unit
     Scenario: An open event stream is closed at shutdown rather than waited on

@@ -491,6 +491,22 @@ Feature: Externalize event byte content to stored_objects
     Then the constructor receives region "auto" (the Cloudflare R2 / MinIO convention)
 
   @unit
+  Scenario: S3 client never sends the 'auto' region to AWS, even with access keys
+    Given S3_REGION is not set, or is "auto", and an access key pair is set
+    And the endpoint is absent or an AWS host
+    When createS3Client constructs the S3Client
+    Then the region is never "auto"
+    And a regional AWS endpoint such as s3.eu-west-1.amazonaws.com gives the region eu-west-1
+    And so do the FIPS, dual-stack and PrivateLink (vpce) forms of a regional AWS host
+    And with no regional endpoint the SDK region chain (AWS_REGION) decides
+
+  @unit
+  Scenario: Every S3 client picks its region by the same rule
+    Given the dataset and stored-objects client, the object-storage migration client and the governance S3 channel
+    When each builds an S3 client with no region named
+    Then each gets the region the AWS client package's one region rule gives
+
+  @unit
   Scenario: S3 client falls back to default chain when credentials are partial — prevents misleading 'empty string credentials' bug
     Given only S3_ACCESS_KEY_ID is set but S3_SECRET_ACCESS_KEY is not
     When createS3Client constructs the S3Client
@@ -733,6 +749,14 @@ Feature: Externalize event byte content to stored_objects
     And selecting the azureBlob provider emits STORED_OBJECTS_BACKEND=azure on the deployment
 
   @unit
+  Scenario: Helm chart passes the awsS3 provider's region to every process
+    Given the awsS3 dataplane provider with region.value "eu-north1"
+    When the chart renders
+    Then the app, the workers and every hook that carries the S3 settings carry S3_REGION=eu-north1
+    And a region.secretKeyRef reaches the same containers as a secret reference
+    And with no region set no S3_REGION is rendered
+
+  @unit
   Scenario: Selecting the azureBlob provider satisfies the multi-replica shared-storage guard
     Given a chart render with replicaCount greater than 1
     And the azureBlob dataplane provider selected
@@ -818,6 +842,7 @@ Feature: Externalize event byte content to stored_objects
   #                                                                          -> Scenario: Datasets round-trip through Azure Blob when azure is the configured backend
   #                                                                          -> Scenario: The dataset-content backfill task migrates a postgres-layout dataset onto azure
   #                                                                          -> Scenario: Helm chart exposes an azureBlob dataplane provider mirroring awsS3
+  #                                                                          -> Scenario: Helm chart passes the awsS3 provider's region to every process
   #                                                                          -> Scenario: Selecting the azureBlob provider satisfies the multi-replica shared-storage guard
   #                                                                          -> Scenario: .env.example and self-hosting docs describe the Azure stored-objects backend
   # AC39 "MediaPart playback contract (onLoadedData / non-zero duration)"    -> Scenario: MediaPart audio playback reports a non-zero duration once the browser has decoded the media
@@ -826,6 +851,8 @@ Feature: Externalize event byte content to stored_objects
   #                                                                          -> Scenario: S3 client omits credentials so the SDK default provider chain handles IRSA and instance profiles
   #                                                                          -> Scenario: S3 client honors S3_REGION env for real AWS deployments instead of the R2/MinIO 'auto' default
   #                                                                          -> Scenario: S3 client defaults region to 'auto' for R2 and MinIO compatibility
+  #                                                                          -> Scenario: S3 client never sends the 'auto' region to AWS, even with access keys
+  #                                                                          -> Scenario: Every S3 client picks its region by the same rule
   #                                                                          -> Scenario: S3 client falls back to default chain when credentials are partial — prevents misleading 'empty string credentials' bug
   # AC41 "Documented image/file attachment shapes accepted and externalized" -> Scenario: A simulated user message with an image attachment shows the image in the run conversation
   #                                                                          -> Scenario: A simulated user message with a document attachment stays available under its original filename

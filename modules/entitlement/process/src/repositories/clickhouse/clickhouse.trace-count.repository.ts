@@ -9,8 +9,18 @@ type TotalRow = { total: string | number };
 type ProjectTotalRow = TotalRow & { projectId: string };
 
 /**
- * ClickHouse twin of the trace count; the table is migration 00104. Reads group by trace instead
- * of FINAL, and count a trace only in the earliest month it has a row, looking back one month.
+ * The month's reads group every trace of two months, so their hash table grows with the
+ * organization's volume. Spilling the GROUP BY to disk past this size keeps a large organization's
+ * count under the per-query memory cap instead of failing it; the ingest doors ask it per batch.
+ */
+const COUNT_SETTINGS = {
+  max_bytes_before_external_group_by: String(256 * 1024 * 1024),
+} as const;
+
+/**
+ * ClickHouse twin of the trace count (migration 00104). Reads group by a 64-bit hash of each trace,
+ * never FINAL: a third of the memory of grouping by id. A trace counts only in the earliest month
+ * it has a row, looking back one month.
  */
 export class TraceCountClickHouseRepository extends TraceCountRepository {
   readonly #clickhouse: ClickHouseQueryClient;
@@ -61,15 +71,16 @@ export class TraceCountClickHouseRepository extends TraceCountRepository {
       sql: `
         SELECT countIf(FirstMonth = {month:Date}) AS total
         FROM (
-          SELECT TenantId, TraceId, min(Month) AS FirstMonth
+          SELECT sipHash64(TenantId, TraceId) AS TraceKey, min(Month) AS FirstMonth
           FROM ${TABLE_NAME}
           WHERE OrganizationId = {organizationId:String}
             AND Month >= {previousMonth:Date}
             AND Month <= {month:Date}
-          GROUP BY TenantId, TraceId
+          GROUP BY TraceKey
         )
       `,
       params: { organizationId, ...monthParams(month) },
+      settings: COUNT_SETTINGS,
       // The organization's count sums every project the organization owns.
       SKIP_TENANT_CHECK: true,
     });
@@ -91,20 +102,27 @@ export class TraceCountClickHouseRepository extends TraceCountRepository {
       organizationId,
       table: TABLE_NAME,
       sql: `
-        SELECT TenantId AS projectId, countIf(FirstMonth = {month:Date}) AS total
+        SELECT {projectIds:Array(String)}[ProjectIndex] AS projectId, total
         FROM (
-          SELECT TenantId, TraceId, min(Month) AS FirstMonth
-          FROM ${TABLE_NAME}
-          WHERE OrganizationId = {organizationId:String}
-            AND Month >= {previousMonth:Date}
-            AND Month <= {month:Date}
-            AND TenantId IN {projectIds:Array(String)}
-          GROUP BY TenantId, TraceId
+          SELECT ProjectIndex, countIf(FirstMonth = {month:Date}) AS total
+          FROM (
+            SELECT
+              indexOf({projectIds:Array(String)}, TenantId) AS ProjectIndex,
+              sipHash64(TraceId) AS TraceKey,
+              min(Month) AS FirstMonth
+            FROM ${TABLE_NAME}
+            WHERE OrganizationId = {organizationId:String}
+              AND Month >= {previousMonth:Date}
+              AND Month <= {month:Date}
+              AND TenantId IN {projectIds:Array(String)}
+            GROUP BY ProjectIndex, TraceKey
+          )
+          GROUP BY ProjectIndex
+          HAVING total > 0
         )
-        GROUP BY TenantId
-        HAVING total > 0
       `,
       params: { organizationId, projectIds: [...projectIds], ...monthParams(month) },
+      settings: COUNT_SETTINGS,
       // The organization's count reads every project the organization owns.
       SKIP_TENANT_CHECK: true,
     });

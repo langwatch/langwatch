@@ -135,7 +135,7 @@ function projectDdl(statements: string[]): Projection {
 
   const ncStmt = statements.find((s) => s.startsWith("CREATE NAMED COLLECTION"));
   if (!ncStmt) throw new Error("DDL missing named collection");
-  const ncName = ncStmt.match(/CREATE NAMED COLLECTION (\S+) AS/)?.[1] ?? "";
+  const ncName = ncStmt.match(/CREATE NAMED COLLECTION IF NOT EXISTS (\S+) AS/)?.[1] ?? "";
   const field = (name: string): string =>
     ncStmt.match(new RegExp(`${name}=('([^']*)'|\\d+)`))?.[2] ??
     ncStmt.match(new RegExp(`${name}=(\\d+)`))?.[1] ??

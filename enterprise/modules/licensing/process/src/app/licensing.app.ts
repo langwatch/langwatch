@@ -561,6 +561,7 @@ export class LicensingModule implements LicensingApiContract {
     id: string;
     maxMembers?: number;
     maxMembersLite?: number;
+    maxMembersDeveloper?: number;
     maxMessagesPerMonth?: number;
     expiresAt: string;
     operatorId: string;
@@ -637,6 +638,10 @@ export class LicensingModule implements LicensingApiContract {
 
   verifyLicenceToken(input: ConnectPresentedCredential): Promise<ConnectLicenceCaller> {
     return this.#sync.verify(input);
+  }
+
+  verifyLicenceTokenForSync(input: ConnectPresentedCredential): Promise<ConnectLicenceCaller> {
+    return this.#sync.verifyForSync(input);
   }
 
   verifyActivationCode(input: ConnectPresentedCredential): Promise<ConnectActivationCaller> {
@@ -741,6 +746,10 @@ export class LicensingModule implements LicensingApiContract {
 
   getContractTerms(input: { organizationId: string }): Promise<ContractTerms> {
     return this.#contractBudgets.termsOf(input.organizationId);
+  }
+
+  countFullSeatsInUse(input: { organizationId: string }): Promise<number> {
+    return this.#service.countFullSeatsInUse(input.organizationId);
   }
 
   getConnectedSeats(input: { organizationId: string }): Promise<ConnectedSeats> {

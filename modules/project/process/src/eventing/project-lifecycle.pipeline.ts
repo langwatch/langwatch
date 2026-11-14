@@ -34,6 +34,8 @@ import {
   RecordProjectRevivedCommand,
   RecordProjectDepartmentAssignedCommand,
   RecordProjectTraceSharingDisabledCommand,
+  RecordProjectPersonalOwnerListedCommand,
+  RecordProjectFirstMessageListedCommand,
 } from "./project-lifecycle.commands.ts";
 import {
   projectCreatedEventSchema,
@@ -45,6 +47,8 @@ import {
   projectRevivedEventSchema,
   projectDepartmentAssignedEventSchema,
   projectTraceSharingDisabledEventSchema,
+  projectPersonalOwnerListedEventSchema,
+  projectFirstMessageListedEventSchema,
 } from "./project-lifecycle.events.ts";
 
 function lifecycleCommands() {
@@ -62,6 +66,8 @@ function lifecycleCommands() {
       projectTraceSharingDisabledEventSchema,
       projectAggregateRuleChangedEventSchema,
       projectRevivedEventSchema,
+      projectPersonalOwnerListedEventSchema,
+      projectFirstMessageListedEventSchema,
     ])
     .withCommand("recordProjectCreated", RecordProjectCreatedCommand)
     .withCommand("recordProjectLegacyKeyRevoked", RecordProjectLegacyKeyRevokedCommand)
@@ -71,7 +77,9 @@ function lifecycleCommands() {
     .withCommand("recordProjectDepartmentAssigned", RecordProjectDepartmentAssignedCommand)
     .withCommand("recordProjectTraceSharingDisabled", RecordProjectTraceSharingDisabledCommand)
     .withCommand("recordProjectAggregateRuleChanged", RecordProjectAggregateRuleChangedCommand)
-    .withCommand("recordProjectRevived", RecordProjectRevivedCommand);
+    .withCommand("recordProjectRevived", RecordProjectRevivedCommand)
+    .withCommand("recordPersonalOwnerListed", RecordProjectPersonalOwnerListedCommand)
+    .withCommand("recordFirstMessageListed", RecordProjectFirstMessageListedCommand);
 }
 
 type ProjectLifecycleDefinition = ReturnType<ReturnType<typeof lifecycleCommands>["build"]>;
@@ -127,5 +135,8 @@ export const projectLifecycleEventing = defineEventingModule({
       recordProjectCreated: (input) => app.recordProjectCreated(input),
       personalProjects: app.personalProjects(),
     }),
-  connect: ({ app, commands }) => app.connectLifecycle(commands),
+  connect: ({ app, commands }) => {
+    app.connectLifecycle(commands);
+    app.connectHistoryListing(commands);
+  },
 });

@@ -15,6 +15,7 @@ import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import { NEVER_LANDED_ON_PROJECT_KINDS } from "@langwatch/project-contract";
 import { toDate, type Instant } from "@langwatch/time";
 
+import type { SeatChangeCause } from "../../eventing/seat-peak.events.ts";
 import {
   DEVELOPER_ADMISSION_AUDIT_ACTION,
   type DeveloperAdmissionVia,
@@ -27,6 +28,7 @@ import {
   type WriteInviteInput,
 } from "../organization-invite.repository.ts";
 import { PrismaOrganizationAuditStore } from "./prisma.organization-audit.store.ts";
+import { PrismaOrganizationSeatChangeStore } from "./prisma.organization-seat-change.store.ts";
 import {
   inviteFromRecord,
   organizationFromRecord,
@@ -37,6 +39,11 @@ import { PrismaPersonalTeamScopeRepository } from "./prisma.personal-team-scope.
 /** A root client, or the transaction-scoped client `$transaction` hands back. */
 type InviteClient = PrismaClient | Prisma.TransactionClient;
 
+type InviteOutbox = Readonly<{
+  audit: PrismaOrganizationAuditStore;
+  seatChanges: PrismaOrganizationSeatChangeStore;
+}>;
+
 function toInviteJson(value: unknown): Prisma.InputJsonValue | undefined {
   return value === undefined ? undefined : (value as Prisma.InputJsonValue);
 }
@@ -44,20 +51,51 @@ function toInviteJson(value: unknown): Prisma.InputJsonValue | undefined {
 /** Private Prisma owner for an organization's invitations and what settles them. */
 export class PrismaOrganizationInviteRepository extends OrganizationInviteRepository {
   static create(options: { database: PrismaClient }): PrismaOrganizationInviteRepository {
-    return new PrismaOrganizationInviteRepository(
-      options.database,
-      options.database,
-      PrismaOrganizationAuditStore.create({ database: options.database }),
-    );
+    return new PrismaOrganizationInviteRepository(options.database, options.database, {
+      audit: PrismaOrganizationAuditStore.create({ database: options.database }),
+      seatChanges: PrismaOrganizationSeatChangeStore.create({ database: options.database }),
+    });
   }
 
   private constructor(
     private readonly prisma: InviteClient,
     /** Absent on a transaction-scoped instance — only the root can open one. */
     private readonly root: PrismaClient | null,
-    private readonly audit: PrismaOrganizationAuditStore,
+    /** What a write appends beside itself, in its own transaction. */
+    private readonly outbox: InviteOutbox,
   ) {
     super();
+  }
+
+  /** A write and the seat change it makes: the caller's transaction, or one opened here. */
+  #transact<T>(write: (client: Prisma.TransactionClient) => Promise<T>): Promise<T> {
+    return this.root ? this.root.$transaction(write) : write(this.prisma);
+  }
+
+  /** An invitation write, with the seat it moves recorded in the same transaction. */
+  #movingInvitation<T>({
+    organizationId,
+    inviteId,
+    cause,
+    actorUserId,
+    write,
+  }: {
+    organizationId: string;
+    inviteId: string;
+    cause: SeatChangeCause;
+    actorUserId: string | null;
+    write: (client: Prisma.TransactionClient) => Promise<T>;
+  }): Promise<T> {
+    return this.#transact((transaction) =>
+      this.outbox.seatChanges.movingInvitation({
+        transaction,
+        organizationId,
+        inviteId,
+        cause,
+        actorUserId,
+        write: () => write(transaction),
+      }),
+    );
   }
 
   async withTransaction<T>(
@@ -69,7 +107,7 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
     }
 
     return this.root.$transaction(
-      (client) => write(new PrismaOrganizationInviteRepository(client, null, this.audit)),
+      (client) => write(new PrismaOrganizationInviteRepository(client, null, this.outbox)),
       options ? { timeout: options.timeoutMs, maxWait: options.maxWaitMs } : undefined,
     );
   }
@@ -92,6 +130,44 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
     });
 
     return invite !== null;
+  }
+
+  async hasPendingInviteForEmail({
+    email,
+    organizationId,
+  }: {
+    email: string;
+    organizationId: string;
+  }): Promise<boolean> {
+    const invite = await this.prisma.organizationInvite.findFirst({
+      where: {
+        email: { equals: email.trim(), mode: "insensitive" },
+        organizationId,
+        status: "PENDING",
+        OR: [{ expiration: { gt: new Date() } }, { expiration: null }],
+      },
+      select: { id: true },
+    });
+
+    return invite !== null;
+  }
+
+  async deletePaymentPendingInvitesForEmail({
+    email,
+    organizationId,
+  }: {
+    email: string;
+    organizationId: string;
+  }): Promise<number> {
+    const { count } = await this.prisma.organizationInvite.deleteMany({
+      where: {
+        email: { equals: email.trim(), mode: "insensitive" },
+        organizationId,
+        status: "PAYMENT_PENDING",
+      },
+    });
+
+    return count;
   }
 
   async findMemberEmails({
@@ -172,19 +248,30 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
     });
   }
 
+  /** A pending invitation holds its seat from the moment it is written (ADR-002). */
   async createPendingInvite(input: WriteInviteInput): Promise<OrganizationInvite> {
-    const invite = await this.prisma.organizationInvite.create({
-      data: {
-        email: input.email,
-        inviteCode: input.inviteCode,
-        expiration: input.expiration && toDate(input.expiration),
+    const invite = await this.#transact(async (transaction) => {
+      const created = await transaction.organizationInvite.create({
+        data: {
+          email: input.email,
+          inviteCode: input.inviteCode,
+          expiration: input.expiration && toDate(input.expiration),
+          organizationId: input.organizationId,
+          teamIds: input.teamIds,
+          teamAssignments: toInviteJson(input.teamAssignments),
+          role: input.role,
+          status: "PENDING",
+          requestedBy: input.requestedBy ?? null,
+        },
+      });
+      await this.outbox.seatChanges.newInvitation({
+        transaction,
         organizationId: input.organizationId,
-        teamIds: input.teamIds,
-        teamAssignments: toInviteJson(input.teamAssignments),
-        role: input.role,
-        status: "PENDING",
-        requestedBy: input.requestedBy ?? null,
-      },
+        inviteId: created.id,
+        cause: "invited",
+        actorUserId: input.requestedBy ?? null,
+      });
+      return created;
     });
 
     return inviteFromRecord(invite);
@@ -240,14 +327,20 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
     inviteId: string;
     organizationId: string;
   }): Promise<number> {
-    return this.prisma.$executeRaw`
-      UPDATE "OrganizationInvite"
-         SET "status" = 'REVOKED',
-             "updatedAt" = now()
-       WHERE "id" = ${inviteId}
-         AND "organizationId" = ${organizationId}
-         AND "status" IN ('PENDING', 'PAYMENT_PENDING')
-    `;
+    return this.#movingInvitation({
+      organizationId,
+      inviteId,
+      cause: "invitation_revoked",
+      actorUserId: null,
+      write: (client) => client.$executeRaw`
+        UPDATE "OrganizationInvite"
+           SET "status" = 'REVOKED',
+               "updatedAt" = now()
+         WHERE "id" = ${inviteId}
+           AND "organizationId" = ${organizationId}
+           AND "status" IN ('PENDING', 'PAYMENT_PENDING')
+      `,
+    });
   }
 
   async getInviteWithOrganization({
@@ -279,14 +372,22 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
     inviteCode: string;
     expiration: Instant;
   }): Promise<number> {
-    const { count } = await this.prisma.organizationInvite.updateMany({
-      where: {
-        id: inviteId,
-        organizationId,
-        status: "PENDING",
-        inviteCode: expectedInviteCode,
-      },
-      data: { inviteCode, expiration: toDate(expiration) },
+    // A fresh expiry on a lapsed invitation takes its seat back.
+    const { count } = await this.#movingInvitation({
+      organizationId,
+      inviteId,
+      cause: "invited",
+      actorUserId: null,
+      write: (client) =>
+        client.organizationInvite.updateMany({
+          where: {
+            id: inviteId,
+            organizationId,
+            status: "PENDING",
+            inviteCode: expectedInviteCode,
+          },
+          data: { inviteCode, expiration: toDate(expiration) },
+        }),
     });
 
     return count;
@@ -301,9 +402,16 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
     organizationId: string;
     expiration: Instant;
   }): Promise<number> {
-    const { count } = await this.prisma.organizationInvite.updateMany({
-      where: { id: inviteId, organizationId, status: "PENDING" },
-      data: { expiration: toDate(expiration) },
+    const { count } = await this.#movingInvitation({
+      organizationId,
+      inviteId,
+      cause: "invited",
+      actorUserId: null,
+      write: (client) =>
+        client.organizationInvite.updateMany({
+          where: { id: inviteId, organizationId, status: "PENDING" },
+          data: { expiration: toDate(expiration) },
+        }),
     });
 
     return count;
@@ -480,19 +588,26 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
     acceptedByUserId: string;
     acceptedViaIdentifierId: string | null;
   }): Promise<number> {
-    // SQL for the reason given on `revokeOpenInvite`.
-    return this.prisma.$executeRaw`
-      UPDATE "OrganizationInvite"
-         SET "status" = 'ACCEPTED',
-             "acceptedByUserId" = ${acceptedByUserId},
-             "acceptedViaIdentifierId" = ${acceptedViaIdentifierId},
-             "updatedAt" = now()
-       WHERE "id" = ${inviteId}
-         AND "organizationId" = ${organizationId}
-         AND "inviteCode" = ${inviteCode}
-         AND "status" = 'PENDING'
-         AND ("expiration" IS NULL OR "expiration" > now())
-    `;
+    // SQL for the reason given on `revokeOpenInvite`. The invitation gives its seat back here;
+    // the membership `addMembership` writes beside it takes the member's.
+    return this.#movingInvitation({
+      organizationId,
+      inviteId,
+      cause: "invitation_accepted",
+      actorUserId: acceptedByUserId,
+      write: (client) => client.$executeRaw`
+        UPDATE "OrganizationInvite"
+           SET "status" = 'ACCEPTED',
+               "acceptedByUserId" = ${acceptedByUserId},
+               "acceptedViaIdentifierId" = ${acceptedViaIdentifierId},
+               "updatedAt" = now()
+         WHERE "id" = ${inviteId}
+           AND "organizationId" = ${organizationId}
+           AND "inviteCode" = ${inviteCode}
+           AND "status" = 'PENDING'
+           AND ("expiration" IS NULL OR "expiration" > now())
+      `,
+    });
   }
 
   async addMembership(input: {
@@ -519,14 +634,22 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
     role: OrganizationUserRole;
     admission?: { inviteId: string; actorUserId: string | null };
   }): Promise<void> {
-    const { count } = await client.organizationUser.createMany({
-      data: [{ userId, organizationId, role }],
-      skipDuplicates: true,
+    const { count } = await this.outbox.seatChanges.movingMember({
+      transaction: client,
+      organizationId,
+      userId,
+      cause: "invitation_accepted",
+      actorUserId: admission?.actorUserId ?? null,
+      write: () =>
+        client.organizationUser.createMany({
+          data: [{ userId, organizationId, role }],
+          skipDuplicates: true,
+        }),
     });
     // A Developer gets no grant to audit, so its admission is recorded here (ADR-171).
     if (count === 0 || role !== OrganizationUserRole.DEVELOPER || !admission) return;
     const via: DeveloperAdmissionVia = "invite";
-    await this.audit.append({
+    await this.outbox.audit.append({
       transaction: client,
       fact: {
         tenantId: organizationId,
@@ -605,9 +728,17 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
     organizationId: string;
     expiration: Instant;
   }): Promise<OrganizationInvite> {
-    const invite = await this.prisma.organizationInvite.update({
-      where: { id: inviteId, organizationId },
-      data: { status: "PENDING", expiration: toDate(expiration) },
+    // A payment-pending invitation holds no seat; approval makes it a live one that does.
+    const invite = await this.#movingInvitation({
+      organizationId,
+      inviteId,
+      cause: "payment_approved",
+      actorUserId: null,
+      write: (client) =>
+        client.organizationInvite.update({
+          where: { id: inviteId, organizationId },
+          data: { status: "PENDING", expiration: toDate(expiration) },
+        }),
     });
 
     return inviteFromRecord(invite);

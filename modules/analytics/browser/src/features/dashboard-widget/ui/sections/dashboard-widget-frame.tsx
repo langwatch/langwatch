@@ -4,7 +4,10 @@
  * row IS the widget, so the dashboard's list query already has it live.
  */
 
-import type { LangWatchQLAcceptedGranularityStep } from "@langwatch/analytics-contract";
+import type {
+  LangWatchQLAcceptedGranularityStep,
+  LangWatchQLRunTelemetryRequest,
+} from "@langwatch/analytics-contract";
 import type {
   ChartFrameDashboardContext,
   NavigableTarget,
@@ -16,10 +19,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useAnalyticsPeriod } from "../../../../behavior/use-analytics-period.ts";
 import { useFrameDiagnostic } from "../../../../behavior/use-frame-diagnostic.ts";
+import { useSpanDataFloor } from "../../../../behavior/use-span-data-floor.ts";
 import { useWidgetQueryRecords } from "../../../../behavior/use-widget-query-records.ts";
 import { usePublishWidgetCompleteness } from "../../../../behavior/widget-completeness-sink.ts";
 import { projectAwaitsFirstTrace, useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import { declaredParamDefaults } from "../../../../model/dashboard-widget/params-snapshot.ts";
+import {
+  readsSpanMetrics,
+  spanDataFloorNotice,
+} from "../../../../model/dashboard-widget/span-data-floor.ts";
 import { withheldWords } from "../../../../model/dashboard-widget/widget-access.ts";
 import {
   awaitsFirstAnswer,
@@ -51,6 +59,7 @@ import { useDashboardRefreshedAt } from "../../../../ui/sections/use-dashboard-a
 import { useDashboardWidgetChartNavigate } from "../../behavior/use-dashboard-widget-chart-navigate.ts";
 import { useDashboardWidgetExecutor } from "../../behavior/use-dashboard-widget-executor.ts";
 import { useSlowLoading } from "../../behavior/use-slow-loading.ts";
+import { type ParsedDefinition, placedWidgetTelemetry } from "../../model/widget-run-telemetry.ts";
 import { FrameDiagnosticBadge } from "./frame-diagnostic-badge.tsx";
 import { SandboxedChartFrame } from "./sandboxed-chart-frame.tsx";
 
@@ -66,6 +75,11 @@ export interface DashboardWidgetFrameProps {
   readonly dashboardId?: string;
   /** The widget's own name, for LW.dashboardContext.widgetName. */
   readonly widgetName?: string;
+  /**
+   * What the widget's runs say they are for, on their log line. Absent, a placed widget sends
+   * its board and its id; a frame on no board, such as the editor's preview, sends nothing.
+   */
+  readonly telemetry?: LangWatchQLRunTelemetryRequest;
 }
 
 /** A widget over the page's period selector, as the analytics dashboard draws it. */
@@ -129,9 +143,6 @@ export function DashboardWidgetFrameOverWindow(props: DashboardWidgetFrameOverWi
   return <WidgetFrameOverWindow key={key} {...props} parsed={parsed} />;
 }
 
-/** The outcome of reading a row's graph, parsed once by the caller. */
-type ParsedDefinition = ReturnType<typeof dashboardWidgetDefinitionSchema.safeParse>;
-
 /**
  * `granularitySeconds`, when given, is the step the reserved parameters carry.
  * What its queries report decides its face (features/dashboards/WIDGET_STANDARD.md).
@@ -143,6 +154,7 @@ function WidgetFrameOverWindow({
   maxHeight,
   dashboardId,
   widgetName,
+  telemetry: given,
   timeWindow,
   granularitySeconds,
   onAskLangyToSetUp,
@@ -163,6 +175,9 @@ function WidgetFrameOverWindow({
   // crashing the grid.
   const definition = parsed.success ? parsed.data : { code: "", queries: [] };
 
+  // A new object each render is fine: the executor reads it by its ids, so a re-render with the
+  // same ids does not start the queries over.
+  const telemetry = given ?? placedWidgetTelemetry({ dashboardId, widgetId: id, parsed });
   const {
     executeQuery: runQuery,
     params: hostParams,
@@ -170,6 +185,7 @@ function WidgetFrameOverWindow({
   } = useDashboardWidgetExecutor(projectId, definition.queries, {
     timeWindow,
     ...(granularitySeconds === void 0 ? {} : { granularitySeconds }),
+    ...(telemetry ? { telemetry } : {}),
   });
   const { executeQuery, records, results, reset } = useWidgetQueryRecords({
     executeQuery: runQuery,
@@ -283,8 +299,44 @@ function WidgetFrameOverWindow({
           {cover}
         </Box>
       )}
+      {/* An empty span widget may only lack history, so its empty face keeps the notice. */}
+      {(!cover || face.kind === "no_traffic") && readsSpanMetrics(definition.queries) && (
+        <SpanDataFloorNotice
+          projectId={projectId}
+          queries={definition.queries}
+          periodStart={timeWindow.start}
+        />
+      )}
       <FrameDiagnosticBadge diagnostic={diagnostic} />
     </Box>
+  );
+}
+
+/** Where span history starts, on a span widget whose period begins earlier (analytics ADR-006). */
+function SpanDataFloorNotice({
+  projectId,
+  queries,
+  periodStart,
+}: {
+  readonly projectId: string;
+  readonly queries: readonly { readonly sql: string }[];
+  readonly periodStart: number;
+}) {
+  const floor = useSpanDataFloor({ projectId });
+  const notice = spanDataFloorNotice({ queries, periodStart, floor });
+  if (!notice) return null;
+  return (
+    <Text
+      as="output"
+      position="absolute"
+      bottom={1}
+      left={2}
+      textStyle="xs"
+      color="fg.muted"
+      data-testid="widget-span-floor-notice"
+    >
+      {notice}
+    </Text>
   );
 }
 

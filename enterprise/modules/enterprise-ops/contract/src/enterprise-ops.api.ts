@@ -45,6 +45,7 @@ export interface EnterpriseOpsApi {
     planType: string;
     maxMembers: number;
     maxMembersLite?: number;
+    maxMembersDeveloper?: number;
     maxMessagesPerMonth?: number;
     /** ISO 8601. The instant the term ends. */
     expiresAt: string;
@@ -65,6 +66,7 @@ export interface EnterpriseOpsApi {
     id: string;
     maxMembers?: number;
     maxMembersLite?: number;
+    maxMembersDeveloper?: number;
     maxMessagesPerMonth?: number;
     /** ISO 8601. The instant the new term ends. */
     expiresAt: string;
@@ -103,6 +105,7 @@ export interface EnterpriseOpsApi {
     planType: string;
     maxMembers: number;
     maxMembersLite?: number;
+    maxMembersDeveloper?: number;
     licenseTermDays: number;
     services?: string[];
     /** ISO 8601. The instant the code stops working. */

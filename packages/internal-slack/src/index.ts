@@ -36,6 +36,7 @@ export {
   slackNotices,
   subscriptionActivatedNotice,
   subscriptionCancelledNotice,
+  seatRequestedNotice,
   subscriptionProspectiveNotice,
   upgradeDiagnosticsNotice,
 } from "./templates/index.ts";

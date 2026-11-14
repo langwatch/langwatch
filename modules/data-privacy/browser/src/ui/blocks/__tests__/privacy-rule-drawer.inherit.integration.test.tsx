@@ -13,6 +13,7 @@ import {
  */
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -94,13 +95,11 @@ describe("PrivacyRuleDrawer inherit controls", () => {
       expect(categoryValue("System instructions")).toContain("Inherit");
       expect(categoryValue("Tool calls")).toContain("Inherit");
       expect(categoryValue("Secrets redaction")).toContain("Inherit");
-
-      const piiInherit = screen.getByRole("radio", { name: /Inherit/ });
-      expect(piiInherit).toBeChecked();
+      expect(categoryValue("PII redaction")).toContain("Inherit");
     });
 
     /** @scenario Every control offers Inherit as a choice */
-    it("offers Inherit on every category, PII, and secrets control", () => {
+    it("offers Inherit on every category, PII, and secrets control", async () => {
       renderDrawer();
 
       for (const label of [
@@ -109,12 +108,16 @@ describe("PrivacyRuleDrawer inherit controls", () => {
         "System instructions",
         "Tool calls",
         "Secrets redaction",
+        "PII redaction",
       ]) {
         expect(categoryValue(label)).toContain("Inherit");
       }
 
-      for (const name of [/Inherit/, /^Off$/, /^Essential/, /^Strict/, /^Custom/]) {
-        expect(screen.getByRole("radio", { name })).toBeInTheDocument();
+      await userEvent.setup().click(screen.getByLabelText("PII redaction"));
+      for (const name of ["Inherit", "Off", "Essential", "Strict", "Custom"]) {
+        expect(
+          await screen.findByRole("option", { name: new RegExp(`^${name}`) }),
+        ).toBeInTheDocument();
       }
     });
   });
@@ -133,7 +136,7 @@ describe("PrivacyRuleDrawer inherit controls", () => {
       });
 
       expect(screen.getAllByText("Inherits Captured")).toHaveLength(4);
-      expect(screen.getByRole("radio", { name: /Inherit.*Essential/ })).toBeInTheDocument();
+      expect(screen.getByText("Inherits Essential")).toBeInTheDocument();
       expect(screen.getByText("Inherits On")).toBeInTheDocument();
     });
   });
@@ -181,8 +184,7 @@ describe("PrivacyRuleDrawer inherit controls", () => {
         },
       });
 
-      const strict = screen.getByRole("radio", { name: /Strict/ });
-      expect(strict).toBeChecked();
+      expect(categoryValue("PII redaction")).toContain("Strict");
       expect(categoryValue("Secrets redaction")).toContain("Inherit");
       const secretsSection = screen.getByLabelText("Secrets redaction");
       expect(within(secretsSection).queryByText("Captured")).toBeNull();

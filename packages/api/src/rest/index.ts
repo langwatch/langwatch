@@ -109,8 +109,10 @@ export {
 } from "./idempotency.ts";
 export type {
   IdempotencyReceiptCreateInput,
+  IdempotencyReceiptFence,
   IdempotencyReceiptPersistence,
   IdempotencyReceiptRecord,
+  IdempotencyReceiptUpdate,
 } from "./repositories/prisma/prisma.idempotency-receipt.ts";
 
 export { recordRequestPrincipal } from "./request-principal.ts";
