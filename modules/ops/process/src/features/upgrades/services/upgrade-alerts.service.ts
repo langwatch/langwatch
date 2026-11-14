@@ -3,17 +3,13 @@ import type { NotificationService as NotificationApi } from "@langwatch/notifica
 import { createLogger } from "@langwatch/observability";
 
 import type { UpgradeLedgerRepository } from "#repositories/upgrade-ledger.repository";
+import { installationOf } from "#rules/installation-name.rules";
 import type { PlatformOperatorsService } from "#services/platform-operators.service";
 
 import { type UpgradeAlert, upgradeAlertsBetween } from "../rules/upgrade-alerts.rules.ts";
 import type { UpgradeDiagnosticsService } from "./upgrade-diagnostics.service.ts";
 
 const logger = createLogger("langwatch:ops:upgrade-alerts");
-
-/** The host an operator knows this install by; the bare phrase when no public URL is set. */
-function installationOf(upgradesUrl: string): string {
-  return URL.canParse(upgradesUrl) ? new URL(upgradesUrl).host : "this installation";
-}
 
 function toUpgradeAlertMail({
   alerts,

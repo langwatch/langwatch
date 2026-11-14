@@ -9,6 +9,7 @@ import {
   type AuthzGrantPlatformOperatorInput,
   type PlatformOperator,
 } from "@langwatch/authz-contract";
+import type { MailRender } from "@langwatch/mail";
 import type { NotificationService as NotificationApi } from "@langwatch/notification-contract";
 import type * as observabilityModule from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
@@ -63,6 +64,9 @@ function world({
   organizations = [],
   administrators = [],
   deployment = SELF_HOSTED,
+  mailFails = false,
+  lookupFails = false,
+  holdersReadFails = false,
   isEmailUnconfigured = false,
   erasedAccountsCreatedAt = [],
 }: {
@@ -71,6 +75,9 @@ function world({
   organizations?: string[];
   administrators?: string[];
   deployment?: { cloud: boolean; isLocalDevelopment: boolean };
+  mailFails?: boolean;
+  lookupFails?: boolean;
+  holdersReadFails?: boolean;
   isEmailUnconfigured?: boolean;
   /** The creation times user's erasure records keep of accounts whose rows are gone. */
   erasedAccountsCreatedAt?: Date[];
@@ -80,12 +87,20 @@ function world({
     AuthzApi,
     "grantPlatformOperator" | "revokePlatformOperator" | "listPlatformOperators"
   > = {
-    listPlatformOperators: async () => holders,
+    listPlatformOperators: async () => {
+      if (holdersReadFails) throw new Error("grant ledger unavailable");
+      return [...holders];
+    },
     grantPlatformOperator: async (input) => {
       granted.push(input);
-      return holder(input.principal.id ?? "anyone");
+      const held = holder(input.principal.id ?? "anyone");
+      if (!holders.some((row) => row.userId === held.userId)) holders.push(held);
+      return held;
     },
-    revokePlatformOperator: vi.fn(async () => undefined),
+    revokePlatformOperator: vi.fn(async ({ grantId }: { grantId: string }) => {
+      const at = holders.findIndex((row) => row.grantId === grantId);
+      if (at >= 0) holders.splice(at, 1);
+    }),
   };
   const directory = createApiFixture<
     Pick<UserApi, "findByEmail" | "findById" | "countUsage" | "isFirstCreatedAccount">
@@ -97,7 +112,10 @@ function world({
     },
     findByEmail: async ({ email }) =>
       users.find((candidate) => candidate.email === email.toLowerCase()) ?? null,
-    findById: async ({ id }) => users.find((candidate) => candidate.id === id) ?? null,
+    findById: async ({ id }) => {
+      if (lookupFails) throw new Error("user directory unavailable");
+      return users.find((candidate) => candidate.id === id) ?? null;
+    },
     isFirstCreatedAccount: async ({ userId }) => {
       const first = users.toSorted((a, b) => a.createdAt.getTime() - b.createdAt.getTime())[0];
       if (!first || first.id !== userId) return false;
@@ -126,14 +144,31 @@ function world({
     findAdministrators: async () =>
       administrators.map((userId) => ({ userId, name: null, email: null })),
   };
+  const told: { to: string; subject: string; idempotencyKey?: string | undefined }[] = [];
   const service = PlatformOperatorsService.create({
     authz,
     users: directory,
     organizations: organizationDirectory,
     mail,
     deployment,
+    notice: {
+      mail: createApiFixture<Pick<NotificationApi, "sendEmail">>({
+        sendEmail: async ({ to, subject, idempotencyKey }) => {
+          if (mailFails) throw new Error("mail gateway unavailable");
+          for (const address of [to].flat()) told.push({ to: address, subject, idempotencyKey });
+        },
+      }),
+      renderer: createApiFixture<Pick<MailRender, "renderPlatformOperatorChange">>({
+        renderPlatformOperatorChange: async ({ change, subjectName, actorName }) => ({
+          subject: `${subjectName} ${change} by ${actorName}`,
+          html: "",
+        }),
+      }),
+      installation: "langwatch.acme.example",
+      operatorsUrl: "https://langwatch.acme.example/ops/operators",
+    },
   });
-  return { service, granted, authz };
+  return { service, granted, authz, told };
 }
 
 describe("PlatformOperatorsService", () => {
@@ -730,6 +765,125 @@ describe("PlatformOperatorsService", () => {
       await expect(service.grant({ email: "gone@acme.com", operator })).rejects.toMatchObject({
         meta: { userId: "gone" },
       });
+    });
+
+    /** @scenario "Every operator is told when someone is given the role" */
+    it("tells every holder and the new operator who granted it, once per address", async () => {
+      const { service, told } = world({
+        holders: [holder("ana"), holder("cy")],
+        users: [user("ana"), user("bo"), user("cy")],
+      });
+
+      await service.grant({ email: "bo@acme.com", operator: { ...operator, name: "Ana" } });
+
+      expect(told.map(({ to }) => to).toSorted()).toEqual([
+        "ana@acme.com",
+        "bo@acme.com",
+        "cy@acme.com",
+      ]);
+      expect(told[0]).toMatchObject({
+        subject: "bo granted by Ana",
+        idempotencyKey: expect.stringMatching(/^platform-operator-granted:grant_bo:/),
+      });
+    });
+
+    /** @scenario "Every operator is told when someone is given the role" */
+    it("tells nobody when the account already held the role", async () => {
+      const { service, told } = world({
+        holders: [holder("ana"), holder("bo")],
+        users: [user("ana"), user("bo")],
+      });
+
+      await service.grant({ email: "bo@acme.com", operator });
+
+      expect(told).toEqual([]);
+    });
+
+    /** @scenario "Every operator is told when someone loses the role" */
+    it("tells the remaining holders and the person who lost it", async () => {
+      const { service, told } = world({
+        holders: [holder("ana"), holder("bo")],
+        users: [user("ana"), user("bo")],
+      });
+
+      await service.revoke({ grantId: "grant_bo", operator });
+
+      expect(told.map(({ to }) => to).toSorted()).toEqual(["ana@acme.com", "bo@acme.com"]);
+      expect(told[0]?.subject).toBe("bo revoked by ana@acme.com");
+    });
+
+    /** @scenario "Every operator is told when someone is given the role" */
+    it("names the recovery task when it granted the role", async () => {
+      const { service, told } = world({
+        holders: [holder("ana")],
+        users: [user("ana"), user("bo")],
+      });
+
+      await service.grantAsSystem({ email: "bo@acme.com" });
+
+      expect(told.map(({ to }) => to).toSorted()).toEqual(["ana@acme.com", "bo@acme.com"]);
+      expect(told[0]?.subject).toBe("bo granted by The grant-platform-operator task");
+    });
+
+    /** @scenario "A notice that cannot be sent leaves the change standing" */
+    it("keeps the grant when the mail cannot be sent", async () => {
+      const { service, granted } = world({
+        users: [user("ana"), user("bo")],
+        mailFails: true,
+      });
+
+      await expect(service.grant({ email: "bo@acme.com", operator })).resolves.toMatchObject({
+        userId: "bo",
+      });
+      expect(granted).toHaveLength(1);
+    });
+
+    /** @scenario "A notice that cannot be sent leaves the change standing" */
+    it("answers a revoke that went through even when its notice cannot be prepared", async () => {
+      const { service, authz } = world({
+        holders: [holder("ana"), holder("bo")],
+        users: [user("ana"), user("bo")],
+        lookupFails: true,
+      });
+      warn.mockClear();
+
+      await expect(service.revoke({ grantId: "grant_bo", operator })).resolves.toBeUndefined();
+      expect(authz.revokePlatformOperator).toHaveBeenCalledTimes(1);
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A notice that cannot be sent leaves the change standing" */
+    it("grants, and tells nobody, when the holders cannot be read for the notice", async () => {
+      const { service, granted, told } = world({ users: [user("bo")], holdersReadFails: true });
+
+      await expect(service.grant({ email: "bo@acme.com", operator })).resolves.toMatchObject({
+        userId: "bo",
+      });
+      expect(granted).toHaveLength(1);
+      expect(told).toEqual([]);
+    });
+
+    /** @scenario "A notice that cannot be sent leaves the change standing" */
+    it("revokes, and tells nobody, when the holders cannot be read for the notice", async () => {
+      const { service, told, authz } = world({ users: [user("bo")], holdersReadFails: true });
+
+      await expect(service.revoke({ grantId: "grant_bo", operator })).resolves.toBeUndefined();
+      expect(authz.revokePlatformOperator).toHaveBeenCalledTimes(1);
+      expect(told).toEqual([]);
+    });
+
+    it("tells nobody, and says so, when the revoked holder is no longer active", async () => {
+      const { service, told, authz } = world({
+        holders: [holder("ana")],
+        users: [user("ana")],
+      });
+      warn.mockClear();
+
+      await service.revoke({ grantId: "grant_gone", operator });
+
+      expect(authz.revokePlatformOperator).toHaveBeenCalledTimes(1);
+      expect(told).toEqual([]);
+      expect(warn).toHaveBeenCalledWith({ grantId: "grant_gone" }, expect.any(String));
     });
 
     /** @scenario "An impersonated session cannot change who operates" */

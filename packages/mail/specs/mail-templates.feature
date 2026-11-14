@@ -111,6 +111,14 @@ Feature: The transactional messages LangWatch sends
     Then the email goes to that member and names the organization and the administrator
     And it says whether a second factor is now needed to open that organization
 
+  @unit
+  Scenario: A platform operator change tells who changed whose role and links to the Operators page
+    Given someone was given or lost the platform operator role
+    When the notice is rendered
+    Then it names the person, who made the change and the installation
+    And a grant says to revoke the role on the Operators page if it was not expected
+    And it links to the Operators page
+
   # A self-hosted operator cannot fix an upgrade step; LangWatch staff on Cloud can.
   # Plan: dev/docs/plans/upgrade-diagnostics-via-connect.md
   @unit

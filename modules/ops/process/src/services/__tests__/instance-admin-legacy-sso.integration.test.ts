@@ -55,6 +55,7 @@ function buildInstanceAdmin(connectionDecides = true) {
     accounts: createApiFixture<AuthApi>(),
     auditLog: createApiFixture<AuditLogApi>(),
     authz: createApiFixture<AuthzApi>(),
+    operatorAddressesFixed: true,
     users: new TestUserApi(),
     shares: createApiFixture<ShareApi>(),
     ssoRouting: { connectionDecides: async () => connectionDecides },
