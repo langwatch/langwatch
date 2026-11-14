@@ -8,6 +8,7 @@ import {
   cloneIngestionTemplateFromPlatform,
   getBudgetOverview,
   getIngestionTemplate,
+  managementCredentialsOrRefusal,
   getCliBootstrap,
   getEventsForSource,
   getGovernanceStatus,
@@ -600,14 +601,46 @@ describe("cli-api — ingestion template answers", () => {
     });
   });
 
-  describe("when there is no device login", () => {
-    it("refuses as not logged in without calling the app", async () => {
-      const fetchImpl = vi.fn<typeof fetch>();
+  describe("when the login cannot act in a project", () => {
+    const credentials = {
+      apiKey: "sk-lw-lookup_secret",
+      endpoint: "http://app.example",
+      projectId: "project_personal",
+    };
 
-      await expect(
-        adminListIngestionTemplates({ fetchImpl, managementCredentials: async () => undefined }),
-      ).rejects.toMatchObject({ status: 401, code: "not_logged_in" });
-      expect(fetchImpl).not.toHaveBeenCalled();
+    it("names the other address when the login belongs to one", () => {
+      expect(() =>
+        managementCredentialsOrRefusal({
+          elsewhere: { loginEndpoint: "http://a.example", endpoint: "http://b.example" },
+          credentials,
+          isSignedIn: true,
+        }),
+      ).toThrow(
+        expect.objectContaining({
+          code: "login_endpoint_mismatch",
+          message: expect.stringContaining("http://a.example"),
+        }),
+      );
+    });
+
+    it("says a signed-in login holds no login key, rather than not logged in", () => {
+      expect(() =>
+        managementCredentialsOrRefusal({
+          elsewhere: undefined,
+          credentials: undefined,
+          isSignedIn: true,
+        }),
+      ).toThrow(expect.objectContaining({ message: expect.stringContaining("no login key") }));
+    });
+
+    it("refuses a login key with no project instead of reading LANGWATCH_PROJECT_ID", () => {
+      expect(() =>
+        managementCredentialsOrRefusal({
+          elsewhere: undefined,
+          credentials: { ...credentials, projectId: undefined },
+          isSignedIn: true,
+        }),
+      ).toThrow(expect.objectContaining({ code: "personal_project_unknown" }));
     });
   });
 });

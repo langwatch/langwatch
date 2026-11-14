@@ -7,8 +7,13 @@ import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled
 import { buildRequestHeaders, buildSdkIdentityHeaders } from "@/internal/api/request-headers";
 
 import { normalizeEndpoint } from "../../../internal/endpoint";
-import { resolvePersonCredentials } from "../apiKey";
-import { type GovernanceConfig } from "./config";
+import {
+  type LoginElsewhere,
+  loginElsewhereMessage,
+  loginMadeElsewhere,
+  resolvePersonCredentials,
+} from "../apiKey";
+import { type GovernanceConfig, isLoggedIn, loadConfig } from "./config";
 import type { PlatformToolPolicyMap } from "./platform-tool-policy";
 import {
   canRefreshSession,
@@ -128,7 +133,7 @@ export interface CliApiOptions {
    */
   timeoutMs?: number;
   /** Seam for the management door's credentials (the login key and its project). Tests only. */
-  managementCredentials?: () => Promise<ManagementCredentials | undefined>;
+  managementCredentials?: () => Promise<ManagementCredentials>;
 }
 
 /** What the management REST door authenticates with: the login key, acting in a project. */
@@ -500,14 +505,7 @@ async function requestManagementREST<T>(
   path: string,
   options: { body?: unknown } & CliApiOptions = {},
 ): Promise<T> {
-  const credentials = await (options.managementCredentials ?? resolvePersonCredentials)();
-  if (!credentials) {
-    throw new GovernanceCliError(
-      401,
-      "not_logged_in",
-      "Not logged in. Run `langwatch login --device` first.",
-    );
-  }
+  const credentials = await (options.managementCredentials ?? managementCredentialsFromLogin)();
   const headers: Record<string, string> = {
     ...buildRequestHeaders({ apiKey: credentials.apiKey, projectId: credentials.projectId }),
     Accept: "application/json",
@@ -520,6 +518,54 @@ async function requestManagementREST<T>(
     ...(options.timeoutMs === undefined ? {} : { signal: AbortSignal.timeout(options.timeoutMs) }),
   });
   return readRestAnswer<T>({ res, method, path });
+}
+
+async function managementCredentialsFromLogin(): Promise<ManagementCredentials> {
+  const elsewhere = loginMadeElsewhere();
+  return managementCredentialsOrRefusal({
+    elsewhere,
+    credentials: elsewhere ? undefined : await resolvePersonCredentials(),
+    isSignedIn: isLoggedIn(loadConfig()),
+  });
+}
+
+/**
+ * The login key and the project it acts in, or the refusal that says why there is none. A missing
+ * project is refused rather than left to `LANGWATCH_PROJECT_ID`, which may name another org's.
+ */
+export function managementCredentialsOrRefusal({
+  elsewhere,
+  credentials,
+  isSignedIn,
+}: {
+  elsewhere: LoginElsewhere | undefined;
+  credentials: ManagementCredentials | undefined;
+  isSignedIn: boolean;
+}): ManagementCredentials & { projectId: string } {
+  if (elsewhere) {
+    throw new GovernanceCliError(
+      401,
+      "login_endpoint_mismatch",
+      loginElsewhereMessage({ ...elsewhere, canUseApiKey: false }),
+    );
+  }
+  if (!credentials) {
+    throw new GovernanceCliError(
+      401,
+      "not_logged_in",
+      isSignedIn
+        ? "This device login holds no login key. Run `langwatch login --device` again."
+        : "Not logged in. Run `langwatch login --device` first.",
+    );
+  }
+  if (!credentials.projectId) {
+    throw new GovernanceCliError(
+      409,
+      "personal_project_unknown",
+      "Your personal project could not be read, so the request would name no project. Run `langwatch login --device` again.",
+    );
+  }
+  return { ...credentials, projectId: credentials.projectId };
 }
 
 /** Reads a REST answer, raising the failure the platform named. */
