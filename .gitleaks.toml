@@ -615,3 +615,11 @@ condition = "AND"
 targetRules = ["generic-api-key"]
 paths = ['''^services/nlpgo/app/engine/blocks/codeblock/runner_stderr_test\.go$''']
 regexes = ['''^CAPSECRET-0123456789$''']
+
+# paymentsim's stand-in Stripe key, which the Cloud billing e2e job hands the
+# app so it talks to the simulator (services/sims/paymentsim). Stripe never
+# issued it and it authenticates nothing. Anchored by value and scoped to one rule.
+[[allowlists]]
+description = "paymentsim stand-in Stripe key in the e2e workflow, not a credential"
+targetRules = ["stripe-access-token"]
+regexes = ['''^sk_test_paymentsim$''']
