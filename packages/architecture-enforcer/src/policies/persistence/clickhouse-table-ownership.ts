@@ -500,6 +500,7 @@ type Reader = {
   module: string;
   tables: ReadonlyMap<string, string>;
   constant: (name: string) => string | undefined;
+  aliases: () => ReadonlyMap<string, ReadonlySet<string>>;
   found: Access[];
 };
 
@@ -560,24 +561,83 @@ function insertedTable(reader: Reader, node: ts.CallExpression): string | undefi
   return namedTable(reader, value);
 }
 
-/** A constant, or a descriptor's `$table.name`, naming a table. */
+/** A constant, or a descriptor's (or its alias's) `$table.name`, naming a table. */
 function namedTable(reader: Reader, value: ts.Expression): string | undefined {
   if (ts.isIdentifier(value)) return reader.constant(value.text);
 
-  return ts.isPropertyAccessExpression(value)
-    ? reader.constant(value.getText(reader.source))
-    : void 0;
+  if (!ts.isPropertyAccessExpression(value)) return void 0;
+
+  const text = value.getText(reader.source);
+
+  return reader.constant(text) ?? [...(reader.aliases().get(text) ?? [])][0];
+}
+
+/** Every table a descriptor name may hold: its binding and each local alias of that name. */
+function descriptorTables(reader: Reader, name: string): string[] {
+  const key = name + DESCRIPTOR_NAME;
+  const bound = reader.constant(key);
+
+  return [...new Set([...(bound ? [bound] : []), ...(reader.aliases().get(key) ?? [])])];
 }
 
 /** `.from(descriptor)` and the builder's joins: the descriptor names the table read. */
-function descriptorRead(reader: Reader, node: ts.CallExpression): string | undefined {
-  if (!ts.isPropertyAccessExpression(node.expression)) return void 0;
+function descriptorReads(reader: Reader, node: ts.CallExpression): string[] {
+  if (!ts.isPropertyAccessExpression(node.expression)) return [];
 
-  if (!DESCRIPTOR_READS.has(node.expression.name.text)) return void 0;
+  if (!DESCRIPTOR_READS.has(node.expression.name.text)) return [];
 
   const [table] = node.arguments;
 
-  return table && ts.isIdentifier(table) ? reader.constant(table.text + DESCRIPTOR_NAME) : void 0;
+  return table && ts.isIdentifier(table) ? descriptorTables(reader, table.text) : [];
+}
+
+/**
+ * `const ledger = descriptor` at any depth: the alias names the same table. Every
+ * binding of a name is kept, so a shadowing alias adds a read rather than hiding one.
+ */
+function descriptorAliases(
+  source: ts.SourceFile,
+  constant: (name: string) => string | undefined,
+): Map<string, Set<string>> {
+  const aliases = new Map<string, Set<string>>();
+  const visit = (node: ts.Node): void => {
+    if (ts.isVariableDeclaration(node)) addAlias({ aliases, constant, declaration: node });
+
+    ts.forEachChild(node, visit);
+  };
+
+  visit(source);
+
+  return aliases;
+}
+
+/** The descriptor key a declaration's identifier initialiser names, if it has one. */
+function aliasedKey(declaration: ts.VariableDeclaration): string | undefined {
+  const initialiser = declaration.initializer;
+  if (!initialiser) return void 0;
+
+  const value = ts.isAsExpression(initialiser) ? initialiser.expression : initialiser;
+
+  return ts.isIdentifier(value) ? value.text + DESCRIPTOR_NAME : void 0;
+}
+
+function addAlias({
+  aliases,
+  constant,
+  declaration,
+}: {
+  aliases: Map<string, Set<string>>;
+  constant: (name: string) => string | undefined;
+  declaration: ts.VariableDeclaration;
+}): void {
+  const target = aliasedKey(declaration);
+  if (!target || !ts.isIdentifier(declaration.name)) return;
+
+  const bound = constant(target);
+  const tables = [...(bound ? [bound] : []), ...(aliases.get(target) ?? [])];
+  const key = declaration.name.text + DESCRIPTOR_NAME;
+
+  for (const table of tables) aliases.set(key, (aliases.get(key) ?? new Set()).add(table));
 }
 
 function isInsertOptions(node: ts.Node): boolean {
@@ -617,8 +677,8 @@ function readCall(reader: Reader, node: ts.CallExpression): void {
   const table = insertedTable(reader, node);
   if (table) record({ reader, node, table, write: true });
 
-  const described = descriptorRead(reader, node);
-  if (described) record({ reader, node, table: described, write: false });
+  for (const described of descriptorReads(reader, node))
+    record({ reader, node, table: described, write: false });
 }
 
 function readFile({
@@ -646,7 +706,9 @@ function readFile({
   const local = literalConstants(source);
   const constant = (name: string): string | undefined =>
     local.get(name) ?? constantsOf({ file, scope }).get(name);
-  const reader: Reader = { source, module, tables, constant, found };
+  let collected: Map<string, Set<string>> | undefined;
+  const aliases = () => (collected ??= descriptorAliases(source, constant));
+  const reader: Reader = { source, module, tables, constant, aliases, found };
 
   const visit = (node: ts.Node): void => {
     if (ts.isStringLiteralLike(node)) readSql(reader, node);

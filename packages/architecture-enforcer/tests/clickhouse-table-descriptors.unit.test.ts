@@ -189,5 +189,48 @@ export const read = () => clickhouseRead({ scope }).from(summaries).build();
         "Table trace_summaries is shared with analytics, which no longer reads it. Delete the reader.",
       ]);
     });
+
+    /** @scenario "A local alias of a foreign descriptor is a foreign read" */
+    it("reports a builder read from a local alias of the descriptor", () => {
+      const workspace = fixture();
+      workspace.traceOwns();
+      workspace.write(`${ANALYTICS_CLICKHOUSE}/clickhouse.trace-summaries.table.ts`, DESCRIPTOR);
+      workspace.write(
+        `${ANALYTICS_CLICKHOUSE}/summary-read.repository.ts`,
+        `import { summaries } from "./clickhouse.trace-summaries.table.ts";
+export function read() {
+  const first = summaries;
+  const table = first;
+  return clickhouseRead({ scope }).from(table).build();
+}
+`,
+      );
+
+      expect(workspace.messages()).toEqual(["analytics reads trace_summaries, owned by trace."]);
+      expect(workspace.messages(SHARED)).toEqual([]);
+    });
+
+    /** @scenario "A shadowing alias adds a read rather than hiding one" */
+    it("counts both tables a shadowed descriptor name may hold", () => {
+      const workspace = fixture();
+      workspace.traceOwns();
+      workspace.write(
+        `${ANALYTICS_CLICKHOUSE}/clickhouse.own.table.ts`,
+        `export const own = defineClickHouseTable({ name: "analytics_own", tenantColumn: "TenantId" });\n`,
+      );
+      workspace.write(`${ANALYTICS_CLICKHOUSE}/clickhouse.trace-summaries.table.ts`, DESCRIPTOR);
+      workspace.write(
+        `${ANALYTICS_CLICKHOUSE}/summary-read.repository.ts`,
+        `import { own } from "./clickhouse.own.table.ts";
+import { summaries } from "./clickhouse.trace-summaries.table.ts";
+export function read() {
+  { const own = summaries; void own; }
+  return clickhouseRead({ scope }).from(own).build();
+}
+`,
+      );
+
+      expect(workspace.messages()).toEqual(["analytics reads trace_summaries, owned by trace."]);
+    });
   });
 });

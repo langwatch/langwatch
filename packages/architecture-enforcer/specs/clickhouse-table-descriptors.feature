@@ -58,3 +58,16 @@ Feature: ClickHouse table descriptors in the table-ownership policy
     Given analytics declares a descriptor of trace_summaries and never uses it
     When the policy runs
     Then trace_summaries has no reader in analytics
+
+  @unit @architecture
+  Scenario: A local alias of a foreign descriptor is a foreign read
+    Given trace writes trace_summaries
+    When analytics' repository binds its descriptor of trace_summaries to a local alias and reads from the alias
+    Then the policy reports that analytics reads trace_summaries, owned by trace
+    And the read passes once trace shares trace_summaries with analytics
+
+  @unit @architecture
+  Scenario: A shadowing alias adds a read rather than hiding one
+    Given analytics binds a foreign descriptor to a local name that shadows its own descriptor
+    When analytics reads from that name
+    Then the policy counts a read of trace_summaries as well
