@@ -60,8 +60,12 @@ function clippedSides(ring: HTMLElement): string[] {
     const rect = node.getBoundingClientRect();
     const left = rect.left + node.clientLeft;
     const right = left + node.clientWidth;
+    const top = rect.top + node.clientTop;
+    const bottom = top + node.clientHeight;
     if (box.left - reach < left) cut.push(`left by ${left - (box.left - reach)}px`);
     if (box.right + reach > right) cut.push(`right by ${box.right + reach - right}px`);
+    if (box.top - reach < top) cut.push(`top by ${top - (box.top - reach)}px`);
+    if (box.bottom + reach > bottom) cut.push(`bottom by ${box.bottom + reach - bottom}px`);
   }
   return cut;
 }
@@ -82,7 +86,7 @@ describe.each([
     await screen.findByTestId("braid-condition-check", {}, { timeout: 3000 });
 
     const ring = ringBox(editor);
-    expect(parseFloat(getComputedStyle(ring).outlineWidth)).toBeGreaterThan(0);
-    expect(clippedSides(ring)).toEqual([]);
+    await expect.poll(() => parseFloat(getComputedStyle(ring).outlineWidth)).toBeGreaterThan(0);
+    await expect.poll(() => clippedSides(ring)).toEqual([]);
   });
 });
