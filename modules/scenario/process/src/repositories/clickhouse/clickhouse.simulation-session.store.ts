@@ -1,5 +1,5 @@
 import type { ClickHouseSettings } from "@clickhouse/client";
-import { type ClickHouseColumns, type ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import { type ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { SecurityError } from "@langwatch/eventing";
 
 type SimulationEventingClickHouseClient = {
@@ -11,8 +11,6 @@ type SimulationEventingClickHouseClient = {
   }): Promise<unknown>;
   /** A statement the typed builder built; it names its own tenant scope. */
   read: ClickHouseQueryClient["read"];
-  /** Absent on a bare driver client (tests): every column is then named. */
-  select?(input: Parameters<ClickHouseColumns["select"]>[0]): Promise<string>;
   /** Which columns of a table this tenant's target holds, for `fn.heldOr`. */
   holds(input: { table: string }): Promise<(name: string) => boolean>;
 };
@@ -44,11 +42,6 @@ export class ClickHouseSimulationSession implements SimulationEventingClickHouse
 
   holds({ table }: { table: string }): Promise<(name: string) => boolean> {
     return this.clickhouse.columns({ tenantId: this.tenantId }).holds({ table });
-  }
-
-  /** A select list naming only the columns this tenant's target has, the rest as defaults. */
-  select(input: Parameters<ClickHouseColumns["select"]>[0]): Promise<string> {
-    return this.clickhouse.columns({ tenantId: this.tenantId }).select(input);
   }
 
   async insert(input: Parameters<SimulationEventingClickHouseClient["insert"]>[0]): Promise<void> {
