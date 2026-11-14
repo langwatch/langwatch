@@ -155,7 +155,8 @@ const OPS_PROCEDURES: Readonly<Record<string, "query" | "mutation" | "subscripti
   discardDeadLetters: "mutation",
   listOutboxAttempts: "query",
   processReleaseLapsedLease: "mutation",
-  searchAggregates: "query",
+  searchAggregates: "mutation",
+  getAggregateSearch: "query",
   getEventLogSearchWindow: "query",
   loadAggregateEvents: "query",
   computeProjectionState: "query",
@@ -190,9 +191,13 @@ const OPS_PROCEDURES: Readonly<Record<string, "query" | "mutation" | "subscripti
 const ANSWERING_PROBE = "getScope";
 
 /** The procedures whose handler reads the operator's name, email or impersonation. */
+/** A read sent to the worker as a command (ADR-202 Decided 14): a mutation that asks ops:view. */
+const READS_SENT_TO_THE_WORKER = ["searchAggregates"];
+
 const OPERATOR_READERS = [
   ANSWERING_PROBE,
   "startReplay",
+  "searchAggregates",
   "grantPlatformOperator",
   "revokePlatformOperator",
   "runBlobCleanup",
@@ -287,11 +292,15 @@ describe("the ops tRPC declarations", () => {
       >;
       const mutations = Object.entries(OPS_PROCEDURES)
         .filter(([, kind]) => kind === "mutation")
-        .map(([name]) => name);
+        .map(([name]) => name)
+        .filter((name) => !READS_SENT_TO_THE_WORKER.includes(name));
 
       expect(mutations.filter((name) => access[name] !== "permission-platform:ops:manage")).toEqual(
         [],
       );
+      expect(READS_SENT_TO_THE_WORKER.map((name) => access[name])).toEqual([
+        "permission-platform:ops:view",
+      ]);
     });
 
     /** The operator is bound only where the handler reads the person, beyond who may call it. */

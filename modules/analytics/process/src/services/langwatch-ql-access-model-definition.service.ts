@@ -38,8 +38,9 @@ const viewProvisioning = LangWatchQLViewProvisioningService.create();
 const viewStatements = LangWatchQLViewStatementsService.create();
 
 const LWQL_CUSTOM_SETTINGS_PREFIX = "custom_";
-const LWQL_USERS_D_RELATIVE_PATH = "users.d/lwql-access.yaml";
-const LWQL_CONFIG_D_RELATIVE_PATH = "config.d/lwql-named-collection.yaml";
+/** Where the rendered access model lands under the ClickHouse config root. */
+export const LWQL_USERS_D_RELATIVE_PATH = "users.d/lwql-access.yaml";
+export const LWQL_CONFIG_D_RELATIVE_PATH = "config.d/lwql-named-collection.yaml";
 
 const LWQL_USER_NETWORKS_IP = "::/0";
 

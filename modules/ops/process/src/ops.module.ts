@@ -13,6 +13,7 @@ import { OpsModule } from "#app/ops.app";
 import { opsChannels } from "#channels/ops-channels.registry";
 import { anomalyDetectionEventing } from "#eventing/ops-anomaly-detection.pipeline";
 import { clickhouseExplainEventing } from "#eventing/ops-clickhouse-explain.pipeline";
+import { eventLogSearchEventing } from "#eventing/ops-event-log-search.pipeline";
 import { groupQueueReaperEventing } from "#eventing/ops-group-queue-reaper.pipeline";
 import { platformOperatorSeedEventing } from "#eventing/ops-platform-operator-seed.pipeline";
 import { projectionReplayEventing } from "#eventing/ops-projection-replay.pipeline";
@@ -79,6 +80,7 @@ export const opsProcessModule: PublishedProcessModule<"ops", OpsApi, OpsServerCo
     .withEventing(upgradeAlertsEventing)
     .withEventing(projectionReplayEventing)
     .withEventing(clickhouseExplainEventing)
+    .withEventing(eventLogSearchEventing)
     .withEventing(systemMigrationsEventing)
     .withEventing(platformOperatorSeedEventing)
     .withTasks(async ({ repositories, app, secrets }) => [

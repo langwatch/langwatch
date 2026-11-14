@@ -77,6 +77,8 @@ import {
   type AggregateDiscovery,
   type AggregateEventView,
   type AggregateProcessManager,
+  type AggregateSearchAnswer,
+  type AggregateSearchRequested,
   type AggregateSearchResult,
   type Anomaly,
   type AnomalyKind,
@@ -302,6 +304,10 @@ import {
   type ClickHouseExplainRequestSender,
   OpsExplainService,
 } from "#services/ops-clickhouse-explain.service";
+import {
+  type EventLogSearchCommands,
+  OpsEventLogSearchService,
+} from "#services/ops-event-log-search.service";
 
 import type { OpsChannels } from "../channels/ops.channels.ts";
 import type { AnomalyDetectionTickResult } from "../eventing/ops-anomaly-detection.intent.ts";
@@ -731,6 +737,7 @@ type OpsRuntimeDependencies = Readonly<{
   inbox: BugReportInboxService;
   intake: BugReportIntakeService;
   explain: OpsExplainService;
+  eventLogSearch: OpsEventLogSearchService;
   /** Settings, Checkup and the usage report; absent where a composition built none. */
   checkup: OpsCheckupService | undefined;
   /** The detector `ops_anomaly_detection` ticks; absent where a composition built none. */
@@ -1004,8 +1011,10 @@ export class OpsModule implements OpsApi {
     const systemMigrationPassRequests = SystemMigrationPassRequestsService.create();
     const systemMigrationRollbackFacts = SystemMigrationRollbackFactsService.create();
 
+    const ops = members.createCapability(dependencies);
+
     return new OpsModule({
-      ops: members.createCapability(dependencies),
+      ops,
       authz: dependencies.authz,
       inbox,
       intake: BugReportIntakeService.create({
@@ -1033,6 +1042,10 @@ export class OpsModule implements OpsApi {
           resolver: members.explainClients,
         }),
         results: repositories.explainResults,
+      }),
+      eventLogSearch: OpsEventLogSearchService.create({
+        explorer: ops.eventExplorer,
+        results: repositories.eventLogSearchResults,
       }),
       checkup: setup.checkup,
       upgrades: OpsUpgradeService.create({
@@ -1202,20 +1215,38 @@ export class OpsModule implements OpsApi {
   }
 
   /**
-   * The event-log search. A caller naming no lower bound gets the explorer's
-   * own default lookback, which lives here so two doors cannot disagree about
-   * how far back the same question reaches.
+   * Accepts an event-log search for a worker (ADR-202 Decided 14). A caller naming no lower
+   * bound gets the explorer's default lookback, which lives here so two doors cannot disagree
+   * about how far back the same question reaches.
    */
   searchAggregates(input: {
     query: string;
     tenantIds: string[];
     sinceMs?: number | undefined;
-  }): Promise<AggregateSearchResult[]> {
-    return this.#dependencies.ops.eventExplorer.searchAggregates({
+    operator: OpsOperator | null;
+  }): Promise<AggregateSearchRequested> {
+    // The completion hint is sent under the operator's own user id.
+    if (!input.operator) throw new OpsOperatorSessionRequiredError();
+    return this.#dependencies.eventLogSearch.request({
       query: input.query,
       tenantIds: input.tenantIds,
       sinceMs: input.sinceMs ?? nowInstant().epochMilliseconds - EVENT_LOG_SEARCH_LOOKBACK_MS,
+      requestedBy: input.operator.id,
     });
+  }
+
+  getAggregateSearch(input: { requestId: string }): Promise<AggregateSearchAnswer> {
+    return this.#dependencies.eventLogSearch.result(input);
+  }
+
+  /** One accepted search of `ops_event_log_search`, on its worker; not on {@link OpsApi}. */
+  runAggregateSearch(request: { requestId: string; tenantId: string }): Promise<void> {
+    return this.#dependencies.eventLogSearch.run(request);
+  }
+
+  /** Opens the search commands once `ops_event_log_search` has registered and answered. */
+  connectEventLogSearch(commands: EventLogSearchCommands): void {
+    this.#dependencies.eventLogSearch.connect(commands);
   }
 
   getAggregateEvents(input: GetAggregateEventsInput): Promise<AggregateEventView[]> {

@@ -33,6 +33,13 @@ export interface OpsSearchAggregatesInputSchema extends Named<
 export const opsSearchAggregatesInputSchema: OpsSearchAggregatesInputSchema =
   opsSearchAggregatesInputSchemaDefinition;
 
+const opsGetAggregateSearchInputSchemaDefinition = z.object({ requestId: z.string().min(1) });
+export interface OpsGetAggregateSearchInputSchema extends Named<
+  typeof opsGetAggregateSearchInputSchemaDefinition
+> {}
+export const opsGetAggregateSearchInputSchema: OpsGetAggregateSearchInputSchema =
+  opsGetAggregateSearchInputSchemaDefinition;
+
 const opsLoadAggregateEventsInputSchemaDefinition = z.object({
   aggregateId: z.string(),
   tenantId: z.string(),
@@ -131,6 +138,32 @@ export interface AggregateSearchResultSchema extends Named<
 export const aggregateSearchResultSchema: AggregateSearchResultSchema =
   aggregateSearchResultSchemaDefinition;
 export type AggregateSearchResult = z.infer<typeof aggregateSearchResultSchema>;
+
+/** Committed once the worker stored a search's answer; the result read refetches on it. */
+export const OPS_EVENT_LOG_SEARCH_COMPLETED_EVENT_TYPE = "lw.ops.event_log_search.completed";
+
+/** The request id an accepted search answers; the matches follow on the worker. */
+const aggregateSearchRequestedSchemaDefinition = z.object({ requestId: z.string().min(1) });
+export interface AggregateSearchRequestedSchema extends Named<
+  typeof aggregateSearchRequestedSchemaDefinition
+> {}
+export const aggregateSearchRequestedSchema: AggregateSearchRequestedSchema =
+  aggregateSearchRequestedSchemaDefinition;
+export type AggregateSearchRequested = z.infer<typeof aggregateSearchRequestedSchema>;
+
+/** One search by its request id: still running, its matches, failed, or gone after its TTL. */
+const aggregateSearchAnswerSchemaDefinition = z.discriminatedUnion("status", [
+  z.object({ status: z.literal("pending") }),
+  z.object({ status: z.literal("done"), results: z.array(aggregateSearchResultSchema) }),
+  z.object({ status: z.literal("failed") }),
+  z.object({ status: z.literal("expired") }),
+]);
+export interface AggregateSearchAnswerSchema extends Named<
+  typeof aggregateSearchAnswerSchemaDefinition
+> {}
+export const aggregateSearchAnswerSchema: AggregateSearchAnswerSchema =
+  aggregateSearchAnswerSchemaDefinition;
+export type AggregateSearchAnswer = z.infer<typeof aggregateSearchAnswerSchema>;
 
 /** One stored event, with its payload parsed when it parses. */
 const aggregateEventViewSchemaDefinition = z.object({

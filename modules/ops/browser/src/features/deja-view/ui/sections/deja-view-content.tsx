@@ -101,7 +101,14 @@ function AggregateSearchScreen({
             </Banner>
           )}
 
-          {searchLoading && !searchResults && <SkeletonRows rows={6} />}
+          {searchLoading && !searchResults && (
+            <VStack align="stretch" gap={2}>
+              <Box color="fg.muted" fontSize="sm">
+                Searching…
+              </Box>
+              <SkeletonRows rows={6} />
+            </VStack>
+          )}
 
           {searchError}
 

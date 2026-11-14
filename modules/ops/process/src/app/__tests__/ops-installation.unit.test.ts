@@ -49,6 +49,7 @@ import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { opsProcessModule } from "../../ops.module.ts";
+import { OpsClickHouseRuntime } from "../../repositories/clickhouse/clickhouse.ops-explain.repository.ts";
 import { MemoryOpsSnapshotRepository } from "../../repositories/memory/memory.ops-snapshot.repository.ts";
 import { OPS_STAFF_ADDRESS, platformOperatorAuthz } from "./ops.fixture.ts";
 
@@ -56,7 +57,7 @@ function process(
   role: "api" | "worker",
   identity: IdentityApi = createApiFixture<IdentityApi>(),
   authz: AuthzApi = platformOperatorAuthz({ holders: { user_alex: ["ops:view", "ops:manage"] } }),
-  cloud: { asked?: boolean; privateKey?: string } = {},
+  options: { asked?: boolean; privateKey?: string; clickhouseOpsUrl?: string } = {},
 ) {
   const { logger } = createTestLogger();
 
@@ -64,14 +65,14 @@ function process(
     role,
     secrets: () =>
       new ScopedSecrets(async (handle, build) =>
-        build(handle.id === "LANGWATCH_LICENSE_PRIVATE_KEY" ? cloud.privateKey : void 0),
+        build(handle.id === "LANGWATCH_LICENSE_PRIVATE_KEY" ? options.privateKey : void 0),
       ),
   })
     .withModules([opsProcessModule])
     .withConfig({
       ops: {
         apiKey: undefined,
-        clickhouseOpsUrl: undefined,
+        clickhouseOpsUrl: options.clickhouseOpsUrl,
         usageStats: {
           disabled: false,
           installMethod: undefined,
@@ -88,7 +89,7 @@ function process(
         },
         bugReportSlackChannel: undefined,
         slackApiBase: "https://slack.com/api",
-        cloudOps: cloud.asked ?? false,
+        cloudOps: options.asked ?? false,
         adminEmails: [],
         nodeEnvironment: undefined,
         isSaas: false,
@@ -227,6 +228,33 @@ describe("ops app installation", () => {
         expect(release).toHaveBeenCalled();
       },
     );
+  });
+
+  describe("given CLICKHOUSE_OPS_URL is set in the environment", () => {
+    const OPS_URL = "http://langwatch_ops@clickhouse-ops:8123/langwatch";
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    /** @scenario "The api role opens no ops ClickHouse client" */
+    it("gives the api role no ops identity to open, and the worker its URL", async () => {
+      const opened = vi.spyOn(OpsClickHouseRuntime, "create");
+
+      for (const role of ["api", "worker"] as const) {
+        opened.mockClear();
+        const runtime = await process(role, void 0, void 0, { clickhouseOpsUrl: OPS_URL }).boot();
+        try {
+          expect(opened).toHaveBeenCalledTimes(1);
+          const [options] = opened.mock.calls[0] ?? [];
+          expect(options?.url).toBe(role === "worker" ? OPS_URL : void 0);
+          // Only the worker can resolve a client; the api has no URL to open one with.
+          expect(opened.mock.results[0]?.value?.findClient() === null).toBe(role === "api");
+        } finally {
+          await runtime.stop();
+        }
+      }
+    });
   });
 
   describe("given a worker holding the snapshot store", () => {

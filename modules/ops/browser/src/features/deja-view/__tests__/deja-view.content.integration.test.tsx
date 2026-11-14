@@ -92,6 +92,21 @@ describe("DejaView", () => {
     expect(screen.getByText("Search for an aggregate ID to get started.")).toBeDefined();
   });
 
+  /** @scenario "The explorer says it is searching until the matches arrive" */
+  it("shows Searching… while the worker has not answered, and the rows once it has", () => {
+    const rendered = renderDejaView({
+      hasSearched: true,
+      searchLoading: true,
+      searchResults: void 0,
+    });
+
+    expect(screen.getByText("Searching…")).toBeDefined();
+
+    rendered.rerenderDejaView({ searchLoading: false, searchResults: [] });
+    expect(screen.queryByText("Searching…")).toBeNull();
+    expect(screen.getByText("No aggregates found")).toBeDefined();
+  });
+
   it("shows the empty result state after a completed search", () => {
     renderDejaView({ hasSearched: true, searchResults: [] });
 

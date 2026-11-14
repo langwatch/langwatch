@@ -9,7 +9,6 @@ import { z } from "zod";
 import {
   opsAggregateDiscoverySchema,
   opsAggregateEventsSchema,
-  opsAggregateSearchSchema,
   opsAnomalyDismissedSchema,
   opsAnomalyListingSchema,
   opsDryRunReplaySchema,
@@ -21,9 +20,13 @@ import {
 } from "../../ops.responses.ts";
 import { opsDismissAnomalyInputSchema } from "../dashboard/ops-anomaly.ts";
 import {
+  aggregateSearchAnswerSchema,
+  aggregateSearchRequestedSchema,
+  OPS_EVENT_LOG_SEARCH_COMPLETED_EVENT_TYPE,
   opsComputeProjectionStateInputSchema,
   opsDiscoverAggregatesInputSchema,
   opsDryRunReplayInputSchema,
+  opsGetAggregateSearchInputSchema,
   opsGetReplayRunInputSchema,
   opsLoadAggregateEventsInputSchema,
   opsSearchAggregatesInputSchema,
@@ -38,9 +41,18 @@ import {
 } from "./ops-replay.ts";
 
 export const opsEventLogTrpc = defineTrpcContract("ops")
-  .query("searchAggregates")
+  /**
+   * Hands an event-log search to a worker, which reads every tenant on its own identity
+   * (ADR-202 Decided 14); the answer is the request id `getAggregateSearch` reads.
+   */
+  .mutation("searchAggregates")
   .withInput(opsSearchAggregatesInputSchema)
-  .withOutput(opsAggregateSearchSchema)
+  .withOutput(aggregateSearchRequestedSchema)
+
+  /** One search by its request id, refetched when the worker records it completed. */
+  .query("getAggregateSearch", { invalidatedBy: [OPS_EVENT_LOG_SEARCH_COMPLETED_EVENT_TYPE] })
+  .withInput(opsGetAggregateSearchInputSchema)
+  .withOutput(aggregateSearchAnswerSchema)
 
   /**
    * The bound on an event-log search: the default lookback the explorer uses

@@ -21,6 +21,8 @@ import {
 import {
   LangWatchQLAccessModelDefinitionService,
   type LwqlAccessModelDefinition,
+  LWQL_CONFIG_D_RELATIVE_PATH,
+  LWQL_USERS_D_RELATIVE_PATH,
   type RenderedConfigFile,
 } from "../services/langwatch-ql-access-model-definition.service.ts";
 import {
@@ -35,11 +37,6 @@ const accessModelDefinition = LangWatchQLAccessModelDefinitionService.create();
 const production = LangWatchQLProductionProvisioningService.create();
 const selfProvisioning = LangWatchQLSelfProvisioningService.create();
 const collectionBinding = LangWatchQLCollectionBindingService.create();
-
-// The paths renderUsersConfig writes and the chart mounts; restated until the definition
-// exports them.
-const USERS_D_RELATIVE_PATH = "users.d/lwql-access.yaml";
-const CONFIG_D_RELATIVE_PATH = "config.d/lwql-named-collection.yaml";
 
 /** The definition the app would converge, from the same environment the app reads. */
 export function lwqlAccessModelDefinitionFromSource(
@@ -117,13 +114,13 @@ export function lwqlAccessConfigFilesFromSource(source: Record<string, string | 
   return {
     files: [
       {
-        relativePath: USERS_D_RELATIVE_PATH,
+        relativePath: LWQL_USERS_D_RELATIVE_PATH,
         contents: accessModelDefinition.renderAppReaderUsersD({
           sourceDatabase: database,
           appReader,
         }),
       },
-      { relativePath: CONFIG_D_RELATIVE_PATH, contents: "{}\n" },
+      { relativePath: LWQL_CONFIG_D_RELATIVE_PATH, contents: "{}\n" },
     ],
     secretLength: appReader.passwordSha256Hex.length,
   };

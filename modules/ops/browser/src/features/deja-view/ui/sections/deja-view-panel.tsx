@@ -1,11 +1,16 @@
+import { Banner } from "@langwatch/design-system/banner";
 import { Kbd } from "@langwatch/design-system/kbd";
 import { HandledErrorAlert } from "@langwatch/error-views";
-import { useMemo } from "react";
+import { type ReactNode, useMemo } from "react";
 
 import { api } from "../../../../behavior/ops-api.ts";
 import { useOpsRouter as useRouter } from "../../../../behavior/ops-router.ts";
 import { describeError } from "../../../../model/describe-error.ts";
 import { useDejaViewState } from "../../behavior/deja-view-state.ts";
+import {
+  type AggregateSearchState,
+  useAggregateSearch,
+} from "../../behavior/use-aggregate-search.ts";
 import { type EventResult } from "../../model/deja-view-types.ts";
 import { DejaView } from "./deja-view-content.tsx";
 
@@ -14,16 +19,12 @@ export function DejaViewContent() {
   const state = useDejaViewState(router.asPath);
   const selectedAggregate = state.selectedAggregate;
 
-  const searchResults = api.ops.searchAggregates.useQuery(
-    {
-      query: state.submittedQuery,
-      tenantId: state.submittedTenant || void 0,
-    },
-    {
-      enabled:
-        state.hasSearched && (state.submittedQuery.trim() !== "" || state.submittedTenant !== ""),
-    },
-  );
+  const search = useAggregateSearch({
+    query: state.submittedQuery,
+    tenantId: state.submittedTenant || void 0,
+    enabled:
+      state.hasSearched && (state.submittedQuery.trim() !== "" || state.submittedTenant !== ""),
+  });
 
   // DejaView search is bounded server-side to the last 365 days; cold-tier
   // storage kicks in earlier (from CLICKHOUSE_COLD_STORAGE_EVENT_LOG_TTL_DAYS)
@@ -80,14 +81,14 @@ export function DejaViewContent() {
   const events: EventResult[] = eventsQuery.data ?? [];
 
   const currentAggregateType = useMemo(() => {
-    if (!searchResults.data || !selectedAggregate) return null;
-    const agg = searchResults.data.find(
+    if (!search.results || !selectedAggregate) return null;
+    const agg = search.results.find(
       (a) =>
         a.aggregateId === selectedAggregate.aggregateId &&
         a.tenantId === selectedAggregate.tenantId,
     );
     return agg?.aggregateType ?? null;
-  }, [searchResults.data, selectedAggregate]);
+  }, [search.results, selectedAggregate]);
 
   const matchingProjections = useMemo(() => {
     if (!projectionsQuery.data || !currentAggregateType) return [];
@@ -119,15 +120,9 @@ export function DejaViewContent() {
       searchQuery={state.searchQuery}
       tenantFilter={state.tenantFilter}
       hasSearched={state.hasSearched}
-      searchResults={searchResults.data}
-      searchLoading={searchResults.isFetching}
-      searchError={
-        searchResults.error ? (
-          <HandledErrorAlert error={searchResults.error} fallbackTitle="Couldn't run this search" />
-        ) : (
-          void 0
-        )
-      }
+      searchResults={search.results}
+      searchLoading={search.isSearching}
+      searchError={searchProblemOf(search)}
       searchLookbackDays={searchLookbackDays}
       hotTierDays={hotTierDays}
       hotTierEnvVar={searchWindowQuery.data?.hotTierEnvVar ?? null}
@@ -172,4 +167,26 @@ export function DejaViewContent() {
       onSelectEvent={state.setEventCursor}
     />
   );
+}
+
+/** What the search box shows when the search did not come back with rows. */
+function searchProblemOf(search: AggregateSearchState): ReactNode {
+  if (search.error) {
+    return <HandledErrorAlert error={search.error} fallbackTitle="Couldn't run this search" />;
+  }
+  if (search.outcome === "failed") {
+    return (
+      <Banner status="error" placement="inline">
+        Couldn't run this search. Try again, or narrow it with a tenant.
+      </Banner>
+    );
+  }
+  if (search.outcome === "expired") {
+    return (
+      <Banner status="warning" placement="inline">
+        This search has expired. Search again to refresh the results.
+      </Banner>
+    );
+  }
+  return void 0;
 }

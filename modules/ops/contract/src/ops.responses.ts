@@ -11,7 +11,6 @@ import { anomalySchema } from "./features/dashboard/ops-anomaly.ts";
 import {
   aggregateEventViewSchema,
   aggregateDiscoverySchema,
-  aggregateSearchResultSchema,
   projectionStateAtEventSchema,
 } from "./features/event-log/ops-event-log.ts";
 import {
@@ -375,12 +374,6 @@ export interface OpsTenantSearchSchema extends Named<typeof opsTenantSearchSchem
 export const opsTenantSearchSchema: OpsTenantSearchSchema = opsTenantSearchSchemaDefinition;
 
 export const opsAggregateDiscoverySchema = aggregateDiscoverySchema;
-const opsAggregateSearchSchemaDefinition = z.array(aggregateSearchResultSchema);
-export interface OpsAggregateSearchSchema extends Named<
-  typeof opsAggregateSearchSchemaDefinition
-> {}
-export const opsAggregateSearchSchema: OpsAggregateSearchSchema =
-  opsAggregateSearchSchemaDefinition;
 const opsAggregateEventsSchemaDefinition = z.array(aggregateEventViewSchema);
 export interface OpsAggregateEventsSchema extends Named<
   typeof opsAggregateEventsSchemaDefinition

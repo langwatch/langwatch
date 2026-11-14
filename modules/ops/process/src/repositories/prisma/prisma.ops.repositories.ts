@@ -71,6 +71,7 @@ type NotPostgres =
   | "rateTracker"
   | "storageReadings"
   | "explainResults"
+  | "eventLogSearchResults"
   | "redisHealth"
   | "clickhouseHealth"
   | "events"

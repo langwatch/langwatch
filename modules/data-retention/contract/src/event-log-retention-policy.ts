@@ -76,6 +76,8 @@ export const RETENTION_CLASS_BY_AGGREGATE_TYPE: Record<string, EventLogRetention
   billing_report: "indefinite",
   // An operator EXPLAIN's request id only; the query and rows expire in Redis (ADR-202 Decided 14).
   clickhouse_explain: "indefinite",
+  // An ops search's request id only; its query and matches expire in Redis (ADR-202 D14).
+  event_log_search: "indefinite",
   coding_assistant_billing: "indefinite",
   connected_billing: "indefinite",
   dataset: "indefinite",

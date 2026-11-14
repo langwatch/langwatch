@@ -53,7 +53,8 @@ import type { OpsSnapshotAbortSignal } from "./features/dashboard/ops-snapshot.s
 import type {
   AggregateDiscovery,
   AggregateEventView,
-  AggregateSearchResult,
+  AggregateSearchAnswer,
+  AggregateSearchRequested,
   ProjectionStateAtEvent,
 } from "./features/event-log/ops-event-log.ts";
 import type {
@@ -649,15 +650,18 @@ export interface OpsApi {
   clearFeatureFlag(input: { key: string; lastEditedBy: string | null }): Promise<void>;
   discoverAggregates(input: DiscoverAggregatesInput): Promise<AggregateDiscovery>;
   /**
-   * The event-log search. `sinceMs` is optional because the explorer's own
-   * default lookback is the module's rule, not the door's: two doors asking
-   * the same question must not disagree about how far back it reaches.
+   * Accepts an event-log search for a worker and answers its request id (ADR-202 Decided 14).
+   * `sinceMs` is optional because the default lookback is the module's rule, not the door's;
+   * The completion hint is sent under the operator's own user id, so a session is required.
    */
   searchAggregates(input: {
     query: string;
     tenantIds: string[];
     sinceMs?: number | undefined;
-  }): Promise<AggregateSearchResult[]>;
+    operator: OpsOperator | null;
+  }): Promise<AggregateSearchRequested>;
+  /** One accepted search by its request id: pending, its matches, failed or expired. */
+  getAggregateSearch(input: { requestId: string }): Promise<AggregateSearchAnswer>;
   getAggregateEvents(input: GetAggregateEventsInput): Promise<AggregateEventView[]>;
   getForAggregate(input: GetForAggregateInput): Promise<AggregateProcessManager[]>;
   requeueDeadMessages(input: RequeueDeadMessagesInput): Promise<RequeueDeadMessagesResult>;

@@ -20,6 +20,7 @@ import { RedisCloudNoticeRepository } from "../redis/redis.cloud-notice.reposito
 import { RedisRedisHealthRepository } from "../redis/redis.datastore-health.repository.ts";
 import { RedisGroupQueueReaperRepository } from "../redis/redis.group-queue-reaper.repository.ts";
 import { RedisMigrationLeaseRepository } from "../redis/redis.migration-lease.repository.ts";
+import { RedisOpsEventLogSearchResultsRepository } from "../redis/redis.ops-event-log-search-results.repository.ts";
 import { RedisOpsExplainResultsRepository } from "../redis/redis.ops-explain-results.repository.ts";
 import { RedisOpsMetricsRepository } from "../redis/redis.ops-metrics.repository.ts";
 import { RedisOpsSnapshotRepository } from "../redis/redis.ops-snapshot.repository.ts";
@@ -73,6 +74,7 @@ export const LiveOpsRepositories = {
       rateTracker: RedisAnomalyRateTrackerRepository.create({ redis }),
       storageReadings: RedisStorageStatsReadingsRepository.create({ redis }),
       explainResults: RedisOpsExplainResultsRepository.create({ redis }),
+      eventLogSearchResults: RedisOpsEventLogSearchResultsRepository.create({ redis }),
       cloudLatestRelease: RedisCloudLatestReleaseRepository.create({ redis }),
       cloudNotices: RedisCloudNoticeRepository.create({ redis }),
       seatSharingChecks: RedisSeatSharingCheckRepository.create({ redis }),

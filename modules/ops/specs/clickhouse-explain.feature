@@ -83,7 +83,7 @@ Feature: Operator EXPLAIN behind the operator secret
     When the request is delivered again
     Then ClickHouse is not asked again and the stored rows stay as they are
 
-  @unimplemented
+  @unit
   Scenario: The api role opens no ops ClickHouse client
     Given CLICKHOUSE_OPS_URL is set in the api's environment
     When the api role builds ops

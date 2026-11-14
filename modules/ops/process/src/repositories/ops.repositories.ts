@@ -23,6 +23,7 @@ import type { GroupQueueReaperRepository } from "./group-queue-reaper.repository
 import type { ImpersonationRepository } from "./impersonation.repository.ts";
 import type { InstanceAdminRepository } from "./instance-admin.repository.ts";
 import type { MigrationMembershipRepository } from "./migration-membership.repository.ts";
+import type { OpsEventLogSearchResultsRepository } from "./ops-event-log-search-results.repository.ts";
 import type { OpsExplainResultsRepository } from "./ops-explain-results.repository.ts";
 import type { OpsMetricsRepository } from "./ops-metrics.repository.ts";
 import type { OpsMigrationRepository } from "./ops-migration.repository.ts";
@@ -93,6 +94,7 @@ export interface OpsRepositories {
   readonly storageReadings: StorageStatsReadingsRepository;
   /** Operator EXPLAIN requests and their answers, kept for a short time to live. */
   readonly explainResults: OpsExplainResultsRepository;
+  readonly eventLogSearchResults: OpsEventLogSearchResultsRepository;
   /** The newest release cloud named in the last usage-report reply. */
   readonly cloudLatestRelease: CloudLatestReleaseRepository;
   /** The notices cloud named in the last usage-report reply. */

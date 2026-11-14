@@ -11,14 +11,20 @@ import { opsOperatorContext } from "#transport/ops-operator.trpc";
 export const opsEventLogTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsEventLogTrpc> =
   defineTrpcRouter(OpsApi, opsEventLogTrpc)
     .procedure("searchAggregates")
+    .withMiddlewareContext(opsOperatorContext)
     .withPermission("ops:view", { at: "platform" })
-    .handle(({ app, input }) =>
+    .handle(({ app, input }, operator) =>
       app.searchAggregates({
         query: input.query,
         tenantIds: input.tenantId ? [input.tenantId] : [],
         sinceMs: input.sinceMs,
+        operator: operator ?? null,
       }),
     )
+
+    .procedure("getAggregateSearch")
+    .withPermission("ops:view", { at: "platform" })
+    .handle(({ app, input }) => app.getAggregateSearch({ requestId: input.requestId }))
 
     .procedure("getEventLogSearchWindow")
     .withPermission("ops:view", { at: "platform" })
