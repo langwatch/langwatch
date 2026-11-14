@@ -1,7 +1,7 @@
 # Docs video polish
 
-Read the guide before you author a timeline:
-<https://nexus.langwatch.ai/wiki/recording-video-for-docs>. It holds the
+Read the guide before you author a timeline: the internal wiki page
+`recording-video-for-docs` (Laze wiki, `laze wiki get recording-video-for-docs`). It holds the
 editorial rules, which target earns a zoom and how a take must be recorded.
 This file is the format reference.
 
@@ -252,7 +252,7 @@ follows the cursor through the text.
 
 ## Choosing the zooms
 
-The full rules are on the Nexus guide. In short:
+The full rules are in the wiki guide. In short:
 
 - **Corners earn a zoom, centres usually do not.** A button in the top right is
   hard to find at full size. A dialog in the middle is already the only thing
