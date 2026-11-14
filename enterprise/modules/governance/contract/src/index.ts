@@ -46,6 +46,8 @@ export * from "./features/personal/personal-usage.ts";
 export * from "./features/personal/personal-budget-overview.ts";
 export * from "./platform-tool-policy.ts";
 export * from "./features/ingestion/puller.ts";
+export * from "./features/ingestion/ingested-cost.commands.ts";
+export * from "./features/ingestion/ingested-cost.events.ts";
 export * from "./features/ingestion/pulled-usage.commands.ts";
 export * from "./features/ingestion/pulled-usage.events.ts";
 export * from "./features/ingestion/quarantine-fill.ts";

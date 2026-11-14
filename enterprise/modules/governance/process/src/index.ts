@@ -89,7 +89,7 @@ export type {
   GovernanceIngestPrincipalDirectory,
   GovernanceIngestReceiverApi,
   GovernanceIngestReceiverMembers,
-  GovernanceIngestSpend,
+  GovernanceIngestCostRecorder,
   GovernanceIngestTraceCollection,
 } from "./features/ingest/services/governance-ingest-receiver.service.ts";
 

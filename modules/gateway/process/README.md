@@ -6,13 +6,13 @@ The server half of [gateway](../README.md). The AI Gateway: virtual keys, gatewa
 
 ## Installation
 
-`defineProcessModule("gateway").withRepositories(gatewayRepositories).withChannels(gatewayChannels).withApi(GatewayModule).withTransports(agentCacheRest, elevenLabsWebhookRest, gatewayInternalRest, gatewayBudgetTrpcTransport, gatewayCacheRuleTrpcTransport, gatewayGuardrailTrpcTransport, gatewayPlatformRest, gatewaySpendRest, gatewaySpendEventTrpcTransport, gatewayUsageTrpcTransport, virtualKeyTrpcTransport).withEventing(gatewayGovernanceEventsEventing).withEventing(gatewaySpendEventing).withEventing(gatewayRealtimeSessionEventing).withEventing(gatewayPulledUsageLedgerEventing).withEventing(gatewayInstantEvalJudgeSpendEventing).withEventing(gatewayPiiRedactionSpendEventing).withEventing(gatewayConnectManagedKeyEventing).withTasks(…).provideMiddlewareBindings(…).provideMiddlewareContext(…).withIdIndexes(GATEWAY_ID_INDEXES, …)`, `src/gateway.module.ts:48`.
+`defineProcessModule("gateway").withRepositories(gatewayRepositories).withChannels(gatewayChannels).withApi(GatewayModule).withTransports(agentCacheRest, elevenLabsWebhookRest, gatewayInternalRest, gatewayBudgetTrpcTransport, gatewayCacheRuleTrpcTransport, gatewayGuardrailTrpcTransport, gatewayPlatformRest, gatewaySpendRest, gatewaySpendEventTrpcTransport, gatewayUsageTrpcTransport, virtualKeyTrpcTransport).withEventing(gatewayGovernanceEventsEventing).withEventing(gatewaySpendEventing).withEventing(gatewayRealtimeSessionEventing).withEventing(gatewayPulledUsageLedgerEventing).withEventing(gatewayIngestedCostLedgerEventing).withEventing(gatewayInstantEvalJudgeSpendEventing).withEventing(gatewayPiiRedactionSpendEventing).withEventing(gatewayConnectManagedKeyEventing).withTasks(…).provideMiddlewareBindings(…).provideMiddlewareContext(…).withIdIndexes(GATEWAY_ID_INDEXES, …)`, `src/gateway.module.ts:49`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
 ## Module API (`GatewayApi`)
 
-Peers call these through the token, declared at `../contract/src/gateway.api.ts:572`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/gateway.api.ts:570`; nothing else in this package is public.
 It extends `GatewayInternalProtocol`.
 
 #### `internalDoor`
@@ -233,22 +233,6 @@ Main's `GatewayBudgetService.check` (budget.service.ts:1241), read by the CLI.
 
 ```typescript
 checkBudget(input: GatewayBudgetCheckInput): Promise<GatewayBudgetCheckResult>;
-```
-
-#### `insertSpendDebit`
-
-Main's ClickHouse budget `insertDebit` (budget.clickhouse.repository.ts:615).
-
-```typescript
-insertSpendDebit(rows: readonly GatewayBudgetDebitRow[]): Promise<void>;
-```
-
-#### `appendBudgetChange`
-
-Main's ingest `BUDGET_UPDATED` append (ingestionRoutes.ts:825).
-
-```typescript
-appendBudgetChange(input: GatewayBudgetChangeInput): Promise<void>;
 ```
 
 #### `listCacheRules`
@@ -1423,21 +1407,21 @@ Contract `../contract/src/features/budget/gateway-budget.trpc.ts:25`, router `sr
 
 ```typescript
 // gatewayBudgets.list
-// Input: gatewayBudgetApiOrganizationInputSchema, ../contract/src/features/budget/gateway.budget.ts:483
+// Input: gatewayBudgetApiOrganizationInputSchema, ../contract/src/features/budget/gateway.budget.ts:476
 interface Input {
   organizationId: string;
 }
 type Output = z.infer<typeof gatewayBudgetListSchema>; // ../contract/src/gateway.responses.ts:203
 
 // gatewayBudgets.listForProject
-// Input: gatewayBudgetApiProjectInputSchema, ../contract/src/features/budget/gateway.budget.ts:491
+// Input: gatewayBudgetApiProjectInputSchema, ../contract/src/features/budget/gateway.budget.ts:484
 interface Input {
   projectId: string;
 }
 type Output = z.infer<typeof gatewayBudgetListSchema>; // ../contract/src/gateway.responses.ts:203
 
 // gatewayBudgets.get
-// Input: gatewayBudgetApiBudgetInputSchema, ../contract/src/features/budget/gateway.budget.ts:502
+// Input: gatewayBudgetApiBudgetInputSchema, ../contract/src/features/budget/gateway.budget.ts:495
 interface Input {
   organizationId: string;
   id: string;
@@ -1445,7 +1429,7 @@ interface Input {
 type Output = z.infer<typeof gatewayBudgetDetailSchema>; // ../contract/src/gateway.responses.ts:229
 
 // gatewayBudgets.groupTargets
-type Input = z.infer<typeof gatewayBudgetApiOrganizationInputSchema>; // ../contract/src/features/budget/gateway.budget.ts:483
+type Input = z.infer<typeof gatewayBudgetApiOrganizationInputSchema>; // ../contract/src/features/budget/gateway.budget.ts:476
 // Output: gatewayBudgetGroupTargetsSchema, ../contract/src/gateway.responses.ts:241
 type Output = {
   id: string;
@@ -1454,15 +1438,15 @@ type Output = {
 }[];
 
 // gatewayBudgets.personalBudget
-type Input = z.infer<typeof gatewayBudgetApiOrganizationInputSchema>; // ../contract/src/features/budget/gateway.budget.ts:483
+type Input = z.infer<typeof gatewayBudgetApiOrganizationInputSchema>; // ../contract/src/features/budget/gateway.budget.ts:476
 type Output = z.infer<typeof gatewayPersonalBudgetSchema>; // ../contract/src/gateway.responses.ts:400
 
 // gatewayBudgets.create
-type Input = z.infer<typeof gatewayBudgetApiCreateInputSchema>; // ../contract/src/features/budget/gateway.budget.ts:538
+type Input = z.infer<typeof gatewayBudgetApiCreateInputSchema>; // ../contract/src/features/budget/gateway.budget.ts:531
 type Output = z.infer<typeof gatewayBudgetDtoResponseSchema>; // ../contract/src/gateway.responses.ts:244
 
 // gatewayBudgets.update
-// Input: gatewayBudgetApiUpdateInputSchema, ../contract/src/features/budget/gateway.budget.ts:553
+// Input: gatewayBudgetApiUpdateInputSchema, ../contract/src/features/budget/gateway.budget.ts:546
 interface Input {
   organizationId: string;
   id: string;
@@ -1475,11 +1459,11 @@ interface Input {
 type Output = z.infer<typeof gatewayBudgetDtoResponseSchema>; // ../contract/src/gateway.responses.ts:244
 
 // gatewayBudgets.archive
-type Input = z.infer<typeof gatewayBudgetApiBudgetInputSchema>; // ../contract/src/features/budget/gateway.budget.ts:502
+type Input = z.infer<typeof gatewayBudgetApiBudgetInputSchema>; // ../contract/src/features/budget/gateway.budget.ts:495
 type Output = z.infer<typeof gatewayBudgetDtoResponseSchema>; // ../contract/src/gateway.responses.ts:244
 
 // gatewayBudgets.reset
-// Input: gatewayBudgetApiResetInputSchema, ../contract/src/features/budget/gateway.budget.ts:565
+// Input: gatewayBudgetApiResetInputSchema, ../contract/src/features/budget/gateway.budget.ts:558
 interface Input {
   organizationId: string;
   id: string;
@@ -1759,6 +1743,14 @@ Declared at `src/eventing/gateway-governance-events.pipeline.ts:34`. Events: `ga
 | command | `recordVkLifecycle`    | –       | `src/eventing/gateway-governance-events.pipeline.ts:39` |
 | command | `recordBudgetCrossing` | –       | `src/eventing/gateway-governance-events.pipeline.ts:40` |
 
+### Pipeline `gateway_ingested_cost_ledger` (aggregate `global`)
+
+Declared at `src/eventing/gateway-ingested-cost-ledger.pipeline.ts:32`.
+
+| Kind            | Name                       | Handles                                                                                             | Declared at                                                |
+| --------------- | -------------------------- | --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| peer subscriber | `gatewayIngestedCostDebit` | `lw.obs.ingested_cost.recorded` from [governance](../../../enterprise/modules/governance/README.md) | `src/eventing/gateway-ingested-cost-ledger.pipeline.ts:39` |
+
 ### Pipeline `gateway_instant_eval_judge_spend` (aggregate `global`)
 
 Declared at `src/eventing/gateway-instant-eval-judge-spend.pipeline.ts:32`.
@@ -1817,9 +1809,9 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                          | Environment variable                    | Declared at                            |
 | ------ | ----------------------------- | --------------------------------------- | -------------------------------------- |
-| secret | `internalSecret`              | `LW_GATEWAY_INTERNAL_SECRET`            | `src/app/gateway.app.ts:1162`          |
-| secret | `jwtSecret`                   | `LW_GATEWAY_JWT_SECRET`                 | `src/app/gateway.app.ts:1163`          |
-| secret | `virtualKeyPepper`            | `LW_VIRTUAL_KEY_PEPPER`                 | `src/app/gateway.app.ts:1164`          |
+| secret | `internalSecret`              | `LW_GATEWAY_INTERNAL_SECRET`            | `src/app/gateway.app.ts:1164`          |
+| secret | `jwtSecret`                   | `LW_GATEWAY_JWT_SECRET`                 | `src/app/gateway.app.ts:1165`          |
+| secret | `virtualKeyPepper`            | `LW_VIRTUAL_KEY_PEPPER`                 | `src/app/gateway.app.ts:1166`          |
 | config | `spendSettlementGraceMs`      | `LW_SPEND_SETTLEMENT_GRACE_MS`          | `../contract/src/gateway.config.ts:27` |
 | config | `internalUrl`                 | `LW_GATEWAY_INTERNAL_URL`               | `../contract/src/gateway.config.ts:29` |
 | config | `controlPlaneUrl`             | `GATEWAY_CONTROL_PLANE_URL`             | `../contract/src/gateway.config.ts:31` |

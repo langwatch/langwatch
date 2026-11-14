@@ -258,6 +258,10 @@ import { IdentityMatchService } from "../features/identity/services/identity-mat
 import { PersonDiscoveryService } from "../features/identity/services/person-discovery.service.ts";
 import { PersonListingService } from "../features/identity/services/person-listing.service.ts";
 import { SuppressionSnapshotService } from "../features/identity/services/suppression-snapshot.service.ts";
+import {
+  buildIngestedCostPipeline,
+  type IngestedCostDefinition,
+} from "../features/ingest/eventing/ingested-cost.pipeline.ts";
 import { GovernanceIngestAccessService } from "../features/ingest/services/governance-ingest-access.service.ts";
 import { GovernanceIngestPrincipalService } from "../features/ingest/services/governance-ingest-principal.service.ts";
 import { GovernanceIngestReceiverService } from "../features/ingest/services/governance-ingest-receiver.service.ts";
@@ -408,9 +412,6 @@ interface GovernanceAppDependencies {
     | "budgetOverviewForUser"
     | "findSpendDaysForOrganizationProjects"
     | "checkBudget"
-    | "resolveApplicableBudgets"
-    | "insertSpendDebit"
-    | "appendBudgetChange"
     | "getPrincipalSpendSummary"
     | "findPrincipalDailySpend"
     | "findPrincipalModelSpend"
@@ -1003,7 +1004,12 @@ export class GovernanceModule implements GovernanceRestApi {
           dependencies.logs.collectOtlpLogs({ ...input, piiRedactionLevel: "ESSENTIAL" }),
         metricCollection: (input) =>
           dependencies.metrics.collectOtlpMetrics({ ...input, piiRedactionLevel: "ESSENTIAL" }),
-        spend: dependencies.gateway,
+        costs: {
+          record: (commands) =>
+            this.ingestedCostSender().sendBatch(
+              commands.map(({ tenantId, occurredAt, data }) => ({ tenantId, occurredAt, ...data })),
+            ),
+        },
       }),
     });
   }
@@ -1058,6 +1064,7 @@ export class GovernanceModule implements GovernanceRestApi {
   private readonly vendorBases: VendorBases;
   private ingestionPullCommands: EventingSenders | undefined;
   private pulledUsageCommands: EventingSenders | undefined;
+  private ingestedCostCommands: EventingSenders | undefined;
   private codingAssistantBillingCommands: EventingSenders | undefined;
   private readonly personalUsageDashboards: PersonalUsageDashboardService;
   private readonly personalUsageKeys: PersonalUsageKeyService;
@@ -1235,6 +1242,23 @@ export class GovernanceModule implements GovernanceRestApi {
 
   connectPulledUsage(commands: EventingSenders): void {
     this.pulledUsageCommands = commands;
+  }
+
+  /** The push receivers' cost facts; the api records them, gateway's ledger debits them. */
+  ingestedCostPipeline(): IngestedCostDefinition {
+    return buildIngestedCostPipeline({ retention: this.tenantRetention() });
+  }
+
+  connectIngestedCost(commands: EventingSenders): void {
+    this.ingestedCostCommands = commands;
+  }
+
+  /** No pipeline is a refusal the receiver answers 503 for, never a cost dropped. */
+  private ingestedCostSender() {
+    const sender = this.ingestedCostCommands?.["recordIngestedCost"];
+    if (!sender)
+      throw new Error("ingested_cost_processing is not registered for recordIngestedCost");
+    return sender;
   }
 
   connectCodingAssistantBilling(commands: EventingSenders): void {

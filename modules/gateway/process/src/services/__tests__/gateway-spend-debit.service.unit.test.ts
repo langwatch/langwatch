@@ -3,6 +3,7 @@
  * ledger and which BUDGET_UPDATED change events reach the feed, rather than
  * ClickHouse or Postgres.
  */
+import type { IngestedCostRecordedEventData } from "@langwatch/enterprise-governance-contract";
 import type {
   GatewayBudgetResolutionTarget,
   GatewayBudgetScopeType,
@@ -164,6 +165,26 @@ const payload = (overrides: Record<string, unknown> = {}) =>
     occurred_at: 1_753_800_000_000,
     ...overrides,
   });
+
+const ingested = (overrides: Partial<IngestedCostRecordedEventData> = {}) =>
+  ({
+    ingestionSourceId: "src-1",
+    sourceType: "otel_generic",
+    organizationId: "org-1",
+    teamId: null,
+    projectId: "gov-project",
+    requestId: "push-req-1",
+    model: "claude-sonnet",
+    tokensInput: 100,
+    tokensOutput: 50,
+    tokensCacheRead: 0,
+    tokensCacheWrite: 0,
+    amountNanoUsd: 1_250_000_000,
+    principalUserId: "usr-1",
+    occurredAtMs: 1_753_800_000_000,
+    observedAtMs: 1_753_800_001_000,
+    ...overrides,
+  }) satisfies IngestedCostRecordedEventData;
 
 function harness({
   budgets,
@@ -448,6 +469,95 @@ describe("GatewaySpendDebitService", () => {
 
       await expect(debits.write(payload())).resolves.toBeUndefined();
       expect(ledger.batches).toHaveLength(1);
+    });
+  });
+
+  describe("given a cost a governance push source recorded", () => {
+    /** @scenario "The gateway budget ledger debits a recorded push cost" */
+    it("debits every applicable budget but attributed-user ones, under the event's tenant", async () => {
+      const { debits, resolver, ledger, changes } = harness({
+        budgets: [
+          resolved({ id: "b-org", scopeType: "ORGANIZATION" }),
+          resolved({ id: "b-principal", scopeType: "PRINCIPAL" }),
+          resolved({ id: "b-attributed", scopeType: "ATTRIBUTED_USER" }),
+        ],
+      });
+
+      await debits.writeIngestedCost({ tenantId: "gov-project", fact: ingested() });
+
+      expect(resolver.asked).toEqual([
+        {
+          organizationId: "org-1",
+          teamId: "_ingestion_:src-1",
+          projectId: "gov-project",
+          virtualKeyId: "_ingestion_:src-1",
+          principalUserId: "usr-1",
+        },
+      ]);
+      const rows = ledger.batches.flat();
+      expect(rows.map((row) => row.budgetId)).toEqual(["b-org", "b-principal"]);
+      expect(rows[0]).toMatchObject({
+        tenantId: "gov-project",
+        gatewayRequestId: "push-req-1",
+        virtualKeyId: "_ingestion_:src-1",
+        providerKey: null,
+        amountNanoUsd: 1_250_000_000,
+        tokensInput: 100,
+        tokensOutput: 50,
+        durationMs: 0,
+        status: "SUCCESS",
+      });
+      expect(changes.appended).toEqual([
+        {
+          organizationId: "org-1",
+          projectId: "gov-project",
+          kind: "BUDGET_UPDATED",
+          payload: {
+            source: "ingestion_source",
+            sourceId: "src-1",
+            requestId: "push-req-1",
+            budgetIds: ["b-org", "b-principal"],
+            amountNanoUsd: 1_250_000_000,
+          },
+        },
+      ]);
+    });
+
+    it("resolves a team source's budgets under its own team", async () => {
+      const { debits, resolver } = harness({ budgets: [] });
+
+      await debits.writeIngestedCost({
+        tenantId: "gov-project",
+        fact: ingested({ teamId: "team-9" }),
+      });
+
+      expect(resolver.asked[0]).toMatchObject({ teamId: "team-9" });
+    });
+
+    /** @scenario "A pushed cost that crosses a budget threshold raises the crossing" */
+    it("checks the debited budgets for crossings once the rows land", async () => {
+      const { debits, crossings } = harness({
+        budgets: [resolved({ id: "b-org", scopeType: "ORGANIZATION" })],
+      });
+
+      await debits.writeIngestedCost({ tenantId: "gov-project", fact: ingested() });
+
+      expect(crossings.detected).toEqual([{ tenantId: "gov-project", budgetIds: ["b-org"] }]);
+    });
+
+    /** @scenario "A ledger write that fails is retried, never dropped" */
+    it("fails the delivery so the fact is redelivered, and announces nothing", async () => {
+      const refusal = new Error("clickhouse concurrency queue is full");
+      const { debits, crossings, changes } = harness({
+        budgets: [resolved({ id: "b-org", scopeType: "ORGANIZATION" })],
+        refusal,
+      });
+
+      await expect(
+        debits.writeIngestedCost({ tenantId: "gov-project", fact: ingested() }),
+      ).rejects.toBe(refusal);
+      expect(crossings.detected).toEqual([]);
+      expect(changes.appended).toEqual([]);
     });
   });
 });

@@ -6,7 +6,7 @@ The server half of [governance](../README.md). AI governance: ingestion sources 
 
 ## Installation
 
-`defineProcessModule("governance").withRepositories(governanceRepositories).withApi(GovernanceModule).withTransports(governanceRest, agentRegistryRest, governanceCliRest, governanceIngestRest, meUsageRest, departmentsTrpcTransport, ingestionTemplatesTrpcTransport, aiToolsTrpcTransport, ingestionSourcesTrpcTransport, governanceTrpcTransport, anomalyRulesTrpcTransport, activityMonitorTrpcTransport, personalSessionsTrpcTransport, ingestionKeyTrpcTransport, sessionPolicyTrpcTransport, governancePeopleTrpcTransport, governanceAgentsTrpcTransport, governanceCostTrpcTransport).provideMiddlewareBindings(…).provideMiddlewareContext(…).withEventing(pulledUsageEventing).withEventing(ingestionPullEventing).withEventing(ingestionPullReconcileEventing).withEventing(governanceActivityMonitorEventing).withEventing(codingAssistantBillingEventing).withEventing(agentRegistryEventing).withMigrations(…)`, `src/governance.module.ts:72`.
+`defineProcessModule("governance").withRepositories(governanceRepositories).withApi(GovernanceModule).withTransports(governanceRest, agentRegistryRest, governanceCliRest, governanceIngestRest, meUsageRest, departmentsTrpcTransport, ingestionTemplatesTrpcTransport, aiToolsTrpcTransport, ingestionSourcesTrpcTransport, governanceTrpcTransport, anomalyRulesTrpcTransport, activityMonitorTrpcTransport, personalSessionsTrpcTransport, ingestionKeyTrpcTransport, sessionPolicyTrpcTransport, governancePeopleTrpcTransport, governanceAgentsTrpcTransport, governanceCostTrpcTransport).provideMiddlewareBindings(…).provideMiddlewareContext(…).withEventing(pulledUsageEventing).withEventing(ingestionPullEventing).withEventing(ingestionPullReconcileEventing).withEventing(governanceActivityMonitorEventing).withEventing(codingAssistantBillingEventing).withEventing(ingestedCostEventing).withEventing(agentRegistryEventing).withMigrations(…)`, `src/governance.module.ts:73`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -1033,7 +1033,7 @@ interface Params {
   sourceId: string;
 }
 // Rawbody: "bytes" (inline, src/transport/governance-ingest.rest.ts:40)
-type Headers = z.infer<typeof governanceIngestHeadersSchema>; // ../contract/src/features/ingestion/governance-ingest-rest.schemas.ts:47
+type Headers = z.infer<typeof governanceIngestHeadersSchema>; // ../contract/src/features/ingestion/governance-ingest-rest.schemas.ts:46
 ```
 
 #### `POST /api/ingest/webhook/:sourceId` · `ingestSourceWebhook`
@@ -1045,7 +1045,7 @@ Answers at `/api/ingest/webhook/:sourceId`, `/api/v1/ingest/webhook/:sourceId`.
 ```typescript
 type Params = z.infer<typeof governanceIngestSourceParamsSchema>; // ../contract/src/features/ingestion/governance-ingest-rest.schemas.ts:15
 // Rawbody: "text" (inline, src/transport/governance-ingest.rest.ts:55)
-type Headers = z.infer<typeof governanceIngestHeadersSchema>; // ../contract/src/features/ingestion/governance-ingest-rest.schemas.ts:47
+type Headers = z.infer<typeof governanceIngestHeadersSchema>; // ../contract/src/features/ingestion/governance-ingest-rest.schemas.ts:46
 ```
 
 #### `POST /api/ingest/otel/:sourceId/v1/logs` · `ingestSourceOtlpLogs`
@@ -1057,7 +1057,7 @@ Answers at `/api/ingest/otel/:sourceId/v1/logs`.
 ```typescript
 type Params = z.infer<typeof governanceIngestSourceParamsSchema>; // ../contract/src/features/ingestion/governance-ingest-rest.schemas.ts:15
 // Rawbody: "bytes" (inline, src/transport/governance-ingest.rest.ts:70)
-type Headers = z.infer<typeof governanceIngestHeadersSchema>; // ../contract/src/features/ingestion/governance-ingest-rest.schemas.ts:47
+type Headers = z.infer<typeof governanceIngestHeadersSchema>; // ../contract/src/features/ingestion/governance-ingest-rest.schemas.ts:46
 ```
 
 #### `POST /api/ingest/otel/:sourceId/v1/metrics` · `ingestSourceOtlpMetrics`
@@ -1069,7 +1069,7 @@ Answers at `/api/ingest/otel/:sourceId/v1/metrics`.
 ```typescript
 type Params = z.infer<typeof governanceIngestSourceParamsSchema>; // ../contract/src/features/ingestion/governance-ingest-rest.schemas.ts:15
 // Rawbody: "bytes" (inline, src/transport/governance-ingest.rest.ts:85)
-type Headers = z.infer<typeof governanceIngestHeadersSchema>; // ../contract/src/features/ingestion/governance-ingest-rest.schemas.ts:47
+type Headers = z.infer<typeof governanceIngestHeadersSchema>; // ../contract/src/features/ingestion/governance-ingest-rest.schemas.ts:46
 ```
 
 ### `governanceRest`
@@ -2348,6 +2348,15 @@ Declared at `src/eventing/pulled-usage.pipeline.ts:167`. Events: `pulledUsageObs
 | ClickHouse fold projection | `≈ this.costRollup`       | –                                                 | `src/eventing/pulled-usage.pipeline.ts:183` |
 | ClickHouse map projection  | `≈ this.costCharges`      | –                                                 | `src/eventing/pulled-usage.pipeline.ts:186` |
 
+### Pipeline `ingested_cost_processing` (aggregate `ingested_cost`)
+
+Declared at `src/features/ingest/eventing/ingested-cost.pipeline.ts:61`. Events: `ingestedCostRecordedEventSchema`.
+
+| Kind      | Name                 | Handles | Declared at                                                 |
+| --------- | -------------------- | ------- | ----------------------------------------------------------- |
+| command   | `recordIngestedCost` | –       | `src/features/ingest/eventing/ingested-cost.pipeline.ts:66` |
+| retention | `≈ retention`        | –       | `src/features/ingest/eventing/ingested-cost.pipeline.ts:67` |
+
 ### Pipeline `governance_agent_registry` (aggregate `global`)
 
 Declared at `src/features/registry/eventing/agent-registry.pipeline.ts:89`.
@@ -2363,7 +2372,7 @@ Declared at `src/features/registry/eventing/agent-registry.pipeline.ts:89`.
 
 | Kind   | Leaf                       | Environment variable                  | Declared at                               |
 | ------ | -------------------------- | ------------------------------------- | ----------------------------------------- |
-| secret | `–`                        | `GOVERNANCE_ERASURE_PSEUDONYM_SECRET` | `src/app/governance.app.ts:533`           |
+| secret | `–`                        | `GOVERNANCE_ERASURE_PSEUDONYM_SECRET` | `src/app/governance.app.ts:534`           |
 | config | `gatewayPublicUrl`         | `LW_GATEWAY_PUBLIC_URL`               | `../contract/src/governance.config.ts:41` |
 | config | `gatewayInternalUrl`       | `LW_GATEWAY_INTERNAL_URL`             | `../contract/src/governance.config.ts:42` |
 | config | `gatewayLegacyUrl`         | `LW_GATEWAY_BASE_URL`                 | `../contract/src/governance.config.ts:43` |

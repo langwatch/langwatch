@@ -103,7 +103,6 @@ export class GovernanceIngestService {
       bytes: receipt.bytes,
       logRecords: receipt.logRecords,
       costEvents: receipt.costEvents,
-      ledgerRows: receipt.ledgerRows,
     };
 
     if (receipt.hint) body.hint = receipt.hint;

@@ -277,10 +277,7 @@ describe.skipIf(!databaseUrl)(
         audit: {} as never,
         budgetSpend: budgets,
       }).build();
-      ledger = GatewayBudgetLedgerService.create({
-        spend: budgets,
-        changes: { append: async () => ({ revision: 0n }) },
-      });
+      ledger = GatewayBudgetLedgerService.create({ spend: budgets });
     }, 600_000);
 
     afterAll(async () => {
