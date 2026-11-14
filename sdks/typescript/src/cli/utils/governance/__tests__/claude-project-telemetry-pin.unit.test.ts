@@ -20,6 +20,7 @@ import {
   CURRENT_TOKEN,
   currentClaudeVars,
   installTempHomeAndCwd,
+  preLightClaudeVars,
   STALE_ENDPOINT,
   STALE_TOKEN,
 } from "./telemetry-refresh-test-helpers";
@@ -100,6 +101,48 @@ describe("ensureClaudeProjectTelemetryPin", () => {
     });
   });
 
+  describe("when a pre-#8284 pin still carries the raw-body default", () => {
+    it("strips the raw-body flag, adds the light one and reports updated", () => {
+      const target = claudeProjectSettingsTarget(temp.cwd);
+      installAppEnv(target, preLightClaudeVars(STALE_ENDPOINT, STALE_TOKEN));
+
+      const result = ensureClaudeProjectTelemetryPin({ vars: currentClaudeVars(), cwd: temp.cwd });
+
+      expect(result.action).toBe("updated");
+      const written = JSON.parse(fs.readFileSync(target.path, "utf8"));
+      expect(written.env.OTEL_LOG_RAW_API_BODIES).toBeUndefined();
+      expect(written.env.OTEL_LOG_ASSISTANT_RESPONSES).toBe("1");
+    });
+  });
+
+  describe("when a migrated pin carries a raw-body flag the user added back", () => {
+    /** @scenario "A raw-body opt-in added after the upgrade survives every refresh" */
+    it("keeps the flag and reports unchanged", () => {
+      const target = claudeProjectSettingsTarget(temp.cwd);
+      installAppEnv(target, { ...currentClaudeVars(), OTEL_LOG_RAW_API_BODIES: "1" });
+
+      const result = ensureClaudeProjectTelemetryPin({ vars: currentClaudeVars(), cwd: temp.cwd });
+
+      expect(result.action).toBe("unchanged");
+      const written = JSON.parse(fs.readFileSync(target.path, "utf8"));
+      expect(written.env.OTEL_LOG_RAW_API_BODIES).toBe("1");
+    });
+  });
+
+  describe("when the project file holds only a hand-set raw-body flag", () => {
+    /** @scenario "A raw-body-only project setting is not stripped before the pin has ever been ours" */
+    it("adds the pin beside it and keeps the flag", () => {
+      const target = claudeProjectSettingsTarget(temp.cwd);
+      installAppEnv(target, { OTEL_LOG_RAW_API_BODIES: "1" });
+
+      ensureClaudeProjectTelemetryPin({ vars: currentClaudeVars(), cwd: temp.cwd });
+
+      const written = JSON.parse(fs.readFileSync(target.path, "utf8"));
+      expect(written.env.OTEL_EXPORTER_OTLP_ENDPOINT).toBe(CURRENT_ENDPOINT);
+      expect(written.env.OTEL_LOG_RAW_API_BODIES).toBe("1");
+    });
+  });
+
   describe("when the project file carries the user's own OTLP wiring", () => {
     it("skips and leaves the file byte-for-byte unchanged", () => {
       const target = claudeProjectSettingsTarget(temp.cwd);
@@ -149,6 +192,16 @@ describe("removeClaudeProjectTelemetryPin", () => {
       expect(removeClaudeProjectTelemetryPin({ cwd: temp.cwd })).toBe(true);
       expect(fs.existsSync(target.path)).toBe(false);
       expect(fs.existsSync(path.dirname(target.path))).toBe(false);
+    });
+  });
+
+  describe("when the pin also carries the raw-body flag", () => {
+    it("removes that flag with the rest of the pin", () => {
+      const target = claudeProjectSettingsTarget(temp.cwd);
+      installAppEnv(target, { ...currentClaudeVars(), OTEL_LOG_RAW_API_BODIES: "1" });
+
+      expect(removeClaudeProjectTelemetryPin({ cwd: temp.cwd })).toBe(true);
+      expect(fs.existsSync(target.path)).toBe(false);
     });
   });
 
