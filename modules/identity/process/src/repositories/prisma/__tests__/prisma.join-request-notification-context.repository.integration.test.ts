@@ -1,5 +1,12 @@
-import { PrismaTenancyGuardService } from "@langwatch/prisma-client";
-import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
+import {
+  PrismaConfigService,
+  PrismaConnectionService,
+  PrismaQueryGuard,
+  PrismaTenancyGuardService,
+  type PrismaQueryContext,
+  type PrismaQueryExecutor,
+} from "@langwatch/prisma-client";
+import { createTestLogger } from "@langwatch/test-harness";
 import { describe, expect, it, vi } from "vitest";
 
 import type { JoinRequestNotificationMail } from "../../../channels/join-request-notification-mail.channel.ts";
@@ -9,32 +16,46 @@ import { PrismaJoinRequestNotificationContextRepository } from "../prisma.join-r
 
 /**
  * Spec: modules/identity/specs/join-request-worker-composition.feature
- * Every scripted query runs through the production tenancy guard chain before it answers.
+ * The real Prisma client emits each query through the production tenancy guard, which answers
+ * every statement it admits itself so nothing reaches a database.
  */
 
-const guard = PrismaTenancyGuardService.create();
+class TenancyGuardOnly extends PrismaQueryGuard {
+  readonly admitted: { model?: string; action: string; args: unknown }[] = [];
+  readonly #tenancy = PrismaTenancyGuardService.create();
 
-function guarded<Answer>(model: string, action: string, answer: Answer) {
-  return vi.fn(async (args: unknown) => guard.execute({ model, action, args }, async () => answer));
+  constructor(private readonly answers: Record<string, unknown>) {
+    super();
+  }
+
+  execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
+    void next;
+
+    return this.#tenancy.execute(context, async () => {
+      this.admitted.push({ model: context.model, action: context.action, args: context.args });
+
+      return this.answers[`${context.model}.${context.action}`] ?? null;
+    });
+  }
 }
 
-function guardedPrisma({ personalTeamSlugs }: { personalTeamSlugs: string[] }) {
-  const teamFindMany = guarded(
-    "Team",
-    "findMany",
-    personalTeamSlugs.map((slug) => ({ slug })),
-  );
-  const prisma = prismaDouble({
-    team: { findMany: teamFindMany },
-    organization: { findUnique: guarded("Organization", "findUnique", { name: "Acme Corp" }) },
-    user: {
-      findUnique: guarded("User", "findUnique", {
-        name: "Morgan Ellis",
-        email: "morgan@acme.example",
-      }),
-    },
+function clientBehindTheGuard({ personalTeamSlugs }: { personalTeamSlugs: string[] }) {
+  const guard = new TenancyGuardOnly({
+    "Team.findMany": personalTeamSlugs.map((slug) => ({ slug })),
+    "Organization.findUnique": { name: "Acme Corp" },
+    "User.findUnique": { name: "Morgan Ellis", email: "morgan@acme.example" },
   });
-  return { prisma, teamFindMany };
+  const connection = PrismaConnectionService.create({
+    guard,
+    logger: createTestLogger().logger,
+  }).connect(
+    PrismaConfigService.create().resolve({
+      databaseUrl: "postgresql://guard-only@127.0.0.1:1/unreachable",
+      log: ["error"],
+    }),
+  );
+
+  return { guard, prisma: connection.client };
 }
 
 function recordingMail() {
@@ -63,7 +84,7 @@ function recordingMail() {
 }
 
 async function expire({ personalTeamSlugs }: { personalTeamSlugs: string[] }) {
-  const { prisma, teamFindMany } = guardedPrisma({ personalTeamSlugs });
+  const { guard, prisma } = clientBehindTheGuard({ personalTeamSlugs });
   const recording = recordingMail();
   const notifier = JoinRequestNotifierService.create({
     audience: PrismaJoinRequestAudienceRepository.create(prisma),
@@ -78,7 +99,7 @@ async function expire({ personalTeamSlugs }: { personalTeamSlugs: string[] }) {
     requesterUserId: "user_morgan",
   });
 
-  return { sendRequestExpired: recording.sendRequestExpired, teamFindMany };
+  return { guard, prisma, sendRequestExpired: recording.sendRequestExpired };
 }
 
 describe("PrismaJoinRequestNotificationContextRepository", () => {
@@ -86,12 +107,18 @@ describe("PrismaJoinRequestNotificationContextRepository", () => {
     describe("when a requester who owns a personal project elsewhere lets a request lapse", () => {
       /** @scenario "An expired request tells the requester, with a link to their personal project when they have one" */
       it("mails them the link to that personal project", async () => {
-        const { sendRequestExpired, teamFindMany } = await expire({
+        const { guard, sendRequestExpired } = await expire({
           personalTeamSlugs: ["personal-morgan-ellis"],
         });
 
-        expect(teamFindMany).toHaveBeenCalledWith(
-          expect.objectContaining({ where: { ownerUserId: "user_morgan", isPersonal: true } }),
+        expect(guard.admitted).toContainEqual(
+          expect.objectContaining({
+            model: "Team",
+            action: "findMany",
+            args: expect.objectContaining({
+              where: { ownerUserId: "user_morgan", isPersonal: true },
+            }),
+          }),
         );
         expect(sendRequestExpired).toHaveBeenCalledWith(
           expect.objectContaining({
@@ -110,6 +137,18 @@ describe("PrismaJoinRequestNotificationContextRepository", () => {
 
         expect(sendRequestExpired).toHaveBeenCalledTimes(1);
         expect(sendRequestExpired.mock.calls[0]?.[0].personalProjectUrl).toBeUndefined();
+      });
+    });
+
+    describe("when a read of teams by owner is not of personal teams", () => {
+      /** @scenario "An expired request tells the requester, with a link to their personal project when they have one" */
+      it("is still refused before it is answered", async () => {
+        const { guard, prisma } = clientBehindTheGuard({ personalTeamSlugs: [] });
+
+        await expect(
+          prisma.team.findMany({ where: { ownerUserId: "user_morgan" }, select: { slug: true } }),
+        ).rejects.toThrow(/organizationId/);
+        expect(guard.admitted).toEqual([]);
       });
     });
   });
