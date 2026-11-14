@@ -122,6 +122,14 @@ Whether the account behind an id holds the platform-operator grant.
 isOperator(input: { userId: string }): Promise<boolean>;
 ```
 
+#### `searchForOperators`
+
+Accounts whose id, name or address holds the query, for a platform operator's search.
+
+```typescript
+searchForOperators(input: { query: string; limit: number }): Promise<UserProfile[]>;
+```
+
 #### `findByEmail`
 
 The account holding an address, matched on its stored lower-cased form, however typed.
