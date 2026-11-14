@@ -305,6 +305,7 @@ export class ClickHouseOcsfEventsRepository
         ),
       )
       // An event's replays carry its one EventTime, so the election repeats the cursor, as before.
+      // An OCSF event's EventTime is its own time: it never changes across versions.
       .latestVersion({ repeat: [events.EventTime] })
       .orderBy(events.EventTime, "ASC")
       .orderBy(events.EventId, "ASC")

@@ -1,4 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import {
+  clickhouseRead,
+  fn,
+  type ReaderReadStatement,
+  tenantScope,
+} from "@langwatch/clickhouse-client/builder";
 import type { BulkAppendContext, ProjectionStoreContext } from "@langwatch/eventing";
 
 import {
@@ -6,7 +12,8 @@ import {
   GovernanceCostChargeRepository,
   type GovernanceCostChargeRow,
 } from "../governance-cost-charge.repository.ts";
-import type { GovernanceClickHouseTenantResolver } from "../governance.repositories.ts";
+import type { GovernanceClickHouseReadResolver } from "../governance.repositories.ts";
+import { governanceCostRollupCharges as charges } from "./clickhouse.governance-cost-rollup-charges.table.ts";
 
 const SYNCHRONOUS_INSERT = { async_insert: 0, wait_for_async_insert: 0 };
 
@@ -36,12 +43,12 @@ function decodeCharge(row: Record<string, unknown>): GovernanceCostChargeRow {
 
 /** Keyed (TenantId, Day, EventId) in a ReplacingMergeTree, so a redelivered event collapses. */
 export class ClickHouseGovernanceCostChargeRepository extends GovernanceCostChargeRepository {
-  private constructor(private readonly resolveClient: GovernanceClickHouseTenantResolver) {
+  private constructor(private readonly resolveClient: GovernanceClickHouseReadResolver) {
     super();
   }
 
   static create(
-    resolveClient: GovernanceClickHouseTenantResolver,
+    resolveClient: GovernanceClickHouseReadResolver,
   ): ClickHouseGovernanceCostChargeRepository {
     return new ClickHouseGovernanceCostChargeRepository(resolveClient);
   }
@@ -60,41 +67,53 @@ export class ClickHouseGovernanceCostChargeRepository extends GovernanceCostChar
     day: string;
     costSource: string;
   }): Promise<GovernanceCostChargeRow[]> {
-    const client = await this.resolveClient(input.tenantId);
-    const result = await client.query<Record<string, unknown>>({
-      query: `
-        SELECT
-          TenantId, Day, CostSource, IngestionSourceId, Provider, Model,
-          AgentId, CurrencyCode, RawActorId, EventId, RestatementKey, IsRetraction,
-          ObservedAtMs, AmountNanoMinor, EventOccurredAt
-        FROM ${GOVERNANCE_COST_CHARGE_TABLE} FINAL
-        WHERE TenantId = {tenantid:String}
-          AND Day = {day:Date}
-          AND CostSource = {costsource:String}
-      `,
-      query_params: { tenantid: input.tenantId, day: input.day, costsource: input.costSource },
-      format: "JSONEachRow",
-    });
-    return (await result.json()).map(decodeCharge);
+    const statement = clickhouseRead({ scope: tenantScope.single({ tenantId: input.tenantId }) })
+      .from(charges)
+      .final()
+      .select({
+        TenantId: charges.TenantId,
+        Day: charges.Day,
+        CostSource: charges.CostSource,
+        IngestionSourceId: charges.IngestionSourceId,
+        Provider: charges.Provider,
+        Model: charges.Model,
+        AgentId: charges.AgentId,
+        CurrencyCode: charges.CurrencyCode,
+        RawActorId: charges.RawActorId,
+        EventId: charges.EventId,
+        RestatementKey: charges.RestatementKey,
+        IsRetraction: charges.IsRetraction,
+        ObservedAtMs: charges.ObservedAtMs,
+        AmountNanoMinor: charges.AmountNanoMinor,
+        EventOccurredAt: charges.EventOccurredAt,
+      })
+      .where(({ and, eq }) =>
+        and(eq(charges.Day, input.day), eq(charges.CostSource, input.costSource)),
+      )
+      .build();
+    return (await this.rowsOf(input.tenantId, statement)).map(decodeCharge);
   }
 
   async findLatestChargeOccurredAt(input: {
     tenantId: string;
     costSource: string;
   }): Promise<number | null> {
-    const client = await this.resolveClient(input.tenantId);
-    const result = await client.query<Record<string, unknown>>({
-      query: `
-        SELECT max(EventOccurredAt) AS LatestOccurredAt
-        FROM ${GOVERNANCE_COST_CHARGE_TABLE}
-        WHERE TenantId = {tenantid:String}
-          AND CostSource = {costsource:String}
-      `,
-      query_params: { tenantid: input.tenantId, costsource: input.costSource },
-      format: "JSONEachRow",
-    });
-    const latest = int((await result.json())[0]?.LatestOccurredAt);
+    const statement = clickhouseRead({ scope: tenantScope.single({ tenantId: input.tenantId }) })
+      .from(charges)
+      .select({ LatestOccurredAt: fn.max(charges.EventOccurredAt) })
+      .where(({ eq }) => eq(charges.CostSource, input.costSource))
+      .build();
+    const latest = int((await this.rowsOf(input.tenantId, statement))[0]?.LatestOccurredAt);
     return latest > 0 ? latest : null;
+  }
+
+  private async rowsOf(
+    tenantId: string,
+    statement: ReaderReadStatement<Record<string, unknown>>,
+  ): Promise<Record<string, unknown>[]> {
+    const client = await this.resolveClient(tenantId);
+    const { rows } = await client.read({ statement });
+    return rows;
   }
 
   private async insert(tenantId: string, rows: GovernanceCostChargeRow[]): Promise<void> {

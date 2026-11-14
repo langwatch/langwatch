@@ -46,21 +46,6 @@ class MemberGovernanceClickHouseClient implements GovernanceClickHouseReadClient
     this.read = (input) => clickhouse.read(input);
   }
 
-  async query<Row>(input: {
-    query: string;
-    query_params?: Record<string, unknown>;
-    format: "JSONEachRow";
-    clickhouse_settings?: Record<string, string | number>;
-  }): Promise<{ json(): Promise<Row[]> }> {
-    const result = await this.clickhouse.query<Row>({
-      tenantId: this.tenantId,
-      sql: input.query,
-      params: input.query_params ?? {},
-      ...(input.clickhouse_settings ? { settings: input.clickhouse_settings } : {}),
-    });
-    return { json: async () => result.rows };
-  }
-
   async insert(input: {
     table: string;
     values: readonly Record<string, unknown>[];
@@ -78,8 +63,7 @@ class MemberGovernanceClickHouseClient implements GovernanceClickHouseReadClient
 
 /**
  * The member, as the tenant-keyed resolver every ClickHouse-tier governance
- * repository takes: raw `query` for the repositories not yet on the typed
- * builder, `read` for those that are, `insert` for both.
+ * repository takes: `read` for its built reads, `insert` for its rows.
  */
 function memberClickHouseResolver(
   clickhouse: ClickHouseQueryClient,

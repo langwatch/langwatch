@@ -2,77 +2,146 @@
 
 /**
  * @vitest-environment node
- * Each cost summary read runs through the real tenant guard, so a statement it would refuse live
- * fails here. Spec: specs/governance/governance-cost-rollup.feature
+ * Each cost summary read is a built read (ADR-202) scoped to the one tenant it names, sent on the
+ * reader identity with that tenant as its setting. Spec: specs/governance/governance-cost-rollup.feature
  */
-import type { QueryRequest, QueryResult } from "@langwatch/clickhouse-client";
-import { ClickHouseQueryClient, TenantGuard } from "@langwatch/clickhouse-client";
+import type { ReaderReadStatement } from "@langwatch/clickhouse-client/builder";
 import { describe, expect, it } from "vitest";
 
-import { memberClickHouseResolver } from "../clickhouse.governance-clickhouse.repositories.ts";
+import { GOVERNANCE_COST_ROLLUP_PROJECTION_VERSION_LATEST } from "../../governance-cost-rollup.repository.ts";
+import { ClickHouseGovernanceCostChargeRepository } from "../clickhouse.governance-cost-charge.repository.ts";
 import { ClickHouseGovernanceCostRollupRepository } from "../clickhouse.governance-cost-rollup.repository.ts";
+import { ClickHouseRollupErasureRepository } from "../clickhouse.rollup-erasure.repository.ts";
 
-const WINDOW = { tenantId: "project-a", fromDay: "2026-09-01", toDay: "2026-09-30" };
+const TENANT = "project-a";
+const WINDOW = { tenantId: TENANT, fromDay: "2026-09-01", toDay: "2026-09-30" };
+const CELL = {
+  TenantId: TENANT,
+  Day: "2026-09-02",
+  CostSource: "pulled",
+  IngestionSourceId: "source-1",
+  Provider: "openai",
+  Model: "gpt-5",
+  AgentId: "",
+  CurrencyCode: "USD",
+  RawActorId: "actor-1",
+};
 
-function guardedRepository() {
-  const executed: QueryRequest[] = [];
-  const clickhouse = new ClickHouseQueryClient({
-    tenantGuard: new TenantGuard(),
-    driver: {
-      execute: async <Row>(request: QueryRequest): Promise<QueryResult<Row>> => {
-        executed.push(request);
-        return { rows: [] };
-      },
-      insert: async () => undefined,
-      command: async () => undefined,
+function recordingClient() {
+  const statements: ReaderReadStatement[] = [];
+  const client = {
+    read: async ({ statement }: { statement: ReaderReadStatement }) => {
+      statements.push(statement);
+      return { rows: [] };
     },
-  });
-  const repository = ClickHouseGovernanceCostRollupRepository.create(
-    memberClickHouseResolver(clickhouse),
-  );
-  return { repository, executed };
+    insert: async () => undefined,
+    command: async () => undefined,
+  };
+  return { client, resolve: async () => client as never, statements };
 }
 
 const READS: {
   name: string;
-  run: (repository: ClickHouseGovernanceCostRollupRepository) => Promise<unknown>;
+  run: (resolve: () => Promise<never>, client: never) => Promise<unknown>;
 }[] = [
-  { name: "sumDaysByProvider", run: (r) => r.sumDaysByProvider(WINDOW) },
+  ...(
+    [
+      ["sumDaysByProvider", (r) => r.sumDaysByProvider(WINDOW)],
+      [
+        "sumPeriodRecordsByProvider",
+        (r) => r.sumPeriodRecordsByProvider({ ...WINDOW, provider: "openai" }),
+      ],
+      ["sumWindowBySpender", (r) => r.sumWindowBySpender(WINDOW)],
+      ["sumWindowByModel", (r) => r.sumWindowByModel(WINDOW)],
+      ["sumDaysByLane", (r) => r.sumDaysByLane(WINDOW)],
+      ["sumDaysByLane for one lane", (r) => r.sumDaysByLane({ ...WINDOW, costSource: "pulled" })],
+      ["sumWindowByProvider", (r) => r.sumWindowByProvider(WINDOW)],
+      ["sumWindowByCurrency", (r) => r.sumWindowByCurrency({ ...WINDOW, costSource: "pulled" })],
+      [
+        "hasRowsForSource",
+        (r) =>
+          r.hasRowsForSource({ ...WINDOW, costSource: "pulled", ingestionSourceId: "source-1" }),
+      ],
+      ["findCellRows", (r) => r.findCellRows(CELL)],
+      [
+        "findCellsForDay",
+        (r) => r.findCellsForDay({ tenantId: TENANT, day: CELL.Day, costSource: "pulled" }),
+      ],
+      [
+        "findLatestSummarizedOccurredAt",
+        (r) => r.findLatestSummarizedOccurredAt({ tenantId: TENANT, costSource: "pulled" }),
+      ],
+    ] as const satisfies readonly (readonly [
+      string,
+      (repository: ClickHouseGovernanceCostRollupRepository) => Promise<unknown>,
+    ])[]
+  ).map(([name, read]) => ({
+    name,
+    run: (resolve: () => Promise<never>) =>
+      read(ClickHouseGovernanceCostRollupRepository.create(resolve)),
+  })),
   {
-    name: "sumPeriodRecordsByProvider",
-    run: (r) => r.sumPeriodRecordsByProvider({ ...WINDOW, provider: "openai" }),
+    name: "findChargesForDay",
+    run: (resolve) =>
+      ClickHouseGovernanceCostChargeRepository.create(resolve).findChargesForDay({
+        tenantId: TENANT,
+        day: CELL.Day,
+        costSource: "pulled",
+      }),
   },
-  { name: "sumWindowBySpender", run: (r) => r.sumWindowBySpender(WINDOW) },
-  { name: "sumWindowByModel", run: (r) => r.sumWindowByModel(WINDOW) },
-  { name: "sumDaysByLane", run: (r) => r.sumDaysByLane(WINDOW) },
   {
-    name: "sumDaysByLane for one lane",
-    run: (r) => r.sumDaysByLane({ ...WINDOW, costSource: "pulled" }),
-  },
-  { name: "sumWindowByProvider", run: (r) => r.sumWindowByProvider(WINDOW) },
-  {
-    name: "sumWindowByCurrency",
-    run: (r) => r.sumWindowByCurrency({ ...WINDOW, costSource: "pulled" }),
+    name: "findLatestChargeOccurredAt",
+    run: (resolve) =>
+      ClickHouseGovernanceCostChargeRepository.create(resolve).findLatestChargeOccurredAt({
+        tenantId: TENANT,
+        costSource: "pulled",
+      }),
   },
   {
-    name: "hasRowsForSource",
-    run: (r) =>
-      r.hasRowsForSource({ ...WINDOW, costSource: "pulled", ingestionSourceId: "source-1" }),
+    name: "findDaysCarryingActor",
+    run: (_resolve, client) =>
+      ClickHouseRollupErasureRepository.create(client).findDaysCarryingActor({
+        tenantIds: [TENANT],
+        rawActorId: "actor-1",
+      }),
   },
 ];
 
-describe("ClickHouseGovernanceCostRollupRepository under the tenant guard", () => {
-  describe("when each cost summary read runs through the real guard", () => {
+describe("governance's cost reads as built reads", () => {
+  describe("when each cost summary read is sent", () => {
     /** @scenario "Every cost summary read passes the tenant guard" */
-    it.each(READS)("$name is accepted and scoped to the one tenant it names", async (read) => {
-      const { repository, executed } = guardedRepository();
+    it.each(READS)("$name is scoped to the one tenant it names, on the reader", async (read) => {
+      const { client, resolve, statements } = recordingClient();
 
-      await read.run(repository);
+      await read.run(resolve, client as never);
 
-      expect(executed).toHaveLength(1);
-      expect(executed[0]?.tenantId).toBe("project-a");
-      expect(executed[0]?.params?.tenantid).toBe("project-a");
-      expect(executed[0]?.SKIP_TENANT_CHECK).toBeUndefined();
+      expect(statements).toHaveLength(1);
+      const [statement] = statements;
+      expect(statement).toMatchObject({ identity: "reader", kind: "tenant", tenantId: TENANT });
+      expect(statement?.settings).toMatchObject({ SQL_langwatch_tenant_ids: TENANT });
+      expect(statement?.sql).toContain("WHERE TenantId = {tenantId:String}");
+      expect(statement?.params.tenantId).toBe(TENANT);
+      expect(statement?.sql).not.toContain(TENANT);
+    });
+  });
+
+  describe("when a cell carrying restatement keys is upserted", () => {
+    it("asks the index only for that tenant's keys before writing the unrecorded ones", async () => {
+      const { resolve, statements } = recordingClient();
+      const row = { PulledItemsJson: JSON.stringify({ "key-1": 1, "key-2": 2 }) };
+
+      await ClickHouseGovernanceCostRollupRepository.create(resolve).upsert({
+        ...CELL,
+        ...row,
+        Version: GOVERNANCE_COST_ROLLUP_PROJECTION_VERSION_LATEST,
+      } as never);
+
+      expect(statements).toHaveLength(1);
+      expect(statements[0]).toMatchObject({ kind: "tenant", tenantId: TENANT });
+      expect(statements[0]?.sql).toContain(
+        "SELECT DISTINCT RestatementKey FROM governance_cost_rollup_restatement_index",
+      );
+      expect(Object.values(statements[0]?.params ?? {})).toContainEqual(["key-1", "key-2"]);
     });
   });
 });

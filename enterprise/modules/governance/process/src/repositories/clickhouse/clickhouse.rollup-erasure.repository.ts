@@ -1,26 +1,28 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import { clickhouseRead, fn, tenantScope } from "@langwatch/clickhouse-client/builder";
 import { createLogger } from "@langwatch/observability";
 
 import { GOVERNANCE_COST_CHARGE_TABLE } from "../governance-cost-charge.repository.ts";
 import { type ErasedRollupDay, RollupErasureRepository } from "../rollup-erasure.repository.ts";
+import { governanceCostRollup1d as rollup } from "./clickhouse.governance-cost-rollup-1d.table.ts";
 
 const logger = createLogger("langwatch:governance:rollup-erasure");
 
-const GOVERNANCE_COST_ROLLUP_TABLE = "governance_cost_rollup_1d";
+const GOVERNANCE_COST_ROLLUP_TABLE = rollup.$table.stored;
 const GOVERNANCE_COST_ROLLUP_RESTATEMENT_INDEX_TABLE = "governance_cost_rollup_restatement_index";
 
 /** `mutations_sync` so the erasure does not return while the rows still exist. */
 export class ClickHouseRollupErasureRepository extends RollupErasureRepository {
   private constructor(
-    private readonly clickhouse: Pick<ClickHouseQueryClient, "query" | "command">,
+    private readonly clickhouse: Pick<ClickHouseQueryClient, "read" | "command">,
   ) {
     super();
   }
 
   static create(
-    clickhouse: Pick<ClickHouseQueryClient, "query" | "command">,
+    clickhouse: Pick<ClickHouseQueryClient, "read" | "command">,
   ): ClickHouseRollupErasureRepository {
     return new ClickHouseRollupErasureRepository(clickhouse);
   }
@@ -34,18 +36,15 @@ export class ClickHouseRollupErasureRepository extends RollupErasureRepository {
   }): Promise<ErasedRollupDay[]> {
     const days: ErasedRollupDay[] = [];
     for (const tenantId of tenantIds) {
-      const result = await this.clickhouse.query<{ Day: string }>({
-        tenantId,
-        sql: `
-          SELECT DISTINCT toString(Day) AS Day
-          FROM ${GOVERNANCE_COST_ROLLUP_TABLE}
-          WHERE TenantId = {tenantId:String}
-            AND RawActorId = {rawActorId:String}
-          ORDER BY Day ASC
-        `,
-        params: { tenantId, rawActorId },
-      });
-      for (const row of result.rows) days.push({ tenantId, day: row.Day });
+      const statement = clickhouseRead({ scope: tenantScope.single({ tenantId }) })
+        .from(rollup)
+        .distinct()
+        .select({ DayText: fn.toString(rollup.Day) })
+        .where(({ eq }) => eq(rollup.RawActorId, rawActorId))
+        .orderBy("DayText")
+        .build();
+      const result = await this.clickhouse.read({ statement });
+      for (const row of result.rows) days.push({ tenantId, day: row.DayText });
     }
     return days;
   }

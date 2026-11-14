@@ -6,35 +6,34 @@
  * The statement is pinned, not the rows; the rows are the store's. Spec:
  * specs/governance/governance-cost-screen.feature
  */
-import type { QueryRequest, QueryResult } from "@langwatch/clickhouse-client";
-import { ClickHouseQueryClient, TenantGuard } from "@langwatch/clickhouse-client";
+import type { ReaderReadStatement } from "@langwatch/clickhouse-client/builder";
 import { describe, expect, it } from "vitest";
 
 import { GOVERNANCE_COST_SOURCE } from "../../../features/cost/rules/governance-cost-rollup-cell.rules.ts";
 import { GOVERNANCE_COST_ROLLUP_PROJECTION_VERSION_LATEST } from "../../governance-cost-rollup.repository.ts";
-import { memberClickHouseResolver } from "../clickhouse.governance-clickhouse.repositories.ts";
 import { ClickHouseGovernanceCostRollupRepository } from "../clickhouse.governance-cost-rollup.repository.ts";
 
 const WINDOW = { tenantId: "project-a", fromDay: "2026-09-01", toDay: "2026-09-30" };
 const PULLED = { ...WINDOW, costSource: GOVERNANCE_COST_SOURCE.PULLED };
 
 function repositoryOverRecorder() {
-  const executed: QueryRequest[] = [];
-  const clickhouse = new ClickHouseQueryClient({
-    tenantGuard: new TenantGuard(),
-    driver: {
-      execute: async <Row>(request: QueryRequest): Promise<QueryResult<Row>> => {
-        executed.push(request);
-        return { rows: [] };
-      },
-      insert: async () => undefined,
-      command: async () => undefined,
+  const statements: ReaderReadStatement[] = [];
+  const client = {
+    read: async ({ statement }: { statement: ReaderReadStatement }) => {
+      statements.push(statement);
+      return { rows: [] };
     },
-  });
-  const repository = ClickHouseGovernanceCostRollupRepository.create(
-    memberClickHouseResolver(clickhouse),
+  };
+  const repository = ClickHouseGovernanceCostRollupRepository.create(async () => client as never);
+  return { repository, statements };
+}
+
+/** The values a statement binds `column = {…}` to, in the order its text names them. */
+function boundTo(statement: ReaderReadStatement | undefined, column: string): unknown[] {
+  const pattern = new RegExp(`\\b${column} = \\{(\\w+):String\\}`, "g");
+  return [...(statement?.sql ?? "").matchAll(pattern)].map(
+    ([, name]) => statement?.params[name ?? ""],
   );
-  return { repository, executed };
 }
 
 /** Every read the billed total, the breakdowns and the day series are built from. */
@@ -58,26 +57,25 @@ describe("ClickHouseGovernanceCostRollupRepository screen reads", () => {
   describe("when the billed total, the breakdowns and the day series are read", () => {
     /** @scenario Gateway rows left in the rollup are counted nowhere */
     it.each(SCREEN_READS)("$name counts pulled rows only", async (read) => {
-      const { repository, executed } = repositoryOverRecorder();
+      const { repository, statements } = repositoryOverRecorder();
 
       await read.run(repository);
 
-      const [request] = executed;
-      expect(request?.params?.costsource).toBe(GOVERNANCE_COST_SOURCE.PULLED);
-      expect(request?.sql).toContain("CostSource = {costsource:String}");
+      expect(statements).toHaveLength(1);
+      expect(boundTo(statements[0], "CostSource")).toEqual([GOVERNANCE_COST_SOURCE.PULLED]);
     });
   });
 
   describe("when the summary table holds rows written by an older version of the summary", () => {
     /** @scenario Rows written by an older summary shape are not counted */
     it.each(SCREEN_READS)("$name reads only the current shape's rows", async (read) => {
-      const { repository, executed } = repositoryOverRecorder();
+      const { repository, statements } = repositoryOverRecorder();
 
       await read.run(repository);
 
-      const [request] = executed;
-      expect(request?.params?.version).toBe(GOVERNANCE_COST_ROLLUP_PROJECTION_VERSION_LATEST);
-      expect(request?.sql).toContain("Version = {version:String}");
+      expect(boundTo(statements[0], "Version")).toEqual([
+        GOVERNANCE_COST_ROLLUP_PROJECTION_VERSION_LATEST,
+      ]);
     });
   });
 });

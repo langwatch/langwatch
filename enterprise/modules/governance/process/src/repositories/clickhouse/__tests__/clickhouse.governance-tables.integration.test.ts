@@ -11,12 +11,18 @@ import type { ClickHouseTableFacts } from "@langwatch/clickhouse-client/builder"
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { startMigratedClickHouse } from "../../../__tests__/migrated-clickhouse.harness.ts";
+import { governanceCostRollup1d } from "../clickhouse.governance-cost-rollup-1d.table.ts";
+import { governanceCostRollupCharges } from "../clickhouse.governance-cost-rollup-charges.table.ts";
+import { governanceCostRollupRestatementIndex } from "../clickhouse.governance-cost-rollup-restatement-index.table.ts";
 import { governanceKpis } from "../clickhouse.governance-kpis.table.ts";
 import { governanceOcsfEvents } from "../clickhouse.governance-ocsf-events.table.ts";
 
 const DESCRIPTORS: readonly { readonly $table: ClickHouseTableFacts }[] = [
   governanceOcsfEvents,
   governanceKpis,
+  governanceCostRollup1d,
+  governanceCostRollupRestatementIndex,
+  governanceCostRollupCharges,
 ];
 
 /** The parameter type a stored column binds as: storage wrappers that change no value go. */

@@ -12,6 +12,7 @@ import { createClient, type ClickHouseClient } from "@clickhouse/client";
 import {
   migrateTestClickHouseOnce,
   startTestClickHouseEndpoints,
+  vendorQueryClient,
 } from "@langwatch/clickhouse-client/testing";
 import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
 import {
@@ -33,6 +34,7 @@ import {
   type AzureDailyCost,
   azureCostEvents,
 } from "../../features/microsoft/rules/azure-cost-management.rules.ts";
+import { memberClickHouseResolver } from "../../repositories/clickhouse/clickhouse.governance-clickhouse.repositories.ts";
 import { ClickHouseGovernanceCostRollupRepository } from "../../repositories/clickhouse/clickhouse.governance-cost-rollup.repository.ts";
 
 const DAY = "2026-01-14";
@@ -191,7 +193,9 @@ describe.skipIf(
       },
     });
     clickhouse = createClient({ url: endpoint.url });
-    repository = ClickHouseGovernanceCostRollupRepository.create(async () => clickhouse);
+    repository = ClickHouseGovernanceCostRollupRepository.create(
+      memberClickHouseResolver(vendorQueryClient({ vendor: clickhouse, indexes: [] })),
+    );
     await clickhouse.command({ query: "SYSTEM STOP MERGES governance_cost_rollup_1d" });
   }, 600_000);
 

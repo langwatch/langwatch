@@ -174,27 +174,8 @@ export interface GovernanceClickHouseRepositories {
     OcsfSeatReportReader;
 }
 
-/**
- * How every ClickHouse repository reaches a client: by tenant, resolved at
- * call time rather than bound once at construction. The live tier's factory
- * hands every repository the same resolver, closed over the one
- * `clickhouse` process member — there is one client, not one per tenant, so
- * the resolver ignores the id it is given. The signature stays per-tenant
- * because every query below was written against it, same convention as
- * `modules/trace/process`'s `TraceClickHouseWriteResolver`.
- */
-/**
- * The client a ClickHouse-tier governance repository is handed, narrowed to the
- * two methods every one of them calls. Narrow rather than the vendor client so a
- * member-backed wrapper satisfies it without a cast.
- */
-interface GovernanceClickHouseTenantClient {
-  query<Row>(input: {
-    query: string;
-    query_params?: Record<string, unknown>;
-    format: "JSONEachRow";
-    clickhouse_settings?: Record<string, string | number>;
-  }): Promise<{ json(): Promise<Row[]> }>;
+/** The insert every ClickHouse-tier governance repository owns, in the vendor client's shape. */
+interface GovernanceClickHouseInsertClient {
   insert(input: {
     table: string;
     values: readonly Record<string, unknown>[];
@@ -203,14 +184,11 @@ interface GovernanceClickHouseTenantClient {
   }): Promise<unknown>;
 }
 
-export type GovernanceClickHouseTenantResolver = (
-  tenantId: string,
-) => Promise<GovernanceClickHouseTenantClient>;
-
 /** A typed-builder repository's client: built reads, plus the inserts it owns (ADR-202). */
 export type GovernanceClickHouseReadClient = Pick<ClickHouseQueryClient, "read"> &
-  Pick<GovernanceClickHouseTenantClient, "insert">;
+  GovernanceClickHouseInsertClient;
 
+/** Resolved per tenant at call time; the live tier closes over the one member and ignores the id. */
 export type GovernanceClickHouseReadResolver = (
   tenantId: string,
 ) => Promise<GovernanceClickHouseReadClient>;

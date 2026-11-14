@@ -14,6 +14,7 @@ import { ClickHouseQueryClient, type QueryDriver, TenantGuard } from "@langwatch
 import {
   migrateTestClickHouseOnce,
   startTestClickHouseEndpoints,
+  vendorQueryClient,
 } from "@langwatch/clickhouse-client/testing";
 import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
 import {
@@ -33,6 +34,7 @@ import { erasureDigest } from "../../features/identity/rules/erasure-digest.rule
 import { ErasureSuppressionService } from "../../features/identity/services/erasure-suppression.service.ts";
 import { IdentityErasureService } from "../../features/identity/services/identity-erasure.service.ts";
 import { SuppressionSnapshotService } from "../../features/identity/services/suppression-snapshot.service.ts";
+import { memberClickHouseResolver } from "../../repositories/clickhouse/clickhouse.governance-clickhouse.repositories.ts";
 import { ClickHouseGovernanceCostChargeRepository } from "../../repositories/clickhouse/clickhouse.governance-cost-charge.repository.ts";
 import { ClickHouseGovernanceCostRollupRepository } from "../../repositories/clickhouse/clickhouse.governance-cost-rollup.repository.ts";
 import { ClickHouseRollupErasureRepository } from "../../repositories/clickhouse/clickhouse.rollup-erasure.repository.ts";
@@ -270,8 +272,12 @@ describe.skipIf(
       },
     });
     clickhouse = createClient({ url: endpoint.url });
-    rollup = ClickHouseGovernanceCostRollupRepository.create(async () => clickhouse);
-    charges = ClickHouseGovernanceCostChargeRepository.create(async () => clickhouse);
+    rollup = ClickHouseGovernanceCostRollupRepository.create(
+      memberClickHouseResolver(vendorQueryClient({ vendor: clickhouse, indexes: [] })),
+    );
+    charges = ClickHouseGovernanceCostChargeRepository.create(
+      memberClickHouseResolver(vendorQueryClient({ vendor: clickhouse, indexes: [] })),
+    );
     rollupErasure = ClickHouseRollupErasureRepository.create(queryClient(clickhouse));
   }, 600_000);
 

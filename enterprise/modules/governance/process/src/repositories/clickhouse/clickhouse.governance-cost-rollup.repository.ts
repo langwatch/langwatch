@@ -1,9 +1,22 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+/** Port of main's `governanceCostRollup.clickhouse.repository.ts` reads, as built reads (ADR-202). */
+import {
+  clickhouseRead,
+  column,
+  type Condition,
+  type ConditionOps,
+  type Expression,
+  type ReaderReadStatement,
+  type SingleTenantScope,
+  fn,
+  param,
+  tenantScope,
+} from "@langwatch/clickhouse-client/builder";
+
 import {
   GOVERNANCE_COST_CURRENCY_USD,
   GOVERNANCE_COST_SOURCE,
 } from "../../features/cost/rules/governance-cost-rollup-cell.rules.ts";
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-/** Port of main's `governanceCostRollup.clickhouse.repository.ts` reads. */
 import {
   GOVERNANCE_COST_ROLLUP_PROJECTION_VERSION_LATEST,
   GovernanceCostRollupRepository,
@@ -19,65 +32,112 @@ import {
   type GovernanceCostRollupWindow,
   type GovernanceCostSpenderGroup,
 } from "../governance-cost-rollup.repository.ts";
-import type { GovernanceClickHouseTenantResolver } from "../governance.repositories.ts";
+import type { GovernanceClickHouseReadResolver } from "../governance.repositories.ts";
+import { governanceCostRollup1d as rollup } from "./clickhouse.governance-cost-rollup-1d.table.ts";
+import { governanceCostRollupRestatementIndex as restatements } from "./clickhouse.governance-cost-rollup-restatement-index.table.ts";
 
-const TABLE = "governance_cost_rollup_1d";
-const RESTATEMENT_INDEX_TABLE = "governance_cost_rollup_restatement_index";
+const TABLE = rollup.$table.stored;
+const RESTATEMENT_INDEX_TABLE = restatements.$table.stored;
 const SYNCHRONOUS_INSERT = { async_insert: 0, wait_for_async_insert: 0 };
-const UNPRICED_CURRENCY_SAMPLE_LIMIT = 8;
-const KEY_COLUMNS = [
-  "TenantId",
-  "Day",
-  "CostSource",
-  "IngestionSourceId",
-  "Provider",
-  "Model",
-  "AgentId",
-  "CurrencyCode",
-  "RawActorId",
-] as const;
+const UNPRICED_CURRENCIES = { max: 8 };
+const NULL_INT64 = column.nullable(column.int64());
 
-/**
- * No USD figure, and no non-zero amount in another currency either. Main's `OR` chain, by De
- * Morgan: the tenant guard refuses an `OR` at its predicate's depth, which varies per statement.
- */
-const HOLDS_NO_AMOUNT_IN_ANY_CURRENCY_SQL = `
-            LatestAmountNanoUsd IS NULL
-            AND NOT (
-              CurrencyCode NOT IN ({usd:String}, '')
-              AND LatestAmountNanoMinor != 0
-            )`;
+type Ops<T extends string> = ConditionOps<T, Record<never, never>>;
+type Rows = Record<string, unknown>[];
 
-const CURRENCIES_WITHOUT_USD_SQL = `arraySort(groupUniqArrayIf(${UNPRICED_CURRENCY_SAMPLE_LIMIT})(
-            CurrencyCode,
-            LatestAmountNanoUsd IS NULL AND CurrencyCode != {usd:String}
-          ))`;
+/** The cell key, tenant and partition key first, every column as itself. */
+const CELL_KEY = {
+  TenantId: rollup.TenantId,
+  Day: rollup.Day,
+  CostSource: rollup.CostSource,
+  IngestionSourceId: rollup.IngestionSourceId,
+  Provider: rollup.Provider,
+  Model: rollup.Model,
+  AgentId: rollup.AgentId,
+  CurrencyCode: rollup.CurrencyCode,
+  RawActorId: rollup.RawActorId,
+} as const;
+const CELL_KEY_COLUMNS = Object.values(CELL_KEY);
 
-/** Every cell collapsed to its surviving version, tenant and partition key first. */
-function latestPulledCells(extraWhere = ""): string {
-  return `
-          SELECT
-            ${KEY_COLUMNS.join(",\n            ")},
-            argMax(tuple(AmountNanoUsd), EventTimestamp).1 AS LatestAmountNanoUsd,
-            argMax(AmountNanoMinor, EventTimestamp) AS LatestAmountNanoMinor
-          FROM ${TABLE}
-          WHERE TenantId = {tenantid:String}
-            AND Day >= {fromday:Date}
-            AND Day <= {today:Date}${extraWhere}
-            AND CostSource = {costsource:String}
-            AND Version = {version:String}
-          GROUP BY ${KEY_COLUMNS.join(", ")}`;
+/** `argMax(tuple(x), EventTimestamp).1`: the tuple keeps a NULL latest value from losing to a set one. */
+const latestNullable = <V>(of: Expression<V | null, typeof ROLLUP>) =>
+  fn.tupleElement(fn.argMax(fn.tuple(of), rollup.EventTimestamp), "0");
+const latest = <V>(of: Expression<V, typeof ROLLUP>) => fn.argMax(of, rollup.EventTimestamp);
+const ROLLUP = "governance_cost_rollup_1d";
+
+type CellAmounts<T extends string> = {
+  readonly LatestAmountNanoUsd: Expression<number | null, T>;
+  readonly LatestAmountNanoMinor: Expression<number, T>;
+  readonly CurrencyCode: Expression<string, T>;
+};
+
+/** No USD figure, and no non-zero amount in another currency either (main's `OR` chain, by De Morgan). */
+function holdsNoAmountInAnyCurrency<T extends string>({
+  ops: { and, isNull, ne, not, oneOf },
+  cells,
+}: {
+  ops: Ops<T>;
+  cells: CellAmounts<T>;
+}): Condition<T> {
+  return and(
+    isNull(cells.LatestAmountNanoUsd),
+    not(
+      and(
+        not(oneOf(cells.CurrencyCode, [GOVERNANCE_COST_CURRENCY_USD, ""])),
+        ne(cells.LatestAmountNanoMinor, 0),
+      ),
+    ),
+  );
 }
 
-function windowParams(input: GovernanceCostRollupWindow): Record<string, unknown> {
-  return {
-    tenantid: input.tenantId,
-    fromday: input.fromDay,
-    today: input.toDay,
-    costsource: GOVERNANCE_COST_SOURCE.PULLED,
-    version: GOVERNANCE_COST_ROLLUP_PROJECTION_VERSION_LATEST,
-    usd: GOVERNANCE_COST_CURRENCY_USD,
-  };
+function currenciesWithoutUsd<T extends string>({
+  ops: { and, isNull, ne },
+  cells,
+}: {
+  ops: Ops<T>;
+  cells: CellAmounts<T>;
+}) {
+  return fn.arraySort(
+    fn.groupUniqArrayIf(
+      cells.CurrencyCode,
+      and(isNull(cells.LatestAmountNanoUsd), ne(cells.CurrencyCode, GOVERNANCE_COST_CURRENCY_USD)),
+      UNPRICED_CURRENCIES,
+    ),
+  );
+}
+
+const scopeOf = (tenantId: string) => tenantScope.single({ tenantId });
+
+/** Every cell of the window collapsed to its surviving version, at the current shape. */
+function latestPulledCells({
+  scope,
+  window,
+  costSource = GOVERNANCE_COST_SOURCE.PULLED,
+  provider,
+}: {
+  scope: SingleTenantScope;
+  window: GovernanceCostRollupWindow;
+  costSource?: string;
+  provider?: string;
+}) {
+  return clickhouseRead({ scope })
+    .from(rollup)
+    .select({
+      ...CELL_KEY,
+      LatestAmountNanoUsd: latestNullable(rollup.AmountNanoUsd),
+      LatestAmountNanoMinor: latest(rollup.AmountNanoMinor),
+    })
+    .where(({ and, eq, gte, lte }) =>
+      and(
+        gte(rollup.Day, window.fromDay),
+        lte(rollup.Day, window.toDay),
+        ...(provider === undefined ? [] : [eq(rollup.Provider, provider)]),
+        eq(rollup.CostSource, costSource),
+        eq(rollup.Version, GOVERNANCE_COST_ROLLUP_PROJECTION_VERSION_LATEST),
+      ),
+    )
+    .groupBy(...CELL_KEY_COLUMNS)
+    .as("cells");
 }
 
 const int = (value: unknown): number => Number(value ?? 0);
@@ -103,32 +163,6 @@ function currencyLines(value: unknown): GovernanceCostDayCurrencyGroup[] {
   });
 }
 
-const CELL_PREDICATE = KEY_COLUMNS.map(
-  (column) => `${column} = {${column.toLowerCase()}:String}`,
-).join("\n          AND ");
-
-const LATEST_PAYLOAD_COLUMNS = [
-  "argMax(OrganizationId, EventTimestamp) AS OrganizationId",
-  "argMax(ExactOrEstimate, EventTimestamp) AS ExactOrEstimate",
-  "argMax(tuple(AmountNanoUsd), EventTimestamp).1 AS AmountNanoUsd",
-  "argMax(AmountNanoMinor, EventTimestamp) AS AmountNanoMinor",
-  "argMax(TokensInput, EventTimestamp) AS TokensInput",
-  "argMax(TokensOutput, EventTimestamp) AS TokensOutput",
-  "argMax(TokensCacheRead, EventTimestamp) AS TokensCacheRead",
-  "argMax(TokensCacheWrite, EventTimestamp) AS TokensCacheWrite",
-  "argMax(RequestCount, EventTimestamp) AS RequestCount",
-  "argMax(RevisionCount, EventTimestamp) AS RevisionCount",
-  "argMax(tuple(PreviousAmountNanoUsd), EventTimestamp).1 AS PreviousAmountNanoUsd",
-  "argMax(tuple(toUnixTimestamp(RevisedAt)), EventTimestamp).1 AS RevisedAt",
-  "toUnixTimestamp(argMax(LastObservedAt, EventTimestamp)) AS LastObservedAt",
-  "argMax(PulledItemsJson, EventTimestamp) AS PulledItemsJson",
-  "argMax(Version, EventTimestamp) AS Version",
-  "argMax(AppliedEventIds, EventTimestamp) AS AppliedEventIds",
-  "argMax(CreatedAt, EventTimestamp) AS CreatedAt",
-  "argMax(LastEventOccurredAt, EventTimestamp) AS LastEventOccurredAt",
-  "max(EventTimestamp) AS LatestEventTimestamp",
-] as const;
-
 function restatementKeysOf(pulledItemsJson: string): string[] {
   if (!pulledItemsJson) return [];
   try {
@@ -139,9 +173,28 @@ function restatementKeysOf(pulledItemsJson: string): string[] {
   }
 }
 
-function cellParams(cell: GovernanceCostRollupCellAddress): Record<string, unknown> {
-  return Object.fromEntries(KEY_COLUMNS.map((column) => [column.toLowerCase(), cell[column]]));
-}
+/** A cell's surviving version. Keys carry `Latest`: an alias may not shadow a column it reads. */
+const LATEST_PAYLOAD = {
+  LatestOrganizationId: latest(rollup.OrganizationId),
+  LatestExactOrEstimate: latest(rollup.ExactOrEstimate),
+  LatestAmountNanoUsd: latestNullable(rollup.AmountNanoUsd),
+  LatestAmountNanoMinor: latest(rollup.AmountNanoMinor),
+  LatestTokensInput: latest(rollup.TokensInput),
+  LatestTokensOutput: latest(rollup.TokensOutput),
+  LatestTokensCacheRead: latest(rollup.TokensCacheRead),
+  LatestTokensCacheWrite: latest(rollup.TokensCacheWrite),
+  LatestRequestCount: latest(rollup.RequestCount),
+  LatestRevisionCount: latest(rollup.RevisionCount),
+  LatestPreviousAmountNanoUsd: latestNullable(rollup.PreviousAmountNanoUsd),
+  LatestRevisedAt: latestNullable(fn.toUnixTimestamp(rollup.RevisedAt)),
+  LatestLastObservedAt: fn.toUnixTimestamp(latest(rollup.LastObservedAt)),
+  LatestPulledItemsJson: latest(rollup.PulledItemsJson),
+  LatestVersion: latest(rollup.Version),
+  LatestAppliedEventIds: latest(rollup.AppliedEventIds),
+  LatestCreatedAt: latest(rollup.CreatedAt),
+  LatestLastEventOccurredAt: latest(rollup.LastEventOccurredAt),
+  LatestEventTimestamp: fn.max(rollup.EventTimestamp),
+};
 
 function decodeRow(row: Record<string, unknown>): GovernanceCostRollupRow {
   return {
@@ -154,150 +207,192 @@ function decodeRow(row: Record<string, unknown>): GovernanceCostRollupRow {
     AgentId: str(row.AgentId),
     CurrencyCode: str(row.CurrencyCode),
     RawActorId: str(row.RawActorId),
-    OrganizationId: str(row.OrganizationId),
-    ExactOrEstimate: str(row.ExactOrEstimate),
-    AmountNanoUsd: row.AmountNanoUsd == null ? null : Number(row.AmountNanoUsd),
-    AmountNanoMinor: int(row.AmountNanoMinor),
-    TokensInput: int(row.TokensInput),
-    TokensOutput: int(row.TokensOutput),
-    TokensCacheRead: int(row.TokensCacheRead),
-    TokensCacheWrite: int(row.TokensCacheWrite),
-    RequestCount: int(row.RequestCount),
-    RevisionCount: int(row.RevisionCount),
+    OrganizationId: str(row.LatestOrganizationId),
+    ExactOrEstimate: str(row.LatestExactOrEstimate),
+    AmountNanoUsd: row.LatestAmountNanoUsd == null ? null : Number(row.LatestAmountNanoUsd),
+    AmountNanoMinor: int(row.LatestAmountNanoMinor),
+    TokensInput: int(row.LatestTokensInput),
+    TokensOutput: int(row.LatestTokensOutput),
+    TokensCacheRead: int(row.LatestTokensCacheRead),
+    TokensCacheWrite: int(row.LatestTokensCacheWrite),
+    RequestCount: int(row.LatestRequestCount),
+    RevisionCount: int(row.LatestRevisionCount),
     PreviousAmountNanoUsd:
-      row.PreviousAmountNanoUsd == null ? null : Number(row.PreviousAmountNanoUsd),
-    RevisedAt: row.RevisedAt == null ? null : Number(row.RevisedAt),
-    LastObservedAt: int(row.LastObservedAt),
-    PulledItemsJson: str(row.PulledItemsJson),
-    Version: str(row.Version),
-    AppliedEventIds: strArray(row.AppliedEventIds),
-    CreatedAt: int(row.CreatedAt),
-    LastEventOccurredAt: int(row.LastEventOccurredAt),
+      row.LatestPreviousAmountNanoUsd == null ? null : Number(row.LatestPreviousAmountNanoUsd),
+    RevisedAt: row.LatestRevisedAt == null ? null : Number(row.LatestRevisedAt),
+    LastObservedAt: int(row.LatestLastObservedAt),
+    PulledItemsJson: str(row.LatestPulledItemsJson),
+    Version: str(row.LatestVersion),
+    AppliedEventIds: strArray(row.LatestAppliedEventIds),
+    CreatedAt: int(row.LatestCreatedAt),
+    LastEventOccurredAt: int(row.LatestLastEventOccurredAt),
     EventTimestamp: int(row.LatestEventTimestamp),
   };
 }
 
-/** Main's four-layer day read: collapse, carry the day's latest revision, bucket each cell, fold per currency. */
-function daysByLaneQuery(costSourcePredicate: string): string {
-  return `
-        SELECT
-          Day                                   AS Day,
-          CostSource                            AS CostSource,
-          sumOrNull(CurrencyAmountNanoUsd)      AS AmountNanoUsd,
-          sum(CurrencyCellsWithoutAmount)       AS CellsWithoutAmount,
-          arraySort(
-            groupUniqArrayIf(${UNPRICED_CURRENCY_SAMPLE_LIMIT})(
-              CurrencyCode,
-              CurrencyCellsWithoutUsdFigure > 0 AND CurrencyCode != {usd:String}
-            )
-          ) AS CurrenciesWithoutUsdAmount,
-          max(RevisedAt)                        AS RevisedAt,
-          sumOrNull(CurrencyPriorAmountNanoUsd) AS PreviousAmountNanoUsd,
-          sum(CellsWithoutPreviousAmount)       AS CellsWithoutPreviousAmount,
-          max(LastObservedAt)                   AS LastObservedAt,
-          groupArray(
-            tuple(
-              CurrencyCode,
-              CurrencyAmountNanoMinor,
-              CurrencyPriorAmountNanoMinor,
-              CurrencyCellsWithoutAmount,
-              CurrencyCellsWithoutPreviousMinor
-            )
-          ) AS ByCurrency
-        FROM (
-          SELECT
-            Day,
-            CostSource,
-            CurrencyCode,
-            sumOrNull(LatestAmountNanoUsd)        AS CurrencyAmountNanoUsd,
-            sum(LatestAmountNanoMinor)            AS CurrencyAmountNanoMinor,
-            countIf(HoldsNoAmountAtAll)           AS CurrencyCellsWithoutAmount,
-            countIf(LatestAmountNanoUsd IS NULL)  AS CurrencyCellsWithoutUsdFigure,
-            max(LatestRevisedAt)                  AS RevisedAt,
-            sumOrNull(PriorAmountNanoUsd)         AS CurrencyPriorAmountNanoUsd,
-            countIf(PriorAmountNanoUsd IS NULL) AS CellsWithoutPreviousAmount,
-            sumOrNull(PriorAmountNanoMinor)       AS CurrencyPriorAmountNanoMinor,
-            countIf(PriorAmountNanoMinor IS NULL AND NOT CreatedByRevision)
-              AS CurrencyCellsWithoutPreviousMinor,
-            max(LatestLastObservedAt)             AS LastObservedAt
-          FROM (
-            SELECT
-              Day,
-              CostSource,
-              CurrencyCode,
-              LatestAmountNanoUsd,
-              LatestAmountNanoMinor,
-              LatestRevisedAt,
-              LatestLastObservedAt,
-              (${HOLDS_NO_AMOUNT_IN_ANY_CURRENCY_SQL}
-              ) AS HoldsNoAmountAtAll,
-              (CellCreatedAt >= toUnixTimestamp(Day) * 1000)
-                AND (CellCreatedAt < (toUnixTimestamp(Day) + 86400) * 1000)
-                AND ifNull(CellCreatedAt >= DayLatestRevisedAt * 1000, 0)
-                AS CreatedByRevision,
-              if(
-                CreatedByRevision,
-                toNullable(toInt64(0)),
-                if(
-                  ifNull(LatestRevisedAt = DayLatestRevisedAt, 0),
-                  LatestPreviousAmountNanoUsd,
-                  if(
-                    HoldsNoAmountAtAll,
-                    CAST(NULL AS Nullable(Int64)),
-                    ifNull(LatestAmountNanoUsd, toInt64(0))
-                  )
-                )
-              ) AS PriorAmountNanoUsd,
-              if(
-                CreatedByRevision,
-                CAST(NULL AS Nullable(Int64)),
-                if(
-                  ifNull(LatestRevisedAt = DayLatestRevisedAt, 0),
-                  if(
-                    CurrencyCode = {usd:String},
-                    LatestPreviousAmountNanoUsd,
-                    CAST(NULL AS Nullable(Int64))
-                  ),
-                  toNullable(LatestAmountNanoMinor)
-                )
-              ) AS PriorAmountNanoMinor
-            FROM (
-              SELECT
-                *,
-                max(LatestRevisedAt) OVER (PARTITION BY Day, CostSource)
-                  AS DayLatestRevisedAt
-              FROM (
-                SELECT
-                  ${KEY_COLUMNS.join(",\n                  ")},
-                  argMax(tuple(AmountNanoUsd), EventTimestamp).1 AS LatestAmountNanoUsd,
-                  argMax(AmountNanoMinor, EventTimestamp) AS LatestAmountNanoMinor,
-                  argMax(tuple(PreviousAmountNanoUsd), EventTimestamp).1 AS LatestPreviousAmountNanoUsd,
-                  argMax(tuple(toUnixTimestamp(RevisedAt)), EventTimestamp).1 AS LatestRevisedAt,
-                  toUnixTimestamp(argMax(LastObservedAt, EventTimestamp)) AS LatestLastObservedAt,
-                  min(CreatedAt) AS CellCreatedAt
-                FROM ${TABLE}
-                WHERE TenantId = {tenantid:String}
-                  AND Day >= {fromday:Date}
-                  AND Day <= {today:Date}
-                  AND Version = {version:String}
-                  ${costSourcePredicate}
-                GROUP BY ${KEY_COLUMNS.join(", ")}
-              )
-            )
-          )
-          GROUP BY Day, CostSource, CurrencyCode
-        )
-        GROUP BY Day, CostSource
-        ORDER BY Day, CostSource`;
+/** Main's day read, layer by layer: collapse each cell, carry the day's latest revision, bucket. */
+function daysByLaneRead(input: GovernanceCostRollupWindow & { costSource?: string }) {
+  const scope = scopeOf(input.tenantId);
+  const cells = clickhouseRead({ scope })
+    .from(rollup)
+    .select({
+      ...CELL_KEY,
+      LatestAmountNanoUsd: latestNullable(rollup.AmountNanoUsd),
+      LatestAmountNanoMinor: latest(rollup.AmountNanoMinor),
+      LatestPreviousAmountNanoUsd: latestNullable(rollup.PreviousAmountNanoUsd),
+      LatestRevisedAt: latestNullable(fn.toUnixTimestamp(rollup.RevisedAt)),
+      LatestLastObservedAt: fn.toUnixTimestamp(latest(rollup.LastObservedAt)),
+      CellCreatedAt: fn.min(rollup.CreatedAt),
+    })
+    .where(({ and, eq, gte, lte }) =>
+      and(
+        gte(rollup.Day, input.fromDay),
+        lte(rollup.Day, input.toDay),
+        eq(rollup.Version, GOVERNANCE_COST_ROLLUP_PROJECTION_VERSION_LATEST),
+        ...(input.costSource ? [eq(rollup.CostSource, input.costSource)] : []),
+      ),
+    )
+    .groupBy(...CELL_KEY_COLUMNS)
+    .as("cells");
+  const dayed = clickhouseRead({ scope })
+    .from(cells)
+    .select({
+      Day: cells.Day,
+      CostSource: cells.CostSource,
+      CurrencyCode: cells.CurrencyCode,
+      LatestAmountNanoUsd: cells.LatestAmountNanoUsd,
+      LatestAmountNanoMinor: cells.LatestAmountNanoMinor,
+      LatestPreviousAmountNanoUsd: cells.LatestPreviousAmountNanoUsd,
+      LatestRevisedAt: cells.LatestRevisedAt,
+      LatestLastObservedAt: cells.LatestLastObservedAt,
+      CellCreatedAt: cells.CellCreatedAt,
+      DayLatestRevisedAt: fn.over(fn.max(cells.LatestRevisedAt), {
+        partitionBy: [cells.Day, cells.CostSource],
+      }),
+    })
+    .as("dayed");
+  const bucketed = clickhouseRead({ scope })
+    .from(dayed)
+    .select((ops) => {
+      const { and, eq, gte, isNotNull, lt } = ops;
+      const holdsNoAmountAtAll = holdsNoAmountInAnyCurrency({ ops, cells: dayed });
+      const dayStartSeconds = fn.toUnixTimestamp(fn.cast(dayed.Day, column.dateTime()));
+      // `ifNull(a, 0)` of main's comparisons: a NULL revision time compares false.
+      const createdByRevision = and(
+        gte(dayed.CellCreatedAt, fn.multiply(dayStartSeconds, 1000)),
+        lt(dayed.CellCreatedAt, fn.multiply(fn.plus(dayStartSeconds, 86400), 1000)),
+        isNotNull(dayed.DayLatestRevisedAt),
+        gte(dayed.CellCreatedAt, fn.multiply(dayed.DayLatestRevisedAt, 1000)),
+      );
+      const revisedWithTheDay = and(
+        isNotNull(dayed.LatestRevisedAt),
+        eq(dayed.LatestRevisedAt, dayed.DayLatestRevisedAt),
+      );
+      const zero = fn.toInt64(param.int64(0));
+      return {
+        Day: dayed.Day,
+        CostSource: dayed.CostSource,
+        CurrencyCode: dayed.CurrencyCode,
+        LatestAmountNanoUsd: dayed.LatestAmountNanoUsd,
+        LatestAmountNanoMinor: dayed.LatestAmountNanoMinor,
+        LatestRevisedAt: dayed.LatestRevisedAt,
+        LatestLastObservedAt: dayed.LatestLastObservedAt,
+        HoldsNoAmountAtAll: holdsNoAmountAtAll,
+        CreatedByRevision: createdByRevision,
+        PriorAmountNanoUsd: fn.if(
+          createdByRevision,
+          fn.toNullable(zero),
+          fn.if(
+            revisedWithTheDay,
+            dayed.LatestPreviousAmountNanoUsd,
+            fn.if(
+              holdsNoAmountAtAll,
+              fn.nullAs(NULL_INT64),
+              fn.ifNull(dayed.LatestAmountNanoUsd, zero),
+            ),
+          ),
+        ),
+        PriorAmountNanoMinor: fn.if(
+          createdByRevision,
+          fn.nullAs(NULL_INT64),
+          fn.if(
+            revisedWithTheDay,
+            fn.if(
+              eq(dayed.CurrencyCode, GOVERNANCE_COST_CURRENCY_USD),
+              dayed.LatestPreviousAmountNanoUsd,
+              fn.nullAs(NULL_INT64),
+            ),
+            fn.toNullable(dayed.LatestAmountNanoMinor),
+          ),
+        ),
+      };
+    })
+    .as("bucketed");
+  const currencies = clickhouseRead({ scope })
+    .from(bucketed)
+    .select(({ and, isNull, not }) => ({
+      Day: bucketed.Day,
+      CostSource: bucketed.CostSource,
+      CurrencyCode: bucketed.CurrencyCode,
+      CurrencyAmountNanoUsd: fn.sumOrNull(bucketed.LatestAmountNanoUsd),
+      CurrencyAmountNanoMinor: fn.sum(bucketed.LatestAmountNanoMinor),
+      CurrencyCellsWithoutAmount: fn.countIf(bucketed.HoldsNoAmountAtAll),
+      CurrencyCellsWithoutUsdFigure: fn.countIf(isNull(bucketed.LatestAmountNanoUsd)),
+      RevisedAt: fn.max(bucketed.LatestRevisedAt),
+      CurrencyPriorAmountNanoUsd: fn.sumOrNull(bucketed.PriorAmountNanoUsd),
+      CellsWithoutPreviousAmount: fn.countIf(isNull(bucketed.PriorAmountNanoUsd)),
+      CurrencyPriorAmountNanoMinor: fn.sumOrNull(bucketed.PriorAmountNanoMinor),
+      CurrencyCellsWithoutPreviousMinor: fn.countIf(
+        and(isNull(bucketed.PriorAmountNanoMinor), not(bucketed.CreatedByRevision)),
+      ),
+      LastObservedAt: fn.max(bucketed.LatestLastObservedAt),
+    }))
+    .groupBy(bucketed.Day, bucketed.CostSource, bucketed.CurrencyCode)
+    .as("currencies");
+  return clickhouseRead({ scope })
+    .from(currencies)
+    .select(({ and, gt, ne }) => ({
+      Day: currencies.Day,
+      CostSource: currencies.CostSource,
+      AmountNanoUsd: fn.sumOrNull(currencies.CurrencyAmountNanoUsd),
+      CellsWithoutAmount: fn.sum(currencies.CurrencyCellsWithoutAmount),
+      CurrenciesWithoutUsdAmount: fn.arraySort(
+        fn.groupUniqArrayIf(
+          currencies.CurrencyCode,
+          and(
+            gt(currencies.CurrencyCellsWithoutUsdFigure, 0),
+            ne(currencies.CurrencyCode, GOVERNANCE_COST_CURRENCY_USD),
+          ),
+          UNPRICED_CURRENCIES,
+        ),
+      ),
+      RevisedAt: fn.max(currencies.RevisedAt),
+      PreviousAmountNanoUsd: fn.sumOrNull(currencies.CurrencyPriorAmountNanoUsd),
+      CellsWithoutPreviousAmount: fn.sum(currencies.CellsWithoutPreviousAmount),
+      LastObservedAt: fn.max(currencies.LastObservedAt),
+      ByCurrency: fn.groupArray(
+        fn.tuple(
+          currencies.CurrencyCode,
+          currencies.CurrencyAmountNanoMinor,
+          currencies.CurrencyPriorAmountNanoMinor,
+          currencies.CurrencyCellsWithoutAmount,
+          currencies.CurrencyCellsWithoutPreviousMinor,
+        ),
+      ),
+    }))
+    .groupBy(currencies.Day, currencies.CostSource)
+    .orderBy(currencies.Day)
+    .orderBy(currencies.CostSource)
+    .build();
 }
 
 export class ClickHouseGovernanceCostRollupRepository extends GovernanceCostRollupRepository {
-  private constructor(private readonly resolveClient: GovernanceClickHouseTenantResolver) {
+  private constructor(private readonly resolveClient: GovernanceClickHouseReadResolver) {
     super();
   }
 
   static create(
-    resolveClient: GovernanceClickHouseTenantResolver,
+    resolveClient: GovernanceClickHouseReadResolver,
   ): ClickHouseGovernanceCostRollupRepository {
     return new ClickHouseGovernanceCostRollupRepository(resolveClient);
   }
@@ -305,20 +400,22 @@ export class ClickHouseGovernanceCostRollupRepository extends GovernanceCostRoll
   async sumDaysByProvider(
     input: GovernanceCostRollupWindow,
   ): Promise<GovernanceCostProviderDayGroup[]> {
-    const rows = await this.read(input, {
-      query: `
-        SELECT
-          Day                            AS Day,
-          Provider                       AS Provider,
-          sumOrNull(LatestAmountNanoUsd) AS AmountNanoUsd,
-          countIf(${HOLDS_NO_AMOUNT_IN_ANY_CURRENCY_SQL}
-          ) AS CellsWithoutAmount,
-          ${CURRENCIES_WITHOUT_USD_SQL} AS CurrenciesWithoutUsdAmount
-        FROM (${latestPulledCells()}
-        )
-        GROUP BY Day, Provider
-        ORDER BY Day, Provider`,
-    });
+    const scope = scopeOf(input.tenantId);
+    const cells = latestPulledCells({ scope, window: input });
+    const statement = clickhouseRead({ scope })
+      .from(cells)
+      .select((ops) => ({
+        Day: cells.Day,
+        Provider: cells.Provider,
+        AmountNanoUsd: fn.sumOrNull(cells.LatestAmountNanoUsd),
+        CellsWithoutAmount: fn.countIf(holdsNoAmountInAnyCurrency({ ops, cells })),
+        CurrenciesWithoutUsdAmount: currenciesWithoutUsd({ ops, cells }),
+      }))
+      .groupBy(cells.Day, cells.Provider)
+      .orderBy(cells.Day)
+      .orderBy(cells.Provider)
+      .build();
+    const rows = await this.rowsOf(input.tenantId, statement);
     return rows.map((row) => ({
       day: str(row.Day),
       provider: str(row.Provider),
@@ -331,21 +428,22 @@ export class ClickHouseGovernanceCostRollupRepository extends GovernanceCostRoll
   async sumPeriodRecordsByProvider(
     input: GovernanceCostRollupWindow & { provider: string },
   ): Promise<GovernanceCostPeriodRecordGroup[]> {
-    const rows = await this.read(input, {
-      query: `
-        SELECT
-          Model                          AS Model,
-          AgentId                        AS AgentId,
-          sumOrNull(LatestAmountNanoUsd) AS AmountNanoUsd,
-          countIf(${HOLDS_NO_AMOUNT_IN_ANY_CURRENCY_SQL}
-          ) AS CellsWithoutAmount,
-          ${CURRENCIES_WITHOUT_USD_SQL} AS CurrenciesWithoutUsdAmount
-        FROM (${latestPulledCells("\n            AND Provider = {provider:String}")}
-        )
-        GROUP BY Model, AgentId
-        ORDER BY Model, AgentId`,
-      params: { provider: input.provider },
-    });
+    const scope = scopeOf(input.tenantId);
+    const cells = latestPulledCells({ scope, window: input, provider: input.provider });
+    const statement = clickhouseRead({ scope })
+      .from(cells)
+      .select((ops) => ({
+        Model: cells.Model,
+        AgentId: cells.AgentId,
+        AmountNanoUsd: fn.sumOrNull(cells.LatestAmountNanoUsd),
+        CellsWithoutAmount: fn.countIf(holdsNoAmountInAnyCurrency({ ops, cells })),
+        CurrenciesWithoutUsdAmount: currenciesWithoutUsd({ ops, cells }),
+      }))
+      .groupBy(cells.Model, cells.AgentId)
+      .orderBy(cells.Model)
+      .orderBy(cells.AgentId)
+      .build();
+    const rows = await this.rowsOf(input.tenantId, statement);
     return rows.map((row) => ({
       model: str(row.Model),
       agentId: str(row.AgentId),
@@ -358,19 +456,23 @@ export class ClickHouseGovernanceCostRollupRepository extends GovernanceCostRoll
   async sumWindowBySpender(
     input: GovernanceCostRollupWindow,
   ): Promise<GovernanceCostSpenderGroup[]> {
-    const rows = await this.read(input, {
-      query: `
-        SELECT
-          Provider                             AS Provider,
-          RawActorId                           AS RawActorId,
-          AgentId                              AS AgentId,
-          sumOrNull(LatestAmountNanoUsd)       AS AmountNanoUsd,
-          countIf(LatestAmountNanoUsd IS NULL) AS CellsWithoutAmount
-        FROM (${latestPulledCells()}
-        )
-        GROUP BY Provider, RawActorId, AgentId
-        ORDER BY Provider, RawActorId, AgentId`,
-    });
+    const scope = scopeOf(input.tenantId);
+    const cells = latestPulledCells({ scope, window: input });
+    const statement = clickhouseRead({ scope })
+      .from(cells)
+      .select(({ isNull }) => ({
+        Provider: cells.Provider,
+        RawActorId: cells.RawActorId,
+        AgentId: cells.AgentId,
+        AmountNanoUsd: fn.sumOrNull(cells.LatestAmountNanoUsd),
+        CellsWithoutAmount: fn.countIf(isNull(cells.LatestAmountNanoUsd)),
+      }))
+      .groupBy(cells.Provider, cells.RawActorId, cells.AgentId)
+      .orderBy(cells.Provider)
+      .orderBy(cells.RawActorId)
+      .orderBy(cells.AgentId)
+      .build();
+    const rows = await this.rowsOf(input.tenantId, statement);
     return rows.map((row) => ({
       provider: str(row.Provider),
       rawActorId: str(row.RawActorId),
@@ -381,17 +483,19 @@ export class ClickHouseGovernanceCostRollupRepository extends GovernanceCostRoll
   }
 
   async sumWindowByModel(input: GovernanceCostRollupWindow): Promise<GovernanceCostModelGroup[]> {
-    const rows = await this.read(input, {
-      query: `
-        SELECT
-          Model                                AS Model,
-          sumOrNull(LatestAmountNanoUsd)       AS AmountNanoUsd,
-          countIf(LatestAmountNanoUsd IS NULL) AS CellsWithoutAmount
-        FROM (${latestPulledCells()}
-        )
-        GROUP BY Model
-        ORDER BY Model`,
-    });
+    const scope = scopeOf(input.tenantId);
+    const cells = latestPulledCells({ scope, window: input });
+    const statement = clickhouseRead({ scope })
+      .from(cells)
+      .select(({ isNull }) => ({
+        Model: cells.Model,
+        AmountNanoUsd: fn.sumOrNull(cells.LatestAmountNanoUsd),
+        CellsWithoutAmount: fn.countIf(isNull(cells.LatestAmountNanoUsd)),
+      }))
+      .groupBy(cells.Model)
+      .orderBy(cells.Model)
+      .build();
+    const rows = await this.rowsOf(input.tenantId, statement);
     return rows.map((row) => ({
       model: str(row.Model),
       amountNanoUsd: row.AmountNanoUsd == null ? null : Number(row.AmountNanoUsd),
@@ -402,10 +506,7 @@ export class ClickHouseGovernanceCostRollupRepository extends GovernanceCostRoll
   async sumDaysByLane(
     input: GovernanceCostRollupWindow & { costSource?: string },
   ): Promise<GovernanceCostDayLaneGroup[]> {
-    const rows = await this.read(input, {
-      query: daysByLaneQuery(input.costSource ? "AND CostSource = {costsource:String}" : ""),
-      params: input.costSource ? { costsource: input.costSource } : {},
-    });
+    const rows = await this.rowsOf(input.tenantId, daysByLaneRead(input));
     return rows.map((row) => ({
       day: str(row.Day),
       costSource: str(row.CostSource),
@@ -424,19 +525,20 @@ export class ClickHouseGovernanceCostRollupRepository extends GovernanceCostRoll
   async sumWindowByProvider(
     input: GovernanceCostRollupWindow,
   ): Promise<GovernanceCostProviderGroup[]> {
-    const rows = await this.read(input, {
-      query: `
-        SELECT
-          Provider,
-          sumOrNull(LatestAmountNanoUsd) AS AmountNanoUsd,
-          countIf(${HOLDS_NO_AMOUNT_IN_ANY_CURRENCY_SQL}
-          ) AS CellsWithoutAmount,
-          ${CURRENCIES_WITHOUT_USD_SQL} AS CurrenciesWithoutUsdAmount
-        FROM (${latestPulledCells()}
-        )
-        GROUP BY Provider
-        ORDER BY Provider`,
-    });
+    const scope = scopeOf(input.tenantId);
+    const cells = latestPulledCells({ scope, window: input });
+    const statement = clickhouseRead({ scope })
+      .from(cells)
+      .select((ops) => ({
+        Provider: cells.Provider,
+        AmountNanoUsd: fn.sumOrNull(cells.LatestAmountNanoUsd),
+        CellsWithoutAmount: fn.countIf(holdsNoAmountInAnyCurrency({ ops, cells })),
+        CurrenciesWithoutUsdAmount: currenciesWithoutUsd({ ops, cells }),
+      }))
+      .groupBy(cells.Provider)
+      .orderBy(cells.Provider)
+      .build();
+    const rows = await this.rowsOf(input.tenantId, statement);
     return rows.map((row) => ({
       provider: str(row.Provider),
       amountNanoUsd: row.AmountNanoUsd == null ? null : Number(row.AmountNanoUsd),
@@ -448,19 +550,19 @@ export class ClickHouseGovernanceCostRollupRepository extends GovernanceCostRoll
   async sumWindowByCurrency(
     input: GovernanceCostRollupWindow & { costSource: string },
   ): Promise<GovernanceCostCurrencyGroup[]> {
-    const rows = await this.read(input, {
-      query: `
-        SELECT
-          CurrencyCode                     AS CurrencyCode,
-          sumOrNull(LatestAmountNanoMinor) AS AmountNanoMinor,
-          countIf(${HOLDS_NO_AMOUNT_IN_ANY_CURRENCY_SQL}
-          ) AS CellsWithoutAmount
-        FROM (${latestPulledCells()}
-        )
-        GROUP BY CurrencyCode
-        ORDER BY CurrencyCode`,
-      params: { costsource: input.costSource },
-    });
+    const scope = scopeOf(input.tenantId);
+    const cells = latestPulledCells({ scope, window: input, costSource: input.costSource });
+    const statement = clickhouseRead({ scope })
+      .from(cells)
+      .select((ops) => ({
+        CurrencyCode: cells.CurrencyCode,
+        AmountNanoMinor: fn.sumOrNull(cells.LatestAmountNanoMinor),
+        CellsWithoutAmount: fn.countIf(holdsNoAmountInAnyCurrency({ ops, cells })),
+      }))
+      .groupBy(cells.CurrencyCode)
+      .orderBy(cells.CurrencyCode)
+      .build();
+    const rows = await this.rowsOf(input.tenantId, statement);
     return rows.map((row) => ({
       currencyCode: str(row.CurrencyCode),
       amountNanoMinor: row.AmountNanoMinor == null ? null : Number(row.AmountNanoMinor),
@@ -472,19 +574,21 @@ export class ClickHouseGovernanceCostRollupRepository extends GovernanceCostRoll
   async hasRowsForSource(
     input: GovernanceCostRollupWindow & { costSource: string; ingestionSourceId: string },
   ): Promise<boolean> {
-    const rows = await this.read(input, {
-      query: `
-        SELECT 1 AS RowExists
-        FROM ${TABLE}
-        WHERE TenantId = {tenantid:String}
-          AND Day >= {fromday:Date}
-          AND Day <= {today:Date}
-          AND CostSource = {costsource:String}
-          AND IngestionSourceId = {ingestionsourceid:String}
-          AND Version = {version:String}
-        LIMIT 1`,
-      params: { costsource: input.costSource, ingestionsourceid: input.ingestionSourceId },
-    });
+    const statement = clickhouseRead({ scope: scopeOf(input.tenantId) })
+      .from(rollup)
+      .select({ TenantId: rollup.TenantId })
+      .where(({ and, eq, gte, lte }) =>
+        and(
+          gte(rollup.Day, input.fromDay),
+          lte(rollup.Day, input.toDay),
+          eq(rollup.CostSource, input.costSource),
+          eq(rollup.IngestionSourceId, input.ingestionSourceId),
+          eq(rollup.Version, GOVERNANCE_COST_ROLLUP_PROJECTION_VERSION_LATEST),
+        ),
+      )
+      .limit(1)
+      .build();
+    const rows = await this.rowsOf(input.tenantId, statement);
     return rows.length > 0;
   }
 
@@ -500,20 +604,24 @@ export class ClickHouseGovernanceCostRollupRepository extends GovernanceCostRoll
   }
 
   async findCellRows(cell: GovernanceCostRollupCellAddress): Promise<GovernanceCostRollupRow[]> {
-    const client = await this.resolveClient(cell.TenantId);
-    const result = await client.query<Record<string, unknown>>({
-      query: `
-        SELECT
-          ${KEY_COLUMNS.join(",\n          ")},
-          ${LATEST_PAYLOAD_COLUMNS.join(",\n          ")}
-        FROM ${TABLE}
-        WHERE ${CELL_PREDICATE}
-        GROUP BY ${KEY_COLUMNS.join(", ")}
-      `,
-      query_params: cellParams(cell),
-      format: "JSONEachRow",
-    });
-    return (await result.json()).map(decodeRow);
+    const statement = clickhouseRead({ scope: scopeOf(cell.TenantId) })
+      .from(rollup)
+      .select({ ...CELL_KEY, ...LATEST_PAYLOAD })
+      .where(({ and, eq }) =>
+        and(
+          eq(rollup.Day, cell.Day),
+          eq(rollup.CostSource, cell.CostSource),
+          eq(rollup.IngestionSourceId, cell.IngestionSourceId),
+          eq(rollup.Provider, cell.Provider),
+          eq(rollup.Model, cell.Model),
+          eq(rollup.AgentId, cell.AgentId),
+          eq(rollup.CurrencyCode, cell.CurrencyCode),
+          eq(rollup.RawActorId, cell.RawActorId),
+        ),
+      )
+      .groupBy(...CELL_KEY_COLUMNS)
+      .build();
+    return (await this.rowsOf(cell.TenantId, statement)).map(decodeRow);
   }
 
   async findCellsForDay(input: {
@@ -521,62 +629,53 @@ export class ClickHouseGovernanceCostRollupRepository extends GovernanceCostRoll
     day: string;
     costSource: string;
   }): Promise<GovernanceCostRollupRow[]> {
-    const client = await this.resolveClient(input.tenantId);
-    const result = await client.query<Record<string, unknown>>({
-      query: `
-        SELECT
-          ${KEY_COLUMNS.join(",\n          ")},
-          ${LATEST_PAYLOAD_COLUMNS.join(",\n          ")}
-        FROM ${TABLE}
-        WHERE TenantId = {tenantid:String}
-          AND Day = {day:String}
-          AND CostSource = {costsource:String}
-        GROUP BY ${KEY_COLUMNS.join(", ")}
-        ORDER BY CostSource, Provider, Model, RawActorId, CurrencyCode
-      `,
-      query_params: { tenantid: input.tenantId, day: input.day, costsource: input.costSource },
-      format: "JSONEachRow",
-    });
-    return (await result.json()).map(decodeRow);
+    const statement = clickhouseRead({ scope: scopeOf(input.tenantId) })
+      .from(rollup)
+      .select({ ...CELL_KEY, ...LATEST_PAYLOAD })
+      .where(({ and, eq }) =>
+        and(eq(rollup.Day, input.day), eq(rollup.CostSource, input.costSource)),
+      )
+      .groupBy(...CELL_KEY_COLUMNS)
+      .orderBy(rollup.CostSource)
+      .orderBy(rollup.Provider)
+      .orderBy(rollup.Model)
+      .orderBy(rollup.RawActorId)
+      .orderBy(rollup.CurrencyCode)
+      .build();
+    return (await this.rowsOf(input.tenantId, statement)).map(decodeRow);
   }
 
   async findLatestSummarizedOccurredAt(input: {
     tenantId: string;
     costSource: string;
   }): Promise<number | null> {
-    const client = await this.resolveClient(input.tenantId);
-    const result = await client.query<Record<string, unknown>>({
-      query: `
-        SELECT max(LastEventOccurredAt) AS LatestOccurredAt
-        FROM ${TABLE}
-        WHERE TenantId = {tenantid:String}
-          AND CostSource = {costsource:String}
-      `,
-      query_params: { tenantid: input.tenantId, costsource: input.costSource },
-      format: "JSONEachRow",
-    });
-    const latest = int((await result.json())[0]?.LatestOccurredAt);
-    return latest > 0 ? latest : null;
+    const statement = clickhouseRead({ scope: scopeOf(input.tenantId) })
+      .from(rollup)
+      .select({ LatestOccurredAt: fn.max(rollup.LastEventOccurredAt) })
+      .where(({ eq }) => eq(rollup.CostSource, input.costSource))
+      .build();
+    const latestOccurredAt = int(
+      (await this.rowsOf(input.tenantId, statement))[0]?.LatestOccurredAt,
+    );
+    return latestOccurredAt > 0 ? latestOccurredAt : null;
   }
 
   /** Main's index write: only keys the index has not recorded, keyed by tenant first. */
   private async recordRestatementKeys(row: GovernanceCostRollupRow): Promise<void> {
     const keys = restatementKeysOf(row.PulledItemsJson);
     if (keys.length === 0) return;
-    const client = await this.resolveClient(row.TenantId);
-    const result = await client.query<Record<string, unknown>>({
-      query: `
-        SELECT DISTINCT RestatementKey
-        FROM ${RESTATEMENT_INDEX_TABLE}
-        WHERE TenantId = {tenantid:String}
-          AND RestatementKey IN {keys:Array(String)}
-      `,
-      query_params: { tenantid: row.TenantId, keys },
-      format: "JSONEachRow",
-    });
-    const recorded = new Set((await result.json()).map((entry) => str(entry.RestatementKey)));
+    const statement = clickhouseRead({ scope: scopeOf(row.TenantId) })
+      .from(restatements)
+      .distinct()
+      .select({ RestatementKey: restatements.RestatementKey })
+      .where(({ oneOf }) => oneOf(restatements.RestatementKey, keys))
+      .build();
+    const recorded = new Set(
+      (await this.rowsOf(row.TenantId, statement)).map((entry) => str(entry.RestatementKey)),
+    );
     const unrecorded = keys.filter((key) => !recorded.has(key));
     if (unrecorded.length === 0) return;
+    const client = await this.resolveClient(row.TenantId);
     await client.insert({
       table: RESTATEMENT_INDEX_TABLE,
       values: unrecorded.map((key) => ({
@@ -597,16 +696,12 @@ export class ClickHouseGovernanceCostRollupRepository extends GovernanceCostRoll
     });
   }
 
-  private async read(
-    window: GovernanceCostRollupWindow,
-    statement: { query: string; params?: Record<string, unknown> },
-  ): Promise<Record<string, unknown>[]> {
-    const client = await this.resolveClient(window.tenantId);
-    const result = await client.query<Record<string, unknown>>({
-      query: statement.query,
-      query_params: { ...windowParams(window), ...statement.params },
-      format: "JSONEachRow",
-    });
-    return result.json();
+  private async rowsOf(
+    tenantId: string,
+    statement: ReaderReadStatement<Record<string, unknown>>,
+  ): Promise<Rows> {
+    const client = await this.resolveClient(tenantId);
+    const { rows } = await client.read({ statement });
+    return rows;
   }
 }

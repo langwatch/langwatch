@@ -11,6 +11,7 @@ import { createClient, type ClickHouseClient } from "@clickhouse/client";
 import {
   migrateTestClickHouseOnce,
   startTestClickHouseEndpoints,
+  vendorQueryClient,
 } from "@langwatch/clickhouse-client/testing";
 import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
 import {
@@ -32,6 +33,7 @@ import {
   type AzureDailyCost,
   azureCostEvents,
 } from "../../features/microsoft/rules/azure-cost-management.rules.ts";
+import { memberClickHouseResolver } from "../../repositories/clickhouse/clickhouse.governance-clickhouse.repositories.ts";
 import { ClickHouseGovernanceCostRollupRepository } from "../../repositories/clickhouse/clickhouse.governance-cost-rollup.repository.ts";
 
 const PERIOD = ["2026-01-13", "2026-01-14", "2026-01-15"] as const;
@@ -146,7 +148,9 @@ describe("given a read that recorded part of a period and then failed", () => {
       },
     });
     clickhouse = createClient({ url: endpoint.url });
-    repository = ClickHouseGovernanceCostRollupRepository.create(async () => clickhouse);
+    repository = ClickHouseGovernanceCostRollupRepository.create(
+      memberClickHouseResolver(vendorQueryClient({ vendor: clickhouse, indexes: [] })),
+    );
   }, 600_000);
 
   beforeEach(() => {
