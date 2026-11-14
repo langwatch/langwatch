@@ -2163,7 +2163,7 @@ clickhouse:
   # next release. Turn it on once clickhouse-serverless.image.tag is at that
   # release. A values-only change does not roll ClickHouse (see podAnnotations).
   appReader:
-    ## @param clickhouse.appReader.enabled [default: false] Provision the app reader on chart-managed ClickHouse and point the app and workers at it (CLICKHOUSE_READER_URL). Needs lwql.enabled, whose access-render Job delivers it, and a clickhouse-serverless image that declares the SQL_ settings prefix. The password is generated into a hook Secret; with secrets.existingSecret, or autogen off, that Secret carries CLICKHOUSE_READER_URL (and CLICKHOUSE_ENFORCING_READER_URL) itself.
+    ## @param clickhouse.appReader.enabled [default: false] Provision the app reader on chart-managed ClickHouse and point the app and workers at it (CLICKHOUSE_READER_URL). The access-render Job delivers it whether or not lwql.enabled is on. Needs a clickhouse-serverless image that declares the SQL_ settings prefix. The password is generated into a hook Secret; with secrets.existingSecret, or autogen off, that Secret carries CLICKHOUSE_READER_URL (and CLICKHOUSE_ENFORCING_READER_URL) itself.
     enabled: false
     ## @param clickhouse.appReader.enforce [default: false] Enforce each read's tenant set (CLICKHOUSE_TENANCY_ENFORCE). false keeps shadow: the policies exist and admit every row. Read wherever the reader is provisioned, chart-managed or not.
     enforce: false

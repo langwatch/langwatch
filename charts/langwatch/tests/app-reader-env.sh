@@ -4,6 +4,7 @@
 # is off by default this release, so an install that sets no reader value renders
 # exactly as before. Turned on, a hook Secret holds its password and URL before the
 # access-render Job runs, and the app, the workers and that Job read the URL from it.
+# The cross-tenant CLICKHOUSE_OPS_URL reaches the worker only (ADR-202 Decided 14).
 #
 # Usage (from charts/langwatch):
 #   helm dependency build .
@@ -131,11 +132,13 @@ test_enabled_wires_reader() {
     fail "on-url" "the Secret's CLICKHOUSE_READER_URL is not langwatch_app_reader's on the chart's ClickHouse service."
   fi
   if ! render_to "$out" "$err" --set autogen.enabled=true --set clickhouse.appReader.enabled=true --set lwql.enabled=false; then
-    grep -q "clickhouse.appReader.enabled=true needs lwql.enabled=true" "$err" ||
-      fail "on-no-lwql-reason" "the render with LangWatchQL off failed without naming lwql.enabled."
-  else
-    fail "on-no-lwql" "the reader rendered with lwql.enabled=false, whose render Job would not deliver it."
+    fail "on-no-lwql-render" "render with the reader on and LangWatchQL off failed: $(cat "$err")"
+    return
   fi
+  [[ "$(secret_ref_of "$out" "clickhouse/lwql-access-render.yaml" CLICKHOUSE_READER_URL)" == "t-clickhouse-app-reader/CLICKHOUSE_READER_URL" ]] ||
+    fail "on-no-lwql-ref" "with LangWatchQL off the render Job does not read CLICKHOUSE_READER_URL, so it cannot deliver the reader."
+  grep -qF 'if [ "${LWQL_ENABLED}" = "true" ] || [ -n "${CLICKHOUSE_READER_URL:-}" ]; then' "$out" ||
+    fail "on-no-lwql-run" "the render Job does not run the task when only the reader is on."
 }
 
 # @scenario "The chart provisions and wires the app reader when it is enabled"
@@ -178,10 +181,44 @@ test_existing_secret_carries_reader() {
     fail "existing-ref" "the app does not read CLICKHOUSE_READER_URL from secrets.existingSecret."
 }
 
+# The `value:` of every `- name: <var>` in one Source block, one per line.
+env_values_in() {
+  local render="$1" src="$2" var="$3"
+  awk -v want="$src" -v v="$var" '
+    /^# Source:/ { insrc = (index($0, want) > 0) }
+    insrc && $0 ~ "- name: " v "$" { getline; sub(/^[[:space:]]*value:[[:space:]]*/, ""); gsub(/"/, ""); print }
+  ' "$render"
+}
+
+# @scenario "The chart gives CLICKHOUSE_OPS_URL to the worker and never to the api"
+test_ops_url_reaches_the_worker_only() {
+  local out="${TMPDIR:-/tmp}/ops-url.yaml" err="${TMPDIR:-/tmp}/ops-url.err"
+  local ops=(--set 'app.extraEnvs[0].name=CLICKHOUSE_OPS_URL' --set-string 'app.extraEnvs[0].value=http://ops:pw@ch:8123/langwatch'
+    --set 'app.extraEnvs[1].name=APP_ONLY_FLAG' --set-string 'app.extraEnvs[1].value=kept')
+  if ! render_to "$out" "$err" --set autogen.enabled=true "${ops[@]}"; then
+    fail "ops-render" "render with CLICKHOUSE_OPS_URL in app.extraEnvs failed: $(cat "$err")"
+    return
+  fi
+  [[ -z "$(env_values_in "$out" "app/deployment.yaml" CLICKHOUSE_OPS_URL)" ]] ||
+    fail "ops-api" "the api container carries CLICKHOUSE_OPS_URL, a credential that reads every tenant."
+  [[ "$(env_values_in "$out" "app/deployment.yaml" APP_ONLY_FLAG)" == "kept" ]] ||
+    fail "ops-api-others" "dropping CLICKHOUSE_OPS_URL also dropped the api container's other extraEnvs."
+  [[ "$(env_values_in "$out" "workers/deployment.yaml" CLICKHOUSE_OPS_URL)" == "http://ops:pw@ch:8123/langwatch" ]] ||
+    fail "ops-workers" "the workers container lost CLICKHOUSE_OPS_URL, so Ops EXPLAIN has no credential."
+  if ! render_to "$out" "$err" --set autogen.enabled=true --set workers.enabled=false "${ops[@]}"; then
+    fail "ops-sidecar-render" "render with workers.enabled=false failed: $(cat "$err")"
+    return
+  fi
+  # One app pod, two containers: only the worker sidecar's copy may remain.
+  [[ "$(env_values_in "$out" "app/deployment.yaml" CLICKHOUSE_OPS_URL | wc -l | tr -d ' ')" == "1" ]] ||
+    fail "ops-sidecar" "with workers.enabled=false the app pod must carry CLICKHOUSE_OPS_URL once, on the worker sidecar."
+}
+
 test_default_renders_as_before
 test_enabled_wires_reader
 test_sampling_and_enforce
 test_existing_secret_carries_reader
+test_ops_url_reaches_the_worker_only
 
 if [[ $failures -gt 0 ]]; then
   echo
@@ -189,4 +226,4 @@ if [[ $failures -gt 0 ]]; then
   exit 1
 fi
 
-echo "PASS: the app reader is off by default and renders as before; enabled, a pre-install/pre-upgrade hook Secret holds its URL for the app, the workers and the render Job; sampling adds the enforcing URL and rate; enforce sets CLICKHOUSE_TENANCY_ENFORCE; an operator Secret is read instead of generated"
+echo "PASS: the app reader is off by default and renders as before; enabled, a pre-install/pre-upgrade hook Secret holds its URL for the app, the workers and the render Job; sampling adds the enforcing URL and rate; enforce sets CLICKHOUSE_TENANCY_ENFORCE; an operator Secret is read instead of generated; LangWatchQL off still delivers the reader; CLICKHOUSE_OPS_URL reaches the worker only"

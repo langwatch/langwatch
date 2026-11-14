@@ -463,9 +463,6 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   {{- if and (not .Values.autogen.enabled) (eq $chSecretName $chDefaultName) }}
     {{- $errors = append $errors (printf "clickhouse.chartManaged=true with autogen.enabled=false requires clickhouse.auth.existingSecret to be set to an operator-owned Secret name different from the default %q. The deployment composes CLICKHOUSE_URL at runtime from the password key when a custom name is used; with the default name the deployment expects the chart-rendered url key, which is gated off when autogen.enabled=false. Either set autogen.enabled=true OR override clickhouse.auth.existingSecret." $chDefaultName) }}
   {{- end }}
-  {{- if and ($chValues.appReader).enabled (not .Values.lwql.enabled) }}
-    {{- $errors = append $errors "clickhouse.appReader.enabled=true needs lwql.enabled=true on chart-managed ClickHouse: the access-render Job delivers the app reader with the LangWatchQL access model" }}
-  {{- end }}
   {{- if or $chValues.cold.enabled $chValues.backup.enabled }}
     {{- if empty $chValues.objectStorage.bucket }}
       {{- $errors = append $errors "clickhouse.objectStorage.bucket is required when cold.enabled or backup.enabled" }}

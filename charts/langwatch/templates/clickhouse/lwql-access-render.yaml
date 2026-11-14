@@ -313,11 +313,6 @@ spec:{{ $jobSpec }}
               mkdir -p /render/users.d /render/config.d
 
               if [ "${LWQL_ENABLED}" = "true" ] && { [ -z "${LWQL_CLICKHOUSE_PASSWORD:-}" ] || [ -z "${LWQL_POSTGRES_READER_PASSWORD:-}" ]; }; then
-                if [ -n "${CLICKHOUSE_READER_URL:-}" ]; then
-                  # The app reader rides on this render; without it every reader read fails to log in.
-                  echo "lwql-access-render: the app reader is on but LangWatchQL is off: Secret ${LWQL_PASSWORD_SECRET} has no ${LWQL_CLICKHOUSE_PASSWORD_KEY} or ${LWQL_POSTGRES_READER_PASSWORD_KEY} key. Add both keys, or set clickhouse.appReader.enabled=false." >&2
-                  exit 1
-                fi
                 # The passwords are optional keys of the operator's Secret. A
                 # missing one turns LangWatchQL off rather than failing the Job,
                 # which would leave every ClickHouse pod waiting on this Secret.
@@ -325,10 +320,11 @@ spec:{{ $jobSpec }}
                 LWQL_ENABLED=false
               fi
 
-              if [ "${LWQL_ENABLED}" = "true" ]; then
+              if [ "${LWQL_ENABLED}" = "true" ] || [ -n "${CLICKHOUSE_READER_URL:-}" ]; then
                 # Render the two files from the same env the app reads for LWQL.
                 # The renderer is offline (no ClickHouse connection), so it is
-                # safe to run before the ClickHouse StatefulSet exists.
+                # safe to run before the ClickHouse StatefulSet exists. With
+                # LangWatchQL off it writes the app reader alone (ADR-202 Decided 6).
                 cd /app/apps/tasks
                 LWQL_RENDER_OUT_DIR=/render pnpm run task lwql-render-access-config
               else

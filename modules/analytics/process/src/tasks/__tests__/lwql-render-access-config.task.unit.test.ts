@@ -214,6 +214,54 @@ describe("renderLwqlAccessConfig", () => {
     });
   });
 
+  describe("when LangWatchQL is off and the app reader is configured", () => {
+    const READER_SECRET = "app-reader-secret-value";
+    const READER_ONLY = {
+      CLICKHOUSE_URL: "http://admin:adminpass@clickhouse:8123/langwatch",
+      CLICKHOUSE_READER_URL: `http://langwatch_app_reader:${READER_SECRET}@clickhouse:8123/langwatch`,
+    };
+
+    /** @scenario "The rendered access config carries the app reader while LangWatchQL is off" */
+    it("writes the readers alone to users.d and an empty config.d", async () => {
+      const result = await writeLwqlAccessConfig({ outDir, source: READER_ONLY });
+
+      expect(result.files.map((file) => file.relativePath)).toEqual([
+        "users.d/lwql-access.yaml",
+        "config.d/lwql-named-collection.yaml",
+      ]);
+      const usersD = await readFile(join(outDir, "users.d", "lwql-access.yaml"), "utf8");
+      expect(usersD).toContain("langwatch_app_reader:");
+      expect(usersD).toContain(createHash("sha256").update(READER_SECRET).digest("hex"));
+      expect(usersD).not.toContain(READER_SECRET);
+      expect(usersD).not.toContain("langwatch_lwql");
+      expect(await readFile(join(outDir, "config.d", "lwql-named-collection.yaml"), "utf8")).toBe(
+        "{}\n",
+      );
+    });
+
+    /** @scenario "The rendered access config carries the app reader while LangWatchQL is off" */
+    it("renders the readers alone while a LangWatchQL password is missing", async () => {
+      await writeLwqlAccessConfig({
+        outDir,
+        source: { ...READER_ONLY, LWQL_CLICKHOUSE_PASSWORD: CLICKHOUSE_PASSWORD },
+      });
+
+      const usersD = await readFile(join(outDir, "users.d", "lwql-access.yaml"), "utf8");
+      expect(usersD).toContain("langwatch_app_reader:");
+      expect(usersD).not.toContain(createHash("sha256").update(CLICKHOUSE_PASSWORD).digest("hex"));
+    });
+
+    /** @scenario "The rendered access config refuses an unreadable enforce switch by name" */
+    it("still refuses an unreadable enforce switch, writing no file", async () => {
+      const env = { ...READER_ONLY, CLICKHOUSE_TENANCY_ENFORCE: "maybe" };
+
+      await expect(writeLwqlAccessConfig({ outDir, source: env })).rejects.toThrow(
+        /CLICKHOUSE_TENANCY_ENFORCE/,
+      );
+      expect(await readdir(outDir)).toEqual([]);
+    });
+  });
+
   describe("when it reports what it wrote", () => {
     /** @scenario "renderLwqlAccessConfig never prints file contents or secrets" */
     it("returns the relative paths and the secret length, not the secret", async () => {

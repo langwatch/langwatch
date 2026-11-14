@@ -281,6 +281,12 @@ jobs:
         if: "!cancelled()"
         run: ./tests/workers-extra-envs.sh
 
+      # The app reader is off by default and renders as before; on, a hook Secret holds
+      # its URL before the render Job runs. CLICKHOUSE_OPS_URL reaches the worker only.
+      - name: "assert the app reader wiring and the worker-only ops URL"
+        if: "!cancelled()"
+        run: ./tests/app-reader-env.sh
+
       - name: "assert ClickHouse pool sizing follows fleet capacity"
         if: "!cancelled()"
         run: ./tests/clickhouse-pool-sizing.sh

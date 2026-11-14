@@ -8,6 +8,7 @@ import { createHash } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
+import { parseConnectionUrl } from "@langwatch/clickhouse-migrations";
 import { createLogger } from "@langwatch/observability";
 import { Task } from "@langwatch/task";
 
@@ -23,6 +24,7 @@ import {
   type RenderedConfigFile,
 } from "../services/langwatch-ql-access-model-definition.service.ts";
 import {
+  type AppReaderTarget,
   appReaderInputOf,
   planAppReaderWalk,
   SHARED_APP_READER_TARGET,
@@ -33,6 +35,11 @@ const accessModelDefinition = LangWatchQLAccessModelDefinitionService.create();
 const production = LangWatchQLProductionProvisioningService.create();
 const selfProvisioning = LangWatchQLSelfProvisioningService.create();
 const collectionBinding = LangWatchQLCollectionBindingService.create();
+
+// The paths renderUsersConfig writes and the chart mounts; restated until the definition
+// exports them.
+const USERS_D_RELATIVE_PATH = "users.d/lwql-access.yaml";
+const CONFIG_D_RELATIVE_PATH = "config.d/lwql-named-collection.yaml";
 
 /** The definition the app would converge, from the same environment the app reads. */
 export function lwqlAccessModelDefinitionFromSource(
@@ -71,13 +78,55 @@ export function lwqlAccessModelDefinitionFromSource(
 export function appReaderFromSource(source: Record<string, string | undefined>): {
   appReader?: ReturnType<typeof appReaderInputOf>;
 } {
+  const [shared] = findSharedAppReaders(source);
+  return shared ? { appReader: appReaderInputOf(shared) } : {};
+}
+
+/** The shared server's entry in the upgrade walk: none until a reader URL is set. */
+function findSharedAppReaders(source: Record<string, string | undefined>): AppReaderTarget[] {
   const walk = planAppReaderWalk({ source });
   const refused = walk.unprovisioned.find(({ target }) => target === SHARED_APP_READER_TARGET);
   if (refused) {
     throw new Error(`lwql-render-access-config: the app reader needs a valid ${refused.variable}`);
   }
-  const shared = walk.targets.find(({ target }) => target === SHARED_APP_READER_TARGET);
-  return shared ? { appReader: appReaderInputOf(shared) } : {};
+  return walk.targets.filter(({ target }) => target === SHARED_APP_READER_TARGET);
+}
+
+/**
+ * The two files a config store merges. While LangWatchQL is off they hold the readers alone and an
+ * empty config.d, so a reader never waits on LangWatchQL's passwords (ADR-202 Decided 6).
+ */
+export function lwqlAccessConfigFilesFromSource(source: Record<string, string | undefined>): {
+  files: RenderedConfigFile[];
+  secretLength: number;
+} {
+  const request = selfProvisioning.request({ source });
+  const [reader] = request.requested && request.complete ? [] : findSharedAppReaders(source);
+  if (!reader) {
+    const definition = lwqlAccessModelDefinitionFromSource(source);
+    return {
+      files: accessModelDefinition.renderUsersConfig(definition),
+      secretLength: definition.user.passwordSha256Hex.length,
+    };
+  }
+  if (request.requested && !request.complete) {
+    logger.warn({ missing: request.missing }, "LangWatchQL is off; rendering the app reader alone");
+  }
+  const appReader = appReaderInputOf(reader);
+  const { database } = parseConnectionUrl({ connectionUrl: reader.adminUrl });
+  return {
+    files: [
+      {
+        relativePath: USERS_D_RELATIVE_PATH,
+        contents: accessModelDefinition.renderAppReaderUsersD({
+          sourceDatabase: database,
+          appReader,
+        }),
+      },
+      { relativePath: CONFIG_D_RELATIVE_PATH, contents: "{}\n" },
+    ],
+    secretLength: appReader.passwordSha256Hex.length,
+  };
 }
 
 /** Writes both files under `outDir`, owner-read-only: they carry the reader password. */
@@ -88,14 +137,13 @@ export async function writeLwqlAccessConfig({
   outDir: string;
   source: Record<string, string | undefined>;
 }): Promise<{ files: RenderedConfigFile[]; secretLength: number }> {
-  const definition = lwqlAccessModelDefinitionFromSource(source);
-  const files = accessModelDefinition.renderUsersConfig(definition);
+  const { files, secretLength } = lwqlAccessConfigFilesFromSource(source);
   for (const file of files) {
     const absolute = join(outDir, file.relativePath);
     await mkdir(dirname(absolute), { recursive: true });
     await writeFile(absolute, file.contents, { mode: 0o600 });
   }
-  return { files, secretLength: definition.user.passwordSha256Hex.length };
+  return { files, secretLength };
 }
 
 /** The task-launcher entry; the output directory is `LWQL_RENDER_OUT_DIR`. */

@@ -318,3 +318,21 @@ Feature: The ClickHouse client sends reads as the app reader and everything else
     When the reader reads system.columns, system.replicas and system.server_settings with no tenant setting
     Then each answers
     And system.query_log, system.processes and system.mutations are refused as access denied
+
+  # The readers without LangWatchQL (ADR-202 Decided 6): the render Job delivers them on their own.
+
+  @unit
+  Scenario: The rendered access config carries the app reader while LangWatchQL is off
+    Given "CLICKHOUSE_READER_URL" set and no LangWatchQL password
+    When "lwql-render-access-config" renders
+    Then users.d carries "langwatch_app_reader" and no LangWatchQL user
+    And config.d is an empty document
+
+  # The cross-tenant ops credential (ADR-202 Decided 14): Ops reads run in the worker, so only it holds the URL.
+
+  @integration
+  Scenario: The chart gives CLICKHOUSE_OPS_URL to the worker and never to the api
+    Given "CLICKHOUSE_OPS_URL" set in "app.extraEnvs"
+    When the chart renders
+    Then the workers container carries it, and so does the worker sidecar with "workers.enabled" off
+    And the api container does not, while keeping its other extraEnvs
