@@ -25,6 +25,14 @@ function unhandledLevel(error: unknown): "warn" | "error" {
   return isUpgradeInProgress(error) ? "warn" : "error";
 }
 
+/** The ids a saved version is recorded with. */
+export type PromptVersionSavedInput = {
+  projectId: string;
+  promptId: string;
+  versionId: string;
+  authorId?: string | null;
+};
+
 /**
  * A prompt as the `/api/prompts` REST family reads and writes it, tags included:
  * its refusals keep the statuses that family has always answered with.
@@ -33,19 +41,23 @@ export class PromptLibraryService {
   static create(options: {
     prompts: PromptService;
     afterPromptCreated: (input: { projectId: string; promptId: string }) => void;
+    afterPromptVersionSaved: (input: PromptVersionSavedInput) => void;
   }): PromptLibraryService {
     return new PromptLibraryService(options);
   }
 
   readonly #prompts: PromptService;
   readonly #afterPromptCreated: (input: { projectId: string; promptId: string }) => void;
+  readonly #afterPromptVersionSaved: (input: PromptVersionSavedInput) => void;
 
   private constructor(options: {
     prompts: PromptService;
     afterPromptCreated: (input: { projectId: string; promptId: string }) => void;
+    afterPromptVersionSaved: (input: PromptVersionSavedInput) => void;
   }) {
     this.#prompts = options.prompts;
     this.#afterPromptCreated = options.afterPromptCreated;
+    this.#afterPromptVersionSaved = options.afterPromptVersionSaved;
   }
 
   async getByAddress(input: {
@@ -140,6 +152,12 @@ export class PromptLibraryService {
       const updated = await this.#prompts.updatePrompt(command);
 
       if (!updated) throw new PromptNotFoundError(`Prompt not found: ${id}`);
+      this.#afterPromptVersionSaved({
+        projectId,
+        promptId: updated.id,
+        versionId: updated.versionId,
+        authorId: updated.authorId,
+      });
 
       const answered = await this.#assignInitialTags({
         prompt: updated,
@@ -180,6 +198,13 @@ export class PromptLibraryService {
 
       if (syncResult.action === "created" && syncResult.prompt) {
         this.#afterPromptCreated({ projectId, promptId: syncResult.prompt.id });
+      } else if (syncResult.action === "updated" && syncResult.prompt) {
+        this.#afterPromptVersionSaved({
+          projectId,
+          promptId: syncResult.prompt.id,
+          versionId: syncResult.prompt.versionId,
+          authorId: syncResult.prompt.authorId,
+        });
       }
 
       return syncResult;

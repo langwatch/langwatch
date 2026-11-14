@@ -29,7 +29,7 @@ Personal workspaces contain one personal team and project, listed under **My Wor
   <img src="/images/access/directory-dark.png" alt="The Directory People tab with organization members and their seat roles" className="hidden dark:block" />
 </Frame>
 
-**Settings > Directory > People** lists every member with their organization role and their access. Opening the page needs `organization:manage`.
+**Settings > Users > People** lists every member with their organization role and their access. Every member can open it read-only (`members:view`); changing anyone needs `organization:manage`.
 
 Each row shows the name, the email, a **Lite Member** or **Developer** badge when the member is on one of those seats, a **Disabled** badge when access is switched off, and the **Access** column: one badge per role binding, as `role on scope`, with `via <group>` when the binding comes from a group.
 
@@ -64,7 +64,7 @@ provider:
 | Option | Behavior |
 |--------|----------|
 | **Invite only** | Only people with an invitation can join |
-| **Approval required** | Someone with a verified company address can ask to join. You approve or reject the request in **Settings > Directory > People** |
+| **Approval required** | Someone with a verified company address can ask to join. You approve or reject the request in **Settings > Users > People** |
 | **Automatic joining** | Someone on a domain you verified joins without approval and receives the seat chosen below |
 
 Under the door setting, **Seat for people who join** decides what a person admitted without an invitation lands on: **Member** (the default, a full seat that can be added to shared teams and projects) or **Developer** (a project of their own, with access to no shared team or project). The same choice applies to people your identity provider admits. Invitations always name their own seat and ignore this setting.
@@ -98,7 +98,7 @@ The CLI honours the seat too: `langwatch login` offers a Developer their persona
   <img src="/images/access/teams-dark.png" alt="Teams and projects with direct and inherited access" className="hidden dark:block" />
 </Frame>
 
-**Settings > Directory > Teams & projects** shows every team with its projects and members. Click **New team** to create one; you are added as its Admin. The team card shows the members with their team role, which you can change in place, and an **X** to remove the member from the team. Members that come from a group are read only and show `via <group>`.
+**Settings > Users > Teams & projects** shows every team with its projects and members. Click **New team** to create one; you are added as its Admin. The team card shows the members with their team role, which you can change in place, and an **X** to remove the member from the team. Members that come from a group are read only and show `via <group>`.
 
 **Add to team** adds an organization member with a role on this team, and so on every project in it. Under each project, **Add person to this project** gives a role on that project only. For someone already on the team, the page marks the row **override** and shows their team role next to it; the project role adds to the team role, it does not take permissions away. Remove the project role to leave only the team role.
 
@@ -108,10 +108,10 @@ Click **Edit** on a team to open its page: rename it (the slug is read only), ed
 
 | Action | Where | Effect |
 |--------|-------|--------|
-| Remove from a team | Settings > Directory > Teams, the **X** on the member row, or the member dialog | The person loses the role on that team and its projects. Project overrides stay until removed |
-| Remove a group member | Settings > Directory > Groups | The person loses every binding that came from the group |
-| Disable | Settings > Directory > People, row menu | Every request from the person is refused until you enable them again. Their role and bindings stay, and their seat is freed. Enabling them again takes a seat |
-| Delete | Settings > Directory > People, row menu | The membership and its bindings are removed. Not available for yourself; removing the last active administrator is refused |
+| Remove from a team | Settings > Users > Teams, the **X** on the member row, or the member dialog | The person loses the role on that team and its projects. Project overrides stay until removed |
+| Remove a group member | Settings > Users > Groups | The person loses every binding that came from the group |
+| Disable | Settings > Users > People, row menu | Every request from the person is refused until you enable them again. Their role and bindings stay, and their seat is freed. Enabling them again takes a seat |
+| Delete | Settings > Users > People, row menu | The membership and its bindings are removed. Not available for yourself; removing the last active administrator is refused |
 
 Deleting a member does not delete the traces, prompts or other work they created.
 

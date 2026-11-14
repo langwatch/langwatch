@@ -1,3 +1,4 @@
+import { INGESTION_SOURCE_LIVE_STATUSES } from "@langwatch/enterprise-governance-contract";
 import type {
   ProjectionStoreContext,
   StoredProjection,
@@ -141,24 +142,35 @@ export class PrismaIngestionPullRunProjectionRepository extends IngestionPullRun
         },
         update: data,
       });
-      const mirror = buildIngestionSourceMirror({ state: projection.state });
-      await tx.ingestionSource.updateMany({
-        // `IngestionSource` is organization-scoped and carries no projectId,
-        // so the tenant predicate has to travel through the org that owns
-        // this pipeline's governance project. Keyed on the source id alone,
-        // a projection carrying another org's source id wrote that org's
-        // cursor, error count and status.
-        where: {
-          id: sourceId,
-          organization: {
-            teams: { some: { projects: { some: { id: projectId } } } },
-          },
+      const { status, ...columns } = buildIngestionSourceMirror({ state: projection.state });
+      // `IngestionSource` is organization-scoped and carries no projectId,
+      // so the tenant predicate has to travel through the org that owns
+      // this pipeline's governance project. Keyed on the source id alone,
+      // a projection carrying another org's source id wrote that org's
+      // cursor, error count and status.
+      const ownSource = {
+        id: sourceId,
+        organization: {
+          teams: { some: { projects: { some: { id: projectId } } } },
         },
+      };
+      await tx.ingestionSource.updateMany({
+        where: ownSource,
         data: {
-          ...mirror,
-          pollerCursor: mirror.pollerCursor === null ? Prisma.JsonNull : mirror.pollerCursor,
+          ...columns,
+          pollerCursor: columns.pollerCursor === null ? Prisma.JsonNull : columns.pollerCursor,
         },
       });
+      // The status goes in its own conditional write, the way the push
+      // door's stamp does: a source disabled while this run's completion was
+      // queued must not come back active (GOV-01). The run's outcome above
+      // still lands, because it happened.
+      if (status !== undefined) {
+        await tx.ingestionSource.updateMany({
+          where: { ...ownSource, status: { in: [...INGESTION_SOURCE_LIVE_STATUSES] } },
+          data: { status },
+        });
+      }
     });
   }
 }

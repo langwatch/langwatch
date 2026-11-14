@@ -100,6 +100,20 @@ Feature: Stored Objects service and API
     And repeating deletion is safe
 
   @unit
+  Scenario: Probing an object or minting its read URL opens none of its bytes
+    Given an available stored object
+    When a viewer probes it, or a peer asks for its read URL for a purpose
+    Then storage is asked at most whether the bytes exist
+    And no byte stream is opened, so no storage connection is held
+
+  @unit
+  Scenario: A byte read hands over storage's own stream
+    Given an available stored object whose bytes storage streams
+    When a reader reads it by id
+    Then the reader gets storage's own stream, not a wrapper around it
+    And stopping that stream early frees the storage connection behind it
+
+  @unit
   Scenario: The storage checkup probe writes and removes one canary object
     Given a project whose storage destination accepts writes
     When the storage checkup probe runs for it

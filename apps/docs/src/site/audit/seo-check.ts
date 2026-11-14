@@ -294,6 +294,24 @@ export function knownIssuesOf({ issues }: { issues: SeoIssue[] }) {
   );
 }
 
+/** Pages llms.txt reaches: those it links, and those in a section file it links (`> Page:`). */
+function llmsListed({ outDir }: { outDir: string }) {
+  const llmsFile = path.join(outDir, "llms.txt");
+  if (!existsSync(llmsFile)) return new Set<string>();
+  const links = [...readFileSync(llmsFile, "utf8").matchAll(/\]\((https?:\/\/[^)\s]+)\)/g)].flatMap(
+    (match) => (match[1] === undefined ? [] : [match[1]]),
+  );
+  const listed = new Set(links);
+  for (const link of links) {
+    if (!link.startsWith(`${DOCS_URL}/llms-full/`) || !link.endsWith(".txt")) continue;
+    const file = path.join(outDir, link.slice(DOCS_URL.length));
+    if (!existsSync(file)) continue;
+    for (const match of readFileSync(file, "utf8").matchAll(/^> Page: (\S+)$/gm))
+      if (match[1]) listed.add(match[1]);
+  }
+  return listed;
+}
+
 /**
  * Static search and agent-readiness checks over every sitemap page; no browser, no server.
  * `exports` are the Markdown export paths the pages link, for a served Content-Type check.
@@ -307,14 +325,7 @@ export function checkSeo({
   basePath: string;
   seo: SeoBudgets;
 }) {
-  const llmsFile = path.join(outDir, "llms.txt");
-  const llms = new Set(
-    existsSync(llmsFile)
-      ? [...readFileSync(llmsFile, "utf8").matchAll(/\]\((https?:\/\/[^)\s]+)\)/g)].flatMap((m) =>
-          m[1] === undefined ? [] : [m[1]],
-        )
-      : [],
-  );
+  const llms = llmsListed({ outDir });
   const pages = sitemapPages({ outDir });
   const issues: SeoIssue[] = [...checkRobots({ outDir }), ...checkNotFound({ outDir })];
   if (llms.size === 0)

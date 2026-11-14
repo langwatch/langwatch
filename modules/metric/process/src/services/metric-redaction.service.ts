@@ -9,6 +9,8 @@ export interface MetricRedaction {
       attributes: Record<string, string>;
       resourceAttributes: Record<string, string>;
       attributeNames?: Record<string, string>;
+      /** The point's own key, which the PII redaction model's priced request is derived from. */
+      recordKey?: string;
     },
     level: MetricPiiRedactionLevel,
     tenantId?: string,
@@ -88,6 +90,7 @@ export class MetricRedactionService {
     exemplarAttributes: unknown;
     piiRedactionLevel: MetricPiiRedactionLevel;
     tenantId: string;
+    recordKey?: string | undefined;
   }): Promise<void> {
     const refs: StringRef[] = [];
     collectStringRefs({
@@ -122,7 +125,12 @@ export class MetricRedactionService {
       ),
     );
     await this.redaction.redactMetricAttributes(
-      { attributes, resourceAttributes: {}, attributeNames },
+      {
+        attributes,
+        resourceAttributes: {},
+        attributeNames,
+        ...(args.recordKey === undefined ? {} : { recordKey: args.recordKey }),
+      },
       args.piiRedactionLevel,
       args.tenantId,
     );

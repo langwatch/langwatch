@@ -236,6 +236,14 @@ Feature: Guided onboarding variant
     Then each guard is a permission the platform delegates to a Langy session key
 
   @unit
+  Scenario: completing a path asks a write permission, so a read-only key cannot
+    Given a key that holds only the project's read permissions, such as a read-only docs session key
+    When it reads the guided state
+    Then the state is answered
+    When it completes a path
+    Then it is refused with status 403 and nothing is written
+
+  @unit
   Scenario: the CLI prints the guided state as JSON
     When "langwatch onboarding state" runs
     Then it resolves credentials first and prints the state the platform answered

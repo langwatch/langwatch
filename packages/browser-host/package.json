@@ -142,6 +142,10 @@
       "types": "./dist/copy-button.d.ts",
       "default": "./src/copy-button.tsx"
     },
+    "./enterprise-lock": {
+      "types": "./dist/enterprise-lock.d.ts",
+      "default": "./src/enterprise-lock.tsx"
+    },
     "./drawer": {
       "types": "./dist/drawer/index.d.ts",
       "default": "./src/drawer/index.ts"

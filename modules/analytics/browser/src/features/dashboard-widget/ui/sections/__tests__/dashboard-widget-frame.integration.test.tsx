@@ -301,23 +301,22 @@ describe("given a widget on a board", () => {
   });
 
   describe("when its query fails on a limit", () => {
-    const BUILT_IN_WORDS =
-      "This widget hit a LangWatch limit in the selected period. This is not a problem with your data.";
+    const NOT_YOUR_DATA = "This is not a problem with your data.";
 
     /** @scenario "A built-in widget that fails on a limit says the limit is LangWatch's" */
-    it.each([OUT_OF_MEMORY, TIMED_OUT])(
-      "tells a built-in card the limit is LangWatch's, for $code",
-      async (error) => {
-        const run = frameRuns(() => Promise.reject(error));
-        render(boardWidget({ limitAudience: { kind: "built_in" } }));
-        await run();
+    it.each([
+      [OUT_OF_MEMORY, `This widget hit a LangWatch limit in the selected period. ${NOT_YOUR_DATA}`],
+      [TIMED_OUT, `This query took longer than 60 s, the most a widget may take. ${NOT_YOUR_DATA}`],
+    ])("tells a built-in card the limit is LangWatch's, for %#", async (error, words) => {
+      const run = frameRuns(() => Promise.reject(error));
+      render(boardWidget({ limitAudience: { kind: "built_in" } }));
+      await run();
 
-        expect(screen.getByText("Couldn't load")).toBeTruthy();
-        expect(screen.getByText(BUILT_IN_WORDS)).toBeTruthy();
-        expect(screen.getByRole("button", { name: "Retry" })).toBeTruthy();
-        expect(screen.queryByRole("button", { name: "Edit code" })).toBeNull();
-      },
-    );
+      expect(screen.getByText("Couldn't load")).toBeTruthy();
+      expect(screen.getByText(words)).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Retry" })).toBeTruthy();
+      expect(screen.queryByRole("button", { name: "Edit code" })).toBeNull();
+    });
 
     /** @scenario "An editable widget that fails on memory says its query used too much" */
     it("tells an editable card its query used too much memory and offers the edits", async () => {
@@ -336,12 +335,14 @@ describe("given a widget on a board", () => {
     });
 
     /** @scenario "An editable widget that fails on time says its query ran too long" */
-    it("tells an editable card its query ran past the time a widget may take", async () => {
+    it("tells an editable card its query took longer than the 60 s a widget may take", async () => {
       const run = frameRuns(() => Promise.reject(TIMED_OUT));
       render(boardWidget({ limitAudience: { kind: "editable", onEditCode: vi.fn() } }));
       await run();
 
-      expect(screen.getByText("The query ran past the time a widget may take.")).toBeTruthy();
+      expect(
+        screen.getByText("This query took longer than 60 s, the most a widget may take."),
+      ).toBeTruthy();
     });
 
     /** @scenario "A reader who cannot edit is told to ask someone who can" */
@@ -360,7 +361,11 @@ describe("given a widget on a board", () => {
     /** @scenario "A failed limit card carries short words beside the full words" */
     it.each([
       [OUT_OF_MEMORY, "The query used more memory than a widget may use.", "Hit the memory limit."],
-      [TIMED_OUT, "The query ran past the time a widget may take.", "Hit the time limit."],
+      [
+        TIMED_OUT,
+        "This query took longer than 60 s, the most a widget may take.",
+        "Took longer than 60 s.",
+      ],
     ])("holds hidden short words beside the full ones for %#", async (error, full, short) => {
       const run = frameRuns(() => Promise.reject(error));
       render(boardWidget({ limitAudience: { kind: "editable" } }));
@@ -599,21 +604,21 @@ describe("given a widget on a board whose queries are running", () => {
     });
 
     /** @scenario "A widget that loads for long says it is still loading" */
-    it("says it is still loading", () => {
+    it("says it is a slow query, still running", () => {
       vi.useFakeTimers();
       frameRuns(() => new Promise(() => undefined));
       render(boardWidget({}));
-      expect(screen.queryByText("Still loading…")).toBeNull();
+      expect(screen.queryByText("Slow query, still running…")).toBeNull();
 
       act(() => {
         vi.advanceTimersByTime(4_999);
       });
-      expect(screen.queryByText("Still loading…")).toBeNull();
+      expect(screen.queryByText("Slow query, still running…")).toBeNull();
       act(() => {
         vi.advanceTimersByTime(1);
       });
 
-      expect(screen.getByText("Still loading…")).toBeTruthy();
+      expect(screen.getByText("Slow query, still running…")).toBeTruthy();
     });
   });
 

@@ -36,6 +36,8 @@ export type StubNavigationReadings = {
   organizationRole?: string;
   rememberedProjectSlug?: string;
   permissions?: readonly string[];
+  /** Held across the organization on top of `permissions`, as the session's own read adds them. */
+  organizationPermissions?: readonly string[];
   flags?: Readonly<Record<string, NavigationFlagReading>>;
   waiting?: ReactNode;
   notFound?: ReactNode;
@@ -143,6 +145,13 @@ export class StubNavigationHost extends NavigationHost {
 
   hasPermission(permission: string): boolean {
     return (this.readings.permissions ?? []).includes(permission);
+  }
+
+  hasOrganizationPermission(permission: string): boolean {
+    return (
+      this.hasPermission(permission) ||
+      (this.readings.organizationPermissions ?? []).includes(permission)
+    );
   }
 
   featureFlag(flag: ReleaseFlagToken): NavigationFlagReading {

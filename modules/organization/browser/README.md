@@ -4,7 +4,7 @@ The browser half of [organization](../README.md). What a browser installs when i
 
 <!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
 
-Declared in `src/organization.web.ts:24` (`defineBrowserModule("organization")`), exported as `organizationWeb` at `./declaration`.
+Declared in `src/organization.web.ts:25` (`defineBrowserModule("organization")`), exported as `organizationWeb` at `./declaration`.
 
 Installed by ui, from the app's generated module list (`pnpm generate:modules`).
 
@@ -13,7 +13,7 @@ Installed by ui, from the app's generated module list (`pnpm generate:modules`).
 | Page key                        | URL                        | Within   | Label          | Permission      | Flags |
 | ------------------------------- | -------------------------- | -------- | -------------- | --------------- | ----- |
 | `pages/settings/audit-log`      | `/settings/audit-log`      | settings | Audit Log      | `auditLog:view` | –     |
-| `pages/settings/directory`      | `/settings/directory`      | settings | Directory      | –               | –     |
+| `pages/settings/directory`      | `/settings/directory`      | settings | Users          | –               | –     |
 | `pages/settings/authentication` | `/settings/authentication` | settings | Authentication | `sso:view`      | –     |
 | `pages/settings/teams/[team]`   | `/settings/teams/:team`    | settings | –              | `team:view`     | –     |
 
@@ -25,7 +25,7 @@ A URL marked (route table) is joined from `apps/ui/src/shell/ui-route-table.ts`;
 | --------------- | ------------------------------------------- | ------------------- |
 | `createProject` | `src/ui/sections/create-project-drawer.tsx` | api-key, navigation |
 | `editProject`   | `src/ui/sections/edit-project-drawer.tsx`   | –                   |
-| `createTeam`    | `src/ui/sections/create-team-drawer.tsx`    | –                   |
+| `createTeam`    | `src/ui/sections/create-team-drawer.tsx`    | navigation          |
 | `inviteMember`  | `src/ui/sections/invite-member-drawer.tsx`  | navigation          |
 | `person`        | `src/ui/sections/person-drawer.tsx`         | –                   |
 
@@ -36,7 +36,7 @@ Opened from lists the other modules (and `ui`, the app) whose browser source nam
 
 - `withApi(organizationApi)`, tRPC contracts: `organization.*`, `plan.*`.
 - Client packages (package.json): `@langwatch/enterprise-licensing-client`, `@langwatch/enterprise-scim-client`, `@langwatch/identity-client`, `@langwatch/organization-client`, `@langwatch/project-client`.
-- Lends: `JoinOfferToken`, `JoinInsteadToken`, `PendingJoinRequestsToken`, `ProjectDepartmentFieldToken`.
+- Lends: `JoinOfferToken`, `JoinInsteadToken`, `HeldMembershipGateToken`, `PendingJoinRequestsToken`, `ProjectDepartmentFieldToken`.
 - Host APIs it requires: `OrganizationHostApi`.
 - Capabilities: `scope`, `copyTargets`, `organizationFacts`, `teamAccessWaiting`.
 

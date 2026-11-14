@@ -43,6 +43,19 @@ function isDriverTimeout(error: Error): boolean {
   return error.name === "TimeoutError" || DRIVER_TIMEOUT_MESSAGE.test(error.message.trim());
 }
 
+/** ClickHouse's TIMEOUT_EXCEEDED (159): the server stopped the statement at its time cap. */
+export function isServerTimeout(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  const code = String(Reflect.get(error, "code"));
+  const message = String(Reflect.get(error, "message") ?? "");
+  return (
+    code === "159" ||
+    Reflect.get(error, "type") === "TIMEOUT_EXCEEDED" ||
+    message.includes("TIMEOUT_EXCEEDED") ||
+    message.startsWith("Code: 159.")
+  );
+}
+
 /**
  * Whether a failure is worth another attempt. Deliberately conservative:
  * anything unrecognised is permanent, since retrying costs the full budget

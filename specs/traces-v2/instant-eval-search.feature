@@ -316,7 +316,7 @@ Feature: Instant Evals inside the Trace Explorer
       Given a running run that was asked to stop
       Then the bar stays and says it is stopping, with Stop disabled
       When the run's status turns cancelled
-      Then the run is still polled, because the page it held lands its verdicts last
+      Then the run is read again, because the page it held lands its verdicts last
       And the header, the pagination and the sidebar keep reading the run's counters
       When a second read answers the same counters
       Then the list and the facets are read one last time
@@ -327,6 +327,57 @@ Feature: Instant Evals inside the Trace Explorer
       Given a run that finished more than fifteen seconds ago
       When the page reads it for the first time
       Then it is settled without a second read, and no bar is shown
+
+  Rule: A run that fails says so, with a way to try again
+
+    @integration
+    Scenario: A run that fails on the server shows the failure instead of judging
+      Given a run behind the query's eval chip that LangWatch could not reach
+      When its status turns failed with nothing charged
+      Then the bar is replaced by "Instant Evals could not reach LangWatch. Nothing was charged."
+      And it offers Retry
+      And neither the bar nor the empty table says the run is still judging
+
+    @integration
+    Scenario: A failed chip keeps its bar when a later chip has settled
+      Given two eval chips, where the earlier run failed and the later run settled
+      When the table shows its results
+      Then the failure and Retry for the earlier chip are shown
+
+    @unit
+    Scenario Outline: A failed run says why, as far as the server knows
+      Given a run that failed with "<code>" and charged <charged>
+      When the failure is worded
+      Then it reads "<message>"
+
+      Examples:
+        | code                               | charged  | message                                                                          |
+        | connect_unreachable                | 0        | Instant Evals could not reach LangWatch. Nothing was charged.                    |
+        | hosted_service_unavailable         | 0        | Instant Evals could not reach LangWatch. Nothing was charged.                    |
+        | connect_license_revoked            | 0        | This license is no longer active, so Instant Evals are off. Nothing was charged. |
+        | instant_eval_classifier_unavailable | 0       | The judge did not answer. Nothing was charged.                                   |
+        | instant_eval_stalled               | 0.02     | This Instant Eval stopped before it finished. Only the rows judged were charged. |
+
+    @integration
+    Scenario: Retry starts the same eval again
+      Given a failed run behind the query's eval chip
+      When Retry is pressed
+      Then the chip's failed run is forgotten
+      And the query is submitted again, so the same question is estimated and started as on Enter
+
+    @unit
+    Scenario: A failed run read after a reload still shows the failure
+      Given a run that failed more than fifteen seconds before the page opened
+      When the page reads it for the first time
+      Then its phase is failed, not settled
+      And the empty table says the run failed rather than "Nothing matches these filters"
+
+    @integration
+    Scenario: An ended run is read once more without a timer
+      Given a run whose status turns finished, failed or cancelled
+      When its first ended answer is stored
+      Then the run is read once more, straight away
+      And when that read answers the same counters the run settles
 
   # ---------------------------------------------------------------------------
   # Refusals
@@ -360,11 +411,12 @@ Feature: Instant Evals inside the Trace Explorer
       And the sentence and the terms typed beside it are routed again with Instant Evals unavailable
       And the router's answer is applied: a filter, a phrase or a question for the assistant, never an eval chip
 
-    # Instant Evals off for the organization: the popover offers the switch or a word
-    # with us, depending on the plan. Both are specified in
-    # modules/instant-eval/specs/instant-eval-opt-in.feature ("Instant Evals off for a
-    # self-serve organization open the enable popover", "Instant Evals off for an
-    # enterprise organization open the contact-us popover"). Either way no estimate
+    # Instant Evals off for the organization: the popover offers the switch, the
+    # project's own decision model, or a word with us, depending on the plan. All are
+    # specified in modules/instant-eval/specs/instant-eval-opt-in.feature ("Instant
+    # Evals off for a self-serve organization open the enable popover", "Instant Evals
+    # off for an enterprise organization ask for a decision model of its own", "Instant
+    # Evals off for an enterprise organization open the contact-us popover"). Either way no estimate
     # is requested, the typed query stays in the bar, and a chip typed alongside
     # other words is refused the same way, before any request.
 
