@@ -33,16 +33,16 @@ describe("WebhookSignatureVectorsTask", () => {
     });
 
     /** @scenario "A task whose file write fails leaves no staged temporary file" */
-    it("@regression throws and leaves no .tmp file beside the target", async () => {
+    it("throws and leaves no .tmp file beside the target", async () => {
       const dir = mkdtempSync(join(tmpdir(), "webhook-vectors-"));
       dirs.push(dir);
       const target = join(dir, "vectors.json");
       mkdirSync(target);
 
       const task = WebhookSignatureVectorsTask.create({ target });
-      await expect(task.run({ args: [], signal: new AbortController().signal })).rejects.toThrow(
-        /EISDIR/,
-      );
+      await expect(
+        task.run({ args: [], signal: new AbortController().signal }),
+      ).rejects.toMatchObject({ code: "EISDIR" });
 
       expect(readdirSync(dir).filter((name) => name.endsWith(".tmp"))).toEqual([]);
     });
