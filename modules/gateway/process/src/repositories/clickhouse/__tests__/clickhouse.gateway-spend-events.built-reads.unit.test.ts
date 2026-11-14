@@ -18,7 +18,6 @@ function repositoryOver(rows: Record<string, unknown>[] = []) {
       sent.push(input);
       return { rows: rows as never[] };
     },
-    query: () => Promise.reject(new Error("spend reads are built statements")),
     insert: async () => undefined,
   };
   const repository = ClickHouseGatewaySpendEventsRepository.create(async () => client);

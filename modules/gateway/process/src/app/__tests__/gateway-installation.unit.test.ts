@@ -122,9 +122,12 @@ function openAdmission(gatewayRequestId: string): OpenAdmission {
   };
 }
 
+/** One built read as the router sees it: the statement's tenant and the server it names. */
+type RoutedRead = { tenantId: string; organizationId: string | undefined };
+
 /** Two organizations on one private server, answering per server as the router would. */
-function routedClickHouse(answer: (request: QueryRequest) => Promise<OpenAdmission[]>) {
-  const reads: QueryRequest[] = [];
+function routedClickHouse(answer: (request: RoutedRead) => Promise<OpenAdmission[]>) {
+  const reads: RoutedRead[] = [];
   const clickhouse = createApiFixture<ClickHouseQueryClient>({
     privateRoutes: () =>
       new Map([
@@ -132,12 +135,21 @@ function routedClickHouse(answer: (request: QueryRequest) => Promise<OpenAdmissi
         ["org-b", PRIVATE_SERVER],
       ]),
     targetOf: async () => "shared",
+    // The id indexes' boot check finds no marker, so every read here takes today's path.
     query: vi.fn().mockImplementation(async (request: QueryRequest) => {
-      // The id indexes' boot check finds no marker, so every read here takes today's path.
       if (isIdIndexReadinessStatement(request)) return { rows: [] };
-      reads.push(request);
-      return { rows: await answer(request) };
+      throw new Error("gateway reads are built statements");
     }),
+    read: vi
+      .fn()
+      .mockImplementation(async (request: Parameters<ClickHouseQueryClient["read"]>[0]) => {
+        const routed: RoutedRead = {
+          tenantId: (request.statement as { tenantId?: string }).tenantId ?? "",
+          organizationId: request.organizationId,
+        };
+        reads.push(routed);
+        return { rows: await answer(routed) };
+      }),
   });
   return { clickhouse, reads };
 }

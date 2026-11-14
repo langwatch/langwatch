@@ -1,4 +1,4 @@
-import type { ClickHouseQueryClient, IdBoundOptions } from "@langwatch/clickhouse-client";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 
 /**
  * The ClickHouse surface this feature uses, structurally, so the package
@@ -6,22 +6,6 @@ import type { ClickHouseQueryClient, IdBoundOptions } from "@langwatch/clickhous
  * setting, a typed insert result) are not assignable here (contravariance).
  */
 export type GatewayClickHouseClient = Pick<ClickHouseQueryClient, "read"> & {
-  query(input: {
-    query: string;
-    query_params?: Record<string, unknown>;
-    format: "JSONEachRow";
-    clickhouse_settings?: Record<string, string | number | boolean | undefined>;
-    /** Set when the statement genuinely spans tenants; see the tenant-scope guard. */
-    SKIP_TENANT_CHECK?: true;
-    /** Set when the read must walk every partition; see the cold-scan detector. */
-    SKIP_COLD_SCAN_CHECK?: true;
-    /** One organisation's projects a `TenantId IN (...)` read binds, exactly. */
-    tenantIds?: readonly string[];
-    /** Abandons the read, retries included, once it aborts. */
-    signal?: AbortSignal;
-    /** For a statement carrying `{{idBound}}`: a time the caller has, and today's fallback. */
-    idBound?: IdBoundOptions;
-  }): Promise<{ json<T = unknown>(): Promise<T[]> }>;
   insert(input: {
     table: string;
     values: Record<string, unknown>[];
@@ -38,9 +22,9 @@ export interface GatewayClickHouse {
 }
 
 /**
- * One tenant's view of the process's ONE routing ClickHouse client: the
- * driver-shaped calls the gateway repositories make, translated to the
- * routing client's own. A private server answers when `organizationId` names one.
+ * One tenant's view of the process's ONE routing ClickHouse client: built reads
+ * and driver-shaped inserts, translated to the routing client's own. A private
+ * server answers when `organizationId` names one.
  */
 export class ClickHouseGatewaySession implements GatewayClickHouseClient {
   static create(input: {
@@ -66,33 +50,6 @@ export class ClickHouseGatewaySession implements GatewayClickHouseClient {
 
   /** A built statement, sent to this session's private server when the session names one. */
   readonly read: ClickHouseQueryClient["read"];
-
-  async query(input: {
-    query: string;
-    query_params?: Record<string, unknown>;
-    format: "JSONEachRow";
-    clickhouse_settings?: Record<string, string | number | boolean | undefined>;
-    SKIP_TENANT_CHECK?: true;
-    SKIP_COLD_SCAN_CHECK?: true;
-    tenantIds?: readonly string[];
-    signal?: AbortSignal;
-    idBound?: IdBoundOptions;
-  }): Promise<{ json<T = unknown>(): Promise<T[]> }> {
-    const { rows } = await this.clickhouse.query<unknown>({
-      tenantId: this.tenantId,
-      ...(this.organizationId === undefined ? {} : { organizationId: this.organizationId }),
-      sql: input.query,
-      params: input.query_params,
-      settings: input.clickhouse_settings as Record<string, string | number> | undefined,
-      SKIP_TENANT_CHECK: input.SKIP_TENANT_CHECK,
-      ...(input.SKIP_COLD_SCAN_CHECK === true ? { SKIP_COLD_SCAN_CHECK: true as const } : {}),
-      ...(input.tenantIds ? { tenantIds: input.tenantIds } : {}),
-      ...(input.signal ? { signal: input.signal } : {}),
-      ...(input.idBound === undefined ? {} : { idBound: input.idBound }),
-    });
-
-    return { json: <T = unknown>() => Promise.resolve(rows as T[]) };
-  }
 
   async insert(input: {
     table: string;

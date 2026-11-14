@@ -19,7 +19,6 @@ function guardedRepository() {
       statements.push(input.statement as ReaderReadStatement);
       return { rows: [] };
     },
-    query: () => Promise.reject(new Error("budget reads are built statements")),
     insert: async () => undefined,
   }));
   return { repository, statements };

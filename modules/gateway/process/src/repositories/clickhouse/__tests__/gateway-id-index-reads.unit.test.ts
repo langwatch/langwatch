@@ -195,7 +195,9 @@ describe("gateway lookups by request id with the id index", () => {
       await gateway.budget.insertDebit([debit()]);
 
       expect(gateway.queries).toHaveLength(1);
-      expect(gateway.queries[0]?.sql).toContain("SELECT 1 FROM gateway_budget_ledger_events");
+      expect(gateway.queries[0]?.sql).toContain(
+        "SELECT GatewayRequestId FROM gateway_budget_ledger_events",
+      );
       expect(gateway.inserts).toHaveLength(0);
     });
   });

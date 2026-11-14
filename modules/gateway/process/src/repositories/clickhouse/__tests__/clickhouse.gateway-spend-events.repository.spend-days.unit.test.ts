@@ -16,7 +16,6 @@ function repositoryOver(rows: readonly Record<string, unknown>[]) {
       queries.push(statement as ReaderReadStatement);
       return { rows: JSON.parse(JSON.stringify(rows)) };
     },
-    query: () => Promise.reject(new Error("spend reads are built statements")),
     insert: async () => undefined,
   };
   const repository = ClickHouseGatewaySpendEventsRepository.create(async (tenantId) => {

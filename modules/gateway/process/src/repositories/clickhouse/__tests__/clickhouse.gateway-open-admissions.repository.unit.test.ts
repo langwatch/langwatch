@@ -23,7 +23,6 @@ describe("ClickHouseGatewayOpenAdmissionsRepository", () => {
       });
       const client: GatewayClickHouseClient = {
         read,
-        query: async () => ({ json: async () => [] }),
         insert: async () => undefined,
       };
 

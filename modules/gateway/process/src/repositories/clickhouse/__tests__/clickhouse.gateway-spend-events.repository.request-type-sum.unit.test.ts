@@ -17,7 +17,6 @@ function repositoryOver(rows: Record<string, unknown>[] = []) {
       statements.push(statement as ReaderReadStatement);
       return { rows: rows as never[] };
     },
-    query: () => Promise.reject(new Error("spend reads are built statements")),
     insert: async () => undefined,
   };
 

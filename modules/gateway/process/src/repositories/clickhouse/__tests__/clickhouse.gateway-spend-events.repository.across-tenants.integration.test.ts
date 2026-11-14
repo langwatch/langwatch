@@ -2,6 +2,7 @@
 /** @vitest-environment node */
 /** Spec: specs/webhooks/webhook-endpoints.feature (webhook's listing, answered by gateway) */
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
+import type { ReaderReadStatement } from "@langwatch/clickhouse-client/builder";
 import { startTestClickHouseEndpoints } from "@langwatch/clickhouse-client/testing";
 import { Temporal, toDate } from "@langwatch/time";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -91,13 +92,12 @@ function tenantRoutedClickHouse(raw: () => ClickHouseClient): GatewayClickHouseR
   return async (routed) => {
     const session = await gatewayClickHouseOver(raw())(routed);
     return {
-      read: session.read,
-      async query(input) {
-        const { query, query_params } = input;
-        if (!/TenantId = \{tenantId:String\}/.test(query) || query_params?.tenantId !== routed) {
+      read: (input) => {
+        const statement = input.statement as ReaderReadStatement;
+        if (statement.kind !== "tenant" || statement.tenantId !== routed) {
           throw new Error(`statement is not scoped to its routed tenant ${routed}`);
         }
-        return session.query(input);
+        return session.read(input);
       },
       insert: async () => undefined,
     };

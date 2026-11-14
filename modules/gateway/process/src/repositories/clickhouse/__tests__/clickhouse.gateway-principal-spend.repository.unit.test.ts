@@ -24,7 +24,6 @@ function repositoryOver(...answers: unknown[][]) {
   });
   const client: GatewayClickHouseClient = {
     read,
-    query: async () => ({ json: async () => [] }),
     insert: async () => undefined,
   };
   const repository = ClickHouseGatewayPrincipalSpendRepository.create(async (tenantId) => {
