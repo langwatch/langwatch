@@ -20,9 +20,16 @@ import type { GovernanceConfig } from "./config";
 import { isLoggedIn, loadConfig, saveConfig } from "./config";
 import { copilotGatewayModelPreflight, copilotPrespawnWarnings } from "./copilot-prespawn";
 import { runDeviceFlowLogin } from "./login-flow";
+import { ensurePiTelemetryExtension } from "./pi-plugin";
+import { piPrespawnWarnings } from "./pi-prespawn";
 import { clearToolProjectPin, pinToolToProject } from "./project-scope";
-import { maybeOfferIngestionShellRcPersist, SHELL_FUNCTION_TOOLS } from "./shell-rc";
+import {
+  assertLaunchHookFile,
+  maybeOfferIngestionShellRcPersist,
+  SHELL_FUNCTION_TOOLS,
+} from "./shell-rc";
 import { envForTool } from "./tool-env";
+import { isToolResolvable } from "./tool-presence";
 import { aliasShellFor, infoRunKind, runInfoRun, toolNotFoundMessage } from "./wrapper-info-run";
 import { resolveWrapperMode } from "./wrapper-mode";
 import {
@@ -563,11 +570,15 @@ async function reportIngestionSetup({
       `${lwTag()} wrote [otel] activation block to ${modeResult.codexConfigPath}.\n`,
     );
   }
+  if (tool === "pi") {
+    ensurePiTelemetryExtension({ notify: (line) => process.stderr.write(`${lwTag()} ${line}\n`) });
+  }
 
   // Path B only: offer to persist the OTLP telemetry exports so a future
   // plain `<tool>` (without the langwatch wrapper) captures
   // automatically. Gated on ingestion mode + opt-out remembered. Runs
   // BEFORE spawn so the prompt still owns stdin.
+  assertLaunchHookFile({ tool });
   await maybeOfferIngestionShellRcPersist({
     cfg,
     tool,
@@ -592,6 +603,12 @@ async function prepareLaunch({
   // capture silently incomplete on either path (ADR-039 D8/D9).
   if (tool === "copilot") {
     for (const warning of copilotPrespawnWarnings()) {
+      process.stderr.write(`${warning}\n`);
+    }
+  }
+  // A pi older than the extension's minimum still captures, so it warns and never blocks.
+  if (tool === "pi") {
+    for (const warning of piPrespawnWarnings()) {
       process.stderr.write(`${warning}\n`);
     }
   }
@@ -762,6 +779,13 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
   // anything below reads the config, signs in, mints a key or writes wiring.
   const infoRun = infoRunKind(args);
   if (infoRun) return runInfoRun({ tool, args, kind: infoRun });
+
+  // A tool that cannot start gets nothing written for it: no config, login,
+  // key, rc block, hook file or extension.
+  if (!isToolResolvable({ tool })) {
+    process.stderr.write(`${toolNotFoundMessage(tool)}\n`);
+    process.exit(127);
+  }
 
   // Before the config is read, so every save below carries it. The Claude
   // Code plugin's hooks run the CLI through this record when PATH cannot

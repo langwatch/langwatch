@@ -44,7 +44,8 @@ export const onboardingRest = defineRestRouter(OnboardingApi)
   .withAudit("onboarding.completePath")
   .withParams(guidedPathRestParamsSchema)
   .withInput(guidedPathCompleteRestInputSchema)
-  .withPermission("project:view")
+  // A write, so a read-only key never completes a path; the member and Langy's key hold it.
+  .withPermission("traces:create")
   .withOutput(guidedStateOutputSchema)
   .withMiddlewareContext(onboardingRestCredential)
   .withDocs({

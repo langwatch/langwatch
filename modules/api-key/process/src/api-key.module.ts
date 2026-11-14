@@ -8,13 +8,16 @@ import {
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 
 import { ApiKeyModule } from "./app/api-key.app.ts";
+import { apiKeyChannels } from "./channels/api-key-channels.registry.ts";
 import { apiKeyEventing } from "./eventing/api-key.pipeline.ts";
+import { docsPlaygroundRevocationEventing } from "./eventing/docs-playground-revocation.pipeline.ts";
 import { apiKeyRepositories } from "./repositories/api-key-repositories.registry.ts";
 import { apiKeyDocsSessionRest } from "./transport/api-key-docs-session.rest.ts";
 import { apiKeyOrganizationsRest } from "./transport/api-key-organizations.rest.ts";
 import { apiKeyProjectsRest } from "./transport/api-key-projects.rest.ts";
 import { apiKeyRest } from "./transport/api-key.rest.ts";
 import { apiKeyTrpcTransport } from "./transport/api-key.trpc.ts";
+import { signingKeyTrpcTransport } from "./transport/signing-key.trpc.ts";
 
 /**
  * The whole module, declared. Every call answers something already
@@ -24,6 +27,7 @@ import { apiKeyTrpcTransport } from "./transport/api-key.trpc.ts";
 export const apiKeyProcessModule: PublishedProcessModule<"api-key", ApiKeyApi> =
   defineProcessModule("api-key")
     .withRepositories(apiKeyRepositories)
+    .withChannels(apiKeyChannels)
     .withApi(ApiKeyModule)
     .withTransports(
       apiKeyRest,
@@ -31,6 +35,7 @@ export const apiKeyProcessModule: PublishedProcessModule<"api-key", ApiKeyApi> =
       apiKeyOrganizationsRest,
       apiKeyDocsSessionRest,
       apiKeyTrpcTransport,
+      signingKeyTrpcTransport,
     )
     // The credential itself, not just its holder: two of these routes ask whether
     // the KEY may act organization-wide as well as whether the member may, so a
@@ -56,4 +61,5 @@ export const apiKeyProcessModule: PublishedProcessModule<"api-key", ApiKeyApi> =
         apiKeyId: keyCredentialOfDoor({ door: "project", request }).apiKeyId,
       }),
     })
-    .withEventing(apiKeyEventing);
+    .withEventing(apiKeyEventing)
+    .withEventing(docsPlaygroundRevocationEventing);

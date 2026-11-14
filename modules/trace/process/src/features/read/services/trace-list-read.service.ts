@@ -1,4 +1,4 @@
-import { type Authorization, ownProjectIdReadBy } from "@langwatch/authorization";
+import { type Authorization, ownProjectIdReadBy, readScopeKeyOf } from "@langwatch/authorization";
 import type { PresenceApi } from "@langwatch/presence-contract";
 import {
   TRACE_ORIGIN_CLICKHOUSE_EXPRESSION,
@@ -22,20 +22,21 @@ import type {
 import type { FacetCatalog } from "#features/facet/rules/trace-facet-registry.rules";
 
 import type { TraceEvaluationRunsReadRepository } from "../../../repositories/trace-evaluation-runs.repository.ts";
-import type {
-  DiscoverParams,
-  FacetValuesParams,
-} from "../../../rules/trace-list-cache-key.rules.ts";
 import {
-  cursorForTraceRow,
-  mapToTraceListItem,
-  SORT_COLUMN_MAP,
-} from "../../../rules/trace-list-row.rules.ts";
+  facetCountWindowKey,
+  type DiscoverParams,
+  type FacetValuesParams,
+} from "../../../rules/trace-list-cache-key.rules.ts";
 import { TraceDiscoverService } from "../../../services/trace-discover.service.ts";
 import type { FacetFilterResolver } from "../../facet/rules/trace-facet-filter.rules.ts";
 import { TraceFacetValuesService } from "../../facet/services/trace-facet-values.service.ts";
 import type { TraceTopicNamesReadRepository } from "../../topic/repositories/trace-topic-names.repository.ts";
 import { TraceTopicNamingService } from "../../topic/services/trace-topic-naming.service.ts";
+import {
+  cursorForTraceRow,
+  mapToTraceListItem,
+  SORT_COLUMN_MAP,
+} from "../rules/trace-list-row.rules.ts";
 
 interface ListParams {
   authorization: Authorization;
@@ -60,6 +61,12 @@ interface FacetParams {
   timeRange: { from: number; to: number; live?: boolean };
   /** The predicate each facet is counted under. */
   filterFor: FacetFilterResolver;
+  /**
+   * Names everything `filterFor` was built from beyond the proof and window
+   * (the query, the eval runs, the viewer's protections): two requests with
+   * the same key count the same facets.
+   */
+  filterKey: string;
 }
 
 interface NewCountParams {
@@ -257,11 +264,28 @@ export class TraceListService {
    * warm start stay with `getDiscover`.
    */
   getFacets(params: FacetParams): Promise<FacetDescriptor[]> {
-    return this.discover.getFilteredFacets({
-      params: { authorization: params.authorization, timeRange: params.timeRange },
-      filterFor: params.filterFor,
-    });
+    // A repeat of a request still counting shares its run, a live window's by
+    // its span since its bounds roll: each repeat used to start another full
+    // scan beside it. Nothing is kept once it answers.
+    const key = JSON.stringify([
+      readScopeKeyOf(params.authorization),
+      ...facetCountWindowKey(params.timeRange),
+      params.filterKey,
+    ]);
+    const running = this.#facetsInFlight.get(key);
+    if (running) return running;
+
+    const run = this.discover
+      .getFilteredFacets({
+        params: { authorization: params.authorization, timeRange: params.timeRange },
+        filterFor: params.filterFor,
+      })
+      .finally(() => this.#facetsInFlight.delete(key));
+    this.#facetsInFlight.set(key, run);
+    return run;
   }
+
+  readonly #facetsInFlight = new Map<string, Promise<FacetDescriptor[]>>();
 
   async getNewCount(params: NewCountParams): Promise<number> {
     return this.repository.findCount({

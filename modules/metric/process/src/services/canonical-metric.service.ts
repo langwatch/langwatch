@@ -10,7 +10,7 @@ import {
   candidatePointCount,
   classifyMetricKind,
 } from "../rules/metric-kinds.rules.ts";
-import { buildPoint } from "../rules/metric-point.rules.ts";
+import { buildPoint, metricRedactionRecordKey } from "../rules/metric-point.rules.ts";
 import { isRecord, type UnknownRecord } from "../rules/metric-serialization.rules.ts";
 import { MetricRedactionService, type MetricRedaction } from "./metric-redaction.service.ts";
 import type { MetricPreparation, MetricPreparationInput } from "./metric.service.ts";
@@ -109,6 +109,7 @@ async function prepareMetric({
         exemplarAttributes: point.exemplars,
         piiRedactionLevel: args.piiRedactionLevel,
         tenantId: args.tenantId,
+        recordKey: metricRedactionRecordKey({ metricName: label, point }),
       });
       accepted.push(
         buildPoint({

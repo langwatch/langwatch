@@ -116,6 +116,34 @@ describe.skipIf(!TEST_DATABASE_URL)("the license registry on Postgres", () => {
     expect(stored).toMatchObject({ maxMembersLite: null, liteSeatsUnlimited: true });
   });
 
+  /** @scenario A replacement keeps the Developer seats of the licence it replaces */
+  it("stores the Developer seats and keeps them on a reissue", async () => {
+    const organization = await prisma.organization.create({
+      data: { name: `ACME Developers ${RUN}`, slug: `--${RUN}-${organizationIds.length}` },
+    });
+    organizationIds.push(organization.id);
+    const { license } = await registry.issue({
+      customer: { organizationId: organization.id },
+      email: "ops@acme.test",
+      planType: "ENTERPRISE",
+      maxMembers: 5,
+      maxMembersDeveloper: 4,
+      expiresAt: nowInstant().add({ hours: 24 * 365 }),
+      operatorId: "user_operator",
+    });
+    const reissued = await registry.reissue({
+      id: license.id,
+      expiresAt: nowInstant().add({ hours: 24 * 730 }),
+      operatorId: "user_operator",
+    });
+
+    const rows = await prisma.issuedLicense.findMany({
+      where: { id: { in: [license.id, reissued.license.id] } },
+      select: { maxMembersDeveloper: true },
+    });
+    expect(rows).toEqual([{ maxMembersDeveloper: 4 }, { maxMembersDeveloper: 4 }]);
+  });
+
   it("records a raised seat change in the replacement's own insert and reads it back", async () => {
     const { license } = await issue("ACME Seats");
     const changed = await registry.changeSeats({

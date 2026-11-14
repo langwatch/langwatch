@@ -4,7 +4,7 @@ import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { UpgradeRequired } from "../access-state.tsx";
+import { AccessState, UpgradeRequired } from "../access-state.tsx";
 import { RestrictedAccess } from "../restricted-access.tsx";
 
 afterEach(() => {
@@ -53,6 +53,19 @@ describe("given a permission gate", () => {
   });
 });
 
+describe("given a page that needs platform operator access", () => {
+  /** @scenario "An organization admin without platform operator access opens an operator page" */
+  it("says it needs platform operator access, not an organization admin", () => {
+    renderWithDesignSystem(<RestrictedAccess permission="ops:view" />);
+    expect(
+      screen.getByText(
+        "This page needs platform operator access. It is for the people who run this LangWatch install.",
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText(/Ask an organization admin/)).toBeNull();
+  });
+});
+
 describe("given an Enterprise gate", () => {
   /** @scenario An Enterprise gate names the missing plan and offers a next step */
   it("names the feature and preserves the owner's action", () => {
@@ -66,6 +79,50 @@ describe("given an Enterprise gate", () => {
     expect(screen.getByRole("link", { name: "Compare plans" })).toHaveAttribute(
       "href",
       "/settings/plans",
+    );
+  });
+});
+
+describe("given an access gate inside a card", () => {
+  /** @scenario A gate inside a card draws no box of its own */
+  it("puts the lock beside the words and keeps the title, description and actions", () => {
+    renderWithDesignSystem(
+      <AccessState
+        kind="permission"
+        title="Directory sync is locked"
+        description="Ask an organization admin for access."
+        actions={<button type="button">Request access</button>}
+        inset
+        data-testid="gate"
+      />,
+    );
+    const gate = screen.getByTestId("gate");
+    const [icon, words] = Array.from(gate.children);
+
+    expect(gate).toHaveAttribute("data-inset");
+    expect(icon?.querySelector("svg")).toBeTruthy();
+    expect(words).toContainElement(
+      screen.getByRole("heading", { name: "Directory sync is locked" }),
+    );
+    expect(words).toHaveTextContent("Ask an organization admin for access.");
+    expect(words).toContainElement(screen.getByRole("button", { name: "Request access" }));
+  });
+
+  /** @scenario A gate inside a card draws no box of its own */
+  it("stacks the lock above the words when it draws its own box", () => {
+    renderWithDesignSystem(
+      <AccessState
+        kind="permission"
+        title="Locked"
+        description="Ask an admin."
+        data-testid="gate"
+      />,
+    );
+    const gate = screen.getByTestId("gate");
+
+    expect(gate).not.toHaveAttribute("data-inset");
+    expect(gate.firstElementChild).toContainElement(
+      screen.getByRole("heading", { name: "Locked" }),
     );
   });
 });

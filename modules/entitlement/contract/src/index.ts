@@ -41,6 +41,7 @@ export {
 } from "./plan-next-step.ts";
 export * from "./usage.ts";
 export * from "./usage.events.ts";
+export * from "./entitlement.errors.ts";
 export * from "./plan-limit.errors.ts";
 export * from "./entitlement.schemas.ts";
 export {

@@ -16,6 +16,7 @@ const baseConfig: StoresConfig = {
   queueTenantCap: undefined,
   queueGlobalBudget: undefined,
   clickhouseStatementLaneReserveShare: undefined,
+  clickhousePasswordFile: undefined,
   clickhousePool: {
     override: undefined,
     replicas: undefined,

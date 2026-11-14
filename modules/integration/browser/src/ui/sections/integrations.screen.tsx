@@ -41,7 +41,7 @@ export default function IntegrationsScreen() {
       <PageLayout.Header>
         <PageLayout.Heading>Integrations</PageLayout.Heading>
       </PageLayout.Header>
-      <VStack align="stretch" gap={6} width="full" paddingTop={4}>
+      <VStack align="stretch" gap={6} width="full">
         <Text color="fg.muted">
           Connect the tools your team already uses, so automations and Langy can reach them.
         </Text>

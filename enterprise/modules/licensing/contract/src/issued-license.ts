@@ -48,6 +48,8 @@ const issuedLicenseViewSchemaDefinition = z.object({
   maxMembers: z.number(),
   maxMembersLite: z.number().nullable(),
   liteSeatsUnlimited: z.boolean(),
+  /** Null when the licence states none, which sells none. */
+  maxMembersDeveloper: z.number().nullable(),
   issuedAt: z.string(),
   expiresAt: z.string(),
   source: issuedLicenseSourceSchema,

@@ -129,6 +129,10 @@ export class ModelProviderQueryService {
     return Object.fromEntries(selected.map((provider) => [provider.provider, provider]));
   }
 
+  /**
+   * The row the project runs on for this provider key, picked as the settings page lists it:
+   * enabled first, then the narrowest scope, so a project key beats an older organization one.
+   */
   async findProviderForProject(input: {
     projectId: string;
     provider: string;
@@ -136,23 +140,48 @@ export class ModelProviderQueryService {
     const parsed = modelProviderListProjectInputSchema.parse({
       projectId: input.projectId,
     });
-    return this.options.scopes
-      .getProjectScopes(parsed.projectId)
-      .then((projectScopes) =>
-        this.options.repository.getByProviderForProject({
-          projectScopes,
-          provider: input.provider,
-        }),
-      )
-      .catch((error: unknown) => {
-        if (
-          HandledError.isHandled(error) &&
-          (error.code === "project_not_found" || error.code === "model_provider_not_found")
-        ) {
-          return null;
-        }
-        throw error;
+    const chain = await this.getProjectScopeChain(parsed.projectId).catch((error: unknown) => {
+      if (HandledError.isHandled(error) && error.code === "project_not_found") return null;
+      throw error;
+    });
+    if (!chain) return null;
+
+    return this.bestRowInChain({ chain, provider: input.provider });
+  }
+
+  /**
+   * The row a Default models scope runs on for this provider key, from that scope up only:
+   * a team sees itself and its organization, an organization sees itself.
+   */
+  async findProviderForScope(input: {
+    scope: ModelDefaultScope;
+    provider: string;
+  }): Promise<ModelProvider | null> {
+    if (input.scope.scopeType === "PROJECT") {
+      return this.findProviderForProject({
+        projectId: input.scope.scopeId,
+        provider: input.provider,
       });
+    }
+
+    const organizationId = await this.options.scopes.getOrganizationIdForScope(input.scope);
+    const organization: ModelDefaultScope = { scopeType: "ORGANIZATION", scopeId: organizationId };
+    const chain = input.scope.scopeType === "TEAM" ? [input.scope, organization] : [organization];
+    return this.bestRowInChain({ chain, provider: input.provider });
+  }
+
+  private async bestRowInChain({
+    chain,
+    provider,
+  }: {
+    chain: ModelDefaultScope[];
+    provider: string;
+  }): Promise<ModelProvider | null> {
+    const rows = await this.options.repository.findForProject(chain);
+    const candidates = rows
+      .filter((row) => row.provider === provider)
+      .toSorted((left, right) => this.compareProjectProviders(left, right, chain));
+    return candidates[0] ?? null;
   }
 
   async getByIdForProject(input: { id: string; projectId: string }): Promise<ModelProvider> {

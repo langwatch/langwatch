@@ -49,7 +49,7 @@ export function ScimSettingsContent({
   const mayReadMembership = host.hasPermission("organization:manage");
 
   return (
-    <VStack gap={6} width="full" align="stretch" paddingTop={4}>
+    <VStack gap={6} width="full" align="stretch">
       {lede && <Text color="fg.muted">{lede}</Text>}
 
       {maySeeSync ? (

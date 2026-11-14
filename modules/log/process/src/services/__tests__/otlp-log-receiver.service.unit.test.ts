@@ -112,6 +112,7 @@ describe("OtlpLogReceiverService", () => {
       await expect(post("/api/otel/v1/logs")).resolves.toEqual({
         status: 503,
         body: { error: "failed to record log record" },
+        headers: { "Retry-After": "5" },
       });
     });
   });

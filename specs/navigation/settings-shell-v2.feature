@@ -29,10 +29,12 @@ Feature: Settings shell
   which put a page they use often at the bottom of a group they have no
   use for.
 
-  PEOPLE & ACCESS holds Directory and Roles. Directory consolidates Members,
+  PEOPLE & ACCESS holds Users and Roles. Users consolidates Members,
   Teams & Projects, Groups and Access as tabs, while Roles holds Role Bindings
   as its second tab. Their old addresses forward to the corresponding tabs.
-  Directory is offered on every plan and is named for what it holds rather
+  Teams & Projects also has its own entry, right under Users, that opens the
+  Users page on that tab: readers could not find it as a tab alone.
+  Users is offered on every plan and is named for what it holds rather
   than for the provisioning protocol it speaks. Authentication remains in
   ORGANIZATION because it controls how everyone in the organization signs in;
   how the reader themselves signs in is Security, under You.
@@ -47,7 +49,7 @@ Feature: Settings shell
   Scenario: The settings menu is grouped with its gates kept
     Given I open Settings
     Then the sidebar shows the ORGANIZATION and PEOPLE & ACCESS groups
-    And General and Directory have their consolidated addresses
+    And General and Users have their consolidated addresses
 
   @integration
   Scenario: The You section comes first and is about the reader
@@ -66,17 +68,17 @@ Feature: Settings shell
   Scenario: The access group is named for people and holds the organization's pages
     Given I open Settings in a new navigation mode
     Then the group is called "People & access"
-    And it offers Directory and Roles
+    And it offers Users and Roles
     And it has no separate Members, Groups, Access or Role Bindings entry
     And Authentication stays in the Organization group
     And the old page addresses forward to the corresponding consolidated tabs
 
   @integration
-  Scenario: A plan with Enterprise sees its entries marked ENT, not locked
+  Scenario: A plan with Enterprise sees its entries as plain entries
     Given my plan includes Enterprise
     When the settings sidebar renders
-    Then the Enterprise entries carry a quiet grey "ENT" chip
-    And no entry carries a lock
+    Then the Enterprise entries carry no badge and no lock, like any entry the plan includes
+    And no entry carries the "Included in Enterprise" lock
 
   @integration
   Scenario: A plan without Enterprise sees its entries locked
@@ -86,6 +88,18 @@ Feature: Settings shell
     And the lock reads "Included in Enterprise"
     And an entry I lack the permission for stays hidden
     And opening a locked entry shows its page title and an Enterprise upsell, never the feature
+
+  @unit @integration
+  Scenario: A branded feature's entries wear its mark
+    Given the settings menu offers the Braids page
+    Then Braids appears once, under Project, never also under People & access
+    And the entry draws the Braids mark, the one its pages' titles and empty states draw
+
+  @unit
+  Scenario: The organization's braids page lights the one Braids entry
+    Given the settings menu offers the Braids page
+    When I open the organization's braids page
+    Then the one Braids entry is the active entry
 
   @unit @integration
   Scenario: Authentication is offered unlocked on every plan
@@ -101,8 +115,15 @@ Feature: Settings shell
 
   @integration
   Scenario: A detail page keeps its owning entry lit
-    Given I open a team's own page under /settings/teams
-    Then the Directory entry is marked as the open one
+    Given I may manage my organization
+    And I open a team's own page under /settings/teams
+    Then the Teams & projects entry is marked as the open one
+
+  @unit @integration
+  Scenario: A team page lights Users for whoever may not manage the organization
+    Given I may view teams but may not manage my organization
+    When I open a team's own page under /settings/teams
+    Then the Users entry is marked as the open one
 
   @unit
   Scenario: A still-loading plan hides the enterprise entries
@@ -131,6 +152,27 @@ Feature: Settings shell
     Given I open Settings
     Then API keys comes right after General in the Organization group
     And the People & access group does not hold it
+
+  @unit @integration
+  Scenario: Teams & projects has its own entry under Users
+    Given I may manage my organization
+    When the settings sidebar renders
+    Then People & access offers Teams & projects right after Users
+    And it opens the Users page on its Teams & projects tab
+    And while that tab is open, Teams & projects is the only entry marked
+    And on any other tab of the Users page, Users is the one marked
+
+  @unit
+  Scenario: Teams & projects is offered only to whoever may manage the organization
+    Given I may not manage my organization
+    When the settings menu is built
+    Then People & access offers no Teams & projects entry
+
+  @unit @integration
+  Scenario: Teams & projects asks who may manage the organization the way its tab does
+    Given I may manage my organization, though not through the project I have open
+    When the settings sidebar renders
+    Then People & access offers Teams & projects, as the Users page offers its Teams tab
 
   @integration
   Scenario: The menu marks the page that is open

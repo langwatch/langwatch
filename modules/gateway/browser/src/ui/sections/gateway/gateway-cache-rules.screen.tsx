@@ -112,10 +112,6 @@ function CacheRulesPage() {
         </PageLayout.Header>
 
         <PageLayout.Container>
-          <Text color="fg.muted" marginBottom={6}>
-            Decide when the gateway answers from its cache instead of calling the model. Rules are
-            checked from the lowest priority number up, and the first one that matches wins.
-          </Text>
           {isLoadingRules && <ListSkeleton />}
           {showRulesError && (
             <GatewayErrorPanel

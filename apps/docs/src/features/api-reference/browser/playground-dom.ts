@@ -1,43 +1,16 @@
 import { slide } from "../../../lib/slide.ts";
-import { generateExample, paramKey } from "../model/codegen.ts";
-import type { RequestState } from "../model/codegen.ts";
-import { EXAMPLE_LANGUAGES } from "../model/operation.ts";
-import type { Operation } from "../model/operation.ts";
+import { jsonTokens } from "../model/json-tokens.ts";
 import { errorFieldId } from "../model/request-validation.ts";
 
 export function fieldValue({ id }: { id: string }) {
   const field = document.getElementById(id);
+  if (field?.getAttribute("role") === "radiogroup")
+    return field.querySelector<HTMLInputElement>("input:checked")?.value ?? "";
   return field instanceof HTMLInputElement ||
     field instanceof HTMLTextAreaElement ||
     field instanceof HTMLSelectElement
     ? field.value
     : "";
-}
-
-export function requestState({ operation }: { operation: Operation }): RequestState {
-  return {
-    values: Object.fromEntries(
-      operation.parameters.map((param) => [
-        paramKey({ location: param.in, name: param.name }),
-        fieldValue({ id: `pg-${param.in}-${param.name}` }),
-      ]),
-    ),
-    body: fieldValue({ id: "pg-body" }),
-  };
-}
-
-export function updateExamples({ operation }: { operation: Operation }) {
-  const state = requestState({ operation });
-  const panel = document.querySelector('section[aria-label="Request example"]');
-  const regions = panel?.querySelectorAll<HTMLElement>(".docs-code-region");
-  EXAMPLE_LANGUAGES.forEach((entry, index) => {
-    const region = regions?.[index];
-    if (!region) return;
-    const code = generateExample({ operation, state, language: entry.id });
-    region.dataset.code = code;
-    const content = region.querySelector("code");
-    if (content) content.textContent = code;
-  });
 }
 
 export function showErrors({ errors }: { errors: Record<string, string> }) {
@@ -54,7 +27,8 @@ export function showErrors({ errors }: { errors: Record<string, string> }) {
     note.className = "docs-request-error";
     note.textContent = message;
     field?.setAttribute("aria-describedby", note.id);
-    field?.insertAdjacentElement("afterend", note);
+    /* A field inside a group (the key's reveal button, the body's coloured copy) notes under it. */
+    (field?.closest("[data-docs-error-after]") ?? field)?.insertAdjacentElement("afterend", note);
   }
   const first = Object.keys(errors)[0];
   if (first) document.getElementById(errorFieldId({ first }))?.focus();
@@ -80,4 +54,22 @@ export function editManualKey({ action }: { action: string }) {
       .querySelector('#try-it-form button[aria-label$="key"]')
       ?.setAttribute("aria-label", input.type === "password" ? "Reveal key" : "Hide key");
   }
+}
+
+/** Recolours the body editor's copy after an edit and grows the field where CSS cannot. */
+export function syncBody() {
+  const field = document.getElementById("pg-body");
+  const mirror = document.querySelector<HTMLElement>("[data-docs-body-mirror]");
+  if (!(field instanceof HTMLTextAreaElement) || !mirror) return;
+  const runs = jsonTokens({ text: field.value }).map((token) => {
+    if (token.kind === "plain") return document.createTextNode(token.text);
+    const run = document.createElement("span");
+    run.className = `docs-json-${token.kind}`;
+    run.textContent = token.text;
+    return run;
+  });
+  mirror.replaceChildren(...runs, document.createTextNode("\u200b"));
+  if (CSS.supports("field-sizing", "content")) return;
+  field.style.height = "auto";
+  field.style.height = `${field.scrollHeight}px`;
 }

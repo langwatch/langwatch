@@ -27,6 +27,7 @@ const persistCapDependencies = {
     requestBound: vi.fn(),
     resolvePlanNextStep: vi.fn(),
     assertWithinUsageLimit: vi.fn(),
+    getUsageMonthBreakdown: vi.fn(),
   },
   config: {
     free: 100,
@@ -50,6 +51,7 @@ function plan(overrides: Record<string, unknown>) {
     free: false,
     maxMembers: 1,
     maxMembersLite: 1,
+    maxMembersDeveloper: 0,
     maxMessagesPerMonth: 1,
     canPublish: true,
     prices: { USD: 0, EUR: 0 },

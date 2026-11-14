@@ -24,14 +24,21 @@ Feature: Custom role permission editing
   # ============================================================================
 
   @integration
-  Scenario: Only an organization manager reaches the RBAC pages
+  Scenario: An organization manager reaches the RBAC pages
     When the reader opens the roles page
     Then the page opens
     And it is framed in the settings chrome
 
   @integration
-  Scenario: A member is refused the RBAC pages
-    Given a reader who may only view the organization
+  Scenario: Every member reads the RBAC pages without a way to change them
+    Given a reader who may view the organization's members but not manage it
+    When the reader opens the roles page
+    Then the page opens with the roles listed
+    And it offers no way to create a role
+
+  @integration
+  Scenario: A reader without the members view is refused the RBAC pages
+    Given a reader who may view the organization but not its members
     When the reader opens the roles page
     Then the page is refused
     And the refusal names the grant the page needs

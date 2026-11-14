@@ -5,10 +5,26 @@
  */
 
 export interface LatestVersionColumn {
-  /** Column name the outer query reads (`alias.name`). */
+  /** The column, or the alias of `expression`; read outside under its latestVersionKey. */
   name: string;
   /** Expression over the raw table row. Defaults to `name`. */
   expression?: string;
+}
+
+/** Columns whose own names the fence reads, so no alias may take them (ADR-201 §3). */
+const RENAMED_KEYS: Readonly<Record<string, string>> = {
+  OccurredAt: "LatestOccurredAt",
+  UpdatedAt: "LatestUpdatedAt",
+};
+
+/** The name a deduped read exposes `column` under: its own, or a `Latest` one for a fenced name. */
+export function latestVersionKey(column: string): string {
+  return RENAMED_KEYS[column] ?? column;
+}
+
+/** The column a deduped read's key names: the inverse of {@link latestVersionKey}. */
+export function latestVersionColumnOf(key: string): string {
+  return Object.keys(RENAMED_KEYS).find((column) => RENAMED_KEYS[column] === key) ?? key;
 }
 
 const LATEST_ROW = "__latest_row";
@@ -58,8 +74,8 @@ function splitCarriedColumns({
 
 /**
  * Derived table of the newest version of each key in range: `argMax(__latest_row, __version)`
- * grouped by the keys, unpacked per column. `where` applies to every version row before the
- * collapse and must carry the tenant and partition predicates.
+ * grouped by the keys, unpacked per column under {@link latestVersionKey}. `where` applies to
+ * every version row before the collapse and must carry the tenant and partition predicates.
  */
 export function latestVersionSubquery({
   table,
@@ -83,10 +99,9 @@ export function latestVersionSubquery({
     columns,
     versionColumn,
   });
-
   const sourceRef = sourceAlias ? `${sourceAlias}.` : "";
   const innerSelect = [
-    ...keyColumns.map((key) => `${sourceRef}${key} AS ${key}`),
+    ...keyColumns.map((key) => `${sourceRef}${key}`),
     `${sourceRef}${versionColumn} AS ${VERSION}`,
   ];
   const outerSelect = [...keyColumns];
@@ -96,11 +111,11 @@ export function latestVersionSubquery({
     );
     outerSelect.push(`argMax(${LATEST_ROW}, ${VERSION}) AS ${LATEST}`);
     carried.forEach((column, index) => {
-      outerSelect.push(`tupleElement(${LATEST}, ${index + 1}) AS ${column.name}`);
+      outerSelect.push(`tupleElement(${LATEST}, ${index + 1}) AS ${latestVersionKey(column.name)}`);
     });
   }
   if (isVersionCarried) {
-    outerSelect.push(`max(${VERSION}) AS ${versionColumn}`);
+    outerSelect.push(`max(${VERSION}) AS ${latestVersionKey(versionColumn)}`);
   }
 
   return `(

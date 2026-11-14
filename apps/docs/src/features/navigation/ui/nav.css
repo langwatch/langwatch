@@ -37,3 +37,12 @@
   min-width: 0;
   max-width: 100%;
 }
+
+/* Every group above the current page wears the accent, its guide line too, so the way to the page
+   reads at a glance, even through a group the reader closed. */
+.docs-nav-tree li:has(> [data-docs-panel] [aria-current="page"]) > a:not([aria-current]) {
+  color: var(--chakra-colors-accent-fg);
+}
+.docs-nav-tree [data-docs-panel]:has([aria-current="page"]) {
+  border-color: color-mix(in srgb, var(--chakra-colors-accent-fg) 40%, transparent);
+}

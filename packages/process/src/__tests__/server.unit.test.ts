@@ -34,9 +34,10 @@ function addressOf(server: Server): AddressInfo {
   return address;
 }
 
+/** `localhost`: on macOS another process can hold 127.0.0.1 on the door's wildcard port. */
 function fetchFrom(server: Server, path: string, authorization?: string): Promise<Response> {
   const address = addressOf(server);
-  return fetch(`http://127.0.0.1:${address.port}${path}`, {
+  return fetch(`http://localhost:${address.port}${path}`, {
     headers: authorization === undefined ? {} : { authorization },
   });
 }
@@ -170,7 +171,7 @@ describe("Server", () => {
 
         await server.close();
 
-        await expect(fetch(`http://127.0.0.1:${address.port}/healthz`)).rejects.toThrow(TypeError);
+        await expect(fetch(`http://localhost:${address.port}/healthz`)).rejects.toThrow(TypeError);
       });
     });
 
@@ -347,6 +348,57 @@ describe("Server", () => {
         expect(refused.status).toBe(503);
         expect(refused.headers.get("x-langwatch-not-handled")).toBe("draining");
         expect(health.status).toBe(200);
+        releaseDrain();
+      });
+    });
+
+    describe.each([
+      { door: "the main loop", offLoop: false },
+      { door: "the liveness thread", offLoop: true },
+    ])("when the request arrives on a kept-alive connection to $door", ({ offLoop }) => {
+      /** @scenario "A draining refusal closes the connection it came in on" */
+      it("refuses it with 503 and closes the connection", async () => {
+        const server = await startServer();
+        let releaseDrain: () => void = () => undefined;
+        const drainStarted = new Promise<void>((resolve) => {
+          releaseDrain = resolve;
+        });
+        server.with({ name: "slow drain", stop: () => drainStarted, drain: true });
+        if (offLoop) await server.openLiveness();
+        await server.serve({
+          name: "api",
+          start: () => undefined,
+          stop: () => undefined,
+          handler: (_request: http.IncomingMessage, response: http.ServerResponse) => {
+            response.writeHead(200).end("served");
+          },
+        });
+        const agent = new http.Agent({ keepAlive: true, maxSockets: 1 });
+
+        void server.close();
+        const refused = await new Promise<{
+          status?: number;
+          connection?: string;
+          closed: boolean;
+        }>((resolve, reject) => {
+          const request = http.get(
+            { host: "localhost", port: addressOf(server).port, path: "/api/things", agent },
+            (response) => {
+              response.resume();
+              response.socket.once("close", () =>
+                resolve({
+                  status: response.statusCode,
+                  connection: response.headers.connection,
+                  closed: true,
+                }),
+              );
+            },
+          );
+          request.on("error", reject);
+        });
+        agent.destroy();
+
+        expect(refused).toEqual({ status: 503, connection: "close", closed: true });
         releaseDrain();
       });
     });

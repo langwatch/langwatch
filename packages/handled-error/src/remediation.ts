@@ -214,6 +214,12 @@ const registry = {
       "Ask an administrator to enable the SQL workbench for this project",
     ],
   },
+  lwql_not_provisioned: {
+    tips: [
+      "This organisation's data is on a server LangWatchQL is not provisioned on; retrying will not help",
+      "On a self-hosted install, let the deploy provision the LangWatchQL access model, then retry",
+    ],
+  },
   custom_chart_playground_not_enabled: {
     tips: [
       "Dashboard widgets need both Dashboards and LangWatchQL enabled for this project; retrying will not help",
@@ -322,9 +328,18 @@ const registry = {
     tips: ["Revoked keys cannot be reactivated — create a new API key if you need one"],
     docsPath: "/api-reference/api-keys/create-api-key",
   },
+  api_key_expired: {
+    tips: ["An expired key cannot be rotated. Create a new API key instead"],
+    docsPath: "/api-reference/api-keys/create-api-key",
+  },
   api_key_permission_denied: {
     tips: ["Re-create the API key with the required scope, or ask an admin to raise your role"],
     docsPath: "/api-reference/api-keys/create-api-key",
+  },
+  impersonation_cannot_mint_credential: {
+    tips: [
+      "No role or grant changes this; leave impersonation, and ask the member to create or rotate the key themselves",
+    ],
   },
   legacy_project_key_ingestion_only: {
     tips: [
@@ -354,6 +369,12 @@ const registry = {
       "A self-hosted installation registers more documentation sites in its configuration",
     ],
   },
+  docs_playground_sessions_disabled: {
+    tips: [
+      "Paste an API key into the playground instead",
+      "An organisation admin can turn docs playground sessions back on under Settings, Authentication",
+    ],
+  },
   api_key_reserved_name: {
     tips: [
       "This name is reserved for keys LangWatch manages on your behalf; pick a different name",
@@ -361,6 +382,14 @@ const registry = {
     docsPath: "/api-reference/api-keys/create-api-key",
   },
 
+  // ---- ingestion sources ----
+  ingestion_source_disabled: {
+    tips: [
+      "Stop the exporter, or ask an organization admin to set the source back to active",
+      "Events refused while the source was disabled are not kept; resend them after re-enabling if you need them",
+    ],
+    docsPath: "/ai-governance/ingestion-sources/index",
+  },
   // ---- ingestion keys ----
   ingestion_key_not_found: {
     tips: [
@@ -437,9 +466,16 @@ const registry = {
       "Organization slugs are unique across the instance; pick a different slug, or omit it to derive one from the name",
     ],
   },
+  workflow_result_too_large: {
+    tips: [
+      "The workflow ran, but its result is over the 6 MB one synchronous answer can carry",
+      "Return less from the end node: fewer rows, shorter text, or a reference to stored data instead of the data itself",
+    ],
+    docsPath: "/workflows/overview",
+  },
   duplicate_invite: {
     tips: [
-      "A pending invite for this email already exists; revoke it first, or treat this as already done",
+      "A pending invite for this email already exists; resend it, revoke it first, or treat this as already done",
     ],
   },
   scim_token_not_found: {
@@ -448,6 +484,13 @@ const registry = {
       "List the organization's SCIM tokens to find the right id",
     ],
     docsPath: "/platform/scim",
+  },
+
+  braids_not_enabled: {
+    tips: [
+      "Braid management is not switched on for this organisation yet; retrying will not help",
+      "Braids that already exist keep applying to trace reads; ask LangWatch to switch braids on to create or change them",
+    ],
   },
 
   // ---- personal workspace reads ----
@@ -519,6 +562,13 @@ const registry = {
       "An archived agent is not found; a connected agent that registers again restores its row",
     ],
     docsPath: "/agent-testing/connect-your-agent",
+  },
+  agent_registry_entry_not_found: {
+    tips: [
+      "List the registry with GET /api/governance/registry/agents and use an `id` from that list",
+      "Registry ids start with agentreg_; a LangWatch agent id is a different id",
+    ],
+    docsPath: "/governance/agent-registry",
   },
   agent_offline: {
     tips: [
@@ -991,7 +1041,7 @@ const registry = {
   instant_eval_free_budget_exhausted: {
     tips: [
       "Read `meta.spentUsd` against `meta.budgetUsd`; the organization has spent its free Instant Evals allowance across every project",
-      "Upgrade the organization to a paid plan under Settings, Subscription; judged queries and runs are then billed per input token",
+      "Upgrade the organization to a paid plan under Settings, Plan & billing; judged queries and runs are then billed per input token",
     ],
   },
   instant_eval_not_enabled: {
@@ -1003,6 +1053,7 @@ const registry = {
   instant_eval_opt_in_not_offered: {
     tips: [
       "Read `meta.deployment`; an enterprise organization is switched on by LangWatch rather than from the search bar, and a self-hosted install gets Instant Evals from a license that names them, or from its operator's RELEASE_INSTANT_EVALS flag when it judges with its own JEV_API_KEY",
+      "When `meta.deployment` is `hosted_off`, LangWatch's hosted model is off for the organization; set an own decision model as the INSTANT_EVALS default model instead",
       "Contact support@langwatch.ai to switch them on, or to add them to the license",
     ],
     docsPath: "/features/instant-evals/limits-and-cost",

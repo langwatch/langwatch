@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+// Spec: packages/design-system/specs/meter-bar.feature
 
 import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
@@ -56,6 +57,49 @@ describe("MeterBar", () => {
 
       expect(track.children).toHaveLength(1);
       expect(fill?.getAttribute("data-fill-ratio")).toBe("0.25");
+    });
+  });
+
+  describe("given a meter split into two parts", () => {
+    /** @scenario A two-part meter lays its parts end to end in their own colours */
+    it("draws each part at its share, in order, in its own colour token", () => {
+      renderWithDesignSystem(
+        <MeterBar
+          segments={[
+            { ratio: 0.5, color: "blue.solid" },
+            { ratio: 0.25, color: "blue.muted" },
+          ]}
+          width="100px"
+          height="3px"
+          data-testid="meter"
+        />,
+      );
+      const parts = [...screen.getByTestId("meter").children];
+
+      expect(parts.map((part) => part.getAttribute("data-fill-ratio"))).toEqual(["0.5", "0.25"]);
+    });
+
+    /** @scenario A two-part meter never runs past the end of its track */
+    it("clamps the parts together to a full track and drops what does not fit", () => {
+      renderWithDesignSystem(
+        <MeterBar
+          segments={[
+            { ratio: 0.8, color: "blue.solid" },
+            { ratio: 0.5, color: "blue.muted" },
+            { ratio: 0.1, color: "blue.subtle" },
+          ]}
+          width="100px"
+          height="3px"
+          data-testid="meter"
+        />,
+      );
+      const ratios = [...screen.getByTestId("meter").children].map((part) =>
+        Number(part.getAttribute("data-fill-ratio")),
+      );
+
+      expect(ratios).toHaveLength(2);
+      expect(ratios[0]).toBe(0.8);
+      expect(ratios[1]).toBeCloseTo(0.2);
     });
   });
 });

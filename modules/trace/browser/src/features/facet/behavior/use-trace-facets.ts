@@ -8,12 +8,32 @@ import { api, type RouterOutputs } from "../../../behavior/trace-api.ts";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 
 const EMPTY: never[] = [];
+
+/**
+ * How often a viewer answered `pending` asks again. The `discover_updated` push is the fast
+ * path; this covers a push that never comes. A pending repeat reads only the server's cache.
+ */
+const DISCOVER_PENDING_POLL_MS = 5_000;
 const EMPTY_RESULT: { facets: never[]; pending: boolean } = {
   facets: EMPTY,
   pending: true,
 };
 
 type DiscoverResult = RouterOutputs["traces"]["discover"] | undefined;
+
+/**
+ * How long until a viewer asks again: every few seconds while its answer is pending. A failed
+ * read keeps its last data, which still says pending; stop, and let focus and the push recover it.
+ */
+export function discoverPollMs({
+  status,
+  data,
+}: {
+  status: "pending" | "error" | "success";
+  data: Pick<NonNullable<DiscoverResult>, "pending"> | undefined;
+}): number | false {
+  return status !== "error" && data?.pending === true ? DISCOVER_PENDING_POLL_MS : false;
+}
 
 // A project switch with no fresh response yet shows the skeleton, so project A's
 // payload never bleeds into project B's render.
@@ -58,6 +78,7 @@ export function useTraceFacets() {
       // the sidebar doesn't flicker. Project switches are gated below by
       // remembering which project the cached response belongs to.
       placeholderData: keepPreviousData,
+      refetchInterval: (query) => discoverPollMs(query.state),
       // needs a read hint: discover computed (a cold miss returns pending: true)
     },
   );

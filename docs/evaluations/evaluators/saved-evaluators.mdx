@@ -51,11 +51,29 @@ class Code:
 
 From code you can:
 
+- **Create it**: `POST /api/evaluators` with `type: "code"` and a `config` carrying `code` (the program) and `inputs` (each an `identifier` and a `type`, for example `str`). The CLI does the same with `langwatch evaluator create "Contains answer" --code ./evaluator.py --input output --input expected_output`.
 - **Run it** like any saved evaluator: `POST /api/evaluations/evaluators/{slug}/evaluate`, with `data` holding one value per declared input.
 - **Find it**: `GET /api/evaluators` lists it with `type: "code"`, and `GET /api/evaluators/{idOrSlug}` returns its code and inputs in `config`.
 - **Monitor with it**: run it on incoming traces with `POST /api/monitors`, sending the evaluator's id as `evaluatorId` and `code/<evaluatorId>` as `checkType`, plus `mappings` from trace fields to its inputs.
 
-Creating a code evaluator and editing its code are done on the Evaluators page: `POST /api/evaluators` only creates built-in evaluator types.
+Creating one from code looks like this:
+
+```bash
+curl -X POST "https://app.langwatch.ai/api/evaluators" \
+  -H "X-Auth-Token: $LANGWATCH_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Contains answer",
+    "type": "code",
+    "config": {
+      "code": "class Code:\n    def __call__(self, output: str, expected_output: str):\n        passed = expected_output.lower() in output.lower()\n        return {\"passed\": passed}",
+      "inputs": [
+        { "identifier": "output", "type": "str" },
+        { "identifier": "expected_output", "type": "str" }
+      ]
+    }
+  }'
+```
 
 ## Using Saved Evaluators
 

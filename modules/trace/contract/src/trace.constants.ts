@@ -87,6 +87,21 @@ export const TRACE_NAME_CHANGED_EVENT_VERSION_LATEST = "2026-05-07" as const;
 
 export const TRACE_NAME_CHANGED_EVENT_VERSIONS = [TRACE_NAME_CHANGED_EVENT_VERSION_LATEST] as const;
 
+/** An evaluation's outcome recorded on its trace, so the trace fold copies it (trace ADR-003). */
+export const EVALUATION_OUTCOME_RECORDED_EVENT_TYPE =
+  "lw.obs.trace.evaluation_outcome_recorded" as const;
+export const EVALUATION_OUTCOME_RECORDED_EVENT_VERSION_LATEST = "2026-11-12" as const;
+
+export const EVALUATION_OUTCOME_RECORDED_EVENT_VERSIONS = [
+  EVALUATION_OUTCOME_RECORDED_EVENT_VERSION_LATEST,
+] as const;
+
+/** The longest evaluator name or label an outcome carries; the recorder truncates past it. */
+export const EVALUATION_OUTCOME_TEXT_MAX_LENGTH = 256;
+
+/** The latest evaluation time an outcome may carry: the row's TTL casts it to DateTime (2106). */
+export const EVALUATION_OUTCOME_OCCURRED_AT_MAX_MS = 4_294_967_295_000;
+
 export const TRACE_PROCESSING_EVENT_TYPES = [
   SPAN_RECEIVED_EVENT_TYPE,
   SPAN_RECORDED_EVENT_TYPE,
@@ -99,6 +114,7 @@ export const TRACE_PROCESSING_EVENT_TYPES = [
   ANNOTATION_REMOVED_EVENT_TYPE,
   ANNOTATIONS_BULK_SYNCED_EVENT_TYPE,
   TRACE_NAME_CHANGED_EVENT_TYPE,
+  EVALUATION_OUTCOME_RECORDED_EVENT_TYPE,
 ] as const;
 
 export type TraceProcessingEventType = (typeof TRACE_PROCESSING_EVENT_TYPES)[number];
@@ -113,6 +129,8 @@ export const ADD_ANNOTATION_COMMAND_TYPE = "lw.obs.trace.add_annotation" as cons
 export const REMOVE_ANNOTATION_COMMAND_TYPE = "lw.obs.trace.remove_annotation" as const;
 export const BULK_SYNC_ANNOTATIONS_COMMAND_TYPE = "lw.obs.trace.bulk_sync_annotations" as const;
 export const CHANGE_TRACE_NAME_COMMAND_TYPE = "lw.obs.trace.change_trace_name" as const;
+export const RECORD_EVALUATION_OUTCOME_COMMAND_TYPE =
+  "lw.obs.trace.record_evaluation_outcome" as const;
 
 export const TRACE_PROCESSING_COMMAND_TYPES = [
   RECORD_SPAN_COMMAND_TYPE,
@@ -125,6 +143,7 @@ export const TRACE_PROCESSING_COMMAND_TYPES = [
   REMOVE_ANNOTATION_COMMAND_TYPE,
   BULK_SYNC_ANNOTATIONS_COMMAND_TYPE,
   CHANGE_TRACE_NAME_COMMAND_TYPE,
+  RECORD_EVALUATION_OUTCOME_COMMAND_TYPE,
 ] as const;
 
 /**

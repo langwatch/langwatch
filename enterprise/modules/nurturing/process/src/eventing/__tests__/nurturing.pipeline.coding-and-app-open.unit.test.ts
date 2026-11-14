@@ -29,6 +29,9 @@ function nurturing() {
     evaluationsCompleted: async () => undefined,
     simulationRunsFinished: async () => undefined,
     codingSessionsStored: async ({ sessions }) => void codingBatches.push([...sessions]),
+    recordPersonalOwner: async () => undefined,
+    recordTracedProject: async () => undefined,
+    forgetErasedUser: async () => undefined,
   });
   const subscribers: EventSubscriberDefinition<Event>[] = [];
   const registry = createApiFixture<
@@ -40,7 +43,7 @@ function nurturing() {
   return { delivered, codingBatches, lanesOf };
 }
 
-const appOpenedFact = (): Event =>
+const appOpenedFact = (page = "me_sessions"): Event =>
   ({
     id: "evt-app-opened",
     aggregateId: "user-1",
@@ -50,8 +53,8 @@ const appOpenedFact = (): Event =>
     occurredAt: AT,
     type: APP_PAGE_OPENED_EVENT_TYPE,
     version: "2026-10-21",
-    data: { tenantId: "user-1", userId: "user-1", page: "me_sessions", occurredAt: AT },
-    idempotencyKey: `user-1:app_page_opened:me_sessions:${AT}`,
+    data: { tenantId: "user-1", userId: "user-1", page, occurredAt: AT },
+    idempotencyKey: `user-1:app_page_opened:${page}:${AT}`,
   }) as Event;
 
 const sessionStoredFact = (): Event =>
@@ -93,6 +96,29 @@ describe("nurturing's appPageOpened peer subscriber", () => {
       ).toEqual([
         ["app_opened", "user-1"],
         ["sessions_page_viewed", "user-1"],
+      ]);
+    });
+  });
+
+  describe("when auth records an open of the usage page", () => {
+    /** @scenario "A usage, cost or plan page open identifies usage_page_viewed_at on the opening user" */
+    /** @scenario "Any tracked page open identifies app_last_opened_at" */
+    it("delivers the app open and usage page signals and nothing about the sessions page", async () => {
+      const { delivered, lanesOf } = nurturing();
+
+      for (const lane of lanesOf(APP_PAGE_OPENED_EVENT_TYPE)) {
+        await lane.handle?.(appOpenedFact("settings_usage"), {
+          tenantId: createTenantId("user-1"),
+          aggregateId: "user-1",
+        });
+      }
+
+      expect(
+        delivered.map((signal) => [signal.kind, "userId" in signal ? signal.userId : null]),
+      ).toEqual([
+        ["app_opened", "user-1"],
+        ["usage_page_opened", "user-1"],
+        ["usage_page_viewed", "user-1"],
       ]);
     });
   });

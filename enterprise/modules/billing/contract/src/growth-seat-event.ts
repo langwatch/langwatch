@@ -132,9 +132,22 @@ export const isGrowthInstantEvalPriceProvisioned = ({
 }): boolean => Boolean(prices.GROWTH_INSTANT_EVAL_USD);
 
 /**
+ * The PII redaction price on a Growth subscription, when the mode has one.
+ * Dollars only, since its meter counts dollars (ADR-201), and absent until
+ * provisioned, so a checkout never fails over it.
+ */
+export const pickGrowthPiiRedactionPriceId = ({
+  currency,
+  prices,
+}: {
+  currency: Currency;
+  prices: StripePriceMap;
+}): string | undefined => (currency === "USD" ? prices.GROWTH_PII_REDACTION_USD : undefined);
+
+/**
  * Stripe checkout line items for a Growth subscription: a seat item (quantity
- * = coreMembers), a metered events item, and where provisioned a metered
- * Instant Evals one. Neither metered item carries a quantity.
+ * = coreMembers), a metered events item, and where provisioned the metered
+ * Instant Evals and PII redaction ones. No metered item carries a quantity.
  */
 export const createCheckoutLineItems = ({
   coreMembers,
@@ -151,6 +164,7 @@ export const createCheckoutLineItems = ({
     throw new InvalidSeatCountError(coreMembers);
   }
   const instantEvalPriceId = pickGrowthInstantEvalPriceId({ currency, prices });
+  const piiRedactionPriceId = pickGrowthPiiRedactionPriceId({ currency, prices });
 
   return [
     {
@@ -161,5 +175,36 @@ export const createCheckoutLineItems = ({
       price: resolveGrowthEventsPriceId({ currency, interval, prices }),
     },
     ...(instantEvalPriceId ? [{ price: instantEvalPriceId }] : []),
+    ...(piiRedactionPriceId ? [{ price: piiRedactionPriceId }] : []),
   ];
 };
+
+/** Developer seats: sold only where an operator configured their optional catalogue price. */
+const DEVELOPER_SEAT_PRICE_NAMES = [
+  "DEVELOPER_SEAT_EUR_MONTHLY",
+  "DEVELOPER_SEAT_EUR_ANNUAL",
+  "DEVELOPER_SEAT_USD_MONTHLY",
+  "DEVELOPER_SEAT_USD_ANNUAL",
+] as const satisfies readonly StripePriceName[];
+
+/** Whether Developer seats are sold in this currency and interval, and at which price. */
+export type DeveloperSeatOffer = { sold: true; priceId: string } | { sold: false };
+
+/** The configured Developer seat price for this currency and interval, if one is configured. */
+export const developerSeatOfferFor = ({
+  currency,
+  interval,
+  prices,
+}: {
+  currency: Currency;
+  interval: BillingInterval;
+  prices: StripePriceMap;
+}): DeveloperSeatOffer => {
+  const key = `DEVELOPER_SEAT_${currency}_${interval.toUpperCase()}` as StripePriceName;
+  const priceId = prices[key];
+  return priceId ? { sold: true, priceId } : { sold: false };
+};
+
+/** Whether a subscription line bills Developer seats. */
+export const isDeveloperSeatPrice = (priceId: string, prices: StripePriceMap): boolean =>
+  DEVELOPER_SEAT_PRICE_NAMES.some((name) => prices[name] === priceId);

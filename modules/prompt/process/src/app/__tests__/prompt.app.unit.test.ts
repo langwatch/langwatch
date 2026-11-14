@@ -1,6 +1,7 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EventingCommands } from "@langwatch/eventing";
+import type * as Observability from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 /**
  * @vitest-environment node
@@ -19,6 +20,51 @@ import type { PromptService } from "../../services/prompt.service.ts";
 import { PromptModule } from "../prompt.app.ts";
 
 const NOW = new Date("2026-08-24T00:00:00.000Z");
+
+/** Every error line any prompt logger writes, so a lost lifecycle fact can be checked. */
+const loggedErrors = vi.hoisted((): { fields: unknown; message: unknown }[] => []);
+vi.mock("@langwatch/observability", async (importOriginal) => ({
+  ...(await importOriginal<typeof Observability>()),
+  createLogger: () => ({
+    debug: () => undefined,
+    info: () => undefined,
+    warn: () => undefined,
+    error: (fields: unknown, message: unknown) => void loggedErrors.push({ fields, message }),
+  }),
+}));
+
+const lostFacts = (fact: string) =>
+  loggedErrors.filter((e) => e.message === `prompt ${fact} was not recorded`);
+
+/** A sender that records each payload it is given. */
+function recorder<T>(into: unknown[], fail = false) {
+  return {
+    send: async (payload: T) => {
+      if (fail) throw new Error("event store down");
+      into.push(payload);
+    },
+    sendBatch: async () => {},
+    close: async () => {},
+    waitUntilReady: async () => {},
+  };
+}
+
+/** Lifecycle senders that record what each command was sent. */
+function recordingCommands(input: {
+  created?: unknown[];
+  versions?: unknown[];
+  deleted?: unknown[];
+  fail?: boolean;
+}): EventingCommands<PromptLifecyclePipeline> {
+  return {
+    recordPromptCreated: recorder(input.created ?? [], input.fail),
+    recordPromptVersionSaved: recorder(input.versions ?? [], input.fail),
+    recordPromptDeleted: recorder(input.deleted ?? [], input.fail),
+  };
+}
+
+/** The fire-and-forget senders run on the microtask queue; a flush lets them land. */
+const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 /**
  * A source prompt as the library reads it back. Only the fields the copy rule
@@ -340,16 +386,7 @@ describe("PromptModule.create", () => {
     /** @scenario "Prompt creation tracked regardless of whether created via platform UI or API" */
     it("resolves the org admin and sends the count when the write carried no user", async () => {
       const sent: unknown[] = [];
-      const commands: EventingCommands<PromptLifecyclePipeline> = {
-        recordPromptCreated: {
-          send: async (payload) => {
-            sent.push(payload);
-          },
-          sendBatch: async () => {},
-          close: async () => {},
-          waitUntilReady: async () => {},
-        },
-      };
+      const commands = recordingCommands({ created: sent });
 
       const app = PromptModule.create({
         dependencies: {
@@ -397,5 +434,267 @@ describe("PromptModule.create", () => {
         }),
       ]);
     });
+  });
+});
+
+describe("PromptModule lifecycle facts", () => {
+  function connected(options: { fail?: boolean } = {}) {
+    const versions: unknown[] = [];
+    const deleted: unknown[] = [];
+    const repositories = MemoryPromptRepositories.create();
+    const app = PromptModule.create({
+      dependencies: {
+        projects: createApiFixture<ProjectApi>({
+          getOrganizationId: async () => "org-1",
+          listIdsByOrganization: async () => [],
+        }),
+        permissions: createApiFixture<AuthzApi>(),
+        plans: createApiFixture<EntitlementApi>(),
+        workflow: createApiFixture<WorkflowApi>(),
+        modelProviders: defaultModelFixture(),
+      },
+      config: { publicBaseUrl: "https://app.langwatch.test" },
+      resources: { own: () => {}, ownService: () => {} },
+      secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
+      repositories,
+    });
+    app.connectLifecycleCommands(recordingCommands({ versions, deleted, fail: options.fail }));
+    const createOne = () =>
+      app.createPrompt({
+        projectId: "project-1",
+        organizationId: "org-1",
+        handle: "support-triage",
+        prompt: "You are a support bot.",
+      });
+    return { app, versions, deleted, createOne, repositories };
+  }
+
+  /** @scenario "saving a new version of a prompt records that a version was saved" */
+  it("records one version saved fact with ids only when a prompt is updated", async () => {
+    const { app, versions, createOne } = connected();
+    const created = await createOne();
+
+    const saved = await app.update(
+      {
+        idOrHandle: created.id,
+        projectId: "project-1",
+        data: { commitMessage: "Tighter tone", prompt: "You are a terse support bot." },
+      },
+      { id: "user-1" },
+    );
+    await flush();
+
+    expect(versions).toEqual([
+      {
+        tenantId: "project-1",
+        occurredAt: expect.any(Number),
+        promptId: created.id,
+        projectId: "project-1",
+        versionId: saved.versionId,
+        authorId: "user-1",
+      },
+    ]);
+  });
+
+  /** @scenario "restoring an earlier version records the restored copy as a saved version" */
+  it("records one version saved fact for the new version a restore writes", async () => {
+    const { app, versions, createOne } = connected();
+    const created = await createOne();
+
+    const restored = await app.restoreVersion(
+      { versionId: created.versionId, projectId: "project-1" },
+      { id: "user-1" },
+    );
+    await flush();
+
+    expect(restored.versionId).not.toBe(created.versionId);
+    expect(versions).toEqual([
+      expect.objectContaining({ promptId: created.id, versionId: restored.versionId }),
+    ]);
+  });
+
+  /** @scenario "restoring an earlier version records the restored copy as a saved version" */
+  it("records the version the restore wrote even when another save lands right after it", async () => {
+    const { app, versions, createOne, repositories } = connected();
+    const created = await createOne();
+    const store = repositories.configs.versions;
+    const write = store.restoreVersion.bind(store);
+    let restoredRowId = "";
+    let concurrentVersionId = "";
+    vi.spyOn(store, "restoreVersion").mockImplementation(async (params) => {
+      const row = await write(params);
+      restoredRowId = row.id;
+      const concurrent = await app.update(
+        { idOrHandle: created.id, projectId: "project-1", data: { commitMessage: "Meanwhile" } },
+        { id: "user-2" },
+      );
+      concurrentVersionId = concurrent.versionId;
+      return row;
+    });
+
+    const restored = await app.restoreVersion(
+      { versionId: created.versionId, projectId: "project-1" },
+      { id: "user-1" },
+    );
+    await flush();
+
+    expect(restored.versionId).toBe(restoredRowId);
+    expect(restoredRowId).not.toBe(concurrentVersionId);
+    expect(versions).toEqual([
+      expect.objectContaining({ versionId: concurrentVersionId, authorId: "user-2" }),
+      expect.objectContaining({ versionId: restoredRowId, authorId: "user-1" }),
+    ]);
+  });
+
+  /** @scenario "updating a prompt through the REST API records one saved version" */
+  it("records one version saved fact when the REST update writes a version", async () => {
+    const { app, versions, createOne } = connected();
+    const created = await createOne();
+
+    const updated = await app.updateWithTags({
+      idOrHandle: created.id,
+      projectId: "project-1",
+      organizationId: "org-1",
+      data: { commitMessage: "From the SDK", prompt: "You are a calm support bot." },
+    });
+    await flush();
+
+    expect(versions).toEqual([
+      expect.objectContaining({ promptId: created.id, versionId: updated.versionId }),
+    ]);
+  });
+
+  /** @scenario "syncing a prompt from the CLI records a saved version only when it writes one" */
+  it("records one version saved fact for a sync that updates and none for one that is up to date", async () => {
+    const { app, versions, createOne } = connected();
+    const created = await createOne();
+    const localConfigData = {
+      model: "gpt-4",
+      prompt: "You are a synced support bot.",
+      messages: [],
+      inputs: [{ identifier: "input", type: "str" as const }],
+      outputs: [{ identifier: "output", type: "str" as const }],
+    };
+
+    const first = await app.syncAndAnnounce({
+      idOrHandle: created.id,
+      projectId: "project-1",
+      organizationId: "org-1",
+      localConfigData,
+      localVersion: created.version,
+    });
+    const second = await app.syncAndAnnounce({
+      idOrHandle: created.id,
+      projectId: "project-1",
+      organizationId: "org-1",
+      localConfigData,
+      localVersion: first.prompt?.version,
+    });
+    await flush();
+
+    expect([first.action, second.action]).toEqual(["updated", "up_to_date"]);
+    expect(versions).toEqual([
+      expect.objectContaining({ promptId: created.id, versionId: first.prompt?.versionId }),
+    ]);
+  });
+
+  /** @scenario "pushing or syncing a source onto a copy records a saved version on the copy" */
+  it("records one version saved fact for the copy, in the copy's project", async () => {
+    const { app, apply } = harness();
+    const versions: unknown[] = [];
+    app.connectLifecycleCommands(recordingCommands({ versions }));
+
+    await apply(sourcePrompt());
+    await flush();
+
+    expect(versions).toEqual([
+      expect.objectContaining({
+        tenantId: "project-copy",
+        promptId: "prompt-copy",
+        projectId: "project-copy",
+        versionId: "version-7",
+      }),
+    ]);
+  });
+
+  /** @scenario "creating a prompt records no saved version" */
+  it("records no version saved fact for a prompt's first version", async () => {
+    const { versions, createOne } = connected();
+
+    await createOne();
+    await flush();
+
+    expect(versions).toEqual([]);
+  });
+
+  /** @scenario "deleting a prompt by its handle records that the prompt was deleted" */
+  it("records one deleted fact carrying the prompt id when deleted by handle", async () => {
+    const { app, deleted, createOne } = connected();
+    const created = await createOne();
+
+    await app.delete({ idOrHandle: "support-triage", projectId: "project-1" });
+    await flush();
+
+    expect(deleted).toEqual([
+      {
+        tenantId: "project-1",
+        occurredAt: expect.any(Number),
+        promptId: created.id,
+        projectId: "project-1",
+      },
+    ]);
+  });
+
+  /** @scenario "a lost lifecycle fact never fails the write" */
+  it("logs exactly one error with its ids for each lost fact", async () => {
+    const { app, createOne } = connected({ fail: true });
+    const created = await createOne();
+    loggedErrors.length = 0;
+
+    const saved = await app.update(
+      { idOrHandle: created.id, projectId: "project-1", data: { commitMessage: "Edit" } },
+      { id: "user-1" },
+    );
+    await app.delete({ idOrHandle: created.id, projectId: "project-1" });
+    await flush();
+
+    expect(lostFacts("version_saved")).toEqual([
+      {
+        fields: expect.objectContaining({
+          tenantId: "project-1",
+          projectId: "project-1",
+          promptId: created.id,
+          versionId: saved.versionId,
+        }),
+        message: "prompt version_saved was not recorded",
+      },
+    ]);
+    expect(lostFacts("deleted")).toEqual([
+      {
+        fields: expect.objectContaining({
+          tenantId: "project-1",
+          projectId: "project-1",
+          promptId: created.id,
+        }),
+        message: "prompt deleted was not recorded",
+      },
+    ]);
+  });
+
+  /** @scenario "a lost lifecycle fact never fails the write" */
+  it("saves and deletes even when every send fails", async () => {
+    const { app, versions, deleted, createOne } = connected({ fail: true });
+    const created = await createOne();
+
+    const saved = await app.update(
+      { idOrHandle: created.id, projectId: "project-1", data: { commitMessage: "Edit" } },
+      { id: "user-1" },
+    );
+    const removed = await app.delete({ idOrHandle: created.id, projectId: "project-1" });
+    await flush();
+
+    expect(saved.id).toBe(created.id);
+    expect(removed.success).toBe(true);
+    expect([...versions, ...deleted]).toEqual([]);
   });
 });

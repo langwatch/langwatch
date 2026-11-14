@@ -15,6 +15,8 @@ type AgentWorkflowFieldsServiceOptions = {
     listWorkflowConfigs(input: AgentWorkflowInput): Promise<AgentWorkflowConfig[]>;
     updateWorkflowConfig(input: UpdateAgentWorkflowConfigInput): Promise<void>;
   };
+  /** Says an agent changed, so its reads refetch. */
+  recordChanged(agent: { id: string; projectId: string }): Promise<void>;
 };
 
 export class AgentWorkflowFieldsService {
@@ -37,6 +39,7 @@ export class AgentWorkflowFieldsService {
         workflowId,
         config: { ...config, workflowFields: fields },
       });
+      await this.options.recordChanged({ id, projectId });
     }
   }
 

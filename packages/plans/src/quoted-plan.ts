@@ -14,6 +14,8 @@ import type { Plan } from "./plan.ts";
 export const planSeatsAndVolumeShape = {
   maxMembers: z.number(),
   maxMembersLite: z.number(),
+  /** Defaults so a plan stored before Developer seats were capped still reads. */
+  maxMembersDeveloper: z.number().default(0),
   maxMessagesPerMonth: z.number(),
   canPublish: z.boolean(),
 } as const;
@@ -42,6 +44,7 @@ export const planNextStepCeilingsShape = {
 export type PlanSeatsAndVolume = {
   maxMembers: number;
   maxMembersLite: number;
+  maxMembersDeveloper: number;
   maxMessagesPerMonth: number;
 };
 
@@ -57,15 +60,18 @@ export type PlanNextStepCeilings = {
 export function planSeatsAndVolume({
   members,
   membersLite,
+  membersDeveloper,
   messagesPerMonth,
 }: {
   members: number;
   membersLite: number;
+  membersDeveloper: number;
   messagesPerMonth: number;
 }): PlanSeatsAndVolume {
   return {
     maxMembers: members,
     maxMembersLite: membersLite,
+    maxMembersDeveloper: membersDeveloper,
     maxMessagesPerMonth: messagesPerMonth,
   };
 }
@@ -88,16 +94,18 @@ export function planQuantities<Members, Volume>({
 export function quotedPlanLimits({
   members,
   membersLite,
+  membersDeveloper,
   messagesPerMonth,
   publish,
 }: {
   members: number;
   membersLite: number;
+  membersDeveloper: number;
   messagesPerMonth: number;
   publish: boolean;
 }): QuotedPlanLimits {
   return {
-    ...planSeatsAndVolume({ members, membersLite, messagesPerMonth }),
+    ...planSeatsAndVolume({ members, membersLite, membersDeveloper, messagesPerMonth }),
     canPublish: publish,
   };
 }
@@ -118,6 +126,7 @@ export function quotedPlanLimitsOf(source: QuotedPlanLimits): QuotedPlanLimits {
   return quotedPlanLimits({
     members: source.maxMembers,
     membersLite: source.maxMembersLite,
+    membersDeveloper: source.maxMembersDeveloper,
     messagesPerMonth: source.maxMessagesPerMonth,
     publish: source.canPublish,
   });
@@ -151,6 +160,7 @@ export function quotedLimitsOfPlan(plan: Plan): QuotedPlanLimits & {
     ...planSeatsAndVolume({
       members: limits.members.value,
       membersLite: limits.membersLite.value,
+      membersDeveloper: limits.membersDeveloper.value,
       messagesPerMonth: limits.volume.value,
     }),
     canPublish: plan.gates.canPublish,

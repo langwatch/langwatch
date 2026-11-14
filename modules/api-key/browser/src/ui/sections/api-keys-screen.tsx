@@ -32,6 +32,7 @@ import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { apiKeyApi } from "../../behavior/api-key-api.ts";
 import { type LegacyProjectKey, useLegacyKeys } from "../../behavior/use-legacy-keys.ts";
 import { apiKeyRowAnchorId } from "../../model/api-key-anchor.ts";
+import { maskedKeyHint } from "../../model/api-key-details.ts";
 import type { CreateApiKeyInput } from "../../model/api-key-form.ts";
 import { API_KEY_SCOPE_QUERY_KEY, useApiKeyHost } from "../../model/api-key-host.ts";
 import { findBindingAtScope } from "../../model/api-key-permissions.ts";
@@ -48,8 +49,10 @@ import { LegacyKeyRevokedNotice } from "../blocks/legacy-key-revoked-notice.tsx"
 import { LegacyProjectKeyBanner } from "../blocks/legacy-project-key-banner.tsx";
 import { RevokeConfirmDialog } from "../blocks/revoke-confirm-dialog.tsx";
 import { RevokeLegacyKeyDialog } from "../blocks/revoke-legacy-key-dialog.tsx";
+import { ApiKeyDetailsDrawer } from "./api-key-details-drawer.tsx";
 import { CreateApiKeyDrawer } from "./create-api-key-drawer.tsx";
 import { EditApiKeyDrawer } from "./edit-api-key-drawer.tsx";
+import { RotateApiKeyFlow } from "./rotate-api-key-flow.tsx";
 import { TokenCreatedDialog } from "./token-created-dialog.tsx";
 
 /** A key as the browser holds one: the wire carries its instants as ISO strings. */
@@ -125,18 +128,22 @@ function ApiKeyTableRow({
   apiKey,
   scopeBadge,
   canModify,
+  onOpen,
   onEdit,
+  onRotate,
   onRevoke,
 }: {
   apiKey: ApiKeyRow;
   scopeBadge: ReactNode;
   /** Owner or admin; a service key (no user) needs admin. */
   canModify: boolean;
+  onOpen: (apiKey: ApiKeyRow) => void;
   onEdit: (apiKey: ApiKeyRow) => void;
+  onRotate: (apiKey: ApiKeyRow) => void;
   onRevoke: (apiKeyId: string) => void;
 }) {
   return (
-    <ListTable.Row id={apiKeyRowAnchorId(apiKey.id)}>
+    <ListTable.Row id={apiKeyRowAnchorId(apiKey.id)} onActivate={() => onOpen(apiKey)}>
       <ListTable.Cell>
         <HStack align="start">
           <Box paddingTop={1} color="fg.muted" flexShrink={0}>
@@ -145,7 +152,12 @@ function ApiKeyTableRow({
           <VStack align="start" gap={0} minWidth={0}>
             <HStack gap={2} maxWidth="full" minWidth={0}>
               <Text textStyle="label" flex={1} minWidth={0} truncate title={apiKey.name}>
-                {apiKey.name}
+                <ListTable.RowAction
+                  label={`Open API key ${apiKey.name}`}
+                  onActivate={() => onOpen(apiKey)}
+                >
+                  {apiKey.name}
+                </ListTable.RowAction>
               </Text>
               {isExpired(apiKey) ? (
                 <Badge size="sm" colorPalette="red" flexShrink={0}>
@@ -173,11 +185,7 @@ function ApiKeyTableRow({
       </ListTable.Cell>
       <ListTable.Cell>
         <VStack align="start" gap={0}>
-          <IdText
-            value={`sk-lw-${apiKey.lookupIdPrefix}…`}
-            label="secret key prefix"
-            copyable={false}
-          />
+          <IdText value={maskedKeyHint(apiKey)} label="secret key prefix" copyable={false} />
           <Text textStyle="caption" color="fg.muted">
             Created <FormattedDate value={apiKey.createdAt} display="date" />
           </Text>
@@ -230,6 +238,13 @@ function ApiKeyTableRow({
             <Menu.Content>
               <Menu.Item value="edit" data-testid="api-key-edit" onClick={() => onEdit(apiKey)}>
                 Edit
+              </Menu.Item>
+              <Menu.Item
+                value="rotate"
+                data-testid="api-key-rotate"
+                onClick={() => onRotate(apiKey)}
+              >
+                Rotate
               </Menu.Item>
               <Menu.Item
                 value="revoke"
@@ -375,6 +390,8 @@ export default function ApiKeysScreen() {
   const [newKeyInput, setNewKeyInput] = useState<CreateApiKeyInput | null>(null);
   const [apiKeyToRevoke, setApiKeyToRevoke] = useState<string | null>(null);
   const [apiKeyToEdit, setApiKeyToEdit] = useState<ApiKeyRow | null>(null);
+  const [apiKeyToView, setApiKeyToView] = useState<ApiKeyRow | null>(null);
+  const [apiKeyToRotate, setApiKeyToRotate] = useState<ApiKeyRow | null>(null);
   const [legacyKeyToRevoke, setLegacyKeyToRevoke] = useState<LegacyProjectKey | null>(null);
   const [legacyReplacement, setLegacyReplacement] = useState<CreateApiKeyInput | null>(null);
 
@@ -529,6 +546,8 @@ export default function ApiKeysScreen() {
     );
   };
 
+  const canModifyKey = (apiKeyRow: ApiKeyRow) => isAdmin || apiKeyRow.userId === currentUserId;
+
   // Confirming revokes the legacy key, then opens the create drawer filled with
   // its replacement. A reader whose key could not send traces is refused before
   // the revoke, so they are never left with neither key.
@@ -594,7 +613,7 @@ export default function ApiKeysScreen() {
           Create new secret key
         </PageLayout.HeaderButton>
       </PageLayout.Header>
-      <VStack gap={6} width="full" align="stretch" paddingTop={4}>
+      <VStack gap={6} width="full" align="stretch">
         <Text color="fg.muted">
           Keys that let your code and tools talk to LangWatch. Do not share your API keys or expose
           them in the browser or other client-side code.
@@ -606,9 +625,10 @@ export default function ApiKeysScreen() {
           {/* Personal + service keys (ingestSourceType == null); the page heading titles them. */}
           {!isLoadingKeys && serviceApiKeys.length === 0 && legacyKeys.keys.length === 0 ? (
             <NoDataInfoBlock
+              size="inline"
               title="No API keys"
               description="Create one to get started."
-              icon={<Key size={24} />}
+              icon={<Key size={20} />}
               testId="api-keys-empty"
             />
           ) : (
@@ -648,8 +668,10 @@ export default function ApiKeysScreen() {
                     key={apiKey.id}
                     apiKey={apiKey}
                     scopeBadge={getScopeBadge(apiKey)}
-                    canModify={isAdmin || apiKey.userId === currentUserId}
+                    canModify={canModifyKey(apiKey)}
+                    onOpen={setApiKeyToView}
                     onEdit={setApiKeyToEdit}
+                    onRotate={setApiKeyToRotate}
                     onRevoke={setApiKeyToRevoke}
                   />
                 ))}
@@ -704,6 +726,24 @@ export default function ApiKeysScreen() {
           onSave={handleUpdate}
         />
 
+        <ApiKeyDetailsDrawer
+          apiKey={apiKeyToView}
+          canModify={canModifyKey}
+          onClose={() => setApiKeyToView(null)}
+          onEdit={(apiKeyRow) => {
+            setApiKeyToView(null);
+            setApiKeyToEdit(apiKeyRow);
+          }}
+          onRotate={(apiKeyRow) => {
+            setApiKeyToView(null);
+            setApiKeyToRotate(apiKeyRow);
+          }}
+          onRevoke={(apiKeyId) => {
+            setApiKeyToView(null);
+            setApiKeyToRevoke(apiKeyId);
+          }}
+        />
+
         <TokenCreatedDialog
           newToken={newToken}
           keyName={newKeyInput?.name}
@@ -723,6 +763,15 @@ export default function ApiKeysScreen() {
             setNewKeyInput(null);
             onCreateClose();
           }}
+        />
+
+        <RotateApiKeyFlow
+          apiKey={apiKeyToRotate}
+          organizationId={organizationId}
+          projectId={scope.projectId}
+          endpoint={endpoint}
+          orgProjects={availableProjects}
+          onClose={() => setApiKeyToRotate(null)}
         />
 
         <RevokeConfirmDialog

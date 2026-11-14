@@ -15,8 +15,6 @@ const LAUNCHER = ".docs-agent-launcher";
 const PICK = ".docs-agent-pick[data-reel]";
 const motion = matchMedia("(prefers-reduced-motion: no-preference)");
 let chosen = "claude";
-let manual = false;
-let timer: ReturnType<typeof setTimeout> | undefined;
 
 type Reel = {
   pick: HTMLElement;
@@ -32,6 +30,7 @@ type Reel = {
 };
 type Drag = {
   id: number;
+  pick: HTMLElement;
   startY: number;
   from: number;
   moved: boolean;
@@ -122,8 +121,6 @@ function run({ turning }: { turning: Reel }) {
 
 /** Takes hold of a launcher's reel, catching it where it is if it is already turning. */
 function grab({ pick }: { pick: HTMLElement }) {
-  manual = true;
-  clearTimeout(timer);
   if (reel?.pick === pick) return reel;
   if (reel) {
     cancelAnimationFrame(reel.frame);
@@ -200,26 +197,6 @@ function release({ event, pick }: { event: PointerEvent; pick: HTMLElement }) {
   });
 }
 
-function busy() {
-  return (
-    document.hidden ||
-    Boolean(document.querySelector(`${LAUNCHER}:hover, ${LAUNCHER}:focus-within`))
-  );
-}
-
-function schedule() {
-  clearTimeout(timer);
-  if (manual || !motion.matches) return;
-  timer = setTimeout(() => {
-    const select = document.querySelector<HTMLSelectElement>(`${LAUNCHER} select`);
-    if (!select || busy() || reel) return schedule();
-    const options = [...select.options].map((option) => option.value);
-    chosen = options[(options.indexOf(chosen) + 1) % options.length] ?? chosen;
-    show();
-    schedule();
-  }, 2800);
-}
-
 function onPointerDown(event: PointerEvent) {
   const pick = event.target instanceof Element ? event.target.closest<HTMLElement>(PICK) : null;
   if (!pick || event.button !== 0) return;
@@ -229,12 +206,20 @@ function onPointerDown(event: PointerEvent) {
   const from = motion.matches ? grab({ pick }).position : CODING_AGENTS.indexOf(chosen);
   if (reel) Object.assign(reel, { goal: from, target: undefined });
   const sample = { time: event.timeStamp, y: event.clientY };
-  drag = { id: event.pointerId, startY: event.clientY, from, moved: false, samples: [sample] };
+  drag = {
+    id: event.pointerId,
+    pick,
+    startY: event.clientY,
+    from,
+    moved: false,
+    samples: [sample],
+  };
 }
 
+/* A drag follows its pointer anywhere on the page, not only over the launcher it started on. */
 function onPointerMove(event: PointerEvent) {
-  const pick = event.target instanceof Element ? event.target.closest<HTMLElement>(PICK) : null;
-  if (!pick || drag?.id !== event.pointerId) return;
+  if (!drag || drag.id !== event.pointerId) return;
+  const { pick } = drag;
   const dy = event.clientY - drag.startY;
   if (Math.abs(dy) > 4) drag.moved = true;
   drag.samples = [...drag.samples, { time: event.timeStamp, y: event.clientY }].slice(-12);
@@ -245,9 +230,8 @@ function onPointerMove(event: PointerEvent) {
 }
 
 function onPointerEnd(event: Event) {
-  const pick = event.target instanceof Element ? event.target.closest<HTMLElement>(PICK) : null;
-  if (pick && event instanceof PointerEvent && drag?.id === event.pointerId)
-    release({ event, pick });
+  if (event instanceof PointerEvent && drag?.id === event.pointerId)
+    release({ event, pick: drag.pick });
 }
 
 function onWheel(event: WheelEvent) {
@@ -275,8 +259,6 @@ function onWheel(event: WheelEvent) {
 function onChange(event: Event) {
   const select = event.target;
   if (!(select instanceof HTMLSelectElement) || !select.closest(LAUNCHER)) return;
-  manual = true;
-  clearTimeout(timer);
   chosen = select.value;
   show();
 }
@@ -292,20 +274,17 @@ function onNavigated() {
     reel = undefined;
   }
   show();
-  schedule();
 }
 
 function onMotionChange() {
-  clearTimeout(timer);
   show();
-  schedule();
 }
 
-/** Wires the sidebar agent launcher: drag, wheel and select turn it; idle, it cycles. */
+/** Wires the sidebar agent launcher: drag, wheel and select turn it; left alone, it stays put. */
 export function startAgentChoice() {
   document.addEventListener("pointerdown", onPointerDown);
-  document.addEventListener("pointermove", onPointerMove);
-  for (const type of ["pointerup", "pointercancel"]) document.addEventListener(type, onPointerEnd);
+  window.addEventListener("pointermove", onPointerMove);
+  for (const type of ["pointerup", "pointercancel"]) window.addEventListener(type, onPointerEnd);
   document.addEventListener("wheel", onWheel, { passive: false });
   document.addEventListener("change", onChange);
   document.addEventListener("pointerover", onApproach);
@@ -313,5 +292,4 @@ export function startAgentChoice() {
   document.addEventListener("docs:navigated", onNavigated);
   motion.addEventListener("change", onMotionChange);
   show();
-  schedule();
 }

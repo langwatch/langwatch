@@ -9,8 +9,10 @@ import {
   type AuthzGrantPlatformOperatorInput,
   type PlatformOperator,
 } from "@langwatch/authz-contract";
+import type { NotificationService as NotificationApi } from "@langwatch/notification-contract";
 import type * as observabilityModule from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import type { UserApi, UserProfile } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
@@ -61,12 +63,17 @@ function world({
   organizations = [],
   administrators = [],
   deployment = SELF_HOSTED,
+  isEmailUnconfigured = false,
+  erasedAccountsCreatedAt = [],
 }: {
   holders?: PlatformOperator[];
   users?: UserProfile[];
   organizations?: string[];
   administrators?: string[];
   deployment?: { cloud: boolean; isLocalDevelopment: boolean };
+  isEmailUnconfigured?: boolean;
+  /** The creation times user's erasure records keep of accounts whose rows are gone. */
+  erasedAccountsCreatedAt?: Date[];
 } = {}) {
   const granted: AuthzGrantPlatformOperatorInput[] = [];
   const authz: Pick<
@@ -80,7 +87,9 @@ function world({
     },
     revokePlatformOperator: vi.fn(async () => undefined),
   };
-  const directory: Pick<UserApi, "findByEmail" | "findById" | "countUsage"> = {
+  const directory = createApiFixture<
+    Pick<UserApi, "findByEmail" | "findById" | "countUsage" | "isFirstCreatedAccount">
+  >({
     countUsage: async () => {
       const emailDomains: Record<string, number> =
         users.length > 0 ? { "acme.com": users.length } : {};
@@ -89,7 +98,20 @@ function world({
     findByEmail: async ({ email }) =>
       users.find((candidate) => candidate.email === email.toLowerCase()) ?? null,
     findById: async ({ id }) => users.find((candidate) => candidate.id === id) ?? null,
-  };
+    isFirstCreatedAccount: async ({ userId }) => {
+      const first = users.toSorted((a, b) => a.createdAt.getTime() - b.createdAt.getTime())[0];
+      if (!first || first.id !== userId) return false;
+      return erasedAccountsCreatedAt.every((at) => at.getTime() > first.createdAt.getTime());
+    },
+  });
+  const mail = createApiFixture<Pick<NotificationApi, "getMailDelivery">>({
+    getMailDelivery: async () => ({
+      ...(isEmailUnconfigured ? {} : { provider: "smtp" as const }),
+      smtpConfigured: !isEmailUnconfigured,
+      smtpSendsCredentials: false,
+      misconfigured: false,
+    }),
+  });
   const organizationDirectory: Pick<
     OrganizationApi,
     "listProvisioningSummaries" | "findAdministrators"
@@ -108,6 +130,7 @@ function world({
     authz,
     users: directory,
     organizations: organizationDirectory,
+    mail,
     deployment,
   });
   return { service, granted, authz };
@@ -232,6 +255,204 @@ describe("PlatformOperatorsService", () => {
           organizations: ["org_1"],
           administrators: ["stranger"],
         });
+
+        const outcome = await service.seedOnce({ adminEmails: ["ghost@acme.com"], cloud: false });
+
+        expect(outcome.via).toBe("waiting");
+        expect(record).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("given the install has no email configured and a later sign-up holds the named address", () => {
+      const squatted = {
+        users: [
+          user("first", { createdAt: new Date("2024-01-01T00:00:00Z") }),
+          user("ana", { emailVerified: false }),
+        ],
+        organizations: ["org_1"],
+        administrators: ["first"],
+        isEmailUnconfigured: true,
+      };
+
+      /** @scenario "With no email configured a named unverified account that signed up later waits" */
+      it("waits unlatched and says the account is not the install's first-created", async () => {
+        const { service, granted, record } = seeding(squatted);
+        warn.mockClear();
+
+        const outcome = await service.seedOnce({ adminEmails: ["ana@acme.com"], cloud: false });
+
+        expect(outcome).toMatchObject({
+          via: "waiting",
+          reason: expect.stringMatching(/not the install's first-created account/),
+        });
+        expect(record).not.toHaveBeenCalled();
+        expect(granted).toEqual([]);
+        expect(warn.mock.calls[0]?.[1]).toMatch(/first-created account/);
+      });
+
+      /** @scenario "With no email configured a named unverified account that signed up later waits" */
+      it("grants nobody through the upgrade step", async () => {
+        const { service, granted } = world(squatted);
+
+        await expect(
+          service.seedFromAdminEmails({
+            settings: { adminEmails: ["ana@acme.com"], cloud: false },
+            dryRun: false,
+          }),
+        ).resolves.toBe(0);
+        expect(granted).toEqual([]);
+      });
+
+      /** @scenario "With no email configured a named unverified account that signed up later waits" */
+      it("still seeds a verified named user beside it", async () => {
+        const { service, record } = seeding({
+          ...squatted,
+          users: [...squatted.users, user("bo")],
+        });
+
+        await service.seedOnce({ adminEmails: ["ana@acme.com", "bo@acme.com"], cloud: false });
+
+        expect(record).toHaveBeenCalledWith({ via: "admin-emails", userIds: ["bo"] });
+      });
+    });
+
+    describe("given no email is configured, the first account deactivated and a later sign-up on the named address", () => {
+      const takenOver = {
+        users: [
+          user("first", {
+            createdAt: new Date("2024-01-01T00:00:00Z"),
+            deactivatedAt: new Date("2024-06-01T00:00:00Z"),
+          }),
+          user("ana", { emailVerified: false }),
+        ],
+        organizations: ["org_1"],
+        administrators: ["ana"],
+        isEmailUnconfigured: true,
+      };
+
+      /** @scenario "With no email configured a deactivated first account seeds no later unverified sign-up" */
+      it("waits unlatched, and says the named account is not the first-created one", async () => {
+        const { service, granted, record } = seeding(takenOver);
+        warn.mockClear();
+
+        const outcome = await service.seedOnce({ adminEmails: ["ana@acme.com"], cloud: false });
+
+        expect(outcome).toMatchObject({
+          via: "waiting",
+          reason: expect.stringMatching(
+            /not the install's first-created account.*even once the first is deactivated/,
+          ),
+        });
+        expect(record).not.toHaveBeenCalled();
+        expect(granted).toEqual([]);
+        expect(warn).toHaveBeenCalledTimes(1);
+      });
+
+      /** @scenario "With no email configured a deactivated first account seeds no later unverified sign-up" */
+      it("grants nobody through the upgrade step", async () => {
+        const { service, granted } = world(takenOver);
+
+        await expect(
+          service.seedFromAdminEmails({
+            settings: { adminEmails: ["ana@acme.com"], cloud: false },
+            dryRun: false,
+          }),
+        ).resolves.toBe(0);
+        expect(granted).toEqual([]);
+      });
+    });
+
+    describe("given no email is configured, the first account erased and a later sign-up on the named address", () => {
+      const erased = {
+        users: [user("ana", { emailVerified: false })],
+        organizations: ["org_1"],
+        administrators: ["ana"],
+        isEmailUnconfigured: true,
+        erasedAccountsCreatedAt: [new Date("2024-01-01T00:00:00Z")],
+      };
+
+      /** @scenario "With no email configured an erased first account seeds no later unverified sign-up" */
+      it("waits unlatched, and says the named account is not the first-created one", async () => {
+        const { service, granted, record } = seeding(erased);
+        warn.mockClear();
+
+        const outcome = await service.seedOnce({ adminEmails: ["ana@acme.com"], cloud: false });
+
+        expect(outcome).toMatchObject({
+          via: "waiting",
+          reason: expect.stringMatching(
+            /not the install's first-created account.*deactivated or erased/,
+          ),
+        });
+        expect(record).not.toHaveBeenCalled();
+        expect(granted).toEqual([]);
+        expect(warn).toHaveBeenCalledTimes(1);
+      });
+
+      /** @scenario "With no email configured an erased first account seeds no later unverified sign-up" */
+      it("grants nobody through the upgrade step", async () => {
+        const { service, granted } = world(erased);
+
+        await expect(
+          service.seedFromAdminEmails({
+            settings: { adminEmails: ["ana@acme.com"], cloud: false },
+            dryRun: false,
+          }),
+        ).resolves.toBe(0);
+        expect(granted).toEqual([]);
+      });
+    });
+
+    describe("given the install has no email configured and the named user is unverified", () => {
+      const unverified = {
+        users: [
+          user("ana", { emailVerified: false, createdAt: new Date("2024-01-01T00:00:00Z") }),
+          user("stranger"),
+        ],
+        organizations: ["org_1"],
+        administrators: ["stranger"],
+        isEmailUnconfigured: true,
+      };
+
+      /** @scenario "An install with no email configured seeds the named user unverified" */
+      it("decides the named user, and never the organization's admin", async () => {
+        const { service, record } = seeding(unverified);
+
+        const outcome = await service.seedOnce({ adminEmails: ["ana@acme.com"], cloud: false });
+
+        expect(outcome.via).toBe("admin-emails");
+        expect(record).toHaveBeenCalledWith({ via: "admin-emails", userIds: ["ana"] });
+      });
+
+      /** @scenario "An install with no email configured seeds the named user unverified" */
+      it("grants them through the upgrade step too", async () => {
+        const { service, granted } = world(unverified);
+
+        await expect(
+          service.seedFromAdminEmails({
+            settings: { adminEmails: ["ana@acme.com"], cloud: false },
+            dryRun: false,
+          }),
+        ).resolves.toBe(1);
+        expect(granted.map((grant) => grant.principal)).toEqual([{ type: "user", id: "ana" }]);
+      });
+
+      /** @scenario "An install with no email configured seeds the named user unverified" */
+      it("still skips a deactivated named user", async () => {
+        const { service, record } = seeding({
+          ...unverified,
+          users: [user("ana", { emailVerified: false, deactivatedAt: new Date() })],
+        });
+
+        const outcome = await service.seedOnce({ adminEmails: ["ana@acme.com"], cloud: false });
+
+        expect(outcome.via).toBe("waiting");
+        expect(record).not.toHaveBeenCalled();
+      });
+
+      /** @scenario "An install with no email configured seeds the named user unverified" */
+      it("waits for an address nobody has signed up with yet", async () => {
+        const { service, record } = seeding(unverified);
 
         const outcome = await service.seedOnce({ adminEmails: ["ghost@acme.com"], cloud: false });
 
@@ -385,6 +606,58 @@ describe("PlatformOperatorsService", () => {
         meta: { userId: "squatter" },
       });
       expect(granted).toEqual([]);
+    });
+
+    describe("given the install has no email configured", () => {
+      /** @scenario "With no email configured the recovery task grants an unverified account" */
+      it("grants the unverified account the seed passed over, as the system", async () => {
+        const { service, granted } = world({
+          users: [
+            user("first", { createdAt: new Date("2024-01-01T00:00:00Z") }),
+            user("ana", { emailVerified: false }),
+          ],
+          isEmailUnconfigured: true,
+        });
+
+        const result = await service.grantAsSystem({ email: "ana@acme.com" });
+
+        expect(result).toMatchObject({ userId: "ana" });
+        expect(granted).toEqual([
+          expect.objectContaining({
+            principal: { type: "user", id: "ana" },
+            caller: { type: "system" },
+            actor: PLATFORM_OPERATOR_TASK_ACTOR,
+          }),
+        ]);
+      });
+
+      /** @scenario "With no email configured the recovery task grants an unverified account" */
+      it("names the task in the seed's wait reason", async () => {
+        const { service } = world({
+          users: [
+            user("first", { createdAt: new Date("2024-01-01T00:00:00Z") }),
+            user("ana", { emailVerified: false }),
+          ],
+          isEmailUnconfigured: true,
+        });
+
+        const outcome = await service.seedOnce({ adminEmails: ["ana@acme.com"], cloud: false });
+
+        expect(outcome.reason).toMatch(/grant-platform-operator/);
+      });
+
+      /** @scenario "With no email configured the recovery task grants an unverified account" */
+      it("still refuses a deactivated account", async () => {
+        const { service, granted } = world({
+          users: [user("gone", { emailVerified: false, deactivatedAt: new Date() })],
+          isEmailUnconfigured: true,
+        });
+
+        await expect(service.grantAsSystem({ email: "gone@acme.com" })).rejects.toMatchObject({
+          code: "platform_operator_user_not_found",
+        });
+        expect(granted).toEqual([]);
+      });
     });
   });
 

@@ -1,4 +1,5 @@
 import { frameConnection, mountFrame, onConnectionChange } from "./docs-session.ts";
+import { FRAME_ROOM_SELECTOR } from "./frame-placement.ts";
 
 /** Hides the pasted key while the frame sends as the reader, and shows it again after. */
 export function showSession() {
@@ -6,11 +7,13 @@ export function showSession() {
   if (manual) manual.hidden = frameConnection() !== null;
 }
 
-/** Embeds the app's session frame where the page left room for it; none on other endpoints. */
+/**
+ * Embeds the app's session frame, or keeps the one a previous page embedded, over the room this
+ * page leaves for it; none on endpoints that leave none.
+ */
 export function startSession() {
-  const container = document.querySelector<HTMLElement>("[data-docs-session-frame]");
-  if (!container) return;
-  mountFrame({ container });
+  if (!document.querySelector(FRAME_ROOM_SELECTOR)) return;
+  mountFrame();
   showSession();
 }
 

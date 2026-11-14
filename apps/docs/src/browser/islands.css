@@ -1,5 +1,11 @@
-[hidden] {
+[hidden]:not([hidden="until-found"]) {
   display: none !important;
+}
+/* A collapsed panel find-in-page can open renders its box with no content; it takes no room. */
+[hidden="until-found"] {
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
 }
 .docs-island-dialog {
   color: var(--chakra-colors-fg);
@@ -56,6 +62,51 @@
   .docs-mobile-dialog {
     width: 100%;
   }
+}
+/* The drawer is a compact phone list: sections in two columns, the tree in 40px rows, a slim
+   footer clear of the home indicator. The rail's markup is copied in, so this restyles it here. */
+.docs-mobile-dialog
+  [data-docs-mobile-body]
+  nav:is([aria-label="Documentation sections"], [aria-label="Support"])
+  > ul {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 4px;
+}
+.docs-mobile-dialog [data-docs-mobile-body] nav[aria-label="Documentation sections"] a,
+.docs-mobile-dialog [data-docs-mobile-body] nav[aria-label="Support"] a {
+  min-height: 40px;
+  margin: 0;
+  padding-inline: 10px;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 18px;
+}
+.docs-mobile-dialog [data-docs-mobile-body] nav:not(.docs-nav-tree) a svg {
+  width: 16px;
+  height: 16px;
+}
+.docs-mobile-dialog [data-docs-mobile-body] > :has(> .docs-nav-tree) {
+  margin-top: 12px;
+  padding-top: 4px;
+}
+.docs-mobile-dialog .docs-nav-tree :is(a, button) {
+  min-height: 40px;
+}
+.docs-mobile-dialog .docs-nav-tree > ul > li {
+  margin-top: 2px;
+}
+.docs-mobile-footer {
+  min-height: 48px;
+  padding-bottom: max(8px, env(safe-area-inset-bottom));
+  color: var(--chakra-colors-fg-muted);
+}
+.docs-mobile-footer a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  color: inherit;
+  white-space: nowrap;
 }
 .docs-media-error {
   color: var(--chakra-colors-red-fg);

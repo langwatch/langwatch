@@ -72,6 +72,7 @@ async function registryRow(
     maxMembers: 50,
     maxMembersLite: 0,
     liteSeatsUnlimited: false,
+    maxMembersDeveloper: null,
     issuedAt: Temporal.Instant.from("2025-12-01T00:00:00.000Z"),
     expiresAt: Temporal.Instant.from("2027-01-01T00:00:00.000Z"),
     source: "BACKOFFICE",

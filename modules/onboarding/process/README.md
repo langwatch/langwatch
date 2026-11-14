@@ -126,7 +126,7 @@ type Response = z.infer<typeof guidedStateWithVariantOutputSchema>; // ../contra
 
 Mark one guided onboarding path as done for this project's organization. Idempotent: completing a path twice changes nothing. An unknown path is refused with guided_onboarding_path_unknown.
 
-Permission `project:view`. Hidden from the OpenAPI document. Declared at `src/transport/onboarding.rest.ts:42`.
+Permission `traces:create`. Hidden from the OpenAPI document. Declared at `src/transport/onboarding.rest.ts:42`.
 
 Answers at `/api/onboarding/guided/paths/:path/complete`, `/api/v1/onboarding/guided/paths/:path/complete`; also, undocumented, `/api/onboarding/2026-08-07/guided/paths/:path/complete`, `/api/v1/onboarding/2026-08-07/guided/paths/:path/complete`, `/api/onboarding/latest/guided/paths/:path/complete`, `/api/v1/onboarding/latest/guided/paths/:path/complete`.
 

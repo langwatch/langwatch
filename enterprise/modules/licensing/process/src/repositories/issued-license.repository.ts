@@ -20,6 +20,8 @@ export interface IssuedLicenseRecord {
   /** Null when the license states none, or when `liteSeatsUnlimited`. */
   maxMembersLite: number | null;
   liteSeatsUnlimited: boolean;
+  /** Null when the license states none, which sells none. */
+  maxMembersDeveloper: number | null;
   issuedAt: Instant;
   expiresAt: Instant;
   source: IssuedLicenseSource;

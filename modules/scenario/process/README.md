@@ -1390,7 +1390,7 @@ interface Input {
   message: string;
   params?: Record<string, string | number | boolean>;
 }
-// Output: agentTestTurnResultSchema, ../../agent/contract/src/agent.queries.ts:237
+// Output: agentTestTurnResultSchema, ../../agent/contract/src/agent.queries.ts:246
 interface Output {
   output: unknown;
   durationMs: number;
@@ -1406,7 +1406,7 @@ interface Input {
   projectId: string;
   agentId: string;
 }
-// Output: agentTestRunResultSchema, ../../agent/contract/src/agent.queries.ts:249
+// Output: agentTestRunResultSchema, ../../agent/contract/src/agent.queries.ts:258
 interface Output {
   scenarioRunId: string;
   batchRunId: string;
@@ -1415,7 +1415,7 @@ interface Output {
 
 // scenarios.testHttpAgent
 type Input = z.infer<typeof httpAgentTestInputSchema>; // ../../agent/contract/src/agent.commands.ts:32
-type Output = z.infer<typeof httpProxyResultSchema>; // ../../agent/contract/src/agent.queries.ts:271
+type Output = z.infer<typeof httpProxyResultSchema>; // ../../agent/contract/src/agent.queries.ts:280
 ```
 
 ## Sockets
@@ -1426,11 +1426,12 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `scenario_lifecycle` (aggregate `scenario`)
 
-Declared at `src/eventing/scenario-lifecycle.pipeline.ts:30`. Events: `scenarioCreatedEventSchema`.
+Declared at `src/eventing/scenario-lifecycle.pipeline.ts:34`. Events: `scenarioCreatedEventSchema`, `simulationSetCreatedEventSchema`.
 
-| Kind    | Name                    | Handles | Declared at                                      |
-| ------- | ----------------------- | ------- | ------------------------------------------------ |
-| command | `recordScenarioCreated` | –       | `src/eventing/scenario-lifecycle.pipeline.ts:37` |
+| Kind    | Name                         | Handles | Declared at                                      |
+| ------- | ---------------------------- | ------- | ------------------------------------------------ |
+| command | `recordScenarioCreated`      | –       | `src/eventing/scenario-lifecycle.pipeline.ts:41` |
+| command | `recordSimulationSetCreated` | –       | `src/eventing/scenario-lifecycle.pipeline.ts:42` |
 
 ### Pipeline `simulation_processing` (aggregate `simulation_run`)
 
@@ -1465,9 +1466,9 @@ Declared at `src/eventing/simulation-processing.pipeline.ts:117`. Events: `Simul
 
 | Kind   | Leaf                                                  | Environment variable                      | Declared at                              |
 | ------ | ----------------------------------------------------- | ----------------------------------------- | ---------------------------------------- |
-| secret | `voiceSessionSigning`                                 | `CREDENTIALS_SECRET`                      | `src/app/scenario.app.ts:271`            |
-| secret | `voiceSessionSigningFallback`                         | `NEXTAUTH_SECRET`                         | `src/app/scenario.app.ts:272`            |
-| secret | `nlpInternal`                                         | `LANGWATCH_NLP_INTERNAL_SECRET`           | `src/app/scenario.app.ts:274`            |
+| secret | `voiceSessionSigning`                                 | `CREDENTIALS_SECRET`                      | `src/app/scenario.app.ts:273`            |
+| secret | `voiceSessionSigningFallback`                         | `NEXTAUTH_SECRET`                         | `src/app/scenario.app.ts:274`            |
+| secret | `nlpInternal`                                         | `LANGWATCH_NLP_INTERNAL_SECRET`           | `src/app/scenario.app.ts:276`            |
 | config | `langwatchEndpoint`                                   | `LANGWATCH_ENDPOINT`                      | `../contract/src/scenario.config.ts:96`  |
 | config | `voicePublicBaseUrl`                                  | `VOICE_PUBLIC_BASE_URL`                   | `../contract/src/scenario.config.ts:98`  |
 | config | `voiceTunnel`                                         | `VOICE_TUNNEL`                            | `../contract/src/scenario.config.ts:100` |

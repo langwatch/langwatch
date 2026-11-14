@@ -11,6 +11,8 @@ export interface ActivationCode {
   maxMembers: number;
   maxMembersLite: number | null;
   liteSeatsUnlimited: boolean;
+  /** Null when the licence states none, which sells none. */
+  maxMembersDeveloper: number | null;
   licenseTermDays: number;
   services: string[];
   expiresAt: string;

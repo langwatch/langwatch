@@ -27,6 +27,7 @@ import {
   type ApiKeyCreateRecord,
   type ApiKeyRow,
   type ApiKeyUpdateRecord,
+  type KeyLiveness,
 } from "../api-key.repository.ts";
 import { MemoryApiKeyAnswerCacheRepository } from "../memory/memory.api-key-answer-cache.repository.ts";
 
@@ -81,6 +82,9 @@ async function listApiKeyBindings({
 class MemoryApiKeys extends ApiKeyRepository {
   private rows: ApiKeyRow[] = [];
   findLiveBySessions(): Promise<{ id: string; organizationId: string }[]> {
+    return Promise.resolve([]);
+  }
+  findLiveSystemManagedByName(): Promise<{ id: string }[]> {
     return Promise.resolve([]);
   }
   create(input: ApiKeyCreateRecord): Promise<ApiKeyRow> {
@@ -177,6 +181,20 @@ class MemoryApiKeys extends ApiKeyRepository {
   async upgradeHash({ id, hashedSecret }: { id: string; hashedSecret: string }): Promise<void> {
     await this.update({ id, hashedSecret });
   }
+  async rotateSecret(input: {
+    id: string;
+    organizationId: string;
+    lookupId: string;
+    hashedSecret: string;
+  }): Promise<ApiKeyRow> {
+    const row = await this.findByIdInOrganization(input);
+    if (!row || row.revokedAt) throw new Error("not live");
+    return this.update({
+      id: input.id,
+      lookupId: input.lookupId,
+      hashedSecret: input.hashedSecret,
+    });
+  }
   get(id: string): ApiKeyRow | undefined {
     return this.rows.find((row) => row.id === id);
   }
@@ -204,15 +222,17 @@ class MemoryApiKeys extends ApiKeyRepository {
         .map(({ id }) => ({ id })),
     );
   }
-  findLivenessById(input: {
-    id: string;
-  }): Promise<{ revokedAt: Instant | null; expiresAt: Instant | null } | null> {
+  findLivenessById(input: { id: string }): Promise<KeyLiveness | null> {
     const row = this.rows.find(({ id }) => id === input.id);
     return Promise.resolve(
       row
         ? {
             revokedAt: row.revokedAt ? fromDate(row.revokedAt) : null,
             expiresAt: row.expiresAt ? fromDate(row.expiresAt) : null,
+            createdAt: fromDate(row.createdAt),
+            name: row.name,
+            isSystemManaged: row.isSystemManaged === true,
+            parentApiKeyId: row.parentApiKeyId ?? null,
           }
         : null,
     );

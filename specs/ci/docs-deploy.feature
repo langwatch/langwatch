@@ -12,7 +12,16 @@ Feature: Deploy the docs to their bucket from main
     Then the deploy job needs the verify, build and check jobs
     And it runs only for a push or a dispatch on main
     And it is skipped while the docs bucket variable is unset
+    And it is skipped when the push changed nothing the site shows
     And one deploy runs at a time
+
+  @unit
+  Scenario: The docs site builds, audits and deploys only when what it shows changed
+    Given the docs-site workflow's change detector
+    Then the build, the browser checks, the audit and the deploy wait for its docs-site filter
+    And that filter lists the docs, the docs app, every workspace package the site build reads and the deploy tooling
+    And it leaves out packages the site build never reads
+    And a push to main is diffed against the commit before it rather than run in full
 
   @unit
   Scenario: A deploy caches each file by its name and keeps hashed files
@@ -31,3 +40,12 @@ Feature: Deploy the docs to their bucket from main
     And only new or changed keys are written, then keys the build dropped are deleted
     And every update names the store version it read, at most 50 keys at a time
     And a redirect the store cannot hold fails the deploy
+
+  @unit
+  Scenario: A deploy tells IndexNow which pages it changed
+    Given the sitemap the site served before the deploy and the build's sitemap
+    When the deploy has uploaded the build and refreshed the distribution
+    Then the pages the build adds or dates anew are submitted to IndexNow with the build's key and its location
+    And a first deploy, with no live sitemap, submits every page
+    And no changed page sends nothing
+    And a refused submission warns without failing the deploy

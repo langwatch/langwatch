@@ -1,9 +1,11 @@
 import { LoadingScreen } from "@langwatch/design-system/loading-screen";
 import { Button, VStack } from "@langwatch/design-system/primitives";
+import { useEffect } from "react";
 
-import { isNavigatingAway } from "../../behavior/hard-redirect.ts";
+import { hardRedirect, isNavigatingAway } from "../../behavior/hard-redirect.ts";
 import { useJoinBeforeCreate } from "../../behavior/use-join-before-create.ts";
 import { useRequiredSession } from "../../behavior/use-required-session.ts";
+import { useWaitingInvitation } from "../../behavior/use-waiting-invitation.ts";
 import { JoinBeforeCreateInterstitial } from "../../ui/blocks/join-before-create-interstitial.tsx";
 import { AuthCard } from "../elements/auth-card.tsx";
 import { HandledErrorAlert } from "../elements/handled-error-alert.tsx";
@@ -19,8 +21,16 @@ export default function Join() {
   const email = session?.user?.email;
   const join = useJoinBeforeCreate({ enabled: !!email });
   const { lookup, mine } = join;
+  // An invitation already waiting is the way in this person was given: it goes ahead of any
+  // offer to ask a team, which would need an administrator to approve what the invite grants.
+  const invitation = useWaitingInvitation({ enabled: !!email });
+  const { acceptPath } = invitation;
+  useEffect(() => {
+    if (acceptPath) hardRedirect(acceptPath);
+  }, [acceptPath]);
 
   if (!email) return <LoadingScreen />;
+  if (invitation.isPending || acceptPath) return <LoadingScreen />;
   // Neither "none" nor "not pending" is known until both reads settle.
   if (lookup.isPending || mine.isPending) return <LoadingScreen />;
   // Hard navigation aborts these reads while the old document still renders.

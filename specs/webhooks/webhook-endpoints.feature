@@ -26,6 +26,12 @@ Feature: Webhook endpoints, signed outbound event delivery
       And no other family matches it
 
     @unit
+    Scenario: A prefix wildcard subscribes to every type under that prefix
+      Given an endpoint subscribed to "governance.agent.*"
+      Then every governance agent registry event type matches it
+      And the governance anomaly alert does not match it
+
+    @unit
     Scenario: An empty subscription receives nothing
       Given an endpoint with no enabled events
       Then no event type matches it

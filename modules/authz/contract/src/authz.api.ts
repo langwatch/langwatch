@@ -16,6 +16,8 @@ import { generate } from "@langwatch/ksuid";
 import { moduleApi } from "@langwatch/module";
 import type { Instant } from "@langwatch/time";
 
+import type * as Billing from "./authz-billing-role.commands.ts";
+import type * as Braids from "./authz-braids.commands.ts";
 import type * as authzGrantEventsModule from "./authz-grant.events.ts";
 import type * as Grants from "./authz-grants-rest.schemas.ts";
 import type * as Platform from "./authz-platform-operators.commands.ts";
@@ -33,11 +35,13 @@ import type { Authorized, AuthzDecision, AuthzPrincipalRef, AuthzScopeRef } from
 export interface AuthzCaller {
   readonly id: string;
 }
+/** `organizationPermissions` is the same caller's set at the scope's organization. */
 export type EffectivePermissions =
-  | Readonly<{ scope: null; permissions: string[] }>
+  | Readonly<{ scope: null; permissions: string[]; organizationPermissions: string[] }>
   | Readonly<{
       scope: Readonly<{ type: AuthzScopeRef["type"]; id: string }>;
       permissions: Queries.AuthzEffectivePermissionsOutput;
+      organizationPermissions: Queries.AuthzEffectivePermissionsOutput;
     }>;
 
 /**
@@ -189,6 +193,45 @@ export interface AuthzApi {
   awaitSharedProjectGrants(args: Commands.AuthzAwaitSharedProjectGrantsInput): Promise<void>;
   /** Revokes a reader's live shared reads (all, or those on `memberProjectIds`); answers ids. */
   revokeSharedProjectGrants(args: Commands.AuthzRevokeSharedProjectGrantsInput): Promise<string[]>;
+  /** ADR-201: the live braids out of a project and into it; a downgraded organisation lists too. */
+  listBraids(args: Braids.AuthzListBraidsInput): Promise<Braids.AuthzProjectBraids>;
+  /** The Braids screen's list: refuses `braids_not_enabled` while `release_braids` is off. */
+  listBraidsForScreen(args: Braids.AuthzListBraidsInput): Promise<Braids.AuthzProjectBraids>;
+  /** A braid from the owner (`projectId`) into the reader, its condition compiled on save. */
+  createBraid(args: Braids.AuthzCreateBraidInput): Promise<Braids.AuthzBraid>;
+  /** Attaches the changed braid naming the one it replaces, then revokes that one. */
+  changeBraid(args: Braids.AuthzChangeBraidInput): Promise<Braids.AuthzBraid>;
+  /** Revokes a braid touching `projectId` with reason `braid_removed`. */
+  removeBraid(args: Braids.AuthzRemoveBraidInput): Promise<Braids.AuthzBraidRemoved>;
+  /**
+   * ADR-201 §8: one `braided_spans.viewed` audit row per actor, reader and owner per five
+   * minutes, naming the braids and never a span. Never fails the read that calls it.
+   */
+  recordBraidedSpansView(args: Braids.AuthzRecordBraidedSpansViewInput): Promise<void>;
+  /** The organisation's authz settings; one with no stored row has every setting off. */
+  getOrganizationPolicy(
+    args: Braids.AuthzOrganizationInput,
+  ): Promise<Braids.AuthzOrganizationPolicy>;
+  /** The Braids screen's policy: refuses `braids_not_enabled` while `release_braids` is off. */
+  getOrganizationPolicyForScreen(
+    args: Braids.AuthzOrganizationInput,
+  ): Promise<Braids.AuthzOrganizationPolicy>;
+  /** Keeps braids to organisation admins or opens them again; audited, and bumps the epoch. */
+  setBraidsPolicy(args: Braids.AuthzSetBraidsPolicyInput): Promise<Braids.AuthzOrganizationPolicy>;
+  /** Every live braid in the organisation. */
+  listOrganizationBraids(
+    args: Braids.AuthzOrganizationInput,
+  ): Promise<Braids.AuthzOrganizationBraids>;
+  /** ADR-201 §7: the organisation's active members holding `permission` at the project. */
+  countProjectMembersHolding(
+    args: Braids.AuthzCountProjectMembersHoldingInput,
+  ): Promise<Braids.AuthzProjectMembersHolding>;
+  /** The braid dialog's count: refuses `braids_not_enabled` while `release_braids` is off. */
+  countProjectMembersHoldingForScreen(
+    args: Braids.AuthzCountProjectMembersHoldingInput,
+  ): Promise<Braids.AuthzProjectMembersHolding>;
+  /** The braid dialog's picker: which projects the caller may braid into, one batched decision. */
+  listBraidTargets(args: Braids.AuthzListBraidTargetsInput): Promise<Braids.AuthzBraidTargets>;
   changeBindingRole(
     args: Commands.AuthzChangeBindingRoleInput,
   ): Promise<Commands.AuthzChangeBindingRoleOutput>;
@@ -242,6 +285,12 @@ export interface AuthzApi {
   revokePlatformOperator(args: Platform.AuthzRevokePlatformOperatorInput): Promise<void>;
   /** Every live platform operator, oldest first. */
   listPlatformOperators(): Promise<Platform.AuthzListPlatformOperatorsOutput>;
+  /** Who holds the Billing role on an enabled membership, oldest grant first. */
+  listBillingMembers(
+    args: Billing.AuthzListBillingMembersInput,
+  ): Promise<readonly Billing.AuthzBillingMember[]>;
+  /** Grants or revokes the Billing role; idempotent. Refuses a person with no membership. */
+  setBillingRole(args: Billing.AuthzSetBillingRoleInput): Promise<void>;
   /** The escalation rule every door shares: what of these the caller lacks at that scope. */
   findPermissionsBeyondCaller(
     args: Grants.AuthzFindPermissionsBeyondCallerInput,

@@ -3,6 +3,7 @@ import { Temporal } from "@langwatch/time";
 import {
   BillableEventsMeterRepository,
   type BillableEventRecord,
+  type DayMeterCount,
   type MeterWindow,
   type ProjectMeterCount,
 } from "../billable-events-meter.repository.ts";
@@ -46,6 +47,28 @@ export class MemoryBillableEventsMeterRepository extends BillableEventsMeterRepo
       keysByProject.set(row.tenantId, keys);
     }
     return [...keysByProject].map(([projectId, keys]) => ({ projectId, count: keys.size }));
+  }
+
+  /** Exact per UTC day, as `countByProjects` is exact per project. */
+  async countByDay(input: {
+    organizationId: string;
+    projectIds: readonly string[];
+    window: MeterWindow;
+  }): Promise<DayMeterCount[]> {
+    const keysByDay = new Map<string, Set<string>>();
+    for (const row of this.#inWindow(input)) {
+      if (!input.projectIds.includes(row.tenantId)) continue;
+      const day = Temporal.Instant.fromEpochMilliseconds(row.eventTimestamp)
+        .toZonedDateTimeISO("UTC")
+        .toPlainDate()
+        .toString();
+      const keys = keysByDay.get(day) ?? new Set<string>();
+      keys.add(row.deduplicationKey);
+      keysByDay.set(day, keys);
+    }
+    return [...keysByDay]
+      .toSorted(([a], [b]) => a.localeCompare(b))
+      .map(([day, keys]) => ({ day, count: keys.size }));
   }
 
   #inWindow(input: { organizationId: string; window: MeterWindow }): BillableEventRecord[] {

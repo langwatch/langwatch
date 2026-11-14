@@ -68,6 +68,7 @@ var (
 		"tools/ecrtag",
 		"tools/docsdeploy",
 		"tools/chartheap",
+		"tools/charts3region",
 		"tools/suiteweights",
 		"tools/matrixseed",
 		"cmd/matrixseed",
@@ -152,7 +153,6 @@ var (
 		"specs/ai-gateway/wrapper-e2e/gemini.feature",
 		"specs/ai-gateway/wrapper-e2e/opencode.feature",
 		"specs/ai-governance/cli-wrappers/request-increase.feature",
-		"specs/ai-governance/cli-wrappers/wrap-login-routing.feature",
 		"specs/ai-governance/dogfood-seed/scope-runner.feature",
 		"specs/ai-governance/ingestion-sources/claude-code-otlp.feature",
 		"specs/ai-governance/ingestion-sources/native-receiver-lift.feature",
@@ -285,7 +285,6 @@ var (
 		"specs/monitors/workflow-evaluator-checktype.feature",
 		"specs/monitors/workflow-evaluator-mappings.feature",
 		"specs/nlp-go/dataset-block.feature",
-		"specs/nlp-go/http-block.feature",
 		"specs/nlp-go/proxy.feature",
 		"specs/nlp-go/python-removal.feature",
 		"specs/nlp-go/remove-execute-evaluation.feature",
@@ -395,6 +394,10 @@ var (
 		"specs/workflows/studio-usage-limits.feature",
 	}
 	legacyPartial = []string{
+		// Reason: left legacyInert when the not-found scenarios were bound: a tool
+		// that cannot start exits 127 with a docs link and no setup written. The
+		// login, env and routing scenarios stay untagged.
+		"specs/ai-governance/cli-wrappers/wrap-login-routing.feature",
 		// Reason: left legacyInert when evaluator get gained name resolution; its
 		// scenarios are enforced. The other CLI scenarios stay untagged.
 		"specs/evaluators/evaluator-cli.feature",

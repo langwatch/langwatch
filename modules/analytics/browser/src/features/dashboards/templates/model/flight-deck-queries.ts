@@ -46,11 +46,11 @@ ORDER BY cost DESC
 LIMIT 5`;
 
 export const FAILURES_SQL = `SELECT
-  coalesce(nullIf(SpanAttributes['exception.type'], ''), nullIf(SpanAttributes['error.type'], ''), 'Unclassified error') AS category,
+  coalesce(nullIf(ErrorType, ''), 'Unclassified error') AS category,
   SpanName AS operation,
   min(StartTime) AS first_seen,
   count() AS failures
-FROM spans
+FROM span_metrics
 WHERE ${inPeriod("StartTime")}
   AND StatusCode = 2
 GROUP BY category, operation

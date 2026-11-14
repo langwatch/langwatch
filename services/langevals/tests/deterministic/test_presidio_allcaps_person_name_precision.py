@@ -1,17 +1,20 @@
-"""False PERSON spans over ALL-CAPS strings that are not people.
+"""False PERSON and LOCATION spans over ALL-CAPS strings that are not people.
 
-Red means the second pass invents people: fix the rule, never the corpus or
-the list. History: specs/evaluators/langevals-presidio-allcaps-person-names.feature
+Red means the second pass invents people or places: fix the rule, never the
+corpus or the list. History: specs/evaluators/langevals-presidio-allcaps-person-names.feature
 """
 
 import json
 
 import pytest
 from langevals_presidio.allcaps_names import normalise_allcaps_runs
+from langevals_presidio.pii_detection import PresidioEntities
 from presidio_person_name_support import (
     LENGTH_BAND,
     MIN_THRESHOLD,
+    analyze_calls,
     person_spans,
+    second_pass_places,
 )
 
 # Every false positive accepted, by reference code; a third fails the build.
@@ -96,6 +99,15 @@ PRECISION_CORPUS: dict[str, list[str]] = {
         '{"doc": "D-6611", "heading": "ST ANDREW INDUSTRIAL ESTATE RULES", "body": "The parking allocation per unit was revised in the most recent notice."}',
         '{"part": "P-9911", "line": "TEN BRINK CONVEYOR COMPONENTS", "note": "The roller assembly is stocked in both widths for the coming season."}',
     ],
+    # Non-places where a place would go. Without the name-word rule the second
+    # pass reads each one as a LOCATION, so these are what make that check bite.
+    "place_context_non_names": [
+        '{"doc": "D-6701", "body": "The stock was moved to API KEY overnight and the count matched the system record at the morning check."}',
+        '{"doc": "D-6702", "body": "The stock was moved to DPD CLASSIC overnight and the count matched the system record at the morning check."}',
+        '{"doc": "D-6703", "body": "The stock was moved to MOUNTAIN PEAK GEAR overnight and the count matched the system record at the morning check."}',
+        '{"doc": "D-6704", "body": "The stock was moved to NORTHERN LIGHTS overnight and the count matched the system record at the morning check."}',
+        '{"doc": "D-6705", "body": "The stock was moved to BIN LOCATION overnight and the count matched the system record at the morning check."}',
+    ],
 }
 
 
@@ -116,7 +128,7 @@ def reference(text: str) -> str:
 def test_precision_corpus_is_not_vacuous():
     """A corpus with no ALL-CAPS run would measure nothing at all."""
     assert len(cases()) >= 30, "too few cases for a precision figure"
-    assert len(PRECISION_CORPUS) == 9, "one category per shape tenants send"
+    assert len(PRECISION_CORPUS) == 10, "one category per shape tenants send"
 
     for category, text in cases():
         assert LENGTH_BAND[0] <= len(text) <= LENGTH_BAND[1], (
@@ -174,3 +186,24 @@ def test_no_false_person_on_allcaps_non_name(index: int):
         f"{category}: PERSON span on a non-name. "
         f"Covered: {[text[start:end] for start, end, _ in spans]} in {text!r}"
     )
+
+
+# @scenario "The second pass adds no place over an ALL-CAPS string that is not one"
+@pytest.mark.parametrize("index", range(len(cases())))
+def test_no_false_place_from_the_second_pass(index: int):
+    """Strict redaction asks for places too, and the second pass looks for them.
+
+    Places the first pass already reports (codes like C-2204) are its own business.
+    """
+    category, text = cases()[index]
+    assert second_pass_places(text) == (), f"{category}: LOCATION on a non-place in {text!r}"
+
+
+# @scenario "The second pass adds no place over an ALL-CAPS string that is not one"
+@pytest.mark.parametrize("text", PRECISION_CORPUS["place_context_non_names"])
+def test_place_context_strings_reach_the_second_pass(text: str):
+    """Without a second pass the no-place check above has nothing to judge."""
+    calls = analyze_calls(
+        entities=PresidioEntities(person=True, location=True), text=text
+    )
+    assert len(calls) == 2, f"no second pass over {text!r}"

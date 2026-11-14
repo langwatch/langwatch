@@ -1,5 +1,9 @@
 import type { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contract";
-import { AI_TOOL_STARTER_TILES } from "@langwatch/enterprise-governance-contract";
+import {
+  AI_TOOL_STARTER_TILES,
+  ASSISTANT_KIND_TO_TOOL_SLUG,
+  PLATFORM_TOOL_POLICY_DEFAULTS,
+} from "@langwatch/enterprise-governance-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -81,6 +85,77 @@ describe("DefaultGovernanceAiToolCatalogService", () => {
 
       expect(policy.allowOtelDirect).toBe(false);
     });
+
+    /** @scenario "A stored pi tile that allows a virtual key still resolves without one" */
+    it("keeps the pi virtual key disabled even when a stored tile allows it", async () => {
+      const { catalogue } = world();
+      await catalogue.create({
+        organizationId: ORG,
+        departmentIds: [],
+        type: "coding_assistant",
+        displayName: "pi",
+        config: { assistantKind: "pi", setupCommand: "langwatch pi", allowVk: true },
+      });
+
+      const policy = await catalogue.resolveToolPolicy({
+        organizationId: ORG,
+        userId: "user",
+        slug: "pi",
+      });
+
+      expect(policy.allowVk).toBe(false);
+    });
+  });
+
+  describe("given a Grok tile that stores allowVk true", () => {
+    // ADR-192: Grok routes no model traffic through env, so there is no gateway path.
+    it("keeps the virtual key off for Grok", async () => {
+      const { catalogue } = world();
+      await catalogue.create({
+        organizationId: ORG,
+        departmentIds: [],
+        type: "coding_assistant",
+        displayName: "Grok",
+        config: { assistantKind: "grok", setupCommand: "langwatch grok", allowVk: true },
+      });
+
+      const policy = await catalogue.resolveToolPolicy({
+        organizationId: ORG,
+        userId: "user",
+        slug: "grok",
+      });
+
+      expect(policy).toEqual({ allowVk: false, allowOtelDirect: true });
+    });
+  });
+
+  describe("given a tile of each kind that stores both paths on", () => {
+    it.each(Object.entries(ASSISTANT_KIND_TO_TOOL_SLUG))(
+      "resolves %s to no path its platform default turns off",
+      async (kind, slug) => {
+        const { catalogue } = world();
+        await catalogue.create({
+          organizationId: ORG,
+          departmentIds: [],
+          type: "coding_assistant",
+          displayName: kind,
+          config: {
+            assistantKind: kind,
+            setupCommand: `langwatch ${slug}`,
+            allowVk: true,
+            allowOtelDirect: true,
+          },
+        });
+
+        const policy = await catalogue.resolveToolPolicy({
+          organizationId: ORG,
+          userId: "user",
+          slug: slug!,
+        });
+
+        expect(policy).toEqual(PLATFORM_TOOL_POLICY_DEFAULTS[slug!]);
+      },
+    );
   });
 
   describe("when an admin creates a tile", () => {

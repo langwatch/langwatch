@@ -85,8 +85,9 @@ def sync_detailed(
 ) -> Response[Any | PostApiWorkflowsByIdEvaluateResponse200]:
     """Trigger an evaluation run of a workflow's committed version through the evaluations pipeline.
     Evaluate the workflow's attached dataset, inline data, or a platform dataset id; parameters bind as
-    constant entry inputs on every row. Returns a run id and a results URL to poll or open in the
-    browser.
+    constant entry inputs on every row. A saved dataset is read at `dataset_version` when given, else
+    its current content is saved as a new version. Returns a run id and a results URL to poll or open in
+    the browser.
 
     Args:
         id (str):
@@ -120,8 +121,9 @@ def sync(
 ) -> Any | PostApiWorkflowsByIdEvaluateResponse200 | None:
     """Trigger an evaluation run of a workflow's committed version through the evaluations pipeline.
     Evaluate the workflow's attached dataset, inline data, or a platform dataset id; parameters bind as
-    constant entry inputs on every row. Returns a run id and a results URL to poll or open in the
-    browser.
+    constant entry inputs on every row. A saved dataset is read at `dataset_version` when given, else
+    its current content is saved as a new version. Returns a run id and a results URL to poll or open in
+    the browser.
 
     Args:
         id (str):
@@ -150,8 +152,9 @@ async def asyncio_detailed(
 ) -> Response[Any | PostApiWorkflowsByIdEvaluateResponse200]:
     """Trigger an evaluation run of a workflow's committed version through the evaluations pipeline.
     Evaluate the workflow's attached dataset, inline data, or a platform dataset id; parameters bind as
-    constant entry inputs on every row. Returns a run id and a results URL to poll or open in the
-    browser.
+    constant entry inputs on every row. A saved dataset is read at `dataset_version` when given, else
+    its current content is saved as a new version. Returns a run id and a results URL to poll or open in
+    the browser.
 
     Args:
         id (str):
@@ -183,8 +186,9 @@ async def asyncio(
 ) -> Any | PostApiWorkflowsByIdEvaluateResponse200 | None:
     """Trigger an evaluation run of a workflow's committed version through the evaluations pipeline.
     Evaluate the workflow's attached dataset, inline data, or a platform dataset id; parameters bind as
-    constant entry inputs on every row. Returns a run id and a results URL to poll or open in the
-    browser.
+    constant entry inputs on every row. A saved dataset is read at `dataset_version` when given, else
+    its current content is saved as a new version. Returns a run id and a results URL to poll or open in
+    the browser.
 
     Args:
         id (str):

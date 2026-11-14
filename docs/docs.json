@@ -94,6 +94,7 @@
               },
               "integration/cli",
               "integration/mcp",
+              "integration/mcp-debug-traces",
               "changelog"
             ]
           },
@@ -101,6 +102,7 @@
             "group": "Agent Testing",
             "pages": [
               "agent-testing/overview",
+              "agent-testing/simulated-users",
               {
                 "group": "Get started",
                 "pages": [
@@ -150,7 +152,8 @@
                 ]
               },
               "agent-testing/voice-agents",
-              "agent-testing/red-teaming"
+              "agent-testing/red-teaming",
+              "agent-testing/red-team-open-source"
             ]
           },
           {
@@ -172,6 +175,7 @@
               "features/querying-your-data",
               "features/dashboards",
               "features/automations",
+              "features/braids",
               "features/topic-clustering",
               "features/embedded-analytics"
             ]
@@ -194,6 +198,7 @@
                     ]
                   },
                   "evaluations/experiments/ci-cd",
+                  "evaluations/experiments/versions-and-deploy-labels",
                   "evaluations/experiments/multimodal-evaluation"
                 ]
               },
@@ -212,6 +217,7 @@
                   "features/instant-evals/targets",
                   "features/instant-evals/results",
                   "features/instant-evals/limits-and-cost",
+                  "features/instant-evals/own-model",
                   "features/instant-evals/cli"
                 ]
               },
@@ -498,6 +504,7 @@
                 "group": "LangGraph",
                 "expanded": true,
                 "pages": [
+                  "integration/langgraph-tracing",
                   "integration/python/integrations/langgraph",
                   "integration/typescript/integrations/langgraph"
                 ]
@@ -511,6 +518,7 @@
                 "group": "DSPy Optimization",
                 "pages": [
                   "dspy-visualization/quickstart",
+                  "dspy-visualization/follow-optimization-in-a-ui",
                   "dspy-visualization/custom-optimizer",
                   "dspy-visualization/rag-visualization"
                 ]
@@ -639,6 +647,7 @@
             "pages": [
               "ai-gateway/overview",
               "ai-gateway/quickstart",
+              "ai-gateway/cap-spend-per-team",
               "ai-gateway/concepts"
             ]
           },
@@ -839,6 +848,12 @@
             ]
           },
           {
+            "group": "Agent Registry",
+            "pages": [
+              "governance/agent-registry"
+            ]
+          },
+          {
             "group": "Privacy",
             "pages": [
               "ai-governance/no-spy-mode"
@@ -897,7 +912,8 @@
             "pages": [
               "coding-agents/overview",
               "coding-agents/quickstart",
-              "coding-agents/claude-code-usage"
+              "coding-agents/claude-code-usage",
+              "coding-agents/claude-code-team"
             ]
           },
           {
@@ -936,6 +952,20 @@
                 "icon": "/images/logos/opencode.svg",
                 "pages": [
                   "coding-agents/opencode"
+                ]
+              },
+              {
+                "group": "Grok CLI",
+                "icon": "/images/logos/grok.svg",
+                "pages": [
+                  "coding-agents/grok-cli"
+                ]
+              },
+              {
+                "group": "pi",
+                "icon": "terminal",
+                "pages": [
+                  "coding-agents/pi"
                 ]
               }
             ]
@@ -1049,6 +1079,7 @@
               "self-hosting/configuration/environment-variables",
               "self-hosting/configuration/sizing-and-scaling",
               "self-hosting/configuration/backups",
+              "self-hosting/configuration/clickhouse-access",
               "self-hosting/configuration/object-storage-lifecycle",
               "self-hosting/configuration/sso",
               "self-hosting/configuration/email",
@@ -1147,12 +1178,16 @@
               "api-reference/datasets/get-entries",
               "api-reference/datasets/get-dataset",
               "api-reference/datasets/get-records",
+              "api-reference/datasets/list-dataset-versions",
+              "api-reference/datasets/get-a-dataset-version",
               "api-reference/datasets/update-dataset",
               "api-reference/datasets/update-records",
               "api-reference/datasets/post-dataset-entries",
               "api-reference/datasets/import-an-uploaded-file-into-a-dataset",
               "api-reference/datasets/action-records",
               "api-reference/datasets/action-upload",
+              "api-reference/datasets/save-a-dataset-version",
+              "api-reference/datasets/restore-a-dataset-version",
               "api-reference/datasets/delete-dataset",
               "api-reference/datasets/delete-records"
             ]
@@ -1163,8 +1198,11 @@
               "api-reference/evaluators-config/overview",
               "api-reference/evaluators-config/list-evaluators",
               "api-reference/evaluators-config/create-evaluators",
+              "api-reference/evaluators-config/get-versions",
               "api-reference/evaluators-config/get-evaluators",
+              "api-reference/evaluators-config/update-labels",
               "api-reference/evaluators-config/update-evaluators",
+              "api-reference/evaluators-config/delete-labels",
               "api-reference/evaluators-config/delete-evaluators"
             ]
           },
@@ -1396,12 +1434,28 @@
               "api-reference/agents/create-agents",
               "api-reference/agents/create-frames",
               "api-reference/agents/create-register",
+              "api-reference/agents/list-an-agent-s-versions",
               "api-reference/agents/get-agents",
+              "api-reference/agents/point-a-deploy-label-at-an-agent-version",
               "api-reference/agents/update-agents",
               "api-reference/agents/put-update-agents",
               "api-reference/agents/action-call",
               "api-reference/agents/action-test",
+              "api-reference/agents/remove-a-deploy-label-from-an-agent",
               "api-reference/agents/delete-agents"
+            ]
+          },
+          {
+            "group": "Agent Registry",
+            "pages": [
+              "api-reference/governance-agent-registry/overview",
+              "api-reference/governance-agent-registry/list-the-organisation-s-agent-registry",
+              "api-reference/governance-agent-registry/get-the-registry-as-an-ard-manifest",
+              "api-reference/governance-agent-registry/read-the-registry-change-feed",
+              "api-reference/governance-agent-registry/get-the-registry-s-json-schemas",
+              "api-reference/governance-agent-registry/search-the-registry-ard-search",
+              "api-reference/governance-agent-registry/get-one-registry-agent",
+              "api-reference/governance-agent-registry/list-one-registry-agent-s-versions"
             ]
           },
           {
@@ -1819,7 +1873,7 @@
       "destination": "/api-reference/projects/get-a-dashboard"
     },
     {
-      "source": "/ci/cache/busted/1793627322",
+      "source": "/ci/cache/busted/1794655975",
       "destination": "/introduction"
     },
     {

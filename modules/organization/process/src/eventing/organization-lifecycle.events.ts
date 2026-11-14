@@ -29,6 +29,9 @@ import {
   ORGANIZATION_TRACE_SHARING_DISABLED_EVENT_TYPE,
   ORGANIZATION_TRACE_SHARING_DISABLED_EVENT_VERSION,
   organizationTraceSharingDisabledEventDataSchema,
+  ORGANIZATION_DOCS_PLAYGROUND_SESSIONS_DISABLED_EVENT_TYPE,
+  ORGANIZATION_DOCS_PLAYGROUND_SESSIONS_DISABLED_EVENT_VERSION,
+  organizationDocsPlaygroundSessionsDisabledEventDataSchema,
   PERSONAL_WORKSPACE_PROVISIONED_EVENT_TYPE,
   PERSONAL_TEAM_CREATED_EVENT_TYPE,
   personalWorkspaceProvisionedEventDataSchema,
@@ -44,7 +47,6 @@ import { z } from "zod";
 
 /** An organization's membership milestones, and the integration method its founder chose. */
 export const ORGANIZATION_LIFECYCLE_PIPELINE_NAME = "organization_lifecycle" as const;
-export const ORGANIZATION_AGGREGATE_TYPE = "organization" as const;
 export const ORGANIZATION_LIFECYCLE_EVENT_VERSION = "2026-09-29" as const;
 
 export const RECORD_SIGNED_UP_COMMAND_TYPE = "lw.organization.record_signed_up" as const;
@@ -68,6 +70,8 @@ export const RECORD_PRESENCE_SETTING_CHANGED_COMMAND_TYPE =
   "lw.organization.record_presence_setting_changed" as const;
 export const RECORD_TRACE_SHARING_DISABLED_COMMAND_TYPE =
   "lw.organization.record_trace_sharing_disabled" as const;
+export const RECORD_DOCS_PLAYGROUND_SESSIONS_DISABLED_COMMAND_TYPE =
+  "lw.organization.record_docs_playground_sessions_disabled" as const;
 export const RECORD_CREATED_COMMAND_TYPE = "lw.organization.record_created" as const;
 export const RECORD_MEMBER_DISABLED_COMMAND_TYPE =
   "lw.organization.record_member_disabled" as const;
@@ -214,6 +218,23 @@ export const organizationTraceSharingDisabledEventSchema = z.object({
 });
 export type OrganizationTraceSharingDisabledEvent = z.infer<
   typeof organizationTraceSharingDisabledEventSchema
+>;
+
+/** Docs playground sessions switched off; versioned on its own, like the trace sharing switch. */
+export const recordDocsPlaygroundSessionsDisabledCommandDataSchema =
+  organizationDocsPlaygroundSessionsDisabledEventDataSchema;
+export type RecordDocsPlaygroundSessionsDisabledCommandData = z.infer<
+  typeof recordDocsPlaygroundSessionsDisabledCommandDataSchema
+>;
+
+export const organizationDocsPlaygroundSessionsDisabledEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(ORGANIZATION_DOCS_PLAYGROUND_SESSIONS_DISABLED_EVENT_TYPE),
+  version: z.literal(ORGANIZATION_DOCS_PLAYGROUND_SESSIONS_DISABLED_EVENT_VERSION),
+  data: organizationDocsPlaygroundSessionsDisabledEventDataSchema,
+});
+export type OrganizationDocsPlaygroundSessionsDisabledEvent = z.infer<
+  typeof organizationDocsPlaygroundSessionsDisabledEventSchema
 >;
 
 /** A seat taken away; versioned on its own, like the trace sharing switch. */

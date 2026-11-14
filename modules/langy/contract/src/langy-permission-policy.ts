@@ -22,6 +22,8 @@ export type LangyPermissionVerdict =
  * guardrail actions (attach/detach) bounded by caller's own access.
  */
 const DELEGABLE_ACTIONS = new Set([
+  // Moving a deploy label is bounded by the caller's own `agents:deploy` / `evaluators:deploy`.
+  "deploy",
   "view",
   "create",
   "update",
@@ -56,12 +58,14 @@ const ACTION_EXCLUSIONS: Record<string, string> = {
   // does for everyone in it, not what one caller can reach.
   manageExperiments:
     "sets feature-flag experiment enrolment for a whole project or organization, a platform rollout control rather than tenant data",
+  // Only ever minted onto a braid grant at proof time; no person holds it either (ADR-201 §3).
+  braided: "a braid grant's own permission, minted at proof time and never granted",
 };
 
 /**
  * Fully excluded families: secrets (reading = obtaining), agentCache (stores
  * sessions), langy (recursive authority), ops (platform surgery), featureFlags
- * (release machinery, not tenant data).
+ * (release machinery, not tenant data), braids (a person's decision), spans (never granted).
  */
 const FULLY_EXCLUDED_FAMILIES: Record<string, string> = {
   secrets: "reading a stored credential is obtaining it; there is no safe read",
@@ -75,6 +79,10 @@ const FULLY_EXCLUDED_FAMILIES: Record<string, string> = {
   featureFlags:
     "enrols a project or organization in a LangWatch rollout experiment, " +
     "which is release machinery rather than a tenant capability",
+  braids:
+    "shares a project's spans into another project's traces, a person's " +
+    "decision made in the screen; an agent never braids (ADR-201 §2)",
+  spans: "a braid grant's own permission, minted at proof time and never granted (ADR-201 §3)",
 };
 
 /**
@@ -106,6 +114,7 @@ const AUTH_SCOPE_FAMILIES: Record<string, string> = {
  * anomalyRules, aiTools, activityMonitor, gatewaySpend, governanceCost, ingestionSources.
  */
 const FULL_ACCESS_FAMILIES = new Set([
+  "agents",
   "analytics",
   "annotations",
   "anomalyRules",
@@ -114,6 +123,7 @@ const FULL_ACCESS_FAMILIES = new Set([
   "cost",
   "datasets",
   "evaluations",
+  "evaluators",
   "experiments",
   "gatewayBudgets",
   "gatewayCacheRules",

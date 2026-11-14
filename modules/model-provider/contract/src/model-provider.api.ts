@@ -135,6 +135,8 @@ export interface ModelProviderCredentialProbeRequest {
   readonly organizationId?: string;
   readonly provider: string;
   readonly customKeys: Record<string, string>;
+  /** The model about to run on it; Azure probes this deployment and skips without one. */
+  readonly model?: string;
 }
 /** A credential that is already stored, probed against a base URL. */
 export interface ModelProviderStoredCredentialProbeRequest {
@@ -310,6 +312,15 @@ export interface ModelProviderApi {
   }): Promise<DecisionModelResolution>;
   /** The decision models this project may be offered, hosted first; see `resolveDecisionModel`. */
   listDecisionModelsForProject(input: { projectId: string }): Promise<readonly BuiltInModel[]>;
+  /**
+   * The decision models a Default models config on these scopes may hold, hosted first: an own
+   * one only when it runs from every scope's own chain. Scopes outside the project's
+   * organization are refused.
+   */
+  listDecisionModelsForScopes(input: {
+    projectId: string;
+    scopes: readonly ModelDefaultScope[];
+  }): Promise<readonly BuiltInModel[]>;
   findAlternateModel(input: {
     projectId: string;
     featureKey: string;
