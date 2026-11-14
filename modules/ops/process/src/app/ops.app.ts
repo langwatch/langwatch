@@ -1218,7 +1218,7 @@ export class OpsModule implements OpsApi {
 
   #featureFlagTargets(): FeatureFlagTargetDirectoryService {
     const service = this.#dependencies.featureFlagTargets;
-    if (!service) throw new Error("This process composes no feature flag target directory");
+    if (!service) throw new OpsCapabilityUnavailableError("the feature flag target directory");
     return service;
   }
 

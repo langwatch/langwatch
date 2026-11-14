@@ -65,3 +65,11 @@ Feature: Search for the organization, project or user a feature flag rule target
     When the operator opens the targeting rules
     Then the chip shows the raw id marked as not found
     And the operator can remove it
+
+  @integration
+  Scenario: a failed lookup does not call stored targets unknown
+    Given a stored rule naming an organization that exists
+    And reading the stored ids fails
+    When the operator opens the targeting rules
+    Then the chip shows the raw id with a retry
+    And it is not marked as not found

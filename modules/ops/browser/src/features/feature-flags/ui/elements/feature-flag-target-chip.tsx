@@ -3,6 +3,7 @@ import { IdText } from "@langwatch/design-system/id-text";
 import {
   Badge,
   Box,
+  Button,
   HStack,
   IconButton,
   Skeleton,
@@ -20,19 +21,31 @@ export function FeatureFlagTargetChip({
   id,
   target,
   resolving,
+  failed,
+  onRetry,
   onRemove,
 }: {
   kind: OpsFeatureFlagTargetKind;
   id: string;
   target: OpsFeatureFlagTarget | undefined;
   resolving: boolean;
+  /** Whether resolving the stored ids failed, so a missing target is unknown rather than absent. */
+  failed: boolean;
+  onRetry: () => void;
   onRemove: () => void;
 }) {
   return (
     <Card variant="panel" padding="xs" data-testid="feature-flag-target-chip">
       <HStack gap={2} align="flex-start" minWidth={0}>
         <Box flex={1} minWidth={0}>
-          <ChipBody kind={kind} id={id} target={target} resolving={resolving} />
+          <ChipBody
+            kind={kind}
+            id={id}
+            target={target}
+            resolving={resolving}
+            failed={failed}
+            onRetry={onRetry}
+          />
         </Box>
         <IconButton
           aria-label={`Remove ${target ? targetTitle(target) : id}`}
@@ -52,14 +65,31 @@ function ChipBody({
   id,
   target,
   resolving,
+  failed,
+  onRetry,
 }: {
   kind: OpsFeatureFlagTargetKind;
   id: string;
   target: OpsFeatureFlagTarget | undefined;
   resolving: boolean;
+  failed: boolean;
+  onRetry: () => void;
 }) {
   if (target) return <FeatureFlagTargetSummary target={target} />;
   if (resolving) return <Skeleton height="8" width="60%" />;
+  if (failed) {
+    return (
+      <HStack gap={2} wrap="wrap">
+        <IdText value={id} label={`${kind} ID`} />
+        <Text textStyle="xs" color="fg.muted">
+          Couldn't load its details
+        </Text>
+        <Button size="2xs" variant="outline" onClick={onRetry}>
+          Retry
+        </Button>
+      </HStack>
+    );
+  }
   return (
     <HStack gap={2} wrap="wrap">
       <IdText value={id} label={`${kind} ID`} />

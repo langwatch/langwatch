@@ -1,5 +1,4 @@
-import { Card } from "@langwatch/design-system/card";
-import { Badge, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { Text, VStack } from "@langwatch/design-system/primitives";
 import { SearchInput } from "@langwatch/design-system/search-input";
 import { HandledErrorAlert } from "@langwatch/error-views";
 import type { OpsFeatureFlagTargetKind } from "@langwatch/ops-contract";
@@ -10,8 +9,8 @@ import {
   useFeatureFlagTargetSearch,
 } from "../../behavior/use-feature-flag-targets.ts";
 import { heldIds, withoutId, withPickedId } from "../../model/rule-targets.ts";
+import { FeatureFlagTargetResults } from "../blocks/feature-flag-target-results.tsx";
 import { FeatureFlagTargetChip } from "../elements/feature-flag-target-chip.tsx";
-import { FeatureFlagTargetSummary } from "../elements/feature-flag-target-summary.tsx";
 
 const SEARCH_PLACEHOLDER: Record<OpsFeatureFlagTargetKind, string> = {
   organization: "Search organizations by name, slug or id",
@@ -56,6 +55,8 @@ export function FeatureFlagTargetPicker({
           id={id}
           target={directory.lookup({ kind, id })}
           resolving={directory.resolving}
+          failed={directory.failed}
+          onRetry={directory.retry}
           onRemove={() => onChange(withoutId({ target, id }))}
         />
       ))}
@@ -69,59 +70,60 @@ export function FeatureFlagTargetPicker({
         value={query}
         onChange={(event) => setQuery(event.target.value)}
       />
-      {enabled && search.isFetching && results.length === 0 && (
-        <Text as="output" textStyle="xs" color="fg.muted">
-          Searching {PLURAL[kind]}…
-        </Text>
-      )}
-      {search.isError && (
-        <HandledErrorAlert error={search.error} fallbackTitle={`Couldn't search ${PLURAL[kind]}`} />
-      )}
-      {enabled && search.isSuccess && results.length === 0 && (
-        <Text textStyle="xs" color="fg.muted">
-          No {PLURAL[kind]} match "{query.trim()}".
-        </Text>
-      )}
+      <SearchStatus
+        kind={kind}
+        query={query}
+        enabled={enabled}
+        search={search}
+        found={results.length}
+      />
       {results.length > 0 && (
-        <Card variant="elevated" padding="xs">
-          <VStack
-            align="stretch"
-            gap={0.5}
-            maxHeight="72"
-            overflowY="auto"
-            aria-label={`Matching ${PLURAL[kind]}`}
-          >
-            {results.map((result) => {
-              const held = ids.includes(result.id);
-              return (
-                <Button
-                  key={result.id}
-                  aria-pressed={held}
-                  variant="ghost"
-                  justifyContent="start"
-                  height="auto"
-                  whiteSpace="normal"
-                  paddingY={1.5}
-                  onClick={() => {
-                    directory.remember(result);
-                    onChange(withPickedId({ target, id: result.id, multiple }));
-                    setQuery("");
-                  }}
-                >
-                  <HStack gap={2} width="full" minWidth={0}>
-                    <FeatureFlagTargetSummary target={result} />
-                    {held && (
-                      <Badge size="sm" colorPalette="green" marginStart="auto">
-                        added
-                      </Badge>
-                    )}
-                  </HStack>
-                </Button>
-              );
-            })}
-          </VStack>
-        </Card>
+        <FeatureFlagTargetResults
+          label={`Matching ${PLURAL[kind]}`}
+          results={results}
+          heldIds={ids}
+          onPick={(result) => {
+            directory.remember(result);
+            onChange(withPickedId({ target, id: result.id, multiple }));
+            setQuery("");
+          }}
+        />
       )}
     </VStack>
+  );
+}
+
+/** What the search is doing when it has no results to list: reading, failed or empty. */
+function SearchStatus({
+  kind,
+  query,
+  enabled,
+  search,
+  found,
+}: {
+  kind: OpsFeatureFlagTargetKind;
+  query: string;
+  enabled: boolean;
+  search: ReturnType<typeof useFeatureFlagTargetSearch>["search"];
+  found: number;
+}) {
+  if (search.isError) {
+    return (
+      <HandledErrorAlert error={search.error} fallbackTitle={`Couldn't search ${PLURAL[kind]}`} />
+    );
+  }
+  if (!enabled || found > 0) return null;
+  if (search.isFetching) {
+    return (
+      <Text as="output" textStyle="xs" color="fg.muted">
+        Searching {PLURAL[kind]}…
+      </Text>
+    );
+  }
+  if (!search.isSuccess) return null;
+  return (
+    <Text textStyle="xs" color="fg.muted">
+      No {PLURAL[kind]} match "{query.trim()}".
+    </Text>
   );
 }

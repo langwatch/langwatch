@@ -18,6 +18,7 @@ import { PrismaUserRepository } from "../prisma.user.repository.ts";
 
 const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
 const RUN = `search-${randomUUID()}`;
+const UNDERSCORE_RUN = `underscore-${randomUUID()}`;
 
 describe.skipIf(!databaseUrl)("given accounts an operator searches", () => {
   let connection: PrismaConnection;
@@ -33,13 +34,32 @@ describe.skipIf(!databaseUrl)("given accounts an operator searches", () => {
       data: [
         { id: danaId, name: "Dana Reyes", email: `dana@${RUN}.acme.test` },
         { name: `Kay ${RUN}`, email: `kay@${RUN}.other.test` },
+        { name: "Ann Lee", email: `ann_lee@${UNDERSCORE_RUN}.acme.test` },
+        { name: "Annalee", email: `annalee@${UNDERSCORE_RUN}.acme.test` },
       ],
     });
   });
 
   afterAll(async () => {
-    await connection.client.user.deleteMany({ where: { email: { contains: RUN } } });
-    await connection.client.$disconnect();
+    if (!connection) return;
+    try {
+      await connection.client.user.deleteMany({
+        where: { OR: [{ email: { contains: RUN } }, { email: { contains: UNDERSCORE_RUN } }] },
+      });
+    } finally {
+      await connection.closeOnce();
+    }
+  });
+
+  it("reads an underscore in the query as itself, not as any character", async () => {
+    const repository = PrismaUserRepository.create({ prisma: connection.client });
+
+    const found = await repository.searchProfiles({
+      query: `ann_lee@${UNDERSCORE_RUN}`,
+      limit: 10,
+    });
+
+    expect(found.map((profile) => profile.email)).toEqual([`ann_lee@${UNDERSCORE_RUN}.acme.test`]);
   });
 
   /** @scenario "an operator finds a user by email, name or id" */

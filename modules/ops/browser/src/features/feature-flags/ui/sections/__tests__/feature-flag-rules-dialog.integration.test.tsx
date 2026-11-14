@@ -13,6 +13,7 @@ vi.mock("../../../../../behavior/ops-api.ts", async () => ({
 }));
 
 import { FeatureFlagRulesDialog } from "../feature-flag-rules-dialog.tsx";
+import { directoryState } from "./support/feature-flag-target-directory.fixture.ts";
 
 // The dialog marks the rest of the document inert, which user-event reads as
 // "nothing here is clickable"; the operator's pointer is not so fussy.
@@ -282,5 +283,21 @@ describe("given stored rules that hold raw ids", () => {
     expect(chips()).toEqual([expect.stringMatching(/not found/)]);
     await user.click(screen.getByRole("button", { name: "Remove organization_gone" }));
     expect(chips()).toEqual([]);
+  });
+
+  describe("when looking up the stored ids fails", () => {
+    afterEach(() => {
+      directoryState.failing = false;
+    });
+
+    /** @scenario "a failed lookup does not call stored targets unknown" */
+    it("offers a retry instead of marking the ids not found", () => {
+      directoryState.failing = true;
+      renderDialog([{ match: { organizationId: "organization_labs_old" }, enabled: true }]);
+
+      expect(chips()).toEqual([expect.stringMatching(/Couldn't load its details/)]);
+      expect(chips()[0]).not.toMatch(/not found/);
+      expect(screen.getByRole("button", { name: "Retry" })).toBeTruthy();
+    });
   });
 });

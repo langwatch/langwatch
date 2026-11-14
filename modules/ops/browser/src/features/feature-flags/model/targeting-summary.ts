@@ -31,6 +31,7 @@ export interface TargetingSummary {
    */
   excludedOrganizationCount: number;
   excludedProjectCount: number;
+  excludedUserCount: number;
   excludedNewUsers: AgeRange[];
 }
 
@@ -65,6 +66,7 @@ export function summarizeTargeting(rules: FeatureFlagRules): TargetingSummary {
       enabled: false,
     }),
     excludedProjectCount: count({ decisions: projects, enabled: false }),
+    excludedUserCount: count({ decisions: users, enabled: false }),
     excludedNewUsers: ages.filter((range) => !range.enabled).flatMap((range) => bare(range) ?? []),
   };
 }
@@ -82,6 +84,7 @@ export function targetingLabel(summary: TargetingSummary): string | null {
         noun: "organization",
       }),
       pluralize({ count: summary.excludedProjectCount, noun: "project" }),
+      pluralize({ count: summary.excludedUserCount, noun: "user" }),
       ...summary.excludedNewUsers.map(describeRange),
     ]);
     return exceptions

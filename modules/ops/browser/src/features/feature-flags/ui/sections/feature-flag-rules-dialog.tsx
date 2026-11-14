@@ -52,7 +52,11 @@ import {
   type ScopeKind,
   type UIRule,
 } from "../../model/rule-editing.ts";
-import { PICKED_TARGET_SCOPES } from "../../model/rule-targets.ts";
+import {
+  isPickedScope,
+  PICKED_TARGET_SCOPES,
+  type PickedScopeKind,
+} from "../../model/rule-targets.ts";
 import { FeatureFlagTargetPicker } from "./feature-flag-target-picker.tsx";
 
 const SCOPE_COLLECTION = createListCollection<{ value: ScopeKind; label: string }>({
@@ -77,11 +81,11 @@ const SCOPE_FIELD_LABEL: Record<ScopeKind, string> = {
   EMAIL_DOMAIN: "Email domains",
 };
 
-const SCOPE_FIELD_PLACEHOLDER: Record<ScopeKind, string> = {
+/** Scopes that type their target; the picked scopes search for it instead. */
+type TypedScopeKind = Exclude<ScopeKind, PickedScopeKind>;
+
+const SCOPE_FIELD_PLACEHOLDER: Record<TypedScopeKind, string> = {
   EVERYONE: "",
-  ORGANIZATION: "organization_xxxx",
-  PROJECT: "project_xxxx, project_yyyy",
-  USER: "",
   NEW_USERS: "",
   PERCENTAGE: "50",
   EMAIL_DOMAIN: "acme.com, acme.io",
@@ -98,11 +102,8 @@ const MISSING_TARGET_MESSAGE: Record<ScopeKind, string> = {
 };
 
 /** The `<input>` type the field's scope needs: a date picker, a number, or free text. */
-const SCOPE_FIELD_INPUT_TYPE: Record<ScopeKind, "date" | "number" | "text"> = {
+const SCOPE_FIELD_INPUT_TYPE: Record<TypedScopeKind, "date" | "number" | "text"> = {
   EVERYONE: "text",
-  ORGANIZATION: "text",
-  PROJECT: "text",
-  USER: "text",
   NEW_USERS: "date",
   PERCENTAGE: "number",
   EMAIL_DOMAIN: "text",
@@ -125,7 +126,9 @@ export function FeatureFlagRulesDialog({
   const [saving, setSaving] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
   const wasOpen = useRef(false);
-  const directory = useFeatureFlagTargetDirectory({ rules: initialRules, open });
+  // Targets resolve from the rules that seeded the draft, not a refetch that arrived mid-edit.
+  const [seeded, setSeeded] = useState<FeatureFlagRules>(initialRules);
+  const directory = useFeatureFlagTargetDirectory({ rules: seeded, open });
 
   // A small distance threshold on the pointer, so the grip still accepts an
   // ordinary click without the row starting to drag under it. The keyboard
@@ -141,6 +144,7 @@ export function FeatureFlagRulesDialog({
   useEffect(() => {
     if (open && !wasOpen.current) {
       setDraft(rulesToUI(initialRules));
+      setSeeded(initialRules);
       setValidationError(null);
     }
     wasOpen.current = open;
@@ -334,10 +338,11 @@ function RuleTargetField({
   directory: FeatureFlagTargetDirectory;
   onChange: (patch: Partial<UIRule>) => void;
 }) {
-  const isNewUsers = rule.scopeKind === "NEW_USERS";
-  const picked = PICKED_TARGET_SCOPES[rule.scopeKind];
+  const scope = rule.scopeKind;
+  const isNewUsers = scope === "NEW_USERS";
 
-  if (picked) {
+  if (isPickedScope(scope)) {
+    const picked = PICKED_TARGET_SCOPES[scope];
     return (
       <Field.Root flex={1} minWidth={0}>
         <Field.Label fontSize="xs">{SCOPE_FIELD_LABEL[rule.scopeKind]}</Field.Label>
@@ -357,10 +362,10 @@ function RuleTargetField({
       <Field.Label fontSize="xs">{SCOPE_FIELD_LABEL[rule.scopeKind]}</Field.Label>
       <Input
         size="sm"
-        type={SCOPE_FIELD_INPUT_TYPE[rule.scopeKind]}
+        type={SCOPE_FIELD_INPUT_TYPE[scope]}
         fontFamily={isNewUsers ? void 0 : "mono"}
         fontSize="xs"
-        placeholder={SCOPE_FIELD_PLACEHOLDER[rule.scopeKind]}
+        placeholder={SCOPE_FIELD_PLACEHOLDER[scope]}
         value={rule.target}
         disabled={rule.scopeKind === "EVERYONE"}
         onChange={(event) => onChange({ target: event.target.value })}

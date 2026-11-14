@@ -1,19 +1,28 @@
 import { projectIdsOf, userIdsOf, type FeatureFlagRules } from "@langwatch/feature-flag-contract";
 import type { OpsFeatureFlagTarget, OpsFeatureFlagTargetKind } from "@langwatch/ops-contract";
 
-import type { ScopeKind } from "./rule-editing.ts";
+import { parseTargetIds, type ScopeKind } from "./rule-editing.ts";
+
+/** The scopes whose target is an organization, project or user picked by search. */
+export type PickedScopeKind = Extract<ScopeKind, "ORGANIZATION" | "PROJECT" | "USER">;
 
 /**
  * Which targets a rule scope picks from the directory, and how many it holds;
  * see modules/ops/specs/feature-flag-target-search.feature.
  */
-export const PICKED_TARGET_SCOPES: Partial<
-  Record<ScopeKind, { kind: OpsFeatureFlagTargetKind; multiple: boolean }>
+export const PICKED_TARGET_SCOPES: Record<
+  PickedScopeKind,
+  { kind: OpsFeatureFlagTargetKind; multiple: boolean }
 > = {
   ORGANIZATION: { kind: "organization", multiple: false },
   PROJECT: { kind: "project", multiple: true },
   USER: { kind: "user", multiple: true },
 };
+
+/** Whether a scope searches for its target instead of typing it. */
+export function isPickedScope(scope: ScopeKind): scope is PickedScopeKind {
+  return scope in PICKED_TARGET_SCOPES;
+}
 
 /** The ids stored rules name, so the dialog can show each by name. */
 export function targetIdsOf(rules: FeatureFlagRules): {
@@ -36,14 +45,7 @@ export function targetKey({ kind, id }: { kind: OpsFeatureFlagTargetKind; id: st
 
 /** The ids a field holds, in order, without repeats. */
 export function heldIds(target: string): string[] {
-  return [
-    ...new Set(
-      target
-        .split(",")
-        .map((id) => id.trim())
-        .filter((id) => id !== ""),
-    ),
-  ];
+  return [...new Set(parseTargetIds(target))];
 }
 
 /** The field after a pick: a single-target scope swaps its id, a list scope appends it. */

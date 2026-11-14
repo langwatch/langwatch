@@ -308,7 +308,7 @@ export class PrismaUserRepository
     const rows = await this.prisma.user.findMany({
       where: {
         OR: (["id", "name", "email"] as const).map((field) => ({
-          [field]: { contains: query, mode: "insensitive" as const },
+          [field]: { contains: literalSubstring(query), mode: "insensitive" as const },
         })),
       },
       select: userProfileSelect,
@@ -746,4 +746,9 @@ function domainCounts(emails: readonly string[]): Record<string, number> {
     if (domain) counts[domain] = (counts[domain] ?? 0) + 1;
   }
   return counts;
+}
+
+/** The query as a literal substring: LIKE reads `%`, `_` and `\\` as patterns otherwise. */
+function literalSubstring(query: string): string {
+  return query.replace(/[\\%_]/g, (character) => `\\${character}`);
 }

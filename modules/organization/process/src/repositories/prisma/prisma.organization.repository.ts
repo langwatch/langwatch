@@ -99,7 +99,7 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
         ? { id: { in: [...input.organizationIds] } }
         : {
             OR: (["id", "name", "slug"] as const).map((field) => ({
-              [field]: { contains: input.query, mode: "insensitive" as const },
+              [field]: { contains: literalSubstring(input.query), mode: "insensitive" as const },
             })),
           };
     const rows = await this.database.organization.findMany({
@@ -929,4 +929,9 @@ function mapPersonalWorkspace(
       createdAtMs: project.createdAt.getTime(),
     },
   };
+}
+
+/** The query as a literal substring: LIKE reads `%`, `_` and `\\` as patterns otherwise. */
+function literalSubstring(query: string): string {
+  return query.replace(/[\\%_]/g, (character) => `\\${character}`);
 }

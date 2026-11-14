@@ -69,6 +69,7 @@ vi.mock("~/features/errors", () => ({
 
 vi.mock("../../../behavior/ops-api.ts", () => ({
   api: {
+    useQueries: () => [],
     useUtils: () => ({
       ops: { listFeatureFlags: { invalidate: vi.fn() } },
     }),
@@ -91,7 +92,6 @@ vi.mock("../../../behavior/ops-api.ts", () => ({
       setFeatureFlagRules: {
         useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
       },
-      findFeatureFlagTargets: { useQuery: () => ({ data: undefined, isLoading: false }) },
       searchFeatureFlagTargets: {
         useQuery: () => ({ data: undefined, isFetching: false, isError: false, isSuccess: false }),
       },

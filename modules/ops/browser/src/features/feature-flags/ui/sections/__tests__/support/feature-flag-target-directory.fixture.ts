@@ -52,28 +52,51 @@ function matches(target: OpsFeatureFlagTarget, query: string): boolean {
 }
 
 /** The two target reads the rules dialog makes, answered from {@link TARGETS} at once. */
+/** Switches every stored-target read to failing, for the case where the lookup errors. */
+export const directoryState = { failing: false };
+
+/** What one stored-target read answers in tests. */
+function storedTargets({
+  input,
+  enabled,
+  failing,
+}: {
+  input: { organizationIds: string[]; projectIds: string[]; userIds: string[] };
+  enabled: boolean;
+  failing: boolean;
+}) {
+  const named = (kind: OpsFeatureFlagTargetKind) =>
+    ({ organization: input.organizationIds, project: input.projectIds, user: input.userIds })[kind];
+  return {
+    isLoading: false,
+    isError: enabled && failing,
+    refetch: () => Promise.resolve(),
+    data:
+      enabled && !failing
+        ? TARGETS.filter((target) => named(target.kind).includes(target.id))
+        : undefined,
+  };
+}
+
 export function directoryApi() {
   return {
+    useQueries: (
+      build: (t: {
+        ops: {
+          findFeatureFlagTargets: (
+            input: { organizationIds: string[]; projectIds: string[]; userIds: string[] },
+            options: { enabled: boolean },
+          ) => ReturnType<typeof storedTargets>;
+        };
+      }) => ReturnType<typeof storedTargets>[],
+    ) =>
+      build({
+        ops: {
+          findFeatureFlagTargets: (input, { enabled }) =>
+            storedTargets({ input, enabled, failing: directoryState.failing }),
+        },
+      }),
     ops: {
-      findFeatureFlagTargets: {
-        useQuery: (
-          input: { organizationIds: string[]; projectIds: string[]; userIds: string[] },
-          options: { enabled: boolean },
-        ) => ({
-          isLoading: false,
-          data: options.enabled
-            ? TARGETS.filter((target) =>
-                (
-                  ({
-                    organization: input.organizationIds,
-                    project: input.projectIds,
-                    user: input.userIds,
-                  }) as Record<OpsFeatureFlagTargetKind, string[]>
-                )[target.kind].includes(target.id),
-              )
-            : undefined,
-        }),
-      },
       searchFeatureFlagTargets: {
         useQuery: (
           input: { kind: OpsFeatureFlagTargetKind; query: string },

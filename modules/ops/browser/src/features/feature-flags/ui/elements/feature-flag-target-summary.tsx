@@ -1,4 +1,4 @@
-import { FormattedDate } from "@langwatch/design-system/formatted-date";
+import { formatInstant } from "@langwatch/design-system/describe-instant";
 import { IdText } from "@langwatch/design-system/id-text";
 import { Badge, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import type { OpsFeatureFlagTarget } from "@langwatch/ops-contract";
@@ -40,9 +40,7 @@ function TargetFacts({ target }: { target: OpsFeatureFlagTarget }) {
     return (
       <Facts>
         {target.memberCount === 1 ? "1 member" : `${target.memberCount} members`}
-        <>
-          Created <FormattedDate value={target.createdAtMs} display="date" />
-        </>
+        {`Created ${formatInstant({ epochMs: target.createdAtMs, display: "date" })}`}
         {target.administratorEmails.length > 0
           ? `Admin ${target.administratorEmails.join(", ")}`
           : "No admin who can sign in"}
