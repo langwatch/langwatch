@@ -85,15 +85,13 @@ function recordingDriver(client: ClickHouseClient): ScriptedStatements {
   };
 }
 
-/** The parts the planner reaches for one statement, summed over the tables it names. */
+/**
+ * The parts left once the time bound has pruned partitions (EXPLAIN's Partition stage). Not
+ * EXPLAIN ESTIMATE: from 26.4 that also counts column-statistics pruning, which can narrow an
+ * unbounded read to the same part and hide what the bound saves.
+ */
 async function partsReached(request: QueryRequest): Promise<number> {
-  const result = await ch.query({
-    query: `EXPLAIN ESTIMATE ${request.sql}`,
-    format: "JSONEachRow",
-    ...(request.params === undefined ? {} : { query_params: request.params }),
-  });
-  const rows = await result.json<{ parts: number | string }>();
-  return rows.reduce((total, row) => total + Number(row.parts), 0);
+  return partsAfterPartitionPruning({ query: queryRows, request });
 }
 
 /** One query on the test server, its rows as JSONEachRow parses them. */
@@ -113,6 +111,14 @@ function sourceReadOf(table: string): QueryRequest {
   );
   if (!read) throw new Error(`no source read of ${table} was sent`);
   return read;
+}
+
+/** A list read's dedup subquery on its own, which the outer statement's plan does not show. */
+function dedupScopeOf(request: QueryRequest): QueryRequest {
+  const from = request.sql.indexOf("SELECT TenantId, SessionId, max(UpdatedAt)");
+  const having = "HAVING max(toUInt8(Auxiliary)) = 0";
+  const to = request.sql.indexOf(having, from) + having.length;
+  return { ...request, sql: request.sql.slice(from, to) };
 }
 
 beforeAll(async () => {
@@ -316,6 +322,69 @@ describe("coding-agent lookups by id with the id index", () => {
       expect(await partsReached(bounded)).toBeLessThan(
         await partsReached(sourceReadOf("coding_agent_trace_sessions")),
       );
+    });
+  });
+});
+
+describe("coding-agent session reads bounded by the session id index", () => {
+  const sessionIds = () => [
+    `${tenantId}-session`,
+    ...decoyAgesInDays.flatMap((days) => decoyIds.map((id) => `${id}-${days}`)),
+  ];
+
+  describe("given a window around the session written eight weeks ago", () => {
+    it("lists the same sessions as the unbounded read, its dedup scope reaching fewer parts", async () => {
+      const window = { fromMs: eightWeeksAgoMs - DAY_MS, toMs: eightWeeksAgoMs + DAY_MS };
+
+      const listed = await sessions.findManyRecent({ tenantId, ...window, limit: 10 });
+
+      expect(listed.map((row) => row.sessionId)).toEqual([`${tenantId}-session`]);
+      const bounded = sourceReadOf("coding_agent_sessions");
+      expect(bounded.params).toMatchObject({
+        spanFrom: eightWeeksAgoMs - DAY_MS,
+        spanTo: eightWeeksAgoMs + DAY_MS,
+      });
+      statements = [];
+      const unboundedList = await unbounded.sessions.findManyRecent({
+        tenantId,
+        ...window,
+        limit: 10,
+      });
+      expect(unboundedList).toEqual(listed);
+      const unboundedDedup = dedupScopeOf(sourceReadOf("coding_agent_sessions"));
+      expect(
+        await partsAfterPartitionPruning({ query: queryRows, request: dedupScopeOf(bounded) }),
+      ).toBeLessThan(
+        await partsAfterPartitionPruning({ query: queryRows, request: unboundedDedup }),
+      );
+    });
+  });
+
+  describe("given a project whose sessions span two hundred days", () => {
+    it("counts its sessions and its first one as the unbounded read does", async () => {
+      const counted = await sessions.countUsage({ projectIds: [tenantId] });
+
+      expect(counted.sessions).toBe(sessionIds().length);
+      await expect(unbounded.sessions.countUsage({ projectIds: [tenantId] })).resolves.toEqual(
+        counted,
+      );
+    });
+
+    it("answers main for the other sessions, probing inside their span", async () => {
+      await expect(
+        sessions.findOtherSessionKind({ tenantId, excludeSessionIds: [`${tenantId}-session`] }),
+      ).resolves.toBe("main");
+
+      expect(sourceReadOf("coding_agent_sessions").sql).toContain("{spanFrom:Int64}");
+    });
+
+    it("answers none from the index alone when every session is excluded", async () => {
+      await expect(
+        sessions.findOtherSessionKind({ tenantId, excludeSessionIds: sessionIds() }),
+      ).resolves.toBe("none");
+
+      expect(statements).not.toHaveLength(0);
+      expect(statements.every((request) => request.sql.includes("_id_index"))).toBe(true);
     });
   });
 });

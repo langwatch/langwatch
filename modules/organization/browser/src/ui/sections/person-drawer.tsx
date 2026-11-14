@@ -4,13 +4,13 @@
  * Impersonation is deliberately absent. Spec: specs/identity/directory-administration.feature
  */
 
-import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { Badge, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { SettingsSection } from "@langwatch/design-system/settings-section";
 import { SkeletonRows } from "@langwatch/design-system/skeletons";
+import { Switch } from "@langwatch/design-system/switch";
 import type { UiPersonDrawerProps } from "@langwatch/organization-contract";
-import { Ban, KeyRound, ShieldCheck, Trash2, Undo2, UserCog } from "lucide-react";
+import { Ban, CreditCard, KeyRound, ShieldCheck, Trash2, Undo2, UserCog } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 
 import { HandledErrorAlert } from "../../behavior/handled-error-form.tsx";
@@ -28,6 +28,7 @@ import { ProvenanceChip, ProvenanceExplanation } from "../elements/member-proven
 import { SecondFactorCell } from "../elements/second-factor-cell.tsx";
 import { MemberAccessEditor } from "./member-access-editor.tsx";
 import { PersonIdentityRow } from "./person-identity-row.tsx";
+import { RemoveMemberDialog } from "./remove-member-dialog.tsx";
 
 export function PersonDrawer({ open = true, userId }: UiPersonDrawerProps) {
   const { closeDrawer } = useDrawer();
@@ -72,6 +73,11 @@ function PersonDetail({
   );
   const provenance = useMemberProvenance({ organizationId, enabled: canManage });
   const twoStep = useTwoStepRequirement({ organizationId, canManage });
+  const billingMembers = api.authz.listBillingMembers.useQuery(
+    { organizationId },
+    { enabled: canManage },
+  );
+  const holdsBilling = !!billingMembers.data?.some((holder) => holder.userId === userId);
 
   if (!canManage) {
     return (
@@ -103,6 +109,11 @@ function PersonDetail({
             {person.role === "DEVELOPER" ? (
               <Badge colorPalette="teal" size="sm">
                 Developer
+              </Badge>
+            ) : null}
+            {holdsBilling ? (
+              <Badge colorPalette="purple" size="sm" data-testid="person-billing-badge">
+                Billing
               </Badge>
             ) : null}
             {person.user.deactivatedAt ? (
@@ -169,6 +180,13 @@ function PersonDetail({
         />
       </SettingsSection>
 
+      <BillingRoleSection
+        organizationId={organizationId}
+        userId={person.userId}
+        holdsBilling={holdsBilling}
+        loading={billingMembers.isLoading}
+      />
+
       {isSelf ? null : (
         <PersonActions
           organizationId={organizationId}
@@ -178,6 +196,48 @@ function PersonDetail({
         />
       )}
     </VStack>
+  );
+}
+
+/** Billing sits beside any other role and takes no seat; only an administrator toggles it. */
+function BillingRoleSection({
+  organizationId,
+  userId,
+  holdsBilling,
+  loading,
+}: {
+  organizationId: string;
+  userId: string;
+  holdsBilling: boolean;
+  loading: boolean;
+}) {
+  const showErrorToast = useShowErrorToast();
+  const queryClient = api.useUtils();
+  const setBilling = api.authz.setMemberBillingRole.useMutation({
+    onSuccess: () => void queryClient.authz.listBillingMembers.invalidate(),
+    onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't change Billing" }),
+  });
+
+  return (
+    <SettingsSection title="Billing" icon={<CreditCard size={18} />} divided={false}>
+      <VStack align="start" gap={2} width="full">
+        <Switch
+          size="sm"
+          data-testid="person-billing-switch"
+          checked={holdsBilling}
+          disabled={loading || setBilling.isPending}
+          inputProps={{ "aria-label": "Billing role" }}
+          onCheckedChange={(event) =>
+            setBilling.mutate({ organizationId, userId, holds: event.checked === true })
+          }
+        >
+          <Text fontSize="sm">Pays for the organization</Text>
+        </Switch>
+        <Text fontSize="xs" color="fg.muted">
+          Changes the plan and seats, sees invoices, and approves seat requests.
+        </Text>
+      </VStack>
+    </SettingsSection>
   );
 }
 
@@ -213,12 +273,14 @@ function PersonActions({
   const toaster = useOrganizationToaster();
   const showErrorToast = useShowErrorToast();
   const queryClient = api.useUtils();
+  const organizationName = useOrganizationTeamProject().organization?.name;
   const [confirmingRemoval, setConfirmingRemoval] = useState(false);
   useEffect(() => setConfirmingRemoval(false), [person.userId]);
 
   const removeMember = api.organization.deleteMember.useMutation();
   const refreshSeats = () => {
     void queryClient.organization.getOrganizationWithMembersAndTheirTeams.invalidate();
+    void queryClient.organization.listHeldSeats.invalidate();
     void queryClient.limits.getUsage.invalidate();
     void queryClient.licenseEnforcement.checkLimit.invalidate();
   };
@@ -255,26 +317,27 @@ function PersonActions({
             </Button>
           </HStack>
           <Text fontSize="xs" color="fg.muted">
-            Taking a seat away is reversible and frees a licensed seat. Removing ends their
-            membership of this organization; their account and everything they did stay.
+            Taking a seat away is reversible. Removing ends their membership of this organization;
+            their account and everything they did stay.
           </Text>
         </VStack>
       </SettingsSection>
-      <ConfirmDialog
-        open={confirmingRemoval}
-        onOpenChange={(isOpen) => {
-          if (!isOpen) setConfirmingRemoval(false);
-        }}
-        title="Remove from organization"
-        message={`Remove ${
-          person.user.name ?? person.user.email ?? "this member"
-        } from this organization? They lose access to everything in it.`}
-        confirmLabel="Remove"
-        tone="danger"
+      <RemoveMemberDialog
+        organizationId={organizationId}
+        organizationName={organizationName}
+        target={
+          confirmingRemoval
+            ? {
+                userId: person.userId,
+                label: person.user.name ?? person.user.email ?? "this member",
+              }
+            : null
+        }
         loading={removeMember.isPending}
-        onConfirm={() =>
+        onClose={() => setConfirmingRemoval(false)}
+        onConfirm={(removal) =>
           removeMember.mutate(
-            { organizationId, userId: person.userId },
+            { organizationId, ...removal },
             {
               onSuccess: () => {
                 toaster.create({

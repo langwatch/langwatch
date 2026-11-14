@@ -1,7 +1,7 @@
 /**
  * The hooks that make a session report its repository. An entry is ours only
  * when its command is ours; others are written back untouched. In a folder of
- * hook files (Copilot) we own one file, and only while it holds nothing else.
+ * hook files (Copilot, Grok) we own one file, and only while it holds nothing else.
  */
 
 import * as fs from "node:fs";
@@ -16,9 +16,11 @@ import {
   HOOK_TIMEOUT_SECONDS,
   type HookedTool,
   type HooksTarget,
+  ownedHookFileFormat,
   type OwnedHookFileTool,
   ownedHookFileToolForCommand,
   SESSION_CONTEXT_AGENTS,
+  type SessionContextAgent,
   type SessionContextAgentId,
 } from "./session-context-agents";
 
@@ -42,21 +44,6 @@ const OWNED_COMMAND_PREFIXES = [OWNED_COMMAND_PREFIX, GUIDANCE_COMMAND_PREFIX] a
 
 /** The two events a session's git context can have changed between. */
 const HOOK_EVENTS = ["SessionStart", "Stop"] as const;
-
-/**
- * Copilot's names for the same two events, as its hook file format spells
- * them: `agentStop` closes every turn the way Claude Code's `Stop` does.
- */
-const COPILOT_HOOK_EVENTS = ["sessionStart", "agentStop"] as const;
-
-/**
- * Grok reads Claude Code's hook shape. SubagentStart fires in the parent with
- * the child's id, the one place a subagent's parent is known (ADR-192).
- */
-const GROK_HOOK_EVENTS = ["SessionStart", "Stop", "SubagentStart"] as const;
-
-/** The only version of the Copilot hook file format there is. */
-const COPILOT_HOOK_FILE_VERSION = 1;
 
 /** The command an installed hook entry runs, for one agent. */
 export function sessionContextHookCommand(tool: HookedTool): string {
@@ -281,17 +268,18 @@ function mergeHookEntries({
 }
 
 /**
- * No matcher: every session start counts. Still ONE entry per event --
- * claude's SessionStart carries the guidance hook as a second command, so
- * removal holds for both. Codex's guidance rides the AGENTS.md block instead.
+ * No matcher: every session start counts. Still ONE entry per event: an agent
+ * row naming `sessionStartGuidance` carries it as a second command, so removal
+ * holds for both. Codex's guidance rides the AGENTS.md block instead.
  */
 function sessionContextHookEntry(
   tool: HookedTool,
   event: (typeof HOOK_EVENTS)[number],
 ): Record<string, unknown> {
   const commands = [sessionContextHookCommand(tool)];
-  if (tool === "claude_code" && event === "SessionStart") {
-    commands.push(`${GUIDANCE_COMMAND_PREFIX} claude-code`);
+  const agent: SessionContextAgent = SESSION_CONTEXT_AGENTS[tool];
+  if (agent.sessionStartGuidance !== undefined && event === "SessionStart") {
+    commands.push(`${GUIDANCE_COMMAND_PREFIX} ${agent.sessionStartGuidance}`);
   }
   return {
     hooks: commands.map((command) => ({
@@ -336,7 +324,7 @@ function installOwnedHookFile({
   tool,
   target,
 }: {
-  tool: HookedTool;
+  tool: OwnedHookFileTool;
   target: HooksTarget;
 }): SessionContextHooksInstallResult {
   const existing = readHookFileText(target.path);
@@ -345,7 +333,10 @@ function installOwnedHookFile({
     return { action: isRunningOurHook ? "user_file_runs_hook" : "not_ours", ...target };
   }
 
-  const document = ownedHookFileDocument(tool);
+  const document = ownedHookFileFormat(tool).document({
+    command: sessionContextHookCommand(tool),
+    timeoutSeconds: HOOK_TIMEOUT_SECONDS,
+  });
   if (existing === `${JSON.stringify(document, null, 2)}\n`) {
     return { action: "unchanged", ...target };
   }
@@ -374,72 +365,6 @@ function isMissingFileError(error: unknown): boolean {
   return isPlainObject(error) && error.code === "ENOENT";
 }
 
-/** The whole of our own hook file, in the format its agent reads. */
-function ownedHookFileDocument(tool: HookedTool): Record<string, unknown> {
-  return tool === "grok" ? grokHookFileDocument(tool) : copilotHookFileDocument(tool);
-}
-
-/** The file in Claude Code's hook shape, as Grok reads it: one matcher-less group per event. */
-function grokHookFileDocument(tool: HookedTool): Record<string, unknown> {
-  const group = {
-    hooks: [
-      { type: "command", command: sessionContextHookCommand(tool), timeout: HOOK_TIMEOUT_SECONDS },
-    ],
-  };
-  return { hooks: Object.fromEntries(GROK_HOOK_EVENTS.map((event) => [event, [group]])) };
-}
-
-/**
- * The file in Copilot's hook format: one command per event, under `bash` for
- * macOS and Linux and `powershell` for Windows, as Copilot reads them. The
- * command is the same in both shells, as a Claude Code or Codex hook's is.
- */
-function copilotHookFileDocument(tool: HookedTool): Record<string, unknown> {
-  const command = sessionContextHookCommand(tool);
-  const entry = {
-    type: "command",
-    bash: command,
-    powershell: command,
-    timeoutSec: HOOK_TIMEOUT_SECONDS,
-  };
-  return {
-    version: COPILOT_HOOK_FILE_VERSION,
-    hooks: Object.fromEntries(COPILOT_HOOK_EVENTS.map((event) => [event, [entry]])),
-  };
-}
-
-/** The keys an entry of ours carries, in what `copilotHookFileDocument` writes or wrote. */
-const OWNED_ENTRY_KEYS: ReadonlySet<string> = new Set(["type", "bash", "powershell", "timeoutSec"]);
-
-/** The keys a handler of ours carries, in what `grokHookFileDocument` writes. */
-const OWNED_HANDLER_KEYS: ReadonlySet<string> = new Set(["type", "command", "timeout"]);
-
-/** The top-level keys a hook file of ours carries. */
-const OWNED_FILE_KEYS: ReadonlySet<string> = new Set(["version", "hooks"]);
-
-/** Grok's file carries no version: `hooks` is all of it. */
-const GROK_OWNED_FILE_KEYS: ReadonlySet<string> = new Set(["hooks"]);
-
-/** A Grok matcher group whose every handler runs our command and nothing else. */
-function isOurGrokGroup({ group, command }: { group: unknown; command: string }): boolean {
-  if (!isPlainObject(group)) return false;
-  const hasOnlyHooks = Object.keys(group).every((key) => key === "hooks");
-  if (!hasOnlyHooks || !Array.isArray(group.hooks) || group.hooks.length === 0) return false;
-  return group.hooks.every((handler: unknown) => isOurHandler({ handler, command }));
-}
-
-function isOurHandler({ handler, command }: { handler: unknown; command: string }): boolean {
-  if (!isPlainObject(handler) || handler.command !== command) return false;
-  return Object.keys(handler).every((key) => OWNED_HANDLER_KEYS.has(key));
-}
-
-function isOurCopilotEntry({ entry, command }: { entry: unknown; command: string }): boolean {
-  if (!isPlainObject(entry) || entry.bash !== command) return false;
-  // A file an older CLI wrote carries no `powershell`; one that differs is the user's.
-  if ("powershell" in entry && entry.powershell !== command) return false;
-  return Object.keys(entry).every((key) => OWNED_ENTRY_KEYS.has(key));
-}
-
 /**
  * The owned hook file when it holds nothing but entries running our command.
  * Running it is not enough: a user may write it beside hooks of their own,
@@ -449,7 +374,7 @@ function readOwnedHookFile({
   tool,
   filePath,
 }: {
-  tool: HookedTool;
+  tool: OwnedHookFileTool;
   filePath: string;
 }): Record<string, unknown> | null {
   let parsed: unknown;
@@ -459,18 +384,14 @@ function readOwnedHookFile({
     return null;
   }
   if (!isPlainObject(parsed) || !isPlainObject(parsed.hooks)) return null;
-  const fileKeys = tool === "grok" ? GROK_OWNED_FILE_KEYS : OWNED_FILE_KEYS;
-  const hasOnlyOurKeys = Object.keys(parsed).every((key) => fileKeys.has(key));
+  const format = ownedHookFileFormat(tool);
+  const hasOnlyOurKeys = Object.keys(parsed).every((key) => format.fileKeys.has(key));
   if (!hasOnlyOurKeys) return null;
   const events = Object.values(parsed.hooks);
   const command = sessionContextHookCommand(tool);
-  const isOurEntry = (entry: unknown): boolean =>
-    tool === "grok"
-      ? isOurGrokGroup({ group: entry, command })
-      : isOurCopilotEntry({ entry, command });
   const isOnlyOurs = (entries: unknown): boolean => {
     if (!Array.isArray(entries) || entries.length === 0) return false;
-    return entries.every(isOurEntry);
+    return entries.every((entry: unknown) => format.isOurEntry({ entry, command }));
   };
   return events.length > 0 && events.every(isOnlyOurs) ? parsed : null;
 }
@@ -553,7 +474,13 @@ function runsLangwatchWith({ part, args }: { part: string; args: readonly string
 }
 
 /** Delete the owned hook file when it is ours. Returns whether it was removed. */
-function removeOwnedHookFile({ tool, filePath }: { tool: HookedTool; filePath: string }): boolean {
+function removeOwnedHookFile({
+  tool,
+  filePath,
+}: {
+  tool: OwnedHookFileTool;
+  filePath: string;
+}): boolean {
   if (readOwnedHookFile({ tool, filePath }) === null) return false;
   try {
     fs.unlinkSync(filePath);

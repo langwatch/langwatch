@@ -13,5 +13,5 @@ export {
   type Section,
   type SiteMeta,
 } from "./model/nav.ts";
-export { notFoundIndex } from "./model/not-found.ts";
+export { notFoundIndex, sectionId } from "./model/not-found.ts";
 export { matchRedirect } from "./model/redirect-match.ts";

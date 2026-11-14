@@ -46,6 +46,7 @@ import {
   limitDatasetRecordsByBytes,
   selectDatasetRecords,
 } from "../rules/dataset-selection.rules.ts";
+import { DatasetBirthService } from "../services/dataset-birth.service.ts";
 import { DatasetChunkReadService } from "../services/dataset-chunk-read.service.ts";
 import { StreamingChunkWriterService } from "../services/dataset-chunk-writer.service.ts";
 import { DatasetChunkService } from "../services/dataset-chunk.service.ts";
@@ -56,11 +57,14 @@ export class DatasetContentService implements DatasetContent {
 
   private readonly reads = DatasetChunkReadService.create();
 
+  private readonly births: DatasetBirthService;
+
   private constructor(
     private readonly datasets: DatasetContentRepository,
     private readonly storage: DatasetChunkRepository,
   ) {
     this.chunks = DatasetChunkService.create({ datasets });
+    this.births = DatasetBirthService.create({ datasets, storage, chunks: this.chunks });
   }
 
   static create(options: {
@@ -312,7 +316,10 @@ export class DatasetContentService implements DatasetContent {
     dataset: Dataset;
     input: CreateDatasetRecordsInput;
   }): Promise<DatasetRecord[]> {
-    const forcedIds = input.entries.map((entry) => entry.id);
+    // Minted here, not in the chunk write, so each answered row carries the id it was stored under.
+    const forcedIds = input.entries.map(
+      (entry) => entry.id ?? generate(RECORD_KSUID_RESOURCE).toString(),
+    );
     const entries = input.entries.map(({ id: _id, ...entry }) => entry);
     entries.forEach((entry) => assertStoredRowWithinLimit(entry));
     const storage = this.storage;
@@ -340,6 +347,11 @@ export class DatasetContentService implements DatasetContent {
       storage: this.storage,
     });
     return { count: result.deleted };
+  }
+
+  /** A new dataset born in object storage: chunks first, then its row (ADR-032 v13). */
+  async createDataset(input: Parameters<DatasetContent["createDataset"]>[0]): Promise<Dataset> {
+    return storedDatasetSchema.parse(await this.births.createDataset(input));
   }
 
   async copyDataset({

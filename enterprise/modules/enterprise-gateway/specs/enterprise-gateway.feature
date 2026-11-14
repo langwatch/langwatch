@@ -28,7 +28,7 @@ Feature: Enterprise gateway routing policies and personal virtual keys
   Scenario: No personal virtual key is issued while an operator acts as another member
     Given an operator acting as a member through impersonation
     When they issue a personal virtual key in the member's organization
-    Then the issue is refused with permission_denied before membership is read
+    Then the issue is refused with impersonation_cannot_mint_credential before membership is read
 
   # main's user.personalContext, served where the routing policies live. It is
   # a cached read, so it never carries a credential: the page mints a personal

@@ -505,8 +505,13 @@ export function deriveToolName({
 
   const name = spanName ?? "";
   if (name.length === 0) return null;
-  // GenAI semconv names a tool run `execute_tool {tool}` and declares the tool by attribute.
-  if (name.split(" ", 1)[0] === GEN_AI_TOOL_RUN_OPERATION) {
+  // GenAI semconv names a tool run `execute_tool {tool}` and declares the tool by attribute, as
+  // does an agent's declared tool-run span (pi's `pi.harness.tool`, lifted by its canonicaliser).
+  const operation = name.split(" ", 1)[0];
+  const isToolRun =
+    operation === GEN_AI_TOOL_RUN_OPERATION ||
+    CODING_AGENT_REGISTRY.some((agent) => agent.genAiOperations?.toolRun === operation);
+  if (isToolRun) {
     const declared = pickFirstString(attrs, ["gen_ai.tool.name"]);
     if (declared !== null) return declared;
   }

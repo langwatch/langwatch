@@ -9,7 +9,9 @@ import {
   auditClient,
   auditDayHeading,
   auditDayLabel,
+  auditEntryPhrase,
   auditFeedDays,
+  auditTargetLine,
   groupAuditRuns,
 } from "../audit-log-rows.ts";
 
@@ -25,6 +27,53 @@ describe("given a recorded action slug", () => {
     ["routingPolicy.personalContext", "Routing policy personal context"],
   ])("reads %s as %s", (action, phrase) => {
     expect(auditActionPhrase(action)).toBe(phrase);
+  });
+});
+
+describe("given a row whose target is a braid", () => {
+  /** @scenario A braid's entries read as braid changes */
+  it.each([
+    ["authz.grants.attach", "Created braid"],
+    ["authz.grants.revoke", "Removed braid"],
+  ])("reads %s as %s", (action, phrase) => {
+    expect(auditEntryPhrase({ action, targetKind: "braid" })).toBe(phrase);
+  });
+
+  /** @scenario A braid's entries read as braid changes */
+  it("keeps the generic wording for a verb a braid never records", () => {
+    expect(auditEntryPhrase({ action: "authz.grants.role_change", targetKind: "braid" })).toBe(
+      auditActionPhrase("authz.grants.role_change"),
+    );
+  });
+
+  /** @scenario A braid's entries read as braid changes */
+  it("keeps the grant wording on any other target", () => {
+    expect(auditEntryPhrase({ action: "authz.grants.attach", targetKind: "role_binding" })).toBe(
+      "Attached grant",
+    );
+    expect(auditEntryPhrase({ action: "authz.grants.attach", targetKind: null })).toBe(
+      "Attached grant",
+    );
+  });
+});
+
+describe("given the line under a row's phrase", () => {
+  /** @scenario A braid's entry row names its owner project, never its grant id */
+  it("reads a braid by its owner project, or as Braid alone", () => {
+    expect(
+      auditTargetLine({ targetKind: "braid", targetId: "rolebinding_1", projectName: "payments" }),
+    ).toEqual({ kind: "words", text: "Braid owned by payments" });
+    expect(
+      auditTargetLine({ targetKind: "braid", targetId: "rolebinding_1", projectName: null }),
+    ).toEqual({ kind: "words", text: "Braid" });
+  });
+
+  /** @scenario A braid's entry row names its owner project, never its grant id */
+  it("keeps any other target's id", () => {
+    expect(
+      auditTargetLine({ targetKind: "role_binding", targetId: "rolebinding_1", projectName: "p" }),
+    ).toEqual({ kind: "id", id: "rolebinding_1" });
+    expect(auditTargetLine({ targetKind: null, targetId: null, projectName: null })).toBeNull();
   });
 });
 
@@ -163,8 +212,18 @@ describe("given entries across several days", () => {
 
   /** @scenario The feed reads by day */
   it("pairs a relative day with its full date and spells older days out once", () => {
-    expect(auditDayHeading({ at: new Date(2026, 9, 10, 1, 0), now })).toBe("Today · Oct 10, 2026");
-    expect(auditDayHeading({ at: new Date(2026, 9, 8, 9, 0), now })).toBe("Oct 8, 2026");
+    const at = new Date(2026, 9, 10, 1, 0);
+    expect(auditDayHeading({ at, now, locale: "en-US" })).toBe("Today · Oct 10, 2026");
+    expect(auditDayHeading({ at: new Date(2026, 9, 8, 9, 0), now, locale: "en-US" })).toBe(
+      "Oct 8, 2026",
+    );
+  });
+
+  /** @scenario The feed reads by day */
+  it("writes the date in the reader's locale", () => {
+    const at = new Date(2026, 9, 8, 9, 0);
+    expect(auditDayHeading({ at, now, locale: "en-GB" })).toBe("8 Oct 2026");
+    expect(auditDayHeading({ at, now, locale: "de-DE" })).toBe("8. Okt. 2026");
   });
 
   /** @scenario The feed reads by day */

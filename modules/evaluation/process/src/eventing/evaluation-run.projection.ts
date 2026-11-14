@@ -93,6 +93,8 @@ export class EvaluationRunFoldProjection
       lastAttemptAt: null,
       lastAttemptError: null,
       nextAttemptAt: null,
+      // A run never stored mints its id in the corrected layout (#9575)
+      idLayout: "v2",
     };
   }
 

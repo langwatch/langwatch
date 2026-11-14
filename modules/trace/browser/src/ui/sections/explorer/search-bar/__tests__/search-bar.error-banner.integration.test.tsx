@@ -38,6 +38,7 @@ vi.mock("../use-instant-eval-route.ts", () => ({
   }),
 }));
 
+vi.mock("../use-own-decision-models.ts", () => ({ useOwnDecisionModels: () => undefined }));
 vi.mock("../use-submit-search.ts", () => ({
   useSubmitSearch: () => ({ submitSearch: vi.fn(), isRouting: false }),
 }));
