@@ -482,7 +482,7 @@ const registry = {
   braids_not_enabled: {
     tips: [
       "Braid management is not switched on for this organisation yet; retrying will not help",
-      "Braids that already exist keep applying to trace reads; ask LangWatch to switch braids on to create, change or remove them",
+      "Braids that already exist keep applying to trace reads; ask LangWatch to switch braids on to create or change them",
     ],
   },
 

@@ -1,3 +1,8 @@
+/**
+ * The API key module's half of signed-calls.feature (ADR-201 §4): the answer span admission marks
+ * from, and the failures the keys list counts. The trace module's half, a span marked only on a
+ * `verified` answer, is record-span.signed-calls.unit.test.ts.
+ */
 import { createHmac } from "node:crypto";
 
 import {
@@ -5,11 +10,6 @@ import {
   SIGNING_KEY_ROTATION_OVERLAP_MS,
 } from "@langwatch/api-key-contract";
 import { braidSignatureMessage } from "@langwatch/api-key-contract/signing-key-wire-format";
-/**
- * The API key module's half of signed-calls.feature (ADR-201 §4): the answer span admission marks
- * from, and the failures the keys list counts. The trace module's half, a span marked only on a
- * `verified` answer, is record-span.signed-calls.unit.test.ts.
- */
 import { BRAIDS_FLAG } from "@langwatch/authz-contract";
 import { fromDate, type Instant } from "@langwatch/time";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -58,7 +58,7 @@ describe("the API key module's answer to a span's signature", () => {
     const keys = MemorySigningKeyRepository.create();
     const usage = MemorySigningKeyUsageRepository.create();
     flags = MemoryReleaseFlagsChannel.create();
-    flags.release({ flag: BRAIDS_FLAG });
+    flags.release({ flag: BRAIDS_FLAG, organizationId: ORGANIZATION });
     signatures = BraidSignatureVerificationService.create({ keys, usage, now: () => now });
     signingKeys = SigningKeyService.create({
       keys,
@@ -86,7 +86,7 @@ describe("the API key module's answer to a span's signature", () => {
     /** @scenario "Signed calls are still verified while release_braids is off" */
     it("still verifies its signature, while managing the key refuses", async () => {
       const issued = await issue();
-      flags.withhold({ flag: BRAIDS_FLAG });
+      flags.withhold({ flag: BRAIDS_FLAG, organizationId: ORGANIZATION });
 
       await expect(verify(sign({ issued, entries: { orchestrator: "web" } }))).resolves.toEqual({
         outcome: "verified",

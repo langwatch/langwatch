@@ -37,7 +37,7 @@ function randomBase62({ length }: { length: number }): string {
 /**
  * A project's braid signing keys (ADR-201 §4): issued, rotated, revoked, listed with 24h counts.
  * The door asks permission and plan; the project's organisation names every read, so another
- * project's key reads as not found. Each operation refuses while `release_braids` is off.
+ * project's key reads as not found. All but revoke refuse while `release_braids` is off.
  */
 export class SigningKeyService {
   private readonly keys: SigningKeyRepository;
@@ -128,8 +128,9 @@ export class SigningKeyService {
     return this.issue({ organizationId, projectId, name: current.name, userId: input.userId });
   }
 
+  /** Asks no release flag: revoking only narrows access, so a leaked key is never stranded. */
   async revoke({ projectId, keyId }: { projectId: string; keyId: string }): Promise<SigningKey> {
-    const organizationId = await this.releasedOrganizationOf({ projectId });
+    const organizationId = await this.projects.getOrganizationId(projectId);
     await this.keys.revoke({ organizationId, projectId, id: keyId, revokedAt: this.now() });
     const row = await this.keys.getById({ organizationId, projectId, id: keyId });
     this.braidSignatures.forget({ organizationId, publicId: row.publicId });

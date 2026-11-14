@@ -32,7 +32,7 @@ function composeOver(memory: AuthzMemoryStore) {
     },
     resources: { own: () => void 0, ownService: () => void 0 },
     secrets: createApiFixture<AuthzSetup["secrets"]>(),
-    channels: memoryAuthzChannels({ braidsReleased: true }),
+    channels: memoryAuthzChannels(),
     repositories: {
       ...MemoryAuthzRepositories.create(),
       read: MemoryAuthzReadRepository.create({ memory }),
@@ -129,9 +129,7 @@ describe("AuthzApi.countProjectMembersHolding", () => {
   });
 
   describe("when the project is unknown", () => {
-    // No organisation answers release_braids for it, so the gate fails closed before counting.
-    /** @scenario "A project with no organisation is refused as braids not enabled" */
-    it("refuses as braids not enabled", async () => {
+    it("counts nobody", async () => {
       const { memory } = organisation();
 
       await expect(
@@ -139,7 +137,7 @@ describe("AuthzApi.countProjectMembersHolding", () => {
           projectId: "proj_gone",
           permission: "traces:view",
         }),
-      ).rejects.toMatchObject({ code: "braids_not_enabled" });
+      ).resolves.toEqual({ count: 0, exact: true });
     });
   });
 

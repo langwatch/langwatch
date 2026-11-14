@@ -38,14 +38,13 @@ afterEach(async () => {
 
 const braidInput = { projectId: SPECIALISTS, readerProjectId: ORCHESTRATOR, fromMs: FROM_MS };
 
-/** Every braid management procedure the screens call, asked once each by `userId`. */
+/** Every refused management procedure the screens call; removing a braid is not one of them. */
 function everyManagementCall({ as }: World, userId: string, braidId: string) {
   const caller = as(userId);
   return {
     listBraids: caller.listBraids({ projectId: SPECIALISTS }),
     createBraid: caller.createBraid(braidInput),
     changeBraid: caller.changeBraid({ ...braidInput, braidId }),
-    removeBraid: caller.removeBraid({ projectId: SPECIALISTS, braidId }),
     listOrganizationBraids: caller.listOrganizationBraids({ organizationId: ORG }),
     listBraidTargets: caller.listBraidTargets({
       projectId: SPECIALISTS,
@@ -98,18 +97,54 @@ describe("braid management behind release_braids", () => {
 
   describe("given a live braid, then release_braids switched off", () => {
     /** @scenario "Existing braids still apply to trace reads while release_braids is off" */
-    it("still carries the owner's spans on the reader's next read, and refuses removing it", async () => {
+    it("still carries the owner's spans on the reader's next read", async () => {
       const made = await world();
       await made.seat(SAM, { teams: { [TEAMS.orchestrator]: "member" } });
       const braid = await made.as(ANA).createBraid(braidInput);
 
-      made.flags.withhold({ flag: BRAIDS_FLAG });
+      made.flags.withhold({ flag: BRAIDS_FLAG, organizationId: ORG });
       const proof = await made.mint(SAM, ORCHESTRATOR);
 
       expect(proof.grants.map((grant) => grant.projectId)).toEqual([ORCHESTRATOR, SPECIALISTS]);
       expect(proof.grants[1]).toMatchObject({ projectId: SPECIALISTS, via: [braid.braidId] });
+    });
+
+    /** @scenario "Removing a braid still works while release_braids is off" */
+    it("removes it through the screen's route, and the reader's next read no longer carries it", async () => {
+      const made = await world();
+      await made.seat(SAM, { teams: { [TEAMS.orchestrator]: "member" } });
+      const braid = await made.as(ANA).createBraid(braidInput);
+
+      made.flags.withhold({ flag: BRAIDS_FLAG, organizationId: ORG });
+      const removed = await made.as(ANA).removeBraid({
+        projectId: SPECIALISTS,
+        braidId: braid.braidId,
+      });
+      const proof = await made.mint(SAM, ORCHESTRATOR);
+
+      expect(removed).toEqual({ braidId: braid.braidId });
+      expect(proof.grants.map((grant) => grant.projectId)).toEqual([ORCHESTRATOR]);
+      await expect(refusalOf(made.as(ANA).createBraid(braidInput))).resolves.toBe(
+        "braids_not_enabled",
+      );
+    });
+
+    /** @scenario "General authz reads peers ask still answer while release_braids is off" */
+    it("answers the policy and the member count to peers, while the screen's routes refuse", async () => {
+      const made = await world();
+      made.flags.withhold({ flag: BRAIDS_FLAG, organizationId: ORG });
+
+      await expect(made.app.getOrganizationPolicy({ organizationId: ORG })).resolves.toMatchObject({
+        braidsOrganizationAdminsOnly: false,
+      });
       await expect(
-        refusalOf(made.as(ANA).removeBraid({ projectId: SPECIALISTS, braidId: braid.braidId })),
+        made.app.countProjectMembersHolding({ projectId: ORCHESTRATOR, permission: "traces:view" }),
+      ).resolves.toMatchObject({ exact: true });
+      await expect(refusalOf(made.as(ANA).getBraidsPolicy({ organizationId: ORG }))).resolves.toBe(
+        "braids_not_enabled",
+      );
+      await expect(
+        refusalOf(made.as(ANA).countProjectTraceViewers({ projectId: ORCHESTRATOR })),
       ).resolves.toBe("braids_not_enabled");
     });
 
@@ -118,7 +153,7 @@ describe("braid management behind release_braids", () => {
       const made = await world();
       const braid = await made.as(ANA).createBraid({ ...braidInput, where: WEB });
 
-      made.flags.withhold({ flag: BRAIDS_FLAG });
+      made.flags.withhold({ flag: BRAIDS_FLAG, organizationId: ORG });
 
       await expect(made.app.listBraids({ projectId: ORCHESTRATOR })).resolves.toMatchObject({
         fromOtherProjects: [

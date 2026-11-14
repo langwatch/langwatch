@@ -708,8 +708,9 @@ export class AuthzModule implements AuthzApi {
     return this.#memberships;
   }
 
-  // Braid management asks `release_braids` first. `listBraids` does not: trace reads ask it
-  // for an existing braid's matched conditions, and existing braids keep working.
+  // Braid management asks `release_braids` first. General reads peers ask (trace reads list
+  // braids) do not, and nor does removing a braid, which only narrows access; the screen's
+  // routes call the `*ForScreen` twins. modules/authz/specs/braids-release-flag.feature
   listBraids: AuthzApi["listBraids"] = (a) => this.braids().listBraids(a);
   listBraidsForScreen: AuthzApi["listBraidsForScreen"] = async (a) => {
     await this.braidRelease().assertEnabledForProject(a);
@@ -723,10 +724,7 @@ export class AuthzModule implements AuthzApi {
     await this.braidRelease().assertEnabledForProject(a);
     return this.braids().changeBraid(a);
   };
-  removeBraid: AuthzApi["removeBraid"] = async (a) => {
-    await this.braidRelease().assertEnabledForProject(a);
-    return this.braids().removeBraid(a);
-  };
+  removeBraid: AuthzApi["removeBraid"] = (a) => this.braids().removeBraid(a);
   /** An app composing no audit trail refuses, so a braided read is never shown unaudited. */
   recordBraidedSpansView: AuthzApi["recordBraidedSpansView"] = (a) =>
     this.braidedReads().recordBraidedSpansView(a);
@@ -735,8 +733,12 @@ export class AuthzModule implements AuthzApi {
     await this.braidRelease().assertEnabledForOrganization(a);
     return this.braids().listOrganizationBraids(a);
   };
-  /** The braid dialog's "<n> people will see these spans", so it is braid management too. */
-  countProjectMembersHolding: AuthzApi["countProjectMembersHolding"] = async (a) => {
+  countProjectMembersHolding: AuthzApi["countProjectMembersHolding"] = (a) =>
+    this.projectMembers().countProjectMembersHolding(a);
+  /** The braid dialog's "<n> people will see these spans". */
+  countProjectMembersHoldingForScreen: AuthzApi["countProjectMembersHoldingForScreen"] = async (
+    a,
+  ) => {
     await this.braidRelease().assertEnabledForProject(a);
     return this.projectMembers().countProjectMembersHolding(a);
   };
@@ -744,8 +746,10 @@ export class AuthzModule implements AuthzApi {
     await this.braidRelease().assertEnabledForProject(a);
     return this.braidTargets().listBraidTargets(a);
   };
-  /** The policy holds only who may braid, so reading it is braid management. */
-  getOrganizationPolicy: AuthzApi["getOrganizationPolicy"] = async (a) => {
+  getOrganizationPolicy: AuthzApi["getOrganizationPolicy"] = (a) =>
+    this.organizationPolicies().getOrganizationPolicy(a);
+  /** The Braids screen's "who may braid" setting. */
+  getOrganizationPolicyForScreen: AuthzApi["getOrganizationPolicyForScreen"] = async (a) => {
     await this.braidRelease().assertEnabledForOrganization(a);
     return this.organizationPolicies().getOrganizationPolicy(a);
   };

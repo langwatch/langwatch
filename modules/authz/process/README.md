@@ -435,6 +435,14 @@ The organisation's authz settings; one with no stored row has every setting off.
 getOrganizationPolicy(args: Braids.AuthzOrganizationInput): Promise<Braids.AuthzOrganizationPolicy>;
 ```
 
+#### `getOrganizationPolicyForScreen`
+
+The Braids screen's policy: refuses `braids_not_enabled` while `release_braids` is off.
+
+```typescript
+getOrganizationPolicyForScreen(args: Braids.AuthzOrganizationInput): Promise<Braids.AuthzOrganizationPolicy>;
+```
+
 #### `setBraidsPolicy`
 
 Keeps braids to organisation admins or opens them again; audited, and bumps the epoch.
@@ -457,6 +465,14 @@ ADR-201 §7: the organisation's active members holding `permission` at the proje
 
 ```typescript
 countProjectMembersHolding(args: Braids.AuthzCountProjectMembersHoldingInput): Promise<Braids.AuthzProjectMembersHolding>;
+```
+
+#### `countProjectMembersHoldingForScreen`
+
+The braid dialog's count: refuses `braids_not_enabled` while `release_braids` is off.
+
+```typescript
+countProjectMembersHoldingForScreen(args: Braids.AuthzCountProjectMembersHoldingInput): Promise<Braids.AuthzProjectMembersHolding>;
 ```
 
 #### `listBraidTargets`

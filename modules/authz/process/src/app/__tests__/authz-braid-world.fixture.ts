@@ -143,7 +143,7 @@ export async function braidWorld({
   const memory = AuthzMemoryStore.create();
   seedOrganisation(memory);
   const repositories = repositoriesOver(memory);
-  const channels = memoryAuthzChannels({ braidsReleased });
+  const channels = memoryAuthzChannels({ braidsReleasedFor: braidsReleased ? [ORG] : [] });
   const app = AuthzModule.create({
     dependencies: {},
     config: {

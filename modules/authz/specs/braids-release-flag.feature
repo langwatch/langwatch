@@ -41,14 +41,37 @@ Feature: Braid management behind the release_braids flag
       When the settings menu is built for ana
       Then it offers no Braids entry until the flag answers on
 
-  Rule: Every braid management procedure refuses while the flag is off
+  Rule: Braid management refuses while the flag is off, except what only narrows access
 
     @integration
     Scenario: With release_braids off every braid management procedure refuses with braids_not_enabled
       Given release_braids is off for the organisation
-      When ana creates, changes, removes or lists braids, lists the organisation's braids, lists braid targets, counts who would see the spans, or reads or sets who may braid
+      When ana creates, changes or lists braids, lists the organisation's braids, lists braid targets, counts who would see the spans, or reads or sets who may braid
       Then each call is refused with braids_not_enabled
       And no braid is written
+
+    @integration
+    Scenario: Removing a braid still works while release_braids is off
+      Given a live braid from "specialists" into "orchestrator"
+      And release_braids is then switched off for the organisation
+      When ana removes the braid
+      Then it is removed, since removing only narrows access
+      And the reader's next read no longer carries "specialists"
+      And creating a braid is still refused with braids_not_enabled
+
+    @integration
+    Scenario: General authz reads peers ask still answer while release_braids is off
+      Given release_braids is off for the organisation
+      When another module reads the organisation's authz settings or counts a project's members holding a permission
+      Then each answers as it does with the flag on
+      And the Braids screen's own reads of the same are refused with braids_not_enabled
+
+    @unit
+    Scenario: release_braids is answered for each organisation on its own
+      Given release_braids is on for one organisation and off for another
+      When braid management is asked about a project in each
+      Then the released organisation's project is answered
+      And the other organisation's project is refused with braids_not_enabled
 
     @integration
     Scenario: With release_braids on braid management answers again

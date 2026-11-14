@@ -37,7 +37,7 @@ function composeOver(
     },
     resources: { own: () => void 0, ownService: () => void 0 },
     secrets: createApiFixture<AuthzSetup["secrets"]>(),
-    channels: memoryAuthzChannels({ braidsReleased: true }),
+    channels: memoryAuthzChannels({ braidsReleasedFor: [ORG] }),
     repositories: {
       ...MemoryAuthzRepositories.create(),
       read,
@@ -170,6 +170,21 @@ describe("AuthzApi.listBraidTargets", () => {
           caller: { type: "user", id: "user_tom" },
         }),
       ).resolves.toEqual([{ projectId: SPECIALISTS, selectable: false, reason: "this_project" }]);
+    });
+  });
+
+  describe("when braids are released for one organisation and not another", () => {
+    /** @scenario "release_braids is answered for each organisation on its own" */
+    it("answers for the released organisation's project and refuses the other's", async () => {
+      const app = composeOver(await organisation());
+      const caller = { type: "user", id: "user_ana" } as const;
+
+      await expect(
+        app.listBraidTargets({ projectId: SPECIALISTS, projectIds: [ORCHESTRATOR], caller }),
+      ).resolves.toEqual(expect.any(Array));
+      await expect(
+        app.listBraidTargets({ projectId: ELSEWHERE, projectIds: [], caller }),
+      ).rejects.toMatchObject({ code: "braids_not_enabled" });
     });
   });
 

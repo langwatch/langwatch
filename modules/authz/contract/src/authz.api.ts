@@ -212,6 +212,10 @@ export interface AuthzApi {
   getOrganizationPolicy(
     args: Braids.AuthzOrganizationInput,
   ): Promise<Braids.AuthzOrganizationPolicy>;
+  /** The Braids screen's policy: refuses `braids_not_enabled` while `release_braids` is off. */
+  getOrganizationPolicyForScreen(
+    args: Braids.AuthzOrganizationInput,
+  ): Promise<Braids.AuthzOrganizationPolicy>;
   /** Keeps braids to organisation admins or opens them again; audited, and bumps the epoch. */
   setBraidsPolicy(args: Braids.AuthzSetBraidsPolicyInput): Promise<Braids.AuthzOrganizationPolicy>;
   /** Every live braid in the organisation. */
@@ -220,6 +224,10 @@ export interface AuthzApi {
   ): Promise<Braids.AuthzOrganizationBraids>;
   /** ADR-201 §7: the organisation's active members holding `permission` at the project. */
   countProjectMembersHolding(
+    args: Braids.AuthzCountProjectMembersHoldingInput,
+  ): Promise<Braids.AuthzProjectMembersHolding>;
+  /** The braid dialog's count: refuses `braids_not_enabled` while `release_braids` is off. */
+  countProjectMembersHoldingForScreen(
     args: Braids.AuthzCountProjectMembersHoldingInput,
   ): Promise<Braids.AuthzProjectMembersHolding>;
   /** The braid dialog's picker: which projects the caller may braid into, one batched decision. */
