@@ -55,6 +55,7 @@ describe("given an endpoint's system tables", () => {
         },
       ]);
       expect(statements[1]?.sql).toContain("FROM system.backup_log");
+      expect(statements[1]?.settings).toEqual({});
     });
 
     /** @scenario "A named cluster reads every replica's backup history" */
@@ -64,8 +65,11 @@ describe("given an endpoint's system tables", () => {
       await repo.findBackupStatuses({ cluster: "default" });
 
       expect(statements[1]?.sql).toContain("clusterAllReplicas('default', system.backup_log)");
-      expect(statements[1]?.sql).toContain("skip_unavailable_shards = 1");
       expect(statements[0]?.sql).toContain("clusterAllReplicas('default', system.tables)");
+      expect(statements.map((statement) => statement.settings)).toEqual([
+        { skip_unavailable_shards: 1 },
+        { skip_unavailable_shards: 1 },
+      ]);
     });
 
     /** @scenario "A cluster the server does not know falls back to the local node" */
@@ -92,6 +96,7 @@ describe("given an endpoint's system tables", () => {
 
       expect(statements.at(-1)?.sql).toContain("FROM system.backup_log");
       expect(statements.at(-1)?.sql).not.toContain("clusterAllReplicas");
+      expect(statements.at(-1)?.settings).toEqual({});
     });
 
     /** @scenario "Any other cluster-wide failure is reported, not hidden" */

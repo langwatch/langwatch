@@ -155,8 +155,8 @@ export class ClickHouseStorageFootprintRepository extends StorageFootprintReposi
           argMaxIf(total_size, end_time, status = 'BACKUP_CREATED') as last_success_size
         FROM ${backupLogSource(cluster)}
         GROUP BY status
-        ${clusterSettings(cluster)}
       `,
+      settings: clusterSettings(cluster),
       // System.backup_log carries no tenant column: this is the instance's backup history.
       SKIP_TENANT_CHECK: true,
     });
@@ -168,7 +168,8 @@ export class ClickHouseStorageFootprintRepository extends StorageFootprintReposi
     const result = await this.clickhouse.query<{ present: string }>({
       tenantId: "",
       sql: `SELECT count() AS present FROM ${systemTablesSource(cluster)}
-        WHERE database = 'system' AND name = 'backup_log' ${clusterSettings(cluster)}`,
+        WHERE database = 'system' AND name = 'backup_log'`,
+      settings: clusterSettings(cluster),
       // System.tables carries no tenant column: this asks what the server has.
       SKIP_TENANT_CHECK: true,
     });
@@ -193,6 +194,6 @@ function systemTablesSource(cluster: string | undefined): string {
 }
 
 /** One unreachable replica must not blank the reading the others can still answer. */
-function clusterSettings(cluster: string | undefined): string {
-  return plainClusterName(cluster) ? "SETTINGS skip_unavailable_shards = 1" : "";
+function clusterSettings(cluster: string | undefined): Record<string, number> {
+  return plainClusterName(cluster) ? { skip_unavailable_shards: 1 } : {};
 }

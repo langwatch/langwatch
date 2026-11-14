@@ -853,12 +853,18 @@ export class OpsModule implements OpsApi {
     // One tracker: the queue-metrics writer records into it, the detector reads it.
     const { rateTracker } = setup.repositories;
     const logger = createLogger("langwatch:ops");
+    const processFleet = ProcessFleetCollectionService.create({
+      fleet: setup.repositories.processFleet,
+      readings: setup.repositories.processFleetReadings,
+      logger,
+    });
     const infrastructure = buildOpsInfrastructure({
       bugReportNotifier: setup.channels.bugReportNotifier,
       declaredMigrationSteps: setup.declaredMigrationSteps,
       // Only the worker runs listed work; a tasks pass keeps reading the whole queue's depth.
       runListedWork: setup.role === "worker" ? setup.runListedWork : undefined,
       reportsFleetGauges: setup.role === "worker",
+      processFleet,
       logger,
       config: setup.config,
       resources: setup.resources,
@@ -921,12 +927,6 @@ export class OpsModule implements OpsApi {
       readings: storageReadings,
       collectBackups: setup.config.collectClickHouseBackupMetrics,
       clusterName: setup.config.clickhouseCluster,
-      logger,
-    });
-
-    const processFleet = ProcessFleetCollectionService.create({
-      fleet: repositories.processFleet,
-      readings: repositories.processFleetReadings,
       logger,
     });
 
@@ -2494,6 +2494,8 @@ function buildOpsInfrastructure(input: {
   runListedWork: SystemMigrationRunnerDeps["runListedWork"];
   /** Only the worker binds the pm_* gauges, so api and tasks pods never read the fleet counts. */
   reportsFleetGauges: boolean;
+  /** The one fleet service: ops_storage_stats collects through it, the gauges read it. */
+  processFleet: ProcessFleetCollectionService;
 }): OpsAppInfrastructure {
   const { logger, config, resources, repositories } = input;
   const introspection = EventingIntrospectionService.create(() =>
@@ -2530,12 +2532,8 @@ function buildOpsInfrastructure(input: {
   // pm_instances / pm_outbox_* report nothing until a source is bound. The source reads the
   // counts `ops_storage_stats` shares, never the tables, and refuses them once stale.
   if (input.reportsFleetGauges) {
-    const fleetReadings = ProcessFleetCollectionService.create({
-      fleet: repositories.processFleet,
-      readings: repositories.processFleetReadings,
-      logger,
-    });
-    bindProcessFleetMetricsSource(() => fleetReadings.currentReadings());
+    const { processFleet } = input;
+    bindProcessFleetMetricsSource(() => processFleet.currentReadings());
     resources.own("process fleet metrics source", () => unbindProcessFleetMetricsSource());
   }
 

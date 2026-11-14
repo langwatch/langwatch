@@ -8,9 +8,9 @@ import { isHandledTransientRefusal } from "@langwatch/handled-error";
 import type { Logger } from "@langwatch/observability";
 import { toEpochMs } from "@langwatch/time";
 
-import {
-  type BackupStatusRow,
-  type StorageFootprintRepository,
+import type {
+  BackupStatusRow,
+  StorageFootprintRepository,
 } from "../repositories/storage-footprint.repository.ts";
 import type {
   StorageStatsReading,
