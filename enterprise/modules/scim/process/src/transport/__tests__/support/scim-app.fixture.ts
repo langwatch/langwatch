@@ -77,6 +77,7 @@ function fakePlan(type: string): Plan {
     free: false,
     maxMembers: 0,
     maxMembersLite: 0,
+    maxMembersDeveloper: 0,
     maxMessagesPerMonth: 0,
     canPublish: true,
     prices: { USD: 0, EUR: 0 },

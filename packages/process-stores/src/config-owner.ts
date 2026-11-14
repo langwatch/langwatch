@@ -64,6 +64,8 @@ export const storesOwner = {
     queueTenantCap: c.env("LANGWATCH_DISPATCH_TENANT_CAP", unsetWhenBlank),
     /** Fleet in-flight budget the tenants share; unset or "0" keeps the fixed cap. */
     queueGlobalBudget: c.env("LANGWATCH_DISPATCH_GLOBAL_BUDGET", unsetWhenBlank),
+    /** A file holding the shared ClickHouse password, re-read while running (ADR-198). */
+    clickhousePasswordFile: c.env("CLICKHOUSE_PASSWORD_FILE", unsetWhenBlank),
     clickhousePool: {
       override: c.env("CLICKHOUSE_MAX_OPEN_CONNECTIONS", z.coerce.number().optional()),
       replicas: c.env("CLICKHOUSE_CLIENT_REPLICAS", z.coerce.number().optional()),

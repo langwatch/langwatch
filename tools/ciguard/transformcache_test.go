@@ -14,6 +14,8 @@ import (
 
 const goodTransformJob = `jobs:
   package-suites:
+    env:
+      VITEST_FS_MODULE_CACHE_DIR: ${{ github.workspace }}/node_modules/.vitest-cache
     steps:
       - name: Hash
         id: transform-inputs
@@ -166,4 +168,11 @@ func TestHandRolledVitestConfigsMustAskForTheCache(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, []string{filepath.Join("handrolled", "package.json") + " test"}, missing)
+}
+
+// @scenario "Vitest writes its transforms to the directory the job restores"
+func TestTransformCacheIsWhereVitestWrites(t *testing.T) {
+	assert.Empty(t, transformProblems(t, goodTransformJob))
+	unset := strings.Replace(goodTransformJob, "      VITEST_FS_MODULE_CACHE_DIR: ${{ github.workspace }}/node_modules/.vitest-cache\n", "", 1)
+	assert.Contains(t, strings.Join(transformProblems(t, unset), "\n"), "VITEST_FS_MODULE_CACHE_DIR")
 }

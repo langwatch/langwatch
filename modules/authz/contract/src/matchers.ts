@@ -5,8 +5,10 @@
 import { permissionSatisfiedBy } from "@langwatch/authorization";
 
 import type { AuthzScopeRef, CollectedBinding, CollectedGrants, ResourceGrant } from "./authz.ts";
-import { builtinRoleGrants, PROJECT_READER_ROLE_KEY } from "./roles.ts";
+import { BILLING_ROLE_KEY, builtinRoleGrants, PROJECT_READER_ROLE_KEY } from "./roles.ts";
 import { audienceMatches, bindingScopeCanGrantPermission } from "./scope.ts";
+
+const BRAIDS_MANAGE_PERMISSION = "braids:manage";
 
 /**
  * ADR-171: a Developer holds its personal team and nothing shared. An
@@ -58,6 +60,24 @@ export function seatCapsBinding({
   );
 }
 
+/**
+ * ADR-201 §2: a key never braids, at any tier, as no binding confers a platform permission; and
+ * while the organisation keeps braids to its admins, only an organisation-wide binding does.
+ */
+function braidsWithheld({
+  binding,
+  grants,
+  permission,
+}: {
+  binding: Pick<CollectedBinding, "scopeType">;
+  grants: CollectedGrants;
+  permission: string;
+}): boolean {
+  if (permission !== BRAIDS_MANAGE_PERMISSION) return false;
+  if (grants.principal.type === "apiKey") return true;
+  return grants.braidsOrganizationAdminsOnly === true && binding.scopeType !== "ORGANIZATION";
+}
+
 /** A custom role grants exactly its own permissions; an unknown or empty one grants nothing. */
 function customRoleGrants({
   roleKey,
@@ -75,15 +95,35 @@ function customRoleGrants({
   return permissionSatisfiedBy({ granted: new Set(customPermissions), requested: permission });
 }
 
+/** Billing holds only on the organization, for a user granted it directly, and only its bag. */
+function billingBindingGrants({
+  binding,
+  grants,
+  permission,
+}: {
+  binding: Pick<CollectedBinding, "scopeType" | "viaGroupId">;
+  grants: CollectedGrants;
+  permission: string;
+}): boolean {
+  return (
+    binding.scopeType === "ORGANIZATION" &&
+    !binding.viaGroupId &&
+    grants.principal.type === "user" &&
+    builtinRoleGrants({ role: BILLING_ROLE_KEY, permission })
+  );
+}
+
 export function bindingGrants({
   binding,
   grants,
   permission,
 }: {
-  binding: Pick<CollectedBinding, "roleKey" | "scopeType" | "viaGroupId">;
+  binding: Pick<CollectedBinding, "roleKey" | "scopeType" | "viaGroupId" | "conditioned">;
   grants: CollectedGrants;
   permission: string;
 }): boolean {
+  // ADR-201 v1.10: a conditioned grant narrows a proof, never answers yes/no.
+  if (binding.conditioned !== undefined && binding.conditioned !== false) return false;
   // ADR-021 fence: a team/project binding never grants an org-exclusive
   // permission, even through a custom role that lists it.
   if (
@@ -94,6 +134,11 @@ export function bindingGrants({
   ) {
     return false;
   }
+
+  if (braidsWithheld({ binding, grants, permission })) return false;
+  // Billing takes no seat, so neither seat cap reads it.
+  if (binding.roleKey === BILLING_ROLE_KEY)
+    return billingBindingGrants({ binding, grants, permission });
 
   if (developerSeatExcludes({ binding, grants })) return false;
   if (liteSeatWithholds({ binding, grants, permission })) return false;
@@ -117,12 +162,8 @@ export function bindingGrants({
     return false;
   }
 
-  // Organization grants retain their existing scope-specific meaning:
-  // admin covers everything; member and viewer carry the organization floor.
   if (binding.scopeType === "ORGANIZATION") {
-    if (grants.organizationRole === "EXTERNAL") return false;
-    if (roleKey === "admin") return true;
-    return builtinRoleGrants({ role: "org-member", permission });
+    return organizationBindingGrants({ roleKey, grants, permission });
   }
 
   // EXTERNAL membership holds a built-in team/project grant as the lite-member bag.
@@ -131,6 +172,24 @@ export function bindingGrants({
   }
 
   return builtinRoleGrants({ role: roleKey, permission });
+}
+
+/**
+ * Organization grants retain their existing scope-specific meaning:
+ * admin covers everything; member and viewer carry the organization floor.
+ */
+function organizationBindingGrants({
+  roleKey,
+  grants,
+  permission,
+}: {
+  roleKey: "admin" | "member" | "viewer";
+  grants: CollectedGrants;
+  permission: string;
+}): boolean {
+  if (grants.organizationRole === "EXTERNAL") return false;
+  if (roleKey === "admin") return true;
+  return builtinRoleGrants({ role: "org-member", permission });
 }
 
 /**

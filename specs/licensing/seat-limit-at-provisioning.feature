@@ -5,6 +5,8 @@ Feature: A directory or a first single sign-on never takes a full seat the licen
   # too, the person is held pending (no access, shown to admins). Invitations are
   # refused at the limit (enforcement-members.feature); provisioning is not, because
   # the person already exists in the customer's directory and a refusal loses them.
+  # An interactive arrival held pending or admitted Lite opens a seat request, and a held
+  # person reads a waiting screen instead of onboarding: modules/organization/specs/seat-requests.feature.
 
   Background:
     Given an organization on a signed Enterprise licence

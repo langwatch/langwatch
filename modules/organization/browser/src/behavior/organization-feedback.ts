@@ -15,24 +15,24 @@ export type OrganizationToast = {
 
 export type OrganizationToaster = { create: (toast: OrganizationToast) => void };
 
+/** The toast's optional lines, as the host notices take them. */
+function toastExtras(toast: OrganizationToast): { description?: string; id?: string } {
+  return {
+    ...(toast.description ? { description: toast.description } : {}),
+    ...(toast.id ? { id: toast.id } : {}),
+  };
+}
+
 export function useOrganizationToaster(): OrganizationToaster {
   const host = useOrganizationHost();
   return useMemo(
     () => ({
       create: (toast: OrganizationToast) => {
         if (toast.type === "error") {
-          host.failed({
-            error: void 0,
-            fallbackTitle: toast.title,
-            ...(toast.id ? { id: toast.id } : {}),
-          });
+          host.failed({ error: void 0, fallbackTitle: toast.title, ...toastExtras(toast) });
           return;
         }
-        host.succeeded({
-          title: toast.title,
-          ...(toast.description ? { description: toast.description } : {}),
-          ...(toast.id ? { id: toast.id } : {}),
-        });
+        host.succeeded({ title: toast.title, ...toastExtras(toast) });
       },
     }),
     [host],

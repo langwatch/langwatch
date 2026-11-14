@@ -2,6 +2,7 @@
 import type * as Observability from "@langwatch/observability";
 import { describe, expect, it, vi } from "vitest";
 
+import { LangWatchQLCollectionBindingService } from "../../../features/provisioning/services/langwatch-ql-collection-binding.service.ts";
 import { CLICKHOUSE_ERROR_CODE } from "../../../langwatch-ql/__tests__/lwql-clickhouse-harness.ts";
 import {
   CLICKHOUSE_CONFIG_STORE_ERROR_CODE,
@@ -597,5 +598,50 @@ describe("inventoryConfigStoreLwqlEntities", () => {
     ).rejects.toThrow(/non-identifier name/);
 
     expect(queried.called).toBe(false);
+  });
+});
+
+describe("readCollectionState", () => {
+  const NAMES: LangWatchQLNames = {
+    database: "langwatch",
+    restrictedUser: "langwatch_lwql",
+    settingsProfile: "lwql_restricted",
+    keyMapTable: "lwql_api_key_tenant_map",
+    tenantSetting: "custom_api_key_hash",
+  };
+  const collectionBinding = LangWatchQLCollectionBindingService.create();
+  const candidates = collectionBinding.renderedCollectionCandidates({ names: NAMES });
+  const alias = collectionBinding.namedCollection({ names: NAMES, mode: "sql" });
+  const table = "lwql_trace_pg";
+
+  describe("when ClickHouse refuses both catalog reads", () => {
+    it("reads an empty state, and the engine table takes the preferred collection", async () => {
+      logCalls.length = 0;
+      const server = await provisioning({
+        async query() {
+          throw new FakeClickHouseError("497");
+        },
+      }).readCollectionState({ database: NAMES.database, candidates });
+
+      expect(server).toEqual({ available: [], bound: {}, configDefined: [] });
+      expect(collectionBinding.renderedCollectionFor({ names: NAMES, table, server })).toBe(
+        "lwql_postgres",
+      );
+      expect(logCalls.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("when only the engine-table read fails", () => {
+    it("drops the known binding, and the table takes the first collection the server holds", async () => {
+      const server = await provisioning({
+        async query({ query }) {
+          if (query.includes("system.tables")) throw new FakeClickHouseError("497");
+          return { json: async () => [{ name: alias }] };
+        },
+      }).readCollectionState({ database: NAMES.database, candidates });
+
+      expect(server).toEqual({ available: [alias], bound: {}, configDefined: [] });
+      expect(collectionBinding.renderedCollectionFor({ names: NAMES, table, server })).toBe(alias);
+    });
   });
 });

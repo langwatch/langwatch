@@ -1,7 +1,9 @@
 /**
  * @see modules/workflow/specs/studio-lambda-stream.feature
  */
+import type { GatewayApi } from "@langwatch/gateway-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { WorkflowServerConfig } from "@langwatch/workflow-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -60,7 +62,11 @@ async function composeWith(fleet: object) {
   const secrets = new ScopedSecrets(async (handle, build) =>
     build(handle === nlpLambdaFleetSecret ? JSON.stringify(fleet) : undefined),
   );
-  const channels = await HttpWorkflowChannels.create({ config, secrets });
+  const channels = await HttpWorkflowChannels.create({
+    config,
+    secrets,
+    bound: { spend: createApiFixture<GatewayApi>() },
+  });
 
   return { engine: channels.engine, credentials: aws.constructed.map((c) => c.config.credentials) };
 }

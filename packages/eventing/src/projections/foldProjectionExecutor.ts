@@ -11,7 +11,7 @@ import {
 } from "../metrics.ts";
 import { compareOrdinal } from "../utils/compareOrdinal.ts";
 import { appliedTokenOf } from "./appliedToken.ts";
-import { mergeAppliedEventIds } from "./foldCache/foldCacheEntry.ts";
+import { MAX_APPLIED_EVENT_IDS, mergeAppliedEventIds } from "./foldCache/foldCacheEntry.ts";
 import type { FoldProjectionDefinition } from "./foldProjection.types.ts";
 import { type ProjectionStoreContext, readWindowAround } from "./projectionStoreContext.ts";
 import { projectionConsumes } from "./sealedProjection.ts";
@@ -171,6 +171,85 @@ function applyUnseenEvents<State, E extends Event>({
   return { state: next, appliedCount };
 }
 
+/** The running result of one paged rebuild pass (see `streamRebuild`). */
+interface RebuildPass<State> {
+  state: State;
+  /** The newest applied tokens; only the last MAX_APPLIED_EVENT_IDS are stored. */
+  appliedTail: string[];
+  appliedCount: number;
+  maxOccurredAt: number;
+  seen: Set<string>;
+  /** Applied ids the loaded state holds that no page has accounted for yet. */
+  unaccounted: Set<string>;
+}
+
+function foldIntoRebuildPass<State, E extends Event>({
+  projection,
+  pass,
+  event,
+}: {
+  projection: FoldProjectionDefinition<State, E>;
+  pass: RebuildPass<State>;
+  event: E;
+}): void {
+  pass.state = projection.apply(pass.state, event);
+  pass.appliedTail.push(appliedTokenOf(event));
+  pass.appliedCount++;
+  if (pass.appliedTail.length > 2 * MAX_APPLIED_EVENT_IDS) {
+    pass.appliedTail = pass.appliedTail.slice(-MAX_APPLIED_EVENT_IDS);
+  }
+}
+
+/** Accounts one page against the pass's fences and folds its unseen consumed events. */
+function foldRebuildPage<State, E extends Event>({
+  projection,
+  consumes,
+  pass,
+  page,
+}: {
+  projection: FoldProjectionDefinition<State, E>;
+  consumes: (event: E) => boolean;
+  pass: RebuildPass<State>;
+  page: readonly Event[];
+}): void {
+  for (const event of page) {
+    for (const token of appliedTokensOf(event)) pass.unaccounted.delete(token);
+    pass.maxOccurredAt = Math.max(pass.maxOccurredAt, event.occurredAt ?? 0);
+    const token = appliedTokenOf(event);
+    if (pass.seen.has(token)) continue;
+    pass.seen.add(token);
+    if (consumes(event as E)) foldIntoRebuildPass({ projection, pass, event: event as E });
+  }
+}
+
+/** Closes a paged rebuild pass: the missed event and the fences, as `rebuild` decides them. */
+function finishRebuildPass<State, E extends Event>({
+  projection,
+  consumes,
+  pass,
+  missed,
+  redeliversAppliedKey,
+  stateFrontierOccurredAtMs,
+}: {
+  projection: FoldProjectionDefinition<State, E>;
+  consumes: (event: E) => boolean;
+  pass: RebuildPass<State>;
+  missed: E;
+  redeliversAppliedKey: boolean;
+  stateFrontierOccurredAtMs: number;
+}): RebuildPass<State> & { hasGap: boolean } {
+  // A redelivery of an applied key must not vouch for it; only the log can.
+  if (!redeliversAppliedKey) {
+    for (const token of appliedTokensOf(missed)) pass.unaccounted.delete(token);
+    pass.maxOccurredAt = Math.max(pass.maxOccurredAt, missed.occurredAt ?? 0);
+  }
+  const alreadyRead = pass.seen.has(appliedTokenOf(missed));
+  if (!alreadyRead && consumes(missed)) foldIntoRebuildPass({ projection, pass, event: missed });
+  const isFrontierMissing =
+    stateFrontierOccurredAtMs > 0 && pass.maxOccurredAt < stateFrontierOccurredAtMs;
+  return { ...pass, hasGap: pass.unaccounted.size > 0 || isFrontierMissing };
+}
+
 // Incremental fold execution: load state, re-fold on miss/out-of-order,
 // apply event, store result. See ADR-066 for store-miss and re-fold logic.
 /** Whether a batch's earliest event lands before what the persisted state already folded. */
@@ -191,9 +270,9 @@ function startsBeforeCheckpoint({
 
 export class FoldProjectionExecutor {
   /**
-   * Events per page for the streaming store-miss re-fold. Bounds the working set —
-   * 1000 keeps per-page memory small while amortising the round-trip. Injected so
-   * tests can force multi-page runs.
+   * Events per page for both paged history reads: the streaming store-miss re-fold
+   * and the paged hand-off rebuild. 1000 keeps per-page memory small while amortising
+   * the round-trip. Injected so tests can force multi-page runs.
    */
   private readonly refoldPageSize: number;
 
@@ -805,6 +884,16 @@ export class FoldProjectionExecutor {
     // the log can account for the key, and the rebuild retries until it does.
     const missedToken = appliedTokenOf(missed);
     const redeliversAppliedKey = missedToken !== missed.id && appliedEventIds.includes(missedToken);
+    if (projection.eventLoaderUpToPaged && projection.options?.refoldOnOutOfOrder === false) {
+      return this.streamRebuild({
+        projection,
+        missed,
+        context,
+        loadedAppliedIds: appliedEventIds,
+        stateFrontierOccurredAtMs: typeof frontier === "number" ? frontier : 0,
+        redeliversAppliedKey,
+      });
+    }
     const { history, gap } = await this.readHistoryUntilComplete({
       projection,
       delivered: redeliversAppliedKey ? [] : [missed],
@@ -848,6 +937,135 @@ export class FoldProjectionExecutor {
       "Rebuilt the aggregate for a missed hand-off",
     );
     return state;
+  }
+
+  /**
+   * `rebuild` a page at a time, so a huge aggregate's history never meets ClickHouse's
+   * per-query memory limit in one read. Page order is immaterial to an order-insensitive
+   * fold; the `readHistoryUntilComplete` fences still apply, tracked across pages.
+   */
+  private async streamRebuild<State, E extends Event>(request: {
+    projection: FoldProjectionDefinition<State, E>;
+    missed: E;
+    context: ProjectionStoreContext;
+    loadedAppliedIds: readonly string[];
+    stateFrontierOccurredAtMs: number;
+    redeliversAppliedKey: boolean;
+  }): Promise<State> {
+    const { projection, missed, context } = request;
+    let pass = await this.streamHistoryForRebuild(request);
+    for (const delayMs of this.refoldHistoryRetryDelaysMs) {
+      if (!pass.hasGap) break;
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+      pass = await this.streamHistoryForRebuild(request);
+    }
+    if (pass.hasGap) {
+      throw new Error(
+        `Rebuild of ${projection.name} for aggregate ${context.aggregateId} read an incomplete history; retrying`,
+      );
+    }
+    await projection.store.store(
+      pass.state,
+      withAppliedEventIds(
+        context,
+        mergeAppliedEventIds({ previous: [], applied: pass.appliedTail }),
+      ),
+    );
+    logger.info(
+      {
+        projection: projection.name,
+        aggregateId: context.aggregateId,
+        tenantId: context.tenantId,
+        missedEventId: missed.id,
+        rebuiltEventCount: pass.appliedCount,
+        streamed: true,
+      },
+      "Rebuilt the aggregate for a missed hand-off",
+    );
+    return pass.state;
+  }
+
+  /** One paged pass over the history for `streamRebuild`: the folded state and its fences. */
+  private async streamHistoryForRebuild<State, E extends Event>({
+    projection,
+    missed,
+    context,
+    loadedAppliedIds,
+    stateFrontierOccurredAtMs,
+    redeliversAppliedKey,
+  }: {
+    projection: FoldProjectionDefinition<State, E>;
+    missed: E;
+    context: ProjectionStoreContext;
+    loadedAppliedIds: readonly string[];
+    stateFrontierOccurredAtMs: number;
+    redeliversAppliedKey: boolean;
+  }): Promise<RebuildPass<State> & { hasGap: boolean }> {
+    // Upper bound past every event, so queued live jobs skip themselves on the applied
+    // set. `occurredAt` stays the missed event's: it is the only predicate that prunes
+    // partitions on the paged read, and zeroing it makes every page a full cold scan.
+    const logHead: E = { ...missed, createdAt: Number.MAX_SAFE_INTEGER };
+    const consumes = projectionConsumes<E, Event>(projection);
+    const pass: RebuildPass<State> = {
+      state: projection.init(),
+      appliedTail: [],
+      appliedCount: 0,
+      maxOccurredAt: 0,
+      seen: new Set(),
+      unaccounted: new Set(loadedAppliedIds),
+    };
+    for await (const page of this.historyPages({
+      projection,
+      context,
+      upToEvent: logHead,
+      reader: "streamRebuild",
+    })) {
+      foldRebuildPage({ projection, consumes, pass, page });
+    }
+    return finishRebuildPass({
+      projection,
+      consumes,
+      pass,
+      missed,
+      redeliversAppliedKey,
+      stateFrontierOccurredAtMs,
+    });
+  }
+
+  /**
+   * The aggregate's history up to `upToEvent`, one `refoldPageSize` page at a time.
+   * The page bound is a safety net for a non-advancing cursor: 100k pages of the
+   * default 1000 covers a 100M-event aggregate. Callers guard `eventLoaderUpToPaged`.
+   */
+  private async *historyPages<State, E extends Event>({
+    projection,
+    context,
+    upToEvent,
+    reader,
+  }: {
+    projection: FoldProjectionDefinition<State, E>;
+    context: ProjectionStoreContext;
+    upToEvent: E;
+    reader: string;
+  }): AsyncGenerator<readonly Event[]> {
+    const MAX_PAGES = 100_000;
+    let after: { timestamp: number; eventId: string } | undefined;
+    for (let pageCount = 1; pageCount <= MAX_PAGES; pageCount++) {
+      const page = await projection.eventLoaderUpToPaged!({
+        tenantId: context.tenantId,
+        aggregateId: context.aggregateId,
+        upToEvent,
+        after,
+        limit: this.refoldPageSize,
+      });
+      if (page.length > 0) yield page;
+      const last = page.at(-1);
+      if (!last || page.length < this.refoldPageSize) return;
+      after = { timestamp: last.createdAt, eventId: last.id };
+    }
+    throw new Error(
+      `${reader} exceeded ${MAX_PAGES} pages for aggregate ${context.aggregateId} — possible non-advancing cursor`,
+    );
   }
 
   /**
@@ -1168,42 +1386,19 @@ export class FoldProjectionExecutor {
     context: ProjectionStoreContext;
     upToEvent: E;
   }): Promise<State | null> {
-    const PAGE_SIZE = this.refoldPageSize;
-    // Safety net only: the paged loader's cursor is expected to strictly
-    // advance every call. If that contract is ever violated (e.g. a
-    // non-advancing cursor from a repository bug), this bounds the loop
-    // instead of hanging the fold worker for the aggregate indefinitely.
-    // 100k pages * 1000/page default covers a 100M-event aggregate.
-    const MAX_PAGES = 100_000;
     const seen = new Set<string>();
     let state = projection.init();
-    let after: { timestamp: number; eventId: string } | undefined;
     let refoldEventCount = 0;
-    let pageCount = 0;
 
-    for (;;) {
-      if (++pageCount > MAX_PAGES) {
-        throw new Error(
-          `streamRefoldUpToDelivered exceeded ${MAX_PAGES} pages for aggregate ${context.aggregateId} — possible non-advancing cursor`,
-        );
-      }
-      // Caller guards eventLoaderUpToPaged is set.
-      const page = await projection.eventLoaderUpToPaged!({
-        tenantId: context.tenantId,
-        aggregateId: context.aggregateId,
-        upToEvent,
-        after,
-        limit: PAGE_SIZE,
-      });
-      if (page.length === 0) break;
-
+    for await (const page of this.historyPages({
+      projection,
+      context,
+      upToEvent,
+      reader: "streamRefoldUpToDelivered",
+    })) {
       const applied = applyUnseenEvents({ projection, events: page, seen, state });
       state = applied.state;
       refoldEventCount += applied.appliedCount;
-
-      const last = page[page.length - 1]!;
-      after = { timestamp: last.createdAt, eventId: last.id };
-      if (page.length < PAGE_SIZE) break;
     }
 
     if (refoldEventCount === 0) return null;

@@ -7,4 +7,8 @@ import type { OrganizationMemberSeats } from "@langwatch/organization-contract";
  */
 export interface ScimSeatRepository {
   countMemberSeats(input: Readonly<{ organizationId: string }>): Promise<OrganizationMemberSeats>;
+  /** The person's live seat holds (seat-rotation.feature): one at most, none when the seat freed. */
+  findLiveHoldUserIds(
+    input: Readonly<{ organizationId: string; userId: string }>,
+  ): Promise<string[]>;
 }

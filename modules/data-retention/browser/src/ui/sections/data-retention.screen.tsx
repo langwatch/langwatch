@@ -3,6 +3,8 @@
  * reads the URL directly. See {@link specs/data-retention/retention-policy-configuration.feature}
  */
 
+import { useUiDeployment } from "@langwatch/browser-host/capabilities";
+import { EnterpriseLock } from "@langwatch/browser-host/enterprise-lock";
 import { type ScopeAssignment } from "@langwatch/data-retention-contract";
 import { Card } from "@langwatch/design-system/card";
 import { MoreVerticalIcon } from "@langwatch/design-system/icons";
@@ -163,6 +165,7 @@ function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; pr
   // Enterprise (and self-hosted, which resolves to enterprise) gets the full
   // retention menu + custom; paid non-enterprise gets the fixed short pair.
   const isEnterprise = host.isEnterprise();
+  const { isSaaS } = useUiDeployment();
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   // When set, the Add drawer opens in edit mode locked to this scope's policy.
@@ -318,11 +321,20 @@ function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; pr
           </PageLayout.HeaderButton>
         )}
       </PageLayout.Header>
-      <VStack gap={6} width="full" align="start" paddingTop={4}>
+      <VStack gap={6} width="full" align="start">
         <Text color="fg.muted">
           How long your traces, scenarios and experiments are kept before deletion.
         </Text>
-        {!canConfigureRetention && snapshot && (
+        {!canConfigureRetention && snapshot && !isSaaS && (
+          <EnterpriseLock
+            compact
+            feature="Data retention"
+            description="Set how long traces, scenarios and experiments are kept, per organization, team or project."
+            canManage={host.hasPermission("organization:manage")}
+            data-testid="retention-enterprise-upsell"
+          />
+        )}
+        {!canConfigureRetention && snapshot && isSaaS && (
           <Alert.Root status="info">
             <Alert.Indicator />
             <Alert.Content>
@@ -440,7 +452,7 @@ function DataRetentionLoading() {
       <PageLayout.Header>
         <PageLayout.Heading>Data Retention</PageLayout.Heading>
       </PageLayout.Header>
-      <VStack gap={6} width="full" align="start" paddingTop={4} aria-busy="true">
+      <VStack gap={6} width="full" align="start" aria-busy="true">
         <SkeletonText noOfLines={1} width="sm" />
         <StatTileSkeleton columns={2} />
         <Card padding="lg">

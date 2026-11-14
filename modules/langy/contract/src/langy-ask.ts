@@ -22,3 +22,56 @@ export type LangyAskRequest = {
  * short of it and sit beside Langy rather than under or over it.
  */
 export const LANGY_DOCK_WIDTH_PX = 392;
+
+/*
+ * The one product event for a question a member puts to Langy, wherever they ask it:
+ * `langy.asked.question` once the host composes it. It carries where it was asked, never the text.
+ * @see modules/dashboard/specs/dashboards-telemetry.feature
+ */
+
+/** Where a member asked: the Langy composer, a board's ask bar, or "Add a widget". */
+export const LANGY_ASK_SURFACES = ["composer", "ask_bar", "add_widget"] as const;
+/** One place a member can ask Langy from. */
+export type LangyAskSurface = (typeof LANGY_ASK_SURFACES)[number];
+
+/** The event, shaped as the browser host's analytics event; never the question's text. */
+export type LangyQuestionAskedEvent = Readonly<{
+  boundary: "langy";
+  action: "asked";
+  name: "question";
+  attributes: Readonly<{ surface: LangyAskSurface }>;
+}>;
+
+/** A question a member sent to Langy. */
+export function langyQuestionAsked({
+  surface,
+}: {
+  surface: LangyAskSurface;
+}): LangyQuestionAskedEvent {
+  return { boundary: "langy", action: "asked", name: "question", attributes: { surface } };
+}
+
+/*
+ * What a member did with a change Langy proposed: `langy.applied.proposal` once the page carried
+ * it out, `langy.discarded.proposal` once they dismissed it. With `langy.asked.question` these
+ * chart the funnel from a question to a kept change. Browser only; never the summary or payload.
+ */
+
+/** The events, shaped as the browser host's analytics event. */
+export type LangyProposalEvent = Readonly<{
+  boundary: "langy";
+  action: "applied" | "discarded";
+  name: "proposal";
+  /** The kind as a page registered it; one no handler knows is the model's text, so "other". */
+  attributes: Readonly<{ kind: string }>;
+}>;
+
+/** A proposal the page carried out for the member. */
+export function langyProposalApplied({ kind }: { kind: string }): LangyProposalEvent {
+  return { boundary: "langy", action: "applied", name: "proposal", attributes: { kind } };
+}
+
+/** A proposal the member dismissed. */
+export function langyProposalDiscarded({ kind }: { kind: string }): LangyProposalEvent {
+  return { boundary: "langy", action: "discarded", name: "proposal", attributes: { kind } };
+}

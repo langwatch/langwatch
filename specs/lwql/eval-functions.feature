@@ -31,7 +31,7 @@ Feature: LangWatchQL eval functions — a judged column, computed by the classif
   Background:
     Given a project whose credential holds analytics:view
     And the caller holds the captured-input and captured-output permissions
-    And the Instant Evals flag is on for the project
+    And Instant Evals are enabled for the project
     And a classifier is configured for the deployment
 
   # ---------------------------------------------------------------------------
@@ -229,8 +229,8 @@ Feature: LangWatchQL eval functions — a judged column, computed by the classif
   # ---------------------------------------------------------------------------
 
   @unit
-  Scenario: An eval function is refused while the flag is off for the project
-    Given the Instant Evals flag is off for the project
+  Scenario: An eval function is refused while Instant Evals are not enabled for the project
+    Given Instant Evals are not enabled for the project
     When a statement calling eval is validated
     Then it is refused with APP_FUNCTION_GATED
     And the message says the feature is not open to this project
@@ -247,20 +247,30 @@ Feature: LangWatchQL eval functions — a judged column, computed by the classif
   @unit
   Scenario: An eval function is refused for a key that reads more than one project
     Given a key that can read two projects
-    And the Instant Evals flag is on for both of them
+    And Instant Evals are enabled for both of them
     When the caller asks whether Instant Evals are open to it
     Then the answer is no
 
   @unit
-  Scenario: A key that reads one project is judged on that project's own flag
+  Scenario: A key that reads one project is judged on that project's own Instant Evals access
     Given a key that can read one project
-    And the Instant Evals flag is on for it
+    And Instant Evals are enabled for it
     When the caller asks whether Instant Evals are open to it
     Then the answer is yes
 
+  # The release flag governs LangWatch's own model only (ADR-182): a project on its own decision
+  # model, or an organization that switched Instant Evals on, calls eval functions without it.
+  @unit
+  Scenario: Eval functions open on Instant Evals' own answer, not on the release flag
+    Given the Instant Evals release flag is off for the project
+    And Instant Evals are enabled for the project because it runs on its own decision model
+    When a statement calling eval is run
+    Then the eval gate is open
+    And Analytics never reads the release flag for it
+
   @unit
   Scenario: The schema publishes eval functions as unavailable while they are gated
-    Given the Instant Evals flag is off for the project
+    Given Instant Evals are not enabled for the project
     When the schema endpoint is asked for the functions section
     Then every eval function is listed with available false
     And the extraction functions keep the availability their permissions give them
