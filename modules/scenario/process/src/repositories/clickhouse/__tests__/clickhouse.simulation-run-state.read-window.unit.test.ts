@@ -98,20 +98,29 @@ describe("ClickHouseSimulationRunStateRepository.startedAtBounds", () => {
     it("bounds the row read to the window and the latest-version lookup to a wider one", () => {
       const bounds = ClickHouseSimulationRunStateRepository.startedAtBounds({ window });
 
-      expect(bounds.row).toBe(
-        "AND t.StartedAt >= fromUnixTimestamp64Milli({fromMs:Int64}) " +
-          "AND t.StartedAt <= fromUnixTimestamp64Milli({toMs:Int64})",
-      );
-      expect(bounds.latestVersion).toBe(
-        "AND s.StartedAt >= fromUnixTimestamp64Milli({lookupFromMs:Int64}) " +
-          "AND s.StartedAt <= fromUnixTimestamp64Milli({lookupToMs:Int64})",
-      );
-      expect(bounds.params).toEqual({
-        fromMs: window.fromMs,
-        toMs: window.toMs,
-        lookupFromMs: window.fromMs - LATEST_VERSION_LOOKUP_MARGIN_MS,
-        lookupToMs: window.toMs + LATEST_VERSION_LOOKUP_MARGIN_MS,
+      expect(bounds).toEqual({
+        kind: "bounded",
+        row: { fromMs: window.fromMs, toMs: window.toMs },
+        latestVersion: {
+          fromMs: window.fromMs - LATEST_VERSION_LOOKUP_MARGIN_MS,
+          toMs: window.toMs + LATEST_VERSION_LOOKUP_MARGIN_MS,
+        },
       });
+    });
+
+    it("bounds both the row read and the latest-version lookup by start time", () => {
+      const { sql, params } = ClickHouseSimulationRunStateRepository.latestRowRead({
+        tenantId: "project_1",
+        scenarioRunId: "run_1",
+        window,
+        holds: () => true,
+      });
+      const bound = Object.values(params);
+
+      expect(sql.match(/StartedAt >= /g)).toHaveLength(2);
+      expect(sql.match(/StartedAt <= /g)).toHaveLength(2);
+      expect(bound).toContain(window.fromMs - LATEST_VERSION_LOOKUP_MARGIN_MS);
+      expect(bound).toContain(window.toMs + LATEST_VERSION_LOOKUP_MARGIN_MS);
     });
   });
 
@@ -121,17 +130,14 @@ describe("ClickHouseSimulationRunStateRepository.startedAtBounds", () => {
         window: { fromMs: 1_000.5, toMs: 2_000.5 },
       });
 
-      expect(bounds.params.fromMs).toBe(1_000);
-      expect(bounds.params.toMs).toBe(2_001);
+      expect(bounds).toMatchObject({ row: { fromMs: 1_000, toMs: 2_001 } });
     });
   });
 
   describe("given no read window", () => {
-    it("adds no start-time bound and no params", () => {
+    it("adds no start-time bound", () => {
       expect(ClickHouseSimulationRunStateRepository.startedAtBounds({ window: void 0 })).toEqual({
-        row: "",
-        latestVersion: "",
-        params: {},
+        kind: "unbounded",
       });
     });
   });

@@ -1,5 +1,10 @@
-import type { ClickHouseColumns, IdBoundOptions } from "@langwatch/clickhouse-client";
+import type {
+  ClickHouseColumns,
+  ClickHouseQueryClient,
+  IdBoundOptions,
+} from "@langwatch/clickhouse-client";
 
+import { refuseUnlessOwnTenant } from "./clickhouse.simulation-session.store.ts";
 import type { SimulationClickHouseClient } from "./simulation-clickhouse.repository.ts";
 
 /** The process's one routing `clickhouse` member, as the simulation reads query it. */
@@ -13,6 +18,7 @@ type ScenarioReadOnlyClickHouse = Readonly<{
     idBound?: IdBoundOptions;
   }): Promise<{ rows: Row[] }>;
   columns(input: { tenantId: string }): ClickHouseColumns;
+  read: ClickHouseQueryClient["read"];
 }>;
 
 /** One tenant's view of the routing member, in the `.query()` shape the simulation reads use. */
@@ -48,6 +54,16 @@ export class ClickHouseScenarioSession implements SimulationClickHouseClient {
 
     return { json: async <Result>() => (await this.clickhouse.query<Result>(request)).rows };
   }
+
+  /** Sends a built statement only when it is this session's tenant's, else refuses by name. */
+  read: ClickHouseQueryClient["read"] = async (input) => {
+    refuseUnlessOwnTenant({
+      statement: input.statement,
+      tenantId: this.tenantId,
+      operation: "ClickHouseScenarioSession.read",
+    });
+    return this.clickhouse.read(input);
+  };
 
   /** A select list naming only the columns this tenant's target has, the rest as defaults. */
   select(input: Parameters<ClickHouseColumns["select"]>[0]): Promise<string> {

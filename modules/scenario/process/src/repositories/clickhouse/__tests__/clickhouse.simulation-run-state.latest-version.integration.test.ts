@@ -1,10 +1,8 @@
 /**
- * The run-state read's latest-version election on a run of many unmerged versions, the scalar
- * subquery it sends today against the built candidate (a CTE of max(UpdatedAt)), on 26.8.
- * Numbers: .claude/handoffs/rp-port-scenario-suite.md section 11, Risk 1.
+ * The run-state read's latest-version election on a run of many unmerged versions: the built
+ * scalar subquery against the hand-written one it replaced, on 26.8.
  */
 import { type ClickHouseSettings, createClient, type ClickHouseClient } from "@clickhouse/client";
-import { clickhouseRead, fn, tenantScope } from "@langwatch/clickhouse-client/builder";
 import {
   migrateTestClickHouseOnce,
   startTestClickHouseEndpoints,
@@ -16,7 +14,6 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { SimulationRunState } from "../../../eventing/simulation-run-state.projection.ts";
 import { ClickHouseSimulationRunStateRepository } from "../clickhouse.simulation-run-state.repository.ts";
-import { simulationRuns } from "../clickhouse.simulation-runs.table.ts";
 import { scenarioClickHouseOver } from "./simulation-clickhouse-rows.fixture.ts";
 
 const tenantId = `test-sim-latest-version-${nanoid()}`;
@@ -98,44 +95,24 @@ function snapshot({ scenarioRunId, index }: { scenarioRunId: string; index: numb
   };
 }
 
-/** The candidate: the version elected by `UpdatedAt IN latest`, a CTE of `max(UpdatedAt)`. */
-function candidateRead({ scenarioRunId }: { scenarioRunId: string }) {
-  const t = simulationRuns;
-  return clickhouseRead({ scope: tenantScope.single({ tenantId }) })
-    .from(t)
-    .with("latest", (sub) =>
-      sub
-        .from(t)
-        .select({ latestUpdatedAt: fn.max(t.UpdatedAt) })
-        .where(({ and, eq, gte, lte }) =>
-          and(
-            eq(t.ScenarioRunId, scenarioRunId),
-            gte(t.StartedAt, window.fromMs),
-            lte(t.StartedAt, window.toMs),
-          ),
-        ),
+/** The hand-written windowed read the built one replaced, as it was sent before the port. */
+const HAND_WRITTEN_SCALAR = `
+  SELECT t.ProjectionId AS ProjectionId, t.Name AS Name,
+    t.\`Messages.Id\` AS messageIds, t.\`Messages.Content\` AS messageContents
+  FROM simulation_runs AS t
+  WHERE t.TenantId = {tenantId:String}
+    AND t.ScenarioRunId = {scenarioRunId:String}
+    AND t.StartedAt >= fromUnixTimestamp64Milli({fromMs:Int64})
+    AND t.StartedAt <= fromUnixTimestamp64Milli({toMs:Int64})
+    AND t.UpdatedAt = (
+      SELECT max(s.UpdatedAt)
+      FROM simulation_runs AS s
+      WHERE s.TenantId = {tenantId:String}
+        AND s.ScenarioRunId = {scenarioRunId:String}
+        AND s.StartedAt >= fromUnixTimestamp64Milli({lookupFromMs:Int64})
+        AND s.StartedAt <= fromUnixTimestamp64Milli({lookupToMs:Int64})
     )
-    .select({
-      projectionId: t.ProjectionId,
-      name: t.Name,
-      messageIds: t["Messages.Id"],
-      messageRoles: t["Messages.Role"],
-      messageContents: t["Messages.Content"],
-      messageTraceIds: t["Messages.TraceId"],
-      messageRests: t["Messages.Rest"],
-      updatedAtMs: fn.toUnixTimestamp64Milli(t.UpdatedAt),
-    })
-    .where(({ and, eq, gte, lte, oneOf }) =>
-      and(
-        eq(t.ScenarioRunId, scenarioRunId),
-        gte(t.StartedAt, window.fromMs),
-        lte(t.StartedAt, window.toMs),
-        oneOf(t.UpdatedAt, { cte: "latest" }),
-      ),
-    )
-    .limit(1)
-    .build();
-}
+  LIMIT 1`;
 
 type Measured = { readRows: number; readBytes: number; memoryUsage: number; granules: number };
 
@@ -186,7 +163,7 @@ async function measure({
 
 describe("the scenario-run state latest-version read", () => {
   describe("when a run holds many unmerged snapshots", () => {
-    it("elects the latest version, the scalar form reading no more rows than the candidate", async () => {
+    it("elects the latest version, the built read reading no more rows than the hand-written one", async () => {
       const scenarioRunId = `run-many-${nanoid()}`;
       await ch!.command({ query: "SYSTEM STOP MERGES simulation_runs" });
       for (let from = 0; from < SNAPSHOTS; from += PER_INSERT) {
@@ -210,41 +187,45 @@ describe("the scenario-run state latest-version read", () => {
       const windowed = await repo.findProjection(scenarioRunId, { ...context, readWindow: window });
       const unbounded = await repo.findProjection(scenarioRunId, context);
 
-      const statement = candidateRead({ scenarioRunId });
-      const cteBody = /^WITH latest AS \((.*?)\) SELECT /.exec(statement.sql)?.[1];
-      expect(cteBody).toBeDefined();
-      const scalarSql = statement.sql
-        .replace(/^WITH latest AS \(.*?\) SELECT /, "SELECT ")
-        .replace("UpdatedAt IN latest", `UpdatedAt = (${cteBody})`);
-      const shared = {
-        params: { ...statement.params },
-        settings: { ...statement.settings } as ClickHouseSettings,
-      };
-      const median = async (sql: string): Promise<Measured> => {
+      const statement = ClickHouseSimulationRunStateRepository.latestRowRead({
+        tenantId,
+        scenarioRunId,
+        window,
+        holds: () => true,
+      });
+      const bounds = ClickHouseSimulationRunStateRepository.startedAtBounds({ window });
+      if (bounds.kind !== "bounded") throw new Error("A read window must bound the read");
+      const settings = { ...statement.settings } as ClickHouseSettings;
+      const median = async (input: {
+        sql: string;
+        params: Record<string, unknown>;
+      }): Promise<Measured> => {
         const runs = [];
-        for (let i = 0; i < 3; i++) runs.push(await measure({ sql, ...shared }));
+        for (let i = 0; i < 3; i++) runs.push(await measure({ ...input, settings }));
         const memory =
           runs.map((run) => run.memoryUsage).toSorted((x, y) => x - y)[1] ?? Number.NaN;
         return { ...runs[0]!, memoryUsage: memory };
       };
-      const scalar = await median(scalarSql);
-      const cte = await median(statement.sql);
-      const candidate = (
-        await ch!.query({
-          query: statement.sql,
-          query_params: shared.params,
-          clickhouse_settings: shared.settings,
-          format: "JSONEachRow",
-        })
-      ).json<{ name: string }>();
+      const handWritten = await median({
+        sql: HAND_WRITTEN_SCALAR,
+        params: {
+          tenantId,
+          scenarioRunId,
+          fromMs: bounds.row.fromMs,
+          toMs: bounds.row.toMs,
+          lookupFromMs: bounds.latestVersion.fromMs,
+          lookupToMs: bounds.latestVersion.toMs,
+        },
+      });
+      const built = await median({ sql: statement.sql, params: { ...statement.params } });
 
       expect(Number(n)).toBe(SNAPSHOTS);
       expect(windowed?.data.Name).toBe(`version ${SNAPSHOTS - 1}`);
       expect(unbounded?.data.Name).toBe(`version ${SNAPSHOTS - 1}`);
       expect(windowed?.data.Messages).toHaveLength(20);
-      expect((await candidate)[0]?.name).toBe(`version ${SNAPSHOTS - 1}`);
-      expect(scalar.readRows).toBeLessThanOrEqual(cte.readRows);
-      expect(scalar.granules).toBeLessThanOrEqual(cte.granules);
+      expect(unbounded?.data.Messages).toHaveLength(20);
+      expect(built.readRows).toBeLessThanOrEqual(handWritten.readRows);
+      expect(built.granules).toBeLessThanOrEqual(handWritten.granules);
     }, 240_000);
   });
 });

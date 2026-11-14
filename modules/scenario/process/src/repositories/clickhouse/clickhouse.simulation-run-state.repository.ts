@@ -1,4 +1,12 @@
-import { ClickHouseColumns, queryWindowed } from "@langwatch/clickhouse-client";
+import { queryWindowed } from "@langwatch/clickhouse-client";
+import {
+  clickhouseRead,
+  column,
+  type ColumnRef,
+  fn,
+  type ReaderReadStatement,
+  tenantScope,
+} from "@langwatch/clickhouse-client/builder";
 import type {
   Projection,
   ProjectionStoreReadContext,
@@ -23,15 +31,14 @@ import type {
 import {
   type ClickHouseEvaluationColumns,
   columnsToEvaluations,
-  EVALUATION_COLUMNS_SQL,
   evaluationsToColumns,
 } from "../../rules/simulation-evaluation-columns.rules.ts";
 import type { SimulationRunStateRepository } from "../simulation-run-state.repository.ts";
+import { simulationRuns } from "./clickhouse.simulation-runs.table.ts";
 import { type SimulationEventingClickHouseResolver } from "./clickhouse.simulation-session.store.ts";
 import {
   type ClickHouseCriteriaColumns,
   columnsToCriteria,
-  CRITERIA_COLUMNS,
   criteriaToColumns,
 } from "./simulation-criteria.mapper.ts";
 
@@ -44,14 +51,30 @@ const TABLE_NAME = "simulation_runs" as const;
  */
 export const LATEST_VERSION_LOOKUP_MARGIN_MS = 7 * 24 * 60 * 60 * 1000;
 
-/** The StartedAt predicates of a run-state read, and their params. */
-interface StartedAtBounds {
-  /** For the row read (alias `t`). */
-  row: string;
-  /** For the latest-version lookup (alias `s`). */
-  latestVersion: string;
-  params: Record<string, number>;
+/** A StartedAt range in whole milliseconds, both ends inclusive. */
+interface StartedAtRange {
+  fromMs: number;
+  toMs: number;
 }
+
+/** The StartedAt ranges of a run-state read: none without a window. */
+type StartedAtBounds =
+  | { kind: "unbounded" }
+  | {
+      kind: "bounded";
+      /** For the row read. */
+      row: StartedAtRange;
+      /** For the latest-version lookup, wider by {@link LATEST_VERSION_LOOKUP_MARGIN_MS}. */
+      latestVersion: StartedAtRange;
+    };
+
+/** A row of the run-state latest-row read. */
+type LatestRunRow =
+  ReturnType<
+    typeof ClickHouseSimulationRunStateRepository.latestRowRead
+  > extends ReaderReadStatement<infer Row>
+    ? Row
+    : never;
 
 const logger = createLogger("langwatch:simulation-processing:run-state-repository");
 
@@ -133,53 +156,65 @@ export class ClickHouseSimulationRunStateRepository<
     },
   ) {}
 
-  private mapClickHouseRecordToProjectionData(
-    record: ClickHouseSimulationRunRecord,
-  ): SimulationRunStateData {
-    const ids = record["Messages.Id"] ?? [];
+  private mapLatestRowToProjectionData(row: LatestRunRow): SimulationRunStateData {
+    const millis = (value: number | string | null): number | null =>
+      value === null ? null : Number(value);
     return {
-      ScenarioRunId: record.ScenarioRunId,
-      ScenarioId: record.ScenarioId,
-      BatchRunId: record.BatchRunId,
-      ScenarioSetId: record.ScenarioSetId,
-      Status: record.Status,
-      Name: record.Name,
-      Description: record.Description,
-      Metadata: record.Metadata,
-      Messages: ids.map((Id, i) => ({
+      ScenarioRunId: row.ScenarioRunId,
+      ScenarioId: row.ScenarioId,
+      BatchRunId: row.BatchRunId,
+      ScenarioSetId: row.ScenarioSetId,
+      Status: row.Status,
+      Name: row.Name,
+      Description: row.Description,
+      Metadata: row.Metadata,
+      Messages: row.messageIds.map((Id, i) => ({
         Id,
-        Role: record["Messages.Role"]?.[i] ?? "",
-        Content: record["Messages.Content"]?.[i] ?? "",
-        TraceId: record["Messages.TraceId"]?.[i] ?? "",
-        Rest: record["Messages.Rest"]?.[i] ?? "",
+        Role: row.messageRoles[i] ?? "",
+        Content: row.messageContents[i] ?? "",
+        TraceId: row.messageTraceIds[i] ?? "",
+        Rest: row.messageRests[i] ?? "",
       })),
-      TraceIds: record.TraceIds ?? [],
-      Verdict: record.Verdict,
-      Reasoning: record.Reasoning,
-      MetCriteria: record.MetCriteria ?? [],
-      UnmetCriteria: record.UnmetCriteria ?? [],
-      InconclusiveCriteria: record.InconclusiveCriteria ?? [],
-      Criteria: columnsToCriteria(record),
-      Error: record.Error,
-      Evaluations: columnsToEvaluations(record),
-      DurationMs: record.DurationMs ? parseInt(record.DurationMs, 10) : null,
-      TotalCost: record.TotalCost ?? null,
-      RoleCosts: record.RoleCosts ?? {},
-      RoleLatencies: record.RoleLatencies ?? {},
-      TraceMetrics: record.TraceMetricsJson ? JSON.parse(record.TraceMetricsJson) : {},
-      StartedAt: record.StartedAt === null ? null : Number(record.StartedAt),
-      QueuedAt:
-        record.QueuedAt === null || record.QueuedAt === undefined ? null : Number(record.QueuedAt),
-      CreatedAt: Number(record.CreatedAt),
-      UpdatedAt: Number(record.UpdatedAt),
-      FinishedAt: record.FinishedAt === null ? null : Number(record.FinishedAt),
-      ArchivedAt: record.ArchivedAt === null ? null : Number(record.ArchivedAt),
-      CancellationRequestedAt:
-        record.CancellationRequestedAt === null || record.CancellationRequestedAt === undefined
-          ? null
-          : Number(record.CancellationRequestedAt),
-      LastSnapshotOccurredAt: Number(record.LastSnapshotOccurredAt ?? 0),
-      LastEventOccurredAt: Number(record.LastEventOccurredAt ?? 0),
+      TraceIds: [...row.TraceIds],
+      Verdict: row.Verdict,
+      Reasoning: row.Reasoning,
+      MetCriteria: [...row.MetCriteria],
+      UnmetCriteria: [...row.UnmetCriteria],
+      InconclusiveCriteria: [...row.InconclusiveCriteria],
+      Criteria: columnsToCriteria({
+        "Criteria.Criterion": [...row.criteriaCriterion],
+        "Criteria.Requirement": [...row.criteriaRequirement],
+        "Criteria.Status": [...row.criteriaStatus],
+        "Criteria.Reasoning": [...row.criteriaReasoning],
+      }),
+      Error: row.Error,
+      Evaluations: columnsToEvaluations({
+        "Evaluations.EvaluatorId": [...row.evaluationEvaluatorIds],
+        "Evaluations.Name": [...row.evaluationNames],
+        "Evaluations.Status": [...row.evaluationStatuses],
+        "Evaluations.Required": [...row.evaluationRequired],
+        "Evaluations.Passed": [...row.evaluationPassed],
+        "Evaluations.Score": [...row.evaluationScores],
+        "Evaluations.Label": [...row.evaluationLabels],
+        "Evaluations.Details": [...row.evaluationDetails],
+        "Evaluations.CostAmount": [...row.evaluationCostAmounts],
+        "Evaluations.CostCurrency": [...row.evaluationCostCurrencies],
+        "Evaluations.InputsJson": [...row.evaluationInputsJson],
+      }),
+      DurationMs: row.durationMs ? parseInt(row.durationMs, 10) : null,
+      TotalCost: row.TotalCost ?? null,
+      RoleCosts: copiedMap(row.RoleCosts),
+      RoleLatencies: copiedMap(row.RoleLatencies),
+      TraceMetrics: row.TraceMetricsJson ? JSON.parse(row.TraceMetricsJson) : {},
+      StartedAt: millis(row.startedAtMs),
+      QueuedAt: millis(row.queuedAtMs),
+      CreatedAt: Number(row.createdAtMs),
+      UpdatedAt: Number(row.updatedAtMs),
+      FinishedAt: millis(row.finishedAtMs),
+      ArchivedAt: millis(row.archivedAtMs),
+      CancellationRequestedAt: millis(row.cancellationRequestedAtMs),
+      LastSnapshotOccurredAt: Number(row.lastSnapshotOccurredAtMs ?? 0),
+      LastEventOccurredAt: Number(row.lastEventOccurredAtMs ?? 0),
     };
   }
 
@@ -254,22 +289,7 @@ export class ClickHouseSimulationRunStateRepository<
    * {@link LATEST_VERSION_LOOKUP_MARGIN_MS}. No window, no bounds.
    */
   static startedAtBounds({ window }: { window: ReadTimeWindow | undefined }): StartedAtBounds {
-    if (!window) return { row: "", latestVersion: "", params: {} };
-
-    return {
-      row:
-        "AND t.StartedAt >= fromUnixTimestamp64Milli({fromMs:Int64}) " +
-        "AND t.StartedAt <= fromUnixTimestamp64Milli({toMs:Int64})",
-      latestVersion:
-        "AND s.StartedAt >= fromUnixTimestamp64Milli({lookupFromMs:Int64}) " +
-        "AND s.StartedAt <= fromUnixTimestamp64Milli({lookupToMs:Int64})",
-      params: {
-        fromMs: Math.floor(window.fromMs),
-        toMs: Math.ceil(window.toMs),
-        lookupFromMs: Math.floor(window.fromMs - LATEST_VERSION_LOOKUP_MARGIN_MS),
-        lookupToMs: Math.ceil(window.toMs + LATEST_VERSION_LOOKUP_MARGIN_MS),
-      },
-    };
+    return startedAtBoundsOf({ window });
   }
 
   /**
@@ -288,7 +308,7 @@ export class ClickHouseSimulationRunStateRepository<
 
     try {
       const row = window
-        ? await queryWindowed<ClickHouseSimulationRunRecord | null>({
+        ? await queryWindowed<LatestRunRow | null>({
             table: TABLE_NAME,
             hintMs: (window.fromMs + window.toMs) / 2,
             windowMs: (window.toMs - window.fromMs) / 2,
@@ -309,7 +329,7 @@ export class ClickHouseSimulationRunStateRepository<
         aggregateId: scenarioRunId,
         tenantId: createTenantId(context.tenantId),
         version: row.Version,
-        data: this.mapClickHouseRecordToProjectionData(row),
+        data: this.mapLatestRowToProjectionData(row),
       };
 
       return projection as ProjectionType;
@@ -330,6 +350,114 @@ export class ClickHouseSimulationRunStateRepository<
     }
   }
 
+  /**
+   * The run's latest version: `UpdatedAt` equal to a scalar `max(UpdatedAt)` (PREWHERE-able for
+   * the heavy columns; the IN form ran out of memory on runs with many snapshots). Windowed: both
+   * reads bounded by StartedAt, the election wider. Unwindowed: both bounded by the run id index.
+   */
+  static latestRowRead({
+    tenantId,
+    scenarioRunId,
+    window,
+    holds,
+  }: {
+    tenantId: string;
+    scenarioRunId: string;
+    window: ReadTimeWindow | undefined;
+    holds: (name: string) => boolean;
+  }) {
+    const t = simulationRuns;
+    const bounds = startedAtBoundsOf({ window });
+    const held = (of: ColumnRef<typeof simulationRuns.$table.name, string, readonly string[]>) =>
+      fn.heldOr(of, { holds, otherwise: fn.emptyArrayAs(column.array(column.string())) });
+    return clickhouseRead({ scope: tenantScope.single({ tenantId }) })
+      .from(t)
+      .select({
+        ProjectionId: t.ProjectionId,
+        TenantId: t.TenantId,
+        ScenarioRunId: t.ScenarioRunId,
+        ScenarioId: t.ScenarioId,
+        BatchRunId: t.BatchRunId,
+        ScenarioSetId: t.ScenarioSetId,
+        Version: t.Version,
+        Status: t.Status,
+        Name: t.Name,
+        Description: t.Description,
+        Metadata: t.Metadata,
+        messageIds: t["Messages.Id"],
+        messageRoles: t["Messages.Role"],
+        messageContents: t["Messages.Content"],
+        messageTraceIds: t["Messages.TraceId"],
+        messageRests: t["Messages.Rest"],
+        TraceIds: t.TraceIds,
+        Verdict: t.Verdict,
+        Reasoning: t.Reasoning,
+        MetCriteria: t.MetCriteria,
+        UnmetCriteria: t.UnmetCriteria,
+        InconclusiveCriteria: t.InconclusiveCriteria,
+        criteriaCriterion: held(t["Criteria.Criterion"]),
+        criteriaRequirement: held(t["Criteria.Requirement"]),
+        criteriaStatus: fn.heldOr(t["Criteria.Status"], {
+          holds,
+          otherwise: fn.emptyArrayAs(column.array(column.lowCardinality(column.string()))),
+        }),
+        criteriaReasoning: held(t["Criteria.Reasoning"]),
+        Error: t.Error,
+        evaluationEvaluatorIds: t["Evaluations.EvaluatorId"],
+        evaluationNames: t["Evaluations.Name"],
+        evaluationStatuses: t["Evaluations.Status"],
+        evaluationRequired: t["Evaluations.Required"],
+        evaluationPassed: t["Evaluations.Passed"],
+        evaluationScores: t["Evaluations.Score"],
+        evaluationLabels: t["Evaluations.Label"],
+        evaluationDetails: t["Evaluations.Details"],
+        evaluationCostAmounts: t["Evaluations.CostAmount"],
+        evaluationCostCurrencies: t["Evaluations.CostCurrency"],
+        evaluationInputsJson: t["Evaluations.InputsJson"],
+        durationMs: fn.toString(t.DurationMs),
+        TotalCost: t.TotalCost,
+        RoleCosts: t.RoleCosts,
+        RoleLatencies: t.RoleLatencies,
+        TraceMetricsJson: t.TraceMetricsJson,
+        startedAtMs: fn.toUnixTimestamp64Milli(t.StartedAt),
+        queuedAtMs: fn.toUnixTimestamp64Milli(t.QueuedAt),
+        createdAtMs: fn.toUnixTimestamp64Milli(t.CreatedAt),
+        updatedAtMs: fn.toUnixTimestamp64Milli(t.UpdatedAt),
+        finishedAtMs: fn.toUnixTimestamp64Milli(t.FinishedAt),
+        archivedAtMs: fn.toUnixTimestamp64Milli(t.ArchivedAt),
+        cancellationRequestedAtMs: fn.toUnixTimestamp64Milli(t.CancellationRequestedAt),
+        lastSnapshotOccurredAtMs: fn.toUnixTimestamp64Milli(t.LastSnapshotOccurredAt),
+        lastEventOccurredAtMs: fn.toUnixTimestamp64Milli(t.LastEventOccurredAt),
+      })
+      .where(({ and, eq, gte, lte, idBound, scalar }) => {
+        const latest = scalar((sub) =>
+          sub
+            .from(t)
+            .select({ latestUpdatedAt: fn.max(t.UpdatedAt) })
+            .where((inner) =>
+              bounds.kind === "bounded"
+                ? inner.and(
+                    inner.eq(t.ScenarioRunId, scenarioRunId),
+                    inner.gte(t.StartedAt, bounds.latestVersion.fromMs),
+                    inner.lte(t.StartedAt, bounds.latestVersion.toMs),
+                  )
+                : inner.idBound(t.ScenarioRunId, scenarioRunId),
+            ),
+        );
+        // A fold read-back's own window, applied verbatim (ADR-066): no id bound.
+        return bounds.kind === "bounded"
+          ? and(
+              eq(t.ScenarioRunId, scenarioRunId),
+              gte(t.StartedAt, bounds.row.fromMs),
+              lte(t.StartedAt, bounds.row.toMs),
+              eq(t.UpdatedAt, latest),
+            )
+          : and(idBound(t.ScenarioRunId, scenarioRunId), eq(t.UpdatedAt, latest));
+      })
+      .limit(1)
+      .build();
+  }
+
   async #findLatestRow({
     tenantId,
     scenarioRunId,
@@ -338,33 +466,18 @@ export class ClickHouseSimulationRunStateRepository<
     tenantId: string;
     scenarioRunId: string;
     window: ReadTimeWindow | undefined;
-  }): Promise<ClickHouseSimulationRunRecord | null> {
-    const bounds = ClickHouseSimulationRunStateRepository.startedAtBounds({ window });
+  }): Promise<LatestRunRow | null> {
     const client = await this.options.resolveClient(tenantId);
-    const columns = await this.#latestRowColumns(client);
-    // Latest-version read via scalar equality on UpdatedAt (PREWHERE-able for heavy columns).
-    // IN-tuple form causes OOM on runs with many snapshots; scalar is better for single-row gets.
-    const result = await client.query({
-      // ID_BOUND_SKIP: a fold read-back's own window, applied verbatim (ADR-066).
-      query: `
-          SELECT ${columns}
-          FROM ${TABLE_NAME} AS t
-          WHERE t.TenantId = {tenantId:String}
-            AND t.ScenarioRunId = {scenarioRunId:String}
-            ${bounds.row}
-            AND t.UpdatedAt = (
-              SELECT max(s.UpdatedAt)
-              FROM ${TABLE_NAME} AS s
-              WHERE s.TenantId = {tenantId:String}
-                AND s.ScenarioRunId = {scenarioRunId:String}
-                ${bounds.latestVersion}
-            )
-          LIMIT 1
-        `,
-      query_params: { tenantId, scenarioRunId, ...bounds.params },
-      format: "JSONEachRow",
+    const holds = await client.holds({ table: simulationRuns.$table.name });
+    const { rows } = await client.read({
+      statement: ClickHouseSimulationRunStateRepository.latestRowRead({
+        tenantId,
+        scenarioRunId,
+        window,
+        holds,
+      }),
+      table: simulationRuns.$table.name,
     });
-    const rows = await result.json<ClickHouseSimulationRunRecord>();
     return rows[0] ?? null;
   }
 
@@ -375,70 +488,20 @@ export class ClickHouseSimulationRunStateRepository<
   }: {
     tenantId: string;
     scenarioRunId: string;
-  }): Promise<ClickHouseSimulationRunRecord | null> {
+  }): Promise<LatestRunRow | null> {
     const client = await this.options.resolveClient(tenantId);
-    const columns = await this.#latestRowColumns(client);
-    const result = await client.query({
-      query: `
-          SELECT ${columns}
-          FROM ${TABLE_NAME} AS t
-          WHERE t.TenantId = {tenantId:String}
-            AND t.ScenarioRunId = {scenarioRunId:String}
-            {{idBound:simulation_runs.ScenarioRunId:scenarioRunId:t}}
-            AND t.UpdatedAt = (
-              SELECT max(s.UpdatedAt)
-              FROM ${TABLE_NAME} AS s
-              WHERE s.TenantId = {tenantId:String}
-                AND s.ScenarioRunId = {scenarioRunId:String}
-                {{idBound:simulation_runs.ScenarioRunId:scenarioRunId:s}}
-            )
-          LIMIT 1
-        `,
-      query_params: { tenantId, scenarioRunId },
-      format: "JSONEachRow",
+    const holds = await client.holds({ table: simulationRuns.$table.name });
+    const { rows } = await client.read({
+      statement: ClickHouseSimulationRunStateRepository.latestRowRead({
+        tenantId,
+        scenarioRunId,
+        window: undefined,
+        holds,
+      }),
+      table: simulationRuns.$table.name,
       idBound: { fallback: "unbounded" },
     });
-    const rows = await result.json<ClickHouseSimulationRunRecord>();
     return rows[0] ?? null;
-  }
-
-  /** The latest-row select list, criteria columns named as this tenant's target holds them. */
-  async #latestRowColumns(
-    client: Awaited<ReturnType<SimulationClickHouseClientResolver>>,
-  ): Promise<string> {
-    const input = { table: TABLE_NAME, alias: "t", columns: CRITERIA_COLUMNS };
-    const criteria = (await client.select?.(input)) ?? ClickHouseColumns.named(input);
-    return `
-            t.ProjectionId AS ProjectionId, t.TenantId AS TenantId,
-            t.ScenarioRunId AS ScenarioRunId, t.ScenarioId AS ScenarioId,
-            t.BatchRunId AS BatchRunId, t.ScenarioSetId AS ScenarioSetId,
-            t.Version AS Version, t.Status AS Status, t.Name AS Name,
-            t.Description AS Description, t.Metadata AS Metadata,
-            t.\`Messages.Id\` AS \`Messages.Id\`,
-            t.\`Messages.Role\` AS \`Messages.Role\`,
-            t.\`Messages.Content\` AS \`Messages.Content\`,
-            t.\`Messages.TraceId\` AS \`Messages.TraceId\`,
-            t.\`Messages.Rest\` AS \`Messages.Rest\`,
-            t.TraceIds AS TraceIds,
-            t.Verdict AS Verdict, t.Reasoning AS Reasoning,
-            t.MetCriteria AS MetCriteria, t.UnmetCriteria AS UnmetCriteria,
-            t.InconclusiveCriteria AS InconclusiveCriteria,
-            ${criteria},
-            t.Error AS Error,
-            ${EVALUATION_COLUMNS_SQL.replaceAll("`Evaluations.", "t.`Evaluations.")},
-            toString(t.DurationMs) AS DurationMs,
-            t.TotalCost AS TotalCost, t.RoleCosts AS RoleCosts,
-            t.RoleLatencies AS RoleLatencies,
-            t.TraceMetricsJson AS TraceMetricsJson,
-            toUnixTimestamp64Milli(t.StartedAt) AS StartedAt,
-            if(t.QueuedAt IS NOT NULL, toUnixTimestamp64Milli(t.QueuedAt), NULL) AS QueuedAt,
-            toUnixTimestamp64Milli(t.CreatedAt) AS CreatedAt,
-            toUnixTimestamp64Milli(t.UpdatedAt) AS UpdatedAt,
-            toUnixTimestamp64Milli(t.FinishedAt) AS FinishedAt,
-            toUnixTimestamp64Milli(t.ArchivedAt) AS ArchivedAt,
-            if(t.CancellationRequestedAt IS NOT NULL, toUnixTimestamp64Milli(t.CancellationRequestedAt), NULL) AS CancellationRequestedAt,
-            toUnixTimestamp64Milli(t.LastSnapshotOccurredAt) AS LastSnapshotOccurredAt,
-            toUnixTimestamp64Milli(t.LastEventOccurredAt) AS LastEventOccurredAt`;
   }
 
   async storeProjection(
@@ -590,3 +653,24 @@ export class ClickHouseSimulationRunStateRepository<
 }
 
 export { ClickHouseSimulationRunStateRepository as SimulationRunStateRepositoryClickHouse };
+
+/** A role map as the projection holds it: its arrays copied out of the read-only row. */
+function copiedMap(
+  map: Readonly<Record<string, readonly number[]>> | null | undefined,
+): Record<string, number[]> {
+  return Object.fromEntries(Object.entries(map ?? {}).map(([key, values]) => [key, [...values]]));
+}
+
+/** See {@link ClickHouseSimulationRunStateRepository.startedAtBounds}. */
+function startedAtBoundsOf({ window }: { window: ReadTimeWindow | undefined }): StartedAtBounds {
+  if (!window) return { kind: "unbounded" };
+
+  return {
+    kind: "bounded",
+    row: { fromMs: Math.floor(window.fromMs), toMs: Math.ceil(window.toMs) },
+    latestVersion: {
+      fromMs: Math.floor(window.fromMs - LATEST_VERSION_LOOKUP_MARGIN_MS),
+      toMs: Math.ceil(window.toMs + LATEST_VERSION_LOOKUP_MARGIN_MS),
+    },
+  };
+}

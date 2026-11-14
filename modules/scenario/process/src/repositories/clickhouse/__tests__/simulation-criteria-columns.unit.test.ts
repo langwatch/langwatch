@@ -25,6 +25,7 @@ function readRunOver(columnList: readonly { table: string; name: string }[]) {
       return { json: async () => [] };
     },
     select: (input) => columns.select(input),
+    read: () => Promise.reject(new Error("the criteria reads send no built read")),
   }));
   return { statements, repository };
 }

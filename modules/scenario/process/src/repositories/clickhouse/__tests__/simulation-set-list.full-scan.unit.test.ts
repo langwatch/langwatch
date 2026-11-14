@@ -21,6 +21,7 @@ function compose() {
       columns: () => {
         throw new Error("the set list names its columns");
       },
+      read: () => Promise.reject(new Error("the set list sends no built read")),
     }),
   );
   return { repository, sent };

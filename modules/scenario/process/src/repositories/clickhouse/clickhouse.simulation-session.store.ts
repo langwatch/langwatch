@@ -59,23 +59,13 @@ export class ClickHouseSimulationSession implements SimulationEventingClickHouse
   }
 
   /** Sends a built statement only when it is this session's tenant's, else refuses by name. */
-  read: ClickHouseQueryClient["read"] = (input) => {
-    const { statement } = input;
-    const own =
-      statement.identity === "reader" &&
-      statement.kind === "tenant" &&
-      statement.tenantId === this.tenantId &&
-      statement.routeTenantId === this.tenantId &&
-      (statement.tenantIds ?? [this.tenantId]).every((id) => id === this.tenantId);
-    if (own) return this.clickhouse.read(input);
-    return Promise.reject(
-      new SecurityError({
-        operation: "ClickHouseSimulationSession.read",
-        message: "A built read sent through a tenant's session must be scoped to that tenant",
-        tenantId: this.tenantId,
-        context: { identity: statement.identity, kind: statement.kind },
-      }),
-    );
+  read: ClickHouseQueryClient["read"] = async (input) => {
+    refuseUnlessOwnTenant({
+      statement: input.statement,
+      tenantId: this.tenantId,
+      operation: "ClickHouseSimulationSession.read",
+    });
+    return this.clickhouse.read(input);
   };
 
   holds({ table }: { table: string }): Promise<(name: string) => boolean> {
@@ -104,4 +94,29 @@ function settingsOf(settings: Readonly<Record<string, unknown>>): Record<string,
     else if (typeof value === "boolean") carried[name] = value ? 1 : 0;
   }
   return carried;
+}
+
+/** Throws when a built read is not scoped to `tenantId` alone. */
+export function refuseUnlessOwnTenant({
+  statement,
+  tenantId,
+  operation,
+}: {
+  statement: Parameters<ClickHouseQueryClient["read"]>[0]["statement"];
+  tenantId: string;
+  operation: string;
+}): void {
+  const own =
+    statement.identity === "reader" &&
+    statement.kind === "tenant" &&
+    statement.tenantId === tenantId &&
+    statement.routeTenantId === tenantId &&
+    (statement.tenantIds ?? [tenantId]).every((id) => id === tenantId);
+  if (own) return;
+  throw new SecurityError({
+    operation,
+    message: "A built read sent through a tenant's session must be scoped to that tenant",
+    tenantId,
+    context: { identity: statement.identity, kind: statement.kind },
+  });
 }

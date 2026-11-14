@@ -2,10 +2,18 @@ import { Buffer } from "node:buffer";
 
 import {
   ClickHouseColumns,
+  type ClickHouseQueryClient,
   type IdBoundOptions,
   queryWindowed,
   type WindowFragment,
 } from "@langwatch/clickhouse-client";
+import {
+  clickhouseRead,
+  type ConditionOps,
+  fn,
+  type ReaderReadStatement,
+  tenantScope,
+} from "@langwatch/clickhouse-client/builder";
 import {
   AGENT_TEST_SET_SUFFIX,
   RUN_ACTOR_LABELS,
@@ -27,6 +35,7 @@ import {
   EVALUATION_LIST_COLUMNS_SQL,
 } from "../../rules/simulation-evaluation-columns.rules.ts";
 import { SimulationRepository } from "../simulation.repository.ts";
+import { simulationRuns } from "./clickhouse.simulation-runs.table.ts";
 import { CRITERIA_COLUMNS } from "./simulation-criteria.mapper.ts";
 import {
   type ClickHouseSimulationRunRow,
@@ -120,6 +129,50 @@ type BatchAggregateRow = {
   MinStartedAt: string;
   MaxStartedAt: string;
 };
+
+/** A row of {@link batchAggregateFields}: the builder types its counts as numbers. */
+type BuiltBatchAggregateRow = { [Key in keyof BatchAggregateRow]: BatchAggregateRow[Key] | number };
+
+type RunConditionOps = ConditionOps<typeof simulationRuns.$table.name, Record<never, never>>;
+
+const RUNNING_STATUS_LIST = ["IN_PROGRESS", "PENDING", "PENDING_EVALUATION", "QUEUED", "RUNNING"];
+const FAILED_STATUS_LIST = ["FAILED", "FAILURE", "ERROR", "CANCELLED"];
+const COMPLETED_STATUS_LIST = ["SUCCESS", ...FAILED_STATUS_LIST];
+
+/** A metadata string under `path`, `''` when absent, as {@link RUN_NOTE_EXPR} reads it. */
+const metadataString = (...path: string[]) =>
+  fn.JSONExtractString(fn.ifNull(simulationRuns.Metadata, "{}"), ...path);
+
+/** {@link RUN_NOT_SCORED_EXPR} as a typed condition. */
+function runNotScored({ and, eq, not, oneOf }: RunConditionOps) {
+  return and(
+    eq(simulationRuns.Status, "ERROR"),
+    not(oneOf(metadataString("langwatch", "hooks", "setup", "status"), ["", "ok"])),
+  );
+}
+
+/** {@link BATCH_AGGREGATE_COLUMNS} as typed fields, under the same keys. */
+function batchAggregateFields(ops: RunConditionOps) {
+  const { and, eq, not, oneOf } = ops;
+  const t = simulationRuns;
+  const running = oneOf(t.Status, RUNNING_STATUS_LIST);
+  const millis = fn.toUnixTimestamp64Milli;
+  return {
+    BatchRunId: t.BatchRunId,
+    TotalCount: fn.count(),
+    PassCount: fn.countIf(eq(t.Status, "SUCCESS")),
+    FailCount: fn.countIf(and(oneOf(t.Status, FAILED_STATUS_LIST), not(runNotScored(ops)))),
+    RunningCount: fn.countIf(running),
+    SettledCount: fn.countIf(not(running)),
+    StalledCount: fn.countIf(eq(t.Status, "STALLED")),
+    LastUpdatedAt: millis(fn.max(t.UpdatedAt)),
+    LastRunAt: millis(fn.max(t.CreatedAt)),
+    FirstCompletedAt: millis(fn.minIf(t.UpdatedAt, oneOf(t.Status, COMPLETED_STATUS_LIST))),
+    AllCompletedAt: fn.if(eq(fn.countIf(running), 0), millis(fn.max(t.UpdatedAt)), 0),
+    MinStartedAt: millis(fn.min(t.StartedAt)),
+    MaxStartedAt: millis(fn.max(t.StartedAt)),
+  };
+}
 
 /** A whole run's columns, given the criteria select list its target answers. */
 const runColumns = (criteria: string) => `
@@ -258,6 +311,8 @@ export type SimulationClickHouseClient = {
   }): Promise<{ json<Result>(): Promise<Result[]> }>;
   /** Absent on a bare driver client (tests): every column is then named. */
   select?(input: Parameters<ClickHouseColumns["select"]>[0]): Promise<string>;
+  /** A statement the typed builder built; it names its own tenant scope. */
+  read: ClickHouseQueryClient["read"];
 };
 
 type SimulationClickHouseClientResolver = (tenantId: string) => Promise<SimulationClickHouseClient>;
@@ -676,26 +731,12 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     projectId: string;
     batchRunId: string;
   }): Promise<SimulationBatchSummary | null> {
-    const whereFilters = `TenantId = {tenantId:String} AND BatchRunId = {batchRunId:String} ${BATCH_BOUND}`;
-
-    // The note and the actor are read here and not in BATCH_AGGREGATE_COLUMNS:
-    // this query is bounded to one batch, while the history page shares those
-    // columns with a step that aggregates over the whole run set.
-    const rows = await this.queryRows<
-      BatchAggregateRow & { Note: string; ActorId: string; ActorLabel: string }
-    >(
-      `SELECT ${BATCH_AGGREGATE_COLUMNS},
-        anyIf(${RUN_NOTE_EXPR}, ${RUN_NOTE_EXPR} != '')                AS Note,
-        anyIf(${RUN_ACTOR_ID_EXPR}, ${RUN_ACTOR_ID_EXPR} != '')        AS ActorId,
-        anyIf(${RUN_ACTOR_LABEL_EXPR}, ${RUN_ACTOR_ID_EXPR} != '')     AS ActorLabel
-       FROM ${TABLE_NAME}
-       WHERE ${whereFilters}
-         AND ArchivedAt IS NULL
-         ${SimulationClickHouseRepository.simulationRunDedupPredicate(whereFilters)}
-       GROUP BY BatchRunId`,
-      { tenantId: projectId, batchRunId },
-      ID_BOUND_READ,
-    );
+    const client = await this.getClient(projectId);
+    const { rows } = await client.read({
+      statement: SimulationClickHouseRepository.batchSummaryRead({ projectId, batchRunId }),
+      table: simulationRuns.$table.name,
+      ...ID_BOUND_READ,
+    });
 
     const row = rows[0];
     if (!row) return null;
@@ -723,16 +764,12 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     | { changed: true; lastUpdatedAt: number; runs: SimulationRunData[] }
   > {
     if (sinceTimestamp !== undefined) {
-      const tsRows = await this.queryRows<{ LastUpdatedAt: string }>(
-        `SELECT toString(toUnixTimestamp64Milli(max(UpdatedAt))) AS LastUpdatedAt
-         FROM ${TABLE_NAME}
-         WHERE TenantId = {tenantId:String}
-           AND BatchRunId = {batchRunId:String}
-           ${BATCH_BOUND}
-           AND ArchivedAt IS NULL`,
-        { tenantId: projectId, batchRunId },
-        ID_BOUND_READ,
-      );
+      const client = await this.getClient(projectId);
+      const { rows: tsRows } = await client.read({
+        statement: SimulationClickHouseRepository.batchLastUpdatedRead({ projectId, batchRunId }),
+        table: simulationRuns.$table.name,
+        ...ID_BOUND_READ,
+      });
       const lastUpdatedAt = Number(tsRows[0]?.LastUpdatedAt ?? "0");
       if (lastUpdatedAt <= sinceTimestamp) {
         return { changed: false, lastUpdatedAt };
@@ -793,25 +830,18 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     startDate?: number;
     endDate?: number;
   }): Promise<number> {
-    const dateFilter = SimulationClickHouseRepository.buildDateFilter({ startDate, endDate });
-
-    const rows = await this.queryRows<{ BatchRunCount: string }>(
-      `SELECT toString(count(DISTINCT BatchRunId)) AS BatchRunCount
-       FROM ${TABLE_NAME}
-       WHERE TenantId = {tenantId:String}
-         AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
-         ${SET_BOUND}
-         ${dateFilter.whereClause}
-         AND ArchivedAt IS NULL
-         ${SimulationClickHouseRepository.simulationRunDedupPredicate(`TenantId = {tenantId:String} AND ScenarioSetId IN ({scenarioSetIds:Array(String)}) ${SET_BOUND} ${dateFilter.whereClause}`)}`,
-      {
-        tenantId: projectId,
-        scenarioSetIds: SimulationClickHouseRepository.expandSetIdFilter(scenarioSetId),
-        ...dateFilter.params,
-      },
-      ID_BOUND_READ,
-    );
-    return parseInt(rows[0]?.BatchRunCount ?? "0", 10);
+    const client = await this.getClient(projectId);
+    const { rows } = await client.read({
+      statement: SimulationClickHouseRepository.batchRunCountRead({
+        projectId,
+        scenarioSetId,
+        startDate,
+        endDate,
+      }),
+      table: simulationRuns.$table.name,
+      ...ID_BOUND_READ,
+    });
+    return Number(rows[0]?.BatchRunCount ?? 0);
   }
 
   async findAllRunDataForScenarioSet({
@@ -1790,6 +1820,62 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     return rows.map((row) => mapClickHouseRowToScenarioRunData(row));
   }
 
+  /**
+   * One batch's counts, note and actor, latest versions only. The note and the actor are read
+   * here and not in {@link batchAggregateFields}: this read is bounded to one batch.
+   */
+  static batchSummaryRead(input: {
+    projectId: string;
+    batchRunId: string;
+  }): ReaderReadStatement<BatchSummaryRow> {
+    return batchSummaryReadOf(input);
+  }
+
+  /** When any version of a batch's runs last changed, every version counted. */
+  static batchLastUpdatedRead({
+    projectId,
+    batchRunId,
+  }: {
+    projectId: string;
+    batchRunId: string;
+  }): ReaderReadStatement<{ LastUpdatedAt: number }> {
+    const t = simulationRuns;
+    return clickhouseRead({ scope: tenantScope.single({ tenantId: projectId }) })
+      .from(t)
+      .select({ LastUpdatedAt: fn.toUnixTimestamp64Milli(fn.max(t.UpdatedAt)) })
+      .where(({ and, idBound, isNull }) =>
+        and(idBound(t.BatchRunId, batchRunId), isNull(t.ArchivedAt)),
+      )
+      .build();
+  }
+
+  /** How many batches a set ran in the date range, latest versions only. */
+  static batchRunCountRead({
+    projectId,
+    scenarioSetId,
+    startDate,
+    endDate,
+  }: {
+    projectId: string;
+    scenarioSetId: string;
+    startDate?: number;
+    endDate?: number;
+  }): ReaderReadStatement<{ BatchRunCount: number }> {
+    const t = simulationRuns;
+    const setIds = SimulationClickHouseRepository.expandSetIdFilter(scenarioSetId);
+    // One conjunct per `where`: the election repeats the StartedAt ones for partition pruning.
+    let read = clickhouseRead({ scope: tenantScope.single({ tenantId: projectId }) })
+      .from(t)
+      .select({ BatchRunCount: fn.countDistinct(t.BatchRunId) })
+      .where(({ idBound }) => idBound(t.ScenarioSetId, setIds));
+    if (startDate !== undefined) read = read.where(({ gte }) => gte(t.StartedAt, startDate));
+    if (endDate !== undefined) read = read.where(({ lte }) => lte(t.StartedAt, endDate));
+    return read
+      .where(({ isNull }) => isNull(t.ArchivedAt))
+      .latestVersion()
+      .build();
+  }
+
   private static expandSetIdFilter(scenarioSetId: string): string[] {
     return scenarioSetId === DEFAULT_SET_ID || scenarioSetId === ""
       ? [DEFAULT_SET_ID, ""]
@@ -1802,13 +1888,13 @@ export class SimulationClickHouseRepository extends SimulationRepository {
    * the single-batch summary from its own aggregate/StalledCount column.
    */
   private static mapBatchAggregateRow(
-    row: BatchAggregateRow,
+    row: BatchAggregateRow | BuiltBatchAggregateRow,
   ): Omit<SimulationBatchSummary, "stalledCount" | "note" | "startedBy"> {
     const firstCompletedAt = Number(row.FirstCompletedAt);
     const allCompletedAt = Number(row.AllCompletedAt);
 
     return {
-      batchRunId: row.BatchRunId,
+      batchRunId: String(row.BatchRunId),
       totalCount: Number(row.TotalCount),
       passCount: Number(row.PassCount),
       failCount: Number(row.FailCount),
@@ -1890,4 +1976,27 @@ export class SimulationClickHouseRepository extends SimulationRepository {
       params,
     };
   }
+}
+
+/** A row of {@link SimulationClickHouseRepository.batchSummaryRead}. */
+type BatchSummaryRow =
+  ReturnType<typeof batchSummaryReadOf> extends ReaderReadStatement<infer Row> ? Row : never;
+
+function batchSummaryReadOf({ projectId, batchRunId }: { projectId: string; batchRunId: string }) {
+  const t = simulationRuns;
+  const note = metadataString("note");
+  const actorId = metadataString("langwatch", "actorId");
+  return clickhouseRead({ scope: tenantScope.single({ tenantId: projectId }) })
+    .from(t)
+    .select((ops) => ({
+      ...batchAggregateFields(ops),
+      Note: fn.anyIf(note, ops.ne(note, "")),
+      ActorId: fn.anyIf(actorId, ops.ne(actorId, "")),
+      ActorLabel: fn.anyIf(metadataString("langwatch", "actorLabel"), ops.ne(actorId, "")),
+    }))
+    .where(({ idBound }) => idBound(t.BatchRunId, batchRunId))
+    .where(({ isNull }) => isNull(t.ArchivedAt))
+    .latestVersion()
+    .groupBy(t.BatchRunId)
+    .build();
 }
