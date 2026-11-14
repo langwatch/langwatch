@@ -12,6 +12,7 @@ const CATALOG = skipTenantCheck({
   SKIP_TENANT_CHECK: true,
 }).sql;
 const approvedViewRowsSchema = z.array(z.object({ view: z.string(), granted: z.boolean() }));
+const missingViewRowsSchema = z.array(z.object({ view: z.string() }));
 const BOOT_LOCK = skipTenantCheck({
   // The self-provision boot lock and its session setting are global, with no tenant scope.
   SKIP_TENANT_CHECK: true,
@@ -54,6 +55,28 @@ export class PrismaLangWatchQLPostgresRepository extends LangWatchQLPostgresRepo
       [...views],
     );
     return approvedViewRowsSchema.parse(rows);
+  }
+
+  async findScopedReaderMissingViews({
+    schema,
+    role,
+    views,
+  }: {
+    schema: string;
+    role: string;
+    views: readonly string[];
+  }): Promise<string[]> {
+    const rows = await this.database.$queryRawUnsafe(
+      `${CATALOG}\nSELECT v AS view FROM unnest($3::text[]) AS v ` +
+        `WHERE EXISTS (SELECT 1 FROM pg_roles WHERE rolname = $2::text) ` +
+        `AND to_regclass(format('%I.%I', $1::text, v)) IS NOT NULL ` +
+        `AND NOT has_table_privilege($2::text, format('%I.%I', $1::text, v), 'SELECT') ` +
+        `ORDER BY v`,
+      schema,
+      role,
+      [...views],
+    );
+    return missingViewRowsSchema.parse(rows).map((row) => row.view);
   }
 
   withAdvisoryLock<T>({

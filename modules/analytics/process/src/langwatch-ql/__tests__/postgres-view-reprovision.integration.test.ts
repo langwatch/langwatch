@@ -70,6 +70,7 @@ const currentStatements = () => [
     schema: SCHEMA,
     views: topics ? [topics] : [],
     readerRole: READER_ROLE,
+    sharedReaderRole: READER_ROLE,
   }),
   ...postgresMapping.readerRoleStatements({
     reader: {

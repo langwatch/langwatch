@@ -12,6 +12,7 @@ import { postgresEngineColumnType } from "../rules/lwql-postgres-engine-type.rul
 import {
   DEFAULT_POSTGRES_ENGINE_POOL_SIZE,
   LangWatchQLPostgresMappingService,
+  LWQL_SHARED_READER_ROLE,
   POSTGRES_BASE_ALIAS,
 } from "./langwatch-ql-postgres-mapping.service.ts";
 
@@ -55,6 +56,7 @@ export class LangWatchQLPostgresViewsService {
     schema,
     views = LWQL_VIEW_CATALOG,
     readerRole,
+    sharedReaderRole = LWQL_SHARED_READER_ROLE,
   }: {
     /** PostgreSQL schema the application's tables live in. */
     schema: string;
@@ -65,6 +67,8 @@ export class LangWatchQLPostgresViewsService {
      * derivation with no runtime reader identity.
      */
     readerRole?: string;
+    /** The login whose reads keep every row; every other login is row-scoped. */
+    sharedReaderRole?: string;
   }): string[] {
     return catalogShapes.postgresViews(views).map((view) => {
       const joins = view.postgres.tenantPath ?? [];
@@ -80,6 +84,10 @@ export class LangWatchQLPostgresViewsService {
         joins,
         ...(view.postgres.rowFilter !== undefined ? { rowFilter: view.postgres.rowFilter } : {}),
         ...(readerRole !== undefined ? { readerRole } : {}),
+        rowScope: {
+          sharedReaderRole,
+          tenant: { alias: tenantAlias, column: view.postgres.tenantSourceColumn },
+        },
         columns: view.columns.map((column) => ({
           exposed: column.name,
           // The tenant column is the one rename every mapping performs; the rest

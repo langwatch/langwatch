@@ -16,6 +16,7 @@ import {
   type LwqlAccessModelMode,
   type LwqlCollectionProbe,
 } from "../features/provisioning/services/langwatch-ql-collection-binding.service.ts";
+import { LWQL_SCOPED_READER_GROUP } from "../features/provisioning/services/langwatch-ql-postgres-mapping.service.ts";
 import {
   LangWatchQLProductionProvisioningService,
   LWQL_POSTGRES_READER_ROLE,
@@ -505,7 +506,8 @@ const POSTGRES_FAILED_MESSAGES: Record<ProvisioningFailureLevel, string> = {
 
 /**
  * A deploy's whole half: every approved view, then the reader role with its revokes and grants.
- * A check's gaps: only the absent views, then additive grants on each gap, never a revoke.
+ * A check's gaps: only the absent views, then grants on each gap. The one revoke is the scoped
+ * group's, on a gap view that fails the scoped-view check.
  */
 function postgresStatements({
   plan,
@@ -524,6 +526,7 @@ function postgresStatements({
         readerPassword: plan.request.postgresReaderPassword,
         schema,
       }),
+      ...lwqlProvisioning.postgresScopedReaderGrantStatements({ schema }),
     ];
   }
   const absent = gaps.filter((gap) => gap.absent).map((gap) => gap.view);
@@ -542,6 +545,40 @@ function postgresStatements({
   ];
 }
 
+/**
+ * Names the views the scoped-reader group still cannot select, so a view that fails the
+ * scoped-view check is visible. Best-effort: a failed read logs and never fails the converge.
+ */
+async function warnScopedReaderGaps({
+  database,
+  schema,
+  views,
+}: {
+  database: LwqlProvisioningDatabase;
+  schema: string;
+  views: readonly string[];
+}): Promise<void> {
+  try {
+    const repository = PrismaLangWatchQLPostgresRepository.create(database);
+    const missing = await repository.findScopedReaderMissingViews({
+      schema,
+      role: LWQL_SCOPED_READER_GROUP,
+      views,
+    });
+    if (missing.length > 0) {
+      logger.warn(
+        { views: missing },
+        "the scoped-reader group has no SELECT on these views: they fail the scoped-view check",
+      );
+    }
+  } catch (error) {
+    logger.warn(
+      { error: clickHouseErrorSummary(error), ...postgresErrorCodeFields(error) },
+      "lwql could not read the scoped-reader group's grants",
+    );
+  }
+}
+
 async function convergePostgres({
   database,
   plan,
@@ -555,6 +592,11 @@ async function convergePostgres({
 }): Promise<unknown> {
   try {
     await runPostgresStatements({ database, statements: postgresStatements({ plan, gaps }) });
+    await warnScopedReaderGaps({
+      database,
+      schema: plan.schema,
+      views: gaps?.map((gap) => gap.view) ?? selfProvisioning.approvedPostgresViews(),
+    });
     return undefined;
   } catch (error) {
     logger[failureLevel](

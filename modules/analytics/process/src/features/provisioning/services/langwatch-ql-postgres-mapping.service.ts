@@ -75,25 +75,87 @@ function assertNoDollarTagCollision({ view, body }: { view: string; body: string
 }
 
 /**
- * The fallback branch's guarded re-grant, run only when the `DROP`+`CREATE` path
- * actually drops the view. Empty when the caller does not know the reader role.
+ * The NOLOGIN role whose members read the approved views through their per-reader row scope.
+ * Granted `SELECT` only when it exists, so a deployment without it is unchanged.
  */
-function readerRegrantClause({
-  readerRole,
-  qualifiedView,
+export const LWQL_SCOPED_READER_GROUP = "lwql_scoped_reader";
+
+/** Prefix of the per-organization role; the suffix is the md5 of the organization id. */
+const ORG_ROLE_PREFIX = "lwql_org_";
+
+/**
+ * The shared reader login: the one role whose reads keep every row. One source for the
+ * collection binding, self-provisioning and the view row scope.
+ */
+export const LWQL_SHARED_READER_ROLE = "lwql_ro";
+
+/**
+ * The canonical text of the row scope's org-role lookup. The view source spells it exactly so,
+ * and PostgreSQL's `pg_get_viewdef` keeps it verbatim, so the scoped-reader-group grant can prove a
+ * live view is the scoped one by finding this fragment in its stored definition.
+ */
+export const LWQL_ORG_SCOPE_FRAGMENT = `${postgresLiteral(ORG_ROLE_PREFIX)}::text || md5(`;
+
+/**
+ * Lower-cased fragments a scoped view's stored definition must also carry: the membership catalog
+ * and the session-user comparison (deparsed upper-case, hence lower-cased matching). Without
+ * both, the org-role lookup is not row-scoped to the reader.
+ */
+export const LWQL_ORG_MEMBERSHIP_FRAGMENT = "pg_auth_members";
+export const LWQL_SESSION_USER_FRAGMENT = "rolname = current_user";
+
+/** Where the per-reader row scope reads each row's owning project. */
+export interface PostgresReaderRowScope {
+  /** The shared reader login, which keeps every row. */
+  sharedReaderRole: string;
+  /** Alias and column carrying the row's project id. */
+  tenant: { alias: string; column: string };
+}
+
+/**
+ * The predicate ANDed into every approved view: the shared reader keeps every row, any other
+ * login sees the projects of the organizations whose role it holds. Inner aliases are prefixed
+ * so they cannot shadow the view body's own.
+ */
+function readerRowScopePredicate({
+  scope,
+  quotedSchema,
 }: {
-  readerRole: string | undefined;
-  qualifiedView: string;
+  scope: PostgresReaderRowScope;
+  quotedSchema: string;
 }): string {
-  if (!readerRole) {
-    return "";
-  }
+  const tenant = `${sqlText.postgresQuoted(scope.tenant.alias)}.${sqlText.postgresQuoted(scope.tenant.column)}`;
 
   return (
-    `\n    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = ${postgresLiteral(readerRole)}) THEN\n` +
-    `      GRANT SELECT ON ${qualifiedView} TO ${sqlText.postgresQuoted(readerRole)};\n` +
-    `    END IF;`
+    `(current_user = ${postgresLiteral(scope.sharedReaderRole)} OR EXISTS (SELECT 1 ` +
+    `FROM ${quotedSchema}."Project" lwql_p ` +
+    `JOIN ${quotedSchema}."Team" lwql_t ON lwql_t.id = lwql_p."teamId" ` +
+    `JOIN pg_roles lwql_g ON lwql_g.rolname = ${LWQL_ORG_SCOPE_FRAGMENT}lwql_t."organizationId") ` +
+    `JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid ` +
+    `JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user ` +
+    `WHERE lwql_p.id = ${tenant}))`
   );
+}
+
+/**
+ * The fallback branch's guarded re-grants, run only when the `DROP`+`CREATE` path
+ * actually drops the view. Empty when there is no role to re-grant.
+ */
+function readerRegrantClause({
+  roles,
+  qualifiedView,
+}: {
+  roles: readonly string[];
+  qualifiedView: string;
+}): string {
+  return roles
+    .map(
+      (role) =>
+        `\n    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = ${postgresLiteral(role)}) THEN\n` +
+        `      GRANT SELECT ON ${qualifiedView} TO ${sqlText.postgresQuoted(role)};\n` +
+        `    END IF;`,
+    )
+    .join("");
 }
 
 /** A defined-but-blank `rowFilter` is refused rather than read as no filter. */
@@ -266,6 +328,7 @@ export class LangWatchQLPostgresMappingService {
     joins = [],
     rowFilter,
     readerRole,
+    rowScope,
   }: {
     schema: string;
     /** Name of the view to create. */
@@ -295,6 +358,11 @@ export class LangWatchQLPostgresMappingService {
      * `CREATE OR REPLACE VIEW` never touches privileges.
      */
     readerRole?: string;
+    /**
+     * Per-reader row scoping. When set the view is `security_barrier` and its WHERE clause
+     * carries the scope predicate; the scoped-reader group is re-granted on the fallback path.
+     */
+    rowScope?: PostgresReaderRowScope;
   }): string {
     const quotedSchema = sqlText.postgresQuoted(schema);
     const quotedView = sqlText.postgresQuoted(view);
@@ -328,7 +396,12 @@ export class LangWatchQLPostgresMappingService {
     // is known, so a filter naming a sibling relation cannot spell that schema
     // literally; `{{schema}}` defers it to this call's actual schema.
     const resolvedRowFilter = rowFilter?.replaceAll("{{schema}}", quotedSchema);
-    const whereClause = resolvedRowFilter ? `\nWHERE (${resolvedRowFilter})` : "";
+    const conditions = [
+      ...(resolvedRowFilter ? [`(${resolvedRowFilter})`] : []),
+      ...(rowScope ? [readerRowScopePredicate({ scope: rowScope, quotedSchema })] : []),
+    ];
+    const whereClause = conditions.length > 0 ? `\nWHERE ${conditions.join("\nAND ")}` : "";
+    const viewOptions = rowScope ? " WITH (security_barrier=true)" : "";
     const body =
       `SELECT\n${projection}\n` +
       `FROM ${quotedSchema}.${sqlText.postgresQuoted(baseRelation)} AS ${sqlText.postgresQuoted(POSTGRES_BASE_ALIAS)}` +
@@ -338,16 +411,19 @@ export class LangWatchQLPostgresMappingService {
     // `CREATE OR REPLACE VIEW` refuses a changed column list; the fallback drops
     // and recreates, which is the only path that loses the reader's grant, so
     // that branch — and only that branch — re-grants it.
-    const regrant = readerRegrantClause({ readerRole, qualifiedView });
+    const regrant = readerRegrantClause({
+      roles: [...(readerRole ? [readerRole] : []), ...(rowScope ? [LWQL_SCOPED_READER_GROUP] : [])],
+      qualifiedView,
+    });
 
     return (
       `DO ${APPROVED_VIEW_DOLLAR_TAG}\n` +
       `BEGIN\n` +
-      `  CREATE OR REPLACE VIEW ${qualifiedView} AS\n${body};\n` +
+      `  CREATE OR REPLACE VIEW ${qualifiedView}${viewOptions} AS\n${body};\n` +
       `EXCEPTION\n` +
       `  WHEN feature_not_supported OR invalid_table_definition THEN\n` +
       `    DROP VIEW IF EXISTS ${qualifiedView};\n` +
-      `    CREATE VIEW ${qualifiedView} AS\n${body};${regrant}\n` +
+      `    CREATE VIEW ${qualifiedView}${viewOptions} AS\n${body};${regrant}\n` +
       `END\n${APPROVED_VIEW_DOLLAR_TAG}`
     );
   }

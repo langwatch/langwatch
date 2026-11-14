@@ -3,7 +3,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { lwqlAppFunctionNames } from "../../features/app-functions/rules/langwatch-ql-app-function-catalog.rules.ts";
 import { LangWatchQLCollectionBindingService } from "../../features/provisioning/services/langwatch-ql-collection-binding.service.ts";
-import { LangWatchQLPostgresMappingService } from "../../features/provisioning/services/langwatch-ql-postgres-mapping.service.ts";
+import {
+  LangWatchQLPostgresMappingService,
+  LWQL_SCOPED_READER_GROUP,
+} from "../../features/provisioning/services/langwatch-ql-postgres-mapping.service.ts";
 import {
   LangWatchQLProductionProvisioningService,
   LWQL_POSTGRES_READER_ROLE,
@@ -57,8 +60,19 @@ const NAMES = {
   tenantSetting: "custom_api_key_hash",
 };
 
-/** A PostgreSQL that records each statement, or refuses each as one without CREATEROLE does. */
-function postgresThat({ refuses }: { refuses: boolean }) {
+/**
+ * A PostgreSQL that records each statement, or refuses each as one without CREATEROLE does. Its
+ * scoped-reader probe names `missing` as the views the group cannot select, or fails.
+ */
+function postgresThat({
+  refuses,
+  missing = [],
+  probeFails = false,
+}: {
+  refuses: boolean;
+  missing?: readonly string[];
+  probeFails?: boolean;
+}) {
   const ran: string[] = [];
   const database: LwqlProvisioningDatabase = {
     $executeRawUnsafe: async (statement) => {
@@ -74,7 +88,10 @@ function postgresThat({ refuses }: { refuses: boolean }) {
       ran.push(statement);
       return 0;
     },
-    $queryRawUnsafe: async () => [],
+    $queryRawUnsafe: async () => {
+      if (probeFails) throw new Error("probe refused");
+      return missing.map((view) => ({ view }));
+    },
     $transaction: (fn) => fn({ $executeRawUnsafe: async () => 0 }),
   };
   return { ran, database };
@@ -385,7 +402,7 @@ describe("convergeLwqlAccessModel", () => {
     });
 
     /** @scenario "An older worker never rewrites a newer view for columns it does not declare" */
-    it("creates only the absent approved view, grants SELECT on each gap and never revokes", async () => {
+    it("creates only the absent view, grants each gap and never revokes the shared reader", async () => {
       const [absent, ungranted, untouched] = approvedViews;
       if (!absent || !ungranted || !untouched) throw new Error("the catalog maps too few datasets");
       const postgres = postgresThat({ refuses: false });
@@ -410,7 +427,55 @@ describe("convergeLwqlAccessModel", () => {
       expect(grants).toContain(`GRANT SELECT ON "public"."${absent}"`);
       expect(grants).toContain(`GRANT SELECT ON "public"."${ungranted}"`);
       expect(grants).not.toContain(`"${untouched}" TO`);
-      expect(grants).not.toMatch(/REVOKE|ALTER ROLE|CREATE ROLE/);
+      expect(grants).not.toMatch(/ALTER ROLE|CREATE ROLE/);
+      expect(grants).not.toContain(`FROM "${LWQL_POSTGRES_READER_ROLE}"`);
+      const repaired = new RegExp(
+        `^REVOKE SELECT ON "public"\\."(${absent}|${ungranted})" ` +
+          `FROM "${LWQL_SCOPED_READER_GROUP}"$`,
+      );
+      const revokes = grants.match(/REVOKE[^;']*/g) ?? [];
+      expect(revokes.length).toBeGreaterThanOrEqual(2);
+      for (const revoke of revokes) {
+        expect(revoke).toMatch(repaired);
+      }
+    });
+
+    /** @scenario "An older worker never rewrites a newer view for columns it does not declare" */
+    it("warns with the views the scoped-reader group cannot select, after a deploy and a repair", async () => {
+      const [first, second] = approvedViews;
+      if (!first || !second) throw new Error("the catalog maps too few datasets");
+      const warned = async (missing: string[], drift?: LwqlAppOwnedDrift) => {
+        logCalls.length = 0;
+        await convergeLwqlAccessModel({
+          database: postgresThat({ refuses: false, missing }).database,
+          plan: clickHouseThat().plan,
+          ...(drift ? { only: drift } : {}),
+        });
+        return logCalls.filter(
+          (call) => call.level === "warn" && String(call.message).includes("group has no SELECT"),
+        );
+      };
+      const repair = only({ postgres: [{ view: first, absent: false }] });
+
+      for (const drift of [undefined, repair]) {
+        expect((await warned([first, second], drift)).map((call) => call.fields)).toEqual([
+          { views: [first, second] },
+        ]);
+        expect(await warned([], drift)).toEqual([]);
+      }
+    });
+
+    it("logs and carries on when the scoped-reader probe fails", async () => {
+      logCalls.length = 0;
+
+      await convergeLwqlAccessModel({
+        database: postgresThat({ refuses: false, probeFails: true }).database,
+        plan: clickHouseThat().plan,
+        failOnError: true,
+      });
+
+      const warnings = logCalls.filter((call) => call.level === "warn");
+      expect(warnings.some((call) => String(call.message).includes("could not read"))).toBe(true);
     });
 
     /** @scenario "An older worker never rewrites a newer view for columns it does not declare" */

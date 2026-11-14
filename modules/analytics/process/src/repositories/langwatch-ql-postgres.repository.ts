@@ -24,6 +24,12 @@ export abstract class LangWatchQLPostgresRepository {
     role: string;
     views: readonly string[];
   }): Promise<LwqlPostgresViewFound[]>;
+  /** The named views in `schema` that `role` cannot select; none when `role` does not exist. */
+  abstract findScopedReaderMissingViews(input: {
+    schema: string;
+    role: string;
+    views: readonly string[];
+  }): Promise<string[]>;
   /** Holds a transaction-scoped advisory lock on `key` while `fn` runs on other connections. */
   abstract withAdvisoryLock<T>(input: {
     key: string;

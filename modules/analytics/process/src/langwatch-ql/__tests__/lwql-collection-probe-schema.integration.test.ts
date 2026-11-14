@@ -54,13 +54,20 @@ describe("given the approved views live in a PostgreSQL schema other than public
     const relations = [
       mapped.postgres.baseRelation,
       ...(mapped.postgres.tenantPath ?? []).map((hop) => hop.relation),
+      // the row-scope predicate joins Project and Team in the view's schema
+      "Project",
+      "Team",
     ];
     await asAdmin([
       `CREATE SCHEMA ${ALT_SCHEMA}`,
       ...[...new Set(relations)].map(
         (relation) => `CREATE TABLE ${ALT_SCHEMA}."${relation}" AS TABLE public."${relation}"`,
       ),
-      ...postgresViews.approvedViewStatements({ schema: ALT_SCHEMA, views: [mapped] }),
+      ...postgresViews.approvedViewStatements({
+        schema: ALT_SCHEMA,
+        views: [mapped],
+        sharedReaderRole: postgres.readerRole,
+      }),
       ...postgresMapping.readerRoleStatements({
         reader: {
           role: postgres.readerRole,
