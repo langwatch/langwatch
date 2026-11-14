@@ -22,10 +22,10 @@ import { EventingClickHouseReplayEventSource } from "../replay-event-source.clic
 const EVENT_TYPE = "lw.test.span_received";
 const AGGREGATES = 100;
 const EVENTS_PER_AGGREGATE = 15;
-/** Each payload carries 16 KB of hex, so the batch holds about 24 MB of payload. */
-const PAYLOAD_RANDOM_BYTES = 8_000;
+/** Each payload carries 100 KB of hex, so the batch holds about 150 MB of payload. */
+const PAYLOAD_RANDOM_BYTES = 50_000;
 /** Under the batch's payload, well over one slice's. */
-const SERVER_MEMORY_CAP_BYTES = 24_000_000;
+const SERVER_MEMORY_CAP_BYTES = 80_000_000;
 
 const tenantId = `${randomUUID()}-replay-read-memory`;
 const aggregateIds = Array.from(
@@ -187,7 +187,7 @@ describe("a replay batch's event read", () => {
         params: { tenantId, eventTypes: [EVENT_TYPE], aggregateIds },
       });
 
-      await expect(whole).rejects.toThrow(/memory limit/i);
+      await expect(whole).rejects.toMatchObject({ code: "241" });
     });
 
     /** @scenario "A batch's events are read in slices sized by their payload" */

@@ -1,3 +1,5 @@
+import { createLogger } from "@langwatch/observability";
+
 import {
   type CutoffInfo,
   type DiscoveredAggregateWithEventTypes,
@@ -392,8 +394,7 @@ export const REPLAY_READ_BUDGET: ReplayReadBudget = {
   maxPayloadBytes: 64 * 1024 * 1024,
 };
 
-/** Past this a read's sort spills to disk rather than fail: an aggregate may outgrow the budget. */
-const REPLAY_READ_SETTINGS = { max_bytes_before_external_sort: 128 * 1024 * 1024 } as const;
+const logger = createLogger("langwatch:event-sourcing:replay-event-source");
 
 /**
  * Stream every event a replay batch must apply for a set of aggregates, invoking `onEvent` per row
@@ -423,10 +424,12 @@ export async function streamEventsForAggregatesBulk({
 }): Promise<{ eventsApplied: number }> {
   if (aggregateIds.length === 0) return { eventsApplied: 0 };
 
+  // Two aggregate types may share an id; `AggregateId IN` reads both, so each id is read once.
+  const distinctIds = [...new Set(aggregateIds)];
   const read = { client, tenantId, eventTypes, cutoffs, occurredAtBounds, lean, onEvent };
-  const sizes = await readAggregateSizes({ ...read, aggregateIds });
+  const sizes = await readAggregateSizes({ ...read, aggregateIds: distinctIds });
   let eventsApplied = 0;
-  for (const slice of sliceByBudget({ aggregateIds, sizes, budget })) {
+  for (const slice of sliceByBudget({ aggregateIds: distinctIds, sizes, budget })) {
     eventsApplied += await streamSliceOrHalves({ ...read, aggregateIds: slice });
   }
   return { eventsApplied };
@@ -437,7 +440,10 @@ interface AggregateSize {
   payloadBytes: number;
 }
 
-/** Each aggregate's event count and payload bytes; `length` reads only the payload's sizes. */
+/**
+ * Each aggregate's event count and payload bytes, aggregated without a sort; on a server that
+ * serves `length` from the String's size subcolumn it reads no payload bytes at all.
+ */
 async function readAggregateSizes({
   client,
   tenantId,
@@ -515,7 +521,13 @@ export function sliceByBudget({
   return slices;
 }
 
-interface SliceRead {
+/** Events a slice's read applied, and whether it handed one on at all (set before the call). */
+interface SliceProgress {
+  count: number;
+  handedOn: boolean;
+}
+
+export interface SliceRead {
   client: EventingClickHouseReplayClient;
   tenantId: string;
   aggregateIds: string[];
@@ -527,17 +539,21 @@ interface SliceRead {
 }
 
 /**
- * One slice's read; one over a memory limit before it applied an event is read again as halves,
- * down to a single aggregate, whose failure is the batch's. A read that applied any rethrows.
+ * One slice's read; one over a memory limit before it handed on any event is read again as halves,
+ * down to a single aggregate, whose failure is the batch's. A read that handed on one rethrows.
  */
-async function streamSliceOrHalves(read: SliceRead): Promise<number> {
-  const applied = { count: 0 };
+export async function streamSliceOrHalves(read: SliceRead): Promise<number> {
+  const applied: SliceProgress = { count: 0, handedOn: false };
   try {
     return await streamSlice({ ...read, applied });
   } catch (error) {
-    if (applied.count > 0 || read.aggregateIds.length < 2 || !isAnyMemoryLimitExceeded(error)) {
+    if (applied.handedOn || read.aggregateIds.length < 2 || !isAnyMemoryLimitExceeded(error)) {
       throw error;
     }
+    logger.warn(
+      { tenantId: read.tenantId, aggregates: read.aggregateIds.length, error },
+      "Replay read over a memory limit before it applied an event; reading it as halves",
+    );
     const middle = Math.ceil(read.aggregateIds.length / 2);
     let eventsApplied = 0;
     for (const half of [read.aggregateIds.slice(0, middle), read.aggregateIds.slice(middle)]) {
@@ -557,7 +573,7 @@ async function streamSlice({
   lean,
   onEvent,
   applied,
-}: SliceRead & { applied: { count: number } }): Promise<number> {
+}: SliceRead & { applied: SliceProgress }): Promise<number> {
   const pruning = occurredAtPredicate(occurredAtBounds);
   const batches = client.stream<ClickHouseEventRow>({
     tenantId,
@@ -578,7 +594,6 @@ async function streamSlice({
       aggregateIds,
       ...pruning.params,
     },
-    settings: REPLAY_READ_SETTINGS,
   });
 
   for await (const rows of batches) {
@@ -586,6 +601,7 @@ async function streamSlice({
       const key = `${tenantId}:${row.AggregateType}:${row.AggregateId}`;
       if (isRowBeyondCutoff(row, cutoffs.get(key))) continue;
 
+      applied.handedOn = true;
       const maybePromise = onEvent(rowToEvent(row, lean));
       if (maybePromise instanceof Promise) await maybePromise;
       applied.count++;
