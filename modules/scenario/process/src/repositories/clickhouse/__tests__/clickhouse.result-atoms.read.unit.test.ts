@@ -22,6 +22,9 @@ const statements = {
   trend: ResultAtomsClickHouseRepository.trendRead({ filter, groupBy: "scenario" }),
   series: ResultAtomsClickHouseRepository.seriesRead({ filter, bucketSeconds: 3600 }),
   configurations: RunConfigurationsClickHouseRepository.configurationsRead({ filter }),
+  atomPage: ResultAtomsClickHouseRepository.atomPageRead({ filter, limit: 51, after: null }),
+  totals: ResultAtomsClickHouseRepository.totalsRead(filter),
+  groups: ResultAtomsClickHouseRepository.groupsRead({ filter, groupBy: "target" }),
 };
 
 describe("the typed atom reads", () => {

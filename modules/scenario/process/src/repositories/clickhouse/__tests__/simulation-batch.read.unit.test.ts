@@ -66,3 +66,37 @@ describe("SimulationClickHouseRepository.batchRunCountRead()", () => {
     expect(statement.sql.match(/StartedAt >= /g)).toHaveLength(2);
   });
 });
+
+describe("SimulationClickHouseRepository.batchHistoryPageRead()", () => {
+  const statement = SimulationClickHouseRepository.batchHistoryPageRead({
+    projectId: "project_1",
+    scenarioSetId: "default",
+    limit: 9,
+    after: { ts: "1500", batchRunId: "batch_7" },
+    startDate: 1_000,
+    endDate: 2_000,
+  });
+  const lastRunAt = "toUnixTimestamp64Milli(max(CreatedAt))";
+
+  it("scopes the read to its one tenant with the tenant setting", () => {
+    scoped(statement);
+    expect(statement.sql).toContain("FROM simulation_runs");
+  });
+
+  it("elects latest versions bounded by the set id index and the window, in the election too", () => {
+    expect(statement.sql.match(/\{\{idBound:simulation_runs\.ScenarioSetId:/g)).toHaveLength(2);
+    expect(statement.sql.match(/StartedAt >= /g)).toHaveLength(2);
+    expect(statement.sql).toContain("GROUP BY BatchRunId");
+  });
+
+  it("pages on the newest run, then the batch id, and bounds that run by the range", () => {
+    expect(statement.sql).toContain(`HAVING (${lastRunAt} < {`);
+    expect(statement.sql).toContain("BatchRunId > {");
+    expect(statement.sql).toContain(`${lastRunAt} >= {`);
+    expect(statement.sql).toContain(`${lastRunAt} <= {`);
+    expect(statement.sql).toContain(`ORDER BY ${lastRunAt} DESC, BatchRunId ASC LIMIT 9`);
+    expect(Object.values(statement.params)).toEqual(
+      expect.arrayContaining([1_500, "batch_7", 1_000, 2_000]),
+    );
+  });
+});

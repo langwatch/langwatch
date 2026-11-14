@@ -37,11 +37,6 @@ import {
   ResultAtomsRepository,
 } from "../result-atoms.repository.ts";
 import { simulationRuns } from "./clickhouse.simulation-runs.table.ts";
-import {
-  RUN_NOT_SCORED_EXPR,
-  RUN_NOTE_EXPR,
-  TABLE_NAME,
-} from "./simulation-clickhouse.repository.ts";
 import { mapStatus } from "./simulation-run.mapper.ts";
 
 /** How many scenarios that ran from code the filter lists at most. */
@@ -60,150 +55,8 @@ export const FAILED_STATUS_VALUES = ["ERROR", "FAILED", "FAILURE", "STALLED", "C
 /** Raw `Status` values that read as a pass. */
 export const PASSED_STATUS_VALUES = ["SUCCESS"] as const;
 
-const quoted = (values: readonly string[]): string => values.map((value) => `'${value}'`).join(",");
-
-/** How an atom's status reads: passed, failed, not scored (its setup failed) or still pending. */
-const OUTCOME_EXPR = `multiIf(
-  Status IN (${quoted(PASSED_STATUS_VALUES)}), 'passed',
-  ${RUN_NOT_SCORED_EXPR}, 'not_scored',
-  Status IN (${quoted(FAILED_STATUS_VALUES)}), 'failed',
-  'pending')`;
-
 /** The outcomes a pass rate divides by: a not-scored run is finished but never graded. */
 const GRADED_OUTCOME_VALUES = ["passed", "failed"] as const;
-const GRADED_OUTCOMES = `(${quoted(GRADED_OUTCOME_VALUES)})`;
-
-/**
- * When the run started (epoch ms): ORDER BY, the cursor predicate and the
- * returned cursor must be this ONE coalesced expression, since ClickHouse
- * sorts a nullable `StartedAt` first and would strand those rows on page one.
- */
-export const ATOM_SORT_KEY = "toUnixTimestamp64Milli(ifNull(StartedAt, CreatedAt))";
-
-/**
- * The reserved namespace the platform stamps onto a run's metadata —
- * everything the platform knows sits under this one key, so a customer key
- * can never collide with it.
- */
-export const LANGWATCH_METADATA = "JSONExtractRaw(ifNull(Metadata, '{}'), 'langwatch')";
-
-/**
- * The target a run was pointed at, as the bare reference id — stamped by
- * the platform into a reserved namespace; an SDK/CI push carries none, and
- * nothing here resolves names (the client's own target map does).
- */
-export const TARGET_REF_EXPR = `JSONExtractString(${LANGWATCH_METADATA}, 'targetReferenceId')`;
-
-/**
- * The target key the platform stamped: reference id alone, or id + a hash
- * of parameter overrides. Empty on pre-target runs and any code-pushed run.
- * @see `@langwatch/suite-contract`'s `target-key.ts`
- */
-export const TARGET_STAMP_KEY_EXPR = `JSONExtractString(${LANGWATCH_METADATA}, 'targetKey')`;
-
-/**
- * Raw JSON of the run's target parameter overrides ('' when none) — kept
- * raw rather than mapped, since the values are strings/numbers/booleans and
- * re-typing them in SQL would lose which they were.
- */
-export const TARGET_PARAMETERS_EXPR = `JSONExtractRaw(${LANGWATCH_METADATA}, 'targetParameters')`;
-
-/**
- * Agent names the run reported, joined. Only the `agent` role (not the user
- * simulator or judge) names what the run tested; empty on any run pushed by
- * an older SDK that reported no agent.
- */
-export const CODE_TARGET_NAME_EXPR = `arrayStringConcat(
-  arrayMap(agent -> JSONExtractString(agent, 'name'),
-    arrayFilter(agent ->
-      JSONExtractString(agent, 'role') = 'agent'
-      AND JSONExtractString(agent, 'name') != '',
-      JSONExtractArrayRaw(ifNull(Metadata, '{}'), 'agents'))),
-  ' vs ')`;
-
-/**
- * Any name as a key: lower case, every stretch of anything but a letter or a
- * digit folded to one dash, no dash at either end. "List agents" and
- * "list-agents" fold to one key.
- */
-function nameSlug(expr: string): string {
-  return `trim(BOTH '-' FROM replaceRegexpAll(lowerUTF8(${expr}), '[^\\p{L}\\p{N}]+', '-'))`;
-}
-
-/** The reported agent names as a key, folded the way a scenario name is. */
-const CODE_TARGET_SLUG_EXPR = nameSlug(CODE_TARGET_NAME_EXPR);
-
-/**
- * The key a target folds under: the platform's stamped key when present, a
- * stored agent/prompt reference id for pre-stamp runs, `code:<name>` for a
- * code-pushed run, otherwise `unknown` (the page's default target).
- */
-export const TARGET_KEY_EXPR = `multiIf(
-  ${TARGET_STAMP_KEY_EXPR} != '', ${TARGET_STAMP_KEY_EXPR},
-  ${TARGET_REF_EXPR} != '', ${TARGET_REF_EXPR},
-  ${CODE_TARGET_SLUG_EXPR} != '', concat('code:', ${CODE_TARGET_SLUG_EXPR}),
-  '${UNKNOWN_TARGET_KEY}')`;
-
-/**
- * What started the run: no trigger column exists, since a platform run
- * always stamps a target (both the one-off and suite paths) and an SDK/CI
- * push never does — the target's presence IS the signal, at no extra cost.
- */
-const TRIGGER_EXPR = `if(${TARGET_REF_EXPR} = '', 'code', 'app')`;
-
-/**
- * The set a run belongs to, the empty id read as `default` the way every
- * other read of a set that runs from code does.
- */
-const SET_KEY_EXPR = `if(ScenarioSetId = '', 'default', ScenarioSetId)`;
-
-/** A run's name as a key, so two spellings of one scenario fold together. */
-const NAME_SLUG_EXPR = nameSlug("ifNull(Name, '')");
-
-/**
- * The key a scenario folds under: a platform run's stored scenario id, or
- * for a code run `<set>:<name>` (what the SDK would have derived) so two
- * runs of one scenario fold together; the filter reads this same key.
- */
-export const SCENARIO_KEY_EXPR = `if(${TARGET_REF_EXPR} = '' AND ${NAME_SLUG_EXPR} != '', concat(${SET_KEY_EXPR}, '-', ${NAME_SLUG_EXPR}), ScenarioId)`;
-
-const TRACE_METRIC_KEYS = "JSONExtractKeys(TraceMetricsJson)";
-
-/**
- * Per-trace costs, summed from `TraceMetricsJson` (keyed by trace id, so
- * already distinct) — NOT from `TraceIds`, which held ~3x as many entries as
- * distinct traces on local data and would triple the reported cost.
- */
-const TRACE_COST_SUM = `arraySum(arrayMap(
-  traceKey -> JSONExtractFloat(JSONExtractRaw(TraceMetricsJson, traceKey), 'totalCost'),
-  ${TRACE_METRIC_KEYS}))`;
-
-/**
- * Cost source, ordered so NULL `TotalCost` (traces summed to zero) is told
- * apart from truly unmeasured: reading the per-trace map next resolved 260
- * of 309 NULL rows on local data; summing `TotalCost` alone under-reports.
- */
-const COST_SOURCE_EXPR = `multiIf(
-  TotalCost IS NOT NULL, 'run',
-  length(${TRACE_METRIC_KEYS}) > 0, 'traces',
-  length(TraceIds) = 0, 'none',
-  'unknown')`;
-
-/** The atom's cost, as a string, with '' standing for "never measured". */
-const COST_VALUE_EXPR = `multiIf(
-  TotalCost IS NOT NULL, toString(TotalCost),
-  length(${TRACE_METRIC_KEYS}) > 0, toString(${TRACE_COST_SUM}),
-  length(TraceIds) = 0, '0',
-  '')`;
-
-/** The cost as a number for aggregation, with a never-measured atom as zero. */
-const COST_NUMERIC_EXPR = `multiIf(
-  TotalCost IS NOT NULL, TotalCost,
-  length(${TRACE_METRIC_KEYS}) > 0, ${TRACE_COST_SUM},
-  0)`;
-
-/** 1 when the atom's cost was never measured. */
-const COST_UNKNOWN_EXPR = `if(${COST_SOURCE_EXPR} = 'unknown', 1, 0)`;
 
 /**
  * `StartedAt` moves (null -> `CreatedAt` -> started event), so a tight
@@ -211,127 +64,6 @@ const COST_UNKNOWN_EXPR = `if(${COST_SOURCE_EXPR} = 'unknown', 1, 0)`;
  * @see dev/docs/best_practices/clickhouse-queries.md — "A range filter on a MOVABLE column"
  */
 export const DEDUP_WINDOW_SLACK_MS = 7 * 24 * 60 * 60 * 1000;
-
-interface AtomFilterSql {
-  /**
-   * Predicates safe inside the dedup subquery: a run never moves between
-   * sets, and `ScenarioSetId` is part of the dedup key already, so narrowing
-   * on it picks the same version either way.
-   */
-  stableClause: string;
-  /**
-   * Predicates only valid AFTER dedup, since the column they read can differ
-   * between versions of one run — e.g. `Status` could resolve a finished run
-   * to an old version that still said "running".
-   */
-  volatileClause: string;
-  /** The widened window for the dedup subquery. See {@link DEDUP_WINDOW_SLACK_MS}. */
-  dedupWindowClause: string;
-  params: Record<string, string | string[]>;
-}
-
-/** A set of WHERE predicates and the query parameters they read. */
-interface FilterParts {
-  parts: string[];
-  params: Record<string, string | string[]>;
-}
-
-/** The predicates that may run inside the dedup subquery. */
-function stableFilterParts(filter: ResultsFilter): FilterParts {
-  // An atom is one scenario, one target, one run. A row that names no
-  // scenario answers none of those: it groups under an empty key and reads
-  // as a row with no name.
-  const parts: string[] = [
-    "ScenarioId != ''",
-    // A "Test agent" run is a check of an agent, not a result of a scenario;
-    // the legacy `voice-calls` set is a pre-#8020 drawer call, likewise never a
-    // scenario result (a drawer call no longer writes a run at all).
-    `NOT endsWith(ScenarioSetId, '${AGENT_TEST_SET_SUFFIX}')`,
-    `ScenarioSetId != '${VOICE_CALL_SCENARIO_SET_ID}'`,
-  ];
-  const params: Record<string, string | string[]> = {};
-
-  if (filter.scenarioSetIds && filter.scenarioSetIds.length > 0) {
-    parts.push("ScenarioSetId IN ({atomSetIds:Array(String)})");
-    params.atomSetIds = filter.scenarioSetIds.flatMap((setId) => expandSetIdFilter(setId));
-  }
-
-  return { parts, params };
-}
-
-/** The `Status` predicate a verdict filter asks for, if it asks for one. */
-function buildOutcomePart(outcome: ResultsFilter["outcome"]): string | null {
-  if (outcome === "passed") {
-    return `Status IN (${quoted(PASSED_STATUS_VALUES)})`;
-  }
-
-  if (outcome === "failed") {
-    return `Status IN (${quoted(FAILED_STATUS_VALUES)}) AND NOT ${RUN_NOT_SCORED_EXPR}`;
-  }
-
-  if (outcome === "not_scored") {
-    return RUN_NOT_SCORED_EXPR;
-  }
-
-  if (outcome === "pending") {
-    return `Status NOT IN (${quoted([...PASSED_STATUS_VALUES, ...FAILED_STATUS_VALUES])})`;
-  }
-
-  return null;
-}
-
-/** The predicates that may only run after dedup. */
-function volatileFilterParts(filter: ResultsFilter): FilterParts {
-  const params: Record<string, string | string[]> = {
-    atomStartMs: String(filter.startDate),
-  };
-  // The lower bound always applies and is what prunes partitions. The upper
-  // bound is deliberately optional: a live view sends none, so a run that
-  // starts while the page is open still lands in the window.
-  const parts = ["StartedAt >= fromUnixTimestamp64Milli(toUInt64({atomStartMs:String}))"];
-  if (filter.endDate !== undefined) {
-    params.atomEndMs = String(filter.endDate);
-    parts.push("StartedAt <= fromUnixTimestamp64Milli(toUInt64({atomEndMs:String}))");
-  }
-
-  const outcome = buildOutcomePart(filter.outcome);
-  if (outcome !== null) {
-    parts.push(outcome);
-  }
-
-  if (filter.targetKeys && filter.targetKeys.length > 0) {
-    parts.push(`${TARGET_KEY_EXPR} IN ({atomTargetKeys:Array(String)})`);
-    params.atomTargetKeys = filter.targetKeys;
-  }
-
-  // A scenario is named by its key, and the name a code run folds under can
-  // arrive with a later version of the run, so the key is read after dedup.
-  if (filter.scenarioIds && filter.scenarioIds.length > 0) {
-    parts.push(`${SCENARIO_KEY_EXPR} IN ({atomScenarioIds:Array(String)})`);
-    params.atomScenarioIds = filter.scenarioIds;
-  }
-
-  return { parts, params };
-}
-
-/** The widened window the dedup subquery prunes partitions with. */
-function dedupWindowParts(filter: ResultsFilter): FilterParts {
-  const params: Record<string, string | string[]> = {
-    atomDedupStartMs: String(Math.max(0, filter.startDate - DEDUP_WINDOW_SLACK_MS)),
-  };
-  const parts = ["StartedAt >= fromUnixTimestamp64Milli(toUInt64({atomDedupStartMs:String}))"];
-  if (filter.endDate !== undefined) {
-    params.atomDedupEndMs = String(filter.endDate + DEDUP_WINDOW_SLACK_MS);
-    parts.push("StartedAt <= fromUnixTimestamp64Milli(toUInt64({atomDedupEndMs:String}))");
-  }
-
-  return { parts, params };
-}
-
-/** The predicates as one appendable fragment, or nothing when there are none. */
-function andClause(parts: string[]): string {
-  return parts.length > 0 ? `AND ${parts.join(" AND ")}` : "";
-}
 
 interface AtomCursor {
   ts: string;
@@ -404,6 +136,17 @@ function atomRunsOf({ filter, scope }: { filter: ResultsFilter; scope: SingleTen
       Metadata: t.Metadata,
       StartedAt: t.StartedAt,
       CreatedAt: t.CreatedAt,
+      DurationMs: t.DurationMs,
+      TotalCost: t.TotalCost,
+      TraceIds: t.TraceIds,
+      TraceMetricsJson: t.TraceMetricsJson,
+      evaluationIds: t["Evaluations.EvaluatorId"],
+      evaluationNames: t["Evaluations.Name"],
+      evaluationStatuses: t["Evaluations.Status"],
+      evaluationRequired: t["Evaluations.Required"],
+      evaluationPassed: t["Evaluations.Passed"],
+      evaluationScores: t["Evaluations.Score"],
+      evaluationLabels: t["Evaluations.Label"],
     })
     .where(({ and, ne, not, oneOf }) =>
       and(
@@ -432,8 +175,51 @@ type AtomText = Expression<string, "atoms">;
 const metadataOf = (atoms: AtomRuns) => fn.ifNull(atoms.Metadata, "{}");
 const langwatchOf = (atoms: AtomRuns) => fn.JSONExtractRaw(metadataOf(atoms), "langwatch");
 
-/** The typed reads of a run's fields; each mirrors the text expression of the same name above. */
+/** The typed reads of a run's fields, shared by every atom read. */
 export const atomFields = {
+  /**
+   * Per-trace costs summed from `TraceMetricsJson` (keyed by trace id, so already distinct), not
+   * from `TraceIds`, which held ~3x as many entries as distinct traces and would triple the cost.
+   */
+  traceCostSum: (atoms: AtomRuns): Expression<number, "atoms"> =>
+    fn.arraySum(
+      fn.arrayMap(
+        (traceKey) =>
+          fn.JSONExtractFloat(fn.JSONExtractRaw(atoms.TraceMetricsJson, traceKey), "totalCost"),
+        fn.JSONExtractKeys(atoms.TraceMetricsJson),
+      ),
+    ),
+  hasTraceMetrics: (atoms: AtomRuns, { gt }: AtomOps): Condition =>
+    gt(fn.length(fn.JSONExtractKeys(atoms.TraceMetricsJson)), 0),
+  /** Ordered so a NULL `TotalCost` (traces summed to zero) is told apart from never measured. */
+  costSource: (atoms: AtomRuns, ops: AtomOps): AtomText =>
+    fn.multiIf(
+      [
+        [ops.isNotNull(atoms.TotalCost), param.string("run")],
+        [atomFields.hasTraceMetrics(atoms, ops), param.string("traces")],
+        [ops.eq(fn.length(atoms.TraceIds), 0), param.string("none")],
+      ],
+      param.string("unknown"),
+    ),
+  /** The atom's cost as a string, '' standing for "never measured". */
+  costValue: (atoms: AtomRuns, ops: AtomOps): AtomText =>
+    fn.multiIf(
+      [
+        [ops.isNotNull(atoms.TotalCost), fn.toString(atoms.TotalCost)],
+        [atomFields.hasTraceMetrics(atoms, ops), fn.toString(atomFields.traceCostSum(atoms))],
+        [ops.eq(fn.length(atoms.TraceIds), 0), param.string("0")],
+      ],
+      param.string(""),
+    ),
+  /** The cost as a number for aggregation, a never-measured atom as zero. */
+  costNumeric: (atoms: AtomRuns, ops: AtomOps): Expression<number, "atoms"> =>
+    fn.multiIf(
+      [
+        [ops.isNotNull(atoms.TotalCost), fn.assumeNotNull(atoms.TotalCost)],
+        [atomFields.hasTraceMetrics(atoms, ops), atomFields.traceCostSum(atoms)],
+      ],
+      param.float64(0),
+    ),
   sortKey: (atoms: AtomRuns): Expression<number, "atoms"> =>
     fn.toUnixTimestamp64Milli(fn.ifNull(atoms.StartedAt, atoms.CreatedAt)),
   targetRef: (atoms: AtomRuns): AtomText =>
@@ -551,20 +337,171 @@ function atomsInScope(filter: ResultsFilter, atoms: AtomRuns, ops: AtomOps): Con
   return and(...parts);
 }
 
-/** The raw ClickHouse row, `Status` unmapped. Internal to this file only. */
-type RawAtomQueryRow = Omit<RawAtomRow, "Status"> & { Status: string };
+/** A keyset position: the sort key of the last atom shown and its run id, breaking ties. */
+type AtomPagePosition = { ts: string; executionId: string };
 
-/**
- * Narrow duck-typed slice of `ClickHouseClient` this repository reads
- * through, so the composition root can hand it the same routed-tenant
- * client v1's `SimulationClickHouseClient` already composes, with no cast.
- */
+/** A row of {@link ResultAtomsClickHouseRepository.atomPageRead}, `Status` unmapped. */
+type AtomPageRow =
+  ReturnType<typeof atomPageReadOf> extends ReaderReadStatement<infer Row> ? Row : never;
+
+/** A row of {@link ResultAtomsClickHouseRepository.groupsRead}. */
+type AtomGroupRow =
+  ReturnType<typeof groupsReadOf> extends ReaderReadStatement<infer Row> ? Row : never;
+
+function atomPageReadOf({
+  filter,
+  limit,
+  after,
+}: {
+  filter: ResultsFilter;
+  limit: number;
+  after: AtomPagePosition | null;
+}) {
+  const scope = tenantScope.single({ tenantId: filter.projectId });
+  const atoms = atomRunsOf({ filter, scope });
+  const sortKey = atomFields.sortKey(atoms);
+  return clickhouseRead({ scope })
+    .from(atoms)
+    .select((ops) => ({
+      SetId: atoms.ScenarioSetId,
+      BatchRunId: atoms.BatchRunId,
+      ScenarioRunId: atoms.ScenarioRunId,
+      ScenarioId: atoms.ScenarioId,
+      ScenarioKey: atomFields.scenarioKey(atoms, ops),
+      ScenarioName: fn.ifNull(atoms.Name, ""),
+      Status: atoms.Status,
+      Outcome: atomFields.outcome(atoms, ops),
+      RunAt: fn.toString(sortKey),
+      durationText: fn.ifNull(fn.toString(atoms.DurationMs), ""),
+      Note: atomFields.metadataString(atoms, "note"),
+      TargetKey: atomFields.targetKey(atoms, ops),
+      TargetParameters: atomFields.targetParameters(atoms),
+      TargetName: atomFields.codeTargetName(atoms, ops),
+      Trigger: atomFields.trigger(atoms, ops),
+      CostUsd: atomFields.costValue(atoms, ops),
+      CostSource: atomFields.costSource(atoms, ops),
+      SortKey: fn.toString(sortKey),
+      EvaluationIds: atoms.evaluationIds,
+      EvaluationNames: atoms.evaluationNames,
+      EvaluationStatuses: atoms.evaluationStatuses,
+      EvaluationRequired: atoms.evaluationRequired,
+      EvaluationPassed: atoms.evaluationPassed,
+      EvaluationScores: atoms.evaluationScores,
+      EvaluationLabels: atoms.evaluationLabels,
+    }))
+    .where((ops) => {
+      const inScope = atomsInScope(filter, atoms, ops);
+      if (after === null) return inScope;
+      const ts = Number(after.ts);
+      return ops.and(
+        inScope,
+        ops.or(
+          ops.lt(sortKey, ts),
+          ops.and(ops.eq(sortKey, ts), ops.lt(atoms.ScenarioRunId, after.executionId)),
+        ),
+      );
+    })
+    .orderBy(sortKey, "DESC")
+    .orderBy(atoms.ScenarioRunId, "DESC")
+    .limit(limit)
+    .build();
+}
+
+function mapAtomPageRow(row: AtomPageRow): RawAtomRow {
+  return {
+    SetId: row.SetId,
+    BatchRunId: row.BatchRunId,
+    ScenarioRunId: row.ScenarioRunId,
+    ScenarioId: row.ScenarioId,
+    ScenarioKey: row.ScenarioKey,
+    ScenarioName: row.ScenarioName,
+    Status: mapStatus(row.Status),
+    Outcome: row.Outcome,
+    RunAt: row.RunAt,
+    DurationMs: row.durationText,
+    Note: row.Note,
+    TargetKey: row.TargetKey,
+    TargetParameters: row.TargetParameters,
+    TargetName: row.TargetName,
+    Trigger: row.Trigger,
+    CostUsd: row.CostUsd,
+    CostSource: row.CostSource,
+    SortKey: row.SortKey,
+    EvaluationIds: [...row.EvaluationIds],
+    EvaluationNames: [...row.EvaluationNames],
+    EvaluationStatuses: [...row.EvaluationStatuses],
+    EvaluationRequired: [...row.EvaluationRequired],
+    EvaluationPassed: [...row.EvaluationPassed],
+    EvaluationScores: [...row.EvaluationScores],
+    EvaluationLabels: [...row.EvaluationLabels],
+  };
+}
+
+/** Each atom in scope with what the stat strip and the groups count. */
+function countedRunsOf({ filter, groupBy }: { filter: ResultsFilter; groupBy: ResultsGroupBy }) {
+  const scope = tenantScope.single({ tenantId: filter.projectId });
+  const atoms = atomRunsOf({ filter, scope });
+  const runs = clickhouseRead({ scope })
+    .from(atoms)
+    .select((ops) => ({
+      GroupKey: atomFields.groupKey(groupBy, atoms, ops),
+      RunName: fn.ifNull(atoms.Name, ""),
+      BatchRunId: atoms.BatchRunId,
+      ScenarioId: atoms.ScenarioId,
+      TargetKey: atomFields.targetKey(atoms, ops),
+      TargetName: atomFields.codeTargetName(atoms, ops),
+      TargetParameters: atomFields.targetParameters(atoms),
+      RunAt: atomFields.sortKey(atoms),
+      Outcome: atomFields.outcome(atoms, ops),
+      CostUsd: atomFields.costNumeric(atoms, ops),
+      CostSource: atomFields.costSource(atoms, ops),
+    }))
+    .where((ops) => atomsInScope(filter, atoms, ops))
+    .as("counted_runs");
+  return { scope, runs };
+}
+
+function totalsReadOf(filter: ResultsFilter) {
+  const { scope, runs } = countedRunsOf({ filter, groupBy: "none" });
+  return clickhouseRead({ scope })
+    .from(runs)
+    .select(({ eq, oneOf }) => ({
+      Atoms: fn.toString(fn.count()),
+      Passed: fn.toString(fn.countIf(eq(runs.Outcome, "passed"))),
+      Settled: fn.toString(fn.countIf(oneOf(runs.Outcome, [...GRADED_OUTCOME_VALUES]))),
+      RunCount: fn.toString(fn.uniqExact(runs.BatchRunId)),
+      FailingScenarios: fn.toString(fn.uniqExactIf(runs.ScenarioId, eq(runs.Outcome, "failed"))),
+      CostTotal: fn.toString(fn.sum(runs.CostUsd)),
+      CostUnknown: fn.toString(fn.countIf(eq(runs.CostSource, "unknown"))),
+    }))
+    .build();
+}
+
+function groupsReadOf({ filter, groupBy }: { filter: ResultsFilter; groupBy: ResultsGroupBy }) {
+  const { scope, runs } = countedRunsOf({ filter, groupBy });
+  return clickhouseRead({ scope })
+    .from(runs)
+    .select(({ eq, oneOf }) => ({
+      GroupKey: runs.GroupKey,
+      Name: fn.argMax(runs.RunName, runs.RunAt),
+      TargetName: fn.argMax(runs.TargetName, runs.RunAt),
+      TargetParameters: fn.argMax(runs.TargetParameters, runs.RunAt),
+      Atoms: fn.toString(fn.count()),
+      Passed: fn.toString(fn.countIf(eq(runs.Outcome, "passed"))),
+      Settled: fn.toString(fn.countIf(oneOf(runs.Outcome, [...GRADED_OUTCOME_VALUES]))),
+      RunCount: fn.toString(fn.uniqExact(runs.BatchRunId)),
+      ScenarioCount: fn.toString(fn.uniqExact(runs.ScenarioId)),
+      LastRunAt: fn.toString(fn.max(runs.RunAt)),
+      TargetKeys: fn.arraySort(fn.groupUniqArray(runs.TargetKey)),
+      CostTotal: fn.toString(fn.sum(runs.CostUsd)),
+      CostUnknown: fn.toString(fn.countIf(eq(runs.CostSource, "unknown"))),
+    }))
+    .groupBy(runs.GroupKey)
+    .build();
+}
+
+/** The slice of the routed tenant client this repository reads through. */
 type ResultAtomsClickHouseClient = {
-  query(input: {
-    query: string;
-    query_params: Record<string, string | string[]>;
-    format: "JSONEachRow";
-  }): Promise<{ json<Result>(): Promise<Result[]> }>;
   /** A statement the typed builder built; the session refuses one scoped to another tenant. */
   read: ClickHouseQueryClient["read"];
 };
@@ -587,57 +524,6 @@ export class ResultAtomsClickHouseRepository extends ResultAtomsRepository {
     return atomsInScope(filter, atoms, ops);
   }
 
-  /** The column a grouping folds on. */
-  static groupKeyExpr(groupBy: ResultsGroupBy): string {
-    switch (groupBy) {
-      case "plan":
-        return "ScenarioSetId";
-      case "scenario":
-        return SCENARIO_KEY_EXPR;
-      case "target":
-        return TARGET_KEY_EXPR;
-      case "none":
-        return "ScenarioRunId";
-    }
-  }
-
-  /**
-   * Builds the WHERE fragments both reads share: one builder on purpose, so
-   * the overview and the atom list can never disagree about what's in scope.
-   */
-  static buildAtomFilters(filter: ResultsFilter): AtomFilterSql {
-    const stable = stableFilterParts(filter);
-    const volatilePredicates = volatileFilterParts(filter);
-    const dedupWindow = dedupWindowParts(filter);
-
-    return {
-      stableClause: andClause(stable.parts),
-      volatileClause: andClause(volatilePredicates.parts),
-      dedupWindowClause: andClause(dedupWindow.parts),
-      params: { ...stable.params, ...volatilePredicates.params, ...dedupWindow.params },
-    };
-  }
-
-  /**
-   * The scope every atom read runs over (latest version per run in window,
-   * archived excluded) — written once so the overview and atom list can't
-   * scan different row sets.
-   */
-  static atomScopeSql(filters: AtomFilterSql): string {
-    const dedupFilters = `TenantId = {tenantId:String} ${filters.stableClause} ${filters.dedupWindowClause}`;
-    return `FROM ${TABLE_NAME}
-   WHERE TenantId = {tenantId:String}
-     ${filters.stableClause}
-     ${filters.volatileClause}
-     AND ArchivedAt IS NULL
-     AND (TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, UpdatedAt) IN (
-       SELECT TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, max(UpdatedAt)
-       FROM ${TABLE_NAME}
-       WHERE ${dedupFilters}
-       GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
-     )`;
-  }
-
   private constructor(private readonly resolveClient: ResultAtomsClickHouseClientResolver) {
     super();
   }
@@ -648,15 +534,6 @@ export class ResultAtomsClickHouseRepository extends ResultAtomsRepository {
     }
 
     return this.resolveClient(tenantId);
-  }
-
-  private async queryRows<T>(
-    query: string,
-    params: { tenantId: string } & Record<string, string | string[]>,
-  ): Promise<T[]> {
-    const client = await this.getClient(params.tenantId);
-    const result = await client.query({ query, query_params: params, format: "JSONEachRow" });
-    return result.json<T>();
   }
 
   /**
@@ -678,63 +555,14 @@ export class ResultAtomsClickHouseRepository extends ResultAtomsRepository {
     }
 
     const pageSize = Math.min(Math.max(1, limit), MAX_ATOM_PAGE);
-    const filters = ResultAtomsClickHouseRepository.buildAtomFilters(filter);
-    const decoded = cursor ? decodeCursor(cursor) : null;
-
-    const cursorPredicate = decoded
-      ? `AND (
-          (${ATOM_SORT_KEY} < toUInt64({atomCursorTs:String}))
-          OR (${ATOM_SORT_KEY} = toUInt64({atomCursorTs:String})
-              AND ScenarioRunId < {atomCursorRunId:String})
-        )`
-      : "";
-
-    const rows = await this.queryRows<RawAtomQueryRow>(
-      `SELECT
-         ScenarioSetId AS SetId,
-         BatchRunId,
-         ScenarioRunId,
-         ScenarioId,
-         ${SCENARIO_KEY_EXPR} AS ScenarioKey,
-         ifNull(Name, '') AS ScenarioName,
-         Status,
-         ${OUTCOME_EXPR} AS Outcome,
-         toString(${ATOM_SORT_KEY}) AS RunAt,
-         ifNull(toString(DurationMs), '') AS DurationMs,
-         ${RUN_NOTE_EXPR} AS Note,
-         ${TARGET_KEY_EXPR} AS TargetKey,
-         ${TARGET_PARAMETERS_EXPR} AS TargetParameters,
-         ${CODE_TARGET_NAME_EXPR} AS TargetName,
-         ${TRIGGER_EXPR} AS Trigger,
-         ${COST_VALUE_EXPR} AS CostUsd,
-         ${COST_SOURCE_EXPR} AS CostSource,
-         toString(${ATOM_SORT_KEY}) AS SortKey,
-         ` +
-        "`Evaluations.EvaluatorId` AS EvaluationIds,\n" +
-        "         `Evaluations.Name` AS EvaluationNames,\n" +
-        "         `Evaluations.Status` AS EvaluationStatuses,\n" +
-        "         `Evaluations.Required` AS EvaluationRequired,\n" +
-        "         `Evaluations.Passed` AS EvaluationPassed,\n" +
-        "         `Evaluations.Score` AS EvaluationScores,\n" +
-        "         `Evaluations.Label` AS EvaluationLabels\n" +
-        `
-       ${ResultAtomsClickHouseRepository.atomScopeSql(filters)}
-         ${cursorPredicate}
-       ORDER BY ${ATOM_SORT_KEY} DESC, ScenarioRunId DESC
-       LIMIT {atomLimit:UInt32}`,
-      {
-        tenantId: filter.projectId,
-        ...filters.params,
-        ...(decoded ? { atomCursorTs: decoded.ts, atomCursorRunId: decoded.executionId } : {}),
-        atomLimit: String(pageSize + 1),
-      },
+    const after = cursor ? decodeCursor(cursor) : null;
+    const rows = await this.readRows(
+      filter,
+      ResultAtomsClickHouseRepository.atomPageRead({ filter, limit: pageSize + 1, after }),
     );
 
     const hasMore = rows.length > pageSize;
-    const page = (hasMore ? rows.slice(0, pageSize) : rows).map((row): RawAtomRow => ({
-      ...row,
-      Status: mapStatus(row.Status),
-    }));
+    const page = (hasMore ? rows.slice(0, pageSize) : rows).map(mapAtomPageRow);
     const last = page[page.length - 1];
 
     return {
@@ -745,6 +573,15 @@ export class ResultAtomsClickHouseRepository extends ResultAtomsRepository {
           ? encodeCursor({ ts: last.SortKey, executionId: last.ScenarioRunId })
           : undefined,
     };
+  }
+
+  /** Up to `limit` atoms in scope, newest first, after `after` when one is given. */
+  static atomPageRead(input: {
+    filter: ResultsFilter;
+    limit: number;
+    after: AtomPagePosition | null;
+  }): ReaderReadStatement<AtomPageRow> {
+    return atomPageReadOf(input);
   }
 
   /**
@@ -801,28 +638,13 @@ export class ResultAtomsClickHouseRepository extends ResultAtomsRepository {
   /** The stat strip counts, over every atom in scope. */
   async aggregateTotals(filter: ResultsFilter): Promise<RawTotalsRow> {
     if (isEmptyScope(filter)) return EMPTY_TOTALS;
-    const filters = ResultAtomsClickHouseRepository.buildAtomFilters(filter);
-    const rows = await this.queryRows<RawTotalsRow>(
-      `SELECT
-         toString(count())                                        AS Atoms,
-         toString(countIf(Outcome = 'passed'))                    AS Passed,
-         toString(countIf(Outcome IN ${GRADED_OUTCOMES}))                  AS Settled,
-         toString(uniqExact(BatchRunId))                          AS RunCount,
-         toString(uniqExactIf(ScenarioId, Outcome = 'failed'))    AS FailingScenarios,
-         toString(sum(CostUsd))                                   AS CostTotal,
-         toString(sum(CostUnknown))                               AS CostUnknown
-       FROM (
-         SELECT
-           BatchRunId,
-           ScenarioId,
-           ${OUTCOME_EXPR} AS Outcome,
-           ${COST_NUMERIC_EXPR} AS CostUsd,
-           ${COST_UNKNOWN_EXPR} AS CostUnknown
-         ${ResultAtomsClickHouseRepository.atomScopeSql(filters)}
-       )`,
-      { tenantId: filter.projectId, ...filters.params },
-    );
+    const rows = await this.readRows(filter, ResultAtomsClickHouseRepository.totalsRead(filter));
     return rows[0] ?? EMPTY_TOTALS;
+  }
+
+  /** The stat strip counts as one row. */
+  static totalsRead(filter: ResultsFilter): ReaderReadStatement<RawTotalsRow> {
+    return totalsReadOf(filter);
   }
 
   /**
@@ -838,41 +660,20 @@ export class ResultAtomsClickHouseRepository extends ResultAtomsRepository {
     groupBy: ResultsGroupBy;
   }): Promise<RawGroupRow[]> => {
     if (isEmptyScope(filter)) return [];
-    const filters = ResultAtomsClickHouseRepository.buildAtomFilters(filter);
-    return this.queryRows<RawGroupRow>(
-      `SELECT
-         GroupKey,
-         argMax(Name, RunAt)                     AS Name,
-         argMax(TargetName, RunAt)               AS TargetName,
-         argMax(TargetParameters, RunAt)         AS TargetParameters,
-         toString(count())                       AS Atoms,
-         toString(countIf(Outcome = 'passed'))   AS Passed,
-         toString(countIf(Outcome IN ${GRADED_OUTCOMES})) AS Settled,
-         toString(uniqExact(BatchRunId))         AS RunCount,
-         toString(uniqExact(ScenarioId))         AS ScenarioCount,
-         toString(max(RunAt))                    AS LastRunAt,
-         arraySort(groupUniqArray(TargetKey))    AS TargetKeys,
-         toString(sum(CostUsd))                  AS CostTotal,
-         toString(sum(CostUnknown))              AS CostUnknown
-       FROM (
-         SELECT
-           ${ResultAtomsClickHouseRepository.groupKeyExpr(groupBy)} AS GroupKey,
-           ifNull(Name, '') AS Name,
-           BatchRunId,
-           ScenarioId,
-           ${TARGET_KEY_EXPR} AS TargetKey,
-           ${CODE_TARGET_NAME_EXPR} AS TargetName,
-           ${TARGET_PARAMETERS_EXPR} AS TargetParameters,
-           ${ATOM_SORT_KEY} AS RunAt,
-           ${OUTCOME_EXPR} AS Outcome,
-           ${COST_NUMERIC_EXPR} AS CostUsd,
-           ${COST_UNKNOWN_EXPR} AS CostUnknown
-         ${ResultAtomsClickHouseRepository.atomScopeSql(filters)}
-       )
-       GROUP BY GroupKey`,
-      { tenantId: filter.projectId, ...filters.params },
+    const rows = await this.readRows(
+      filter,
+      ResultAtomsClickHouseRepository.groupsRead({ filter, groupBy }),
     );
+    return rows.map((row) => ({ ...row, TargetKeys: [...row.TargetKeys] }));
   };
+
+  /** One row per group, its name and target from the group's newest run. */
+  static groupsRead(input: {
+    filter: ResultsFilter;
+    groupBy: ResultsGroupBy;
+  }): ReaderReadStatement<AtomGroupRow> {
+    return groupsReadOf(input);
+  }
 
   /**
    * Code-run scenarios inside the window, one per key under their newest

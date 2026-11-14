@@ -89,31 +89,7 @@ const AGENT_TEST_SET_EXCLUSION = `AND NOT endsWith(ScenarioSetId, '${AGENT_TEST_
  */
 export const RUN_NOT_SCORED_EXPR = `(Status = 'ERROR' AND JSONExtractString(ifNull(Metadata, '{}'), 'langwatch', 'hooks', 'setup', 'status') NOT IN ('', 'ok'))`;
 
-/**
- * Batch aggregate SELECT shared by batch history and single-batch summary. SettledCount is
- * complement of RUNNING_STATUSES (not terminal); PENDING_EVALUATION counts as running.
- */
-const BATCH_AGGREGATE_COLUMNS = `BatchRunId,
-        toString(count())                                               AS TotalCount,
-        toString(countIf(Status = 'SUCCESS'))                          AS PassCount,
-        toString(countIf(Status IN ('FAILED','FAILURE','ERROR','CANCELLED') AND NOT ${RUN_NOT_SCORED_EXPR})) AS FailCount,
-        toString(countIf(Status IN (${RUNNING_STATUSES})))             AS RunningCount,
-        toString(countIf(Status NOT IN (${RUNNING_STATUSES})))         AS SettledCount,
-        toString(countIf(Status = 'STALLED'))                          AS StalledCount,
-        toString(toUnixTimestamp64Milli(max(UpdatedAt)))               AS LastUpdatedAt,
-        toString(toUnixTimestamp64Milli(max(CreatedAt)))               AS LastRunAt,
-        toString(toUnixTimestamp64Milli(
-          minIf(UpdatedAt, Status IN ('SUCCESS','FAILED','FAILURE','ERROR','CANCELLED'))
-        )) AS FirstCompletedAt,
-        toString(if(
-          countIf(Status IN (${RUNNING_STATUSES})) = 0,
-          toUnixTimestamp64Milli(max(UpdatedAt)),
-          0
-        )) AS AllCompletedAt,
-        toString(toUnixTimestamp64Milli(min(StartedAt)))                AS MinStartedAt,
-        toString(toUnixTimestamp64Milli(max(StartedAt)))                AS MaxStartedAt`;
-
-/** One row of BATCH_AGGREGATE_COLUMNS. Every value arrives as a string. */
+/** The keys of {@link batchAggregateFields}. SettledCount is every run not running. */
 type BatchAggregateRow = {
   BatchRunId: string;
   TotalCount: string;
@@ -130,8 +106,10 @@ type BatchAggregateRow = {
   MaxStartedAt: string;
 };
 
-/** A row of {@link batchAggregateFields}: the builder types its counts as numbers. */
-type BuiltBatchAggregateRow = { [Key in keyof BatchAggregateRow]: BatchAggregateRow[Key] | number };
+/** A row of {@link batchAggregateFields}: a UInt64 count may arrive as a string. */
+type BuiltBatchAggregateRow = { BatchRunId: string } & {
+  [Key in Exclude<keyof BatchAggregateRow, "BatchRunId">]: string | number;
+};
 
 type RunConditionOps = ConditionOps<typeof simulationRuns.$table.name, Record<never, never>>;
 
@@ -151,7 +129,7 @@ function runNotScored({ and, eq, not, oneOf }: RunConditionOps) {
   );
 }
 
-/** {@link BATCH_AGGREGATE_COLUMNS} as typed fields, under the same keys. */
+/** A batch's counts and times over its runs' latest versions; PENDING_EVALUATION is running. */
 function batchAggregateFields(ops: RunConditionOps) {
   const { and, eq, not, oneOf } = ops;
   const t = simulationRuns;
@@ -556,59 +534,33 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     const validatedLimit = Math.min(Math.max(1, limit), 100);
     const decoded = cursor ? this.decodeCursor(cursor) : null;
 
-    const cursorPredicate = decoded
-      ? `((toString(toUnixTimestamp64Milli(max(CreatedAt))) < {cursorTs:String})
-         OR (toString(toUnixTimestamp64Milli(max(CreatedAt))) = {cursorTs:String} AND BatchRunId > {cursorBatchRunId:String}))`
-      : "1 = 1";
-
-    const dateFilter = SimulationClickHouseRepository.buildDateFilter({ startDate, endDate });
-
-    const combinedHaving = `HAVING ${[cursorPredicate, dateFilter.havingClause].filter(Boolean).join(" AND ")}`;
-
-    // Step 0: fetch total distinct batch count (runs in parallel with step 1)
-    const totalCountPromise = this.queryRows<{ TotalBatchCount: string }>(
-      `SELECT toString(count(DISTINCT BatchRunId)) AS TotalBatchCount
-       FROM ${TABLE_NAME}
-       WHERE TenantId = {tenantId:String}
-         AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
-         ${SET_BOUND}
-         ${dateFilter.whereClause}
-         AND ArchivedAt IS NULL
-         ${SimulationClickHouseRepository.simulationRunDedupPredicate(`TenantId = {tenantId:String} AND ScenarioSetId IN ({scenarioSetIds:Array(String)}) ${SET_BOUND} ${dateFilter.whereClause}`)}`,
-      {
-        tenantId: projectId,
-        scenarioSetIds: SimulationClickHouseRepository.expandSetIdFilter(scenarioSetId),
-        ...dateFilter.params,
-      },
-      ID_BOUND_READ,
-    );
-
-    // Step 1: fetch batch-level aggregates
-    const batchRowsPromise = this.queryRows<BatchAggregateRow>(
-      `SELECT ${BATCH_AGGREGATE_COLUMNS}
-       FROM ${TABLE_NAME}
-       WHERE TenantId = {tenantId:String}
-         AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
-         ${SET_BOUND}
-         ${dateFilter.whereClause}
-         AND ArchivedAt IS NULL
-         ${SimulationClickHouseRepository.simulationRunDedupPredicate(`TenantId = {tenantId:String} AND ScenarioSetId IN ({scenarioSetIds:Array(String)}) ${SET_BOUND} ${dateFilter.whereClause}`)}
-       GROUP BY BatchRunId
-       ${combinedHaving}
-       ORDER BY LastRunAt DESC, BatchRunId ASC
-       LIMIT {fetchLimit:UInt32}`,
-      {
-        tenantId: projectId,
-        scenarioSetIds: SimulationClickHouseRepository.expandSetIdFilter(scenarioSetId),
-        ...(decoded ? { cursorTs: decoded.ts, cursorBatchRunId: decoded.batchRunId } : {}),
-        ...dateFilter.params,
-        fetchLimit: String(validatedLimit + 1),
-      },
-      ID_BOUND_READ,
-    );
-
-    const [totalCountRows, batchRows] = await Promise.all([totalCountPromise, batchRowsPromise]);
-    const totalCount = parseInt(totalCountRows[0]?.TotalBatchCount ?? "0", 10);
+    const client = await this.getClient(projectId);
+    const [totalCountRead, batchRowsRead] = await Promise.all([
+      client.read({
+        statement: SimulationClickHouseRepository.batchRunCountRead({
+          projectId,
+          scenarioSetId,
+          startDate,
+          endDate,
+        }),
+        table: simulationRuns.$table.name,
+        ...ID_BOUND_READ,
+      }),
+      client.read({
+        statement: SimulationClickHouseRepository.batchHistoryPageRead({
+          projectId,
+          scenarioSetId,
+          limit: validatedLimit + 1,
+          after: decoded,
+          startDate,
+          endDate,
+        }),
+        table: simulationRuns.$table.name,
+        ...ID_BOUND_READ,
+      }),
+    ]);
+    const totalCount = Number(totalCountRead.rows[0]?.BatchRunCount ?? 0);
+    const batchRows = batchRowsRead.rows;
 
     const hasMore = batchRows.length > validatedLimit;
     const pageRows = hasMore ? batchRows.slice(0, validatedLimit) : batchRows;
@@ -625,7 +577,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
 
     const lastRow = pageRows[pageRows.length - 1]!;
     const nextCursor = hasMore
-      ? this.encodeCursor(lastRow.LastRunAt, lastRow.BatchRunId)
+      ? this.encodeCursor(String(lastRow.LastRunAt), lastRow.BatchRunId)
       : undefined;
 
     const batchRunIds = pageRows.map((r) => r.BatchRunId);
@@ -635,7 +587,12 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     // runs windowed/hit; no usable range runs unbounded/unwindowed (the old
     // silent widening, now counted). fallback "none": step 1 already bounded
     // these batches, so an empty windowed read is a genuine empty page.
-    const startedAtBounds = SimulationClickHouseRepository.computeStartedAtBoundsForPage(pageRows);
+    const startedAtBounds = SimulationClickHouseRepository.computeStartedAtBoundsForPage(
+      pageRows.map((row) => ({
+        MinStartedAt: String(row.MinStartedAt),
+        MaxStartedAt: String(row.MaxStartedAt),
+      })),
+    );
 
     // Step 2: fetch slim item rows (preview columns only)
     const itemRows = await queryWindowed<PreviewItemRow[]>({
@@ -1876,6 +1833,35 @@ export class SimulationClickHouseRepository extends SimulationRepository {
       .build();
   }
 
+  /**
+   * One page of a set's batches, newest run first, keyset paginated on (LastRunAt, BatchRunId).
+   * The range bounds StartedAt for pruning and the batch's newest CreatedAt exactly.
+   */
+  static batchHistoryPageRead({
+    projectId,
+    scenarioSetId,
+    limit,
+    after,
+    startDate,
+    endDate,
+  }: {
+    projectId: string;
+    scenarioSetId: string;
+    limit: number;
+    after: { ts: string; batchRunId: string } | null;
+    startDate?: number;
+    endDate?: number;
+  }): ReaderReadStatement<BuiltBatchAggregateRow> {
+    return batchHistoryPageReadOf({
+      projectId,
+      setIds: SimulationClickHouseRepository.expandSetIdFilter(scenarioSetId),
+      limit,
+      after,
+      startDate,
+      endDate,
+    });
+  }
+
   private static expandSetIdFilter(scenarioSetId: string): string[] {
     return scenarioSetId === DEFAULT_SET_ID || scenarioSetId === ""
       ? [DEFAULT_SET_ID, ""]
@@ -1888,7 +1874,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
    * the single-batch summary from its own aggregate/StalledCount column.
    */
   private static mapBatchAggregateRow(
-    row: BatchAggregateRow | BuiltBatchAggregateRow,
+    row: BuiltBatchAggregateRow,
   ): Omit<SimulationBatchSummary, "stalledCount" | "note" | "startedBy"> {
     const firstCompletedAt = Number(row.FirstCompletedAt);
     const allCompletedAt = Number(row.AllCompletedAt);
@@ -1999,4 +1985,43 @@ function batchSummaryReadOf({ projectId, batchRunId }: { projectId: string; batc
     .latestVersion()
     .groupBy(t.BatchRunId)
     .build();
+}
+
+function batchHistoryPageReadOf({
+  projectId,
+  setIds,
+  limit,
+  after,
+  startDate,
+  endDate,
+}: {
+  projectId: string;
+  setIds: string[];
+  limit: number;
+  after: { ts: string; batchRunId: string } | null;
+  startDate?: number;
+  endDate?: number;
+}) {
+  const t = simulationRuns;
+  const lastRunAt = fn.toUnixTimestamp64Milli(fn.max(t.CreatedAt));
+  // One conjunct per `where`: the election repeats the StartedAt ones for partition pruning.
+  let read = clickhouseRead({ scope: tenantScope.single({ tenantId: projectId }) })
+    .from(t)
+    .select((ops) => batchAggregateFields(ops))
+    .where(({ idBound }) => idBound(t.ScenarioSetId, setIds));
+  if (startDate !== undefined) read = read.where(({ gte }) => gte(t.StartedAt, startDate));
+  if (endDate !== undefined) read = read.where(({ lte }) => lte(t.StartedAt, endDate));
+  let page = read
+    .where(({ isNull }) => isNull(t.ArchivedAt))
+    .latestVersion()
+    .groupBy(t.BatchRunId);
+  if (after !== null) {
+    const ts = Number(after.ts);
+    page = page.having(({ and, eq, gt, lt, or }) =>
+      or(lt(lastRunAt, ts), and(eq(lastRunAt, ts), gt(t.BatchRunId, after.batchRunId))),
+    );
+  }
+  if (startDate !== undefined) page = page.having(({ gte }) => gte(lastRunAt, startDate));
+  if (endDate !== undefined) page = page.having(({ lte }) => lte(lastRunAt, endDate));
+  return page.orderBy(lastRunAt, "DESC").orderBy(t.BatchRunId, "ASC").limit(limit).build();
 }

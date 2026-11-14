@@ -305,7 +305,7 @@ describe.skipIf(databaseUrl === null)("the cost of reading the note", () => {
       expect(noteQueries[0]).toContain("BatchRunId IN ({batchRunIds:");
       expect(noteQueries[0]).toContain("StartedAt >=");
 
-      const wholeSetQueries = captured.filter((q) => q.includes("count(DISTINCT BatchRunId)"));
+      const wholeSetQueries = captured.filter((q) => q.includes("countDistinct(BatchRunId)"));
       expect(wholeSetQueries).toHaveLength(1);
       expect(wholeSetQueries[0]).not.toContain("Metadata");
     });

@@ -4,41 +4,60 @@
 
 import {
   categorizeRunStatus,
+  type ResultsFilter,
   type ResultsGroupBy,
   ScenarioRunStatus,
 } from "@langwatch/scenario-contract";
 import { describe, expect, it } from "vitest";
 
 import {
-  CODE_TARGET_NAME_EXPR,
-  DEDUP_WINDOW_SLACK_MS,
   FAILED_STATUS_VALUES,
   PASSED_STATUS_VALUES,
   ResultAtomsClickHouseRepository,
-  SCENARIO_KEY_EXPR,
-  TARGET_KEY_EXPR,
-  TARGET_PARAMETERS_EXPR,
-  TARGET_REF_EXPR,
-  TARGET_STAMP_KEY_EXPR,
 } from "../clickhouse.result-atoms.repository.ts";
-import { RUN_NOT_SCORED_EXPR } from "../simulation-clickhouse.repository.ts";
 import { mapStatus } from "../simulation-run.mapper.ts";
 
-const buildAtomFilters = (
-  ...args: Parameters<typeof ResultAtomsClickHouseRepository.buildAtomFilters>
-): ReturnType<typeof ResultAtomsClickHouseRepository.buildAtomFilters> =>
-  ResultAtomsClickHouseRepository.buildAtomFilters(...args);
-const groupKeyExpr = (
-  ...args: Parameters<typeof ResultAtomsClickHouseRepository.groupKeyExpr>
-): ReturnType<typeof ResultAtomsClickHouseRepository.groupKeyExpr> =>
-  ResultAtomsClickHouseRepository.groupKeyExpr(...args);
+const base: ResultsFilter = { projectId: "proj", startDate: 1_000_000 };
+
+/** The atom page's SQL and its bound values, for a filter. */
+const pageRead = (filter: ResultsFilter) =>
+  ResultAtomsClickHouseRepository.atomPageRead({ filter, limit: 10, after: null });
+
+/** What a read asks of the elected atoms, after the election. */
+const afterElection = (sql: string): string => sql.split(") AS atoms WHERE ")[1] ?? "";
+
+/** The SQL with bound value and lambda names blanked: two renderings of one expression compare. */
+const unnamed = (sql: string): string => sql.replace(/\{v\d+:/g, "{v:").replace(/__x\d+/g, "__x");
+
+/** The election subquery alone. */
+const election = (sql: string): string => {
+  const body = sql.split(" IN (SELECT TenantId, ScenarioRunId,")[1] ?? "";
+  return body.slice(0, body.indexOf("GROUP BY"));
+};
+
+/** The expression a page read selects under an alias. */
+const selected = (sql: string, alias: string): string => {
+  const end = sql.indexOf(` AS ${alias},`);
+  let depth = 0;
+  for (let at = end - 1; at > 0; at--) {
+    const char = sql[at];
+    if (char === ")") depth++;
+    if (char === "(") depth--;
+    if (depth === 0 && sql.startsWith(", ", at - 1)) return sql.slice(at + 1, end);
+  }
+  return "";
+};
+
 /** The trend key a grouping's built trend read selects. */
 const trendKeyExpr = (groupBy: ResultsGroupBy): string | undefined =>
   /\(SELECT .*?, (\w+) AS TrendKey,/.exec(
-    ResultAtomsClickHouseRepository.trendRead({
-      filter: { projectId: "proj", startDate: 1_000_000 },
-      groupBy,
-    }).sql,
+    ResultAtomsClickHouseRepository.trendRead({ filter: base, groupBy }).sql,
+  )?.[1];
+
+/** The group key a grouping's built groups read folds on. */
+const groupKeyExpr = (groupBy: ResultsGroupBy): string | undefined =>
+  /FROM \(SELECT (.*?) AS GroupKey,/.exec(
+    ResultAtomsClickHouseRepository.groupsRead({ filter: base, groupBy }).sql,
   )?.[1];
 
 /**
@@ -73,18 +92,19 @@ describe("the outcome of a status", () => {
   });
 });
 
-describe("buildAtomFilters", () => {
-  const base = { projectId: "proj", startDate: 1_000_000 };
-
+describe("the atom reads' scope", () => {
   describe("when the filter asks for failed or not-scored runs", () => {
     /** @scenario "Server-side pass rates leave out a run whose setup failed" */
     it("keeps a run whose setup failed out of the failures and in the not-scored list", () => {
-      const failed = buildAtomFilters({ ...base, outcome: "failed" });
-      const notScored = buildAtomFilters({ ...base, outcome: "not_scored" });
+      const failed = pageRead({ ...base, outcome: "failed" });
+      const notScored = pageRead({ ...base, outcome: "not_scored" });
 
-      expect(failed.volatileClause).toContain(`NOT ${RUN_NOT_SCORED_EXPR}`);
-      expect(notScored.volatileClause).toContain(RUN_NOT_SCORED_EXPR);
-      expect(RUN_NOT_SCORED_EXPR).toContain("'langwatch', 'hooks', 'setup', 'status'");
+      expect(afterElection(failed.sql)).toContain("AND NOT ((Status = {");
+      expect(afterElection(notScored.sql)).toContain("AND (Status = {");
+      expect(afterElection(notScored.sql)).not.toContain("NOT ((Status");
+      expect(Object.values(failed.params)).toEqual(
+        expect.arrayContaining(["langwatch", "hooks", "setup", "status"]),
+      );
     });
   });
 
@@ -95,111 +115,97 @@ describe("buildAtomFilters", () => {
      * run beginning while someone watches would never appear.
      */
     it("bounds the window only from below", () => {
-      const filters = buildAtomFilters(base);
+      const { sql } = ResultAtomsClickHouseRepository.totalsRead(base);
 
-      expect(filters.volatileClause).toContain("StartedAt >=");
-      expect(filters.volatileClause).not.toContain("StartedAt <=");
-      expect(filters.params.atomEndMs).toBeUndefined();
+      expect(afterElection(sql)).toContain("StartedAt >=");
+      expect(sql).not.toContain("StartedAt <=");
     });
   });
 
   describe("when an end date is given", () => {
     it("bounds the window at both ends", () => {
-      const filters = buildAtomFilters({ ...base, endDate: 2_000_000 });
+      const statement = ResultAtomsClickHouseRepository.totalsRead({ ...base, endDate: 2_000_000 });
 
-      expect(filters.volatileClause).toContain("StartedAt <=");
-      expect(filters.params.atomEndMs).toBe("2000000");
+      expect(afterElection(statement.sql)).toContain("StartedAt <=");
+      expect(Object.values(statement.params)).toContain(2_000_000);
     });
   });
 
   describe("when the project holds agent test runs", () => {
     /** @scenario "The results lists leave the agent test batches out" */
-    it("keeps them out of every atom read, inside the dedup scope too", () => {
-      const filters = buildAtomFilters(base);
-
-      expect(filters.stableClause).toContain("NOT endsWith(ScenarioSetId, '__agent-test')");
+    it("keeps them out of every atom read", () => {
+      for (const { sql, params } of [
+        pageRead(base),
+        ResultAtomsClickHouseRepository.totalsRead(base),
+        ResultAtomsClickHouseRepository.groupsRead({ filter: base, groupBy: "plan" }),
+      ]) {
+        expect(sql).toContain("NOT (endsWith(ScenarioSetId, {");
+        expect(Object.values(params)).toContain("__agent-test");
+      }
     });
   });
 
   describe("when the project holds legacy voice-call runs", () => {
     /** @scenario "The legacy voice-calls set is excluded from run listings" */
     it("excludes the voice-calls set from every atom read, alongside the agent-test set", () => {
-      const filters = buildAtomFilters(base);
+      const { sql, params } = pageRead(base);
 
-      expect(filters.stableClause).toContain("ScenarioSetId != 'voice-calls'");
-    });
-  });
-
-  describe("when the query dedups a run to its latest version", () => {
-    /**
-     * StartedAt moves between versions of one run, so a dedup scope bounded exactly to the window
-     * can drop the true latest version out of its own group and resolve to a stale in-window one.
-     * The slack is what keeps the subquery pruning partitions without that risk.
-     */
-    it("reaches a week past the window it prunes for", () => {
-      const startDate = Date.UTC(2026, 0, 15);
-      const endDate = Date.UTC(2026, 1, 15);
-      const filters = buildAtomFilters({ ...base, startDate, endDate });
-
-      expect(filters.params.atomDedupStartMs).toBe(String(startDate - DEDUP_WINDOW_SLACK_MS));
-      expect(filters.params.atomDedupEndMs).toBe(String(endDate + DEDUP_WINDOW_SLACK_MS));
-      expect(filters.dedupWindowClause).toContain("atomDedupStartMs");
-    });
-
-    it("never reaches before the epoch", () => {
-      const filters = buildAtomFilters({ ...base, startDate: 5 });
-
-      expect(filters.params.atomDedupStartMs).toBe("0");
+      expect(sql).toContain("ScenarioSetId != {");
+      expect(Object.values(params)).toContain("voice-calls");
     });
   });
 
   describe("when the filter names a status", () => {
     /**
      * Status differs between versions of one run, so narrowing on it may only
-     * happen after dedup. Inside the subquery it would pick whichever old
-     * version still matched.
+     * happen after the election. Inside it would pick whichever old version
+     * still matched.
      */
-    it("keeps it out of the clause the dedup subquery uses", () => {
-      const filters = buildAtomFilters({ ...base, outcome: "failed" });
+    it("keeps it out of the election", () => {
+      const { sql } = pageRead({ ...base, outcome: "failed" });
 
-      expect(filters.volatileClause).toContain("Status IN");
-      expect(filters.stableClause).not.toContain("Status");
-    });
-  });
-
-  describe("when the filter names sets", () => {
-    /**
-     * A run never moves between sets, and ScenarioSetId is part of the dedup key already, so
-     * narrowing on it picks the same version either way. Keeping it in the subquery is what stops
-     * it grouping over the whole tenant.
-     */
-    it("puts them where the dedup subquery can use them", () => {
-      const filters = buildAtomFilters({ ...base, scenarioSetIds: ["set-1"] });
-
-      expect(filters.stableClause).toContain("ScenarioSetId IN");
+      expect(afterElection(sql)).toContain("Status IN (");
+      expect(election(sql)).not.toContain("Status");
     });
   });
 
   describe("when the filter names scenarios", () => {
     /**
-     * A scenario is named by the key it folds under, and the name a run from
-     * code folds under can arrive with a later version of the run, so the
-     * key is read after dedup and never inside it.
+     * A scenario is named by the key it folds under, and the name a code run
+     * folds under can arrive with a later version of the run, so the key is
+     * read after the election and never inside it.
      */
-    it("reads the scenario key after dedup", () => {
-      const filters = buildAtomFilters({ ...base, scenarioIds: ["s1"] });
+    it("reads the scenario key after the election", () => {
+      const statement = pageRead({ ...base, scenarioIds: ["s1"] });
 
-      expect(filters.stableClause).not.toContain("ScenarioId IN");
-      expect(filters.volatileClause).toContain(SCENARIO_KEY_EXPR);
-      expect(filters.volatileClause).toContain("IN ({atomScenarioIds");
+      expect(election(statement.sql)).not.toContain("ScenarioId");
+      expect(unnamed(afterElection(statement.sql))).toContain(
+        `${unnamed(selected(statement.sql, "ScenarioKey"))} IN ({`,
+      );
     });
   });
 
   describe("when the filter names the default set", () => {
     it("expands it to both stored spellings", () => {
-      const filters = buildAtomFilters({ ...base, scenarioSetIds: ["default"] });
+      const { params } = pageRead({ ...base, scenarioSetIds: ["default"] });
 
-      expect(filters.params.atomSetIds).toEqual(["default", ""]);
+      expect(Object.values(params)).toContainEqual(["default", ""]);
+    });
+  });
+
+  describe("when a cursor is given", () => {
+    it("pages backwards through the sort key, breaking ties on the run id", () => {
+      const statement = ResultAtomsClickHouseRepository.atomPageRead({
+        filter: base,
+        limit: 11,
+        after: { ts: "1500000", executionId: "run-9" },
+      });
+      const sortKey = "toUnixTimestamp64Milli(ifNull(StartedAt, CreatedAt))";
+
+      expect(statement.sql).toContain(`(${sortKey} < {`);
+      expect(statement.sql).toContain(`ScenarioRunId < {`);
+      expect(statement.sql).toContain(`ORDER BY ${sortKey} DESC, ScenarioRunId DESC LIMIT 11`);
+      expect(Object.values(statement.params)).toEqual(expect.arrayContaining([1_500_000, "run-9"]));
     });
   });
 });
@@ -233,6 +239,9 @@ describe("the grain of a grouping", () => {
 });
 
 describe("the key a target folds under", () => {
+  const targetKey = selected(pageRead(base).sql, "TargetKey");
+  const pageParams = Object.values(pageRead(base).params);
+
   describe("when a run carries the key the platform stamped", () => {
     /**
      * The stamp is what tells one agent's parameter variants apart, so it is
@@ -243,19 +252,25 @@ describe("the key a target folds under", () => {
     /** @scenario "A target with parameter overrides is its own target" */
     /** @scenario "An old run with no target key keeps its reference id as key" */
     it("reads the stamped key first, then the reference id", () => {
-      const stampAt = TARGET_KEY_EXPR.indexOf(TARGET_STAMP_KEY_EXPR);
-      const refAt = TARGET_KEY_EXPR.indexOf(TARGET_REF_EXPR);
+      const { params } = pageRead(base);
+      const stampParam = Object.entries(params).find(([, value]) => value === "targetKey")?.[0];
+      const refParams = Object.entries(params)
+        .filter(([, value]) => value === "targetReferenceId")
+        .map(([name]) => name);
+      const refAt = Math.min(
+        ...refParams.map((name) => targetKey.indexOf(`{${name}:`)).filter((at) => at >= 0),
+      );
 
-      expect(stampAt).toBeGreaterThanOrEqual(0);
-      expect(refAt).toBeGreaterThan(stampAt);
-      expect(TARGET_STAMP_KEY_EXPR).toContain("'targetKey'");
-      expect(TARGET_STAMP_KEY_EXPR).toContain("'langwatch'");
+      expect(stampParam).toBeDefined();
+      expect(targetKey.indexOf(`{${stampParam}:`)).toBeGreaterThanOrEqual(0);
+      expect(refAt).toBeGreaterThan(targetKey.indexOf(`{${stampParam}:`));
     });
 
     it("reads the target's overrides raw, under the reserved namespace", () => {
-      expect(TARGET_PARAMETERS_EXPR).toContain("JSONExtractRaw(");
-      expect(TARGET_PARAMETERS_EXPR).toContain("'targetParameters'");
-      expect(TARGET_PARAMETERS_EXPR).toContain("'langwatch'");
+      const overrides = selected(pageRead(base).sql, "TargetParameters");
+
+      expect(overrides).toMatch(/^JSONExtractRaw\(JSONExtractRaw\(ifNull\(Metadata, /);
+      expect(pageParams).toEqual(expect.arrayContaining(["langwatch", "targetParameters"]));
     });
   });
 
@@ -266,17 +281,19 @@ describe("the key a target folds under", () => {
      * such a run on the target a person chose for it.
      */
     it("reads the platform reference id before anything the run reported", () => {
-      const refAt = TARGET_KEY_EXPR.indexOf(TARGET_REF_EXPR);
-      const nameAt = TARGET_KEY_EXPR.indexOf(CODE_TARGET_NAME_EXPR);
+      const nameAt = targetKey.indexOf("JSONExtractArrayRaw(");
+      const refParam = Object.entries(pageRead(base).params).find(
+        ([, value]) => value === "targetReferenceId",
+      )?.[0];
 
-      expect(refAt).toBeGreaterThanOrEqual(0);
-      expect(nameAt).toBeGreaterThan(refAt);
+      expect(nameAt).toBeGreaterThan(0);
+      expect(targetKey.indexOf(`{${refParam}:`)).toBeLessThan(nameAt);
     });
   });
 
   describe("when a run reported no agent", () => {
     it("falls back to the unknown key", () => {
-      expect(TARGET_KEY_EXPR).toContain("'unknown'");
+      expect(pageParams).toContain("unknown");
     });
   });
 
@@ -286,8 +303,11 @@ describe("the key a target folds under", () => {
      * the run tests, so only the agent role may name the target.
      */
     it("keeps only the agents, and joins two of them the way a row reads them", () => {
-      expect(CODE_TARGET_NAME_EXPR).toContain("'role') = 'agent'");
-      expect(CODE_TARGET_NAME_EXPR).toContain("' vs '");
+      const name = selected(pageRead(base).sql, "TargetName");
+
+      expect(name).toMatch(/^arrayStringConcat\(arrayMap\(/);
+      expect(name).toContain("arrayFilter(");
+      expect(pageParams).toEqual(expect.arrayContaining(["role", "agent", " vs "]));
     });
   });
 
@@ -295,17 +315,23 @@ describe("the key a target folds under", () => {
     /**
      * A run opens with no metadata and gains it when its started event lands,
      * so the key it folds under can differ between versions of one run and may
-     * only be read after dedup.
+     * only be read after the election.
      */
-    it("reads the target key after dedup, never inside it", () => {
-      const filters = buildAtomFilters({
-        projectId: "proj",
-        startDate: 1_000_000,
-        targetKeys: ["code:acmesupportagent"],
-      });
+    it("reads the target key after the election, never inside it", () => {
+      const { sql } = pageRead({ ...base, targetKeys: ["code:acmesupportagent"] });
 
-      expect(filters.volatileClause).toContain("atomTargetKeys");
-      expect(filters.stableClause).not.toContain("atomTargetKeys");
+      expect(unnamed(afterElection(sql))).toContain(`${unnamed(selected(sql, "TargetKey"))} IN ({`);
+      expect(election(sql)).not.toContain("Metadata");
     });
+  });
+});
+
+describe("the cost of an atom", () => {
+  it("reads the run's cost, then the per-trace map, never the trace id list", () => {
+    const cost = selected(pageRead(base).sql, "CostUsd");
+
+    expect(cost).toMatch(/^multiIf\(TotalCost IS NOT NULL, toString\(TotalCost\), /);
+    expect(cost).toContain("JSONExtractFloat(JSONExtractRaw(TraceMetricsJson, ");
+    expect(cost).toContain("JSONExtractKeys(TraceMetricsJson)");
   });
 });

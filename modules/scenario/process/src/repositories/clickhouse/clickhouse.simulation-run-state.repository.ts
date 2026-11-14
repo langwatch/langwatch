@@ -70,11 +70,7 @@ type StartedAtBounds =
 
 /** A row of the run-state latest-row read. */
 type LatestRunRow =
-  ReturnType<
-    typeof ClickHouseSimulationRunStateRepository.latestRowRead
-  > extends ReaderReadStatement<infer Row>
-    ? Row
-    : never;
+  ReturnType<typeof latestRowReadOf> extends ReaderReadStatement<infer Row> ? Row : never;
 
 const logger = createLogger("langwatch:simulation-processing:run-state-repository");
 
@@ -355,107 +351,13 @@ export class ClickHouseSimulationRunStateRepository<
    * the heavy columns; the IN form ran out of memory on runs with many snapshots). Windowed: both
    * reads bounded by StartedAt, the election wider. Unwindowed: both bounded by the run id index.
    */
-  static latestRowRead({
-    tenantId,
-    scenarioRunId,
-    window,
-    holds,
-  }: {
+  static latestRowRead(input: {
     tenantId: string;
     scenarioRunId: string;
     window: ReadTimeWindow | undefined;
     holds: (name: string) => boolean;
-  }) {
-    const t = simulationRuns;
-    const bounds = startedAtBoundsOf({ window });
-    const held = (of: ColumnRef<typeof simulationRuns.$table.name, string, readonly string[]>) =>
-      fn.heldOr(of, { holds, otherwise: fn.emptyArrayAs(column.array(column.string())) });
-    return clickhouseRead({ scope: tenantScope.single({ tenantId }) })
-      .from(t)
-      .select({
-        ProjectionId: t.ProjectionId,
-        TenantId: t.TenantId,
-        ScenarioRunId: t.ScenarioRunId,
-        ScenarioId: t.ScenarioId,
-        BatchRunId: t.BatchRunId,
-        ScenarioSetId: t.ScenarioSetId,
-        Version: t.Version,
-        Status: t.Status,
-        Name: t.Name,
-        Description: t.Description,
-        Metadata: t.Metadata,
-        messageIds: t["Messages.Id"],
-        messageRoles: t["Messages.Role"],
-        messageContents: t["Messages.Content"],
-        messageTraceIds: t["Messages.TraceId"],
-        messageRests: t["Messages.Rest"],
-        TraceIds: t.TraceIds,
-        Verdict: t.Verdict,
-        Reasoning: t.Reasoning,
-        MetCriteria: t.MetCriteria,
-        UnmetCriteria: t.UnmetCriteria,
-        InconclusiveCriteria: t.InconclusiveCriteria,
-        criteriaCriterion: held(t["Criteria.Criterion"]),
-        criteriaRequirement: held(t["Criteria.Requirement"]),
-        criteriaStatus: fn.heldOr(t["Criteria.Status"], {
-          holds,
-          otherwise: fn.emptyArrayAs(column.array(column.lowCardinality(column.string()))),
-        }),
-        criteriaReasoning: held(t["Criteria.Reasoning"]),
-        Error: t.Error,
-        evaluationEvaluatorIds: t["Evaluations.EvaluatorId"],
-        evaluationNames: t["Evaluations.Name"],
-        evaluationStatuses: t["Evaluations.Status"],
-        evaluationRequired: t["Evaluations.Required"],
-        evaluationPassed: t["Evaluations.Passed"],
-        evaluationScores: t["Evaluations.Score"],
-        evaluationLabels: t["Evaluations.Label"],
-        evaluationDetails: t["Evaluations.Details"],
-        evaluationCostAmounts: t["Evaluations.CostAmount"],
-        evaluationCostCurrencies: t["Evaluations.CostCurrency"],
-        evaluationInputsJson: t["Evaluations.InputsJson"],
-        durationMs: fn.toString(t.DurationMs),
-        TotalCost: t.TotalCost,
-        RoleCosts: t.RoleCosts,
-        RoleLatencies: t.RoleLatencies,
-        TraceMetricsJson: t.TraceMetricsJson,
-        startedAtMs: fn.toUnixTimestamp64Milli(t.StartedAt),
-        queuedAtMs: fn.toUnixTimestamp64Milli(t.QueuedAt),
-        createdAtMs: fn.toUnixTimestamp64Milli(t.CreatedAt),
-        updatedAtMs: fn.toUnixTimestamp64Milli(t.UpdatedAt),
-        finishedAtMs: fn.toUnixTimestamp64Milli(t.FinishedAt),
-        archivedAtMs: fn.toUnixTimestamp64Milli(t.ArchivedAt),
-        cancellationRequestedAtMs: fn.toUnixTimestamp64Milli(t.CancellationRequestedAt),
-        lastSnapshotOccurredAtMs: fn.toUnixTimestamp64Milli(t.LastSnapshotOccurredAt),
-        lastEventOccurredAtMs: fn.toUnixTimestamp64Milli(t.LastEventOccurredAt),
-      })
-      .where(({ and, eq, gte, lte, idBound, scalar }) => {
-        const latest = scalar((sub) =>
-          sub
-            .from(t)
-            .select({ latestUpdatedAt: fn.max(t.UpdatedAt) })
-            .where((inner) =>
-              bounds.kind === "bounded"
-                ? inner.and(
-                    inner.eq(t.ScenarioRunId, scenarioRunId),
-                    inner.gte(t.StartedAt, bounds.latestVersion.fromMs),
-                    inner.lte(t.StartedAt, bounds.latestVersion.toMs),
-                  )
-                : inner.idBound(t.ScenarioRunId, scenarioRunId),
-            ),
-        );
-        // A fold read-back's own window, applied verbatim (ADR-066): no id bound.
-        return bounds.kind === "bounded"
-          ? and(
-              eq(t.ScenarioRunId, scenarioRunId),
-              gte(t.StartedAt, bounds.row.fromMs),
-              lte(t.StartedAt, bounds.row.toMs),
-              eq(t.UpdatedAt, latest),
-            )
-          : and(idBound(t.ScenarioRunId, scenarioRunId), eq(t.UpdatedAt, latest));
-      })
-      .limit(1)
-      .build();
+  }): ReaderReadStatement<LatestRunRow> {
+    return latestRowReadOf(input);
   }
 
   async #findLatestRow({
@@ -673,4 +575,107 @@ function startedAtBoundsOf({ window }: { window: ReadTimeWindow | undefined }): 
       toMs: Math.ceil(window.toMs + LATEST_VERSION_LOOKUP_MARGIN_MS),
     },
   };
+}
+
+function latestRowReadOf({
+  tenantId,
+  scenarioRunId,
+  window,
+  holds,
+}: {
+  tenantId: string;
+  scenarioRunId: string;
+  window: ReadTimeWindow | undefined;
+  holds: (name: string) => boolean;
+}) {
+  const t = simulationRuns;
+  const bounds = startedAtBoundsOf({ window });
+  const held = (of: ColumnRef<typeof simulationRuns.$table.name, string, readonly string[]>) =>
+    fn.heldOr(of, { holds, otherwise: fn.emptyArrayAs(column.array(column.string())) });
+  return clickhouseRead({ scope: tenantScope.single({ tenantId }) })
+    .from(t)
+    .select({
+      ProjectionId: t.ProjectionId,
+      TenantId: t.TenantId,
+      ScenarioRunId: t.ScenarioRunId,
+      ScenarioId: t.ScenarioId,
+      BatchRunId: t.BatchRunId,
+      ScenarioSetId: t.ScenarioSetId,
+      Version: t.Version,
+      Status: t.Status,
+      Name: t.Name,
+      Description: t.Description,
+      Metadata: t.Metadata,
+      messageIds: t["Messages.Id"],
+      messageRoles: t["Messages.Role"],
+      messageContents: t["Messages.Content"],
+      messageTraceIds: t["Messages.TraceId"],
+      messageRests: t["Messages.Rest"],
+      TraceIds: t.TraceIds,
+      Verdict: t.Verdict,
+      Reasoning: t.Reasoning,
+      MetCriteria: t.MetCriteria,
+      UnmetCriteria: t.UnmetCriteria,
+      InconclusiveCriteria: t.InconclusiveCriteria,
+      criteriaCriterion: held(t["Criteria.Criterion"]),
+      criteriaRequirement: held(t["Criteria.Requirement"]),
+      criteriaStatus: fn.heldOr(t["Criteria.Status"], {
+        holds,
+        otherwise: fn.emptyArrayAs(column.array(column.lowCardinality(column.string()))),
+      }),
+      criteriaReasoning: held(t["Criteria.Reasoning"]),
+      Error: t.Error,
+      evaluationEvaluatorIds: t["Evaluations.EvaluatorId"],
+      evaluationNames: t["Evaluations.Name"],
+      evaluationStatuses: t["Evaluations.Status"],
+      evaluationRequired: t["Evaluations.Required"],
+      evaluationPassed: t["Evaluations.Passed"],
+      evaluationScores: t["Evaluations.Score"],
+      evaluationLabels: t["Evaluations.Label"],
+      evaluationDetails: t["Evaluations.Details"],
+      evaluationCostAmounts: t["Evaluations.CostAmount"],
+      evaluationCostCurrencies: t["Evaluations.CostCurrency"],
+      evaluationInputsJson: t["Evaluations.InputsJson"],
+      durationMs: fn.toString(t.DurationMs),
+      TotalCost: t.TotalCost,
+      RoleCosts: t.RoleCosts,
+      RoleLatencies: t.RoleLatencies,
+      TraceMetricsJson: t.TraceMetricsJson,
+      startedAtMs: fn.toUnixTimestamp64Milli(t.StartedAt),
+      queuedAtMs: fn.toUnixTimestamp64Milli(t.QueuedAt),
+      createdAtMs: fn.toUnixTimestamp64Milli(t.CreatedAt),
+      updatedAtMs: fn.toUnixTimestamp64Milli(t.UpdatedAt),
+      finishedAtMs: fn.toUnixTimestamp64Milli(t.FinishedAt),
+      archivedAtMs: fn.toUnixTimestamp64Milli(t.ArchivedAt),
+      cancellationRequestedAtMs: fn.toUnixTimestamp64Milli(t.CancellationRequestedAt),
+      lastSnapshotOccurredAtMs: fn.toUnixTimestamp64Milli(t.LastSnapshotOccurredAt),
+      lastEventOccurredAtMs: fn.toUnixTimestamp64Milli(t.LastEventOccurredAt),
+    })
+    .where(({ and, eq, gte, lte, idBound, scalar }) => {
+      const latest = scalar((sub) =>
+        sub
+          .from(t)
+          .select({ latestUpdatedAt: fn.max(t.UpdatedAt) })
+          .where((inner) =>
+            bounds.kind === "bounded"
+              ? inner.and(
+                  inner.eq(t.ScenarioRunId, scenarioRunId),
+                  inner.gte(t.StartedAt, bounds.latestVersion.fromMs),
+                  inner.lte(t.StartedAt, bounds.latestVersion.toMs),
+                )
+              : inner.idBound(t.ScenarioRunId, scenarioRunId),
+          ),
+      );
+      // A fold read-back's own window, applied verbatim (ADR-066): no id bound.
+      return bounds.kind === "bounded"
+        ? and(
+            eq(t.ScenarioRunId, scenarioRunId),
+            gte(t.StartedAt, bounds.row.fromMs),
+            lte(t.StartedAt, bounds.row.toMs),
+            eq(t.UpdatedAt, latest),
+          )
+        : and(idBound(t.ScenarioRunId, scenarioRunId), eq(t.UpdatedAt, latest));
+    })
+    .limit(1)
+    .build();
 }
