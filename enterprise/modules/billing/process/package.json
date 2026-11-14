@@ -64,6 +64,8 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@clickhouse/client": "catalog:",
+    "@langwatch/clickhouse-migrations": "workspace:*",
     "@langwatch/instant-eval-judge-process": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
