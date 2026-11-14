@@ -11,6 +11,8 @@ import {
   DEFAULT_CALLER_VOICE,
   type CallerVoiceConfig,
   coerceFieldValue,
+  type InlineDeclaration,
+  inlineDeclarationsOf,
   parseCallerVoiceConfig,
   parseScenarioFieldValues,
   parseScenarioParameterDefinitions,
@@ -170,6 +172,8 @@ export type CaseEditorState = {
   save: (options: { shouldRunAfterSave: boolean }) => void;
   /** The optional blocks the chips of the dialog open. */
   customize: CaseCustomizeBlocks;
+  /** The `{ name: value }` declarations of the situation, as a run reads them. */
+  inlineDeclarations: InlineDeclaration[];
 };
 
 /**
@@ -338,12 +342,34 @@ function savePayload({
 }
 
 /** Says what a save would refuse, or nothing when the draft is complete. */
-function useCaseProblem(draft: CaseDraft): string | null {
+function useCaseProblem({
+  draft,
+  inlineDeclarations,
+}: {
+  draft: CaseDraft;
+  inlineDeclarations: InlineDeclaration[];
+}): string | null {
   return useMemo(() => {
     if (!draft.title.trim()) return "A scenario needs a title.";
     if (criteriaOf(draft).length === 0) return "A scenario needs at least one criterion.";
-    return null;
-  }, [draft]);
+    return secretInSituationProblem(inlineDeclarations) ?? null;
+  }, [draft, inlineDeclarations]);
+}
+
+/** What declaring a stored secret inline reads as; a run of it is refused. */
+export const SECRET_IN_SITUATION_MESSAGE = "A secret cannot be declared in the situation";
+
+/** Names the secrets the situation declares, which a run would refuse. */
+export function secretInSituationProblem(
+  inlineDeclarations: readonly InlineDeclaration[],
+): string | undefined {
+  const names = new Set(
+    inlineDeclarations
+      .filter((declaration) => declaration.status.kind === "secret")
+      .map((declaration) => declaration.name),
+  );
+  if (names.size === 0) return void 0;
+  return `${SECRET_IN_SITUATION_MESSAGE}: ${[...names].join(", ")}`;
 }
 
 /** Sends the draft: an update when it came from a stored scenario, else a create. */
@@ -472,8 +498,19 @@ function useCaseDerived({
     () => parseScenarioParameterDefinitions(scenario?.parameters),
     [scenario?.parameters],
   );
-  const problem = useCaseProblem(draft);
-  return { fieldDefinitions, existingParameters, problem };
+  const inlineDeclarations = useMemo(
+    () =>
+      inlineDeclarationsOf({
+        text: draft.situation,
+        parameters: toParameterDefinitions({
+          line: draft.parameters,
+          existing: existingParameters,
+        }),
+      }),
+    [draft.situation, draft.parameters, existingParameters],
+  );
+  const problem = useCaseProblem({ draft, inlineDeclarations });
+  return { fieldDefinitions, existingParameters, inlineDeclarations, problem };
 }
 
 /** Rereads the scenario, seeds the draft from it, and clears the stale flag. */
@@ -530,7 +567,18 @@ export function useCaseEditor({
     scenario,
   });
 
-  const customize = useCaseCustomizeBlocks({ seedCount, draft, setDraft });
+  const { fieldDefinitions, existingParameters, inlineDeclarations, problem } = useCaseDerived({
+    suites,
+    draft,
+    scenario,
+  });
+
+  const customize = useCaseCustomizeBlocks({
+    seedCount,
+    draft,
+    setDraft,
+    hasInlineParameters: inlineDeclarations.length > 0,
+  });
 
   const {
     createMutation,
@@ -542,12 +590,6 @@ export function useCaseEditor({
   } = useCaseWrites({ projectId, onSaved, runAfterSave });
 
   useCaseErrorReset({ open, scenarioId, setStaleVersion, setFieldsError });
-
-  const { fieldDefinitions, existingParameters, problem } = useCaseDerived({
-    suites,
-    draft,
-    scenario,
-  });
 
   const save = useCaseSave({
     problem,
@@ -581,5 +623,6 @@ export function useCaseEditor({
     problem,
     save,
     customize,
+    inlineDeclarations,
   };
 }

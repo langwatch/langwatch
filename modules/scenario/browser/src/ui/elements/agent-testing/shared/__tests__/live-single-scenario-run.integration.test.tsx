@@ -284,6 +284,7 @@ function scenarioRow(overrides: Record<string, unknown> = {}) {
     labels: [],
     testSuiteId: REFUNDS.id,
     parameters: null,
+    situation: "",
     createdAt: new Date("2026-07-06T12:00:00.000Z"),
     lastUpdatedById: null,
     version: 1,

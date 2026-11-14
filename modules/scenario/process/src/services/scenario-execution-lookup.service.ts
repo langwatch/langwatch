@@ -1,8 +1,8 @@
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import {
+  declaredScenarioParameters,
   mergeRunParameters,
-  parseScenarioParameterDefinitions,
   partitionParameterDefinitions,
   renderScenarioContent,
   type RunParameterValues,
@@ -55,7 +55,10 @@ export class ScenarioExecutionLookupService {
       id: scenarioId,
     });
 
-    const definitions = parseScenarioParameterDefinitions(scenario.parameters);
+    const { definitions, situation } = declaredScenarioParameters({
+      parameters: scenario.parameters,
+      situation: scenario.situation,
+    });
     // The secret declarations are taken out before the merge, so no secret value
     // can reach `params` or the scenario's own text. They stay in
     // `declaredNames`, which is what makes a `params.SECRET` reference fail here
@@ -70,7 +73,7 @@ export class ScenarioExecutionLookupService {
     });
 
     const rendered = await renderScenarioContent({
-      situation: scenario.situation,
+      situation,
       criteria: scenario.criteria,
       parameters,
       declaredNames: definitions.map((definition) => definition.name),
