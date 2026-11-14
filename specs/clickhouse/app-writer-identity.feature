@@ -121,15 +121,49 @@ Feature: The api sends its three ClickHouse inserts as an insert-only writer
     When the writer inserts one row into "instant_eval_runs", as one statement and as an async insert
     Then each row is stored
 
-  # The shipped views carry no SQL SECURITY clause, so on 26.8 a view's push checks the inserter's
-  # SELECT on the columns it reads. Until that is decided (ADR-202 Decided 12), the writer's insert
-  # into a table that feeds a view is refused after its source row is stored.
+  # ADR-202 Decided 16: a view with no SQL SECURITY checks the inserter's SELECT on the columns it
+  # reads, and refuses the push with ACCESS_DENIED after the source row is stored. Migrations 00132
+  # and 00133 set the three views the writer's tables feed to SQL SECURITY DEFINER, the definer being
+  # the user the migration ran as.
   @integration
-  Scenario: A view that checks the inserter refuses the writer's push by name
+  Scenario: The writer's insert fills every view its table feeds
     Given ClickHouse 26.8 with the shipped migrations and the writer provisioned
-    When the writer inserts into "gateway_budget_ledger_events" or "dspy_steps"
-    Then ClickHouse refuses each with ACCESS_DENIED while pushing to a view
-    And the source row is stored while every view it feeds misses it
+    When the writer inserts into "gateway_budget_ledger_events" or "dspy_steps", as one statement and as an async insert
+    Then the source row is stored
+    And every view that table feeds holds the row
+    And each such view runs as SQL SECURITY DEFINER with the migrating user as its definer
+
+  # The definer is a dependency of every insert into those tables: the operator note is the chart
+  # README's "bring your own ClickHouse" rows (keep the user that runs the upgrade).
+  @integration
+  Scenario: ClickHouse refuses to drop a user a view runs as
+    Given ClickHouse 26.8 with the shipped migrations and the writer provisioned
+    And "dspy_steps_id_index_mv" runs as a user of its own
+    When an operator drops that user
+    Then ClickHouse refuses it with HAVE_DEPENDENT_OBJECTS, naming the view
+
+  @integration
+  Scenario: A definer without the grants fails the writer's insert by code
+    Given ClickHouse 26.8 with the shipped migrations and the writer provisioned
+    And "dspy_steps_id_index_mv" runs as a user holding no grant
+    When the writer inserts into "dspy_steps"
+    Then ClickHouse refuses it with ACCESS_DENIED
+    And no row is stored
+
+  @integration
+  Scenario: A definer renamed away fails the writer's insert by code
+    Given ClickHouse 26.8 with the shipped migrations and the writer provisioned
+    And the user "dspy_steps_id_index_mv" runs as has been renamed
+    When the writer inserts into "dspy_steps"
+    Then ClickHouse refuses it with UNKNOWN_USER
+    And no row is stored
+
+  @unit
+  Scenario: Every view a writer table feeds runs as its definer
+    Given the shipped ClickHouse migrations replayed in order
+    When a materialised view reads from one of the writer's tables
+    Then its last definition carries SQL SECURITY DEFINER, or a later migration sets it
+    And a view created again without it fails the guard by name
 
   @integration
   Scenario: The writer may not read, even the tables it inserts into
@@ -142,3 +176,28 @@ Feature: The api sends its three ClickHouse inserts as an insert-only writer
     Given ClickHouse 26.8 with the shipped migrations and the writer provisioned
     When the writer inserts into "stored_spans"
     Then ClickHouse refuses it with ACCESS_DENIED
+
+  # ---------------------------------------------------------------------------
+  # The chart
+  # ---------------------------------------------------------------------------
+
+  @unit
+  Scenario: A chart install that sets no writer value renders as before
+    Given the LangWatch chart with the app reader on and clickhouse.appWriter unset
+    When it renders
+    Then no workload carries CLICKHOUSE_WRITER_URL
+    And no app writer Secret is rendered
+
+  @unit
+  Scenario: The chart provisions and wires the app writer when it is enabled
+    Given the LangWatch chart with clickhouse.appReader.enabled and clickhouse.appWriter.enabled
+    When it renders, with LangWatchQL on or off
+    Then a pre-install, pre-upgrade and pre-rollback hook Secret holds langwatch_app_writer's URL on the chart's ClickHouse
+    And the app, the workers and the access-render Job read CLICKHOUSE_WRITER_URL from it
+    And with secrets.existingSecret set they read it from that Secret, and the chart generates none
+
+  @unit
+  Scenario: The chart refuses the app writer without the app reader
+    Given the LangWatch chart with clickhouse.appWriter.enabled and the app reader off
+    When it renders
+    Then the render fails naming clickhouse.appReader.enabled

@@ -1,7 +1,7 @@
 /**
  * ADR-202 Decided 12 on a throwaway ClickHouse 26.8: the api's insert-only writer holds INSERT on
- * its three tables alone and may not read anything or insert anywhere else. The shipped views carry
- * no SQL SECURITY, so they check the inserter's SELECT: the view case waits on that decision.
+ * its three tables alone and may not read anything or insert anywhere else. The views its tables
+ * feed run as their definer (Decided 16, migrations 00132 and 00133), so its inserts fill them.
  * @see specs/clickhouse/app-writer-identity.feature
  */
 import { createHash, randomBytes } from "node:crypto";
@@ -30,6 +30,8 @@ const READER_LOGIN = "app-writer-identity-reader-login";
 const WRITER_LOGIN = "app-writer-identity-writer-login";
 const sha256 = (value: string) => createHash("sha256").update(value).digest("hex");
 const ACCESS_DENIED = "497";
+const HAVE_DEPENDENT_OBJECTS = "630";
+const UNKNOWN_USER = "192";
 
 /** Values a view's own filter requires, beside the generic fill. */
 const VIEW_FILTER_VALUES: Record<string, Record<string, string | number>> = {
@@ -50,6 +52,8 @@ interface MaterializedView {
   name: string;
   source: string;
   target: string;
+  /** `<definer>:<SQL SECURITY>` as the server reports it. */
+  security: string;
 }
 
 /** The reader and the writer, as the upgrade renders them for a server LangWatchQL is off on. */
@@ -79,6 +83,9 @@ async function materializedViews(
   });
   const found = await listed.json<{ name: string; create_table_query: string }>();
   return found.map(({ name, create_table_query }) => ({
+    security: (/\bDEFINER = `?([^`\s]+)`? SQL SECURITY (\w+)/.exec(create_table_query) ?? [])
+      .slice(1)
+      .join(":"),
     name,
     source: new RegExp(`\\bFROM ${database}\\.\`?(\\w+)`).exec(create_table_query)?.[1] ?? "",
     target: new RegExp(`\\bTO ${database}\\.\`?(\\w+)`).exec(create_table_query)?.[1] ?? "",
@@ -204,39 +211,110 @@ describe("given ClickHouse 26.8 with the shipped migrations and the writer provi
       );
     });
 
-    /** @scenario "A view that checks the inserter refuses the writer's push by name" */
-    it("refuses the insert while pushing to a view, after the source row is stored", async () => {
-      expect(views.length).toBeGreaterThanOrEqual(3);
-      for (const source of new Set(views.map((view) => view.source))) {
-        const tenant = `writer_view_${randomBytes(3).toString("hex")}`;
-        await expect(
-          writer.insert({
+    /** @scenario "The writer's insert fills every view its table feeds" */
+    it("runs every such view as its definer, the migrating user", async () => {
+      expect(views.map((view) => view.name).toSorted()).toEqual([
+        "dspy_steps_id_index_mv",
+        "gateway_budget_ledger_events_id_index_mv",
+        "gateway_budget_scope_totals_mv",
+      ]);
+      const [migrator] = await (
+        await admin.query({ query: "SELECT currentUser() AS user", format: "JSONEachRow" })
+      ).json<{ user: string }>();
+      for (const view of views) {
+        expect(view.security, view.name).toBe(`${migrator?.user}:DEFINER`);
+      }
+    });
+
+    /** @scenario "The writer's insert fills every view its table feeds" */
+    it.each(Object.entries(INSERT_MODES))(
+      "stores the row and fills each view (%s)",
+      async (mode, settings) => {
+        for (const source of new Set(views.map((view) => view.source))) {
+          const tenant = `writer_view_${mode}_${randomBytes(3).toString("hex")}`;
+          await writer.insert({
             table: `${factDatabase}.${source}`,
             values: [await rowFor({ admin, database: factDatabase, table: source, tenant })],
             format: "JSONEachRow",
-            clickhouse_settings: INSERT_MODES.sync,
-          }),
-          source,
-        ).rejects.toMatchObject({ code: ACCESS_DENIED });
-        const column = tenantColumnOf.get(source) ?? "TenantId";
-        expect(
-          await count(
-            admin,
-            `SELECT count() AS n FROM ${factDatabase}.${source} WHERE ${column} = '${tenant}'`,
-          ),
-          source,
-        ).toBe(1);
-        for (const view of views.filter((each) => each.source === source)) {
-          const target = tenantColumnOf.get(view.target) ?? "TenantId";
+            clickhouse_settings: settings,
+          });
+          const column = tenantColumnOf.get(source) ?? "TenantId";
           expect(
             await count(
               admin,
-              `SELECT count() AS n FROM ${factDatabase}.${view.target} WHERE ${target} = '${tenant}'`,
+              `SELECT count() AS n FROM ${factDatabase}.${source} WHERE ${column} = '${tenant}'`,
             ),
-            view.name,
-          ).toBe(0);
+            source,
+          ).toBe(1);
+          for (const view of views.filter((each) => each.source === source)) {
+            const target = tenantColumnOf.get(view.target) ?? "TenantId";
+            expect(
+              await count(
+                admin,
+                `SELECT count() AS n FROM ${factDatabase}.${view.target} WHERE ${target} = '${tenant}'`,
+              ),
+              view.name,
+            ).toBeGreaterThan(0);
+          }
         }
+      },
+    );
+
+    describe("and the view's definer is a user holding no grant", () => {
+      const view = () => `${factDatabase}.dspy_steps_id_index_mv`;
+      const definer = `app_writer_bare_definer_${randomBytes(3).toString("hex")}`;
+
+      beforeAll(async () => {
+        await admin.command({ query: `CREATE USER ${definer} IDENTIFIED WITH no_password` });
+        await admin.command({
+          query: `ALTER TABLE ${view()} MODIFY SQL SECURITY DEFINER DEFINER = ${definer}`,
+        });
+      });
+
+      afterAll(async () => {
+        await admin.command({
+          query: `ALTER TABLE ${view()} MODIFY SQL SECURITY DEFINER DEFINER = CURRENT_USER`,
+        });
+        await admin.command({ query: `DROP USER IF EXISTS ${definer}` });
+        await admin.command({ query: `DROP USER IF EXISTS ${definer}_renamed` });
+      });
+
+      /** @scenario "ClickHouse refuses to drop a user a view runs as" */
+      it("refuses to drop the definer, naming the view", async () => {
+        await expect(admin.command({ query: `DROP USER ${definer}` })).rejects.toMatchObject({
+          code: HAVE_DEPENDENT_OBJECTS,
+        });
+      });
+
+      async function insertDspyStep(tenant: string) {
+        return writer.insert({
+          table: `${factDatabase}.dspy_steps`,
+          values: [await rowFor({ admin, database: factDatabase, table: "dspy_steps", tenant })],
+          format: "JSONEachRow",
+          clickhouse_settings: INSERT_MODES.sync,
+        });
       }
+
+      const storedSteps = (tenant: string) =>
+        count(
+          admin,
+          `SELECT count() AS n FROM ${factDatabase}.dspy_steps WHERE TenantId = '${tenant}'`,
+        );
+
+      /** @scenario "A definer without the grants fails the writer's insert by code" */
+      it("refuses the writer's insert and stores nothing", async () => {
+        const tenant = `writer_bare_${randomBytes(3).toString("hex")}`;
+        await expect(insertDspyStep(tenant)).rejects.toMatchObject({ code: ACCESS_DENIED });
+        expect(await storedSteps(tenant)).toBe(0);
+      });
+
+      /** @scenario "A definer renamed away fails the writer's insert by code" */
+      it("refuses the writer's insert once the definer is renamed, and stores nothing", async () => {
+        await admin.command({ query: `ALTER USER ${definer} RENAME TO ${definer}_renamed` });
+        const tenant = `writer_renamed_${randomBytes(3).toString("hex")}`;
+        await expect(insertDspyStep(tenant)).rejects.toMatchObject({ code: UNKNOWN_USER });
+        expect(await storedSteps(tenant)).toBe(0);
+      });
     });
   });
 

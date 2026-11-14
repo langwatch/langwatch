@@ -953,6 +953,14 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   value: {{ .Values.clickhouse.appReader.shadowSampleRate | quote }}
 {{- end }}
 {{- end }}
+{{- /* The app writer (ADR-202 Decided 12): its URL comes from the hook Secret, or the operator's. */}}
+{{- if and .Values.clickhouse.chartManaged .Values.clickhouse.appWriter.enabled }}
+- name: CLICKHOUSE_WRITER_URL
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "langwatch.clickhouse.appWriterSecret" . }}
+      key: CLICKHOUSE_WRITER_URL
+{{- end }}
 {{- if .Values.clickhouse.appReader.enforce }}
 - name: CLICKHOUSE_TENANCY_ENFORCE
   value: "true"
@@ -1470,6 +1478,20 @@ LWQL_POSTGRES_READER_PASSWORD
 {{- define "langwatch.clickhouse.appReaderSecret" -}}
 {{- if include "langwatch.lwql.passwordsChartOwned" . -}}
 {{- include "langwatch.clickhouse.appReaderSecretName" . -}}
+{{- else -}}
+{{- include "langwatch.lwql.passwordSecret" . -}}
+{{- end -}}
+{{- end -}}
+
+{{/* The chart-owned app writer Secret (templates/clickhouse/app-writer-secret.yaml). */}}
+{{- define "langwatch.clickhouse.appWriterSecretName" -}}
+  {{- printf "%s-clickhouse-app-writer" (include "langwatch.fullname" .) -}}
+{{- end -}}
+
+{{/* The Secret the writer URL is read from: the chart's hook Secret, or the operator's. */}}
+{{- define "langwatch.clickhouse.appWriterSecret" -}}
+{{- if include "langwatch.lwql.passwordsChartOwned" . -}}
+{{- include "langwatch.clickhouse.appWriterSecretName" . -}}
 {{- else -}}
 {{- include "langwatch.lwql.passwordSecret" . -}}
 {{- end -}}

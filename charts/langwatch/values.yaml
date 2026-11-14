@@ -2169,6 +2169,12 @@ clickhouse:
     enforce: false
     ## @param clickhouse.appReader.shadowSampleRate [string, default: "0"] Share of reader reads re-run as langwatch_app_reader_enforcing to count the rows enforcement would hide (CLICKHOUSE_SHADOW_SAMPLE_RATE). Above 0, the chart also wires CLICKHOUSE_ENFORCING_READER_URL.
     shadowSampleRate: "0"
+  # App writer (ADR-202 Decided 12): the insert-only user the api sends its three
+  # inserts as once its system credential is removed. Off this release; it is
+  # provisioned beside the reader, so it needs clickhouse.appReader.enabled.
+  appWriter:
+    ## @param clickhouse.appWriter.enabled [default: false] Provision the app writer (langwatch_app_writer, INSERT on three tables, no SELECT) on chart-managed ClickHouse and point the app, the workers and the render Job at it (CLICKHOUSE_WRITER_URL). Needs clickhouse.appReader.enabled. The password is generated into a hook Secret; with secrets.existingSecret, or autogen off, that Secret carries CLICKHOUSE_WRITER_URL itself.
+    enabled: false
   ## @param clickhouse.extraVolumes [array] Extra volumes for the ClickHouse pod.
   extraVolumes: []
   ## @param clickhouse.extraVolumeMounts [array] Extra mounts for the ClickHouse container.

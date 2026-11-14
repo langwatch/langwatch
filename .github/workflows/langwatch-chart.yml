@@ -287,6 +287,12 @@ jobs:
         if: "!cancelled()"
         run: ./tests/app-reader-env.sh
 
+      # ADR-202 Decided 12: the insert-only app writer, off by default, provisioned beside
+      # the reader; turned on without the reader the chart refuses to render.
+      - name: "assert the app writer wiring"
+        if: "!cancelled()"
+        run: ./tests/app-writer-env.sh
+
       - name: "assert ClickHouse pool sizing follows fleet capacity"
         if: "!cancelled()"
         run: ./tests/clickhouse-pool-sizing.sh

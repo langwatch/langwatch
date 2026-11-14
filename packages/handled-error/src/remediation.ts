@@ -314,6 +314,7 @@ const registry = {
   clickhouse_system_identity_absent: {
     tips: [
       "Give this process the ClickHouse system credential, or send the statement from the worker (ADR-202)",
+      "An insert needs CLICKHOUSE_URL or the insert-only CLICKHOUSE_WRITER_URL on this process (ADR-202 Decided 12)",
     ],
   },
 
