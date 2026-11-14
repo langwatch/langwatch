@@ -89,18 +89,21 @@ function wiringToolFor(sourceType: string): string | null {
 
 /**
  * Re-mints the personal ingest key cached under `sourceType` and rewrites its tool's wiring,
- * declining without a platform call when this device can't repair the 401.
- * {@link revocationBlocksHeal} decides whether the platform withholds the repair.
+ * declining without a platform call when this device can't repair the 401. A wiring-sourced
+ * token (#7958) must instead be an `ik-lw-` key the platform knows as this account's.
  */
 export async function healRevokedIngestKey({
   sourceType,
   rejectedToken,
+  rejectedTokenSource = "cache",
   deps = REAL_DEPS,
 }: {
   /** The source type the rejected personal key is cached and minted under. */
   sourceType: string;
   /** The bearer the collector answered 401 to, without the `Bearer ` word. */
   rejectedToken: string | undefined;
+  /** `"cache"` must match the cached key; `"wiring"` is from the agent's settings (#7958). */
+  rejectedTokenSource?: "cache" | "wiring";
   deps?: HealDeps;
 }): Promise<HealOutcome> {
   const tool = wiringToolFor(sourceType);
@@ -110,13 +113,23 @@ export async function healRevokedIngestKey({
   if (!deps.isLoggedIn(cfg)) return DECLINED;
   if (cfg.tool_project_keys?.[tool]?.secret) return DECLINED;
 
-  // Only the cached personal key is ours to replace, and only when it is
-  // demonstrably the credential that was rejected. A 401 the device carried
-  // no bearer for, or carried someone else's, is not this key's failure.
+  // Only a key this device wrote is ours to replace: the cached key by identity, or a
+  // wired `ik-lw-` key the platform must recognise as this account's (checked below).
   const cached = cfg.default_personal_ingest_keys?.[sourceType]?.secret;
-  if (!cached || rejectedToken !== cached) return DECLINED;
+  if (!rejectedToken) return DECLINED;
+  if (rejectedTokenSource === "cache" && (!cached || rejectedToken !== cached)) {
+    return DECLINED;
+  }
+  if (rejectedTokenSource === "wiring" && !extractLookupIdFromToken(rejectedToken)) {
+    return DECLINED;
+  }
 
-  const blocked = await revocationBlocksHeal({ cfg, cached, deps });
+  const blocked = await revocationBlocksHeal({
+    cfg,
+    rejected: rejectedToken,
+    mustBeKnown: rejectedTokenSource === "wiring",
+    deps,
+  });
   if (blocked) return blocked;
 
   const resolved = await deps.resolveLiveIngestionKey({
@@ -124,26 +137,71 @@ export async function healRevokedIngestKey({
     sourceType,
     allowOfflineFallback: false,
   });
-  if (!resolved.minted) return { status: "failed" };
+  if (!resolved.minted) {
+    // A live cached key under a dead wired one is the drift itself: point the wiring at it.
+    const liveCachedKey =
+      rejectedTokenSource === "wiring" &&
+      resolved.token !== rejectedToken &&
+      extractLookupIdFromToken(resolved.token) !== undefined;
+    return liveCachedKey ? rewireToKey({ cfg, tool, resolved, deps }) : { status: "failed" };
+  }
 
   return adoptMintedKey({ sourceType, tool, cfg, resolved, deps });
 }
 
-/**
- * The status check between the 401 and the mint: an outcome ends the heal, `null` means the
- * key may still be replaced. A call that errors or times out also ends the heal — a platform
- * that didn't answer never said "safe to re-mint" — and a refused session ends on `expired`.
- */
-async function revocationBlocksHeal({
+/** Rewrites the tool's wiring onto a key the cache already holds; the cache is untouched. */
+function rewireToKey({
   cfg,
-  cached,
+  tool,
+  resolved,
   deps,
 }: {
   cfg: GovernanceConfig;
-  cached: string;
+  tool: string;
+  resolved: Awaited<ReturnType<HealDeps["resolveLiveIngestionKey"]>>;
+  deps: HealDeps;
+}): HealOutcome {
+  const wiring = deps.installTelemetryWiring({
+    cfg,
+    tool,
+    endpoint: resolved.endpoint,
+    token: resolved.token,
+  });
+  if (wiring.requiredFailures.length > 0 || wiring.labels.length === 0) {
+    return { status: "failed" };
+  }
+  return healedTarget(resolved);
+}
+
+function healedTarget(resolved: { endpoint: string; token: string }): HealOutcome {
+  return {
+    status: "healed",
+    target: {
+      endpoint: `${resolved.endpoint}/v1/logs`,
+      headers: { Authorization: `Bearer ${resolved.token}` },
+    },
+  };
+}
+
+/**
+ * The status check between the 401 and the mint: an outcome ends the heal, `null` means the
+ * key may still be replaced. A call that errors or times out also ends the heal, and a refused
+ * session ends on `expired`. With `mustBeKnown` (a wired key) an `unknown` key declines.
+ */
+async function revocationBlocksHeal({
+  cfg,
+  rejected,
+  mustBeKnown = false,
+  deps,
+}: {
+  cfg: GovernanceConfig;
+  /** The rejected bearer itself — cached or wired, whichever 401'd. */
+  rejected: string;
+  /** Decline, rather than mint, when the platform does not know the key. */
+  mustBeKnown?: boolean;
   deps: HealDeps;
 }): Promise<HealOutcome | null> {
-  const lookupId = extractLookupIdFromToken(cached);
+  const lookupId = extractLookupIdFromToken(rejected);
   if (!lookupId) return null;
 
   const described = await deps
@@ -151,6 +209,7 @@ async function revocationBlocksHeal({
     .catch((error: unknown) => (isExpiredSession(error) ? EXPIRED_SESSION : null));
   if (!described) return { status: "failed" };
   if (described === EXPIRED_SESSION) return { status: "expired" };
+  if (described.status === "unknown" && mustBeKnown) return DECLINED;
   if (described.status === "revoked") {
     if (described.revocationCause === USER_REVOCATION_CAUSE || described.revocationCause === null) {
       return { status: "withheld" };
@@ -213,11 +272,5 @@ function adoptMintedKey({
     return { status: "failed" };
   }
 
-  return {
-    status: "healed",
-    target: {
-      endpoint: `${resolved.endpoint}/v1/logs`,
-      headers: { Authorization: `Bearer ${resolved.token}` },
-    },
-  };
+  return healedTarget(resolved);
 }
