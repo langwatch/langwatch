@@ -1,6 +1,7 @@
 /**
  * `simulation_runs`, owned by scenario (ADR-202): ReplacingMergeTree(UpdatedAt) over (TenantId,
- * ScenarioRunId). Nested columns by stored name (00002, 00090, 00101); role maps from 00008.
+ * ScenarioRunId), partitioned by StartedAt (the election's window). Nested columns by stored name
+ * (00002, 00090, 00101); role maps from 00008.
  */
 import { column, defineClickHouseTable } from "@langwatch/clickhouse-client/builder";
 
@@ -8,6 +9,7 @@ export const simulationRuns = defineClickHouseTable({
   name: "simulation_runs",
   tenantColumn: "TenantId",
   versionColumn: "UpdatedAt",
+  timeColumn: "StartedAt",
   sortKey: ["TenantId", "ScenarioRunId"],
   columns: {
     ProjectionId: column.string(),

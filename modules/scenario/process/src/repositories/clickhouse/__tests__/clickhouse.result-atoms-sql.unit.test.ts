@@ -2,7 +2,11 @@
  * @see specs/features/agent-testing/results-atoms.feature
  */
 
-import { categorizeRunStatus, ScenarioRunStatus } from "@langwatch/scenario-contract";
+import {
+  categorizeRunStatus,
+  type ResultsGroupBy,
+  ScenarioRunStatus,
+} from "@langwatch/scenario-contract";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -28,10 +32,14 @@ const groupKeyExpr = (
   ...args: Parameters<typeof ResultAtomsClickHouseRepository.groupKeyExpr>
 ): ReturnType<typeof ResultAtomsClickHouseRepository.groupKeyExpr> =>
   ResultAtomsClickHouseRepository.groupKeyExpr(...args);
-const trendKeyExpr = (
-  ...args: Parameters<typeof ResultAtomsClickHouseRepository.trendKeyExpr>
-): ReturnType<typeof ResultAtomsClickHouseRepository.trendKeyExpr> =>
-  ResultAtomsClickHouseRepository.trendKeyExpr(...args);
+/** The trend key a grouping's built trend read selects. */
+const trendKeyExpr = (groupBy: ResultsGroupBy): string | undefined =>
+  /\(SELECT .*?, (\w+) AS TrendKey,/.exec(
+    ResultAtomsClickHouseRepository.trendRead({
+      filter: { projectId: "proj", startDate: 1_000_000 },
+      groupBy,
+    }).sql,
+  )?.[1];
 
 /**
  * Every raw value the Status column is known to hold, including the legacy

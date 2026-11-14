@@ -16,6 +16,7 @@ import {
   MAX_RUN_TARGETS,
   ResultAtomsClickHouseRepository,
 } from "../clickhouse.result-atoms.repository.ts";
+import { scenarioClickHouseOver } from "./simulation-clickhouse-rows.fixture.ts";
 
 const configuredClickHouseUrl = process.env.TEST_CLICKHOUSE_URL ?? process.env.CI_CLICKHOUSE_URL;
 const databaseUrl = configuredClickHouseUrl ? new URL(configuredClickHouseUrl) : null;
@@ -146,7 +147,14 @@ beforeAll(() => {
     url: databaseUrl,
     clickhouse_settings: { date_time_input_format: "best_effort" },
   });
-  repo = ResultAtomsClickHouseRepository.create(async () => ch!);
+  const client = ch;
+  repo = ResultAtomsClickHouseRepository.create(
+    scenarioClickHouseOver({
+      query: (input) => client.query(input),
+      insert: (input) => client.insert(input),
+      command: (input) => client.command(input),
+    }),
+  );
 });
 
 afterAll(async () => {

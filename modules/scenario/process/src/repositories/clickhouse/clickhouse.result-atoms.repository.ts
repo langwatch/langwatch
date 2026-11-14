@@ -2,6 +2,18 @@
  * Results tab atom: flat `simulation_runs` for filter/group, distinct from v1 batch/set.
  * SQL builders are static methods per restructure-bug-hunt-2026-09-03.md.
  */
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import {
+  clickhouseRead,
+  type Condition,
+  type ConditionOps,
+  type Expression,
+  fn,
+  param,
+  type ReaderReadStatement,
+  type SingleTenantScope,
+  tenantScope,
+} from "@langwatch/clickhouse-client/builder";
 import {
   MAX_TREND_POINTS,
   MAX_ATOM_PAGE,
@@ -24,6 +36,7 @@ import {
   type RawTotalsRow,
   ResultAtomsRepository,
 } from "../result-atoms.repository.ts";
+import { simulationRuns } from "./clickhouse.simulation-runs.table.ts";
 import {
   RUN_NOT_SCORED_EXPR,
   RUN_NOTE_EXPR,
@@ -57,7 +70,8 @@ const OUTCOME_EXPR = `multiIf(
   'pending')`;
 
 /** The outcomes a pass rate divides by: a not-scored run is finished but never graded. */
-const GRADED_OUTCOMES = "('passed','failed')";
+const GRADED_OUTCOME_VALUES = ["passed", "failed"] as const;
+const GRADED_OUTCOMES = `(${quoted(GRADED_OUTCOME_VALUES)})`;
 
 /**
  * When the run started (epoch ms): ORDER BY, the cursor predicate and the
@@ -370,6 +384,173 @@ function isEmptyScope(filter: ResultsFilter): boolean {
   );
 }
 
+/**
+ * The window's runs at their latest version, as the table the typed atom reads select from. The
+ * election repeats only the widened window, so the exact window applies over this table.
+ * @see dev/docs/best_practices/clickhouse-queries.md — "A range filter on a MOVABLE column"
+ */
+function atomRunsOf({ filter, scope }: { filter: ResultsFilter; scope: SingleTenantScope }) {
+  const t = simulationRuns;
+  const setIds = filter.scenarioSetIds?.flatMap((setId) => expandSetIdFilter(setId)) ?? [];
+  const runs = clickhouseRead({ scope })
+    .from(t)
+    .select({
+      ScenarioSetId: t.ScenarioSetId,
+      BatchRunId: t.BatchRunId,
+      ScenarioRunId: t.ScenarioRunId,
+      ScenarioId: t.ScenarioId,
+      Name: t.Name,
+      Status: t.Status,
+      Metadata: t.Metadata,
+      StartedAt: t.StartedAt,
+      CreatedAt: t.CreatedAt,
+    })
+    .where(({ and, ne, not, oneOf }) =>
+      and(
+        ne(t.ScenarioId, ""),
+        not(fn.endsWith(t.ScenarioSetId, AGENT_TEST_SET_SUFFIX)),
+        ne(t.ScenarioSetId, VOICE_CALL_SCENARIO_SET_ID),
+        ...(setIds.length > 0 ? [oneOf(t.ScenarioSetId, setIds)] : []),
+      ),
+    )
+    .where(({ gte }) => gte(t.StartedAt, Math.max(0, filter.startDate - DEDUP_WINDOW_SLACK_MS)));
+  const { endDate } = filter;
+  const windowed =
+    endDate === undefined
+      ? runs
+      : runs.where(({ lte }) => lte(t.StartedAt, endDate + DEDUP_WINDOW_SLACK_MS));
+  return windowed
+    .where(({ isNull }) => isNull(t.ArchivedAt))
+    .latestVersion()
+    .as("atoms");
+}
+
+export type AtomRuns = ReturnType<typeof atomRunsOf>;
+export type AtomOps = ConditionOps<"atoms", Record<never, never>>;
+type AtomText = Expression<string, "atoms">;
+
+const metadataOf = (atoms: AtomRuns) => fn.ifNull(atoms.Metadata, "{}");
+const langwatchOf = (atoms: AtomRuns) => fn.JSONExtractRaw(metadataOf(atoms), "langwatch");
+
+/** The typed reads of a run's fields; each mirrors the text expression of the same name above. */
+export const atomFields = {
+  sortKey: (atoms: AtomRuns): Expression<number, "atoms"> =>
+    fn.toUnixTimestamp64Milli(fn.ifNull(atoms.StartedAt, atoms.CreatedAt)),
+  targetRef: (atoms: AtomRuns): AtomText =>
+    fn.JSONExtractString(langwatchOf(atoms), "targetReferenceId"),
+  targetStampKey: (atoms: AtomRuns): AtomText =>
+    fn.JSONExtractString(langwatchOf(atoms), "targetKey"),
+  targetParameters: (atoms: AtomRuns): AtomText =>
+    fn.JSONExtractRaw(langwatchOf(atoms), "targetParameters"),
+  langwatchString: (atoms: AtomRuns, key: string): AtomText =>
+    fn.JSONExtractString(langwatchOf(atoms), key),
+  metadataRaw: (atoms: AtomRuns, key: string): AtomText =>
+    fn.JSONExtractRaw(metadataOf(atoms), key),
+  metadataString: (atoms: AtomRuns, key: string): AtomText =>
+    fn.JSONExtractString(metadataOf(atoms), key),
+  codeTargetName: (atoms: AtomRuns, { and, eq, ne }: AtomOps): AtomText =>
+    fn.arrayStringConcat(
+      fn.arrayMap(
+        (agent) => fn.JSONExtractString(agent, "name"),
+        fn.arrayFilter(
+          (agent) =>
+            and(
+              eq(fn.JSONExtractString(agent, "role"), "agent"),
+              ne(fn.JSONExtractString(agent, "name"), ""),
+            ),
+          fn.JSONExtractArrayRaw(metadataOf(atoms), "agents"),
+        ),
+      ),
+      " vs ",
+    ),
+  targetKey: (atoms: AtomRuns, ops: AtomOps): AtomText => {
+    const stamp = atomFields.targetStampKey(atoms);
+    const ref = atomFields.targetRef(atoms);
+    const slug = nameSlugOf(atomFields.codeTargetName(atoms, ops));
+    return fn.multiIf(
+      [
+        [ops.ne(stamp, ""), stamp],
+        [ops.ne(ref, ""), ref],
+        [ops.ne(slug, ""), fn.concat("code:", slug)],
+      ],
+      param.string(UNKNOWN_TARGET_KEY),
+    );
+  },
+  trigger: (atoms: AtomRuns, { eq }: AtomOps): AtomText =>
+    fn.if(eq(atomFields.targetRef(atoms), ""), param.string("code"), "app"),
+  scenarioKey: (atoms: AtomRuns, { and, eq, ne }: AtomOps): AtomText => {
+    const setKey = fn.if(eq(atoms.ScenarioSetId, ""), param.string("default"), atoms.ScenarioSetId);
+    const nameSlug = nameSlugOf(fn.ifNull(atoms.Name, ""));
+    return fn.if(
+      and(eq(atomFields.targetRef(atoms), ""), ne(nameSlug, "")),
+      fn.concat(setKey, "-", nameSlug),
+      atoms.ScenarioId,
+    );
+  },
+  notScored: (atoms: AtomRuns, { and, eq, not, oneOf }: AtomOps): Condition =>
+    and(
+      eq(atoms.Status, "ERROR"),
+      not(
+        oneOf(fn.JSONExtractString(metadataOf(atoms), "langwatch", "hooks", "setup", "status"), [
+          "",
+          "ok",
+        ]),
+      ),
+    ),
+  outcome: (atoms: AtomRuns, ops: AtomOps): AtomText =>
+    fn.multiIf(
+      [
+        [ops.oneOf(atoms.Status, [...PASSED_STATUS_VALUES]), param.string("passed")],
+        [atomFields.notScored(atoms, ops), param.string("not_scored")],
+        [ops.oneOf(atoms.Status, [...FAILED_STATUS_VALUES]), param.string("failed")],
+      ],
+      param.string("pending"),
+    ),
+  groupKey: (groupBy: ResultsGroupBy, atoms: AtomRuns, ops: AtomOps): AtomText => {
+    switch (groupBy) {
+      case "plan":
+        return atoms.ScenarioSetId;
+      case "scenario":
+        return atomFields.scenarioKey(atoms, ops);
+      case "target":
+        return atomFields.targetKey(atoms, ops);
+      case "none":
+        return atoms.ScenarioRunId;
+    }
+  },
+  trendKey: (groupBy: ResultsGroupBy, atoms: AtomRuns): AtomText =>
+    groupBy === "plan" ? atoms.BatchRunId : atoms.ScenarioRunId,
+} as const;
+
+/** Lower case, each stretch of anything but a letter or digit one dash, no dash at either end. */
+function nameSlugOf<T extends string>(of: Expression<string, T>) {
+  return fn.trimBoth(fn.replaceRegexpAll(fn.lowerUTF8(of), "[^\\p{L}\\p{N}]+", "-"), "-");
+}
+
+/** The predicates only valid after the election: the exact window, outcome, target and scenario. */
+function atomsInScope(filter: ResultsFilter, atoms: AtomRuns, ops: AtomOps): Condition {
+  const { and, gte, lte, not, oneOf } = ops;
+  const parts: Condition[] = [gte(atoms.StartedAt, filter.startDate)];
+  if (filter.endDate !== undefined) parts.push(lte(atoms.StartedAt, filter.endDate));
+  if (filter.outcome === "passed") parts.push(oneOf(atoms.Status, [...PASSED_STATUS_VALUES]));
+  if (filter.outcome === "failed") {
+    parts.push(
+      and(oneOf(atoms.Status, [...FAILED_STATUS_VALUES]), not(atomFields.notScored(atoms, ops))),
+    );
+  }
+  if (filter.outcome === "not_scored") parts.push(atomFields.notScored(atoms, ops));
+  if (filter.outcome === "pending") {
+    parts.push(not(oneOf(atoms.Status, [...PASSED_STATUS_VALUES, ...FAILED_STATUS_VALUES])));
+  }
+  if (filter.targetKeys && filter.targetKeys.length > 0) {
+    parts.push(oneOf(atomFields.targetKey(atoms, ops), filter.targetKeys));
+  }
+  if (filter.scenarioIds && filter.scenarioIds.length > 0) {
+    parts.push(oneOf(atomFields.scenarioKey(atoms, ops), filter.scenarioIds));
+  }
+  return and(...parts);
+}
+
 /** The raw ClickHouse row, `Status` unmapped. Internal to this file only. */
 type RawAtomQueryRow = Omit<RawAtomRow, "Status"> & { Status: string };
 
@@ -384,6 +565,8 @@ type ResultAtomsClickHouseClient = {
     query_params: Record<string, string | string[]>;
     format: "JSONEachRow";
   }): Promise<{ json<Result>(): Promise<Result[]> }>;
+  /** A statement the typed builder built; the session refuses one scoped to another tenant. */
+  read: ClickHouseQueryClient["read"];
 };
 
 export class ResultAtomsClickHouseRepository extends ResultAtomsRepository {
@@ -391,6 +574,17 @@ export class ResultAtomsClickHouseRepository extends ResultAtomsRepository {
     resolveClient: ResultAtomsClickHouseClientResolver,
   ): ResultAtomsClickHouseRepository {
     return new ResultAtomsClickHouseRepository(resolveClient);
+  }
+
+  /** The atoms in scope as one tenant's read, with the scope its derived tables share. */
+  static atomScope(filter: ResultsFilter): { scope: SingleTenantScope; atoms: AtomRuns } {
+    const scope = tenantScope.single({ tenantId: filter.projectId });
+    return { scope, atoms: atomRunsOf({ filter, scope }) };
+  }
+
+  /** The predicates only valid after the election, over the atoms of {@link atomScope}. */
+  static inScope(filter: ResultsFilter, atoms: AtomRuns, ops: AtomOps): Condition {
+    return atomsInScope(filter, atoms, ops);
   }
 
   /** The column a grouping folds on. */
@@ -405,15 +599,6 @@ export class ResultAtomsClickHouseRepository extends ResultAtomsRepository {
       case "none":
         return "ScenarioRunId";
     }
-  }
-
-  /**
-   * The grain of one sparkline bar: a run plan row covers many scenarios (so
-   * folds a whole run), while a scenario or target row already names one
-   * thing, so each bar is one execution of it.
-   */
-  static trendKeyExpr(groupBy: ResultsGroupBy): string {
-    return groupBy === "plan" ? "BatchRunId" : "ScenarioRunId";
   }
 
   /**
@@ -569,25 +754,48 @@ export class ResultAtomsClickHouseRepository extends ResultAtomsRepository {
    */
   async findRunOrdinals(filter: ResultsFilter): Promise<RunOrdinalRow[]> {
     if (isEmptyScope(filter)) return [];
-    const filters = ResultAtomsClickHouseRepository.buildAtomFilters(filter);
-    return this.queryRows<RunOrdinalRow>(
-      `SELECT
-         SetId,
-         BatchRunId,
-         toString(RunAt) AS RunAt,
-         toString(row_number() OVER (
-           PARTITION BY SetId ORDER BY RunAt ASC, BatchRunId ASC
-         )) AS Ordinal
-       FROM (
-         SELECT
-           ScenarioSetId AS SetId,
-           BatchRunId,
-           min(${ATOM_SORT_KEY}) AS RunAt
-         ${ResultAtomsClickHouseRepository.atomScopeSql(filters)}
-         GROUP BY ScenarioSetId, BatchRunId
-       )`,
-      { tenantId: filter.projectId, ...filters.params },
-    );
+    return this.readRows(filter, ResultAtomsClickHouseRepository.runOrdinalsRead(filter));
+  }
+
+  /** Each batch's first run in the window, numbered within its plan oldest first. */
+  static runOrdinalsRead(filter: ResultsFilter): ReaderReadStatement<RunOrdinalRow> {
+    const { scope, atoms } = ResultAtomsClickHouseRepository.atomScope(filter);
+    const batches = clickhouseRead({ scope })
+      .from(atoms)
+      .select({
+        SetId: atoms.ScenarioSetId,
+        BatchRunId: atoms.BatchRunId,
+        RunAt: fn.min(atomFields.sortKey(atoms)),
+      })
+      .where((ops) => atomsInScope(filter, atoms, ops))
+      .groupBy(atoms.ScenarioSetId, atoms.BatchRunId)
+      .as("batches");
+    return clickhouseRead({ scope })
+      .from(batches)
+      .select({
+        SetId: batches.SetId,
+        BatchRunId: batches.BatchRunId,
+        RunAt: fn.toString(batches.RunAt),
+        Ordinal: fn.toString(
+          fn.over(fn.rowNumber(), {
+            partitionBy: [batches.SetId],
+            orderBy: [
+              [batches.RunAt, "ASC"],
+              [batches.BatchRunId, "ASC"],
+            ],
+          }),
+        ),
+      })
+      .build();
+  }
+
+  private async readRows<Row>(
+    filter: ResultsFilter,
+    statement: ReaderReadStatement<Row>,
+  ): Promise<Row[]> {
+    const client = await this.getClient(filter.projectId);
+    const { rows } = await client.read({ statement, table: simulationRuns.$table.name });
+    return rows;
   }
 
   /** The stat strip counts, over every atom in scope. */
@@ -673,28 +881,33 @@ export class ResultAtomsClickHouseRepository extends ResultAtomsRepository {
    */
   async findCodeScenarios(filter: ResultsFilter): Promise<RawCodeScenarioRow[]> {
     if (isEmptyScope(filter)) return [];
-    const filters = ResultAtomsClickHouseRepository.buildAtomFilters(filter);
-    return this.queryRows<RawCodeScenarioRow>(
-      `SELECT
-         ScenarioKey,
-         argMax(Name, RunAt) AS Name
-       FROM (
-         SELECT
-           ${SCENARIO_KEY_EXPR} AS ScenarioKey,
-           ifNull(Name, '') AS Name,
-           ${ATOM_SORT_KEY} AS RunAt
-         ${ResultAtomsClickHouseRepository.atomScopeSql(filters)}
-           AND ${TRIGGER_EXPR} = 'code'
-       )
-       GROUP BY ScenarioKey
-       ORDER BY Name ASC, ScenarioKey ASC
-       LIMIT {atomCodeScenarios:UInt32}`,
-      {
-        tenantId: filter.projectId,
-        ...filters.params,
-        atomCodeScenarios: String(MAX_CODE_SCENARIOS),
-      },
-    );
+    return this.readRows(filter, ResultAtomsClickHouseRepository.codeScenariosRead(filter));
+  }
+
+  /** Code-run scenarios in scope, one per key under its newest run's name. */
+  static codeScenariosRead(filter: ResultsFilter): ReaderReadStatement<RawCodeScenarioRow> {
+    const { scope, atoms } = ResultAtomsClickHouseRepository.atomScope(filter);
+    const runs = clickhouseRead({ scope })
+      .from(atoms)
+      .select((ops) => ({
+        ScenarioKey: atomFields.scenarioKey(atoms, ops),
+        Name: fn.ifNull(atoms.Name, ""),
+        RunAt: atomFields.sortKey(atoms),
+      }))
+      .where((ops) =>
+        ops.and(atomsInScope(filter, atoms, ops), ops.eq(atomFields.trigger(atoms, ops), "code")),
+      )
+      .as("code_runs");
+    // Ordered by the aggregate, not its alias: 26.8 reads the alias as the source's column.
+    const name = fn.argMax(runs.Name, runs.RunAt);
+    return clickhouseRead({ scope })
+      .from(runs)
+      .select({ ScenarioKey: runs.ScenarioKey, Name: name })
+      .groupBy(runs.ScenarioKey)
+      .orderBy(name, "ASC")
+      .orderBy("ScenarioKey", "ASC")
+      .limit(MAX_CODE_SCENARIOS)
+      .build();
   }
 
   /**
@@ -704,32 +917,51 @@ export class ResultAtomsClickHouseRepository extends ResultAtomsRepository {
    */
   async findRunTargets(filter: ResultsFilter): Promise<RawRunTargetRow[]> {
     if (isEmptyScope(filter)) return [];
-    const filters = ResultAtomsClickHouseRepository.buildAtomFilters(filter);
-    return this.queryRows<RawRunTargetRow>(
-      `SELECT
-         TargetKey,
-         argMax(Name, RunAt)             AS Name,
-         argMax(ReferenceId, RunAt)      AS ReferenceId,
-         argMax(TargetParameters, RunAt) AS TargetParameters
-       FROM (
-         SELECT
-           ${TARGET_KEY_EXPR} AS TargetKey,
-           ${CODE_TARGET_NAME_EXPR} AS Name,
-           ${TARGET_REF_EXPR} AS ReferenceId,
-           ${TARGET_PARAMETERS_EXPR} AS TargetParameters,
-           ${ATOM_SORT_KEY} AS RunAt
-         ${ResultAtomsClickHouseRepository.atomScopeSql(filters)}
-           AND (
-             (${TRIGGER_EXPR} = 'code'
-               AND ${TARGET_KEY_EXPR} != '${UNKNOWN_TARGET_KEY}')
-             OR ${TARGET_PARAMETERS_EXPR} != ''
-           )
-       )
-       GROUP BY TargetKey
-       ORDER BY Name ASC, ReferenceId ASC, TargetKey ASC
-       LIMIT {atomRunTargets:UInt32}`,
-      { tenantId: filter.projectId, ...filters.params, atomRunTargets: String(MAX_RUN_TARGETS) },
-    );
+    return this.readRows(filter, ResultAtomsClickHouseRepository.runTargetsRead(filter));
+  }
+
+  /** Code-named targets and stored targets with overrides, each under its newest run. */
+  static runTargetsRead(filter: ResultsFilter): ReaderReadStatement<RawRunTargetRow> {
+    const { scope, atoms } = ResultAtomsClickHouseRepository.atomScope(filter);
+    const runs = clickhouseRead({ scope })
+      .from(atoms)
+      .select((ops) => ({
+        TargetKey: atomFields.targetKey(atoms, ops),
+        Name: atomFields.codeTargetName(atoms, ops),
+        ReferenceId: atomFields.targetRef(atoms),
+        TargetParameters: atomFields.targetParameters(atoms),
+        RunAt: atomFields.sortKey(atoms),
+      }))
+      .where((ops) =>
+        ops.and(
+          atomsInScope(filter, atoms, ops),
+          ops.or(
+            ops.and(
+              ops.eq(atomFields.trigger(atoms, ops), "code"),
+              ops.ne(atomFields.targetKey(atoms, ops), UNKNOWN_TARGET_KEY),
+            ),
+            ops.ne(atomFields.targetParameters(atoms), ""),
+          ),
+        ),
+      )
+      .as("target_runs");
+    // Ordered by the aggregates, not their aliases: 26.8 reads an alias as the source's column.
+    const name = fn.argMax(runs.Name, runs.RunAt);
+    const referenceId = fn.argMax(runs.ReferenceId, runs.RunAt);
+    return clickhouseRead({ scope })
+      .from(runs)
+      .select({
+        TargetKey: runs.TargetKey,
+        Name: name,
+        ReferenceId: referenceId,
+        TargetParameters: fn.argMax(runs.TargetParameters, runs.RunAt),
+      })
+      .groupBy(runs.TargetKey)
+      .orderBy(name, "ASC")
+      .orderBy(referenceId, "ASC")
+      .orderBy("TargetKey", "ASC")
+      .limit(MAX_RUN_TARGETS)
+      .build();
   }
 
   /**
@@ -744,35 +976,53 @@ export class ResultAtomsClickHouseRepository extends ResultAtomsRepository {
     groupBy: ResultsGroupBy;
   }): Promise<RawTrendRow[]> {
     if (isEmptyScope(filter)) return [];
-    const filters = ResultAtomsClickHouseRepository.buildAtomFilters(filter);
-    return this.queryRows<RawTrendRow>(
-      `SELECT
-         GroupKey,
-         TrendKey,
-         toString(RunAtMs)  AS RunAt,
-         toString(Passed)   AS Passed,
-         toString(Settled)  AS Settled
-       FROM (
-         SELECT
-           GroupKey,
-           TrendKey,
-           min(RunAtMs)                   AS RunAtMs,
-           countIf(Outcome = 'passed')    AS Passed,
-           countIf(Outcome IN ${GRADED_OUTCOMES})  AS Settled
-         FROM (
-           SELECT
-             ${ResultAtomsClickHouseRepository.groupKeyExpr(groupBy)} AS GroupKey,
-             ${ResultAtomsClickHouseRepository.trendKeyExpr(groupBy)} AS TrendKey,
-             ${ATOM_SORT_KEY} AS RunAtMs,
-             ${OUTCOME_EXPR} AS Outcome
-           ${ResultAtomsClickHouseRepository.atomScopeSql(filters)}
-         )
-         GROUP BY GroupKey, TrendKey
-       )
-       ORDER BY GroupKey ASC, RunAtMs DESC, TrendKey DESC
-       LIMIT {atomTrendPoints:UInt32} BY GroupKey`,
-      { tenantId: filter.projectId, ...filters.params, atomTrendPoints: String(MAX_TREND_POINTS) },
-    );
+    return this.readRows(filter, ResultAtomsClickHouseRepository.trendRead({ filter, groupBy }));
+  }
+
+  /** Each group's newest sparkline points: one per run or per execution, by the grouping. */
+  static trendRead({
+    filter,
+    groupBy,
+  }: {
+    filter: ResultsFilter;
+    groupBy: ResultsGroupBy;
+  }): ReaderReadStatement<RawTrendRow> {
+    const { scope, atoms } = ResultAtomsClickHouseRepository.atomScope(filter);
+    const runs = clickhouseRead({ scope })
+      .from(atoms)
+      .select((ops) => ({
+        GroupKey: atomFields.groupKey(groupBy, atoms, ops),
+        TrendKey: atomFields.trendKey(groupBy, atoms),
+        RunAtMs: atomFields.sortKey(atoms),
+        Outcome: atomFields.outcome(atoms, ops),
+      }))
+      .where((ops) => atomsInScope(filter, atoms, ops))
+      .as("trend_runs");
+    const points = clickhouseRead({ scope })
+      .from(runs)
+      .select(({ eq, oneOf }) => ({
+        GroupKey: runs.GroupKey,
+        TrendKey: runs.TrendKey,
+        RunAtMs: fn.min(runs.RunAtMs),
+        Passed: fn.countIf(eq(runs.Outcome, "passed")),
+        Settled: fn.countIf(oneOf(runs.Outcome, [...GRADED_OUTCOME_VALUES])),
+      }))
+      .groupBy(runs.GroupKey, runs.TrendKey)
+      .as("trend_points");
+    return clickhouseRead({ scope })
+      .from(points)
+      .select({
+        GroupKey: points.GroupKey,
+        TrendKey: points.TrendKey,
+        RunAt: fn.toString(points.RunAtMs),
+        Passed: fn.toString(points.Passed),
+        Settled: fn.toString(points.Settled),
+      })
+      .orderBy(points.GroupKey, "ASC")
+      .orderBy(points.RunAtMs, "DESC")
+      .orderBy(points.TrendKey, "DESC")
+      .limitBy(MAX_TREND_POINTS, points.GroupKey)
+      .build();
   }
 
   /**
@@ -788,25 +1038,41 @@ export class ResultAtomsClickHouseRepository extends ResultAtomsRepository {
     bucketSeconds: number;
   }): Promise<RawSeriesRow[]> {
     if (isEmptyScope(filter)) return [];
-    const filters = ResultAtomsClickHouseRepository.buildAtomFilters(filter);
-    return this.queryRows<RawSeriesRow>(
-      `SELECT
-         toString(toUnixTimestamp(Bucket) * 1000)  AS Bucket,
-         toString(countIf(Outcome = 'passed'))     AS Passed,
-         toString(countIf(Outcome IN ${GRADED_OUTCOMES}))   AS Settled
-       FROM (
-         SELECT
-           toStartOfInterval(
-             ifNull(StartedAt, CreatedAt),
-             INTERVAL {atomBucketSeconds:UInt32} SECOND
-           ) AS Bucket,
-           ${OUTCOME_EXPR} AS Outcome
-         ${ResultAtomsClickHouseRepository.atomScopeSql(filters)}
-       )
-       GROUP BY Bucket
-       ORDER BY Bucket ASC`,
-      { tenantId: filter.projectId, ...filters.params, atomBucketSeconds: String(bucketSeconds) },
+    return this.readRows(
+      filter,
+      ResultAtomsClickHouseRepository.seriesRead({ filter, bucketSeconds }),
     );
+  }
+
+  /** Passed and graded counts per fixed bucket; a bucket with no atoms is absent. */
+  static seriesRead({
+    filter,
+    bucketSeconds,
+  }: {
+    filter: ResultsFilter;
+    bucketSeconds: number;
+  }): ReaderReadStatement<RawSeriesRow> {
+    const { scope, atoms } = ResultAtomsClickHouseRepository.atomScope(filter);
+    const runs = clickhouseRead({ scope })
+      .from(atoms)
+      .select((ops) => ({
+        Bucket: fn.toStartOfInterval(fn.ifNull(atoms.StartedAt, atoms.CreatedAt), {
+          seconds: bucketSeconds,
+        }),
+        Outcome: atomFields.outcome(atoms, ops),
+      }))
+      .where((ops) => atomsInScope(filter, atoms, ops))
+      .as("series_runs");
+    return clickhouseRead({ scope })
+      .from(runs)
+      .select(({ eq, oneOf }) => ({
+        Bucket: fn.toString(fn.multiply(fn.toUnixTimestamp(runs.Bucket), 1000)),
+        Passed: fn.toString(fn.countIf(eq(runs.Outcome, "passed"))),
+        Settled: fn.toString(fn.countIf(oneOf(runs.Outcome, [...GRADED_OUTCOME_VALUES]))),
+      }))
+      .groupBy(runs.Bucket)
+      .orderBy(runs.Bucket, "ASC")
+      .build();
   }
 }
 
