@@ -3,6 +3,7 @@
  * @see specs/coding-agent/pull-request-linkage.feature
  */
 import { TenantGuard, type QueryRequest } from "@langwatch/clickhouse-client";
+import type { ReaderReadStatement } from "@langwatch/clickhouse-client/builder";
 import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { describe, expect, it } from "vitest";
 
@@ -18,21 +19,27 @@ const REPOSITORY = { repositoryHost: "github.com", repositoryOwner: "acme", repo
 function guardedClient() {
   const guard = new TenantGuard();
   const requests: QueryRequest[] = [];
+  const statements: ReaderReadStatement[] = [];
   const clickhouse = clickHouseQueryClientDouble({
     ...sessionIdIndexNotReady,
+    read: async (request: { statement: unknown }) => {
+      const statement = request.statement as ReaderReadStatement;
+      statements.push(statement);
+      return { rows: [] };
+    },
     query: async (request: QueryRequest) => {
       guard.assert(request);
       requests.push(request);
       return { rows: [] };
     },
   });
-  return { clickhouse, requests };
+  return { clickhouse, requests, statements };
 }
 
 describe("coding-agent pull-request rollups", () => {
   describe("when they read an organization's project tenants together", () => {
     it("declares the tenant set and passes the tenant guard without skipping it", async () => {
-      const { clickhouse, requests } = guardedClient();
+      const { clickhouse, requests, statements } = guardedClient();
       const events = CodingAgentSessionEventsClickHouseRepository.create({
         clickhouse,
         defaultTraceRetentionDays: 30,
@@ -63,10 +70,15 @@ describe("coding-agent pull-request rollups", () => {
         startedAtFromMs: 0,
       });
 
-      expect(requests).toHaveLength(4);
+      expect(requests).toHaveLength(2);
       for (const request of requests) {
         expect(request.tenantIds).toEqual(TENANTS);
         expect(request.SKIP_TENANT_CHECK).toBeUndefined();
+      }
+      expect(statements).toHaveLength(2);
+      for (const statement of statements) {
+        expect(statement).toMatchObject({ identity: "reader", kind: "tenant" });
+        expect(statement.settings).toMatchObject({ SQL_langwatch_tenant_ids: TENANTS.join(",") });
       }
     });
   });

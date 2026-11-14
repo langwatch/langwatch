@@ -1,4 +1,5 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import type { ReaderReadStatement } from "@langwatch/clickhouse-client/builder";
 /**
  * How the per-call fact table's cross-tenant read reaches ClickHouse.
  * @see specs/coding-agent/pull-request-linkage.feature
@@ -23,9 +24,10 @@ function recordingClient(rows: Record<string, unknown>[]): {
   const named: string[] = [];
   const scopedTo: string[][] = [];
   const client = clickHouseQueryClientDouble({
-    query: async (request: { tenantId: string; params?: Record<string, unknown> }) => {
-      named.push(request.tenantId);
-      scopedTo.push((request.params?.tenantIds ?? []) as string[]);
+    read: async (request: { statement: unknown }) => {
+      const statement = request.statement as ReaderReadStatement;
+      named.push(statement.routeTenantId);
+      scopedTo.push(String(statement.settings.SQL_langwatch_tenant_ids).split(","));
       return { rows };
     },
   });
@@ -45,11 +47,11 @@ function modelTotals({
     TenantId: tenantId,
     SessionId: sessionId,
     Model: "claude-fable-5",
-    InputTokens: "1",
-    OutputTokens: "1",
-    CacheReadTokens: "1",
-    CacheCreationTokens: "1",
-    CostUsd: costUsd,
+    SumInputTokens: "1",
+    SumOutputTokens: "1",
+    SumCacheReadTokens: "1",
+    SumCacheCreationTokens: "1",
+    SumCostUsd: costUsd,
   };
 }
 

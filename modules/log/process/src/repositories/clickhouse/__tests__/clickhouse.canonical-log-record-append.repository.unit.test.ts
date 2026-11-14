@@ -16,7 +16,6 @@ function createRepository(resolveClient: () => Promise<LogClickHouseClient>) {
 function clientWithInsert(insert: LogClickHouseClient["insert"]): LogClickHouseClient {
   return {
     insert,
-    query: async () => ({ json: async () => [] }),
   };
 }
 

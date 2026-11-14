@@ -1,24 +1,15 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import { clickhouseRead, cond, fn, tenantScope } from "@langwatch/clickhouse-client/builder";
 import type { CodingAgentTraceSessionRecord } from "@langwatch/coding-agent-contract";
 import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
 import type { CodingAgentTraceSessionRepository as TraceSessionRepository } from "../coding-agent-trace-session.repository.ts";
-import {
-  clickHouseMomentOf,
-  parseClickHouseDateTimeMs,
-  type ClickHouseMoment,
-} from "./clickhouse.mapper.ts";
+import { codingAgentTraceSessions } from "./clickhouse.coding-agent-trace-sessions.table.ts";
+import { clickHouseMomentOf, type ClickHouseMoment } from "./clickhouse.mapper.ts";
 
 const TABLE_NAME = "coding_agent_trace_sessions" as const;
-
-/** The columns the by-trace read selects. */
-interface TraceSessionReadRow {
-  TraceId: string;
-  SessionId: string;
-  OccurredAt: string;
-}
 
 const logger = createLogger("langwatch:app-layer:coding-agent:trace-session-repository");
 
@@ -37,14 +28,14 @@ export class CodingAgentTraceSessionClickHouseRepository implements TraceSession
     clickhouse,
     defaultTraceRetentionDays,
   }: {
-    clickhouse: ClickHouseQueryClient;
+    clickhouse: Pick<ClickHouseQueryClient, "read" | "insert">;
     defaultTraceRetentionDays: number;
   }): CodingAgentTraceSessionClickHouseRepository {
     return new CodingAgentTraceSessionClickHouseRepository(clickhouse, defaultTraceRetentionDays);
   }
 
   private constructor(
-    private readonly clickhouse: ClickHouseQueryClient,
+    private readonly clickhouse: Pick<ClickHouseQueryClient, "read" | "insert">,
     private readonly defaultTraceRetentionDays: number,
   ) {}
 
@@ -108,30 +99,22 @@ export class CodingAgentTraceSessionClickHouseRepository implements TraceSession
       { tenantId },
       "CodingAgentTraceSessionClickHouseRepository.findByTraceId",
     );
-    const { rows } = await this.clickhouse.query<TraceSessionReadRow>({
-      tenantId,
-      table: TABLE_NAME,
-      kind: "read",
-      sql: `
-        SELECT TraceId, SessionId, OccurredAt
-        FROM ${TABLE_NAME}
-        WHERE TenantId = {tenantId:String}
-          AND TraceId = {traceId:String}
-          {{idBound:coding_agent_trace_sessions.TraceId:traceId}}
-          AND (TenantId, TraceId, UpdatedAt) IN (
-            SELECT TenantId, TraceId, max(UpdatedAt)
-            FROM ${TABLE_NAME}
-            WHERE TenantId = {tenantId:String}
-              AND TraceId = {traceId:String}
-              {{idBound:coding_agent_trace_sessions.TraceId:traceId}}
-            GROUP BY TenantId, TraceId
-          )
-        ORDER BY SessionId != TraceId DESC, OccurredAt DESC, SessionId ASC
-        LIMIT 1
-      `,
-      params: { tenantId, traceId },
-      idBound: { fallback: "unbounded" },
-    });
+    const t = codingAgentTraceSessions;
+    const statement = clickhouseRead({ scope: tenantScope.single({ tenantId }) })
+      .from(t)
+      .select({
+        TraceId: t.TraceId,
+        SessionId: t.SessionId,
+        OccurredAtMs: fn.toUnixTimestamp64Milli(t.OccurredAt),
+      })
+      .where(({ and, eq, idBound }) => and(eq(t.TraceId, traceId), idBound(t.TraceId, traceId)))
+      .latestVersion()
+      .orderBy(cond.ne(t.SessionId, t.TraceId), "DESC")
+      .orderBy(t.OccurredAt, "DESC")
+      .orderBy(t.SessionId, "ASC")
+      .limit(1)
+      .build();
+    const { rows } = await this.clickhouse.read({ statement, idBound: { fallback: "unbounded" } });
 
     const first = rows[0];
     if (!first) return null;
@@ -139,7 +122,7 @@ export class CodingAgentTraceSessionClickHouseRepository implements TraceSession
       tenantId,
       traceId: first.TraceId,
       sessionId: first.SessionId,
-      occurredAtMs: parseClickHouseDateTimeMs(first.OccurredAt),
+      occurredAtMs: Number(first.OccurredAtMs),
     };
   }
 }

@@ -14,11 +14,11 @@ function modelTotal(tenantId: string, sessionId: string, costUsd: number) {
     TenantId: tenantId,
     SessionId: sessionId,
     Model: "claude-fable-5",
-    InputTokens: "1",
-    OutputTokens: "1",
-    CacheReadTokens: "1",
-    CacheCreationTokens: "1",
-    CostUsd: costUsd,
+    SumInputTokens: "1",
+    SumOutputTokens: "1",
+    SumCacheReadTokens: "1",
+    SumCacheCreationTokens: "1",
+    SumCostUsd: costUsd,
   };
 }
 

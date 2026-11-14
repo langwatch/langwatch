@@ -1,4 +1,5 @@
 import { type ClickHouseQueryClient, type IdBoundOptions } from "@langwatch/clickhouse-client";
+import { clickhouseRead, fn, param, tenantScope } from "@langwatch/clickhouse-client/builder";
 import type {
   CodingAgentSessionEvent,
   CodingAgentSessionEventRecord,
@@ -8,7 +9,8 @@ import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
 import type { CodingAgentSessionEventRepository as SessionEventsRepository } from "../coding-agent-session-event.repository.ts";
-import { clickHouseMomentOf, routingTenantOf, type ClickHouseMoment } from "./clickhouse.mapper.ts";
+import { codingAgentSessionEvents } from "./clickhouse.coding-agent-session-events.table.ts";
+import { clickHouseMomentOf, type ClickHouseMoment } from "./clickhouse.mapper.ts";
 
 const TABLE_NAME = "coding_agent_session_events" as const;
 
@@ -102,20 +104,59 @@ interface ClickHouseWriteRecord {
   _retention_days: number;
 }
 
-const READ_COLUMNS = `
-  SessionId, toUnixTimestamp64Milli(TimeUnixMs) AS TimeMs, RecordId, EventKind,
-  Agent, SessionKeySource, TraceId, SpanId, PromptId, QuerySource, AgentType,
-  EventSequence, RequestId, Model, InputTokens, OutputTokens, CacheReadTokens,
-  CacheCreationTokens, CostUsd, DurationMs, TtftMs, Attempt, Speed, StopReason,
-  PreTokens, PostTokens, CompactionTrigger, PrecomputeReuse, StatusCode,
-  ErrorType, RateLimitCarrier, RetryDurationMs, ToolName, Success, Decision,
-  DecisionSource, ToolInputBytes, ToolResultBytes, PromptChars, TotalTokens,
-  RepositoryHost, RepositoryOwner, RepositoryName, Branch
-`;
+const events = codingAgentSessionEvents;
+
+/** The columns a session-events page selects. */
+const READ_COLUMNS = {
+  SessionId: events.SessionId,
+  TimeMs: fn.toUnixTimestamp64Milli(events.TimeUnixMs),
+  RecordId: events.RecordId,
+  EventKind: events.EventKind,
+  Agent: events.Agent,
+  SessionKeySource: events.SessionKeySource,
+  TraceId: events.TraceId,
+  SpanId: events.SpanId,
+  PromptId: events.PromptId,
+  QuerySource: events.QuerySource,
+  AgentType: events.AgentType,
+  EventSequence: events.EventSequence,
+  RequestId: events.RequestId,
+  Model: events.Model,
+  InputTokens: events.InputTokens,
+  OutputTokens: events.OutputTokens,
+  CacheReadTokens: events.CacheReadTokens,
+  CacheCreationTokens: events.CacheCreationTokens,
+  CostUsd: events.CostUsd,
+  DurationMs: events.DurationMs,
+  TtftMs: events.TtftMs,
+  Attempt: events.Attempt,
+  Speed: events.Speed,
+  StopReason: events.StopReason,
+  PreTokens: events.PreTokens,
+  PostTokens: events.PostTokens,
+  CompactionTrigger: events.CompactionTrigger,
+  PrecomputeReuse: events.PrecomputeReuse,
+  StatusCode: events.StatusCode,
+  ErrorType: events.ErrorType,
+  RateLimitCarrier: events.RateLimitCarrier,
+  RetryDurationMs: events.RetryDurationMs,
+  ToolName: events.ToolName,
+  Success: events.Success,
+  Decision: events.Decision,
+  DecisionSource: events.DecisionSource,
+  ToolInputBytes: events.ToolInputBytes,
+  ToolResultBytes: events.ToolResultBytes,
+  PromptChars: events.PromptChars,
+  TotalTokens: events.TotalTokens,
+  RepositoryHost: events.RepositoryHost,
+  RepositoryOwner: events.RepositoryOwner,
+  RepositoryName: events.RepositoryName,
+  Branch: events.Branch,
+} as const;
 
 interface ClickHouseReadRow {
   SessionId: string;
-  TimeMs: string;
+  TimeMs: number | string;
   RecordId: string;
   EventKind: string;
   Agent: string;
@@ -125,35 +166,35 @@ interface ClickHouseReadRow {
   PromptId: string;
   QuerySource: string;
   AgentType: string;
-  EventSequence: string;
+  EventSequence: number | string;
   RequestId: string;
   Model: string;
-  InputTokens: string;
-  OutputTokens: string;
-  CacheReadTokens: string;
-  CacheCreationTokens: string;
+  InputTokens: number | string;
+  OutputTokens: number | string;
+  CacheReadTokens: number | string;
+  CacheCreationTokens: number | string;
   CostUsd: number;
-  DurationMs: string;
-  TtftMs: string;
-  Attempt: string;
+  DurationMs: number | string;
+  TtftMs: number | string;
+  Attempt: number | string;
   Speed: string;
   StopReason: string;
-  PreTokens: string;
-  PostTokens: string;
+  PreTokens: number | string;
+  PostTokens: number | string;
   CompactionTrigger: string;
   PrecomputeReuse: string;
   StatusCode: string;
   ErrorType: string;
   RateLimitCarrier: string;
-  RetryDurationMs: string;
+  RetryDurationMs: number | string;
   ToolName: string;
   Success: string;
   Decision: string;
   DecisionSource: string;
-  ToolInputBytes: string;
-  ToolResultBytes: string;
-  PromptChars: string;
-  TotalTokens: string;
+  ToolInputBytes: number | string;
+  ToolResultBytes: number | string;
+  PromptChars: number | string;
+  TotalTokens: number | string;
   RepositoryHost: string;
   RepositoryOwner: string;
   RepositoryName: string;
@@ -165,14 +206,14 @@ export class CodingAgentSessionEventsClickHouseRepository implements SessionEven
     clickhouse,
     defaultTraceRetentionDays,
   }: {
-    clickhouse: ClickHouseQueryClient;
+    clickhouse: Pick<ClickHouseQueryClient, "read" | "insert">;
     defaultTraceRetentionDays: number;
   }): CodingAgentSessionEventsClickHouseRepository {
     return new CodingAgentSessionEventsClickHouseRepository(clickhouse, defaultTraceRetentionDays);
   }
 
   private constructor(
-    private readonly clickhouse: ClickHouseQueryClient,
+    private readonly clickhouse: Pick<ClickHouseQueryClient, "read" | "insert">,
     private readonly defaultTraceRetentionDays: number,
   ) {}
 
@@ -288,42 +329,33 @@ export class CodingAgentSessionEventsClickHouseRepository implements SessionEven
     cursor: SessionEventsCursor | undefined;
     limit: number;
   }): Promise<ClickHouseReadRow[]> {
-    const conditions = ["TenantId = {tenantId:String}", "SessionId = {sessionId:String}"];
-    if (kinds && kinds.length > 0) {
-      conditions.push("EventKind IN {kinds:Array(String)}");
-    }
+    let read = clickhouseRead({ scope: tenantScope.single({ tenantId }) })
+      .from(events)
+      .select(READ_COLUMNS)
+      .where(({ and, eq, idBound: bound }) =>
+        and(eq(events.SessionId, sessionId), bound(events.SessionId, sessionId)),
+      );
+    if (kinds && kinds.length > 0) read = read.where(({ oneOf }) => oneOf(events.EventKind, kinds));
     if (cursor) {
-      conditions.push(
-        "(TimeUnixMs, RecordId) > (fromUnixTimestamp64Milli({cursorTimeMs:Int64}), {cursorRecordId:String})",
+      read = read.where(({ gt }) =>
+        gt(
+          fn.tuple(events.TimeUnixMs, events.RecordId),
+          fn.tuple(param.epochMs(cursor.timeUnixMs), param.string(cursor.recordId)),
+        ),
       );
     }
 
     // `LIMIT 1 BY` dedups un-merged duplicate versions (same RecordId). It is
     // safe on this table because every column is a small scalar; the newest
     // UpdatedAt wins via the ORDER BY.
-    const { rows } = await this.clickhouse.query<ClickHouseReadRow>({
-      tenantId,
-      table: TABLE_NAME,
-      kind: "read",
-      sql: `
-        SELECT ${READ_COLUMNS}
-        FROM ${TABLE_NAME}
-        WHERE ${conditions.join(" AND ")}
-          {{idBound:coding_agent_session_events.SessionId:sessionId}}
-        ORDER BY TimeUnixMs ASC, RecordId ASC, UpdatedAt DESC
-        LIMIT 1 BY TimeUnixMs, RecordId
-        LIMIT {limit:UInt32}
-      `,
-      params: {
-        tenantId,
-        sessionId,
-        kinds,
-        cursorTimeMs: cursor?.timeUnixMs,
-        cursorRecordId: cursor?.recordId,
-        limit,
-      },
-      idBound,
-    });
+    const statement = read
+      .orderBy(events.TimeUnixMs, "ASC")
+      .orderBy(events.RecordId, "ASC")
+      .orderBy(events.UpdatedAt, "DESC")
+      .limitBy(1, events.TimeUnixMs, events.RecordId)
+      .limit(limit)
+      .build();
+    const { rows } = await this.clickhouse.read({ statement, idBound });
     return rows;
   }
 
@@ -360,59 +392,67 @@ export class CodingAgentSessionEventsClickHouseRepository implements SessionEven
     // The inner scope dedups un-merged versions of one row before anything is summed, so a
     // redelivered call cannot be counted twice. `LIMIT 1 BY` is safe here for the same reason
     // it is in `findBySessionId`: every column this table holds is a small scalar.
-    const { rows } = await this.clickhouse.query<ClickHouseModelTotalsRow>({
-      tenantId: routingTenantOf(tenantIds),
-      table: TABLE_NAME,
-      kind: "read",
-      tenantIds,
-      // ID_BOUND_SKIP: a page of sessions' totals, bounded from below by the caller's own time.
-      sql: `
-        SELECT
-          TenantId,
-          SessionId,
-          Model,
-          RepositoryHost,
-          RepositoryOwner,
-          RepositoryName,
-          Branch,
-          sum(InputTokens) AS InputTokens,
-          sum(OutputTokens) AS OutputTokens,
-          sum(CacheReadTokens) AS CacheReadTokens,
-          sum(CacheCreationTokens) AS CacheCreationTokens,
-          sum(CostUsd) AS CostUsd,
-          sum(AiUnits) AS AiUnits
-        FROM (
-          SELECT
-            TenantId,
-            SessionId,
-            Model,
-            RepositoryHost,
-            RepositoryOwner,
-            RepositoryName,
-            Branch,
-            InputTokens,
-            OutputTokens,
-            CacheReadTokens,
-            CacheCreationTokens,
-            CostUsd,
-            AiUnits
-          FROM ${TABLE_NAME}
-          WHERE TenantId IN ({tenantIds:Array(String)})
-            AND TimeUnixMs >= fromUnixTimestamp64Milli({fromMs:Int64})
-            AND SessionId IN {sessionIds:Array(String)}
-            AND EventKind = {eventKind:String}
-          ORDER BY TenantId, SessionId, TimeUnixMs, RecordId, UpdatedAt DESC
-          LIMIT 1 BY TenantId, SessionId, TimeUnixMs, RecordId
-        )
-        GROUP BY TenantId, SessionId, Model, RepositoryHost, RepositoryOwner, RepositoryName, Branch
-      `,
-      params: {
-        tenantIds,
-        sessionIds,
-        fromMs,
-        eventKind: MODEL_CALL_EVENT_KIND,
-      },
-    });
+    // ID_BOUND_SKIP: a page of sessions' totals, bounded from below by the caller's own time.
+    const scope = tenantScope.set({ tenantIds });
+    const calls = clickhouseRead({ scope })
+      .from(events)
+      .select({
+        TenantId: events.TenantId,
+        SessionId: events.SessionId,
+        Model: events.Model,
+        RepositoryHost: events.RepositoryHost,
+        RepositoryOwner: events.RepositoryOwner,
+        RepositoryName: events.RepositoryName,
+        Branch: events.Branch,
+        InputTokens: events.InputTokens,
+        OutputTokens: events.OutputTokens,
+        CacheReadTokens: events.CacheReadTokens,
+        CacheCreationTokens: events.CacheCreationTokens,
+        CostUsd: events.CostUsd,
+        AiUnits: events.AiUnits,
+      })
+      .where(({ and, eq, gte, oneOf }) =>
+        and(
+          gte(events.TimeUnixMs, fromMs),
+          oneOf(events.SessionId, sessionIds),
+          eq(events.EventKind, MODEL_CALL_EVENT_KIND),
+        ),
+      )
+      .orderBy(events.TenantId)
+      .orderBy(events.SessionId)
+      .orderBy(events.TimeUnixMs)
+      .orderBy(events.RecordId)
+      .orderBy(events.UpdatedAt, "DESC")
+      .limitBy(1, events.TenantId, events.SessionId, events.TimeUnixMs, events.RecordId)
+      .as("calls");
+    const statement = clickhouseRead({ scope })
+      .from(calls)
+      .select({
+        TenantId: calls.TenantId,
+        SessionId: calls.SessionId,
+        Model: calls.Model,
+        RepositoryHost: calls.RepositoryHost,
+        RepositoryOwner: calls.RepositoryOwner,
+        RepositoryName: calls.RepositoryName,
+        Branch: calls.Branch,
+        SumInputTokens: fn.sum(calls.InputTokens),
+        SumOutputTokens: fn.sum(calls.OutputTokens),
+        SumCacheReadTokens: fn.sum(calls.CacheReadTokens),
+        SumCacheCreationTokens: fn.sum(calls.CacheCreationTokens),
+        SumCostUsd: fn.sum(calls.CostUsd),
+        SumAiUnits: fn.sum(calls.AiUnits),
+      })
+      .groupBy(
+        calls.TenantId,
+        calls.SessionId,
+        calls.Model,
+        calls.RepositoryHost,
+        calls.RepositoryOwner,
+        calls.RepositoryName,
+        calls.Branch,
+      )
+      .build();
+    const { rows } = await this.clickhouse.read({ statement });
 
     return rows.map((row) => ({
       tenantId: row.TenantId,
@@ -422,12 +462,12 @@ export class CodingAgentSessionEventsClickHouseRepository implements SessionEven
       repositoryOwner: row.RepositoryOwner,
       repositoryName: row.RepositoryName,
       branch: row.Branch,
-      inputTokens: Number(row.InputTokens),
-      outputTokens: Number(row.OutputTokens),
-      cacheReadTokens: Number(row.CacheReadTokens),
-      cacheCreationTokens: Number(row.CacheCreationTokens),
-      costUsd: Number(row.CostUsd),
-      aiUnits: Number(row.AiUnits),
+      inputTokens: Number(row.SumInputTokens),
+      outputTokens: Number(row.SumOutputTokens),
+      cacheReadTokens: Number(row.SumCacheReadTokens),
+      cacheCreationTokens: Number(row.SumCacheCreationTokens),
+      costUsd: Number(row.SumCostUsd),
+      aiUnits: Number(row.SumAiUnits),
     }));
   }
 
@@ -566,50 +606,25 @@ export class CodingAgentSessionEventsClickHouseRepository implements SessionEven
     // case-folded on both sides for the same reason the session read folds
     // it — a session stores the remote's casing verbatim while the mapping
     // stores lower case. Branches stay case sensitive.
-    const { rows } = await this.clickhouse.query<{ TenantId: string; SessionId: string }>({
-      tenantId: routingTenantOf(tenantIds),
-      table: TABLE_NAME,
-      kind: "read",
-      tenantIds,
-      sql: `
-          SELECT DISTINCT TenantId, SessionId
-          FROM ${TABLE_NAME}
-          WHERE TenantId IN ({tenantIds:Array(String)})
-            AND TimeUnixMs >= fromUnixTimestamp64Milli({fromMs:Int64})
-            AND lower(RepositoryHost) = {repositoryHost:String}
-            AND lower(RepositoryOwner) = {repositoryOwner:String}
-            AND lower(RepositoryName) = {repositoryName:String}
-            AND Branch IN {branches:Array(String)}
-        `,
-      params: {
-        tenantIds,
-        fromMs,
-        repositoryHost: repositoryHost.toLowerCase(),
-        repositoryOwner: repositoryOwner.toLowerCase(),
-        repositoryName: repositoryName.toLowerCase(),
-        branches,
-      },
-    });
+    const statement = clickhouseRead({ scope: tenantScope.set({ tenantIds }) })
+      .from(events)
+      .distinct()
+      .select({ TenantId: events.TenantId, SessionId: events.SessionId })
+      .where(({ and, eq, gte, oneOf }) =>
+        and(
+          gte(events.TimeUnixMs, fromMs),
+          eq(fn.lower(events.RepositoryHost), repositoryHost.toLowerCase()),
+          eq(fn.lower(events.RepositoryOwner), repositoryOwner.toLowerCase()),
+          eq(fn.lower(events.RepositoryName), repositoryName.toLowerCase()),
+          oneOf(events.Branch, branches),
+        ),
+      )
+      .build();
+    const { rows } = await this.clickhouse.read({ statement });
 
     return rows.map((row) => ({
       tenantId: row.TenantId,
       sessionId: row.SessionId,
     }));
   }
-}
-
-interface ClickHouseModelTotalsRow {
-  TenantId: string;
-  SessionId: string;
-  Model: string;
-  RepositoryHost: string;
-  RepositoryOwner: string;
-  RepositoryName: string;
-  Branch: string;
-  InputTokens: string;
-  OutputTokens: string;
-  CacheReadTokens: string;
-  CacheCreationTokens: string;
-  CostUsd: number;
-  AiUnits: number;
 }

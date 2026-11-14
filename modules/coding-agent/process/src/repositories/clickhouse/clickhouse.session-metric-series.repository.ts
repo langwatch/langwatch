@@ -1,4 +1,5 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import { clickhouseRead, fn, tenantScope } from "@langwatch/clickhouse-client/builder";
 import type { CodingAgentSessionMetricSeriesRecord } from "@langwatch/coding-agent-contract";
 import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
@@ -6,6 +7,7 @@ import { nowInstant } from "@langwatch/time";
 
 import type { SessionMetricSeriesRepository as MetricSeriesRepository } from "../session-metric-series.repository.ts";
 import { clickHouseMomentOf, type ClickHouseMoment } from "./clickhouse.mapper.ts";
+import { sessionMetricSeries } from "./clickhouse.session-metric-series.table.ts";
 
 const TABLE_NAME = "session_metric_series" as const;
 
@@ -41,14 +43,14 @@ export class SessionMetricSeriesClickHouseRepository implements MetricSeriesRepo
     clickhouse,
     defaultTraceRetentionDays,
   }: {
-    clickhouse: ClickHouseQueryClient;
+    clickhouse: Pick<ClickHouseQueryClient, "read" | "insert">;
     defaultTraceRetentionDays: number;
   }): SessionMetricSeriesClickHouseRepository {
     return new SessionMetricSeriesClickHouseRepository(clickhouse, defaultTraceRetentionDays);
   }
 
   private constructor(
-    private readonly clickhouse: ClickHouseQueryClient,
+    private readonly clickhouse: Pick<ClickHouseQueryClient, "read" | "insert">,
     private readonly defaultTraceRetentionDays: number,
   ) {}
 
@@ -131,37 +133,39 @@ export class SessionMetricSeriesClickHouseRepository implements MetricSeriesRepo
     // re-delivery leaves two un-merged rows sharing the winning AsOf, both pass the filter,
     // and a plain sum counts the unit twice. UpdatedAt breaks AsOf ties so a same-timestamp
     // correction converges on the newest write instead of an arbitrary row.
-    const { rows } = await this.clickhouse.query<{
-      SessionId: string;
-      MetricName: string;
-      Bucket: string;
-      Total: number;
-    }>({
-      tenantId,
-      table: TABLE_NAME,
-      kind: "read",
-      sql: `
-        SELECT
-          SessionId,
-          MetricName,
-          Bucket,
-          sum(SeriesValue) AS Total
-        FROM (
-          SELECT
-            SessionId,
-            MetricName,
-            Attributes['type'] AS Bucket,
-            argMax(Value, tuple(AsOf, UpdatedAt)) AS SeriesValue
-          FROM ${TABLE_NAME}
-          WHERE TenantId = {tenantId:String}
-            AND SessionId IN {sessionIds:Array(String)}
-            AND AsOf BETWEEN fromUnixTimestamp64Milli({from:Int64}) AND fromUnixTimestamp64Milli({to:Int64})
-          GROUP BY TenantId, SessionId, SeriesId, MetricName, Bucket
-        )
-        GROUP BY SessionId, MetricName, Bucket
-      `,
-      params: { tenantId, sessionIds, from: fromMs, to: toMs },
-    });
+    const t = sessionMetricSeries;
+    const scope = tenantScope.single({ tenantId });
+    const bucket = fn.mapGet(t.Attributes, "type");
+    const units = clickhouseRead({ scope })
+      .from(t)
+      .select({
+        SessionId: t.SessionId,
+        MetricName: t.MetricName,
+        Bucket: bucket,
+        SeriesValue: fn.argMax(t.Value, fn.tuple(t.AsOf, t.UpdatedAt)),
+      })
+      .where(({ and, gte, lte, oneOf }) =>
+        and(oneOf(t.SessionId, sessionIds), gte(t.AsOf, fromMs), lte(t.AsOf, toMs)),
+      )
+      .groupBy(t.TenantId)
+      .groupBy(t.SessionId)
+      .groupBy(t.SeriesId)
+      .groupBy(t.MetricName)
+      .groupBy(bucket)
+      .as("units");
+    const statement = clickhouseRead({ scope })
+      .from(units)
+      .select({
+        SessionId: units.SessionId,
+        MetricName: units.MetricName,
+        Bucket: units.Bucket,
+        Total: fn.sum(units.SeriesValue),
+      })
+      .groupBy(units.SessionId)
+      .groupBy(units.MetricName)
+      .groupBy(units.Bucket)
+      .build();
+    const { rows } = await this.clickhouse.read({ statement });
 
     return rows.map((row) => ({
       sessionId: row.SessionId,

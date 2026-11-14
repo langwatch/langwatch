@@ -25,12 +25,6 @@ export interface LogClickHouseClient {
     format?: DataFormat;
     clickhouse_settings?: ClickHouseSettings;
   }): Promise<unknown>;
-  query(params: {
-    query: string;
-    query_params?: Record<string, unknown>;
-    format?: DataFormat;
-    clickhouse_settings?: ClickHouseSettings;
-  }): Promise<{ json(): Promise<unknown[]> }>;
 }
 
 type LogClickHouseClientResolver = (tenantId: string) => Promise<LogClickHouseClient>;
@@ -49,14 +43,6 @@ function logClickHouseResolver(clickhouse: ClickHouseQueryClient): LogClickHouse
           rows: params.values as readonly Record<string, unknown>[],
         });
         return undefined;
-      },
-      async query(params) {
-        const result = await clickhouse.query<Record<string, unknown>>({
-          tenantId,
-          sql: params.query,
-          ...(params.query_params ? { params: params.query_params } : {}),
-        });
-        return { json: async () => result.rows };
       },
     });
 }
