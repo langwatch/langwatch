@@ -2,6 +2,7 @@ import { ATTR_KEYS } from "@langwatch/span-normalisation";
 import { describe, expect, it } from "vitest";
 
 import {
+  accumulateLogTiming,
   accumulateSpanTiming,
   addReservedTokenSum,
   extractSpanStatus,
@@ -189,6 +190,102 @@ describe("accumulateSpanTiming", () => {
         span: span({ startTimeUnixMs: 5000, endTimeUnixMs: 4000 }),
       }),
     ).toEqual({ occurredAt: 5000, totalDurationMs: 0 });
+  });
+
+  it("opens the window on the first span", () => {
+    expect(accumulateSpanTiming({ state: emptyState(), span: span() })).toEqual({
+      occurredAt: 1000,
+      totalDurationMs: 1000,
+    });
+  });
+
+  it("widens the window on both sides as earlier and later spans arrive", () => {
+    const state = emptyState({ occurredAt: 1000, totalDurationMs: 1000 });
+
+    expect(
+      accumulateSpanTiming({ state, span: span({ startTimeUnixMs: 500, endTimeUnixMs: 3000 }) }),
+    ).toEqual({ occurredAt: 500, totalDurationMs: 2500 });
+  });
+
+  it("keeps the window when a span sits inside it", () => {
+    const state = emptyState({ occurredAt: 1000, totalDurationMs: 1000 });
+
+    expect(
+      accumulateSpanTiming({ state, span: span({ startTimeUnixMs: 1200, endTimeUnixMs: 1800 }) }),
+    ).toEqual({ occurredAt: 1000, totalDurationMs: 1000 });
+  });
+
+  it("leaves the window to real spans when the span is synthetic", () => {
+    const state = emptyState({ occurredAt: 1000, totalDurationMs: 1000 });
+
+    expect(
+      accumulateSpanTiming({
+        state,
+        span: span({ name: "langwatch.track_event", startTimeUnixMs: 1, endTimeUnixMs: 9000 }),
+      }),
+    ).toEqual({ occurredAt: 1000, totalDurationMs: 1000 });
+  });
+});
+
+describe("accumulateLogTiming", () => {
+  const acceptedAtMs = 1_700_000_100_000;
+
+  it("opens a zero-length window on a Grok trace's first record", () => {
+    expect(
+      accumulateLogTiming({
+        state: { occurredAt: 0, totalDurationMs: 0 },
+        correlationSource: "grok_synthesized",
+        timeUnixMs: 1_700_000_000_000,
+        acceptedAtMs,
+      }),
+    ).toEqual({ occurredAt: 1_700_000_000_000, totalDurationMs: 0 });
+  });
+
+  it("widens the window on both sides as earlier and later records arrive", () => {
+    const state = { occurredAt: 1_700_000_000_000, totalDurationMs: 1000 };
+
+    expect(
+      accumulateLogTiming({
+        state,
+        correlationSource: "grok_synthesized",
+        timeUnixMs: 1_700_000_005_000,
+        acceptedAtMs,
+      }),
+    ).toEqual({ occurredAt: 1_700_000_000_000, totalDurationMs: 5000 });
+    expect(
+      accumulateLogTiming({
+        state,
+        correlationSource: "grok_synthesized",
+        timeUnixMs: 1_699_999_999_000,
+        acceptedAtMs,
+      }),
+    ).toEqual({ occurredAt: 1_699_999_999_000, totalDurationMs: 2000 });
+  });
+
+  it("leaves the window to spans when the record is not Grok's", () => {
+    const state = { occurredAt: 1_700_000_000_000, totalDurationMs: 1000 };
+
+    expect(
+      accumulateLogTiming({
+        state,
+        correlationSource: "wire",
+        timeUnixMs: 1_700_000_009_000,
+        acceptedAtMs,
+      }),
+    ).toEqual(state);
+  });
+
+  it("ignores a record whose clock sits more than a day off its accept time", () => {
+    const state = { occurredAt: 1_700_000_000_000, totalDurationMs: 1000 };
+
+    expect(
+      accumulateLogTiming({
+        state,
+        correlationSource: "grok_synthesized",
+        timeUnixMs: acceptedAtMs + 2 * 24 * 60 * 60 * 1000,
+        acceptedAtMs,
+      }),
+    ).toEqual(state);
   });
 });
 
