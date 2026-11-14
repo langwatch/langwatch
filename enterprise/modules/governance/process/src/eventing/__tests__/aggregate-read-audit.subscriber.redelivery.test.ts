@@ -13,7 +13,10 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 
 import type { GovernanceOcsfEventWriter } from "../../repositories/governance.repositories.ts";
-import { DefaultGovernanceAdminWorkspaceViewAuditService } from "../../services/admin-workspace-view-audit.service.ts";
+import {
+  DefaultGovernanceAdminWorkspaceViewAuditService,
+  type WorkspaceViewMirrorOutbox,
+} from "../../services/admin-workspace-view-audit.service.ts";
 import { auditAggregateRead } from "../aggregate-read-audit.subscriber.ts";
 
 /** Rows carry the time they were written; the window asks for any since `sinceMs`. */
@@ -55,12 +58,14 @@ const projects = new Map([
 let nowMs: number;
 let auditLog: MemoryAuditLog;
 let ocsf: { insertEvent: Mock<GovernanceOcsfEventWriter["insertEvent"]> };
+let outbox: { record: Mock<WorkspaceViewMirrorOutbox["record"]> };
 let service: DefaultGovernanceAdminWorkspaceViewAuditService;
 
 beforeEach(() => {
   nowMs = 1_700_000_000_000;
   auditLog = new MemoryAuditLog(() => nowMs);
   ocsf = { insertEvent: vi.fn<GovernanceOcsfEventWriter["insertEvent"]>(async () => undefined) };
+  outbox = { record: vi.fn<WorkspaceViewMirrorOutbox["record"]>(async () => undefined) };
   service = DefaultGovernanceAdminWorkspaceViewAuditService.create({
     auditLog,
     teams: createApiFixture<OrganizationApi>({}, "OrganizationApi"),
@@ -77,6 +82,7 @@ beforeEach(() => {
       }),
     },
     events: ocsf satisfies GovernanceOcsfEventWriter,
+    outbox: () => outbox,
     clock: () => nowMs,
   });
 });
@@ -102,9 +108,10 @@ describe("DefaultGovernanceAdminWorkspaceViewAuditService, aggregate kind", () =
           metadata: { kind: "aggregate", workspaceLabel: aggregate.name },
         }),
       ]);
-      expect(ocsf.insertEvent).toHaveBeenCalledWith(
-        expect.objectContaining({ sourceId: aggregate.id, sourceType: "aggregate_project" }),
+      expect(outbox.record).toHaveBeenCalledWith(
+        expect.objectContaining({ targetId: aggregate.id, targetKind: "aggregate_project" }),
       );
+      expect(ocsf.insertEvent).not.toHaveBeenCalled();
     });
   });
 

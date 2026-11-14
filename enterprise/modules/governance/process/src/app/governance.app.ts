@@ -213,6 +213,7 @@ import {
   PulledUsageEventingAdapter,
   type PulledUsageDefinition,
 } from "../eventing/pulled-usage.pipeline.ts";
+import { OutboxWorkspaceViewMirror } from "../eventing/workspace-view-mirror.intent.ts";
 import { AgentDiscoveryService } from "../features/agents/services/agent-discovery.service.ts";
 import { GovernanceAgentSyncService } from "../features/agents/services/governance-agent-sync.service.ts";
 import { GovernanceAgentsScreenService } from "../features/agents/services/governance-agents-screen.service.ts";
@@ -293,7 +294,10 @@ import type { GovernanceRepositories } from "../repositories/governance.reposito
 import { governanceOperatorReads } from "../repositories/prisma/prisma.suppression-snapshot.repository.ts";
 import { anomalyRuleConfigComplaint } from "../rules/anomaly-rule-config-error.rules.ts";
 import { exemptOriginsOf, vendorBasesOf, type VendorBases } from "../rules/vendor-bases.rules.ts";
-import { DefaultGovernanceAdminWorkspaceViewAuditService } from "../services/admin-workspace-view-audit.service.ts";
+import {
+  DefaultGovernanceAdminWorkspaceViewAuditService,
+  type WorkspaceViewMirror,
+} from "../services/admin-workspace-view-audit.service.ts";
 import { AggregateReconcilerService } from "../services/aggregate-reconciler.service.ts";
 import { DefaultGovernanceAiToolCatalogService } from "../services/ai-tool-catalog.service.ts";
 import { ModelProviderAiToolCatalogService } from "../services/ai-tool-provider-catalog.service.ts";
@@ -764,6 +768,7 @@ export class GovernanceModule implements GovernanceRestApi {
       targets: dependencies.projects,
       projects: tenantHistory,
       events: repositories.ocsfEvents,
+      outbox: () => this.#workspaceViewMirrorOutbox,
       diagnostics: { warn: (message, context) => logger.warn(context, message) },
     });
     this.ocsfExport = DefaultGovernanceOcsfExportService.create({
@@ -1086,6 +1091,22 @@ export class GovernanceModule implements GovernanceRestApi {
     processStore: Pick<ProcessStore, "appendIntents">;
   }): void {
     this.#anomalyAlertOutbox = OutboxAnomalyAlertDelivery.create(processStore);
+  }
+
+  #workspaceViewMirrorOutbox: OutboxWorkspaceViewMirror | undefined;
+
+  /** A built pipeline means an outbox: a recorded view's OCSF mirror is queued in it from here on. */
+  connectWorkspaceViewMirrorOutbox({
+    processStore,
+  }: {
+    processStore: Pick<ProcessStore, "appendIntents">;
+  }): void {
+    this.#workspaceViewMirrorOutbox = OutboxWorkspaceViewMirror.create(processStore);
+  }
+
+  /** The mirror intent's handler, in the worker: the OCSF row for one recorded view. */
+  mirrorWorkspaceView(mirror: WorkspaceViewMirror): Promise<void> {
+    return this.workspaceViews.mirrorView(mirror);
   }
 
   /** The delivery intent's handler: one WebhookApi.requestDelivery per recorded intent. */

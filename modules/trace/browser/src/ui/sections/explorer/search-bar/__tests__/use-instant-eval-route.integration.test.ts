@@ -27,6 +27,7 @@ const mutations = vi.hoisted(() => ({
   },
   setAccess: vi.fn(),
   invalidateAccess: vi.fn(async () => undefined),
+  setRun: vi.fn(),
 }));
 vi.mock("../../../../../behavior/trace-api.ts", () => ({
   api: {
@@ -39,6 +40,7 @@ vi.mock("../../../../../behavior/trace-api.ts", () => ({
     useUtils: () => ({
       instantEval: {
         access: { setData: mutations.setAccess, invalidate: mutations.invalidateAccess },
+        get: { setData: mutations.setRun },
       },
     }),
   },
@@ -82,6 +84,7 @@ beforeEach(() => {
   mutations.assign.mutate.mockClear();
   mutations.setAccess.mockClear();
   mutations.invalidateAccess.mockClear();
+  mutations.setRun.mockReset();
   toast.mockClear();
   useFilterStore.getState().clearAll();
 });
@@ -232,6 +235,27 @@ describe("given the router answered instant_eval", () => {
     const applied = useFilterStore.getState().queryText;
     expect(applied).toContain("service:api");
     expect(applied).toContain('eval:"the user is annoyed"');
+  });
+
+  /** @scenario "A started run shows as queued before the worker writes its row" */
+  it("seeds the run's read with the started run before its chip lands", () => {
+    const started = { id: "run-1", status: "QUEUED", progress: 0, total: 120, matched: 0 };
+    const queryWhenSeeded: string[] = [];
+    mutations.setRun.mockImplementation(() => {
+      queryWhenSeeded.push(useFilterStore.getState().queryText);
+    });
+    const { result } = renderHook(() => useInstantEvalRoute({ isInstantEvalAvailable: true }));
+    act(() => result.current.onInstantEvalRoute(payload));
+    act(() => estimateCallbacks().onSuccess?.({ rows: 120, isRowsCapped: false, priceUsd: 0.1 }));
+
+    act(() => startCallbacks().onSuccess?.(started));
+
+    expect(mutations.setRun).toHaveBeenCalledExactlyOnceWith(
+      { projectId: "project-1", runId: "run-1" },
+      started,
+    );
+    expect(queryWhenSeeded).toEqual([""]);
+    expect(useFilterStore.getState().queryText).toContain('eval:"the user is annoyed"');
   });
 
   /** @scenario "An Instant Eval route starts a run" */

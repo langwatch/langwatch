@@ -13,7 +13,10 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import type { GovernanceOcsfEventWriter } from "../../repositories/governance.repositories.ts";
-import { DefaultGovernanceAdminWorkspaceViewAuditService } from "../admin-workspace-view-audit.service.ts";
+import {
+  DefaultGovernanceAdminWorkspaceViewAuditService,
+  type WorkspaceViewMirrorOutbox,
+} from "../admin-workspace-view-audit.service.ts";
 
 class RecordingAuditLog implements Pick<AuditLogApi, "record" | "hasRecordedSince"> {
   recent = false;
@@ -43,6 +46,10 @@ function stubProjects(): ProjectApi {
 
 class StubOcsf implements GovernanceOcsfEventWriter {
   readonly insertEvent = vi.fn(async () => undefined);
+}
+
+class RecordingOutbox implements WorkspaceViewMirrorOutbox {
+  readonly record = vi.fn<WorkspaceViewMirrorOutbox["record"]>(async () => undefined);
 }
 
 const at = new Date(0);
@@ -105,13 +112,14 @@ describe("DefaultGovernanceAdminWorkspaceViewAuditService", () => {
   it("records the scoped view and mirrors it under the audit identifier", async () => {
     const repository = new RecordingAuditLog();
     const teams = new StubTeams();
-    const ocsf = new StubOcsf();
+    const outbox = new RecordingOutbox();
     const service = DefaultGovernanceAdminWorkspaceViewAuditService.create({
       targets: stubProjects(),
       auditLog: repository,
       teams: teams.api(),
       projects: stubProjects(),
-      events: ocsf,
+      events: new StubOcsf(),
+      outbox: () => outbox,
     });
 
     await expect(service.recordView(input)).resolves.toEqual({
@@ -127,16 +135,39 @@ describe("DefaultGovernanceAdminWorkspaceViewAuditService", () => {
       metadata: { kind: "personal", workspaceLabel: "Owner workspace" },
     });
     expect(repository.record).toHaveBeenCalledTimes(1);
-    expect(ocsf.insertEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        tenantId: "governance-project",
-        eventId: "audit",
-        sourceId: "team",
-        sourceType: "personal_workspace",
-        actionName: "governance.viewWorkspaceAs",
-        targetName: "Owner workspace",
-      }),
-    );
+    expect(outbox.record).toHaveBeenCalledWith(expect.objectContaining({ auditLogId: "audit" }));
+  });
+
+  describe("when a privileged view is recorded from a request", () => {
+    /** @scenario "A recorded workspace view queues its OCSF mirror for the worker" */
+    it("queues one mirror intent keyed by the audit row and writes no OCSF row itself", async () => {
+      const ocsf = new StubOcsf();
+      const outbox = new RecordingOutbox();
+      const service = DefaultGovernanceAdminWorkspaceViewAuditService.create({
+        targets: stubProjects(),
+        auditLog: new RecordingAuditLog(),
+        teams: new StubTeams().api(),
+        projects: stubProjects(),
+        events: ocsf,
+        outbox: () => outbox,
+      });
+
+      await expect(service.recordView(input)).resolves.toEqual({
+        recorded: true,
+        auditLogId: "audit",
+      });
+      expect(outbox.record).toHaveBeenCalledExactlyOnceWith({
+        auditLogId: "audit",
+        occurredAt: 1_700_000_000_000,
+        organizationId: "org",
+        actorUserId: "admin",
+        kind: "personal",
+        targetId: "team",
+        targetKind: "personal_workspace",
+        label: "Owner workspace",
+      });
+      expect(ocsf.insertEvent).not.toHaveBeenCalled();
+    });
   });
 
   it("silently collapses cross-tenant and self-view probes", async () => {
@@ -147,6 +178,8 @@ describe("DefaultGovernanceAdminWorkspaceViewAuditService", () => {
       targets: stubProjects(),
       auditLog: repository,
       teams: teams.api(),
+      projects: stubProjects(),
+      events: new StubOcsf(),
     });
     await expect(service.recordView(input)).resolves.toEqual({
       recorded: false,
@@ -174,6 +207,8 @@ describe("DefaultGovernanceAdminWorkspaceViewAuditService", () => {
       targets: stubProjects(),
       auditLog: repository,
       teams: teams.api(),
+      projects: stubProjects(),
+      events: new StubOcsf(),
     });
 
     await expect(service.recordView({ ...input, kind: "team" })).resolves.toEqual({
@@ -196,6 +231,8 @@ describe("DefaultGovernanceAdminWorkspaceViewAuditService", () => {
       targets: stubProjects(),
       auditLog: repository,
       teams: teams.api(),
+      projects: stubProjects(),
+      events: new StubOcsf(),
       clock: () => 1_700_000_000_000,
     });
     await expect(service.recordView(input)).resolves.toEqual({
@@ -207,18 +244,20 @@ describe("DefaultGovernanceAdminWorkspaceViewAuditService", () => {
     );
   });
 
-  it("keeps the authoritative audit when the OCSF mirror fails", async () => {
+  /** @scenario "The view is answered even when its OCSF mirror cannot be queued" */
+  it("keeps the authoritative audit when the OCSF mirror cannot be queued", async () => {
     const repository = new RecordingAuditLog();
     const teams = new StubTeams();
-    const ocsf = new StubOcsf();
-    ocsf.insertEvent.mockRejectedValueOnce(new Error("ClickHouse unavailable"));
+    const outbox = new RecordingOutbox();
+    outbox.record.mockRejectedValueOnce(new Error("outbox unavailable"));
     const diagnostics = { warn: vi.fn() };
     const service = DefaultGovernanceAdminWorkspaceViewAuditService.create({
       targets: stubProjects(),
       auditLog: repository,
       teams: teams.api(),
       projects: stubProjects(),
-      events: ocsf,
+      events: new StubOcsf(),
+      outbox: () => outbox,
       diagnostics,
     });
 

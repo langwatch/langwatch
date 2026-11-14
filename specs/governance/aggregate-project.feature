@@ -776,6 +776,41 @@ Feature: An aggregate project reads its member projects
     Then one audit row of kind personal exists, as before
     And no row of kind aggregate exists
 
+  # ADR-202 Decided 12: the request holds no ClickHouse write; the worker writes the OCSF mirror.
+  @unit
+  Scenario: A recorded workspace view queues its OCSF mirror for the worker
+    Given ana opens sam's personal workspace
+    When the request records the view
+    Then the audit row is written and its id answered, as before
+    And one OCSF mirror intent keyed by that audit row waits in governance's outbox
+    And the request writes no OCSF row itself
+
+  @unit
+  Scenario: The worker writes the view's OCSF row from the queued intent
+    Given a recorded view's OCSF mirror intent
+    When the worker handles it
+    Then one OCSF row under the organisation's internal governance project carries the audit row's id
+
+  @unit
+  Scenario: A redelivered mirror intent writes one OCSF row
+    Given the worker has handled a view's OCSF mirror intent
+    When the same intent is queued or delivered again
+    Then one intent and one OCSF row exist for that audit row
+
+  @unit
+  Scenario: A failed OCSF insert is retried by the worker
+    Given ClickHouse refuses the OCSF row
+    When the worker handles a view's OCSF mirror intent
+    Then the intent fails and the outbox delivers it again
+    And the view's answer and audit row are unaffected
+
+  @unit
+  Scenario: The view is answered even when its OCSF mirror cannot be queued
+    Given governance's outbox refuses the mirror intent
+    When ana opens sam's personal workspace
+    Then the audit row is written and its id answered
+    And a warning names the view whose mirror was not queued
+
   @integration
   Scenario: Every write under the aggregate's tenant is refused on the server
     Given an aggregate project and one of its members

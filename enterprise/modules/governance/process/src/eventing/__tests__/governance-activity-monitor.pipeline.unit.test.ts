@@ -154,6 +154,7 @@ describe("main's trace-side governance lanes", () => {
         repositories: createApiFixture<GovernanceRepositories>({}),
         app: createApiFixture<GovernanceModule>({
           connectAnomalyAlertOutbox: vi.fn(),
+          connectWorkspaceViewMirrorOutbox: vi.fn(),
         }),
         processStore: InMemoryProcessStore.createForTesting(),
       });

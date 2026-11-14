@@ -13,7 +13,10 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { createGovernanceTestConnection } from "../app/__tests__/governance-database.fixture.ts";
 import type { GovernanceOcsfEventWriter } from "../repositories/governance.repositories.ts";
-import { DefaultGovernanceAdminWorkspaceViewAuditService } from "../services/admin-workspace-view-audit.service.ts";
+import {
+  DefaultGovernanceAdminWorkspaceViewAuditService,
+  type WorkspaceViewMirrorOutbox,
+} from "../services/admin-workspace-view-audit.service.ts";
 
 const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
 const connection = databaseUrl ? createGovernanceTestConnection(databaseUrl) : null;
@@ -28,14 +31,9 @@ const TEAM_MEMBER_ID = `usr-awva-tm-${suffix}`;
 const PERSONAL_TEAM_ID = `team-awva-personal-${suffix}`;
 const SHARED_TEAM_ID = `team-awva-shared-${suffix}`;
 
-/** The mirror the service writes best-effort, as a spy. */
-type MirrorInput = Parameters<GovernanceOcsfEventWriter["insertEvent"]>[0];
-const mirror = vi.fn(async (_input: MirrorInput): Promise<void> => undefined);
-class SpyOcsf implements GovernanceOcsfEventWriter {
-  insertEvent(input: MirrorInput): Promise<void> {
-    return mirror(input);
-  }
-}
+/** The OCSF writer the request must not reach, and the outbox its mirror is queued in, as spies. */
+const ocsfInsert = vi.fn<GovernanceOcsfEventWriter["insertEvent"]>(async () => undefined);
+const mirror = vi.fn<WorkspaceViewMirrorOutbox["record"]>(async () => undefined);
 
 const projects = createApiFixture<ProjectApi>({
   ensureInternal: async () => ({
@@ -105,7 +103,8 @@ describe.skipIf(!databaseUrl)("AdminWorkspaceViewAuditService", () => {
       teams,
       targets: projects,
       projects,
-      events: new SpyOcsf(),
+      events: { insertEvent: ocsfInsert },
+      outbox: () => ({ record: mirror }),
     });
 
   beforeAll(async () => {
@@ -365,8 +364,9 @@ describe.skipIf(!databaseUrl)("AdminWorkspaceViewAuditService", () => {
       }
     }
 
-    it("emits the mirror keyed by the audit-log id", async () => {
+    it("queues the mirror keyed by the audit-log id and writes no OCSF row itself", async () => {
       mirror.mockClear();
+      ocsfInsert.mockClear();
       await withFreshTarget("fresh", async (teamId) => {
         const result = await service().recordView({
           actorUserId: ADMIN_ID,
@@ -377,18 +377,19 @@ describe.skipIf(!databaseUrl)("AdminWorkspaceViewAuditService", () => {
         expect(result.recorded).toBe(true);
         expect(mirror).toHaveBeenCalledTimes(1);
         expect(mirror.mock.calls[0]![0]).toMatchObject({
-          tenantId: GOV_PROJECT_ID,
-          eventId: result.auditLogId,
+          organizationId: ORG_ID,
+          auditLogId: result.auditLogId,
           actorUserId: ADMIN_ID,
-          sourceId: teamId,
-          sourceType: "personal_workspace",
+          targetId: teamId,
+          targetKind: "personal_workspace",
         });
+        expect(ocsfInsert).not.toHaveBeenCalled();
       });
     });
 
-    it("writes the audit row even when the mirror fails", async () => {
+    it("writes the audit row even when the mirror cannot be queued", async () => {
       mirror.mockClear();
-      mirror.mockRejectedValueOnce(new Error("clickhouse explode"));
+      mirror.mockRejectedValueOnce(new Error("outbox unavailable"));
       await withFreshTarget("ocsf-fail", async (teamId) => {
         const result = await service().recordView({
           actorUserId: ADMIN_ID,

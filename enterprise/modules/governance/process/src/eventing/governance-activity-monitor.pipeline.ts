@@ -101,6 +101,19 @@ import {
   spendSpikeEvaluationStateSchema,
   spendSpikeEvaluationWake,
 } from "./spend-spike-evaluation.process.ts";
+import { pruneWorkspaceViewMirrors } from "./workspace-view-mirror.intent.ts";
+import {
+  WORKSPACE_VIEW_MIRROR_INITIAL_STATE,
+  WORKSPACE_VIEW_MIRROR_INTENT,
+  WORKSPACE_VIEW_MIRROR_MAX_ATTEMPTS,
+  WORKSPACE_VIEW_MIRROR_PROCESS_NAME,
+  WORKSPACE_VIEW_MIRROR_PRUNE_INTENT,
+  WORKSPACE_VIEW_MIRROR_PRUNE_INTERVAL_MS,
+  workspaceViewMirrorIntentSchema,
+  workspaceViewMirrorPruneSchema,
+  workspaceViewMirrorPruneWake,
+  workspaceViewMirrorStateSchema,
+} from "./workspace-view-mirror.process.ts";
 
 export const GOVERNANCE_ACTIVITY_MONITOR_PIPELINE_NAME = "governance_activity_monitor";
 
@@ -151,9 +164,12 @@ function buildGovernanceActivityMonitor({
     | "departmentAssignUser"
     | "aggregateReconciler"
     | "governanceAuditWorkspaceView"
+    | "connectWorkspaceViewMirrorOutbox"
+    | "mirrorWorkspaceView"
   >
 >): StaticPipelineDefinition<never> {
   app.connectAnomalyAlertOutbox({ processStore });
+  app.connectWorkspaceViewMirrorOutbox({ processStore });
   const reconciler = app.aggregateReconciler;
   const aggregateOutbox = OutboxAggregateReconcile.create(processStore);
   const affected = (trigger: string) =>
@@ -322,6 +338,21 @@ function buildGovernanceActivityMonitor({
         data: authzAggregateReadEventDataSchema,
         handle: auditAggregateRead({ views: app }),
       })
+      .withProcessManager(WORKSPACE_VIEW_MIRROR_PROCESS_NAME, (pm) =>
+        pm
+          .state(workspaceViewMirrorStateSchema, WORKSPACE_VIEW_MIRROR_INITIAL_STATE)
+          .intent(WORKSPACE_VIEW_MIRROR_INTENT, workspaceViewMirrorIntentSchema, (intent) =>
+            app.mirrorWorkspaceView(intent),
+          )
+          .intent(
+            WORKSPACE_VIEW_MIRROR_PRUNE_INTENT,
+            workspaceViewMirrorPruneSchema,
+            pruneWorkspaceViewMirrors(processStore),
+          )
+          .schedule({ everyMs: WORKSPACE_VIEW_MIRROR_PRUNE_INTERVAL_MS })
+          .onWake(workspaceViewMirrorPruneWake)
+          .outbox({ maxAttempts: WORKSPACE_VIEW_MIRROR_MAX_ATTEMPTS }),
+      )
       .withProcessManager(AGGREGATE_RECONCILE_PROCESS_NAME, (pm) =>
         pm
           .state(aggregateReconcileStateSchema, AGGREGATE_RECONCILE_INITIAL_STATE)

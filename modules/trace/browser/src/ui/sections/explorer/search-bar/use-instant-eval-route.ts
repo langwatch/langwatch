@@ -245,6 +245,7 @@ function useInstantEvalStarter({
   startRun: (args: PendingRoute & { seq: number }) => void;
 } {
   const start = api.instantEval.start.useMutation();
+  const utils = api.useUtils();
   const applyQueryText = useFilterStore((s) => s.applyQueryText);
   const registerEvalRun = useFilterStore((s) => s.registerEvalRun);
   const recordSearchNotice = useFilterStore((s) => s.recordSearchNotice);
@@ -284,6 +285,8 @@ function useInstantEvalStarter({
           if (seq !== seqRef.current) return;
           pendingRef.current = null;
           setConfirmation(null);
+          // The worker writes the run's row later; the created run shows as queued until then.
+          utils.instantEval.get.setData({ projectId: payload.projectId, runId: run.id }, run);
           applyChip({ payload, key, runId: run.id });
         },
         onError: (error) => {
@@ -292,7 +295,7 @@ function useInstantEvalStarter({
         },
       });
     },
-    [applyChip, pendingRef, refuse, seqRef, setConfirmation, start],
+    [applyChip, pendingRef, refuse, seqRef, setConfirmation, start, utils],
   );
 
   return { isStarting: start.isPending, applyChip, startRun };

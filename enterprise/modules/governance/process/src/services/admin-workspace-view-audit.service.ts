@@ -44,12 +44,31 @@ const skipped = (): RecordWorkspaceViewResult => ({
   auditLogId: null,
 });
 
+/** One OCSF mirror per AuditLog row, written by the worker (ADR-202 Decided 12). */
+export type WorkspaceViewMirror = {
+  auditLogId: string;
+  occurredAt: number;
+  organizationId: string;
+  actorUserId: string;
+  kind: string;
+  targetId: string;
+  targetKind: string;
+  label: string;
+};
+
+/** Records one mirror intent in governance's outbox; a repeated key is one intent. */
+export interface WorkspaceViewMirrorOutbox {
+  record(mirror: WorkspaceViewMirror): Promise<void>;
+}
+
 type AuditOptions = {
   auditLog: WorkspaceAuditLog;
   teams: WorkspaceTeams;
   targets: ViewTargets;
-  projects?: Pick<ProjectApi, "ensureInternal">;
-  events?: GovernanceOcsfEventWriter;
+  projects: Pick<ProjectApi, "ensureInternal">;
+  events: GovernanceOcsfEventWriter;
+  /** Read at record: the outbox exists once governance's pipeline is built. */
+  outbox: () => WorkspaceViewMirrorOutbox | undefined;
   diagnostics?: GovernanceDiagnosticsSink;
   clock: () => number;
 };
@@ -58,10 +77,14 @@ export class DefaultGovernanceAdminWorkspaceViewAuditService {
   private constructor(private readonly options: AuditOptions) {}
 
   static create(
-    options: Omit<AuditOptions, "clock"> & { clock?: () => number },
+    options: Omit<AuditOptions, "clock" | "outbox"> & {
+      clock?: () => number;
+      outbox?: () => WorkspaceViewMirrorOutbox | undefined;
+    },
   ): DefaultGovernanceAdminWorkspaceViewAuditService {
     return new DefaultGovernanceAdminWorkspaceViewAuditService({
       ...options,
+      outbox: options.outbox ?? (() => undefined),
       clock: options.clock ?? Date.now,
     });
   }
@@ -108,7 +131,7 @@ export class DefaultGovernanceAdminWorkspaceViewAuditService {
       targetId: target.targetId,
       metadata: { kind: parsed.kind, workspaceLabel: label },
     });
-    await this.mirrorBestEffort({ input: parsed, target, targetKind, label, row });
+    await this.queueMirror({ input: parsed, target, targetKind, label, row });
 
     return { recorded: true, auditLogId: row.id };
   }
@@ -168,7 +191,38 @@ export class DefaultGovernanceAdminWorkspaceViewAuditService {
     return withMembers.members.some((member) => member.userId === actorUserId);
   }
 
-  private async mirrorBestEffort({
+  /** The worker's side: the OCSF row keyed by the AuditLog id, so a retry replaces it. */
+  async mirrorView(mirror: WorkspaceViewMirror): Promise<void> {
+    const project = await this.options.projects.ensureInternal({
+      organizationId: mirror.organizationId,
+      kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
+    });
+    await this.options.events.insertEvent({
+      tenantId: project.id,
+      eventId: mirror.auditLogId,
+      traceId: "",
+      sourceId: mirror.targetId,
+      sourceType: mirror.targetKind,
+      activityId: OCSF_ACTIVITY.READ,
+      severityId: OCSF_SEVERITY.INFO,
+      eventTime: Temporal.Instant.fromEpochMilliseconds(mirror.occurredAt),
+      actorUserId: mirror.actorUserId,
+      actorEmail: "",
+      actorEnduserId: "",
+      actionName: ADMIN_WORKSPACE_VIEW_ACTION,
+      targetName: mirror.label || mirror.targetId,
+      anomalyAlertId: "",
+      rawOcsfJson: JSON.stringify({
+        action: ADMIN_WORKSPACE_VIEW_ACTION,
+        actor: { user_uid: mirror.actorUserId },
+        target: { uid: mirror.targetId, name: mirror.label, type: mirror.kind },
+        organization_id: mirror.organizationId,
+      }),
+    });
+  }
+
+  /** The request's side: one outbox intent; the AuditLog row stands if it cannot be queued. */
+  private async queueMirror({
     input,
     target,
     targetKind,
@@ -181,40 +235,23 @@ export class DefaultGovernanceAdminWorkspaceViewAuditService {
     label: string;
     row: { id: string; occurredAt: number };
   }): Promise<void> {
-    if (!this.options.events || !this.options.projects) {
-      return;
-    }
+    const outbox = this.options.outbox();
+    if (!outbox) return;
 
     try {
-      const project = await this.options.projects.ensureInternal({
+      await outbox.record({
+        auditLogId: row.id,
+        occurredAt: row.occurredAt,
         organizationId: input.organizationId,
-        kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
-      });
-      await this.options.events.insertEvent({
-        tenantId: project.id,
-        eventId: row.id,
-        traceId: "",
-        sourceId: target.targetId,
-        sourceType: targetKind,
-        activityId: OCSF_ACTIVITY.READ,
-        severityId: OCSF_SEVERITY.INFO,
-        eventTime: Temporal.Instant.fromEpochMilliseconds(row.occurredAt),
         actorUserId: input.actorUserId,
-        actorEmail: "",
-        actorEnduserId: "",
-        actionName: ADMIN_WORKSPACE_VIEW_ACTION,
-        targetName: label || target.targetId,
-        anomalyAlertId: "",
-        rawOcsfJson: JSON.stringify({
-          action: ADMIN_WORKSPACE_VIEW_ACTION,
-          actor: { user_uid: input.actorUserId },
-          target: { uid: target.targetId, name: label, type: input.kind },
-          organization_id: input.organizationId,
-        }),
+        kind: input.kind,
+        targetId: target.targetId,
+        targetKind,
+        label,
       });
     } catch (error) {
       this.options.diagnostics?.warn(
-        "OCSF mirror for admin workspace view failed — AuditLog row already written",
+        "OCSF mirror for admin workspace view was not queued; the AuditLog row is already written",
         {
           actorUserId: input.actorUserId,
           targetId: target.targetId,

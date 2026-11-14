@@ -281,6 +281,13 @@ Feature: Instant Evals inside the Trace Explorer
   Rule: Progress is visible while a run judges
 
     @integration
+    Scenario: A started run shows as queued before the worker writes its row
+      Given the run's read still answers not found, because the worker has not written its row
+      When a run is started and its eval chip is applied
+      Then the run's read already holds the started run, queued, before the chip lands
+      And no not-found shows for the run while the worker catches up
+
+    @integration
     Scenario: A determinate bar reads the run's counters
       Given a run with total 10,000, progress 3,200 and 412 matched
       When the progress bar renders
