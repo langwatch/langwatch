@@ -299,6 +299,10 @@ export class UserModule implements UserApi {
     return this.#users.getProfiles(input);
   }
 
+  searchForOperators(input: { query: string; limit: number }): Promise<UserProfile[]> {
+    return this.#users.searchForOperators(input);
+  }
+
   findByEmail(input: UserEmailInput): Promise<UserProfile | null> {
     return this.#users.findByEmail(input);
   }
