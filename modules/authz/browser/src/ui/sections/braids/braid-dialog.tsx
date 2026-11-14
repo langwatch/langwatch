@@ -319,7 +319,6 @@ export function BraidDialog({
               onSettle={settle}
               ownerName={owner.name}
               readerName={reader?.name ?? "the other project"}
-              verified={verifiedKey !== undefined}
               attributeKeys={attributeKeys.data?.keys ?? []}
               focusOnLoad={!!editing}
             >

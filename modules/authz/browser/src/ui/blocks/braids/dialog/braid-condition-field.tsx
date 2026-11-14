@@ -81,7 +81,6 @@ export type BraidConditionFieldProps = {
   onSettle?: (value: string) => void;
   ownerName: string;
   readerName: string;
-  verified: boolean;
   attributeKeys: readonly { key: string; spanCount: number }[];
   /** Puts the caret in the condition once the editor has loaded, so Edit opens on it. */
   focusOnLoad?: boolean;

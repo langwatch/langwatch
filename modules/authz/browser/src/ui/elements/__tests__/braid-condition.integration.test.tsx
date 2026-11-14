@@ -57,7 +57,6 @@ describe("Feature: Braids screen", () => {
         check={compileBraidCondition({ text: CONDITION })}
         ownerName="specialists"
         readerName="orchestrator"
-        verified
         attributeKeys={[]}
       />,
     );
