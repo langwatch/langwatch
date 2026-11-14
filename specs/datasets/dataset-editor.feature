@@ -59,6 +59,15 @@ Feature: Dataset editor
       When I press the down arrow until the selection passes the rendered rows
       Then the grid scrolls to the selected row
 
+    @integration
+    Scenario: Moving to another column on a row scrolled out of view brings the row back
+      Given the dataset has more rows than the grid renders at once
+      And a cell in the first row is selected
+      When I scroll the grid until the first row is no longer rendered
+      Then the grid stays where I scrolled it
+      When I press the right arrow
+      Then the grid scrolls back to the selected row
+
   @integration @unimplemented
   Scenario: Large datasets stay responsive
     Given the dataset has thousands of records

@@ -224,13 +224,15 @@ describe("given an in-memory dataset", () => {
       expect(scrollTo.mock.calls.at(-1)?.[0]).toMatchObject({ top: rowBottom - viewport });
     });
 
-    /** @scenario Moving with the keyboard to a row that is not rendered brings it into view */
+    /** @scenario Moving to another column on a row scrolled out of view brings the row back */
     it("brings the selected row back when only the column changes after scrolling it away", async () => {
       const grid = gridScroller();
+      scrollTo.mockClear();
       grid.scrollTop = 40 * rowHeight;
       fireEvent.scroll(grid);
       await waitFor(() => expect(screen.queryByText("value 0")).not.toBeInTheDocument());
-      scrollTo.mockClear();
+      // Scrolling by hand leaves the selection where it is; only a keyboard move recovers it.
+      expect(scrollTo).not.toHaveBeenCalled();
 
       await user.keyboard("{ArrowRight}");
 

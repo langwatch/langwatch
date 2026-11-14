@@ -186,9 +186,9 @@ function useScrollToSelectedRow({
 }
 
 /**
- * Memoized by hand: the React Compiler skips components using TanStack
- * Table/Virtual, so without this every editor render repaints every row.
- * The cast keeps the generic row type, which React.memo would otherwise erase.
+ * Memoized by hand: `useVirtualizer` is on the React Compiler's incompatible-
+ * library list, so it skips this component; without this every editor render
+ * repaints every row. The cast keeps the generic row type React.memo erases.
  */
 export const VirtualizedTableBody = React.memo(
   VirtualizedTableBodyImpl,
