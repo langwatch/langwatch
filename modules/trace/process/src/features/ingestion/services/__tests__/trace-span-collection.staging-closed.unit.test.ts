@@ -23,7 +23,7 @@ vi.mock("@langwatch/observability", async (importOriginal) => ({
   createLogger: () => captured.logger,
 }));
 
-class RefusingCommand extends TraceIngressCommand {
+class ClosedStagingCommand extends TraceIngressCommand {
   constructor(private readonly refusal: () => Error) {
     super();
   }
@@ -89,7 +89,7 @@ function collecting(refusal: () => Error) {
   captured.logger = logger;
   const service = TraceSpanCollectionService.create({
     dedup: new FreeDedup(),
-    commands: new RefusingCommand(refusal),
+    commands: new ClosedStagingCommand(refusal),
   });
   return { service, lines };
 }
