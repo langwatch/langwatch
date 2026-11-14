@@ -2145,7 +2145,7 @@ export class GovernanceModule implements GovernanceRestApi {
   }
 
   templateGetByIdForOrg(input: { id: string; organizationId: string }): Promise<IngestionTemplate> {
-    return this.templates.getByIdForOrg(input);
+    return this.templates.getByIdForMember(input);
   }
 
   /** An `otlp_token` credential is the default one, so it is stored as none, as on main. */

@@ -220,7 +220,7 @@ export class GovernanceMcpToolsService {
 
     server.tool(
       "governance_ingestion_templates_get",
-      "Fetch a single ingestion template by id. Cross-org probes return null. Mirrors GET /api/governance/ingestion-templates/:id.",
+      "Fetch a single ingestion template by id, without the OTTL source (as in the list). Cross-org probes return null.",
       { id: z.string().describe("IngestionTemplate id") },
       ({ id }) =>
         this.read(session, "aiTools:view", (organizationId) =>

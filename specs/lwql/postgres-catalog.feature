@@ -208,6 +208,12 @@ Feature: Every catalogued Postgres model is queryable through LangWatchQL
       Then Centroid, EmbeddingsModel and P95Distance are absent
       And TopicId, TopicName, ParentTopicId and TenantId are present
 
+    @unit
+    Scenario: LWQL reads a template's OTTL rules only with aiTools:manage
+      Given the derived ingestion templates view
+      When a caller without aiTools:manage queries it
+      Then the OTTL rules column is not readable
+
   Rule: Re-provisioning converges an already-provisioned installation
 
     @integration

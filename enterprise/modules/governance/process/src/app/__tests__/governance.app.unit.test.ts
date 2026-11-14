@@ -32,10 +32,12 @@ import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import type { WebhookApi } from "@langwatch/webhook-contract";
 import { describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 
 import { governanceProcessModule } from "../../governance.module.ts";
 import type { GovernanceRepositories } from "../../repositories/governance.repositories.ts";
 import { MemoryGovernanceRepositories } from "../../repositories/memory/memory.governance.repositories.ts";
+import type { GovernanceMcpServer } from "../../services/governance-mcp-tools.service.ts";
 import { governanceCliRest } from "../../transport/governance-cli.rest.ts";
 import { GovernanceModule } from "../governance.app.ts";
 
@@ -122,6 +124,67 @@ async function buildCliApp() {
 }
 
 describe("GovernanceModule ingestion templates", () => {
+  describe("given an organization template whose OTTL rules are set", () => {
+    const OTTL = 'set(attributes["langwatch.cost.usd"], attributes["x.cost"])';
+
+    async function withTemplate() {
+      const built = await buildApp();
+      const template = await built.repositories.ingestionTemplates.createWithAudit({
+        template: {
+          slug: "org_tool",
+          sourceType: "org_tool",
+          displayName: "Org Tool",
+          description: null,
+          iconAsset: null,
+          credentialSchema: null,
+          ottlRules: OTTL,
+          organizationId: ORGANIZATION_ID,
+        },
+        callerUserId: "seed",
+        surface: "hono",
+      });
+      return { ...built, template };
+    }
+
+    /** @scenario "A member reads one ingestion template without its OTTL rules" */
+    it("answers the member read with the rules empty and the admin read with them", async () => {
+      const { app, template } = await withTemplate();
+
+      const member = await app.templateGetByIdForOrg({
+        id: template.id,
+        organizationId: ORGANIZATION_ID,
+      });
+      const admin = await app.getIngestionTemplate({ projectId: PROJECT_ID, id: template.id });
+
+      expect(member).toEqual({ ...template, ottlRules: "" });
+      expect(admin.ottlRules).toBe(OTTL);
+    });
+
+    /** @scenario "A project API key's MCP session never reads a template's OTTL rules" */
+    it("answers a project-key MCP session's list and get without the rules", async () => {
+      const { app, template } = await withTemplate();
+      const tools = new Map<
+        string,
+        (args: Record<string, unknown>) => Promise<{ content: { text: string }[] }>
+      >();
+      const server: GovernanceMcpServer = {
+        tool(name, _description, schema, cb) {
+          tools.set(name, (args) => cb(z.object(schema).parse(args)));
+          return undefined;
+        },
+      };
+      app.registerMcpTools({ server, projectId: PROJECT_ID, callerUserId: undefined });
+
+      const listed = await tools.get("governance_ingestion_templates_list")!({});
+      const got = await tools.get("governance_ingestion_templates_get")!({ id: template.id });
+
+      expect(listed.content[0]!.text).toContain(template.id);
+      expect(got.content[0]!.text).toContain(template.id);
+      expect(listed.content[0]!.text).not.toContain("x.cost");
+      expect(got.content[0]!.text).not.toContain("x.cost");
+    });
+  });
+
   describe("given a caller who names only their project", () => {
     it("resolves the organization from the project rather than taking one", async () => {
       const { app, getOrganizationId, repositories } = await buildApp();

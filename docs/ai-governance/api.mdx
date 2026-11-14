@@ -64,7 +64,7 @@ The first surface to ship is `ingestion-templates` (Lane B-1 commit). The verb s
 | --------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------- |
 | `list`                | `GET /api/v1/governance/ingestion-templates`                  | `{ data: IngestionTemplateDto[] }` (end-user shape, `ottl_rules` redacted) | `aiTools:view`   |
 | `admin-list`          | `GET /api/v1/governance/ingestion-templates/admin`            | `{ data: IngestionTemplateDto[] }` (admin shape, includes `ottl_rules`)    | `aiTools:manage` |
-| `get`                 | `GET /api/v1/governance/ingestion-templates/:id`              | `{ ingestion_template: IngestionTemplateDto }`                             | `aiTools:view`   |
+| `get`                 | `GET /api/v1/governance/ingestion-templates/:id`              | `{ ingestion_template: IngestionTemplateDto }` (includes `ottl_rules`)     | `aiTools:manage` |
 | `create`              | `POST /api/v1/governance/ingestion-templates`                 | `{ ingestion_template: IngestionTemplateDto }` (201)                       | `aiTools:manage` |
 | `update-ottl-rules`   | `PATCH /api/v1/governance/ingestion-templates/:id/ottl-rules` | `{ ingestion_template: IngestionTemplateDto }`                             | `aiTools:manage` |
 | `archive`             | `DELETE /api/v1/governance/ingestion-templates/:id`           | `{ archived: true }` (soft-archive)                                        | `aiTools:manage` |
