@@ -25,3 +25,19 @@ Feature: A system reader lists bare trace summaries under the list read's filter
     Given the trace store fails the page statement
     When a system reader lists trace summaries
     Then the read fails with the store's error
+
+  # The updated axis windows on UpdatedAt, which is not the table's partition column, so
+  # without a bound on OccurredAt (the frozen storage anchor) every read walks every weekly
+  # partition, cold storage included (#9354).
+  @unit
+  Scenario: A summaries-only list on the updated axis can bound the partitions it reads
+    Given a window on the updated axis and a floor on when its traces first occurred
+    When a system reader lists trace summaries
+    Then the page statement, its latest-version lookup and the summary read all carry the floor
+    And none of them is a cold scan of the table
+
+  @unit
+  Scenario: A summaries-only list reads every partition when no floor is given
+    Given a window on the updated axis and no floor
+    When a system reader lists trace summaries
+    Then no statement carries an occurrence bound, as before
