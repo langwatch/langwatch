@@ -961,8 +961,8 @@ Messages:
 - Kind: problem
 - Applies to: isModuleProcessSource
 - Fixable: no
-- Spec: none yet
-- Enforced: **no** — registered here but not enabled in `oxlint.architecture.jsonc`, so it reports nothing
+- Spec: `specs/tooling/lint-no-raw-clickhouse-sql.feature`
+- Enforced: yes, at `error`
 
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |

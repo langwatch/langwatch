@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -321,6 +321,19 @@ function callSitesIn(file: string, source: string): CallSite[] {
   return sites;
 }
 
+/** The files `langwatch/no-raw-clickhouse-sql` still admits raw SQL in; empty once ported. */
+function rawClickHouseBaselineFiles(): string[] {
+  const baseline = join(
+    ROOT,
+    "packages/oxlint-rules/src/rules/no-raw-clickhouse-sql.baseline.json",
+  );
+  if (!existsSync(baseline)) return [];
+  const { findings } = JSON.parse(readFileSync(baseline, "utf8")) as {
+    findings: Record<string, number>;
+  };
+  return Object.keys(findings).filter((file) => existsSync(join(ROOT, file)));
+}
+
 function scan(): CallSite[] {
   const sites: CallSite[] = [];
   for (const directory of SCANNED_DIRECTORIES) {
@@ -351,10 +364,30 @@ describe("ClickHouse repositories", () => {
     });
   });
 
-  it("finds the statements it is meant to be reading", () => {
-    expect(sites.length).toBeGreaterThan(150);
-    expect(sites.filter((site) => site.verdict === "scoped").length).toBeGreaterThan(100);
-    expect(sites.filter((site) => site.verdict === "declared-unscoped").length).toBeGreaterThan(9);
+  /** Raw statements shrink as reads move to the builder (ADR-202), so the floor is the baseline. */
+  it("finds a statement in every unported file that sends one", () => {
+    const unported = rawClickHouseBaselineFiles().map((file) => ({
+      file,
+      source: readFileSync(join(ROOT, file), "utf8"),
+    }));
+    const verdictsIn = (file: string) =>
+      sites.filter((site) => site.file === file).map((site) => site.verdict);
+    const sending = unported.filter(({ source }) =>
+      /\.query\s*(?:<[^;{}()]*?>)?\s*\(/.test(source),
+    );
+    const blind = sending
+      .filter(({ file }) => verdictsIn(file).length === 0)
+      .map(({ file }) => file);
+    const undeclared = unported
+      .filter(({ source }) => /SKIP_TENANT_CHECK\s*:/.test(source))
+      .filter(({ file }) => !verdictsIn(file).includes("declared-unscoped"))
+      .map(({ file }) => file);
+
+    expect(blind, "the scan no longer reaches these files' statements").toEqual([]);
+    expect(undeclared, "the scan no longer reads these files' skip flags").toEqual([]);
+    expect(sites.filter((site) => site.verdict === "scoped").length).toBeGreaterThanOrEqual(
+      Math.min(1, sending.length),
+    );
   });
 
   describe("when the rule itself is exercised", () => {
