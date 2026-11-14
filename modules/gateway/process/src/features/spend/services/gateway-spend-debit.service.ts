@@ -1,4 +1,7 @@
-import type { IngestedCostRecordedEventData } from "@langwatch/enterprise-governance-contract";
+import {
+  type IngestedCostRecordedEventData,
+  ingestedCostKey,
+} from "@langwatch/enterprise-governance-contract";
 import {
   budgetAppliesToProvider,
   type GatewayBudgetDebitRow,
@@ -83,11 +86,15 @@ export class GatewaySpendDebitService {
       virtualKeyId: sentinel,
       principalUserId: fact.principalUserId,
     });
-    const budgets = applicable.filter(({ budget }) => budget.scopeType !== "ATTRIBUTED_USER");
+    // A push cost names no provider, so a provider-restricted budget does not cover it.
+    const budgets = applicable.filter(
+      ({ budget }) =>
+        budget.scopeType !== "ATTRIBUTED_USER" && budgetAppliesToProvider(budget, null),
+    );
     await this.debit({
       projectId: tenantId,
       organizationId: fact.organizationId,
-      requestId: fact.requestId,
+      requestId: ingestedCostKey(fact),
       budgets,
       rows: () => this.ingestedRows({ tenantId, fact, budgets, sentinel }),
       announcement: (budgetIds) => ({
@@ -196,7 +203,8 @@ export class GatewaySpendDebitService {
       window: budget.window,
       virtualKeyId: sentinel,
       providerKey: null,
-      gatewayRequestId: fact.requestId,
+      // Two sources may each report the same request id; the ledger key keeps them apart.
+      gatewayRequestId: ingestedCostKey(fact),
       amountNanoUsd: fact.amountNanoUsd,
       tokensInput: fact.tokensInput,
       tokensOutput: fact.tokensOutput,

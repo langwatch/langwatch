@@ -197,30 +197,25 @@ const COSTED_SOURCE: GovernanceIngestionSource = {
 const COST_OCCURRED_AT_MS = Date.UTC(2026, 10, 14, 12);
 
 const attribute = (key: string, value: string) => ({ key, value: { stringValue: value } });
-const costedLogBody = JSON.stringify({
-  resourceLogs: [
-    {
-      scopeLogs: [
-        {
-          logRecords: [
-            {
-              timeUnixNano: String(BigInt(COST_OCCURRED_AT_MS) * 1_000_000n),
-              body: { stringValue: "request" },
-              attributes: [
-                attribute("langwatch.request_id", "req_1"),
-                attribute("langwatch.cost.usd", "1.25"),
-                attribute("langwatch.model", "claude-sonnet"),
-                attribute("langwatch.input_tokens", "100"),
-                attribute("langwatch.output_tokens", "50"),
-                attribute("langwatch.principal.email", "member@example.com"),
-              ],
-            },
-          ],
-        },
-      ],
-    },
+const costRecord = ({
+  requestId = "req_1",
+  costUsd = "1.25",
+  timeUnixNano = String(BigInt(COST_OCCURRED_AT_MS) * 1_000_000n),
+}: { requestId?: string; costUsd?: string; timeUnixNano?: string } = {}) => ({
+  timeUnixNano,
+  body: { stringValue: "request" },
+  attributes: [
+    attribute("langwatch.request_id", requestId),
+    attribute("langwatch.cost.usd", costUsd),
+    attribute("langwatch.model", "claude-sonnet"),
+    attribute("langwatch.input_tokens", "100"),
+    attribute("langwatch.output_tokens", "50"),
+    attribute("langwatch.principal.email", "member@example.com"),
   ],
 });
+const costedLogs = (...logRecords: ReturnType<typeof costRecord>[]) =>
+  JSON.stringify({ resourceLogs: [{ scopeLogs: [{ logRecords }] }] });
+const costedLogBody = costedLogs(costRecord());
 
 const metricBody = JSON.stringify({
   resourceMetrics: [
@@ -526,7 +521,6 @@ describe("the ingestion-source receivers", () => {
             sourceType: "otel_generic",
             organizationId: ORGANIZATION_ID,
             teamId: null,
-            projectId: "gov_project",
             requestId: "req_1",
             model: "claude-sonnet",
             tokensInput: 100,
@@ -541,6 +535,35 @@ describe("the ingestion-source receivers", () => {
         },
       ]);
       expect(JSON.stringify(api.recorded)).not.toContain("member@example.com");
+    });
+  });
+
+  describe("when one cost in a batch is not a decimal amount", () => {
+    it("skips that cost and still records the batch's valid ones", async () => {
+      const api = mountIngest({ source: COSTED_SOURCE });
+
+      const response = await api.post(
+        `/api/ingest/otel/${SOURCE_ID}/v1/logs`,
+        costedLogs(costRecord({ requestId: "req_hex", costUsd: "0x10" }), costRecord()),
+      );
+
+      expect(response.status).toBe(202);
+      expect(api.recorded.map(({ data }) => data.requestId)).toEqual(["req_1"]);
+    });
+  });
+
+  describe("when a cost's record is stamped at the epoch", () => {
+    it("records it at receive time, where a budget period counts it", async () => {
+      const api = mountIngest({ source: COSTED_SOURCE });
+
+      await api.post(
+        `/api/ingest/otel/${SOURCE_ID}/v1/logs`,
+        costedLogs(costRecord({ timeUnixNano: "0" })),
+      );
+
+      const [fact] = api.recorded;
+      expect(fact?.data.occurredAtMs).toBe(fact?.data.observedAtMs);
+      expect(fact?.occurredAt).toBe(fact?.data.observedAtMs);
     });
   });
 

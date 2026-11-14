@@ -124,37 +124,45 @@ export class GovernanceIngestCostService {
     events: readonly CanonicalCostEvent[];
     source: GovernanceIngestionSource;
     governanceProjectId: string;
-  }): Promise<number> {
+  }): Promise<void> {
     const { events, source, governanceProjectId } = input;
     const observedAtMs = nowInstant().epochMilliseconds;
     const commands: RecordIngestedCostCommand[] = [];
 
     for (const event of events) {
-      const data = await this.recordedFact({ event, source, governanceProjectId, observedAtMs });
+      const data = await this.recordedFact({ event, source, observedAtMs });
       if (data)
         commands.push({ tenantId: governanceProjectId, occurredAt: data.occurredAtMs, data });
     }
 
     if (commands.length > 0) await this.members.costs.record(commands);
-
-    return commands.length;
   }
 
-  /** One event's fact, or null for an amount no ledger integer can hold without rounding. */
+  /**
+   * One event's fact, or null for a cost the ledger cannot hold exactly: not a decimal amount,
+   * or past a safe integer. Skipped with a log, since a resend carries the same value.
+   */
   private async recordedFact({
     event,
     source,
-    governanceProjectId,
     observedAtMs,
   }: {
     event: CanonicalCostEvent;
     source: GovernanceIngestionSource;
-    governanceProjectId: string;
     observedAtMs: number;
   }): Promise<IngestedCostRecordedEventData | null> {
     // The reported cost is a decimal string, so it is pinned to an integer
     // once, here, and every total downstream adds those integers.
-    const nano = usdToNanoUsd(event.costUsd);
+    let nano: bigint;
+    try {
+      nano = usdToNanoUsd(event.costUsd);
+    } catch (error) {
+      logger.error(
+        { costUsd: event.costUsd, requestId: event.requestId, error },
+        "budget: cost is not a decimal amount, skipping debit row",
+      );
+      return null;
+    }
     const amountNanoUsd = Number(nano);
 
     if (!Number.isSafeInteger(amountNanoUsd)) {
@@ -170,7 +178,6 @@ export class GovernanceIngestCostService {
       sourceType: source.sourceType,
       organizationId: source.organizationId,
       teamId: source.teamId ?? null,
-      projectId: governanceProjectId,
       requestId: event.requestId,
       model: event.model,
       tokensInput: event.inputTokens,
@@ -179,9 +186,21 @@ export class GovernanceIngestCostService {
       tokensCacheWrite: event.cacheCreationTokens,
       amountNanoUsd,
       principalUserId: await this.findPrincipal({ event, source }),
-      occurredAtMs: Math.max(1, event.occurredAt.epochMilliseconds),
+      occurredAtMs: this.occurredAtMs({ event, observedAtMs }),
       observedAtMs,
     };
+  }
+
+  /** A record stamped at or before the epoch counts at receive time, as an absent stamp does. */
+  private occurredAtMs({
+    event,
+    observedAtMs,
+  }: {
+    event: CanonicalCostEvent;
+    observedAtMs: number;
+  }): number {
+    const occurredAtMs = event.occurredAt.epochMilliseconds;
+    return occurredAtMs > 0 ? occurredAtMs : observedAtMs;
   }
 
   /**

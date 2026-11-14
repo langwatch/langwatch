@@ -172,7 +172,6 @@ const ingested = (overrides: Partial<IngestedCostRecordedEventData> = {}) =>
     sourceType: "otel_generic",
     organizationId: "org-1",
     teamId: null,
-    projectId: "gov-project",
     requestId: "push-req-1",
     model: "claude-sonnet",
     tokensInput: 100,
@@ -498,7 +497,7 @@ describe("GatewaySpendDebitService", () => {
       expect(rows.map((row) => row.budgetId)).toEqual(["b-org", "b-principal"]);
       expect(rows[0]).toMatchObject({
         tenantId: "gov-project",
-        gatewayRequestId: "push-req-1",
+        gatewayRequestId: "src-1:push-req-1",
         virtualKeyId: "_ingestion_:src-1",
         providerKey: null,
         amountNanoUsd: 1_250_000_000,
@@ -520,6 +519,36 @@ describe("GatewaySpendDebitService", () => {
             amountNanoUsd: 1_250_000_000,
           },
         },
+      ]);
+    });
+
+    it("leaves a provider-restricted budget alone, since a push cost names no provider", async () => {
+      const { debits, ledger } = harness({
+        budgets: [
+          resolved({ id: "b-org", scopeType: "ORGANIZATION" }),
+          resolved({ id: "b-openai", scopeType: "ORGANIZATION", providerKey: "mp-openai" }),
+        ],
+      });
+
+      await debits.writeIngestedCost({ tenantId: "gov-project", fact: ingested() });
+
+      expect(ledger.batches.flat().map((row) => row.budgetId)).toEqual(["b-org"]);
+    });
+
+    it("keys each row by source and request, so two sources' same request id both count", async () => {
+      const { debits, ledger } = harness({
+        budgets: [resolved({ id: "b-org", scopeType: "ORGANIZATION" })],
+      });
+
+      await debits.writeIngestedCost({ tenantId: "gov-project", fact: ingested() });
+      await debits.writeIngestedCost({
+        tenantId: "gov-project",
+        fact: ingested({ ingestionSourceId: "src-2" }),
+      });
+
+      expect(ledger.batches.flat().map((row) => row.gatewayRequestId)).toEqual([
+        "src-1:push-req-1",
+        "src-2:push-req-1",
       ]);
     });
 

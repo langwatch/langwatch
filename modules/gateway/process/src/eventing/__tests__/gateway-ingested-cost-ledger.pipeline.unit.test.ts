@@ -88,7 +88,6 @@ function recordedFact(): IngestedCostRecordedEventData {
     sourceType: "otel_generic",
     organizationId: "org-1",
     teamId: null,
-    projectId: GOVERNANCE_TENANT,
     requestId: "push-req-1",
     model: "claude-sonnet",
     tokensInput: 100,
@@ -171,7 +170,7 @@ describe("given gateway's ingested-cost ledger pipeline beside governance's reco
         expect.objectContaining({
           tenantId: GOVERNANCE_TENANT,
           budgetId: "budget-org",
-          gatewayRequestId: "push-req-1",
+          gatewayRequestId: "src-1:push-req-1",
           amountNanoUsd: 1_250_000_000,
         }),
       ]);
