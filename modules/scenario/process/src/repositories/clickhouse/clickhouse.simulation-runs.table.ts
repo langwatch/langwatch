@@ -1,7 +1,6 @@
 /**
  * `simulation_runs`, owned by scenario (ADR-202): ReplacingMergeTree(UpdatedAt) over (TenantId,
- * ScenarioRunId). The nested `Messages.*` and `Evaluations.*` columns and the
- * `Map(String, Array(Float64))` role maps have no descriptor form yet, so they are not declared.
+ * ScenarioRunId). Nested columns by stored name (00002, 00090, 00101); role maps from 00008.
  */
 import { column, defineClickHouseTable } from "@langwatch/clickhouse-client/builder";
 
@@ -22,15 +21,37 @@ export const simulationRuns = defineClickHouseTable({
     Name: column.nullable(column.string()),
     Description: column.nullable(column.string()),
     Metadata: column.nullable(column.string()),
+    "Messages.Id": column.array(column.string()),
+    "Messages.Role": column.array(column.string()),
+    "Messages.Content": column.array(column.string()),
+    "Messages.TraceId": column.array(column.string()),
+    "Messages.Rest": column.array(column.string()),
     TraceIds: column.stringArray(),
     Verdict: column.nullable(column.string()),
     Reasoning: column.nullable(column.string()),
     MetCriteria: column.stringArray(),
     UnmetCriteria: column.stringArray(),
     InconclusiveCriteria: column.stringArray(),
+    "Criteria.Criterion": column.array(column.string()),
+    "Criteria.Requirement": column.array(column.string()),
+    "Criteria.Status": column.array(column.lowCardinality(column.string())),
+    "Criteria.Reasoning": column.array(column.string()),
     Error: column.nullable(column.string()),
+    "Evaluations.EvaluatorId": column.array(column.string()),
+    "Evaluations.Name": column.array(column.string()),
+    "Evaluations.Status": column.array(column.string()),
+    "Evaluations.Required": column.array(column.uint8()),
+    "Evaluations.Passed": column.array(column.nullable(column.uint8())),
+    "Evaluations.Score": column.array(column.nullable(column.float64())),
+    "Evaluations.Label": column.array(column.string()),
+    "Evaluations.Details": column.array(column.string()),
+    "Evaluations.CostAmount": column.array(column.nullable(column.float64())),
+    "Evaluations.CostCurrency": column.array(column.string()),
+    "Evaluations.InputsJson": column.array(column.string()),
     DurationMs: column.nullable(column.uint64()),
     TotalCost: column.nullable(column.float64()),
+    RoleCosts: column.map({ key: column.string(), value: column.array(column.float64()) }),
+    RoleLatencies: column.map({ key: column.string(), value: column.array(column.float64()) }),
     TraceMetricsJson: column.string(),
     StartedAt: column.dateTime64({ precision: 3 }),
     QueuedAt: column.nullable(column.dateTime64({ precision: 3 })),

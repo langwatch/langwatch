@@ -4,6 +4,7 @@ import {
   type ClickHouseQueryClient,
   type IdBoundOptions,
 } from "@langwatch/clickhouse-client";
+import { SecurityError } from "@langwatch/eventing";
 
 type SimulationEventingClickHouseClient = {
   query(input: {
@@ -24,6 +25,8 @@ type SimulationEventingClickHouseClient = {
   read: ClickHouseQueryClient["read"];
   /** Absent on a bare driver client (tests): every column is then named. */
   select?(input: Parameters<ClickHouseColumns["select"]>[0]): Promise<string>;
+  /** Which columns of a table this tenant's target holds, for `fn.heldOr`. */
+  holds(input: { table: string }): Promise<(name: string) => boolean>;
 };
 
 export type SimulationEventingClickHouseResolver = (
@@ -55,7 +58,29 @@ export class ClickHouseSimulationSession implements SimulationEventingClickHouse
     return { json: async <Row>() => (await this.clickhouse.query<Row>(request)).rows };
   }
 
-  read: ClickHouseQueryClient["read"] = (input) => this.clickhouse.read(input);
+  /** Sends a built statement only when it is this session's tenant's, else refuses by name. */
+  read: ClickHouseQueryClient["read"] = (input) => {
+    const { statement } = input;
+    const own =
+      statement.identity === "reader" &&
+      statement.kind === "tenant" &&
+      statement.tenantId === this.tenantId &&
+      statement.routeTenantId === this.tenantId &&
+      (statement.tenantIds ?? [this.tenantId]).every((id) => id === this.tenantId);
+    if (own) return this.clickhouse.read(input);
+    return Promise.reject(
+      new SecurityError({
+        operation: "ClickHouseSimulationSession.read",
+        message: "A built read sent through a tenant's session must be scoped to that tenant",
+        tenantId: this.tenantId,
+        context: { identity: statement.identity, kind: statement.kind },
+      }),
+    );
+  };
+
+  holds({ table }: { table: string }): Promise<(name: string) => boolean> {
+    return this.clickhouse.columns({ tenantId: this.tenantId }).holds({ table });
+  }
 
   /** A select list naming only the columns this tenant's target has, the rest as defaults. */
   select(input: Parameters<ClickHouseColumns["select"]>[0]): Promise<string> {
