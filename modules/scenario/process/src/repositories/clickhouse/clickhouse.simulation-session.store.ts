@@ -20,6 +20,8 @@ type SimulationEventingClickHouseClient = {
     format: "JSONEachRow";
     clickhouse_settings?: ClickHouseSettings;
   }): Promise<unknown>;
+  /** A statement the typed builder built; it names its own tenant scope. */
+  read: ClickHouseQueryClient["read"];
   /** Absent on a bare driver client (tests): every column is then named. */
   select?(input: Parameters<ClickHouseColumns["select"]>[0]): Promise<string>;
 };
@@ -52,6 +54,8 @@ export class ClickHouseSimulationSession implements SimulationEventingClickHouse
 
     return { json: async <Row>() => (await this.clickhouse.query<Row>(request)).rows };
   }
+
+  read: ClickHouseQueryClient["read"] = (input) => this.clickhouse.read(input);
 
   /** A select list naming only the columns this tenant's target has, the rest as defaults. */
   select(input: Parameters<ClickHouseColumns["select"]>[0]): Promise<string> {

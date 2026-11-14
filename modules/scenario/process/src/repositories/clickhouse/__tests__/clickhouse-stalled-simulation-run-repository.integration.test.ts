@@ -1,16 +1,15 @@
 import { createClient, type ClickHouseClient } from "@clickhouse/client";
 import { ClickHouseQueryClient, type QueryDriver, TenantGuard } from "@langwatch/clickhouse-client";
+import {
+  migrateTestClickHouseOnce,
+  startTestClickHouseEndpoints,
+} from "@langwatch/clickhouse-client/testing";
+import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { BACKFILL_STALE_THRESHOLD_MS } from "../../stalled-simulation-run.repository.ts";
 import { ClickHouseStalledSimulationRunRepository } from "../clickhouse.stalled-simulation-run.repository.ts";
-
-const configuredClickHouseUrl = process.env.TEST_CLICKHOUSE_URL ?? process.env.CI_CLICKHOUSE_URL;
-const databaseUrl = configuredClickHouseUrl ? new URL(configuredClickHouseUrl) : null;
-if (databaseUrl && !process.env.TEST_CLICKHOUSE_URL) {
-  databaseUrl.pathname = "/test_langwatch";
-}
 
 const tenantId = `test-stalled-backfill-${nanoid()}`;
 const otherTenantId = `test-stalled-backfill-other-${nanoid()}`;
@@ -88,14 +87,36 @@ async function insertRows(rows: ReturnType<typeof makeRow>[]) {
   });
 }
 
-beforeAll(() => {
-  if (!databaseUrl) return;
+/** A native ClickHouse when LANGWATCH_TEST_CLICKHOUSE_URL is set, else a container. */
+beforeAll(async () => {
+  const [endpoint] = await startTestClickHouseEndpoints({
+    suite: "stalled-simulation-run",
+    names: ["schema"],
+    environment: process.env,
+  });
+  if (!endpoint)
+    throw new Error("No ClickHouse endpoint was provisioned for the stalled-run suite");
+  await migrateTestClickHouseOnce({
+    url: endpoint.url,
+    migrate: async () => {
+      // CLICKHOUSE_CLUSTER switches every engine to its Replicated form, which needs a Keeper.
+      const previousCluster = process.env.CLICKHOUSE_CLUSTER;
+      delete process.env.CLICKHOUSE_CLUSTER;
+      try {
+        await ClickHouseMigrateTask.createFromConfig({
+          config: { buildTime: false, sharedUrl: endpoint.url, privateEndpoints: [] },
+        }).execute();
+      } finally {
+        if (previousCluster !== undefined) process.env.CLICKHOUSE_CLUSTER = previousCluster;
+      }
+    },
+  });
   client = createClient({
-    url: databaseUrl,
+    url: endpoint.url,
     clickhouse_settings: { date_time_input_format: "best_effort" },
   });
   finder = ClickHouseStalledSimulationRunRepository.create(queryClient(client));
-});
+}, 180_000);
 
 afterAll(async () => {
   if (!client) return;
@@ -109,114 +130,111 @@ afterAll(async () => {
   client = undefined;
 });
 
-describe.skipIf(databaseUrl === null)(
-  "ClickHouseStalledSimulationRunRepository.findStalledRuns (integration)",
-  () => {
-    describe("given a mix of abandoned, active, terminal and archived runs", () => {
-      /** @scenario "The backfill only selects abandoned non-terminal runs" */
-      it("surfaces only the abandoned non-terminal runs, with the ids needed to finish them", async () => {
-        const abandonedStarted = makeRow({
-          ScenarioRunId: "abandoned-started",
-          ScenarioId: "scenario-abandoned",
-          BatchRunId: "batch-abandoned",
-          ScenarioSetId: "set-abandoned",
-          Status: "IN_PROGRESS",
-        });
-        const abandonedQueued = makeRow({
-          ScenarioRunId: "abandoned-queued",
-          Status: "QUEUED",
-        });
-        const recentlyActive = makeRow({
-          ScenarioRunId: "recently-active",
-          Status: "IN_PROGRESS",
-          StartedAt: hoursAgo(1),
-          CreatedAt: hoursAgo(1),
-          UpdatedAt: hoursAgo(1),
-        });
-        const finished = makeRow({
-          ScenarioRunId: "already-finished",
-          Status: "SUCCESS",
-          Verdict: "success",
-          FinishedAt: hoursAgo(48),
-        });
-        const archived = makeRow({
-          ScenarioRunId: "archived-run",
-          Status: "IN_PROGRESS",
-          ArchivedAt: hoursAgo(48),
-        });
+describe("ClickHouseStalledSimulationRunRepository.findStalledRuns (integration)", () => {
+  describe("given a mix of abandoned, active, terminal and archived runs", () => {
+    /** @scenario "The backfill only selects abandoned non-terminal runs" */
+    it("surfaces only the abandoned non-terminal runs, with the ids needed to finish them", async () => {
+      const abandonedStarted = makeRow({
+        ScenarioRunId: "abandoned-started",
+        ScenarioId: "scenario-abandoned",
+        BatchRunId: "batch-abandoned",
+        ScenarioSetId: "set-abandoned",
+        Status: "IN_PROGRESS",
+      });
+      const abandonedQueued = makeRow({
+        ScenarioRunId: "abandoned-queued",
+        Status: "QUEUED",
+      });
+      const recentlyActive = makeRow({
+        ScenarioRunId: "recently-active",
+        Status: "IN_PROGRESS",
+        StartedAt: hoursAgo(1),
+        CreatedAt: hoursAgo(1),
+        UpdatedAt: hoursAgo(1),
+      });
+      const finished = makeRow({
+        ScenarioRunId: "already-finished",
+        Status: "SUCCESS",
+        Verdict: "success",
+        FinishedAt: hoursAgo(48),
+      });
+      const archived = makeRow({
+        ScenarioRunId: "archived-run",
+        Status: "IN_PROGRESS",
+        ArchivedAt: hoursAgo(48),
+      });
 
-        await insertRows([abandonedStarted, abandonedQueued, recentlyActive, finished, archived]);
+      await insertRows([abandonedStarted, abandonedQueued, recentlyActive, finished, archived]);
 
-        const result = await finder.findStalledRuns({
-          now: NOW,
-          thresholdMs: BACKFILL_STALE_THRESHOLD_MS,
-        });
-        const mine = result.filter((r) => r.tenantId === tenantId);
-        const ids = mine.map((r) => r.scenarioRunId);
+      const result = await finder.findStalledRuns({
+        now: NOW,
+        thresholdMs: BACKFILL_STALE_THRESHOLD_MS,
+      });
+      const mine = result.filter((r) => r.tenantId === tenantId);
+      const ids = mine.map((r) => r.scenarioRunId);
 
-        expect(ids).toContain("abandoned-started");
-        expect(ids).toContain("abandoned-queued");
-        expect(ids).not.toContain("recently-active");
-        expect(ids).not.toContain("already-finished");
-        expect(ids).not.toContain("archived-run");
+      expect(ids).toContain("abandoned-started");
+      expect(ids).toContain("abandoned-queued");
+      expect(ids).not.toContain("recently-active");
+      expect(ids).not.toContain("already-finished");
+      expect(ids).not.toContain("archived-run");
 
-        const abandonedRow = mine.find((r) => r.scenarioRunId === "abandoned-started");
-        expect(abandonedRow).toEqual({
-          tenantId,
-          scenarioRunId: "abandoned-started",
-          scenarioId: "scenario-abandoned",
-          batchRunId: "batch-abandoned",
-          scenarioSetId: "set-abandoned",
-          status: "IN_PROGRESS",
-        });
+      const abandonedRow = mine.find((r) => r.scenarioRunId === "abandoned-started");
+      expect(abandonedRow).toEqual({
+        tenantId,
+        scenarioRunId: "abandoned-started",
+        scenarioId: "scenario-abandoned",
+        batchRunId: "batch-abandoned",
+        scenarioSetId: "set-abandoned",
+        status: "IN_PROGRESS",
       });
     });
+  });
 
-    describe("given a run whose latest version is terminal", () => {
-      it("does not surface it even though a stale non-terminal version exists", async () => {
-        const runId = "superseded-by-terminal";
-        const staleVersion = makeRow({
-          ScenarioRunId: runId,
-          Status: "IN_PROGRESS",
-          UpdatedAt: hoursAgo(72),
-        });
-        const terminalVersion = makeRow({
-          ScenarioRunId: runId,
-          BatchRunId: staleVersion.BatchRunId,
-          ScenarioSetId: staleVersion.ScenarioSetId,
-          Status: "ERROR",
-          FinishedAt: hoursAgo(70),
-          UpdatedAt: hoursAgo(70),
-        });
-
-        await insertRows([staleVersion, terminalVersion]);
-
-        const result = await finder.findStalledRuns({
-          now: NOW,
-          thresholdMs: BACKFILL_STALE_THRESHOLD_MS,
-        });
-
-        expect(result.map((r) => r.scenarioRunId)).not.toContain(runId);
+  describe("given a run whose latest version is terminal", () => {
+    it("does not surface it even though a stale non-terminal version exists", async () => {
+      const runId = "superseded-by-terminal";
+      const staleVersion = makeRow({
+        ScenarioRunId: runId,
+        Status: "IN_PROGRESS",
+        UpdatedAt: hoursAgo(72),
       });
-    });
-
-    describe("given abandoned runs belonging to different tenants", () => {
-      it("surfaces every tenant's runs, each attributed to its own tenant", async () => {
-        await insertRows([
-          makeRow({ ScenarioRunId: "abandoned-tenant-a" }),
-          makeRow({ ScenarioRunId: "abandoned-tenant-b", TenantId: otherTenantId }),
-        ]);
-
-        const result = await finder.findStalledRuns({
-          now: NOW,
-          thresholdMs: BACKFILL_STALE_THRESHOLD_MS,
-        });
-
-        const a = result.find((r) => r.scenarioRunId === "abandoned-tenant-a");
-        const b = result.find((r) => r.scenarioRunId === "abandoned-tenant-b");
-        expect(a?.tenantId).toBe(tenantId);
-        expect(b?.tenantId).toBe(otherTenantId);
+      const terminalVersion = makeRow({
+        ScenarioRunId: runId,
+        BatchRunId: staleVersion.BatchRunId,
+        ScenarioSetId: staleVersion.ScenarioSetId,
+        Status: "ERROR",
+        FinishedAt: hoursAgo(70),
+        UpdatedAt: hoursAgo(70),
       });
+
+      await insertRows([staleVersion, terminalVersion]);
+
+      const result = await finder.findStalledRuns({
+        now: NOW,
+        thresholdMs: BACKFILL_STALE_THRESHOLD_MS,
+      });
+
+      expect(result.map((r) => r.scenarioRunId)).not.toContain(runId);
     });
-  },
-);
+  });
+
+  describe("given abandoned runs belonging to different tenants", () => {
+    it("surfaces every tenant's runs, each attributed to its own tenant", async () => {
+      await insertRows([
+        makeRow({ ScenarioRunId: "abandoned-tenant-a" }),
+        makeRow({ ScenarioRunId: "abandoned-tenant-b", TenantId: otherTenantId }),
+      ]);
+
+      const result = await finder.findStalledRuns({
+        now: NOW,
+        thresholdMs: BACKFILL_STALE_THRESHOLD_MS,
+      });
+
+      const a = result.find((r) => r.scenarioRunId === "abandoned-tenant-a");
+      const b = result.find((r) => r.scenarioRunId === "abandoned-tenant-b");
+      expect(a?.tenantId).toBe(tenantId);
+      expect(b?.tenantId).toBe(otherTenantId);
+    });
+  });
+});

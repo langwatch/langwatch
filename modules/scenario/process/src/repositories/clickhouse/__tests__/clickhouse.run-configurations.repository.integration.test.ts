@@ -30,6 +30,7 @@ import { RunConfigurationsService } from "../../../services/run-configurations.s
 import type { ScenarioPlanRecord, ScenarioRepository } from "../../scenario.repository.ts";
 import { RunConfigurationsClickHouseRepository } from "../clickhouse.run-configurations.repository.ts";
 import { SimulationRunStateRepositoryClickHouse } from "../clickhouse.simulation-run-state.repository.ts";
+import { scenarioClickHouseOver } from "./simulation-clickhouse-rows.fixture.ts";
 
 const configuredClickHouseUrl = process.env.TEST_CLICKHOUSE_URL ?? process.env.CI_CLICKHOUSE_URL;
 const databaseUrl = configuredClickHouseUrl ? new URL(configuredClickHouseUrl) : null;
@@ -61,9 +62,15 @@ beforeAll(() => {
     url: databaseUrl,
     clickhouse_settings: { date_time_input_format: "best_effort" },
   });
-  repository = RunConfigurationsClickHouseRepository.create(async () => ch!);
+  const client = ch;
+  const resolveClient = scenarioClickHouseOver({
+    query: (input) => client.query(input),
+    insert: (input) => client.insert(input),
+    command: (input) => client.command(input),
+  });
+  repository = RunConfigurationsClickHouseRepository.create(resolveClient);
   stateRepository = SimulationRunStateRepositoryClickHouse.create({
-    resolveClient: async () => ch!,
+    resolveClient,
     defaultRetentionDays: () => 30,
   });
 });

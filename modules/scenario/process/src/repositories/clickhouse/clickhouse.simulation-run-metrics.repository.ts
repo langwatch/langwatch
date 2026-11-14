@@ -1,12 +1,18 @@
+import {
+  clickhouseRead,
+  fn,
+  type ReaderReadStatement,
+  tenantScope,
+} from "@langwatch/clickhouse-client/builder";
 import { classifyClickHouseError, StoreError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 
 import type { SimulationRunMetricsProjectionRecord } from "../../eventing/simulation-run-metrics.projection.ts";
 import type { SimulationRunMetricsRepository } from "../simulation-run-metrics.repository.ts";
+import { simulationRunMetricsRollup } from "./clickhouse.simulation-run-metrics-rollup.table.ts";
 import type { SimulationEventingClickHouseResolver } from "./clickhouse.simulation-session.store.ts";
 
 const TABLE_NAME = "simulation_run_metrics" as const;
-const ROLLUP_TABLE_NAME = "simulation_run_metrics_rollup" as const;
 
 const logger = createLogger("langwatch:simulation-processing:run-metrics-repository");
 
@@ -21,11 +27,11 @@ type ClickHouseSimulationRunMetricsWriteRecord = WithDateWrites<
   "OccurredAt"
 >;
 
-interface ClickHouseSimulationRunMetricsRollupRow {
-  TotalCost: number;
-  RoleCosts: Record<string, number>;
-  RoleLatencies: Record<string, number>;
-}
+type SimulationRunMetricsRollupRow = {
+  totalCost: number | string;
+  roleCosts: Record<string, number>;
+  roleLatencies: Record<string, number>;
+};
 
 /** Aggregated metrics for one simulation run, rolled up across its traces. */
 interface SimulationRunMetricsRollup {
@@ -91,6 +97,41 @@ export class ClickHouseSimulationRunMetricsRepository implements SimulationRunMe
     }
   }
 
+  /** One run's totals: argMax collapses retry duplicates per trace, sumMap adds the roles. */
+  static runMetricsRead({
+    tenantId,
+    scenarioRunId,
+  }: {
+    tenantId: string;
+    scenarioRunId: string;
+  }): ReaderReadStatement<SimulationRunMetricsRollupRow> {
+    const scope = tenantScope.single({ tenantId });
+    const rollup = simulationRunMetricsRollup;
+    const latest = clickhouseRead({ scope })
+      .from(rollup)
+      .select({
+        trace: rollup.TraceId,
+        cost: fn.argMaxMerge(rollup.TotalCost),
+        costs: fn.argMaxMerge(rollup.RoleCosts),
+        latencies: fn.argMaxMerge(rollup.RoleLatencies),
+      })
+      .where(({ eq }) => eq(rollup.ScenarioRunId, scenarioRunId))
+      .groupBy(rollup.TraceId)
+      .as("latest");
+    const summed = (map: typeof latest.costs | typeof latest.latencies) => {
+      const sums = fn.sumMap(fn.mapKeys(map), fn.mapValues(map));
+      return fn.mapFromArrays(fn.tupleElement(sums, "0"), fn.tupleElement(sums, "1"));
+    };
+    return clickhouseRead({ scope })
+      .from(latest)
+      .select({
+        totalCost: fn.sum(latest.cost),
+        roleCosts: summed(latest.costs),
+        roleLatencies: summed(latest.latencies),
+      })
+      .build();
+  }
+
   /**
    * Future read path (not yet wired into services): aggregates per-trace
    * metric rows for a run via the dedupe-safe rollup (migration 00079) —
@@ -104,43 +145,21 @@ export class ClickHouseSimulationRunMetricsRepository implements SimulationRunMe
 
     try {
       const client = await this.resolveClient(tenantId);
-      const result = await client.query({
-        query: `
-          SELECT
-            sum(TotalCost) AS TotalCost,
-            mapFromArrays(
-              sumMap(mapKeys(RoleCosts), mapValues(RoleCosts)).1,
-              sumMap(mapKeys(RoleCosts), mapValues(RoleCosts)).2
-            ) AS RoleCosts,
-            mapFromArrays(
-              sumMap(mapKeys(RoleLatencies), mapValues(RoleLatencies)).1,
-              sumMap(mapKeys(RoleLatencies), mapValues(RoleLatencies)).2
-            ) AS RoleLatencies
-          FROM (
-            SELECT
-              TraceId,
-              argMaxMerge(TotalCost) AS TotalCost,
-              argMaxMerge(RoleCosts) AS RoleCosts,
-              argMaxMerge(RoleLatencies) AS RoleLatencies
-            FROM ${ROLLUP_TABLE_NAME}
-            WHERE TenantId = {tenantId:String}
-              AND ScenarioRunId = {scenarioRunId:String}
-            GROUP BY TraceId
-          )
-        `,
-        query_params: { tenantId, scenarioRunId },
-        format: "JSONEachRow",
+      const { rows } = await client.read({
+        statement: ClickHouseSimulationRunMetricsRepository.runMetricsRead({
+          tenantId,
+          scenarioRunId,
+        }),
+        table: simulationRunMetricsRollup.$table.name,
       });
-
-      const rows = await result.json<ClickHouseSimulationRunMetricsRollupRow>();
       const row = rows[0];
 
       // Aggregates without GROUP BY always return one row; an empty run
       // yields zeros and empty maps.
       return {
-        totalCost: row?.TotalCost ?? 0,
-        roleCosts: row?.RoleCosts ?? {},
-        roleLatencies: row?.RoleLatencies ?? {},
+        totalCost: Number(row?.totalCost ?? 0),
+        roleCosts: row?.roleCosts ?? {},
+        roleLatencies: row?.roleLatencies ?? {},
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);

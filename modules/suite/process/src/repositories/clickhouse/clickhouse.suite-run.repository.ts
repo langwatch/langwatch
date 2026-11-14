@@ -1,5 +1,11 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import {
+  clickhouseRead,
+  fn,
+  type ReaderReadStatement,
+  tenantScope,
+} from "@langwatch/clickhouse-client/builder";
+import {
   classifyClickHouseError,
   createTenantId,
   EventUtils,
@@ -16,18 +22,63 @@ import { suiteRunStateDataSchema, type SuiteRunStateData } from "@langwatch/suit
 
 import { OPEN_SUITE_RUN_STATUSES } from "#rules/suite-run-open.rules";
 
+import { suiteRuns } from "./clickhouse.suite-runs.table.ts";
+
 type SuiteRunClickHouseRepositoryOptions = {
   /**
    * The process's one ClickHouse client. It routes each statement to the
    * server its tenant belongs on, so this repository holds no per-tenant
    * client and cannot obtain an unscoped one.
    */
-  clickhouse: ClickHouseQueryClient;
+  clickhouse: Pick<ClickHouseQueryClient, "read" | "insert">;
   /** Read at write time: the owner answers only once the process is running. */
   defaultRetentionDays: () => number;
 };
 
-const TABLE_NAME = "suite_runs" as const;
+const TABLE_NAME = suiteRuns.$table.name;
+
+/** The fold state's columns, keyed apart from the stored names; times as epoch millis. */
+const SUITE_RUN_STATE_COLUMNS = {
+  suiteRunId: suiteRuns.SuiteRunId,
+  batchRunId: suiteRuns.BatchRunId,
+  scenarioSetId: suiteRuns.ScenarioSetId,
+  suiteId: suiteRuns.SuiteId,
+  status: suiteRuns.Status,
+  total: suiteRuns.Total,
+  startedCount: suiteRuns.StartedCount,
+  completedCount: suiteRuns.CompletedCount,
+  failedCount: suiteRuns.FailedCount,
+  progress: suiteRuns.Progress,
+  passRateBps: suiteRuns.PassRateBps,
+  passedCount: suiteRuns.PassedCount,
+  gradedCount: suiteRuns.GradedCount,
+  createdAtMs: fn.toUnixTimestamp64Milli(suiteRuns.CreatedAt),
+  updatedAtMs: fn.toUnixTimestamp64Milli(suiteRuns.UpdatedAt),
+  lastEventOccurredAtMs: fn.toUnixTimestamp64Milli(suiteRuns.LastEventOccurredAt),
+  startedAtMs: fn.toUnixTimestamp64Milli(suiteRuns.StartedAt),
+  finishedAtMs: fn.toUnixTimestamp64Milli(suiteRuns.FinishedAt),
+};
+
+type SuiteRunReadRow = {
+  suiteRunId: string;
+  batchRunId: string;
+  scenarioSetId: string;
+  suiteId: string;
+  status: string;
+  total: number | string;
+  startedCount: number | string;
+  completedCount: number | string;
+  failedCount: number | string;
+  progress: number | string;
+  passRateBps: number | string | null;
+  passedCount: number | string | null;
+  gradedCount: number | string | null;
+  createdAtMs: number | string;
+  updatedAtMs: number | string;
+  lastEventOccurredAtMs: number | string | null;
+  startedAtMs: number | string | null;
+  finishedAtMs: number | string | null;
+};
 const logger = createLogger("langwatch:suite-run-processing:run-state-repository");
 
 /** Reads the latest event-sourced Suite run rows, before background merges. */
@@ -47,21 +98,21 @@ export class ClickHouseSuiteRunRepository implements ProjectionStore<
     EventUtils.validateTenantId(context, "SuiteRunStateRepositoryClickHouse.findProjection");
     try {
       const tenantId = String(context.tenantId);
-      const { rows } = await this.options.clickhouse.query<Record<string, unknown>>({
-        tenantId,
-        sql: ClickHouseSuiteRunRepository.projectionQuery(),
-        params: { tenantId, batchRunId: aggregateId },
+      const { rows } = await this.options.clickhouse.read({
+        statement: ClickHouseSuiteRunRepository.projectionRead({
+          tenantId,
+          batchRunId: aggregateId,
+        }),
         table: TABLE_NAME,
-        kind: "read",
         idBound: { fallback: "unbounded" },
       });
       const row = rows[0];
       if (!row) return null;
       return {
-        id: String(row.ProjectionId),
+        id: row.projectionId,
         aggregateId,
         tenantId: createTenantId(String(context.tenantId)),
-        version: String(row.Version),
+        version: row.version,
         data: ClickHouseSuiteRunRepository.mapRowToState(row),
       };
     } catch (error) {
@@ -78,14 +129,11 @@ export class ClickHouseSuiteRunRepository implements ProjectionStore<
 
   /** One tenant's suite runs still open, the latest row of each batch run. */
   async findOpenRuns({ tenantId }: { tenantId: string }): Promise<SuiteRunStateData[]> {
-    const { rows } = await this.options.clickhouse.query<Record<string, unknown>>({
-      tenantId,
-      sql: ClickHouseSuiteRunRepository.openRunsQuery(),
-      params: { tenantId, statuses: [...OPEN_SUITE_RUN_STATUSES] },
+    const { rows } = await this.options.clickhouse.read({
+      statement: ClickHouseSuiteRunRepository.openRunsRead({ tenantId }),
       table: TABLE_NAME,
-      kind: "read",
       // A run started in any week can still be open, so the sweep has no lower time bound.
-      SKIP_COLD_SCAN_CHECK: true,
+      declaresFullScan: true,
     });
     return rows.map((row) => ClickHouseSuiteRunRepository.mapRowToState(row));
   }
@@ -201,88 +249,60 @@ export class ClickHouseSuiteRunRepository implements ProjectionStore<
     });
   }
 
-  private static mapRowToState(row: Record<string, unknown>): SuiteRunStateData {
+  private static mapRowToState(row: SuiteRunReadRow): SuiteRunStateData {
     return suiteRunStateDataSchema.parse({
-      SuiteRunId: String(row.SuiteRunId),
-      BatchRunId: String(row.BatchRunId),
-      ScenarioSetId: String(row.ScenarioSetId),
-      SuiteId: String(row.SuiteId),
-      Status: String(row.Status),
-      Total: Number(row.Total),
-      StartedCount: Number(row.StartedCount),
-      CompletedCount: Number(row.CompletedCount),
-      FailedCount: Number(row.FailedCount),
-      Progress: Number(row.Progress),
-      PassRateBps: row.PassRateBps == null ? null : Number(row.PassRateBps),
-      PassedCount: Number(row.PassedCount ?? 0),
-      GradedCount: Number(row.GradedCount ?? 0),
-      CreatedAt: Number(row.CreatedAt),
-      UpdatedAt: Number(row.UpdatedAt),
-      LastEventOccurredAt: Number(row.LastEventOccurredAt ?? 0),
-      StartedAt: row.StartedAt == null ? null : Number(row.StartedAt),
-      FinishedAt: row.FinishedAt == null ? null : Number(row.FinishedAt),
+      SuiteRunId: row.suiteRunId,
+      BatchRunId: row.batchRunId,
+      ScenarioSetId: row.scenarioSetId,
+      SuiteId: row.suiteId,
+      Status: row.status,
+      Total: Number(row.total),
+      StartedCount: Number(row.startedCount),
+      CompletedCount: Number(row.completedCount),
+      FailedCount: Number(row.failedCount),
+      Progress: Number(row.progress),
+      PassRateBps: row.passRateBps == null ? null : Number(row.passRateBps),
+      PassedCount: Number(row.passedCount ?? 0),
+      GradedCount: Number(row.gradedCount ?? 0),
+      CreatedAt: Number(row.createdAtMs),
+      UpdatedAt: Number(row.updatedAtMs),
+      LastEventOccurredAt: Number(row.lastEventOccurredAtMs ?? 0),
+      StartedAt: row.startedAtMs == null ? null : Number(row.startedAtMs),
+      FinishedAt: row.finishedAtMs == null ? null : Number(row.finishedAtMs),
     });
   }
 
   /** The latest run row by batch id, bounded by the run id index once ready. */
-  private static projectionQuery(): string {
-    return `
-      SELECT
-        t.ProjectionId AS ProjectionId, t.TenantId AS TenantId,
-        t.Version AS Version, t.SuiteRunId AS SuiteRunId,
-        t.BatchRunId AS BatchRunId, t.ScenarioSetId AS ScenarioSetId,
-        t.SuiteId AS SuiteId, t.Status AS Status, t.Total AS Total,
-        t.StartedCount AS StartedCount, t.CompletedCount AS CompletedCount,
-        t.FailedCount AS FailedCount, t.Progress AS Progress,
-        t.PassRateBps AS PassRateBps, t.PassedCount AS PassedCount,
-        t.GradedCount AS GradedCount,
-        toUnixTimestamp64Milli(t.CreatedAt) AS CreatedAt,
-        toUnixTimestamp64Milli(t.UpdatedAt) AS UpdatedAt,
-        toUnixTimestamp64Milli(t.LastEventOccurredAt) AS LastEventOccurredAt,
-        toUnixTimestamp64Milli(t.StartedAt) AS StartedAt,
-        toUnixTimestamp64Milli(t.FinishedAt) AS FinishedAt
-      FROM suite_runs AS t
-      WHERE t.TenantId = {tenantId:String}
-        AND t.BatchRunId = {batchRunId:String}
-        {{idBound:suite_runs.BatchRunId:batchRunId:t}}
-        AND (t.TenantId, t.BatchRunId, t.UpdatedAt) IN (
-          SELECT TenantId, BatchRunId, max(UpdatedAt)
-          FROM suite_runs
-          WHERE TenantId = {tenantId:String}
-            AND BatchRunId = {batchRunId:String}
-            {{idBound:suite_runs.BatchRunId:batchRunId}}
-          GROUP BY TenantId, BatchRunId
-        )
-      LIMIT 1
-    `;
+  static projectionRead({
+    tenantId,
+    batchRunId,
+  }: {
+    tenantId: string;
+    batchRunId: string;
+  }): ReaderReadStatement<SuiteRunReadRow & { projectionId: string; version: string }> {
+    return clickhouseRead({ scope: tenantScope.single({ tenantId }) })
+      .from(suiteRuns)
+      .select({
+        projectionId: suiteRuns.ProjectionId,
+        version: suiteRuns.Version,
+        ...SUITE_RUN_STATE_COLUMNS,
+      })
+      .where(({ idBound }) => idBound(suiteRuns.BatchRunId, batchRunId))
+      .latestVersion()
+      .limit(1)
+      .build();
   }
 
-  private static openRunsQuery(): string {
-    return `
-      SELECT
-        t.SuiteRunId AS SuiteRunId, t.BatchRunId AS BatchRunId,
-        t.ScenarioSetId AS ScenarioSetId, t.SuiteId AS SuiteId, t.Status AS Status,
-        t.Total AS Total, t.StartedCount AS StartedCount,
-        t.CompletedCount AS CompletedCount, t.FailedCount AS FailedCount,
-        t.Progress AS Progress, t.PassRateBps AS PassRateBps,
-        t.PassedCount AS PassedCount, t.GradedCount AS GradedCount,
-        toUnixTimestamp64Milli(t.CreatedAt) AS CreatedAt,
-        toUnixTimestamp64Milli(t.UpdatedAt) AS UpdatedAt,
-        toUnixTimestamp64Milli(t.LastEventOccurredAt) AS LastEventOccurredAt,
-        toUnixTimestamp64Milli(t.StartedAt) AS StartedAt,
-        toUnixTimestamp64Milli(t.FinishedAt) AS FinishedAt
-      FROM suite_runs AS t
-      WHERE t.TenantId = {tenantId:String}
-        AND (t.TenantId, t.BatchRunId, t.UpdatedAt) IN (
-          SELECT TenantId, BatchRunId, max(UpdatedAt)
-          FROM suite_runs
-          WHERE TenantId = {tenantId:String}
-          GROUP BY TenantId, BatchRunId
-        )
-        AND t.Status IN {statuses:Array(String)}
-      ORDER BY t.BatchRunId
-      LIMIT 1 BY t.BatchRunId
-    `;
+  /** One tenant's open runs, the latest row of each batch run; status asked after the election. */
+  static openRunsRead({ tenantId }: { tenantId: string }): ReaderReadStatement<SuiteRunReadRow> {
+    return clickhouseRead({ scope: tenantScope.single({ tenantId }) })
+      .from(suiteRuns)
+      .select(SUITE_RUN_STATE_COLUMNS)
+      .latestVersion()
+      .where(({ oneOf }) => oneOf(suiteRuns.Status, [...OPEN_SUITE_RUN_STATUSES]))
+      .orderBy(suiteRuns.BatchRunId, "ASC")
+      .limitBy(1, suiteRuns.BatchRunId)
+      .build();
   }
 
   private static mapProjectionToRow(
