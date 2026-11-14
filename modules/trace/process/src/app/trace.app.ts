@@ -4161,11 +4161,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     context: Readonly<{ projectId: string; traceId?: string | undefined }>,
   ): void {
     logger.warn(
-      {
-        error,
-        projectId: context.projectId,
-        ...(context.traceId ? { traceId: context.traceId } : {}),
-      },
+      { error, projectId: context.projectId, traceId: context.traceId },
       "the collector refused a payload",
     );
   }
