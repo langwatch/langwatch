@@ -1,5 +1,5 @@
 /**
- * A full record's built summary and thread reads (ADR-202) over real ClickHouse, sent through
+ * A full record's built summary, span and thread reads (ADR-202) over real ClickHouse, sent through
  * the client's tenant guard with their tenant setting: latest version only, one tenant only.
  */
 import type { ClickHouseClient } from "@clickhouse/client";
@@ -8,7 +8,6 @@ import { nanoid } from "nanoid";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { ClickHouseTraceFullRecordRowsRepository } from "../clickhouse.trace-full-record-rows.repository.ts";
-import { ClickHouseTraceClientsRepository } from "../clickhouse.trace-member-client.repository.ts";
 import { traceQueryClientFor } from "./support/authorized-clickhouse.support.ts";
 import {
   startMigratedTraceClickHouse,
@@ -73,11 +72,7 @@ describe.skipIf(!testClickHouseConfigured())(
   () => {
     beforeAll(async () => {
       ch = await startMigratedTraceClickHouse();
-      const client = traceQueryClientFor(ch);
-      rows = ClickHouseTraceFullRecordRowsRepository.create({
-        reader: client,
-        clients: ClickHouseTraceClientsRepository.create(client),
-      });
+      rows = ClickHouseTraceFullRecordRowsRepository.create({ reader: traceQueryClientFor(ch) });
       const insert = (values: ReturnType<typeof row>[]) =>
         ch.insert({
           table: "trace_summaries",
@@ -146,6 +141,55 @@ describe.skipIf(!testClickHouseConfigured())(
           { TraceId: "t-1", OccurredAtMs: atMs },
           { TraceId: "t-2", OccurredAtMs: atMs + 1_000 },
         ]);
+      });
+    });
+
+    describe("when the trace's spans are read", () => {
+      it("keeps each span's newest StartTime version within the tenant", async () => {
+        const stored = (args: {
+          tenant?: string;
+          spanId: string;
+          startMs: number;
+          updatedMs: number;
+          name: string;
+        }) => ({
+          TenantId: args.tenant ?? tenantId,
+          TraceId: "t-1",
+          SpanId: args.spanId,
+          StartTime: new Date(args.startMs),
+          EndTime: new Date(args.startMs + 10),
+          DurationMs: 10,
+          SpanName: args.name,
+          CreatedAt: new Date(args.updatedMs),
+          UpdatedAt: new Date(args.updatedMs),
+        });
+        const insert = (values: ReturnType<typeof stored>[]) =>
+          ch.insert({
+            table: "stored_spans",
+            format: "JSONEachRow",
+            clickhouse_settings: { date_time_input_format: "best_effort" },
+            values,
+          });
+        await insert([
+          stored({ spanId: "s-1", startMs: atMs + 100, updatedMs: atMs, name: "late start" }),
+          stored({
+            tenant: otherTenantId,
+            spanId: "s-2",
+            startMs: atMs,
+            updatedMs: atMs,
+            name: "other",
+          }),
+        ]);
+        // Written later but started earlier: the engine replaces by StartTime, so this loses.
+        await insert([
+          stored({ spanId: "s-1", startMs: atMs, updatedMs: atMs + 9_000, name: "early start" }),
+        ]);
+
+        const spans = await rows.findSpans({ tenantId, traceId: "t-1", occurredAtMs: atMs });
+
+        expect(
+          spans.map(({ SpanId, SpanName, StartTimeMs }) => ({ SpanId, SpanName, StartTimeMs })),
+        ).toEqual([{ SpanId: "s-1", SpanName: "late start", StartTimeMs: atMs + 100 }]);
       });
     });
   },

@@ -10,29 +10,12 @@ import { describe, expect, it } from "vitest";
 import type { TraceFullIo } from "../../../features/read/services/trace-read-full-io.service.ts";
 import { TracePayloadReaderRepository } from "../../trace-payload-reader.repository.ts";
 import { ClickHouseTraceFullRecordRowsRepository } from "../clickhouse.trace-full-record-rows.repository.ts";
-import {
-  TraceClickHouse,
-  type TraceClickHouseClient,
-} from "../clickhouse.trace-member-client.repository.ts";
 import { ClickHouseTraceFullRecordRepository } from "../trace-full-record.repository.ts";
 
 type ReadRequest = Parameters<ClickHouseQueryClient["read"]>[0];
 
 function outputText(value: unknown): string {
   return typeof value === "string" ? value : "";
-}
-
-class TenantClickHouseResolver extends TraceClickHouse {
-  readonly tenants: string[] = [];
-
-  constructor(private readonly client: TraceClickHouseClient) {
-    super();
-  }
-
-  resolve(tenantId: string): Promise<TraceClickHouseClient> {
-    this.tenants.push(tenantId);
-    return Promise.resolve(this.client);
-  }
 }
 
 class Payloads extends TracePayloadReaderRepository {
@@ -135,19 +118,7 @@ const span = (traceId: string) => ({
   Links_Attributes: [],
 });
 
-/** The raw tenant client: it answers the span read, the one read not yet built. */
-function clientFor(queries: string[] = []) {
-  return {
-    query: async (input: { query: string; query_params?: Record<string, unknown> }) => {
-      queries.push(input.query);
-      const queriedTraceId = input.query_params?.traceId;
-      const traceId = typeof queriedTraceId === "string" ? queriedTraceId : "trace";
-      return { json: async () => [span(traceId)] };
-    },
-  } satisfies TraceClickHouseClient;
-}
-
-/** The built summary and thread reads, keyed by the trace or thread id each statement binds. */
+/** The built summary, span and thread reads, keyed by the trace or thread id each one binds. */
 function readerFor(
   { missing = false, thread = false }: { missing?: boolean; thread?: boolean } = {},
   requests: ReadRequest[] = [],
@@ -166,25 +137,27 @@ function readerFor(
         return { rows };
       }
       const traceId = ["first", "later", "missing"].find((id) => bound.includes(id)) ?? "trace";
+      if (request.table === "stored_spans") return { rows: [span(traceId)] };
       return { rows: missing ? [] : [summary(traceId)] };
     },
   });
 }
 
 function repositoryFor({
-  port,
   reader = readerFor(),
   payloads,
   io = new FullIo(),
 }: {
-  port: TraceClickHouse;
   reader?: Pick<ClickHouseQueryClient, "read">;
   payloads: TracePayloadReaderRepository;
   io?: TraceFullIo;
 }) {
-  const rows = ClickHouseTraceFullRecordRowsRepository.create({ reader, clients: port });
+  const rows = ClickHouseTraceFullRecordRowsRepository.create({ reader });
   return ClickHouseTraceFullRecordRepository.create(rows, payloads, io);
 }
+
+const spanReadsOf = (requests: ReadRequest[]) =>
+  requests.filter((request) => request.table === "stored_spans");
 
 /** The tenant each built statement was sent under. */
 function tenantsOf(requests: ReadRequest[]): unknown[] {
@@ -196,10 +169,9 @@ function tenantsOf(requests: ReadRequest[]): unknown[] {
 
 describe("ClickHouseTraceFullRecordRepository", () => {
   it("returns tenant-scoped rich full records, recalls payloads, and recomputes IO", async () => {
-    const port = new TenantClickHouseResolver(clientFor());
     const requests: ReadRequest[] = [];
     const payloads = new Payloads("full output");
-    const repository = repositoryFor({ port, reader: readerFor({}, requests), payloads });
+    const repository = repositoryFor({ reader: readerFor({}, requests), payloads });
 
     await expect(repository.get({ tenantId: "tenant_a", traceId: "trace" })).resolves.toMatchObject(
       {
@@ -219,19 +191,17 @@ describe("ClickHouseTraceFullRecordRepository", () => {
         events: expect.arrayContaining([expect.objectContaining({ event_type: "score" })]),
       },
     );
-    expect(port.tenants).toEqual(["tenant_a"]);
-    expect(tenantsOf(requests)).toEqual(["tenant_a"]);
+    expect(spanReadsOf(requests)).toHaveLength(1);
+    expect(tenantsOf(requests)).toEqual(["tenant_a", "tenant_a"]);
     expect(payloads.calls).toEqual([
       expect.objectContaining({ tenantId: "tenant_a", traceId: "trace" }),
     ]);
   });
 
   it("throws the canonical missing error and never issues a cross-tenant payload read", async () => {
-    const port = new TenantClickHouseResolver(clientFor());
     const requests: ReadRequest[] = [];
     const payloads = new Payloads("unexpected");
     const repository = repositoryFor({
-      port,
       reader: readerFor({ missing: true }, requests),
       payloads,
     });
@@ -240,29 +210,29 @@ describe("ClickHouseTraceFullRecordRepository", () => {
       new TraceNotFoundError("missing"),
     );
     expect(tenantsOf(requests)).toEqual(["tenant_b"]);
-    expect(port.tenants).toEqual([]);
+    expect(spanReadsOf(requests)).toEqual([]);
     expect(payloads.calls).toEqual([]);
   });
 
   it("uses stored_spans' StartTime ReplacingMergeTree election key", async () => {
-    const queries: string[] = [];
+    const requests: ReadRequest[] = [];
     const repository = repositoryFor({
-      port: new TenantClickHouseResolver(clientFor(queries)),
+      reader: readerFor({}, requests),
       payloads: new Payloads("unread"),
     });
 
     await repository.get({ tenantId: "tenant_a", traceId: "trace" });
 
-    const query = queries.find((item) => item.includes("FROM stored_spans"));
+    const spanReads = spanReadsOf(requests);
+    const query = spanReads[0]?.statement.sql;
     expect(query).toContain("SpanId, StartTime) IN");
     expect(query).toContain("max(StartTime)");
     expect(query).not.toContain("SpanId, UpdatedAt");
-    expect(queries.filter((item) => item.includes("FROM stored_spans"))).toHaveLength(1);
+    expect(spanReads).toHaveLength(1);
   });
 
   it("keeps the projection preview on blob failure and returns chronological thread records", async () => {
     const repository = repositoryFor({
-      port: new TenantClickHouseResolver(clientFor()),
       reader: readerFor({ thread: true }),
       payloads: new FailingPayloads(),
     });
@@ -279,7 +249,6 @@ describe("ClickHouseTraceFullRecordRepository", () => {
 
   it("deserializes claim-check JSON before canonical IO recomputation", async () => {
     const repository = repositoryFor({
-      port: new TenantClickHouseResolver(clientFor()),
       payloads: new Payloads('{"answer":"full"}'),
       io: new TypedFullIo(),
     });

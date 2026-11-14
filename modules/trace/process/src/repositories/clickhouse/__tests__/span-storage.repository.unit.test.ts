@@ -407,23 +407,26 @@ class QueryingClickHouse {
   rows: Row[] = [];
   refuseWith: Error | null = null;
 
+  /** The built reads' client; the raw reads still resolve it through `authorized`. */
+  readonly reader = idIndexedClientDouble({
+    indexes: TRACE_ID_INDEXES,
+    driver: {
+      execute: vi.fn<ScriptedStatements["execute"]>(async (request) => {
+        if (this.refuseWith) throw this.refuseWith;
+        this.queries.push({
+          query: request.sql,
+          params: request.params ?? {},
+          settings: request.settings,
+        });
+        return { rows: this.rows };
+      }),
+    },
+  });
+
   readonly authorized = new AuthorizedClickHouse({
     resolveClient: async (tenantId?: string) => {
       this.resolvedTenants.push(tenantId);
-      return idIndexedClientDouble({
-        indexes: TRACE_ID_INDEXES,
-        driver: {
-          execute: vi.fn<ScriptedStatements["execute"]>(async (request) => {
-            if (this.refuseWith) throw this.refuseWith;
-            this.queries.push({
-              query: request.sql,
-              params: request.params ?? {},
-              settings: request.settings,
-            });
-            return { rows: this.rows };
-          }),
-        },
-      });
+      return this.reader;
     },
   });
 }
@@ -459,7 +462,7 @@ function readRepository() {
   const repo = SpanStorageClickHouseRepository.create({
     resolveClient: new RecordingClickHouse().resolve,
     clickhouse: clickhouse.authorized,
-    reader: { read: () => Promise.reject(new Error("this test sends no built read")) },
+    reader: clickhouse.reader,
   });
   return { clickhouse, repo };
 }
@@ -502,14 +505,12 @@ describe("SpanStorageClickHouseRepository.findNormalizedSpanById", () => {
       });
 
       const read = clickhouse.queries[0];
+      const params = read?.params ?? {};
+      const bound = (value: string) => Object.keys(params).find((name) => params[name] === value);
       expect(read?.query).toContain("TenantId IN ({tenantScope");
-      expect(read?.query).toContain("TraceId = {traceId:String}");
-      expect(read?.query).toContain("SpanId = {spanId:String}");
-      expect(Object.values(read?.params ?? {})).toContainEqual(["project-1"]);
-      expect(read?.params).toMatchObject({
-        traceId: "trace-1",
-        spanId: "span-1",
-      });
+      expect(read?.query).toContain(`TraceId = {${bound("trace-1")}:String}`);
+      expect(read?.query).toContain(`SpanId = {${bound("span-1")}:String}`);
+      expect(Object.values(params)).toContainEqual(["project-1"]);
     });
 
     /** @scenario "The derivation read never asks for the nested columns" */
@@ -560,10 +561,10 @@ describe("SpanStorageClickHouseRepository.findNormalizedSpanById", () => {
         occurredAtMs: 1_700_000_000_000,
       });
 
-      expect(clickhouse.queries[0]?.settings).toMatchObject({
-        query_plan_optimize_lazy_materialization: "0",
-        max_memory_usage: expect.any(String),
-      });
+      // A built read carries its own settings in the statement's SETTINGS clause.
+      const settings = clickhouse.queries[0]?.query.split("SETTINGS").at(-1) ?? "";
+      expect(settings).toContain("query_plan_optimize_lazy_materialization = '0'");
+      expect(settings).toMatch(/max_memory_usage = '\d+'/);
     });
 
     /** @scenario "A single-span read never defers its columns to the lazy reader" */

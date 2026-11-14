@@ -13,7 +13,7 @@ import {
   type TraceFullSummaryRow,
   type TraceFullThreadTraceRow,
 } from "../trace-full-record-rows.repository.ts";
-import type { TraceClickHouse } from "./clickhouse.trace-member-client.repository.ts";
+import { storedSpans } from "./clickhouse.stored-spans.table.ts";
 import { traceSummaries } from "./clickhouse.trace-summaries.table.ts";
 import { chBoolean, chNumber, chString, chStringMap } from "./stored-span-row.mapper.ts";
 
@@ -78,21 +78,47 @@ const storedSpanRowSchema: z.ZodType<StoredSpanRow> = z.looseObject({
 
 const storedSpanRowsSchema = z.array(storedSpanRowSchema);
 
+/** The record's span columns, as main's full-record read named them. */
+const SPAN_SELECTION = {
+  SpanId: storedSpans.SpanId,
+  TraceId: storedSpans.TraceId,
+  TenantId: storedSpans.TenantId,
+  ParentSpanId: storedSpans.ParentSpanId,
+  ParentTraceId: storedSpans.ParentTraceId,
+  ParentIsRemote: storedSpans.ParentIsRemote,
+  Sampled: storedSpans.Sampled,
+  StartTimeMs: fn.toUnixTimestamp64Milli(storedSpans.StartTime),
+  EndTimeMs: fn.toUnixTimestamp64Milli(storedSpans.EndTime),
+  DurationMs: storedSpans.DurationMs,
+  SpanName: storedSpans.SpanName,
+  SpanKind: storedSpans.SpanKind,
+  ResourceAttributes: storedSpans.ResourceAttributes,
+  SpanAttributes: storedSpans.SpanAttributes,
+  StatusCode: storedSpans.StatusCode,
+  StatusMessage: storedSpans.StatusMessage,
+  ScopeName: storedSpans.ScopeName,
+  ScopeVersion: storedSpans.ScopeVersion,
+  Events_Timestamp: fn.arrayMap(
+    (at) => fn.toUnixTimestamp64Milli(at),
+    storedSpans["Events.Timestamp"],
+  ),
+  Events_Name: storedSpans["Events.Name"],
+  Events_Attributes: storedSpans["Events.Attributes"],
+  Links_TraceId: storedSpans["Links.TraceId"],
+  Links_SpanId: storedSpans["Links.SpanId"],
+  Links_Attributes: storedSpans["Links.Attributes"],
+};
+
 /** A full record's summary, span and thread rows, each read under the record's own tenant. */
 export class ClickHouseTraceFullRecordRowsRepository extends TraceFullRecordRowsRepository {
-  private constructor(
-    private readonly reader: Pick<ClickHouseQueryClient, "read">,
-    private readonly clients: TraceClickHouse,
-  ) {
+  private constructor(private readonly reader: Pick<ClickHouseQueryClient, "read">) {
     super();
   }
 
   static create(options: {
     reader: Pick<ClickHouseQueryClient, "read">;
-    /** The raw tenant client the span read still takes: its election is not the descriptor's. */
-    clients: TraceClickHouse;
   }): ClickHouseTraceFullRecordRowsRepository {
-    return new ClickHouseTraceFullRecordRowsRepository(options.reader, options.clients);
+    return new ClickHouseTraceFullRecordRowsRepository(options.reader);
   }
 
   /** Bounded by the id index once ready; an id it has never seen reads unbounded, as before. */
@@ -148,46 +174,37 @@ export class ClickHouseTraceFullRecordRowsRepository extends TraceFullRecordRows
     return threadTraceRowsSchema.parse(result.rows);
   }
 
+  /** Bounded by the occurred time the caller found on the trace's summary, not the id index. */
   async findSpans(input: {
     tenantId: string;
     traceId: string;
     occurredAtMs: number;
   }): Promise<StoredSpanRow[]> {
-    const client = await this.clients.resolve(input.tenantId);
-    const read = async (bounded: boolean): Promise<StoredSpanRow[]> => {
-      const filter = bounded
-        ? "AND StartTime BETWEEN fromUnixTimestamp64Milli({fromMs:Int64}) AND fromUnixTimestamp64Milli({toMs:Int64})"
-        : "";
-      const result = await client.query({
-        // ID_BOUND_SKIP: bounded by the occurred time the caller found on the trace's summary.
-        query: `SELECT SpanId, TraceId, TenantId, ParentSpanId, ParentTraceId, ParentIsRemote, Sampled,
-          toUnixTimestamp64Milli(StartTime) AS StartTimeMs, toUnixTimestamp64Milli(EndTime) AS EndTimeMs, DurationMs,
-          SpanName, SpanKind, ResourceAttributes, SpanAttributes, StatusCode, StatusMessage, ScopeName, ScopeVersion,
-          arrayMap(x -> toUnixTimestamp64Milli(x), \`Events.Timestamp\`) AS Events_Timestamp, \`Events.Name\` AS Events_Name,
-          \`Events.Attributes\` AS Events_Attributes, \`Links.TraceId\` AS Links_TraceId, \`Links.SpanId\` AS Links_SpanId,
-          \`Links.Attributes\` AS Links_Attributes FROM stored_spans WHERE TenantId = {tenantId:String} AND TraceId = {traceId:String}
-          ${filter} AND (TenantId, TraceId, SpanId, StartTime) IN (SELECT TenantId, TraceId, SpanId, max(StartTime) FROM stored_spans
-            WHERE TenantId = {tenantId:String} AND TraceId = {traceId:String} ${filter} GROUP BY TenantId, TraceId, SpanId)
-          ORDER BY StartTime ASC, SpanId ASC LIMIT {limit:UInt32}`,
-        query_params: {
-          tenantId: input.tenantId,
-          traceId: input.traceId,
-          limit: MAX_SPANS,
-          ...(bounded
-            ? {
-                fromMs: input.occurredAtMs - PARTITION_WINDOW_MS,
-                toMs: input.occurredAtMs + PARTITION_WINDOW_MS,
-              }
-            : {}),
-        },
-        clickhouse_settings: { max_memory_usage: String(2 * 1024 * 1024 * 1024) },
-        format: "JSONEachRow",
-      });
-      return storedSpanRowsSchema.parse(await result.json());
-    };
+    const spans = clickhouseRead({ scope: tenantScope.single({ tenantId: input.tenantId }) })
+      .from(storedSpans)
+      .select(SPAN_SELECTION)
+      .where(({ eq }) => eq(storedSpans.TraceId, input.traceId));
     // A summary occurrence anchor is authoritative for this trace. An empty window means there
     // are no matching spans there; widening to every cold partition would make span-less reads
     // unbounded scans.
-    return input.occurredAtMs > 0 ? read(true) : read(false);
+    const anchored =
+      input.occurredAtMs > 0
+        ? spans.where(({ and, gte, lte }) =>
+            and(
+              gte(storedSpans.StartTime, input.occurredAtMs - PARTITION_WINDOW_MS),
+              lte(storedSpans.StartTime, input.occurredAtMs + PARTITION_WINDOW_MS),
+            ),
+          )
+        : spans;
+    const statement = anchored
+      // stored_spans replaces by StartTime (goose 00002), so the election keeps the engine's key.
+      .latestVersion({ version: storedSpans.StartTime })
+      .orderBy(storedSpans.StartTime, "ASC")
+      .orderBy(storedSpans.SpanId, "ASC")
+      .limit(MAX_SPANS)
+      .settings({ max_memory_usage: String(2 * 1024 * 1024 * 1024) })
+      .build();
+    const result = await this.reader.read({ statement, table: storedSpans.$table.name });
+    return storedSpanRowsSchema.parse(result.rows);
   }
 }

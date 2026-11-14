@@ -8,7 +8,6 @@ import { TraceNotFoundError } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import { ClickHouseTraceFullRecordRowsRepository } from "../clickhouse.trace-full-record-rows.repository.ts";
-import { TraceClickHouse } from "../clickhouse.trace-member-client.repository.ts";
 
 type ReadRequest = Parameters<ClickHouseQueryClient["read"]>[0];
 
@@ -31,13 +30,6 @@ const SUMMARY = {
   UpdatedAtMs: "2",
 };
 
-/** The span read's raw client is never asked by these reads. */
-class RefusingClients extends TraceClickHouse {
-  resolve(): never {
-    throw new Error("the summary and thread reads are built");
-  }
-}
-
 /** A reader answering the rows given, keeping each request it was sent. */
 function repositoryOver(rows: unknown[]) {
   const requests: ReadRequest[] = [];
@@ -48,21 +40,29 @@ function repositoryOver(rows: unknown[]) {
         return { rows };
       },
     }),
-    clients: new RefusingClients(),
   });
   return { repository, requests };
 }
 
 /** How many times the statement binds `value` to a parameter. */
-function bindings({ request, value }: { request: ReadRequest | undefined; value: string }): number {
+function bindings({
+  request,
+  value,
+}: {
+  request: ReadRequest | undefined;
+  value: unknown;
+}): number {
   const params = request?.statement.params ?? {};
   const names = Object.keys(params).filter((name) => params[name] === value);
   const sql = request?.statement.sql ?? "";
   return names.reduce((count, name) => count + sql.split(`{${name}:`).length - 1, 0);
 }
 
-function expectSingleTenantReader(request: ReadRequest | undefined) {
-  expect(request?.table).toBe("trace_summaries");
+function expectSingleTenantReader(
+  request: ReadRequest | undefined,
+  { table = "trace_summaries", version = "UpdatedAt" }: { table?: string; version?: string } = {},
+) {
+  expect(request?.table).toBe(table);
   expect(request?.statement).toMatchObject({
     kind: "tenant",
     identity: "reader",
@@ -71,8 +71,11 @@ function expectSingleTenantReader(request: ReadRequest | undefined) {
     settings: { SQL_langwatch_tenant_ids: TENANT },
   });
   expect(request?.statement.sql).toContain("TenantId = {tenantId:String}");
-  expect(request?.statement.sql).toContain("max(UpdatedAt)");
+  expect(request?.statement.sql).toContain(`max(${version})`);
 }
+
+const OCCURRED_MS = 1_700_000_000_000;
+const PARTITION_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
 
 describe("ClickHouseTraceFullRecordRowsRepository", () => {
   describe("given a full record read for one project", () => {
@@ -115,6 +118,45 @@ describe("ClickHouseTraceFullRecordRowsRepository", () => {
         expect(bindings({ request: requests[0], value: "thread-1" })).toBe(2);
         expect(requests[0]?.statement.sql).toMatch(/ORDER BY OccurredAt ASC, TraceId ASC/);
         expect(requests[0]?.statement.sql).toMatch(/LIMIT 1000\b/);
+      });
+    });
+
+    describe("when the trace's spans are read around its summary's occurrence", () => {
+      /** @scenario "A full trace record's spans are elected on the engine's StartTime key within the record's own tenant" */
+      it("elects on StartTime, repeating the trace and its occurrence window in the election", async () => {
+        const { repository, requests } = repositoryOver([]);
+
+        await repository.findSpans({
+          tenantId: TENANT,
+          traceId: "trace-1",
+          occurredAtMs: OCCURRED_MS,
+        });
+
+        expect(requests).toHaveLength(1);
+        expectSingleTenantReader(requests[0], { table: "stored_spans", version: "StartTime" });
+        const sql = requests[0]?.statement.sql ?? "";
+        expect(sql).toContain("(TenantId, TraceId, SpanId, StartTime) IN");
+        expect(sql).not.toContain("max(UpdatedAt)");
+        expect(bindings({ request: requests[0], value: "trace-1" })).toBe(2);
+        expect(bindings({ request: requests[0], value: OCCURRED_MS - PARTITION_WINDOW_MS })).toBe(
+          2,
+        );
+        expect(bindings({ request: requests[0], value: OCCURRED_MS + PARTITION_WINDOW_MS })).toBe(
+          2,
+        );
+        expect(sql).toMatch(/ORDER BY StartTime ASC, SpanId ASC/);
+        expect(sql).toMatch(/LIMIT 10000\b/);
+        expect(sql).toMatch(/SETTINGS[^]*max_memory_usage/);
+      });
+
+      /** @scenario "A full trace record's spans are elected on the engine's StartTime key within the record's own tenant" */
+      it("reads the trace's spans unwindowed when the summary names no occurrence", async () => {
+        const { repository, requests } = repositoryOver([]);
+
+        await repository.findSpans({ tenantId: TENANT, traceId: "trace-1", occurredAtMs: 0 });
+
+        expectSingleTenantReader(requests[0], { table: "stored_spans", version: "StartTime" });
+        expect(requests[0]?.statement.sql).not.toMatch(/StartTime [<>]=/);
       });
     });
   });

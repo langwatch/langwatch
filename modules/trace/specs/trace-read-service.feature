@@ -153,3 +153,19 @@ Feature: Trace span-tree read service
     When the trace's summary or the thread's traces are read
     Then each statement is a reader statement over that project alone with the tenant setting
     And it elects each trace's latest summary, the thread read repeating its conversation filter in the election
+
+  @unit
+  Scenario: A single span is read within the reader's proof
+    Given a reader whose proof covers its own project, or a braid through which it reads the owner's span
+    When one span is read by its trace and span ids, whole or for derivation
+    Then the statement is a reader statement over the proof's tenants with the tenant setting
+    And it reads the span's newest version eagerly within the stored_spans id bound
+    And a braided read elects each project's latest version under the braid's condition and keeps the owner's
+
+  @unit
+  Scenario: A full trace record's spans are elected on the engine's StartTime key within the record's own tenant
+    Given a full record read for one project whose summary names the trace's occurrence, or none
+    When the trace's spans are read
+    Then the statement is a reader statement over that project alone with the tenant setting
+    And it elects each span's newest StartTime, the trace and the occurrence window repeated in the election
+    And a summary with no occurrence reads the trace's spans unwindowed

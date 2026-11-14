@@ -142,35 +142,10 @@ const FULL_SPAN_SELECT = `
 `;
 
 /**
- * {@link FULL_SPAN_SELECT} minus the `Events.*` / `Links.*` nested columns, for
- * internal derivation consumers that read scalar span/resource attributes and
- * never touch a span's events or links.
+ * The full-span projection minus the `Events.*` / `Links.*` nested columns, for internal
+ * derivation consumers that read scalar span/resource attributes, never events or links.
  */
-const DERIVATION_SPAN_SELECT = `
-  SpanId,
-  TraceId,
-  TenantId,
-  ParentSpanId,
-  ParentTraceId,
-  ParentIsRemote,
-  Sampled,
-  toUnixTimestamp64Milli(StartTime) AS StartTimeMs,
-  toUnixTimestamp64Milli(EndTime) AS EndTimeMs,
-  DurationMs,
-  SpanName,
-  SpanKind,
-  ResourceAttributes,
-  SpanAttributes,
-  StatusCode,
-  StatusMessage,
-  ScopeName,
-  ScopeVersion,
-  Cost,
-  NonBilledCost
-`;
-
-/** {@link FULL_SPAN_SELECT} as the builder selects it, for the reads already built. */
-const FULL_SPAN_SELECTION = {
+const DERIVATION_SPAN_SELECTION = {
   SpanId: storedSpans.SpanId,
   TraceId: storedSpans.TraceId,
   TenantId: storedSpans.TenantId,
@@ -191,6 +166,11 @@ const FULL_SPAN_SELECTION = {
   ScopeVersion: storedSpans.ScopeVersion,
   Cost: storedSpans.Cost,
   NonBilledCost: storedSpans.NonBilledCost,
+};
+
+/** {@link FULL_SPAN_SELECT} as the builder selects it, for the reads already built. */
+const FULL_SPAN_SELECTION = {
+  ...DERIVATION_SPAN_SELECTION,
   Events_Timestamp: fn.arrayMap(
     (at) => fn.toUnixTimestamp64Milli(at),
     storedSpans["Events.Timestamp"],
@@ -262,6 +242,35 @@ function storedSpansStatement({
     .orderBy("StartTimeMs", "ASC")
     .limit(limit)
     .settings(SINGLE_TRACE_READ_SETTINGS)
+    .build();
+}
+
+/**
+ * One span's latest version under the proof. Braided: one per project holding the span id, the
+ * condition on the outer select beside a bare election, so the caller keeps the owner's row
+ * (ADR-201 §3); otherwise the newest version in the reader's own windows.
+ */
+function singleSpanStatement({
+  authorization,
+  braided,
+  traceId,
+  spanId,
+  selection,
+}: {
+  authorization: Authorization;
+  braided: boolean;
+  traceId: string;
+  spanId: string;
+  selection: typeof FULL_SPAN_SELECTION | typeof DERIVATION_SPAN_SELECTION;
+}) {
+  const scope = builtTenantScope.fromProof({ authorization, reads: braided ? "spans" : "traces" });
+  const read = clickhouseRead({ scope }).from(storedSpans);
+  const span = (braided ? read.braided({ heldTrace: { traceId } }) : read.withinWindows())
+    .select(selection)
+    .where(({ idBound }) => idBound(storedSpans.TraceId, traceId))
+    .where(({ eq }) => eq(storedSpans.SpanId, spanId));
+  return (braided ? span.latestVersion() : span.orderBy(storedSpans.UpdatedAt, "DESC").limit(1))
+    .settings(SINGLE_SPAN_FETCH_SETTINGS)
     .build();
 }
 
@@ -1241,7 +1250,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         // Derivation consumers lift scalar attributes only; the nested
         // Events/Links columns are both unused here and the source of the
         // `Attempt to read after eof` failures this read retries on.
-        select: DERIVATION_SPAN_SELECT,
+        selection: DERIVATION_SPAN_SELECTION,
       });
     } catch (error) {
       logger.warn(
@@ -1257,64 +1266,35 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     }
   }
 
-  /**
-   * Single-span fetch via LazilyRead optimization to defer heavy columns.
-   */
+  /** One span's latest version, read eagerly ({@link SINGLE_SPAN_FETCH_SETTINGS}). */
   private async fetchNormalizedSpanRow({
     authorization,
     traceId,
     spanId,
     idBound,
-    select = FULL_SPAN_SELECT,
+    selection = FULL_SPAN_SELECTION,
     ownerProjectId,
   }: {
     authorization: Authorization;
     traceId: string;
     spanId: string;
     idBound: IdBoundOptions;
-    select?: string;
+    selection?: typeof FULL_SPAN_SELECTION | typeof DERIVATION_SPAN_SELECTION;
     ownerProjectId?: string | undefined;
   }): Promise<NormalizedSpan | null> {
     const ownerRead = singleSpanOwnerRead({ authorization, ownerProjectId });
     if (ownerRead.kind === "unreadable") return null;
-    if (ownerRead.kind === "braided") {
-      const braided = await this.spanReader(authorization).query({
-        query: `
-          SELECT ${select}
-          FROM ${TABLE_NAME}
-          WHERE ${BRAIDED_SINGLE_SPAN_WHERE}
-        `,
-        query_params: { traceId, spanId },
-        clickhouse_settings: SINGLE_SPAN_FETCH_SETTINGS,
-        format: "JSONEachRow",
-        idBound,
-      });
-      const row = fullSpanRowsSchema
-        .parse(await braided.json())
-        .find((candidate) => candidate.TenantId === ownerRead.ownerProjectId);
-      return row === undefined ? null : mapChRowToNormalized(row);
-    }
-    const client = this.reader(authorization);
-    const result = await client.query({
-      query: `
-        SELECT ${select}
-        FROM ${TABLE_NAME}
-        WHERE ${tenantScope("StartTime")}
-          AND TraceId = {traceId:String}
-          AND SpanId = {spanId:String}
-          ${STORED_SPANS_ID_BOUND}
-        ORDER BY UpdatedAt DESC
-        LIMIT 1
-      `,
-      query_params: { traceId, spanId },
-      clickhouse_settings: SINGLE_SPAN_FETCH_SETTINGS,
-      format: "JSONEachRow",
+    const braided = ownerRead.kind === "braided";
+    const result = await this.deps.reader.read({
+      statement: singleSpanStatement({ authorization, braided, traceId, spanId, selection }),
+      table: storedSpans.$table.name,
       idBound,
     });
-
-    const rows = fullSpanRowsSchema.parse(await result.json());
-    if (rows.length === 0) return null;
-    return mapChRowToNormalized(rows[0]!);
+    const rows = fullSpanRowsSchema.parse(result.rows);
+    const row = braided
+      ? rows.find((candidate) => candidate.TenantId === ownerRead.ownerProjectId)
+      : rows[0];
+    return row === undefined ? null : mapChRowToNormalized(row);
   }
 
   async findSpanResourcesByTraceId({

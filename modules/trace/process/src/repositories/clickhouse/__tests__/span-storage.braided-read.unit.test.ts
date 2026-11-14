@@ -25,24 +25,22 @@ const WEB: CompiledWhere = {
 
 function spanRepository(rows: Record<string, unknown>[] = []) {
   const statements: { sql: string; params: Record<string, unknown> }[] = [];
-  const clickhouse = new AuthorizedClickHouse({
-    resolveClient: async () =>
-      idIndexedClientDouble({
-        indexes: TRACE_ID_INDEXES,
-        driver: {
-          execute: vi.fn<ScriptedStatements["execute"]>(async (request) => {
-            statements.push({ sql: request.sql, params: request.params ?? {} });
-            return { rows: request.sql.includes("FROM stored_spans") ? rows : [] };
-          }),
-        },
+  // One client sends both the built reads and the raw ones still on the authorized handle.
+  const client = idIndexedClientDouble({
+    indexes: TRACE_ID_INDEXES,
+    driver: {
+      execute: vi.fn<ScriptedStatements["execute"]>(async (request) => {
+        statements.push({ sql: request.sql, params: request.params ?? {} });
+        return { rows: request.sql.includes("FROM stored_spans") ? rows : [] };
       }),
+    },
   });
   const repo = SpanStorageClickHouseRepository.create({
     resolveClient: async () => {
       throw new Error("this test writes nothing");
     },
-    clickhouse,
-    reader: { read: () => Promise.reject(new Error("this test sends no built read")) },
+    clickhouse: new AuthorizedClickHouse({ resolveClient: async () => client }),
+    reader: client,
   });
   const spanReads = () => statements.filter(({ sql }) => sql.includes("FROM stored_spans"));
   return { repo, spanReads };
