@@ -5,23 +5,18 @@ name: pr-token-usage
 # model, read from the LangWatch pull-request usage API), and rewrites that
 # same comment on every subsequent push.
 #
-# `synchronize` IS "a new commit was pushed to this PR", so one `pull_request`
-# trigger covers both "on open" and "on every push". Usage accrues while the
-# work happens, so each push refreshes the numbers; `workflow_dispatch` exists
-# for a manual refresh after the last commit.
+# Pull requests run this in pr.yml's checks job on open and on every push.
+# Usage accrues while the work happens, so each push refreshes the numbers;
+# `workflow_dispatch` exists for a manual refresh after the last commit.
 #
 # Deliberately non-blocking: this workflow only describes what the work cost,
 # it never judges it. A LangWatch outage logs a warning and the job stays
 # green, so nothing here should gate a merge or join branch protection.
 #
-# No path filter, so it always produces a result and needs no "-unmodified"
-# stub under the complementary-pair system (see specs/ci/path-filters.feature).
-#
 # Spec: specs/ci/pr-token-usage.feature
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
+  # Pull requests run this in pr.yml's checks job.
   workflow_dispatch:
     inputs:
       pull_request:

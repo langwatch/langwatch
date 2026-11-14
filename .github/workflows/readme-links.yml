@@ -8,26 +8,19 @@ name: readme-links
 # /self-hosting/ entirely. Nothing in this repository failed when they broke,
 # because none of the changes that broke them happened in this repository.
 #
-# That is why it runs on a schedule as well as on pull requests: this class of
-# rot needs no commit here to happen. The scheduled run is the one that catches
-# it; the pull-request run only stops us adding a new dead link.
+# That is why it runs on a schedule; pull requests run the same check in
+# pr.yml's checks job. This class of rot needs no commit here to happen. The
+# scheduled run is the one that catches it; the pull-request run only stops us
+# adding a new dead link.
 #
 # Only 404 and 410 fail the run. A bot block, a rate limit or a timeout is
 # reported as unverified and does not gate — npmjs.com answers 403 to CI egress
 # addresses, and a check that fails on that is a check people learn to ignore.
 #
-# No path filter: a filtered workflow in this repository needs a complementary
-# "-unmodified" stub so branch protection still resolves (specs/ci/path-filters.feature),
-# and this check is under a minute. Always running is the cheaper arrangement.
-#
-# Runs the checker from the PR head, so the trigger stays `pull_request` — never
-# `pull_request_target`. It needs no token.
-#
 # Spec: specs/ci/readme-link-check.feature
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
+  # Pull requests run this in pr.yml's checks job.
   schedule:
     # Mondays, 07:00 UTC — a dead link found at the start of the week gets
     # fixed that week.
