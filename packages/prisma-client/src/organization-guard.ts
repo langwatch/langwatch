@@ -99,6 +99,16 @@ const hasUserBound = (clause: unknown): boolean => {
   return typeof userId === "string" || isNonEmptyStringList(userId);
 };
 
+/** One named owner's personal teams: a non-empty `ownerUserId` beside `isPersonal: true`. */
+const isOwnPersonalTeam = (clause: unknown): boolean => {
+  const ownerUserId = clauseField(clause, "ownerUserId");
+  return (
+    typeof ownerUserId === "string" &&
+    ownerUserId.trim().length > 0 &&
+    clauseField(clause, "isPersonal") === true
+  );
+};
+
 const isOrganizationIdValue = (value: unknown): boolean =>
   typeof value === "string" && value.trim().length > 0;
 
@@ -178,7 +188,11 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   },
   OrganizationAccessNotice: {},
   OrganizationSeatLease: {},
-  Team: {},
+  // "Which personal teams does this person own" is a READ bounded by the named owner: a personal
+  // team has exactly one. Any other Team query, and every write, still names its organization.
+  Team: {
+    extraBound: ({ clause, action }) => READ_ACTIONS.has(action) && isOwnPersonalTeam(clause),
+  },
   OrganizationInvite: {
     // inviteCode is a globally-unique acceptance token; the invite row it
     // names belongs to exactly one organization. "Is this address invited
