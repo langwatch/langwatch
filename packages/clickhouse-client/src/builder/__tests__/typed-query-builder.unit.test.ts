@@ -25,7 +25,8 @@ import {
   type ReadResource,
 } from "../../authorized-reads.ts";
 import { TENANT_IDS_SETTING } from "../../identity/tenantSetting.ts";
-import { column, fn, sql } from "../expression.ts";
+import { column, sql } from "../expression.ts";
+import { fn } from "../functions.ts";
 import { clickhouseRead, type ReaderReadStatement, readerStatementOf } from "../read.ts";
 import { REVIEWED_FRAGMENTS } from "../reviewed-fragments.ts";
 import { tenantScope } from "../scope.ts";

@@ -26,7 +26,14 @@ export type QueryBuilderViolation =
   | { kind: "bad-cte-name"; name: string }
   | { kind: "bad-alias"; name: string }
   | { kind: "bad-row-count"; value: number }
-  | { kind: "unsupported-operand"; column: string };
+  | { kind: "unsupported-operand"; column: string }
+  | { kind: "bad-constant"; value: number }
+  | { kind: "foreign-scope" }
+  | { kind: "table-outside-scope"; table: string; scope: string }
+  | { kind: "unjoinable"; table: string }
+  | { kind: "prewhere-in-join" }
+  | { kind: "id-bound-in-join" }
+  | { kind: "bad-union-order" };
 
 /** A read the builder will not build. Named so a test can tell which refusal fired. */
 export class QueryBuilderError extends Error {
@@ -68,13 +75,13 @@ function describe(violation: QueryBuilderViolation): string {
     case "empty-select":
       return "A read selects at least one value.";
     case "self-join":
-      return `A read joins "${violation.table}" to itself, which the builder does not alias.`;
+      return `A read joins "${violation.table}" to itself; alias one side with aliasOf.`;
     case "union-mismatch":
       return `A UNION ALL arm selects ${violation.received}; the read selects ${violation.expected}.`;
     case "ordered-union":
-      return "A read with UNION ALL arms is neither ordered nor limited; order each arm's consumer instead.";
+      return "A UNION ALL arm carries no arms of its own.";
     case "nested-with":
-      return "A common table expression or UNION ALL arm carries no WITH of its own.";
+      return "A common table expression carries no WITH or UNION ALL of its own.";
     case "bad-cte-name":
       return `"${violation.name}" is not a usable common table expression name.`;
     case "bad-alias":
@@ -82,6 +89,20 @@ function describe(violation: QueryBuilderViolation): string {
     case "bad-row-count":
       return `A limit or offset is a non-negative integer, not ${violation.value}.`;
     case "unsupported-operand":
-      return `Column "${violation.column}" binds through a conversion that a set comparison cannot apply.`;
+      return `"${violation.column}" cannot take a bound value in this position.`;
+    case "bad-constant":
+      return `A constant the grammar needs as text is finite and inside its bounds, not ${violation.value}.`;
+    case "foreign-scope":
+      return "A derived table was built under another scope; a read and its parts share one scope.";
+    case "table-outside-scope":
+      return `Table "${violation.table}" cannot be read under a ${violation.scope} scope.`;
+    case "unjoinable":
+      return `"${violation.table}" is not a stored tenant table, so it cannot be a join side.`;
+    case "prewhere-in-join":
+      return "PREWHERE applies to a one-table read; a join side filters in its own subquery.";
+    case "id-bound-in-join":
+      return "An {{idBound}} marker is written on a one-table read, a CTE or a derived table.";
+    case "bad-union-order":
+      return "A UNION ALL read is ordered by the keys it selects, not by an expression.";
   }
 }

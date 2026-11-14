@@ -33,8 +33,14 @@ export type AllTenantsScope = {
   readonly identity: "system";
   readonly reason: string;
 };
+/** A read of server metadata, holding no tenant rows: the reader identity, no tenant setting. */
+export type ServerMetadataScope = {
+  readonly kind: "serverMetadata";
+  readonly identity: "reader";
+  readonly reason: string;
+};
 export type ReaderScope = ProofScope | SingleTenantScope | TenantSetScope;
-export type TenantScope = ReaderScope | AllTenantsScope;
+export type TenantScope = ReaderScope | AllTenantsScope | ServerMetadataScope;
 
 /** Refuses a tenant id the comma-separated setting would split or widen. */
 function checkedTenantIds(tenantIds: readonly string[]): readonly [string, ...string[]] {
@@ -103,5 +109,11 @@ export const tenantScope = {
   allTenants({ reason }: { reason: string }): AllTenantsScope {
     if (reason.trim() === "") throw new QueryBuilderError({ kind: "missing-reason" });
     return { kind: "allTenants", identity: "system", reason };
+  },
+
+  /** Server metadata only: the allow-listed system tables, or no table (ADR-202). */
+  serverMetadata({ reason }: { reason: string }): ServerMetadataScope {
+    if (reason.trim() === "") throw new QueryBuilderError({ kind: "missing-reason" });
+    return { kind: "serverMetadata", identity: "reader", reason };
   },
 } as const;

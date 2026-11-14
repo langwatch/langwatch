@@ -136,3 +136,98 @@ Feature: A typed ClickHouse read builder renders the tenant predicate and the te
     Given three fenced reads: a windowed read, a braided read electing its latest version, and a read through a common table expression
     When each is built and its marker form is expanded by the fence
     Then the statement text and the bound parameters are equal
+
+  # ---------------------------------------------------------------------------
+  # The shapes the repositories issue (rp-b2 census)
+  # ---------------------------------------------------------------------------
+
+  @unit
+  Scenario: A read calls only catalogued functions, binding every value
+    Given a read selecting aggregates, conditional aggregates, date buckets and tuple comparisons
+    When it is built
+    Then each call is a function from the builder's catalogue
+    And every value it passes is a named parameter bound by the function's signature
+    And a constant the grammar needs as text, such as a quantile level, is refused out of bounds
+
+  @unit
+  Scenario: PREWHERE, HAVING, DISTINCT and LIMIT BY render in their clauses
+    Given a read with PREWHERE conditions, a grouping with HAVING, or DISTINCT with LIMIT BY
+    When it is built
+    Then each renders in its own clause and the tenant predicate stays in WHERE
+    And PREWHERE on a join is refused
+
+  @unit
+  Scenario: The IN-tuple election renders in WHERE, in PREWHERE or inside a join side
+    Given a read asking for the latest version on its table or on a joined table
+    When it is built
+    Then the election reads keys and the version under the same scope
+    And on a join each side elects inside its own scoped subquery
+
+  @unit
+  Scenario: A DateTime64 column is a member of bound epoch milliseconds
+    Given a read testing a DateTime64 column against a list of epoch milliseconds
+    When it is built
+    Then the column is compared as epoch milliseconds against one bound array
+
+  @unit
+  Scenario: A derived table is read under its own scope and carries the predicate inside
+    Given a read selecting from another read used as a table
+    When it is built
+    Then the inner read carries the tenant predicate and the outer read adds none
+    And a derived table built under another scope is refused
+
+  @unit
+  Scenario: A self-join aliases one side and qualifies fragments by their side
+    Given a read joining a table to an alias of itself and reading a reviewed fragment on each side
+    When it is built
+    Then each side is its own scoped subquery under its own name
+    And each fragment's columns are qualified by the side it names
+    And joining a table to itself without an alias is refused
+
+  @unit
+  Scenario: An ordered or limited UNION ALL orders the whole union
+    Given a UNION ALL read ordered and limited, with an arm carrying its own WITH, order and limit
+    When it is built
+    Then the union is wrapped so its order and limit cover every arm
+    And the arm is parenthesised with its own clauses
+    And ordering a union by an expression rather than a selected key is refused
+
+  @unit
+  Scenario: A read by id carries the id index marker the client expands
+    Given a read filtering on one id, or on a composite id
+    When it is built
+    Then the equality carries the id index marker naming its table, keys and parameters
+    And the marker on a join read is refused
+
+  @integration
+  Scenario: Built statements return their tenant's rows under the reader's row policy on 26.8
+    Given ClickHouse 26.8 with a reader whose row policy reads the tenant setting
+    When join, common table expression, UNION ALL, FINAL, latest-version, derived, windowed and braided reads are built and sent
+    Then each returns exactly its tenant's rows
+    And each keeps another tenant's rows out by its own text when the setting lists every tenant
+    And a statement sent under another tenant's setting returns no rows
+
+  # ---------------------------------------------------------------------------
+  # Server metadata
+  # ---------------------------------------------------------------------------
+
+  @unit
+  Scenario: A server-metadata read names only the allow-listed system tables
+    Given a server-metadata scope stating its reason
+    When it reads system.columns, system.replicas or system.server_settings, or no table at all
+    Then the statement goes out on the reader identity as a metadata statement
+    And it carries no tenant setting and no tenant predicate
+
+  @unit
+  Scenario: A server-metadata read naming any other table is refused
+    Given a server-metadata scope
+    When it names an app table, or a system table off the allow-list such as query_log, processes, mutations, query_views_log, text_log, parts or disks
+    Then the read does not type-check
+    And it is refused at run time
+    And a tenant scope naming an allow-listed system table is refused the same way
+
+  @integration
+  Scenario: A server-metadata read runs on 26.8 with no tenant setting
+    Given ClickHouse 26.8 and the reader identity
+    When a server-metadata read of system.columns and a table-less read are built and sent
+    Then both return their rows without a tenant setting

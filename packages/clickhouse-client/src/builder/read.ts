@@ -9,25 +9,32 @@ import { TENANT_IDS_SETTING } from "../identity/tenantSetting.ts";
 import { refuseOverBudget } from "../statementBudget.ts";
 import { StatementScopeError } from "../statementScopeError.ts";
 import {
+  type Binding,
+  type ColumnType,
   type Condition,
   type ConditionOps,
   columnsOf,
   conditionOpsFor,
+  type Direction,
   type Expression,
   type ExpressionNode,
+  holdsIdBound,
+  paramNameOf,
+  refOf,
   type RenderContext,
   renderContext,
   renderExpression,
-  slotOf,
+  type ValueNode,
   type ValueOfExpression,
 } from "./expression.ts";
 import { QueryBuilderError } from "./query-builder-error.ts";
-import type { AllTenantsScope, ReaderScope, TenantScope } from "./scope.ts";
+import type { AllTenantsScope, ReaderScope, ServerMetadataScope, TenantScope } from "./scope.ts";
 import {
   type ClickHouseTable,
   type ClickHouseTableFacts,
   type ColumnsSpec,
   IDENTIFIER,
+  SERVER_METADATA_TABLES,
 } from "./table.ts";
 
 declare const rowBrand: unique symbol;
@@ -36,6 +43,7 @@ type Settings = typeof PINNED_SETTINGS;
 
 export type ReaderReadStatement<Row = unknown> = {
   readonly identity: "reader";
+  readonly kind: "tenant";
   readonly sql: string;
   readonly params: Readonly<Record<string, unknown>>;
   readonly settings: Settings & { readonly [TENANT_IDS_SETTING]: string };
@@ -49,6 +57,7 @@ export type ReaderReadStatement<Row = unknown> = {
 
 export type SystemReadStatement<Row = unknown> = {
   readonly identity: "system";
+  readonly kind: "allTenants";
   readonly sql: string;
   readonly params: Readonly<Record<string, unknown>>;
   readonly settings: Settings;
@@ -56,15 +65,29 @@ export type SystemReadStatement<Row = unknown> = {
   readonly [rowBrand]?: Row;
 };
 
+/** Server metadata on the reader identity, no tenant setting (`tenantScope.serverMetadata`). */
+export type MetadataReadStatement<Row = unknown> = {
+  readonly identity: "reader";
+  readonly kind: "metadata";
+  readonly sql: string;
+  readonly params: Readonly<Record<string, unknown>>;
+  readonly settings: Settings;
+  readonly reason: string;
+  readonly [rowBrand]?: Row;
+};
+
+/** What the client's built path sends today; a metadata statement joins when it is wired. */
 export type ClickHouseReadStatement<Row = unknown> =
   | ReaderReadStatement<Row>
   | SystemReadStatement<Row>;
 
 type StatementOf<Scope extends TenantScope, Row> = Scope extends AllTenantsScope
   ? SystemReadStatement<Row>
-  : ReaderReadStatement<Row>;
+  : Scope extends ServerMetadataScope
+    ? MetadataReadStatement<Row>
+    : ReaderReadStatement<Row>;
 
-/** A statement for a path that sends on the reader identity only; refuses an all-tenants read. */
+/** A statement for a path that sends tenant reads only; refuses every other kind. */
 export function readerStatementOf<Row>({
   statement,
 }: {
@@ -75,56 +98,132 @@ export function readerStatementOf<Row>({
   return statement;
 }
 
-type HeldTrace = { kind: "traceId" | "sinceMs"; node: ExpressionNode & { kind: "value" } };
+type HeldTrace = { kind: "traceId" | "sinceMs"; node: ValueNode };
 type Tenancy =
   | { kind: "unstated" }
   | { kind: "windows" }
   | { kind: "braided"; held: HeldTrace | undefined };
-type Join = { kind: "INNER" | "LEFT"; table: ClickHouseTableFacts; on: ExpressionNode };
-type Order = { target: ExpressionNode | string; direction: "ASC" | "DESC" };
+type Join = {
+  kind: "INNER" | "LEFT";
+  table: ClickHouseTableFacts;
+  on: ExpressionNode;
+  latestVersion: boolean;
+};
+type Order = { target: ExpressionNode | string; direction: Direction };
+type Selected = { key: string; node: ExpressionNode; binding: Binding | undefined };
 
 type ReadState = {
   readonly scope: TenantScope;
   readonly table: ClickHouseTableFacts;
   readonly final: boolean;
   readonly joins: readonly Join[];
-  readonly select: readonly (readonly [string, ExpressionNode])[];
+  readonly select: readonly Selected[];
+  readonly distinct: boolean;
+  readonly prewhere: readonly ExpressionNode[];
   readonly where: readonly ExpressionNode[];
   readonly groupBy: readonly ExpressionNode[];
+  readonly having: readonly ExpressionNode[];
   readonly orderBy: readonly Order[];
+  readonly limitBy: { readonly count: number; readonly by: readonly ExpressionNode[] } | undefined;
   readonly limit: number | undefined;
   readonly offset: number | undefined;
   readonly tenancy: Tenancy;
-  readonly latestVersion: boolean;
+  /** Where the latest-version election renders: WHERE or PREWHERE. */
+  readonly latestVersion: "where" | "prewhere" | undefined;
   readonly ctes: readonly { name: string; read: ReadState }[];
   readonly arms: readonly ReadState[];
 };
 
 type NoCtes = Record<never, never>;
 
+/** The table kinds a scope reads: server metadata reads system tables, other scopes tenants'. */
+type KindFor<Scope extends TenantScope> = Scope extends ServerMetadataScope ? "system" : "tenant";
+
+/** A read used as a table: its selected keys, typed by the values they hold. */
+export type DerivedColumns<Row> = { readonly [Key in keyof Row & string]: ColumnType<Row[Key]> };
+
+/** The read each derived table was built from, so `from` renders it and checks its scope. */
+const DERIVED = new WeakMap<ClickHouseTableFacts, ReadState>();
+
+/** The source of a read with no table: `SELECT <constants>`, server metadata only. */
+const NO_TABLE: ClickHouseTableFacts = {
+  kind: "system",
+  name: "",
+  stored: "",
+  tenantColumn: "",
+  timeColumn: undefined,
+  versionColumn: undefined,
+  sortKey: [],
+  columns: [],
+};
+
+const initialState = ({
+  scope,
+  table,
+}: {
+  scope: TenantScope;
+  table: ClickHouseTableFacts;
+}): ReadState => ({
+  scope,
+  table,
+  final: false,
+  joins: [],
+  select: [],
+  distinct: false,
+  prewhere: [],
+  where: [],
+  groupBy: [],
+  having: [],
+  orderBy: [],
+  limitBy: undefined,
+  limit: undefined,
+  offset: undefined,
+  tenancy: { kind: "unstated" },
+  latestVersion: undefined,
+  ctes: [],
+  arms: [],
+});
+
+/** Refuses a table the scope may not read: tenants read tenant tables, metadata the allow-list. */
+function checkSource({ scope, table }: { scope: TenantScope; table: ClickHouseTableFacts }) {
+  if (table.kind === "derived") {
+    if (DERIVED.get(table)?.scope !== scope) throw new QueryBuilderError({ kind: "foreign-scope" });
+    return;
+  }
+  const allowed =
+    scope.kind === "serverMetadata"
+      ? table.kind === "system" &&
+        (SERVER_METADATA_TABLES as readonly string[]).includes(table.stored)
+      : table.kind === "tenant" && IDENTIFIER.test(table.stored);
+  if (!allowed) {
+    throw new QueryBuilderError({
+      kind: "table-outside-scope",
+      table: table.stored,
+      scope: scope.kind,
+    });
+  }
+}
+
 /** The start of a read: the scope is required, the table comes next. */
 export class ClickHouseReadStart<Scope extends TenantScope> {
   constructor(private readonly scope: Scope) {}
 
   from<Name extends string, Columns extends ColumnsSpec>(
-    table: ClickHouseTable<Name, Columns>,
+    table: ClickHouseTable<Name, Columns, KindFor<Scope> | "derived">,
   ): ClickHouseRead<Scope, Name, NoCtes, NoCtes> {
-    return new ClickHouseRead({
-      scope: this.scope,
-      table: table.$table,
-      final: false,
-      joins: [],
-      select: [],
-      where: [],
-      groupBy: [],
-      orderBy: [],
-      limit: undefined,
-      offset: undefined,
-      tenancy: { kind: "unstated" },
-      latestVersion: false,
-      ctes: [],
-      arms: [],
-    });
+    checkSource({ scope: this.scope, table: table.$table });
+    return new ClickHouseRead(initialState({ scope: this.scope, table: table.$table }));
+  }
+
+  /** `SELECT <constants>` with no table, such as a server-metadata `SELECT 1`. */
+  withoutTable(
+    this: ClickHouseReadStart<ServerMetadataScope>,
+  ): ClickHouseRead<ServerMetadataScope, never, NoCtes, NoCtes> {
+    const scope = this.scope as TenantScope;
+    if (scope.kind !== "serverMetadata") {
+      throw new QueryBuilderError({ kind: "table-outside-scope", table: "", scope: scope.kind });
+    }
+    return new ClickHouseRead(initialState({ scope, table: NO_TABLE }));
   }
 }
 
@@ -143,6 +242,8 @@ const rowCount = (value: number): number => {
     throw new QueryBuilderError({ kind: "bad-row-count", value });
   return value;
 };
+
+type JoinOptions = { latestVersion?: boolean };
 
 export class ClickHouseRead<
   Scope extends TenantScope,
@@ -164,16 +265,37 @@ export class ClickHouseRead<
     return new ClickHouseRead({ ...this.#state, ...patch });
   }
 
+  /** The selection, or a function of the condition operations for `countIf`, `if` and the like. */
   select<Selection extends Record<string, Expression<unknown, Tables>>>(
-    selection: Selection,
+    selection: Selection | ((ops: ConditionOps<Tables, Ctes>) => Selection),
   ): ClickHouseRead<
     Scope,
     Tables,
     { [Key in keyof Selection]: ValueOfExpression<Selection[Key]> },
     Ctes
   > {
+    const chosen =
+      typeof selection === "function" ? selection(conditionOpsFor<Tables, Ctes>()) : selection;
     return this.#next({
-      select: Object.entries(selection).map(([key, value]) => [key, value.node] as const),
+      select: Object.entries(chosen).map(([key, value]) => ({
+        key,
+        node: value.node,
+        binding: value.binding,
+      })),
+    });
+  }
+
+  distinct(): ClickHouseRead<Scope, Tables, Row, Ctes> {
+    return this.#next({ distinct: true });
+  }
+
+  /** PREWHERE conditions, on a one-table read; the tenant predicate stays in WHERE. */
+  prewhere(
+    build: (ops: ConditionOps<Tables, Ctes>) => Condition<Tables>,
+  ): ClickHouseRead<Scope, Tables, Row, Ctes> {
+    if (this.#state.joins.length > 0) throw new QueryBuilderError({ kind: "prewhere-in-join" });
+    return this.#next({
+      prewhere: [...this.#state.prewhere, build(conditionOpsFor<Tables, Ctes>()).node],
     });
   }
 
@@ -185,34 +307,58 @@ export class ClickHouseRead<
     });
   }
 
+  having(
+    build: (ops: ConditionOps<Tables, Ctes>) => Condition<Tables>,
+  ): ClickHouseRead<Scope, Tables, Row, Ctes> {
+    return this.#next({
+      having: [...this.#state.having, build(conditionOpsFor<Tables, Ctes>()).node],
+    });
+  }
+
+  /** `latestVersion` elects the joined side's latest version inside its own subquery. */
   innerJoin<Name extends string, Columns extends ColumnsSpec>(
     table: ClickHouseTable<Name, Columns>,
     on: (ops: ConditionOps<Tables | Name, Ctes>) => Condition<Tables | Name>,
+    options: JoinOptions = {},
   ): ClickHouseRead<Scope, Tables | Name, Row, Ctes> {
-    return this.#join({
-      kind: "INNER",
-      table: table.$table,
-      on: on(conditionOpsFor<Tables | Name, Ctes>()).node,
-    });
+    return this.#join({ kind: "INNER", table: table.$table, options, on: on(conditionOpsFor()) });
   }
 
   leftJoin<Name extends string, Columns extends ColumnsSpec>(
     table: ClickHouseTable<Name, Columns>,
     on: (ops: ConditionOps<Tables | Name, Ctes>) => Condition<Tables | Name>,
+    options: JoinOptions = {},
   ): ClickHouseRead<Scope, Tables | Name, Row, Ctes> {
-    return this.#join({
-      kind: "LEFT",
-      table: table.$table,
-      on: on(conditionOpsFor<Tables | Name, Ctes>()).node,
-    });
+    return this.#join({ kind: "LEFT", table: table.$table, options, on: on(conditionOpsFor()) });
   }
 
-  #join<NextTables extends string>(join: Join): ClickHouseRead<Scope, NextTables, Row, Ctes> {
-    const taken = [this.#state.table, ...this.#state.joins.map((each) => each.table)];
-    if (taken.some((table) => table.name === join.table.name)) {
-      throw new QueryBuilderError({ kind: "self-join", table: join.table.name });
+  #join<NextTables extends string>({
+    kind,
+    table,
+    on,
+    options,
+  }: {
+    kind: Join["kind"];
+    table: ClickHouseTableFacts;
+    on: Condition<string>;
+    options: JoinOptions;
+  }): ClickHouseRead<Scope, NextTables, Row, Ctes> {
+    for (const side of [this.#state.table, table]) {
+      if (side.kind !== "tenant")
+        throw new QueryBuilderError({ kind: "unjoinable", table: side.name });
     }
-    if (this.#state.latestVersion) throw new QueryBuilderError({ kind: "latest-version-in-join" });
+    checkSource({ scope: this.#state.scope, table });
+    const taken = [this.#state.table, ...this.#state.joins.map((each) => each.table)];
+    if (taken.some((each) => each.name === table.name)) {
+      throw new QueryBuilderError({ kind: "self-join", table: table.name });
+    }
+    if (this.#state.prewhere.length > 0 || this.#state.latestVersion === "prewhere") {
+      throw new QueryBuilderError({ kind: "prewhere-in-join" });
+    }
+    if (options.latestVersion === true && table.versionColumn === undefined) {
+      throw new QueryBuilderError({ kind: "no-version-column", table: table.name });
+    }
+    const join: Join = { kind, table, on: on.node, latestVersion: options.latestVersion === true };
     return this.#next({ joins: [...this.#state.joins, join] });
   }
 
@@ -224,10 +370,18 @@ export class ClickHouseRead<
 
   orderBy(
     target: Expression<unknown, Tables> | (keyof Row & string),
-    direction: "ASC" | "DESC" = "ASC",
+    direction: Direction = "ASC",
   ): ClickHouseRead<Scope, Tables, Row, Ctes> {
     const order = { target: typeof target === "string" ? target : target.node, direction };
     return this.#next({ orderBy: [...this.#state.orderBy, order] });
+  }
+
+  /** `LIMIT count BY …`: light key columns only, never heavy ones (clickhouse-queries.md). */
+  limitBy(
+    count: number,
+    ...by: Expression<unknown, Tables>[]
+  ): ClickHouseRead<Scope, Tables, Row, Ctes> {
+    return this.#next({ limitBy: { count: rowCount(count), by: by.map((each) => each.node) } });
   }
 
   limit(count: number): ClickHouseRead<Scope, Tables, Row, Ctes> {
@@ -241,21 +395,29 @@ export class ClickHouseRead<
   /** `FINAL`, only where the sort key holds the tenant column, so versions never cross tenants. */
   final(): ClickHouseRead<Scope, Tables, Row, Ctes> {
     const { table } = this.#state;
-    if (!table.sortKey.includes(table.tenantColumn)) {
+    if (table.kind !== "tenant" || !table.sortKey.includes(table.tenantColumn)) {
       throw new QueryBuilderError({ kind: "final-without-tenant-key", table: table.name });
     }
     return this.#next({ final: true });
   }
 
-  /** The key-and-version election the latest-version marker renders, under the same scope. */
-  latestVersion(): ClickHouseRead<Scope, Tables, Row, Ctes> {
+  /**
+   * The IN-tuple election of keys and version (clickhouse-queries.md) under the same scope. On a
+   * join it elects the FROM side inside its own subquery; `prewhere` places it in PREWHERE.
+   */
+  latestVersion({ prewhere = false }: { prewhere?: boolean } = {}): ClickHouseRead<
+    Scope,
+    Tables,
+    Row,
+    Ctes
+  > {
     const { table } = this.#state;
     if (table.versionColumn === undefined) {
       throw new QueryBuilderError({ kind: "no-version-column", table: table.name });
     }
-    if (this.#state.joins.length > 0)
-      throw new QueryBuilderError({ kind: "latest-version-in-join" });
-    return this.#next({ latestVersion: true });
+    if (prewhere && this.#state.joins.length > 0)
+      throw new QueryBuilderError({ kind: "prewhere-in-join" });
+    return this.#next({ latestVersion: prewhere ? "prewhere" : "where" });
   }
 
   /** A proof's shared windows, as `{{tenantScope:<TimeColumn>}}` renders them. */
@@ -310,30 +472,75 @@ export class ClickHouseRead<
     return this.#next({ ctes: [...this.#state.ctes, { name, read }] });
   }
 
-  /** A UNION ALL arm under the same scope, selecting the read's keys. */
-  unionAll<ArmTables extends string>(
-    build: (arm: ClickHouseReadStart<Scope>) => ClickHouseRead<Scope, ArmTables, Row, NoCtes>,
+  /**
+   * A UNION ALL arm under the same scope, selecting the read's keys. An arm may carry its own
+   * WITH, order and limit; the read's own order and limit then apply to the whole union.
+   */
+  unionAll<ArmTables extends string, ArmCtes extends Record<string, unknown>>(
+    build: (arm: ClickHouseReadStart<Scope>) => ClickHouseRead<Scope, ArmTables, Row, ArmCtes>,
   ): ClickHouseRead<Scope, Tables, Row, Ctes> {
     const arm = build(new ClickHouseReadStart(this.#state.scope as Scope)).#state;
     return this.#next({ arms: [...this.#state.arms, arm] });
   }
 
+  /** This read as a table another read under the same scope selects from: `FROM (…) AS alias`. */
+  as<const Alias extends string>(
+    alias: Alias,
+  ): ClickHouseTable<Alias, DerivedColumns<Row>, "derived"> {
+    if (!IDENTIFIER.test(alias)) throw new QueryBuilderError({ kind: "bad-alias", name: alias });
+    const { select } = this.#state;
+    if (select.length === 0) throw new QueryBuilderError({ kind: "empty-select" });
+    const facts: ClickHouseTableFacts = {
+      kind: "derived",
+      name: alias,
+      stored: alias,
+      tenantColumn: "",
+      timeColumn: undefined,
+      versionColumn: undefined,
+      sortKey: [],
+      columns: select.map((each) => each.key),
+    };
+    DERIVED.set(facts, this.#state);
+    const refs = Object.fromEntries(
+      select.map((each) => [
+        each.key,
+        refOf({ table: alias, stored: alias, name: each.key, binding: each.binding }),
+      ]),
+    );
+    return { ...refs, $table: facts } as ClickHouseTable<Alias, DerivedColumns<Row>, "derived">;
+  }
+
   build(): StatementOf<Scope, Row> {
     const context = renderContext();
-    const sql = renderStatement({ state: this.#state, context, nested: false });
+    const sql = renderStatement({ state: this.#state, context, nested: false, keys: undefined });
     refuseOverBudget({ statement: sql, params: context.params });
     const { scope } = this.#state;
-    const statement: ClickHouseReadStatement<Row> =
-      scope.kind === "allTenants"
-        ? {
-            identity: "system",
-            sql,
-            params: context.params,
-            settings: { ...PINNED_SETTINGS },
-            reason: scope.reason,
-          }
-        : readerStatement({ scope, sql, params: context.params });
-    // The scope's kind decided the identity above; the conditional type restates it.
+    const { params } = context;
+    let statement: ClickHouseReadStatement<Row> | MetadataReadStatement<Row>;
+    if (scope.kind === "allTenants") {
+      const settings = { ...PINNED_SETTINGS };
+      statement = {
+        identity: "system",
+        kind: "allTenants",
+        sql,
+        params,
+        settings,
+        reason: scope.reason,
+      };
+    } else if (scope.kind === "serverMetadata") {
+      const settings = { ...PINNED_SETTINGS };
+      statement = {
+        identity: "reader",
+        kind: "metadata",
+        sql,
+        params,
+        settings,
+        reason: scope.reason,
+      };
+    } else {
+      statement = readerStatement({ scope, sql, params });
+    }
+    // The scope's kind decided the statement above; the conditional type restates it.
     return statement as StatementOf<Scope, Row>;
   }
 }
@@ -349,6 +556,7 @@ function readerStatement<Row>({
 }): ReaderReadStatement<Row> {
   return {
     identity: "reader",
+    kind: "tenant",
     sql,
     params,
     settings: { ...PINNED_SETTINGS, [TENANT_IDS_SETTING]: scope.tenantIds.join(",") },
@@ -359,109 +567,195 @@ function readerStatement<Row>({
   };
 }
 
-function renderStatement({
-  state,
-  context,
-  nested,
-}: {
+type Render = {
   state: ReadState;
   context: RenderContext;
-  nested: boolean;
-}): string {
+  /** The union's key order an arm selects in; undefined for a read's own selection. */
+  keys: readonly string[] | undefined;
+};
+
+function renderStatement({ state, context, nested, keys }: Render & { nested: boolean }): string {
   if (nested && (state.ctes.length > 0 || state.arms.length > 0)) {
     throw new QueryBuilderError({ kind: "nested-with" });
   }
   const parts: string[] = [];
   if (state.ctes.length > 0) {
-    const ctes = state.ctes.map(
-      (cte) => `${cte.name} AS (${renderStatement({ state: cte.read, context, nested: true })})`,
-    );
+    const ctes = state.ctes.map((cte) => {
+      const body = renderStatement({ state: cte.read, context, nested: true, keys: undefined });
+      return `${cte.name} AS (${body})`;
+    });
     parts.push(`WITH ${ctes.join(", ")}`);
   }
-  parts.push(renderSelect({ state, context, keys: undefined }));
-  parts.push(...renderedArms({ state, context }));
+  parts.push(renderBody({ state, context, keys }));
   return parts.join(" ");
 }
 
 const isOrdered = (state: ReadState): boolean =>
-  state.orderBy.length > 0 || state.limit !== undefined || state.offset !== undefined;
+  state.orderBy.length > 0 ||
+  state.limitBy !== undefined ||
+  state.limit !== undefined ||
+  state.offset !== undefined;
 
-/** The UNION ALL arms, each in the read's key order; neither the read nor an arm is ordered. */
-function renderedArms({ state, context }: { state: ReadState; context: RenderContext }): string[] {
-  if (state.arms.length === 0) return [];
-  if (isOrdered(state)) throw new QueryBuilderError({ kind: "ordered-union" });
-  const keys = state.select.map(([key]) => key);
-  return state.arms.map((arm) => {
-    if (arm.ctes.length > 0 || arm.arms.length > 0) {
-      throw new QueryBuilderError({ kind: "nested-with" });
-    }
-    if (isOrdered(arm)) throw new QueryBuilderError({ kind: "ordered-union" });
-    return `UNION ALL ${renderSelect({ state: arm, context, keys })}`;
+/** A read and its arms; an ordered or limited union is wrapped so the order covers every arm. */
+function renderBody({ state, context, keys }: Render): string {
+  if (state.arms.length === 0) return renderSelect({ state, context, keys });
+  const order = keys ?? state.select.map((each) => each.key);
+  const ordered = isOrdered(state);
+  const head = ordered
+    ? { ...state, orderBy: [], limitBy: undefined, limit: undefined, offset: undefined }
+    : state;
+  const arms = state.arms.map((arm) => {
+    if (arm.arms.length > 0) throw new QueryBuilderError({ kind: "ordered-union" });
+    const text = renderStatement({ state: arm, context, nested: false, keys: order });
+    return arm.ctes.length > 0 || isOrdered(arm) ? `UNION ALL (${text})` : `UNION ALL ${text}`;
   });
+  const union = [renderSelect({ state: head, context, keys }), ...arms].join(" ");
+  if (!ordered) return union;
+  if (state.limitBy !== undefined) throw new QueryBuilderError({ kind: "bad-union-order" });
+  const orders = state.orderBy.map(({ target, direction }) => {
+    if (typeof target !== "string" || !order.includes(target)) {
+      throw new QueryBuilderError({ kind: "bad-union-order" });
+    }
+    return `${target} ${direction}`;
+  });
+  return [
+    `SELECT ${order.join(", ")} FROM (${union})`,
+    orders.length > 0 ? `ORDER BY ${orders.join(", ")}` : "",
+    state.limit === undefined ? "" : `LIMIT ${state.limit}`,
+    state.offset === undefined ? "" : `OFFSET ${state.offset}`,
+  ]
+    .filter((clause) => clause !== "")
+    .join(" ");
 }
 
+/** Every expression a read holds, for its column checks and its join sides' projections. */
+const nodesOf = (state: ReadState): ExpressionNode[] => [
+  ...state.select.map((each) => each.node),
+  ...state.prewhere,
+  ...state.where,
+  ...state.groupBy,
+  ...state.having,
+  ...state.joins.map((join) => join.on),
+  ...state.orderBy.flatMap(({ target }) => (typeof target === "string" ? [] : [target])),
+  ...(state.limitBy?.by ?? []),
+];
+
 /** One SELECT: its own scope predicate on every table it reads, then the caller's clauses. */
-function renderSelect({
-  state,
-  context,
-  keys,
-}: {
-  state: ReadState;
-  context: RenderContext;
-  keys: readonly string[] | undefined;
-}): string {
+function renderSelect({ state, context, keys }: Render): string {
   const tables = [state.table, ...state.joins.map((join) => join.table)];
   const qualify = state.joins.length > 0;
   const render = (node: ExpressionNode) => renderExpression({ node, context, qualify });
   refuseForeignColumns({ state, tables });
+  if (qualify && [...state.where, ...state.having].some(holdsIdBound)) {
+    throw new QueryBuilderError({ kind: "id-bound-in-join" });
+  }
   const selection = selectionOf({ state, tables, keys });
 
-  const list = selection.map(([key, node]) => {
+  const list = selection.map(({ key, node }) => {
     const rendered = render(node);
     const bare = node.kind === "column" && node.name === key && !qualify;
     return bare ? rendered : `${rendered} AS ${key}`;
   });
-  const source = sourceOf({ state, context, render });
-  const where = [
-    ...(source.predicate === undefined ? [] : [source.predicate]),
-    ...state.where.map(render),
-    ...(state.latestVersion ? [electionOf({ state, context })] : []),
-  ];
+  const source = sourceOf({ state, context });
+  const { prewhere, where } = filtersOf({ state, context, render, predicate: source.predicate });
   const clauses = [
-    `SELECT ${list.join(", ")}`,
-    `FROM ${source.from}`,
+    `SELECT ${state.distinct ? "DISTINCT " : ""}${list.join(", ")}`,
+    source.from === undefined ? "" : `FROM ${source.from}`,
+    prewhere.length > 0 ? `PREWHERE ${prewhere.join(" AND ")}` : "",
     where.length > 0 ? `WHERE ${where.join(" AND ")}` : "",
-    state.groupBy.length > 0 ? `GROUP BY ${state.groupBy.map(render).join(", ")}` : "",
-    orderClauseOf({ state, selection, render }),
-    state.limit === undefined ? "" : `LIMIT ${state.limit}`,
-    state.offset === undefined ? "" : `OFFSET ${state.offset}`,
+    ...tailClausesOf({ state, selection, render }),
   ];
   return clauses.filter((clause) => clause !== "").join(" ");
 }
 
-/** The FROM clause, and the scope's predicate on a one-table read; join sides carry their own. */
-function sourceOf({
+/** PREWHERE and WHERE: the scope's predicate first, then the caller's, then any election. */
+function filtersOf({
   state,
   context,
   render,
+  predicate,
 }: {
   state: ReadState;
   context: RenderContext;
   render: (node: ExpressionNode) => string;
-}): { from: string; predicate: string | undefined } {
+  predicate: string | undefined;
+}): { prewhere: string[]; where: string[] } {
+  const election =
+    state.latestVersion !== undefined && state.joins.length === 0
+      ? electionOf({ state, table: state.table, context })
+      : undefined;
+  const elected = (clause: "where" | "prewhere") =>
+    state.latestVersion === clause && election !== undefined ? [election] : [];
+  return {
+    prewhere: [...state.prewhere.map(render), ...elected("prewhere")],
+    where: [
+      ...(predicate === undefined ? [] : [predicate]),
+      ...state.where.map(render),
+      ...elected("where"),
+    ],
+  };
+}
+
+/** GROUP BY, HAVING, ORDER BY, LIMIT BY, LIMIT and OFFSET, each empty when not asked for. */
+function tailClausesOf({
+  state,
+  selection,
+  render,
+}: {
+  state: ReadState;
+  selection: readonly Selected[];
+  render: (node: ExpressionNode) => string;
+}): string[] {
+  const { limitBy } = state;
+  return [
+    state.groupBy.length > 0 ? `GROUP BY ${state.groupBy.map(render).join(", ")}` : "",
+    state.having.length > 0 ? `HAVING ${state.having.map(render).join(" AND ")}` : "",
+    orderClauseOf({ state, selection, render }),
+    limitBy === undefined ? "" : `LIMIT ${limitBy.count} BY ${limitBy.by.map(render).join(", ")}`,
+    state.limit === undefined ? "" : `LIMIT ${state.limit}`,
+    state.offset === undefined ? "" : `OFFSET ${state.offset}`,
+  ];
+}
+
+/** The FROM clause, and the scope's predicate on a one-table read; join sides carry their own. */
+function sourceOf({ state, context }: { state: ReadState; context: RenderContext }): {
+  from: string | undefined;
+  predicate: string | undefined;
+} {
+  const { table } = state;
+  if (table === NO_TABLE) return { from: undefined, predicate: undefined };
   if (state.joins.length === 0) {
+    const derived = DERIVED.get(table);
+    if (derived !== undefined) {
+      const body = renderStatement({ state: derived, context, nested: false, keys: undefined });
+      return { from: `(${body}) AS ${table.name}`, predicate: undefined };
+    }
+    const alias = table.name === table.stored ? "" : ` AS ${table.name}`;
     return {
-      from: `${state.table.name}${state.final ? " FINAL" : ""}`,
-      predicate: tenantPredicate({ state, table: state.table, context, election: false }),
+      from: `${table.stored}${alias}${state.final ? " FINAL" : ""}`,
+      predicate: tenantPredicate({ state, table, context, election: false }),
     };
   }
   // The FROM side binds its parameters before the joined sides, in text order.
-  const first = joinSide({ state, table: state.table, context });
+  const first = joinSide({
+    state,
+    table,
+    context,
+    final: state.final,
+    latestVersion: state.latestVersion !== undefined,
+  });
   const joined = state.joins.map((join) => {
-    const left = `${state.table.name}.${state.table.tenantColumn}`;
+    const left = `${table.name}.${table.tenantColumn}`;
     const right = `${join.table.name}.${join.table.tenantColumn}`;
-    const side = joinSide({ state, table: join.table, context });
-    return `${join.kind} JOIN ${side} ON ${left} = ${right} AND ${render(join.on)}`;
+    const side = joinSide({
+      state,
+      table: join.table,
+      context,
+      final: false,
+      latestVersion: join.latestVersion,
+    });
+    const on = renderExpression({ node: join.on, context, qualify: true });
+    return `${join.kind} JOIN ${side} ON ${left} = ${right} AND ${on}`;
   });
   return { from: [first, ...joined].join(" "), predicate: undefined };
 }
@@ -472,11 +766,11 @@ function orderClauseOf({
   render,
 }: {
   state: ReadState;
-  selection: readonly (readonly [string, ExpressionNode])[];
+  selection: readonly Selected[];
   render: (node: ExpressionNode) => string;
 }): string {
   if (state.orderBy.length === 0) return "";
-  const keys = new Set(selection.map(([key]) => key));
+  const keys = new Set(selection.map(({ key }) => key));
   const orders = state.orderBy.map(({ target, direction }) => {
     if (typeof target !== "string") return `${render(target)} ${direction}`;
     if (!keys.has(target)) throw new QueryBuilderError({ kind: "bad-alias", name: target });
@@ -492,21 +786,17 @@ function refuseForeignColumns({
   state: ReadState;
   tables: readonly ClickHouseTableFacts[];
 }) {
-  const nodes = [
-    ...state.select.map(([, node]) => node),
-    ...state.where,
-    ...state.groupBy,
-    ...state.joins.map((join) => join.on),
-    ...state.orderBy.flatMap(({ target }) => (typeof target === "string" ? [] : [target])),
-  ];
-  for (const { table, name } of nodes.flatMap(columnsOf)) {
+  for (const { table, name } of nodesOf(state).flatMap(columnsOf)) {
     if (!tables.some((each) => each.name === table)) {
       throw new QueryBuilderError({ kind: "foreign-column", table, column: name });
     }
   }
 }
 
-/** The selection in the order asked for, refusing an alias that would shadow a declared column. */
+/**
+ * The selection in the order asked for, refusing an alias that would shadow a column of a tenant
+ * table the read names: the scope predicate reads those columns by their bare names.
+ */
 function selectionOf({
   state,
   tables,
@@ -515,26 +805,27 @@ function selectionOf({
   state: ReadState;
   tables: readonly ClickHouseTableFacts[];
   keys: readonly string[] | undefined;
-}): (readonly [string, ExpressionNode])[] {
+}): Selected[] {
   if (state.select.length === 0) throw new QueryBuilderError({ kind: "empty-select" });
-  const declared = new Set(tables.flatMap((table) => table.columns));
-  for (const [key, node] of state.select) {
+  const declared = new Set(
+    tables.filter((table) => table.kind === "tenant").flatMap((table) => table.columns),
+  );
+  for (const { key, node } of state.select) {
     if (!IDENTIFIER.test(key)) throw new QueryBuilderError({ kind: "bad-alias", name: key });
     const same = node.kind === "column" && node.name === key;
     if (declared.has(key) && !same)
       throw new StatementScopeError({ kind: "shadowing-alias", name: key });
   }
   if (keys === undefined) return [...state.select];
-  const received = new Map(state.select);
+  const received = new Map(state.select.map((each) => [each.key, each]));
   const ordered = keys.flatMap((key) => {
-    const node = received.get(key);
-    return node === undefined ? [] : [[key, node] as const];
+    const each = received.get(key);
+    return each === undefined ? [] : [each];
   });
   if (ordered.length !== keys.length || received.size !== keys.length) {
-    const expected = keys.join(", ");
     throw new QueryBuilderError({
       kind: "union-mismatch",
-      expected,
+      expected: keys.join(", "),
       received: [...received.keys()].join(", "),
     });
   }
@@ -546,32 +837,29 @@ function joinSide({
   state,
   table,
   context,
+  final,
+  latestVersion,
 }: {
   state: ReadState;
   table: ClickHouseTableFacts;
   context: RenderContext;
+  final: boolean;
+  latestVersion: boolean;
 }): string {
-  const nodes = [
-    ...state.select.map(([, node]) => node),
-    ...state.where,
-    ...state.groupBy,
-    ...state.joins.map((join) => join.on),
-    ...state.orderBy.flatMap(({ target }) => (typeof target === "string" ? [] : [target])),
-  ];
   const read = new Set(
-    nodes
+    nodesOf(state)
       .flatMap(columnsOf)
       .filter((each) => each.table === table.name)
       .map((each) => each.name),
   );
-  const projected = table.columns.filter(
-    (name) => name === table.tenantColumn || read.has(name) || read.has("*"),
-  );
-  const isFrom = table.name === state.table.name;
-  const predicate = tenantPredicate({ state, table, context, election: false });
-  const where = predicate === undefined ? "" : ` WHERE ${predicate}`;
-  const final = isFrom && state.final ? " FINAL" : "";
-  return `(SELECT ${projected.join(", ")} FROM ${table.name}${final}${where}) AS ${table.name}`;
+  const projected = table.columns.filter((name) => name === table.tenantColumn || read.has(name));
+  const where = [
+    tenantPredicate({ state, table, context, election: false }),
+    ...(latestVersion ? [electionOf({ state, table, context })] : []),
+  ].filter((each) => each !== undefined);
+  const filter = where.length > 0 ? ` WHERE ${where.join(" AND ")}` : "";
+  const stored = `${table.stored}${final ? " FINAL" : ""}`;
+  return `(SELECT ${projected.join(", ")} FROM ${stored}${filter}) AS ${table.name}`;
 }
 
 /**
@@ -590,8 +878,11 @@ function tenantPredicate({
   election: boolean;
 }): string | undefined {
   const { scope, tenancy } = state;
+  // A derived table's own read carries the predicate; a system table holds no tenant rows.
+  if (table.kind !== "tenant") return undefined;
   switch (scope.kind) {
     case "allTenants":
+    case "serverMetadata":
       return undefined;
     case "single":
       context.params.tenantId = scope.tenantId;
@@ -621,33 +912,26 @@ function tenantPredicate({
     const held =
       tenancy.held === undefined
         ? undefined
-        : { kind: tenancy.held.kind, param: paramOf({ node: tenancy.held.node, context }) };
+        : { kind: tenancy.held.kind, param: paramNameOf({ node: tenancy.held.node, context }) };
     expression = conditionsExpression({ fence, column, held });
   }
   Object.assign(context.params, expression.params);
   return expression.sql;
 }
 
-/** Binds a value node and returns its parameter name, for a renderer that writes its own slot. */
-function paramOf({
-  node,
-  context,
-}: {
-  node: ExpressionNode & { kind: "value" };
-  context: RenderContext;
-}): string {
-  slotOf({ node, context });
-  const name = context.slots.get(node);
-  if (name === undefined) throw new Error("a bound value holds a parameter name");
-  return name;
-}
-
 /**
  * The latest-version election: keys and version from the descriptor, under the fence's
- * latest-version form, repeating the read's conjuncts that filter on key columns alone.
+ * latest-version form, repeating the read's conjuncts that filter on that table's keys alone.
  */
-function electionOf({ state, context }: { state: ReadState; context: RenderContext }): string {
-  const { table } = state;
+function electionOf({
+  state,
+  table,
+  context,
+}: {
+  state: ReadState;
+  table: ClickHouseTableFacts;
+  context: RenderContext;
+}): string {
   const version = table.versionColumn ?? "";
   const keys = table.sortKey;
   const filtersKeys = (node: ExpressionNode) => {
@@ -663,12 +947,12 @@ function electionOf({ state, context }: { state: ReadState; context: RenderConte
   const where: string[] = [];
   const predicate = tenantPredicate({ state, table, context, election: true });
   if (predicate !== undefined) where.push(predicate);
-  for (const node of state.where.filter(filtersKeys)) {
+  for (const node of [...state.prewhere, ...state.where].filter(filtersKeys)) {
     where.push(renderExpression({ node, context, qualify: false }));
   }
   const filter = where.length > 0 ? ` WHERE ${where.join(" AND ")}` : "";
   return (
-    `(${[...keys, version].join(", ")}) IN (SELECT ${keys.join(", ")}, max(${version}) FROM ${table.name}` +
+    `(${[...keys, version].join(", ")}) IN (SELECT ${keys.join(", ")}, max(${version}) FROM ${table.stored}` +
     `${filter} GROUP BY ${keys.join(", ")})`
   );
 }
