@@ -23,10 +23,7 @@ import { TraceSummaryService } from "../../../features/read/services/trace-summa
 import { SpanStorageClickHouseRepository } from "../span-storage.repository.ts";
 import { ClickHouseTraceSpanRepository } from "../trace-span.repository.ts";
 import { TraceSummaryClickHouseRepository } from "../trace-summary.repository.ts";
-import {
-  authorizedClickHouseFor,
-  traceQueryClientFor,
-} from "./support/authorized-clickhouse.support.ts";
+import { traceQueryClientFor } from "./support/authorized-clickhouse.support.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
@@ -160,7 +157,6 @@ const settings = { async_insert: 0, wait_for_async_insert: 0 } as const;
 beforeAll(async () => {
   if (!clickHouseConfigured) return;
   ch = await startMigratedTraceClickHouse();
-  const clickhouse = authorizedClickHouseFor(ch);
   summaries = TraceSummaryService.create({
     repository: TraceSummaryClickHouseRepository.create({
       resolveClient: async () => ch,
@@ -176,7 +172,6 @@ beforeAll(async () => {
   });
   totals = TraceBraidedTotalsService.create({
     reads: ClickHouseTraceBraidReadsRepository.create({
-      clickhouse,
       reader: traceQueryClientFor(ch),
     }),
     prices: { estimateCost: () => 0 },

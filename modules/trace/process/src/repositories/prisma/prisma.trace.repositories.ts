@@ -90,7 +90,6 @@ export class PostgresTraceRepositories {
       spanStorage: SpanStorageClickHouseRepository.create(summaries),
       spanTree: ClickHouseTraceSpanRepository.create({ clickhouse: members.clickhouse }),
       braidReads: ClickHouseTraceBraidReadsRepository.create({
-        clickhouse,
         reader: members.clickhouse,
       }),
       existence: ClickHouseTraceExistenceRepository.create({ clickhouse: members.clickhouse }),
@@ -101,7 +100,7 @@ export class PostgresTraceRepositories {
       logRecords: LogRecordStorageClickHouseRepository.create({ reader: members.clickhouse }),
       topicNames: PrismaTraceTopicNamesRepository.create(members.prisma),
       instantEvalRuns: ClickHouseTraceInstantEvalRunsRepository.create({
-        resolveClient: traceClickHouse,
+        reader: members.clickhouse,
       }),
       evaluationRuns: ClickHouseTraceEvaluationRunsRepository.create({
         ...storage,

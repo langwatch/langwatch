@@ -7,6 +7,7 @@ import {
   tenantScope,
   type Condition,
   type ConditionOps,
+  type Expression,
 } from "@langwatch/clickhouse-client/builder";
 import { nowInstant } from "@langwatch/time";
 import {
@@ -550,6 +551,13 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
 
   /** The tree's summary columns, for a statement of the module's own reading the same nodes. */
   static readonly summarySelect: string = summarySelect;
+
+  /** The tree's summary columns as a built selection, the owner named under a braided proof. */
+  static summarySelection(
+    authorization: Authorization,
+  ): Record<string, Expression<unknown, typeof spans.$table.name>> {
+    return summarySelectionFor(authorization);
+  }
 
   /** Rows selected with `summarySelect`, mapped as the tree maps them. */
   static summaryRecordsOf({

@@ -4,7 +4,6 @@
  * Spec: modules/trace/specs/braided-spans.feature
  */
 import type { Authorization, CompiledWhere } from "@langwatch/authorization";
-import { AuthorizedClickHouse } from "@langwatch/clickhouse-client";
 import {
   idIndexedClientDouble,
   type ScriptedStatements,
@@ -51,14 +50,13 @@ function braidReads(rows: Record<string, unknown>[] = []) {
       }),
     },
   });
-  const clickhouse = new AuthorizedClickHouse({ resolveClient: async () => queryClient });
   const read = (): Statement => {
     const found = statements.find(({ sql }) => /FROM (stored_spans|trace_summaries)/.test(sql));
     if (found === undefined) throw new Error("no braid statement was sent");
     return found;
   };
   return {
-    repo: ClickHouseTraceBraidReadsRepository.create({ clickhouse, reader: queryClient }),
+    repo: ClickHouseTraceBraidReadsRepository.create({ reader: queryClient }),
     read,
   };
 }
@@ -70,6 +68,20 @@ function fencedProjects({ params }: Statement): string[] {
     .flatMap(([, value]) => (Array.isArray(value) ? value : [value]))
     .filter((value): value is string => value === READER || value === OWNER);
   return [...new Set(named)];
+}
+
+/** The values a statement binds under parameters whose generated name ends with `suffix`. */
+function boundUnder({ params }: Statement, suffix: string): unknown[] {
+  return Object.entries(params)
+    .filter(([name]) => name.endsWith(suffix))
+    .map(([, value]) => value);
+}
+
+/** The epoch-ms instants a statement binds, every window edge and floor among them. */
+function boundInstants({ params }: Statement): number[] {
+  return Object.values(params)
+    .filter((value): value is number => typeof value === "number" && value > 1_000_000_000_000)
+    .toSorted((a, b) => a - b);
 }
 
 const activityRead = (overrides: Partial<BraidActivityRead> = {}): BraidActivityRead => ({
@@ -145,11 +157,8 @@ describe("ClickHouseTraceBraidReadsRepository", () => {
         exampleTraceId: "trace-2",
       });
       expect(fencedProjects(statement)).toEqual([OWNER]);
-      expect(statement.params).toMatchObject({
-        traceIds: ["trace-1", "trace-2"],
-        braid_reader: READER,
-        braidSigned_reader: READER,
-      });
+      expect(Object.values(statement.params)).toContainEqual(["trace-1", "trace-2"]);
+      expect(boundUnder(statement, "_reader")).toEqual([READER, READER]);
     });
 
     it("binds every key and literal of the condition, never writing one into the text", async () => {
@@ -158,10 +167,8 @@ describe("ClickHouseTraceBraidReadsRepository", () => {
       expect(statement.sql).not.toMatch(/'(web|orchestrator|sig)'/);
       expect(statement.sql).not.toContain(READER);
       expect(statement.sql).toContain("argMax(");
-      expect(statement.params).toMatchObject({
-        braid_k: expect.arrayContaining(["orchestrator"]),
-        braid_v: ["web"],
-      });
+      expect(boundUnder(statement, "_k")).toContainEqual(expect.arrayContaining(["orchestrator"]));
+      expect(boundUnder(statement, "_v")).toContainEqual(["web"]);
     });
 
     describe("and the reader already has live braids from the owner", () => {
@@ -185,15 +192,13 @@ describe("ClickHouseTraceBraidReadsRepository", () => {
         });
 
         expect(fencedProjects(statement)).toEqual([OWNER]);
-        expect(statement.params).toMatchObject({
-          live0_fromMs: 1_600_000_000_000,
-          live0_untilMs: 1_650_000_000_000,
-          live0_v: ["web"],
-          live1_fromMs: 1_660_000_000_000,
-          braid_fromMs: 1_700_000_000_000,
-        });
-        expect(statement.params).not.toHaveProperty("live1_untilMs");
-        expect(statement.sql).toContain("{live0_untilMs:Int64}");
+        // Each edge binds once per braid: live1's open end and the draft's bind no upper edge.
+        expect(boundInstants(statement)).toEqual([
+          1_600_000_000_000, 1_650_000_000_000, 1_660_000_000_000, 1_699_000_000_000,
+          1_700_000_000_000, 1_700_000_000_000,
+        ]);
+        expect(boundUnder(statement, "_v")).toContainEqual(["web"]);
+        expect(statement.sql).toMatch(/StartTime < fromUnixTimestamp64Milli\(\{v\d+:Int64\}\)/);
         expect(statement.sql).not.toMatch(/'(web|orchestrator|sig)'/);
         expect(statement.sql).toContain("AS exampleTraceId");
       });
@@ -214,7 +219,9 @@ describe("ClickHouseTraceBraidReadsRepository", () => {
       expect(keys).toEqual([{ key: "orchestrator", spanCount: 6 }]);
       expect(fencedProjects(read())).toEqual([OWNER]);
       expect(read().sql).not.toContain("langwatch.reserved.");
-      expect(read().params).toMatchObject({ excludedPrefix: "langwatch.reserved.", limit: 200 });
+      expect(Object.values(read().params)).toContain("langwatch.reserved.");
+      expect(read().sql).toContain("arrayJoin(mapKeys(SpanAttributes))");
+      expect(read().sql).toContain("LIMIT 200");
     });
   });
 
@@ -231,12 +238,11 @@ describe("ClickHouseTraceBraidReadsRepository", () => {
       expect(counts).toEqual(new Map([["braid_web", 7]]));
       expect(fencedProjects(read())).toEqual([OWNER]);
       expect(read().sql).not.toMatch(/'(web|orchestrator|sig)'/);
-      expect(read().params).toMatchObject({
-        a0_v: ["web"],
-        a0_reader: READER,
-        a0_fromMs: 1_700_000_000_000,
-        a0_untilMs: 1_700_000_100_000,
-      });
+      expect(boundUnder(read(), "_v")).toEqual([["web"]]);
+      expect(boundUnder(read(), "_reader")).toEqual([READER]);
+      expect(boundInstants(read())).toEqual([
+        1_700_000_000_000, 1_700_000_000_000, 1_700_000_100_000,
+      ]);
     });
   });
 
@@ -255,14 +261,13 @@ describe("ClickHouseTraceBraidReadsRepository", () => {
       });
 
       const [outer = ""] = read().sql.split("SELECT TenantId, TraceId, SpanId, max(UpdatedAt)");
-      expect(outer).toContain(
-        "TraceId IN (SELECT TraceId FROM stored_spans WHERE TenantId IN ({tenantScope_own:Array(String)})" +
-          " AND StartTime >= fromUnixTimestamp64Milli({tenantScope_heldFrom:Int64})" +
-          " AND StartTime >= fromUnixTimestamp64Milli({sinceMs:Int64}))",
+      const held = outer.match(
+        /TraceId IN \(SELECT TraceId FROM stored_spans WHERE TenantId IN \(\{tenantScope_own:Array\(String\)\}\) AND StartTime >= fromUnixTimestamp64Milli\(\{tenantScope_heldFrom:Int64\}\) AND StartTime >= fromUnixTimestamp64Milli\(\{(v\d+):Int64\}\)\)/,
       );
+      expect(held?.[1]).toBeDefined();
       expect(read().params).toMatchObject({
         tenantScope_own: [READER],
-        sinceMs: 1_700_000_000_000,
+        [held?.[1] ?? "unbound"]: 1_700_000_000_000,
       });
     });
 
@@ -309,20 +314,25 @@ describe("ClickHouseTraceBraidReadsRepository", () => {
 
       expect(read().sql).toContain("AS Braided");
       expect(fencedProjects(read())).toEqual([OWNER]);
-      expect(read().params).toMatchObject({
-        traceId: "trace-1",
-        braid0_v: ["web"],
-        braid0_untilMs: 1_650_000_000_000,
-        braid1_v: ["web"],
-        braid1_fromMs: 1_700_000_000_000,
-      });
+      expect(Object.values(read().params)).toContain("trace-1");
+      expect(boundUnder(read(), "_v")).toEqual([["web"], ["web"]]);
+      expect(boundInstants(read())).toEqual([
+        1_600_000_000_000, 1_650_000_000_000, 1_700_000_000_000,
+      ]);
       expect(read().sql).not.toContain("'web'");
     });
   });
 
   describe("when the trace header sums one trace's spans", () => {
     const rows = [
-      { TenantId: READER, HasCost: 0, SpanCount: "4", StartMs: "1000", EndMs: "1500", Cost: 0 },
+      {
+        TenantId: READER,
+        HasCost: 0,
+        SpanCount: "4",
+        StartMs: "1000",
+        EndMs: "1500",
+        UsageCost: 0,
+      },
       {
         TenantId: OWNER,
         HasCost: 1,
@@ -331,7 +341,7 @@ describe("ClickHouseTraceBraidReadsRepository", () => {
         EndMs: "1900",
         InputTokens: 30,
         OutputTokens: 7,
-        Cost: 0.2,
+        UsageCost: 0.2,
       },
       {
         TenantId: OWNER,
@@ -341,7 +351,7 @@ describe("ClickHouseTraceBraidReadsRepository", () => {
         EndMs: "1300",
         InputTokens: 10,
         OutputTokens: 5,
-        Cost: 0,
+        UsageCost: 0,
         Model: "gpt-5-mini",
         ResponseModel: "",
         CacheReadTokens: 3,
@@ -359,12 +369,17 @@ describe("ClickHouseTraceBraidReadsRepository", () => {
         traceId: "trace-1",
       });
 
-      expect(read().sql).toMatch(/GROUP BY TenantId, HasCost/);
+      expect(read().sql).toMatch(/\) GROUP BY TenantId, toFloat64OrZero\(SpanAttributes\[/);
       expect(read().sql).toContain("{tenantScope_c0_ids:Array(String)}");
       expect(read().sql).not.toMatch(/TenantId\s*(=|IN)\s*\{(?!tenantScope)/);
       expect(read().sql).not.toMatch(/'(web|orchestrator)'/);
-      expect(read().params).toMatchObject({ traceId: "trace-1", tenantScope_own: [READER] });
-      expect(read().sql).toContain("AND TraceId = {traceId:String})");
+      expect(read().params).toMatchObject({
+        tenantScope_own: [READER],
+        tenantScope_c0_ids: [OWNER],
+        tenantScope_p0_v: ["web"],
+      });
+      expect(fencedProjects(read()).toSorted()).toEqual([READER, OWNER].toSorted());
+      expect(read().sql).toMatch(/AND TraceId = \{v\d+:String\}\) AND \(\(TenantId IN/);
       expect(groups.filter((group) => group.tenantId === OWNER)).toEqual([
         expect.objectContaining({ spanCount: 2, explicitCost: 0.2, costInput: null }),
         expect.objectContaining({

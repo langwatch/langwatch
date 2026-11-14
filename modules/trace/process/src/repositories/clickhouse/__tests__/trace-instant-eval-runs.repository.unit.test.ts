@@ -2,41 +2,51 @@
  * Trace's read of instant-eval's shared `instant_eval_runs`.
  * @see specs/traces-v2/instant-eval-search.feature
  */
-import { describe, expect, it, vi } from "vitest";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
+import { describe, expect, it } from "vitest";
 
 import { ClickHouseTraceInstantEvalRunsRepository } from "../trace-instant-eval-runs.repository.ts";
 
-type ChQuery = { query: string; query_params?: Record<string, unknown> };
+type ReadRequest = Parameters<ClickHouseQueryClient["read"]>[0];
 
-function client(rows: unknown[] = []) {
-  const query = vi.fn(async (_request: ChQuery) => ({ json: async () => rows }));
-  return { query, insert: vi.fn() };
+function repositoryOver(rows: unknown[] = []) {
+  const reads: ReadRequest[] = [];
+  const repository = ClickHouseTraceInstantEvalRunsRepository.create({
+    reader: clickHouseQueryClientDouble({
+      read: async (request: ReadRequest) => {
+        reads.push(request);
+        return { rows };
+      },
+    }),
+  });
+  return { repository, reads };
 }
 
 describe("given the runs an Explorer read's chips claim", () => {
   describe("when trace reads them from instant-eval's table", () => {
     it("reads the latest version of each named run inside the project", async () => {
-      const ch = client([]);
-      const repository = ClickHouseTraceInstantEvalRunsRepository.create({
-        resolveClient: async () => ch as never,
-      });
+      const { repository, reads } = repositoryOver([]);
 
       await repository.findRunsByIds({ projectId: "project-1", runIds: ["run-1", "run-1"] });
 
-      const request = ch.query.mock.calls[0]?.[0];
-      expect(request?.query).toContain("FROM instant_eval_runs AS t");
-      expect(request?.query).toContain("max((WrittenAt, ifNull(AcceptedAt");
-      expect(request?.query_params).toEqual({ tenantId: "project-1", runIds: ["run-1"] });
+      const request = reads[0];
+      expect(request?.table).toBe("instant_eval_runs");
+      expect(request?.statement).toMatchObject({
+        kind: "tenant",
+        identity: "reader",
+        settings: { SQL_langwatch_tenant_ids: "project-1" },
+      });
+      expect(request?.statement.sql).toContain("max(tuple(WrittenAt, ifNull(AcceptedAt");
+      expect(request?.statement.sql).toContain("LIMIT 1 BY RunId");
+      expect(Object.values(request?.statement.params ?? {})).toContainEqual(["run-1"]);
     });
 
     it("maps a run still judging to no finish", async () => {
-      const ch = client([
-        { RunId: "run-1", CreatedAt: "1758189600000", FinishedAt: "1758193200000" },
-        { RunId: "run-2", CreatedAt: 1758189600000, FinishedAt: null },
+      const { repository } = repositoryOver([
+        { RunId: "run-1", CreatedAtMs: "1758189600000", FinishedAtMs: "1758193200000" },
+        { RunId: "run-2", CreatedAtMs: 1758189600000, FinishedAtMs: null },
       ]);
-      const repository = ClickHouseTraceInstantEvalRunsRepository.create({
-        resolveClient: async () => ch as never,
-      });
 
       const rows = await repository.findRunsByIds({
         projectId: "project-1",
@@ -51,13 +61,10 @@ describe("given the runs an Explorer read's chips claim", () => {
     });
 
     it("asks nothing when no run is named", async () => {
-      const ch = client([]);
-      const repository = ClickHouseTraceInstantEvalRunsRepository.create({
-        resolveClient: async () => ch as never,
-      });
+      const { repository, reads } = repositoryOver([]);
 
       expect(await repository.findRunsByIds({ projectId: "project-1", runIds: [] })).toEqual([]);
-      expect(ch.query).not.toHaveBeenCalled();
+      expect(reads).toEqual([]);
     });
   });
 });

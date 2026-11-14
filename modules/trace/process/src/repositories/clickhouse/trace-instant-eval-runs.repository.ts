@@ -2,6 +2,8 @@
  * Instant-eval's `instant_eval_runs`, shared with trace for reading: each run
  * collapsed to its latest version, as instant-eval's own lookup collapses it.
  */
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import { clickhouseRead, fn, param, tenantScope } from "@langwatch/clickhouse-client/builder";
 import { Temporal } from "@langwatch/time";
 import { z } from "zod";
 
@@ -9,23 +11,48 @@ import {
   type TraceInstantEvalRunRow,
   TraceInstantEvalRunsReadRepository,
 } from "../trace-instant-eval-runs.repository.ts";
-import type { TraceClickHouseResolver } from "./clickhouse.trace-member-client.repository.ts";
+import { instantEvalRuns } from "./clickhouse.instant-eval-runs.table.ts";
 import { chNumber, chString } from "./stored-span-row.mapper.ts";
 
-const INSTANT_EVAL_RUNS_TABLE = "instant_eval_runs" as const;
-
 const runRowsSchema = z.array(
-  z.looseObject({ RunId: chString, CreatedAt: chNumber, FinishedAt: chNumber.nullable() }),
+  z.looseObject({ RunId: chString, CreatedAtMs: chNumber, FinishedAtMs: chNumber.nullable() }),
 );
+
+/** Each named run's latest version, elected on instant-eval's own tuple version. */
+function runsByIdsStatement({
+  projectId,
+  runIds,
+}: {
+  projectId: string;
+  runIds: readonly string[];
+}) {
+  return clickhouseRead({ scope: tenantScope.single({ tenantId: projectId }) })
+    .from(instantEvalRuns)
+    .select({
+      RunId: instantEvalRuns.RunId,
+      CreatedAtMs: fn.toUnixTimestamp64Milli(instantEvalRuns.CreatedAt),
+      FinishedAtMs: fn.toUnixTimestamp64Milli(instantEvalRuns.FinishedAt),
+    })
+    .where(({ oneOf }) => oneOf(instantEvalRuns.RunId, [...new Set(runIds)]))
+    .latestVersion({
+      version: fn.tuple(
+        instantEvalRuns.WrittenAt,
+        fn.ifNull(instantEvalRuns.AcceptedAt, fn.toDateTime64(param.uint32(0), 3)),
+        instantEvalRuns.LastEventId,
+      ),
+    })
+    .limitBy(1, instantEvalRuns.RunId)
+    .build();
+}
 
 export class ClickHouseTraceInstantEvalRunsRepository extends TraceInstantEvalRunsReadRepository {
   static create(options: {
-    resolveClient: TraceClickHouseResolver;
+    reader: Pick<ClickHouseQueryClient, "read">;
   }): ClickHouseTraceInstantEvalRunsRepository {
-    return new ClickHouseTraceInstantEvalRunsRepository(options.resolveClient);
+    return new ClickHouseTraceInstantEvalRunsRepository(options.reader);
   }
 
-  private constructor(private readonly resolveClient: TraceClickHouseResolver) {
+  private constructor(private readonly reader: Pick<ClickHouseQueryClient, "read">) {
     super();
   }
 
@@ -37,33 +64,16 @@ export class ClickHouseTraceInstantEvalRunsRepository extends TraceInstantEvalRu
     runIds: readonly string[];
   }): Promise<TraceInstantEvalRunRow[]> {
     if (runIds.length === 0) return [];
-    const client = await this.resolveClient(projectId);
-    const result = await client.query({
-      query: `
-        SELECT
-          t.RunId AS RunId,
-          toUnixTimestamp64Milli(t.CreatedAt) AS CreatedAt,
-          toUnixTimestamp64Milli(t.FinishedAt) AS FinishedAt
-        FROM ${INSTANT_EVAL_RUNS_TABLE} AS t
-        WHERE t.TenantId = {tenantId:String}
-          AND t.RunId IN ({runIds:Array(String)})
-          AND (t.TenantId, t.RunId, (t.WrittenAt, ifNull(t.AcceptedAt, toDateTime64(0, 3)), t.LastEventId)) IN (
-            SELECT TenantId, RunId, max((WrittenAt, ifNull(AcceptedAt, toDateTime64(0, 3)), LastEventId))
-            FROM ${INSTANT_EVAL_RUNS_TABLE}
-            WHERE TenantId = {tenantId:String}
-              AND RunId IN ({runIds:Array(String)})
-            GROUP BY TenantId, RunId
-          )
-        LIMIT 1 BY t.RunId
-      `,
-      query_params: { tenantId: projectId, runIds: [...new Set(runIds)] },
-      format: "JSONEachRow",
+    const result = await this.reader.read({
+      // ID_BOUND_SKIP: a lookup by run id on instant-eval's own sort key.
+      statement: runsByIdsStatement({ projectId, runIds }),
+      table: instantEvalRuns.$table.name,
     });
-    return runRowsSchema.parse(await result.json()).map((row) => ({
+    return runRowsSchema.parse(result.rows).map((row) => ({
       runId: row.RunId,
-      createdAt: Temporal.Instant.fromEpochMilliseconds(row.CreatedAt),
+      createdAt: Temporal.Instant.fromEpochMilliseconds(row.CreatedAtMs),
       finishedAt:
-        row.FinishedAt === null ? null : Temporal.Instant.fromEpochMilliseconds(row.FinishedAt),
+        row.FinishedAtMs === null ? null : Temporal.Instant.fromEpochMilliseconds(row.FinishedAtMs),
     }));
   }
 }

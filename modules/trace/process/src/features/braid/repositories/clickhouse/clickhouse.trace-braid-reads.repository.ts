@@ -1,6 +1,6 @@
 /**
  * The braid dialog's and the Braids page's statements (ADR-201 §7). Each reads one project
- * under that project's own proof; a condition renders through `braidConditionExpression`, so
+ * under that project's own proof; a condition renders through the builder's `braidCondition`, so
  * every key and literal is a bound parameter.
  */
 import {
@@ -8,21 +8,18 @@ import {
   type Authorization,
   type CompiledWhere,
 } from "@langwatch/authorization";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import {
-  type AuthorizedClickHouse,
-  braidConditionExpression,
-  type ClickHouseQueryClient,
-  tenantScope,
-  tenantScopeForLatestVersion,
-  tenantScopeWithConditions,
-} from "@langwatch/clickhouse-client";
-import {
+  braidCondition,
   clickhouseRead,
+  cond,
   fn,
+  param,
   tenantScope as builtTenantScope,
 } from "@langwatch/clickhouse-client/builder";
 import { z } from "zod";
 
+import { storedSpans } from "../../../../repositories/clickhouse/clickhouse.stored-spans.table.ts";
 import { traceSummaries } from "../../../../repositories/clickhouse/clickhouse.trace-summaries.table.ts";
 import { ClickHouseTraceSpanRepository } from "../../../../repositories/clickhouse/trace-span.repository.ts";
 import type { TraceSpanSummaryRecord } from "../../../../repositories/trace-projected-read.repository.ts";
@@ -60,9 +57,6 @@ type VerifiedParts =
   | { kind: "signed"; rest: CompiledWhere | undefined; verified: CompiledWhere };
 
 /** The span versions an attribute key read samples, newest partitions first. */
-/** A span attribute read as a column; the key is fixed text, never a caller's value. */
-const attribute = (key: string) => `SpanAttributes['${key}']`;
-const attributeNumber = (key: string) => `toFloat64OrZero(${attribute(key)})`;
 /** The attributes a span is priced by that group spans together: one rate per group. */
 const PRICE_KEYS = [
   ["gen_ai.request.model", "Model"],
@@ -95,61 +89,60 @@ const spanTotalsRowsSchema = z.array(
       EndMs: z.coerce.number(),
       InputTokens: total,
       OutputTokens: total,
-      Cost: total,
+      UsageCost: total,
     })
     .catchall(z.unknown()),
 );
 const ATTRIBUTE_KEY_SAMPLE_ROWS = 50_000;
 const MAX_TEST_TRACE_SPANS = 10_000;
 
-const millis = (param: string) => `fromUnixTimestamp64Milli({${param}:Int64})`;
+/** A constant false, for a braid set with no braid in it. */
+const noBraid = () => cond.eq(param.uint16(0), param.uint16(1));
 
-/** `1` for no condition, else the condition with its keys and literals bound under `prefix`. */
-function conditionSql({
-  compiledWhere,
-  reader,
-  prefix,
+/** A braid's own window on `StartTime`; an open end bounds nothing. */
+function braidWindow(braid: BraidWindowRead) {
+  const from = cond.gte(storedSpans.StartTime, braid.fromMs);
+  if (braid.untilMs === null) return from;
+  return cond.and(from, cond.lt(storedSpans.StartTime, braid.untilMs));
+}
+
+/** A condition with every key and literal bound; none holds every span. */
+function conditionOf(compiledWhere: CompiledWhere | undefined, reader: string) {
+  if (compiledWhere === undefined) return undefined;
+  return braidCondition(storedSpans, { compiledWhere, reader });
+}
+
+/** A braid's window and its condition. */
+function braidPick(braid: BraidWindowRead) {
+  const condition = conditionOf(braid.compiledWhere, braid.readerProjectId);
+  return condition === undefined ? braidWindow(braid) : cond.and(braidWindow(braid), condition);
+}
+
+/** A span in the draft window only its `Verified()` terms hold back, which no live braid shows. */
+function unsignedOf({
+  draft,
+  split,
+  liveShown,
 }: {
-  compiledWhere: CompiledWhere | undefined;
-  reader: string;
-  prefix: string;
-}): { sql: string; params: Record<string, unknown> } {
-  if (compiledWhere === undefined) return { sql: "1", params: {} };
-  return braidConditionExpression({ compiledWhere, reader, prefix });
+  draft: BraidWindowRead;
+  split: Extract<VerifiedParts, { kind: "signed" }>;
+  liveShown: ReturnType<typeof anyBraid>;
+}) {
+  const window = braidWindow(draft);
+  const held = cond.not(
+    braidCondition(storedSpans, { compiledWhere: split.verified, reader: draft.readerProjectId }),
+  );
+  const rest = conditionOf(split.rest, draft.readerProjectId);
+  const unshown = cond.not(liveShown);
+  return rest === undefined
+    ? cond.and(window, held, unshown)
+    : cond.and(window, rest, held, unshown);
 }
 
-/** A braid's own window on `StartTime`, its edges bound under `prefix`; an open end binds none. */
-function windowSql({ braid, prefix }: { braid: BraidWindowRead; prefix: string }): {
-  sql: string;
-  params: Record<string, unknown>;
-} {
-  const from = `StartTime >= ${millis(`${prefix}_fromMs`)}`;
-  if (braid.untilMs === null) return { sql: from, params: { [`${prefix}_fromMs`]: braid.fromMs } };
-  return {
-    sql: `${from} AND StartTime < ${millis(`${prefix}_untilMs`)}`,
-    params: { [`${prefix}_fromMs`]: braid.fromMs, [`${prefix}_untilMs`]: braid.untilMs },
-  };
-}
-
-/** Whether any braid shows a span: each its own window and condition, never merged; `0` if none. */
-function anyBraidSql({ braids, prefix }: { braids: readonly BraidWindowRead[]; prefix: string }): {
-  sql: string;
-  params: Record<string, unknown>;
-} {
-  if (braids.length === 0) return { sql: "0", params: {} };
-  const params: Record<string, unknown> = {};
-  const picks = braids.map((braid, index) => {
-    const named = `${prefix}${index}`;
-    const window = windowSql({ braid, prefix: named });
-    const condition = conditionSql({
-      compiledWhere: braid.compiledWhere,
-      reader: braid.readerProjectId,
-      prefix: named,
-    });
-    Object.assign(params, window.params, condition.params);
-    return `(${window.sql} AND ${condition.sql})`;
-  });
-  return { sql: `(${picks.join(" OR ")})`, params };
+/** Whether any braid shows a span: each its own window and condition, never merged. */
+function anyBraid(braids: readonly BraidWindowRead[]) {
+  if (braids.length === 0) return noBraid();
+  return braids.map(braidPick).reduce((shown, pick) => cond.or(shown, pick));
 }
 
 function verifiedPartsOf(compiledWhere: CompiledWhere | undefined): VerifiedParts {
@@ -187,19 +180,246 @@ function readerTraceIdsStatement({
     .build();
 }
 
+/** A span attribute read as a column, its key bound. */
+const attribute = (key: string) => fn.mapGet(storedSpans.SpanAttributes, key);
+const attributeNumber = (key: string) => fn.toFloat64OrZero(attribute(key));
+const priceKeyColumns = Object.fromEntries(
+  PRICE_KEYS.map(([key, name]) => [name, attribute(key)] as const),
+);
+const priceCountColumns = Object.fromEntries(
+  PRICE_COUNTS.map(([key, name]) => [name, fn.sum(attributeNumber(key))] as const),
+);
+
+/** One trace's latest spans under the braided proof, summed per owner and price group. */
+function spanTotalsStatement({
+  authorization,
+  traceId,
+}: {
+  authorization: Authorization;
+  traceId: string;
+}) {
+  const hasCost = cond.gt(attributeNumber("gen_ai.usage.cost"), 0);
+  const hasSpanCost = cond.gt(attributeNumber("langwatch.span.cost"), 0);
+  return clickhouseRead({ scope: builtTenantScope.fromProof({ authorization, reads: "spans" }) })
+    .from(storedSpans)
+    .braided({ heldTrace: { traceId } })
+    .select({
+      TenantId: storedSpans.TenantId,
+      HasCost: hasCost,
+      HasSpanCost: hasSpanCost,
+      ...priceKeyColumns,
+      SpanCount: fn.count(),
+      StartMs: fn.min(fn.toUnixTimestamp64Milli(storedSpans.StartTime)),
+      EndMs: fn.max(fn.toUnixTimestamp64Milli(storedSpans.EndTime)),
+      InputTokens: fn.sum(attributeNumber("gen_ai.usage.input_tokens")),
+      OutputTokens: fn.sum(attributeNumber("gen_ai.usage.output_tokens")),
+      UsageCost: fn.sum(attributeNumber("gen_ai.usage.cost")),
+      ...priceCountColumns,
+    })
+    .where(({ idBound }) => idBound(storedSpans.TraceId, traceId))
+    .latestVersion()
+    .groupBy(storedSpans.TenantId, hasCost, hasSpanCost, ...Object.values(priceKeyColumns))
+    .build();
+}
+
+/**
+ * Per span, whether the live braids show it and whether they or the draft do, each braid in its
+ * own window; per trace, the counts; and the newest trace shown any span.
+ */
+function ownerSpansInTracesStatement({
+  authorization,
+  traceIds,
+  sinceMs,
+  live,
+  draft,
+}: {
+  authorization: Authorization;
+  traceIds: readonly string[];
+  sinceMs: number;
+  live: readonly BraidWindowRead[];
+  draft: BraidWindowRead;
+}) {
+  const scope = builtTenantScope.fromProof({ authorization, reads: "traces" });
+  const liveShown = anyBraid(live);
+  const shown = cond.or(liveShown, braidPick(draft));
+  const split = verifiedPartsOf(draft.compiledWhere);
+  const unsigned = split.kind === "signed" ? unsignedOf({ draft, split, liveShown }) : noBraid();
+  const perSpan = clickhouseRead({ scope })
+    .from(storedSpans)
+    .withinWindows()
+    .select({
+      TraceId: storedSpans.TraceId,
+      started: fn.max(storedSpans.StartTime),
+      s: fn.argMax(shown, storedSpans.UpdatedAt),
+      l: fn.argMax(liveShown, storedSpans.UpdatedAt),
+      u: fn.argMax(unsigned, storedSpans.UpdatedAt),
+    })
+    .where(({ oneOf }) => oneOf(storedSpans.TraceId, [...traceIds]))
+    .where(({ gte }) => gte(storedSpans.StartTime, sinceMs))
+    .groupBy(storedSpans.TraceId, storedSpans.SpanId)
+    .as("perSpan");
+  const perTrace = clickhouseRead({ scope })
+    .from(perSpan)
+    .select({
+      TraceId: perSpan.TraceId,
+      spans: fn.count(),
+      newest: fn.max(perSpan.started),
+      shown: fn.countIf(perSpan.s),
+      liveShown: fn.countIf(perSpan.l),
+      unsigned: fn.countIf(perSpan.u),
+    })
+    .groupBy(perSpan.TraceId)
+    .as("perTrace");
+  const every = (of: typeof perTrace.shown | typeof perTrace.liveShown) =>
+    fn.countIf(cond.and(cond.gt(perTrace.spans, 0), cond.eq(of, perTrace.spans)));
+  const some = (of: typeof perTrace.shown | typeof perTrace.liveShown) =>
+    fn.countIf(cond.and(cond.gt(of, 0), cond.lt(of, perTrace.spans)));
+  return clickhouseRead({ scope })
+    .from(perTrace)
+    .select({
+      every: every(perTrace.shown),
+      some: some(perTrace.shown),
+      shownSpans: fn.sum(perTrace.shown),
+      liveEvery: every(perTrace.liveShown),
+      liveSome: some(perTrace.liveShown),
+      liveSpans: fn.sum(perTrace.liveShown),
+      unsignedSpans: fn.sum(perTrace.unsigned),
+      exampleTraceId: fn.argMaxIf(perTrace.TraceId, perTrace.newest, cond.gt(perTrace.shown, 0)),
+    })
+    .build();
+}
+
+/** The owner's attribute keys over a sample of its spans in its own windows, most used first. */
+function attributeKeysStatement({
+  authorization,
+  sinceMs,
+  limit,
+  excludedPrefix,
+}: {
+  authorization: Authorization;
+  sinceMs: number;
+  limit: number;
+  excludedPrefix: string;
+}) {
+  const scope = builtTenantScope.fromProof({ authorization, reads: "traces" });
+  const sampled = clickhouseRead({ scope })
+    .from(storedSpans)
+    .withinWindows()
+    .select({ SpanAttributes: storedSpans.SpanAttributes })
+    .where(({ gte }) => gte(storedSpans.StartTime, sinceMs))
+    .limit(ATTRIBUTE_KEY_SAMPLE_ROWS)
+    .as("sampled");
+  const keys = clickhouseRead({ scope })
+    .from(sampled)
+    .select({ key: fn.arrayJoin(fn.mapKeys(sampled.SpanAttributes)) })
+    .as("keys");
+  return clickhouseRead({ scope })
+    .from(keys)
+    .select({ key: keys.key, spanCount: fn.count() })
+    .where(({ not }) => not(fn.startsWith(keys.key, excludedPrefix)))
+    .groupBy(keys.key)
+    .orderBy("spanCount", "DESC")
+    .orderBy("key", "ASC")
+    .limit(limit)
+    .build();
+}
+
+/** Per braid, the owner's spans whose latest version it shows, in its own window. */
+function ownerBraidActivityStatement({
+  authorization,
+  braids,
+  sinceMs,
+}: {
+  authorization: Authorization;
+  braids: readonly BraidActivityRead[];
+  sinceMs: number;
+}) {
+  const scope = builtTenantScope.fromProof({ authorization, reads: "traces" });
+  const perSpan = clickhouseRead({ scope })
+    .from(storedSpans)
+    .withinWindows()
+    .select(
+      Object.fromEntries(
+        braids.map((braid, index) => [
+          `a${index}`,
+          fn.argMax(braidPick(braid), storedSpans.UpdatedAt),
+        ]),
+      ),
+    )
+    .where(({ gte }) => gte(storedSpans.StartTime, sinceMs))
+    .groupBy(storedSpans.TraceId, storedSpans.SpanId)
+    .as("perSpan");
+  return clickhouseRead({ scope })
+    .from(perSpan)
+    .select(
+      Object.fromEntries(
+        braids.flatMap((_, index) => {
+          const shown = perSpan[`a${index}`];
+          return shown === undefined ? [] : [[`a${index}`, fn.countIf(shown)] as const];
+        }),
+      ),
+    )
+    .build();
+}
+
+/** Per owner and braid, the latest spans the reader's braided fence shows in the braid's window. */
+function readerBraidActivityStatement({
+  authorization,
+  braids,
+  sinceMs,
+}: {
+  authorization: Authorization;
+  braids: readonly BraidActivityRead[];
+  sinceMs: number;
+}) {
+  return clickhouseRead({ scope: builtTenantScope.fromProof({ authorization, reads: "spans" }) })
+    .from(storedSpans)
+    .braided({ heldTrace: { sinceMs } })
+    .select({
+      TenantId: storedSpans.TenantId,
+      ...Object.fromEntries(
+        braids.map((braid, index) => [`a${index}`, fn.countIf(braidPick(braid))]),
+      ),
+    })
+    .where(({ gte }) => gte(storedSpans.StartTime, sinceMs))
+    .latestVersion()
+    .groupBy(storedSpans.TenantId)
+    .build();
+}
+
+/** One trace's latest owner spans in the owner's windows, each flagged when any braid shows it. */
+function ownerSpansMarkedStatement({
+  authorization,
+  traceId,
+  braids,
+}: {
+  authorization: Authorization;
+  traceId: string;
+  braids: readonly BraidWindowRead[];
+}) {
+  return clickhouseRead({ scope: builtTenantScope.fromProof({ authorization, reads: "traces" }) })
+    .from(storedSpans)
+    .withinWindows()
+    .select({
+      ...ClickHouseTraceSpanRepository.summarySelection(authorization),
+      Braided: anyBraid(braids),
+    })
+    .where(({ idBound }) => idBound(storedSpans.TraceId, traceId))
+    .latestVersion()
+    .orderBy(fn.toUnixTimestamp64Milli(storedSpans.StartTime), "ASC")
+    .limit(MAX_TEST_TRACE_SPANS)
+    .build();
+}
+
 export class ClickHouseTraceBraidReadsRepository extends TraceBraidReadsRepository {
-  private constructor(
-    private readonly clickhouse: AuthorizedClickHouse,
-    private readonly reader: Pick<ClickHouseQueryClient, "read">,
-  ) {
+  private constructor(private readonly reader: Pick<ClickHouseQueryClient, "read">) {
     super();
   }
 
   static create(options: {
-    clickhouse: AuthorizedClickHouse;
     reader: Pick<ClickHouseQueryClient, "read">;
   }): ClickHouseTraceBraidReadsRepository {
-    return new ClickHouseTraceBraidReadsRepository(options.clickhouse, options.reader);
+    return new ClickHouseTraceBraidReadsRepository(options.reader);
   }
 
   async findReaderTraceIds(input: {
@@ -227,63 +447,12 @@ export class ClickHouseTraceBraidReadsRepository extends TraceBraidReadsReposito
     live: readonly BraidWindowRead[];
     draft: BraidWindowRead;
   }): Promise<BraidOwnerTraceCounts> {
-    const { draft } = input;
-    const reader = draft.readerProjectId;
-    const live = anyBraidSql({ braids: input.live, prefix: "live" });
-    const draftWindow = windowSql({ braid: draft, prefix: "braid" });
-    const matched = conditionSql({ compiledWhere: draft.compiledWhere, reader, prefix: "braid" });
-    const split = verifiedPartsOf(draft.compiledWhere);
-    const signed = split.kind === "signed" ? split : null;
-    const rest = conditionSql({ compiledWhere: signed?.rest, reader, prefix: "braidRest" });
-    const verified = signed
-      ? conditionSql({ compiledWhere: signed.verified, reader, prefix: "braidSigned" })
-      : null;
-    const shown = `(${live.sql} OR (${draftWindow.sql} AND ${matched.sql}))`;
-    const unsigned = verified
-      ? `(${draftWindow.sql} AND ${rest.sql} AND NOT ${verified.sql} AND NOT ${live.sql})`
-      : "0";
-    const client = this.clickhouse.as(input.authorization, { reads: "traces" });
-    const result = await client.query({
+    const result = await this.reader.read({
       // ID_BOUND_SKIP: bounded by the reader's trace ids and the 7-day StartTime floor.
-      query: `
-        SELECT
-          countIf(spans > 0 AND shown = spans) AS every,
-          countIf(shown > 0 AND shown < spans) AS some,
-          sum(shown) AS shownSpans,
-          countIf(spans > 0 AND liveShown = spans) AS liveEvery,
-          countIf(liveShown > 0 AND liveShown < spans) AS liveSome,
-          sum(liveShown) AS liveSpans,
-          sum(unsigned) AS unsignedSpans,
-          argMaxIf(TraceId, newest, shown > 0) AS exampleTraceId
-        FROM (
-          SELECT TraceId, count() AS spans, max(started) AS newest,
-            sum(s) AS shown, sum(l) AS liveShown, sum(u) AS unsigned
-          FROM (
-            SELECT TraceId, SpanId, max(StartTime) AS started,
-              argMax(${shown}, UpdatedAt) AS s,
-              argMax(${live.sql}, UpdatedAt) AS l,
-              argMax(${unsigned}, UpdatedAt) AS u
-            FROM stored_spans
-            WHERE ${tenantScope("StartTime")}
-              AND TraceId IN {traceIds:Array(String)}
-              AND StartTime >= ${millis("sinceMs")}
-            GROUP BY TraceId, SpanId
-          )
-          GROUP BY TraceId
-        )
-      `,
-      query_params: {
-        traceIds: [...input.traceIds],
-        sinceMs: input.sinceMs,
-        ...live.params,
-        ...draftWindow.params,
-        ...matched.params,
-        ...rest.params,
-        ...verified?.params,
-      },
-      format: "JSONEachRow",
+      statement: ownerSpansInTracesStatement(input),
+      table: storedSpans.$table.name,
     });
-    const [row] = ownerCountsRowsSchema.parse(await result.json());
+    const [row] = ownerCountsRowsSchema.parse(result.rows);
     if (row === undefined) return NO_BRAID_TRACE_COUNTS;
     return {
       shown: { every: row.every, some: row.some, spans: row.shownSpans },
@@ -299,34 +468,13 @@ export class ClickHouseTraceBraidReadsRepository extends TraceBraidReadsReposito
     limit: number;
     excludedPrefix: string;
   }): Promise<{ key: string; spanCount: number }[]> {
-    const client = this.clickhouse.as(input.authorization, { reads: "traces" });
-    const result = await client.query({
+    const result = await this.reader.read({
       // ID_BOUND_SKIP: a sampled window read over the owner's own spans, bounded by StartTime.
-      query: `
-        SELECT key, count() AS spanCount
-        FROM (
-          SELECT SpanAttributes
-          FROM stored_spans
-          WHERE ${tenantScope("StartTime")}
-            AND StartTime >= ${millis("sinceMs")}
-          LIMIT {sampleRows:UInt32}
-        )
-        ARRAY JOIN mapKeys(SpanAttributes) AS key
-        WHERE NOT startsWith(key, {excludedPrefix:String})
-        GROUP BY key
-        ORDER BY spanCount DESC, key ASC
-        LIMIT {limit:UInt32}
-      `,
-      query_params: {
-        sinceMs: input.sinceMs,
-        sampleRows: ATTRIBUTE_KEY_SAMPLE_ROWS,
-        excludedPrefix: input.excludedPrefix,
-        limit: input.limit,
-      },
-      format: "JSONEachRow",
+      statement: attributeKeysStatement(input),
+      table: storedSpans.$table.name,
     });
     return attributeKeyRowsSchema
-      .parse(await result.json())
+      .parse(result.rows)
       .map((row) => ({ key: row.key, spanCount: row.spanCount }));
   }
 
@@ -336,24 +484,12 @@ export class ClickHouseTraceBraidReadsRepository extends TraceBraidReadsReposito
     sinceMs: number;
   }): Promise<Map<string, number>> {
     if (input.braids.length === 0) return new Map();
-    const columns = braidColumns(input.braids);
-    const client = this.clickhouse.as(input.authorization, { reads: "traces" });
-    const result = await client.query({
+    const result = await this.reader.read({
       // ID_BOUND_SKIP: a 24-hour window read over the owner's own spans, bounded by StartTime.
-      query: `
-        SELECT ${columns.names.map((name) => `sum(${name}) AS ${name}`).join(", ")}
-        FROM (
-          SELECT ${columns.windowed.map(({ name, sql }) => `argMax(${sql}, UpdatedAt) AS ${name}`).join(",\n            ")}
-          FROM stored_spans
-          WHERE ${tenantScope("StartTime")}
-            AND StartTime >= ${millis("sinceMs")}
-          GROUP BY TraceId, SpanId
-        )
-      `,
-      query_params: { sinceMs: input.sinceMs, ...columns.params },
-      format: "JSONEachRow",
+      statement: ownerBraidActivityStatement(input),
+      table: storedSpans.$table.name,
     });
-    const [row = {}] = activityRowsSchema.parse(await result.json());
+    const [row = {}] = activityRowsSchema.parse(result.rows);
     return new Map(input.braids.map((braid, index) => [braid.braidId, row[`a${index}`] ?? 0]));
   }
 
@@ -363,28 +499,12 @@ export class ClickHouseTraceBraidReadsRepository extends TraceBraidReadsReposito
     sinceMs: number;
   }): Promise<Map<string, number>> {
     if (input.braids.length === 0) return new Map();
-    const columns = braidColumns(input.braids);
-    const client = this.clickhouse.as(input.authorization, { reads: "spans" });
-    const result = await client.query({
+    const result = await this.reader.read({
       // ID_BOUND_SKIP: a 24-hour window read through the reader's fence, bounded by StartTime.
-      query: `
-        SELECT TenantId, ${columns.windowed.map(({ name, sql }) => `countIf(${sql}) AS ${name}`).join(", ")}
-        FROM stored_spans
-        WHERE ${tenantScopeWithConditions("StartTime", { sinceMs: "sinceMs" })}
-          AND StartTime >= ${millis("sinceMs")}
-          AND (TenantId, TraceId, SpanId, UpdatedAt) IN (
-            SELECT TenantId, TraceId, SpanId, max(UpdatedAt)
-            FROM stored_spans
-            WHERE ${tenantScopeForLatestVersion("StartTime")}
-              AND StartTime >= ${millis("sinceMs")}
-            GROUP BY TenantId, TraceId, SpanId
-          )
-        GROUP BY TenantId
-      `,
-      query_params: { sinceMs: input.sinceMs, ...columns.params },
-      format: "JSONEachRow",
+      statement: readerBraidActivityStatement(input),
+      table: storedSpans.$table.name,
     });
-    const rows = ownerActivityRowsSchema.parse(await result.json());
+    const rows = ownerActivityRowsSchema.parse(result.rows);
     const byOwner = new Map(rows.map((row) => [row.TenantId, row]));
     return new Map(
       input.braids.map((braid, index) => [
@@ -399,50 +519,23 @@ export class ClickHouseTraceBraidReadsRepository extends TraceBraidReadsReposito
     traceId: string;
     occurredAtMs?: number | undefined;
   }): Promise<TraceSpanTotalsGroup[]> {
-    const client = this.clickhouse.as(input.authorization, { reads: "spans" });
-    const keys = PRICE_KEYS.map(([key, name]) => `${attribute(key)} AS ${name}`);
-    const counts = PRICE_COUNTS.map(([key, name]) => `sum(${attributeNumber(key)}) AS ${name}`);
-    const result = await client.query({
-      query: `
-        SELECT TenantId,
-          ${attributeNumber("gen_ai.usage.cost")} > 0 AS HasCost,
-          ${attributeNumber("langwatch.span.cost")} > 0 AS HasSpanCost,
-          ${keys.join(",\n          ")},
-          count() AS SpanCount,
-          min(toUnixTimestamp64Milli(StartTime)) AS StartMs,
-          max(toUnixTimestamp64Milli(EndTime)) AS EndMs,
-          sum(${attributeNumber("gen_ai.usage.input_tokens")}) AS InputTokens,
-          sum(${attributeNumber("gen_ai.usage.output_tokens")}) AS OutputTokens,
-          sum(${attributeNumber("gen_ai.usage.cost")}) AS Cost,
-          ${counts.join(",\n          ")}
-        FROM stored_spans
-        WHERE ${tenantScopeWithConditions("StartTime", { traceId: "traceId" })} AND TraceId = {traceId:String}
-          {{idBound:stored_spans.TraceId:traceId}}
-          AND (TenantId, TraceId, SpanId, UpdatedAt) IN (
-            SELECT TenantId, TraceId, SpanId, max(UpdatedAt)
-            FROM stored_spans
-            WHERE ${tenantScopeForLatestVersion("StartTime")} AND TraceId = {traceId:String}
-              {{idBound:stored_spans.TraceId:traceId}}
-            GROUP BY TenantId, TraceId, SpanId
-          )
-        GROUP BY TenantId, HasCost, HasSpanCost, ${PRICE_KEYS.map(([, name]) => name).join(", ")}
-      `,
-      query_params: { traceId: input.traceId },
-      format: "JSONEachRow",
+    const result = await this.reader.read({
+      statement: spanTotalsStatement(input),
+      table: storedSpans.$table.name,
       idBound: {
         occurredAtHint: input.occurredAtMs ?? null,
         fallback: "unbounded",
         openEnded: true,
       },
     });
-    return spanTotalsRowsSchema.parse(await result.json()).map((row) => ({
+    return spanTotalsRowsSchema.parse(result.rows).map((row) => ({
       tenantId: row.TenantId,
       spanCount: row.SpanCount,
       startMs: row.StartMs,
       endMs: row.EndMs,
       inputTokens: row.InputTokens,
       outputTokens: row.OutputTokens,
-      explicitCost: row.HasCost === 1 ? row.Cost : 0,
+      explicitCost: row.HasCost === 1 ? row.UsageCost : 0,
       costInput: row.HasCost === 1 ? null : costInputOf(row),
     }));
   }
@@ -452,30 +545,12 @@ export class ClickHouseTraceBraidReadsRepository extends TraceBraidReadsReposito
     traceId: string;
     braids: readonly BraidWindowRead[];
   }): Promise<(TraceSpanSummaryRecord & { braided: boolean })[]> {
-    const braided = anyBraidSql({ braids: input.braids, prefix: "braid" });
-    const client = this.clickhouse.as(input.authorization, { reads: "traces" });
-    const result = await client.query({
-      query: `
-        SELECT ${ClickHouseTraceSpanRepository.summarySelect},
-          ${braided.sql} AS Braided
-        FROM stored_spans
-        WHERE ${tenantScope("StartTime")} AND TraceId = {traceId:String}
-          {{idBound:stored_spans.TraceId:traceId}}
-          AND (TenantId, TraceId, SpanId, UpdatedAt) IN (
-            SELECT TenantId, TraceId, SpanId, max(UpdatedAt)
-            FROM stored_spans
-            WHERE ${tenantScope("StartTime")} AND TraceId = {traceId:String}
-              {{idBound:stored_spans.TraceId:traceId}}
-            GROUP BY TenantId, TraceId, SpanId
-          )
-        ORDER BY StartTimeMs ASC
-        LIMIT ${MAX_TEST_TRACE_SPANS}
-      `,
-      query_params: { traceId: input.traceId, ...braided.params },
-      format: "JSONEachRow",
+    const result = await this.reader.read({
+      statement: ownerSpansMarkedStatement(input),
+      table: storedSpans.$table.name,
       idBound: { occurredAtHint: null, fallback: "unbounded", openEnded: true },
     });
-    const rows: unknown = await result.json();
+    const rows: unknown = result.rows;
     const flags = braidedFlagRowsSchema.parse(rows);
     return ClickHouseTraceSpanRepository.summaryRecordsOf({
       rows,
@@ -497,28 +572,4 @@ function costInputOf(row: Record<string, unknown>): TraceSpanTotalsGroup["costIn
     promptTokens: total.parse(row.InputTokens),
     completionTokens: total.parse(row.OutputTokens),
   };
-}
-
-/** One `a<i>` column per braid: its window and condition, every literal bound under `a<i>`. */
-function braidColumns(braids: readonly BraidActivityRead[]): {
-  names: string[];
-  windowed: { name: string; sql: string }[];
-  params: Record<string, unknown>;
-} {
-  const params: Record<string, unknown> = {};
-  const windowed = braids.map((braid, index) => {
-    const name = `a${index}`;
-    const condition = conditionSql({
-      compiledWhere: braid.compiledWhere,
-      reader: braid.readerProjectId,
-      prefix: name,
-    });
-    Object.assign(params, condition.params, {
-      [`${name}_fromMs`]: braid.fromMs,
-      [`${name}_untilMs`]: braid.untilMs,
-    });
-    const window = `StartTime >= ${millis(`${name}_fromMs`)} AND StartTime < ${millis(`${name}_untilMs`)}`;
-    return { name, sql: `(${window} AND ${condition.sql})` };
-  });
-  return { names: windowed.map(({ name }) => name), windowed, params };
 }

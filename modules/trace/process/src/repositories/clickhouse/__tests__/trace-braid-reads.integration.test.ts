@@ -13,10 +13,7 @@ import { braidedProof, ownProof } from "../../../__tests__/support/authorization
 import { ClickHouseTraceBraidReadsRepository } from "../../../features/braid/repositories/clickhouse/clickhouse.trace-braid-reads.repository.ts";
 import { TraceBraidPreviewService } from "../../../features/braid/services/trace-braid-preview.service.ts";
 import { ClickHouseTraceSpanRepository } from "../trace-span.repository.ts";
-import {
-  authorizedClickHouseFor,
-  traceQueryClientFor,
-} from "./support/authorized-clickhouse.support.ts";
+import { traceQueryClientFor } from "./support/authorized-clickhouse.support.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
@@ -185,11 +182,9 @@ const braid: AuthzBraid = {
 beforeAll(async () => {
   if (!clickHouseConfigured) return;
   ch = await startMigratedTraceClickHouse();
-  const clickhouse = authorizedClickHouseFor(ch);
   const spans = ClickHouseTraceSpanRepository.create({ clickhouse: traceQueryClientFor(ch) });
   service = TraceBraidPreviewService.create({
     reads: ClickHouseTraceBraidReadsRepository.create({
-      clickhouse,
       reader: traceQueryClientFor(ch),
     }),
     readerSpans: async ({ authorization, traceId }) =>
