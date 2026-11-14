@@ -1,11 +1,10 @@
 /**
- * Memoized table body for virtualized rows, extracted to prevent the
- * entire EvaluationsV3Table re-rendering on every scroll event — the
- * virtualizer state is contained here.
+ * Table body for virtualized rows; the virtualizer state lives here so a
+ * scroll re-renders the body, not the whole table.
  */
 import type { Row } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import React, { useCallback, useEffect } from "react";
+import { useEffect } from "react";
 
 import { type DatasetTableRowData, useDatasetTable } from "../../model/dataset-table-context.tsx";
 import { TableCell } from "../elements/table-cell.tsx";
@@ -29,11 +28,8 @@ type VirtualizedTableBodyProps<TData extends DatasetTableRowData> = {
   trailingSpacerWidth?: number;
 };
 
-/**
- * Memoized table body component that manages its own virtualizer state.
- * This prevents the parent component from re-rendering on scroll.
- */
-function VirtualizedTableBodyImpl<TData extends DatasetTableRowData>({
+/** Renders every row, or only the visible window once the dataset is large. */
+export function VirtualizedTableBody<TData extends DatasetTableRowData>({
   rows,
   scrollContainer,
   columnCount,
@@ -45,9 +41,8 @@ function VirtualizedTableBodyImpl<TData extends DatasetTableRowData>({
   displayRowCount,
   trailingSpacerWidth,
 }: VirtualizedTableBodyProps<TData>) {
-  // Stable callbacks for virtualizer
-  const getScrollElement = useCallback(() => scrollContainer, [scrollContainer]);
-  const estimateSize = useCallback(() => COMPACT_ROW_HEIGHT, []);
+  const getScrollElement = () => scrollContainer;
+  const estimateSize = () => COMPACT_ROW_HEIGHT;
 
   // Set up row virtualization (contained in this component to prevent parent re-renders)
   const rowVirtualizer = useVirtualizer({
@@ -182,12 +177,3 @@ function useScrollToSelectedRow({
     if (!isRendered) rowVirtualizer.scrollToIndex(selectedRow, { align: "auto" });
   }, [enabled, selectedRow, rowVirtualizer]);
 }
-
-/**
- * Memoized table body that manages its own virtualizer state so the parent
- * table doesn't re-render on scroll. The cast keeps the generic row type,
- * which React.memo would otherwise erase.
- */
-export const VirtualizedTableBody = React.memo(
-  VirtualizedTableBodyImpl,
-) as typeof VirtualizedTableBodyImpl;

@@ -177,17 +177,24 @@ describe("given an in-memory dataset", () => {
   describe("when the dataset has more rows than the grid renders at once", () => {
     /** @scenario Moving with the keyboard to a row that is not rendered brings it into view */
     it("scrolls the grid to the selected row once it leaves the rendered rows", async () => {
+      const rowCount = 150;
+      const rowHeight = 160;
+      const viewport = 800;
       const scrollTo = vi.spyOn(Element.prototype, "scrollTo").mockImplementation(() => {});
-      // jsdom lays nothing out; the virtualizer needs a viewport to render rows into.
-      const height = vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(800);
-      const width = vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(1000);
+      // jsdom lays nothing out; give the grid a viewport and a scroll height.
+      const layout = [
+        vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(viewport),
+        vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(1000),
+        vi.spyOn(Element.prototype, "clientHeight", "get").mockReturnValue(viewport),
+        vi.spyOn(Element.prototype, "scrollHeight", "get").mockReturnValue(rowCount * rowHeight),
+      ];
       try {
         const user = userEvent.setup();
         renderInMemory({
           inMemoryDataset: {
             name: "Long",
             columnTypes,
-            datasetRecords: Array.from({ length: 150 }, (_, i) => ({
+            datasetRecords: Array.from({ length: rowCount }, (_, i) => ({
               id: `r${i}`,
               input: `value ${i}`,
               expected_output: "",
@@ -197,14 +204,17 @@ describe("given an in-memory dataset", () => {
 
         await user.click(await screen.findByText("value 0"));
         scrollTo.mockClear();
-        for (let i = 0; i < 40; i++) await user.keyboard("{ArrowDown}");
+        const selectedRow = 40;
+        for (let i = 0; i < selectedRow; i++) await user.keyboard("{ArrowDown}");
 
         const grid = screen.getByTestId("dataset-editor-grid").parentElement!;
-        expect(scrollTo.mock.contexts).toContain(grid);
+        expect(scrollTo.mock.contexts.at(-1)).toBe(grid);
+        // Row 40's bottom edge lands on the viewport's bottom edge.
+        const rowBottom = (selectedRow + 1) * rowHeight;
+        expect(scrollTo.mock.calls.at(-1)?.[0]).toMatchObject({ top: rowBottom - viewport });
       } finally {
         scrollTo.mockRestore();
-        height.mockRestore();
-        width.mockRestore();
+        for (const spy of layout) spy.mockRestore();
       }
     });
   });
