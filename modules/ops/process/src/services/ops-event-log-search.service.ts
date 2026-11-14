@@ -1,6 +1,7 @@
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import {
+  type AggregateDiscoveryAnswer,
   type AggregateSearchAnswer,
   type AggregateSearchRequested,
   OpsSearchQueryRequiredError,
@@ -8,7 +9,10 @@ import {
 import { nowInstant } from "@langwatch/time";
 
 import type { OpsEventExplorer } from "../app/ops.app.ts";
-import type { OpsEventLogSearchResultsRepository } from "../repositories/ops-event-log-search-results.repository.ts";
+import type {
+  OpsEventLogSearchRecord,
+  OpsEventLogSearchResultsRepository,
+} from "../repositories/ops-event-log-search-results.repository.ts";
 
 const logger = createLogger("langwatch:ops:event-log-search");
 
@@ -34,7 +38,7 @@ export class OpsEventLogSearchService {
     results,
     newRequestId = () => generate("ops").toString(),
   }: {
-    explorer: Pick<OpsEventExplorer, "searchAggregates">;
+    explorer: Pick<OpsEventExplorer, "searchAggregates" | "discoverAggregates">;
     results: OpsEventLogSearchResultsRepository;
     newRequestId?: () => string;
   }): OpsEventLogSearchService {
@@ -42,7 +46,7 @@ export class OpsEventLogSearchService {
   }
 
   private constructor(
-    private readonly explorer: Pick<OpsEventExplorer, "searchAggregates">,
+    private readonly explorer: Pick<OpsEventExplorer, "searchAggregates" | "discoverAggregates">,
     private readonly results: OpsEventLogSearchResultsRepository,
     private readonly newRequestId: () => string,
   ) {}
@@ -81,6 +85,32 @@ export class OpsEventLogSearchService {
     return { requestId };
   }
 
+  /** The replay wizard's aggregate count, stored pending and handed to the same worker. */
+  async requestDiscovery({
+    projectionNames,
+    since,
+    tenantIds,
+    requestedBy,
+  }: {
+    projectionNames: string[];
+    since: string;
+    tenantIds: string[];
+    requestedBy: string;
+  }): Promise<AggregateSearchRequested> {
+    const commands = this.#requireConnected();
+    const requestId = this.newRequestId();
+    await this.results.save({
+      requestId,
+      record: { status: "pending", read: "discovery", projectionNames, since, tenantIds },
+    });
+    await commands.requestEventLogSearch.send({
+      requestId,
+      tenantId: requestedBy,
+      occurredAt: nowInstant().epochMilliseconds,
+    });
+    return { requestId };
+  }
+
   /** The worker's half: an answered search is not read again, and its completion is resent. */
   async run({ requestId, tenantId }: { requestId: string; tenantId: string }): Promise<void> {
     const commands = this.#requireConnected();
@@ -98,13 +128,23 @@ export class OpsEventLogSearchService {
     });
   }
 
-  /** The screen's answer for one request id. */
+  /** The screen's answer for one request id; a count's id is not a search's. */
   async result({ requestId }: { requestId: string }): Promise<AggregateSearchAnswer> {
     const [record] = await this.results.findByRequestId({ requestId });
-    if (!record) return { status: "expired" };
+    if (!record || "read" in record) return { status: "expired" };
     if (record.status === "pending") return { status: "pending" };
     if (record.status === "failed") return { status: "failed" };
     return { status: "done", results: record.results };
+  }
+
+  /** The replay wizard's answer for one request id; a search's id is not a count's. */
+  async discovery({ requestId }: { requestId: string }): Promise<AggregateDiscoveryAnswer> {
+    const [record] = await this.results.findByRequestId({ requestId });
+    if (!record) return { status: "expired" };
+    if (record.status === "failed") return { status: "failed" };
+    if (!("read" in record)) return { status: "expired" };
+    if (record.status === "pending") return { status: "pending" };
+    return { status: "done", discovery: record.discovery };
   }
 
   async #answer({
@@ -112,15 +152,10 @@ export class OpsEventLogSearchService {
     record,
   }: {
     requestId: string;
-    record: { query: string; tenantIds: string[]; sinceMs: number };
+    record: Extract<OpsEventLogSearchRecord, { status: "pending" }>;
   }): Promise<void> {
     try {
-      const results = await this.explorer.searchAggregates({
-        query: record.query,
-        tenantIds: record.tenantIds,
-        sinceMs: record.sinceMs,
-      });
-      await this.results.save({ requestId, record: { status: "done", results } });
+      await this.results.save({ requestId, record: await this.#read(record) });
     } catch (err) {
       // The engine's own prose names cluster internals; it is logged, never answered.
       logger.warn(
@@ -129,6 +164,26 @@ export class OpsEventLogSearchService {
       );
       await this.results.save({ requestId, record: { status: "failed" } });
     }
+  }
+
+  /** The one explorer read a pending record names, on the worker's own identity. */
+  async #read(
+    record: Extract<OpsEventLogSearchRecord, { status: "pending" }>,
+  ): Promise<OpsEventLogSearchRecord> {
+    if ("read" in record) {
+      const discovery = await this.explorer.discoverAggregates({
+        projectionNames: record.projectionNames,
+        since: record.since,
+        tenantIds: record.tenantIds,
+      });
+      return { status: "done", read: "discovery", discovery };
+    }
+    const results = await this.explorer.searchAggregates({
+      query: record.query,
+      tenantIds: record.tenantIds,
+      sinceMs: record.sinceMs,
+    });
+    return { status: "done", results };
   }
 
   #requireConnected(): EventLogSearchCommands {

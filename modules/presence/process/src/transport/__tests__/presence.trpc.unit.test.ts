@@ -66,6 +66,7 @@ describe("given the presence declaration", () => {
     expect(Object.keys(presenceTrpc.members).toSorted()).toEqual([
       "cursor",
       "leave",
+      "onOperatorReadHints",
       "onOrganizationReadHints",
       "onPresenceCursor",
       "onPresenceUpdate",
@@ -92,6 +93,11 @@ describe("given the presence declaration", () => {
       ["onProjectReadHints", "subscription", "project:view"],
       [
         "onUpgradeReadHints",
+        "subscription",
+        expect.objectContaining({ kind: "permission-platform", permission: "ops:view" }),
+      ],
+      [
+        "onOperatorReadHints",
         "subscription",
         expect.objectContaining({ kind: "permission-platform", permission: "ops:view" }),
       ],

@@ -6,6 +6,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { api } from "../../../behavior/ops-api.ts";
+import { useOperatorReadHints } from "../../../behavior/use-operator-read-hints.ts";
 import type { AggregateResult } from "../model/deja-view-types.ts";
 
 export type AggregateSearchState = {
@@ -25,6 +26,7 @@ export function useAggregateSearch({
   tenantId: string | undefined;
   enabled: boolean;
 }): AggregateSearchState {
+  useOperatorReadHints({ path: "ops.getAggregateSearch" });
   const request = api.ops.searchAggregates.useMutation();
   const { mutate } = request;
   const [requestId, setRequestId] = useState<string | undefined>(void 0);

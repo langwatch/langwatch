@@ -39,14 +39,20 @@ export const opsEventLogTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsE
     .handle(({ app, input }) => app.computeProjectionState(input))
 
     .procedure("discoverAggregates")
+    .withMiddlewareContext(opsOperatorContext)
     .withPermission("ops:view", { at: "platform" })
-    .handle(({ app, input }) =>
+    .handle(({ app, input }, operator) =>
       app.discoverAggregates({
         projectionNames: input.projectionNames,
         since: input.since,
         tenantIds: input.tenantIds ?? [],
+        operator: operator ?? null,
       }),
     )
+
+    .procedure("getAggregateDiscovery")
+    .withPermission("ops:view", { at: "platform" })
+    .handle(({ app, input }) => app.getAggregateDiscovery({ requestId: input.requestId }))
 
     .procedure("searchTenants")
     .withPermission("ops:view", { at: "platform" })

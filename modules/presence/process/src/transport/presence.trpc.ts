@@ -90,4 +90,11 @@ export const presenceTrpcTransport: TrpcRouterDeclaration<PresenceApi, typeof pr
     .procedure("onUpgradeReadHints")
     .withPermission("ops:view", { at: "platform" })
     .handle(({ app, signal }) => app.upgradeReadHints(signal === undefined ? {} : { signal }))
+
+    // The same door: the actor's own user scope only, never a tenant named in the input.
+    .procedure("onOperatorReadHints")
+    .withPermission("ops:view", { at: "platform" })
+    .handle(({ app, actor, signal }) =>
+      app.operatorReadHints({ userId: actor.id, ...(signal === undefined ? {} : { signal }) }),
+    )
     .build();

@@ -160,7 +160,8 @@ const OPS_PROCEDURES: Readonly<Record<string, "query" | "mutation" | "subscripti
   getEventLogSearchWindow: "query",
   loadAggregateEvents: "query",
   computeProjectionState: "query",
-  discoverAggregates: "query",
+  discoverAggregates: "mutation",
+  getAggregateDiscovery: "query",
   searchTenants: "query",
   dryRunReplay: "mutation",
   getReplayHistory: "query",
@@ -192,12 +193,13 @@ const ANSWERING_PROBE = "getScope";
 
 /** The procedures whose handler reads the operator's name, email or impersonation. */
 /** A read sent to the worker as a command (ADR-202 Decided 14): a mutation that asks ops:view. */
-const READS_SENT_TO_THE_WORKER = ["searchAggregates"];
+const READS_SENT_TO_THE_WORKER = ["searchAggregates", "discoverAggregates"];
 
 const OPERATOR_READERS = [
   ANSWERING_PROBE,
   "startReplay",
   "searchAggregates",
+  "discoverAggregates",
   "grantPlatformOperator",
   "revokePlatformOperator",
   "runBlobCleanup",
@@ -299,6 +301,7 @@ describe("the ops tRPC declarations", () => {
         [],
       );
       expect(READS_SENT_TO_THE_WORKER.map((name) => access[name])).toEqual([
+        "permission-platform:ops:view",
         "permission-platform:ops:view",
       ]);
     });

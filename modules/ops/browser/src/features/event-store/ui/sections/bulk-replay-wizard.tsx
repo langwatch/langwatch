@@ -1,3 +1,4 @@
+import { Banner } from "@langwatch/design-system/banner";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
@@ -17,11 +18,15 @@ import {
 import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { nowInstant, toDate } from "@langwatch/time";
 import { Layers } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 
 import { api } from "../../../../behavior/ops-api.ts";
 import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
 import { useOpsPermission } from "../../../../behavior/ops-session.ts";
+import {
+  type AggregateDiscoveryState,
+  useAggregateDiscovery,
+} from "../../behavior/use-aggregate-discovery.ts";
 import { useReplayStatus } from "../../behavior/use-replay-status.ts";
 import { TenantSelector } from "./tenant-selector.tsx";
 const KIND_PALETTE = {
@@ -79,20 +84,11 @@ export function BulkReplayWizard({ onReplayStarted }: { onReplayStarted: () => v
   const hasSince = since.length > 0;
   const canDiscover = hasTenants && hasSince;
 
-  const discoverQuery = api.ops.discoverAggregates.useQuery(
-    {
-      projectionNames: projectionsQuery.data?.projections.map((p) => p.projectionName) ?? [],
-      since,
-      tenantIds: allTenants ? [] : tenantIds,
-    },
-    { enabled: false },
-  );
-
-  useDiscoverOnScopeChange({
-    canDiscover,
-    tenantIds: allTenants ? [] : tenantIds,
+  const discoverQuery = useAggregateDiscovery({
+    projectionNames: projectionsQuery.data?.projections.map((p) => p.projectionName) ?? [],
     since,
-    refetch: discoverQuery.refetch,
+    tenantIds: allTenants ? [] : tenantIds,
+    enabled: canDiscover && (projectionsQuery.data?.projections.length ?? 0) > 0,
     onDiscovered: setSelectedProjections,
   });
 
@@ -101,9 +97,9 @@ export function BulkReplayWizard({ onReplayStarted }: { onReplayStarted: () => v
     [projectionsQuery.data?.projections],
   );
 
-  const hasDiscovered = !!discoverQuery.data;
+  const hasDiscovered = discoverQuery.discovery !== void 0;
   const projectionsWithData = new Set(
-    discoverQuery.data?.projections
+    discoverQuery.discovery?.projections
       .filter((p) => p.aggregateCount > 0)
       .map((p) => p.projectionName) ?? [],
   );
@@ -145,7 +141,7 @@ export function BulkReplayWizard({ onReplayStarted }: { onReplayStarted: () => v
   }
 
   const totalAggregates =
-    discoverQuery.data?.projections
+    discoverQuery.discovery?.projections
       .filter((p) => selectedProjections.has(p.projectionName))
       .reduce((sum, p) => sum + p.aggregateCount, 0) ?? 0;
 
@@ -227,14 +223,7 @@ export function BulkReplayWizard({ onReplayStarted }: { onReplayStarted: () => v
           <SincePresets since={since} onSince={setSince} />
         </HStack>
 
-        {canDiscover && discoverQuery.isFetching && (
-          <HStack gap={2} marginTop={3}>
-            <Spinner size="xs" />
-            <Text textStyle="xs" color="fg.muted">
-              Discovering aggregates...
-            </Text>
-          </HStack>
-        )}
+        {canDiscover && discoveryStatusOf(discoverQuery)}
       </WizardStep>
 
       {hasDiscovered && (
@@ -259,7 +248,7 @@ export function BulkReplayWizard({ onReplayStarted }: { onReplayStarted: () => v
                 </ListTable.Row>
               </ListTable.Header>
               <ListTable.Body>
-                {discoverQuery.data!.projections.map((proj) => (
+                {discoverQuery.discovery!.projections.map((proj) => (
                   <ProjectionRow
                     key={proj.projectionName}
                     projectionName={proj.projectionName}
@@ -530,38 +519,31 @@ function projectionCount(count: number): string {
   return `${count} projection${count !== 1 ? "s" : ""}`;
 }
 
-type DiscoverResult = {
-  data?: { projections: { projectionName: string; aggregateCount: number }[] };
-};
-
-/** Rediscovers once per tenant scope and date, preselecting every projection that has data. */
-function useDiscoverOnScopeChange({
-  canDiscover,
-  tenantIds,
-  since,
-  refetch,
-  onDiscovered,
-}: {
-  canDiscover: boolean;
-  tenantIds: string[];
-  since: string;
-  refetch: () => Promise<DiscoverResult>;
-  onDiscovered: (projectionNames: Set<string>) => void;
-}) {
-  const lastDiscoverKey = useRef("");
-  const key = JSON.stringify({ tenantIds, since });
-
-  useEffect(() => {
-    if (!canDiscover || key === lastDiscoverKey.current) return;
-    lastDiscoverKey.current = key;
-
-    void refetch().then((result) => {
-      if (!result.data) return;
-      onDiscovered(
-        new Set(
-          result.data.projections.filter((p) => p.aggregateCount > 0).map((p) => p.projectionName),
-        ),
-      );
-    });
-  }, [canDiscover, key, refetch, onDiscovered]);
+/** What step two shows while the worker counts, or when the count did not come back. */
+function discoveryStatusOf(count: AggregateDiscoveryState): React.ReactNode {
+  if (count.isDiscovering) {
+    return (
+      <HStack gap={2} marginTop={3}>
+        <Spinner size="xs" />
+        <Text textStyle="xs" color="fg.muted">
+          Discovering aggregates...
+        </Text>
+      </HStack>
+    );
+  }
+  if (count.outcome === "failed") {
+    return (
+      <Banner status="error" placement="inline">
+        Couldn't count the aggregates. Change the tenants or the date to try again.
+      </Banner>
+    );
+  }
+  if (count.outcome === "expired") {
+    return (
+      <Banner status="warning" placement="inline">
+        This count has expired. Change the tenants or the date to count again.
+      </Banner>
+    );
+  }
+  return void 0;
 }

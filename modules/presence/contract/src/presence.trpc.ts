@@ -63,4 +63,9 @@ export const presenceTrpc = defineTrpcContract("presence")
   .subscription("onUpgradeReadHints")
   .withInput(z.void())
   .withOutput(readHintSchema)
+
+  /** The operator's own user-scope hints, for an Ops tab with no organisation; operators only. */
+  .subscription("onOperatorReadHints")
+  .withInput(z.void())
+  .withOutput(readHintSchema)
   .build();

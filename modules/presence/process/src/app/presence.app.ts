@@ -177,4 +177,17 @@ export class PresenceModule implements PresenceApiContract, PresenceBroadcastFab
   upgradeReadHints({ signal }: { signal?: AbortSignal }): AsyncIterable<ReadHint> {
     return this.#readHints.watchUpgrades(signal === undefined ? {} : { signal });
   }
+
+  operatorReadHints({
+    userId,
+    signal,
+  }: {
+    userId: string;
+    signal?: AbortSignal;
+  }): AsyncIterable<ReadHint> {
+    return this.#readHints.watch({
+      tenantIds: [userId],
+      ...(signal === undefined ? {} : { signal }),
+    });
+  }
 }

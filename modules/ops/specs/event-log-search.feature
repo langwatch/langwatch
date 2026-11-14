@@ -85,3 +85,53 @@ Feature: Searching the event log from the operator console
     Given an operator who submitted a search
     When its result is still pending
     Then the explorer shows "Searching…"
+
+  @integration
+  Scenario: An ops tab with no organisation in scope refreshes when its search completes
+    Given an operator on an ops tab with no organisation in scope has submitted a search
+    When the operator read-hint stream relays the completed search's hint
+    Then the explorer reads the result again
+    And no timer polls it
+
+  @integration
+  Scenario: The operator read-hint stream relays the operator's own hints only
+    Given an operator holding the operator view grant has opened the operator read-hint stream
+    When a hint arrives on the operator's own user scope
+    And a malformed frame arrives on the same scope
+    Then the stream relays the hint once
+    And it listens on no organisation's or project's hints
+
+  @integration
+  Scenario: A reader without the operator view grant is refused the operator read-hint stream
+    Given a signed-in user who is not a platform operator
+    When they open the operator read-hint stream
+    Then the stream is refused at the door
+    And nothing listens on their user scope
+
+  @unit
+  Scenario: The replay wizard's aggregate count runs in the worker
+    Given an operator who picked the tenants and lower bound of a replay
+    When the wizard asks how many aggregates each projection would replay
+    Then the api stores the request and answers its request id
+    And the worker counts the aggregates on its own identity and stores the counts under the request id
+    And the completion is sent so the wizard's read is refetched
+
+  @unit
+  Scenario: An aggregate count the worker could not run is recorded failed
+    Given a requested aggregate count whose read fails in the worker
+    When the worker runs it
+    Then the count answers failed, with no engine text
+    And the completion is still sent
+
+  @unit
+  Scenario: An unknown or expired aggregate count answers expired
+    Given a request id no count was stored under, or one past its ten minutes
+    When the wizard reads the count
+    Then it answers expired
+
+  @integration
+  Scenario: The replay wizard selects the projections with data once the count arrives
+    Given an operator who changed a replay's tenants or lower bound
+    When the operator read-hint stream relays the completed count's hint
+    Then the wizard reads the count again
+    And it selects the projections that have aggregates, with no timer polling

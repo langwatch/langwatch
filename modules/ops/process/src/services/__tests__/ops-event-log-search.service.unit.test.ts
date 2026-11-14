@@ -1,5 +1,5 @@
 /** Spec: modules/ops/specs/event-log-search.feature (ADR-202 Decided 14) */
-import type { AggregateSearchResult } from "@langwatch/ops-contract";
+import type { AggregateDiscovery, AggregateSearchResult } from "@langwatch/ops-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { MemoryOpsEventLogSearchResultsRepository } from "../../repositories/memory/memory.ops-event-log-search-results.repository.ts";
@@ -19,9 +19,14 @@ const MATCHES: AggregateSearchResult[] = [
   },
 ];
 
+const COUNTS: AggregateDiscovery = {
+  projections: [{ projectionName: "trace_summary", aggregateCount: 2, tenantBreakdown: [] }],
+};
+
 function serviceWith({
   now = () => 0,
   searchAggregates = vi.fn(async () => MATCHES),
+  discoverAggregates = vi.fn(async () => COUNTS),
 }: {
   now?: () => number;
   searchAggregates?: (input: {
@@ -29,8 +34,16 @@ function serviceWith({
     tenantIds: string[];
     sinceMs: number;
   }) => Promise<AggregateSearchResult[]>;
+  discoverAggregates?: (input: {
+    projectionNames: string[];
+    since: string;
+    tenantIds: string[];
+  }) => Promise<AggregateDiscovery>;
 } = {}) {
-  const explorer = { searchAggregates: vi.fn(searchAggregates) };
+  const explorer = {
+    searchAggregates: vi.fn(searchAggregates),
+    discoverAggregates: vi.fn(discoverAggregates),
+  };
   const results = MemoryOpsEventLogSearchResultsRepository.create({
     store: MemoryOpsStore.create(),
     now,
@@ -49,7 +62,14 @@ function serviceWith({
   const accept = (query = "trace_abc", tenantIds: string[] = []) =>
     service.request({ query, tenantIds, sinceMs: SINCE_MS, requestedBy: OPERATOR });
   const runOnWorker = () => service.run({ requestId: "ops_search_1", tenantId: OPERATOR });
-  return { service, explorer, requestSend, completeSend, accept, runOnWorker };
+  const acceptCount = () =>
+    service.requestDiscovery({
+      projectionNames: ["trace_summary"],
+      since: "2025-11-14",
+      tenantIds: ["project_1"],
+      requestedBy: OPERATOR,
+    });
+  return { service, explorer, requestSend, completeSend, accept, acceptCount, runOnWorker };
 }
 
 describe("given an event-log search the api accepted", () => {
@@ -160,5 +180,67 @@ describe("given an event-log search the api accepted", () => {
       2,
       expect.objectContaining({ requestId: "ops_search_1", tenantId: OPERATOR }),
     );
+  });
+});
+
+describe("given the replay wizard's aggregate count the api accepted", () => {
+  /** @scenario "The replay wizard's aggregate count runs in the worker" */
+  it("stores it pending, counts on the worker, stores the counts and records the completion", async () => {
+    const { acceptCount, runOnWorker, service, explorer, requestSend, completeSend } =
+      serviceWith();
+
+    expect(await acceptCount()).toEqual({ requestId: "ops_search_1" });
+    expect(requestSend).toHaveBeenCalledWith(
+      expect.objectContaining({ requestId: "ops_search_1", tenantId: OPERATOR }),
+    );
+    expect(JSON.stringify(requestSend.mock.calls)).not.toContain("project_1");
+    expect(await service.discovery({ requestId: "ops_search_1" })).toEqual({ status: "pending" });
+
+    await runOnWorker();
+
+    expect(explorer.discoverAggregates).toHaveBeenCalledWith({
+      projectionNames: ["trace_summary"],
+      since: "2025-11-14",
+      tenantIds: ["project_1"],
+    });
+    expect(explorer.searchAggregates).not.toHaveBeenCalled();
+    expect(await service.discovery({ requestId: "ops_search_1" })).toEqual({
+      status: "done",
+      discovery: COUNTS,
+    });
+    expect(await service.result({ requestId: "ops_search_1" })).toEqual({ status: "expired" });
+    expect(completeSend).toHaveBeenCalledWith(
+      expect.objectContaining({ requestId: "ops_search_1", tenantId: OPERATOR }),
+    );
+  });
+
+  /** @scenario "An aggregate count the worker could not run is recorded failed" */
+  it("stores the failure with none of the engine's text and still records the completion", async () => {
+    const { acceptCount, runOnWorker, service, completeSend } = serviceWith({
+      discoverAggregates: async () => {
+        throw new Error("Code: 159. Timeout exceeded on host ch-0");
+      },
+    });
+    await acceptCount();
+
+    await runOnWorker();
+
+    const answer = await service.discovery({ requestId: "ops_search_1" });
+    expect(answer).toEqual({ status: "failed" });
+    expect(JSON.stringify(answer)).not.toContain("ch-0");
+    expect(completeSend).toHaveBeenCalledTimes(1);
+  });
+
+  /** @scenario "An unknown or expired aggregate count answers expired" */
+  it("answers expired for an id it never accepted, a search's id, and after the TTL", async () => {
+    let nowMs = 0;
+    const { accept, acceptCount, service } = serviceWith({ now: () => nowMs });
+
+    expect(await service.discovery({ requestId: "ops_unknown" })).toEqual({ status: "expired" });
+    await accept();
+    expect(await service.discovery({ requestId: "ops_search_1" })).toEqual({ status: "expired" });
+    await acceptCount();
+    nowMs = OPS_EVENT_LOG_SEARCH_RESULT_TTL_SECONDS * 1000 + 1;
+    expect(await service.discovery({ requestId: "ops_search_1" })).toEqual({ status: "expired" });
   });
 });

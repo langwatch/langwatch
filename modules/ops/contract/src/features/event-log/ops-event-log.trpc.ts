@@ -7,7 +7,6 @@ import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
 import {
-  opsAggregateDiscoverySchema,
   opsAggregateEventsSchema,
   opsAnomalyDismissedSchema,
   opsAnomalyListingSchema,
@@ -20,6 +19,7 @@ import {
 } from "../../ops.responses.ts";
 import { opsDismissAnomalyInputSchema } from "../dashboard/ops-anomaly.ts";
 import {
+  aggregateDiscoveryAnswerSchema,
   aggregateSearchAnswerSchema,
   aggregateSearchRequestedSchema,
   OPS_EVENT_LOG_SEARCH_COMPLETED_EVENT_TYPE,
@@ -71,9 +71,18 @@ export const opsEventLogTrpc = defineTrpcContract("ops")
   .withInput(opsComputeProjectionStateInputSchema)
   .withOutput(opsProjectionStateSchema)
 
-  .query("discoverAggregates")
+  /**
+   * Hands the replay wizard's aggregate count to a worker, which reads every tenant on its own
+   * identity (ADR-202 Decided 14); the answer is the request id `getAggregateDiscovery` reads.
+   */
+  .mutation("discoverAggregates")
   .withInput(opsDiscoverAggregatesInputSchema)
-  .withOutput(opsAggregateDiscoverySchema)
+  .withOutput(aggregateSearchRequestedSchema)
+
+  /** One aggregate count by its request id, refetched when the worker records it completed. */
+  .query("getAggregateDiscovery", { invalidatedBy: [OPS_EVENT_LOG_SEARCH_COMPLETED_EVENT_TYPE] })
+  .withInput(opsGetAggregateSearchInputSchema)
+  .withOutput(aggregateDiscoveryAnswerSchema)
 
   .query("searchTenants")
   .withInput(opsSearchTenantsInputSchema)

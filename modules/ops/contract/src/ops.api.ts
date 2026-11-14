@@ -51,7 +51,7 @@ import type {
 } from "./features/dashboard/ops-dashboard.ts";
 import type { OpsSnapshotAbortSignal } from "./features/dashboard/ops-snapshot.service.ts";
 import type {
-  AggregateDiscovery,
+  AggregateDiscoveryAnswer,
   AggregateEventView,
   AggregateSearchAnswer,
   AggregateSearchRequested,
@@ -648,7 +648,12 @@ export interface OpsApi {
     lastEditedBy: string | null;
   }): Promise<void>;
   clearFeatureFlag(input: { key: string; lastEditedBy: string | null }): Promise<void>;
-  discoverAggregates(input: DiscoverAggregatesInput): Promise<AggregateDiscovery>;
+  /** Accepts the replay wizard's aggregate count for a worker and answers its request id. */
+  discoverAggregates(
+    input: DiscoverAggregatesInput & { operator: OpsOperator | null },
+  ): Promise<AggregateSearchRequested>;
+  /** One accepted aggregate count by its request id: pending, its counts, failed or expired. */
+  getAggregateDiscovery(input: { requestId: string }): Promise<AggregateDiscoveryAnswer>;
   /**
    * Accepts an event-log search for a worker and answers its request id (ADR-202 Decided 14).
    * `sinceMs` is optional because the default lookback is the module's rule, not the door's;

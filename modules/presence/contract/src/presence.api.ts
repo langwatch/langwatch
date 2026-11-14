@@ -10,7 +10,12 @@ import type {
   PresenceSession,
   PresenceUpdateInput,
 } from "./presence.ts";
-import type { ReadHint, ReadHintsWatchInput, UpgradeReadHintsWatchInput } from "./read-hints.ts";
+import type {
+  OperatorReadHintsWatchInput,
+  ReadHint,
+  ReadHintsWatchInput,
+  UpgradeReadHintsWatchInput,
+} from "./read-hints.ts";
 
 /** Portable cancellation shape; browser and Node AbortSignals satisfy it. */
 export type PresenceStreamSignal = unknown;
@@ -58,6 +63,8 @@ export interface PresenceApi {
   readHints(input: ReadHintsWatchInput): AsyncIterable<ReadHint>;
   /** The upgrade runner's platform-scoped hints, for the Ops Upgrades pages, until the abort. */
   upgradeReadHints(input: UpgradeReadHintsWatchInput): AsyncIterable<ReadHint>;
+  /** The operator's own user-scope hints, for an Ops tab with no organisation, until the abort. */
+  operatorReadHints(input: OperatorReadHintsWatchInput): AsyncIterable<ReadHint>;
 }
 
 export const PresenceApi = moduleApi<PresenceApi>()("presence");

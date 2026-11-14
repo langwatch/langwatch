@@ -75,6 +75,7 @@ import {
   opsSecrets,
   type AdminIdentity,
   type AggregateDiscovery,
+  type AggregateDiscoveryAnswer,
   type AggregateEventView,
   type AggregateProcessManager,
   type AggregateSearchAnswer,
@@ -1210,8 +1211,22 @@ export class OpsModule implements OpsApi {
     return this.#dependencies.featureFlags.clearStoredFlag(input);
   }
 
-  discoverAggregates(input: DiscoverAggregatesInput): Promise<AggregateDiscovery> {
-    return this.#dependencies.ops.eventExplorer.discoverAggregates(input);
+  /** Accepts the replay wizard's aggregate count for the search's worker (ADR-202 Decided 14). */
+  discoverAggregates(
+    input: DiscoverAggregatesInput & { operator: OpsOperator | null },
+  ): Promise<AggregateSearchRequested> {
+    // The completion hint is sent under the operator's own user id.
+    if (!input.operator) throw new OpsOperatorSessionRequiredError();
+    return this.#dependencies.eventLogSearch.requestDiscovery({
+      projectionNames: input.projectionNames,
+      since: input.since,
+      tenantIds: input.tenantIds,
+      requestedBy: input.operator.id,
+    });
+  }
+
+  getAggregateDiscovery(input: { requestId: string }): Promise<AggregateDiscoveryAnswer> {
+    return this.#dependencies.eventLogSearch.discovery(input);
   }
 
   /**

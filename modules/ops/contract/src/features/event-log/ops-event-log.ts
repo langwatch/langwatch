@@ -165,6 +165,20 @@ export const aggregateSearchAnswerSchema: AggregateSearchAnswerSchema =
   aggregateSearchAnswerSchemaDefinition;
 export type AggregateSearchAnswer = z.infer<typeof aggregateSearchAnswerSchema>;
 
+/** One aggregate count by its request id, in the search's four states (ADR-202 Decided 14). */
+const aggregateDiscoveryAnswerSchemaDefinition = z.discriminatedUnion("status", [
+  z.object({ status: z.literal("pending") }),
+  z.object({ status: z.literal("done"), discovery: aggregateDiscoverySchema }),
+  z.object({ status: z.literal("failed") }),
+  z.object({ status: z.literal("expired") }),
+]);
+export interface AggregateDiscoveryAnswerSchema extends Named<
+  typeof aggregateDiscoveryAnswerSchemaDefinition
+> {}
+export const aggregateDiscoveryAnswerSchema: AggregateDiscoveryAnswerSchema =
+  aggregateDiscoveryAnswerSchemaDefinition;
+export type AggregateDiscoveryAnswer = z.infer<typeof aggregateDiscoveryAnswerSchema>;
+
 /** One stored event, with its payload parsed when it parses. */
 const aggregateEventViewSchemaDefinition = z.object({
   eventId: z.string(),
