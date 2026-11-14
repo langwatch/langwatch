@@ -106,6 +106,7 @@ export const reads = {
   "@langwatch/entitlement-process": ["docs/pricing.mdx", "docs/pricing/billable-events.mdx"],
   "@langwatch/group-queue": ["apps/*/package.json"],
   "@langwatch/process": ["charts/langwatch/**/*"],
+  "@langwatch/process-stores": ["infra/compose.yml", "infra/docker/Dockerfile"],
   "@langwatch/automation-contract": ["modules/automation/**/*"],
   "@langwatch/config": ["packages/browser/src/wire/public-config.ts"],
   "@langwatch/mail": ["skills/tracing/SKILL.mdx"],
