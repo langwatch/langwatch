@@ -26,6 +26,9 @@ export type ChildLog = (
   extra?: Record<string, unknown>,
 ) => void;
 
+/** Set when the processor stops a child on purpose, so its exit is not read as a failure. */
+type ChildRelease = { released: boolean };
+
 type ScenarioChildProcessResult = {
   success: boolean;
   error?: string;
@@ -55,11 +58,13 @@ export function superviseScenarioChild(input: {
   log: ChildLog;
 }): ScenarioChildExecutionSession {
   input.pool.registerChild(input.jobData.scenarioRunId, input.child);
-  const completion = observeChild(input);
+  const release = { released: false };
+  const completion = observeChild({ ...input, release });
   return NodeScenarioChildExecutionSession.create({
     child: input.child,
     completion,
     log: input.log,
+    release,
   });
 }
 
@@ -68,6 +73,7 @@ function observeChild(input: {
   jobData: ExecutionJobData;
   pool: ScenarioChildRunPool;
   log: ChildLog;
+  release: ChildRelease;
 }): Promise<ScenarioExecutionResult> {
   return new Promise((resolve) => {
     const { child, log, pool } = input;
@@ -80,6 +86,7 @@ function observeChild(input: {
       settled = true;
       log("error", "Child process timed out", { timeoutMs: CHILD_PROCESS.TIMEOUT_MS });
       child.kill();
+      endStdin({ child, log });
       resolve({ success: false, error: "Scenario execution timed out" });
     }, CHILD_PROCESS.TIMEOUT_MS);
 
@@ -93,7 +100,7 @@ function observeChild(input: {
       stderr += chunk;
       logChildChunk(chunk, "warn", log);
     });
-    child.on("close", (code) => {
+    child.on("close", (code, signal) => {
       clearTimeout(timeout);
       pool.deregisterChild(input.jobData.scenarioRunId);
       if (settled) return;
@@ -106,6 +113,8 @@ function observeChild(input: {
           stderr,
           log,
           cancelled: pool.wasCancelled(input.jobData.scenarioRunId),
+          signal,
+          released: input.release.released && endedByTheRelease(signal),
         }),
       );
     });
@@ -133,6 +142,7 @@ class NodeScenarioChildExecutionSession implements ScenarioChildExecutionSession
       message: string,
       extra?: Record<string, unknown>,
     ) => void;
+    release: ChildRelease;
   }): NodeScenarioChildExecutionSession {
     return new NodeScenarioChildExecutionSession(options);
   }
@@ -148,6 +158,7 @@ class NodeScenarioChildExecutionSession implements ScenarioChildExecutionSession
         message: string,
         extra?: Record<string, unknown>,
       ) => void;
+      release: ChildRelease;
     },
   ) {}
 
@@ -168,8 +179,21 @@ class NodeScenarioChildExecutionSession implements ScenarioChildExecutionSession
   }
 
   async abort(): Promise<void> {
-    this.options.child.kill("SIGTERM");
+    this.options.release.released = this.options.child.kill("SIGTERM");
+    endStdin({ child: this.options.child, log: this.options.log });
     await this.options.completion;
+  }
+}
+
+// A child still reading its job blocks on stdin and ignores SIGTERM, so a
+// stop closes it too. Ending an already-ended stream must not throw.
+function endStdin({ child, log }: { child: ChildProcess; log: ChildLog }): void {
+  try {
+    child.stdin?.end();
+  } catch (error) {
+    log("warn", "Child stdin end failed", {
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 }
 
@@ -202,18 +226,28 @@ function logChildChunk(chunk: string, level: "info" | "warn", log: ChildLog): vo
   }
 }
 
+// The Node child dies of SIGTERM; the Go runner traps it and exits with a
+// code, so its signal is null. Any other signal (SIGKILL, SIGSEGV) is no release.
+function endedByTheRelease(signal: NodeJS.Signals | null): boolean {
+  return signal === null || signal === "SIGTERM";
+}
+
 function childExitResult({
   code,
   stdout,
   stderr,
   log,
   cancelled,
+  released,
+  signal,
 }: {
   code: number | null;
   stdout: string;
   stderr: string;
   log: ChildLog;
   cancelled: boolean;
+  released: boolean;
+  signal: NodeJS.Signals | null;
 }): ScenarioExecutionResult {
   if (cancelled) {
     log("info", "Job cancelled via cancel broadcast");
@@ -224,10 +258,13 @@ function childExitResult({
     const error = childResult?.error?.trim()
       ? childResult.error
       : `Child process exited with code ${code}: ${stderr}`;
-    log("error", `Child process exited with code ${code}`, {
-      exitCode: code,
-      stderr,
-    });
+    log(
+      released ? "info" : "error",
+      released
+        ? "Child process stopped after its run was released"
+        : `Child process exited with code ${code}`,
+      { exitCode: code, signal, stderr },
+    );
     // A failed run still ran its teardown, and its record matters most then.
     return { success: false, error, ...(childResult?.hooks ? { hooks: childResult.hooks } : {}) };
   }

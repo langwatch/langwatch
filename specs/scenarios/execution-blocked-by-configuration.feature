@@ -33,6 +33,48 @@ Feature: A simulation blocked by the project's own configuration says so
     And the record names the reason the run could not start
 
   @unit @scenario-prefetch
+  Scenario: A project with no model for the simulator gets a run refused with the remediation message, logged as a warning, not an error
+    Given a project with no model for the simulator
+    When the run's models are resolved
+    Then the run is refused with the model-not-configured remediation message
+    And the record names the reason "model_not_configured"
+    And the record is logged at warn level
+    And nothing is logged at error level
+
+  @unit @scenario-prefetch
+  Scenario: A project whose only models are restricted for a scenario feature gets the run refused, logged as a warning
+    Given a project whose only configured models are restricted for a scenario feature
+    When the run's models are resolved
+    Then the run is refused with the restriction message
+    And the record names the reason "model_not_configured"
+    And the record is logged at warn level
+    And nothing is logged at error level
+
+  @unit @scenario-child
+  Scenario: A child the processor released is logged at info, not error
+    Given a scenario child process the processor has released on purpose
+    When the child closes because of the SIGTERM the release sent, or exits with a code after trapping it
+    Then the close is logged at info level and not at error level
+
+  @unit @scenario-child
+  Scenario: A released child that something else ended is still logged at error
+    Given a scenario child process the processor has released on purpose
+    When the child closes from any other signal, or exits before the release could signal it
+    Then the close is logged at error level
+
+  @unit @scenario-child
+  Scenario: A child nobody released that dies by itself is logged at error
+    Given a scenario child process the processor has not released
+    When the child closes without an exit code
+    Then the close is logged at error level
+
+  @unit @scenario-child
+  Scenario: Stopping a child closes its stdin so a child still reading its job can stop
+    Given a scenario child process still reading its job from stdin
+    When the processor releases it, or the timeout stops it
+    Then the child's stdin is closed after the kill
+
+  @unit @scenario-prefetch
   Scenario: A failure we do not recognise stays ours
     Given a prefetch that fails while preparing the run
     When the run's data is prefetched

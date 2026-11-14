@@ -126,8 +126,12 @@ export class ScenarioExecutionLookupService {
       return resolved.model;
     }
 
-    throw new Error(
-      `No model configured for "${featureKey}" (role: DEFAULT, project: ${projectId}).`,
-    );
+    // The resolver owns the feature registry: it throws ModelNotConfiguredError
+    // with the role and display name filled in, or finds a model the default read missed.
+    const resolution = await this.options.modelProviders.resolveModelForFeature({
+      projectId,
+      featureKey,
+    });
+    return resolution.model;
   }
 }

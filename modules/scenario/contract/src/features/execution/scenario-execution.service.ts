@@ -39,9 +39,9 @@ export type ScenarioModelParametersFailureReason =
   | "provider_not_found"
   | "provider_not_enabled"
   | "missing_params"
-  // A project with no model set for a scenario feature key is the customer's
-  // to fix, so the refusal names it rather than leaving the caller unable to
-  // tell it from a fault of ours.
+  // A project with no usable model for a scenario feature (none set, or only
+  // restricted ones) is the customer's to fix, so the refusal names it rather
+  // than leaving the caller unable to tell it from a fault of ours.
   | "model_not_configured"
   | "preparation_error";
 
