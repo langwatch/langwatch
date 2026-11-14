@@ -14,6 +14,8 @@ import {
 } from "@langwatch/eventing";
 import {
   INSIGHT_DAILY_RUN_EVENT_TYPES,
+  INSIGHT_DAILY_RUN_LEASE_MS,
+  INSIGHT_DAILY_RUN_MAX_ATTEMPTS,
   INSIGHT_DAILY_RUN_PIPELINE_NAME,
   INSIGHT_DAILY_SCHEDULE_AGGREGATE_TYPE,
 } from "@langwatch/insight-contract";
@@ -48,8 +50,6 @@ import {
 } from "./insight-daily-run.events.ts";
 import {
   INSIGHT_DAILY_RUN_INTENT,
-  INSIGHT_DAILY_RUN_LEASE_MS,
-  INSIGHT_DAILY_RUN_MAX_ATTEMPTS,
   type InsightDailyRunExecutor,
   runBoardIntent,
   runBoardIntentSchema,

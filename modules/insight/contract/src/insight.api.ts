@@ -4,6 +4,7 @@ import type {
   ConfigureInsightDailyRunInput,
   InsightBoardDailyRunScope,
   InsightDailyRun,
+  InsightDailyRunRequested,
   InsightDailyRunSetting,
   InsightOperatorDailySchedule,
   RequestInsightDailyRunInput,
@@ -37,6 +38,11 @@ export interface InsightApi {
    * never a run: the worker starts none for it while a run is in flight for that board.
    */
   requestDailyRun(input: RequestInsightDailyRunInput): Promise<{ requestId: string }>;
+  /**
+   * The reader's own Run now: the same request, refused with `validation_error` unless their
+   * daily run on the board is on.
+   */
+  runDailyRunNow(input: RequestInsightDailyRunInput): Promise<InsightDailyRunRequested>;
   /** The reader's own runs in the project, one per board, each with how its last run ended. */
   findDailyRuns(input: { projectId: string } & Reader): Promise<InsightDailyRun[]>;
   /** The reader's own daily run on one board: `undecided` until they turned it on or off. */

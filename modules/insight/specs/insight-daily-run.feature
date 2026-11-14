@@ -1145,3 +1145,235 @@ Feature: The daily insights run
       When the member turns it on
       Then the control goes back to off
       And the member is told it could not be turned on
+
+  Rule: A person can run their board's insights now
+    Run now asks for the same run the schedule asks for, so it files into the same inbox.
+    Insights runs have no rate limit for now: what is worth running is not known yet.
+
+    @integration
+    Scenario: Run now is in the dropdown of a board that is on
+      Given a member turned the daily run on for a stored board with widgets
+      When they open the dropdown in the board's header
+      Then it offers Run now
+
+    @integration
+    Scenario: Run now is offered only on a board a run can read
+      Given a board that is on, and a member who may ask Langy
+      When they open the dropdown in the board's header
+      Then a stored board with widgets offers Run now
+      And a From LangWatch board does not, since a run on it always ends skipped with template_board
+      And a board with no widgets does not, since a run on it always ends skipped with board_empty
+      And a board whose widgets have not loaded does not, until they have
+      And a member who may not ask Langy is offered no Run now
+
+    @integration
+    Scenario: Run now asks for a run and opens Langy on it
+      Given a board that is on, with no run in flight
+      When the member chooses Run now
+      Then a run is requested for them on that board
+      And once the run has started, the Langy panel opens on the run's conversation
+
+    @integration
+    Scenario: Run now opens Langy when the start's hint arrives before its run is stored
+      Given a board that is on, with no run in flight
+      And the member chose Run now
+      When the hint that the run started reaches the board before the run is stored
+      Then the board reads no more on a timer, and the member is told nothing
+      And the Langy panel opens on the run's conversation once a later hint's read shows it
+
+    @integration
+    Scenario: Run now waits for the run it asked for, not one that settled before the click
+      Given a board that is on, with no run in flight
+      And a scheduled run settled before the board read it
+      When the member chooses Run now
+      Then the board shows that run as the last run and keeps waiting
+      And the Langy panel opens only once the run that Run now asked for has started
+
+    @integration
+    Scenario: Run now follows a run that started after the click
+      Given a board that is on, with no run in flight
+      And the member chose Run now
+      When another run starts first, from another tab or the schedule, so the request starts none
+      Then the board follows that run instead of waiting for a run that never comes
+      And it compares the run's start with the time the server recorded the request
+      And the Langy panel opens on that run's conversation
+
+    @integration
+    Scenario: Run now waits past a lost run settled before its own starts
+      Given a board that is on, whose run in flight is lost
+      And the member chose Run now
+      When the worker records the lost run as timed out, with no conversation, before it starts theirs
+      Then the board keeps waiting instead of taking the lost run for theirs
+      And the Langy panel opens on their run's conversation once it starts
+
+    @unit
+    Scenario: Run now on a board whose run is already going follows that run
+      Given a board that is on, whose run is in flight before the page shows it
+      When the member chooses Run now
+      Then no run is requested
+      And Run now answers the id of the run in flight, so the board follows that run
+
+    @integration
+    Scenario: A run in flight is opened, not started again
+      Given a board that is on, with a run in flight
+      When the member opens the dropdown
+      Then it says a run is going and offers to open it in Langy, not Run now
+      And opening it opens the Langy panel on the run's conversation
+
+    @integration
+    Scenario: A refused Run now says so
+      Given a board that is on, and a server that refuses the request
+      When the member chooses Run now
+      Then the member is told the run could not be started
+      And the dropdown offers Run now again
+
+    @integration
+    Scenario: A requested run that ends with no conversation says how it ended
+      Given a board that is on, and the member chose Run now
+      When the run they asked for settles with no conversation
+      Then the member is told how it ended, or why it did not start, in plain words
+      And no Langy panel opens and no failure is shown
+      And the dropdown offers Run now again
+
+    @integration
+    Scenario: The deadline follows a run its last read finds
+      Given a board that is on, and the member chose Run now
+      And the board has read no run for as long as a run can last
+      When the deadline reads the board once more and that read shows the run
+      Then the spinner ended when the deadline fired, before the read answered
+      And the Langy panel opens on the run's conversation, or the member is told how it ended
+      And the member is not told the run could not be started
+
+    @integration
+    Scenario: The deadline read is replaced by a later hint's read
+      Given a board that is on, and the member chose Run now
+      And the board has read no run for as long as a run can last
+      When the deadline fires its read and that read never answers
+      Then the spinner ends at expiry, and no failure, no notice and no Langy panel is shown
+      And when a later hint's read replaces it and shows the run, Langy opens once on the run
+
+    @integration
+    Scenario: A read that lands a run's lifetime after the deadline gives no verdict
+      Given a board that is on, and the member chose Run now
+      And the deadline fired its read and that read never answered
+      When a later hint's read answers more than a run's lifetime after the deadline
+      Then no failure, no notice and no Langy panel is shown, whatever that read shows
+
+    @integration
+    Scenario: A run that started after the deadline gives no verdict
+      Given a board that is on, and the member chose Run now
+      And the deadline fired its read and that read never answered
+      When a later hint's read, inside a run's lifetime, shows a scheduled run that started after the deadline
+      Then no failure, no notice and no Langy panel is shown
+
+    @integration
+    Scenario: The deadline says the run could not be started when its last read finds none
+      Given a board that is on, and the member chose Run now
+      And the board has read no run for as long as a run can last
+      When the deadline reads the board once more and that read shows no run
+      Then the member is told once that the run could not be started
+      And the dropdown offers Run now again
+
+    @integration
+    Scenario: The deadline does not move when the page's host is rebuilt
+      Given a board that is on, and the member chose Run now
+      When the page's address changes before the deadline
+      Then the member is told once, at the same time as if it had not changed
+      And the message goes through the page as it is by then
+
+    @integration
+    Scenario: Turning the run off after the deadline fired drops the verdict its read owes
+      Given a board that is on, and the member chose Run now
+      And the deadline fired and its read has not answered
+      When they turn the run off and then that read answers
+      Then no Langy panel opens, no notice is shown and no failure is shown
+
+    @integration
+    Scenario: Leaving the board after the deadline fired drops the verdict its read owes
+      Given a board that is on, and the member chose Run now
+      And the deadline fired and its read has not answered
+      When they leave the board and then that read answers with the run
+      Then no Langy panel opens, no notice is shown and no failure is shown
+
+    @integration
+    Scenario: A second Run now drops the verdict the earlier deadline read owes
+      Given a board that is on, and the member chose Run now
+      And the deadline fired and its read has not answered
+      When they choose Run now again and then the earlier read answers
+      Then nothing is shown for the earlier request
+
+    @integration
+    Scenario: The deadline says so once when its last read fails
+      Given a board that is on, and the member chose Run now
+      And the board has read no run for as long as a run can last
+      When the deadline reads the board once more and that read fails
+      Then the member is told once that the run could not be started
+      And the board reads no more
+
+    @integration
+    Scenario: A run that shows after the deadline gave up opens nothing and says nothing
+      Given the member was told a run they asked for could not be started
+      When a later read shows that run in flight, or settled with no conversation
+      Then no Langy panel opens and the member is told nothing more
+      And the dropdown shows the run as any run on the board
+
+    @integration
+    Scenario: Turning the run off ends the wait for a requested run
+      Given a board that is on, and the member chose Run now
+      When they turn the run off before the run shows
+      Then no Langy panel opens and nothing is said when the run shows, or at the deadline
+      And turning it on again shows no run starting, and offers Run now
+
+    @integration
+    Scenario: Turning the run off ends the wait even when the write is refused
+      Given a board that is on, and the member chose Run now
+      When they turn the run off and the server refuses the write
+      Then no Langy panel opens and no notice is shown when the run shows, or at the deadline
+      And no failure is shown for the run, only the refused turn-off's own
+
+    @integration
+    Scenario: Turning the run off before Run now answers ends the wait
+      Given a board that is on, and the member chose Run now
+      When they turn the run off before the server answers Run now
+      Then no Langy panel opens, no notice and no failure is shown when Run now answers, when the run shows, or at the deadline
+      And if the server then refuses Run now, no failure is shown for it either
+
+    @integration
+    Scenario: Starting a run still shows after the last widget is deleted
+      Given a board that is on, and the member chose Run now
+      When the board loses its last widget before the run shows
+      Then the dropdown still says a run is starting
+      And it offers no Run now
+
+    @unit
+    Scenario: A started run names its conversation on the board's row
+      Given a run was requested for a board
+      When the run starts
+      Then the board's row names the run's conversation as the run in flight
+      And once the run settles the row names no run in flight
+
+    @integration
+    Scenario: Run now asks for analytics:view and langy:create
+      Given a member without analytics:view or without langy:create
+      When they ask to run a board now
+      Then the request is refused as forbidden and no run is requested
+
+    @integration
+    Scenario: Run now is refused on an aggregate project, and with the flag off
+      Given an aggregate project, or a project with release_insights off
+      When a member asks to run a board now
+      Then the request is refused and no run is requested
+
+    @unit
+    Scenario: Run now is refused on a board that is not on
+      Given a member whose daily run on a board is off, or never decided
+      When they ask to run that board now
+      Then the request is refused with validation_error and no run is requested
+      And the refusal tells them to turn the board's daily insights on first
+      And an operator's run of the same board is still requested
+
+    @unit
+    Scenario: An Insights run is not held to the unattended window
+      Given a project whose unattended turns reached their window
+      When an Insights run asks Langy for its turn
+      Then the turn starts

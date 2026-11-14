@@ -6,6 +6,7 @@
 
 import {
   DEFAULT_INSIGHT_RUN_MAX_INSIGHTS,
+  INSIGHT_DAILY_RUN_EXPIRY_MS,
   INSIGHT_RUN_MAX_INSIGHTS_CHOICES,
   INSIGHT_RUN_SKIP_REASONS,
   INSIGHT_SCHEDULE_SKIPPED_DAYS_BEFORE_OFF,
@@ -152,6 +153,14 @@ function ranWords({ filedCount, renewedCount, reason }: InsightLastRun): string 
   return parts.join(", ") || "nothing new";
 }
 
+/** Why a run was skipped; a reason the contract does not list says what is sure. */
+function skipWords({ reason }: InsightLastRun): string {
+  const known = INSIGHT_RUN_SKIP_REASONS.find((skipReason) => skipReason === reason);
+  return known ? SKIP_REASON_WORDS[known] : "nothing was filed";
+}
+
+const FAILED_WORDS = "nothing was filed, and the next run tries again";
+
 /**
  * The line under the schedule: what the last run did. A run that never reached Langy says
  * "Did not run" and why, so an empty inbox is an answer and not a question.
@@ -172,10 +181,18 @@ export function lastRunWords({
     return `Ran ${when} · ${ranWords(lastRun)}`;
   }
   if (lastRun.outcome === "failed") {
-    return `Failed ${when} · nothing was filed, and the next run tries again`;
+    return `Failed ${when} · ${FAILED_WORDS}`;
   }
-  const reason = INSIGHT_RUN_SKIP_REASONS.find((known) => known === lastRun.reason);
-  return `Did not run ${when} · ${reason ? SKIP_REASON_WORDS[reason] : "nothing was filed"}`;
+  return `Did not run ${when} · ${skipWords(lastRun)}`;
+}
+
+/** What a person is told when the run they asked for ended with no conversation to open. */
+export function requestedRunEndWords(lastRun: InsightLastRun): string {
+  if (lastRun.outcome === "filed" || lastRun.outcome === "nothing") {
+    return `The run ended: ${ranWords(lastRun)}.`;
+  }
+  if (lastRun.outcome === "failed") return `The run failed: ${FAILED_WORDS}.`;
+  return `The run did not start: ${skipWords(lastRun)}.`;
 }
 
 /**
@@ -184,3 +201,60 @@ export function lastRunWords({
  */
 export const TEMPLATE_BOARD_NOTE =
   "Langy cannot read From LangWatch boards yet. Until it can, a run on this board files nothing.";
+
+/**
+ * What a Run now waits for: the run its request named, or another that started or settled after
+ * the request, never a lost run (settled with no conversation); see ADR-004. Once the verdict
+ * is owed (`owedSince`), another run counts only if it started or settled before that instant.
+ */
+export function requestedRunOf({
+  setting,
+  requestId,
+  requestedAt,
+  owedSince = Number.POSITIVE_INFINITY,
+}: {
+  setting: InsightDailyRunSetting;
+  /** What the server answered Run now with. */
+  requestId: string;
+  /** When the server recorded the request, on the clock that stamps a run's start. */
+  requestedAt: number;
+  /** When the verdict is owed, on that same server clock: the request's expiry. */
+  owedSince?: number;
+}): { conversationId: string | null; settled?: InsightLastRun } | undefined {
+  const { runInFlight, lastRun } = setting;
+  if (
+    runInFlight &&
+    (runInFlight.runId === requestId ||
+      (runInFlight.startedAt >= requestedAt && runInFlight.startedAt < owedSince))
+  ) {
+    return { conversationId: runInFlight.conversationId };
+  }
+  const settledInLangy =
+    lastRun?.conversationId != null && lastRun.at >= requestedAt && lastRun.at < owedSince;
+  if (lastRun && (lastRun.runId === requestId || settledInLangy)) {
+    return { conversationId: lastRun.conversationId, settled: lastRun };
+  }
+  return undefined;
+}
+
+/** What the deadline's read shows of the request. */
+export type DeadlineRead =
+  | { kind: "run"; run: NonNullable<ReturnType<typeof requestedRunOf>> }
+  /** No run for the request: it could not be started. */
+  | { kind: "none" }
+  /** Only a run that started after the deadline: it says nothing of the request. */
+  | { kind: "unrelated" };
+
+/** The deadline's read, told apart: the request's run, no run, or a later run that is not it. */
+export function deadlineReadOf(request: {
+  setting: InsightDailyRunSetting;
+  requestId: string;
+  requestedAt: number;
+}): DeadlineRead {
+  // The deadline on the server's clock, the one that stamps a run's start: a browser clock
+  // that runs fast or slow must not move which runs count.
+  const owedSince = request.requestedAt + INSIGHT_DAILY_RUN_EXPIRY_MS;
+  const run = requestedRunOf({ ...request, owedSince });
+  if (run) return { kind: "run", run };
+  return requestedRunOf(request) ? { kind: "unrelated" } : { kind: "none" };
+}

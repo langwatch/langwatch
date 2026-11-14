@@ -72,10 +72,11 @@ export const INSIGHT_DAILY_RUN_EVENT_TYPES = {
   RUN_SETTLED: "lw.insight.daily_schedule.run_settled",
 } as const;
 
-/** What changes a person's read of their daily run on a board: its setting and its last run. */
+/** What changes a person's read of their daily run: its setting, run in flight and last run. */
 export const INSIGHT_DAILY_RUN_SETTING_EVENT_TYPES = [
   INSIGHT_DAILY_RUN_EVENT_TYPES.CONFIGURED,
   INSIGHT_DAILY_RUN_EVENT_TYPES.TURNED_OFF,
+  INSIGHT_DAILY_RUN_EVENT_TYPES.RUN_STARTED,
   INSIGHT_DAILY_RUN_EVENT_TYPES.RUN_SETTLED,
 ] as const;
 
