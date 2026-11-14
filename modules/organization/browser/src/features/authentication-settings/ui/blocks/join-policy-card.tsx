@@ -1,5 +1,6 @@
 import { Link } from "@langwatch/browser-host/link";
 import { AccessState } from "@langwatch/design-system/access-state";
+import { EnterpriseBadge } from "@langwatch/design-system/enterprise-badge";
 /**
  * How people join without an invitation. Opening policies need the Enterprise plan; the saved
  * setting stays selectable after a lapse so it can always be closed.
@@ -12,7 +13,6 @@ import { DEFAULT_DOMAIN_JOIN_SETTING } from "@langwatch/identity-contract";
 import type { DomainJoinSetting, JoinerRole } from "@langwatch/identity-contract";
 import { useState } from "react";
 
-import { EnterprisePlanBadge } from "../../../../ui/elements/enterprise-plan-badge.tsx";
 import { PolicySection } from "../elements/policy-section.tsx";
 
 const OPTIONS: { value: DomainJoinSetting; label: string; help: string }[] = [
@@ -168,7 +168,7 @@ export function JoinPolicyCard({
     <PolicySection
       title="Joining your organization"
       hint="Choose how people can join without an invitation."
-      badge={planLocked ? <EnterprisePlanBadge data-testid="join-policy-plan-badge" /> : undefined}
+      badge={planLocked ? <EnterpriseBadge data-testid="join-policy-plan-badge" /> : undefined}
       actions={
         <HStack
           width="full"

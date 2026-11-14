@@ -29,8 +29,33 @@ describe("BraidedSpanCallout", () => {
 
       expect(screen.getByText("Braided from Specialists")).toBeInTheDocument();
       expect(screen.getByTestId("braided-span-callout")).toHaveTextContent(
-        'Shown because it matches attributes["orchestrator"] == "web".',
+        "Shown because it matches:",
       );
+      const conditions = screen.getByTestId("braided-span-conditions");
+      expect(conditions.querySelectorAll("code")).toHaveLength(1);
+      expect(conditions.querySelector("code")).toHaveTextContent(
+        'attributes["orchestrator"] == "web"',
+      );
+    });
+
+    it("sets each of several matched conditions on its own line", () => {
+      renderWithDesignSystem(
+        <BraidedSpanCallout
+          braid={braid({
+            matchedConditions: ['attributes["orchestrator"] == "web"', 'name == "charge"'],
+          })}
+          ownerHref={null}
+        />,
+      );
+
+      expect(screen.getByTestId("braided-span-callout")).toHaveTextContent(
+        "Shown because it matches one of:",
+      );
+      const codes = screen.getByTestId("braided-span-conditions").querySelectorAll("code");
+      expect(Array.from(codes).map((code) => code.textContent)).toEqual([
+        'attributes["orchestrator"] == "web"',
+        'name == "charge"',
+      ]);
     });
   });
 

@@ -60,7 +60,7 @@ export function AuthenticationSettings({
   const organizationName = host.organization()?.name;
 
   return (
-    <VStack align="stretch" gap={8} width="full" paddingTop={4}>
+    <VStack align="stretch" gap={8} width="full">
       <Text color="fg.muted">
         {organizationName
           ? `Manage sign-in, provisioning, and security policies for ${organizationName}.`

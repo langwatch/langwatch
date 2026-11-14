@@ -453,7 +453,7 @@ export function SubscriptionPage() {
         currency={currency}
         onCurrencyChange={setSelectedCurrency}
       />
-      <VStack gap={6} width="full" align="stretch" paddingTop={4}>
+      <VStack gap={6} width="full" align="stretch">
         <Text color="fg.muted">
           Your plan, your usage, your seats and your invoices. Questions about billing?{" "}
           <Link href="mailto:sales@langwatch.ai" color="orange.fg">
@@ -577,7 +577,7 @@ function SubscriptionPagePlaceholder({
         currency={currency}
         onCurrencyChange={onCurrencyChange}
       />
-      <VStack gap={6} width="full" align="stretch" paddingTop={4}>
+      <VStack gap={6} width="full" align="stretch">
         {isLoading ? (
           <>
             <SkeletonText noOfLines={1} width="320px" />

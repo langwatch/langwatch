@@ -1,4 +1,4 @@
-/** Quiet sidebar chip (grey type, hairline border) on the key cap; ENT is EnterprisePill. */
+/** Quiet sidebar chip (grey type, hairline border) on the key cap; see EnterpriseBadge. */
 export const QUIET_SIDEBAR_CHIP = {
   color: "fg.muted",
   borderWidth: "1px",

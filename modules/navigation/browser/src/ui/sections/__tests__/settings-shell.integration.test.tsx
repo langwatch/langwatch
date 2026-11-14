@@ -73,6 +73,8 @@ function renderSettingsSidebar({
         plan: { isEnterprise, isLoading: false, isLiteMember },
         opsAccess: { hasAccess: hasOpsAccess, isAdmin: isOpsAdmin },
         deployment: { isSaaS, hasCloudOps },
+        // Braids released, so the menu's Braids entry renders as the organisation would see it.
+        flags: { release_braids: { enabled: true, isLoading: false } },
         commandBar: { shortcut: "⌘K", open: commandBarOpenMock, trigger: null },
       }}
     >
@@ -278,12 +280,13 @@ describe("the settings shell in a new navigation mode", () => {
       expect(screen.getByRole("link", { name: /^Roles/ })).toHaveAttribute("aria-current", "page");
     });
 
-    /** @scenario "A plan with Enterprise sees its entries marked ENT, not locked" */
-    it("marks the enterprise entries ENT on a plan that includes them", () => {
+    /** @scenario "A plan with Enterprise sees its entries as plain entries" */
+    it("draws the enterprise entries plainly on a plan that includes them", () => {
       renderSettingsSidebar();
 
       const roles = screen.getByRole("link", { name: /^Roles/ });
-      expect(within(roles).getByText("ENT")).toBeInTheDocument();
+      expect(within(roles).queryByLabelText("Enterprise")).not.toBeInTheDocument();
+      expect(roles.querySelector(".lucide-lock")).toBeNull();
       expect(screen.queryByLabelText("Included in Enterprise")).not.toBeInTheDocument();
     });
 
@@ -296,7 +299,7 @@ describe("the settings shell in a new navigation mode", () => {
         const link = screen.getByRole("link", { name });
         expect(within(link).getByLabelText("Included in Enterprise")).toBeInTheDocument();
       }
-      expect(screen.queryByText("ENT")).not.toBeInTheDocument();
+      expect(screen.queryByLabelText("Enterprise")).not.toBeInTheDocument();
       for (const name of [/^Users/, /^Authentication/]) {
         const link = screen.getByRole("link", { name });
         expect(within(link).queryByLabelText("Included in Enterprise")).not.toBeInTheDocument();
@@ -309,6 +312,15 @@ describe("the settings shell in a new navigation mode", () => {
 
       expect(screen.queryByRole("link", { name: /^Audit log/ })).not.toBeInTheDocument();
       expect(screen.queryByRole("link", { name: /^Authentication/ })).not.toBeInTheDocument();
+    });
+
+    /** @scenario "A branded feature's entries wear its mark" */
+    it("draws the Braids entry with the braids mark, not a stock icon", () => {
+      renderSettingsSidebar();
+
+      const braids = screen.getByRole("link", { name: /^Braids/ });
+      expect(braids.querySelector('[data-feature="braids"]')).not.toBeNull();
+      expect(braids.querySelector(".lucide")).toBeNull();
     });
 
     /** @scenario "Settings groups read in sentence case" */

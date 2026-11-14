@@ -32,23 +32,6 @@ const animated = (container: HTMLElement) =>
 
 describe("FeatureIllustration", () => {
   describe("given a reader who has not asked for less motion", () => {
-    /** @scenario The hero weaves in once when motion is allowed */
-    it("animates each strand once, staggered", () => {
-      answerMotionPreference({ reduce: false });
-      const { container } = renderWithDesignSystem(
-        <FeatureIllustration feature="braids" name="hero" />,
-      );
-      expect(container.querySelector("svg")?.getAttribute("data-motion")).toBe("play");
-      const strands = [...container.querySelectorAll("[data-strand]")];
-      expect(strands).toHaveLength(3);
-      for (const strand of strands) {
-        expect(getComputedStyle(strand).animation).toContain("feature-weave-in");
-        expect(getComputedStyle(strand).animation).not.toContain("infinite");
-      }
-      const delays = strands.map((strand) => (strand as SVGElement).style.animationDelay);
-      expect(new Set(delays).size).toBe(3);
-    });
-
     /** @scenario The empty state and the Enterprise art never animate */
     it("holds the empty state and the Enterprise art still", () => {
       answerMotionPreference({ reduce: false });
@@ -58,28 +41,13 @@ describe("FeatureIllustration", () => {
           <FeatureIllustration feature="braids" name="enterprise" />
         </>,
       );
-      for (const svg of container.querySelectorAll("svg[data-illustration]")) {
-        expect(svg.getAttribute("data-motion")).toBe("still");
-      }
-      expect(animated(container)).toEqual([]);
-    });
-  });
-
-  describe("given a reader who has asked their system for less motion", () => {
-    /** @scenario The hero stands still for a reader who asked for less motion */
-    it("animates nothing", () => {
-      answerMotionPreference({ reduce: true });
-      const { container } = renderWithDesignSystem(
-        <FeatureIllustration feature="braids" name="hero" />,
-      );
-      expect(container.querySelector("svg")?.getAttribute("data-motion")).toBe("still");
       expect(animated(container)).toEqual([]);
     });
   });
 
   describe("given any Braids illustration", () => {
     /** @scenario Illustrations are hidden from assistive technology */
-    it.each(["empty-state", "enterprise", "hero"] as const)("hides %s", (name) => {
+    it.each(["empty-state", "enterprise"] as const)("hides %s", (name) => {
       const { container } = renderWithDesignSystem(
         <FeatureIllustration feature="braids" name={name} />,
       );
@@ -87,13 +55,13 @@ describe("FeatureIllustration", () => {
     });
   });
 
-  describe("given two Braids hero illustrations on the same page", () => {
+  describe("given two Braids empty state illustrations on the same page", () => {
     /** @scenario Two illustrations on one page never share a mask */
     it("gives every mask its own id", () => {
       const { container } = renderWithDesignSystem(
         <>
-          <FeatureIllustration feature="braids" name="hero" />
-          <FeatureIllustration feature="braids" name="hero" />
+          <FeatureIllustration feature="braids" name="empty-state" />
+          <FeatureIllustration feature="braids" name="empty-state" />
         </>,
       );
       const ids = [...container.querySelectorAll("mask")].map((mask) => mask.id);

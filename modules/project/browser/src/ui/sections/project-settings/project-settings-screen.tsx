@@ -187,7 +187,7 @@ export function ProjectGeneralScreen() {
         <Spacer />
         {host.projectSwitcher()}
       </PageLayout.Header>
-      <VStack gap={6} width="full" align="stretch" paddingTop={4}>
+      <VStack gap={6} width="full" align="stretch">
         {sharedProject && host.hasPermission("project:update") ? (
           <ProjectSettingsForm project={sharedProject} />
         ) : null}
@@ -358,7 +358,7 @@ function SettingsForm({
       <PageLayout.Header>
         <PageLayout.Heading>Organization settings</PageLayout.Heading>
       </PageLayout.Header>
-      <VStack gap={6} width="full" align="stretch" paddingTop={4}>
+      <VStack gap={6} width="full" align="stretch">
         <Text textStyle="body" color="fg.muted">
           How your organization is named, where members land, and what they can share.
         </Text>

@@ -1,6 +1,7 @@
 // The braid dialog's reads and its one write. A refusal the person can act on is said in the
 // drawer; anything else goes to the host's failure notice. Spec: braids-screen.feature.
 
+import type { BraidConditionCompileResult } from "@langwatch/authz-contract/braid-condition-compiler";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { traceClient } from "@langwatch/trace-client";
 import { useEffect, useState } from "react";
@@ -21,6 +22,25 @@ export function useSettled<T>({ value, key, delayMs }: { value: T; key: string; 
     return () => clearTimeout(timer);
   }, [key, value, delayMs, settled.key]);
   return settled.value;
+}
+
+/** How long typing must pause before a refusal is announced, so a half-typed key is not refused. */
+export const BRAID_CONDITION_SETTLE_MS = 600;
+
+/**
+ * The condition checked as typed (`check`, which blocks Save and Test at once) and the check to
+ * announce (`shown`): a refusal only once typing pauses, or once `settle` names the blurred text.
+ */
+export function useConditionCheck(where: string) {
+  const check = checkCondition(where);
+  const [settledWhere, setSettledWhere] = useState(where);
+  useEffect(() => {
+    const timer = setTimeout(() => setSettledWhere(where), BRAID_CONDITION_SETTLE_MS);
+    return () => clearTimeout(timer);
+  }, [where]);
+  const shown: BraidConditionCompileResult =
+    settledWhere === where || check.ok ? check : { ok: true };
+  return { check, shown, settle: setSettledWhere };
 }
 
 export function useBraidTargets({

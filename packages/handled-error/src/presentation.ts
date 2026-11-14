@@ -877,6 +877,11 @@ const presentations = {
     describe: () =>
       "A braid can only be removed from the project its spans come from or the project that shows them.",
   },
+  braids_not_enabled: {
+    title: "Braids aren't switched on here",
+    describe: () =>
+      "This organisation can't manage braids yet. Braids it already has keep showing their spans.",
+  },
   broadcaster_not_active: {
     title: "Live updates disconnected",
     describe: () => "Refresh the page to reconnect.",

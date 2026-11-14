@@ -10,9 +10,11 @@ import {
   SIGNING_KEY_ROTATION_OVERLAP_MS,
 } from "@langwatch/api-key-contract";
 import { braidSignatureMessage } from "@langwatch/api-key-contract/signing-key-wire-format";
+import { BRAIDS_FLAG } from "@langwatch/authz-contract";
 import { fromDate, type Instant } from "@langwatch/time";
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { MemoryReleaseFlagsChannel } from "../../channels/memory/memory.release-flags.channel.ts";
 import { MemorySigningKeyUsageRepository } from "../../repositories/memory/memory.signing-key-usage.repository.ts";
 import { MemorySigningKeyRepository } from "../../repositories/memory/memory.signing-key.repository.ts";
 import { BraidSignatureVerificationService } from "../braid-signature-verification.service.ts";
@@ -49,16 +51,20 @@ describe("the API key module's answer to a span's signature", () => {
   let now: Instant;
   let signingKeys: SigningKeyService;
   let signatures: BraidSignatureVerificationService;
+  let flags: MemoryReleaseFlagsChannel;
 
   beforeEach(() => {
     now = fromDate(new Date(Date.UTC(2026, 9, 21, 12)));
     const keys = MemorySigningKeyRepository.create();
     const usage = MemorySigningKeyUsageRepository.create();
+    flags = MemoryReleaseFlagsChannel.create();
+    flags.release({ flag: BRAIDS_FLAG, organizationId: ORGANIZATION });
     signatures = BraidSignatureVerificationService.create({ keys, usage, now: () => now });
     signingKeys = SigningKeyService.create({
       keys,
       usage,
       projects: { getOrganizationId: async () => ORGANIZATION },
+      flags,
       braidSignatures: signatures,
       now: () => now,
     });
@@ -75,6 +81,23 @@ describe("the API key module's answer to a span's signature", () => {
       entries: { orchestrator: "web" },
       signature,
     });
+
+  describe("given a key issued before release_braids was switched off", () => {
+    /** @scenario "Signed calls are still verified while release_braids is off" */
+    it("still verifies its signature, while managing the key refuses", async () => {
+      const issued = await issue();
+      flags.withhold({ flag: BRAIDS_FLAG, organizationId: ORGANIZATION });
+
+      await expect(verify(sign({ issued, entries: { orchestrator: "web" } }))).resolves.toEqual({
+        outcome: "verified",
+        signingProjectId: "orchestrator",
+        keys: ["orchestrator"],
+      });
+      await expect(signingKeys.find({ projectId: "orchestrator" })).rejects.toMatchObject({
+        code: "braids_not_enabled",
+      });
+    });
+  });
 
   describe("given a signature that does not match the entry the span carries", () => {
     /** @scenario "A span whose signature does not check out is stored unmarked and counted" */

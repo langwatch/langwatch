@@ -129,6 +129,7 @@ export const APP_ERROR_CODES = [
   "braid_governance_project",
   "braid_into_itself",
   "braid_not_on_project",
+  "braids_not_enabled",
   "broadcaster_not_active",
   "browser_drawer_undeclared",
   "budget_not_found",

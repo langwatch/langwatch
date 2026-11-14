@@ -25,6 +25,15 @@ import {
 /** A key `Verified("k")` may name: the signed entry keys of ADR-201 §4's wire format. */
 export const BRAID_VERIFIED_KEY_PATTERN = /^[A-Za-z0-9._-]{1,128}$/;
 
+/** Everything a condition may say, so an editor offers only what compiles; the rest is refused. */
+export const BRAID_CONDITION_VOCABULARY = {
+  indexedPaths: ["attributes", "resource.attributes"],
+  paths: ["name"],
+  functions: ["Verified"],
+  operators: ["==", "!="],
+  words: ["and", "nil"],
+} as const;
+
 /** Accepted: the compiled tree, or none for an empty condition, which braids every owner span. */
 const braidConditionCompiledSchemaDefinition = z
   .object({ ok: z.literal(true), compiledWhere: compiledWhereSchema.optional() })
@@ -56,7 +65,7 @@ const FIX = {
   function:
     'The only function is Verified("k"); compare whole values with ==, for example attributes["k"] == "v".',
   stringEquality:
-    'Only string equality is supported: write attributes["k"] == "v" with the value in double quotes.',
+    'Compare with == and put the value in double quotes, for example attributes["k"] == "v".',
   notEqualValue:
     'Name the value a braided span carries with ==, or require the key with attributes["k"] != nil.',
   emptyString:

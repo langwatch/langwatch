@@ -20,8 +20,9 @@ API keys: creating and updating them, resolving a presented token to its caller,
 
 | Kind            | Name                                                                                                                                                     | Declared at                                                     |
 | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| Stores required |                                                                                                                                                          | `process/src/channels/api-key.channels.ts:15`                   |
 | Stores required | prisma, encryption, redis                                                                                                                                | `process/src/repositories/live/live.api-key.repositories.ts:29` |
-| Secrets         | `pepper` (API_KEY_PEPPER), `pepperFallback` (CREDENTIALS_SECRET), `pepperLastFallback` (NEXTAUTH_SECRET), `pepperPrevious` (CREDENTIALS_SECRET_PREVIOUS) | `process/src/app/api-key.app.ts:196`                            |
+| Secrets         | `pepper` (API_KEY_PEPPER), `pepperFallback` (CREDENTIALS_SECRET), `pepperLastFallback` (NEXTAUTH_SECRET), `pepperPrevious` (CREDENTIALS_SECRET_PREVIOUS) | `process/src/app/api-key.app.ts:199`                            |
 | Config          | `docsOrigins` (LANGWATCH_DOCS_ORIGINS), `isSaas` (IS_SAAS), `publicBaseUrl` (BASE_HOST)                                                                  | `contract/src/api-key.config.ts:23`                             |
 
 Anything else api-key needs belongs to another module and is reached through its `*Api`.

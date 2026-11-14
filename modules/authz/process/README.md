@@ -37,7 +37,7 @@ the grant or role aggregate ID.
 
 ## Installation
 
-`defineProcessModule("authz").withRepositories(authzRepositories).withApi(AuthzModule).withTransports(authzGrantRest, authzRoleBindingRest, authzTrpcTransport).provideMiddlewareContext(…).withEventing(authzEventing).withEventing(authzAggregateReadEventing).withEventing(authzMemberOffboardedEventing).withMigrations(…)`, `src/authz.module.ts:30`.
+`defineProcessModule("authz").withRepositories(authzRepositories).withChannels(authzChannels).withApi(AuthzModule).withTransports(authzGrantRest, authzRoleBindingRest, authzTrpcTransport).provideMiddlewareContext(…).withEventing(authzEventing).withEventing(authzAggregateReadEventing).withEventing(authzMemberOffboardedEventing).withMigrations(…)`, `src/authz.module.ts:31`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -387,6 +387,14 @@ ADR-201: the live braids out of a project and into it; a downgraded organisation
 listBraids(args: Braids.AuthzListBraidsInput): Promise<Braids.AuthzProjectBraids>;
 ```
 
+#### `listBraidsForScreen`
+
+The Braids screen's list: refuses `braids_not_enabled` while `release_braids` is off.
+
+```typescript
+listBraidsForScreen(args: Braids.AuthzListBraidsInput): Promise<Braids.AuthzProjectBraids>;
+```
+
 #### `createBraid`
 
 A braid from the owner (`projectId`) into the reader, its condition compiled on save.
@@ -427,6 +435,14 @@ The organisation's authz settings; one with no stored row has every setting off.
 getOrganizationPolicy(args: Braids.AuthzOrganizationInput): Promise<Braids.AuthzOrganizationPolicy>;
 ```
 
+#### `getOrganizationPolicyForScreen`
+
+The Braids screen's policy: refuses `braids_not_enabled` while `release_braids` is off.
+
+```typescript
+getOrganizationPolicyForScreen(args: Braids.AuthzOrganizationInput): Promise<Braids.AuthzOrganizationPolicy>;
+```
+
 #### `setBraidsPolicy`
 
 Keeps braids to organisation admins or opens them again; audited, and bumps the epoch.
@@ -449,6 +465,14 @@ ADR-201 §7: the organisation's active members holding `permission` at the proje
 
 ```typescript
 countProjectMembersHolding(args: Braids.AuthzCountProjectMembersHoldingInput): Promise<Braids.AuthzProjectMembersHolding>;
+```
+
+#### `countProjectMembersHoldingForScreen`
+
+The braid dialog's count: refuses `braids_not_enabled` while `release_braids` is off.
+
+```typescript
+countProjectMembersHoldingForScreen(args: Braids.AuthzCountProjectMembersHoldingInput): Promise<Braids.AuthzProjectMembersHolding>;
 ```
 
 #### `listBraidTargets`
@@ -986,11 +1010,11 @@ interface Output {
 }
 
 // authz.listBraids
-// Input: authzListBraidsInputSchema, ../contract/src/authz-braids.commands.ts:73
+// Input: authzListBraidsInputSchema, ../contract/src/authz-braids.commands.ts:76
 interface Input {
   projectId: string;
 }
-type Output = z.infer<typeof authzProjectBraidsSchema>; // ../contract/src/authz-braids.commands.ts:164
+type Output = z.infer<typeof authzProjectBraidsSchema>; // ../contract/src/authz-braids.commands.ts:167
 
 // authz.createBraid
 // Input: inline, src/transport/authz.trpc.ts:87
@@ -1001,7 +1025,7 @@ interface Input {
   fromMs: number;
   expiresAtMs?: number;
 }
-// Output: authzBraidSchema, ../contract/src/authz-braids.commands.ts:150
+// Output: authzBraidSchema, ../contract/src/authz-braids.commands.ts:153
 interface Output {
   braidId: string;
   ownerProjectId: string;
@@ -1023,7 +1047,7 @@ interface Input {
   fromMs: number;
   expiresAtMs?: number;
 }
-type Output = z.infer<typeof authzBraidSchema>; // ../contract/src/authz-braids.commands.ts:150
+type Output = z.infer<typeof authzBraidSchema>; // ../contract/src/authz-braids.commands.ts:153
 
 // authz.removeBraid
 // Input: inline, src/transport/authz.trpc.ts:95
@@ -1031,17 +1055,17 @@ interface Input {
   projectId: string;
   braidId: string;
 }
-// Output: authzBraidRemovedSchema, ../contract/src/authz-braids.commands.ts:169
+// Output: authzBraidRemovedSchema, ../contract/src/authz-braids.commands.ts:172
 interface Output {
   braidId: string;
 }
 
 // authz.getBraidsPolicy
-// Input: authzOrganizationInputSchema, ../contract/src/authz-braids.commands.ts:214
+// Input: authzOrganizationInputSchema, ../contract/src/authz-braids.commands.ts:217
 interface Input {
   organizationId: string;
 }
-// Output: authzOrganizationPolicySchema, ../contract/src/authz-braids.commands.ts:206
+// Output: authzOrganizationPolicySchema, ../contract/src/authz-braids.commands.ts:209
 interface Output {
   organizationId: string;
   braidsOrganizationAdminsOnly: boolean;
@@ -1055,11 +1079,11 @@ interface Input {
   organizationId: string;
   braidsOrganizationAdminsOnly: boolean;
 }
-type Output = z.infer<typeof authzOrganizationPolicySchema>; // ../contract/src/authz-braids.commands.ts:206
+type Output = z.infer<typeof authzOrganizationPolicySchema>; // ../contract/src/authz-braids.commands.ts:209
 
 // authz.listOrganizationBraids
-type Input = z.infer<typeof authzOrganizationInputSchema>; // ../contract/src/authz-braids.commands.ts:214
-// Output: authzOrganizationBraidsSchema, ../contract/src/authz-braids.commands.ts:237
+type Input = z.infer<typeof authzOrganizationInputSchema>; // ../contract/src/authz-braids.commands.ts:217
+// Output: authzOrganizationBraidsSchema, ../contract/src/authz-braids.commands.ts:240
 type Output = {
   braidId: string;
   ownerProjectId: string;
@@ -1076,7 +1100,7 @@ type Output = {
 interface Input {
   projectId: string;
 }
-// Output: authzProjectMembersHoldingSchema, ../contract/src/authz-braids.commands.ts:97
+// Output: authzProjectMembersHoldingSchema, ../contract/src/authz-braids.commands.ts:100
 interface Output {
   count: number;
   exact: boolean;
@@ -1088,7 +1112,7 @@ interface Input {
   projectId: string;
   projectIds: string[];
 }
-// Output: authzBraidTargetsSchema, ../contract/src/authz-braids.commands.ts:133
+// Output: authzBraidTargetsSchema, ../contract/src/authz-braids.commands.ts:136
 type Output = {
   projectId: string;
   selectable: boolean;
