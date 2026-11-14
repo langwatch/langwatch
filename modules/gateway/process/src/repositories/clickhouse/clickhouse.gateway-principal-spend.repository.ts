@@ -1,3 +1,4 @@
+import { clickhouseRead, fn, tenantScope } from "@langwatch/clickhouse-client/builder";
 import {
   type GatewayPrincipalDailySpend,
   type GatewayPrincipalModelSpend,
@@ -8,60 +9,50 @@ import {
 } from "@langwatch/gateway-contract";
 
 import { GatewayPrincipalSpendRepository } from "../gateway-principal-spend.repository.ts";
+import { gatewayBudgetLedgerEvents as ledger } from "./clickhouse.gateway-budget-ledger-events.table.ts";
 import type { GatewayClickHouseResolver } from "./clickhouse.gateway-session.store.ts";
 
 const SETTINGS = { max_bytes_before_external_group_by: 500_000_000 };
-
-/**
- * One row per gateway request: every row a request writes carries its own cost, tokens and model,
- * so `any()` is exact and N budgets' rows collapse to one. Money sums the integer nano column;
- * `Status = 'success'` matches every other ledger read. Main's governance personal-usage query.
- */
-const PRINCIPAL_REQUESTS_SUBQUERY = `
-  SELECT
-    GatewayRequestId,
-    any(AmountNanoUSD) AS RequestAmountNanoUSD,
-    any(TokensInput)   AS RequestTokensInput,
-    any(TokensOutput)  AS RequestTokensOutput,
-    any(Model)         AS RequestModel,
-    any(OccurredAt)    AS RequestOccurredAt
-  FROM gateway_budget_ledger_events
-  WHERE TenantId = {tenantId:String}
-    AND Scope = 'principal'
-    AND ScopeId = {userId:String}
-    AND Status = 'success'
-    AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
-    AND OccurredAt <  fromUnixTimestamp64Milli({toMs:Int64})
-  GROUP BY GatewayRequestId
-`;
 
 type PrincipalSpendInput = {
   tenantId: string;
   userId: string;
   window: GatewayPrincipalSpendWindow;
 };
-type SummaryRow = {
-  TotalNanoCost: string | null;
-  RequestCount: number | string | null;
-  PromptTokens: number | string | null;
-  CompletionTokens: number | string | null;
-};
-type TopModelRow = { Name: string; Requests: number | string | null };
-type DailyRow = { Day: string; SpentNanoUsd: string; Requests: number | string };
-type ModelRow = { Label: string; SpentNanoUsd: string; Requests: number | string };
 
 /** A summed Int64 nano-USD string as USD, read digit by digit so no float division drifts it. */
 function summedNanoUsdToUsd(value: unknown): number {
   return Number(nanoUsdToDecimalString(parseSummedNanoUsd(value)));
 }
 
-function paramsFor(input: PrincipalSpendInput): Record<string, string | number> {
-  return {
-    tenantId: input.tenantId,
-    userId: input.userId,
-    fromMs: input.window.startMs,
-    toMs: input.window.endMs,
-  };
+/**
+ * One row per gateway request: every row a request writes carries its own cost, tokens and model,
+ * so `any()` is exact and N budgets' rows collapse to one. Money sums the integer nano column;
+ * `Status = 'success'` matches every other ledger read. Main's governance personal-usage query.
+ */
+function principalRequests({ tenantId, userId, window }: PrincipalSpendInput) {
+  const scope = tenantScope.single({ tenantId });
+  const requests = clickhouseRead({ scope })
+    .from(ledger)
+    .select({
+      RequestAmountNanoUSD: fn.any(ledger.AmountNanoUSD),
+      RequestTokensInput: fn.any(ledger.TokensInput),
+      RequestTokensOutput: fn.any(ledger.TokensOutput),
+      RequestModel: fn.any(ledger.Model),
+      RequestOccurredAt: fn.any(ledger.OccurredAt),
+    })
+    .where(({ and, eq, gte, lt }) =>
+      and(
+        eq(ledger.Scope, "principal"),
+        eq(ledger.ScopeId, userId),
+        eq(ledger.Status, "success"),
+        gte(ledger.OccurredAt, window.startMs),
+        lt(ledger.OccurredAt, window.endMs),
+      ),
+    )
+    .groupBy(ledger.GatewayRequestId)
+    .as("requests");
+  return { requests, start: clickhouseRead({ scope }).from(requests) };
 }
 
 export class ClickHouseGatewayPrincipalSpendRepository extends GatewayPrincipalSpendRepository {
@@ -80,20 +71,19 @@ export class ClickHouseGatewayPrincipalSpendRepository extends GatewayPrincipalS
 
   async getSummary(input: PrincipalSpendInput): Promise<GatewayPrincipalSpendSummary> {
     const client = await this.#resolveClient(input.tenantId);
-    const result = await client.query({
-      query: `
-        SELECT
-          toString(sum(RequestAmountNanoUSD)) AS TotalNanoCost,
-          count()                             AS RequestCount,
-          sum(RequestTokensInput)             AS PromptTokens,
-          sum(RequestTokensOutput)            AS CompletionTokens
-        FROM (${PRINCIPAL_REQUESTS_SUBQUERY})
-      `,
-      query_params: paramsFor(input),
-      format: "JSONEachRow",
-      clickhouse_settings: SETTINGS,
+    const summary = principalRequests(input);
+    const { rows } = await client.read({
+      statement: summary.start
+        .select({
+          TotalNanoCost: fn.toString(fn.sum(summary.requests.RequestAmountNanoUSD)),
+          RequestCount: fn.count(),
+          PromptTokens: fn.sum(summary.requests.RequestTokensInput),
+          CompletionTokens: fn.sum(summary.requests.RequestTokensOutput),
+        })
+        .settings(SETTINGS)
+        .build(),
     });
-    const [row] = await result.json<SummaryRow>();
+    const [row] = rows;
     if (!row || !Number(row.RequestCount)) {
       return {
         totalCost: 0,
@@ -104,21 +94,17 @@ export class ClickHouseGatewayPrincipalSpendRepository extends GatewayPrincipalS
       };
     }
 
-    const topModelResult = await client.query({
-      query: `
-        SELECT
-          RequestModel AS Name,
-          count()       AS Requests
-        FROM (${PRINCIPAL_REQUESTS_SUBQUERY})
-        GROUP BY RequestModel
-        ORDER BY Requests DESC
-        LIMIT 1
-      `,
-      query_params: paramsFor(input),
-      format: "JSONEachRow",
-      clickhouse_settings: SETTINGS,
+    const top = principalRequests(input);
+    const { rows: topRows } = await client.read({
+      statement: top.start
+        .select({ Name: top.requests.RequestModel, Requests: fn.count() })
+        .groupBy(top.requests.RequestModel)
+        .orderBy(fn.count(), "DESC")
+        .limit(1)
+        .settings(SETTINGS)
+        .build(),
     });
-    const [topRow] = await topModelResult.json<TopModelRow>();
+    const [topRow] = topRows;
 
     return {
       totalCost: summedNanoUsdToUsd(row.TotalNanoCost),
@@ -131,22 +117,22 @@ export class ClickHouseGatewayPrincipalSpendRepository extends GatewayPrincipalS
 
   async findDailySpend(input: PrincipalSpendInput): Promise<GatewayPrincipalDailySpend[]> {
     const client = await this.#resolveClient(input.tenantId);
-    const result = await client.query({
-      query: `
-        SELECT
-          toDate(RequestOccurredAt)           AS Day,
-          toString(sum(RequestAmountNanoUSD)) AS SpentNanoUsd,
-          count()                             AS Requests
-        FROM (${PRINCIPAL_REQUESTS_SUBQUERY})
-        GROUP BY Day
-        ORDER BY Day
-      `,
-      query_params: paramsFor(input),
-      format: "JSONEachRow",
-      clickhouse_settings: SETTINGS,
+    const { requests, start } = principalRequests(input);
+    const day = fn.toDate(requests.RequestOccurredAt);
+    const { rows } = await client.read({
+      statement: start
+        .select({
+          Day: day,
+          SpentNanoUsd: fn.toString(fn.sum(requests.RequestAmountNanoUSD)),
+          Requests: fn.count(),
+        })
+        .groupBy(day)
+        .orderBy(day, "ASC")
+        .settings(SETTINGS)
+        .build(),
     });
 
-    return (await result.json<DailyRow>()).map((row) => {
+    return rows.map((row) => {
       const spentUsd = summedNanoUsdToUsd(row.SpentNanoUsd);
       return { day: row.Day, spentUsd, billedUsd: spentUsd, requests: Number(row.Requests) || 0 };
     });
@@ -154,22 +140,21 @@ export class ClickHouseGatewayPrincipalSpendRepository extends GatewayPrincipalS
 
   async findModelSpend(input: PrincipalSpendInput): Promise<GatewayPrincipalModelSpend[]> {
     const client = await this.#resolveClient(input.tenantId);
-    const result = await client.query({
-      query: `
-        SELECT
-          RequestModel                        AS Label,
-          toString(sum(RequestAmountNanoUSD)) AS SpentNanoUsd,
-          count()                             AS Requests
-        FROM (${PRINCIPAL_REQUESTS_SUBQUERY})
-        GROUP BY Label
-        ORDER BY sum(RequestAmountNanoUSD) DESC
-      `,
-      query_params: paramsFor(input),
-      format: "JSONEachRow",
-      clickhouse_settings: SETTINGS,
+    const { requests, start } = principalRequests(input);
+    const { rows } = await client.read({
+      statement: start
+        .select({
+          Label: requests.RequestModel,
+          SpentNanoUsd: fn.toString(fn.sum(requests.RequestAmountNanoUSD)),
+          Requests: fn.count(),
+        })
+        .groupBy(requests.RequestModel)
+        .orderBy(fn.sum(requests.RequestAmountNanoUSD), "DESC")
+        .settings(SETTINGS)
+        .build(),
     });
 
-    return (await result.json<ModelRow>()).map((row) => {
+    return rows.map((row) => {
       const spentUsd = summedNanoUsdToUsd(row.SpentNanoUsd);
       return {
         label: row.Label,

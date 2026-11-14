@@ -35,6 +35,7 @@ function spendRow({
 function routedRepository(rowsByTenant: Record<string, ReturnType<typeof spendRow>[]>) {
   const statements: Statement[] = [];
   const repository = ClickHouseGatewaySpendEventsRepository.create(async (tenantId) => ({
+    read: () => Promise.reject(new Error("this fake answers raw statements only")),
     async query({ query, query_params = {} }) {
       statements.push({ tenantId, sql: query, params: query_params });
       if (!/TenantId = \{tenantId:String\}/.test(query) || query_params.tenantId !== tenantId) {

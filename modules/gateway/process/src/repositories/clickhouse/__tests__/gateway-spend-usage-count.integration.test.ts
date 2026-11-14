@@ -12,6 +12,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { GatewaySpendState } from "../../../eventing/gateway-spend.projection.ts";
 import { ClickHouseGatewaySpendEventsRepository } from "../clickhouse.gateway-spend-events.repository.ts";
+import { gatewayClickHouseOver } from "./support/clickhouse-endpoint.support.ts";
 import { startMigratedGatewayClickHouse } from "./support/migrated-clickhouse.harness.ts";
 
 const enabled = Boolean(
@@ -88,7 +89,7 @@ describe.skipIf(!enabled)("the gateway figures of the usage report (real ClickHo
 
   beforeAll(async () => {
     ({ client } = await startMigratedGatewayClickHouse());
-    repo = new ClickHouseGatewaySpendEventsRepository(async () => client);
+    repo = new ClickHouseGatewaySpendEventsRepository(gatewayClickHouseOver(client));
     // Both versions of the settled request stay on disk until the query has read them.
     await client.command({ query: "SYSTEM STOP MERGES gateway_spend" });
     const requestId = `req-settled-${run}`;

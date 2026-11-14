@@ -5,7 +5,7 @@ import type { ClickHouseQueryClient, IdBoundOptions } from "@langwatch/clickhous
  * does not depend on the driver — the driver's stricter types (a nested-map
  * setting, a typed insert result) are not assignable here (contravariance).
  */
-export type GatewayClickHouseClient = {
+export type GatewayClickHouseClient = Pick<ClickHouseQueryClient, "read"> & {
   query(input: {
     query: string;
     query_params?: Record<string, unknown>;
@@ -56,7 +56,16 @@ export class ClickHouseGatewaySession implements GatewayClickHouseClient {
     private readonly tenantId: string,
     /** Routes an install-wide read to one private server; the shared one when absent. */
     private readonly organizationId: string | undefined,
-  ) {}
+  ) {
+    this.read = (input) =>
+      this.clickhouse.read({
+        ...input,
+        organizationId: input.organizationId ?? this.organizationId,
+      });
+  }
+
+  /** A built statement, sent to this session's private server when the session names one. */
+  readonly read: ClickHouseQueryClient["read"];
 
   async query(input: {
     query: string;

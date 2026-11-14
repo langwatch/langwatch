@@ -1,3 +1,5 @@
+import { clickhouseRead, fn, tenantScope } from "@langwatch/clickhouse-client/builder";
+
 import {
   GatewayOpenAdmissionsRepository,
   type OpenAdmission,
@@ -5,8 +7,7 @@ import {
 } from "../../repositories/gateway-open-admissions.repository.ts";
 import { MAX_OPEN_ADMISSIONS_PER_SWEEP } from "../../rules/gateway-spend-settlement.rules.ts";
 import type { GatewayClickHouseClient } from "./clickhouse.gateway-session.store.ts";
-
-const TABLE_NAME = "gateway_spend" as const;
+import { gatewaySpend as spend } from "./clickhouse.gateway-spend.table.ts";
 
 /**
  * Every request still `admitted` whose grace elapsed, across all tenants —
@@ -30,50 +31,37 @@ export class ClickHouseGatewayOpenAdmissionsRepository extends GatewayOpenAdmiss
     const openBeforeMs = now - graceMs;
     const fromMs = now - lookbackMs;
 
-    const result = await this.client.query({
-      query: `
-        SELECT
-          TenantId AS tenantId,
-          GatewayRequestId AS gatewayRequestId,
-          OrganizationId AS organizationId,
-          VirtualKeyId AS virtualKeyId,
-          PrincipalUserId AS principalUserId,
-          EndUserId AS endUserId,
-          TraceId AS traceId,
-          RequestType AS requestType,
-          Labels AS labels,
-          Metadata AS metadata,
-          Model AS model,
-          ProviderKey AS providerKey,
-          toUnixTimestamp64Milli(OccurredAt) AS admittedAtMs
-        FROM ${TABLE_NAME}
-        WHERE (TenantId, GatewayRequestId, EventTimestamp) IN (
-            SELECT TenantId, GatewayRequestId, max(EventTimestamp)
-            FROM ${TABLE_NAME}
-            -- Repeated inside the subquery on purpose: the partition prune
-            -- has to happen where the scan happens, not only on the outer
-            -- filter, or the dedup reads every partition in retention.
-            WHERE OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
-              AND OccurredAt < fromUnixTimestamp64Milli({openBeforeMs:Int64})
-            GROUP BY TenantId, GatewayRequestId
-          )
-          AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
-          AND OccurredAt < fromUnixTimestamp64Milli({openBeforeMs:Int64})
-          AND Status = 'admitted'
-        ORDER BY OccurredAt ASC
-        LIMIT {maxRows:UInt32}
-      `,
-      query_params: {
-        fromMs,
-        openBeforeMs,
-        maxRows: MAX_OPEN_ADMISSIONS_PER_SWEEP,
-      },
-      format: "JSONEachRow",
-      // Install-wide settlement sweep: it finds every request left at admitted past its grace on
-      // this instance, and each settle it triggers is scoped to that row's own tenant.
-      SKIP_TENANT_CHECK: true,
-    });
+    // Install-wide settlement sweep: each settle it triggers is scoped to that row's own tenant.
+    // The window repeats inside the election, so the partition prune happens where the scan does.
+    const statement = clickhouseRead({
+      scope: tenantScope.allTenants({ reason: "install-wide gateway settlement sweep" }),
+    })
+      .from(spend)
+      .select({
+        tenantId: spend.TenantId,
+        gatewayRequestId: spend.GatewayRequestId,
+        organizationId: spend.OrganizationId,
+        virtualKeyId: spend.VirtualKeyId,
+        principalUserId: spend.PrincipalUserId,
+        endUserId: spend.EndUserId,
+        traceId: spend.TraceId,
+        requestType: spend.RequestType,
+        labels: spend.Labels,
+        metadata: spend.Metadata,
+        model: spend.Model,
+        providerKey: spend.ProviderKey,
+        admittedAtMs: fn.toUnixTimestamp64Milli(spend.OccurredAt),
+      })
+      .where(({ and, gte, lt }) =>
+        and(gte(spend.OccurredAt, fromMs), lt(spend.OccurredAt, openBeforeMs)),
+      )
+      .where(({ eq }) => eq(spend.Status, "admitted"), { inElection: false })
+      .latestVersion()
+      .orderBy(spend.OccurredAt, "ASC")
+      .limit(MAX_OPEN_ADMISSIONS_PER_SWEEP)
+      .build();
+    const { rows } = await this.client.read({ statement });
 
-    return result.json<OpenAdmission>();
+    return rows as OpenAdmission[];
   }
 }

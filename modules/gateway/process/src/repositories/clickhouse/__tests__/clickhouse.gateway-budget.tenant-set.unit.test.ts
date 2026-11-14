@@ -19,6 +19,7 @@ function guardedRepository() {
   const guard = new TenantGuard();
   const statements: Statement[] = [];
   const repository = GatewayBudgetClickHouseRepository.create(async (tenantId) => ({
+    read: () => Promise.reject(new Error("this fake answers raw statements only")),
     query: async (input) => {
       guard.assert({
         tenantId,

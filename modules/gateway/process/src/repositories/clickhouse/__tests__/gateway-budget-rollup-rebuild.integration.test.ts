@@ -11,6 +11,7 @@ import { nanoid } from "nanoid";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { GatewayBudgetClickHouseRepository } from "../clickhouse.gateway-budget.repository.ts";
+import { gatewayClickHouseOver } from "./support/clickhouse-endpoint.support.ts";
 import { replayGooseMigrationUp, replayRollupRebuild } from "./support/goose-migration-replay.ts";
 import {
   startMigratedGatewayClickHouse,
@@ -74,7 +75,7 @@ describe.skipIf(!enabled)("given spend recorded before the rollup rebuild", () =
 
   beforeAll(async () => {
     endpoint = await startMigratedGatewayClickHouse();
-    repo = new GatewayBudgetClickHouseRepository(async () => endpoint.client);
+    repo = new GatewayBudgetClickHouseRepository(gatewayClickHouseOver(endpoint.client));
 
     // Pre-upgrade state: the 00055 view truncates periods in the server
     // session timezone.

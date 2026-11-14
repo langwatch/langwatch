@@ -12,6 +12,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { GatewaySpendState } from "../../../eventing/gateway-spend.projection.ts";
 import { ClickHouseGatewaySpendEventsRepository } from "../clickhouse.gateway-spend-events.repository.ts";
+import { gatewayClickHouseOver } from "./support/clickhouse-endpoint.support.ts";
 import { startMigratedGatewayClickHouse } from "./support/migrated-clickhouse.harness.ts";
 
 const enabled = Boolean(
@@ -98,7 +99,7 @@ describe.skipIf(!enabled)("the metered day read on the spend record (real ClickH
 
   beforeAll(async () => {
     ({ client } = await startMigratedGatewayClickHouse());
-    repo = new ClickHouseGatewaySpendEventsRepository(async () => client);
+    repo = new ClickHouseGatewaySpendEventsRepository(gatewayClickHouseOver(client));
     // Both versions of a request stay on disk until the query has read them.
     await client.command({ query: "SYSTEM STOP MERGES gateway_spend" });
   }, 120_000);

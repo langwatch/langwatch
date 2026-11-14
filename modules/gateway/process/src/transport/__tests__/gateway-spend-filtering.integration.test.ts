@@ -14,6 +14,7 @@ import { createGatewayTestPrismaConnection } from "../../app/__tests__/gateway-p
 import { GatewaySpendScopeService } from "../../features/spend/services/gateway-spend-scope.service.ts";
 import {
   createTestClickHouseClient,
+  gatewayClickHouseOver,
   testClickHouseUrl,
 } from "../../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
 import { ClickHouseGatewaySpendEventsRepository } from "../../repositories/clickhouse/clickhouse.gateway-spend-events.repository.ts";
@@ -58,7 +59,9 @@ function ch(): ClickHouseClient {
 }
 
 function repository(): ClickHouseGatewaySpendEventsRepository {
-  return new ClickHouseGatewaySpendEventsRepository(async () => ch());
+  return new ClickHouseGatewaySpendEventsRepository((tenantId) =>
+    gatewayClickHouseOver(ch())(tenantId),
+  );
 }
 
 let eventTimestamp = 1;

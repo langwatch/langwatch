@@ -15,6 +15,7 @@ import { afterAll, describe, expect, it } from "vitest";
 
 import {
   createTestClickHouseClient,
+  gatewayClickHouseOver,
   testClickHouseUrl,
 } from "../../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
 import { ClickHouseGatewaySpendEventsRepository } from "../../repositories/clickhouse/clickhouse.gateway-spend-events.repository.ts";
@@ -60,7 +61,9 @@ describe.skipIf(!chUrl)("settlement on the spend record (real ClickHouse)", () =
 
   /** @scenario "The full settlement sequence: silent admission settles, a late confirmation supersedes" */
   it("folds admit, settle, then a late confirm superseding the settled row", async () => {
-    const repo = new ClickHouseGatewaySpendEventsRepository(async () => client!);
+    const repo = new ClickHouseGatewaySpendEventsRepository((tenantId) =>
+      gatewayClickHouseOver(client!)(tenantId),
+    );
     const foldStore = GatewaySpendStore.create(repo);
     const projection = new GatewaySpendFoldProjection({ store: foldStore });
     const context = { tenantId: createTenantId(TENANT), aggregateId: REQUEST_ID };

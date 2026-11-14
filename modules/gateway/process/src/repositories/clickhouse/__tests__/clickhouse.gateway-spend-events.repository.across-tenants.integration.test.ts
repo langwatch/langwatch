@@ -91,6 +91,7 @@ function tenantRoutedClickHouse(raw: () => ClickHouseClient): GatewayClickHouseR
   return async (routed) => {
     const session = await gatewayClickHouseOver(raw())(routed);
     return {
+      read: session.read,
       async query(input) {
         const { query, query_params } = input;
         if (!/TenantId = \{tenantId:String\}/.test(query) || query_params?.tenantId !== routed) {

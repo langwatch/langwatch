@@ -23,6 +23,7 @@ import { ClickHouseGatewayOpenAdmissionsRepository } from "../clickhouse.gateway
 import { ClickHouseGatewaySpendEventsRepository } from "../clickhouse.gateway-spend-events.repository.ts";
 import {
   createTestClickHouseClient,
+  gatewayClickHouseOver,
   testClickHouseUrl,
 } from "./support/clickhouse-endpoint.support.ts";
 
@@ -108,8 +109,10 @@ const ALREADY_SETTLED = id("already-settled");
 describe.skipIf(!chUrl)("open admissions on the spend record (real ClickHouse)", () => {
   beforeAll(async () => {
     client = createTestClickHouseClient(chUrl!);
-    repo = new ClickHouseGatewaySpendEventsRepository(async () => client);
-    finder = ClickHouseGatewayOpenAdmissionsRepository.create(client);
+    repo = new ClickHouseGatewaySpendEventsRepository(gatewayClickHouseOver(client));
+    finder = ClickHouseGatewayOpenAdmissionsRepository.create(
+      await gatewayClickHouseOver(client)(""),
+    );
     // The superseded versions are the whole point of the dedup scenarios, and
     // a background merge collapses them on its own schedule — which would
     // leave those tests passing for a reason the query had no part in.

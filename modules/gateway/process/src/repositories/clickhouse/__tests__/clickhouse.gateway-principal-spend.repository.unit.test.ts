@@ -2,7 +2,8 @@
  * Main's governance personal-usage ledger reads, ported to the ledger's owner: `TenantId` first,
  * the window on the `OccurredAt` partition key, one row per gateway request before any sum.
  */
-import { describe, expect, it } from "vitest";
+import type { ReaderReadStatement } from "@langwatch/clickhouse-client/builder";
+import { describe, expect, it, vi } from "vitest";
 
 import { MemoryGatewayPrincipalSpendRepository } from "../../memory/memory.gateway-principal-spend.repository.ts";
 import { ClickHouseGatewayPrincipalSpendRepository } from "../clickhouse.gateway-principal-spend.repository.ts";
@@ -15,27 +16,43 @@ const WINDOW = {
 const INPUT = { tenantId: "governance-project", userId: "user-1", window: WINDOW };
 
 function repositoryOver(...answers: unknown[][]) {
-  const queries: { query: string; query_params?: Record<string, unknown> }[] = [];
+  const statements: ReaderReadStatement[] = [];
   const resolvedFor: string[] = [];
+  const read = vi.fn().mockImplementation(async ({ statement }) => {
+    statements.push(statement);
+    return { rows: answers[statements.length - 1] ?? [] };
+  });
   const client: GatewayClickHouseClient = {
-    query: async (request) => {
-      queries.push(request);
-      const rows = answers[queries.length - 1] ?? [];
-      return { json: async () => JSON.parse(JSON.stringify(rows)) };
-    },
+    read,
+    query: async () => ({ json: async () => [] }),
     insert: async () => undefined,
   };
   const repository = ClickHouseGatewayPrincipalSpendRepository.create(async (tenantId) => {
     resolvedFor.push(tenantId);
     return client;
   });
-  return { queries, resolvedFor, repository };
+  return { statements, resolvedFor, repository };
+}
+
+function expectPrincipalScope(statement: ReaderReadStatement | undefined) {
+  expect(statement).toMatchObject({
+    identity: "reader",
+    kind: "tenant",
+    tenantId: "governance-project",
+  });
+  expect(statement?.settings).toMatchObject({ SQL_langwatch_tenant_ids: "governance-project" });
+  expect(statement?.sql).toContain("SETTINGS max_bytes_before_external_group_by = 500000000");
+  expect(statement?.sql).toContain("TenantId = {tenantId:String}");
+  expect(statement?.sql).toContain("GROUP BY GatewayRequestId) AS requests");
+  expect(Object.values(statement?.params ?? {})).toEqual(
+    expect.arrayContaining(["principal", "user-1", "success", WINDOW.startMs, WINDOW.endMs]),
+  );
 }
 
 describe("ClickHouseGatewayPrincipalSpendRepository", () => {
   describe("when a user's principal summary is read", () => {
     it("collapses to one row per request on the tenant, then names the top model", async () => {
-      const { queries, resolvedFor, repository } = repositoryOver(
+      const { statements, resolvedFor, repository } = repositoryOver(
         [
           {
             TotalNanoCost: "2000000000",
@@ -55,20 +72,15 @@ describe("ClickHouseGatewayPrincipalSpendRepository", () => {
         topModel: { name: "ledger-model", requests: 2 },
       });
       expect(resolvedFor).toEqual(["governance-project"]);
-      expect(queries[0]?.query).toMatch(
-        /WHERE TenantId = \{tenantId:String\}\s+AND Scope = 'principal'/,
-      );
-      expect(queries[0]?.query).toContain("GROUP BY GatewayRequestId");
-      expect(queries[0]?.query_params).toEqual({
-        tenantId: "governance-project",
-        userId: "user-1",
-        fromMs: WINDOW.startMs,
-        toMs: WINDOW.endMs,
-      });
+      expect(statements).toHaveLength(2);
+      statements.forEach(expectPrincipalScope);
+      expect(statements[1]?.sql).toContain("LIMIT 1");
     });
 
     it("answers zeros and skips the model read when the user made no requests", async () => {
-      const { queries, repository } = repositoryOver([{ TotalNanoCost: "0", RequestCount: "0" }]);
+      const { statements, repository } = repositoryOver([
+        { TotalNanoCost: "0", RequestCount: "0" },
+      ]);
 
       await expect(repository.getSummary(INPUT)).resolves.toEqual({
         totalCost: 0,
@@ -77,7 +89,7 @@ describe("ClickHouseGatewayPrincipalSpendRepository", () => {
         completionTokens: 0,
         topModel: null,
       });
-      expect(queries).toHaveLength(1);
+      expect(statements).toHaveLength(1);
     });
   });
 
@@ -94,6 +106,8 @@ describe("ClickHouseGatewayPrincipalSpendRepository", () => {
       await expect(models.repository.findModelSpend(INPUT)).resolves.toEqual([
         { label: "m", spentUsd: 0.5, billedUsd: 0.5, requests: 1 },
       ]);
+      expectPrincipalScope(daily.statements[0]);
+      expectPrincipalScope(models.statements[0]);
     });
   });
 });
