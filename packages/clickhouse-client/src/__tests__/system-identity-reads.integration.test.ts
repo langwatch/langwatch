@@ -89,7 +89,11 @@ const MAIN = {
       WHERE database = currentDatabase() AND table IN {tables:Array(String)}
       AND position(command, '_retention_days = 0') > 0 ORDER BY create_time DESC`,
   idIndexTenants: "SELECT DISTINCT TenantId FROM stored_spans_id_index",
+  partsMissing: `SELECT toUInt32(count()) AS parts FROM (SELECT name FROM system.parts_columns
+      WHERE database = currentDatabase() AND table = 'trace_analytics' AND active GROUP BY name
+      HAVING countIf(has({columns:Array(String)}, column)) < length({columns:Array(String)}))`,
 };
+const METADATA_COLUMNS = ["MetadataA", "MetadataB"];
 
 describe("given ClickHouse 26.8, two tenants' tables, a table the reader is not granted, and retention rewrites", () => {
   beforeAll(async () => {
@@ -112,7 +116,12 @@ describe("given ClickHouse 26.8, two tenants' tables, a table the reader is not 
          ENGINE = MergeTree ORDER BY (TenantId, EventId)`,
       `CREATE TABLE stored_spans_id_index (TenantId String, Id String)
          ENGINE = MergeTree ORDER BY (TenantId, Id)`,
-      ...TABLES.map((table) => `SYSTEM STOP MERGES ${table}`),
+      `CREATE TABLE trace_analytics (TenantId String, TraceId String, MetadataA String)
+         ENGINE = MergeTree ORDER BY (TenantId, TraceId)`,
+      ...[...TABLES, "trace_analytics"].map((table) => `SYSTEM STOP MERGES ${table}`),
+      "INSERT INTO trace_analytics VALUES ('tenant_a', 't1', 'a')",
+      "ALTER TABLE trace_analytics ADD COLUMN MetadataB String",
+      "INSERT INTO trace_analytics VALUES ('tenant_b', 't2', 'a', 'b')",
       "INSERT INTO stored_spans VALUES ('tenant_a', 's1', 30), ('tenant_b', 's2', 30)",
       "INSERT INTO event_log VALUES ('tenant_a', 'e1', 30), ('tenant_b', 'e2', 30)",
       "INSERT INTO stored_spans_id_index VALUES ('', 'marker'), ('tenant_a', 's1'), ('tenant_b', 's2')",
@@ -244,6 +253,27 @@ describe("given ClickHouse 26.8, two tenants' tables, a table the reader is not 
 
       expect(built).toEqual(await rawRows({ sql: MAIN.keepForever, params: { tables } }));
       expect(built).toHaveLength(1);
+    });
+
+    /** @scenario "The parts lacking a table's columns, counted over a derived system read, run on 26.8 as main's raw query does" */
+    it("counts the one part written before a listed column was added, as main's raw read does", async () => {
+      const statement = reads.partsMissingColumnsRead({
+        table: "trace_analytics",
+        columns: METADATA_COLUMNS,
+      });
+      const built = await builtRows({ statement });
+
+      expect(statement.identity).toBe("system");
+      expect(built).toEqual(
+        await rawRows({ sql: MAIN.partsMissing, params: { columns: METADATA_COLUMNS } }),
+      );
+      expect(built).toEqual(["1"]);
+    });
+
+    /** @scenario "A read whose where is the constant false returns no row on 26.8" */
+    it("returns no row for a read whose where is cond.never()", async () => {
+      expect(await builtRows({ statement: reads.everySpanRead() })).toHaveLength(2);
+      expect(await builtRows({ statement: reads.everySpanRead({ none: true }) })).toEqual([]);
     });
 
     /** @scenario "The system-table reads run on 26.8 as main's raw queries do" */

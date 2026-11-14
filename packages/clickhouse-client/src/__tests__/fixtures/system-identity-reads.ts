@@ -3,15 +3,17 @@
  * them (handoff rp-b9-builder-system-tables, section 12). The unit and 26.8 suites share them; the
  * 26.8 suite holds main's raw text beside each.
  */
-import { cond } from "../../builder/expression.ts";
+import { column, cond, param } from "../../builder/expression.ts";
 import { fn } from "../../builder/functions.ts";
 import { clickhouseRead } from "../../builder/read.ts";
+import { defineClickHouseTable } from "../../builder/table.ts";
 import { tenantScope } from "../../builder/scope.ts";
 import {
   systemBackupLog,
   systemDisks,
   systemMutations,
   systemParts,
+  systemPartsColumns,
   systemTables,
 } from "../../builder/system-tables.ts";
 
@@ -123,3 +125,49 @@ export const keepForeverRewritesRead = ({ tables }: { tables: readonly string[] 
     )
     .orderBy(systemMutations.create_time, "DESC")
     .build();
+
+/** Trace's parts lacking a listed column: a count over a derived read of system.parts_columns. */
+export const partsMissingColumnsRead = ({
+  table,
+  columns,
+}: {
+  table: string;
+  columns: readonly string[];
+}) => {
+  const read = systemRead({ reason: "parts written before the metadata columns were added" });
+  const wanted = param.strings(columns);
+  const lacking = read
+    .from(systemPartsColumns)
+    .select({ PartName: systemPartsColumns.name })
+    .where(({ and, eq }) =>
+      and(
+        eq(systemPartsColumns.database, fn.currentDatabase()),
+        eq(systemPartsColumns.table, table),
+        eq(systemPartsColumns.active, 1),
+      ),
+    )
+    .groupBy(systemPartsColumns.name)
+    .having(({ lt }) =>
+      lt(
+        fn.countIf(fn.has(wanted, systemPartsColumns.column)),
+        fn.length(wanted),
+      ),
+    )
+    .as("lacking");
+  return read.from(lacking).select({ parts: fn.toUInt32(fn.count()) }).build();
+};
+
+const storedSpans = defineClickHouseTable({
+  name: "stored_spans",
+  tenantColumn: "TenantId",
+  sortKey: ["TenantId", "SpanId"],
+  columns: { TenantId: column.string(), SpanId: column.string() },
+});
+
+/** Every tenant's spans, or none when `none` makes the where `cond.never()`. */
+export const everySpanRead = ({ none = false }: { none?: boolean } = {}) => {
+  const read = systemRead({ reason: "a constant false, proven on the server" })
+    .from(storedSpans)
+    .select({ SpanId: storedSpans.SpanId });
+  return (none ? read.where(() => cond.never()) : read).build();
+};

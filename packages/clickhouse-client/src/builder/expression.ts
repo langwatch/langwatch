@@ -572,6 +572,8 @@ export type Conditions = {
   and: <const C extends Terms>(...terms: C) => Condition<TablesOfExpression<C[number]>>;
   or: <const C extends Terms>(...terms: C) => Condition<TablesOfExpression<C[number]>>;
   not: <T extends string>(term: Condition<T>) => Condition<T>;
+  /** A constant false, `0 = 1`, which the server folds: a branch that matches no row. */
+  never: () => Condition;
 };
 
 /**
@@ -592,6 +594,13 @@ export const cond: Conditions = {
   and: (...terms) => logic("AND")(...terms),
   or: (...terms) => logic("OR")(...terms),
   not,
+  never: () =>
+    expression<boolean>({
+      kind: "compare",
+      operator: "=",
+      left: { kind: "literal", value: 0 },
+      right: { kind: "literal", value: 1 },
+    }),
 };
 
 /** Values bound by name with an explicit type, for a function argument or a tuple comparison. */
@@ -656,6 +665,8 @@ export type RenderContext = {
   readonly ctes: { visible: ReadonlySet<string> };
   /** The tenant columns of the tenant tables rendered; a reader statement's guard checks them. */
   readonly tenantColumns: Set<string>;
+  /** The allow-listed system-identity tables rendered as a source, a derived read's or a CTE's. */
+  readonly systemTables: Set<string>;
 };
 
 export const renderContext = (): RenderContext => ({
@@ -666,6 +677,7 @@ export const renderContext = (): RenderContext => ({
   ids: new Map(),
   ctes: { visible: new Set() },
   tenantColumns: new Set(),
+  systemTables: new Set(),
 });
 
 /** Binds a value node and returns its parameter name. */

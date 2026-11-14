@@ -690,8 +690,9 @@ export class ClickHouseRead<
     const context = renderContext();
     const sql = renderStatement({ state: this.#state, context, nested: false, keys: undefined });
     refuseOverBudget({ statement: sql, params: context.params });
-    const { scope, table } = this.#state;
-    const namesSystemTable = scope.kind === "allTenants" && readsSystemIdentityTable(table);
+    const { scope } = this.#state;
+    // A derived source or CTE over an allow-listed system table names it too; bound rows do not.
+    const namesSystemTable = scope.kind === "allTenants" && context.systemTables.size > 0;
     if (scope.kind !== "serverMetadata" && !namesSystemTable && context.tenantColumns.size === 0) {
       throw new QueryBuilderError({ kind: "no-tenant-table" });
     }
@@ -925,6 +926,9 @@ function sourceOf({ state, context }: { state: ReadState; context: RenderContext
     const derived = derivedSide({ table, context }) ?? boundRowsSource({ table, context });
     if (derived !== undefined) return { from: derived, predicate: undefined };
     const alias = table.name === table.stored ? "" : ` AS ${table.name}`;
+    if (state.scope.kind === "allTenants" && readsSystemIdentityTable(table)) {
+      context.systemTables.add(table.stored);
+    }
     return {
       from: `${table.stored}${alias}${state.final ? " FINAL" : ""}`,
       predicate: tenantPredicate({ state, table, context, election: false }),

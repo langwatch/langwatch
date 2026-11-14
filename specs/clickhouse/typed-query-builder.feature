@@ -258,6 +258,31 @@ Feature: A typed ClickHouse read builder renders the tenant predicate and the te
     And an all-tenants scope naming a server-metadata table or a system table on neither list is refused the same way
 
   @unit
+  Scenario: An all-tenants read over a derived system read or a system CTE names a system table
+    Given an all-tenants scope stating its reason
+    When it reads from a derived read, or selects beside a CTE, whose own read names system.parts_columns
+    Then the statement goes out on the system identity as an all-tenants statement, with no tenant setting
+    And a derived read or CTE over bound rows alone, which names neither a tenant nor a system table, is still refused as naming no tenant table
+
+  @integration
+  Scenario: The parts lacking a table's columns, counted over a derived system read, run on 26.8 as main's raw query does
+    Given ClickHouse 26.8 and a table with one part holding every listed column and one part written before a column was added
+    When the count of parts lacking a listed column is built over a derived system.parts_columns read and sent as the system
+    Then it returns the count main's raw text returns
+
+  @unit
+  Scenario: A constant false condition matches no row and binds nothing
+    Given a read's where or a branch of an OR
+    When it is cond.never()
+    Then it renders as 0 = 1 with no parameter
+
+  @integration
+  Scenario: A read whose where is the constant false returns no row on 26.8
+    Given ClickHouse 26.8 and two tenants' spans
+    When a read of every span is built with cond.never() as its where and sent as the system
+    Then it returns no row, where the same read without it returns both spans
+
+  @unit
   Scenario: An id index's tenant listing is an all-tenants read beside its raise
     Given an id index's table name
     When its tenant listing is built
