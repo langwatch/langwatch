@@ -173,6 +173,13 @@ Feature: Optimization studio execution on a per-project Lambda
     Then the log carries the error type
     And the exception's message is not logged
 
+  @unit
+  Scenario: A workflow result too large for one synchronous answer is the sender's to shrink
+    Given a workflow run whose engine function answered that its response was too large
+    When the failure is answered
+    Then the caller receives a 422 with the code workflow_result_too_large
+    And it is logged as a warning, not an error
+
   # The stop flag is read from Redis on a timer while a chunk is pending. A read
   # that failed was an unhandled rejection, and an unhandled rejection exits the
   # worker: one Redis blip killed every run on it.

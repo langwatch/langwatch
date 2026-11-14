@@ -38,6 +38,7 @@ function harness({
   const memory = MemoryAuthDatabase.create();
   const sessionRows = MemoryAuthSessionRepository.create({ memory });
   const sessions = BrowserSessionService.create({
+    docsKeys: { revokeDocsSessionKeys: async () => ({ revoked: true as const }) },
     sessions: sessionRows,
     cache: null,
     identityEmails: void 0,

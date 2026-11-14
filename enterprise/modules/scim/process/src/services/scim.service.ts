@@ -15,11 +15,10 @@ import {
   type ScimTokenSummary,
 } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
-import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { Instant } from "@langwatch/time";
 import type { UserProfile } from "@langwatch/user-contract";
 
-import type { ScimSeatRepository } from "../repositories/scim-seat.repository.ts";
+import type { ScimMembers } from "../channels/scim-channels.registry.ts";
 import type { ScimRepository } from "../repositories/scim.repository.ts";
 import type { ScimCostCenterFacts } from "./scim-cost-center.service.ts";
 import type { ScimOrganizationAdministration } from "./scim-deprovision.service.ts";
@@ -31,6 +30,7 @@ import { ScimDirectoryService } from "./scim-directory.service.ts";
 import { type ScimGrantAuthority, ScimGrantsService } from "./scim-grants.service.ts";
 import { ScimProvisioningService, type ScimUserProvisioning } from "./scim-provisioning.service.ts";
 import { ScimRequestLogService } from "./scim-request-log.service.ts";
+import type { ScimSeats } from "./scim-seat-lease.service.ts";
 import type { ScimSyncLifecycle, ScimUserPushOperation } from "./scim-sync-lifecycle.service.ts";
 import { ScimTokenService } from "./scim-token.service.ts";
 
@@ -71,8 +71,8 @@ export class ScimService {
     users: ScimUserProvisioning;
     costCenterFacts: ScimCostCenterFacts;
     organization: ScimOrganizationAdministration;
-    seats: ScimSeatRepository;
-    members: Pick<OrganizationApi, "deleteMember">;
+    seats: ScimSeats;
+    members: ScimMembers;
     entitlements: Pick<EntitlementApi, "getActivePlan">;
     lifecycle: ScimSyncLifecycle;
     provenOffboarding: boolean;
@@ -121,8 +121,8 @@ export class ScimService {
     users: ScimUserProvisioning;
     costCenterFacts: ScimCostCenterFacts;
     organization: ScimOrganizationAdministration;
-    seats: ScimSeatRepository;
-    members: Pick<OrganizationApi, "deleteMember">;
+    seats: ScimSeats;
+    members: ScimMembers;
     entitlements: Pick<EntitlementApi, "getActivePlan">;
     lifecycle: ScimSyncLifecycle;
     provenOffboarding: boolean;

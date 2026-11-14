@@ -66,17 +66,17 @@ export class LicenseRefreshService {
   private constructor(private readonly deps: LicenseRefreshServiceDependencies) {}
 
   /**
-   * One pass over the organizations whose license names a hosted service. A
-   * license that names none is not synced, which is how an install on an
-   * offline license makes no call.
+   * One pass over the organizations whose signed license names a hosted service,
+   * expired or not, so a renewal issued after the term ended is still collected.
+   * A license that names none is not synced: an offline license makes no call.
    */
   async syncAll(organizationIds: readonly string[]): Promise<void> {
     if (!this.deps.host) return;
 
     const pending: string[] = [];
     for (const organizationId of organizationIds) {
-      const entitled = await this.deps.install.findEntitledServices(organizationId);
-      if (entitled.length === 0) continue;
+      const [credential] = await this.deps.install.findCredential(organizationId);
+      if (!credential) continue;
       if (!(await this.syncAndRecord({ organizationId, retryPending: true }))) {
         pending.push(organizationId);
       }
@@ -118,8 +118,8 @@ export class LicenseRefreshService {
     const host = this.deps.host;
     if (!host) throw new ConnectDisabledError();
 
-    const entitled = await this.deps.install.findEntitledServices(organizationId);
-    if (entitled.length === 0) throw new ConnectLicenseRequiredError();
+    const [credential] = await this.deps.install.findCredential(organizationId);
+    if (!credential) throw new ConnectLicenseRequiredError();
 
     let synced: LicenseSyncOutcome;
     try {

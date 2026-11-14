@@ -1,4 +1,3 @@
-import type { Agent as TypedAgent } from "@langwatch/agent-contract";
 import {
   type BoardResults,
   type CarriedOverCell,
@@ -9,9 +8,11 @@ import {
   ExperimentEvaluationInputError,
   ExperimentNotFoundError,
   InvalidExperimentConfigurationError,
+  invertRowIndices,
   persistedEvaluationsV3StateSchema,
   planBoardCarryOver,
   planComparisonSeeding,
+  remapResultRows,
   runInputsBodySchema,
   type SeedableResults,
   type SeedTargetOutputs,
@@ -43,9 +44,11 @@ interface SavedStateExecution {
   datasetRows: LoadedExecutionData["datasetRows"];
   datasetColumns: LoadedExecutionData["datasetColumns"];
   loadedPrompts: Map<string, VersionedPrompt>;
-  loadedAgents: Map<string, TypedAgent>;
+  loadedAgents: LoadedExecutionData["loadedAgents"];
   loadedEvaluators: LoadedExecutionData["loadedEvaluators"];
   loadedWorkflows: LoadedExecutionData["loadedWorkflows"];
+  datasetVersion?: LoadedExecutionData["datasetVersion"];
+  pinnedVersionRowIds?: LoadedExecutionData["pinnedVersionRowIds"];
 }
 
 /**
@@ -106,17 +109,26 @@ export class ExperimentSavedStateExecutionService {
     prepared,
     scope,
     extraCells,
+    boardRowIndices,
   }: {
     prepared: SavedStateExecution;
     scope: ExecutionScope;
     extraCells?: CellId[];
+    /** The board row of each run row, when the run read another version than the board shows. */
+    boardRowIndices?: readonly (number | null)[];
   }): CarriedOverCell[] {
+    const board = prepared.workbenchState.results as Partial<BoardResults> | undefined;
+    // Board cells sit at board rows; the run carries them at its own rows, by row id.
+    const results =
+      board && boardRowIndices
+        ? remapResultRows({ results: board, rowIndices: invertRowIndices(boardRowIndices) })
+        : board;
     return planBoardCarryOver({
       targets: prepared.state.targets,
       evaluators: prepared.state.evaluators,
       scope,
       datasetRows: prepared.datasetRows,
-      results: prepared.workbenchState.results as Partial<BoardResults>,
+      ...(results ? { results } : {}),
       ...(extraCells ? { extraCells } : {}),
     });
   }
@@ -178,9 +190,13 @@ export class ExperimentSavedStateExecutionService {
       datasetRows: dataResult.datasetRows,
       datasetColumns: dataResult.datasetColumns,
       loadedPrompts: dataResult.loadedPrompts as Map<string, VersionedPrompt>,
-      loadedAgents: dataResult.loadedAgents as Map<string, TypedAgent>,
+      loadedAgents: dataResult.loadedAgents,
       loadedEvaluators: dataResult.loadedEvaluators,
       loadedWorkflows: dataResult.loadedWorkflows,
+      ...(dataResult.datasetVersion ? { datasetVersion: dataResult.datasetVersion } : {}),
+      ...(dataResult.pinnedVersionRowIds
+        ? { pinnedVersionRowIds: dataResult.pinnedVersionRowIds }
+        : {}),
     };
   }
 }

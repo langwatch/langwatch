@@ -7,7 +7,6 @@ import {
   LangWatchQLTableModifierError,
   type LangWatchQLTimeWindow,
 } from "@langwatch/analytics-contract";
-import { DEFAULT_TRACE_ORIGIN } from "@langwatch/trace-contract";
 
 import type { LangWatchQLViewDefinition } from "../services/langwatch-ql-catalog-shapes.service.ts";
 import { clickHouseSqlParser, type SqlAstNode } from "./langwatch-ql-parser.rules.ts";
@@ -39,23 +38,13 @@ export function strictestLangWatchQLProtections(
   };
 }
 
-const ORIGIN_COLUMN = "Origin";
 const TRACE_ID_COLUMN = "TraceId";
-
-/**
- * The one-row-per-trace view that knows each trace's origin. A view that only names a trace is
- * scoped through it, because spans, evaluations and the rest carry no origin of their own.
- */
-const TRACE_ORIGIN_VIEW = "trace_metrics";
-
-/** An unstamped origin is the application's, exactly as `deriveTraceOrigin` reads it. */
-const traceOriginOf = (column: string) =>
-  `ifNull(nullIf(${column}, ''), ${clickHouseLiteral(DEFAULT_TRACE_ORIGIN)})`;
+const TENANT_COLUMN = "TenantId";
 
 /**
  * Earliest `OccurredAt` of a trace owning a row in `window`: one window back for a comparison
  * with the period before, plus the day of slack catalogue lookups give a trace observed after its
- * first span started. `OccurredAt` leads the sort key, so it prunes (analytics ADR-003).
+ * first span started. `OccurredAt` leads the sort key, so it prunes.
  */
 function traceLookupStart(window: LangWatchQLTimeWindow): string {
   const at = (instant: string) =>
@@ -229,47 +218,6 @@ export function assertNoUnsupportedTableModifiers({
   });
 }
 
-/**
- * The predicate keeping each view's rows to the origins not left out, keyed like a reference.
- * A view with no `Origin` and no `TraceId`, such as a per-minute rollup, gets none.
- */
-function buildOriginPredicates({
-  views,
-  database,
-  excludeOrigins,
-  timeWindow,
-}: {
-  views: readonly LangWatchQLViewDefinition[];
-  database: string;
-  excludeOrigins: readonly string[];
-  timeWindow?: LangWatchQLTimeWindow;
-}): ReadonlyMap<string, string> {
-  const excluded = excludeOrigins.map(clickHouseLiteral).join(", ");
-  const traceOriginView = qualifyTableName({ table: TRACE_ORIGIN_VIEW, defaultDatabase: database });
-  const canReachTraceOrigin = views.some(
-    (view) => qualifyTableName({ table: view.name, defaultDatabase: database }) === traceOriginView,
-  );
-  // `ifNull` because `NULL NOT IN (…)` is NULL, which would drop a row that belongs to no trace.
-  const byTrace =
-    `ifNull(${TRACE_ID_COLUMN}, '') NOT IN (SELECT ${TRACE_ID_COLUMN} ` +
-    `FROM ${database}.${TRACE_ORIGIN_VIEW} ` +
-    `WHERE ${traceOriginOf(ORIGIN_COLUMN)} IN (${excluded})` +
-    (timeWindow ? ` AND OccurredAt >= ${traceLookupStart(timeWindow)}` : "") +
-    ")";
-  const byOrigin = `${traceOriginOf(ORIGIN_COLUMN)} NOT IN (${excluded})`;
-
-  const predicates = new Map<string, string>();
-  for (const view of views) {
-    const columns = new Set(view.columns.map((column) => column.name));
-    const key = qualifyTableName({ table: view.name, defaultDatabase: database });
-    if (columns.has(ORIGIN_COLUMN)) predicates.set(key, byOrigin);
-    else if (columns.has(TRACE_ID_COLUMN) && canReachTraceOrigin) predicates.set(key, byTrace);
-  }
-  return predicates;
-}
-
-const TENANT_COLUMN = "TenantId";
-
 /** The one-row-per-trace view a dated member's evaluations are timed through. */
 const TRACE_VIEW = "traces";
 
@@ -282,6 +230,8 @@ const EVALUATION_VIEWS: readonly string[] = [
   "evaluations",
   "evaluation_metrics",
   "evaluation_metrics_by_minute",
+  "trace_evaluation_metrics",
+  "trace_evaluation_checks",
 ];
 
 /** Admits no row: a view the windows cannot be applied to reads nothing on an aggregate. */
@@ -337,7 +287,7 @@ type WindowReach = {
   dated: readonly LangWatchQLMemberWindow[];
   canReachTraceView: boolean;
   evaluationViews: ReadonlySet<string>;
-  /** The statement's period, bounding the trace lookup as the origin lookup is bounded. */
+  /** The statement's period, bounding the trace lookup. */
   timeWindow: LangWatchQLTimeWindow | undefined;
 };
 
@@ -399,20 +349,18 @@ function datedPicks({
 }
 
 /**
- * `sql` with each catalogued view it reads replaced by that view minus the `excludeOrigins` traces
- * (ADR-061, analytics ADR-003). With `memberWindows`, each view is also kept to the members inside
- * their grants' windows, and a view outside `views` reads nothing (ADR-177 v4.14).
+ * `sql` with each catalogued view it reads kept to the members inside their grants' windows, and
+ * a view outside `views` reading nothing (ADR-177 v4.14). It adds no origin condition: a statement
+ * is kept to its sources only where its SQL reads the sources parameter (analytics ADR-003).
  */
 export function scopeLangWatchQL({
   sql,
-  excludeOrigins,
   database,
   views,
   timeWindow,
   memberWindows,
 }: {
   sql: string;
-  excludeOrigins: readonly string[];
   /** Where unqualified view names resolve. */
   database: string;
   views: readonly LangWatchQLViewDefinition[];
@@ -423,7 +371,7 @@ export function scopeLangWatchQL({
 }): string {
   // Whole-history members need no rewrite: the row policy bounds them exactly.
   const isWindowed = memberWindows?.some((window) => window.from > 0) === true;
-  if (excludeOrigins.length === 0 && !isWindowed) {
+  if (!isWindowed) {
     assertNoUnsupportedTableModifiers({ sql, views, database });
     return sql;
   }
@@ -433,15 +381,6 @@ export function scopeLangWatchQL({
     throw new Error("LangWatchQL scope: an accepted statement no longer parses");
   }
 
-  const origins =
-    excludeOrigins.length === 0
-      ? new Map<string, string>()
-      : buildOriginPredicates({
-          views,
-          database,
-          excludeOrigins,
-          ...(timeWindow ? { timeWindow } : {}),
-        });
   const windows =
     isWindowed && memberWindows
       ? buildWindowPredicates({ views, database, memberWindows, timeWindow })
@@ -452,10 +391,7 @@ export function scopeLangWatchQL({
   const rewrites = references.flatMap((reference) => {
     const window =
       windows === undefined ? undefined : (windows.get(reference.qualified) ?? NO_ROWS);
-    const predicate = [origins.get(reference.qualified), window]
-      .filter((part) => part !== undefined)
-      .join(" AND ");
-    return predicate === "" ? [] : [{ reference, predicate }];
+    return window === undefined ? [] : [{ reference, predicate: window }];
   });
   assertNoTableModifiers({
     statements: parsed.statements,

@@ -1,3 +1,4 @@
+import { EnterpriseLock } from "@langwatch/browser-host/enterprise-lock";
 import { resolveUiFailureCopy } from "@langwatch/browser-host/feedback";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
@@ -60,10 +61,6 @@ export function LoadFailure({ error, what }: { error: unknown; what: string }) {
 
 /** What the reader is told when setting single sign-on up is not theirs yet. */
 const AVAILABILITY_REFUSAL_COPY = {
-  license_required: {
-    title: "Single sign-on needs an active license",
-    body: "Activate an enterprise license on this installation, and you can set single sign-on up here.",
-  },
   license_activation_pending: {
     title: "Single sign-on is turning on",
     body: "The license is active. Every server in this installation picks it up within a minute. Reload this page then.",
@@ -81,9 +78,16 @@ const AVAILABILITY_REFUSAL_COPY = {
  */
 export function AvailabilityRefusalNotice({
   refusal,
+  canManageOrganization = false,
 }: {
-  refusal: keyof typeof AVAILABILITY_REFUSAL_COPY;
+  /** `license_required` is the Enterprise lock; the others are a banner. */
+  refusal: keyof typeof AVAILABILITY_REFUSAL_COPY | "license_required";
+  /** The reader holds `organization:manage`, so the lock offers to activate a license. */
+  canManageOrganization?: boolean;
 }) {
+  if (refusal === "license_required") {
+    return <SsoEnterpriseLock canManage={canManageOrganization} />;
+  }
   const copy = AVAILABILITY_REFUSAL_COPY[refusal];
 
   return (
@@ -94,17 +98,23 @@ export function AvailabilityRefusalNotice({
 }
 
 /**
- * The organization's plan, not the reader, is what refuses single sign-on.
+ * The organization's plan or license, not the reader, is what refuses single sign-on.
  * Said instead of the journey, so no control is offered that would refuse.
  */
-export function EnterprisePlanRequiredNotice() {
+export function SsoEnterpriseLock({
+  canManage,
+  compact = false,
+}: {
+  canManage: boolean;
+  compact?: boolean;
+}) {
   return (
-    <Banner
-      status="info"
+    <EnterpriseLock
+      feature="Single sign-on"
+      description="Your people sign in with your company's identity provider, and you decide there who still has access."
+      canManage={canManage}
+      compact={compact}
       data-testid="sso-enterprise-required"
-      title="Single sign-on needs an Enterprise plan"
-    >
-      Upgrade this organization to Enterprise, and you can set single sign-on up here.
-    </Banner>
+    />
   );
 }

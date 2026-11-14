@@ -4,13 +4,14 @@ import { defineProcessModule, type PublishedProcessModule } from "@langwatch/pro
 
 import { DashboardModule } from "./app/dashboard.app.ts";
 import { dashboardRepositories } from "./repositories/dashboard-repositories.registry.ts";
+import { keyReachOfCredential } from "./rules/dashboard-widget-key-reach.rules.ts";
 import { widgetSourceOfCredential } from "./rules/dashboard-widget-source.rules.ts";
 import { boardProjectRest } from "./transport/board-project.rest.ts";
 import { boardRest, releasedOrRefused } from "./transport/board.rest.ts";
 import { boardTrpcTransport } from "./transport/board.trpc.ts";
 import { dashboardWidgetRest } from "./transport/dashboard-widget.rest.ts";
 import { dashboardWidgetTrpcTransport } from "./transport/dashboard-widget.trpc.ts";
-import { dashboardRest, dashboardRestBeforeDashboardsApi } from "./transport/dashboard.rest.ts";
+import { dashboardRest } from "./transport/dashboard.rest.ts";
 import { dashboardTrpcTransport } from "./transport/dashboard.trpc.ts";
 import { graphRest } from "./transport/graph.rest.ts";
 import { graphTrpcTransport } from "./transport/graph.trpc.ts";
@@ -28,8 +29,6 @@ export const dashboardProcessModule: PublishedProcessModule<
   .withTransports(
     dashboardRest,
     dashboardWidgetRest,
-    // Ahead of boardRest: its dated routes answer before the Dashboards API's `/:dashboardId`.
-    dashboardRestBeforeDashboardsApi,
     boardRest,
     boardProjectRest,
     graphRest,
@@ -70,6 +69,12 @@ export const dashboardProcessModule: PublishedProcessModule<
           projectId: projectCredentialOfRequest(request).project.id,
         }),
       ),
-    dashboardWidgetCallerSource: (request) =>
-      widgetSourceOfCredential({ credential: projectCredentialOfRequest(request) }),
+    dashboardWidgetCaller: (request) => {
+      const credential = projectCredentialOfRequest(request);
+
+      return {
+        source: widgetSourceOfCredential({ credential }),
+        ...keyReachOfCredential({ credential }),
+      };
+    },
   });

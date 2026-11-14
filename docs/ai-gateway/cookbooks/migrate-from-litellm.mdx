@@ -45,10 +45,10 @@ A LiteLLM budget on a team becomes a budget with **Target** set to the team, und
 # LiteLLM
 router_settings:
   fallbacks:
-    - gpt-5-mini: ["azure-mini-eu"]
+    - gpt-6-luna: ["azure-mini-eu"]
 ```
 
-Create a routing policy under **AI Gateway > Routing policies** with the OpenAI row first and the Azure row second, map `gpt-5-mini` to `azure/acme-mini-eu` in its model aliases, and pick the policy under **Routing** on the key.
+Create a routing policy under **AI Gateway > Routing policies** with the OpenAI row first and the Azure row second, map `gpt-6-luna` to `azure/acme-mini-eu` in its model aliases, and pick the policy under **Routing** on the key.
 
 ## 4. Change the client
 
@@ -60,7 +60,7 @@ client = OpenAI(
     api_key="sk-...",
 )
 client.chat.completions.create(
-    model="gpt-5-mini",
+    model="gpt-6-luna",
     messages=[...],
     user="cust_8841",
     extra_body={"metadata": {"plan": "pro"}},
@@ -73,7 +73,7 @@ client = OpenAI(
     api_key="vk-lw-...",
 )
 client.chat.completions.create(
-    model="openai/gpt-5-mini",
+    model="openai/gpt-6-luna",
     messages=[...],
     user="cust_8841",
     extra_headers={"X-LangWatch-Metadata": '{"plan": "pro"}'},

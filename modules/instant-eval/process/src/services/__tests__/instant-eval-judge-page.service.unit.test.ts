@@ -4,6 +4,7 @@
  * @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
 
+import { HandledError } from "@langwatch/handled-error";
 import {
   INSTANT_EVAL_PRICING,
   INSTANT_EVAL_CLASSIFIER_LIMITS,
@@ -192,6 +193,7 @@ async function judging({
   now = () => AT.epochMilliseconds,
   assertWithinBudget = async () => undefined,
   onInsert,
+  runCostUsd = 0,
 }: {
   keyPage?: InstantEvalKeyPage;
   keySource?: Pick<InstantEvalRowSourceService, "keys">;
@@ -201,8 +203,10 @@ async function judging({
   questions?: readonly (typeof QUESTION)[];
   concurrency?: number;
   now?: () => number;
-  assertWithinBudget?: () => Promise<undefined>;
+  assertWithinBudget?: (input: { inFlightUsd?: number | undefined }) => Promise<undefined>;
   onInsert?: () => void;
+  /** The running row's routed cost so far; zero on an unrouted run, as on main. */
+  runCostUsd?: number;
 }): Promise<{
   service: InstantEvalJudgePageService;
   judge: ScriptedJudge;
@@ -222,6 +226,7 @@ async function judging({
         options: [],
       })),
       tokens: 0,
+      costUsd: runCostUsd,
     }),
   );
   const judge = new ScriptedJudge(answer);
@@ -432,6 +437,60 @@ describe("given a judge that answers nothing at all", () => {
   });
 });
 
+/** A handled reason the hosted judge fails with when LangWatch is not reached. */
+class UnreachableError extends HandledError {
+  constructor() {
+    super("connect_unreachable", "LangWatch-hosted services were not reached", {
+      httpStatus: 503,
+      fault: "customer",
+    });
+  }
+}
+
+describe("given a judge that fails every row with the same handled reason", () => {
+  describe("when the page is judged", () => {
+    /** @scenario "A page the judge could not answer at all fails with the judge's own reason" */
+    it("throws that reason so the failed run carries its code", async () => {
+      const { service, judgments } = await judging({
+        keyPage: { keys: [rowKey("t1"), rowKey("t2")], hasMore: false },
+        rows: [
+          { TraceId: "t1", annoyed: "one" },
+          { TraceId: "t2", annoyed: "two" },
+        ],
+        answer: async () => {
+          throw new UnreachableError();
+        },
+      });
+
+      await expect(service.judgePage(INPUT)).rejects.toMatchObject({ code: "connect_unreachable" });
+      expect(judgments.written).toEqual([]);
+    });
+  });
+});
+
+describe("given a judge that fails every row for different reasons", () => {
+  describe("when the page is judged", () => {
+    /** @scenario "A page the judge could not answer for mixed reasons fails as the judge being unavailable" */
+    it("throws the judge being unavailable", async () => {
+      const { service } = await judging({
+        keyPage: { keys: [rowKey("t1"), rowKey("t2")], hasMore: false },
+        rows: [
+          { TraceId: "t1", annoyed: "one" },
+          { TraceId: "t2", annoyed: "two" },
+        ],
+        answer: async ({ index }) => {
+          if (index === 0) {
+            throw new UnreachableError();
+          }
+          throw new Error("the judge is down");
+        },
+      });
+
+      await expect(service.judgePage(INPUT)).rejects.toThrow(InstantEvalClassifierUnavailableError);
+    });
+  });
+});
+
 describe("given a run whose organization has spent its allowance", () => {
   describe("when the next page comes up", () => {
     it("refuses before reading anything, so a stopped run is never reported complete", async () => {
@@ -446,6 +505,29 @@ describe("given a run whose organization has spent its allowance", () => {
       await expect(service.judgePage(INPUT)).rejects.toThrow(InstantEvalFreeBudgetExhaustedError);
       expect(texts.asked).toEqual([]);
       expect(judge.requests).toEqual([]);
+    });
+  });
+});
+
+describe("given a routed run whose cost so far came with no input tokens", () => {
+  describe("when the next page checks the budget", () => {
+    /** @scenario "A routed cost with no input tokens is still billed" */
+    it("counts that cost at the markup, never as nothing spent", async () => {
+      const checked: number[] = [];
+      const { service } = await judging({
+        keyPage: { keys: [], hasMore: false },
+        rows: [],
+        runCostUsd: 0.002,
+        assertWithinBudget: async ({ inFlightUsd }) => {
+          checked.push(inFlightUsd ?? 0);
+          return undefined;
+        },
+      });
+
+      await service.judgePage(INPUT);
+
+      // $0.002 of routed cost at the 1.3 markup.
+      expect(checked).toEqual([0.0026]);
     });
   });
 });

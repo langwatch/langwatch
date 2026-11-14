@@ -23,6 +23,19 @@ describe("webhook event registry", () => {
     expect(eventMatches(enabled, "trace.settled")).toBe(false);
   });
 
+  /** @scenario A prefix wildcard subscribes to every type under that prefix */
+  it("a prefix wildcard matches the types under it and nothing beside it", () => {
+    const enabled = ["governance.agent.*"];
+    for (const t of WEBHOOK_EVENT_TYPES.filter((eventType) =>
+      eventType.type.startsWith("governance.agent."),
+    )) {
+      expect(eventMatches(enabled, t.type)).toBe(true);
+    }
+    expect(eventMatches(enabled, "governance.anomaly_alert.triggered")).toBe(false);
+    expect(isValidEventSelector("governance.agent.*")).toBe(true);
+    expect(isValidEventSelector("governance.imagined.*")).toBe(false);
+  });
+
   /** @scenario A settled event never matches a completed-only subscription */
   it("settled is its own stream: completed-only endpoints never receive it", () => {
     expect(eventMatches(["gateway.request.completed"], "gateway.request.settled")).toBe(false);

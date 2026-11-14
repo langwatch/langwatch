@@ -17,7 +17,7 @@ import {
 type AgentInventory = { rows: GovernanceAgentRow[]; unknownProviders: string[] };
 
 /** Closed: a provider with no chip is dropped and reported, never filed under Custom. */
-const SOURCE_BY_PROVIDER: ReadonlyMap<string, AgentSource> = new Map([
+export const AGENT_SOURCE_BY_PROVIDER: ReadonlyMap<string, AgentSource> = new Map([
   [DATABRICKS_GENIE_ADAPTER_ID, "databricks"],
   [COPILOT_STUDIO_DATAVERSE_ADAPTER_ID, "copilot_studio"],
 ]);
@@ -48,7 +48,7 @@ export function buildAgentInventory({
 
   const unknownProviders = new Set<string>();
   const discoveredRows = discovered.flatMap((agent) => {
-    const source = SOURCE_BY_PROVIDER.get(agent.provider);
+    const source = AGENT_SOURCE_BY_PROVIDER.get(agent.provider);
     if (source === undefined) {
       unknownProviders.add(agent.provider);
       return [];

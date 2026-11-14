@@ -96,6 +96,9 @@
       "path": "../contract/tsconfig.build.json"
     },
     {
+      "path": "../../../../modules/data-privacy/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../../packages/clickhouse-client/tsconfig.build.json"
     },
     {

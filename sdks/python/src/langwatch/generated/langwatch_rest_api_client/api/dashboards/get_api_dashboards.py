@@ -93,9 +93,9 @@ def sync_detailed(
     | GetApiDashboardsResponse403
     | GetApiDashboardsResponse500
 ]:
-    """List boards
+    """List dashboards
 
-     Lists the Dashboards boards of the key's project, each with how many widgets it holds.
+     Lists the dashboards of the key's project, each with how many widgets it holds.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -125,9 +125,9 @@ def sync(
     | GetApiDashboardsResponse500
     | None
 ):
-    """List boards
+    """List dashboards
 
-     Lists the Dashboards boards of the key's project, each with how many widgets it holds.
+     Lists the dashboards of the key's project, each with how many widgets it holds.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -152,9 +152,9 @@ async def asyncio_detailed(
     | GetApiDashboardsResponse403
     | GetApiDashboardsResponse500
 ]:
-    """List boards
+    """List dashboards
 
-     Lists the Dashboards boards of the key's project, each with how many widgets it holds.
+     Lists the dashboards of the key's project, each with how many widgets it holds.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -182,9 +182,9 @@ async def asyncio(
     | GetApiDashboardsResponse500
     | None
 ):
-    """List boards
+    """List dashboards
 
-     Lists the Dashboards boards of the key's project, each with how many widgets it holds.
+     Lists the dashboards of the key's project, each with how many widgets it holds.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

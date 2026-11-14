@@ -32,7 +32,7 @@ import {
 import { MemoryDashboardRepositories } from "../../repositories/memory/memory.dashboard.repositories.ts";
 import { boardTrpcTransport } from "../board.trpc.ts";
 import {
-  dashboardWidgetCallerSource,
+  dashboardWidgetCaller,
   dashboardWidgetRest,
   dashboardWidgetUrl,
 } from "../dashboard-widget.rest.ts";
@@ -172,7 +172,7 @@ function credentialDoors(app: DashboardApi, projectId: string, actor: Actor | nu
 
 const WIDGET_CONTEXT = [
   bindMiddlewareContext(dashboardWidgetUrl, () => PLATFORM_URL),
-  bindMiddlewareContext(dashboardWidgetCallerSource, () => ({ kind: "api" as const })),
+  bindMiddlewareContext(dashboardWidgetCaller, () => ({ source: { kind: "api" as const } })),
 ];
 const CHART_CONTEXT = [
   bindMiddlewareContext(langWatchQLCallerProtections, () => FULLY_PERMITTED),
@@ -471,7 +471,7 @@ describe("board scope at the doors", () => {
 
   describe("when a key makes a board over REST", () => {
     /** @scenario "AC197 Scope: a key that names no person stands where a project credential does" */
-    /** @scenario "AC199i Split: a board made in Analytics Reports is not starred and not Only me" */
+    /** @scenario "AC199i Split: a board made in Analytics Reports is not pinned and not Only me" */
     it.each([
       { key: "its author's own key", actor: keyOf(AUTHOR) },
       { key: "a key that names nobody", actor: NOBODY },
@@ -717,7 +717,7 @@ describe("the Dashboards and Analytics Reports boards at the doors", () => {
     });
   });
 
-  /** @scenario "AC199i Split: a board made in Analytics Reports is not starred and not Only me" */
+  /** @scenario "AC199i Split: a board made in Analytics Reports is not pinned and not Only me" */
   it("makes My dashboard in Reports at Project with no star, and in Dashboards Only me and starred", async () => {
     const { call } = appWith();
     const made = (procedure: string) =>

@@ -30,7 +30,7 @@ async def main(message: cl.Message):
     )
 
     completion = client.chat.completions.create(
-        model="gpt-5-mini",
+        model="gpt-6-luna",
         messages=[
             {
                 "role": "system",
@@ -57,11 +57,10 @@ async def main(message: cl.Message):
                 },
             }
         ],
-        # gpt-5-mini refuses a FORCED function tool_choice outright
-        # (400 invalid_prompt, pointing at the reasoning-model prompting
-        # guide), so the example relies on "auto" picking the tool for a
-        # weather question.
         tool_choice="auto",
+        # gpt-6-luna takes function tools on Chat Completions only with
+        # reasoning turned off.
+        reasoning_effort="none",
     )
 
     # "auto" does not guarantee a tool call: bail out with the model's
@@ -77,7 +76,7 @@ async def main(message: cl.Message):
     weather = get_weather(weather_call["city"])
 
     completion = client.chat.completions.create(
-        model="gpt-5-mini",
+        model="gpt-6-luna",
         messages=[
             {
                 "role": "system",

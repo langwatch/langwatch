@@ -1,7 +1,7 @@
 /** Sidebar column: product pages and utilities. Host and search palette integration. */
 
 import { RawKbd as Kbd } from "@langwatch/design-system/kbd";
-import { Badge, Box, VStack } from "@langwatch/design-system/primitives";
+import { Box, VStack } from "@langwatch/design-system/primitives";
 import { ScrollEdgeFade, useScrollEdges } from "@langwatch/design-system/scroll-fade";
 import { ArrowLeft, ArrowUpRight, Search } from "lucide-react";
 import { useRef, useState } from "react";
@@ -33,7 +33,7 @@ import {
   type SectionNavItemData,
 } from "../../model/section-nav-items.ts";
 import {
-  isSettingsMenuItemActive,
+  isSettingsMenuItemActiveAmong,
   OPS_ATTENTION_HREF,
   type SettingsMenuGroup,
 } from "../../model/settings-menu.ts";
@@ -44,6 +44,7 @@ import {
 import { SideMenuItem, SideMenuLink } from "../blocks/side-menu-link.tsx";
 import { SupportMenu } from "../blocks/support-menu.tsx";
 import { ThemeToggle } from "../blocks/theme-toggle.tsx";
+import { featureMenuIcon } from "../elements/feature-menu-icon.tsx";
 import { SideMenuDensityProvider } from "../elements/side-menu-density.tsx";
 import { MainMenuSections } from "./main-menu.tsx";
 import { PersonalSidebarLinks } from "./personal-sidebar.tsx";
@@ -183,7 +184,9 @@ function DetourMenuBody({
   showExpanded: boolean;
   badgeFor?: (href: string) => number | undefined;
 }) {
-  const pathname = useNavigationHost().pathname();
+  const host = useNavigationHost();
+  const pathname = host.pathname();
+  const search = host.search();
 
   return (
     <>
@@ -197,14 +200,18 @@ function DetourMenuBody({
           {group.items.map((item) => (
             <SideMenuLink
               key={item.href}
-              icon={item.icon}
+              icon={item.feature ? featureMenuIcon(item.feature) : item.icon}
               label={item.label}
               href={item.href}
-              isActive={isSettingsMenuItemActive({ item, pathname })}
+              isActive={isSettingsMenuItemActiveAmong({
+                item,
+                siblings: group.items,
+                pathname,
+                search,
+              })}
               showLabel={showExpanded}
               badgeNumber={badgeFor?.(item.href)}
               isLocked={item.isLocked}
-              rightElement={item.isEnterprise ? <EnterpriseChip /> : undefined}
             />
           ))}
         </SidebarSection>
@@ -322,8 +329,8 @@ function DashboardsSidebarBody({ showExpanded }: { showExpanded: boolean }) {
 }
 
 /**
- * The member's starred dashboards in every other product's sidebar, for a member who can reach
- * Dashboards; Dashboards lists its stars itself, and Settings is no product.
+ * The Dashboards section analytics lends, in the LLM Ops sidebar only and for a member who can
+ * reach Dashboards: the owner wants it in the project's sidebar, not everywhere.
  */
 function StarredDashboardsGroup({
   surface,
@@ -333,7 +340,7 @@ function StarredDashboardsGroup({
   showExpanded: boolean;
 }) {
   const { reachableProducts } = useReachableProducts();
-  if (!showExpanded || surface === "dashboards" || surface === "settings") return null;
+  if (!showExpanded || surface !== "llm-ops") return null;
   if (!reachableProducts.includes("dashboards")) return null;
   return <StarredDashboards />;
 }
@@ -526,21 +533,4 @@ export function ProductSidebar({
 /** Marks an entry that leaves the current section. */
 function OutboundArrow() {
   return <ArrowUpRight size={12} aria-hidden color="var(--chakra-colors-fg-muted)" />;
-}
-
-/** The quiet "ENT" chip on an Enterprise entry the plan includes; a locked entry shows a lock. */
-function EnterpriseChip() {
-  return (
-    <Badge
-      title="Enterprise plan feature"
-      variant="outline"
-      textStyle="micro"
-      fontWeight="semibold"
-      letterSpacing="0.06em"
-      textTransform="uppercase"
-      {...QUIET_SIDEBAR_CHIP}
-    >
-      ENT
-    </Badge>
-  );
 }

@@ -109,8 +109,10 @@ export {
 } from "./idempotency.ts";
 export type {
   IdempotencyReceiptCreateInput,
+  IdempotencyReceiptFence,
   IdempotencyReceiptPersistence,
   IdempotencyReceiptRecord,
+  IdempotencyReceiptUpdate,
 } from "./repositories/prisma/prisma.idempotency-receipt.ts";
 
 export { recordRequestPrincipal } from "./request-principal.ts";
@@ -180,6 +182,7 @@ export {
   projectOf,
   type ProjectScopedContext,
   recordBrowserCaller,
+  keyPrincipalOfApiKey,
   recordKeyCredential,
   recordOrganizationCredential,
   recordProjectCredential,
@@ -337,6 +340,7 @@ export {
 export {
   assertKeyKind,
   keyCredentialOf,
+  keyCredentialOfDoor,
   REST_KEY_KINDS,
   type RestKeyCredential,
   type RestKeyDoor,

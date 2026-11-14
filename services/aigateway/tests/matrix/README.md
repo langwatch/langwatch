@@ -15,6 +15,18 @@ The tests require a live stack:
 
 Each test reads these from env vars — missing env = `t.Skip`, never fails.
 
+In CI, `.github/workflows/gateway-matrix.yaml` mints all of them per run:
+`go run ./cmd/matrixseed` provisions an organization and project on the fresh
+stack through the instance administrator API, stores one model provider per
+provider whose credentials the job holds, mints one virtual key for each, and
+exports `LW_PROJECT_API_KEY` and `TEST_VK_<PROVIDER>` to `$GITHUB_ENV`. The same
+command seeds a local stack started with `LANGWATCH_INSTANCE_ADMIN_API_KEY` set:
+
+```bash
+LANGWATCH_INSTANCE_ADMIN_API_KEY=... OPENAI_API_KEY=... \
+  go run ./cmd/matrixseed -base-url http://localhost:5560 -env-file /tmp/matrix.env
+```
+
 ## Running one cell
 
 ```bash

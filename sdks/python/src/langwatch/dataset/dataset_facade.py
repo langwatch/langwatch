@@ -10,6 +10,7 @@ Follows the same 3-layer pattern as the prompts module:
   DatasetsFacade -> DatasetApiService -> HTTP
 """
 
+import json
 import os
 from typing import Any, Dict, List, Optional
 
@@ -22,7 +23,7 @@ from langwatch.utils.initialization import ensure_setup
 from langwatch.state import get_instance
 
 from .dataset_api_service import DatasetApiService
-from .errors import DatasetApiError, DatasetNotFoundError
+from .errors import DatasetApiError, DatasetNotFoundError, DatasetUpsertKeyError
 from .types import (
     Dataset,
     DatasetEntry,
@@ -31,9 +32,39 @@ from .types import (
     PaginatedResult,
     Pagination,
     UploadResult,
+    UpsertResult,
 )
 
 _SUPPORTED_EXTENSIONS = {".csv", ".json", ".jsonl"}
+
+# Rows sent per batch create: the smallest batch any plan accepts.
+_CREATE_BATCH_SIZE = 1000
+
+
+def _key_of(value: Any) -> str:
+    """A value as sorted-key JSON, so 1 and "1" (and False and 0) stay different."""
+    return json.dumps(value, sort_keys=True)
+
+
+def _incoming_by_key(
+    entries: List[Dict[str, Any]], key: str
+) -> Dict[str, Dict[str, Any]]:
+    """The entries by key, refusing one without the key and two that share a key."""
+    incoming: Dict[str, Dict[str, Any]] = {}
+    for entry in entries:
+        if key not in entry:
+            raise DatasetUpsertKeyError(
+                f"Every entry must hold the key column '{key}'.",
+                code="missing_upsert_key",
+            )
+        entry_key = _key_of(entry[key])
+        if entry_key in incoming:
+            raise DatasetUpsertKeyError(
+                f"Two entries share the key {key}={entry[key]!r}.",
+                code="duplicate_upsert_key",
+            )
+        incoming[entry_key] = entry
+    return incoming
 
 
 class DatasetsFacade:
@@ -87,22 +118,25 @@ class DatasetsFacade:
         name: str,
         *,
         columns: Optional[List[Dict[str, str]]] = None,
+        entries: Optional[List[Dict[str, Any]]] = None,
     ) -> DatasetInfo:
         """
-        Create a new dataset.
+        Create a new dataset, optionally with its first rows, in one request.
 
         Args:
             name: Non-empty dataset name.
             columns: Optional column type definitions.
+            entries: Optional first rows. Each key must be one of ``columns``.
 
         Raises:
             ValueError: If name is empty (client-side validation).
-            DatasetApiError: If the API returns a conflict (409) or other HTTP error.
+            DatasetApiError: If the API returns a conflict (409), refuses a row
+                (422) or another HTTP error.
         """
         if not name or not name.strip():
             raise ValueError("Dataset name is required and must not be empty.")
 
-        raw = self._api.create_dataset(name=name, columns=columns)
+        raw = self._api.create_dataset(name=name, columns=columns, entries=entries)
         return DatasetInfo(**raw)
 
     def get_dataset(
@@ -251,6 +285,100 @@ class DatasetsFacade:
         """
         raw = self._api.update_record(slug_or_id, record_id, entry=entry)
         return DatasetRecord(**raw)
+
+    def upsert_records(
+        self,
+        slug_or_id: str,
+        *,
+        entries: List[Dict[str, Any]],
+        key: str,
+    ) -> UpsertResult:
+        """
+        Update or add rows, matching existing rows on a key column.
+
+        For keeping a dataset in sync with rows held elsewhere, such as files in
+        a repository. Each entry whose ``key`` value is already held by a row
+        updates that row in place; columns the entry leaves out keep their
+        values. An entry with a new key is added. A row the entry would not
+        change is not written, so running it again with the same rows writes
+        nothing.
+
+        Args:
+            slug_or_id: Dataset slug or ID.
+            entries: The rows to upsert. Each must hold the ``key`` column.
+            key: The column that identifies a row, such as ``"case_id"``.
+
+        Returns:
+            UpsertResult with the created and updated records and the number
+            of rows left unchanged.
+
+        Raises:
+            DatasetUpsertKeyError: A ``ValueError`` whose ``code`` says why:
+                an entry lacks the key, two entries share a key, or a key is
+                held by more than one existing row. Nothing is written.
+            DatasetNotFoundError: If the dataset is not found (404).
+        """
+        if not key:
+            raise ValueError("key must name the column that identifies a row.")
+        incoming = _incoming_by_key(entries, key)
+        if not incoming:
+            # Still a read, so a mistyped slug answers DatasetNotFoundError.
+            self._api.list_records(slug_or_id, page=1, limit=1)
+            return UpsertResult()
+
+        existing = self._rows_by_key(slug_or_id, key, incoming)
+        return self._write_upserts(slug_or_id, incoming, existing)
+
+    def _write_upserts(
+        self,
+        slug_or_id: str,
+        incoming: Dict[str, Dict[str, Any]],
+        existing: Dict[str, List[Dict[str, Any]]],
+    ) -> UpsertResult:
+        """Patches the rows an entry changes and adds the new keys in plan-sized batches."""
+        result = UpsertResult()
+        to_create: List[Dict[str, Any]] = []
+        for entry_key, entry in incoming.items():
+            matches = existing.get(entry_key)
+            if not matches:
+                to_create.append(entry)
+                continue
+            record = matches[0]
+            held = record.get("entry") or {}
+            merged = {**held, **entry}
+            if _key_of(merged) == _key_of(held):
+                result.unchanged += 1
+                continue
+            updated = self._api.update_record(slug_or_id, record["id"], entry=merged)
+            result.updated.append(DatasetRecord(**updated))
+
+        for start in range(0, len(to_create), _CREATE_BATCH_SIZE):
+            batch = to_create[start : start + _CREATE_BATCH_SIZE]
+            created = self._api.create_records(slug_or_id, entries=batch)
+            result.created.extend(DatasetRecord(**record) for record in created)
+        return result
+
+    def _rows_by_key(
+        self, slug_or_id: str, key: str, incoming: Dict[str, Dict[str, Any]]
+    ) -> Dict[str, List[Dict[str, Any]]]:
+        """The dataset's rows grouped by key, refusing a key an entry names that two rows hold."""
+        existing: Dict[str, List[Dict[str, Any]]] = {}
+        for record in self._api.get_dataset(slug_or_id).get("data", []):
+            held = record.get("entry") or {}
+            if key in held:
+                existing.setdefault(_key_of(held[key]), []).append(record)
+        duplicated = [
+            repr(existing[entry_key][0]["entry"][key])
+            for entry_key in incoming
+            if len(existing.get(entry_key, [])) > 1
+        ]
+        if duplicated:
+            raise DatasetUpsertKeyError(
+                f"More than one row holds {key} = {', '.join(duplicated)}. "
+                "Delete the extra rows, then upsert again.",
+                code="dataset_has_duplicate_key",
+            )
+        return existing
 
     def delete_records(
         self,

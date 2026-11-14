@@ -9,7 +9,7 @@ import type {
 import { gateSessionTitle } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { applyDerivedTraceEventProtections } from "../trace-read-redaction.rules.ts";
+import { applyDerivedTraceEventProtections } from "../../features/read/rules/trace-read-redaction.rules.ts";
 import {
   gateEvaluations,
   gateHeaderCost,

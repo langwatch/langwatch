@@ -14,6 +14,7 @@ const ACCESS_PROBLEM = {
 export function RevokeLegacyKeyDialog({
   open,
   projectName,
+  projectSlug,
   isRevoking,
   access,
   onClose,
@@ -21,6 +22,7 @@ export function RevokeLegacyKeyDialog({
 }: {
   open: boolean;
   projectName: string | undefined;
+  projectSlug: string | undefined;
   isRevoking: boolean;
   /** Whether the reader's roles are known, which decide the new key's type and role. */
   access: "loading" | "failed" | "ready";
@@ -46,8 +48,9 @@ export function RevokeLegacyKeyDialog({
     >
       <Text>
         The legacy key stops working within seconds. Next you create a new API key for{" "}
-        {projectName ?? "this project"}, which we show to you once. Put it wherever the legacy key
-        was used.
+        {projectName ?? "this project"}
+        {projectSlug ? ` (${projectSlug})` : ""}, which we show to you once. Put it wherever the
+        legacy key was used.
       </Text>
     </Dialog>
   );

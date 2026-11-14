@@ -177,6 +177,25 @@ Feature: Unified Audit Log
     Given a row recorded as "authz.grants.attach"
     Then the entry reads "attached grant" after its actor, with the recorded action small and muted beside it
 
+  @unit
+  Scenario: A braid's entries read as braid changes
+    Given rows recorded as "authz.grants.attach" and "authz.grants.revoke" whose target is a braid
+    Then they read "Created braid" and "Removed braid"
+    And the same actions on any other target keep their grant wording
+
+  @unit
+  Scenario: A braid's target chip names its projects, never its grant id
+    Given the audit log opened from a braid with the label "payments-agent → checkout-web"
+    Then the target chip reads "Braid: payments-agent → checkout-web"
+    And a braid link without a label reads "Braid" alone
+
+  @unit
+  Scenario: A braid's entry row names its owner project, never its grant id
+    Given a row whose target is a braid, recorded on the project that owns it
+    Then the line under its phrase reads "Braid owned by <project>", with no rolebinding id
+    And a braid row with no project reads "Braid" alone
+    And any other target keeps its id on that line
+
   @integration
   Scenario: The feed reads by day
     Then entries sit under "Today", "Yesterday" or their date ("Oct 8"), newest first
@@ -430,6 +449,25 @@ Feature: Unified Audit Log
     When that project belongs to organization "bravo"
     Then no audit rows are returned at all
     And the audit table is never read for that filter
+
+  # Switching organization keeps the reader on the settings page they were
+  # reading, so the screen never unmounts and the filter it holds outlives the
+  # organization it was picked in.
+
+  @unit
+  Scenario: A project filter is forgotten when the organization changes under it
+    Given an "acme" administrator has filtered the audit trail by an "acme" project
+    When they switch to organization "bravo" while still reading the audit trail
+    Then the project filter no longer applies
+    And the trail is read for the whole of "bravo"
+    And switching back to "acme" does not revive the project they had picked
+
+  @integration
+  Scenario: The audit page re-reads the whole trail after an organization switch
+    Given the audit page is open with one organization's project filter applied
+    When the reader switches organization without leaving the page
+    Then the audit read asks for no project
+    And the export takes the whole organization rather than the old project
 
   @unit
   Scenario: A project-filtered read holds only that project's events

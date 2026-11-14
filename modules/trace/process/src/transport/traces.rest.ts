@@ -242,7 +242,8 @@ async function searchTraces({
 
   logger.info({ projectId: scope.id }, "Searching traces for project");
 
-  const pageSize = rawPageSize ?? DEFAULT_TRACES_PAGE_SIZE;
+  // With spans the app picks the page size: it refuses above its spans bound, never clamps.
+  const pageSize = includeSpans ? rawPageSize : (rawPageSize ?? DEFAULT_TRACES_PAGE_SIZE);
   const protections = await app.resolveApiKeyProtections({
     projectId: scope.id,
     principal: caller.principal,

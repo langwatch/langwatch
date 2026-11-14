@@ -71,6 +71,12 @@ Feature: Avatar initials survive every name we are given
       Then that content is shown untouched, because a caller that has already
            chosen the character is not asking for initials
 
+    @integration
+    Scenario: A person with no photo can take the hue hashed from their name
+      Given a person's avatar asked to colour itself from their name
+      When it renders without a photo
+      Then its bubble is filled with the avatar hue for that name, as a project's is
+
     # That nothing reaches past it is a lint rule rather than a scenario:
     # biome's noRestrictedImports refuses the library's avatar everywhere but
     # the wrapper, the same way it already refuses its dialog and drawer.

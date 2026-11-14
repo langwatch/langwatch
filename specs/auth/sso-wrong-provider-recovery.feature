@@ -54,6 +54,19 @@ Feature: Recover from a wrong-provider sign-in without a redirect loop
     Then the page still offers to sign out of the identity provider and try again
     And the guidance falls back to signing in with the method used before
 
+  # The refusal sends the person to their company's sign-in, but a company can
+  # turn away somebody with an address at its domain who was never given access
+  # to the LangWatch app. Without a word about that, the person goes back to the
+  # button that was just refused and circles between the two refusals. Who to
+  # ask is named by role, never by person: the page cannot know them.
+  @integration
+  Scenario: A person refused for using a social button is told who to ask if their company turns them away
+    Given a person whose email domain belongs to an organization that requires single sign-on
+    When they are refused for signing in with a social button
+    Then the page tells them to sign in with their company email address
+    And it tells them that, if their company's sign-in turns them away, their company may not have given them access yet
+    And it tells them to ask their IT administrator to check
+
   # A member can be left carrying a stale "you still need to link SSO" flag:
   # it is set at sign-in and only ever cleared by a LATER sign-in that
   # happens to match the organization's required method. The dashboard

@@ -130,11 +130,12 @@ def sync_detailed(
     | PostApiDashboardsByDashboardIdWidgetsResponse404
     | PostApiDashboardsByDashboardIdWidgetsResponse500
 ]:
-    """Create a widget on a board
+    r"""Create a widget on a dashboard
 
      Saves a React source file and the named LangWatchQL queries it runs as one widget, placed on this
-    board at the next free row. `source` records where the widget came from; without it, the widget is
-    recorded as made through the API.
+    dashboard at the next free row. `source` records where the widget came from; without it, the widget
+    is recorded as made through the API. Each query's `sources` lists the trace origins it counts; a
+    query that names none counts `[\"application\"]`.
 
     Args:
         dashboard_id (str):
@@ -174,11 +175,12 @@ def sync(
     | PostApiDashboardsByDashboardIdWidgetsResponse500
     | None
 ):
-    """Create a widget on a board
+    r"""Create a widget on a dashboard
 
      Saves a React source file and the named LangWatchQL queries it runs as one widget, placed on this
-    board at the next free row. `source` records where the widget came from; without it, the widget is
-    recorded as made through the API.
+    dashboard at the next free row. `source` records where the widget came from; without it, the widget
+    is recorded as made through the API. Each query's `sources` lists the trace origins it counts; a
+    query that names none counts `[\"application\"]`.
 
     Args:
         dashboard_id (str):
@@ -212,11 +214,12 @@ async def asyncio_detailed(
     | PostApiDashboardsByDashboardIdWidgetsResponse404
     | PostApiDashboardsByDashboardIdWidgetsResponse500
 ]:
-    """Create a widget on a board
+    r"""Create a widget on a dashboard
 
      Saves a React source file and the named LangWatchQL queries it runs as one widget, placed on this
-    board at the next free row. `source` records where the widget came from; without it, the widget is
-    recorded as made through the API.
+    dashboard at the next free row. `source` records where the widget came from; without it, the widget
+    is recorded as made through the API. Each query's `sources` lists the trace origins it counts; a
+    query that names none counts `[\"application\"]`.
 
     Args:
         dashboard_id (str):
@@ -254,11 +257,12 @@ async def asyncio(
     | PostApiDashboardsByDashboardIdWidgetsResponse500
     | None
 ):
-    """Create a widget on a board
+    r"""Create a widget on a dashboard
 
      Saves a React source file and the named LangWatchQL queries it runs as one widget, placed on this
-    board at the next free row. `source` records where the widget came from; without it, the widget is
-    recorded as made through the API.
+    dashboard at the next free row. `source` records where the widget came from; without it, the widget
+    is recorded as made through the API. Each query's `sources` lists the trace origins it counts; a
+    query that names none counts `[\"application\"]`.
 
     Args:
         dashboard_id (str):

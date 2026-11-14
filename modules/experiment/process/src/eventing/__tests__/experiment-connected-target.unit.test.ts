@@ -9,6 +9,10 @@ import type { ScenarioParameterDefinition } from "@langwatch/scenario-contract";
 import { describe, expect, it } from "vitest";
 
 import {
+  applyParametersToRows,
+  fillDeclaredColumns,
+} from "../../rules/experiment-execution-data.rules.ts";
+import {
   buildConnectedCall,
   connectedCallFailure,
   connectedOutputText,
@@ -168,13 +172,75 @@ describe("given a connected agent column", () => {
     });
 
     /** @scenario "The declared parameters are column inputs" */
-    it("sends nothing for a parameter with no value, so the default applies", () => {
+    it("sends nothing for a parameter left unmapped, so the default applies", () => {
+      const { params } = buildConnectedCall({ inputs: { input: "hi" }, definitions });
+
+      expect(params).toEqual({});
+    });
+  });
+
+  describe("when a text parameter is mapped to an empty column", () => {
+    /** @scenario "A text parameter mapped to an empty column is sent as empty text" */
+    it("sends the parameter as empty text", () => {
+      const { params } = buildConnectedCall({ inputs: { input: "hi", plan: "" }, definitions });
+
+      expect(params).toEqual({ plan: "" });
+    });
+
+    /** @scenario "A text parameter mapped to an empty column is sent as empty text" */
+    it("sends a null cell as empty text too", () => {
+      const { params } = buildConnectedCall({ inputs: { input: "hi", plan: null }, definitions });
+
+      expect(params).toEqual({ plan: "" });
+    });
+  });
+
+  describe("when a parameter is mapped to a column the dataset does not have", () => {
+    /** @scenario "A parameter mapped to a column the dataset does not have is left out" */
+    it("leaves the parameter out, so the default applies", () => {
       const { params } = buildConnectedCall({
-        inputs: { input: "hi", model: "" },
+        inputs: { input: "hi", plan: undefined },
+        definitions,
+      });
+
+      expect(params).not.toHaveProperty("plan");
+    });
+  });
+
+  describe("when a number, a boolean and a fixed choice are mapped to empty cells", () => {
+    /** @scenario "An empty cell for a number, a boolean or a fixed choice keeps the default" */
+    it("sends none of them", () => {
+      const { params } = buildConnectedCall({
+        inputs: { input: "hi", model: "", max_tools: "", verbose: "" },
         definitions,
       });
 
       expect(params).toEqual({});
+    });
+  });
+
+  describe("when a run parameter fills a column empty in every row", () => {
+    /** @scenario "A run parameter fills a column left empty in every row" */
+    it("sends the run parameter's value on every row", () => {
+      const columns = [
+        { id: "input", name: "input", type: "string" },
+        { id: "environment", name: "environment", type: "string" },
+      ];
+      const { rows } = applyParametersToRows({
+        rows: fillDeclaredColumns({ rows: [{ input: "a" }, { input: "b" }], columns }),
+        columns,
+        parameters: { environment: "staging" },
+      });
+
+      const plans = rows.map(
+        (row) =>
+          buildConnectedCall({
+            inputs: { input: row.input, plan: row.environment },
+            definitions,
+          }).params.plan,
+      );
+
+      expect(plans).toEqual(["staging", "staging"]);
     });
   });
 });

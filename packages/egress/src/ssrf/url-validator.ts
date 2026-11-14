@@ -4,7 +4,11 @@ import { isIP } from "node:net";
 import { createLogger } from "@langwatch/observability";
 
 import { classify as classifyEgressAddress } from "./address.ts";
-import { BLOCKED_CLOUD_DOMAINS, BLOCKED_METADATA_HOSTS } from "./blocked-hosts.ts";
+import {
+  BLOCKED_CLOUD_DOMAINS,
+  BLOCKED_METADATA_HOSTS,
+  ON_PREMISE_SUFFIXES,
+} from "./blocked-hosts.ts";
 
 /**
  * Which addresses a process may open a connection to, and what it must connect to once it has
@@ -20,7 +24,10 @@ export interface SsrfPolicy {
    * Metadata is refused either way.
    */
   blockLocal: boolean;
-  /** Literal hostname allowlist (case-insensitive) that bypasses the local-address block only. */
+  /**
+   * Literal hostname allowlist (case-insensitive) that bypasses the local-address block, and
+   * the `.local` / `.localhost` block for that exact host. Never metadata or a cloud domain.
+   */
   allowedHosts: string[];
 }
 
@@ -115,6 +122,23 @@ export function isBlockedCloudDomain(hostname: string): boolean {
   return BLOCKED_CLOUD_DOMAINS.some(
     (domain) => lowerHostname === domain.slice(1) || lowerHostname.endsWith(domain),
   );
+}
+
+const onPremiseLabels = new Set<string>(ON_PREMISE_SUFFIXES.map((suffix) => suffix.slice(1)));
+
+/**
+ * Whether the hostname is a cloud domain only for its on-premise suffix, so the allowlist may
+ * lift it. Every trailing `local` / `localhost` label comes off first, so
+ * `metadata.google.internal.local.localhost` is still read as `metadata.google.internal`.
+ */
+function isOnPremiseDomain(hostname: string): boolean {
+  const labels = hostname.split(".");
+  if (labels.length < 2 || labels.includes("")) return false;
+  if (!onPremiseLabels.has(labels.at(-1)!)) return false;
+
+  while (labels.length > 1 && onPremiseLabels.has(labels.at(-1)!)) labels.pop();
+  const rest = labels.join(".");
+  return !isBlockedCloudDomain(rest) && !isCloudMetadataHost(rest);
 }
 
 /**
@@ -307,8 +331,9 @@ function isAllowlisted(ctx: ValidationContext, policy: SsrfPolicy): boolean {
 }
 
 /**
- * The allowlist relaxes the private-range refusal only: the name is still
- * resolved, refused if any address is metadata, and pinned to what it resolved to.
+ * The allowlist relaxes the private-range refusal and, for an on-premise host, the `.local` /
+ * `.localhost` one: the name is still resolved, refused if any address is metadata, and pinned
+ * to what it resolved to.
  */
 async function resolveAllowlisted(ctx: ValidationContext): Promise<SsrfAllowlistedResult> {
   logger.info({ url: ctx.logUrl, hostname: ctx.hostname }, "Allowing request to allowlisted host");
@@ -349,11 +374,13 @@ export function createSsrfUrlValidator(policy: SsrfPolicy): SsrfUrlValidator {
     const logUrl = redactUrlForLog(url);
     const ctx: ValidationContext = { url, logUrl, parsedUrl, hostname, requestHost, port, path };
 
-    // Always refused, before anything an operator can relax is consulted.
+    // Always refused, before anything an operator can relax is consulted. The one exception is
+    // an on-premise host the operator named exactly.
     validateNotMetadataEndpoint(ctx);
-    validateNotBlockedCloudDomain(ctx);
+    const allowlisted = isAllowlisted(ctx, policy);
+    if (!(allowlisted && isOnPremiseDomain(hostname))) validateNotBlockedCloudDomain(ctx);
 
-    if (isAllowlisted(ctx, policy)) return resolveAllowlisted(ctx);
+    if (allowlisted) return resolveAllowlisted(ctx);
 
     const ipVersion = isIP(hostname);
     if (ipVersion !== 0) {

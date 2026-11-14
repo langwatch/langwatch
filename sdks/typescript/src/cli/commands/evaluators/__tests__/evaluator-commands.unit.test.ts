@@ -1,3 +1,7 @@
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import chalk from "chalk";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
@@ -66,6 +70,10 @@ const makeEvaluator = (overrides: Partial<EvaluatorResponse> = {}): EvaluatorRes
   config: { evaluatorType: "langevals/llm_boolean" },
   workflowId: null,
   copiedFromEvaluatorId: null,
+  version: 1,
+  labels: [],
+  createdBy: null,
+  updatedBy: null,
   createdAt: "2026-01-01T00:00:00Z",
   updatedAt: "2026-01-02T00:00:00Z",
   fields: [{ identifier: "input", type: "string" }],
@@ -296,6 +304,95 @@ describe("createEvaluatorCommand()", () => {
       await expect(
         createEvaluatorCommand("My Eval", { type: "langevals/llm_boolean" }),
       ).rejects.toThrow(ProcessExitError);
+    });
+  });
+
+  describe("when a custom code evaluator is created from a file", () => {
+    const program = "class Code:\n    def __call__(self, output: str, expected_output: str):\n";
+    let codeFile: string;
+
+    beforeEach(() => {
+      codeFile = join(mkdtempSync(join(tmpdir(), "lw-code-eval-")), "check.py");
+      writeFileSync(codeFile, program);
+    });
+
+    /** @scenario The CLI creates a code evaluator from a Python file */
+    it("sends type code with the file's program and the declared inputs", async () => {
+      mockCreate.mockResolvedValue(makeEvaluator({ name: "Exact", type: "code" }));
+
+      await createEvaluatorCommand("Exact", {
+        code: codeFile,
+        input: ["output", "expected_output:str"],
+      });
+
+      expect(mockCreate).toHaveBeenCalledWith({
+        name: "Exact",
+        type: "code",
+        config: {
+          code: program,
+          inputs: [
+            { identifier: "output", type: "str" },
+            { identifier: "expected_output", type: "str" },
+          ],
+        },
+      });
+    });
+
+    /** @scenario The CLI creates a code evaluator from a Python file */
+    it("refuses without any input, before calling the API", async () => {
+      await expect(createEvaluatorCommand("Exact", { code: codeFile })).rejects.toThrow(
+        ProcessExitError,
+      );
+
+      expect(mockCreate).not.toHaveBeenCalled();
+    });
+
+    it("refuses a file it cannot read, before calling the API", async () => {
+      await expect(
+        createEvaluatorCommand("Exact", { code: `${codeFile}.missing`, input: ["output"] }),
+      ).rejects.toThrow(ProcessExitError);
+
+      expect(mockCreate).not.toHaveBeenCalled();
+    });
+
+    it("refuses both --type and --code together, before calling the API", async () => {
+      await expect(
+        createEvaluatorCommand("Exact", {
+          type: "langevals/exact_match",
+          code: codeFile,
+          input: ["output"],
+        }),
+      ).rejects.toThrow(ProcessExitError);
+
+      expect(mockCreate).not.toHaveBeenCalled();
+    });
+
+    /** @scenario Create an evaluator naming neither a type nor a code file */
+    it("refuses neither --type nor --code, before calling the API", async () => {
+      const code = await jsonErrorCode(() => createEvaluatorCommand("Exact", {}));
+
+      expect(code).toBe("validation_error");
+      expect(mockCreate).not.toHaveBeenCalled();
+    });
+
+    /** @scenario The CLI refuses input declarations a code evaluator cannot take */
+    it("refuses an input with more than name and type, before calling the API", async () => {
+      const code = await jsonErrorCode(() =>
+        createEvaluatorCommand("Exact", { code: codeFile, input: ["output:str:extra"] }),
+      );
+
+      expect(code).toBe("validation_error");
+      expect(mockCreate).not.toHaveBeenCalled();
+    });
+
+    /** @scenario The CLI refuses input declarations a code evaluator cannot take */
+    it("refuses --input beside a built-in --type, before calling the API", async () => {
+      const code = await jsonErrorCode(() =>
+        createEvaluatorCommand("Exact", { type: "langevals/exact_match", input: ["output"] }),
+      );
+
+      expect(code).toBe("validation_error");
+      expect(mockCreate).not.toHaveBeenCalled();
     });
   });
 });

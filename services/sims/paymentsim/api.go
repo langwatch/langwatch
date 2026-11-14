@@ -1,12 +1,15 @@
 package paymentsim
 
 import (
+	"cmp"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/http"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -22,6 +25,7 @@ func (s *Server) apiRoutes(mux *http.ServeMux) {
 		"DELETE /v1/customers/{id}":                   s.deleteCustomer,
 		"GET /v1/prices":                              s.listPrices,
 		"POST /v1/subscriptions":                      s.createSubscription,
+		"GET /v1/subscriptions":                       s.listSubscriptions,
 		"GET /v1/subscriptions/{id}":                  s.getSubscription,
 		"POST /v1/subscriptions/{id}":                 s.updateSubscription,
 		"DELETE /v1/subscriptions/{id}":               s.cancelSubscription,
@@ -193,6 +197,32 @@ func (s *Server) createSubscription(_ *http.Request, p params) (any, error) {
 	anchor, _ := p.integer("billing_cycle_anchor")
 	sub, _, err := s.newSubscription("", cus, p.objects("items"), p.metadata(), p.str("collection_method"), days, anchor)
 	return sub, err
+}
+
+// listSubscriptions answers a customer's subscriptions newest first.
+func (s *Server) listSubscriptions(_ *http.Request, p params) (any, error) {
+	out := []*Subscription{}
+	for _, sub := range s.st.subscriptions {
+		if (p.str("customer") == "" || sub.Customer == p.str("customer")) && listedStatus(sub.Status, p.str("status")) {
+			out = append(out, sub)
+		}
+	}
+	slices.SortFunc(out, func(a, b *Subscription) int {
+		return cmp.Or(cmp.Compare(b.Created, a.Created), cmp.Compare(b.ID, a.ID))
+	})
+	return page(out, func(sub *Subscription) string { return sub.ID }, p, "/v1/subscriptions")
+}
+
+// listedStatus is Stripe's status filter: unset hides ended subscriptions, all shows every one.
+func listedStatus(status, want string) bool {
+	switch want {
+	case "all":
+		return true
+	case "":
+		return status != "canceled" && status != "incomplete_expired"
+	default:
+		return status == want
+	}
 }
 
 func (s *Server) getSubscription(r *http.Request, _ params) (any, error) {
@@ -543,9 +573,9 @@ func (s *Server) createMeterEvent(_ *http.Request, p params) (any, error) {
 	if payload == nil {
 		return nil, missingParam("payload")
 	}
-	value, err := strconv.ParseInt(payload.str("value"), 10, 64)
-	if err != nil {
-		return nil, invalid("payload[value]", "The value %q in payload[value] must be a whole number.", payload.str("value"))
+	value, err := strconv.ParseFloat(payload.str("value"), 64)
+	if err != nil || math.IsInf(value, 0) || math.IsNaN(value) {
+		return nil, invalid("payload[value]", "The value in the event payload must be a number. Received %q.", payload.str("value"))
 	}
 	now := s.now()
 	ts := now.Unix()
@@ -589,7 +619,7 @@ func (s *Server) meterSummaries(r *http.Request, p params) (any, error) {
 		return nil, invalid("start_time", "start_time and end_time must be minute-aligned Unix timestamps, with start_time before end_time.")
 	}
 	summary := map[string]any{
-		"id": s.st.id("mtrusg"), "object": "billing.meter_event_summary", "aggregated_value": s.usage(m.EventName, p.str("customer"), start, end),
+		"id": s.st.id("mtrusg"), "object": "billing.meter_event_summary", "aggregated_value": s.usage(m.EventName, usageWindow{customer: p.str("customer"), from: start, to: end}),
 		"end_time": end, "livemode": false, "meter": m.ID, "start_time": start,
 	}
 	return listOf([]map[string]any{summary}, false, "/v1/billing/meters/"+m.ID+"/event_summaries"), nil

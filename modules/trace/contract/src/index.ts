@@ -41,6 +41,7 @@ export * from "./features/list/trace-explorer-url-state.ts";
 export * from "./explorer/actions/index.ts";
 export * from "./features/evaluation/trace-instant-eval-chips.ts";
 export * from "./features/evaluation/trace-instant-eval.schemas.ts";
+export * from "./features/braid/trace-braid.schemas.ts";
 export * from "./features/query/trace-langwatch-ql-filter.ts";
 export * from "./features/query/trace-query-analysis.ts";
 export * from "./features/query/trace-query-ast.ts";
@@ -57,8 +58,10 @@ export * from "./trace.queries.ts";
 export * from "./features/content/trace-content-read.service.ts";
 export {
   TraceApi,
+  type SpanAnalyticsFloor,
   type TraceAnnotationCommands,
   type TraceAnnotationMarker,
+  type TraceDrawerReadInput,
   type TraceMessagesSide,
   type TracePreconditionSampleInput,
   type TraceRenderedSpanMessages,
@@ -131,6 +134,11 @@ export {
   ASSIGN_TOPIC_COMMAND_TYPE,
   BULK_SYNC_ANNOTATIONS_COMMAND_TYPE,
   CHANGE_TRACE_NAME_COMMAND_TYPE,
+  EVALUATION_OUTCOME_RECORDED_EVENT_TYPE,
+  EVALUATION_OUTCOME_RECORDED_EVENT_VERSION_LATEST,
+  EVALUATION_OUTCOME_RECORDED_EVENT_VERSIONS,
+  EVALUATION_OUTCOME_OCCURRED_AT_MAX_MS,
+  EVALUATION_OUTCOME_TEXT_MAX_LENGTH,
   LOG_CONTRIBUTED_EVENT_TYPE,
   LOG_CONTRIBUTED_EVENT_VERSION_LATEST,
   LOG_RECORD_RECEIVED_EVENT_TYPE,
@@ -142,6 +150,7 @@ export {
   ORIGIN_RESOLVED_EVENT_TYPE,
   ORIGIN_RESOLVED_EVENT_VERSION_LATEST,
   ORIGIN_RESOLVED_EVENT_VERSIONS,
+  RECORD_EVALUATION_OUTCOME_COMMAND_TYPE,
   RECORD_LOG_CONTRIBUTION_COMMAND_TYPE,
   RECORD_METRIC_CORRELATION_COMMAND_TYPE,
   RECORD_SPAN_COMMAND_TYPE,
@@ -184,6 +193,7 @@ export {
 export * from "./features/edit-overlay/trace-edit-overlay-apply.ts";
 export * from "./features/content/trace-python-repr.ts";
 export * from "./features/analytics/trace-model-spend.ts";
+export * from "./features/analytics/trace-agent-traffic.ts";
 export * from "./features/ingest/trace-collector-common.ts";
 export * from "./features/content/trace-rag-chunks.ts";
 export * from "./features/content/trace-rag-extraction.ts";

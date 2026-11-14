@@ -45,6 +45,44 @@ export const codeEvaluatorOutputFields = [
   { identifier: "label", type: "str" },
 ] as const;
 
+/** A code evaluator's config with the full result contract, as the editor stores it. */
+export function withCodeEvaluatorOutputFields<T extends Record<string, unknown>>(
+  config: T,
+): T & { outputs: CodeEvaluatorConfig["outputs"] } {
+  return { ...config, outputs: codeEvaluatorOutputFields.map((field) => ({ ...field })) };
+}
+
+const isContractOutputField = (field: { identifier: string; type: string }): boolean =>
+  codeEvaluatorOutputFields.some(
+    (fixed) => fixed.identifier === field.identifier && fixed.type === field.type,
+  );
+
+/**
+ * A code evaluator's config as a create names it. The result fields are the fixed
+ * contract, so they may be left out; any that are named must belong to it.
+ */
+const codeEvaluatorCreateConfigSchemaDefinition = z
+  .object({
+    code: z.string().min(1),
+    inputs: z.array(codeEvaluatorFieldSchema).min(1),
+    outputs: z.array(codeEvaluatorFieldSchema).optional(),
+  })
+  .strict()
+  .superRefine((config, ctx) => {
+    if (!config.outputs || config.outputs.every(isContractOutputField)) return;
+    ctx.addIssue({
+      code: "custom",
+      path: ["outputs"],
+      message:
+        "A code evaluator's outputs are fixed: passed (bool), score (float), label (str) and details (str). Leave them out or name only those.",
+    });
+  });
+export interface CodeEvaluatorCreateConfigSchema extends Named<
+  typeof codeEvaluatorCreateConfigSchemaDefinition
+> {}
+export const codeEvaluatorCreateConfigSchema: CodeEvaluatorCreateConfigSchema =
+  codeEvaluatorCreateConfigSchemaDefinition;
+
 /** The editor seed for a new stored code evaluator. */
 export const defaultCodeEvaluatorConfig: CodeEvaluatorConfig = {
   code: `class Code:

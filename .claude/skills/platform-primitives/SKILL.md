@@ -70,6 +70,13 @@ Example: `modules/webhook/process/src/rules/webhook-url-policy.rules.ts` and
 the composition root; the package reads no environment. Every fetch also carries a timeout (`langwatch/require-fetch-timeout`).
 Self-hosted calls leave through the proxy helpers in the same package.
 
+## S3 clients
+
+Every `new S3Client` takes `region: s3RegionOf({ region, endpoint })` from `@langwatch/aws-client`, inline or
+through a `const` bound to that call (`langwatch/s3-client-region`). It returns the configured region, else the
+one an AWS endpoint names, else `auto` for any other S3-compatible host. Never hand-pick a fallback: AWS refuses
+to sign with `auto` (`packages/process-stores/src/object-storage-s3.ts`).
+
 ## Redis and rate limits
 
 - A module never holds a Redis client. A repository takes the store's `redis` or `rateLimiter` in `create(stores)`

@@ -32,6 +32,7 @@ const CLOUD_FREE: Plan = {
   free: true,
   maxMembers: 2,
   maxMembersLite: 0,
+  maxMembersDeveloper: 0,
   maxMessagesPerMonth: 50_000,
   canPublish: true,
   prices: { USD: 0, EUR: 0 },

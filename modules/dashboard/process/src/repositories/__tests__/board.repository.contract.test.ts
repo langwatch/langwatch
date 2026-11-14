@@ -261,7 +261,7 @@ function contractCases(backend: DashboardBackend): void {
       ).resolves.toHaveLength(1);
     });
 
-    /** @scenario "AC176 Scope: a narrower scope keeps other members' stars" */
+    /** @scenario "AC176 Scope: a narrower scope keeps other members' pins" */
     it("keeps one star under the owning project, listed in each project that shares it", async () => {
       const boards = backend.boards();
       const own = await board("Own");
@@ -297,7 +297,7 @@ function contractCases(backend: DashboardBackend): void {
       ).resolves.toHaveLength(1);
     });
 
-    /** @scenario "AC176 Scope: a narrower scope keeps other members' stars" */
+    /** @scenario "AC176 Scope: a narrower scope keeps other members' pins" */
     it("reorders a shared board's star with the project's own", async () => {
       const boards = backend.boards();
       const own = await board("Own");

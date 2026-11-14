@@ -19,6 +19,8 @@ export const ASSISTANT_KINDS = [
   "opencode",
   "cursor",
   "github_copilot",
+  "grok",
+  "pi",
   "custom",
 ] as const;
 export const assistantKindSchema = z.enum(ASSISTANT_KINDS);
@@ -31,6 +33,8 @@ export const ASSISTANT_KIND_TO_TOOL_SLUG: Partial<Record<AssistantKind, Platform
   opencode: "opencode",
   cursor: "cursor",
   github_copilot: "copilot",
+  grok: "grok",
+  pi: "pi",
 };
 
 const codingAssistantConfigSchemaDefinition = z.object({
@@ -281,6 +285,20 @@ export const AI_TOOL_STARTER_TILES: readonly AiToolStarterTile[] = [
       assistantKind: "github_copilot",
       setupCommand: "langwatch copilot",
       setupDocsUrl: "https://docs.langwatch.ai/ai-governance/personal-portal/end-user",
+    },
+  },
+  {
+    type: "coding_assistant",
+    slug: "pi",
+    displayName: "pi",
+    iconAsset: "preset:pi",
+    config: {
+      assistantKind: "pi",
+      setupCommand: "langwatch pi",
+      setupDocsUrl: "https://docs.langwatch.ai/coding-agents/pi",
+      allowVk: false,
+      // pi has no flat plan: every call is paid at the model provider.
+      bundledPlan: false,
     },
   },
   {

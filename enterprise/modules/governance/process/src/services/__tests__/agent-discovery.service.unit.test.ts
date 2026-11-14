@@ -46,7 +46,24 @@ class ScriptedHttp implements GovernanceHttpClient {
   }
 }
 
+/** The registry as the listing sees it: it records each reconcile, or fails when told to. */
+class RecordingRegistry {
+  readonly reconciled: string[] = [];
+  failing = false;
+
+  async reconcileOrganization({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<{ events: number }> {
+    if (this.failing) throw new Error("registry store unavailable");
+    this.reconciled.push(organizationId);
+    return { events: 0 };
+  }
+}
+
 async function buildWorld({
+  registry,
   script = [],
   sourceType = "databricks_genie",
   parserConfig = {
@@ -60,8 +77,10 @@ async function buildWorld({
   script?: Scripted[];
   sourceType?: SourceType;
   parserConfig?: Record<string, unknown>;
+  registry?: RecordingRegistry;
 } = {}) {
   const http = new ScriptedHttp(script);
+  const { logger, lines } = createTestLogger();
   const store = MemoryDiscoveredPeopleStore.create();
   const sources = MemoryIngestionSourceRepository.create();
   const source = await sources.create({
@@ -84,11 +103,12 @@ async function buildWorld({
     signIn: HttpProviderSignInChannel.create({ http }),
     genieSpaces: HttpGenieSpacesChannel.create({ http }),
     copilotBots: HttpCopilotBotsChannel.create({ http }),
-    logger: createTestLogger().logger,
+    ...(registry ? { registry } : {}),
+    logger,
   });
   const sync = () =>
     service.syncFromSource({ organizationId: ORG, ingestionSourceId: source.id, now: NOW });
-  return { http, store, sync };
+  return { http, store, sync, lines };
 }
 
 const servicePrincipal = {
@@ -251,6 +271,36 @@ describe("AgentDiscoveryService.syncFromSource", () => {
         refusal: { reason: "not_configured", status: null },
       });
       expect(http.calls).toEqual([]);
+    });
+  });
+});
+
+describe("AgentDiscoveryService.syncFromSource with the agent registry", () => {
+  const oneSpace = (): Scripted[] => [
+    { ok: true, status: 200, body: { spaces: [{ space_id: "s1", title: "Revenue Analyst" }] } },
+  ];
+
+  describe("when the listing records agents", () => {
+    /** @scenario A listing run reconciles the organisation's registry */
+    it("reconciles the organisation's registry after recording them", async () => {
+      const registry = new RecordingRegistry();
+      const { sync } = await buildWorld({ registry, script: oneSpace() });
+
+      expect(await sync()).toEqual({ outcome: "listed", recorded: 1 });
+      expect(registry.reconciled).toEqual([ORG]);
+    });
+  });
+
+  describe("when the registry reconcile after the listing fails", () => {
+    /** @scenario A registry reconcile that fails after a listing leaves the listing saved */
+    it("keeps the listing saved, answers listed and logs the failure", async () => {
+      const registry = new RecordingRegistry();
+      registry.failing = true;
+      const { store, sync, lines } = await buildWorld({ registry, script: oneSpace() });
+
+      expect(await sync()).toEqual({ outcome: "listed", recorded: 1 });
+      expect(store.agents.map((agent) => agent.rawAgentId)).toEqual(["s1"]);
+      expect(lines.findLine("warn", "agent registry reconcile")).toBeDefined();
     });
   });
 });

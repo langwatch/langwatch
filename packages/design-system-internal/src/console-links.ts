@@ -23,6 +23,7 @@ const CONSOLES: { label: string; service: string | null; group?: string }[] = [
   { label: "Lambda", service: "lambda", group: "Sims" },
   { label: "Design system", service: "design-system", group: "Tools" },
   { label: "Mail room", service: "mail-room", group: "Tools" },
+  { label: "Docs", service: "docs", group: "Tools" },
 ];
 
 export type ConsoleLocation = Pick<Location, "protocol" | "hostname" | "port">;

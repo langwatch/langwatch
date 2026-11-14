@@ -15,6 +15,7 @@ import { PrismaGdprUserDataEraseRepository } from "../prisma.user-data-erase.rep
 function databaseRecording({ failOn }: { failOn?: string } = {}) {
   const writes: string[] = [];
   const outboxRows: unknown[] = [];
+  const erasureRows: unknown[] = [];
   const write = (name: string) =>
     vi.fn(async () => {
       if (failOn === name) throw new Error(`${name} unavailable`);
@@ -52,7 +53,20 @@ function databaseRecording({ failOn }: { failOn?: string } = {}) {
     },
     account: { deleteMany: write("account.deleteMany") },
     session: { deleteMany: write("session.deleteMany") },
-    user: { delete: write("user.delete") },
+    user: {
+      delete: vi.fn(async () => {
+        if (failOn === "user.delete") throw new Error("user.delete unavailable");
+        writes.push("user.delete");
+        return { createdAt: ACCOUNT_CREATED_AT };
+      }),
+    },
+    userErasure: {
+      create: vi.fn(async (args: { data: unknown }) => {
+        erasureRows.push(args.data);
+        writes.push("userErasure.create");
+        return args.data;
+      }),
+    },
     processManagerOutbox: { createMany: outboxCreateMany, findMany: vi.fn(async () => []) },
     $transaction: vi.fn(async (callback: (prisma: PrismaClient) => Promise<unknown>) => {
       const result = await callback(client);
@@ -61,9 +75,10 @@ function databaseRecording({ failOn }: { failOn?: string } = {}) {
     }),
   });
   const repository = PrismaGdprUserDataEraseRepository.create({ database: client });
-  return { repository, writes, state, outboxRows };
+  return { repository, writes, state, outboxRows, erasureRows };
 }
 
+const ACCOUNT_CREATED_AT = new Date("2024-01-01T00:00:00Z");
 const ERASE = { userId: "user-1", projectIds: [], soleOwnedTeamIds: [], soleOwnedOrgIds: [] };
 
 describe("PrismaGdprUserDataEraseRepository's erased fact", () => {
@@ -73,9 +88,19 @@ describe("PrismaGdprUserDataEraseRepository's erased fact", () => {
 
     await repository.eraseUserAndOwnedResources(ERASE);
 
-    expect(writes.slice(-2)).toEqual(["user.delete", "outbox:user-1:erased"]);
+    expect(writes.slice(-3)).toEqual(["user.delete", "userErasure.create", "outbox:user-1:erased"]);
     expect(state.committed).toBe(true);
     expect(JSON.stringify(outboxRows)).toContain('"organizationIds":["org_shared"]');
+  });
+
+  /** @scenario "An erased first account leaves no account first-created" */
+  it("keeps the erased account's creation time alone, in the erase's transaction", async () => {
+    const { repository, erasureRows, state } = databaseRecording();
+
+    await repository.eraseUserAndOwnedResources(ERASE);
+
+    expect(erasureRows).toEqual([{ accountCreatedAt: ACCOUNT_CREATED_AT }]);
+    expect(state.committed).toBe(true);
   });
 
   /** @scenario "An erasure that rolls back records no erased fact" */

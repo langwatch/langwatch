@@ -4,7 +4,9 @@
  * @see specs/identity/org-session-lifetime.feature
  */
 import { NO_LOCKOUT, type VerifiedBrowserSession } from "@langwatch/auth-contract";
+import type { IdentityApi } from "@langwatch/identity-contract";
 import { MemorySharedCredentialStore } from "@langwatch/secrets/shared-credential";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal, toDate, type Instant } from "@langwatch/time";
 import type { UserProfile } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
@@ -17,6 +19,7 @@ import { CliDeviceSessionService } from "../../features/cli-device/services/cli-
 import { MemoryAuthSessionRepository } from "../../repositories/memory/memory.auth-session.repository.ts";
 import { MemoryAuthDatabase } from "../../repositories/memory/memory.auth.database.ts";
 import { MemoryCliDeviceSessionRepository } from "../../repositories/memory/memory.cli-device-session.repository.ts";
+import { signInHintSealer } from "../../rules/sign-in-hint.rules.ts";
 import { AuthDoorService } from "../auth-door.service.ts";
 import { BrowserSessionVerificationService } from "../browser-session-verification.service.ts";
 import { BrowserSessionService } from "../browser-session.service.ts";
@@ -50,6 +53,7 @@ async function worldWithAnIdleSessionPastItsWindow({
     }),
   });
   const service = BrowserSessionService.create({
+    docsKeys: { revokeDocsSessionKeys: async () => ({ revoked: true as const }) },
     sessions: MemoryAuthSessionRepository.create({ memory }),
     cache: null,
     identityEmails: void 0,
@@ -100,6 +104,9 @@ describe("a session idle past its organization's window", () => {
           governingConnections: { findGoverningConnections: async () => [] },
           deriveQueryCacheKey: () => "key",
           now: () => SIGNED_IN_AT,
+          signInHints: () => signInHintSealer({ secret: undefined }),
+          refusedSignIns: createApiFixture<IdentityApi>({}),
+          newReferenceId: () => "ref",
         });
 
         return door.getSessionByCookie({ cookie: COOKIE });

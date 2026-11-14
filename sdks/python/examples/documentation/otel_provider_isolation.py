@@ -40,7 +40,7 @@ def chat(user_message: str):
     langwatch.get_current_trace().autotrack_openai_calls(client)
 
     response = client.chat.completions.create(
-        model="gpt-4.1-nano",
+        model="gpt-6-luna",
         messages=[{"role": "user", "content": user_message}],
     )
     return response.choices[0].message.content

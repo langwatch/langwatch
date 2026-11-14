@@ -21,7 +21,7 @@ import { MemoryTraceSpanDedupRepository } from "../../repositories/memory/memory
 import { MemoryTraceRepositories } from "../../repositories/memory/memory.trace.repositories.ts";
 import type { TraceRepositories } from "../../repositories/trace.repositories.ts";
 import { TraceModule } from "../trace.app.ts";
-import { createTraceAppHarness } from "./support/trace-app.harness.ts";
+import { braidTwins, createTraceAppHarness } from "./support/trace-app.harness.ts";
 
 const FOLDED: TraceSummaryData = traceSummaryDataSchema.parse({
   traceId: "trace-1",
@@ -110,6 +110,7 @@ function compose({
   const refuse = () => Promise.reject(new Error("no datastore in this test"));
 
   return TraceModule.composeDependencies({
+    ...braidTwins(),
     repositories,
     ...(withClickHouse ? { resolveClickHouseClient: refuse } : {}),
     ...(summaryStore ? { summaryStore } : {}),

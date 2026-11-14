@@ -25,6 +25,8 @@ import {
   type LookupPersonDetail,
   type IdentityServerConfig,
   type MethodsLastUsed,
+  type RefusedSignInClassification,
+  type RefusedSignInInput,
   type RoutingDecision,
   type SessionClaims,
   type SessionClaimsMintInput,
@@ -48,7 +50,7 @@ import { NotificationService } from "@langwatch/notification-contract";
  * capability crossing a package boundary today (ADR-101, 115, 116, 117).
  */
 import { createLogger } from "@langwatch/observability";
-import { OrganizationApi } from "@langwatch/organization-contract";
+import { OrganizationApi, organizationApiMemberRoleSchema } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { internalSlackSignupsWebhook } from "@langwatch/secrets";
 import type { SystemMigration } from "@langwatch/system-migrations";
@@ -92,6 +94,10 @@ import { MfaGuardsService } from "../features/mfa/services/mfa-guards.service.ts
 import { OrganizationMfaNotifierService } from "../features/mfa/services/organization-mfa-notifier.service.ts";
 import { OrganizationMfaService } from "../features/mfa/services/organization-mfa.service.ts";
 import { TwoStepAccountService } from "../features/mfa/services/two-step-account.service.ts";
+import {
+  RefusedSignInService,
+  type RefusedSignInSeats,
+} from "../features/signin/services/refused-sign-in.service.ts";
 import { SignInGovernanceService } from "../features/signin/services/sign-in-governance.service.ts";
 import { SignUpIdentifierService } from "../features/signin/services/sign-up-identifier.service.ts";
 import { SignInAccountLookupService } from "../features/signin/services/signin-account-lookup.service.ts";
@@ -247,6 +253,7 @@ type IdentityAppParts = {
   organizationMfa: OrganizationMfaService;
   signInRouter: SignInRouterService;
   signInGovernance: SignInGovernanceService;
+  refusedSignIns: RefusedSignInService;
   pipelines: IdentityPipelineBuilders;
 };
 
@@ -269,6 +276,8 @@ type IdentityPipelineBuilders = {
 function arrivalMemberships(organizations: OrganizationApi): SsoArrivalMemberships {
   return {
     isMember: (args) => organizations.isMember(args),
+    getMemberSeat: async (args) =>
+      organizationApiMemberRoleSchema.parse((await organizations.getMember(args)).role),
     createMembership: (args) => organizations.createMembership(args),
     applyPendingInvite: (args) => organizations.applyPendingInvite(args),
     /** Absent for an organization deleted between the decision and the join,
@@ -351,6 +360,11 @@ function legacySsoAccess({
     count: (args) => reads.countLegacySsoAccess(args),
     retire: (args) => auth.retireLegacySsoAccess(args),
   };
+}
+
+/** A refused sign-in at an organization, recorded by the module that owns its seats. */
+function refusedSignInSeats(organizations: OrganizationApi): RefusedSignInSeats {
+  return { recordRefusedSignIn: (args) => organizations.recordRefusedSignIn(args) };
 }
 
 /** Membership is the organization's (ADR-129): a join lands through the arrival's door. */
@@ -625,11 +639,12 @@ export class IdentityModule
     const dialableIdpOrigins = () => setup.channels.authReads.findDialableIdentityProviderOrigins();
     // The same fence the published-proof reads go through: an issuer is a
     // string an administrator typed.
-    const issuerDiscovery = setup.channels.ssoIssuerDiscovery;
+    const issuerDiscovery = setup.channels.ssoRegistrationIssuerDiscovery;
     const ssoIssuers = SsoIssuerDirectoryService.create({
       connections: setup.repositories.ssoConnections,
       endpointOrigins: SsoIssuerEndpointOriginsService.create({
-        discovery: issuerDiscovery,
+        // Read at every sign-in, so on the route the engine's own sign-in fetches take.
+        discovery: setup.channels.ssoSignInIssuerDiscovery,
         resolveHost: systemHostAddresses,
         dialableInternalOrigins: dialableIdpOrigins,
       }),
@@ -700,6 +715,9 @@ export class IdentityModule
       mail: setup.channels.joinRequestMail,
       baseHost: setup.config.publicBaseUrl ?? "",
       plans: setup.dependencies.entitlements,
+      seatRequests: {
+        isSeatRequested: (input) => setup.dependencies.organizations.isSeatRequested(input),
+      },
     });
     const ssoArrival = SsoArrivalService.create({
       joinRequests,
@@ -960,6 +978,10 @@ export class IdentityModule
           ),
       }),
       signInRouter,
+      refusedSignIns: RefusedSignInService.create({
+        connections: setup.repositories.ssoConnections,
+        seats: refusedSignInSeats(setup.dependencies.organizations),
+      }),
       signInGovernance: SignInGovernanceService.create({
         identifiers: accountIdentifiers,
         accountAddress,
@@ -1080,6 +1102,10 @@ export class IdentityModule
     profile: Readonly<Record<string, unknown>>;
   }): Promise<void> {
     return this.#parts.microsoftAccountRekey.moveOnSignIn(input);
+  }
+
+  classifyRefusedSignIn(input: RefusedSignInInput): Promise<RefusedSignInClassification> {
+    return this.#parts.refusedSignIns.classify(input);
   }
 
   /** Whether an organization's single sign-on governs this person's own sign-in. */

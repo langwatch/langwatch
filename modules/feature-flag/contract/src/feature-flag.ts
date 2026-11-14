@@ -11,6 +11,11 @@ export interface FeatureFlagDefinition {
   key: string;
   scope: FeatureFlagScope;
   defaultValue: boolean;
+  /**
+   * The default on a self-hosted install (`IS_SAAS` unset), where it differs from `defaultValue`:
+   * a feature LangWatch Cloud rolls out that a self-hosted install never sees unless switched on.
+   */
+  selfHostedDefaultValue?: boolean;
   description: string;
   /** Surface for the operator UI; `null` for product flags. */
   family?: string;
@@ -147,6 +152,20 @@ export const FEATURE_FLAGS = [
 
   // ----- PRODUCT -----
   {
+    key: "release_pii_redaction_model_enabled",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Sends an organization's strict PII analysis to the PII redaction model instead of Presidio. Off by default; enable per organization through an operator rule. Only takes effect where the deployment names the model (PII_REDACTION_MODEL_ENDPOINT, a Lambda ARN or an HTTP address). Any failure of the model falls back to Presidio, then Google DLP, exactly as an organization with the flag off.",
+  },
+  {
+    key: "release_pii_redaction_model_free",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Records an organization's PII redaction model calls at a price of zero, our own cost still kept (ADR-201). Off by default; enable per organization through an operator rule for organizations that use the model for free. It does not let an organization use the model: release_pii_redaction_model_enabled does that.",
+  },
+  {
     key: "release_instant_evals",
     scope: "PRODUCT",
     defaultValue: false,
@@ -156,9 +175,24 @@ export const FEATURE_FLAGS = [
   {
     key: "release_instant_evals_own_decision_model",
     scope: "PRODUCT",
+    defaultValue: true,
+    description:
+      "Lets an organization run Instant Evals on its own decision model and key, picked in the Instant Evals column of Default models (ADR-182). On by default; switch it off fleet-wide or per organization. A run on an own key is never metered or capped. Off, the column offers LangWatch Evals Preview only, new picks of any other model are refused, and a project that already picked one skips its Instant Evals as not configured; it is never moved onto the billed LangWatch model.",
+  },
+  {
+    key: "instant_evals_hosted_disabled",
+    scope: "PRODUCT",
     defaultValue: false,
     description:
-      "Lets an organization run Instant Evals on its own decision model and key, picked in the Instant Evals column of Default models (ADR-182). Off by default; enable per organization via a targeting rule. Off, the column offers LangWatch Instant Preview only, new picks of any other model are refused, and a project that already picked one skips its Instant Evals as not configured; it is never moved onto the billed LangWatch model.",
+      "Switches LangWatch's hosted Instant Evals model (Evals Preview) off for an organization, whatever its plan. Off by default; turn it on for one organization with a targeting rule { organizationId }. On, the organization is never released onto the hosted model: not by release_instant_evals, its own Instant Evals switch, or a license. It is offered no switch, Default models does not list Evals Preview, and no run, judged query, search-bar route or LLM-judge evaluation calls the hosted classifier. Its own decision models, picked in the Instant Evals column of Default models, keep running.",
+  },
+  {
+    key: "release_instant_evals_judge_router",
+    scope: "PRODUCT",
+    defaultValue: true,
+    selfHostedDefaultValue: false,
+    description:
+      "Routes an organization's Instant Evals judgements through the LangWatch Judge router: a decision model answers what it is sure of and an LLM answers the rest, priced by the summed cost of every call. On by default on LangWatch Cloud; turn it off per organization via a targeting rule. Off by default on a self-hosted install, whose judgements through Connect carry no route, so it never offers routing unless an operator switches it on. On, an LLM-judge evaluation on LangWatch Evals Preview sends the llm_judge route and the Instant Evals column says it routes; an own decision model is never routed. Off, no caller sends a route and every judgement is the single hosted classifier call it is today. The route table and prices are deploy-time configuration; with none set, as on a self-hosted install, every slot goes to the hosted classifier at its published rate, so the answer and the cost are today's.",
   },
   {
     key: "release_lwql_workbench",
@@ -301,6 +335,13 @@ export const FEATURE_FLAGS = [
       "Opens the Insights inbox (/[project]/insights): each person's own saved insights for the project, which only they read, in Inbox, Stale and Archived folders, the sidebar entry with its unread count, the topbar bell, and 'Save as insight' under a Langy answer (spec: modules/insight/specs/insight-inbox.feature). Default off; while off the page answers not-found, the chrome shows nothing and every insights procedure refuses with insights_not_enabled. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_insights.",
   },
   {
+    key: "release_braids",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Opens braid management (spec: modules/authz/specs/braids-release-flag.feature): the project and organisation Braids settings pages and their settings entry, and every procedure behind them, which creates, changes and lists braids, sets who may braid, and issues, rotates and lists braid signing keys. Default off. Enable it per organisation, never by a project rule: organisation-wide procedures ask it for the organisation and project ones for the project, and the two must agree. While off both pages answer not-found, the entry is hidden and those procedures refuse with braids_not_enabled; removing a braid and revoking a signing key still work, since both only narrow access. Braids that already exist keep applying either way: trace reads still show braided spans, signed calls are still verified and braided reads are still audited. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_braids.",
+  },
+  {
     key: "release_ui_comparison_leaderboard_enabled",
     scope: "PRODUCT",
     defaultValue: false,
@@ -314,6 +355,14 @@ export const FEATURE_FLAGS = [
     family: "Langy",
     description:
       "Minimising Langy sinks the panel to an edge peek of itself — a sliver of the card at the bottom edge (floating) or of the dock's spine at the right edge (sidebar) that rises on pointer proximity and opens on click (spec: specs/langy/langy-peek-dock.feature). Off = the classic corner launcher orb. Only the closed-state affordance changes; the panel and its Cmd/Ctrl+I activation are the same either way. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_ui_langy_peek_dock_enabled.",
+  },
+  {
+    key: "release_ui_langy_share_command_names_asker",
+    scope: "PRODUCT",
+    defaultValue: false,
+    family: "Langy",
+    description:
+      "The code access card's share command names who asked with `--as <email>`, so a terminal signed in as someone else says so and offers to switch (spec: specs/langy/langy-code-access.feature). Turn on once the TypeScript SDK release that accepts `langwatch langy --as` is on npm: an older CLI refuses the unknown option. Off = the bare command. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_ui_langy_share_command_names_asker.",
   },
   {
     key: "release_ui_agent_testing_v2_enabled",

@@ -61,6 +61,7 @@ import {
   PayloadTooLargeError,
   readEnvelopeDescriptor,
   readJobAttempt,
+  readJobOverloadAttempts,
   readJobPayloadBytes,
   readJobRoutingMeta,
   withJobAttempt,
@@ -116,6 +117,7 @@ import { nowInstant, Temporal } from "@langwatch/time";
 import { fallbackReadyScore, isPlausibleReadyScore, resolveReadyScore } from "./readyScore.ts";
 import { ScriptCallBatcher } from "./scriptCallBatcher.ts";
 import {
+  activeKeyHeartbeatMs,
   DEFAULT_BISECTION_SPLITS_PER_DISPATCH,
   DEFAULT_CONFIRMED_DEATH_THRESHOLD,
   DEFAULT_GROUP_QUARANTINE_THRESHOLD,
@@ -178,9 +180,34 @@ async function withActiveSpan<T>(
 
 export const JOB_RETRY_CONFIG = {
   maxAttempts: 25,
+  /** An overloaded server is not the job's fault: about six more hours at the backoff cap. */
+  maxOverloadedAttempts: 61,
   backoffBaseMs: 500,
   maxBackoffMs: 600_000,
 } as const;
+
+/**
+ * The attempts a failure may use: an overload names a retry delay and gets the longer budget.
+ * An ordinary failure gets its own rungs on top of the overload retries already spent.
+ */
+export function attemptBudgetOf({
+  decision,
+  overloadAttempts,
+}: {
+  decision: { retryAfterMs?: number };
+  overloadAttempts: number;
+}): number {
+  if (decision.retryAfterMs !== undefined) return JOB_RETRY_CONFIG.maxOverloadedAttempts;
+  return Math.min(
+    JOB_RETRY_CONFIG.maxAttempts + overloadAttempts,
+    JOB_RETRY_CONFIG.maxOverloadedAttempts,
+  );
+}
+
+/** Carried in job data only once an overload retry was spent, so other jobs encode unchanged. */
+function overloadAttemptsField(count: number): { __overloadAttempts?: number } {
+  return count > 0 ? { __overloadAttempts: count } : {};
+}
 
 export function getBackoffMs(attempt: number): number {
   return Math.min(
@@ -194,12 +221,6 @@ export function getBackoffMs(attempt: number): number {
  * derived from retry config to prevent fresh-delivery misreads on re-expire.
  */
 export const GROUP_ATTEMPT_TTL_SECONDS = Math.ceil((JOB_RETRY_CONFIG.maxBackoffMs / 1000) * 3);
-
-/** A handed-back job waits `delayMs`; once handed back for over `windowMs`, it spends attempts. */
-export const HAND_BACK_CONFIG = {
-  delayMs: 1_000,
-  windowMs: 30 * 60_000,
-} as const;
 
 /** Whether a job no worker has handled yet is handed back again, or has waited long enough. */
 export function handBackOutcome({
@@ -274,6 +295,17 @@ export const GROUP_QUEUE_CONFIG = {
   shutdownTimeoutMs: 25_000,
 } as const;
 
+/**
+ * A handed-back job waits `delayMs`; past `windowMs` it spends attempts. Each worker that handed it
+ * back passes its group over for `passOverMs`, two signal waits (#9148). The re-stage holds the
+ * group ~3s, leaving a peer ~7s against its 5s wait: a longer `delayMs` needs a longer pass-over.
+ */
+export const HAND_BACK_CONFIG = {
+  delayMs: 1_000,
+  windowMs: 30 * 60_000,
+  passOverMs: 2 * GROUP_QUEUE_CONFIG.signalTimeoutSec * 1000,
+} as const;
+
 /** Default TTL for deduplication in milliseconds */
 const DEFAULT_DEDUPLICATION_TTL_MS = 200;
 
@@ -314,6 +346,7 @@ const INTERNAL_FIELDS = [
   "__dispatchScore",
   "__attempt",
   "__handedBackSince",
+  "__overloadAttempts",
 ] as const;
 
 /**
@@ -378,6 +411,8 @@ type ClaimedJob<Payload> = {
   jobAttempt: number;
   /** When a worker first handed this job back for want of a handler; absent if none has. */
   handedBackSince: number | undefined;
+  /** Retries this job spent on failures that named a retry delay (an overloaded server). */
+  overloadAttempts: number;
   jobName: string;
   routingLabels: { queue_name: string; pipeline_name: string; job_type: string; job_name: string };
   batchPayloads: Payload[] | null;
@@ -667,6 +702,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
           : undefined,
         groupBatch: () => this.groupBatching(),
         claimGuardWorkerId: () => this.claimGuardWorkerId(),
+        workerId: this.workerId,
       });
       this.dispatcher.start();
       this.adaptiveSlots.start();
@@ -1376,7 +1412,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     const { activeTtlSec } = GROUP_QUEUE_CONFIG;
     const timer = setInterval(
       () => this.beatGroupBatch({ due: [...beating], beating, activeTtlSec }),
-      (activeTtlSec * 1000) / 3,
+      activeKeyHeartbeatMs({ activeTtlSec }),
     );
     return new Map(
       jobs.map((job) => [
@@ -1689,6 +1725,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     const attempt = Math.max(jobAttempt, await (groupAttempt ?? this.readGroupAttempt(groupId)));
     const handedBackSince =
       typeof jobData.__handedBackSince === "number" ? jobData.__handedBackSince : undefined;
+    const overloadAttempts =
+      typeof jobData.__overloadAttempts === "number" ? jobData.__overloadAttempts : 0;
     // Checked, not asserted: these become Prometheus label values, and `??`
     // would let a non-string through to be stringified into one.
     const pipelineName = nonEmptyString(jobData.__pipelineName) ?? "unknown";
@@ -1718,6 +1756,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       attempt,
       jobAttempt,
       handedBackSince,
+      overloadAttempts,
       jobName,
       routingLabels,
     };
@@ -2137,8 +2176,9 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     span.recordException(error);
     span.setStatus({ code: SpanStatusCode.ERROR });
     const [quarantineError] = await this.quarantineErrors({ job, error, isRetryable });
-    if (isRetryable && attempt < JOB_RETRY_CONFIG.maxAttempts && !quarantineError) {
-      await this.retryClaimedJob({ job, error, decision, stopHeartbeat });
+    const budget = attemptBudgetOf({ decision, overloadAttempts: job.overloadAttempts });
+    if (isRetryable && attempt < budget && !quarantineError) {
+      await this.retryClaimedJob({ job, error, decision, budget, stopHeartbeat });
       return;
     }
     await this.exhaustClaimedJob({ job, error, isRetryable, quarantineError, span, offender });
@@ -2210,11 +2250,14 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     job,
     error,
     decision,
+    budget,
     stopHeartbeat,
   }: {
     job: ClaimedJob<Payload>;
     error: Error;
     decision: { retryable: boolean; retryAfterMs?: number };
+    /** The attempt budget the caller enforced, logged as is. */
+    budget: number;
     stopHeartbeat: () => void;
   }): Promise<void> {
     const {
@@ -2254,6 +2297,9 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
           __context: contextMetadata,
           __attempt: attempt + 1,
           ...(job.handedBackSince === undefined ? {} : { __handedBackSince: job.handedBackSince }),
+          ...overloadAttemptsField(
+            job.overloadAttempts + (decision.retryAfterMs === undefined ? 0 : 1),
+          ),
         },
         groupId,
       });
@@ -2347,7 +2393,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
         groupId,
         stagedJobId,
         attempt,
-        maxAttempts: JOB_RETRY_CONFIG.maxAttempts,
+        maxAttempts: budget,
         backoffMs,
         // The whole Error, not `error.message`: the serializer emits
         // the stack, and for a handler crash the stack IS the
@@ -2362,7 +2408,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
 
   /**
    * Returns a job this worker has no handler for to the queue unspent: same attempt, no failure
-   * streak, no audit. A short delay keeps this worker from taking it straight back.
+   * streak, no audit. This worker passes the group over meanwhile, so a peer takes it first.
    */
   private async handBackClaimedJob({
     job,
@@ -2385,6 +2431,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
           __context: contextMetadata,
           __attempt: attempt,
           __handedBackSince: since,
+          ...overloadAttemptsField(job.overloadAttempts),
         },
         groupId,
       });
@@ -2421,6 +2468,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       attempt,
       attemptTtlSec: GROUP_ATTEMPT_TTL_SECONDS,
       claimToken,
+      passOver: { workerId: this.workerId, ttlMs: HAND_BACK_CONFIG.passOverMs },
     });
     if (restaged) {
       await this.blobLifecycle.transferLease({
@@ -2986,7 +3034,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
             workerId: this.workerId,
             error: err instanceof Error ? err.message : String(err),
           },
-          "Failed to publish worker liveness beacon; the poison guard may read this worker as dead if this persists",
+          "Failed to publish worker liveness beacon; if this persists, dispatch reclaims this worker's claims and the poison guard counts them as deaths",
         );
       }
     };
@@ -3025,7 +3073,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     /** True once the job's outcome is decided; see `stopHeartbeat`. */
     isCancelled: () => boolean;
   }): ReturnType<typeof setInterval> {
-    const intervalMs = (GROUP_QUEUE_CONFIG.activeTtlSec * 1000) / 3;
+    const intervalMs = activeKeyHeartbeatMs({ activeTtlSec: GROUP_QUEUE_CONFIG.activeTtlSec });
     return setInterval(() => {
       this.scripts
         .refreshActiveKey({
@@ -3347,7 +3395,12 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
   }): Promise<void> {
     const attempt =
       Math.max(readJobAttempt(jobDataJson) ?? 0, await this.readGroupAttempt(groupId)) + 1;
-    if (attempt >= JOB_RETRY_CONFIG.maxAttempts) {
+    // The overload retries already spent are not this failure's rungs (they ride the header).
+    const budget = attemptBudgetOf({
+      decision: {},
+      overloadAttempts: readJobOverloadAttempts(jobDataJson),
+    });
+    if (attempt >= budget) {
       // The retry ladder is out of rungs — a discard like any other, not
       // recoverable via replay (#5538). Reaching here means every read failed
       // (~2h27m of sustained unreachability), which says the STORE is down, not

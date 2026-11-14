@@ -186,6 +186,7 @@ class StubRepository implements ProjectRepository {
   findIdByLegacyApiKey = vi.fn(async (): Promise<string | null> => null);
   markLegacyApiKeyUsed = vi.fn(async (): Promise<void> => undefined);
   findLegacyApiKeyLastUsedAt = vi.fn(async () => null);
+  findLiveLegacyKeys = vi.fn(async () => []);
   rotateLegacyApiKey = vi.fn(async () => true);
   findPersonalProjectOwner = vi.fn(
     async (): Promise<{ ownerUserId: string | null } | null> => null,

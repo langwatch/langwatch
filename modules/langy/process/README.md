@@ -1343,11 +1343,12 @@ Declared at `src/eventing/langy-conversation.pipeline.ts:117`. Events: `LangyCon
 
 ### Pipeline `langy_guided_onboarding` (aggregate `langy_guided_onboarding`)
 
-Declared at `src/eventing/langy-guided-onboarding.pipeline.ts:31`. Events: `guidedOnboardingTurnFailedEventSchema`.
+Declared at `src/eventing/langy-guided-onboarding.pipeline.ts:41`. Events: `guidedOnboardingTurnFailedEventSchema`, `langyFirstMessageSeenEventSchema`.
 
 | Kind    | Name                               | Handles | Declared at                                           |
 | ------- | ---------------------------------- | ------- | ----------------------------------------------------- |
-| command | `recordGuidedOnboardingTurnFailed` | –       | `src/eventing/langy-guided-onboarding.pipeline.ts:36` |
+| command | `recordGuidedOnboardingTurnFailed` | –       | `src/eventing/langy-guided-onboarding.pipeline.ts:46` |
+| command | `recordLangyFirstMessageSeen`      | –       | `src/eventing/langy-guided-onboarding.pipeline.ts:47` |
 
 ### Pipeline `langy_maintenance` (aggregate `global`)
 
@@ -1361,7 +1362,7 @@ Declared at `src/eventing/langy-maintenance.pipeline.ts:30`.
 
 | Kind   | Leaf                 | Environment variable        | Declared at                          |
 | ------ | -------------------- | --------------------------- | ------------------------------------ |
-| secret | `–`                  | `LANGY_INTERNAL_SECRET`     | `src/app/langy.app.ts:293`           |
+| secret | `–`                  | `LANGY_INTERNAL_SECRET`     | `src/app/langy.app.ts:294`           |
 | config | `agentUrl`           | `LANGY_AGENT_URL`           | `../contract/src/langy.config.ts:18` |
 | config | `workerCallbackUrl`  | `LANGY_WORKER_CALLBACK_URL` | `../contract/src/langy.config.ts:19` |
 | config | `workerGatewayUrl`   | `LANGY_WORKER_GATEWAY_URL`  | `../contract/src/langy.config.ts:20` |

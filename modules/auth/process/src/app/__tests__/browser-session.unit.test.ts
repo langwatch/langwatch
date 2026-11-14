@@ -59,6 +59,7 @@ const LIVE_SESSION: StoredBrowserSession = {
 class Sessions implements AuthSessionRepository {
   countSignedInUsers = vi.fn().mockResolvedValue(0);
   countSignedInUsersAmong = vi.fn().mockResolvedValue(0);
+  findSessionUsersSince = vi.fn().mockResolvedValue([]);
   stored: StoredBrowserSession | null = LIVE_SESSION;
   records: readonly BrowserSessionRecord[] = [];
   readonly deletedAll = vi.fn().mockResolvedValue(2);
@@ -157,6 +158,7 @@ function service(
   return {
     sessions,
     service: BrowserSessionService.create({
+      docsKeys: { revokeDocsSessionKeys: async () => ({ revoked: true as const }) },
       sessions,
       cache: options.cache === undefined ? new Cache() : options.cache,
       identityEmails: options.identityEmails ?? new IdentityEmails(),

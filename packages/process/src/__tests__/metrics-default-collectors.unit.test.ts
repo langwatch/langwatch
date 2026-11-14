@@ -51,7 +51,7 @@ async function serve(environment: Readonly<Record<string, string>>) {
     },
   });
   const scrape = () =>
-    fetch(`http://127.0.0.1:${pullPort}/metrics`, {
+    fetch(`http://localhost:${pullPort}/metrics`, {
       headers: { authorization: "Bearer scrape-me" },
     });
   return { scrape, lines };

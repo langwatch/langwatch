@@ -13,6 +13,7 @@ import {
   keyCredentialOf,
   routeTemplateOf,
   type RestKeyKind,
+  keyPrincipalOfApiKey,
 } from "@langwatch/api/rest";
 import {
   type AuthzPermission,
@@ -304,18 +305,12 @@ export class ApiRestCredentialsService {
         markUsed: () => {},
       };
     }
-    if (resolved) {
+    const keyPrincipal = resolved ? keyPrincipalOfApiKey(resolved) : undefined;
+    if (keyPrincipal) {
       return {
-        principal: {
-          kind: "apiKey",
-          apiKeyId: resolved.apiKeyId,
-          userId: resolved.userId,
-          organizationId: resolved.organizationId,
-          resolvedProject: { id: resolved.project.id, teamId: resolved.project.teamId },
-          ...(resolved.isLangySessionKey ? { isLangySessionKey: true } : {}),
-        },
-        organizationId: resolved.organizationId,
-        markUsed: () => this.apiKeys.markUsed({ id: resolved.apiKeyId }),
+        principal: keyPrincipal,
+        organizationId: keyPrincipal.organizationId,
+        markUsed: () => this.apiKeys.markUsed({ id: keyPrincipal.apiKeyId }),
       };
     }
 

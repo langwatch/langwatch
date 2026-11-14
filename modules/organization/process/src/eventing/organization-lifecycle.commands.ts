@@ -1,6 +1,7 @@
 import type { Command, CommandHandler } from "@langwatch/eventing";
 import { createTenantId, defineCommandSchema, EventUtils } from "@langwatch/eventing";
 import {
+  ORGANIZATION_AGGREGATE_TYPE,
   INTEGRATION_METHOD_CHOSEN_EVENT_TYPE,
   INVITE_ACCEPTED_EVENT_TYPE,
   MEMBERS_INVITED_EVENT_TYPE,
@@ -19,6 +20,8 @@ import {
   ORGANIZATION_MEMBER_DEPARTMENT_CHANGED_EVENT_VERSION,
   ORGANIZATION_TRACE_SHARING_DISABLED_EVENT_TYPE,
   ORGANIZATION_TRACE_SHARING_DISABLED_EVENT_VERSION,
+  ORGANIZATION_DOCS_PLAYGROUND_SESSIONS_DISABLED_EVENT_TYPE,
+  ORGANIZATION_DOCS_PLAYGROUND_SESSIONS_DISABLED_EVENT_VERSION,
   PERSONAL_WORKSPACE_PROVISIONED_EVENT_TYPE,
   PERSONAL_TEAM_CREATED_EVENT_TYPE,
   PERSONAL_WORKSPACE_ARCHIVED_EVENT_TYPE,
@@ -30,7 +33,6 @@ import {
   type IntegrationMethodChosenEvent,
   type InviteAcceptedEvent,
   type MembersInvitedEvent,
-  ORGANIZATION_AGGREGATE_TYPE,
   ORGANIZATION_LIFECYCLE_EVENT_VERSION,
   type OrganizationCreatedEvent,
   type OrganizationMemberDisabledEvent,
@@ -40,6 +42,7 @@ import {
   type OrganizationPresenceSettingChangedEvent,
   type OrganizationSignedUpEvent,
   type OrganizationTraceSharingDisabledEvent,
+  type OrganizationDocsPlaygroundSessionsDisabledEvent,
   type PersonalWorkspaceProvisionedEvent,
   type PersonalTeamCreatedEvent,
   type PersonalWorkspaceArchivedEvent,
@@ -61,6 +64,9 @@ import {
   RECORD_PRESENCE_SETTING_CHANGED_COMMAND_TYPE,
   RECORD_SIGNED_UP_COMMAND_TYPE,
   RECORD_TRACE_SHARING_DISABLED_COMMAND_TYPE,
+  RECORD_DOCS_PLAYGROUND_SESSIONS_DISABLED_COMMAND_TYPE,
+  type RecordDocsPlaygroundSessionsDisabledCommandData,
+  recordDocsPlaygroundSessionsDisabledCommandDataSchema,
   type RecordIntegrationMethodChosenCommandData,
   recordIntegrationMethodChosenCommandDataSchema,
   type RecordInviteAcceptedCommandData,
@@ -464,6 +470,40 @@ export class RecordTraceSharingDisabledCommand implements CommandHandler<
   }
 
   static getAggregateId(payload: RecordTraceSharingDisabledCommandData): string {
+    return payload.organizationId;
+  }
+}
+
+/** Records docs playground sessions switched off, keyed on its moment; api-key revokes the keys. */
+export class RecordDocsPlaygroundSessionsDisabledCommand implements CommandHandler<
+  Command<RecordDocsPlaygroundSessionsDisabledCommandData>,
+  OrganizationDocsPlaygroundSessionsDisabledEvent
+> {
+  static readonly schema = defineCommandSchema(
+    RECORD_DOCS_PLAYGROUND_SESSIONS_DISABLED_COMMAND_TYPE,
+    recordDocsPlaygroundSessionsDisabledCommandDataSchema,
+    "Record that an organization switched docs playground sessions off",
+  );
+
+  handle(
+    command: Command<RecordDocsPlaygroundSessionsDisabledCommandData>,
+  ): OrganizationDocsPlaygroundSessionsDisabledEvent[] {
+    const data = command.data;
+    return [
+      EventUtils.createEvent<OrganizationDocsPlaygroundSessionsDisabledEvent>({
+        aggregateType: ORGANIZATION_AGGREGATE_TYPE,
+        aggregateId: data.organizationId,
+        tenantId: createTenantId(command.tenantId),
+        type: ORGANIZATION_DOCS_PLAYGROUND_SESSIONS_DISABLED_EVENT_TYPE,
+        version: ORGANIZATION_DOCS_PLAYGROUND_SESSIONS_DISABLED_EVENT_VERSION,
+        data,
+        occurredAt: data.occurredAt,
+        idempotencyKey: `${data.organizationId}:docs_playground_sessions_disabled:${data.occurredAt}`,
+      }),
+    ];
+  }
+
+  static getAggregateId(payload: RecordDocsPlaygroundSessionsDisabledCommandData): string {
     return payload.organizationId;
   }
 }

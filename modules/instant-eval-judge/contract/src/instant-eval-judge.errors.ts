@@ -44,3 +44,27 @@ export class InstantEvalFreeBudgetExhaustedError extends HandledError {
     this.name = "InstantEvalFreeBudgetExhaustedError";
   }
 }
+
+/**
+ * The caller's stop, reaching a routed call after some of its legs were paid. Named as an abort
+ * so every caller still treats it as a stop; it carries what those legs spent, to be billed.
+ */
+export class InstantEvalJudgeStoppedError extends Error {
+  readonly inputTokens: number;
+  readonly costNanoUsd: number;
+
+  constructor({
+    inputTokens,
+    costNanoUsd,
+    cause,
+  }: {
+    inputTokens: number;
+    costNanoUsd: number;
+    cause: unknown;
+  }) {
+    super("The judgement was stopped by its caller after some of its calls were paid", { cause });
+    this.name = "AbortError";
+    this.inputTokens = inputTokens;
+    this.costNanoUsd = costNanoUsd;
+  }
+}

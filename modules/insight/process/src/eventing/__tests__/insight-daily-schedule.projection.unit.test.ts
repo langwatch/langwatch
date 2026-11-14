@@ -321,8 +321,8 @@ describe("given a person turned their daily run on and scheduled runs are skippe
 });
 
 describe("given a board a person never decided on", () => {
-  /** @scenario "No thanks from the offer stores off" */
-  it("reads off with nothing chosen once they say no", () => {
+  /** @scenario "Turning off a board never decided on stores off" */
+  it("reads off with nothing chosen once they turn it off", () => {
     const off = applyInsightDailyRunEvent(PROJECTION.init(), turnedOff(T0));
 
     expect(off).toMatchObject({

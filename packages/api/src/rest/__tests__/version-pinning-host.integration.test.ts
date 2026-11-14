@@ -1,6 +1,5 @@
 /**
- * A caller pins a dated family's version by URL or by `X-API-Version`, through one path; a
- * family superseded at a later date keeps only its own dates.
+ * A caller pins a dated family's version by URL or by `X-API-Version`, through one path.
  * Spec: packages/api/specs/public-rest.feature.
  */
 import { moduleApi } from "@langwatch/module";
@@ -23,11 +22,11 @@ const ThingApi = moduleApi<ThingApi>()("annotation");
 const PUBLIC = publicRoute({ reason: "the test reads nothing private" });
 const served = z.object({ served: z.string() });
 
-/** One registration of `/api/things`: a list, a read by id and a create echoing its body. */
-function things({ version, supersededAt }: { version: string; supersededAt?: string }) {
-  const router = defineRestRouter(ThingApi).withNamespace("things").withVersion(version);
-
-  return (supersededAt ? router.withSupersededAt(supersededAt) : router)
+/** `/api/things`, registered at FIRST: a list, a read by id and a create echoing its body. */
+function things() {
+  return defineRestRouter(ThingApi)
+    .withNamespace("things")
+    .withVersion(FIRST)
     .get("/", "listThings")
     .withAccess(PUBLIC)
     .withOutput(served)
@@ -118,8 +117,7 @@ function host() {
     audit: { record: async () => {} },
   });
 
-  server.mount(things({ version: FIRST, supersededAt: SECOND }), answering("first"));
-  server.mount(things({ version: SECOND }), answering("second"));
+  server.mount(things(), answering("things"));
   server.mount(plain, answering("plain"));
   server.mount(literalNotes, answering("notes"));
   server.mount(sharedRatings, answering("rating"));
@@ -154,14 +152,14 @@ async function ask(
   };
 }
 
-describe("given a namespace registered at one date and superseded by a new family at a later one", () => {
+describe("given a namespace registered at one date", () => {
   /** @scenario "An omitted date version defaults to latest" */
   it("answers the newest registration when neither the URL nor the header names a date", async () => {
     const server = host();
 
     expect(await ask(server, "/api/v1/things")).toEqual({
       status: 200,
-      answer: "second",
+      answer: "things",
       version: "latest",
       versionStatus: "latest",
     });
@@ -170,7 +168,7 @@ describe("given a namespace registered at one date and superseded by a new famil
   /** @scenario "A header can pin the optional date version" */
   it("answers a header-pinned date exactly as the same dated URL", async () => {
     const server = host();
-    const pins = [FIRST, "2026-05-01", SECOND, "2026-10-26"];
+    const pins = [FIRST, "2026-05-01", SECOND];
 
     const byHeader = await Promise.all(
       pins.map((version) => ask(server, "/api/v1/things/thing-1", { version })),
@@ -180,12 +178,7 @@ describe("given a namespace registered at one date and superseded by a new famil
     );
 
     expect(byHeader).toEqual(byUrl);
-    expect(byHeader.map(({ answer }) => answer)).toEqual([
-      "first:thing-1",
-      "first:thing-1",
-      "second:thing-1",
-      "second:thing-1",
-    ]);
+    expect(byHeader.map(({ answer }) => answer)).toEqual(pins.map(() => "things:thing-1"));
   });
 
   /** @scenario "A header can pin the optional date version" */
@@ -196,26 +189,8 @@ describe("given a namespace registered at one date and superseded by a new famil
 
     expect({ status: created.status, answer: created.answer }).toEqual({
       status: 200,
-      answer: "first:Kept",
+      answer: "things:Kept",
     });
-  });
-
-  /** @scenario "A registration superseded at a later date keeps only its own dates" */
-  it("leaves latest, the bare path and the later dates to the new family", async () => {
-    const server = host();
-
-    const answers = await Promise.all(
-      [
-        "/api/v1/things",
-        "/api/v1/things/latest",
-        `/api/v1/things/${FIRST}`,
-        "/api/v1/things/2026-08-06",
-        `/api/v1/things/${SECOND}`,
-        "/api/v1/things/2027-01-01",
-      ].map(async (path) => (await ask(server, path)).answer),
-    );
-
-    expect(answers).toEqual(["second", "second", "first", "first", "second", "second"]);
   });
 
   /** @scenario "URL and header disagreement fails" */
@@ -229,7 +204,7 @@ describe("given a namespace registered at one date and superseded by a new famil
 
     expect([conflict, agreeing].map(({ status, answer }) => ({ status, answer }))).toEqual([
       { status: 400, answer: "api_version_conflict" },
-      { status: 200, answer: "first" },
+      { status: 200, answer: "things" },
     ]);
   });
 
@@ -241,7 +216,7 @@ describe("given a namespace registered at one date and superseded by a new famil
 
     expect({ status: answered.status, answer: answered.answer }).toEqual({
       status: 200,
-      answer: "second:thing-1",
+      answer: "things:thing-1",
     });
   });
 

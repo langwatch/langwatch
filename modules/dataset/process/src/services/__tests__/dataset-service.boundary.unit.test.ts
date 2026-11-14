@@ -14,6 +14,7 @@ import { ZodError } from "zod";
 
 import {
   createDatasetTestAttachments,
+  createDatasetTestContent,
   createDatasetTestInlineAttachments,
   createDatasetTestRequestBounds,
 } from "../../app/__tests__/dataset.fixture.ts";
@@ -42,13 +43,24 @@ function serviceOverMemory() {
   const service = DatasetService.create({
     repository,
     records,
+    content: createDatasetTestContent({ database }),
     generateId: () => `record_${(minted += 1)}`,
     requestBounds: createDatasetTestRequestBounds(),
     attachments: createDatasetTestAttachments(),
     inlineAttachments: createDatasetTestInlineAttachments(),
   });
 
-  return { database, service, spies };
+  return { database, repository, records, service, spies };
+}
+
+/** A dataset kept in the Postgres records table, as the releases before object storage made it. */
+function postgresDataset(repository: MemoryDatasetRepository): Promise<Dataset> {
+  return repository.create({
+    projectId: SOURCE_PROJECT,
+    name: "Golden Set",
+    slug: "golden-set",
+    columnTypes,
+  });
 }
 
 /** Marks a stored dataset as still being prepared, the way an import in flight leaves it. */
@@ -62,7 +74,7 @@ function markProcessing(database: MemoryDatasetDatabase, dataset: Dataset) {
 describe("DatasetService boundary", () => {
   describe("when a caller creates a dataset with columns and records", () => {
     /** @scenario "A dataset is created with a portable contract" */
-    it("validates the input, answers a portable Dataset and writes the records through the record repository", async () => {
+    it("validates the input, answers a portable Dataset and writes the records to object storage", async () => {
       const { service, spies } = serviceOverMemory();
 
       const created = await service.upsertDataset({
@@ -73,13 +85,18 @@ describe("DatasetService boundary", () => {
       });
 
       expect(datasetSchema.parse(created)).toEqual(created);
-      expect(created).toMatchObject({ projectId: SOURCE_PROJECT, slug: "golden-set" });
-      expect(spies.createMany).toHaveBeenCalledOnce();
-      expect(spies.createMany.mock.calls[0]![0]).toMatchObject({
-        datasetId: created.id,
+      expect(created).toMatchObject({
         projectId: SOURCE_PROJECT,
-        entries: [{ question: "one" }, { question: "two" }],
+        slug: "golden-set",
+        contentLayout: "s3_jsonl",
+        rowCount: 2,
       });
+      expect(spies.createMany).not.toHaveBeenCalled();
+      const page = await service.listRecords({ slugOrId: created.id, projectId: SOURCE_PROJECT });
+      expect(page.data.map((record) => record.entry)).toEqual([
+        { question: "one" },
+        { question: "two" },
+      ]);
     });
 
     /** @scenario "A dataset is created with a portable contract" */
@@ -138,12 +155,8 @@ describe("DatasetService boundary", () => {
   describe("when a caller creates, updates, lists or deletes records", () => {
     /** @scenario "Records use the Dataset boundary" */
     it("delegates each to the record repository and answers contract records only", async () => {
-      const { service, spies } = serviceOverMemory();
-      const dataset = await service.upsertDataset({
-        projectId: SOURCE_PROJECT,
-        name: "Golden Set",
-        columnTypes,
-      });
+      const { repository, service, spies } = serviceOverMemory();
+      const dataset = await postgresDataset(repository);
       const lookup = { slugOrId: dataset.id, projectId: SOURCE_PROJECT };
 
       const [created] = await service.createRecords({ ...lookup, entries: [{ question: "one" }] });
@@ -166,12 +179,8 @@ describe("DatasetService boundary", () => {
 
     /** @scenario "Records use the Dataset boundary" */
     it("checks the dataset is ready first and touches no record when it is not", async () => {
-      const { database, service, spies } = serviceOverMemory();
-      const dataset = await service.upsertDataset({
-        projectId: SOURCE_PROJECT,
-        name: "Golden Set",
-        columnTypes,
-      });
+      const { database, repository, service, spies } = serviceOverMemory();
+      const dataset = await postgresDataset(repository);
       markProcessing(database, dataset);
       const lookup = { slugOrId: dataset.id, projectId: SOURCE_PROJECT };
 
@@ -196,15 +205,17 @@ describe("DatasetService boundary", () => {
 
   describe("when a caller copies a dataset to another project", () => {
     /** @scenario "Dataset copy remains a Dataset operation" */
-    it("creates the target through the dataset repository and copies the records through the record repository", async () => {
-      const { database, service, spies } = serviceOverMemory();
-      const source = await service.upsertDataset({
+    it("creates the target in object storage and reads the source rows through the record repository", async () => {
+      const { database, repository, records, service, spies } = serviceOverMemory();
+      const source = await postgresDataset(repository);
+      await records.createMany({
+        datasetId: source.id,
         projectId: SOURCE_PROJECT,
-        name: "Golden Set",
-        columnTypes,
-        datasetRecords: [{ question: "one" }, { question: "two" }],
+        entries: [
+          { id: "record_a", question: "one" },
+          { id: "record_b", question: "two" },
+        ],
       });
-      spies.create.mockClear();
       spies.createMany.mockClear();
 
       const target = await service.copyDataset({
@@ -213,19 +224,19 @@ describe("DatasetService boundary", () => {
         targetProjectId: OTHER_PROJECT,
       });
 
-      expect(spies.create).toHaveBeenCalledOnce();
-      expect(spies.create.mock.calls[0]![0]).toMatchObject({
+      expect(target).toMatchObject({
         projectId: OTHER_PROJECT,
         name: "Golden Set",
         columnTypes,
+        contentLayout: "s3_jsonl",
+        rowCount: 2,
       });
-      expect(spies.createMany).toHaveBeenCalledOnce();
-      expect(spies.createMany.mock.calls[0]![0]).toMatchObject({
-        datasetId: target.id,
-        projectId: OTHER_PROJECT,
-        entries: [{ question: "one" }, { question: "two" }],
-      });
-      expect(target.projectId).toBe(OTHER_PROJECT);
+      expect(spies.createMany).not.toHaveBeenCalled();
+      const page = await service.listRecords({ slugOrId: target.id, projectId: OTHER_PROJECT });
+      expect(page.data.map((record) => record.entry)).toEqual([
+        { question: "one" },
+        { question: "two" },
+      ]);
       expect(
         database
           .records()

@@ -48,6 +48,7 @@ export function createDashboardTestAnalytics(overrides: Partial<AnalyticsApi> = 
       followsTimeWindow: false,
       followsGranularity: false,
     }),
+    assertProjectsReadable: async () => void 0,
     isWorkbenchEnabled: async () => true,
     isDashboardsEnabled: async () => true,
     assertDashboardWidgetsEnabled: async () => void 0,

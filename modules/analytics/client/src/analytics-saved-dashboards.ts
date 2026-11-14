@@ -14,9 +14,12 @@ export type SavedDashboardsProps = { openPath: string | undefined };
 export const SavedDashboardsToken =
   uiTokens("analytics").component<SavedDashboardsProps>("savedDashboards");
 
-/** The starred group takes nothing: analytics reads the member's stars itself. */
+/** The Dashboards section takes nothing: analytics reads the member's stars itself. */
 export type StarredDashboardsProps = Record<string, never>;
 
-/** Draws nothing unless the member has starred a dashboard in the project in scope. */
+/**
+ * The LLM Ops sidebar's Dashboards section: the member's stars in the project in scope as
+ * pinned dashboards, and a "+" for a member who may create one.
+ */
 export const StarredDashboardsToken =
   uiTokens("analytics").component<StarredDashboardsProps>("starredDashboards");

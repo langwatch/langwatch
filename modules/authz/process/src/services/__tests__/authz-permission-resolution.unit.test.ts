@@ -10,6 +10,7 @@ import type {
   AuthzReadRepository,
   OrganizationRole,
 } from "../../repositories/authz-read.repository.ts";
+import { MemoryAuthzOrganizationPolicyRepository } from "../../repositories/memory/memory.authz-organization-policy.repository.ts";
 import { AuthzService } from "../authz.service.ts";
 
 const ORG = "org-1";
@@ -52,6 +53,7 @@ function authzFor({
     findTeamOrganization: vi.fn().mockResolvedValue({ organizationId: ORG }),
   };
   return AuthzService.create({
+    policies: MemoryAuthzOrganizationPolicyRepository.create(),
     isOnEngine: async () => true,
     repository: makeReader(overrides),
     listing: new StubAuthzListingRepository(),
@@ -294,6 +296,22 @@ describe("given an organization-scoped permission check", () => {
       const decision = await onOrganization(authzFor(), "organization:manage");
 
       expect(decision.permitted).toBe(false);
+    });
+  });
+
+  describe("when a member or a lite member asks to upgrade the subscription", () => {
+    /** @scenario "A Member may upgrade the organization" */
+    it("lets a Member upgrade", async () => {
+      await expect(onOrganization(authzFor(), "subscription:upgrade")).resolves.toMatchObject({
+        permitted: true,
+      });
+    });
+
+    /** @scenario "A Lite Member may upgrade the organization" */
+    it("lets a Lite Member upgrade", async () => {
+      await expect(
+        onOrganization(authzFor({ membership: "EXTERNAL" }), "subscription:upgrade"),
+      ).resolves.toMatchObject({ permitted: true });
     });
   });
 

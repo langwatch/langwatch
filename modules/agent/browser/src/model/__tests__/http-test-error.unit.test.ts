@@ -13,6 +13,22 @@ describe("explainTestError", () => {
     });
   });
 
+  describe("given a test whose agent replied but the output path matched nothing", () => {
+    /** @scenario "An HTTP agent test whose reply misses the output path points at the output path" */
+    it("points at the output path, not at reaching the agent", () => {
+      const explanation = explainTestError({
+        errorCode: "jsonpath_no_match",
+        error: "jsonpath: no match",
+      });
+
+      expect(explanation.title).toBe("The reply has no value at the output path");
+      expect(explanation.description).toBe(
+        "The request went through. Check the output path against the response.",
+      );
+      expect(explanation.title).not.toBe("Couldn't reach the agent");
+    });
+  });
+
   describe("given a failure with no code or an unknown one", () => {
     /** @scenario "A refused HTTP agent test reads in words, never the code" */
     it("keeps the generic title", () => {

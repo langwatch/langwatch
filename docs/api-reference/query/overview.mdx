@@ -66,6 +66,7 @@ Two column families are gated rather than freely selectable: free-text carriers 
 |------|-------------|-------|-------|-------------|
 | `traces` | One row per trace, with its timing, token, cost and error rollups. | `input`, `output`, `costs` | one row per (TenantId, TraceId), latest version only | `OccurredAt` |
 | `spans` | One row per span, with its timing, status and attributes. | `input`, `output`, `costs` | one row per (TenantId, TraceId, SpanId), latest version only | `StartTime` |
+| `span_metrics` | One row per span with its timing, status, cost and the LangWatch facts dashboards group by, and no attribute map. Holds spans from the span_analytics floor on. | `costs` | one row per (TenantId, TraceId, SpanId); a duplicate span is counted | `StartTime` |
 | `logs` | Canonical OpenTelemetry log records: requests, responses and provider events, correlated to their trace and span. | `input`, `output` | one row per (TenantId, TraceId, TimeUnixMs, RecordId) | `TimeUnixMs` |
 | `log_ingestion_usage` | Per-tenant log ingestion usage estimates. | None | one row per (OrganizationId, RecordId), latest version only | `AcceptedAt` |
 | `metric_points` | Individual metric data points with gauges, sums, histograms, and summaries | `output` | one row per (SeriesId, TimeUnixMs, PointId) | `TimeUnixMs` |
@@ -123,6 +124,8 @@ Rollup views (`_by_minute`, `_rollups`) return **finalised values only**: figure
 | `model_usage_by_minute` | Span metrics summed per minute, per model and span type: span counts, costs and tokens. | `costs` | one merged row per (TenantId, BucketStart, Model, SpanType), every measure summed | `BucketStart` |
 | `evaluation_metrics` | One row per evaluation, its latest state, time-sorted, carrying its outcome, cost and the trace dimensions it inherited. | `costs` | one row per (TenantId, EvaluationId), latest version only | `OccurredAt` |
 | `evaluation_metrics_by_minute` | Evaluation outcomes summed per minute, per evaluator type and terminal status. Every measure is a sum: pass rate is PassCount over PassCount plus FailCount. | `costs` | one merged row per (TenantId, BucketStart, EvaluatorType, Status), every measure summed | `BucketStart` |
+| `trace_evaluation_metrics` | One row per evaluation of a trace, its live outcome, carrying the evaluated trace's time, source and dimensions, so a read by the trace's period needs no join. | None | one row per (TenantId, TraceId, EvaluationId): each revision grouped with its retractions, kept while its signs sum above zero | `OccurredAt` |
+| `trace_evaluation_checks` | Live evaluations of traces counted per trace, evaluator and outcome, carrying the evaluated trace's time and source. Sum Evaluations to count evaluations. | None | one row per (TenantId, TraceId, OccurredAt, TraceOccurredAt, EvaluatorName, Passed, IsGuardrail, Source, TraceSource), Evaluations summed | `OccurredAt` |
 | `metric_rollups` | Time-bucketed rollups of a metric series: per-bucket min, max, sum, count and histogram buckets. | None | one row per (SeriesId, BucketStart) | `BucketStart` |
 | `session_metrics` | Per-session time-series metrics with aggregate statistics | None | one row per (SessionId, SeriesId) | `AsOf` |
 | `simulation_metric_rollups` | Per-trace simulation cost and latency, merged from the aggregating rollup: total cost and per-role cost and latency maps. | `costs` | one row per (TenantId, ScenarioRunId, TraceId), latest version only | `OccurredAt` |
@@ -277,36 +280,36 @@ A query may call only the functions on the allowlist below. `GET /api/v1/query/s
 - `any`, `anyLast`, `argMax`, `argMin`, `arrayAll`, `arrayAvg`, `arrayConcat`, `arrayCount`, `arrayDistinct`, `arrayElement`
 - `arrayEnumerate`, `arrayExists`, `arrayFilter`, `arrayFirst`, `arrayFirstIndex`, `arrayJoin`, `arrayLast`, `arrayMap`, `arrayMax`, `arrayMin`
 - `arrayReverseSort`, `arraySlice`, `arraySort`, `arrayStringConcat`, `arraySum`, `arrayUniq`, `assumeNotNull`, `avg`, `caseWithExpression`, `caseWithoutExpression`
-- `CAST`, `ceil`, `ceiling`, `coalesce`, `concat`, `concatWithSeparator`, `count`, `date_trunc`, `dateDiff`, `dateTrunc`
-- `dense_rank`, `divide`, `empty`, `endsWith`, `equals`, `exists`, `exp`, `extract`, `extractAll`, `first_value`
-- `floor`, `formatDateTime`, `fromUnixTimestamp`, `globalIn`, `globalNotIn`, `greater`, `greaterOrEquals`, `greatest`, `groupArray`, `groupUniqArray`
-- `has`, `hasAll`, `hasAny`, `if`, `ifNull`, `ilike`, `in`, `indexOf`, `intDiv`, `intDivOrZero`
-- `isDistinctFrom`, `isNotDistinctFrom`, `isNotNull`, `isNull`, `isValidJSON`, `JSONExtract`, `JSONExtractArrayRaw`, `JSONExtractBool`, `JSONExtractFloat`, `JSONExtractInt`
-- `JSONExtractKeys`, `JSONExtractKeysAndValues`, `JSONExtractRaw`, `JSONExtractString`, `JSONExtractUInt`, `JSONHas`, `JSONLength`, `JSONType`, `lagInFrame`, `lambda`
-- `last_value`, `leadInFrame`, `least`, `left`, `length`, `lengthUTF8`, `less`, `lessOrEquals`, `like`, `ln`
-- `log`, `log10`, `log2`, `lower`, `lowerUTF8`, `map`, `mapContains`, `mapFilter`, `mapKeys`, `mapValues`
-- `match`, `max`, `median`, `medianExact`, `min`, `minus`, `modulo`, `moduloOrZero`, `multiIf`, `multiply`
-- `negate`, `not`, `notEmpty`, `notEquals`, `notILike`, `notIn`, `notLike`, `now`, `now64`, `nth_value`
-- `ntile`, `nullIf`, `or`, `plus`, `position`, `positionCaseInsensitive`, `pow`, `power`, `quantile`, `quantileExact`
-- `quantiles`, `quantilesExact`, `quantilesTDigest`, `quantilesTiming`, `quantileTDigest`, `quantileTiming`, `rank`, `replaceAll`, `replaceOne`, `replaceRegexpAll`
-- `replaceRegexpOne`, `right`, `round`, `row_number`, `sign`, `simpleJSONExtractBool`, `simpleJSONExtractFloat`, `simpleJSONExtractInt`, `simpleJSONExtractString`, `simpleJSONExtractUInt`
-- `simpleJSONHas`, `splitByChar`, `splitByString`, `sqrt`, `startsWith`, `stddevPop`, `stddevSamp`, `substring`, `substringUTF8`, `subtractDays`
-- `subtractHours`, `subtractMinutes`, `subtractMonths`, `subtractQuarters`, `subtractSeconds`, `subtractWeeks`, `subtractYears`, `sum`, `toBool`, `toDate`
-- `toDate32`, `toDate32OrDefault`, `toDate32OrNull`, `toDate32OrZero`, `toDateOrDefault`, `toDateOrNull`, `toDateOrZero`, `toDateTime`, `toDateTime64`, `toDateTime64OrDefault`
-- `toDateTime64OrNull`, `toDateTime64OrZero`, `toDateTimeOrDefault`, `toDateTimeOrNull`, `toDateTimeOrZero`, `today`, `toDayOfMonth`, `toDayOfWeek`, `toDayOfYear`, `toDecimal128`
-- `toDecimal128OrDefault`, `toDecimal128OrNull`, `toDecimal128OrZero`, `toDecimal256`, `toDecimal256OrDefault`, `toDecimal256OrNull`, `toDecimal256OrZero`, `toDecimal32`, `toDecimal32OrDefault`, `toDecimal32OrNull`
-- `toDecimal32OrZero`, `toDecimal64`, `toDecimal64OrDefault`, `toDecimal64OrNull`, `toDecimal64OrZero`, `toFloat32`, `toFloat32OrDefault`, `toFloat32OrNull`, `toFloat32OrZero`, `toFloat64`
-- `toFloat64OrDefault`, `toFloat64OrNull`, `toFloat64OrZero`, `toHour`, `toInt128`, `toInt128OrDefault`, `toInt128OrNull`, `toInt128OrZero`, `toInt16`, `toInt16OrDefault`
-- `toInt16OrNull`, `toInt16OrZero`, `toInt256`, `toInt256OrDefault`, `toInt256OrNull`, `toInt256OrZero`, `toInt32`, `toInt32OrDefault`, `toInt32OrNull`, `toInt32OrZero`
-- `toInt64`, `toInt64OrDefault`, `toInt64OrNull`, `toInt64OrZero`, `toInt8`, `toInt8OrDefault`, `toInt8OrNull`, `toInt8OrZero`, `toIntervalDay`, `toIntervalHour`
-- `toIntervalMinute`, `toIntervalMonth`, `toIntervalQuarter`, `toIntervalSecond`, `toIntervalWeek`, `toIntervalYear`, `toISOWeek`, `toLastDayOfMonth`, `toMinute`, `toMonday`
-- `toMonth`, `topK`, `toQuarter`, `toSecond`, `toStartOfDay`, `toStartOfFifteenMinutes`, `toStartOfFiveMinutes`, `toStartOfHour`, `toStartOfInterval`, `toStartOfISOWeek`
-- `toStartOfMinute`, `toStartOfMonth`, `toStartOfQuarter`, `toStartOfSecond`, `toStartOfTenMinutes`, `toStartOfWeek`, `toStartOfYear`, `toString`, `toTimeZone`, `toUInt128`
-- `toUInt128OrDefault`, `toUInt128OrNull`, `toUInt128OrZero`, `toUInt16`, `toUInt16OrDefault`, `toUInt16OrNull`, `toUInt16OrZero`, `toUInt256`, `toUInt256OrDefault`, `toUInt256OrNull`
-- `toUInt256OrZero`, `toUInt32`, `toUInt32OrDefault`, `toUInt32OrNull`, `toUInt32OrZero`, `toUInt64`, `toUInt64OrDefault`, `toUInt64OrNull`, `toUInt64OrZero`, `toUInt8`
-- `toUInt8OrDefault`, `toUInt8OrNull`, `toUInt8OrZero`, `toUnixTimestamp`, `toUUID`, `toUUIDOrDefault`, `toUUIDOrNull`, `toUUIDOrZero`, `toWeek`, `toYear`
-- `trim`, `trimBoth`, `trimLeft`, `trimRight`, `trunc`, `truncate`, `tuple`, `tupleElement`, `uniq`, `uniqCombined`
-- `uniqExact`, `upper`, `upperUTF8`, `varPop`, `varSamp`, `yesterday`
+- `CAST`, `ceil`, `ceiling`, `cityHash64`, `coalesce`, `concat`, `concatWithSeparator`, `count`, `date_trunc`, `dateDiff`
+- `dateTrunc`, `dense_rank`, `divide`, `empty`, `endsWith`, `equals`, `exists`, `exp`, `extract`, `extractAll`
+- `first_value`, `floor`, `formatDateTime`, `fromUnixTimestamp`, `globalIn`, `globalNotIn`, `greater`, `greaterOrEquals`, `greatest`, `groupArray`
+- `groupUniqArray`, `has`, `hasAll`, `hasAny`, `if`, `ifNull`, `ilike`, `in`, `indexOf`, `intDiv`
+- `intDivOrZero`, `isDistinctFrom`, `isNotDistinctFrom`, `isNotNull`, `isNull`, `isValidJSON`, `JSONExtract`, `JSONExtractArrayRaw`, `JSONExtractBool`, `JSONExtractFloat`
+- `JSONExtractInt`, `JSONExtractKeys`, `JSONExtractKeysAndValues`, `JSONExtractRaw`, `JSONExtractString`, `JSONExtractUInt`, `JSONHas`, `JSONLength`, `JSONType`, `lagInFrame`
+- `lambda`, `last_value`, `leadInFrame`, `least`, `left`, `length`, `lengthUTF8`, `less`, `lessOrEquals`, `like`
+- `ln`, `log`, `log10`, `log2`, `lower`, `lowerUTF8`, `map`, `mapContains`, `mapFilter`, `mapKeys`
+- `mapValues`, `match`, `max`, `median`, `medianExact`, `min`, `minus`, `modulo`, `moduloOrZero`, `multiIf`
+- `multiply`, `negate`, `not`, `notEmpty`, `notEquals`, `notILike`, `notIn`, `notLike`, `now`, `now64`
+- `nth_value`, `ntile`, `nullIf`, `or`, `plus`, `position`, `positionCaseInsensitive`, `pow`, `power`, `quantile`
+- `quantileExact`, `quantiles`, `quantilesExact`, `quantilesTDigest`, `quantilesTiming`, `quantileTDigest`, `quantileTiming`, `rank`, `replaceAll`, `replaceOne`
+- `replaceRegexpAll`, `replaceRegexpOne`, `right`, `round`, `row_number`, `sign`, `simpleJSONExtractBool`, `simpleJSONExtractFloat`, `simpleJSONExtractInt`, `simpleJSONExtractString`
+- `simpleJSONExtractUInt`, `simpleJSONHas`, `sipHash128`, `splitByChar`, `splitByString`, `sqrt`, `startsWith`, `stddevPop`, `stddevSamp`, `substring`
+- `substringUTF8`, `subtractDays`, `subtractHours`, `subtractMinutes`, `subtractMonths`, `subtractQuarters`, `subtractSeconds`, `subtractWeeks`, `subtractYears`, `sum`
+- `toBool`, `toDate`, `toDate32`, `toDate32OrDefault`, `toDate32OrNull`, `toDate32OrZero`, `toDateOrDefault`, `toDateOrNull`, `toDateOrZero`, `toDateTime`
+- `toDateTime64`, `toDateTime64OrDefault`, `toDateTime64OrNull`, `toDateTime64OrZero`, `toDateTimeOrDefault`, `toDateTimeOrNull`, `toDateTimeOrZero`, `today`, `toDayOfMonth`, `toDayOfWeek`
+- `toDayOfYear`, `toDecimal128`, `toDecimal128OrDefault`, `toDecimal128OrNull`, `toDecimal128OrZero`, `toDecimal256`, `toDecimal256OrDefault`, `toDecimal256OrNull`, `toDecimal256OrZero`, `toDecimal32`
+- `toDecimal32OrDefault`, `toDecimal32OrNull`, `toDecimal32OrZero`, `toDecimal64`, `toDecimal64OrDefault`, `toDecimal64OrNull`, `toDecimal64OrZero`, `toFloat32`, `toFloat32OrDefault`, `toFloat32OrNull`
+- `toFloat32OrZero`, `toFloat64`, `toFloat64OrDefault`, `toFloat64OrNull`, `toFloat64OrZero`, `toHour`, `toInt128`, `toInt128OrDefault`, `toInt128OrNull`, `toInt128OrZero`
+- `toInt16`, `toInt16OrDefault`, `toInt16OrNull`, `toInt16OrZero`, `toInt256`, `toInt256OrDefault`, `toInt256OrNull`, `toInt256OrZero`, `toInt32`, `toInt32OrDefault`
+- `toInt32OrNull`, `toInt32OrZero`, `toInt64`, `toInt64OrDefault`, `toInt64OrNull`, `toInt64OrZero`, `toInt8`, `toInt8OrDefault`, `toInt8OrNull`, `toInt8OrZero`
+- `toIntervalDay`, `toIntervalHour`, `toIntervalMinute`, `toIntervalMonth`, `toIntervalQuarter`, `toIntervalSecond`, `toIntervalWeek`, `toIntervalYear`, `toISOWeek`, `toLastDayOfMonth`
+- `toMinute`, `toMonday`, `toMonth`, `topK`, `toQuarter`, `toSecond`, `toStartOfDay`, `toStartOfFifteenMinutes`, `toStartOfFiveMinutes`, `toStartOfHour`
+- `toStartOfInterval`, `toStartOfISOWeek`, `toStartOfMinute`, `toStartOfMonth`, `toStartOfQuarter`, `toStartOfSecond`, `toStartOfTenMinutes`, `toStartOfWeek`, `toStartOfYear`, `toString`
+- `toTimeZone`, `toUInt128`, `toUInt128OrDefault`, `toUInt128OrNull`, `toUInt128OrZero`, `toUInt16`, `toUInt16OrDefault`, `toUInt16OrNull`, `toUInt16OrZero`, `toUInt256`
+- `toUInt256OrDefault`, `toUInt256OrNull`, `toUInt256OrZero`, `toUInt32`, `toUInt32OrDefault`, `toUInt32OrNull`, `toUInt32OrZero`, `toUInt64`, `toUInt64OrDefault`, `toUInt64OrNull`
+- `toUInt64OrZero`, `toUInt8`, `toUInt8OrDefault`, `toUInt8OrNull`, `toUInt8OrZero`, `toUnixTimestamp`, `toUUID`, `toUUIDOrDefault`, `toUUIDOrNull`, `toUUIDOrZero`
+- `toWeek`, `toYear`, `trim`, `trimBoth`, `trimLeft`, `trimRight`, `trunc`, `truncate`, `tuple`, `tupleElement`
+- `uniq`, `uniqCombined`, `uniqExact`, `upper`, `upperUTF8`, `varPop`, `varSamp`, `yesterday`
 
 ## Response ceilings
 

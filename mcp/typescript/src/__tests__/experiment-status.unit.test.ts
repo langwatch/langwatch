@@ -10,7 +10,7 @@ vi.mock("../langwatch-api.ts", async (importOriginal) => {
 
 import { LangWatchApiError, makeRequest } from "../langwatch-api.ts";
 import { deriveRunStatus, isTerminalStatus } from "../tools/experiment-run-status.ts";
-import { handleExperimentStatus } from "../tools/run-experiment.ts";
+import { handleExperimentStatus, handleRunExperiment } from "../tools/run-experiment.ts";
 
 const mockMakeRequest = vi.mocked(makeRequest);
 
@@ -162,6 +162,39 @@ describe("handleExperimentStatus()", () => {
       await expect(
         handleExperimentStatus({ runId: "sdk_run", experimentSlug: "doc-qa" }),
       ).rejects.toThrow(/boom/);
+    });
+  });
+});
+
+describe("handleRunExperiment()", () => {
+  const started = { runId: "run_1", status: "running", total: 3 };
+
+  describe("when a concurrency is given", () => {
+    /** @scenario "The MCP run tool passes its concurrency on the run" */
+    it("sends the concurrency in the run body", async () => {
+      mockMakeRequest.mockResolvedValueOnce(started);
+
+      await handleRunExperiment({ slug: "my-evaluation", concurrency: 1 });
+
+      expect(mockMakeRequest).toHaveBeenCalledWith(
+        "POST",
+        "/api/v1/experiments/my-evaluation/run",
+        { concurrency: 1 },
+      );
+    });
+  });
+
+  describe("when no concurrency is given", () => {
+    it("sends no body", async () => {
+      mockMakeRequest.mockResolvedValueOnce(started);
+
+      await handleRunExperiment({ slug: "my-evaluation" });
+
+      expect(mockMakeRequest).toHaveBeenCalledWith(
+        "POST",
+        "/api/v1/experiments/my-evaluation/run",
+        undefined,
+      );
     });
   });
 });

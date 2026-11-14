@@ -35,6 +35,7 @@ const source: IngestionSourceDto = {
   lastReadThroughAt: null,
   lastRunCompleteness: null,
   pullStatus: { lastRunAt: null, outcome: null, error: null, backfillThrough: null, hasMore: null },
+  configComplaints: [],
   traceProjectId: null,
   traceProjectArchived: false,
   lastEventAt: null,

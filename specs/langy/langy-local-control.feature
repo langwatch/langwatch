@@ -370,7 +370,29 @@ Feature: Langy works in a folder shared from the developer's machine
       And Langy is running a command that takes several minutes
       When the command runs for longer than the turn stall window
       Then the turn is still in flight and its answer is not lost
-      And the panel says what is running and on which machine
+      And the panel says a command is running and on whose machine
+
+    # The line once repeated the raw uv or Python command beside the card that
+    # already shows it. It names the person who shared the folder, and falls
+    # back to the machine's own name when no name is on record.
+    @unit
+    Scenario: The activity line says whose machine, never the command
+      Given a folder shared by Ada Lovelace from the machine "ada-mbp"
+      When Langy runs a command there for longer than one heartbeat
+      Then the panel says "Running on Ada's machine"
+      And the line never repeats the command, which stays on the card
+      And with no name on record the line says "Running on ada-mbp"
+
+    # A failed command hid its one readable line: a Python warning read as a
+    # stack trace, and uv's progress escapes stayed in the text.
+    @unit
+    Scenario: A failed command says its exit code and its last error line
+      Given a connected folder
+      When a command exits non-zero after printing warnings, progress bars and an error
+      Then the card says the exit code the command stopped with
+      And it shows the last error line the command printed as its detail
+      And a warning line is never taken for a stack trace
+      And the details hold the output with every terminal escape removed
 
     @integration
     Scenario: The live stream stays alive during a long wait

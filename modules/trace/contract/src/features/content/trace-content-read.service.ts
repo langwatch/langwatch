@@ -9,6 +9,7 @@ import type {
   TraceSummaryPage,
   TracesForProjectResult,
 } from "../../trace-read.contract.ts";
+import type { TracePageSizeBound } from "../../trace.errors.ts";
 import type { CompiledProjection } from "../ingest/trace-projection.types.ts";
 
 export type TraceListTracesInput = {
@@ -27,8 +28,8 @@ export type TraceListTracesInput = {
     filterWhere?: { sql: string; params: Record<string, unknown> };
     /** The proof `filterWhere`'s tenant markers expand into (ADR-177 block C). */
     authorization?: Authorization;
-    /** Refuse above this plan bound instead of clamping to the list bound. */
-    refuseAbove?: "tracesPageSizeMax" | "tracesDownloadPageSizeMax";
+    /** Refuse above this plan bound instead of clamping; a spans read takes the spans bound. */
+    refuseAbove?: TracePageSizeBound;
   };
 };
 

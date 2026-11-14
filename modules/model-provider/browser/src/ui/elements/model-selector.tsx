@@ -13,21 +13,23 @@ import {
   Text,
 } from "@langwatch/design-system/primitives";
 import { isProviderKey, ProviderIconGlyph } from "@langwatch/design-system/provider-icons";
-import { Select } from "@langwatch/design-system/select";
+import { scrollToListItem, Select } from "@langwatch/design-system/select";
 import { titleCase } from "@langwatch/design-system/string-casing";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
   type BuiltInModel,
   type GroupedModelOptions,
+  isServedOnlyAsBuiltIn,
   modelSelectionFrom,
   type ModelOption,
+  unavailableModelReason,
 } from "@langwatch/model-provider-contract";
 import {
   MODEL_ICON_SIZE,
   MODEL_ICON_SIZE_SM,
 } from "@langwatch/prompt-contract/llm-config-constants";
 import { AlertTriangle, Search } from "lucide-react";
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { LuSettings2 } from "react-icons/lu";
 
 import { api } from "../../behavior/model-provider-api.ts";
@@ -55,23 +57,13 @@ export const useModelSelectionOptions = ({
     { enabled: !!project?.id },
   );
 
-  // Memoized as one block: the derivation runs on data changes, not on every
-  // render of the caller. Without this, each render handed back fresh
-  // `selectOptions` / `groupedByProvider` arrays, so every downstream
-  // `useMemo` keyed on them recomputed too — the langy composer's model pill
-  // rebuilt its whole combobox collection per parent render because of it.
-  const providers = modelProviders.data;
-  const { selectOptions, groupedByProvider } = useMemo(
-    () =>
-      modelSelectionFrom({
-        providers: providers ?? [],
-        options,
-        mode,
-        featureKey,
-        ...(builtInModels ? { builtInModels } : {}),
-      }),
-    [providers, options, mode, featureKey, builtInModels],
-  );
+  const { selectOptions, groupedByProvider } = modelSelectionFrom({
+    providers: modelProviders.data ?? [],
+    options,
+    mode,
+    featureKey,
+    ...(builtInModels ? { builtInModels } : {}),
+  });
 
   const modelOption = selectOptions.find((opt) => opt.value === model);
 
@@ -198,12 +190,14 @@ function SelectedModelValue({
   isProviderMissing,
   isUnknown,
   label,
+  model,
   providerKey,
   size,
 }: {
   isProviderMissing: boolean;
   isUnknown: boolean;
   label: string;
+  model: string;
   providerKey: string;
   size: SelectorSize;
 }) {
@@ -228,7 +222,7 @@ function SelectedModelValue({
       </Box>
       {isProviderMissing && (
         <Tooltip
-          content={`${providerKey} provider isn't enabled here. Re-add the provider or pick a different model to use it.`}
+          content={unavailableModelReason({ model })}
           positioning={{ placement: "top" }}
           showArrow
         >
@@ -254,14 +248,31 @@ function ModelOptionItem({
   return (
     <>
       {showDivider && <Box borderBottom="1px solid" borderColor="border" marginX={2} marginY={1} />}
-      <Select.Item item={item}>
-        <HStack gap={2}>
+      <Select.Item item={item} flexShrink={0}>
+        <HStack gap={2} minWidth={0}>
           {isProviderKey(provider) && (
             <ProviderIconGlyph provider={provider} size={MODEL_ICON_SIZE} />
           )}
-          <Box textStyle={isSmall ? "monoSm" : "mono"} paddingY={isSmall ? 0 : "2px"}>
-            {item.label}
-          </Box>
+          {item.subtitle ? (
+            // A named entry, such as a decision model: its title, then what it is.
+            <Box minWidth={0}>
+              <Text textStyle={isSmall ? "caption" : "body"} fontWeight="medium" truncate>
+                {item.label}
+              </Text>
+              <Text
+                textStyle="caption"
+                color="fg.muted"
+                truncate
+                data-testid="model-option-subtitle"
+              >
+                {item.subtitle}
+              </Text>
+            </Box>
+          ) : (
+            <Box textStyle={isSmall ? "monoSm" : "mono"} paddingY={isSmall ? 0 : "2px"}>
+              {item.label}
+            </Box>
+          )}
         </HStack>
       </Select.Item>
     </>
@@ -302,14 +313,7 @@ function ModelOptionGroup({
 
 function ConfigureModelsAction({ size }: { size: SelectorSize }) {
   return (
-    <Box
-      position="sticky"
-      bottom={0}
-      bg="bg.panel"
-      borderTop="1px solid"
-      borderColor="border"
-      zIndex="1"
-    >
+    <Box flexShrink={0} bg="bg.panel" borderTop="1px solid" borderColor="border" zIndex="1">
       <Button
         width="full"
         fontWeight="500"
@@ -336,7 +340,7 @@ function ConfigureModelsAction({ size }: { size: SelectorSize }) {
   );
 }
 
-export const ModelSelector = React.memo(function ModelSelector({
+export function ModelSelector({
   model,
   options,
   onChange,
@@ -392,19 +396,24 @@ export const ModelSelector = React.memo(function ModelSelector({
   // Model might not be in the list if it's a custom model or unknown
   const isUnknown = !selectedItem;
 
-  // Provider gone (deleted or never configured at any reachable
-  // scope) — the value is still persisted on the form but the user
-  // needs to update it before the evaluation can run. Same chip
-  // treatment ModelChip renders in the Default Models table.
+  // Provider gone (deleted, or never configured at any reachable scope): the value is still
+  // persisted on the form but has to change before the evaluation can run. A built-in model is
+  // LangWatch's own offer, so no provider row has to carry it; a decision model the picker no
+  // longer offers asks for an update even though its provider's group is there.
   const providerKey = model.split("/")[0] ?? "";
   const isProviderMissing =
-    !!model && !!providerKey && !groupedByProvider.some((group) => group.provider === providerKey);
+    !!model &&
+    !!providerKey &&
+    !selectedItem?.isBuiltIn &&
+    (isServedOnlyAsBuiltIn(model) ||
+      !groupedByProvider.some((group) => group.provider === providerKey));
 
   const selectValueText = (
     <SelectedModelValue
       isProviderMissing={isProviderMissing}
       isUnknown={isUnknown}
       label={selectedItem?.label ?? model}
+      model={model}
       providerKey={providerKey}
       size={size}
     />
@@ -415,8 +424,7 @@ export const ModelSelector = React.memo(function ModelSelector({
   useEffect(() => {
     const next = highlightAfterSearch({ current: highlightedValue, items: allFilteredModels });
     if (next.changed) setHighlightedValue(next.value);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [modelSearch]);
+  }, [modelSearch, highlightedValue, allFilteredModels]);
 
   // Skeleton while the providers query is in flight so the empty
   // state doesn't flash before the data resolves.
@@ -452,6 +460,7 @@ export const ModelSelector = React.memo(function ModelSelector({
       {...(open !== undefined ? { open } : {})}
       {...(onOpenChange ? { onOpenChange: (e) => onOpenChange(e.open) } : {})}
       loopFocus={true}
+      scrollToIndexFn={scrollToListItem}
       highlightedValue={highlightedValue}
       onHighlightChange={(details) => {
         setHighlightedValue(details.highlightedValue);
@@ -469,9 +478,10 @@ export const ModelSelector = React.memo(function ModelSelector({
       >
         <Select.ValueText placeholder={selectValueText}>{() => selectValueText}</Select.ValueText>
       </Select.Trigger>
-      <Select.Content>
+      {/* Only the rows scroll, below the search, so none passes behind it. */}
+      <Select.Content overflow="hidden">
         <Field.Root asChild>
-          <Box position="sticky" top={0} zIndex="1">
+          <Box flexShrink={0}>
             <InputGroup
               startElement={<Search size={16} />}
               startOffset="-4px"
@@ -496,11 +506,13 @@ export const ModelSelector = React.memo(function ModelSelector({
             </InputGroup>
           </Box>
         </Field.Root>
-        {filteredGroups.map((group) => (
-          <ModelOptionGroup key={group.provider} group={group} size={size} />
-        ))}
+        <Select.List data-testid="model-selector-list">
+          {filteredGroups.map((group) => (
+            <ModelOptionGroup key={group.provider} group={group} size={size} />
+          ))}
+        </Select.List>
         {showConfigureAction && <ConfigureModelsAction size={size} />}
       </Select.Content>
     </Select.Root>
   );
-});
+}

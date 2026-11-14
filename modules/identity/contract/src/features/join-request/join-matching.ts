@@ -262,7 +262,18 @@ export function resolveJoinLookup({
     }
   }
 
-  return { outcome: "ask", organizations: open.map(offerOf) };
+  return { outcome: "ask", organizations: largestFirst(open).map(offerOf) };
+}
+
+/**
+ * The team with the most people leads: one-person organizations colleagues made on their own
+ * must not bury the real one. The sort is stable, so organizations of one size keep the order
+ * they came in, oldest first from the candidate read.
+ */
+function largestFirst(
+  organizations: readonly JoinCandidateOrganization[],
+): JoinCandidateOrganization[] {
+  return organizations.toSorted((a, b) => b.memberCount - a.memberCount);
 }
 
 /** Whether an organization is open to a domain at all — the funnel every

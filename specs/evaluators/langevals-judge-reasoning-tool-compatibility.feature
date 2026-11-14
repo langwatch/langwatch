@@ -13,7 +13,8 @@ Feature: Evaluator judge reasoning and tool compatibility
   # Which models refuse cannot be read off their names: near neighbours in the
   # same family accept the request, and other models refuse to run with their
   # reasoning off at all. So a model is treated this way only once it has been
-  # seen to need it, and the treatment is a default, never an override.
+  # seen to need it, either listed or refusing at runtime, and the treatment is
+  # a default, never an override.
   #
   # Bindings:
   #   services/langevals/langevals_core/langevals_core/litellm_patch.py
@@ -21,6 +22,7 @@ Feature: Evaluator judge reasoning and tool compatibility
   #   services/langevals/langevals_core/tests/test_forced_tool_choice_fallback.py
   #   services/langevals/tests/deterministic/test_llm_boolean_polarity_framing.py
   #   services/langevals/evaluators/langevals/tests/test_llm_boolean.py (real calls)
+  #   services/langevals/evaluators/langevals/tests/test_reasoning_model_judges.py (real calls)
 
   @unit
   Scenario: A judge reaches a verdict on a model that would otherwise refuse it
@@ -65,13 +67,26 @@ Feature: Evaluator judge reasoning and tool compatibility
     When the evaluator asks that model to judge
     Then the model is asked exactly what the evaluator wrote
 
-  # A model can start refusing before anyone has seen it do so. The provider's
-  # own words for it name endpoints nobody chose and give the reader nothing to
-  # act on, so the failure names the model and the setting instead.
+  # A model can start refusing before anyone has listed it. The refusal itself
+  # says reasoning off is accepted, so the judge asks once more that way and
+  # remembers the model for the rest of the process. litellm may not know the
+  # model takes a reasoning effort at all, so the setting is sent regardless.
+  @unit
+  Scenario: A model that starts refusing is asked again with its reasoning off
+    Given an evaluator model that has not been seen to refuse a structured verdict
+    And nobody has chosen a reasoning effort for the evaluator
+    And the model refuses the judge's request over its reasoning setting
+    When the evaluator runs
+    Then the request is sent again with reasoning off
+    And the evaluation reaches a verdict
+    And later requests to that model go out with reasoning off from the start
+
+  # The provider's own words name endpoints nobody chose and give the reader
+  # nothing to act on, so the failure names the model and the setting instead.
   @unit
   Scenario: A refusal over the reasoning setting says what to change
     Given an evaluator model that has not been seen to refuse a structured verdict
-    And the model refuses the judge's request over its reasoning setting
+    And the model refuses the judge's request over its reasoning setting, even with reasoning off
     When the evaluator runs
     Then the failure names the model and the setting to change
     And it does not repeat the provider's own wording

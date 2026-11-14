@@ -19,13 +19,13 @@ export const supportAgent = connectAgent(
     name: "support-agent",
     environment: process.env.APP_ENV ?? "development",
     parameters: z.object({
-      model: z.enum(["gpt-5", "gpt-5-mini"]).default("gpt-5-mini"),
+      model: z.enum(["gpt-6-sol", "gpt-6-luna"]).default("gpt-6-luna"),
       plan: z.string().default("free").describe("Customer plan"),
       maxTools: z.number().int().default(5),
     }),
   },
   async ({ messages, params }) => {
-    // params is typed: { model: "gpt-5" | "gpt-5-mini"; plan: string; maxTools: number }
+    // params is typed: { model: "gpt-6-sol" | "gpt-6-luna"; plan: string; maxTools: number }
     return await runMyAgent(messages, { model: params.model });
   },
 );
@@ -81,7 +81,7 @@ Three forms, all of which reach the platform as the same declaration.
 
 ```typescript
 parameters: z.object({
-  model: z.enum(["gpt-5", "gpt-5-mini"]).default("gpt-5-mini"),
+  model: z.enum(["gpt-6-sol", "gpt-6-luna"]).default("gpt-6-luna"),
   plan: z.string().default("free").describe("Customer plan"),
   maxTools: z.number().int().default(5),
 })
@@ -102,7 +102,7 @@ Pass the schema object itself, never `schema["~standard"].jsonSchema` and never 
 
 ```typescript
 parameters: {
-  model: { options: ["gpt-5", "gpt-5-mini"], default: "gpt-5-mini" },
+  model: { options: ["gpt-6-sol", "gpt-6-luna"], default: "gpt-6-luna" },
   plan: { default: "free", description: "Customer plan" },
   maxTools: { type: "number", default: 5 },
 }

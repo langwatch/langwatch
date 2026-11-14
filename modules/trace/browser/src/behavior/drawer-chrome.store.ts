@@ -55,6 +55,8 @@ export interface DrawerChromeState {
   lastVizTab: VizTab;
   /** The span count of the row that opened `traceId`, so the skeleton holds the right height. */
   expectedSpan: { traceId: string; count: number } | null;
+  /** The time the header filled into a link that carried none: it never joins a read's key. */
+  backfilledOccurredAt: { traceId: string; occurredAtMs: number } | null;
   eventsExpanded: boolean;
   evalsExpanded: boolean;
   conversationExpanded: boolean;
@@ -75,6 +77,7 @@ export interface DrawerChromeState {
   rememberViewMode: (mode: DrawerViewMode) => void;
   rememberVizTab: (tab: VizTab) => void;
   expectSpanCount: (hint: { traceId: string; count: number }) => void;
+  noteBackfilledOccurredAt: (hint: { traceId: string; occurredAtMs: number }) => void;
   /** The drawer closed: what only made sense while it was open goes. */
   reset: () => void;
 }
@@ -133,6 +136,7 @@ export const useDrawerChrome = defineSlice<DrawerChromeState>({
     lastViewMode: DEFAULT_VIEW_MODE,
     lastVizTab: DEFAULT_VIZ_TAB,
     expectedSpan: null,
+    backfilledOccurredAt: null,
     eventsExpanded: false,
     evalsExpanded: false,
     conversationExpanded: false,
@@ -175,6 +179,7 @@ export const useDrawerChrome = defineSlice<DrawerChromeState>({
     rememberViewMode: (mode) => set({ lastViewMode: mode }),
     rememberVizTab: (tab) => set({ lastVizTab: tab }),
     expectSpanCount: (hint) => set({ expectedSpan: hint }),
+    noteBackfilledOccurredAt: (hint) => set({ backfilledOccurredAt: hint }),
 
     reset: () => set({ isMaximized: false, shortcutsOpen: false, expectedSpan: null }),
   }),

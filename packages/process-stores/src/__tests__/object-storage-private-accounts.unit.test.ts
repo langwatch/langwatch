@@ -55,6 +55,25 @@ describe("given the stores' DATAPLANE_S3__ family", () => {
     });
   });
 
+  describe("when an entry names its own region", () => {
+    /** @scenario "A private S3 config may name its own region" */
+    it("uses that region over the shared S3_REGION, and entries without one keep the shared", () => {
+      const own = JSON.stringify({ ...JSON.parse(ACME), region: "eu-north1" });
+      const accounts = objectStoragePrivateAccountsOf({
+        family: new Map([
+          ["DATAPLANE_S3__acme__org123", own],
+          ["DATAPLANE_S3__beta__org456", ACME],
+        ]),
+        region: "eu-west-1",
+      });
+
+      expect(accounts).toEqual([
+        expect.objectContaining({ organizationId: "org123", region: "eu-north1" }),
+        expect.objectContaining({ organizationId: "org456", region: "eu-west-1" }),
+      ]);
+    });
+  });
+
   describe("when an entry is not JSON", () => {
     /** @scenario "Invalid JSON in S3 env var is logged and skipped" */
     it("skips it and warns by the variable's name, never its value", () => {

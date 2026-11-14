@@ -1,4 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+/**
+ * How many repo keys an organization's row holds, so its size stays bounded; the count stops here.
+ * Far past what nurturing segments on, and a few tens of KB at most.
+ */
+export const MAX_CODING_REPOSITORY_KEYS = 500;
+
 /** An organization as nurturing knows it from project's created events and its own counts. */
 export type NurturingOrganizationState = Readonly<{
   organizationId: string;
@@ -30,6 +36,10 @@ export type NurturingOrganizationRow = NurturingOrganizationCounts &
  * read by the service through `NurturingProjectDirectoryRepository`, never here (R40).
  */
 export interface NurturingMilestonesRepository {
+  /** The organization's row; empty when nurturing never learned it. */
+  findOrganization(
+    input: Readonly<{ organizationId: string }>,
+  ): Promise<NurturingOrganizationRow[]>;
   /** Learns the project's organization; idempotent, `seeded` is set only when first learned. */
   recordOrganization(
     input: Readonly<{
@@ -48,12 +58,22 @@ export interface NurturingMilestonesRepository {
   ): Promise<NurturingOrganizationCounts[]>;
 }
 
+/** The admin an organization's row names, which an account's erasure takes back. */
+export interface NurturingOrganizationAdminRepository {
+  /** Clears the user as admin of every organization naming them; none named is a no-op. */
+  forgetAdmin(input: Readonly<{ adminUserId: string }>): Promise<void>;
+}
+
+/** The organization's latest trace, the one fact of it a person joining later must be told. */
+export interface NurturingTraceMilestonesRepository {
+  /** Moves the time forward only; a late trace or an organization never learned changes nothing. */
+  recordLastTrace(input: Readonly<{ organizationId: string; occurredAt: number }>): Promise<void>;
+  /** Epoch ms of the latest recorded trace; null when none was recorded. */
+  findLastTraceAt(input: Readonly<{ organizationId: string }>): Promise<number | null>;
+}
+
 /** The coding-agent signals of the same organizations table, written one conditional update each. */
 export interface NurturingCodingMilestonesRepository {
-  /** The organization's row; empty when nurturing never learned it. */
-  findOrganization(
-    input: Readonly<{ organizationId: string }>,
-  ): Promise<NurturingOrganizationRow[]>;
   /**
    * Sets the first coding session once; `first` is true for the setter and a retry of its
    * `occurredAt`.
@@ -65,6 +85,18 @@ export interface NurturingCodingMilestonesRepository {
   addCodingAgentType(
     input: Readonly<{ organizationId: string; agentType: string }>,
   ): Promise<string[]>;
+  /** Adds the terminal type once; the list is always the current one. */
+  addCodingTerminalType(
+    input: Readonly<{ organizationId: string; terminalType: string }>,
+  ): Promise<string[]>;
+  /** Adds the repo's key once, up to the cap; answers how many distinct repos it holds. */
+  addCodingRepository(
+    input: Readonly<{ organizationId: string; repositoryKey: string }>,
+  ): Promise<number>;
+  /** Adds a first-three-days offset once; answers how many distinct offsets it holds. */
+  addCodingSessionDayOffset(
+    input: Readonly<{ organizationId: string; dayOffset: number }>,
+  ): Promise<number>;
   /** Counts the UTC `day` when later than the last one; `changed` stays true for that same day. */
   recordCodingActiveDay(
     input: Readonly<{ organizationId: string; day: string }>,

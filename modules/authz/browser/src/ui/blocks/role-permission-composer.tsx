@@ -28,6 +28,7 @@ import {
   offeredActions,
   offeredAreas,
   offeredPermissions,
+  offersReadLevel,
   resourceCopy,
   setLevel,
   splitPermission,
@@ -315,10 +316,12 @@ function ResourceRow({
             <SegmentGroup.ItemText>None</SegmentGroup.ItemText>
             <SegmentGroup.ItemHiddenInput />
           </SegmentGroup.Item>
-          <SegmentGroup.Item value="read">
-            <SegmentGroup.ItemText>Read</SegmentGroup.ItemText>
-            <SegmentGroup.ItemHiddenInput />
-          </SegmentGroup.Item>
+          {offersReadLevel(resource) && (
+            <SegmentGroup.Item value="read">
+              <SegmentGroup.ItemText>Read</SegmentGroup.ItemText>
+              <SegmentGroup.ItemHiddenInput />
+            </SegmentGroup.Item>
+          )}
           {!isReadOnlyResource(resource) && (
             <SegmentGroup.Item value="full">
               <SegmentGroup.ItemText>Full access</SegmentGroup.ItemText>

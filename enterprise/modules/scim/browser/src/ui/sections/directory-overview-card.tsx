@@ -1,5 +1,5 @@
+import { EnterpriseLock } from "@langwatch/browser-host/enterprise-lock";
 import { Link } from "@langwatch/browser-host/link";
-import { UpgradeRequired } from "@langwatch/design-system/access-state";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * How accounts arrive, beside how people sign in: how much of the membership
@@ -46,7 +46,7 @@ export function DirectoryOverviewCard({
   if (reconciliation.isError) {
     return (
       <OverviewCard title="Directory" data-testid="directory-card">
-        <DirectoryReadFailure error={reconciliation.error} />
+        <DirectoryReadFailure error={reconciliation.error} canManage={canReadMembership} />
       </OverviewCard>
     );
   }
@@ -89,18 +89,15 @@ export function DirectoryOverviewCard({
 export default DirectoryOverviewCard;
 
 /** The read failed: said on the card, never drawn as an empty directory. */
-function DirectoryReadFailure({ error }: { error: unknown }) {
+function DirectoryReadFailure({ error, canManage }: { error: unknown; canManage: boolean }) {
   if (isEnterpriseGateError(error)) {
     return (
-      <UpgradeRequired
+      <EnterpriseLock
         feature="Directory sync"
-        compact
+        description="Sync people and groups from your identity provider, so joiners and leavers are handled for you."
+        canManage={canManage}
+        inset
         data-testid="directory-card-enterprise-gate"
-        actions={
-          <Button asChild size="sm" colorPalette="orange">
-            <Link href="/settings/plans">Compare plans</Link>
-          </Button>
-        }
       />
     );
   }

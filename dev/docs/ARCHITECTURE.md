@@ -11,16 +11,21 @@ it. On conflict between sections, the more specific wins.
 
 Four Node processes, one composite of two of them, and three Go services:
 
-| Process               | Package                   | What it is                                                     |
-| --------------------- | ------------------------- | -------------------------------------------------------------- |
-| `apps/ui`             | `@langwatch/ui`           | The browser application (Vite SPA)                             |
-| `apps/api`            | `@langwatch/platform-api` | tRPC + REST + SSE, serves the browser bundle                   |
-| `apps/worker`         | `@langwatch/worker`       | Queues, schedulers, projections, subscribers                   |
-| `apps/tasks`          | `@langwatch/tasks`        | One-shot migrations and backfills                              |
-| `apps/backend`        | `@langwatch/backend`      | api + worker in one process: what `npx @langwatch/server` runs |
-| `services/aigateway`  | Go                        | Virtual-key data plane (Bifrost fan-out)                       |
-| `services/nlpgo`      | Go                        | Optimization-studio executions and evaluators                  |
-| `services/langyagent` | Go                        | Langy conversation manager (pi harness workers)                |
+| Process               | Package                   | What it is                                                       |
+| --------------------- | ------------------------- | ---------------------------------------------------------------- |
+| `apps/docs`           | `@langwatch/docs-site`    | Static documentation UI; React prerenders HTML and agent exports |
+| `apps/ui`             | `@langwatch/ui`           | The browser application (Vite SPA)                               |
+| `apps/api`            | `@langwatch/platform-api` | tRPC + REST + SSE, serves the browser bundle                     |
+| `apps/worker`         | `@langwatch/worker`       | Queues, schedulers, projections, subscribers                     |
+| `apps/tasks`          | `@langwatch/tasks`        | One-shot migrations and backfills                                |
+| `apps/backend`        | `@langwatch/backend`      | api + worker in one process: what `npx @langwatch/server` runs   |
+| `services/aigateway`  | Go                        | Virtual-key data plane (Bifrost fan-out)                         |
+| `services/nlpgo`      | Go                        | Optimization-studio executions and evaluators                    |
+| `services/langyagent` | Go                        | Langy conversation manager (pi harness workers)                  |
+
+The docs UI is independently built under `apps/docs` from authored `docs/` content.
+Its deployment is static HTML, CSS, media and lazy browser islands; it needs no
+Node server, API or database in production.
 
 **Applications hold no product code.** The product lives in modules. An
 application is a `main.ts` and a `config.ts`; everything it used to carry —
@@ -1115,7 +1120,7 @@ export const billingConfig = Config.define((c) => ({
 - `NODE_ENV` → `nodeEnvironment`, the raw string. The `http` owner **derives** `production` from it,
   because a derived value is not a second claim. A module wanting a boolean derives it the same way.
 - `HTTPS_PROXY`/`HTTP_PROXY`/`NO_PROXY` and their lower-case spellings → `outboundProxy`, raw by env
-  name; notification and webhook parse it.
+  name; notification, webhook and identity parse it.
 
 Framework owners (process, observability) pick from the same object.
 
@@ -1703,6 +1708,8 @@ composes (Alex, 2026-10-06, round 4, Q205). One stored event's payload (trace's 
 read through a narrow single-event read seat beside the producer-only store, within main's 2-day
 window; the producer-only rule stands for everything else (Alex, 2026-10-06, round 3, Q209).
 2026-10-10: identity reads one aggregate's history through the read seat; WEB-9103.
+2026-10-19: the read seat also answers one page of aggregate streams at once, for upgrade steps
+that walk many aggregates (user's standing facts); the producer-only rule still holds for writes.
 
 **A lookup by id reads through its table's id index** (Alex, 2026-10-11): each time-partitioned
 table looked up by id alone has an unpartitioned `<table>_id_index` (TenantId, id to its time range),
@@ -1794,9 +1801,17 @@ markPaidOutOfBand take `ops:manage`. A view-only operator reads and is refused o
 task). Cloud never bootstraps: staff are seeded at cutover. On a self-hosted install the first user to sign up is recorded as the seed's decision (`first-user`) from user's `lw.user.created` fact, whatever `ADMIN_EMAILS` says, while nobody holds the grant and they are the only user; the seed's one-key record and latch grant at most one (Alex, 2026-10-10).
 A set `ADMIN_EMAILS` never falls back to an org admin: the seed waits, unlatched, until a named verified
 user exists. Users with no organization yet also wait; only a decision latches (Alex, 2026-10-01).
+Where no email is configured no address can be verified, so a named active user is seeded unverified;
+the account must already exist, the seed never creates one (Rogerio, 2026-10-18). An unverified one is
+seeded only as the install's first-created account, as the first user is, since anyone can register a
+named address first on an install that cannot verify it; a deactivated or erased first account never passes that
+place to a later sign-up, so the seed waits. Erasure deletes the row, so user keeps only the erased
+account's creation time (`UserErasure`); erasures before that table existed left no trace (Rogerio, 2026-10-19). There the recovery task
+also grants an unverified active account, since shell access naming it is the check, so a seed that
+waits stays recoverable; the page still grants verified accounts only (Rogerio, 2026-10-19).
 On a deployment LangWatch runs (the seed's `cloud`, a developer's local stack excepted) the page and the
-recovery task grant only an account whose verified address is on `langwatch.ai`; the task, like the page,
-grants verified accounts only, everywhere. `can()` asks nothing more than the live grant (Alex, 2026-10-14).
+recovery task grant only an account whose verified address is on `langwatch.ai`; the page grants
+verified accounts only, everywhere, and the task too wherever email is configured. `can()` asks nothing more than the live grant (Alex, 2026-10-14).
 Deactivating a user ends their sessions and CLI tokens before user's fact is sent, without an outbox;
 user's lifecycle facts carry the database clock. The back office refuses bulk user writes, a deliberate
 difference from main (Alex, 2026-10-01).
@@ -1901,7 +1916,7 @@ office deactivates only through user, so it keeps no picked date (Alex, 2026-10-
 - A minted session key (langy's local-control sessions) authenticates at its own door, which puts the actor and
   project on the request; no handler reads the key's headers (Alex, 2026-09-25).
 - No key, token or secret is minted while the actor carries an impersonator (Alex, 2026-10-01). An endpoint that mints
-  declares `.mintsCredential(permission)` and the tRPC and REST runtime refuses it before the handler; a service
+  declares `.mintsCredential()` and the tRPC and REST runtime refuses it before the handler; a service
   guard per door stays for callers that are not a transport. Door names are the typed snake_case union `api_key`,
   `scim_token`, `internal_secret`, `instance_admin`, `session_key`, `cli_token`, `otlp_ingest` (an OTLP exporter's
   key, bound by trace; verified before the body and handed over as `session`, Alex 2026-10-10 W02-DOOR-SHAPE), `licence_token` (a
@@ -2921,25 +2936,25 @@ projectId, datasetId, page })`; evaluator `getById({ projectId, id })`; project:
 members `members({ organizationId })` for active members, with deactivated ones in a second key
 that needs `organization:manage`; user `user.me()`.
 
-**Reads are mirrored to disk by default** (Alex, 2026-09-30, amended 2026-10-01; supersedes opt-in
-persistence and the build-id discard). Each tab keeps its own React Query cache, and every declared
-query is mirrored, one sealed row per query keyed by user and query hash (sealing in §10; memory
-where IndexedDB is unavailable). A read stays in memory only when it is over the per-row cap or on
-the named exclusion list for very high-traffic reads (`UI_QUERY_MIRROR_EXCLUDED` in
-`@langwatch/browser-host/cache-tiers`); there is no opt-in. Each user's mirror is LRU-bounded
-(25 MB, 500 rows, 2 MB a row: `UI_QUERY_MIRROR_BUDGET`), the least recently read rows first out.
-A row carries its read's schema hash: a digest of the contract's input and output schemas and an
-optional `revision: n`, bumped when a read's meaning changes and its shape does not
-(`schemaHashOf`, `@langwatch/module`). The browser takes the hash from the contract it was
-built with and drops a row whose hash differs before painting it; the server's `x-lw-schema`
-header on every query answer is the backstop for a tab whose bundle is older. No build id or age
-decides it. A mirrored read is restored when first asked for, never all at start-up; the first
-page of a paged read is mirrored too, restored as stale and refetched at once. A tab shown again
-reads IndexedDB first, then refetches the stale reads it holds, so hints it missed while hidden
-are caught up (Alex, 2026-10-01). An answer whose `x-lw-schema` differs from the bundle's hash
-drops that row. ADR-170 (in part),
-specs/ui/browser-query-caching.feature.
-`CachedView` ships.
+**Reads are mirrored to disk by default** (Alex, 2026-09-30, amended 2026-10-01 and 2026-10-26;
+supersedes opt-in persistence and the build-id discard). Each tab keeps its own React Query cache,
+and every declared query is mirrored, one sealed row per query keyed by user and query hash (sealing
+in §10; memory where IndexedDB is unavailable). A read stays in memory only when it is over the
+per-row cap or on the named exclusion list for very high-traffic reads (`UI_QUERY_MIRROR_EXCLUDED`
+in `@langwatch/browser-host/cache-tiers`); there is no opt-in. Each user's mirror is LRU-bounded
+(100 MB, 500 rows, 2 MB a row: `UI_QUERY_MIRROR_BUDGET`), the least recently read rows first out,
+room made before a write. A write the browser refuses for space sheds the coldest half and retries
+once, then drops the row. An impersonated session wipes the mirror and writes nothing to it. A row
+carries its read's schema hash: a digest of the contract's input and output schemas and an optional
+`revision: n`, bumped when a read's meaning changes and its shape does not (`schemaHashOf`,
+`@langwatch/module`). The browser takes the hash from the contract it was built with and drops a row
+whose hash differs before painting it; the server's `x-lw-schema` header on every query answer is
+the backstop for a tab whose bundle is older. No build id or age decides it. A mirrored read is
+restored when first asked for, never all at start-up; the first page of a paged read is mirrored
+too, restored as stale and refetched at once. A tab shown again reads IndexedDB first, then
+refetches the stale reads it holds, so hints it missed while hidden are caught up (Alex,
+2026-10-01). An answer whose `x-lw-schema` differs from the bundle's hash drops that row. ADR-170
+(in part), specs/ui/browser-query-caching.feature. `CachedView` ships.
 
 **Browser telemetry** (Alex, 2026-10-01). RUM is on by default wherever a collector is configured.
 Console errors, uncaught errors and rejected promises go out as `browser.error` spans through our

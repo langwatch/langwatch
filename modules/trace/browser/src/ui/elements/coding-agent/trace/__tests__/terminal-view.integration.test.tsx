@@ -135,6 +135,7 @@ describe("TerminalView", () => {
     // The bug this replaces: the client used to rebuild the transcript from
     // the LAST model call's rolling history, so a lone trailing tool call with
     // no text collapsed the whole session to one line.
+    /** @scenario "The transcript shows every beat, not just the final turn" */
     it("still shows every prompt and tool call, not just one collapsed step", () => {
       const noTrailingText: TranscriptEntry[] = [
         entries[0]!,
@@ -154,7 +155,8 @@ describe("TerminalView", () => {
   });
 
   describe("given a tool the user denied", () => {
-    it("shows it as denied rather than silently missing", () => {
+    /** @scenario "A tool the user denied is shown even though it left no span" */
+    it("shows it as denied by the user rather than silently missing", () => {
       const withDenial: TranscriptEntry[] = [
         entries[0]!,
         {
@@ -162,14 +164,80 @@ describe("TerminalView", () => {
           atMs: 1200,
           name: "Bash",
           reason: "user_reject",
+          outcome: "denied",
+          byUser: true,
         },
       ];
       renderView({ entries: withDenial });
-      expect(screen.getByText(/denied by the user, never ran/)).toBeInTheDocument();
+      expect(screen.getByText(/Bash — denied by the user, never ran/)).toBeInTheDocument();
+    });
+  });
+
+  describe("given a tool a policy denied", () => {
+    /** @scenario "A tool call a policy denied is not pinned on the user" */
+    it("shows it as denied without naming the user", () => {
+      const withPolicyDenial: TranscriptEntry[] = [
+        entries[0]!,
+        {
+          kind: "tool_rejected",
+          atMs: 1200,
+          name: "run_terminal_command",
+          reason: "config",
+          outcome: "denied",
+          byUser: false,
+        },
+      ];
+      renderView({ entries: withPolicyDenial });
+      expect(screen.getByText(/run_terminal_command — denied, never ran/)).toBeInTheDocument();
+      expect(screen.queryByText(/by the user/)).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given a tool call the user answered instead of approving", () => {
+    /** @scenario "A tool call the user answered instead of approving reads differently from a denial" */
+    it("shows that the user answered instead, not that it was denied", () => {
+      const withFollowup: TranscriptEntry[] = [
+        entries[0]!,
+        {
+          kind: "tool_rejected",
+          atMs: 1200,
+          name: "run_terminal_command",
+          reason: "user_followup",
+          outcome: "redirected",
+          byUser: true,
+        },
+      ];
+      renderView({ entries: withFollowup });
+      expect(
+        screen.getByText(/run_terminal_command — the user answered instead, never ran/),
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/denied/)).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given a tool call that was cancelled or timed out", () => {
+    /** @scenario "A tool call that was aborted reads differently from one the user denied" */
+    it("shows it as aborted, not denied", () => {
+      const withCancel: TranscriptEntry[] = [
+        entries[0]!,
+        {
+          kind: "tool_rejected",
+          atMs: 1200,
+          name: "run_terminal_command",
+          reason: "user_abort",
+          outcome: "aborted",
+          byUser: true,
+        },
+      ];
+      renderView({ entries: withCancel });
+      expect(screen.getByText(/run_terminal_command — aborted, never ran/)).toBeInTheDocument();
+      expect(screen.queryByText(/by the user/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/denied/)).not.toBeInTheDocument();
     });
   });
 
   describe("given the session banner", () => {
+    /** @scenario "The top of the session identifies the agent, model, and repo" */
     it("shows the Claude Code version, model, and repo above the transcript", () => {
       renderView({
         banner: {
@@ -180,6 +248,7 @@ describe("TerminalView", () => {
         },
       });
       expect(screen.getByText("Claude Code v2.1.207")).toBeInTheDocument();
+      expect(screen.getAllByText("claude-opus-4-8").length).toBeGreaterThan(0);
       expect(screen.getByText("langwatch/langwatch")).toBeInTheDocument();
     });
 
@@ -196,6 +265,25 @@ describe("TerminalView", () => {
       expect(screen.queryByText(/Claude Code/)).toBeNull();
     });
 
+    it("names a pi session pi, not the generic coding agent", () => {
+      renderView({
+        banner: { agent: "pi", version: "0.84.2", model: "claude-sonnet-5", repo: null },
+      });
+      expect(screen.getByText("pi v0.84.2")).toBeInTheDocument();
+      expect(screen.queryByText(/Coding agent/)).toBeNull();
+    });
+
+    /** @scenario "The Grok banner draws Grok's own startup mark" */
+    it("names a Grok session Grok and draws its dotted ring, not a placeholder", () => {
+      renderView({
+        banner: { agent: "grok", version: "1.0.70", model: "grok-4.7", repo: null },
+      });
+      expect(screen.getByText("Grok v1.0.70")).toBeInTheDocument();
+      expect(screen.getByText("grok-4.7")).toBeInTheDocument();
+      expect(document.body.textContent).toContain("⠀⠀⠀⣠⣾⠿⠛⠛⠛⠛⢀⡴⠁⠀");
+      expect(document.body.textContent).toContain("⠐⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀");
+    });
+
     it("falls back to a generic identity when the agent is unknown", () => {
       renderView({
         banner: { agent: "unknown", version: "1.0.0", model: null, repo: null },
@@ -206,7 +294,7 @@ describe("TerminalView", () => {
 
   describe("given a session name", () => {
     it("shows it in the bottom bar", () => {
-      renderView({ sessionName: "Fix the flaky CI job" });
+      renderView({ promptLine: "Fix the flaky CI job" });
       expect(screen.getByText("Fix the flaky CI job")).toBeInTheDocument();
     });
 

@@ -1,4 +1,5 @@
 import {
+  ApiKeyAlreadyRevokedError,
   CLI_LOGIN_KEY_NAME_PREFIX,
   isSystemApiKey,
   type ApiKeyRevocationCause,
@@ -11,6 +12,7 @@ import type {
   ApiKeyRepository,
   ApiKeyRow,
   ApiKeyUpdateRecord,
+  KeyLiveness,
 } from "../api-key.repository.ts";
 import type { MemoryApiKeyDatabase } from "./memory.api-key.database.ts";
 
@@ -36,6 +38,7 @@ export class MemoryApiKeyRepository implements ApiKeyRepository {
       createdByDeviceLabel: data.createdByDeviceLabel ?? null,
       parentApiKeyId: data.parentApiKeyId ?? null,
       isSystemManaged: data.isSystemManaged ?? false,
+      createdByBrowserSessionId: data.createdByBrowserSessionId ?? null,
       id: generate(API_KEY_KSUID_RESOURCE).toString(),
       expiresAt: expiresAt ? toDate(expiresAt) : null,
       revokedAt: startsDisabled ? now : null,
@@ -114,6 +117,23 @@ export class MemoryApiKeyRepository implements ApiKeyRepository {
     );
   }
 
+  async rotateSecret(input: {
+    id: string;
+    organizationId: string;
+    lookupId: string;
+    hashedSecret: string;
+  }): Promise<ApiKeyRow> {
+    const live = this.#find(
+      (key) => key.id === input.id && key.organizationId === input.organizationId && !key.revokedAt,
+    );
+    if (!live) throw new ApiKeyAlreadyRevokedError(input.id);
+    return this.update({
+      id: input.id,
+      hashedSecret: input.hashedSecret,
+      lookupId: input.lookupId,
+    });
+  }
+
   async updateLastUsedAt(input: { id: string }): Promise<void> {
     await this.update({ id: input.id, lastUsedAt: nowInstant() });
   }
@@ -149,6 +169,38 @@ export class MemoryApiKeyRepository implements ApiKeyRepository {
         key.revokedAt === null &&
         input.apiKeyIds.includes(key.id),
     );
+  }
+
+  async findLiveBySessions(input: {
+    userId: string;
+    name: string;
+    browserSessionIds: readonly string[];
+  }): Promise<{ id: string; organizationId: string }[]> {
+    const rows = this.#list(
+      (key) =>
+        key.userId === input.userId &&
+        key.name === input.name &&
+        key.isSystemManaged === true &&
+        key.revokedAt === null &&
+        input.browserSessionIds.includes(key.createdByBrowserSessionId ?? ""),
+    );
+    return rows.map(({ id, organizationId }) => ({ id, organizationId }));
+  }
+
+  async findLiveSystemManagedByName(input: {
+    organizationId: string;
+    name: string;
+    createdAtOrBefore: Instant;
+  }): Promise<{ id: string }[]> {
+    const createdAtOrBefore = input.createdAtOrBefore.epochMilliseconds;
+    return this.#list(
+      (key) =>
+        key.organizationId === input.organizationId &&
+        key.name === input.name &&
+        key.isSystemManaged === true &&
+        key.revokedAt === null &&
+        key.createdAt.getTime() <= createdAtOrBefore,
+    ).map(({ id }) => ({ id }));
   }
 
   async findIngestKeysForUser(input: {
@@ -198,14 +250,16 @@ export class MemoryApiKeyRepository implements ApiKeyRepository {
     ).map((key) => ({ id: key.id }));
   }
 
-  async findLivenessById(input: {
-    id: string;
-  }): Promise<{ revokedAt: Instant | null; expiresAt: Instant | null } | null> {
+  async findLivenessById(input: { id: string }): Promise<KeyLiveness | null> {
     const key = this.#database.keys().find((row) => row.id === input.id);
     if (!key) return null;
     return {
       revokedAt: key.revokedAt ? fromDate(key.revokedAt) : null,
       expiresAt: key.expiresAt ? fromDate(key.expiresAt) : null,
+      createdAt: fromDate(key.createdAt),
+      name: key.name,
+      isSystemManaged: key.isSystemManaged === true,
+      parentApiKeyId: key.parentApiKeyId ?? null,
     };
   }
 

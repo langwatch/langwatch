@@ -30,6 +30,7 @@ function process(role: "api" | "worker") {
       organization: {
         signUp: { mode: "open", allowedDomains: [], adminEmails: [] },
         publicBaseUrl: undefined,
+        isSaas: false,
       },
     })
     .provide({

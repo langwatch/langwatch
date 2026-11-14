@@ -68,6 +68,8 @@ const GLOBAL_MODELS = [
   "Account",
   "Session",
   "User",
+  // An erased account's creation time alone, read install-wide as `User` is.
+  "UserErasure",
   "VerificationToken",
   // Identity pipeline projection tables (ADR-101, D01): per-user, not
   // per-project/org, and the D03 router's lookup is by identifier VALUE
@@ -112,6 +114,8 @@ const GLOBAL_MODELS = [
   "InstanceIdentity",
   // Cloud's notices to every self-hosted install (self-hosted-notices.feature): no tenant at all.
   "SelfHostedNotice",
+  // Billing's claim on a paid licence-renewal invoice: keyed by the Stripe invoice id, no tenant.
+  "LicenseRenewalClaim",
   // A person's own browsers for Web Push, per-user like Passkey: read by the
   // person's id when a push goes to them, never by a tenant.
   "WebPushSubscription",

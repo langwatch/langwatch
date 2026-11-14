@@ -197,6 +197,7 @@ export class PrismaInstanceAdminRepository extends InstanceAdminRepository {
     };
   }
 
+  /** An `id` list narrows to those rows; the list handler would hand the array to Prisma as is. */
   private query(
     resource: AdminOperationInput["resource"],
     params: AdminOperationParams,
@@ -205,6 +206,24 @@ export class PrismaInstanceAdminRepository extends InstanceAdminRepository {
     where: Record<string, unknown>;
   } {
     const filter = { ...params.filter };
+    const ids = Array.isArray(filter.id) ? filter.id.map(String) : undefined;
+    if (ids) delete filter.id;
+    const searched = this.searchQuery(resource, filter);
+    if (!ids) return searched;
+    const search = (searched.where as { where?: Record<string, unknown> }).where ?? {};
+    return {
+      filter: searched.filter,
+      where: { ...searched.where, where: { ...search, id: { in: ids } } },
+    };
+  }
+
+  private searchQuery(
+    resource: AdminOperationInput["resource"],
+    filter: Record<string, unknown>,
+  ): {
+    filter: Record<string, unknown>;
+    where: Record<string, unknown>;
+  } {
     const query = typeof filter.query === "string" ? filter.query : undefined;
     delete filter.query;
     if (!query) return { filter, where: {} };

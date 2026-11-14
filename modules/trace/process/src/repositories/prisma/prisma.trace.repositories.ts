@@ -1,6 +1,7 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
+import { ClickHouseTraceBraidReadsRepository } from "../../features/braid/repositories/clickhouse/clickhouse.trace-braid-reads.repository.ts";
 import { TraceLegacyReadClickHouseRepository } from "../../features/legacy/repositories/clickhouse/trace-legacy-read.repository.ts";
 import { ClickHouseTraceAttributeSpendRepository } from "../clickhouse/clickhouse.trace-attribute-spend.repository.ts";
 import { ClickHouseTraceAttributedRollupRepository } from "../clickhouse/clickhouse.trace-attributed-rollup.repository.ts";
@@ -10,9 +11,12 @@ import { MemberTraceClickHouseClientRepository } from "../clickhouse/clickhouse.
 import { ClickHouseTraceModelSpendRepository } from "../clickhouse/clickhouse.trace-model-spend.repository.ts";
 import { LogRecordStorageClickHouseRepository } from "../clickhouse/log-record-storage.repository.ts";
 import { SessionGroupsClickHouseRepository } from "../clickhouse/session-groups.repository.ts";
+import { SpanAnalyticsClickHouseRepository } from "../clickhouse/span-analytics.repository.ts";
 import { SpanStorageClickHouseRepository } from "../clickhouse/span-storage.repository.ts";
+import { TraceAgentTrafficClickHouseRepository } from "../clickhouse/trace-agent-traffic.repository.ts";
 import { TraceAnalyticsRollupClickHouseRepository } from "../clickhouse/trace-analytics-rollup.repository.ts";
 import { TraceDerivationSpanClickHouseRepository } from "../clickhouse/trace-derivation-span.repository.ts";
+import { TraceEvaluationAnalyticsClickHouseRepository } from "../clickhouse/trace-evaluation-analytics.repository.ts";
 import { ClickHouseTraceEvaluationRunsRepository } from "../clickhouse/trace-evaluation-runs.repository.ts";
 import { ClickHouseTraceExistenceRepository } from "../clickhouse/trace-existence.repository.ts";
 import { ClickHouseTraceInstantEvalRunsRepository } from "../clickhouse/trace-instant-eval-runs.repository.ts";
@@ -25,6 +29,7 @@ import {
 } from "../clickhouse/trace-summary.repository.ts";
 import { TraceUsageCountClickHouseRepository } from "../clickhouse/trace-usage-count.repository.ts";
 import type { TraceRepositories } from "../trace.repositories.ts";
+import { PrismaSpanAnalyticsFloorRepository } from "./prisma.span-analytics-floor.repository.ts";
 import { PrismaTraceAnnotationScoresRepository } from "./prisma.trace-annotation-scores.repository.ts";
 import { PrismaTraceAnnotationsRepository } from "./prisma.trace-annotations.repository.ts";
 import { PrismaTraceEditOverlayRepository } from "./prisma.trace-edit-overlay.repository.ts";
@@ -42,6 +47,7 @@ export class PostgresTraceRepositories {
     members: Readonly<{
       prisma: PrismaClient;
       clickhouse: ClickHouseQueryClient;
+      evaluationAnalyticsQuorumReads: boolean;
     }>,
   ): Omit<
     TraceRepositories,
@@ -70,8 +76,15 @@ export class PostgresTraceRepositories {
       analyticsRollup: TraceAnalyticsRollupClickHouseRepository.create({
         resolveClient: traceClickHouse,
       }),
+      evaluationAnalytics: TraceEvaluationAnalyticsClickHouseRepository.create({
+        ...storage,
+        readYourWrites: members.evaluationAnalyticsQuorumReads,
+      }),
+      spanAnalytics: SpanAnalyticsClickHouseRepository.create({ resolveClient: traceClickHouse }),
+      spanAnalyticsFloor: PrismaSpanAnalyticsFloorRepository.create(members.prisma),
       spanStorage: SpanStorageClickHouseRepository.create(storage),
       spanTree: ClickHouseTraceSpanRepository.create(storage),
+      braidReads: ClickHouseTraceBraidReadsRepository.create({ clickhouse }),
       existence: ClickHouseTraceExistenceRepository.create({
         resolveClient: traceClickHouse,
       }),
@@ -98,6 +111,7 @@ export class PostgresTraceRepositories {
         resolveClient: traceClickHouse,
       }),
       usageCount: TraceUsageCountClickHouseRepository.create(members.clickhouse),
+      agentTraffic: TraceAgentTrafficClickHouseRepository.create(members.clickhouse),
       indexMaterialisation: ClickHouseTraceIndexMaterialisationRepository.create(
         members.clickhouse,
       ),

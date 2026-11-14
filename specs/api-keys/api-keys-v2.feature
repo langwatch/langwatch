@@ -75,7 +75,7 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
 
     @unit
     Scenario: A run nobody started is refused a trace read cleanly
-      Given the key of a run nobody started, for project "alpha"
+      Given the key of a run that names neither a person nor a starting key, for project "alpha"
       When a trace search is sent with that key
       Then the answer is 403 "permission_denied"
 
@@ -106,6 +106,65 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
       And it stays until the legacy key is revoked
 
     @integration
+    Scenario: Every project in the organisation with a live legacy key gets its own row
+      Given project "alpha" and project "beta" both still have a live legacy key
+      When "ada" opens the API keys
+      Then a "Project key" row is listed for project "alpha" and one for project "beta"
+      And each row is scoped to its own project and carries its own Revoke
+
+    @integration
+    Scenario: The banner names every live project without a bulk revoke action
+      Given project "alpha" and project "beta" both still have a live legacy key
+      When "ada" opens the API keys
+      Then the warning banner names both projects
+      And the banner offers no "Revoke and replace" action
+
+    @integration
+    Scenario: Same-named projects remain distinguishable before revoking a legacy key
+      Given two projects named "Web App" have different slugs and live legacy keys
+      When "ada" opens the API keys and chooses Revoke for the second project
+      Then the rows, action labels and confirmation identify the projects by slug
+      And confirming revokes only the second project's legacy key
+
+    @integration
+    Scenario: A replacement key's snippets name the replaced project
+      Given the remembered project is "alpha" and project "beta" has a live legacy key
+      When a reader revokes and replaces the key of project "beta"
+      Then both service and personal replacement keys are scoped to project "beta"
+      And the setup snippets use project "beta"
+
+    @integration
+    Scenario: Legacy key loading does not show an empty key list
+      Given the API key list is empty and the legacy key read has not answered
+      When "ada" opens the API keys
+      Then the table shows loading rows
+      And neither an empty list nor a no-matches message is shown
+
+    @integration
+    Scenario: Revoking one project's legacy key leaves the other project's row and the banner
+      Given project "alpha" and project "beta" both still have a live legacy key
+      And "ada" revoked the legacy key of project "alpha"
+      When "ada" opens the API keys
+      Then no "Project key" row is listed for project "alpha"
+      And a "Project key" row is listed for project "beta"
+      And the warning banner is still shown
+
+    @integration
+    Scenario: The banner goes once no project in the organisation holds a live legacy key
+      Given project "alpha" and project "beta" both still have a live legacy key
+      And "ada" revoked the legacy key of both projects
+      When "ada" opens the API keys
+      Then no "Project key" row is listed
+      And no warning banner is shown
+
+    @unit
+    Scenario: A reader only sees the legacy rows of the projects they can manage
+      Given project "alpha" and project "beta" both still have a live legacy key
+      And "pat" administers project "beta" only
+      When "pat" requests the organisation's legacy keys
+      Then only project "beta" is returned
+
+    @integration
     Scenario: The banner's button revokes and replaces the legacy key
       Given project "alpha" still has a live legacy key
       When "ada" clicks "Revoke and replace" on the banner
@@ -124,12 +183,11 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
       Then the project's stored key is replaced by a value that never authenticates
       And a trace sent with the old key is refused
 
-    @integration
-    Scenario: A reader who cannot manage the project sees no legacy row and no error
-      Given project "alpha" still has a live legacy key
-      When "max" opens the API keys of project "alpha"
-      Then the legacy key status is not read
-      And no legacy row and no error is shown
+    @unit
+    Scenario: A reader who manages no project receives no legacy keys
+      Given project "alpha" and project "beta" both still have a live legacy key
+      When "max" requests the organisation's legacy keys
+      Then no legacy keys are returned
 
     @integration
     Scenario: A project that never had a legacy key shows no legacy row
@@ -164,7 +222,7 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
       And a toast says "Legacy project key revoked"
       And the legacy key row and the banner are gone
       And the create drawer opens with the name "Project API Key", full access to project "alpha" and no expiry
-      And the drawer warns that the legacy key no longer works and the project has no key until one is created
+      And the drawer warns that the legacy key no longer works and the project may have no working key until one is created
       And no API key is created yet
 
     @integration
@@ -252,14 +310,30 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
       Then the 401 says the key was revoked
       And when it is presented with a wrong secret the 401 is the plain invalid-key answer
 
-  Rule: nobody mints a key beyond what they hold, and the minter chooses when it expires
+  Rule: nobody mints a key beyond what they hold, and a new key never expires unless the minter says so
 
     @integration
-    Scenario: Create stays unavailable until an expiry is chosen
-      Given "ada" has named a new key and has not chosen an expiry
-      Then the expiry field asks her to choose one
-      And Create is unavailable
-      And when she chooses an expiry Create becomes available
+    Scenario: A new key starts with no expiration
+      When "ada" opens the create drawer
+      Then the expiry reads "No expiration"
+      And naming the key is enough to create it with no expiry
+
+    @integration
+    Scenario: The create drawer shows the key type, name, scope and expiry up front
+      When "ada" opens the create drawer on project "alpha"
+      Then she sees the key type, the name, the scope and the expiry, in that order
+      And description and permissions sit in a closed "Advanced" section
+      And the closed section says the key gets all permissions on project "alpha"
+      When she opens "Advanced"
+      Then she can change the description and the permissions
+
+    @integration
+    Scenario: A custom expiry asks for its date before the key is minted
+      Given "ada" has named a new key and chosen a custom expiry with no date
+      When she submits the create drawer
+      Then the expiry field asks her for a date
+      And focus lands on the date input, not on the expiry choice
+      And no key is minted
 
     @integration
     Scenario: The authorize page mints nothing until an expiry is chosen
@@ -279,9 +353,9 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
       Then the key expires 30 days from now
 
     @integration
-    Scenario: A key row offers Edit and Revoke
+    Scenario: A key row offers Edit, Rotate and Revoke
       When "ada" opens the row menu of a key she may change
-      Then its actions are "Edit" and "Revoke", and nothing else
+      Then its actions are "Edit", "Rotate" and "Revoke", and nothing else
 
     @integration
     Scenario: A member mints a personal key within their own grants
@@ -319,8 +393,9 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
 
     @integration
     Scenario: Every unmet requirement of a new key is named and the first is focused
-      Given "ada" submits the create drawer with no name, no scope, Restricted with no permission and no expiry
+      Given "ada" submits the create drawer with no name, no scope and Restricted with no permission
       Then each of those fields shows its own error
+      And the "Advanced" section opens so the errors inside it show
       And focus moves to the first of them
       And no key is minted
       And what she entered is kept when she fixes one field and submits again

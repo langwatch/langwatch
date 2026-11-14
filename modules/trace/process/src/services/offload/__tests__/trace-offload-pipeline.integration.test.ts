@@ -63,7 +63,10 @@ import { TraceCanonicalisationService } from "#features/derivation/services/trac
 
 import { TraceIOExtractionService } from "../../../features/derivation/services/trace-io-extraction.service.ts";
 import { type TraceBlobStoreService } from "../../../features/media/services/trace-blob-store.service.ts";
-import { blobStoreResolving } from "../../__tests__/support/trace-blob-store.support.ts";
+import {
+  blobStoreResolving,
+  eventLogReads,
+} from "../../__tests__/support/trace-blob-store.support.ts";
 
 // ---------------------------------------------------------------------------
 // Constants and helpers
@@ -81,15 +84,15 @@ function ioExtractionService(): TraceIOExtractionService {
 }
 
 /**
- * Builds a fake TraceBlobStoreService whose getFromEventLog returns values from an in-memory map.
- * Simulates the event_log read path without a real ClickHouse instance.
+ * Builds a blob store whose event_log reads serve values from an in-memory map, and the spy on
+ * those reads. Simulates the event_log read path without a real ClickHouse instance.
  */
 function makeEventLogBlobStore(contents: Record<string, string>): {
   blobStore: TraceBlobStoreService;
-  getFromEventLogSpy: TraceBlobStoreService["getFromEventLog"];
+  eventReads: ReturnType<typeof eventLogReads>;
 } {
   const blobStore = blobStoreResolving(contents);
-  return { blobStore, getFromEventLogSpy: blobStore.getFromEventLog };
+  return { blobStore, eventReads: eventLogReads(blobStore) };
 }
 
 /**
@@ -220,14 +223,14 @@ describe("given a span field value exceeds the offload threshold (IO_PREVIEW_BYT
     let resolvedResult: Awaited<
       ReturnType<TraceOffloadResolutionService["resolveOffloadedTraces"]>
     >;
-    let getFromEventLogSpy: TraceBlobStoreService["getFromEventLog"];
+    let eventReads: ReturnType<typeof eventLogReads>;
     let logger: WarnLogger;
 
     beforeEach(async () => {
-      const { blobStore, getFromEventLogSpy: spy } = makeEventLogBlobStore({
+      const { blobStore, eventReads: reads } = makeEventLogBlobStore({
         "langwatch.output": ONE_MB_OUTPUT,
       });
-      getFromEventLogSpy = spy;
+      eventReads = reads;
       logger = { warn: vi.fn(), error: vi.fn() };
 
       const normalizedSpan = makeNormalizedSpan(leanAttrs);
@@ -264,10 +267,10 @@ describe("given a span field value exceeds the offload threshold (IO_PREVIEW_BYT
       expect(resolvedResult.anyResolved).toBe(true);
     });
 
-    it("TraceBlobStoreService.getFromEventLog is called once for the langwatch.output field", () => {
-      expect(getFromEventLogSpy).toHaveBeenCalledOnce();
-      expect(getFromEventLogSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ field: "langwatch.output", tenantId: PROJECT_ID }),
+    it("reads the event_log once for the langwatch.output field", () => {
+      expect(eventReads).toHaveBeenCalledOnce();
+      expect(eventReads).toHaveBeenCalledWith(
+        expect.objectContaining({ fields: ["langwatch.output"], tenantId: PROJECT_ID }),
       );
     });
   });
@@ -304,8 +307,8 @@ describe("given the span output is below IO_PREVIEW_BYTES (flag-off / sub-thresh
 
   describe("when resolved via TraceOffloadResolutionService.resolveOffloadedTraces", () => {
     /** @scenario With the flag off, ingestion and reads behave exactly as before */
-    it("returns spans unchanged and calls getFromEventLog zero times", async () => {
-      const { blobStore, getFromEventLogSpy } = makeEventLogBlobStore({});
+    it("returns spans unchanged and reads the event_log zero times", async () => {
+      const { blobStore, eventReads } = makeEventLogBlobStore({});
       const logger = { warn: vi.fn(), error: vi.fn() };
 
       const normalizedSpan = makeNormalizedSpan(leanAttrs);
@@ -321,8 +324,8 @@ describe("given the span output is below IO_PREVIEW_BYTES (flag-off / sub-thresh
       // Span is returned as-is (same reference — fast path)
       expect(result.resolvedSpans[0]).toBe(normalizedSpan);
 
-      // getFromEventLog is never called
-      expect(getFromEventLogSpy).not.toHaveBeenCalled();
+      // The event_log is never read
+      expect(eventReads).not.toHaveBeenCalled();
 
       // anyResolved is false
       expect(result.anyResolved).toBe(false);
@@ -348,7 +351,7 @@ describe("given the span was offloaded but the event_log row is missing on read 
     previewValue = leanAttrs["langwatch.output"] ?? "";
   });
 
-  describe("when getFromEventLog throws BlobNotFoundError", () => {
+  describe("when the event_log read throws BlobNotFoundError", () => {
     let blobStore: ReturnType<typeof makeEventLogBlobStore>["blobStore"];
     let logger: Parameters<TraceOffloadResolutionService["resolveOffloadedTraces"]>[0]["logger"];
     let normalizedSpan: ReturnType<typeof makeNormalizedSpan>;

@@ -17,6 +17,7 @@ import {
   type AggregateRule,
   type AggregateRuleMembers,
   type ProjectApi,
+  type ProjectLegacyKey,
   type ProjectLegacyKeyStatus,
 } from "@langwatch/project-contract";
 
@@ -50,6 +51,11 @@ export interface ProjectBrowserApi {
     projectToArchiveId: string;
     by: Readonly<{ id: string }>;
   }): Promise<{ alreadyArchived: boolean }>;
+  /** Every project in the organisation the caller may manage that still holds a live legacy key. */
+  legacyKeys(input: {
+    organizationId: string;
+    by: Readonly<{ id: string }>;
+  }): Promise<ProjectLegacyKey[]>;
   /** Whether the legacy project key still authenticates; never the key. */
   getLegacyKeyStatus(input: { projectId: string }): Promise<ProjectLegacyKeyStatus>;
   /** Revokes the legacy project key for good, audited; no key is returned. */
@@ -76,6 +82,14 @@ export const ProjectBrowserApi = moduleApi<ProjectBrowserApi>()("project");
  */
 const CREATE_RESOLVES_ITS_OWN_TIER =
   "creating INTO a team asks that team for project:create; creating a team alongside asks the organization for organization:manage, and which of the two was asked for is only known once the input is parsed";
+
+/**
+ * The input names an organisation, but the standing asked is each project's
+ * `project:manage`, and which projects hold a live legacy key is only known
+ * once they are read. A team admin who manages some of them keeps their rows.
+ */
+const LEGACY_KEYS_RESOLVE_THEIR_OWN_PROJECTS =
+  "the organisation-wide read asks project:manage of every project it found holding a live legacy key, which is only knowable after the read";
 
 export const projectTrpcTransport: TrpcRouterDeclaration<ProjectBrowserApi, typeof projectTrpc> =
   defineTrpcRouter(ProjectBrowserApi, projectTrpc)
@@ -121,6 +135,20 @@ export const projectTrpcTransport: TrpcRouterDeclaration<ProjectBrowserApi, type
 
       return { firstMessage: project ? hasTracesToShow(project) : false };
     })
+
+    /** The organisation-wide nudge: one project's revoke never speaks for another's. */
+    .procedure("legacyKeys")
+    .serviceAuthorized({
+      reason: LEGACY_KEYS_RESOLVE_THEIR_OWN_PROJECTS,
+      permissions: ["project:manage"],
+      enforces: {
+        organizationId:
+          "findLegacyKeys decides project:manage for every project it read and drops the ones refused",
+      },
+    })
+    .handle(({ app, input, actor }) =>
+      app.legacyKeys({ organizationId: input.organizationId, by: actor }),
+    )
 
     .procedure("getLegacyKeyStatus")
     .withPermission("project:manage")

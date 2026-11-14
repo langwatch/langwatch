@@ -20,8 +20,8 @@ T = TypeVar("T", bound="PostApiAnalyticsBody")
 class PostApiAnalyticsBody:
     """
     Attributes:
-        start_date (float | str):
-        end_date (float | str):
+        start_date (float | str): Epoch milliseconds, or an ISO 8601 date string.
+        end_date (float | str): Epoch milliseconds, or an ISO 8601 date string.
         series (list[PostApiAnalyticsBodySeriesItem]):
         time_zone (str):
         query (str | Unset):

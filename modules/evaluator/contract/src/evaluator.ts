@@ -27,6 +27,18 @@ export interface EvaluatorConfigSchema extends Named<typeof evaluatorConfigSchem
 export const evaluatorConfigSchema: EvaluatorConfigSchema = evaluatorConfigSchemaDefinition;
 export type EvaluatorConfig = z.infer<typeof evaluatorConfigSchema>;
 
+/** What a reader names: the person behind a created or updated row. */
+const evaluatorPersonViewSchemaDefinition = z.object({
+  id: z.string(),
+  name: z.string().nullable(),
+});
+export interface EvaluatorPersonViewSchema extends Named<
+  typeof evaluatorPersonViewSchemaDefinition
+> {}
+export const evaluatorPersonViewSchema: EvaluatorPersonViewSchema =
+  evaluatorPersonViewSchemaDefinition;
+export type EvaluatorPersonView = z.infer<typeof evaluatorPersonViewSchema>;
+
 const evaluatorSchemaDefinition = z
   .object({
     id: z.string().min(1),
@@ -42,6 +54,15 @@ const evaluatorSchemaDefinition = z
     updatedAt: z.date(),
     copyCount: z.number().int().nonnegative().optional(),
     _count: z.object({ copiedEvaluators: z.number().int().nonnegative() }).optional(),
+    createdById: z.string().nullable().optional(),
+    updatedById: z.string().nullable().optional(),
+    /** The version this read shows: the latest unless a label or a version was asked for. */
+    version: z.number().int().positive().nullable().optional(),
+    labels: z
+      .array(z.object({ label: z.string(), version: z.number().int().positive() }))
+      .optional(),
+    createdBy: evaluatorPersonViewSchema.nullable().optional(),
+    updatedBy: evaluatorPersonViewSchema.nullable().optional(),
   })
   .strict();
 export interface EvaluatorSchema extends Named<typeof evaluatorSchemaDefinition> {}
@@ -171,3 +192,20 @@ export interface EvaluatorDeletedEventDataSchema extends Named<
 export const evaluatorDeletedEventDataSchema: EvaluatorDeletedEventDataSchema =
   evaluatorDeletedEventDataSchemaDefinition;
 export type EvaluatorDeletedEventData = z.infer<typeof evaluatorDeletedEventDataSchema>;
+
+export const EVALUATOR_CREATED_EVENT_TYPE = "lw.evaluator.created" as const;
+export const EVALUATOR_CREATED_EVENT_VERSION = "2026-11-09" as const;
+
+/** Ids only, as for deleted: a peer reads the evaluator itself through `EvaluatorApi`. */
+const evaluatorCreatedEventDataSchemaDefinition = z.object({
+  tenantId: z.string().min(1),
+  projectId: z.string().min(1),
+  evaluatorId: z.string().min(1),
+  occurredAt: z.number().int().nonnegative(),
+});
+export interface EvaluatorCreatedEventDataSchema extends Named<
+  typeof evaluatorCreatedEventDataSchemaDefinition
+> {}
+export const evaluatorCreatedEventDataSchema: EvaluatorCreatedEventDataSchema =
+  evaluatorCreatedEventDataSchemaDefinition;
+export type EvaluatorCreatedEventData = z.infer<typeof evaluatorCreatedEventDataSchema>;

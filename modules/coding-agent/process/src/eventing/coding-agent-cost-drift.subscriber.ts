@@ -66,6 +66,12 @@ export function createCodingAgentCostDriftSubscriber(input: {
           ...labels(data.agent, data.facts),
           valueUsd: next.costUsd,
         });
+        // A span-fed agent that costs itself (pi) reports on the same span; zero records nothing.
+        input.metrics.recordReported({
+          eventId: parsed.id,
+          ...labels(data.agent, data.facts),
+          valueUsd: next.agentReportedCostUsd,
+        });
         return;
       }
 

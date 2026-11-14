@@ -3,6 +3,7 @@
  *
  * @see specs/evaluations/experiments-online-evaluations-separation.feature
  * @see modules/monitor/specs/monitor-auto-pause.feature
+ * @see modules/monitor/specs/monitor-created-by.feature
  */
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen } from "@testing-library/react";
@@ -244,5 +245,22 @@ describe("<OnlineEvaluationsTable />", () => {
         .getByRole("figure", { name: "Performance trend for Answer quality" })
         .querySelector("polyline"),
     ).toHaveAttribute("points", "3,19 56,19 109,19");
+  });
+
+  /** @scenario "The online evaluations list shows who created each monitor" */
+  it("names the creator beside the check type when one was recorded", () => {
+    render(
+      <OnlineEvaluationsTable
+        {...defaultProps}
+        rows={[
+          { ...rows[0]!, createdByName: "Ada" },
+          { ...rows[1]!, createdByName: null },
+        ]}
+      />,
+      { wrapper: Wrapper },
+    );
+
+    expect(screen.getByTestId("monitor-row-monitor-up")).toHaveTextContent("Created by Ada");
+    expect(screen.getByTestId("monitor-row-monitor-down")).not.toHaveTextContent("Created by");
   });
 });

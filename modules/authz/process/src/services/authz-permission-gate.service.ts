@@ -37,8 +37,8 @@ import {
   AuthzScopeNotFoundError,
 } from "@langwatch/authz-contract";
 
+import type { AuthzAggregateReadAuditService } from "../features/read-audit/services/authz-aggregate-read-audit.service.ts";
 import type { AuthorizationService } from "./authorization.service.ts";
-import type { AuthzAggregateReadAuditService } from "./authz-aggregate-read-audit.service.ts";
 import type { AuthzCollectorService } from "./authz-collector.service.ts";
 
 type ScopeIds = {

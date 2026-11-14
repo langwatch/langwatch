@@ -32,6 +32,14 @@ export const traceConfig = Config.define((c) => ({
       .optional()
       .transform((value) => value === "true"),
   ),
+  /** Quorum writes and sequential reads for the evaluation fold; off until load-checked. */
+  evaluationAnalyticsQuorumReads: c.env(
+    "TRACE_EVALUATION_ANALYTICS_QUORUM_READS",
+    z
+      .string()
+      .optional()
+      .transform((value) => value === "true"),
+  ),
   foldCacheTtlSeconds,
   publicBaseUrl,
   /** Stored-object's leaves: whether the Azure spool prefix has its lifecycle rule (ADR-022). */

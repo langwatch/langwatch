@@ -110,3 +110,32 @@ export function discoverCacheKey({
   // the second viewer's facets would be served for a window they aren't looking at.
   return [scopeKeyOf(authorization), snapped.label, snapped.from, snapped.to].join("|");
 }
+
+/**
+ * One discover pass key: the same tenant scope and window span, whatever minute
+ * its bucket rolled to. One pass per key runs at a time.
+ */
+export function discoverPassKey({
+  authorization,
+  snapped,
+}: {
+  authorization: Authorization;
+  snapped: ReturnType<typeof snapToWindowPreset>;
+}): string {
+  return [scopeKeyOf(authorization), snapped.label, snapped.to - snapped.from].join("|");
+}
+
+/**
+ * The window part of a facet count's in-flight key. A live window's bounds roll
+ * forward every request, so it is keyed by both bounds to the minute: a repeat
+ * within the minute shares the count still running.
+ */
+export function facetCountWindowKey(timeRange: {
+  from: number;
+  to: number;
+  live?: boolean;
+}): readonly (string | number)[] {
+  if (timeRange.live !== true) return [timeRange.from, timeRange.to];
+
+  return ["live", bucketTime(timeRange.from), bucketTime(timeRange.to)];
+}
