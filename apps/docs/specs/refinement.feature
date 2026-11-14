@@ -188,6 +188,13 @@ Feature: Actionable documentation and restrained reading surfaces
     When I navigate to a subsection
     Then the active path follows that subsection
     And reduced motion disables the path animation
+  @integration
+  Scenario: Mark the section at the reading line after the page or window changes
+    Given the contents rail lists a page's sections
+    When the reader scrolls a heading past the reading line
+    Then the rail marks that section as current
+    And after an in-place page change or a resize the rail measures the new headings
+    And a scroll that stays in one section changes nothing on the rail
   @e2e
   Scenario: Choose an agent and copy the complete setup prompt
     Given the sidebar command and setup prompt card are visible
