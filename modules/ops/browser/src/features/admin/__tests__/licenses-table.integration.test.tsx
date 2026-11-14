@@ -25,6 +25,7 @@ function license(overrides: Partial<License> = {}): License {
     maxMembers: 50,
     maxMembersLite: 5,
     liteSeatsUnlimited: false,
+    maxMembersDeveloper: null,
     issuedAt: ISSUED,
     expiresAt: TERM_END,
     source: "BACKOFFICE",

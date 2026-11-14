@@ -213,6 +213,15 @@ async function readBlob(place: AzurePlace, at: StoredObjectAddress): Promise<Inc
   return response;
 }
 
+async function blobExists(place: AzurePlace, at: StoredObjectAddress): Promise<boolean> {
+  const response = await call(place, { method: "HEAD", path: blobPath(place, at) });
+  if (response.statusCode !== 200 && response.statusCode !== 404) {
+    throw await refusal(response, "existence check");
+  }
+  response.resume();
+  return response.statusCode === 200;
+}
+
 async function writeBlob(options: {
   place: AzurePlace;
   at: StoredObjectAddress;
@@ -412,6 +421,7 @@ export function azureBackend(options: {
     destination: { kind: "azure", accountName, container },
     write: (at, body, facts) => writeBlob({ place, at, body, facts }),
     read: (at) => readBlob(place, at),
+    exists: (at) => blobExists(place, at),
     digest: async (at) => digestOf(await readBlob(place, at)),
     remove: (at) => removeBlob(place, at),
     signUpload: (at, facts) => signBlobUpload(place, at, facts),

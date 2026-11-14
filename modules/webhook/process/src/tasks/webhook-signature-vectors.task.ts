@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
 import { Task } from "@langwatch/task";
@@ -21,7 +21,11 @@ export class WebhookSignatureVectorsTask extends Task {
   async run(_input: { args: readonly string[]; signal: AbortSignal }): Promise<void> {
     const target = resolve(import.meta.dirname, "../../../../..", VECTORS_RELATIVE_PATH);
     mkdirSync(dirname(target), { recursive: true });
-    writeFileSync(target, serializeVectors());
+    // Written beside the target and renamed over it, so a concurrent reader (the vectors drift
+    // test runs in the same suite) sees the old file or the new one, never a truncated one.
+    const staged = `${target}.${process.pid}.tmp`;
+    writeFileSync(staged, serializeVectors());
+    renameSync(staged, target);
     process.stdout.write(`wrote ${target}\n`);
   }
 }

@@ -14,6 +14,7 @@ import type { SessionGroupsRepository } from "./session-groups.repository.ts";
 import type { SpanAnalyticsFloorRepository } from "./span-analytics-floor.repository.ts";
 import type { SpanAnalyticsRepository } from "./span-analytics.repository.ts";
 import type { SpanStorageRepository } from "./span-storage.repository.ts";
+import type { TraceAgentTrafficRepository } from "./trace-agent-traffic.repository.ts";
 import type { TraceAnalyticsFoldCacheRepository } from "./trace-analytics-fold-cache.repository.ts";
 import type { TraceAnalyticsProjectionRepository } from "./trace-analytics-projection.repository.ts";
 import type { TraceAnalyticsRollupRepository } from "./trace-analytics-rollup.repository.ts";
@@ -84,6 +85,7 @@ export interface TraceRepositories {
   readonly eventPayloads: TracePayloadReaderRepository;
   readonly clusteringSample: TraceClusteringSampleRepository;
   readonly usageCount: TraceUsageCountRepository;
+  readonly agentTraffic: TraceAgentTrafficRepository;
   /** Goose 00103's `idx_updated_at` materialisation, which a background step waits on. */
   readonly indexMaterialisation: TraceIndexMaterialisationRepository;
   readonly modelSpend: TraceModelSpendRepository;

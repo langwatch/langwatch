@@ -86,6 +86,13 @@ export const FENCE_BYPASSES: readonly FenceBypass[] = [
   {
     module: "trace",
     table: "stored_spans",
+    file: `${TRACE_REPOSITORIES}/trace-agent-traffic.repository.ts`,
+    reason:
+      "governance's agent registry reads one project's distinct gen_ai.agent.name, id and model with counts and dates; a system read in the worker, no span content",
+  },
+  {
+    module: "trace",
+    table: "stored_spans",
     file: `${TRACE_REPOSITORIES}/trace-derivation-span.repository.ts`,
     reason:
       "the worker's trace derivation reads the own project's spans to derive its events; a system read no route proof covers",
