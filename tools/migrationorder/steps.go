@@ -35,7 +35,7 @@ type ReleasedStep struct {
 	Release string
 	// Path is repository-relative, on the base branch.
 	Path string
-	// Base is the declaration on the base branch: the defineMigrationStep call
+	// Base is the declaration on the base branch: the step call (stepCalls)
 	// holding the id, or the whole file when no such call encloses it.
 	Base string
 	// Head is the same declaration on the branch head, at HeadPath; empty
@@ -147,7 +147,7 @@ func (r Repo) Steps(ctx context.Context, baseRef string, releasedRefs ...string)
 }
 
 // baseDeclarations returns the base branch files declaring id in a
-// defineMigrationStep call; when none does, every file naming it, whole.
+// step call (stepCalls); when none does, every file naming it, whole.
 func (reader *fileReader) baseDeclarations(ref, id string, declared []declaration) ([]ReleasedStep, error) {
 	var steps, wholeFiles []ReleasedStep
 	for _, d := range declared {
@@ -170,7 +170,7 @@ func (reader *fileReader) baseDeclarations(ref, id string, declared []declaratio
 }
 
 // findBlock returns the first file on ref, by path, that declares id in a
-// defineMigrationStep call, and that call.
+// step call (stepCalls), and that call.
 func (reader *fileReader) findBlock(ref, id string, declared []declaration) (string, string, error) {
 	for _, d := range declared {
 		if d.id != id {
@@ -187,7 +187,7 @@ func (reader *fileReader) findBlock(ref, id string, declared []declaration) (str
 	return "", "", nil
 }
 
-// blockAt returns id's defineMigrationStep call in content, or the whole
+// blockAt returns id's step call in content, or the whole
 // content when the base declaration was the whole file.
 func blockAt(content, id string, wholeFile bool) string {
 	if wholeFile && content != "" {
@@ -229,15 +229,19 @@ func idProperty(id string) *regexp.Regexp {
 	return regexp.MustCompile(`\bid\s*:\s*(?:"` + quoted + `"|'` + quoted + `'|` + "`" + quoted + "`" + `)`)
 }
 
-const stepCall = "defineMigrationStep("
+// stepCalls are the calls a module declares a code step with. A replay step
+// is one too: missing it froze its whole module file.
+var stepCalls = []string{"defineMigrationStep(", "defineProjectionReplayStep("}
 
-// stepBlock returns the defineMigrationStep(...) call whose id property is
-// id, found by balanced brackets from the call start; empty when none is.
+// stepBlock returns the step call (stepCalls) whose id property is id, found
+// by balanced brackets from the call start; empty when none is.
 func stepBlock(content, id string) string {
 	for _, loc := range idProperty(id).FindAllStringIndex(content, -1) {
-		for start := strings.LastIndex(content[:loc[0]], stepCall); start >= 0; start = strings.LastIndex(content[:start], stepCall) {
-			if end := closingParen(content, start+len(stepCall)-1); end > loc[1] {
-				return content[start : end+1]
+		for _, call := range stepCalls {
+			for start := strings.LastIndex(content[:loc[0]], call); start >= 0; start = strings.LastIndex(content[:start], call) {
+				if end := closingParen(content, start+len(call)-1); end > loc[1] {
+					return content[start : end+1]
+				}
 			}
 		}
 	}

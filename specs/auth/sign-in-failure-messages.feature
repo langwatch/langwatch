@@ -50,3 +50,11 @@ Feature: A failed sign-in says what went wrong
   Scenario: The refused address is recorded for whoever runs the installation
     When the installation refuses a sign-in because it is set up for another address
     Then the log records the address it expected and the address it received
+
+  # The screen only says the hand-off failed; the endpoint and the setting
+  # behind the refusal are for whoever administers the connection.
+  @unit
+  Scenario: A refused single sign-on start is recorded for whoever runs the installation
+    Given my address routes to my organization's single sign-on connection
+    When the installation refuses to start that sign-in because of the provider's discovery document
+    Then the log records which connection was refused, the refusal code and the reason

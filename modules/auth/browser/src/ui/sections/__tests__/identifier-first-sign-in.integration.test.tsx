@@ -21,12 +21,13 @@ const {
   searchParamsRef,
   publicEnvRef,
   priorSessionRef,
+  unfinishedRef,
 } = vi.hoisted(() => ({
   routeMock: vi.fn(),
   routeErrorRef: { current: null as unknown },
   requestSignUpVerificationMock: vi.fn(),
   registerMock: vi.fn(),
-  signInMock: vi.fn(),
+  signInMock: vi.fn(async (): Promise<unknown> => undefined),
   replaceMock: vi.fn(),
   hardNavigateMock: vi.fn(),
   sessionRef: { current: { data: null as unknown } },
@@ -35,6 +36,17 @@ const {
     current: { IS_SAAS: true, HAS_EMAIL_PROVIDER_KEY: true } as Record<string, unknown>,
   },
   priorSessionRef: ((): { current: unknown } => ({ current: undefined }))(),
+  unfinishedRef: {
+    current: null as { providerId: string; idp: string | null } | null,
+    enabled: [] as boolean[],
+  },
+}));
+
+vi.mock("../../../behavior/use-unfinished-sign-in.ts", () => ({
+  useUnfinishedSignIn: ({ enabled }: { enabled: boolean }) => {
+    unfinishedRef.enabled.push(enabled);
+    return enabled ? unfinishedRef.current : null;
+  },
 }));
 
 vi.mock("../../../behavior/auth-api.ts", () => ({
@@ -94,7 +106,7 @@ import {
 } from "../../../model/last-used-method.ts";
 import { PASSKEY_ON_THIS_DEVICE_STORAGE_KEY } from "../../../model/passkey-on-this-device.ts";
 import { _resetTwoStepChallengeForTests } from "../../../model/two-step-challenge.ts";
-import { IdentifierFirstSignIn } from "../identifier-first-sign-in.tsx";
+import { COMPANY_HANDOFF_LINE, IdentifierFirstSignIn } from "../identifier-first-sign-in.tsx";
 
 const passwordMethod: SignInMethod = {
   id: "password",
@@ -159,6 +171,8 @@ describe("given the identifier-first sign-in screen", () => {
     searchParamsRef.current = new URLSearchParams("");
     publicEnvRef.current = { IS_SAAS: true, HAS_EMAIL_PROVIDER_KEY: true };
     priorSessionRef.current = undefined;
+    unfinishedRef.current = null;
+    unfinishedRef.enabled.length = 0;
     window.localStorage.clear();
     window.sessionStorage.clear();
     _resetTwoStepChallengeForTests();
@@ -241,6 +255,58 @@ describe("given the identifier-first sign-in screen", () => {
     });
   });
 
+  describe("when this browser's last sign-in left for a provider and never came back", () => {
+    /** @scenario "The sign-in page says the last sign-in did not finish" */
+    it("says so naming the provider kind only, and dials it again on Try again", async () => {
+      unfinishedRef.current = { providerId: "ssoc_acme", idp: "okta" };
+      routeMock.mockResolvedValue(localPicker);
+      renderScreen();
+
+      expect(
+        await screen.findByRole("heading", { name: "Your last sign-in didn't finish" }),
+      ).toBeTruthy();
+      const notice = screen.getByTestId("unfinished-sign-in");
+      expect(notice).toHaveTextContent(
+        "Your sign-in with Okta didn't send you back to LangWatch. If it said you don't have access, ask your IT team to assign you the LangWatch app.",
+      );
+      expect(notice).not.toHaveTextContent(/seat/i);
+
+      await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+      expect(signInMock).toHaveBeenCalledWith("ssoc_acme", {
+        callbackUrl: undefined,
+        loginHint: undefined,
+      });
+    });
+
+    /** @scenario "The sign-in page says the last sign-in did not finish" */
+    it("goes back to the address step on Use a different email", async () => {
+      unfinishedRef.current = { providerId: "ssoc_acme", idp: null };
+      routeMock.mockResolvedValue(localPicker);
+      renderScreen();
+
+      expect(await screen.findByTestId("unfinished-sign-in")).toHaveTextContent(
+        /^Your company's sign-in didn't send you back/,
+      );
+      await userEvent.click(screen.getByRole("button", { name: "Use a different email" }));
+
+      expect(await screen.findByLabelText(/email/i)).toBeTruthy();
+      expect(screen.queryByTestId("unfinished-sign-in")).toBeNull();
+      expect(signInMock).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "The sign-in page says the last sign-in did not finish" */
+    it("is not asked about on the error screen", async () => {
+      searchParamsRef.current = new URLSearchParams("error=access_denied");
+      unfinishedRef.current = { providerId: "ssoc_acme", idp: "okta" };
+      routeMock.mockResolvedValue(localPicker);
+      renderScreen();
+
+      await screen.findByRole("link", { name: /back to sign in/i });
+      expect(unfinishedRef.enabled.every((enabled) => !enabled)).toBe(true);
+      expect(screen.queryByTestId("unfinished-sign-in")).toBeNull();
+    });
+  });
+
   describe("when a self-hosted deployment has one live connection", () => {
     const soleConnection: RoutingDecision = {
       outcome: "redirect_to_connection",
@@ -312,6 +378,7 @@ describe("given the identifier-first sign-in screen", () => {
   describe("when an address routes to an identity provider", () => {
     /** @scenario The email step renders the routed outcome */
     /** @scenario "The address typed on our screen rides along to the identity provider" */
+    /** @scenario "Leaving for the company sign-in says what to do if it refuses" */
     it("sends the person to the provider the decision named, address in hand", async () => {
       routeMock.mockResolvedValueOnce(localPicker).mockResolvedValueOnce({
         outcome: "redirect_to_connection",
@@ -331,7 +398,9 @@ describe("given the identifier-first sign-in screen", () => {
           loginHint: "sam@acme.com",
         });
       });
-      expect(await screen.findByTestId("routed-to-connection")).toHaveTextContent(/okta/i);
+      expect(await screen.findByTestId("routed-to-connection")).toHaveTextContent(
+        COMPANY_HANDOFF_LINE,
+      );
     });
 
     /** @scenario "An address routed to an identity provider is dialled on the router's first answer" */
@@ -347,12 +416,83 @@ describe("given the identifier-first sign-in screen", () => {
       await enterEmail("sam@acme.com");
 
       await waitFor(() => expect(signInMock).toHaveBeenCalledTimes(1));
-      // The card that follows the dial outlasts the quiet window; nothing re-asks or re-dials.
+      // The card that follows the dial re-asks and re-dials nothing.
       expect(await screen.findByTestId("routed-to-connection")).toBeInTheDocument();
       // One ask on arrival with no address, one for the address typed.
       expect(routeMock).toHaveBeenCalledTimes(2);
       expect(routeMock).toHaveBeenLastCalledWith({ identifier: "sam@acme.com", breakGlass: false });
       expect(signInMock).toHaveBeenCalledTimes(1);
+    });
+
+    /** @scenario "A refused hand-off to the identity provider says so instead of waiting" */
+    it("stops the spinner and says so when the provider sign-in is refused", async () => {
+      signInMock.mockResolvedValueOnce({
+        ok: false,
+        error: "Untrusted OIDC discovery URL",
+        code: "discovery_untrusted_origin",
+        status: 400,
+      });
+      routeMock.mockResolvedValueOnce(localPicker).mockResolvedValueOnce({
+        outcome: "redirect_to_connection",
+        connectionId: "org:acme",
+        methodSet: [oktaMethod],
+        reasonCode: "domain_routed",
+      } satisfies RoutingDecision);
+
+      renderScreen();
+      await enterEmail("sam@acme.com");
+
+      const refused = await screen.findByTestId("routed-to-connection-refused");
+      expect(refused).toHaveTextContent(/ask your administrator/i);
+      expect(refused).not.toHaveTextContent(/untrusted/i);
+      expect(screen.getByTestId("routed-to-connection")).toHaveTextContent(
+        /^Log in with .+ to continue\.$/,
+      );
+    });
+
+    /** @scenario "A refused hand-off to the identity provider says so instead of waiting" */
+    it("stops the spinner and says so when the hand-off fails on the network", async () => {
+      signInMock.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+      routeMock.mockResolvedValueOnce(localPicker).mockResolvedValueOnce({
+        outcome: "redirect_to_connection",
+        connectionId: "org:acme",
+        methodSet: [oktaMethod],
+        reasonCode: "domain_routed",
+      } satisfies RoutingDecision);
+
+      renderScreen();
+      await enterEmail("sam@acme.com");
+
+      expect(await screen.findByTestId("routed-to-connection-refused")).toHaveTextContent(
+        /ask your administrator/i,
+      );
+      expect(screen.getByTestId("routed-to-connection")).toHaveTextContent(
+        /^Log in with .+ to continue\.$/,
+      );
+    });
+
+    /** @scenario "Retrying the hand-off clears the refusal" */
+    it("clears the refusal while the person retries from the button", async () => {
+      signInMock
+        .mockResolvedValueOnce({ ok: false, code: "discovery_untrusted_origin", status: 400 })
+        .mockReturnValueOnce(new Promise(() => undefined));
+      routeMock.mockResolvedValueOnce(localPicker).mockResolvedValueOnce({
+        outcome: "redirect_to_connection",
+        connectionId: "org:acme",
+        methodSet: [oktaMethod],
+        reasonCode: "domain_routed",
+      } satisfies RoutingDecision);
+
+      renderScreen();
+      await enterEmail("sam@acme.com");
+      await screen.findByTestId("routed-to-connection-refused");
+      await userEvent.click(screen.getByRole("button", { name: /continue with okta/i }));
+
+      await waitFor(() =>
+        expect(screen.queryByTestId("routed-to-connection-refused")).not.toBeInTheDocument(),
+      );
+      expect(signInMock).toHaveBeenCalledTimes(2);
+      expect(screen.getByTestId("routed-to-connection")).toHaveTextContent(COMPANY_HANDOFF_LINE);
     });
 
     /** @scenario "A provider my address was routed to is badged once it lets me in" */

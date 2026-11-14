@@ -25,3 +25,6 @@ export const HTTP_CLOSE_PHASE_MS = 7_500;
 
 /** What in-flight requests get; the ceiling keeps 2s for the session teardown and the reap. */
 export const HTTP_DRAIN_GRACE_MS = HTTP_CLOSE_PHASE_MS - 2_000;
+
+/** After a cut, what a handler gets to unwind before the stores close; half the 2s above. */
+export const HANDLER_UNWIND_MS = 1_000;

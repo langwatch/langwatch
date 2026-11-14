@@ -2,6 +2,8 @@ import { type RefObject, useEffect } from "react";
 
 /** The entry the menu marks as the page being shown. */
 const ACTIVE_ENTRY_SELECTOR = '[aria-current="page"]';
+/** The bottom ScrollEdgeFade's height (token 6, 1.5rem): an entry under it reads as hidden. */
+const BOTTOM_FADE_PX = 24;
 
 /** Remembers scroll position per menu; module-scoped (new doc = reader arriving, not returning) */
 const lastOffsetByMenu = new Map<string, number>();
@@ -43,7 +45,7 @@ export function useMenuScrollPosition({
       const menu = region.getBoundingClientRect();
       const entry = active.getBoundingClientRect();
       const offset = entry.top - menu.top;
-      const isInView = offset >= 0 && offset + entry.height <= menu.height;
+      const isInView = offset >= 0 && offset + entry.height <= menu.height - BOTTOM_FADE_PX;
       if (isInView) return;
 
       // The browser clamps this to the end of the menu, which is what

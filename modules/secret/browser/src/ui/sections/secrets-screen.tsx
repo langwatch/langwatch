@@ -312,7 +312,7 @@ export default function SecretsScreen() {
           </Tooltip>
         )}
       </PageLayout.Header>
-      <VStack gap={6} width="full" align="start" paddingTop={4}>
+      <VStack gap={6} width="full" align="start">
         <Text color="fg.muted">Encrypted values your code blocks can read at run time.</Text>
         {showSkeleton && <SecretsTableSkeleton />}
         {showEmpty && (

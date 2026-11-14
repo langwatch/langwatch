@@ -9,7 +9,7 @@ import Zod 4 from `zod/mini`. This is a docs-specific exception to the repositor
 Zod import convention. Filesystem and compiler input validation uses `zod`.
 Keep one schema authority and preserve defaults, strictness and error behavior.
 
-Keep the initial browser JavaScript within the existing 3,000-byte gzip guard.
+Keep the initial browser JavaScript within the existing 3,200-byte gzip guard.
 Build caching must account for transitive inputs and validate cached records.
 Parallel renderers must produce deterministic pages, styles and discovery files.
 

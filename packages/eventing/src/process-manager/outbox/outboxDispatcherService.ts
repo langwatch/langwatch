@@ -154,7 +154,7 @@ function retryAfterMsOf(error: unknown): number | undefined {
  * `retryable: false` (DispatchError's shape) — the message retires as dead
  * immediately instead of burning the retry ladder on a permanent failure.
  */
-function isTerminalError(error: unknown): boolean {
+export function isOutboxRetryRefused(error: unknown): boolean {
   if (typeof error !== "object" || error === null) return false;
   // A transient ClickHouse cause still retries; otherwise the group queue's refusal rule decides.
   if (classifyClickHouseError(error) === ErrorCategory.RECOVERABLE) return false;
@@ -823,7 +823,7 @@ export class OutboxDispatcherService {
       message: errorMessage,
     });
     span.setStatus({ code: SpanStatusCode.ERROR });
-    const dead = attempt >= this.maxAttempts || isTerminalError(error);
+    const dead = attempt >= this.maxAttempts || isOutboxRetryRefused(error);
     const retryDelayMs = Math.max(this.retryDelayMs({ attempt }), retryAfterMsOf(error) ?? 0);
     const { applied } = await this.store.markFailed({
       identity,

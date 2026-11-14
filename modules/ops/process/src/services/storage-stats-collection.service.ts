@@ -4,7 +4,7 @@
  */
 
 import { EVENT_TABLES } from "@langwatch/eventing/server";
-import { HandledError, isTransientRefusal } from "@langwatch/handled-error";
+import { isHandledTransientRefusal } from "@langwatch/handled-error";
 import type { Logger } from "@langwatch/observability";
 import { toEpochMs } from "@langwatch/time";
 
@@ -16,6 +16,7 @@ import type {
   StorageStatsReading,
   StorageStatsReadingsRepository,
 } from "../repositories/storage-stats-readings.repository.ts";
+import { isPlainClusterName } from "../rules/cluster-name.rules.ts";
 
 /** The tables whose footprint the size and retention alerts are built on. */
 const MONITORED_TABLES = [
@@ -41,6 +42,8 @@ interface StorageStatsCollectionOptions {
   readings: StorageStatsReadingsRepository;
   /** Whether the backup log is read at all. */
   collectBackups: boolean;
+  /** `CLICKHOUSE_CLUSTER`: replicas whose backup logs are read together; unset reads one node. */
+  clusterName?: string | undefined;
   logger: Pick<Logger, "debug" | "info" | "warn" | "error">;
 }
 
@@ -52,7 +55,14 @@ export class StorageStatsCollectionService {
   private backupsFailing = false;
   private backupLogAbsent = false;
 
-  private constructor(private readonly options: StorageStatsCollectionOptions) {}
+  private constructor(private readonly options: StorageStatsCollectionOptions) {
+    const name = options.clusterName?.trim();
+    if (name && !isPlainClusterName(name)) {
+      options.logger.warn(
+        "CLICKHOUSE_CLUSTER is not a plain identifier, so backup history is read from one node only",
+      );
+    }
+  }
 
   /** One pass over every configured endpoint; each `ops_storage_stats` wake runs one. */
   async collect(): Promise<void> {
@@ -75,7 +85,7 @@ export class StorageStatsCollectionService {
         await this.collectInstance(instance);
       } catch (error) {
         // An overloaded or briefly unreachable ClickHouse refuses for now; the next tick reads it.
-        const transient = error instanceof HandledError && isTransientRefusal(error);
+        const transient = isHandledTransientRefusal(error);
         this.options.logger[transient ? "warn" : "error"](
           { error, instance: instance.target },
           "failed to collect ClickHouse storage stats",
@@ -125,7 +135,7 @@ export class StorageStatsCollectionService {
     reading: StorageStatsReading;
   }): Promise<void> {
     try {
-      const rows = await instance.storage.findBackupStatuses();
+      const rows = await instance.storage.findBackupStatuses({ cluster: this.options.clusterName });
 
       for (const row of rows) {
         this.readBackupRow({ reading, row });

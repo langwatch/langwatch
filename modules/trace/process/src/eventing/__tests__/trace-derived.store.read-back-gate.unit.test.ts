@@ -22,6 +22,7 @@ import {
   type TraceAnalyticsRow,
 } from "../trace-derived.projection.ts";
 import { TraceAnalyticsStore } from "../trace-derived.store.ts";
+import { memoryEvaluationAnalytics } from "./trace-evaluation-analytics.fixtures.ts";
 import { createSpanReceivedEvent, createTestRuntime } from "./trace-summary-test.fixtures.ts";
 
 /**
@@ -50,15 +51,16 @@ function project(state: TraceAnalyticsData): TraceAnalyticsRow {
 }
 
 /** A port that answers reads from a single fixed row. */
-function storeOver(row: TraceAnalyticsRow): TraceAnalyticsStore {
+function storeOver(row: TraceAnalyticsRow, read: { undecodable?: true } = {}): TraceAnalyticsStore {
   const storage = new (class extends TraceAnalyticsProjectionRepository {
     async upsert(): Promise<void> {}
     async findByTraceId() {
-      return { row, appliedEventIds: ["evt-1", "evt-2"] };
+      return { row, appliedEventIds: ["evt-1", "evt-2"], ...read };
     }
   })();
   return TraceAnalyticsStore.create({
     storage,
+    evaluationAnalytics: memoryEvaluationAnalytics(),
     defaultRetentionDays: () => 90,
     authorize: ownProofAuthorizer,
   });
@@ -138,6 +140,25 @@ describe("TraceAnalyticsStore read-back version gate", () => {
   });
 });
 
+describe("TraceAnalyticsStore read-back of unreadable evaluation outcomes", () => {
+  describe("given a current-version row whose stored outcomes would not decode", () => {
+    describe("when the fold reads it back", () => {
+      /** @scenario "Unreadable stored outcomes are rebuilt from the trace's events, never stored over" */
+      it("reports an undecodable miss, so the fold rebuilds from events instead of storing over it", async () => {
+        const row = project({ ...projection.init(), traceId: TRACE_ID });
+        const store = storeOver(row, { undecodable: true });
+
+        expect(await store.getWithApplied(TRACE_ID, context)).toEqual({
+          state: null,
+          appliedEventIds: [],
+          miss: "undecodable",
+        });
+        expect(await store.get(TRACE_ID, context)).toEqual({ kind: "empty" });
+      });
+    });
+  });
+});
+
 /**
  * A trace whose only signal is a classification carries nothing the row can
  * hold, so the store writes none (ADR-066): a MISS, not lossy — the fold's
@@ -197,6 +218,7 @@ describe("TraceAnalyticsStore dimension-only signal", () => {
         const fold = TraceAnalyticsFoldProjection.create({
           store: TraceAnalyticsStore.create({
             storage,
+            evaluationAnalytics: memoryEvaluationAnalytics(),
             defaultRetentionDays: () => 90,
             authorize: ownProofAuthorizer,
           }),

@@ -1,4 +1,37 @@
-import type { TranscriptEntry } from "@langwatch/coding-agent-contract";
+import { classifyPromptText, type TranscriptEntry } from "@langwatch/coding-agent-contract";
+import type { SpanDetail } from "@langwatch/trace-contract";
+
+/** A logs-only trace is named after its id's first eight characters; a shorter name is real. */
+const SHORT_TRACE_ID_LENGTH = 8;
+
+/**
+ * What the bottom bar's prompt line reads. A trace with no name of its own is named after one
+ * of its spans, or after its own id on a logs-only trace. The user typed neither, so the
+ * session's first prompt stands in; null when there is none, never the stand-in.
+ */
+export function promptLineText({
+  sessionName,
+  traceId,
+  spans,
+  entries,
+}: {
+  sessionName: string | null | undefined;
+  traceId: string;
+  spans: SpanDetail[];
+  entries: TranscriptEntry[];
+}): string | null {
+  const name = sessionName?.trim() ?? "";
+  const isIdPrefix = name.length >= SHORT_TRACE_ID_LENGTH && traceId.startsWith(name);
+  const isStandIn = isIdPrefix || spans.some((span) => span.name === name);
+  if (name.length > 0 && !isStandIn) return name;
+
+  for (const entry of entries) {
+    if (entry.kind !== "user_prompt" || entry.text === null) continue;
+    const words = classifyPromptText(entry.text).remainder?.trim() ?? "";
+    if (words.length > 0) return words;
+  }
+  return null;
+}
 
 /**
  * Running totals at each transcript point (cost, tokens, elapsed) for scrubbing

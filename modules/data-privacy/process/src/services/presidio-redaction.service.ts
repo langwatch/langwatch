@@ -9,9 +9,25 @@ import {
   redactSparingNamesAndPlaces,
   type PiiClearing,
 } from "../rules/pii-analysis.rules.ts";
-import type { PiiAnalysisMetricsOtelService } from "./pii-analysis-metrics-otel.service.ts";
+import type {
+  PiiAnalysisMethod,
+  PiiAnalysisMetricsOtelService,
+} from "./pii-analysis-metrics-otel.service.ts";
 
-/** A batch through langevals' Presidio, reached directly (R5, Alex 2026-10-06): `clearPresidio`. */
+/** One batch for `clear`, as the redaction pass hands it over. */
+type PresidioClearInput = {
+  texts: readonly string[];
+  piiRedactionLevel: PIIRedactionLevel;
+  entities?: readonly string[] | undefined;
+  projectId?: string | undefined;
+  /** Per text: a model, provider or tool name, spared name and place findings. */
+  spareNamesAndPlaces?: readonly boolean[] | undefined;
+};
+
+/**
+ * A batch through langevals' Presidio, reached directly (R5, 2026-10-06): `clearPresidio`.
+ * The PII redaction model answers the same exchange, so it runs through a second instance.
+ */
 export class PresidioRedactionService {
   static create(input: {
     presidio: PresidioChannel;
@@ -20,20 +36,36 @@ export class PresidioRedactionService {
       "analysisCalled" | "analysisObserved" | "analysisFinished"
     >;
     timeoutMs: number;
+    /** The `method` label each call is counted under, and the evaluator label it is timed under. */
+    method?: PiiAnalysisMethod;
   }): PresidioRedactionService {
-    return new PresidioRedactionService(input.presidio, input.metrics, input.timeoutMs);
+    return new PresidioRedactionService({ ...input, method: input.method ?? "presidio" });
   }
 
   #configured: Promise<boolean> | undefined;
 
-  private constructor(
-    private readonly presidio: PresidioChannel,
-    private readonly metrics: Pick<
+  private readonly presidio: PresidioChannel;
+  private readonly metrics: Pick<
+    PiiAnalysisMetricsOtelService,
+    "analysisCalled" | "analysisObserved" | "analysisFinished"
+  >;
+  private readonly timeoutMs: number;
+  private readonly method: PiiAnalysisMethod;
+
+  private constructor(input: {
+    presidio: PresidioChannel;
+    metrics: Pick<
       PiiAnalysisMetricsOtelService,
       "analysisCalled" | "analysisObserved" | "analysisFinished"
-    >,
-    private readonly timeoutMs: number,
-  ) {}
+    >;
+    timeoutMs: number;
+    method: PiiAnalysisMethod;
+  }) {
+    this.presidio = input.presidio;
+    this.metrics = input.metrics;
+    this.timeoutMs = input.timeoutMs;
+    this.method = input.method;
+  }
 
   /** Asked once, with an empty batch that sends nothing; a failed answer is asked again. */
   isConfigured(): Promise<boolean> {
@@ -48,35 +80,37 @@ export class PresidioRedactionService {
   }
 
   /** One anonymized text per input, or null where Presidio left it as it was. */
-  async clear(input: {
-    texts: readonly string[];
-    piiRedactionLevel: PIIRedactionLevel;
-    entities?: readonly string[] | undefined;
-    projectId?: string | undefined;
-    /** Per text: a model, provider or tool name, spared name and place findings. */
-    spareNamesAndPlaces?: readonly boolean[] | undefined;
-  }): Promise<(string | null)[]> {
-    if (input.texts.length === 0) return [];
+  async clear(input: PresidioClearInput): Promise<(string | null)[]> {
+    return (await this.clearCounting(input)).cleared;
+  }
 
-    this.metrics.analysisCalled("presidio");
+  /** As `clear`, plus how many findings the service reported across the batch, for a usage log. */
+  async clearCounting(
+    input: PresidioClearInput,
+  ): Promise<{ cleared: (string | null)[]; findings: number }> {
+    if (input.texts.length === 0) return { cleared: [], findings: 0 };
+
+    this.metrics.analysisCalled(this.method);
     const truncated = input.texts.map((text) => ({
       input: text.slice(0, PII_ANALYSIS_TEXT_BUDGET),
       remaining: text.slice(PII_ANALYSIS_TEXT_BUDGET),
     }));
     const startedAt = performance.now();
     const outcome = await this.#detect({ ...input, texts: truncated.map((t) => t.input) });
-    this.metrics.analysisObserved(performance.now() - startedAt);
+    this.metrics.analysisObserved(performance.now() - startedAt, this.method);
 
     if (outcome.kind === "not_configured") {
       throw new Error("LANGEVALS_ENDPOINT is not set, PII check cannot be performed");
     }
 
-    return truncated.map((entry, i) => {
+    let findings = 0;
+    const cleared = truncated.map((entry, i) => {
       const result = outcome.results[i];
       if (!result) throw new Error(`Presidio returned no result for text ${i}`);
-      this.metrics.analysisFinished(result.status);
+      this.metrics.analysisFinished(result.status, this.method);
       if (result.status === "error") throw new Error(result.details);
       if (result.status !== "processed") return null;
+      findings += findingsIn(result.raw_response);
       const clearing = clearingOf({
         input: entry.input,
         rawResponse: result.raw_response,
@@ -84,6 +118,7 @@ export class PresidioRedactionService {
       });
       return clearing.kind === "redacted" ? clearing.text + entry.remaining : null;
     });
+    return { cleared, findings };
   }
 
   async #detect(input: {
@@ -104,8 +139,8 @@ export class PresidioRedactionService {
       });
     } catch (error) {
       if (error instanceof LangevalsPiiDetectionError) {
-        this.metrics.analysisObserved(performance.now() - startedAt);
-        this.metrics.analysisFinished("error");
+        this.metrics.analysisObserved(performance.now() - startedAt, this.method);
+        this.metrics.analysisFinished("error", this.method);
       }
       throw error;
     } finally {
@@ -139,4 +174,11 @@ function clearingOf({
   return typeof anonymized === "string" && anonymized
     ? { kind: "redacted", text: normalizePresidioMarkers(anonymized) }
     : { kind: "unchanged" };
+}
+
+/** How many findings one answer lists; their values are never read here. */
+function findingsIn(rawResponse: unknown): number {
+  if (typeof rawResponse !== "object" || rawResponse === null) return 0;
+  const results = "results" in rawResponse ? rawResponse.results : undefined;
+  return Array.isArray(results) ? results.length : 0;
 }

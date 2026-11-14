@@ -103,6 +103,9 @@ export type LoadedWorkflow = {
 /** The saved dataset version a run read, linked to the run once it has an id. */
 export type LoadedDatasetVersion = { datasetId: string; versionId: string; version: number };
 
+/** An agent as a run loaded it, with the version a label or a version number resolved to. */
+export type LoadedAgent = Agent & { version?: number | null };
+
 /** DB evaluator rows a run has loaded, keyed by their own id. */
 export type LoadedEvaluators = Map<string, { id: string; name: string; config: unknown }>;
 
@@ -113,7 +116,7 @@ export type LoadedExecutionData = {
   datasetRows: Record<string, unknown>[];
   datasetColumns: { id: string; name: string; type: string }[];
   loadedPrompts: Map<string, VersionedPrompt>;
-  loadedAgents: Map<string, Agent>;
+  loadedAgents: Map<string, LoadedAgent>;
   loadedEvaluators: Map<string, Evaluator>;
   loadedWorkflows: Map<string, LoadedWorkflow>;
   /** Absent when the rows came with the request or from an inline dataset. */

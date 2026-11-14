@@ -306,14 +306,20 @@ async function signInWithSso({
   providerId,
   target,
   shouldRedirect,
+  loginHint,
 }: {
   providerId: string;
   target: string | undefined;
   shouldRedirect: boolean;
+  loginHint?: string;
 }): Promise<SignInResult> {
   const result = await client.$fetch("/sign-in/sso", {
     method: "POST",
-    body: { providerId, callbackURL: parkAndHandOff(target) ?? "/" },
+    body: {
+      providerId,
+      callbackURL: parkAndHandOff(target) ?? "/",
+      ...(loginHint ? { loginHint } : {}),
+    },
   });
   if (result.error) {
     const refusal = ssoRefusalSchema.safeParse(result.error).data;
@@ -395,7 +401,12 @@ async function startHandOff({
 }): Promise<SignInResult> {
   // An organization's connection is registered with the SSO plugin, not as a social provider.
   if (looksLikeSsoConnectionId(provider)) {
-    return signInWithSso({ providerId: provider, target, shouldRedirect });
+    return signInWithSso({
+      providerId: provider,
+      target,
+      shouldRedirect,
+      loginHint: options?.loginHint,
+    });
   }
 
   // Every other provider goes through signIn.social, social (google, github, gitlab, microsoft) and

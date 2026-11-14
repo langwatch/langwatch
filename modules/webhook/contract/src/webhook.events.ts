@@ -86,6 +86,43 @@ export const WEBHOOK_EVENT_TYPES = [
     isEmitting: true,
     description: "A governance anomaly rule fired an alert for an endpoint its destination names.",
   },
+  {
+    type: "governance.agent.registered",
+    family: "governance",
+    schemaVersion: "1",
+    isEmitting: true,
+    description: "An agent entered the organisation's agent registry at version 1.",
+  },
+  {
+    type: "governance.agent.versioned",
+    family: "governance",
+    schemaVersion: "1",
+    isEmitting: true,
+    description:
+      "A registry agent's endpoints, model configuration, instructions, tools or status changed; carries from_version and to_version.",
+  },
+  {
+    type: "governance.agent.removed",
+    family: "governance",
+    schemaVersion: "1",
+    isEmitting: true,
+    description: "A registry agent is no longer defined at its source.",
+  },
+  {
+    type: "governance.agent.tool_deprecated",
+    family: "governance",
+    schemaVersion: "1",
+    isEmitting: true,
+    description: "A tool left a registry agent's latest version; it stays listed as deprecated.",
+  },
+  {
+    type: "governance.agent.flagged_shadow",
+    family: "governance",
+    schemaVersion: "1",
+    isEmitting: true,
+    description:
+      "An agent seen in the organisation's traffic matches no listed source and is flagged as shadow.",
+  },
 ] as const satisfies readonly WebhookEventType[];
 
 export type WebhookEventTypeName = (typeof WEBHOOK_EVENT_TYPES)[number]["type"];
@@ -93,18 +130,27 @@ export type WebhookEventTypeName = (typeof WEBHOOK_EVENT_TYPES)[number]["type"];
 const knownTypes = new Set<string>(WEBHOOK_EVENT_TYPES.map((entry) => entry.type));
 const knownFamilies = new Set<string>(WEBHOOK_EVENT_TYPES.map((entry) => entry.family));
 
+/**
+ * `*`, an exact type, a family (`gateway.*`) or a deeper prefix a known type has
+ * (`governance.agent.*`).
+ */
 export function isValidEventSelector(selector: string): boolean {
   if (selector === "*") return true;
-  if (selector.endsWith(".*")) return knownFamilies.has(selector.slice(0, -2));
+  if (selector.endsWith(".*")) {
+    const prefix = selector.slice(0, -1);
+    return (
+      knownFamilies.has(selector.slice(0, -2)) ||
+      [...knownTypes].some((type) => type.startsWith(prefix))
+    );
+  }
   return knownTypes.has(selector);
 }
 
 export function eventMatches(enabledEvents: readonly string[], eventType: string): boolean {
-  const family = eventType.split(".")[0] ?? "";
   return enabledEvents.some(
     (selector) =>
       selector === "*" ||
       selector === eventType ||
-      (selector.endsWith(".*") && selector.slice(0, -2) === family),
+      (selector.endsWith(".*") && eventType.startsWith(selector.slice(0, -1))),
   );
 }

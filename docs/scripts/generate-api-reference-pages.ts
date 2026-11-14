@@ -339,6 +339,13 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
       "Manage AI agent configurations. Create, update, and organize agents that are tracked and evaluated in LangWatch.",
   },
   {
+    name: "Agent Registry",
+    dirName: "governance-agent-registry",
+    pathPrefixes: ["/api/governance/registry"],
+    overviewDescription:
+      "Read every AI agent in your organization with its endpoints, model, instructions, tools and owner, as JSON or as an ARD v0.91 manifest, and follow its changes through the change feed. Needs an organization API key.",
+  },
+  {
     name: "Coding Agents",
     dirName: "coding-agents",
     pathPrefixes: ["/api/v1/coding-agent", "/api/coding-agent"],

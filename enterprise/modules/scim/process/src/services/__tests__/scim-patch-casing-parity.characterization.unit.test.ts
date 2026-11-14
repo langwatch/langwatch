@@ -23,6 +23,12 @@ import { QuietScimSyncLifecycle } from "./support/quiet-scim-sync-lifecycle.ts";
 /** Every seat free, so these tests admit full members (seat-limit-at-provisioning.feature). */
 const openSeats = {
   countMemberSeats: async () => ({ fullMembers: 0, liteMembers: 0, developers: 0 }),
+  findLiveHoldUserIds: async () => [],
+  withSeatLock: <T>({
+    work,
+  }: {
+    work: (lease: { assertHeld(): Promise<void> }) => Promise<T>;
+  }): Promise<T> => work({ assertHeld: async () => {} }),
 };
 
 const patchSchema = "urn:ietf:params:scim:api:messages:2.0:PatchOp";
@@ -38,6 +44,7 @@ class EnterpriseEntitlements implements Pick<EntitlementApi, "getActivePlan"> {
       free: false,
       maxMembers: 1,
       maxMembersLite: 1,
+      maxMembersDeveloper: 0,
       maxMessagesPerMonth: 1,
       canPublish: true,
       prices: { USD: 0, EUR: 0 },

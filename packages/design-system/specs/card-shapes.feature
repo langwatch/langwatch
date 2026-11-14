@@ -11,6 +11,18 @@ Feature: Card, resource tile, load more and the one-line empty state
     And the footer sits under the body
 
   @integration
+  Scenario: A card can set its badge beside the title and rule off its footer
+    Given a card with a badge placed beside the title and a divided footer
+    Then the badge follows the title before the header's spacer
+    And a rule separates the body from the footer
+
+  @integration
+  Scenario: A boxed setting list is a small bordered table with values at the right end
+    Given a setting list in the boxed variant
+    Then the list draws a border round its rows in the same grey as the lines between them
+    And each row's values sit at the right end of the row
+
+  @integration
   Scenario: A card takes only the named looks
     Given a card for each variant and padding
     Then each card says which look and padding it drew

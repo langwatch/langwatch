@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { SYSTEM_ACTORS } from "@langwatch/authorization";
 import type { AuthzGrantsService, GrantScopeTier, TeamUserRole } from "@langwatch/authz-contract";
-import type { OrganizationApi } from "@langwatch/organization-contract";
 
+import type { ScimMembers } from "../channels/scim-channels.registry.ts";
 import type { ScimRepository } from "../repositories/scim.repository.ts";
 import { assertRemovalKeepsAnAdministrator } from "../rules/scim-last-administrator.rules.ts";
 import {
@@ -20,7 +20,7 @@ export class ScimMembershipAccessService {
     grants: ScimGrantsService;
     lifecycle: ScimSyncLifecycle;
     organization: ScimOrganizationAdministration;
-    members: Pick<OrganizationApi, "deleteMember">;
+    members: ScimMembers;
     provenOffboarding: boolean;
   }): ScimMembershipAccessService {
     return new ScimMembershipAccessService(options);
@@ -36,7 +36,7 @@ export class ScimMembershipAccessService {
   private readonly grants: ScimGrantsService;
   private readonly deprovision: ScimDeprovisionService;
   private readonly organization: ScimOrganizationAdministration;
-  private readonly members: Pick<OrganizationApi, "deleteMember">;
+  private readonly members: ScimMembers;
   private readonly provenOffboarding: boolean;
 
   private constructor({
@@ -53,7 +53,7 @@ export class ScimMembershipAccessService {
     grants: ScimGrantsService;
     lifecycle: ScimSyncLifecycle;
     organization: ScimOrganizationAdministration;
-    members: Pick<OrganizationApi, "deleteMember">;
+    members: ScimMembers;
     provenOffboarding: boolean;
   }) {
     this.prisma = prisma;
@@ -63,6 +63,7 @@ export class ScimMembershipAccessService {
       grants: writer,
       lifecycle,
       organization,
+      seats: members,
     });
     this.provenOffboarding = provenOffboarding;
     this.organization = organization;

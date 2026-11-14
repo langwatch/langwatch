@@ -89,6 +89,65 @@ app.kubernetes.io/component: keeper
     {{- fail "replicas must be odd when greater than 1 (required for Keeper raft quorum)" }}
   {{- end }}
   {{- include "clickhouse-serverless.validateTransition" . }}
+  {{- if and .Values.access.enabled (not .Values.access.existingConfigMap) (empty .Values.access.config) }}
+    {{- fail "access.enabled needs access.config or access.existingConfigMap" }}
+  {{- end }}
+  {{- if and (include "clickhouse-serverless.backupSidecar" .) (gt (int .Values.replicas) 1) (not .Values.auth.clusterSecretEnabled) }}
+    {{- fail "backup.mode sidecar or cronjob-observe with replicas > 1 needs auth.clusterSecretEnabled: the sidecar reads every replica's backup log, and without the secret the replicas refuse each other's queries" }}
+  {{- end }}
+  {{- if .Values.access.dynamicOnly.enabled }}
+    {{- if not .Values.access.enabled }}
+      {{- fail "access.dynamicOnly.enabled needs access.enabled: token logins are verified by the access sidecar" }}
+    {{- end }}
+    {{- if and (gt (int .Values.replicas) 1) (not .Values.auth.clusterSecretEnabled) }}
+      {{- fail "access.dynamicOnly.enabled with replicas > 1 needs auth.clusterSecretEnabled: replicas would otherwise log in to each other as default, which is locked" }}
+    {{- end }}
+    {{- if and .Values.backup.enabled (ne (include "clickhouse-serverless.backupMode" .) "sidecar") }}
+      {{- fail "access.dynamicOnly.enabled cannot run the backup CronJobs: they log in as default with the static password, which this mode removes. Set backup.mode=sidecar: the sidecar logs in as the per-boot local admin" }}
+    {{- end }}
+    {{- if and .Values.backup.enabled (gt (int .Values.replicas) 1) }}
+      {{- fail "access.dynamicOnly.enabled with replicas > 1 cannot run backups: the sidecar logs in as the per-boot local admin, which the other replicas refuse, so it cannot read their backup history or poll a restore" }}
+    {{- end }}
+    {{- if .Values.access.passwordSecrets }}
+      {{- fail "access.dynamicOnly.enabled refuses access.passwordSecrets: rolling passwords are long-lived, use token logins" }}
+    {{- end }}
+    {{- if .Values.lwqlAccess.secretName }}
+      {{- fail "access.dynamicOnly.enabled refuses lwqlAccess.secretName: the LangWatchQL access model logs its user in with a static password" }}
+    {{- end }}
+  {{- end }}
+{{- end -}}
+
+{{/* True when the pod runs in dynamic-only mode (ADR-198). */}}
+{{- define "clickhouse-serverless.dynamicOnly" -}}
+{{- if and .Values.access.enabled .Values.access.dynamicOnly.enabled }}true{{ end }}
+{{- end -}}
+
+{{/* clickhouse-client login for exec probes: the per-boot local admin in
+     dynamic-only mode, default with the Secret's password otherwise. */}}
+{{- define "clickhouse-serverless.probeLogin" -}}
+{{- if include "clickhouse-serverless.dynamicOnly" . -}}
+--user local_admin --password "$(cat /run/clickhouse-access/password)"
+{{- else -}}
+--user default --password "$(cat /mnt/secrets/password)"
+{{- end -}}
+{{- end -}}
+
+{{/* Access file and password Secrets, mounted read-only into ClickHouse (for
+     ch-config generate at startup) and the sidecar (for every later sync). */}}
+{{- define "clickhouse-serverless.accessMounts" -}}
+- name: access-config
+  mountPath: /etc/clickhouse-access/config
+  readOnly: true
+{{- if include "clickhouse-serverless.dynamicOnly" . }}
+# The local admin's per-boot password: ClickHouse writes it, the sidecar reads it.
+- name: access-bootstrap
+  mountPath: /run/clickhouse-access
+{{- end }}
+{{- range $i, $name := .Values.access.passwordSecrets }}
+- name: access-secret-{{ $i }}
+  mountPath: /etc/clickhouse-access/secrets/{{ $name }}
+  readOnly: true
+{{- end }}
 {{- end -}}
 
 {{/* Transition guard: refuse to scale an EXISTING single-node release into a
@@ -166,3 +225,22 @@ app.kubernetes.io/component: keeper
 {{- default "clusterSecret" .Values.auth.secretKeys.clusterSecretKey -}}
 {{- end -}}
 
+
+{{/* Backup mode (ADR-199): "cronjob", "sidecar" or "cronjob-observe". */}}
+{{- define "clickhouse-serverless.backupMode" -}}
+{{- $mode := .Values.backup.mode | default "cronjob" -}}
+{{- if not (has $mode (list "cronjob" "sidecar" "cronjob-observe")) -}}
+{{- fail (printf "backup.mode must be cronjob, sidecar or cronjob-observe, got %q" $mode) -}}
+{{- end -}}
+{{- $mode -}}
+{{- end -}}
+
+{{/* "true" when backup CronJobs render. */}}
+{{- define "clickhouse-serverless.backupCronJobs" -}}
+{{- if and .Values.backup.enabled (ne (include "clickhouse-serverless.backupMode" .) "sidecar") }}true{{ end -}}
+{{- end -}}
+
+{{/* "true" when the ch-config sidecar runs backups (or observes them). */}}
+{{- define "clickhouse-serverless.backupSidecar" -}}
+{{- if and .Values.backup.enabled (ne (include "clickhouse-serverless.backupMode" .) "cronjob") }}true{{ end -}}
+{{- end -}}
