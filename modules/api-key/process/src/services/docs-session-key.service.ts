@@ -21,9 +21,10 @@ import { isRegisteredDocsOrigin } from "@langwatch/config";
 import { createLogger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
-import { nowInstant, toDate, type Instant } from "@langwatch/time";
+import { fromDate, nowInstant, toDate, type Instant } from "@langwatch/time";
 
 import type { ApiKeyRepository } from "../repositories/api-key.repository.ts";
+import { isDocsSessionAllowed } from "../rules/api-key-held-answer.rules.ts";
 import {
   docsSessionKeyExpiresAt,
   docsSessionKeyPermissions,
@@ -105,7 +106,7 @@ export class DocsSessionKeyService {
       maxSessionDurationDays: policy.maxSessionDurationDays,
     });
 
-    const { token } = await this.options.apiKeys.create({
+    const { token, apiKey } = await this.options.apiKeys.create({
       isSystemManaged: true,
       name: DOCS_SESSION_API_KEY_NAME,
       description:
@@ -120,6 +121,10 @@ export class DocsSessionKeyService {
       bindings: [{ role: "CUSTOM", scopeType: "PROJECT", scopeId: input.projectId }],
       expiresAt: toDate(expiresAt),
       createdByBrowserSessionId: browserSession.id,
+    });
+    await this.retireIfTurnedOffDuringMint({
+      apiKey: { id: apiKey.id, createdAt: fromDate(apiKey.createdAt) },
+      organizationId: scope.organizationId,
     });
 
     return {
@@ -141,6 +146,28 @@ export class DocsSessionKeyService {
     });
 
     return { enabled: policy.docsPlaygroundSessionsEnabled };
+  }
+
+  /**
+   * The organisation may turn the playground off between the check above and the insert, leaving
+   * a key minted after the cut-off that a switch back on would revive; it goes before it is handed.
+   */
+  private async retireIfTurnedOffDuringMint({
+    apiKey,
+    organizationId,
+  }: {
+    apiKey: { id: string; createdAt: Instant };
+    organizationId: string;
+  }): Promise<void> {
+    const policy = await this.options.organizations.getDocsPlaygroundPolicy({ organizationId });
+    if (isDocsSessionAllowed({ since: apiKey.createdAt, policy })) return;
+    await this.options.lifecycle.revokeSystemManaged({
+      id: apiKey.id,
+      organizationId,
+      callerUserId: null,
+      cause: "session",
+    });
+    throw new DocsPlaygroundSessionsDisabledError();
   }
 
   private async assertOrganizationAllows(organizationId: string): Promise<void> {

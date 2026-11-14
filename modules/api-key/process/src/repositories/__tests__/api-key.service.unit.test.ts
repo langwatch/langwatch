@@ -232,6 +232,7 @@ class MemoryApiKeys extends ApiKeyRepository {
             createdAt: fromDate(row.createdAt),
             name: row.name,
             isSystemManaged: row.isSystemManaged === true,
+            parentApiKeyId: row.parentApiKeyId ?? null,
           }
         : null,
     );

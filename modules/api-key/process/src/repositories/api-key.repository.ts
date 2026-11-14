@@ -42,16 +42,17 @@ export type ApiKeyUpdateRecord = {
   lookupId?: string;
 };
 
-/** Private persistence boundary for the API-key aggregate. */
-/** What the auth path reads about a key's parent: whether it is live, and what kind it is. */
+/** What the auth path reads about a key's ancestor: whether it is live, its kind and its parent. */
 export type KeyLiveness = {
   revokedAt: Instant | null;
   expiresAt: Instant | null;
   createdAt: Instant;
   name: string;
   isSystemManaged: boolean;
+  parentApiKeyId: string | null;
 };
 
+/** Private persistence boundary for the API-key aggregate. */
 export abstract class ApiKeyRepository {
   abstract create(input: ApiKeyCreateRecord): Promise<ApiKeyRow>;
   abstract activate(input: { id: string }): Promise<ApiKeyRow>;

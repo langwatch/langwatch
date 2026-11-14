@@ -123,9 +123,15 @@ Feature: Docs session keys for the documentation playground
 
   @integration
   Scenario: A key minted under a docs session key stops when the playground is turned off
-    Given a run key minted under a docs session key
+    Given a run key minted under a docs session key, and a key minted under that run key
     When an organisation admin turns docs playground sessions off
-    Then the run key stops authenticating at once, before any cleanup revokes it
+    Then both stop authenticating at once, before any cleanup revokes them
+
+  @integration
+  Scenario: A docs session key minted while the playground is turned off is never handed out
+    Given a member is connecting the docs playground
+    When an organisation admin turns docs playground sessions off before the key is written
+    Then the new key is revoked and the member is told the playground is turned off
 
   @integration
   Scenario: A late revocation leaves keys minted after the switch came back on

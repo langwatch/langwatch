@@ -7,6 +7,7 @@ import {
   ApiKeyNotFoundError,
   DOCS_SESSION_API_KEY_NAME,
   DocsOriginNotRegisteredError,
+  DocsPlaygroundSessionsDisabledError,
   type DocsSessionKeyAccess,
   type DocsSessionKeyLifetimeMinutes,
 } from "@langwatch/api-key-contract";
@@ -542,6 +543,15 @@ describe("given live docs session keys and a run key minted under one", () => {
       bindings: [{ role: "MEMBER", scopeType: "PROJECT", scopeId: PROJECT_ID }],
       parentApiKeyId: parent!.id,
     });
+    const grandchild = await app.create({
+      name: "Nested run key",
+      userId: USER_ID,
+      createdByUserId: USER_ID,
+      organizationId: ORG_ID,
+      permissionMode: "all",
+      bindings: [{ role: "MEMBER", scopeType: "PROJECT", scopeId: PROJECT_ID }],
+      parentApiKeyId: child.apiKey.id,
+    });
     /* Another organisation's docs key, written as its own mint would leave the row. */
     const elsewhere = await fixture.apiKeys.create({
       name: DOCS_SESSION_API_KEY_NAME,
@@ -560,7 +570,7 @@ describe("given live docs session keys and a run key minted under one", () => {
       grants: [],
     });
 
-    return { ...fixture, first, second, child, elsewhere };
+    return { ...fixture, first, second, child, grandchild, elsewhere };
   }
 
   describe("when organization records the playground session turned off", () => {
@@ -628,8 +638,8 @@ describe("given live docs session keys and a run key minted under one", () => {
 
     /** @scenario "Turning it on again before revocation runs revives no key minted before" */
     it("refuses the older keys and the keys minted under them, though no revocation ran", async () => {
-      const { app, organization, first, child } = await withKeys();
-      expect(await app.findVerifiedToken({ token: child.token })).not.toBeNull();
+      const { app, organization, first, child, grandchild } = await withKeys();
+      expect(await app.findVerifiedToken({ token: grandchild.token })).not.toBeNull();
 
       organization.docsPlaygroundSessionsEnabled = false;
       organization.docsPlaygroundSessionsDisabledAt = new Date();
@@ -638,19 +648,22 @@ describe("given live docs session keys and a run key minted under one", () => {
 
       expect(await app.findVerifiedToken({ token: first.token })).toBeNull();
       expect(await app.findVerifiedToken({ token: child.token })).toBeNull();
+      expect(await app.findVerifiedToken({ token: grandchild.token })).toBeNull();
       const fresh = await app.mintDocsSessionKey(minting({ sessionId: "session-3" }));
       expect(await app.findVerifiedToken({ token: fresh.token })).not.toBeNull();
     });
 
     /** @scenario "A key minted under a docs session key stops when the playground is turned off" */
-    it("refuses the run key at once, before any cleanup reaches it", async () => {
-      const { app, organization, child } = await withKeys();
-      expect(await app.findVerifiedToken({ token: child.token })).not.toBeNull();
+    it("refuses the run key and the key under it at once, before any cleanup reaches them", async () => {
+      const { app, organization, child, grandchild } = await withKeys();
+      expect(await app.findVerifiedToken({ token: grandchild.token })).not.toBeNull();
 
       organization.docsPlaygroundSessionsEnabled = false;
 
-      expect(await app.findVerifiedToken({ token: child.token })).toBeNull();
-      expect(await app.findResolvedToken({ token: child.token, projectId: PROJECT_ID })).toBeNull();
+      for (const { token } of [child, grandchild]) {
+        expect(await app.findVerifiedToken({ token })).toBeNull();
+        expect(await app.findResolvedToken({ token, projectId: PROJECT_ID })).toBeNull();
+      }
     });
 
     /** @scenario "A late revocation leaves keys minted after the switch came back on" */
@@ -671,6 +684,30 @@ describe("given live docs session keys and a run key minted under one", () => {
       expect(await app.findVerifiedToken({ token: child.token })).toBeNull();
       expect(await app.findVerifiedToken({ token: fresh.token })).not.toBeNull();
     });
+  });
+});
+
+describe("given the admin turns the playground off while a member connects", () => {
+  /** @scenario "A docs session key minted while the playground is turned off is never handed out" */
+  it("revokes the key it just wrote and refuses by name", async () => {
+    const { app, organization, apiKeys, attachBindings } = await appOver();
+    attachBindings.mockImplementationOnce(async ({ bindings }) => {
+      organization.docsPlaygroundSessionsEnabled = false;
+      organization.docsPlaygroundSessionsDisabledAt = new Date();
+      return { attached: bindings.map((binding) => binding.bindingId), duplicates: [] };
+    });
+
+    await expect(app.mintDocsSessionKey(minting())).rejects.toMatchObject({
+      code: new DocsPlaygroundSessionsDisabledError().code,
+    });
+    organization.docsPlaygroundSessionsEnabled = true;
+
+    const written = await apiKeys.findLiveSystemManagedByName({
+      organizationId: ORG_ID,
+      name: DOCS_SESSION_API_KEY_NAME,
+      createdAtOrBefore: nowInstant(),
+    });
+    expect(written).toEqual([]);
   });
 });
 

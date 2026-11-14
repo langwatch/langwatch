@@ -246,6 +246,7 @@ export class PrismaApiKeyRepository implements ApiKeyRepository {
         createdAt: true,
         name: true,
         isSystemManaged: true,
+        parentApiKeyId: true,
       },
     });
     if (!row) return null;
@@ -255,6 +256,7 @@ export class PrismaApiKeyRepository implements ApiKeyRepository {
       createdAt: fromDate(row.createdAt),
       name: row.name,
       isSystemManaged: row.isSystemManaged === true,
+      parentApiKeyId: row.parentApiKeyId ?? null,
     };
   }
   async findElapsedLoginKeys(input: {

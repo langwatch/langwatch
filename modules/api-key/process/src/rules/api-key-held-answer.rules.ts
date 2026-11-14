@@ -87,3 +87,18 @@ export function publicApiKey<Row extends { hashedSecret: unknown }>({
 
   return key;
 }
+
+/** How far up a chain of minted keys the auth path follows; mints nest at most two deep. */
+export const MAX_KEY_ANCESTRY = 8;
+
+/** A key neither revoked nor past its expiry; the hourly sweep may not have reached it yet. */
+export function isKeyLive({
+  key,
+  now,
+}: {
+  key: { revokedAt: Instant | null; expiresAt: Instant | null };
+  now: Instant;
+}): boolean {
+  if (key.revokedAt !== null) return false;
+  return key.expiresAt === null || Temporal.Instant.compare(key.expiresAt, now) >= 0;
+}

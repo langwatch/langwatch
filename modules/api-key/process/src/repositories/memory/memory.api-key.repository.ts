@@ -259,6 +259,7 @@ export class MemoryApiKeyRepository implements ApiKeyRepository {
       createdAt: fromDate(key.createdAt),
       name: key.name,
       isSystemManaged: key.isSystemManaged === true,
+      parentApiKeyId: key.parentApiKeyId ?? null,
     };
   }
 

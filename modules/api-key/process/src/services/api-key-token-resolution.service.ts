@@ -25,11 +25,13 @@ import {
   API_KEY_UNKNOWN_TTL_MS,
   type ApiKeyAnswerCacheRepository,
 } from "../repositories/api-key-answer-cache.repository.ts";
-import type { ApiKeyRepository } from "../repositories/api-key.repository.ts";
+import type { ApiKeyRepository, KeyLiveness } from "../repositories/api-key.repository.ts";
 import { bindingsReachProject, findGrantedProjectIds } from "../rules/api-key-grant-reach.rules.ts";
 import {
   isDocsSessionAllowed,
   isDocsSessionKey,
+  isKeyLive,
+  MAX_KEY_ANCESTRY,
   keyCredentialTypeOf,
   parseHeld,
   publicApiKey,
@@ -324,20 +326,21 @@ export class ApiKeyTokenResolutionService {
     return this.options.tokens.findTokenParts(token);
   }
 
-  /**
-   * Whether the parent key a key was minted under is still live, and when it was minted if it
-   * is a docs session key. A parent that is gone reads as dead: its absence is not something to
-   * authenticate past. Expiry counts too, ahead of the hourly sweep.
-   */
+  /** Every key above must be live; a key minted under a docs key, at any depth, answers to it. */
   private async findParent(
     parentApiKeyId: string,
   ): Promise<{ live: boolean; docsSessionSince: Instant | null }> {
-    const parent = await this.repository.findLivenessById({ id: parentApiKeyId });
-    if (!parent || parent.revokedAt) return { live: false, docsSessionSince: null };
-    const expired =
-      parent.expiresAt !== null && Temporal.Instant.compare(parent.expiresAt, this.now()) < 0;
-    const docsSessionSince = isDocsSessionKey({ key: parent }) ? parent.createdAt : null;
-    return { live: !expired, docsSessionSince };
+    let next: string | null = parentApiKeyId;
+    for (let depth = 0; next !== null; depth++) {
+      const parent: KeyLiveness | null =
+        depth < MAX_KEY_ANCESTRY ? await this.repository.findLivenessById({ id: next }) : null;
+      if (!parent || !isKeyLive({ key: parent, now: this.now() }))
+        return { live: false, docsSessionSince: null };
+      if (isDocsSessionKey({ key: parent }))
+        return { live: true, docsSessionSince: parent.createdAt };
+      next = parent.parentApiKeyId;
+    }
+    return { live: true, docsSessionSince: null };
   }
 
   private async findLegacyProjectKeyResolution(
