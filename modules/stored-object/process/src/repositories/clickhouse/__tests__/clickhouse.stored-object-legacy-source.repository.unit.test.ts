@@ -24,12 +24,15 @@ const ROW = {
 };
 
 function repositoryAnswering(rows: unknown[]) {
-  const query = vi.fn(async (_request: { query: string; SKIP_COLD_SCAN_CHECK?: true }) => ({
-    json: async () => JSON.parse(JSON.stringify(rows)),
-  }));
+  const query = vi.fn(
+    async (_request: { query: string; SKIP_COLD_SCAN_CHECK?: true; SKIP_TENANT_CHECK?: true }) => ({
+      json: async () => JSON.parse(JSON.stringify(rows)),
+    }),
+  );
+  const read = vi.fn();
   class FakeStoredObjectsClickHouse implements StoredObjectsClickHouse {
     async resolveClient() {
-      return { query };
+      return { read, query };
     }
   }
   const repository = ClickHouseStoredObjectLegacySourceRepository.create(
@@ -46,6 +49,15 @@ describe("given a project's legacy stored-object index", () => {
       await repository.findPage({ projectId: "proj-1", limit: 10 });
 
       expect(query.mock.calls[0]?.[0].query).not.toMatch(/AS\s+(project_id|inserted_at)\b/);
+    });
+
+    /** @scenario "The legacy index import declares itself unscoped" */
+    it("declares itself unscoped, since the index has no TenantId column", async () => {
+      const { query, repository } = repositoryAnswering([]);
+
+      await repository.findPage({ projectId: "proj-1", limit: 10 });
+
+      expect(query.mock.calls[0]?.[0].SKIP_TENANT_CHECK).toBe(true);
     });
 
     it("declares the whole-index read, so it raises no cold-scan warning", async () => {

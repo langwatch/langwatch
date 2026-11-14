@@ -568,6 +568,8 @@ export type RenderContext = {
   readonly ids: Map<string, string>;
   /** The CTE names the text being rendered may read: earlier CTEs and the enclosing ones. */
   readonly ctes: { visible: ReadonlySet<string> };
+  /** The tenant columns the rendered tenant predicates bind, which the client's guard checks. */
+  readonly tenantColumns: Set<string>;
 };
 
 export const renderContext = (): RenderContext => ({
@@ -577,6 +579,7 @@ export const renderContext = (): RenderContext => ({
   lambdas: new Map(),
   ids: new Map(),
   ctes: { visible: new Set() },
+  tenantColumns: new Set(),
 });
 
 /** Binds a value node and returns its parameter name. */

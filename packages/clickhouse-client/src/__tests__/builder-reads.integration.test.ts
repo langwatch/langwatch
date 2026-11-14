@@ -675,6 +675,37 @@ const GAPS_3_SHAPES: Record<string, { statement: () => Sendable; rows: string[] 
   },
 };
 
+/** The fourth census's shapes: an election repeating an id bound, a JSON path from a lambda. */
+const GAPS_4_SHAPES: Record<string, { statement: () => Sendable; rows: string[] }> = {
+  "a latest-version election repeating an id bound outside the sort key": {
+    statement: () =>
+      windowed({
+        key: "TraceId",
+        statement: clickhouseRead({ scope: single })
+          .from(evaluations)
+          .latestVersion()
+          .select({ EvaluationId: evaluations.EvaluationId, Score: evaluations.Score })
+          .where(({ idBound }) => idBound(evaluations.TraceId, "t0"))
+          .build(),
+      }),
+    rows: ["e1|0.75"],
+  },
+  "a JSON path keyed by a lambda's parameter": {
+    statement: () => {
+      const metadata = fn.ifNull(runs.Metadata, "{}");
+      return clickhouseRead({ scope: single })
+        .from(runs)
+        .latestVersion()
+        .select({
+          ScenarioRunId: runs.ScenarioRunId,
+          Raw: fn.arrayMap((key) => fn.JSONExtractRaw(metadata, key), fn.JSONExtractKeys(metadata)),
+        })
+        .build();
+    },
+    rows: [`r1|["x","y"],[{"name":"Bot","role":"agent"},{"name":"Cat","role":"agent"}]`, "r2|"],
+  },
+};
+
 describe("given builder statements sent as a reader under a row policy on ClickHouse 26.8", () => {
   beforeAll(async () => {
     const pins = testClickHouseProfilePins();
@@ -798,6 +829,22 @@ describe("given builder statements sent as a reader under a row policy on ClickH
       });
 
       /** @scenario "Nullable and listed ids, derived joins, chained CTEs and scalar subqueries run on 26.8" */
+      it("keeps another tenant's rows out by its own text when the setting lists every tenant", async () => {
+        expect(await rowsOf({ statement: shape.statement(), tenants: EVERY_TENANT })).toEqual(
+          shape.rows,
+        );
+      });
+    });
+  }
+
+  for (const [name, shape] of Object.entries(GAPS_4_SHAPES)) {
+    describe(`when ${name} is built and sent`, () => {
+      /** @scenario "A repeated id bound and a JSON path from a lambda's parameter run on 26.8" */
+      it("returns exactly its tenant's rows", async () => {
+        expect(await rowsOf({ statement: shape.statement() })).toEqual(shape.rows);
+      });
+
+      /** @scenario "A repeated id bound and a JSON path from a lambda's parameter run on 26.8" */
       it("keeps another tenant's rows out by its own text when the setting lists every tenant", async () => {
         expect(await rowsOf({ statement: shape.statement(), tenants: EVERY_TENANT })).toEqual(
           shape.rows,

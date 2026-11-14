@@ -35,10 +35,16 @@ Feature: File reads answer through the installed stored-object module
     Then the read fails as stored_object_not_found, which the route answers 404
 
   @regression
-  Scenario: Every legacy index statement declares itself unscoped
+  Scenario: The legacy index import declares itself unscoped
     Given the stored_objects table has no TenantId column
-    When the repository sends any of its statements
+    When the import pages a project's legacy index
     Then the tenant guard refuses it unless it declares why it is unscoped
+
+  @regression
+  Scenario: The legacy index lookup is a reader statement bounded by its project
+    Given the stored_objects table's tenant column is project_id
+    When the byte door looks up one stored object on the legacy index
+    Then the read is a reader statement whose tenant setting is that project, with no skip-check flag
 
   # Signed read URLs (Alex, 2026-09-30): REST is the key's and tRPC the session's, so the
   # browser asks tRPC for a short-lived URL whose signature is the credential.

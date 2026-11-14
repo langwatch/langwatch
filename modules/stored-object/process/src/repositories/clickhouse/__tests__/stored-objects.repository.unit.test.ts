@@ -1,6 +1,6 @@
 /**
- * Unit tests for StoredObjectsRepository — verifies that the lookup is project-scoped and
- * delegates to the ClickHouse client with the expected shape.
+ * Unit tests for StoredObjectsRepository — verifies that the lookup is a built reader statement
+ * scoped to its project and keyed on the table's own tenant column, project_id.
  * @vitest-environment node
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -9,15 +9,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // Hoisted mocks
 // ---------------------------------------------------------------------------
 
-const { mockQuery, mockQueryResult } = vi.hoisted(() => {
-  const queryResult = {
-    json: vi.fn().mockResolvedValue([]),
-  };
-  return {
-    mockQuery: vi.fn().mockResolvedValue(queryResult),
-    mockQueryResult: queryResult,
-  };
-});
+const { mockQuery, mockRead } = vi.hoisted(() => ({
+  mockQuery: vi.fn(),
+  mockRead: vi.fn(),
+}));
 
 vi.mock("langwatch", () => ({
   getLangWatchTracer: () => ({
@@ -43,7 +38,7 @@ import { ClickHouseStoredObjectsRepository } from "../stored-objects.repository.
 /** The routed connection, as this suite's one project resolves it. */
 class FakeStoredObjectsClickHouse implements StoredObjectsClickHouse {
   async resolveClient() {
-    return { query: mockQuery };
+    return { read: mockRead, query: mockQuery };
   }
 }
 
@@ -56,7 +51,7 @@ describe("StoredObjectsRepository", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockQueryResult.json.mockResolvedValue([]);
+    mockRead.mockResolvedValue({ rows: [] });
     repo = ClickHouseStoredObjectsRepository.create(new FakeStoredObjectsClickHouse());
   });
 
@@ -76,21 +71,21 @@ describe("StoredObjectsRepository", () => {
           created_at: "2025-01-01 00:00:00.000",
           inserted_at: "2025-01-01 00:00:00.000",
         };
-        mockQueryResult.json.mockResolvedValue([rawRow]);
+        mockRead.mockResolvedValue({ rows: [rawRow] });
 
         const result = await repo.tryFindById({
           projectId: "proj-1",
           id: "test-id",
         });
 
-        expect(mockQuery).toHaveBeenCalledOnce();
-        const call = mockQuery.mock.calls[0]![0];
-        // Query must be project-scoped
-        expect(call.query_params).toMatchObject({
-          projectId: "proj-1",
-          id: "test-id",
-        });
-        expect(call.query).toContain("project_id");
+        expect(mockRead).toHaveBeenCalledOnce();
+        const { statement } = mockRead.mock.calls[0]![0];
+        // The read must be project-scoped
+        expect(Object.values(statement.params)).toEqual(
+          expect.arrayContaining(["proj-1", "test-id"]),
+        );
+        expect(statement.sql).toContain("project_id");
+        expect(mockQuery).not.toHaveBeenCalled();
 
         expect(result).not.toBeNull();
         expect(result!.id).toBe("test-id");
@@ -101,8 +96,6 @@ describe("StoredObjectsRepository", () => {
 
     describe("when no row matches", () => {
       it("returns null", async () => {
-        mockQueryResult.json.mockResolvedValue([]);
-
         const result = await repo.tryFindById({
           projectId: "proj-1",
           id: "missing-id",
@@ -113,22 +106,26 @@ describe("StoredObjectsRepository", () => {
     });
   });
 
-  describe("when the lookup is sent against a table with no TenantId column", () => {
+  describe("when the lookup is sent against a table keyed on project_id", () => {
     const tenantId = "proj-1";
 
-    /** @scenario "Every legacy index statement declares itself unscoped" */
-    it("skips the tenant check, or the tenant guard refuses it", async () => {
-      mockQueryResult.json.mockResolvedValue([]);
+    /** @scenario "The legacy index lookup is a reader statement bounded by its project" */
+    it("is a reader statement whose tenant setting is that project, with no skip-check flag", async () => {
       await repo.tryFindById({ projectId: tenantId, id: "x" });
 
-      expect(mockQuery).toHaveBeenCalledOnce();
-      const call = mockQuery.mock.calls[0]![0];
-      const request = { tenantId, sql: call.query, params: call.query_params };
-      expect(() => new TenantGuard().assert(request)).toThrow(TenantScopeError);
+      expect(mockRead).toHaveBeenCalledOnce();
+      const request = mockRead.mock.calls[0]![0];
+      const { statement } = request;
+      expect(statement).toMatchObject({ identity: "reader", kind: "tenant", tenantId });
+      expect(statement.tenantColumns).toEqual(["project_id"]);
+      expect(statement.settings).toMatchObject({ SQL_langwatch_tenant_ids: tenantId });
+      expect(statement.sql).toContain("project_id = {tenantId:String}");
+      expect(request).not.toHaveProperty("SKIP_TENANT_CHECK");
+      const sent = { tenantId, sql: statement.sql, params: statement.params };
       expect(() =>
-        new TenantGuard().assert({ ...request, SKIP_TENANT_CHECK: call.SKIP_TENANT_CHECK }),
+        new TenantGuard().assert(sent, { tenantColumns: statement.tenantColumns }),
       ).not.toThrow();
-      expect(call.query).toContain("project_id = {projectId:String}");
+      expect(() => new TenantGuard().assert(sent)).toThrow(TenantScopeError);
     });
   });
 });

@@ -335,3 +335,35 @@ Feature: A typed ClickHouse read builder renders the tenant predicate and the te
     When the third census's shapes are built, their id markers expanded as the client expands them, and sent
     Then each returns exactly its tenant's rows, also when the setting lists every tenant
     And a day start in a bound time zone runs as a constant
+
+  @unit
+  Scenario: A built read on a table keyed on its own tenant column passes the client's guard
+    Given a descriptor whose tenant column is project_id
+    When a read of it is built and sent through the client
+    Then the statement names project_id as the tenant column its predicates bind, and the client's guard checks that column as it checks TenantId
+    And a predicate on it bound to another tenant, beside an OR, under a NOT or written as a literal is refused
+
+  @unit
+  Scenario: A raw statement cannot borrow a built statement's tenant column
+    Given the text of a built read keyed on project_id
+    When it is sent as a raw statement, with or without the built statement's tenant columns
+    Then the guard refuses it for a missing TenantId predicate
+
+  @unit
+  Scenario: The latest-version election repeats the read's id bounds on any column of its table
+    Given a latest-version read bounded by an id on a column outside the sort key
+    When it is built
+    Then the election repeats the id bound, alone of an AND's terms, naming the outer bound's parameter
+    And a plain filter on a column outside the sort key stays out of the election
+
+  @unit
+  Scenario: A JSON path element may be a lambda's parameter, never spliced as text
+    Given a JSON read whose path holds a lambda's parameter, a bound parameter, a key and an index
+    When it is built
+    Then the lambda's parameter renders as itself, the key binds as a String and the index as an Int64
+
+  @integration
+  Scenario: A repeated id bound and a JSON path from a lambda's parameter run on 26.8
+    Given ClickHouse 26.8, the reader identity and tables whose other tenant reuses the same ids
+    When an election repeating an id bound and a JSON path keyed by a lambda's parameter are built and sent
+    Then each returns exactly its tenant's rows, also when the setting lists every tenant

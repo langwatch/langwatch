@@ -67,9 +67,11 @@ const bound = (value: unknown, binding: Binding): ExpressionNode => ({
   value,
   binding,
 });
-/** A JSON path: each key bound as a String, each index as an Int64. */
-const jsonPath = (path: readonly (string | number)[]) =>
-  path.map((each) => bound(each, typeof each === "number" ? INT64 : STRING));
+/** A JSON path: each key bound as a String, each index as an Int64, an expression as itself. */
+const jsonPath = (path: readonly Arg<string | number, string>[]) =>
+  path.map((each) =>
+    argumentNode({ value: each, binding: typeof each === "number" ? INT64 : STRING }),
+  );
 
 type Arr<V, T extends string> = E<readonly V[], T>;
 type AnyArray = E<readonly unknown[], string>;
@@ -131,8 +133,11 @@ const overArray =
     });
 const jsonRead =
   <V>(name: string, binding: Binding) =>
-  <T extends string>(of: E<string | null, T>, ...path: readonly (string | number)[]) =>
-    call<V, T>({ name, args: [of.node, ...jsonPath(path)], binding });
+  <T extends string, U extends string = never>(
+    of: E<string | null, T>,
+    ...path: readonly Arg<string | number, U>[]
+  ) =>
+    call<V, T | U>({ name, args: [of.node, ...jsonPath(path)], binding });
 const replace =
   (name: string) =>
   <T extends string, U extends string = never>(
@@ -556,19 +561,19 @@ export const fn = {
       binding: UINT64,
     }),
 
-  // JSON, each key of the path bound as a value
+  // JSON, each key of the path bound as a value or given as an expression (a lambda's parameter)
   JSONExtractString: jsonRead<string>("JSONExtractString", STRING),
   JSONExtractRaw: jsonRead<string>("JSONExtractRaw", STRING),
   JSONExtractFloat: jsonRead<number>("JSONExtractFloat", FLOAT64),
   JSONExtractArrayRaw: jsonRead<readonly string[]>("JSONExtractArrayRaw", STRINGS),
   JSONExtractKeys: jsonRead<readonly string[]>("JSONExtractKeys", STRINGS),
   /** `JSONExtract(of, path…, type)`: the type checked against the type grammar, then bound. */
-  JSONExtract: <V, T extends string>(
+  JSONExtract: <V, T extends string, U extends string = never>(
     of: E<string | null, T>,
     type: ColumnType<V>,
-    ...path: readonly (string | number)[]
+    ...path: readonly Arg<string | number, U>[]
   ) =>
-    call<V, T>({
+    call<V, T | U>({
       name: "JSONExtract",
       args: [of.node, ...jsonPath(path), bound(typeTextOf(type), STRING)],
       binding: bindingOf(type),

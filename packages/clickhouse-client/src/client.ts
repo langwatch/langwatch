@@ -28,6 +28,7 @@ import type { ShadowSampler } from "./identity/shadowSampler.ts";
 import {
   identityOf,
   type IdentityOperation,
+  insertIdentityOf,
   SystemIdentityAbsentError,
   type SystemIdentityAbsentErrorFactory,
 } from "./identity/statementIdentity.ts";
@@ -73,6 +74,11 @@ export interface ClickHouseQueryClientOptions {
   driver?: QueryDriver | undefined;
   /** The app reader: every other read, carrying its tenant set as `SQL_langwatch_tenant_ids`. */
   readerDriver?: QueryDriver | undefined;
+  /**
+   * The insert-only writer (ADR-202 Decided 12): inserts in a process given no system driver.
+   * Never sent a read, a command or a skip-check statement; ignored beside a system driver.
+   */
+  writerDriver?: QueryDriver | undefined;
   /** Refuses statements with no tenant predicate unless they set `SKIP_TENANT_CHECK`. */
   tenantGuard: TenantGuard;
   /** Records a span per statement. Omit to record none. */
@@ -146,6 +152,18 @@ class InsertNotRetriedInPlace extends Error {
 /** Raw SQL, a statement the typed builder built, or its server-metadata read (ADR-202). */
 type StatementOrigin = "raw" | "built" | "metadata";
 
+/** A request on its way to the driver; a built one carries its tables' tenant columns. */
+type SentRequest = QueryRequest & { readonly builtTenantColumns?: readonly string[] | undefined };
+
+/** Only a built statement's own tenant columns widen the guard; a raw one is held to TenantId. */
+const guardedColumnsOf = ({
+  request,
+  origin,
+}: {
+  request: SentRequest;
+  origin: StatementOrigin;
+}) => (origin === "built" ? request.builtTenantColumns : undefined);
+
 /** One statement as it leaves: the identity's driver, and the request that driver receives. */
 interface Sending {
   driver: QueryDriver;
@@ -155,6 +173,7 @@ interface Sending {
 export class ClickHouseQueryClient {
   private readonly systemDriver: QueryDriver | undefined;
   private readonly readerDriver: QueryDriver | undefined;
+  private readonly writerDriver: QueryDriver | undefined;
   private readonly tenantGuard: TenantGuard;
   private readonly tracer: QueryTracer | undefined;
   private readonly limiter: ClickHouseStatementAdmission | undefined;
@@ -177,6 +196,7 @@ export class ClickHouseQueryClient {
   constructor({
     driver,
     readerDriver,
+    writerDriver,
     tenantGuard,
     tracer,
     limiter,
@@ -197,6 +217,7 @@ export class ClickHouseQueryClient {
     }
     this.systemDriver = driver;
     this.readerDriver = readerDriver;
+    this.writerDriver = writerDriver;
     this.tenantGuard = tenantGuard;
     this.tracer = tracer;
     this.limiter = limiter;
@@ -344,7 +365,7 @@ export class ClickHouseQueryClient {
     request,
     origin,
   }: {
-    request: QueryRequest;
+    request: SentRequest;
     origin: StatementOrigin;
   }): Promise<QueryResult<Row>> {
     const bound = hasIdBound(request)
@@ -419,6 +440,7 @@ export class ClickHouseQueryClient {
         ...sent,
         tenantId: statement.routeTenantId,
         tenantIds: statement.tenantIds,
+        builtTenantColumns: statement.tenantColumns,
         settings: settingsWithinExpiry({
           settings: { ...statement.settings },
           expiresAt: statement.expiresAt,
@@ -437,7 +459,7 @@ export class ClickHouseQueryClient {
     bound,
     origin,
   }: {
-    request: QueryRequest;
+    request: SentRequest;
     bound: IdBound;
     origin: StatementOrigin;
   }): Promise<QueryResult<Row>> {
@@ -462,11 +484,13 @@ export class ClickHouseQueryClient {
    * wrap, so an absent policy is a skipped line, not a hole in a chain.
    */
   private async statement<Row>(
-    request: QueryRequest,
+    request: SentRequest,
     origin: StatementOrigin = "raw",
   ): Promise<QueryResult<Row>> {
     // A metadata read names only allow-listed system tables (checked in `read`), no tenant rows.
-    if (origin !== "metadata") this.tenantGuard.assert(request);
+    if (origin !== "metadata") {
+      this.tenantGuard.assert(request, { tenantColumns: guardedColumnsOf({ request, origin }) });
+    }
     refuseUnexpandedIdBound({ request });
     const sending = this.sendingOf({ operation: "read", request, origin });
 
@@ -561,7 +585,7 @@ export class ClickHouseQueryClient {
    */
   async insert(request: InsertRequest): Promise<void> {
     this.tenantGuard.assertInsert(request);
-    this.systemFor({ operation: "insert", table: request.table });
+    this.inserterFor({ table: request.table });
     if (request.rows.length === 0) return;
 
     // An async insert that would wait for a slot joins others of its route and table (ADR-187).
@@ -582,7 +606,7 @@ export class ClickHouseQueryClient {
 
   /** One insert statement under the slot already held: retried only when refused, and reported. */
   private sendInsert(request: InsertRequest): Promise<void> {
-    const driver = this.systemFor({ operation: "insert", table: request.table });
+    const driver = this.inserterFor({ table: request.table });
     const runOnce = () => driver.insert(request);
     const refusedOnly = async (): Promise<void> => {
       try {
@@ -656,6 +680,16 @@ export class ClickHouseQueryClient {
       driver: this.readerDriver,
       request: { ...request, settings: { ...request.settings, [TENANT_IDS_SETTING]: tenants } },
     };
+  }
+
+  /** The driver an insert leaves on: the system's, else the writer's, else the refusal. */
+  private inserterFor({ table }: { table: string }): QueryDriver {
+    const identity = insertIdentityOf({
+      holdsSystem: this.systemDriver !== undefined,
+      holdsWriter: this.writerDriver !== undefined,
+    });
+    if (identity === "writer" && this.writerDriver !== undefined) return this.writerDriver;
+    return this.systemFor({ operation: "insert", table });
   }
 
   /** The system identity's driver, or the refusal of a process that holds none. */

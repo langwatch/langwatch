@@ -52,6 +52,8 @@ export type ReaderReadStatement<Row = unknown> = {
   /** Set for set and proof scopes; a single scope is checked by its `TenantId = {tenantId}`. */
   readonly tenantIds: readonly string[] | undefined;
   readonly routeTenantId: string;
+  /** Each tenant column its predicates bind (a descriptor's own, e.g. `project_id`). */
+  readonly tenantColumns: readonly string[];
   /** A braided proof's expiry: the sender cuts the statement's time limit to it. */
   readonly expiresAt: number | undefined;
   readonly [rowBrand]?: Row;
@@ -637,7 +639,12 @@ export class ClickHouseRead<
         reason: scope.reason,
       };
     } else {
-      statement = readerStatement({ scope, sql, params });
+      statement = readerStatement({
+        scope,
+        sql,
+        params,
+        tenantColumns: [...context.tenantColumns].toSorted(),
+      });
     }
     // The scope's kind decided the statement above; the conditional type restates it.
     return statement as StatementOf<Scope, Row>;
@@ -648,10 +655,12 @@ function readerStatement<Row>({
   scope,
   sql,
   params,
+  tenantColumns,
 }: {
   scope: ReaderScope;
   sql: string;
   params: Record<string, unknown>;
+  tenantColumns: readonly string[];
 }): ReaderReadStatement<Row> {
   return {
     identity: "reader",
@@ -662,6 +671,7 @@ function readerStatement<Row>({
     tenantId: scope.tenantId,
     tenantIds: scope.kind === "single" ? undefined : scope.tenantIds,
     routeTenantId: scope.routeTenantId,
+    tenantColumns,
     expiresAt: scope.kind === "proof" ? scope.expiresAt : undefined,
   };
 }
@@ -1005,6 +1015,9 @@ function tenantPredicate({
   const { scope, tenancy } = state;
   // A derived table's own read carries the predicate; a system table holds no tenant rows.
   if (table.kind !== "tenant") return undefined;
+  if (scope.kind !== "allTenants" && scope.kind !== "serverMetadata") {
+    context.tenantColumns.add(table.tenantColumn);
+  }
   switch (scope.kind) {
     case "allTenants":
     case "serverMetadata":
@@ -1046,8 +1059,8 @@ function tenantPredicate({
 
 /**
  * The latest-version election: keys and version from the descriptor, under the fence's
- * latest-version form, repeating the read's conjuncts that filter on that table's keys or its
- * time column alone (the time window keeps partition pruning).
+ * latest-version form, repeating the read's conjuncts on that table's keys or time column alone
+ * (the window keeps partition pruning) and its id bounds on any of the table's own columns.
  */
 function electionOf({
   state,
@@ -1072,10 +1085,19 @@ function electionOf({
       )
     );
   };
+  // An id bound on any of the table's own columns repeats too, as the raw reads repeat it.
+  const boundsIds = (node: ExpressionNode) =>
+    node.kind === "idBound" &&
+    columnsOf(node).every((each) => each.table === table.name && each.name !== table.tenantColumn);
+  const idBoundsOf = (node: ExpressionNode): ExpressionNode[] => {
+    if (boundsIds(node)) return [node];
+    return node.kind === "logic" && node.operator === "AND" ? node.terms.flatMap(idBoundsOf) : [];
+  };
+  const repeated = (node: ExpressionNode) => (filtersKeys(node) ? [node] : idBoundsOf(node));
   const where: string[] = [];
   const predicate = tenantPredicate({ state, table, context, election: true });
   if (predicate !== undefined) where.push(predicate);
-  for (const node of [...state.prewhere, ...state.where].filter(filtersKeys)) {
+  for (const node of [...state.prewhere, ...state.where].flatMap(repeated)) {
     where.push(renderExpression({ node, context, qualify: false }));
   }
   const filter = where.length > 0 ? ` WHERE ${where.join(" AND ")}` : "";

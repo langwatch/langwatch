@@ -158,8 +158,9 @@ function isOrTokenAt(masked: string, i: number): boolean {
 /** Any tenant predicate an `OR` could disjoin away: bound, literal or a tenant set. */
 const ANY_TENANT_PREDICATE = /(?:^|[\s.(])TenantId\s*(?:=\s*[{'"]|IN\s*\(\s*\{)/gi;
 
-/** Where `TenantId` itself starts in a match whose first character may be a separator. */
-const tokenIndex = (match: RegExpExecArray): number => match.index + match[0].search(/TenantId/i);
+/** Where the tenant column itself starts in a match whose first character may be a separator. */
+const tokenIndex = (match: RegExpExecArray): number =>
+  match.index + (/^[\s.(]/.test(match[0]) ? 1 : 0);
 
 const matchesOf = ({ pattern, masked }: { pattern: RegExp; masked: string }): RegExpExecArray[] => [
   ...masked.matchAll(new RegExp(pattern.source, "gi")),
@@ -260,17 +261,19 @@ function hasWeakeningDisjunction({
   masked,
   predicateIndex,
   fencingIndexes = [],
+  patterns,
 }: {
   masked: string;
   predicateIndex: number;
   fencingIndexes?: readonly number[];
+  patterns: TenantPatterns;
 }): boolean {
   const { disjunctions, predicateDepth } = disjunctionsOf({ masked, predicateIndex });
   const { groupAt, parent, balanced } = bracketGroups(masked);
   if (!balanced) return disjunctions.some((each) => each.depth <= predicateDepth);
 
   const groupOf = (index: number): number => groupAt[index] ?? 0;
-  const tenantGroups = matchesOf({ pattern: ANY_TENANT_PREDICATE, masked }).map((match) =>
+  const tenantGroups = matchesOf({ pattern: patterns.any, masked }).map((match) =>
     groupOf(tokenIndex(match)),
   );
   const fencingGroups = fencingIndexes.map(groupOf);
@@ -303,15 +306,61 @@ const NEGATION = /\bNOT\b\s*/i;
 const TENANT_OPERAND = /^(?:[A-Za-z_][A-Za-z0-9_]*\s*\.\s*)?TenantId\b/i;
 const TENANT_TOKEN = /(?<![A-Za-z0-9_])TenantId(?![A-Za-z0-9_])/i;
 
-/** Whether a `NOT` (or `not(`) negates `TenantId` itself or a bracket that names it. */
-function hasNegatedPredicate(masked: string): boolean {
+const TENANT_PATTERNS = {
+  bound: BOUND_TENANT_PREDICATE,
+  set: BOUND_TENANT_SET,
+  literal: LITERAL_TENANT_PREDICATE,
+  any: ANY_TENANT_PREDICATE,
+  operand: TENANT_OPERAND,
+  token: TENANT_TOKEN,
+};
+type TenantPatterns = Record<keyof typeof TENANT_PATTERNS, RegExp>;
+const PATTERNS_BY_COLUMNS = new Map<string, TenantPatterns>();
+
+/**
+ * The tenant patterns for a built statement's own tenant columns, each `TenantId` pattern with
+ * the column swapped in; `TenantId` alone when none is named. A name that is not an identifier is
+ * dropped, so it can only narrow what is accepted.
+ */
+function tenantPatternsOf(columns: readonly string[] | undefined): TenantPatterns {
+  const named = [...new Set(columns ?? [])].filter((name) => IDENTIFIER.test(name)).toSorted();
+  if (named.length === 0 || named.join(",") === "TenantId") return TENANT_PATTERNS;
+  const key = named.join(",");
+  const known = PATTERNS_BY_COLUMNS.get(key);
+  if (known !== undefined) return known;
+  const column = `(?:${named.join("|")})`;
+  const swapped = (pattern: RegExp) =>
+    new RegExp(
+      pattern.source.replace("TenantId", () => column),
+      pattern.flags,
+    );
+  const patterns: TenantPatterns = {
+    bound: swapped(BOUND_TENANT_PREDICATE),
+    set: swapped(BOUND_TENANT_SET),
+    literal: swapped(LITERAL_TENANT_PREDICATE),
+    any: swapped(ANY_TENANT_PREDICATE),
+    operand: swapped(TENANT_OPERAND),
+    token: swapped(TENANT_TOKEN),
+  };
+  PATTERNS_BY_COLUMNS.set(key, patterns);
+  return patterns;
+}
+
+/** Whether a `NOT` (or `not(`) negates the tenant column itself or a bracket that names it. */
+function hasNegatedPredicate({
+  masked,
+  patterns,
+}: {
+  masked: string;
+  patterns: TenantPatterns;
+}): boolean {
   const { groupAt, parent } = bracketGroups(masked);
-  const tenantGroups = matchesOf({ pattern: TENANT_TOKEN, masked }).map(
+  const tenantGroups = matchesOf({ pattern: patterns.token, masked }).map(
     (match) => groupAt[match.index] ?? 0,
   );
   return matchesOf({ pattern: NEGATION, masked }).some((match) => {
     const operand = match.index + match[0].length;
-    if (masked[operand] !== "(") return TENANT_OPERAND.test(masked.slice(operand));
+    if (masked[operand] !== "(") return patterns.operand.test(masked.slice(operand));
     const group = groupAt[operand] ?? 0;
     return tenantGroups.some((inner) => encloses({ parent, outer: group, inner }));
   });
@@ -665,25 +714,31 @@ export function checkTenantScope({
   params,
   tenantId,
   tenantIds,
+  tenantColumns,
 }: {
   sql: string;
   params?: Record<string, unknown> | undefined;
   tenantId: string;
   tenantIds?: readonly string[] | undefined;
+  /** A built statement's own tenant columns (its tables' descriptors); `TenantId` when absent. */
+  tenantColumns?: readonly string[] | undefined;
 }): TenantScopeViolation | null {
+  const patterns = tenantPatternsOf(tenantColumns);
   const statement = maskNonCode(sql);
-  if (hasNegatedPredicate(statement)) return { kind: "negated-predicate" };
+  if (hasNegatedPredicate({ masked: statement, patterns })) return { kind: "negated-predicate" };
   const shape = shapeOf(statement);
-  if (tenantIds !== undefined) return checkTenantSetScope({ shape, params, tenantId, tenantIds });
-  const bound = BOUND_TENANT_PREDICATE.exec(statement);
+  if (tenantIds !== undefined) {
+    return checkTenantSetScope({ shape, params, tenantId, tenantIds, patterns });
+  }
+  const bound = patterns.bound.exec(statement);
 
   if (bound === null) {
-    return LITERAL_TENANT_PREDICATE.test(statement)
+    return patterns.literal.test(statement)
       ? { kind: "literal-predicate" }
       : { kind: "missing-predicate" };
   }
 
-  if (hasWeakeningDisjunction({ masked: statement, predicateIndex: bound.index })) {
+  if (hasWeakeningDisjunction({ masked: statement, predicateIndex: bound.index, patterns })) {
     return { kind: "weakening-disjunction" };
   }
   if (conjunctReach({ shape, match: bound }) === null) return { kind: "predicate-not-and-term" };
@@ -701,11 +756,11 @@ export function checkTenantScope({
     };
   }
   const binds = [
-    ...matchesOf({ pattern: BOUND_TENANT_PREDICATE, masked: statement }).filter(
+    ...matchesOf({ pattern: patterns.bound, masked: statement }).filter(
       (match) => params?.[match[1] as string] === tenantId,
     ),
     // A fence the proof expanded to the caller's own project alone binds exactly as `= {t}` does.
-    ...matchesOf({ pattern: BOUND_TENANT_SET, masked: statement }).filter((match) => {
+    ...matchesOf({ pattern: patterns.set, masked: statement }).filter((match) => {
       const values = boundBy({ match, params });
       return values.length > 0 && values.every((value) => value === tenantId);
     }),
@@ -723,16 +778,18 @@ function checkTenantSetScope({
   params,
   tenantId,
   tenantIds,
+  patterns,
 }: {
   shape: Shape;
   params?: Record<string, unknown> | undefined;
   tenantId: string;
   tenantIds: readonly string[];
+  patterns: TenantPatterns;
 }): TenantScopeViolation | null {
   const statement = shape.masked;
-  const bound = BOUND_TENANT_SET.exec(statement);
+  const bound = patterns.set.exec(statement);
   if (bound === null) return { kind: "missing-predicate" };
-  const sets = matchesOf({ pattern: BOUND_TENANT_SET, masked: statement });
+  const sets = matchesOf({ pattern: patterns.set, masked: statement });
   const missing = sets.flatMap(placeholdersOf).find((name) => params?.[name] === undefined);
   if (missing !== undefined) return { kind: "missing-param", param: missing };
 
@@ -754,6 +811,7 @@ function checkTenantSetScope({
     masked: statement,
     predicateIndex: bound.index,
     fencingIndexes,
+    patterns,
   });
   if (weakened) return { kind: "weakening-disjunction" };
   if (conjunctReach({ shape, match: bound }) === null) return { kind: "predicate-not-and-term" };
@@ -768,7 +826,7 @@ function checkTenantSetScope({
   }
   const binds = [
     ...sets.filter(bindsOnlyDeclared),
-    ...matchesOf({ pattern: BOUND_TENANT_PREDICATE, masked: statement }).filter((match) =>
+    ...matchesOf({ pattern: patterns.bound, masked: statement }).filter((match) =>
       isDeclared(params?.[match[1] as string]),
     ),
   ];
@@ -898,7 +956,10 @@ export class TenantGuard {
    * `SKIP_TENANT_CHECK`. Returns nothing on success rather than the request: it is a check,
    * and a caller that had to remember to use a returned value could forget to.
    */
-  assert(request: QueryRequest): void {
+  assert(
+    request: QueryRequest,
+    { tenantColumns }: { tenantColumns?: readonly string[] | undefined } = {},
+  ): void {
     if (request.SKIP_TENANT_CHECK === true) {
       // `quietly`: a throwing counter must not refuse what the guard allowed (./resilience.ts).
       quietly(() =>
@@ -916,6 +977,7 @@ export class TenantGuard {
       params: request.params,
       tenantId: request.tenantId,
       tenantIds: request.tenantIds,
+      tenantColumns,
     });
     if (violation !== null) {
       throw new TenantScopeError(violation, request.tenantId);

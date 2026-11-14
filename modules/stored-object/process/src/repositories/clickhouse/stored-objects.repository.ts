@@ -1,4 +1,5 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import { clickhouseRead, tenantScope } from "@langwatch/clickhouse-client/builder";
 import { Temporal, toDate, toEpochMs } from "@langwatch/time";
 /**
  * StoredObjectsRepository — ClickHouse I/O for the stored_objects table.
@@ -9,11 +10,13 @@ import { getLangWatchTracer } from "langwatch";
 import type { StoredObject } from "../../rules/stored-object-row.rules.ts";
 import { storedObjectSchema } from "../../rules/stored-object-row.rules.ts";
 import { StoredObjectsRepository } from "../stored-objects.repository.ts";
+import { storedObjectsTable as t } from "./clickhouse.stored-objects.table.ts";
 
 const TABLE_NAME = "stored_objects" as const;
 
-/** The one operation the legacy stored-object index needs, as the driver exposes it. */
+/** The legacy index's operations: the built lookup by id, and the import's raw page query. */
 type StoredObjectsClickHouseClient = Readonly<{
+  read: ClickHouseQueryClient["read"];
   query(input: {
     query: string;
     query_params: Record<string, unknown>;
@@ -42,6 +45,7 @@ export class RoutedStoredObjectsClickHouse implements StoredObjectsClickHouse {
   async resolveClient(projectId: string): Promise<StoredObjectsClickHouseClient> {
     const clickhouse = this.clickhouse;
     return {
+      read: (request) => clickhouse.read(request),
       async query(input) {
         const result = await clickhouse.query({
           tenantId: projectId,
@@ -100,41 +104,27 @@ export class ClickHouseStoredObjectsRepository extends StoredObjectsRepository {
       async (span) => {
         const client = await this.clickhouse.resolveClient(projectId);
 
-        // Scalar-subquery dedup: inner reads only (project_id, id, inserted_at)
-        // to find max(inserted_at), outer reads the full row for that version.
-        const result = await client.query({
-          query: `
-            SELECT
-              t.id           AS id,
-              t.project_id   AS project_id,
-              t.purpose      AS purpose,
-              t.owner_kind   AS owner_kind,
-              t.owner_id     AS owner_id,
-              t.media_type   AS media_type,
-              t.size_bytes   AS size_bytes,
-              t.sha256       AS sha256,
-              t.storage_uri  AS storage_uri,
-              t.created_at   AS created_at,
-              t.inserted_at  AS inserted_at
-            FROM ${TABLE_NAME} AS t
-            WHERE t.project_id = {projectId:String}
-              AND t.id = {id:String}
-              AND t.inserted_at = (
-                SELECT max(s.inserted_at)
-                FROM ${TABLE_NAME} AS s
-                WHERE s.project_id = {projectId:String}
-                  AND s.id = {id:String}
-              )
-            LIMIT 1
-          `,
-          query_params: { projectId, id },
-          format: "JSONEachRow",
-          // Read-only legacy index under ADR-158: stored_objects has no TenantId column, so the
-          // statement is filtered by project_id.
-          SKIP_TENANT_CHECK: true,
-        });
-
-        const rows = await result.json<Record<string, unknown>>();
+        // The newest version of the one id, elected over the project's rows of that id alone.
+        const statement = clickhouseRead({ scope: tenantScope.single({ tenantId: projectId }) })
+          .from(t)
+          .latestVersion()
+          .select({
+            id: t.id,
+            project_id: t.project_id,
+            purpose: t.purpose,
+            owner_kind: t.owner_kind,
+            owner_id: t.owner_id,
+            media_type: t.media_type,
+            size_bytes: t.size_bytes,
+            sha256: t.sha256,
+            storage_uri: t.storage_uri,
+            created_at: t.created_at,
+            inserted_at: t.inserted_at,
+          })
+          .where(({ eq }) => eq(t.id, id))
+          .limit(1)
+          .build();
+        const { rows } = await client.read({ statement, table: TABLE_NAME });
 
         span.setAttribute("result.found", rows.length > 0);
 
