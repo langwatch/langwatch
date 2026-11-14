@@ -26,6 +26,10 @@ export const EXEMPT_FILES = new Map([
     "modules/analytics/process/src/repositories/clickhouse/clickhouse.langwatch-ql-provisioning.repository.ts",
     "LangWatchQL provisioning DDL and key-map reads on the admin identity, worker and tasks app only (ADR-159).",
   ],
+  [
+    "modules/ops/process/src/repositories/clickhouse/clickhouse.ops-explain.repository.ts",
+    "Ops EXPLAIN of an operator's SELECT: worker only, as the read-only langwatch_ops user on its own client (ADR-202 Decided 14).",
+  ],
 ]);
 
 /** Files whose writes (`command`, `kind: "write"`) are system-identity mutations; reads count. */
@@ -123,11 +127,20 @@ function visitCall(state, node) {
   else note(state, { node: node, messageId: "rawRequest", data: { method, key } });
 }
 
+/** SQL text, or `sql` beside request keys; a domain field that holds a user's query passes. */
+function isStatementShaped(owner, value) {
+  if (value?.type === "TemplateLiteral" || typeof value?.value === "string") return true;
+
+  return ["params", "query_params", "settings", "clickhouse_settings"].some((key) =>
+    hasKey(owner, key),
+  );
+}
+
 function visitProperty(state, node) {
   const owner = node.parent;
   if (!state.inRepository || owner?.type !== "ObjectExpression" || state.passed.has(owner)) return;
   const name = keyName(node);
-  if (name === "sql" && !state.requests.has(owner))
+  if (name === "sql" && !state.requests.has(owner) && isStatementShaped(owner, node.value))
     note(state, { node: node, messageId: "sqlProperty" });
   if (SKIP_MARKERS.has(name) && !hasKey(owner, "rows"))
     note(state, { node: node, messageId: "skipMarker", data: { name } });

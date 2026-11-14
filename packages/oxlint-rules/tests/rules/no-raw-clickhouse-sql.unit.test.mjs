@@ -102,6 +102,15 @@ describe("given module process code that reaches ClickHouse", () => {
       expect(ids(report(code, { filename: ENTERPRISE }))).toEqual(["sqlProperty"]);
       expect(ids(report(code, { filename: SERVICE }))).toEqual([]);
     });
+
+    /** @scenario "An object spelling SQL under sql in a ClickHouse repository is reported" */
+    it("reports a variable under sql beside params, and passes a domain field named sql", () => {
+      const request = "export const build = (text) => ({ sql: text, params: {} });";
+      const domain = "export const mapRow = (record) => ({ id: record.Id, sql: record.Sql });";
+
+      expect(ids(report(request, { filename: ENTERPRISE }))).toEqual(["sqlProperty"]);
+      expect(ids(report(domain, { filename: ENTERPRISE }))).toEqual([]);
+    });
   });
 
   describe("when a ClickHouse repository opts a request out of a check", () => {

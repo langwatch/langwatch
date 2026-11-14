@@ -13,8 +13,6 @@
     "modules/coding-agent/process/src/repositories/clickhouse/clickhouse.coding-agent-session.repository.ts": 13,
     "modules/data-retention/process/src/repositories/clickhouse/clickhouse.retroactive-retention.repository.ts": 10,
     "modules/data-retention/process/src/repositories/clickhouse/clickhouse.storage-meter.repository.ts": 2,
-    "modules/instant-eval/process/src/repositories/clickhouse/clickhouse.instant-eval-run.mapper.ts": 1,
-    "modules/ops/process/src/repositories/clickhouse/clickhouse.ops-explain.repository.ts": 3,
     "modules/ops/process/src/repositories/clickhouse/clickhouse.storage-footprint.repository.ts": 8,
     "modules/stored-object/process/src/repositories/clickhouse/clickhouse.stored-object-owner.repository.ts": 2,
     "modules/trace/process/src/features/braid/repositories/clickhouse/clickhouse.trace-braid-reads.repository.ts": 13,
