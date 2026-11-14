@@ -983,7 +983,9 @@ function electionOf({
       read.length > 0 &&
       read.every(
         (each) =>
-          each.table === table.name && each.name !== table.tenantColumn && keys.includes(each.name),
+          each.table === table.name &&
+          each.name !== table.tenantColumn &&
+          (keys.includes(each.name) || each.name === table.timeColumn),
       )
     );
   };

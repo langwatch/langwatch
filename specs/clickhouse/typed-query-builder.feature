@@ -108,7 +108,13 @@ Feature: A typed ClickHouse read builder renders the tenant predicate and the te
     Given a read over a table declaring a version column
     When it asks for the latest version
     Then it renders the key-and-version election under the fence's latest-version form
-    And the election repeats the read's key filters and nothing else
+    And the election repeats the read's key and time filters and nothing else
+
+  @unit
+  Scenario: The latest-version election keeps the read's time window
+    Given a read over a table declaring a version column and a time column
+    When it filters on the time column and asks for the latest version
+    Then the election repeats the time filter, so it prunes the same partitions
 
   @unit
   Scenario: FINAL is refused on a table whose sort key does not hold its tenant column

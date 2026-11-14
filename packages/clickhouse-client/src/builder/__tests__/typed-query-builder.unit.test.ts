@@ -394,7 +394,7 @@ describe("the typed read builder", () => {
 
   describe("when a read asks for the fence's other operations", () => {
     /** @scenario "The latest version is elected inside the same fence" */
-    it("elects keys and version under the scope, repeating only key filters", () => {
+    it("elects keys and version under the scope, repeating only key and time filters", () => {
       const built = clickhouseRead({ scope: single })
         .from(storedSpans)
         .select({ SpanId: storedSpans.SpanId })
@@ -413,6 +413,23 @@ describe("the typed read builder", () => {
         refusalOf(() => clickhouseRead({ scope: single }).from(traceSummaries).latestVersion())
           .kind,
       ).toBe("no-version-column");
+    });
+
+    /** @scenario "The latest-version election keeps the read's time window" */
+    it("repeats a filter on the time column inside the election, for partition pruning", () => {
+      const built = clickhouseRead({ scope: single })
+        .from(storedSpans)
+        .select({ SpanId: storedSpans.SpanId })
+        .where(({ gte }) => gte(storedSpans.StartTime, 1000))
+        .latestVersion()
+        .build();
+
+      expect(built.sql).toBe(
+        "SELECT SpanId FROM stored_spans WHERE TenantId = {tenantId:String} AND StartTime >= fromUnixTimestamp64Milli({v0:Int64})" +
+          " AND (TenantId, TraceId, SpanId, UpdatedAt) IN" +
+          " (SELECT TenantId, TraceId, SpanId, max(UpdatedAt) FROM stored_spans" +
+          " WHERE TenantId = {tenantId:String} AND StartTime >= fromUnixTimestamp64Milli({v0:Int64}) GROUP BY TenantId, TraceId, SpanId)",
+      );
     });
 
     /** @scenario "FINAL is refused on a table whose sort key does not hold its tenant column" */
