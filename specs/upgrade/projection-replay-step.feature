@@ -174,12 +174,11 @@ Feature: A module fills a new read model at deploy by replaying a projection lan
     When the worker runs it
     Then every report it saves and returns names the instant its first run replayed from
 
-  # A heavy tenant's batch can outgrow ClickHouse's per-query memory limit on its event query. That
-  # failure is the batch's size, so a fold lane's batch splits in halves down to one aggregate. Unlike
-  # the group queue's bisection (LANGWATCH_GQ_BISECTION_SPLIT_BUDGET), it has no budget: its depth is
-  # bounded by log2 of the batch size. A map lane writes rows mid-stream, so once it has written a
-  # rerun half would append them twice: it splits only before its first write. Any other failure
-  # stops the lane as before.
+  # A heavy tenant's batch can outgrow ClickHouse's per-query memory limit on its event query.
+  # That is a size failure: a fold lane splits its batch in halves down to one aggregate.
+  # Unlike the group queue's bisection (LANGWATCH_GQ_BISECTION_SPLIT_BUDGET), it has no budget;
+  # its depth is bounded by log2 of the batch size. A map lane writes rows mid-stream, so it splits
+  # only before its first write (a rerun half would append twice). Other failures stop as before.
 
   @unit
   Scenario: A batch over the query memory limit is split until it fits
