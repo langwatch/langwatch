@@ -385,6 +385,18 @@ describe("the product sidebar", () => {
       });
     });
 
+    /** @scenario "Opening a page below the fold reveals its sidebar entry" */
+    it("reveals an entry that sits under the menu's bottom fade", async () => {
+      // Inside the menu's 200px box, but its last pixels are where the fade hides entries.
+      stubMenuLayout({ entryOffsets: { "Virtual keys": 150 }, menuHeight: 200 });
+
+      renderSidebar({ surface: "gateway", pathname: "/gateway/virtual-keys" });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("sidebar-scroll-region").scrollTop).toBe(150);
+      });
+    });
+
     /** @scenario "Opening a page whose entry is in view leaves the menu alone" */
     it("leaves the menu at its start when the entry is already in view", async () => {
       // Where the first entries of a menu sit: below Quick Search and the

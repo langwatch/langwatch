@@ -350,6 +350,15 @@ Ask Langy for a code change in the LangWatch panel first. Its request appears in
 ╰─────────────────────────────────────────────────────────────────────────────╯
 ```
 
+The terminal only sees requests made by the account it is signed in as. With `--as <email>`, available in releases after 2.2.0 (an older CLI refuses the option), it checks that its login is the person who asked Langy. If it is not, it says so and offers to sign in as that person.
+
+After 30 seconds with no request, with or without `--as`, it names the account it is signed in as and tells you how to switch, then keeps waiting.
+
+```text
+Signed in as riley@acme.test, the request came from sam@acme.test.
+? Sign in as sam@acme.test? › (Y/n)
+```
+
 When two conversations asked for the same folder, you pick one first. After you share it, the command prints what Langy does, one line per call:
 
 ```text

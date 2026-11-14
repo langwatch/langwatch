@@ -393,6 +393,11 @@ export interface AuthApi {
     memberUserIds: readonly string[];
     at: number;
   }): Promise<AuthUsageCount>;
+  /** Which of these people used a browser session at or after `since` (epoch ms). */
+  findSessionUsersSince(input: {
+    userIds: readonly string[];
+    since: number;
+  }): Promise<readonly string[]>;
 }
 
 /** Which accounts a legacy-access question is about: the connection being

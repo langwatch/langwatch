@@ -8,6 +8,7 @@ import type { MonitorWithEvaluator } from "@langwatch/monitor-contract";
 import { createLogger } from "@langwatch/observability";
 import type { EvaluationTraceEvent } from "@langwatch/trace-contract";
 
+import { isEvaluationSampled } from "../../../rules/evaluation-sampling.rules.ts";
 import type { AzureSafetyCredentialsService } from "../../evaluators/services/azure-safety-credentials.service.ts";
 import {
   EvaluatorSettingsService,
@@ -165,13 +166,17 @@ export class EvaluationExecutionPreparationService {
   }
 
   private isSampled(data: ExecuteEvaluationCommandData, sample: number): boolean {
-    // A retry was already picked by the first attempt's roll; rolling again could drop it.
+    // A retry was already picked by the first attempt; keep it even if the rate changed since.
     if ((data.attempt ?? 1) > 1) return true;
 
-    const sampled = Math.random() <= sample;
+    const sampled = isEvaluationSampled({
+      traceId: data.traceId,
+      monitorId: data.evaluatorId,
+      sample,
+    });
     if (!sampled) {
       logger.debug(
-        { tenantId: data.tenantId, evaluatorId: data.evaluatorId, sample },
+        { tenantId: data.tenantId, evaluatorId: data.evaluatorId, traceId: data.traceId, sample },
         "Evaluation excluded by sampling",
       );
     }

@@ -210,6 +210,35 @@ describe("given a custom role definition", () => {
     });
   });
 
+  describe("when it, or an API key's private role, lists the braid permission", () => {
+    /** @scenario "No role, custom role or API key may list the braid permission" */
+    it("is refused naming it, even where the role already listed it", async () => {
+      const { writer, db, sent } = harness({});
+      db.role.findFirst.mockResolvedValue({
+        name: "Braided",
+        description: null,
+        permissions: ["project:view", "spans:braided"],
+      });
+
+      for (const kind of ["custom", "system_api_key"] as const) {
+        await expect(
+          writer.defineRole({
+            organizationId: ORG_ID,
+            roleId: "role_braided",
+            name: "Braided",
+            permissions: ["project:view", "spans:braided"],
+            kind,
+            actor: ACTOR,
+          }),
+        ).rejects.toMatchObject({
+          code: "grant_validation_failed",
+          meta: { permissions: ["spans:braided"] },
+        });
+      }
+      expect(sent).toEqual([]);
+    });
+  });
+
   describe("when a legacy role that already lists ops is renamed", () => {
     /** @scenario A legacy custom role listing ops permissions can still be renamed */
     it("writes the definition, keeping the inert ops entries", async () => {

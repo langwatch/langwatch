@@ -35,6 +35,15 @@ const CATALOG_BY_PREFIX: Record<string, Record<string, CatalogModelEntry | undef
   openai: OPENAI_MODELS as unknown as Record<string, CatalogModelEntry>,
 };
 
+/**
+ * Dialects whose models pi's catalog does not list are assumed to reason, as new
+ * frontier releases do. A catalog entry's own `reasoning` always wins over this.
+ */
+const REASONING_BY_DEFAULT: ReadonlySet<LangyWorkerModelConfig["api"]> = new Set([
+  "anthropic-messages",
+  "openai-responses",
+]);
+
 function catalogEntryFor(model: LangyWorkerModelConfig): CatalogModelEntry | undefined {
   const slash = model.id.indexOf("/");
   if (slash <= 0) return undefined;
@@ -81,8 +90,12 @@ function buildModelEntry(model: LangyWorkerModelConfig): Record<string, unknown>
   };
   const catalog = catalogEntryFor(model);
   if (!catalog) {
+    const entry: Record<string, unknown> = { ...configEntry };
+    if (entry.reasoning === undefined && REASONING_BY_DEFAULT.has(model.api)) {
+      entry.reasoning = true;
+    }
     const compat = uncataloguedCompat(model);
-    return compat ? { ...configEntry, compat } : configEntry;
+    return compat ? { ...entry, compat } : entry;
   }
   const {
     // Ours stay authoritative: the provider-prefixed id is what the gateway

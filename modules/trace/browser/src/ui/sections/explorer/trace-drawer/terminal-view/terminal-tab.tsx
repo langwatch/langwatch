@@ -11,9 +11,11 @@ import {
   useResourceInfoRead,
   useSpansFullRead,
   useTraceEventsRead,
+  useTraceLogsRead,
 } from "../../../../../behavior/reads/use-trace-detail-reads.ts";
 import { TERMINAL_TOKENS } from "../../../../../model/coding-agent/trace/terminal-palette.ts";
 import { deriveSessionBanner } from "../../../../../model/coding-agent/trace/terminal-session-banner.ts";
+import { promptLineText } from "../../../../../model/coding-agent/trace/terminal-session.ts";
 import { indexToolSpansBySpanId } from "../../../../../model/coding-agent/trace/terminal-tool-spans.ts";
 import { TerminalSkeleton } from "../../../../elements/coding-agent/trace/terminal-skeleton.tsx";
 import { TerminalView } from "../../../../elements/coding-agent/trace/terminal-view.tsx";
@@ -58,6 +60,11 @@ export function TerminalTab({
   // off the resource attributes (the session fold deliberately carries no
   // identity strings, ADR-041).
   const resourceQuery = useResourceInfoRead(turn);
+  // A logs-only agent (Grok, ADR-192) names itself only on its log records.
+  const logsQuery = useTraceLogsRead({
+    ...turn,
+    enabled: spansQuery.isSuccess && spansQuery.data.length === 0,
+  });
   const sessionCostUsd = useSessionCostUsd({ projectId, traceId });
 
   const toolSpans = useMemo(
@@ -69,14 +76,11 @@ export function TerminalTab({
     [spansQuery.data, eventsQuery.data],
   );
 
-  const banner = useMemo(
-    () =>
-      deriveSessionBanner({
-        resourceAttributes: resourceQuery.data?.resourceAttributes ?? {},
-        spans: spansQuery.data ?? [],
-      }),
-    [resourceQuery.data, spansQuery.data],
-  );
+  const banner = deriveSessionBanner({
+    resourceAttributes: resourceQuery.data?.resourceAttributes ?? {},
+    spans: spansQuery.data ?? [],
+    logs: logsQuery.data ?? [],
+  });
 
   const session = useSessionScrollback({
     projectId,
@@ -95,6 +99,13 @@ export function TerminalTab({
     }),
     [session.status, session.earlierCount, session.loadEarlier],
   );
+
+  const promptLine = promptLineText({
+    sessionName,
+    traceId,
+    spans: spansQuery.data ?? [],
+    entries: session.entries,
+  });
 
   // The loading state has to look like a terminal too — see TerminalSkeleton.
   if (transcriptQuery.isLoading) {
@@ -116,7 +127,7 @@ export function TerminalTab({
       sessionStartAtMs={session.sessionStartAtMs}
       sessionCostUsd={sessionCostUsd}
       banner={banner}
-      sessionName={sessionName}
+      promptLine={promptLine}
     />
   );
 }

@@ -1,5 +1,7 @@
 {
   "bad-negation-reframe.md": ["writing/negation-reframe"],
+  "bad-question-opener.md": ["writing/question-opener", "writing/narrator-sentence"],
+  "ok-question-same-line.md": ["writing/question-opener"],
   "bad-staccato.md": ["writing/staccato", "writing/unintroduced-first-name"],
   "bad-banned-words.md": [
     "writing/banned-words-2026-08-02",

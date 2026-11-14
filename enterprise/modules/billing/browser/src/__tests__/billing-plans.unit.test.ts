@@ -34,6 +34,17 @@ describe("getGrowthFeatures()", () => {
   });
 });
 
+describe("the Growth seat line", () => {
+  describe.each([Currency.EUR, Currency.USD])("when currency is %s", (currency) => {
+    it("offers volume discounts above 20 users on the upgrade block and the comparison, with no seat cap", () => {
+      for (const features of [getGrowthFeatures(currency), getGrowthPlanFeatures(currency)]) {
+        expect(features).toContain("Volume discounts above 20 users");
+        expect(features.some((feature) => /up to \d+ core users/i.test(feature))).toBe(false);
+      }
+    });
+  });
+});
+
 describe("getGrowthPlanFeatures()", () => {
   describe("when currency is EUR", () => {
     it("contains the EUR events pricing string", () => {

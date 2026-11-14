@@ -6,7 +6,7 @@ import { promisify } from "node:util";
 
 import { build, loadEnv } from "vite";
 
-import { buildNav } from "../features/navigation/compile.ts";
+import { buildNav, readStars } from "../features/navigation/compile.ts";
 import { appRoot, cacheRoot, docsRoot, publicRoot, readBuildOptions } from "../paths.ts";
 import { assertMaterializedAssets } from "./assets.ts";
 import { buildFingerprint, buildRecords } from "./build-inputs.ts";
@@ -38,6 +38,8 @@ if (fingerprint && (await records.isCurrent({ fingerprint, outDir }))) {
 }
 
 async function buildSite() {
+  /* Read before media encoding loads the CPU; the navigation plugin reuses this read. */
+  await readStars();
   await assertMaterializedAssets({ docsRoot, publicRoot });
   await build({
     ...createViteConfig({ outDir, basePath, appOrigin }),

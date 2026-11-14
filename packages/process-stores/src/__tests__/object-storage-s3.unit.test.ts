@@ -3,7 +3,7 @@ import { Readable } from "node:stream";
 
 import { NoSuchKey } from "@aws-sdk/client-s3";
 import { Temporal } from "@langwatch/time";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { ObjectBodyTooLargeError, StoredObjectNotFoundError } from "../object-storage-backend.ts";
 import { s3Backend, s3Client } from "../object-storage-s3.ts";
@@ -45,6 +45,26 @@ describe("given an S3 account as the deployment configures it", () => {
       const client = s3Client({ ...account, region: "eu-central-1" });
 
       await expect(client.config.region()).resolves.toBe("eu-central-1");
+    });
+  });
+
+  describe("when access keys reach AWS and no region is named", () => {
+    /** @scenario "S3 client never sends the 'auto' region to AWS, even with access keys" */
+    it("reads a regional endpoint's region, else leaves it to AWS_REGION, never 'auto'", async () => {
+      vi.stubEnv("AWS_REGION", "eu-west-2");
+      try {
+        const regional = s3Client({
+          bucket: "objects",
+          endpoint: "https://s3.eu-west-1.amazonaws.com",
+          credentials: account.credentials,
+        });
+        const bare = s3Client({ bucket: "objects", credentials: account.credentials });
+
+        await expect(regional.config.region()).resolves.toBe("eu-west-1");
+        await expect(bare.config.region()).resolves.toBe("eu-west-2");
+      } finally {
+        vi.unstubAllEnvs();
+      }
     });
   });
 

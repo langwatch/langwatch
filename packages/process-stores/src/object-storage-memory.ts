@@ -42,6 +42,7 @@ export function memoryObjectStorage(): ObjectStorage {
         yield* chunks;
       })();
     },
+    exists: (at) => Promise.resolve(held.has(slot(at))),
     digest: (at) => Promise.resolve(find(at).digest),
     remove(at) {
       held.delete(slot(at));

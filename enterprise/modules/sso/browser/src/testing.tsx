@@ -34,6 +34,8 @@ export class FakeSsoHost extends SsoHostApi {
       currentUserAddress?: string | null;
       /** Whether the reader holds `sso:manage`; they do unless a test says not. */
       canManage?: boolean;
+      /** Whether the reader holds `organization:manage`; they do unless a test says not. */
+      canManageOrganization?: boolean;
       /** Whether the reader holds `sso:view`; they do unless a test says not. */
       canView?: boolean;
       query?: Record<string, string | undefined>;
@@ -60,6 +62,10 @@ export class FakeSsoHost extends SsoHostApi {
 
   canManage(): boolean {
     return this.options.canManage ?? true;
+  }
+
+  canManageOrganization(): boolean {
+    return this.options.canManageOrganization ?? true;
   }
 
   canView(): boolean {

@@ -62,8 +62,19 @@ function contrast(a: string, b: string): number {
 }
 
 describe("production main colour parity", () => {
-  it("preserves all 111 raw scale entries from main", () => {
-    expect(colorSystem).toEqual(mainColours.raw);
+  /* Dark raised steps went near-neutral (zinc 700 to 850): a panel on a card reads as a lift. */
+  const ZINC_DEPARTURES = { 700: "#2c2c33", 750: "#222228", 800: "#1c1c22", 850: "#16161c" };
+
+  it("preserves main's raw scale entries, but the departed zinc steps", () => {
+    const zinc = { ...mainColours.raw.zinc } as Record<string, { value: string }>;
+    for (const [step, value] of Object.entries(ZINC_DEPARTURES)) zinc[step] = { value };
+    expect(colorSystem).toEqual({ ...mainColours.raw, zinc });
+  });
+
+  it("pins the near-neutral raised zinc steps", () => {
+    for (const [step, value] of Object.entries(ZINC_DEPARTURES)) {
+      expect(resolve(`zinc.${step}`, "_dark")).toBe(value);
+    }
   });
 
   // Chosen departures from main, each pinned by its own test below.
@@ -142,10 +153,10 @@ describe("main palette contrast", () => {
     },
   );
 
-  it("retains main's inverted dark hierarchy", () => {
+  it("retains main's inverted dark hierarchy, on the near-neutral panel", () => {
     expect(resolve("bg.surface", "_dark")).toBe("#080812");
     expect(resolve("bg.page", "_dark")).toBe("#10101a");
-    expect(resolve("bg.panel", "_dark")).toBe("#1a1a24");
+    expect(resolve("bg.panel", "_dark")).toBe("#1c1c22");
     expect(luminance(resolve("bg.surface", "_dark"))).toBeLessThan(
       luminance(resolve("bg.page", "_dark")),
     );

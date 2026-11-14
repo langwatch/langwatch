@@ -1,4 +1,4 @@
-/** Main's gateway virtual-key spend reads, ported to the table's owner one tenant at a time. */
+/** Main's gateway virtual-key spend reads, ported to the table's owner. */
 import type { QueryRequest } from "@langwatch/clickhouse-client";
 import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { describe, expect, it } from "vitest";
@@ -74,7 +74,7 @@ describe("ClickHouseTraceAttributeSpendRepository", () => {
 
       await expect(
         repository.findAttributeUsageBuckets({
-          tenantId: "project-1",
+          tenantIds: ["project-1"],
           attributeKey: KEY,
           window: WINDOW,
         }),
@@ -93,12 +93,50 @@ describe("ClickHouseTraceAttributeSpendRepository", () => {
     });
   });
 
+  describe("when usage buckets are read across an organization's projects", () => {
+    it("asks once over the declared tenant set, deduping each trace within its tenant", async () => {
+      const { queries, repository } = createRepository([]);
+
+      await repository.findAttributeUsageBuckets({
+        tenantIds: ["project-1", "project-2"],
+        attributeKey: KEY,
+        window: WINDOW,
+        values: ["vk-1"],
+      });
+
+      expect(queries).toHaveLength(1);
+      expect(queries[0]).toMatchObject({
+        tenantId: "project-1",
+        tenantIds: ["project-1", "project-2"],
+      });
+      expect(queries[0]?.sql).toContain("TenantId IN ({tenantIds:Array(String)})");
+      expect(queries[0]?.sql).toContain("GROUP BY TenantId, TraceId");
+      expect(queries[0]?.params).toMatchObject({ tenantIds: ["project-1", "project-2"] });
+      // Under the client's 30 s request deadline, so ClickHouse ends a slow read first.
+      expect(Number(queries[0]?.settings?.max_execution_time)).toBeLessThan(30);
+    });
+
+    it("answers nothing without querying when the organization has no projects", async () => {
+      const { queries, repository } = createRepository([]);
+
+      await expect(
+        repository.findAttributedTraces({
+          tenantIds: [],
+          attributeKey: KEY,
+          window: WINDOW,
+          limit: 20,
+        }),
+      ).resolves.toEqual([]);
+      expect(queries).toHaveLength(0);
+    });
+  });
+
   describe("when recent traces are read for one model", () => {
     it("filters the winning version's first model and orders newest first under the limit", async () => {
       const { queries, repository } = createRepository([]);
 
       await repository.findAttributedTraces({
-        tenantId: "project-1",
+        tenantIds: ["project-1"],
         attributeKey: KEY,
         window: WINDOW,
         values: ["vk-1"],
@@ -143,7 +181,11 @@ describe("MemoryTraceAttributeSpendRepository", () => {
       });
 
       await expect(
-        repository.findAttributeUsageBuckets({ tenantId: "p1", attributeKey: KEY, window: WINDOW }),
+        repository.findAttributeUsageBuckets({
+          tenantIds: ["p1"],
+          attributeKey: KEY,
+          window: WINDOW,
+        }),
       ).resolves.toEqual([
         {
           value: "vk-1",

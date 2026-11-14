@@ -361,6 +361,7 @@ Feature: Shared organization service
     Given an organization is created by sign-up, by instance provisioning or for a self-hosted customer
     When the organization and its first team are committed
     Then organization records "lw.organization.created" carrying the organization's id and name
+    And it names the founder made its admin, when a person created it
     And peers such as prompt seed their own defaults from that fact
 
   @unit

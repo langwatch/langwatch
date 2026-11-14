@@ -1,12 +1,12 @@
 /**
  * @vitest-environment jsdom
- * SubscriptionPage when the plans page asks it to start the Growth checkout.
+ * SubscriptionPage when the plans page asks it to open the Growth seat dialog.
  * @see specs/licensing/subscription-page.feature
  */
 import "@testing-library/jest-dom/vitest";
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import type { StripeEnvironment } from "@langwatch/enterprise-billing-contract";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -49,6 +49,13 @@ class TestBillingHost extends BillingHostApi {
   }
 
   canInviteMembers(): boolean {
+    return true;
+  }
+
+  canReadMonthBreakdown(): boolean {
+    return true;
+  }
+  canReadHeldSeats(): boolean {
     return true;
   }
 
@@ -111,8 +118,8 @@ function arriveFromPlansPage({
   return host;
 }
 
-function checkoutAnswering(result: Promise<{ url: string | null }>) {
-  const mutateAsync = vi.fn(() => result);
+function checkoutAnswering(result: () => Promise<{ url: string | null }>) {
+  const mutateAsync = vi.fn(result);
   mockCreateSubscription.mockReturnValue({
     mutate: vi.fn(),
     mutateAsync,
@@ -149,6 +156,7 @@ vi.mock("../../../behavior/billing-api.ts", async () => {
         getOrganizationWithMembersAndTheirTeams: {
           useQuery: () => setup.mockGetOrganizationWithMembers(),
         },
+        listHeldSeats: { useQuery: () => setup.mockListHeldSeats() },
       },
       invite: {
         upgradeWithInvites: {
@@ -187,7 +195,25 @@ vi.mock("../../../behavior/billing-api.ts", async () => {
           useQuery: () => setup.mockListInvoices(),
         },
         getLastSubscription: {
-          useQuery: () => setup.mockGetLastSubscription(),
+          useQuery: () => ({ ...setup.mockGetLastSubscription(), refetch: vi.fn() }),
+        },
+        developerSeats: {
+          useQuery: (_input: unknown, opts: { enabled: boolean }) => ({
+            ...(opts.enabled ? setup.mockDeveloperSeats() : { data: undefined }),
+            refetch: setup.mockDeveloperSeatsRefetch,
+          }),
+        },
+        previewDeveloperSeats: {
+          useQuery: (input: { quantity: number }, opts: { enabled: boolean }) =>
+            opts.enabled
+              ? setup.mockPreviewDeveloperSeats(input)
+              : { data: undefined, isLoading: false, isError: false },
+        },
+        setDeveloperSeats: {
+          useMutation: () => ({ mutateAsync: setup.mockSetDeveloperSeats, isPending: false }),
+        },
+        previewProration: {
+          useQuery: () => ({ data: undefined, isLoading: false, isError: false }),
         },
       },
       useUtils: vi.fn(() => ({
@@ -214,9 +240,10 @@ describe("<SubscriptionPage/> opened from the plans page Upgrade now", () => {
   describe("given a Free organization with 2 members", () => {
     /** @scenario "The plans page upgrade opens the Growth checkout" */
     it("creates the annual USD Growth checkout for 2 seats and leaves for Stripe", async () => {
-      const createCheckout = checkoutAnswering(Promise.resolve({ url: CHECKOUT_URL }));
+      const createCheckout = checkoutAnswering(() => Promise.resolve({ url: CHECKOUT_URL }));
 
       const host = arriveFromPlansPage({ interval: "annual", currency: "USD" });
+      fireEvent.click(await screen.findByRole("button", { name: "Continue to checkout" }));
 
       await waitFor(() => expect(host.departures).toEqual([CHECKOUT_URL]));
       expect(createCheckout).toHaveBeenCalledTimes(1);
@@ -234,9 +261,10 @@ describe("<SubscriptionPage/> opened from the plans page Upgrade now", () => {
     /** @scenario "A refused checkout tells the reader why and stays on the page" */
     it("reports the refusal and does not leave the page", async () => {
       const refusal = new Error("organization:manage");
-      checkoutAnswering(Promise.reject(refusal));
+      checkoutAnswering(() => Promise.reject(refusal));
 
       const host = arriveFromPlansPage({ interval: "monthly", currency: "EUR" });
+      fireEvent.click(await screen.findByRole("button", { name: "Continue to checkout" }));
 
       await waitFor(() => expect(host.failures).toHaveLength(1));
       expect(host.failures[0]).toMatchObject({
@@ -262,7 +290,7 @@ describe("<SubscriptionPage/> opened from the plans page Upgrade now", () => {
         isLoading: false,
         refetch: vi.fn(),
       });
-      const createCheckout = checkoutAnswering(Promise.resolve({ url: CHECKOUT_URL }));
+      const createCheckout = checkoutAnswering(() => Promise.resolve({ url: CHECKOUT_URL }));
 
       const host = arriveFromPlansPage({ interval: "monthly", currency: "EUR" });
 

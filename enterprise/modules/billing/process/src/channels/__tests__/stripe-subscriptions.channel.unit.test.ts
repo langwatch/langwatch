@@ -20,6 +20,8 @@ const ACTIVE = {
   status: "active",
   canceled_at: null,
   billing_thresholds: null,
+  current_period_end: 1_701_388_800,
+  currency: "eur",
   items: {
     data: [
       {
@@ -37,13 +39,18 @@ const ACTIVE_HELD: BillingSubscription = {
   status: "active",
   canceledAt: null,
   billingThreshold: null,
-  items: [{ id: "si_seat", priceId: "price_seat", unitAmount: 2500, interval: "month" }],
+  items: [
+    { id: "si_seat", priceId: "price_seat", unitAmount: 2500, interval: "month", quantity: 2 },
+  ],
+  currentPeriodEnd: 1_701_388_800,
+  currency: "eur",
 };
 
 const PREVIEW = {
   object: "invoice",
   currency: "usd",
   total: 1500,
+  total_excluding_tax: 1240,
   amount_due: 1500,
 } as Stripe.Invoice;
 
@@ -106,7 +113,9 @@ function overTheProvider(): StripeSubscriptionsChannel {
 function overTheTwin(): StripeSubscriptionsChannel {
   const subscriptions = MemoryStripeSubscriptionsChannel.create();
   subscriptions.seed({ subscription: ACTIVE_HELD });
-  subscriptions.seedPreview({ preview: { total: 1500, amountDue: 1500, currency: "usd" } });
+  subscriptions.seedPreview({
+    preview: { total: 1500, amountDue: 1500, tax: 260, currency: "usd" },
+  });
   subscriptions.seedCheckoutLineItems({
     checkoutSessionId: "cs_1",
     lineItems: [{ priceId: "price_seat", quantity: 4 }],
@@ -155,7 +164,7 @@ describe.each(tiers)("Stripe subscriptions over $tier", ({ compose }) => {
           subscriptionId: "sub_1",
           change: { items: [{ id: "si_seat", quantity: 3 }] },
         }),
-      ).resolves.toEqual({ currency: "usd", total: 1500, amountDue: 1500 });
+      ).resolves.toEqual({ currency: "usd", total: 1500, amountDue: 1500, tax: 260 });
     });
   });
 
@@ -292,13 +301,21 @@ describe("Billing's subscription shapes over the provider", () => {
       canceledAt: 1_699_000_000,
       billingThreshold: { amountGte: 75_000, resetBillingCycleAnchor: false },
       items: [
-        { id: "si_seat", priceId: "price_seat", unitAmount: 2500, interval: "month" },
-        { id: "si_events", priceId: "price_events", unitAmount: null, interval: null },
+        { id: "si_seat", priceId: "price_seat", unitAmount: 2500, interval: "month", quantity: 2 },
+        {
+          id: "si_events",
+          priceId: "price_events",
+          unitAmount: null,
+          interval: null,
+          quantity: null,
+        },
       ],
+      currentPeriodEnd: 1_701_388_800,
+      currency: "eur",
     });
   });
 
-  it("sends a seat change and a billing threshold as Stripe's update parameters", async () => {
+  it("sends a seat change and a billing threshold as Stripe's update parameters and timeout", async () => {
     const { calls, subscriptions } = recordingProvider();
 
     await subscriptions.updateSubscription({
@@ -309,6 +326,7 @@ describe("Billing's subscription shapes over the provider", () => {
         prorationDate: 1_700_000_000,
         cancelAtPeriodEnd: false,
       },
+      timeoutMs: 60_000,
     });
     await subscriptions.updateSubscription({
       subscriptionId: "sub_1",
@@ -326,6 +344,7 @@ describe("Billing's subscription shapes over the provider", () => {
             proration_date: 1_700_000_000,
             cancel_at_period_end: false,
           },
+          { timeout: 60_000 },
         ],
       },
       {
@@ -333,6 +352,7 @@ describe("Billing's subscription shapes over the provider", () => {
         args: [
           "sub_1",
           { billing_thresholds: { amount_gte: 75_000, reset_billing_cycle_anchor: false } },
+          undefined,
         ],
       },
     ]);
@@ -350,7 +370,8 @@ describe("Billing's subscription shapes over the provider", () => {
       },
     });
 
-    expect(preview).toEqual({ total: 1500, amountDue: 1500, currency: "usd" });
+    // The tax is what the invoice adds on top of its pre-tax total.
+    expect(preview).toEqual({ total: 1500, amountDue: 1500, tax: 260, currency: "usd" });
     expect(calls).toEqual([
       {
         operation: "invoices.createPreview",

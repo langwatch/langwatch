@@ -65,6 +65,7 @@ describe("the apiKey tRPC transport", () => {
       // part of every procedure's name, and of its React Query cache key.
       expect(Object.keys(router._def.procedures).toSorted()).toEqual([
         "apiKey.create",
+        "apiKey.docsSessionAvailability",
         "apiKey.grantablePermissions",
         "apiKey.list",
         "apiKey.mintDocsSessionKey",
@@ -514,6 +515,13 @@ describe("the apiKey tRPC transport", () => {
   });
 
   describe("when a signed-in member allows the docs to connect", () => {
+    const DOCS_MINT = {
+      projectId: "project_1",
+      docsOrigin: "https://langwatch.ai",
+      access: "read",
+      lifetimeMinutes: 30,
+    } as const;
+
     it("hands the member and the browser session they asked on to the application", async () => {
       const mintDocsSessionKey = vi.fn(async () => ({
         token: "sk-lw-docs",
@@ -523,16 +531,34 @@ describe("the apiKey tRPC transport", () => {
       }));
       const { caller } = harness({ mintDocsSessionKey });
 
-      await expect(
-        caller.mintDocsSessionKey({ projectId: "project_1", docsOrigin: "https://langwatch.ai" }),
-      ).resolves.toMatchObject({ token: "sk-lw-docs" });
+      await expect(caller.mintDocsSessionKey(DOCS_MINT)).resolves.toMatchObject({
+        token: "sk-lw-docs",
+      });
       expect(mintDocsSessionKey).toHaveBeenCalledWith({
         userId: USER_ID,
         impersonatorId: undefined,
         browserSession: { id: "session-1", startedAt: null, expiresAt: null },
         projectId: "project_1",
         docsOrigin: "https://langwatch.ai",
+        access: "read",
+        lifetimeMinutes: 30,
       });
+    });
+
+    /** @scenario "A member chooses how long the key lasts, up to one hour" */
+    it("refuses a lifetime longer than an hour, or one not offered, before the application runs", async () => {
+      const mintDocsSessionKey = vi.fn();
+      const { caller } = harness({ mintDocsSessionKey });
+
+      for (const lifetimeMinutes of [61, 120, 1440, 7]) {
+        await expect(
+          caller.mintDocsSessionKey({
+            ...DOCS_MINT,
+            lifetimeMinutes: lifetimeMinutes as typeof DOCS_MINT.lifetimeMinutes,
+          }),
+        ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+      }
+      expect(mintDocsSessionKey).not.toHaveBeenCalled();
     });
 
     it("refuses an operator acting as the member before the application runs", async () => {
@@ -543,9 +569,9 @@ describe("the apiKey tRPC transport", () => {
         actor: { type: "user", id: USER_ID, impersonatorId: "operator_1" },
       });
 
-      await expect(
-        caller.mintDocsSessionKey({ projectId: "project_1", docsOrigin: "https://langwatch.ai" }),
-      ).rejects.toMatchObject({ cause: { code: "permission_denied" } });
+      await expect(caller.mintDocsSessionKey(DOCS_MINT)).rejects.toMatchObject({
+        cause: { code: "impersonation_cannot_mint_credential" },
+      });
       expect(mintDocsSessionKey).not.toHaveBeenCalled();
     });
   });

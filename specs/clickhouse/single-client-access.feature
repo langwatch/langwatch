@@ -321,6 +321,53 @@ Feature: One ClickHouse client, reached one way, bounded where it can be seen
       Then the batches before the failure arrive
       And the stream then fails with the server's code
 
+  # ClickHouse cancels a query whose HTTP client went away only for a read-only query, and a POST
+  # is read-only only under readonly 1 or 2. ADR-197.
+  Rule: A read the app abandons stops on the server
+
+    @unit
+    Scenario: A routed read is sent read-only, so the server cancels it when the app leaves
+      Given a repository reads through the routed client, whole or streamed
+      When the read is sent
+      Then it carries readonly=2 and cancel_http_readonly_queries_on_client_close=1
+      And the read's own settings and parameters still apply
+
+    @unit
+    Scenario: A read cannot change its read-only mode
+      Given a read that sets readonly itself
+      When the read is sent
+      Then readonly=0 is replaced by readonly=2
+
+    @unit
+    Scenario: Commands and inserts are not sent read-only
+      Given a command or an insert through the routed client
+      When it is sent
+      Then it carries only its own settings
+
+    @integration
+    Scenario: A read the app abandons stops running on the server
+      Given a routed read that runs for minutes on the server
+      When the client's request timeout fires, or the caller aborts it
+      Then the server no longer runs it
+      And the same read sent without the read-only settings keeps running
+
+    @integration
+    Scenario: A timed-out read that is retried never runs twice on the server at once
+      Given a routed read that outlasts the request timeout on every attempt
+      When the retry policy tries it three times
+      Then the server runs three queries, one at a time
+      And none is still running after the last attempt fails
+
+    # A readonly=1 user refuses every setting change, so no routed client may connect as one; the
+    # vendor client's own defaults already fail there. ADR-197.
+    @unit
+    Scenario: A read the server refuses for readonly fails and is not resent
+      Given the server refuses a read with READONLY (164)
+      When a repository runs the read
+      Then the read fails with the server's error
+      And the read is not sent again without the read-only settings
+      And the next read still carries readonly=2 and cancel_http_readonly_queries_on_client_close=1
+
   @unit
   Scenario: ClickHouse is reached through a repository, from the application object
     Given a service needs data that lives in ClickHouse

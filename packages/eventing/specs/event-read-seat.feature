@@ -65,6 +65,19 @@ Feature: One event is read by id through a narrow seat beside the event store
       When another tenant, or an empty aggregate id, asks the seat for a stream
       Then no event is answered
 
+  Rule: The seat answers a page of streams in one read for upgrade steps
+
+    @unit
+    Scenario: A page of streams is answered in one read, each stream oldest first
+      Given two streams of one aggregate type in two tenants
+      When the seat is asked for both in one read
+      Then every event of each stream is answered in its own tenant, each stream oldest first
+
+    @unit
+    Scenario: A page of streams answers nothing for a stream asked in another tenant
+      When a stream is asked under a tenant that does not hold it, or with an empty aggregate id
+      Then no event is answered for it
+
   Rule: A producer composes the seat beside its refusing store
 
     @integration

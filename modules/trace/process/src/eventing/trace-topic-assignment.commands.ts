@@ -69,6 +69,9 @@ export class EventingTraceTopicAdapter implements CommandHandler<
           tenantId,
           type: TOPIC_ASSIGNED_EVENT_TYPE,
           version: TOPIC_ASSIGNED_EVENT_VERSION_LATEST,
+          // The summary folds read back within a window around the event's time; an event
+          // stamped now never finds a trace older than that window, and its assignment is lost.
+          occurredAt: commandData.occurredAt,
           data: {
             topicId: commandData.topicId,
             topicName: commandData.topicName,

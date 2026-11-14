@@ -11,6 +11,17 @@ Feature: Directory administration
   Rule: people, invitations and requests are three cuts of one list
 
     @integration
+    Scenario: A member who cannot manage the organization reads only the people
+      When "sam" opens the directory page
+      Then he sees the people tab and no other tab
+      And nothing on the page offers him a change
+
+    @integration
+    Scenario: A reader without the directory view is told which permission it takes
+      When a reader who holds no members:view opens the directory page
+      Then the page names members:view and draws no tab
+
+    @integration
     Scenario: The directory's people tab opens on everybody
       When "ana" opens the directory page
       Then she sees the people tab open, listing members, invitations and
@@ -62,6 +73,20 @@ Feature: Directory administration
       When "ana" opens the members page
       Then "sam" carries a chip naming the domain
       And it says that nobody approved it
+
+    @integration
+    Scenario: A member who accepted an invitation is a member, not an invitation
+      Given "sam" accepted an invitation to "acme"
+      When "ana" opens the members page
+      Then "sam" carries a chip saying he joined from an invitation
+      And his row does not read "Invited", the word an outstanding invitation carries
+
+    @integration
+    Scenario: An invitation not yet accepted still reads as invited
+      Given "dana@acme.com" has an invitation she has not accepted
+      When "ana" opens the members page
+      Then the invitation's row reads "Invited"
+      And the invited cut counts it
 
     @integration
     Scenario: A member we cannot explain carries no chip rather than a guess
