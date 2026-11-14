@@ -1,71 +1,76 @@
 package suiteweights
 
 import (
+	"cmp"
 	"fmt"
+	"maps"
 	"math"
 	"slices"
 	"strconv"
 	"strings"
 )
 
-// Weigh turns the measurements of several runs into one weight per package:
-// the median of each script's measured seconds, summed over the package's
-// scripts. A measurement Nx replayed from its cache is used only when no run
-// executed that script for real, so a cache hit never makes a suite look cheap.
-// A package no sampled run executed at all keeps its weight from `previous`,
-// the committed file, when it has one: its replays say nothing about its cost.
-func Weigh(runs [][]Measurement, previous map[string]float64) map[string]float64 {
+// ScriptKey names one script of one workspace package.
+type ScriptKey struct{ Package, Script string }
+
+// Weigh turns the measurements of several runs into one weight per script:
+// the median of its measured seconds. A replay from the Nx cache counts only
+// when no run executed that script for real. A script no run executed keeps its
+// `previous` (committed) weight if its package was measured in some run. Only
+// scripts the package still `defined` are returned, measured or committed: a
+// renamed or removed one must not live on in the file.
+func Weigh(runs [][]Measurement, previous map[ScriptKey]float64, defined func(ScriptKey) bool) map[ScriptKey]float64 {
 	ran, replayed := byScript(runs)
-	executed := map[string]bool{}
-	weights := map[string]float64{}
-	for k, seconds := range ran {
-		executed[k.pkg] = true
-		weights[k.pkg] += median(seconds)
+	measured := map[string]bool{}
+	weights := map[ScriptKey]float64{}
+	for key, seconds := range ran {
+		measured[key.Package] = true
+		weights[key] = median(seconds)
 	}
-	for k, seconds := range replayed {
-		if _, ranForReal := ran[k]; !ranForReal {
-			weights[k.pkg] += median(seconds)
+	for key, seconds := range replayed {
+		measured[key.Package] = true
+		if _, ranForReal := ran[key]; !ranForReal {
+			weights[key] = median(seconds)
 		}
 	}
-	for pkg, seconds := range previous {
-		if _, measured := weights[pkg]; measured && !executed[pkg] {
-			weights[pkg] = seconds
+	for key, seconds := range previous {
+		if _, ranForReal := ran[key]; measured[key.Package] && !ranForReal {
+			weights[key] = seconds
 		}
 	}
+	maps.DeleteFunc(weights, func(key ScriptKey, _ float64) bool { return !defined(key) })
 	return weights
 }
 
-// ParseWeights reads a weights file: `<package>  <seconds>` per line, `#`
-// comments and blank lines ignored. A line of any other shape is skipped; the
+// ParseWeights reads a weights file: `<package>  <script>  <seconds>` per line,
+// `#` comments and blank lines ignored. A line of any other shape is skipped; the
 // file is only a fallback here, and run-package-suites.ts is what refuses it.
-func ParseWeights(source string) map[string]float64 {
-	weights := map[string]float64{}
+func ParseWeights(source string) map[ScriptKey]float64 {
+	weights := map[ScriptKey]float64{}
 	for _, raw := range strings.Split(source, "\n") {
 		line, _, _ := strings.Cut(raw, "#")
 		fields := strings.Fields(line)
-		if len(fields) != 2 {
+		if len(fields) != 3 {
 			continue
 		}
-		if seconds, err := strconv.ParseFloat(fields[1], 64); err == nil && seconds > 0 {
-			weights[fields[0]] = seconds
+		if seconds, err := strconv.ParseFloat(fields[2], 64); err == nil && seconds > 0 {
+			weights[ScriptKey{fields[0], fields[1]}] = seconds
 		}
 	}
 	return weights
 }
 
-type scriptKey struct{ pkg, script string }
-
 // byScript groups every run's seconds by package script, the executed apart
 // from the ones Nx replayed.
-func byScript(runs [][]Measurement) (ran, replayed map[scriptKey][]float64) {
-	ran, replayed = map[scriptKey][]float64{}, map[scriptKey][]float64{}
+func byScript(runs [][]Measurement) (ran, replayed map[ScriptKey][]float64) {
+	ran, replayed = map[ScriptKey][]float64{}, map[ScriptKey][]float64{}
 	for _, run := range runs {
 		for _, m := range run {
 			into := ran
 			if m.Cached {
 				into = replayed
 			}
-			k := scriptKey{m.Package, m.Script}
+			k := ScriptKey{m.Package, m.Script}
 			into[k] = append(into[k], m.Seconds)
 		}
 	}
@@ -82,30 +87,33 @@ func median(values []float64) float64 {
 	return (sorted[mid-1] + sorted[mid]) / 2
 }
 
-// MinListedSeconds is the lightest package the file names. Below it a package
+// MinListedSeconds is the lightest script the file names. Below it a script
 // costs DEFAULT_WEIGHT_SECONDS in run-package-suites.ts, which is what the
 // small contract packages measure, so listing them would only lengthen the file.
 const MinListedSeconds = 10
 
 const fileHeader = `# How long each workspace package's suites take in the package-suites job, in
 # seconds, so ` + "`.github/scripts/run-package-suites.ts`" + ` can split them over the
-# shards by weight instead of by count. One package per line: ` + "`<package>  <seconds>`" + `.
+# shards by weight instead of by count. One script per line: ` + "`<package>  <script>  <seconds>`" + `.
 #
 # Every shard reads this file from the checkout and computes the split alone, so
 # the file must never come from a cache or a previous run: two shards holding
 # different weights would run a package twice or not at all.
 #
-# A package not listed here costs 5 seconds (DEFAULT_WEIGHT_SECONDS). Only
-# packages of %d seconds or more are listed, so the file stays short.
+# A script not listed here costs 5 seconds (DEFAULT_WEIGHT_SECONDS). Only
+# scripts of %d seconds or more are listed, so the file stays short. A package
+# weighs the sum of its scripts, so a leg that runs only some of them pays only
+# for those.
 #
 # Generated by ` + "`go run ./cmd/suiteweights`" + ` from the package-suites job logs of
-# main runs %s (every shard green in each): the median of each script's
-# seconds, summed per package. Rerun it to refresh; do not edit by hand.
+# main runs %s (every shard and browser job green in each): the median of each script's
+# seconds, kept per script. Rerun it to refresh; do not edit by hand.
 `
 
 // Render writes the weights file: the header naming the runs it was measured
-// from, then one line per package of at least MinListedSeconds, heaviest first.
-func Render(weights map[string]float64, runIDs []int64) string {
+// from, then one line per script of at least MinListedSeconds, heaviest first,
+// ties by package then script.
+func Render(weights map[ScriptKey]float64, runIDs []int64) string {
 	ids := make([]string, len(runIDs))
 	for i, id := range runIDs {
 		ids[i] = fmt.Sprint(id)
@@ -113,20 +121,20 @@ func Render(weights map[string]float64, runIDs []int64) string {
 	var out strings.Builder
 	fmt.Fprintf(&out, fileHeader, MinListedSeconds, strings.Join(ids, ", "))
 	out.WriteString("\n")
-	names := make([]string, 0, len(weights))
-	for name, seconds := range weights {
+	keys := make([]ScriptKey, 0, len(weights))
+	for key, seconds := range weights {
 		if math.Round(seconds) >= MinListedSeconds {
-			names = append(names, name)
+			keys = append(keys, key)
 		}
 	}
-	slices.SortFunc(names, func(a, b string) int {
+	slices.SortFunc(keys, func(a, b ScriptKey) int {
 		if d := math.Round(weights[b]) - math.Round(weights[a]); d != 0 {
 			return int(d)
 		}
-		return strings.Compare(a, b)
+		return cmp.Or(strings.Compare(a.Package, b.Package), strings.Compare(a.Script, b.Script))
 	})
-	for _, name := range names {
-		fmt.Fprintf(&out, "%s  %d\n", name, int(math.Round(weights[name])))
+	for _, key := range keys {
+		fmt.Fprintf(&out, "%s  %s  %d\n", key.Package, key.Script, int(math.Round(weights[key])))
 	}
 	return out.String()
 }

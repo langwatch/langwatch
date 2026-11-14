@@ -81,6 +81,7 @@ Feature: A package's integration suite runs in CI when it declares one
       When the packages are split over the shards
       Then a heavy package counts for all of its seconds and a light one for its share of the concurrency
       And a shard's integration and browser lanes count at full weight, one suite at a time
+      And each script adds its own recorded seconds to its own lane
 
     @unit
     Scenario: Every shard computes the same split
@@ -96,15 +97,49 @@ Feature: A package's integration suite runs in CI when it declares one
 
     @unit
     Scenario: A malformed weights file is refused
-      Given a weights line that is not "<package>  <seconds>" with a positive number
+      Given a weights line that is not "<package>  <script>  <seconds>" with a positive number
       When the package suites job starts
       Then it fails instead of splitting by guesswork
+
+    @unit
+    Scenario: A weights line naming a script its package does not run is refused
+      Given a weights line for a script the workspace package does not run
+      When the package suites job starts
+      Then it fails instead of reading a stale weight as measured
 
     @unit
     Scenario: A malformed shard value is refused
       Given PACKAGE_SUITES_SHARD is not "<index>/<total>"
       When the package suites job starts
       Then it fails instead of running every package on every shard
+
+  Rule: A suite that hangs is stopped, and so is one the run abandons
+
+    @unit
+    Scenario: A suite that runs past the limit is killed and failed
+      Given a suite is still running when the per-suite limit passes
+      When the limit passes
+      Then its whole process tree is killed
+      And an ::error:: line names the suite and the limit
+      And its output so far is printed and its status is 1
+
+    @unit
+    Scenario: A suite that ends inside the limit is left alone
+      Given a suite ends before the per-suite limit
+      When the limit would have passed
+      Then nothing is killed and its own status stands
+
+    @unit
+    Scenario: A malformed suite limit is refused
+      Given PACKAGE_SUITES_TIMEOUT_SECONDS is set to something that is not a positive integer
+      When the limit is read
+      Then the run refuses it rather than guessing, and an unset value gives the default
+
+    @unit
+    Scenario: Killing the tracked suites stops only those still running
+      Given two suites are tracked and one has already ended
+      When the run kills what it tracks
+      Then the suite still running is killed and the ended one is not
 
   Rule: A pull request runs the suites its change reaches
 
@@ -255,15 +290,23 @@ Feature: A package's integration suite runs in CI when it declares one
     Scenario: A push to main runs the package suites as one job
       Given a merge to main
       When langwatch-app-ci runs for that commit
-      Then package-suites runs as one job holding every suite
+      Then package-suites runs as one job holding every suite but the browser suites
+      And the browser suites run as one job beside it
       And a newer merge waits for that run instead of cancelling it
-      And a pull request still splits its suites over eight jobs
+      And a pull request still splits its other suites over eight jobs
 
     @unit
     Scenario: A red package-suites run on main posts to Slack
       Given package-suites fails or times out on main and was not red in the previous finished run
       When the run reaches its Slack job
       Then Slack gets the job, the commit and a link to the run
+
+    @unit
+    Scenario: A red main posts once per red package-suites leg
+      Given the one-job leg, the browser leg or both fail or time out on main
+      When the run reaches its Slack job
+      Then Slack gets one post per red leg, named as that leg
+      And a failed lookup of the run's jobs still posts, as the one-job leg
 
     @unit
     Scenario: A repeat failure or timeout on main posts once

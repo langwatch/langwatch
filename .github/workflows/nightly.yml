@@ -249,7 +249,7 @@ jobs:
   # The setup mirrors langwatch-app-ci.yml's package-suites job; keep them in step.
 
   flaky-hunt:
-    name: flaky hunt (shard ${{ matrix.shard }}/8, run ${{ matrix.run }})
+    name: flaky hunt (${{ matrix.lanes == 'browser' && 'browser' || format('shard {0}/{1}', matrix.shard, matrix.total) }}, run ${{ matrix.run }})
     runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:
@@ -257,7 +257,22 @@ jobs:
       max-parallel: 12
       matrix:
         shard: [1, 2, 3, 4, 5, 6, 7, 8]
+        # Browser suites run on a leg of their own, as in langwatch-app-ci.yml:
+        # a container starting beside Chromium aborts it with ERR_NETWORK_CHANGED
+        # (specs/ci/browser-test-lane.feature). `total` must count the shard list.
+        total: [8]
         run: [1, 2, 3]
+        lanes: [no-browser]
+        include:
+          - shard: browser
+            lanes: browser
+            run: 1
+          - shard: browser
+            lanes: browser
+            run: 2
+          - shard: browser
+            lanes: browser
+            run: 3
     env:
       # langwatch-app-ci.yml sets this at workflow level; the tasks refuse to boot without it.
       NODE_ENV: "test"
@@ -327,7 +342,9 @@ jobs:
       - name: Install Goose migration tool
         run: bash .github/scripts/install-goose.sh
 
+      # The browser leg skips the datastores' setup and the charts: no browser suite reads them.
       - name: Start ClickHouse with storage policy
+        if: ${{ matrix.lanes != 'browser' }}
         env:
           CLICKHOUSE_PASSWORD: ci_password
         run: bash .github/scripts/start-clickhouse-with-storage-policy.sh
@@ -336,6 +353,7 @@ jobs:
         run: pnpm run ensure:built
 
       - name: Run the upgrade (Postgres and ClickHouse migrations)
+        if: ${{ matrix.lanes != 'browser' }}
         working-directory: apps/tasks
         run: |
           for i in 1 2 3; do
@@ -350,7 +368,9 @@ jobs:
           exit 1
 
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
+        if: ${{ matrix.lanes != 'browser' }}
       - name: Build chart dependencies
+        if: ${{ matrix.lanes != 'browser' }}
         run: pnpm exec nx run chart-langwatch:helm:deps --outputStyle=static
 
       # The same seed for a run index on every shard, different per run index
@@ -364,7 +384,9 @@ jobs:
       - name: Run the package suites shuffled
         env:
           REQUIRE_HELM_TESTS: "1"
-          PACKAGE_SUITES_SHARD: ${{ matrix.shard }}/8
+          # Unset on the browser leg, which runs every browser suite as one shard.
+          PACKAGE_SUITES_SHARD: ${{ matrix.lanes != 'browser' && format('{0}/{1}', matrix.shard, matrix.total) || '' }}
+          PACKAGE_SUITES_LANES: ${{ matrix.lanes }}
           PACKAGE_SUITES_VITEST_ARGS: --sequence.shuffle --sequence.seed=${{ steps.seed.outputs.seed }}
           PACKAGE_SUITES_REPORT_DIR: flaky-results/seed-${{ steps.seed.outputs.seed }}
         run: |

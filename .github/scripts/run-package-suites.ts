@@ -188,23 +188,23 @@ export const wallTimeOf = ({ load, concurrency }: { load: ShardLoad; concurrency
   load.alone + Math.max(load.shared / concurrency, load.integration, load.browser);
 
 /**
- * `load` with one package added. The weights file records a package, not its
- * scripts, so a light package's weight is spread evenly over its scripts' lanes.
+ * `load` with one package added. Each script adds its own seconds to its lane, so
+ * a light package with one slow integration suite loads the integration lane, not
+ * a share of it.
  */
 export const withPackage = ({
   load,
-  weight,
-  scripts,
+  seconds,
 }: {
   load: ShardLoad;
-  weight: number;
-  scripts: readonly string[];
+  seconds: ReadonlyMap<string, number>;
 }): ShardLoad => {
+  const weight = [...seconds.values()].reduce((sum, each) => sum + each, 0);
   if (weight >= HEAVY_SECONDS) return { ...load, alone: load.alone + weight };
   const next = { ...load, shared: load.shared + weight };
-  for (const script of scripts) {
+  for (const [script, each] of seconds) {
     const lane = laneOf(script);
-    if (lane !== "shared") next[lane] += weight / scripts.length;
+    if (lane !== "shared") next[lane] += each;
   }
   return next;
 };
@@ -216,22 +216,25 @@ export const withPackage = ({
  */
 export const balanceByWallTime = <T extends { name: string; scripts: readonly string[] }>({
   items,
-  weightOf,
+  scriptSeconds,
   concurrency,
   total,
 }: {
   items: readonly T[];
-  weightOf: (item: T) => number;
+  scriptSeconds: (item: T, script: string) => number;
   concurrency: number;
   total: number;
 }): { groups: T[][]; walls: number[] } => {
   const loads: ShardLoad[] = Array.from({ length: total }, () => ({ ...EMPTY_LOAD }));
   const groupOf = new Map<string, number>();
   const byWeight = items
-    .map((item) => ({ item, weight: weightOf(item) }))
+    .map((item) => {
+      const seconds = new Map(item.scripts.map((script) => [script, scriptSeconds(item, script)]));
+      return { item, seconds, weight: [...seconds.values()].reduce((sum, each) => sum + each, 0) };
+    })
     .toSorted((a, b) => b.weight - a.weight || a.item.name.localeCompare(b.item.name));
-  for (const { item, weight } of byWeight) {
-    const candidates = loads.map((load) => withPackage({ load, weight, scripts: item.scripts }));
+  for (const { item, seconds } of byWeight) {
+    const candidates = loads.map((load) => withPackage({ load, seconds }));
     const walls = candidates.map((load) => wallTimeOf({ load, concurrency }));
     const best = walls.indexOf(Math.min(...walls));
     groupOf.set(item.name, best);
@@ -243,34 +246,69 @@ export const balanceByWallTime = <T extends { name: string; scripts: readonly st
   };
 };
 
-/** Seconds a package costs when the weights file does not name it. */
+/** Seconds a script costs when the weights file does not name it. */
 export const DEFAULT_WEIGHT_SECONDS = 5;
 
 /**
- * Parses the weights file. A line is `<package>  <seconds>`, optionally followed
- * by `# note`. A bad line is an error: one that silently parsed to nothing would
- * put the split back to guessing.
+ * A script's seconds from the weights file. A script the file does not name, or
+ * a package it does not name at all, costs DEFAULT_WEIGHT_SECONDS, so it still
+ * lands on a shard. An excluded package runs nothing, so it adds nothing.
+ */
+export const scriptSecondsFrom =
+  ({
+    weights,
+    excluded,
+  }: {
+    weights: ReadonlyMap<string, ReadonlyMap<string, number>>;
+    excluded: ReadonlyMap<string, string>;
+  }) =>
+  (pkg: { name: string }, script: string): number =>
+    excluded.has(pkg.name) ? 0 : (weights.get(pkg.name)?.get(script) ?? DEFAULT_WEIGHT_SECONDS);
+
+/**
+ * Parses the weights file. A line is `<package>  <script>  <seconds>`, optionally
+ * followed by `# note`. A bad line is an error: one that silently parsed to nothing
+ * would put the split back to guessing.
  */
 export const parseWeights = (
   source: string,
   file: string,
-): { weights: Map<string, number>; errors: string[] } => {
-  const weights = new Map<string, number>();
+): { weights: Map<string, Map<string, number>>; errors: string[] } => {
+  const weights = new Map<string, Map<string, number>>();
   const errors: string[] = [];
   source.split("\n").forEach((raw, index) => {
     const line = (raw.includes("#") ? raw.slice(0, raw.indexOf("#")) : raw).trim();
     if (line === "") return;
-    const match = /^(\S+)\s+(\d+(?:\.\d+)?)$/.exec(line);
-    const seconds = match ? Number(match[2]) : Number.NaN;
-    if (!match || !Number.isFinite(seconds) || seconds <= 0 || weights.has(match[1])) {
+    const match = /^(\S+)\s+(\S+)\s+(\d+(?:\.\d+)?)$/.exec(line);
+    const seconds = match ? Number(match[3]) : Number.NaN;
+    const scripts = match ? weights.get(match[1]!) : undefined;
+    if (!match || !Number.isFinite(seconds) || seconds <= 0 || scripts?.has(match[2]!)) {
       errors.push(
-        `::error file=${file},line=${index + 1}::'${line}' is not '<package>  <seconds>' with a positive number, once per package.`,
+        `::error file=${file},line=${index + 1}::'${line}' is not '<package>  <script>  <seconds>' with a positive number, once per script.`,
       );
       return;
     }
-    weights.set(match[1], seconds);
+    weights.set(match[1]!, (scripts ?? new Map()).set(match[2]!, seconds));
   });
   return { weights, errors };
+};
+
+/**
+ * A weights line naming a script its package does not run is stale (renamed or
+ * removed) and would read as measured coverage. Packages the workspace lacks are
+ * left to the caller's own warning.
+ */
+export const undefinedWeightScripts = (
+  weights: ReadonlyMap<string, ReadonlyMap<string, number>>,
+  discovered: readonly DiscoveredPackage[],
+): string[] => {
+  const scriptsOf = new Map(discovered.map((pkg) => [pkg.name, pkg.scripts]));
+  return [...weights].flatMap(([name, scripts]) => {
+    const defined = scriptsOf.get(name);
+    return defined
+      ? [...scripts.keys()].filter((s) => !defined.includes(s)).map((s) => `${name}  ${s}`)
+      : [];
+  });
 };
 
 /**
@@ -376,6 +414,59 @@ export const commandFor = (job: SuiteJob): string[] =>
     : ["--filter", job.pkg.name, "run", job.script];
 
 /**
+ * Default per-script limit: slowest weighted script is 324s, so 900s is about
+ * 2.8x headroom (browser suites run slower under load) and still half the
+ * job's 45 minutes.
+ */
+export const DEFAULT_SUITE_TIMEOUT_SECONDS = 900;
+
+/** Reads PACKAGE_SUITES_TIMEOUT_SECONDS; unset or empty gives the default. */
+export const parseSuiteTimeoutSeconds = (value: string | undefined): number => {
+  if (value === undefined || value.trim() === "") return DEFAULT_SUITE_TIMEOUT_SECONDS;
+  const seconds = Number(value);
+  if (!Number.isInteger(seconds) || seconds < 1)
+    throw new Error(`PACKAGE_SUITES_TIMEOUT_SECONDS must be a positive integer, got "${value}".`);
+  return seconds;
+};
+
+/**
+ * SIGKILLs the script's process group (it is spawned detached), so vitest and
+ * browser workers die too.
+ */
+export const killProcessTree = (child: ScriptProcess) => {
+  if (child.pid === undefined) return;
+  try {
+    process.kill(-child.pid, "SIGKILL");
+  } catch {
+    // Already gone.
+  }
+};
+
+/** Holds `child` in `running` until it closes, so a signal handler can kill what is live. */
+export const trackWhileRunning = <T extends ScriptProcess>({
+  running,
+  child,
+}: {
+  running: Set<ScriptProcess>;
+  child: T;
+}): T => {
+  running.add(child);
+  child.on("close", () => running.delete(child));
+  return child;
+};
+
+/** Kills the process tree of every tracked suite. */
+export const killAll = ({
+  running,
+  kill = killProcessTree,
+}: {
+  running: Set<ScriptProcess>;
+  kill?: (child: ScriptProcess) => void;
+}) => {
+  for (const child of running) kill(child);
+};
+
+/**
  * Parses `PACKAGE_SUITES_CONCURRENCY`. Absent means one suite at a time; a
  * malformed value is an error, never a silent guess.
  */
@@ -386,6 +477,76 @@ export const parseConcurrency = (value: string | undefined): number => {
     throw new Error(`PACKAGE_SUITES_CONCURRENCY='${value}' is not a positive whole number.`);
   }
   return parsed;
+};
+
+/**
+ * Which lanes a leg of the job runs. Browser suites get a runner of their own:
+ * a container starting beside one changes the network and Chromium aborts its
+ * module loads with ERR_NETWORK_CHANGED. `all` is a local run's default.
+ */
+export type LaneFilter = "all" | "browser" | "no-browser";
+
+/** Parses `PACKAGE_SUITES_LANES`. Absent means every lane; anything else is an error. */
+export const parseLanes = (value: string | undefined): LaneFilter => {
+  const lanes = value?.trim() ?? "";
+  if (lanes === "") return "all";
+  if (lanes === "browser" || lanes === "no-browser") return lanes;
+  throw new Error(`PACKAGE_SUITES_LANES='${value}' is not 'browser' or 'no-browser'.`);
+};
+
+/** The packages with only the scripts `lanes` admits; a package left with none is dropped. */
+const withLanes = ({
+  packages,
+  lanes,
+}: {
+  packages: readonly DiscoveredPackage[];
+  lanes: LaneFilter;
+}): DiscoveredPackage[] =>
+  lanes === "all"
+    ? [...packages]
+    : packages.flatMap((pkg) => {
+        const scripts = pkg.scripts.filter(
+          (script) => (laneOf(script) === "browser") === (lanes === "browser"),
+        );
+        return scripts.length === 0 ? [] : [{ ...pkg, scripts }];
+      });
+
+/**
+ * What one shard runs: the lanes this leg admits, split over `shard.total` by wall
+ * time, this shard's jobs heaviest first. `weightOf` is the kept scripts' summed
+ * seconds; the runner judges heaviness by it too.
+ */
+export const planShard = ({
+  packages,
+  lanes,
+  shard,
+  scriptSeconds,
+  concurrency,
+  excluded,
+}: {
+  packages: readonly DiscoveredPackage[];
+  lanes: LaneFilter;
+  shard: { index: number; total: number };
+  scriptSeconds: (pkg: DiscoveredPackage, script: string) => number;
+  concurrency: number;
+  excluded: Map<string, string>;
+}): {
+  assigned: DiscoveredPackage[];
+  seconds: number;
+  jobs: SuiteJob[];
+  weightOf: (pkg: DiscoveredPackage) => number;
+} => {
+  const items = withLanes({ packages, lanes });
+  const weightOf = (pkg: DiscoveredPackage): number =>
+    pkg.scripts.reduce((sum, script) => sum + scriptSeconds(pkg, script), 0);
+  const split = balanceByWallTime({ items, scriptSeconds, concurrency, total: shard.total });
+  const assigned = split.groups[shard.index - 1] ?? [];
+  return {
+    assigned,
+    seconds: split.walls[shard.index - 1] ?? 0,
+    jobs: jobsFor(heaviestFirst({ packages: assigned, weightOf }), excluded),
+    weightOf,
+  };
 };
 
 /** Every script the gate runs, package by package; an excluded package has none. */
@@ -517,6 +678,7 @@ export const outcomeOf = (
 
 /** A started script as the runner sees it: its two output streams, and its end. */
 export interface ScriptProcess {
+  pid?: number;
   stdout: { on(event: "data", listener: (chunk: Buffer) => void): unknown } | null;
   stderr: { on(event: "data", listener: (chunk: Buffer) => void): unknown } | null;
   on(event: "error", listener: (error?: unknown) => void): unknown;
@@ -534,12 +696,18 @@ export const createSuiteRunner = ({
   log,
   write,
   now = Date.now,
+  timeoutMs = Number.POSITIVE_INFINITY,
+  kill = () => {},
 }: {
   live: boolean;
   start: (job: SuiteJob) => ScriptProcess;
   log: (line: string) => void;
   write: (output: Buffer) => void;
   now?: () => number;
+  /** Longest one script may run before it is killed and failed. */
+  timeoutMs?: number;
+  /** Ends a script's whole process tree; a hung suite's workers outlive pnpm. */
+  kill?: (child: ScriptProcess) => void;
 }) => {
   const unfinished = new Map<SuiteJob, { title: string; chunks: Buffer[] }>();
   const report = (job: SuiteJob, title: string, chunks: Buffer[], startedAt: number) => {
@@ -554,7 +722,7 @@ export const createSuiteRunner = ({
     new Promise((settle) => {
       const startedAt = now();
       const title = `${job.pkg.name} (${job.pkg.dir}) — pnpm run ${job.script}`;
-      log(live ? `::group::${title}` : `started: ${title}`);
+      log(openLine({ live, title }));
       const chunks: Buffer[] = [];
       if (!live) unfinished.set(job, { title, chunks });
       const finish = once((status: number) => {
@@ -562,7 +730,17 @@ export const createSuiteRunner = ({
         settle(status);
       });
       const say = (line: string) => (live ? log(line) : chunks.push(Buffer.from(`${line}\n`)));
-      watchScript({ job, start, chunks, say, finish });
+      const child = watchScript({ job, start, chunks, say, finish });
+      if (child === undefined) return;
+      armTimeout({
+        child,
+        job,
+        timeoutMs,
+        elapsedSeconds: () => (now() - startedAt) / 1000,
+        log,
+        kill,
+        finish,
+      });
     });
   /** What the scripts still running have printed so far, for a cancelled run. */
   const flushUnfinished = () => {
@@ -572,6 +750,43 @@ export const createSuiteRunner = ({
     }
   };
   return { run, flushUnfinished };
+};
+
+const openLine = ({ live, title }: { live: boolean; title: string }) =>
+  live ? `::group::${title}` : `started: ${title}`;
+
+/**
+ * `close` waits for every holder of the output pipes, so a hung worker would
+ * never settle the suite: fail it here instead of waiting for it.
+ */
+const armTimeout = ({
+  child,
+  job,
+  timeoutMs,
+  elapsedSeconds,
+  log,
+  kill,
+  finish,
+}: {
+  child: ScriptProcess;
+  job: SuiteJob;
+  timeoutMs: number;
+  elapsedSeconds: () => number;
+  log: (line: string) => void;
+  kill: (child: ScriptProcess) => void;
+  finish: (status: number) => void;
+}) => {
+  if (!Number.isFinite(timeoutMs)) return;
+  const timer = setTimeout(() => {
+    const seconds = Math.round(elapsedSeconds());
+    log(
+      `::error::package suite ${job.pkg.name} (pnpm run ${job.script}) timed out after ${seconds}s`,
+    );
+    kill(child);
+    finish(1);
+  }, timeoutMs);
+  timer.unref();
+  for (const event of ["close", "error"] as const) child.on(event, () => clearTimeout(timer));
 };
 
 const printGroup = ({
@@ -603,16 +818,20 @@ const watchScript = ({
   chunks: Buffer[];
   say: (line: string) => unknown;
   finish: (status: number) => void;
-}) => {
+}): ScriptProcess | undefined => {
   const failToStart = (error: unknown) => {
     say(`could not start pnpm run ${job.script}: ${String(error)}`);
     finish(1);
   };
   const started = startSafely(() => start(job));
-  if ("error" in started) return failToStart(started.error);
+  if ("error" in started) {
+    failToStart(started.error);
+    return undefined;
+  }
   collectOutput(started.child, chunks);
   started.child.on("error", failToStart);
   started.child.on("close", (code: number | null) => finish(code ?? 1));
+  return started.child;
 };
 
 /** Calls `fn` the first time only: a process can report an error and then close. */
@@ -761,9 +980,14 @@ if (isEntrypoint()) {
       console.log(`::warning::'${name}' has a weight but is not a workspace package.`);
     }
   }
-  // An excluded package runs nothing, so it adds nothing to a shard's time.
-  const weightOf = (pkg: DiscoveredPackage): number =>
-    excluded.has(pkg.name) ? 0 : (parsedWeights.weights.get(pkg.name) ?? DEFAULT_WEIGHT_SECONDS);
+  const staleScripts = undefinedWeightScripts(parsedWeights.weights, discovered);
+  for (const line of staleScripts) {
+    console.error(
+      `::error::'${line}' has a weight but the package does not run that script. Delete the line, or fix the script name if it was renamed.`,
+    );
+  }
+  if (staleScripts.length > 0) process.exit(1);
+  const scriptSeconds = scriptSecondsFrom({ weights: parsedWeights.weights, excluded });
   let concurrency: number;
   try {
     concurrency = parseConcurrency(process.env.PACKAGE_SUITES_CONCURRENCY);
@@ -771,13 +995,27 @@ if (isEntrypoint()) {
     console.error(`::error::${error instanceof Error ? error.message : String(error)}`);
     process.exit(1);
   }
-  // Every shard reads the same concurrency from the job's env, so they agree.
-  const split = balanceByWallTime({ items: reached, weightOf, concurrency, total: shard.total });
-  const assigned = split.groups[shard.index - 1] ?? [];
-  const expected = split.walls[shard.index - 1] ?? 0;
+  let lanes: LaneFilter;
+  try {
+    lanes = parseLanes(process.env.PACKAGE_SUITES_LANES);
+  } catch (error) {
+    console.error(`::error::${error instanceof Error ? error.message : String(error)}`);
+    process.exit(1);
+  }
+  // Every shard reads the same concurrency and lanes from the job's env, so they agree.
+  const plan = planShard({
+    packages: reached,
+    lanes,
+    shard,
+    scriptSeconds,
+    concurrency,
+    excluded,
+  });
+  const { assigned } = plan;
+  console.log(`Lanes: ${lanes} (PACKAGE_SUITES_LANES).`);
   console.log(
     `Shard ${shard.index}/${shard.total}: ${assigned.length} of ${reached.length} packages, ` +
-      `about ${Math.round(expected)}s of suites.`,
+      `about ${Math.round(plan.seconds)}s of suites.`,
   );
   // The nightly flaky-test hunt (.github/workflows/nightly.yml) reruns the suites
   // with vitest's shuffle and seed and a JSON report each; unset, nothing changes.
@@ -802,36 +1040,57 @@ if (isEntrypoint()) {
   const cores = availableParallelism();
   const live = concurrency === 1;
   console.log(`Running up to ${concurrency} suite(s) at once.`);
+  let suiteTimeoutSeconds: number;
+  try {
+    suiteTimeoutSeconds = parseSuiteTimeoutSeconds(process.env.PACKAGE_SUITES_TIMEOUT_SECONDS);
+  } catch (error) {
+    console.error(`::error::${error instanceof Error ? error.message : String(error)}`);
+    process.exit(1);
+  }
   const huntCommandFor = (job: SuiteJob): string[] | undefined => {
     const extra = extraArgsFor(job.pkg, job.script) ?? [];
     return extra.length > 0 ? ["--filter", job.pkg.name, "run", job.script, ...extra] : undefined;
   };
+  const running = new Set<ScriptProcess>();
   const runner = createSuiteRunner({
     live,
+    timeoutMs: suiteTimeoutSeconds * 1000,
+    kill: killProcessTree,
     start: (job) =>
-      // The hunt skips nx, whose cache would replay a result instead of rerunning under the seed.
-      spawn("pnpm", huntCommandFor(job) ?? commandFor(job), {
-        stdio: live ? "inherit" : ["ignore", "pipe", "pipe"],
-        env: {
-          ...process.env,
-          ...workerEnvFor({ job, heavy: isHeavyPackage({ weightOf, pkg: job.pkg }), cores }),
-        },
+      trackWhileRunning({
+        running,
+        child:
+          // The hunt skips nx, whose cache would replay a result instead of
+          // rerunning under the seed.
+          spawn("pnpm", huntCommandFor(job) ?? commandFor(job), {
+            detached: true,
+            stdio: live ? "inherit" : ["ignore", "pipe", "pipe"],
+            env: {
+              ...process.env,
+              ...workerEnvFor({
+                job,
+                heavy: isHeavyPackage({ weightOf: plan.weightOf, pkg: job.pkg }),
+                cores,
+              }),
+            },
+          }),
       }),
     log: (line) => console.log(line),
     write: (output) => process.stdout.write(output),
   });
-  if (!live) {
-    for (const signal of ["SIGINT", "SIGTERM"] as const) {
-      process.once(signal, () => {
-        runner.flushUnfinished();
-        // Exits once stdout has drained, so the flushed output is not cut short.
-        process.stdout.write("", () => process.exit(1));
-      });
-    }
+  // Suites are detached, so a signal to this process no longer reaches them.
+  for (const signal of ["SIGINT", "SIGTERM"] as const) {
+    process.once(signal, () => {
+      killAll({ running });
+      if (live) process.exit(1);
+      runner.flushUnfinished();
+      // Exits once stdout has drained, so the flushed output is not cut short.
+      process.stdout.write("", () => process.exit(1));
+    });
   }
 
   const statuses = await runJobs({
-    jobs: jobsFor(heaviestFirst({ packages: assigned, weightOf }), excluded),
+    jobs: plan.jobs,
     concurrency,
     run: (job) => {
       if (extraArgsFor(job.pkg, job.script) !== undefined) return runner.run(job);
@@ -840,7 +1099,7 @@ if (isEntrypoint()) {
       );
       return Promise.resolve(0);
     },
-    isHeavy: (pkg) => isHeavyPackage({ weightOf, pkg }),
+    isHeavy: (pkg) => isHeavyPackage({ weightOf: plan.weightOf, pkg }),
   });
   const statusOf = (pkg: DiscoveredPackage) => (script: string) =>
     [...statuses].find(([job]) => job.pkg === pkg && job.script === script)?.[1] ?? 1;

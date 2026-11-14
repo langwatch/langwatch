@@ -719,7 +719,16 @@ jobs:
       fail-fast: false
       matrix:
         shard: ${{ fromJSON(needs.changes.outputs.suites-one-job == 'true' && '[1]' || '[1, 2, 3, 4, 5, 6, 7, 8]') }}
-    name: package-suites (${{ matrix.shard }}/${{ strategy.job-total }})
+        # Browser suites run on a leg of their own: a container another suite starts
+        # changes the runner's network and Chromium aborts with ERR_NETWORK_CHANGED
+        # (specs/ci/browser-test-lane.feature). `total` counts the other legs and
+        # must match the shard list; strategy.job-total would count the browser leg.
+        total: ${{ fromJSON(needs.changes.outputs.suites-one-job == 'true' && '[1]' || '[8]') }}
+        lanes: [no-browser]
+        include:
+          - shard: browser
+            lanes: browser
+    name: package-suites (${{ matrix.lanes == 'browser' && 'browser' || format('{0}/{1}', matrix.shard, matrix.total) }})
     #
     # It DOES have services. This job absorbed the datastore lane at the
     # deployment cutover: `test-integration` existed to shard the monolith's
@@ -781,15 +790,17 @@ jobs:
       # downloading Chromium. Cached by Playwright version, that install finds the
       # browser already there and only checks the system libraries. Keyed on the
       # version rather than the lockfile, so an unrelated dependency bump keeps
-      # the cache and the repository's cache quota is not churned.
+      # the cache and the repository's cache quota is not churned. Browser leg only.
       - name: Read the Playwright version
         id: playwright
+        if: matrix.lanes == 'browser'
         run: |
           version=$(grep -m1 -oE '^  playwright@[0-9][^:]*' pnpm-lock.yaml | cut -d@ -f2)
           test -n "$version"
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Cache the Playwright browser
+        if: matrix.lanes == 'browser'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/ms-playwright
@@ -804,7 +815,9 @@ jobs:
       - name: Install Goose migration tool
         run: bash .github/scripts/install-goose.sh
 
+      # The browser leg skips the datastores' setup and the charts: no browser suite reads them.
       - name: Start ClickHouse with storage policy
+        if: ${{ matrix.lanes != 'browser' }}
         env:
           CLICKHOUSE_PASSWORD: ci_password
         run: bash .github/scripts/start-clickhouse-with-storage-policy.sh
@@ -817,6 +830,7 @@ jobs:
       # BUILD_TIME is set job-wide and the ClickHouse migrator returns early
       # under it, so the whole upgrade runs here with it unset, once.
       - name: Run the upgrade (Postgres and ClickHouse migrations)
+        if: ${{ matrix.lanes != 'browser' }}
         working-directory: apps/tasks
         # ClickHouse's HTTP probe can answer SELECT 1 via curl while the
         # Node @clickhouse/client still sees ECONNREFUSED on its first
@@ -843,14 +857,17 @@ jobs:
       # silently unenforced. REQUIRE_HELM_TESTS below turns a skip into a
       # failure, so this setup can never quietly rot.
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
+        if: ${{ matrix.lanes != 'browser' }}
       - name: Build chart dependencies
+        if: ${{ matrix.lanes != 'browser' }}
         run: pnpm exec nx run chart-langwatch:helm:deps --outputStyle=static
 
       # The suites' own Nx cache, apart from the build cache so it holds only test
       # results and stays small. Per shard: a re-push to the same change splits alike.
-      # Main's one job saves under `all`, which a shard falls back to.
+      # Main's one job saves under `all`, which a shard falls back to. The browser
+      # leg runs no suite through Nx (commandFor), so it has no results to keep.
       - name: Restore the package suite results
-        if: ${{ !((github.ref == 'refs/heads/main' && github.event_name != 'pull_request_target') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]')) }}
+        if: ${{ matrix.lanes != 'browser' && !((github.ref == 'refs/heads/main' && github.event_name != 'pull_request_target') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]')) }}
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .nx/suites
@@ -860,7 +877,7 @@ jobs:
             ${{ runner.os }}-nx-suites-all-
 
       - name: Restore the package suite results, saving them at the end of the job
-        if: ${{ (github.ref == 'refs/heads/main' && github.event_name != 'pull_request_target') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]') }}
+        if: ${{ matrix.lanes != 'browser' && ((github.ref == 'refs/heads/main' && github.event_name != 'pull_request_target') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]')) }}
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .nx/suites
@@ -886,6 +903,7 @@ jobs:
       # and packages/vitest-config: the shared config is loaded from the package, so
       # vitest does not count its source (plugin options, React compiler) as a config file.
       # Main's one job saves under `all`, which a shard falls back to: entries are keyed by content.
+      # The browser leg keeps its own cache under `browser`, on main and on a pull request.
       - name: Hash what a cached transform depends on besides its source
         id: transform-inputs
         run: echo "hash=$(git ls-files -s -- pnpm-lock.yaml '*package.json' '*tsconfig*.json' packages/vitest-config | sha256sum | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
@@ -895,20 +913,20 @@ jobs:
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: node_modules/.vitest-cache
-          key: ${{ runner.os }}-vitest-transforms-${{ needs.changes.outputs.suites-one-job == 'true' && 'all' || matrix.shard }}-${{ steps.transform-inputs.outputs.hash }}-${{ github.sha }}
+          key: ${{ runner.os }}-vitest-transforms-${{ matrix.lanes == 'browser' && 'browser' || needs.changes.outputs.suites-one-job == 'true' && 'all' || matrix.shard }}-${{ steps.transform-inputs.outputs.hash }}-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-vitest-transforms-${{ needs.changes.outputs.suites-one-job == 'true' && 'all' || matrix.shard }}-${{ steps.transform-inputs.outputs.hash }}-
-            ${{ runner.os }}-vitest-transforms-all-${{ steps.transform-inputs.outputs.hash }}-
+            ${{ runner.os }}-vitest-transforms-${{ matrix.lanes == 'browser' && 'browser' || needs.changes.outputs.suites-one-job == 'true' && 'all' || matrix.shard }}-${{ steps.transform-inputs.outputs.hash }}-
+            ${{ runner.os }}-vitest-transforms-${{ matrix.lanes == 'browser' && 'browser' || 'all' }}-${{ steps.transform-inputs.outputs.hash }}-
 
       - name: Restore the vitest transforms, saving them at the end of the job
         if: ${{ (github.ref == 'refs/heads/main' && github.event_name != 'pull_request_target') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]') }}
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: node_modules/.vitest-cache
-          key: ${{ runner.os }}-vitest-transforms-${{ needs.changes.outputs.suites-one-job == 'true' && 'all' || matrix.shard }}-${{ steps.transform-inputs.outputs.hash }}-${{ github.sha }}
+          key: ${{ runner.os }}-vitest-transforms-${{ matrix.lanes == 'browser' && 'browser' || needs.changes.outputs.suites-one-job == 'true' && 'all' || matrix.shard }}-${{ steps.transform-inputs.outputs.hash }}-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-vitest-transforms-${{ needs.changes.outputs.suites-one-job == 'true' && 'all' || matrix.shard }}-${{ steps.transform-inputs.outputs.hash }}-
-            ${{ runner.os }}-vitest-transforms-all-${{ steps.transform-inputs.outputs.hash }}-
+            ${{ runner.os }}-vitest-transforms-${{ matrix.lanes == 'browser' && 'browser' || needs.changes.outputs.suites-one-job == 'true' && 'all' || matrix.shard }}-${{ steps.transform-inputs.outputs.hash }}-
+            ${{ runner.os }}-vitest-transforms-${{ matrix.lanes == 'browser' && 'browser' || 'all' }}-${{ steps.transform-inputs.outputs.hash }}-
 
       - uses: ./.github/actions/prune-pr-caches
         with:
@@ -919,7 +937,9 @@ jobs:
           NX_CACHE_DIRECTORY: ${{ github.workspace }}/.nx/suites/cache
           NX_WORKSPACE_DATA_DIRECTORY: ${{ github.workspace }}/.nx/suites/data
           REQUIRE_HELM_TESTS: "1"
-          PACKAGE_SUITES_SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
+          # Unset on the browser leg, which runs every browser suite as one shard.
+          PACKAGE_SUITES_SHARD: ${{ matrix.lanes != 'browser' && format('{0}/{1}', matrix.shard, matrix.total) || '' }}
+          PACKAGE_SUITES_LANES: ${{ matrix.lanes }}
           # Each suite gets two vitest workers (patches/vitest@5.0.1.patch), so one
           # at a time left half the cores idle. A heavy suite still runs alone.
           PACKAGE_SUITES_CONCURRENCY: "2"
@@ -975,13 +995,15 @@ jobs:
           cache-dependency-path: "*/go.sum"
       # A repeat counts a failed or cancelled (timed-out) job in the previous
       # finished main run, so a timeout posts once too (tools/slacknotify).
+      # One post per red leg: `package-suites (1/1)` and `package-suites (browser)`.
+      # A failed jobs lookup falls back to `(1/1)`, so a red main never posts nothing.
       - name: Notify Slack on failure
         env:
           SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
           GH_TOKEN: ${{ github.token }}
           COMMIT_SUBJECT: ${{ github.event.head_commit.message }}
           COMMIT_AUTHOR: ${{ github.event.head_commit.author.name }}
-        run: go run ./cmd/slacknotify -job "package-suites (1/1)"
+        run: go run ./cmd/slacknotify -job-prefix "package-suites (" -fallback-job "package-suites (1/1)"
 
   lint:
     needs: changes

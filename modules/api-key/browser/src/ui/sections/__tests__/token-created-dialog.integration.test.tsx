@@ -446,6 +446,33 @@ describe("given a token has just been minted", () => {
       }
     });
 
+    /** @scenario "Unmounting a copy button before its reset leaves no pending timer" */
+    it("leaves no reset timer pending when the dialog unmounts after Copy API key", async () => {
+      renderDialog();
+      const copyButton = screen.getByRole("button", { name: "Copy API key" });
+
+      // Other widgets in the dialog schedule their own timers; follow only the 2s reset.
+      const setSpy = vi.spyOn(globalThis, "setTimeout");
+      const clearSpy = vi.spyOn(globalThis, "clearTimeout");
+      try {
+        fireEvent.click(copyButton);
+        await vi.waitFor(() => expect(copyButton.querySelector("svg.lucide-check")).not.toBeNull());
+
+        const resetIds = setSpy.mock.calls
+          .map((call, index) => (call[1] === 2000 ? setSpy.mock.results[index]!.value : undefined))
+          .filter((id) => id !== undefined);
+        expect(resetIds).not.toHaveLength(0);
+
+        cleanup();
+
+        const clearedIds = clearSpy.mock.calls.map(([id]) => id);
+        for (const id of resetIds) expect(clearedIds).toContain(id);
+      } finally {
+        setSpy.mockRestore();
+        clearSpy.mockRestore();
+      }
+    });
+
     /** @scenario Copy success is announced to assistive tech */
     it("hands the host a success notice for the copy", async () => {
       const host = renderDialog();
