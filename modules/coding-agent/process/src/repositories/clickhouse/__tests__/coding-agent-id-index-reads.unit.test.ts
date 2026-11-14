@@ -95,7 +95,7 @@ describe("coding-agent lookups by id with the id index", () => {
   });
 
   describe("given a session looked up with the caller's own time", () => {
-    it("keeps the caller's window on the outer scan and leaves the dedup unbounded", async () => {
+    it("keeps the caller's window on the outer scan and the dedup unbounded while the index is not ready", async () => {
       const endpoint = await TestClickHouseEndpoint.create();
       endpoints.push(endpoint);
       endpoint.queryRows.push([]);

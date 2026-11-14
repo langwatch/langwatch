@@ -1,6 +1,6 @@
 /**
- * The session answers an organization permission from the active scope's one grant read,
- * as on main (scope knot Q2): specs/frontend/session-permission-reads.feature (batch 1).
+ * The session answers an organization permission from the active scope's one grant read, which
+ * carries the organization's set too: specs/frontend/session-permission-reads.feature.
  * @vitest-environment jsdom
  */
 
@@ -32,7 +32,7 @@ const ON_ACME_APP: UiActiveScopeReading = {
   project: { id: "proj-app", slug: "acme-app", name: "ACME App" },
 };
 
-/** Answers the active project's grant read, and records every grant read sent. */
+/** Answers the active scope's grant read, and records every grant read sent. */
 function grants({ project }: { project: () => Promise<unknown> }) {
   const reads: ProcedureInput[] = [];
   const answer: ProcedureAnswer = (path, input) => {
@@ -57,6 +57,12 @@ function SessionProbe({ transport }: { transport: UiFeatureApiTransport }) {
       <span data-testid="manage-project">{String(session.hasPermission("project:manage"))}</span>
       <span data-testid="manage-organization">
         {String(session.hasOrganizationPermission("organization:manage"))}
+      </span>
+      <span data-testid="read-members">
+        {String(session.hasOrganizationPermission("members:view"))}
+      </span>
+      <span data-testid="read-members-on-project">
+        {String(session.hasPermission("members:view"))}
       </span>
       <span data-testid="settled">{String(session.isSettled())}</span>
     </div>
@@ -109,6 +115,23 @@ describe("given the reader's project grant manages the project but not its organ
       await waitFor(() => expect(view.getByTestId("settled").textContent).toBe("true"));
       expect(view.getByTestId("manage-organization").textContent).toBe("false");
       expect(view.getByTestId("manage-project").textContent).toBe("true");
+    });
+  });
+});
+
+describe("given the reader holds no grant on the active project but is in the organization", () => {
+  describe("when a screen asks whether they may read the organization's members", () => {
+    /** @scenario "An organization permission held only at the organization answers yes on a project page" */
+    it("answers yes for the organization and no for the project, from the one grant read", async () => {
+      const { answer, reads } = grants({
+        project: () =>
+          Promise.resolve({ permissions: [], organizationPermissions: ["members:view"] }),
+      });
+      const view = renderSession(answer);
+
+      await waitFor(() => expect(view.getByTestId("read-members").textContent).toBe("true"));
+      expect(view.getByTestId("read-members-on-project").textContent).toBe("false");
+      expect(reads).toEqual([{ projectId: "proj-app" }]);
     });
   });
 });

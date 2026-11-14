@@ -1,5 +1,5 @@
-// Starts the Growth checkout the plans page asked for, once the page knows the seats and
-// price. The address is cleaned first so a back step from Stripe cannot start it again.
+// Opens the Growth seat dialog another page asked for, once the page knows the seats and
+// price. The address is cleaned first so a back step from Stripe cannot open it again.
 import { useEffect, useRef } from "react";
 
 import { useBillingHost } from "../../model/billing-host.ts";
@@ -15,7 +15,7 @@ export function useCheckoutIntent({
   currency,
   setBillingPeriod,
   setCurrency,
-  startCheckout,
+  openUpgrade,
 }: {
   /** The plan, members and seat usage have answered, so the checkout prices the right seats. */
   isReady: boolean;
@@ -25,7 +25,7 @@ export function useCheckoutIntent({
   currency: Currency;
   setBillingPeriod: (interval: BillingInterval) => void;
   setCurrency: (currency: Currency) => void;
-  startCheckout: () => Promise<void>;
+  openUpgrade: () => void;
 }): void {
   const host = useBillingHost();
   const intent = parseCheckoutIntent(host.routeQuery());
@@ -38,15 +38,17 @@ export function useCheckoutIntent({
       host.replace(SUBSCRIPTION_PATH);
       return;
     }
+    const interval = intent.interval ?? billingPeriod;
+    const wanted = intent.currency ?? currency;
     if (stage.current === "waiting") {
       stage.current = "applied";
-      setBillingPeriod(intent.interval);
-      setCurrency(intent.currency);
+      setBillingPeriod(interval);
+      setCurrency(wanted);
       return;
     }
-    if (billingPeriod !== intent.interval || currency !== intent.currency) return;
+    if (billingPeriod !== interval || currency !== wanted) return;
     stage.current = "done";
     host.replace(SUBSCRIPTION_PATH);
-    void startCheckout();
+    openUpgrade();
   });
 }

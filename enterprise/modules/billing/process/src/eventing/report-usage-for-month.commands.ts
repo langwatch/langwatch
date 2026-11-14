@@ -25,9 +25,14 @@ import {
   INSTANT_EVAL_USD_EVENT_NAME,
 } from "../rules/instant-eval-meter.rules.ts";
 import { meterEventTimestampSeconds } from "../rules/meter-event-timestamp.rules.ts";
+import {
+  PII_REDACTION_USD_EVENT_NAME,
+  piiRedactionMeterIdentifier,
+} from "../rules/pii-redaction-meter.rules.ts";
 import { type NotUsageBilledReason, usageBilledOf } from "../rules/usage-billed.rules.ts";
 import type { BillingErrorReporter } from "../services/billing-error-reporter.service.ts";
 import type { InstantEvalSpendQueryService } from "../services/instant-eval-spend-query.service.ts";
+import type { PiiRedactionSpendQueryService } from "../services/pii-redaction-spend-query.service.ts";
 import type { UsageReportingService } from "../services/usage-reporting.service.ts";
 
 const logger = createLogger("langwatch:billing-reporting:report-usage-for-month");
@@ -50,6 +55,8 @@ interface BillingMeter {
   readonly eventName: string;
   /** Whether Stripe holds a meter under this name, so an event sent is aggregated. */
   readonly isProvisioned: () => boolean;
+  /** Whether the customer's subscription prices this meter, so an event sent is invoiced. */
+  readonly isPriced: (input: { stripeCustomerId: string }) => Promise<boolean>;
   /** Whether the total is usage's month_counted snapshot, ordered by that event's id. */
   readonly followsCountedEvent: boolean;
   /** The most this month may report for a capped contract, or null for no cap. */
@@ -96,6 +103,16 @@ export interface ReportUsageForMonthCommandDeps {
    * skip that usage for good; the first report after the mapping carries it.
    */
   isInstantEvalMeterProvisioned: () => boolean;
+  /** The PII redaction meter's total, read off the gateway spend ledger (ADR-201). */
+  queryPiiRedactionSpendTotal: PiiRedactionSpendQueryService["queryPiiRedactionSpendTotal"];
+  /** Whether Stripe holds the PII redaction meter in this mode; creating it starts charging. */
+  isPiiRedactionMeterProvisioned: () => boolean;
+  /**
+   * Whether the customer's subscription has a line on the PII redaction price. Stripe bills a
+   * meter event no line prices at nothing, so the month waits until one does (ADR-201
+   * decision 10). A throw holds the month too, and schedules another report.
+   */
+  hasPiiRedactionPrice: (input: { stripeCustomerId: string }) => Promise<boolean>;
   selfDispatch: (data: ReportUsageForMonthCommandData) => Promise<void>;
   /** Shared organization-read cache; see `billing-organization-cache.repository.ts`. */
   organizationCache: BillingOrganizationCacheRepository;
@@ -214,6 +231,8 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
         eventName: BILLABLE_EVENTS_EVENT_NAME,
         // Every mode maps the events meter; the catalogue refuses to load without it.
         isProvisioned: () => true,
+        // Every Growth subscription carries the events price; checkout cannot leave it out.
+        isPriced: async () => true,
         followsCountedEvent: true,
         ceiling: async () => null,
         // Usage's month_counted total; a command without one leaves this meter untouched.
@@ -227,6 +246,8 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
       {
         eventName: INSTANT_EVAL_USD_EVENT_NAME,
         isProvisioned: deps.isInstantEvalMeterProvisioned,
+        // Unchanged here; the same gap is followed up for Instant Evals on its own.
+        isPriced: async () => true,
         followsCountedEvent: false,
         ceiling: ({ contract, ...args }) =>
           contract === "connected" ? deps.connectedUsageCeiling(args) : Promise.resolve(null),
@@ -234,6 +255,17 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
           deps.queryInstantEvalSpendTotal({ organizationId, billingMonth }),
         toValue: instantEvalMeterUnitsToUsd,
         identifier: instantEvalMeterIdentifier,
+      },
+      {
+        eventName: PII_REDACTION_USD_EVENT_NAME,
+        isProvisioned: deps.isPiiRedactionMeterProvisioned,
+        isPriced: deps.hasPiiRedactionPrice,
+        followsCountedEvent: false,
+        ceiling: async () => null,
+        queryTotal: ({ organizationId, billingMonth }) =>
+          deps.queryPiiRedactionSpendTotal({ organizationId, billingMonth }),
+        toValue: instantEvalMeterUnitsToUsd,
+        identifier: piiRedactionMeterIdentifier,
       },
     ];
   }
@@ -395,6 +427,15 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
       logger.debug(
         { organizationId, billingMonth, meter: meter.eventName },
         "Stripe meter is not mapped for this mode; leaving the month's usage unreported until it is",
+      );
+      return false;
+    }
+    // A throw here reaches reportOneMeter, which schedules another report: nothing is written.
+    if (!(await meter.isPriced({ stripeCustomerId }))) {
+      // Nothing is read or written, so the first report after the price is added carries the month.
+      logger.debug(
+        { organizationId, billingMonth, meter: meter.eventName },
+        "subscription has no price for this meter; holding the month's usage until it does",
       );
       return false;
     }

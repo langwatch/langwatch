@@ -41,7 +41,7 @@ function errorFor<TError, TVariables extends { sourceType: string }>(
 
 export function TraceIngestSection() {
   const ctx = usePersonalContext();
-  const orgId = ctx.organizationId ?? "";
+  const orgId = ctx.organizationId;
 
   const templatesQuery = api.ingestionTemplates.list.useQuery(
     { organizationId: orgId },

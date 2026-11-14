@@ -6,7 +6,11 @@
 import type { ChartQueryError } from "@langwatch/analytics-contract/chart-frame-protocol";
 import { describe, expect, it } from "vitest";
 
-import { editorLimitError, isWidgetLimitFailure } from "../widget-limit-failure.ts";
+import {
+  editorLimitError,
+  isWidgetLimitFailure,
+  widgetLimitWords,
+} from "../widget-limit-failure.ts";
 
 describe("editorLimitError", () => {
   /** @scenario "A limit failure in the preview names the reason and the remedy" */
@@ -36,7 +40,7 @@ describe("editorLimitError", () => {
       code: "query_timeout",
       title: "Couldn't load",
       message:
-        "The query ran past the time a widget may take. " +
+        "This query took longer than 60 s, the most a widget may take. " +
         "Narrow the time range or add a filter, then try again.",
     });
   });
@@ -57,5 +61,22 @@ describe("isWidgetLimitFailure", () => {
     expect(isWidgetLimitFailure("constructor")).toBe(false);
     expect(isWidgetLimitFailure("toString")).toBe(false);
     expect(isWidgetLimitFailure("query_timeout")).toBe(true);
+  });
+});
+
+describe("widgetLimitWords", () => {
+  const TOOK_TOO_LONG = "This query took longer than 60 s, the most a widget may take.";
+
+  /** @scenario "A widget whose query runs out of time says it took longer than 60 seconds" */
+  it("names the 60 s limit for an editable and a built-in widget", () => {
+    const editable = widgetLimitWords({
+      code: "query_timeout",
+      audience: { kind: "editable", onEditCode: () => undefined },
+    });
+    const builtIn = widgetLimitWords({ code: "query_timeout", audience: { kind: "built_in" } });
+
+    expect(editable?.message).toBe(TOOK_TOO_LONG);
+    expect(editable?.shortMessage).toBe("Took longer than 60 s.");
+    expect(builtIn?.message).toBe(`${TOOK_TOO_LONG} This is not a problem with your data.`);
   });
 });

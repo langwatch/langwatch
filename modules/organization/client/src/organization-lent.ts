@@ -48,6 +48,9 @@ export type ProjectDepartmentFieldProps = {
 /** The card of people waiting to join needs nothing handed in: it reads scope. */
 export type PendingJoinRequestsProps = Record<string, never>;
 
+/** What onboarding hands the held-membership gate: the screen to draw when nothing is held. */
+export type HeldMembershipGateProps = { children: ReactNode };
+
 const organization = uiTokens("organization");
 
 export const CreateProjectDrawerToken =
@@ -62,6 +65,9 @@ export const AuthenticationOverviewCardToken =
   organization.extension<AuthenticationOverviewCardProps>("authenticationOverviewCard");
 export const JoinOfferToken = organization.component<JoinOfferProps>("joinOffer");
 export const JoinInsteadToken = organization.component<JoinInsteadProps>("joinInstead");
+/** Onboarding's welcome, drawn only for somebody with no membership they cannot use. */
+export const HeldMembershipGateToken =
+  organization.component<HeldMembershipGateProps>("heldMembershipGate");
 export const ProjectDepartmentFieldToken =
   organization.component<ProjectDepartmentFieldProps>("projectDepartmentField");
 export const PendingJoinRequestsToken =

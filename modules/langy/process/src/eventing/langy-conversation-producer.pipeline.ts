@@ -99,7 +99,10 @@ function buildLangyConversationProducerPipeline(input: {
   };
   const guidedOnboarding = {
     reader: { getByProject: refuse("read a project's guided onboarding") },
-    facts: { recordTurnFailed: refuse("record a guided onboarding turn failure") },
+    facts: {
+      recordTurnFailed: refuse("record a guided onboarding turn failure"),
+      recordFirstMessageSeen: refuse("record a person's first answer from Langy"),
+    },
   };
 
   return EventingLangyConversationAdapter.create({

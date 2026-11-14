@@ -52,6 +52,7 @@ export function organizationUserFromRecord(record: OrganizationUserRecord): Orga
     createdAt: fromDate(record.createdAt),
     updatedAt: fromDate(record.updatedAt),
     disabledAt: record.disabledAt && fromDate(record.disabledAt),
+    seatPendingSince: record.seatPendingSince ? fromDate(record.seatPendingSince) : null,
   };
 }
 

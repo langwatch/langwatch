@@ -26,6 +26,7 @@ import {
 } from "../repositories/authz-grant-projection.repository.ts";
 import type { AuthzGrantRepository } from "../repositories/authz-grant.repository.ts";
 import { bindingIdentityKey } from "../repositories/eventing/eventing.authz-grant.mapper.ts";
+import { MemoryAuthzOrganizationPolicyRepository } from "../repositories/memory/memory.authz-organization-policy.repository.ts";
 import {
   grantFactToRow,
   grantRowToFact,
@@ -67,6 +68,7 @@ function authzFor(bindings: CollectedBinding[], { cached = false } = {}) {
   const epoch = new StubAuthzEpoch();
   epoch.findEpoch.mockResolvedValue(1);
   const authz = AuthzService.create({
+    policies: MemoryAuthzOrganizationPolicyRepository.create(),
     repository: reader,
     listing: new StubAuthzListingRepository(),
     bindings: new StubAuthzManagedGrantRepository(),
@@ -98,6 +100,7 @@ function grantsService() {
   const epoch = new StubAuthzEpoch();
   const ledger = compatibilityLedger();
   const service = AuthzGrantsService.create({
+    policies: MemoryAuthzOrganizationPolicyRepository.create(),
     permissions: permissiveGrantGuards,
     repository,
     ledger,

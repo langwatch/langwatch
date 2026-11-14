@@ -3,7 +3,6 @@
  *
  * @see modules/auth/specs/cli-device-flow-refusals.feature
  */
-import { PermissionDeniedError } from "@langwatch/authorization";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -29,7 +28,10 @@ describe("CliDeviceFlowService.approveDeviceCode", () => {
       headers: new Headers(),
     });
 
-    await expect(refusal).rejects.toBeInstanceOf(PermissionDeniedError);
+    await expect(refusal).rejects.toMatchObject({
+      code: "impersonation_cannot_mint_credential",
+      httpStatus: 403,
+    });
     expect(reached).not.toContain("directory");
   });
 });

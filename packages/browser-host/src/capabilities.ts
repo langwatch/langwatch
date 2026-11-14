@@ -133,6 +133,14 @@ export abstract class UiRpc {
 
   abstract mutate(path: string, input: unknown): Promise<unknown>;
 
+  /**
+   * A write no read shows, such as a last-seen stamp. The shell's dispatcher sends it without
+   * marking every read stale, which `mutate` does; this fallback is for test doubles.
+   */
+  record(path: string, input: unknown): Promise<unknown> {
+    return this.mutate(path, input);
+  }
+
   /** A LIVE procedure, opened from outside React. Nothing is cached. */
   abstract subscribe(
     path: string,

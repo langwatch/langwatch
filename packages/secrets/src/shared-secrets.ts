@@ -2,13 +2,41 @@
  * Secrets more than one owner holds: one handle each, claimed by instance, so a
  * double claim passes only for this very handle (ARCHITECTURE.md §6, layer 3).
  */
-import { Secret } from "./secret.ts";
+import { Secret, type Into } from "./secret.ts";
 
 /** The browser-session key: auth builds sessions from it, automation signs unsubscribe links. */
 export const sessionSecret = Secret.load("NEXTAUTH_SECRET", { optional: true });
 
 /** The stored-credential key: stores seal with it, scim peppers directory token digests with it. */
 export const credentialsSecret = Secret.load("CREDENTIALS_SECRET", { optional: true });
+
+/**
+ * The dedicated key pepper, ahead of CREDENTIALS_SECRET: api-key hashes keys with it, analytics
+ * derives its query-hash key from it.
+ */
+export const apiKeyPepper = Secret.load("API_KEY_PEPPER", { optional: true });
+
+/**
+ * Builds from the key pepper: the first of API_KEY_PEPPER, CREDENTIALS_SECRET and NEXTAUTH_SECRET
+ * that is set and not empty, or undefined when none is. api-key hashes keys under it and analytics
+ * derives its query-hash key from it; each owner says itself what none means for it.
+ */
+export function intoKeyPepper<Out>(
+  // Only `into`, so this file stays clear of the resolver: ADR-130's type-seam ceiling counts it.
+  secrets: { into: Into },
+  build: (pepper: string | undefined, fromApiKeyPepper: boolean) => Out | Promise<Out>,
+): Promise<Out> {
+  return secrets.into(apiKeyPepper, (primary) =>
+    secrets.into(credentialsSecret, (credentials) =>
+      secrets.into(sessionSecret, (session) =>
+        build(
+          [primary, credentials, session].find((value) => value !== void 0 && value !== ""),
+          primary !== void 0 && primary !== "",
+        ),
+      ),
+    ),
+  );
+}
 
 /**
  * The value CREDENTIALS_SECRET held before a rotation. It only reads: stores open old values

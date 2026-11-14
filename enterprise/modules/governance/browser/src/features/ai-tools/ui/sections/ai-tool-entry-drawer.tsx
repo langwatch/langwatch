@@ -815,10 +815,20 @@ function CostAttributionSection({
   );
 }
 
+/** Why a kind that locks the gateway off never uses it, shown under the disabled switch. */
+const NO_GATEWAY_REASONS: Partial<Record<AssistantKind, string>> = {
+  pi: "pi sets each model's address in its own build, so the gateway never applies.",
+  grok: "Grok routes no model traffic through its environment, so the gateway never applies.",
+};
+
+/** Why a kind that locks direct OTLP off never uses it, shown under the disabled switch. */
+const NO_OTEL_DIRECT_REASONS: Partial<Record<AssistantKind, string>> = {
+  cursor: "Cursor is GUI-only, so direct OTLP never applies.",
+};
+
 /**
- * CLI path policy for the `langwatch <tool>` wrapper, folded into the
- * coding-assistant tile. Cached at login (cliBootstrap's `toolPolicies`
- * map); Cursor is GUI-only, so its direct-OTLP toggle is forced off.
+ * CLI path policy for the `langwatch <tool>` wrapper, folded into the tile and cached at
+ * login (cliBootstrap's `toolPolicies`). A path the kind locks (`lockedToggles`) shows off.
  */
 function CliPathsSection({
   form,
@@ -827,8 +837,9 @@ function CliPathsSection({
   form: CodingAssistantForm;
   setForm: (f: FormState) => void;
 }) {
-  const cursorOnly = form.assistantKind === "cursor";
-  const noGateway = form.assistantKind === "pi";
+  const locked = lockedToggles(form.assistantKind);
+  const noGateway = locked.allowVk !== undefined;
+  const noOtelDirect = locked.allowOtelDirect !== undefined;
   return (
     <FormSection
       label="CLI paths"
@@ -840,7 +851,7 @@ function CliPathsSection({
             <Text fontSize="sm">Allow gateway (virtual key)</Text>
             <Text fontSize="xs" color="fg.muted">
               {noGateway
-                ? "pi sets each model's address in its own build, so the gateway never applies."
+                ? (NO_GATEWAY_REASONS[form.assistantKind] ?? "This tool never uses the gateway.")
                 : "Route through the LangWatch gateway with a personal virtual key."}
             </Text>
           </VStack>
@@ -855,15 +866,16 @@ function CliPathsSection({
           <VStack align="start" gap={0}>
             <Text fontSize="sm">Allow direct OTLP ingestion</Text>
             <Text fontSize="xs" color="fg.muted">
-              {cursorOnly
-                ? "Cursor is GUI-only, so direct OTLP never applies."
+              {noOtelDirect
+                ? (NO_OTEL_DIRECT_REASONS[form.assistantKind] ??
+                  "This tool never exports straight to the OTLP endpoint.")
                 : "Export telemetry straight to the personal OTLP endpoint."}
             </Text>
           </VStack>
           <Switch
             colorPalette="accent"
-            checked={cursorOnly ? false : form.allowOtelDirect}
-            disabled={cursorOnly}
+            checked={noOtelDirect ? false : form.allowOtelDirect}
+            disabled={noOtelDirect}
             onCheckedChange={({ checked }) => setForm({ ...form, allowOtelDirect: checked })}
           />
         </HStack>

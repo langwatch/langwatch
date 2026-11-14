@@ -4,6 +4,14 @@ import type {
   LwqlAccessModelOwner,
 } from "../rules/langwatch-ql-config-store.rules.ts";
 
+/** The collections a server holds and each PostgreSQL engine table's binding. */
+export interface LwqlCollectionState {
+  readonly available: readonly string[];
+  readonly bound: Readonly<Record<string, string>>;
+  /** The `available` ones a config file defines (`source = 'CONFIG'`): no statement writes them. */
+  readonly configDefined?: readonly string[];
+}
+
 /** One key-map row: a project's key hash and the project it resolves to. */
 export interface LwqlKeyMapInsertRow {
   readonly KeyHash: string;
@@ -72,6 +80,11 @@ export abstract class LangWatchQLProvisioningRepository {
     relations: readonly string[];
     functions: readonly string[];
   }): Promise<LwqlClickHouseInventory>;
+  /** Which candidate collections exist and each engine table's binding; empty where unreadable. */
+  abstract readCollectionState(input: {
+    database: string;
+    candidates: readonly string[];
+  }): Promise<LwqlCollectionState>;
   /**
    * Reads through the `postgresql` table function, which dials with the collection's values as
    * loaded now (never a table's cached pool); with `cluster`, on every replica. Throws on failure.

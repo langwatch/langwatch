@@ -19,6 +19,7 @@ import {
   extractReferencedEvaluationColumns,
   extractReferencedSpanColumns,
   extractReferencedTraceColumns,
+  JOINED_SPAN_ATTRIBUTES,
   narrowMapColumnProjection,
   narrowSpanAttributesColumns,
   spanAttributesNarrowProjection,
@@ -31,6 +32,7 @@ import {
   translateAllFilters,
 } from "./clickhouse.filter-translator.mapper.ts";
 import {
+  latestVersionKey,
   latestVersionSubquery,
   parseLatestVersionColumn,
 } from "./clickhouse.latest-version-dedup.mapper.ts";
@@ -122,7 +124,7 @@ const EVAL_TIME_FILTER_BOTH_PERIODS =
 /**
  * Deduped trace_summaries FROM-clause keeping the latest version of each trace: narrow `columns`
  * use the spillable argMax collapse of {@link latestVersionSubquery}, wide rows the IN-tuple form.
- * See dev/docs/best_practices/clickhouse-queries.md "Whole-range aggregates".
+ * Both expose each column under {@link latestVersionKey}. See clickhouse-queries.md.
  */
 function dedupedTraceSummaries({
   alias,
@@ -143,7 +145,11 @@ function dedupedTraceSummaries({
       where: `${tenantScope("OccurredAt")} ${dateClause}`,
     });
   }
-  const columnList = columns ? Array.from(columns).join(", ") : TRACE_ANALYTICS_COLUMNS.join(", ");
+  const columnList = (columns ?? TRACE_ANALYTICS_COLUMNS)
+    .map((column) =>
+      latestVersionKey(column) === column ? column : `${column} AS ${latestVersionKey(column)}`,
+    )
+    .join(", ");
   return `(
     SELECT ${columnList} FROM trace_summaries
     WHERE ${tenantScope("OccurredAt")}
@@ -723,10 +729,10 @@ const groupByExpressions: Partial<Record<string, (groupByKey?: string) => GroupB
 
   "metadata.span_type": () => ({
     column: `if(
-      ${tableAliases.stored_spans}.SpanAttributes['langwatch.span.type'] = '' OR
-      ${tableAliases.stored_spans}.SpanAttributes['langwatch.span.type'] IS NULL,
+      ${tableAliases.stored_spans}.${JOINED_SPAN_ATTRIBUTES}['langwatch.span.type'] = '' OR
+      ${tableAliases.stored_spans}.${JOINED_SPAN_ATTRIBUTES}['langwatch.span.type'] IS NULL,
       'unknown',
-      ${tableAliases.stored_spans}.SpanAttributes['langwatch.span.type']
+      ${tableAliases.stored_spans}.${JOINED_SPAN_ATTRIBUTES}['langwatch.span.type']
     )`,
     requiredJoins: ["stored_spans"],
     handlesUnknown: true,
@@ -885,7 +891,7 @@ function getDateTruncFunction(timeScaleMinutes: number, timeZone: string): strin
 
   // Convert minutes to appropriate interval
   if (timeScaleMinutes <= 1) {
-    return `toStartOfMinute(ts.OccurredAt, '${validatedTimeZone}')`;
+    return `toStartOfMinute(ts.LatestOccurredAt, '${validatedTimeZone}')`;
   }
 
   if (timeScaleMinutes < MINUTES_PER_DAY) {
@@ -893,23 +899,23 @@ function getDateTruncFunction(timeScaleMinutes: number, timeZone: string): strin
     // Otherwise use MINUTE interval to preserve precision (e.g., 90 minutes)
     if (timeScaleMinutes % MINUTES_PER_HOUR === 0) {
       const hours = timeScaleMinutes / MINUTES_PER_HOUR;
-      return `toStartOfInterval(ts.OccurredAt, INTERVAL ${hours} HOUR, '${validatedTimeZone}')`;
+      return `toStartOfInterval(ts.LatestOccurredAt, INTERVAL ${hours} HOUR, '${validatedTimeZone}')`;
     }
-    return `toStartOfInterval(ts.OccurredAt, INTERVAL ${timeScaleMinutes} MINUTE, '${validatedTimeZone}')`;
+    return `toStartOfInterval(ts.LatestOccurredAt, INTERVAL ${timeScaleMinutes} MINUTE, '${validatedTimeZone}')`;
   }
 
   // Days
   const days = Math.floor(timeScaleMinutes / MINUTES_PER_DAY);
   if (days === 1) {
-    return `toStartOfDay(ts.OccurredAt, '${validatedTimeZone}')`;
+    return `toStartOfDay(ts.LatestOccurredAt, '${validatedTimeZone}')`;
   }
   if (days <= DAYS_PER_WEEK) {
-    return `toStartOfInterval(ts.OccurredAt, INTERVAL ${days} DAY, '${validatedTimeZone}')`;
+    return `toStartOfInterval(ts.LatestOccurredAt, INTERVAL ${days} DAY, '${validatedTimeZone}')`;
   }
   if (days <= DAYS_PER_MONTH) {
-    return `toStartOfWeek(ts.OccurredAt, 1, '${validatedTimeZone}')`;
+    return `toStartOfWeek(ts.LatestOccurredAt, 1, '${validatedTimeZone}')`;
   }
-  return `toStartOfMonth(ts.OccurredAt, '${validatedTimeZone}')`;
+  return `toStartOfMonth(ts.LatestOccurredAt, '${validatedTimeZone}')`;
 }
 
 /**
@@ -1108,9 +1114,9 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
   // filter's) stays bracketed so it never reaches the fence.
   const baseWhere = `
     (
-      (${ts}.OccurredAt >= {currentStart:DateTime64(3)} AND ${ts}.OccurredAt < {currentEnd:DateTime64(3)})
+      (${ts}.LatestOccurredAt >= {currentStart:DateTime64(3)} AND ${ts}.LatestOccurredAt < {currentEnd:DateTime64(3)})
       OR
-      (${ts}.OccurredAt >= {previousStart:DateTime64(3)} AND ${ts}.OccurredAt < {previousEnd:DateTime64(3)})
+      (${ts}.LatestOccurredAt >= {previousStart:DateTime64(3)} AND ${ts}.LatestOccurredAt < {previousEnd:DateTime64(3)})
     )
   `;
 
@@ -1248,8 +1254,8 @@ function buildStandardTimeseriesQuery({
   // Add period indicator
   selectExprs.push(`
     CASE
-      WHEN ${ts}.OccurredAt >= {currentStart:DateTime64(3)} AND ${ts}.OccurredAt < {currentEnd:DateTime64(3)} THEN 'current'
-      WHEN ${ts}.OccurredAt >= {previousStart:DateTime64(3)} AND ${ts}.OccurredAt < {previousEnd:DateTime64(3)} THEN 'previous'
+      WHEN ${ts}.LatestOccurredAt >= {currentStart:DateTime64(3)} AND ${ts}.LatestOccurredAt < {currentEnd:DateTime64(3)} THEN 'current'
+      WHEN ${ts}.LatestOccurredAt >= {previousStart:DateTime64(3)} AND ${ts}.LatestOccurredAt < {previousEnd:DateTime64(3)} THEN 'previous'
     END AS period
   `);
 
@@ -1454,8 +1460,8 @@ function buildMixedEvalTimeseriesQuery({
   const innerSelectExprs: string[] = [
     `${ts}.TraceId AS trace_id`,
     `CASE
-      WHEN ${ts}.OccurredAt >= {currentStart:DateTime64(3)} AND ${ts}.OccurredAt < {currentEnd:DateTime64(3)} THEN 'current'
-      WHEN ${ts}.OccurredAt >= {previousStart:DateTime64(3)} AND ${ts}.OccurredAt < {previousEnd:DateTime64(3)} THEN 'previous'
+      WHEN ${ts}.LatestOccurredAt >= {currentStart:DateTime64(3)} AND ${ts}.LatestOccurredAt < {currentEnd:DateTime64(3)} THEN 'current'
+      WHEN ${ts}.LatestOccurredAt >= {previousStart:DateTime64(3)} AND ${ts}.LatestOccurredAt < {previousEnd:DateTime64(3)} THEN 'previous'
     END AS period`,
   ];
   if (dateTrunc) {
@@ -1507,7 +1513,7 @@ function buildMixedEvalTimeseriesQuery({
           ${periodInnerExprs.join(",\n          ")}
         FROM ${dedupedTraceSummaries({ alias: ts, columns: traceColumns, dateFilter: `AND OccurredAt >= {${startParam}:DateTime64(3)} AND OccurredAt < {${endParam}:DateTime64(3)}` })}
         ${joinClauses}
-        WHERE ${ts}.OccurredAt >= {${startParam}:DateTime64(3)} AND ${ts}.OccurredAt < {${endParam}:DateTime64(3)}
+        WHERE ${ts}.LatestOccurredAt >= {${startParam}:DateTime64(3)} AND ${ts}.LatestOccurredAt < {${endParam}:DateTime64(3)}
           ${filterWhere}
         GROUP BY ${periodInnerGroupBy.join(", ")}
       )`;
@@ -2010,8 +2016,8 @@ function buildArrayJoinTimeseriesQuery({
     : `if(${groupByColumn} IS NULL, 'unknown', toString(${groupByColumn})) AS group_key`;
 
   const periodCaseExpr = `CASE
-      WHEN ${ts}.OccurredAt >= {currentStart:DateTime64(3)} AND ${ts}.OccurredAt < {currentEnd:DateTime64(3)} THEN 'current'
-      WHEN ${ts}.OccurredAt >= {previousStart:DateTime64(3)} AND ${ts}.OccurredAt < {previousEnd:DateTime64(3)} THEN 'previous'
+      WHEN ${ts}.LatestOccurredAt >= {currentStart:DateTime64(3)} AND ${ts}.LatestOccurredAt < {currentEnd:DateTime64(3)} THEN 'current'
+      WHEN ${ts}.LatestOccurredAt >= {previousStart:DateTime64(3)} AND ${ts}.LatestOccurredAt < {previousEnd:DateTime64(3)} THEN 'previous'
     END`;
 
   // Separate eval and non-eval metrics so we can pre-aggregate evaluation
@@ -2333,8 +2339,8 @@ function buildSubqueryMetricCtes({
             SELECT ${nested.select}
             FROM ${dedupedTraceSummaries({ alias: ts, columns: traceColumns, dateFilter: DATE_FILTER_CURRENT })}
             ${joinClauses}
-            WHERE ${ts}.OccurredAt >= {currentStart:DateTime64(3)}
-              AND ${ts}.OccurredAt < {currentEnd:DateTime64(3)}
+            WHERE ${ts}.LatestOccurredAt >= {currentStart:DateTime64(3)}
+              AND ${ts}.LatestOccurredAt < {currentEnd:DateTime64(3)}
               ${filterWhere}
               ${seriesWhere}
             GROUP BY ${nested.groupBy}
@@ -2356,8 +2362,8 @@ function buildSubqueryMetricCtes({
             SELECT ${nested.select}
             FROM ${dedupedTraceSummaries({ alias: ts, columns: traceColumns, dateFilter: DATE_FILTER_PREVIOUS })}
             ${joinClauses}
-            WHERE ${ts}.OccurredAt >= {previousStart:DateTime64(3)}
-              AND ${ts}.OccurredAt < {previousEnd:DateTime64(3)}
+            WHERE ${ts}.LatestOccurredAt >= {previousStart:DateTime64(3)}
+              AND ${ts}.LatestOccurredAt < {previousEnd:DateTime64(3)}
               ${filterWhere}
               ${seriesWhere}
             GROUP BY ${nested.groupBy}
@@ -2378,8 +2384,8 @@ function buildSubqueryMetricCtes({
           SELECT ${subquery.innerSelect}${groupKeyInnerSelect}
           FROM ${dedupedTraceSummaries({ alias: ts, columns: traceColumns, dateFilter: DATE_FILTER_CURRENT })}
           ${joinClauses}
-          WHERE ${ts}.OccurredAt >= {currentStart:DateTime64(3)}
-            AND ${ts}.OccurredAt < {currentEnd:DateTime64(3)}
+          WHERE ${ts}.LatestOccurredAt >= {currentStart:DateTime64(3)}
+            AND ${ts}.LatestOccurredAt < {currentEnd:DateTime64(3)}
             ${filterWhere}
             ${seriesWhere}
           GROUP BY ${subquery.innerGroupBy}${groupKeyInnerGroupBy}
@@ -2396,8 +2402,8 @@ function buildSubqueryMetricCtes({
           SELECT ${subquery.innerSelect}${groupKeyInnerSelect}
           FROM ${dedupedTraceSummaries({ alias: ts, columns: traceColumns, dateFilter: DATE_FILTER_PREVIOUS })}
           ${joinClauses}
-          WHERE ${ts}.OccurredAt >= {previousStart:DateTime64(3)}
-            AND ${ts}.OccurredAt < {previousEnd:DateTime64(3)}
+          WHERE ${ts}.LatestOccurredAt >= {previousStart:DateTime64(3)}
+            AND ${ts}.LatestOccurredAt < {previousEnd:DateTime64(3)}
             ${filterWhere}
             ${seriesWhere}
           GROUP BY ${subquery.innerGroupBy}${groupKeyInnerGroupBy}
@@ -2491,8 +2497,8 @@ function buildSubqueryTimeseriesQuery({
           ${simpleSelectExprs.join(",\n          ")}
         FROM ${dedupedTraceSummaries({ alias: ts, columns: traceColumns, dateFilter: DATE_FILTER_CURRENT })}
         ${joinClauses}
-        WHERE ${ts}.OccurredAt >= {currentStart:DateTime64(3)}
-          AND ${ts}.OccurredAt < {currentEnd:DateTime64(3)}
+        WHERE ${ts}.LatestOccurredAt >= {currentStart:DateTime64(3)}
+          AND ${ts}.LatestOccurredAt < {currentEnd:DateTime64(3)}
           ${filterWhere}${simpleGroupBy}
       )`);
 
@@ -2502,8 +2508,8 @@ function buildSubqueryTimeseriesQuery({
           ${simpleSelectExprs.join(",\n          ")}
         FROM ${dedupedTraceSummaries({ alias: ts, columns: traceColumns, dateFilter: DATE_FILTER_PREVIOUS })}
         ${joinClauses}
-        WHERE ${ts}.OccurredAt >= {previousStart:DateTime64(3)}
-          AND ${ts}.OccurredAt < {previousEnd:DateTime64(3)}
+        WHERE ${ts}.LatestOccurredAt >= {previousStart:DateTime64(3)}
+          AND ${ts}.LatestOccurredAt < {previousEnd:DateTime64(3)}
           ${filterWhere}${simpleGroupBy}
       )`);
   }
@@ -2775,8 +2781,8 @@ function buildDateBucketedPipelineQuery({
 
   const periodCase = `
     CASE
-      WHEN ${ts}.OccurredAt >= {currentStart:DateTime64(3)} AND ${ts}.OccurredAt < {currentEnd:DateTime64(3)} THEN 'current'
-      WHEN ${ts}.OccurredAt >= {previousStart:DateTime64(3)} AND ${ts}.OccurredAt < {previousEnd:DateTime64(3)} THEN 'previous'
+      WHEN ${ts}.LatestOccurredAt >= {currentStart:DateTime64(3)} AND ${ts}.LatestOccurredAt < {currentEnd:DateTime64(3)} THEN 'current'
+      WHEN ${ts}.LatestOccurredAt >= {previousStart:DateTime64(3)} AND ${ts}.LatestOccurredAt < {previousEnd:DateTime64(3)} THEN 'previous'
     END`;
 
   const groupKeyExpr = buildGroupKeyExpression({ groupByColumn, groupByHandlesUnknown });
@@ -3216,8 +3222,8 @@ export function buildTopDocumentsQuery({
   );
 
   // The JOIN's right side is hashed into memory, so it carries only what the
-  // ARRAY JOIN reads: the rag.contexts value, as a one-key map so the outer
-  // `ss.SpanAttributes[...]` access is unchanged, and only for the spans that
+  // ARRAY JOIN reads: the rag.contexts value, as a one-key map read the same
+  // `ss.JoinedSpanAttributes[...]` way as the whole map, and only for the spans that
   // have one. Selecting the whole SpanAttributes map buffered every span's
   // attributes in range (inputs, outputs, prompts) on the join side.
   const spanJoin = buildJoinClause({
@@ -3237,15 +3243,15 @@ export function buildTopDocumentsQuery({
         toString(context.content) AS content
       FROM ${dedupedTraceSummaries({ alias: ts, columns: traceColumns, dateFilter: DATE_FILTER_START_END })}
       ${spanJoin}
-      ARRAY JOIN JSONExtract(${ss}.SpanAttributes['${RAG_CONTEXTS_ATTRIBUTE}'], 'Array(JSON)') AS context
-      WHERE ${ts}.OccurredAt >= {startDate:DateTime64(3)}
-        AND ${ts}.OccurredAt < {endDate:DateTime64(3)}
+      ARRAY JOIN JSONExtract(${ss}.${JOINED_SPAN_ATTRIBUTES}['${RAG_CONTEXTS_ATTRIBUTE}'], 'Array(JSON)') AS context
+      WHERE ${ts}.LatestOccurredAt >= {startDate:DateTime64(3)}
+        AND ${ts}.LatestOccurredAt < {endDate:DateTime64(3)}
         ${filterWhere}
     )
     SELECT
       document_id AS documentId,
       count() AS count,
-      any(TraceId) AS traceId,
+      any(TraceId) AS trace_id,
       any(content) AS content,
       count() OVER () AS total
     FROM document_refs
@@ -3356,8 +3362,8 @@ export function buildFeedbacksQuery({
       ${ss}."Events.Timestamp" AS event_timestamp,
       ${ss}."Events.Name" AS event_name,
       ${ss}."Events.Attributes" AS event_attrs
-    WHERE ${ts}.OccurredAt >= {startDate:DateTime64(3)}
-      AND ${ts}.OccurredAt < {endDate:DateTime64(3)}
+    WHERE ${ts}.LatestOccurredAt >= {startDate:DateTime64(3)}
+      AND ${ts}.LatestOccurredAt < {endDate:DateTime64(3)}
       AND event_name = 'thumbs_up_down'
       AND mapContains(event_attrs, 'event.metrics.vote')
       ${filterWhere}
@@ -3412,8 +3418,8 @@ export function buildFeedbacksPageQuery({
       arrayEnumerate(${ss}."Events.Timestamp") AS event_index,
       ${ss}."Events.Name" AS event_name,
       ${ss}."Events.Attributes" AS event_attrs
-    WHERE ${ts}.OccurredAt >= {startDate:DateTime64(3)}
-      AND ${ts}.OccurredAt < {endDate:DateTime64(3)}
+    WHERE ${ts}.LatestOccurredAt >= {startDate:DateTime64(3)}
+      AND ${ts}.LatestOccurredAt < {endDate:DateTime64(3)}
       AND event_name = 'thumbs_up_down'
       AND mapContains(event_attrs, 'event.metrics.vote')
       ${filterWhere}

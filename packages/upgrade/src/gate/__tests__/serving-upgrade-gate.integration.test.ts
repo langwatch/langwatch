@@ -303,7 +303,7 @@ describe.skipIf(!DB_URL)("servingUpgradeGate over a ledger", () => {
       expect(verdict).toMatchObject({
         admitted: false,
         outcome: "upgrading",
-        outstanding: [PRISMA],
+        outstanding: [GOOSE, PRISMA],
       });
       expect(runs).toBe(0);
     });

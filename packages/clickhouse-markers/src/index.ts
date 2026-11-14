@@ -36,3 +36,32 @@ export function tenantScope(column: TenantScopeTimeColumn): string {
 export function tenantSet(): string {
   return "{{tenantSet}}";
 }
+
+/**
+ * Which statement parameter narrows the fence's held-trace semi-join (ADR-201 §3): the read's
+ * trace id, or the millisecond lower bound of its own `StartTime` window.
+ */
+export type HeldTraceBound = { traceId: string } | { sinceMs: string };
+
+/**
+ * ADR-201 §3: the fence with each braid's condition applied, on a span read's outer select only,
+ * and owner spans kept to traces the reader holds. Name the read's trace id or `since` parameter
+ * so the semi-join reads no wider than the outer read.
+ */
+export function tenantScopeWithConditions(
+  column: TenantScopeTimeColumn,
+  held?: HeldTraceBound,
+): string {
+  if (held === undefined) return `{{tenantScopeWithConditions:${column}}}`;
+  const bound = "traceId" in held ? `traceId=${held.traceId}` : `sinceMs=${held.sinceMs}`;
+  return `{{tenantScopeWithConditions:${column}:${bound}}}`;
+}
+
+/**
+ * The latest-version election's marker: tenants and windows alone, so a condition applies after
+ * the latest version is chosen. Accepted only as `(TenantId, TraceId, SpanId, UpdatedAt) IN (SELECT
+ * TenantId, TraceId, SpanId, max(UpdatedAt) FROM stored_spans WHERE <here>` in a fenced WHERE.
+ */
+export function tenantScopeForLatestVersion(column: TenantScopeTimeColumn): string {
+  return `{{tenantScopeForLatestVersion:${column}}}`;
+}
