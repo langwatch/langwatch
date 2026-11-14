@@ -4,6 +4,14 @@
  * could answer the definition after the counters were laid over it.
  */
 
+import {
+  clickhouseRead,
+  type Condition,
+  type ConditionOps,
+  fn,
+  type ReaderReadStatement,
+  tenantScope,
+} from "@langwatch/clickhouse-client/builder";
 import { type Instant, Temporal, toDate } from "@langwatch/time";
 
 import {
@@ -11,10 +19,11 @@ import {
   type InstantEvalStoredStatus,
 } from "../../rules/instant-eval-run-status.rules.ts";
 import type { InstantEvalRunRow } from "../instant-eval-run.repository.ts";
+import { instantEvalRuns as runs } from "./clickhouse.instant-eval-runs.table.ts";
 
 export const INSTANT_EVAL_RUNS_TABLE = "instant_eval_runs" as const;
 
-/** The row as ClickHouse answers it, timestamps as epoch milliseconds. */
+/** The row as ClickHouse answers it, timestamps as epoch milliseconds under `…Ms` keys. */
 export interface InstantEvalRunRecord {
   TenantId: string;
   RunId: string;
@@ -35,12 +44,12 @@ export interface InstantEvalRunRecord {
   CostUsd: number;
   PriceUsd: number;
   Error: string | null;
-  CreatedAt: number | string;
-  UpdatedAt: number | string;
-  StartedAt: number | string | null;
-  FinishedAt: number | string | null;
-  OccurredAt: number | string | null;
-  AcceptedAt: number | string | null;
+  CreatedAtMs: number | string;
+  UpdatedAtMs: number | string;
+  StartedAtMs: number | string | null;
+  FinishedAtMs: number | string | null;
+  OccurredAtMs: number | string | null;
+  AcceptedAtMs: number | string | null;
   LastEventId: string;
   ProjectionVersion: string;
 }
@@ -77,69 +86,103 @@ interface InstantEvalRunWriteRecord {
   WrittenAt: Date;
 }
 
-/**
- * A predicate on the table's own columns, spelled for the outer read (where
- * the columns are reached through `t`, because the projection shadows their
- * names with epoch numbers) and for the inner max (where they are bare).
- */
-export type InstantEvalRunNarrowing = (column: (name: string) => string) => string;
+/** What a latest-version read is narrowed by, applied to the election and to the read alike. */
+export interface InstantEvalRunNarrowing {
+  readonly runId?: string;
+  /** Keyset paging on `(CreatedAt, RunId)`, epoch milliseconds. */
+  readonly before?: { readonly atMs: number; readonly runId?: string };
+}
+
+/** The version a run's latest row wins by: written, then accepted, then the last event. */
+const runVersion = () => fn.tuple(runs.WrittenAt, fn.ifNull(runs.AcceptedAt, 0), runs.LastEventId);
+
+function narrowed<Ctes>(
+  ops: ConditionOps<typeof INSTANT_EVAL_RUNS_TABLE, Ctes>,
+  { runId, before }: InstantEvalRunNarrowing,
+): Condition<typeof INSTANT_EVAL_RUNS_TABLE>[] {
+  const { and, or, eq, lt } = ops;
+  const terms: Condition<typeof INSTANT_EVAL_RUNS_TABLE>[] = [];
+  if (runId !== undefined) terms.push(eq(runs.RunId, runId));
+  // With `CreatedAt < before` alone a page that ended between two runs of the same millisecond
+  // would skip the rest of them; the id breaks the tie, so the order is total.
+  if (before?.runId !== undefined) {
+    terms.push(
+      or(
+        lt(runs.CreatedAt, before.atMs),
+        and(eq(runs.CreatedAt, before.atMs), lt(runs.RunId, before.runId)),
+      ),
+    );
+  } else if (before !== undefined) {
+    terms.push(lt(runs.CreatedAt, before.atMs));
+  }
+  return terms;
+}
 
 /**
- * The latest version of each run, by the IN-tuple pattern. `narrowings`
- * narrow both the outer read and the inner max, so a list page never dedups
- * rows it is about to discard.
+ * The latest version of each run, by the IN-tuple pattern over `runVersion`; the narrowing
+ * narrows the election and the read, so a list page never dedups rows it is about to discard.
  */
-export function latestRowsQuery({
-  narrowings,
+export function latestRunsRead({
+  projectId,
+  narrowing,
+  limit,
+  newestFirst = false,
 }: {
-  narrowings: readonly InstantEvalRunNarrowing[];
-}): string {
-  const outer = narrowings
-    .map((narrowing) => `AND ${narrowing((name) => `t.${name}`)}`)
-    .join("\n      ");
-  const inner = narrowings
-    .map((narrowing) => `AND ${narrowing((name) => name)}`)
-    .join("\n          ");
-  return `
-    SELECT
-      t.TenantId AS TenantId,
-      t.RunId AS RunId,
-      t.Name AS Name,
-      t.Sql AS Sql,
-      t.Parameters AS Parameters,
-      t.Questions AS Questions,
-      t.Plan AS Plan,
-      t.RowLimit AS RowLimit,
-      t.Status AS Status,
-      t.Total AS Total,
-      t.Progress AS Progress,
-      t.Matched AS Matched,
-      t.MatchedByQuestion AS MatchedByQuestion,
-      t.Failed AS Failed,
-      t.Skipped AS Skipped,
-      t.Tokens AS Tokens,
-      t.CostUsd AS CostUsd,
-      t.PriceUsd AS PriceUsd,
-      t.Error AS Error,
-      toUnixTimestamp64Milli(t.CreatedAt) AS CreatedAt,
-      toUnixTimestamp64Milli(t.UpdatedAt) AS UpdatedAt,
-      toUnixTimestamp64Milli(t.StartedAt) AS StartedAt,
-      toUnixTimestamp64Milli(t.FinishedAt) AS FinishedAt,
-      toUnixTimestamp64Milli(t.OccurredAt) AS OccurredAt,
-      toUnixTimestamp64Milli(t.AcceptedAt) AS AcceptedAt,
-      t.LastEventId AS LastEventId,
-      t.ProjectionVersion AS ProjectionVersion
-    FROM ${INSTANT_EVAL_RUNS_TABLE} AS t
-    WHERE t.TenantId = {tenantId:String}
-      ${outer}
-      AND (t.TenantId, t.RunId, (t.WrittenAt, ifNull(t.AcceptedAt, toDateTime64(0, 3)), t.LastEventId)) IN (
-        SELECT TenantId, RunId, max((WrittenAt, ifNull(AcceptedAt, toDateTime64(0, 3)), LastEventId))
-        FROM ${INSTANT_EVAL_RUNS_TABLE}
-        WHERE TenantId = {tenantId:String}
-          ${inner}
-        GROUP BY TenantId, RunId
-      )
-  `;
+  projectId: string;
+  narrowing: InstantEvalRunNarrowing;
+  limit?: number;
+  /** Ordered by `(CreatedAt, RunId)` descending, the order a list pages in. */
+  newestFirst?: boolean;
+}): ReaderReadStatement<InstantEvalRunRecord> {
+  const isNarrowed = narrowing.runId !== undefined || narrowing.before !== undefined;
+  const read = clickhouseRead({ scope: tenantScope.single({ tenantId: projectId }) })
+    .from(runs)
+    .with("latest", (sub) => {
+      const election = sub
+        .from(runs)
+        .select({ Elected: fn.tuple(runs.RunId, fn.max(runVersion())) })
+        .groupBy(runs.RunId);
+      return isNarrowed ? election.where((ops) => ops.and(...narrowed(ops, narrowing))) : election;
+    })
+    .select({
+      TenantId: runs.TenantId,
+      RunId: runs.RunId,
+      Name: runs.Name,
+      Sql: runs.Sql,
+      Parameters: runs.Parameters,
+      Questions: runs.Questions,
+      Plan: runs.Plan,
+      RowLimit: runs.RowLimit,
+      Status: runs.Status,
+      Total: runs.Total,
+      Progress: runs.Progress,
+      Matched: runs.Matched,
+      MatchedByQuestion: runs.MatchedByQuestion,
+      Failed: runs.Failed,
+      Skipped: runs.Skipped,
+      Tokens: runs.Tokens,
+      CostUsd: runs.CostUsd,
+      PriceUsd: runs.PriceUsd,
+      Error: runs.Error,
+      CreatedAtMs: fn.toUnixTimestamp64Milli(runs.CreatedAt),
+      UpdatedAtMs: fn.toUnixTimestamp64Milli(runs.UpdatedAt),
+      StartedAtMs: fn.toUnixTimestamp64Milli(runs.StartedAt),
+      FinishedAtMs: fn.toUnixTimestamp64Milli(runs.FinishedAt),
+      OccurredAtMs: fn.toUnixTimestamp64Milli(runs.OccurredAt),
+      AcceptedAtMs: fn.toUnixTimestamp64Milli(runs.AcceptedAt),
+      LastEventId: runs.LastEventId,
+      ProjectionVersion: runs.ProjectionVersion,
+    })
+    .where((ops) =>
+      ops.and(
+        ...narrowed(ops, narrowing),
+        ops.oneOf(fn.tuple(runs.RunId, runVersion()), { cte: "latest" }),
+      ),
+    );
+  const ordered = newestFirst
+    ? read.orderBy(runs.CreatedAt, "DESC").orderBy(runs.RunId, "DESC")
+    : read;
+  return (limit === undefined ? ordered : ordered.limit(limit)).build();
 }
 
 const toMillis = (value: number | string | null): number | null =>
@@ -188,12 +231,12 @@ export function toRow(record: InstantEvalRunRecord): InstantEvalRunRow {
     costUsd: Number(record.CostUsd),
     priceUsd: Number(record.PriceUsd),
     error: record.Error,
-    createdAt: Temporal.Instant.fromEpochMilliseconds(Number(record.CreatedAt)),
-    updatedAt: Temporal.Instant.fromEpochMilliseconds(Number(record.UpdatedAt)),
-    startedAt: toInstant(record.StartedAt),
-    finishedAt: toInstant(record.FinishedAt),
-    occurredAt: toMillis(record.OccurredAt),
-    acceptedAt: toMillis(record.AcceptedAt),
+    createdAt: Temporal.Instant.fromEpochMilliseconds(Number(record.CreatedAtMs)),
+    updatedAt: Temporal.Instant.fromEpochMilliseconds(Number(record.UpdatedAtMs)),
+    startedAt: toInstant(record.StartedAtMs),
+    finishedAt: toInstant(record.FinishedAtMs),
+    occurredAt: toMillis(record.OccurredAtMs),
+    acceptedAt: toMillis(record.AcceptedAtMs),
     lastEventId: record.LastEventId || null,
     projectionVersion: record.ProjectionVersion || null,
   };

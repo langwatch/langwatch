@@ -1,14 +1,10 @@
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+
 /**
- * What the process hands this module (ADR-147). The ClickHouse surface is
- * declared structurally so the package does not depend on the driver.
+ * What a repository holds per tenant (ADR-147): built reads go straight to the process member;
+ * the insert keeps the driver's shape it was written against.
  */
-type InstantEvalClickHouseClient = {
-  query<T>(input: {
-    query: string;
-    query_params?: Record<string, unknown>;
-    format: "JSONEachRow";
-    clickhouse_settings?: Record<string, string | number | boolean | undefined>;
-  }): Promise<{ json(): Promise<T[]> }>;
+type InstantEvalClickHouseClient = Pick<ClickHouseQueryClient, "read"> & {
   insert(input: {
     table: string;
     values: Record<string, unknown>[];
@@ -26,13 +22,7 @@ export type InstantEvalClickHouseResolver = (
  * The process's one routing ClickHouse member, carried per tenant. Not a
  * second connection — the member already routes and guards every statement.
  */
-export type InstantEvalClickHouseMember = {
-  query<T>(input: {
-    tenantId: string;
-    sql: string;
-    params?: Record<string, unknown>;
-    settings?: Record<string, string | number>;
-  }): Promise<{ rows: T[] }>;
+export type InstantEvalClickHouseMember = Pick<ClickHouseQueryClient, "read"> & {
   insert(input: {
     tenantId: string;
     table: string;
@@ -43,24 +33,13 @@ export type InstantEvalClickHouseMember = {
 
 /** One tenant's view of the process member, as a repository reads it. */
 export class ClickHouseInstantEvalSession implements InstantEvalClickHouseClient {
+  readonly read: ClickHouseQueryClient["read"];
+
   constructor(
     private readonly clickhouse: InstantEvalClickHouseMember,
     private readonly tenantId: string,
-  ) {}
-
-  async query<T>(input: {
-    query: string;
-    query_params?: Record<string, unknown>;
-    format: "JSONEachRow";
-    clickhouse_settings?: Record<string, string | number | boolean | undefined>;
-  }): Promise<{ json(): Promise<T[]> }> {
-    const { rows } = await this.clickhouse.query<T>({
-      tenantId: this.tenantId,
-      sql: input.query,
-      ...(input.query_params ? { params: input.query_params } : {}),
-      ...(input.clickhouse_settings ? { settings: settingsOf(input.clickhouse_settings) } : {}),
-    });
-    return { json: () => Promise.resolve(rows) };
+  ) {
+    this.read = (input) => clickhouse.read(input);
   }
 
   async insert(input: {

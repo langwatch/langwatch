@@ -10,44 +10,75 @@ import { describe, expect, it } from "vitest";
 import { instantEvalRunRow } from "../../__tests__/instant-eval.fixtures.ts";
 import {
   INSTANT_EVAL_RUNS_TABLE,
-  type InstantEvalRunNarrowing,
-  latestRowsQuery,
+  type InstantEvalRunRecord,
+  latestRunsRead,
   toRow,
   toWriteRecord,
 } from "../clickhouse/clickhouse.instant-eval-run.mapper.ts";
 
-const byRunId: InstantEvalRunNarrowing = (column) => `${column("RunId")} = {runId:String}`;
-
 describe("given the read that collapses a run's versions", () => {
   describe("when it is built", () => {
-    it("filters the tenant first, in the outer read and in the inner max", () => {
-      const sql = latestRowsQuery({ narrowings: [byRunId] });
+    it("is a single-tenant reader read with the tenant setting, the tenant in the election too", () => {
+      const statement = latestRunsRead({
+        projectId: "project-1",
+        narrowing: { runId: "run-1" },
+        limit: 1,
+      });
 
-      const [outer, inner] = sql.split("SELECT TenantId, RunId, max(");
-
-      expect(outer).toContain("WHERE t.TenantId = {tenantId:String}");
-      expect(inner).toContain("WHERE TenantId = {tenantId:String}");
-      expect(sql).toContain(`FROM ${INSTANT_EVAL_RUNS_TABLE}`);
+      expect(statement).toMatchObject({
+        identity: "reader",
+        kind: "tenant",
+        tenantId: "project-1",
+      });
+      expect(statement.settings).toMatchObject({ SQL_langwatch_tenant_ids: "project-1" });
+      const [election, outer] = statement.sql.split(") SELECT ");
+      expect(election).toContain(
+        `FROM ${INSTANT_EVAL_RUNS_TABLE} WHERE TenantId = {tenantId:String}`,
+      );
+      expect(outer).toContain(`FROM ${INSTANT_EVAL_RUNS_TABLE} WHERE TenantId = {tenantId:String}`);
     });
 
-    it("dedups by the IN-tuple pattern rather than by LIMIT 1 BY", () => {
-      const sql = latestRowsQuery({ narrowings: [] });
+    it("dedups by the IN-tuple pattern over written, accepted and last event, not by LIMIT 1 BY", () => {
+      const { sql } = latestRunsRead({ projectId: "project-1", narrowing: {} });
 
-      expect(sql).toContain("GROUP BY TenantId, RunId");
-      expect(sql).toContain(
-        "max((WrittenAt, ifNull(AcceptedAt, toDateTime64(0, 3)), LastEventId))",
+      expect(sql).toContain("GROUP BY RunId");
+      expect(sql).toMatch(
+        /max\(tuple\(WrittenAt, ifNull\(AcceptedAt, fromUnixTimestamp64Milli\(\{v\d+:Int64\}\)\), LastEventId\)\)/,
       );
+      expect(sql).toContain(") IN latest");
       expect(sql).not.toContain("LIMIT 1 BY");
     });
 
     it("narrows both halves, so a page never dedups rows it is about to discard", () => {
-      const sql = latestRowsQuery({ narrowings: [byRunId] });
+      const { sql, params } = latestRunsRead({
+        projectId: "project-1",
+        narrowing: { before: { atMs: 1_000, runId: "run-9" } },
+      });
 
-      expect(sql).toContain("AND t.RunId = {runId:String}");
-      expect(sql).toContain("AND RunId = {runId:String}");
+      const [election, outer] = sql.split(") SELECT ");
+      for (const half of [election, outer]) {
+        expect(half).toMatch(/CreatedAt < fromUnixTimestamp64Milli\(\{v\d+:Int64\}\)/);
+        expect(half).toMatch(/RunId < \{v\d+:String\}/);
+      }
+      expect(Object.values(params)).toContain("run-9");
     });
   });
 });
+
+/** A written record as the read answers it: the instants under their `…Ms` keys. */
+function record({
+  CreatedAt: _created,
+  UpdatedAt: _updated,
+  StartedAt: _started,
+  FinishedAt: _finished,
+  OccurredAt: _occurred,
+  AcceptedAt: _accepted,
+  WrittenAt: _written,
+  ...rest
+}: ReturnType<typeof toWriteRecord> &
+  Omit<InstantEvalRunRecord, keyof ReturnType<typeof toWriteRecord>>): InstantEvalRunRecord {
+  return rest;
+}
 
 describe("given a run row written and read back", () => {
   describe("when it goes through both mappers", () => {
@@ -59,16 +90,18 @@ describe("given a run row written and read back", () => {
       });
       const written = toWriteRecord({ row, writtenAt: row.updatedAt });
 
-      const read = toRow({
-        ...written,
-        Name: written.Name,
-        CreatedAt: written.CreatedAt.getTime(),
-        UpdatedAt: written.UpdatedAt.getTime(),
-        StartedAt: written.StartedAt?.getTime() ?? null,
-        FinishedAt: written.FinishedAt?.getTime() ?? null,
-        OccurredAt: written.OccurredAt?.getTime() ?? null,
-        AcceptedAt: written.AcceptedAt?.getTime() ?? null,
-      });
+      const read = toRow(
+        record({
+          ...written,
+          Name: written.Name,
+          CreatedAtMs: written.CreatedAt.getTime(),
+          UpdatedAtMs: written.UpdatedAt.getTime(),
+          StartedAtMs: written.StartedAt?.getTime() ?? null,
+          FinishedAtMs: written.FinishedAt?.getTime() ?? null,
+          OccurredAtMs: written.OccurredAt?.getTime() ?? null,
+          AcceptedAtMs: written.AcceptedAt?.getTime() ?? null,
+        }),
+      );
 
       expect(read).toEqual(row);
     });
@@ -80,15 +113,17 @@ describe("given a run row written and read back", () => {
       expect(written.LastEventId).toBe("");
       expect(written.ProjectionVersion).toBe("");
       expect(
-        toRow({
-          ...written,
-          CreatedAt: written.CreatedAt.getTime(),
-          UpdatedAt: written.UpdatedAt.getTime(),
-          StartedAt: null,
-          FinishedAt: null,
-          OccurredAt: null,
-          AcceptedAt: null,
-        }).lastEventId,
+        toRow(
+          record({
+            ...written,
+            CreatedAtMs: written.CreatedAt.getTime(),
+            UpdatedAtMs: written.UpdatedAt.getTime(),
+            StartedAtMs: null,
+            FinishedAtMs: null,
+            OccurredAtMs: null,
+            AcceptedAtMs: null,
+          }),
+        ).lastEventId,
       ).toBeNull();
     });
 
@@ -96,17 +131,19 @@ describe("given a run row written and read back", () => {
       const row = instantEvalRunRow();
       const written = toWriteRecord({ row, writtenAt: row.updatedAt });
 
-      const read = toRow({
-        ...written,
-        Status: "HALTED",
-        Parameters: "not json",
-        CreatedAt: written.CreatedAt.getTime(),
-        UpdatedAt: written.UpdatedAt.getTime(),
-        StartedAt: null,
-        FinishedAt: null,
-        OccurredAt: null,
-        AcceptedAt: null,
-      });
+      const read = toRow(
+        record({
+          ...written,
+          Status: "HALTED",
+          Parameters: "not json",
+          CreatedAtMs: written.CreatedAt.getTime(),
+          UpdatedAtMs: written.UpdatedAt.getTime(),
+          StartedAtMs: null,
+          FinishedAtMs: null,
+          OccurredAtMs: null,
+          AcceptedAtMs: null,
+        }),
+      );
 
       expect(read.status).toBe("QUEUED");
       expect(read.parameters).toEqual({});
@@ -116,15 +153,17 @@ describe("given a run row written and read back", () => {
       const row = instantEvalRunRow();
       const written = toWriteRecord({ row, writtenAt: row.updatedAt });
 
-      const read = toRow({
-        ...written,
-        CreatedAt: String(written.CreatedAt.getTime()),
-        UpdatedAt: String(written.UpdatedAt.getTime()),
-        StartedAt: null,
-        FinishedAt: null,
-        OccurredAt: null,
-        AcceptedAt: null,
-      });
+      const read = toRow(
+        record({
+          ...written,
+          CreatedAtMs: String(written.CreatedAt.getTime()),
+          UpdatedAtMs: String(written.UpdatedAt.getTime()),
+          StartedAtMs: null,
+          FinishedAtMs: null,
+          OccurredAtMs: null,
+          AcceptedAtMs: null,
+        }),
+      );
 
       expect(Temporal.Instant.compare(read.createdAt, row.createdAt)).toBe(0);
     });

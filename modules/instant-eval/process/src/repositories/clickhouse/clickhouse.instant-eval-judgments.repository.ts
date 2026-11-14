@@ -1,3 +1,4 @@
+import { clickhouseRead, fn, tenantScope } from "@langwatch/clickhouse-client/builder";
 import { createLogger } from "@langwatch/observability";
 import { Temporal, toDate } from "@langwatch/time";
 import { z } from "zod";
@@ -11,38 +12,19 @@ import type {
   InstantEvalJudgmentsRepository,
 } from "../instant-eval-judgments.repository.ts";
 import {
-  buildFilters,
   encodeInstantEvalCursor,
+  INSTANT_EVAL_JUDGMENTS_TABLE,
+  judgmentsPageRead,
+  judgmentsSampleRead,
   type JudgmentRow,
   toJudgment,
 } from "./clickhouse.instant-eval-judgments.mapper.ts";
+import { instantEvalJudgments as judgments } from "./clickhouse.instant-eval-judgments.table.ts";
 import type { InstantEvalClickHouseResolver } from "./clickhouse.instant-eval-session.store.ts";
-
-const TABLE_NAME = "instant_eval_judgments" as const;
 
 const totalRowsSchema = z.array(z.object({ Total: z.string() }));
 
 const logger = createLogger("langwatch:instant-evals:judgments-repository");
-
-/**
- * argMax over the version column rather than FINAL: the dedup is eventual, and
- * a page has to be the latest version of each verdict without materialising
- * every column of every granule.
- */
-const VERDICT_COLUMNS = `
-          TraceId,
-          SpanId,
-          QuestionId,
-          argMax(ThreadId, UpdatedAt) AS ThreadId,
-          argMax(Kind, UpdatedAt) AS Kind,
-          argMax(Status, UpdatedAt) AS Status,
-          argMax(Passed, UpdatedAt) AS Passed,
-          argMax(Score, UpdatedAt) AS Score,
-          argMax(Label, UpdatedAt) AS Label,
-          argMax(Probability, UpdatedAt) AS Probability,
-          argMax(Probabilities, UpdatedAt) AS Probabilities,
-          argMax(Error, UpdatedAt) AS Error,
-          argMax(OccurredAt, UpdatedAt) AS OccurredAt`;
 
 export class ClickHouseInstantEvalJudgmentsRepository implements InstantEvalJudgmentsRepository {
   private constructor(private readonly resolveClient: InstantEvalClickHouseResolver) {}
@@ -63,21 +45,19 @@ export class ClickHouseInstantEvalJudgmentsRepository implements InstantEvalJudg
     projectIds: readonly string[];
     since?: number;
   }): Promise<number> {
-    const window =
-      since === undefined ? "" : "AND CreatedAt >= fromUnixTimestamp64Milli({since:Int64})";
     const perProject = await Promise.all(
       [...new Set(projectIds)].map(async (tenantId) => {
         const client = await this.resolveClient(tenantId);
-        const result = await client.query({
-          query: `
-            SELECT toString(count()) AS Total
-            FROM ${TABLE_NAME} FINAL
-            WHERE TenantId = {tenantId:String}
-              ${window}`,
-          query_params: since === undefined ? { tenantId } : { tenantId, since },
-          format: "JSONEachRow",
-        });
-        const [row] = totalRowsSchema.parse(await result.json());
+        const counted = clickhouseRead({ scope: tenantScope.single({ tenantId }) })
+          .from(judgments)
+          .final()
+          .select({ Total: fn.toString(fn.count()) });
+        const statement = (
+          since === undefined
+            ? counted
+            : counted.where(({ gte }) => gte(judgments.CreatedAt, since))
+        ).build();
+        const [row] = totalRowsSchema.parse((await client.read({ statement })).rows);
         return Number.parseInt(row?.Total ?? "0", 10);
       }),
     );
@@ -101,7 +81,7 @@ export class ClickHouseInstantEvalJudgmentsRepository implements InstantEvalJudg
 
     const client = await this.resolveClient(tenantId);
     await client.insert({
-      table: TABLE_NAME,
+      table: INSTANT_EVAL_JUDGMENTS_TABLE,
       values: records.map((record) => ({
         ...record,
         OccurredAt: atEpoch(record.OccurredAt),
@@ -118,37 +98,10 @@ export class ClickHouseInstantEvalJudgmentsRepository implements InstantEvalJudg
   }
 
   async getPage(query: InstantEvalJudgmentQuery): Promise<InstantEvalJudgmentPage> {
-    const { where, having, parameters } = buildFilters(query);
+    // An empty trace list matches nothing; the builder refuses an empty set rather than send it.
+    if (query.traceIds?.length === 0) return { judgments: [] };
     const client = await this.resolveClient(query.projectId);
-    // One row past the page, so "there is more" needs no second query.
-    const limit = query.limit + 1;
-
-    const result = await client.query<JudgmentRow>({
-      query: `
-        SELECT ${VERDICT_COLUMNS}
-        FROM ${TABLE_NAME}
-        WHERE TenantId = {tenantId:String}
-          AND RunId = {runId:String}
-          AND CreatedAt >= {writtenFrom:DateTime64(3)}
-          AND CreatedAt <= {writtenUntil:DateTime64(3)}
-          ${where.map((condition) => `AND ${condition}`).join("\n          ")}
-        GROUP BY TraceId, SpanId, QuestionId
-        ${having.length > 0 ? `HAVING ${having.join(" AND ")}` : ""}
-        ORDER BY TraceId, SpanId, QuestionId
-        LIMIT {limit:UInt32}
-      `,
-      query_params: {
-        ...parameters,
-        tenantId: query.projectId,
-        runId: query.runId,
-        writtenFrom: toDate(query.writtenFrom),
-        writtenUntil: toDate(query.writtenUntil),
-        limit,
-      },
-      format: "JSONEachRow",
-    });
-
-    const rows = await result.json();
+    const { rows } = await client.read<JudgmentRow>({ statement: judgmentsPageRead(query) });
     const page = rows.slice(0, query.limit);
     const last = page.at(-1);
     return {
@@ -161,47 +114,8 @@ export class ClickHouseInstantEvalJudgmentsRepository implements InstantEvalJudg
 
   async findSample(query: InstantEvalJudgmentSampleQuery): Promise<readonly InstantEvalJudgment[]> {
     const client = await this.resolveClient(query.projectId);
-    const bounds = `
-      WHERE TenantId = {tenantId:String}
-        AND RunId = {runId:String}
-        AND CreatedAt >= {writtenFrom:DateTime64(3)}
-        AND CreatedAt <= {writtenUntil:DateTime64(3)}
-    `;
-    // The hash of the trace and the seed is the ordering: deterministic for a
-    // given seed, so paging the same sample twice agrees, and different for
-    // the next call, so a caller is not shown one corner of the run forever.
-    const order = query.shouldPreferMatched
-      ? "max(Passed) DESC, cityHash64(TraceId, {seed:UInt64})"
-      : "cityHash64(TraceId, {seed:UInt64})";
-
-    const result = await client.query<JudgmentRow>({
-      query: `
-        SELECT ${VERDICT_COLUMNS}
-        FROM ${TABLE_NAME}
-        ${bounds}
-          AND TraceId IN (
-            SELECT TraceId
-            FROM ${TABLE_NAME}
-            ${bounds}
-            GROUP BY TraceId
-            ORDER BY ${order}
-            LIMIT {traces:UInt32}
-          )
-        GROUP BY TraceId, SpanId, QuestionId
-        ORDER BY TraceId, SpanId, QuestionId
-      `,
-      query_params: {
-        tenantId: query.projectId,
-        runId: query.runId,
-        writtenFrom: toDate(query.writtenFrom),
-        writtenUntil: toDate(query.writtenUntil),
-        traces: query.traces,
-        seed: query.seed,
-      },
-      format: "JSONEachRow",
-    });
-
-    return (await result.json()).map(toJudgment);
+    const { rows } = await client.read<JudgmentRow>({ statement: judgmentsSampleRead(query) });
+    return rows.map(toJudgment);
   }
 }
 

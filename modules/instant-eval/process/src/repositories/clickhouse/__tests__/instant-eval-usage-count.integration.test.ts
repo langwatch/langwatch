@@ -9,11 +9,16 @@
 import { randomUUID } from "node:crypto";
 
 import type { ClickHouseClient } from "@clickhouse/client";
+import { ClickHouseQueryClient, type QueryDriver, TenantGuard } from "@langwatch/clickhouse-client";
 import { Temporal } from "@langwatch/time";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { ClickHouseInstantEvalJudgmentsRepository } from "../clickhouse.instant-eval-judgments.repository.ts";
 import { ClickHouseInstantEvalRunRepository } from "../clickhouse.instant-eval-run.repository.ts";
+import {
+  ClickHouseInstantEvalSession,
+  type InstantEvalClickHouseResolver,
+} from "../clickhouse.instant-eval-session.store.ts";
 import {
   createTestClickHouseClient,
   testClickHouseUrl,
@@ -28,6 +33,38 @@ const now = Date.now();
 const ago = (days: number): number => now - days * DAY_MS;
 
 let ch: ClickHouseClient;
+let resolveClient: InstantEvalClickHouseResolver;
+
+/** The routed member over the migrated test server, as the process hands it to the module. */
+function queryClientOver(client: ClickHouseClient): ClickHouseQueryClient {
+  const driver: QueryDriver = {
+    async execute(request) {
+      const result = await client.query({
+        query: request.sql,
+        format: "JSONEachRow",
+        ...(request.params === undefined ? {} : { query_params: request.params }),
+        ...(request.settings === undefined ? {} : { clickhouse_settings: request.settings }),
+      });
+      return { rows: await result.json() };
+    },
+    async insert(request) {
+      await client.insert({
+        table: request.table,
+        values: request.rows,
+        format: "JSONEachRow",
+        ...(request.settings === undefined ? {} : { clickhouse_settings: request.settings }),
+      });
+    },
+    async command(request) {
+      await client.command({
+        query: request.sql,
+        ...(request.params === undefined ? {} : { query_params: request.params }),
+        ...(request.settings === undefined ? {} : { clickhouse_settings: request.settings }),
+      });
+    },
+  };
+  return new ClickHouseQueryClient({ tenantGuard: new TenantGuard(), driver });
+}
 let runs: ClickHouseInstantEvalRunRepository;
 let judgments: ClickHouseInstantEvalJudgmentsRepository;
 
@@ -35,7 +72,7 @@ let judgments: ClickHouseInstantEvalJudgmentsRepository;
 async function runCreatedAt({ id, atMs }: { id: string; atMs: number }) {
   const at = Temporal.Instant.fromEpochMilliseconds(atMs);
   await ClickHouseInstantEvalRunRepository.create({
-    resolveClient: async () => ch,
+    resolveClient,
     now: () => at,
   }).create({
     id,
@@ -76,10 +113,10 @@ describe.skipIf(!clickHouseUrl)(
   () => {
     beforeAll(async () => {
       ch = createTestClickHouseClient(clickHouseUrl as URL);
-      runs = ClickHouseInstantEvalRunRepository.create({ resolveClient: async () => ch });
-      judgments = ClickHouseInstantEvalJudgmentsRepository.create({
-        resolveClient: async () => ch,
-      });
+      const member = queryClientOver(ch);
+      resolveClient = async (tenantId) => new ClickHouseInstantEvalSession(member, tenantId);
+      runs = ClickHouseInstantEvalRunRepository.create({ resolveClient });
+      judgments = ClickHouseInstantEvalJudgmentsRepository.create({ resolveClient });
       await runCreatedAt({ id: `${tag}-recent`, atMs: ago(3) });
       await runCreatedAt({ id: `${tag}-middle`, atMs: ago(20) });
       await runCreatedAt({ id: `${tag}-old`, atMs: ago(40) });

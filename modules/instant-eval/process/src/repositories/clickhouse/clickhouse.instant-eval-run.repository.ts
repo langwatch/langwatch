@@ -1,4 +1,10 @@
-import { nowInstant, toDate, type Instant } from "@langwatch/time";
+import {
+  clickhouseRead,
+  fn,
+  type ReaderReadStatement,
+  tenantScope,
+} from "@langwatch/clickhouse-client/builder";
+import { nowInstant, type Instant } from "@langwatch/time";
 import { z } from "zod";
 
 import type {
@@ -9,15 +15,17 @@ import type {
 } from "../instant-eval-run.repository.ts";
 import {
   INSTANT_EVAL_RUNS_TABLE,
-  type InstantEvalRunNarrowing,
   type InstantEvalRunRecord,
-  latestRowsQuery,
+  latestRunsRead,
   toRow,
   toWriteRecord,
 } from "./clickhouse.instant-eval-run.mapper.ts";
+import { instantEvalRuns as runs } from "./clickhouse.instant-eval-runs.table.ts";
 import type { InstantEvalClickHouseResolver } from "./clickhouse.instant-eval-session.store.ts";
 
-const usageRowsSchema = z.array(z.object({ Total: z.string(), FirstMs: z.string() }));
+const usageRowsSchema = z.array(
+  z.object({ Counted: z.string(), FirstMs: z.string().default("0") }),
+);
 
 export class ClickHouseInstantEvalRunRepository implements InstantEvalRunRepository {
   private constructor(
@@ -72,14 +80,9 @@ export class ClickHouseInstantEvalRunRepository implements InstantEvalRunReposit
     runId: string;
   }): Promise<InstantEvalRunRow | null> {
     const client = await this.resolveClient(projectId);
-    const result = await client.query<InstantEvalRunRecord>({
-      query: `${latestRowsQuery({
-        narrowings: [(column) => `${column("RunId")} = {runId:String}`],
-      })} LIMIT 1`,
-      query_params: { tenantId: projectId, runId },
-      format: "JSONEachRow",
-    });
-    const [record] = await result.json();
+    const statement = latestRunsRead({ projectId, narrowing: { runId }, limit: 1 });
+    const result = await client.read<InstantEvalRunRecord>({ statement });
+    const [record] = result.rows;
     return record ? toRow(record) : null;
   }
 
@@ -89,34 +92,17 @@ export class ClickHouseInstantEvalRunRepository implements InstantEvalRunReposit
     before,
     beforeId,
   }: InstantEvalRunListQuery): Promise<InstantEvalRunRow[]> {
-    // Ordered and paged by the pair: with `createdAt < before` alone a page
-    // that ended between two runs of the same millisecond would skip the rest
-    // of them. The id breaks the tie, so the order is total.
-    const narrowings: InstantEvalRunNarrowing[] = [];
-    if (before && beforeId) {
-      narrowings.push(
-        (column) =>
-          `(${column("CreatedAt")} < {before:DateTime64(3)} OR (${column("CreatedAt")} = {before:DateTime64(3)} AND ${column("RunId")} < {beforeId:String}))`,
-      );
-    } else if (before) {
-      narrowings.push((column) => `${column("CreatedAt")} < {before:DateTime64(3)}`);
-    }
     const client = await this.resolveClient(projectId);
-    const result = await client.query<InstantEvalRunRecord>({
-      query: `
-        ${latestRowsQuery({ narrowings })}
-        ORDER BY t.CreatedAt DESC, t.RunId DESC
-        LIMIT {limit:UInt32}
-      `,
-      query_params: {
-        tenantId: projectId,
-        limit,
-        ...(before ? { before: toDate(before) } : {}),
-        ...(beforeId ? { beforeId } : {}),
-      },
-      format: "JSONEachRow",
+    const statement = latestRunsRead({
+      projectId,
+      narrowing: before
+        ? { before: { atMs: before.epochMilliseconds, ...(beforeId ? { runId: beforeId } : {}) } }
+        : {},
+      limit,
+      newestFirst: true,
     });
-    return (await result.json()).map(toRow);
+    const result = await client.read<InstantEvalRunRecord>({ statement });
+    return result.rows.map(toRow);
   }
 
   async fail({
@@ -142,35 +128,37 @@ export class ClickHouseInstantEvalRunRepository implements InstantEvalRunReposit
     projectIds: readonly string[];
     since?: number;
   }): Promise<{ runs: number; firstRunAt?: number }> {
-    const window =
-      since === undefined ? "" : "AND CreatedAt >= fromUnixTimestamp64Milli({since:Int64})";
     const perProject = await Promise.all(
       [...new Set(projectIds)].map(async (tenantId) => {
         const client = await this.resolveClient(tenantId);
-        const read = async (query: string) => {
-          const result = await client.query({
-            query,
-            query_params: since === undefined ? { tenantId } : { tenantId, since },
-            format: "JSONEachRow",
-          });
-          return usageRowsSchema.parse(await result.json())[0];
-        };
-        const [counted, earliest] = await Promise.all([
-          read(`
-            SELECT toString(count()) AS Total, '0' AS FirstMs
-            FROM ${INSTANT_EVAL_RUNS_TABLE} FINAL
-            WHERE TenantId = {tenantId:String}
-              ${window}`),
-          read(`
-            SELECT toString(count()) AS Total,
-                   toString(toUnixTimestamp64Milli(min(CreatedAt))) AS FirstMs
-            FROM ${INSTANT_EVAL_RUNS_TABLE}
-            WHERE TenantId = {tenantId:String}`),
+        const scope = tenantScope.single({ tenantId });
+        const counted = clickhouseRead({ scope })
+          .from(runs)
+          .final()
+          .select({ Counted: fn.toString(fn.count()) });
+        const read = async (statement: ReaderReadStatement) =>
+          usageRowsSchema.parse((await client.read({ statement })).rows)[0];
+        const [total, earliest] = await Promise.all([
+          read(
+            (since === undefined
+              ? counted
+              : counted.where(({ gte }) => gte(runs.CreatedAt, since))
+            ).build(),
+          ),
+          read(
+            clickhouseRead({ scope })
+              .from(runs)
+              .select({
+                Counted: fn.toString(fn.count()),
+                FirstMs: fn.toString(fn.toUnixTimestamp64Milli(fn.min(runs.CreatedAt))),
+              })
+              .build(),
+          ),
         ]);
         return {
-          runs: Number.parseInt(counted?.Total ?? "0", 10),
+          runs: Number.parseInt(total?.Counted ?? "0", 10),
           first:
-            Number.parseInt(earliest?.Total ?? "0", 10) === 0
+            Number.parseInt(earliest?.Counted ?? "0", 10) === 0
               ? []
               : [Number(earliest?.FirstMs ?? "0")],
         };

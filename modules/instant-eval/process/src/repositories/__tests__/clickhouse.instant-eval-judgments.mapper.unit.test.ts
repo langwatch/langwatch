@@ -8,9 +8,10 @@ import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import {
-  buildFilters,
   decodeInstantEvalCursor,
   encodeInstantEvalCursor,
+  judgmentsPageRead,
+  judgmentsSampleRead,
   type JudgmentRow,
   parseProbabilities,
   toJudgment,
@@ -33,17 +34,17 @@ const query = (overrides: Partial<InstantEvalJudgmentQuery>): InstantEvalJudgmen
 const row = (overrides: Partial<JudgmentRow> = {}): JudgmentRow => ({
   TraceId: "trace-a",
   QuestionId: "mood",
-  ThreadId: "thread-a",
   SpanId: "",
-  Kind: "category",
-  Status: "judged",
-  Passed: null,
-  Score: null,
-  Label: "annoyed",
-  Probability: 0.91,
-  Probabilities: JSON.stringify({ annoyed: 0.91, calm: 0.09 }),
-  Error: "",
-  OccurredAt: "2026-09-18T10:00:00Z",
+  LatestThreadId: "thread-a",
+  LatestKind: "category",
+  LatestStatus: "judged",
+  LatestPassed: null,
+  LatestScore: null,
+  LatestLabel: "annoyed",
+  LatestProbability: 0.91,
+  LatestProbabilities: JSON.stringify({ annoyed: 0.91, calm: 0.09 }),
+  LatestError: "",
+  LatestOccurredAt: "2026-09-18T10:00:00Z",
   ...overrides,
 });
 
@@ -88,7 +89,9 @@ describe("given the column a category's distribution is stored in", () => {
 describe("given a judgement row ClickHouse answered", () => {
   describe("when it is read", () => {
     it("reads the boolean columns as booleans and the empty strings as none", () => {
-      const judged = toJudgment(row({ Kind: "boolean", Passed: 1, Label: "", Error: "" }));
+      const judged = toJudgment(
+        row({ LatestKind: "boolean", LatestPassed: 1, LatestLabel: "", LatestError: "" }),
+      );
 
       expect(judged.passed).toBe(true);
       expect(judged.label).toBeNull();
@@ -96,39 +99,51 @@ describe("given a judgement row ClickHouse answered", () => {
     });
 
     it("reads a status the table does not know as failed rather than trusting it", () => {
-      expect(toJudgment(row({ Status: "maybe" })).status).toBe("failed");
-      expect(toJudgment(row({ Status: "skipped" })).status).toBe("skipped");
+      expect(toJudgment(row({ LatestStatus: "maybe" })).status).toBe("failed");
+      expect(toJudgment(row({ LatestStatus: "skipped" })).status).toBe("skipped");
     });
   });
 });
 
 describe("given a narrowed page of judgements", () => {
-  describe("when its predicates are built", () => {
+  describe("when its read is built", () => {
+    it("is a single-tenant reader read with the tenant setting", () => {
+      const statement = judgmentsPageRead(query({}));
+
+      expect(statement).toMatchObject({
+        identity: "reader",
+        kind: "tenant",
+        tenantId: "project-1",
+      });
+      expect(statement.settings).toMatchObject({ SQL_langwatch_tenant_ids: "project-1" });
+      expect(statement.sql).toContain(
+        "FROM instant_eval_judgments WHERE TenantId = {tenantId:String}",
+      );
+    });
+
     it("puts a sort-key filter in the WHERE, where the index reads it", () => {
-      const { where, having, parameters } = buildFilters(
+      const { sql, params } = judgmentsPageRead(
         query({ questionId: "mood", traceIds: ["trace-a"] }),
       );
+      const [where] = sql.split(" GROUP BY ");
 
-      expect(where).toEqual([
-        "QuestionId = {questionId:String}",
-        "TraceId IN ({traceIds:Array(String)})",
-      ]);
-      expect(having).toEqual([]);
-      expect(parameters).toMatchObject({ questionId: "mood", traceIds: ["trace-a"] });
+      expect(where).toMatch(/QuestionId = \{v\d+:String\}/);
+      expect(where).toMatch(/TraceId IN \(\{v\d+:Array\(String\)\}\)/);
+      expect(sql).not.toContain("HAVING");
+      expect(Object.values(params)).toEqual(expect.arrayContaining(["mood", ["trace-a"]]));
     });
 
     it("puts a verdict filter in the HAVING, because the verdict is the group's", () => {
-      const matched = buildFilters(query({ matched: true, status: "judged" }));
-      const unmatched = buildFilters(query({ matched: false }));
+      const matched = judgmentsPageRead(query({ matched: true, status: "judged" }));
+      const unmatched = judgmentsPageRead(query({ matched: false }));
 
-      expect(matched.where).toEqual([]);
-      expect(matched.having).toEqual([
-        "Status = {status:String}",
-        "(Passed = 1 OR (Kind != 'boolean' AND Status = 'judged'))",
-      ]);
-      expect(unmatched.having).toEqual([
-        "NOT (Passed = 1 OR (Kind != 'boolean' AND Status = 'judged'))",
-      ]);
+      const [, matchedHaving] = matched.sql.split(" HAVING ");
+      expect(matchedHaving).toMatch(/argMax\(Status, UpdatedAt\) = \{v\d+:String\}/);
+      expect(matchedHaving).toMatch(
+        /\(argMax\(Passed, UpdatedAt\) = \{v\d+:UInt8\} OR \(argMax\(Kind, UpdatedAt\) != \{v\d+:String\} AND argMax\(Status, UpdatedAt\) = \{v\d+:String\}\)\)/,
+      );
+      const [, unmatchedHaving] = unmatched.sql.split(" HAVING ");
+      expect(unmatchedHaving).toMatch(/^\(NOT \(\(argMax\(Passed, UpdatedAt\)/);
     });
 
     it("carries the cursor as the three-part comparison the sort key orders by", () => {
@@ -138,16 +153,43 @@ describe("given a narrowed page of judgements", () => {
         questionId: "mood",
       });
 
-      const { where, parameters } = buildFilters(query({ cursor }));
+      const { sql, params } = judgmentsPageRead(query({ cursor }));
 
-      expect(where).toEqual([
-        "(TraceId, SpanId, QuestionId) > ({after:String}, {afterS:String}, {afterQ:String})",
-      ]);
-      expect(parameters).toMatchObject({ after: "trace-a", afterS: "span-1", afterQ: "mood" });
+      expect(sql).toMatch(
+        /tuple\(TraceId, SpanId, QuestionId\) > tuple\(\{v\d+:String\}, \{v\d+:String\}, \{v\d+:String\}\)/,
+      );
+      expect(Object.values(params)).toEqual(expect.arrayContaining(["trace-a", "span-1", "mood"]));
     });
 
     it("ignores a cursor that is not one of ours rather than refusing the page", () => {
-      expect(buildFilters(query({ cursor: "not-a-cursor" })).where).toEqual([]);
+      expect(judgmentsPageRead(query({ cursor: "not-a-cursor" })).sql).not.toContain("tuple(");
+    });
+  });
+});
+
+describe("given a sample of a run's traces", () => {
+  describe("when its read is built", () => {
+    it("picks the traces by the seeded hash under the same tenant, matched first when asked", () => {
+      const statement = judgmentsSampleRead({
+        ...WINDOW,
+        traces: 3,
+        seed: 7,
+        shouldPreferMatched: true,
+      });
+
+      expect(statement).toMatchObject({
+        identity: "reader",
+        kind: "tenant",
+        tenantId: "project-1",
+      });
+      expect(statement.settings).toMatchObject({ SQL_langwatch_tenant_ids: "project-1" });
+      const [sample, outer] = statement.sql.split(") SELECT ");
+      expect(sample).toContain("WHERE TenantId = {tenantId:String}");
+      expect(sample).toMatch(
+        /ORDER BY max\(Passed\) DESC, cityHash64\(TraceId, \{v\d+:UInt64\}\) ASC LIMIT 3$/,
+      );
+      expect(outer).toContain("WHERE TenantId = {tenantId:String}");
+      expect(outer).toContain("TraceId IN sampled");
     });
   });
 });
