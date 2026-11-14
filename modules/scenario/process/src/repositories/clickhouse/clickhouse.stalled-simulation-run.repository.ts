@@ -1,11 +1,15 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import {
+  clickhouseRead,
+  type SystemReadStatement,
+  tenantScope,
+} from "@langwatch/clickhouse-client/builder";
 
 import {
   type StalledHistoricalRun,
   type StalledSimulationRunRepository,
 } from "../stalled-simulation-run.repository.ts";
-
-const TABLE_NAME = "simulation_runs" as const;
+import { simulationRuns } from "./clickhouse.simulation-runs.table.ts";
 
 /**
  * Sanity cap: the target population is at most thousands of rows. A result
@@ -22,7 +26,7 @@ const NON_TERMINAL_STATUSES = ["QUEUED", "PENDING", "IN_PROGRESS"] as const;
  * older than `now - thresholdMs`, across all tenants on the given client.
  * Cross-tenant sweep BY DESIGN — a backfill has no single tenant to scope to.
  */
-type StalledSimulationRunClickHouseClient = Pick<ClickHouseQueryClient, "query">;
+type StalledSimulationRunClickHouseClient = Pick<ClickHouseQueryClient, "read">;
 
 export class ClickHouseStalledSimulationRunRepository implements StalledSimulationRunRepository {
   static create(
@@ -33,6 +37,42 @@ export class ClickHouseStalledSimulationRunRepository implements StalledSimulati
 
   constructor(private readonly client: StalledSimulationRunClickHouseClient) {}
 
+  /**
+   * Every tenant's latest version of each non-terminal run idle since `staleBeforeMs`. A run
+   * started in any week can still be stalled, so the sweep has no lower StartedAt bound.
+   */
+  static stalledRunsRead({
+    staleBeforeMs,
+  }: {
+    staleBeforeMs: number;
+  }): SystemReadStatement<StalledHistoricalRun> {
+    return clickhouseRead({
+      // Install-wide backfill: each terminal write it triggers is scoped to that run's tenant.
+      scope: tenantScope.allTenants({ reason: "stalled simulation run sweep, every tenant" }),
+    })
+      .from(simulationRuns)
+      .select({
+        tenantId: simulationRuns.TenantId,
+        scenarioRunId: simulationRuns.ScenarioRunId,
+        scenarioId: simulationRuns.ScenarioId,
+        batchRunId: simulationRuns.BatchRunId,
+        scenarioSetId: simulationRuns.ScenarioSetId,
+        status: simulationRuns.Status,
+      })
+      .latestVersion()
+      .where(({ and, lt, isNull, oneOf }) =>
+        and(
+          lt(simulationRuns.UpdatedAt, staleBeforeMs),
+          isNull(simulationRuns.FinishedAt),
+          isNull(simulationRuns.ArchivedAt),
+          oneOf(simulationRuns.Status, [...NON_TERMINAL_STATUSES]),
+        ),
+      )
+      .orderBy(simulationRuns.UpdatedAt, "ASC")
+      .limit(MAX_ROWS)
+      .build();
+  }
+
   async findStalledRuns({
     now,
     thresholdMs,
@@ -42,43 +82,9 @@ export class ClickHouseStalledSimulationRunRepository implements StalledSimulati
   }): Promise<StalledHistoricalRun[]> {
     const staleBeforeMs = now - thresholdMs;
 
-    const { rows } = await this.client.query<StalledHistoricalRun>({
-      tenantId: "",
-      sql: `
-        SELECT
-          TenantId AS tenantId,
-          ScenarioRunId AS scenarioRunId,
-          ScenarioId AS scenarioId,
-          BatchRunId AS batchRunId,
-          ScenarioSetId AS scenarioSetId,
-          Status AS status
-        FROM ${TABLE_NAME}
-        -- The table's full dedup key is (TenantId, ScenarioSetId, BatchRunId,
-        -- ScenarioRunId), but ScenarioRunId is a globally-unique KSUID, so
-        -- grouping by (TenantId, ScenarioRunId) still collapses every version
-        -- of a run. Same shortcut the deleted boot sweeps took.
-        WHERE (TenantId, ScenarioRunId, UpdatedAt) IN (
-            SELECT TenantId, ScenarioRunId, max(UpdatedAt)
-            FROM ${TABLE_NAME}
-            GROUP BY TenantId, ScenarioRunId
-          )
-          AND UpdatedAt < fromUnixTimestamp64Milli({staleBeforeMs:Int64})
-          AND FinishedAt IS NULL
-          AND ArchivedAt IS NULL
-          AND Status IN {nonTerminalStatuses:Array(String)}
-        ORDER BY UpdatedAt ASC
-        LIMIT {maxRows:UInt32}
-      `,
-      params: {
-        staleBeforeMs,
-        nonTerminalStatuses: [...NON_TERMINAL_STATUSES],
-        maxRows: MAX_ROWS,
-      },
-      // Install-wide stalled-run sweep: a backfill has no single tenant to scope to, and each
-      // terminal write it triggers is scoped to that run's own tenant.
-      SKIP_TENANT_CHECK: true,
-      // A run started in any week can still be stalled, so the sweep has no lower StartedAt bound.
-      SKIP_COLD_SCAN_CHECK: true,
+    const { rows } = await this.client.read({
+      statement: ClickHouseStalledSimulationRunRepository.stalledRunsRead({ staleBeforeMs }),
+      table: simulationRuns.$table.name,
     });
 
     if (rows.length >= MAX_ROWS) {
