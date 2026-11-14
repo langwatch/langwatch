@@ -5,9 +5,9 @@
  */
 import type { Row } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import React, { useCallback } from "react";
+import React, { useCallback, useEffect } from "react";
 
-import type { DatasetTableRowData } from "../../model/dataset-table-context.tsx";
+import { type DatasetTableRowData, useDatasetTable } from "../../model/dataset-table-context.tsx";
 import { TableCell } from "../elements/table-cell.tsx";
 
 // Fixed row height for compact mode
@@ -57,6 +57,7 @@ function VirtualizedTableBodyImpl<TData extends DatasetTableRowData>({
     overscan: 5, // Render 5 extra rows above/below viewport for smooth scrolling
     enabled: shouldVirtualize && !!scrollContainer,
   });
+  useScrollToSelectedRow({ rowVirtualizer, enabled: shouldVirtualize && !disableVirtualization });
 
   // Render all rows without virtualization when:
   // - Test mode (disableVirtualization prop)
@@ -164,9 +165,30 @@ function VirtualizedTableBodyImpl<TData extends DatasetTableRowData>({
 }
 
 /**
- * Memoized table body that manages its own virtualizer state so the parent
- * table doesn't re-render on scroll. The cast keeps the generic row type,
- * which React.memo would otherwise erase.
+ * A selected row outside the rendered window has no cell to scroll into view,
+ * so the keyboard would move the selection out of sight; scroll the grid to it.
+ */
+function useScrollToSelectedRow({
+  rowVirtualizer,
+  enabled,
+}: {
+  rowVirtualizer: ReturnType<typeof useVirtualizer<HTMLElement, Element>>;
+  enabled: boolean;
+}) {
+  const { selectedCell } = useDatasetTable();
+  // Any move, a row or only a column, can land on a row scrolled out of the window.
+  useEffect(() => {
+    if (!enabled || !selectedCell) return;
+    const { row } = selectedCell;
+    const isRendered = rowVirtualizer.getVirtualItems().some((item) => item.index === row);
+    if (!isRendered) rowVirtualizer.scrollToIndex(row, { align: "auto" });
+  }, [enabled, selectedCell, rowVirtualizer]);
+}
+
+/**
+ * Memoized by hand: `useVirtualizer` is on the React Compiler's incompatible-
+ * library list, so it skips this component; without this every editor render
+ * repaints every row. The cast keeps the generic row type React.memo erases.
  */
 export const VirtualizedTableBody = React.memo(
   VirtualizedTableBodyImpl,
