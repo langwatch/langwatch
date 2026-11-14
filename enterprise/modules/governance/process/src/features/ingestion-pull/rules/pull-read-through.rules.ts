@@ -46,7 +46,11 @@ export function pullReadThrough({
   const [stated] = result.readThroughAt === undefined ? [] : readableEpochMs(result.readThroughAt);
   if (stated !== undefined) return { outcome: "read-through", at: stated };
   const stamps = result.events.flatMap((event) => readableEpochMs(event.event_timestamp));
-  if (stamps.length > 0) return { outcome: "read-through", at: Math.max(...stamps) };
+  // A loop, not `Math.max(...stamps)`: a spread of a large page throws a RangeError.
+  if (stamps.length > 0) {
+    const newest = stamps.reduce((high, stamp) => (stamp > high ? stamp : high), -Infinity);
+    return { outcome: "read-through", at: newest };
+  }
   if ((result.completeness ?? "complete") === "complete") {
     return { outcome: "read-through", at: nowMs };
   }

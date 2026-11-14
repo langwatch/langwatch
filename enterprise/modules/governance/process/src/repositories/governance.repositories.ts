@@ -92,8 +92,13 @@ export type GovernanceOcsfEventInput = {
   rawOcsfJson: string;
 };
 
+/**
+ * Where a pull run's audit rows go: a whole page at once. There is no per-row
+ * insert here on purpose; each INSERT waits for its async flush, so a page
+ * written one row at a time is a page of round trips.
+ */
 export interface GovernanceOcsfEventSink {
-  insertEvent(input: GovernanceOcsfEventInput): Promise<void>;
+  insertEvents(rows: GovernanceOcsfEventInput[]): Promise<void>;
 }
 
 export type GovernanceOcsfEvent = {
