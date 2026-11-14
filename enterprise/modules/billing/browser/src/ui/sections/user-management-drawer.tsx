@@ -28,7 +28,10 @@ import { seatQuoteOf } from "../../model/seat-change-summary.ts";
 import {
   billingDayOrUndefined,
   type DeveloperSeatPlan,
+  developerMinimumHint,
   developerSeatHint,
+  developerSeatMinimum,
+  developerTargetWithin,
   freeSeatPlan,
   type GrowthSeatPlan,
   growthMinimumSeats,
@@ -38,6 +41,7 @@ import {
   type SeatPrice,
   seatChangeToast,
   seatConfirm,
+  snapDeveloperTarget,
 } from "../../model/seat-purchase.ts";
 import {
   isValidEmail,
@@ -124,6 +128,7 @@ export function UserManagementDrawer({
   isLoading,
   mode,
   inUse,
+  developersInUse,
   held,
   price,
   onInvite,
@@ -139,6 +144,8 @@ export function UserManagementDrawer({
   mode: SeatDrawerMode;
   /** Full seats held now, members and open invites as enforcement counts them. */
   inUse: number;
+  /** Developer seats held now, members and open invites, the floor the server enforces. */
+  developersInUse: number;
   /** Of `inUse`, the seats held for people who left a full seat, as the server lists them. */
   held: HeldSeats;
   price: SeatPrice;
@@ -163,6 +170,7 @@ export function UserManagementDrawer({
     open,
     mode: mode.kind === "growth" ? mode : undefined,
     inUse,
+    developersInUse,
     held,
     invites: emails.length,
     price,
@@ -317,14 +325,20 @@ function FullSeatsHeader({
         )}
       </HStack>
       {growth?.view.minimumHint && (
-        <HStack gap={2} align="start" color="fg.muted" data-testid="seat-drawer-minimum">
-          <Box flexShrink={0} paddingTop={0.5}>
-            <Info size={14} />
-          </Box>
-          <Text textStyle="bodySm">{growth.view.minimumHint}</Text>
-        </HStack>
+        <SeatMinimumHint hint={growth.view.minimumHint} testId="seat-drawer-minimum" />
       )}
     </VStack>
+  );
+}
+
+function SeatMinimumHint({ hint, testId }: { hint: string; testId: string }) {
+  return (
+    <HStack gap={2} align="start" color="fg.muted" data-testid={testId}>
+      <Box flexShrink={0} paddingTop={0.5}>
+        <Info size={14} />
+      </Box>
+      <Text textStyle="bodySm">{hint}</Text>
+    </HStack>
   );
 }
 
@@ -453,12 +467,15 @@ function OtherSeatTypes({ growth, price }: { growth: GrowthSeats; price: SeatPri
               </VStack>
               <SeatStepper
                 value={developer.target}
-                minimum={0}
+                minimum={growth.developerMinimum}
                 onChange={growth.setDeveloperTarget}
                 label="Developer seats"
                 testId="developer-seats-stepper"
               />
             </HStack>
+          )}
+          {growth.developerHint && (
+            <SeatMinimumHint hint={growth.developerHint} testId="developer-seats-minimum" />
           )}
         </VStack>
       </Collapsible.Content>
@@ -478,14 +495,17 @@ function quoteReason({ needed, failed }: { needed: boolean; failed: boolean }) {
 function developerPlanOf({
   seats,
   target,
+  inUse,
 }: {
   seats: DeveloperSeats | undefined;
   target: number | undefined;
+  inUse: number;
 }): DeveloperSeatPlan | undefined {
   if (!seats?.available || seats.unitAmountCents === null) return undefined;
+  const current = seats.quantity;
   return {
-    current: seats.quantity,
-    target: target ?? seats.quantity,
+    current,
+    target: developerTargetWithin({ target: target ?? current, current, inUse }),
     unitCents: seats.unitAmountCents,
   };
 }
@@ -495,6 +515,7 @@ function useGrowthSeats({
   open,
   mode,
   inUse,
+  developersInUse,
   held,
   invites,
   price,
@@ -502,6 +523,7 @@ function useGrowthSeats({
   open: boolean;
   mode: Extract<SeatDrawerMode, { kind: "growth" }> | undefined;
   inUse: number;
+  developersInUse: number;
   held: HeldSeats;
   invites: number;
   price: SeatPrice;
@@ -529,7 +551,11 @@ function useGrowthSeats({
   useEffect(() => {
     if (open && isGrowth) void refetchDeveloperSeats();
   }, [open, isGrowth, refetchDeveloperSeats]);
-  const developer = developerPlanOf({ seats: developerSeats.data, target: developerTarget });
+  const developer = developerPlanOf({
+    seats: developerSeats.data,
+    target: developerTarget,
+    inUse: developersInUse,
+  });
   const developerAdded = developer ? developer.target > developer.current : false;
   const seatsChanged = seats !== paid;
 
@@ -562,12 +588,22 @@ function useGrowthSeats({
     quoteReason({ needed: developerAdded && !developerQuote.data, failed: developerQuote.isError });
   const day = billingDayOrUndefined(quote?.appliesAt ?? plan.periodEndsAt);
 
+  const developerFloor = developer
+    ? { current: developer.current, inUse: developersInUse }
+    : { current: 0, inUse: 0 };
   return {
     seats,
     minimum,
     setRequested,
     developer,
-    setDeveloperTarget,
+    setDeveloperTarget: (next: number) =>
+      setDeveloperTarget(
+        snapDeveloperTarget({ ...developerFloor, previous: developer?.target ?? 0, next }),
+      ),
+    developerMinimum: developerSeatMinimum(developerFloor),
+    developerHint: developer
+      ? developerMinimumHint({ ...developerFloor, target: developer.target })
+      : undefined,
     view: growthSeatPlan(plan),
     pendingReason,
     priceFailed: pendingReason === PRICE_FAILED,

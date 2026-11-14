@@ -88,7 +88,10 @@ import {
 import { NotificationService as BillingUsageNoticeService } from "../services/billing-usage-notice.service.ts";
 import { CurrencyService } from "../services/currency.service.ts";
 import { CustomerService } from "../services/customer.service.ts";
-import { DeveloperSeatService } from "../services/developer-seat.service.ts";
+import {
+  DeveloperSeatService,
+  type DevelopersInUseCounter,
+} from "../services/developer-seat.service.ts";
 import { InstantEvalSpendQueryService } from "../services/instant-eval-spend-query.service.ts";
 import { OrganizationPricingService } from "../services/organization-pricing.service.ts";
 import { PiiRedactionSpendQueryService } from "../services/pii-redaction-spend-query.service.ts";
@@ -135,6 +138,7 @@ type ConnectedLicensing = Pick<
   | "getConnectedSeats"
   | "findSeatChanges"
   | "countFullSeatsInUse"
+  | "countDevelopersInUse"
 >;
 
 /** The peers connected billing reads and gates through, each only as wide as it is used. */
@@ -528,7 +532,7 @@ export class BillingModule
     subscription: SubscriptionComposition;
     stripe: Pick<BillingStripe, "channels">;
     nodeEnvironment: string | undefined;
-    seatsInUse: SeatsInUseCounter;
+    seatsInUse: SeatsInUseCounter & DevelopersInUseCounter;
     repositories: Pick<
       BillingRepositories,
       "subscriptions" | "organizations" | "seatEventSubscriptions"
@@ -568,6 +572,7 @@ export class BillingModule
         subscriptions: repositories.seatEventSubscriptions,
         prices,
         unitAmountOf: (priceId) => stripePricesFile.prices[priceId]?.unitAmount ?? null,
+        seatsInUse,
       }),
     };
   }

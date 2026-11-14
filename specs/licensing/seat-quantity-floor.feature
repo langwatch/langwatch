@@ -35,3 +35,53 @@ Feature: Seat count never goes below the seats in use
     Given no full member seats are in use
     When an administrator sets the seat count to 0
     Then the change is refused with "seat_quantity_below_in_use" and a minimum of 1
+
+  Rule: Developer seats never go below the Developers in use
+  A Developer seat line is billed apart from the full seats (ADR-171). The
+  count is the one the organization classifies: members whose seat is
+  Developer and live Developer invitations. Unlike full seats the line may go
+  to zero, but only when no Developer is in use. The check runs on the server
+  before any call to the payment provider, and nobody is removed to fit.
+
+  Background:
+    Given an organization on Growth with a Developer seat price configured
+    And the subscription bills 3 Developer seats
+    And 2 Developers are in use
+
+  @unit
+  Scenario: Lowering Developer seats to the Developers in use goes through
+    When an administrator sets 2 Developer seats
+    Then the payment provider receives a Developer seat line of 2
+
+  @unit
+  Scenario: Lowering Developer seats below the Developers in use is refused
+    When an administrator sets 1 Developer seat
+    Then the change is refused with "seat_quantity_below_in_use" and a minimum of 2 Developer seats
+    And the payment provider is not called
+
+  @unit
+  Scenario: Removing every Developer seat is refused while Developers are in use
+    When an administrator sets 0 Developer seats
+    Then the change is refused with "seat_quantity_below_in_use" and a minimum of 2 Developer seats
+    And the Developer seat line is kept
+
+  @unit
+  Scenario: Removing every Developer seat goes through when no Developer is in use
+    Given no Developers are in use
+    When an administrator sets 0 Developer seats
+    Then the Developer seat line is removed
+
+  @unit
+  Scenario: The refusal names the Developer seats and the minimum
+    When a Developer seat change is refused with a minimum of 2
+    Then I am told "That's too few seats" and "Nothing changed. Choose at least 2 developer seats."
+
+  Rule: every seat kind sold on a subscription has a floor
+  A new seat price family in the catalogue fails the build until its seat kind
+  declares the minimum it may be lowered to. Seat prices are the *_SEAT_* families
+  and the legacy *_USERS full-seat prices.
+
+  @unit
+  Scenario: Every seat price in the catalogue belongs to a seat kind with a floor
+    Given the seat price names in the Stripe price catalogue
+    Then each one belongs to a seat kind that declares its floor

@@ -20,6 +20,7 @@ type LicenseRows = OrganizationLicenseReads &
 type SeatCounts = Readonly<{
   getMemberCount: (organizationId: string) => Promise<number>;
   getMembersLiteCount: (organizationId: string) => Promise<number>;
+  getMembersDeveloperCount: (organizationId: string) => Promise<number>;
 }>;
 
 /**
@@ -73,6 +74,8 @@ export class LicensingInfrastructureService {
         removeLicense: (organizationId) => writer.remove({ organizationId }),
         getMemberCount: (organizationId) => options.getMemberCount(organizationId),
         getMembersLiteCount: (organizationId) => options.getMembersLiteCount(organizationId),
+        getMembersDeveloperCount: (organizationId) =>
+          options.getMembersDeveloperCount(organizationId),
       },
       reportSigningFailure: () => void 0,
     };
