@@ -38,7 +38,8 @@
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
-      "supportsAudioOutput": false
+      "supportsAudioOutput": false,
+      "outputTokensParameter": "max_completion_tokens"
     },
     "openai/gpt-6.1-terra-pro:batch": {
       "id": "openai/gpt-6.1-terra-pro:batch",
@@ -76,7 +77,8 @@
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
-      "supportsAudioOutput": false
+      "supportsAudioOutput": false,
+      "outputTokensParameter": "max_completion_tokens"
     },
     "openai/gpt-6.1-terra": {
       "id": "openai/gpt-6.1-terra",
@@ -110,7 +112,15 @@
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
-      "supportsAudioOutput": false
+      "supportsAudioOutput": false,
+      "reasoningConfig": {
+        "supported": true,
+        "parameterName": "reasoning_effort",
+        "allowedValues": ["none", "low", "medium", "high", "xhigh", "max"],
+        "defaultValue": "medium",
+        "canDisable": true
+      },
+      "outputTokensParameter": "max_completion_tokens"
     },
     "openai/gpt-6.1-terra:batch": {
       "id": "openai/gpt-6.1-terra:batch",
@@ -144,7 +154,15 @@
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
-      "supportsAudioOutput": false
+      "supportsAudioOutput": false,
+      "reasoningConfig": {
+        "supported": true,
+        "parameterName": "reasoning_effort",
+        "allowedValues": ["none", "low", "medium", "high", "xhigh", "max"],
+        "defaultValue": "medium",
+        "canDisable": true
+      },
+      "outputTokensParameter": "max_completion_tokens"
     },
     "moonshotai/kimi-k3.1-pro": {
       "id": "moonshotai/kimi-k3.1-pro",

@@ -146,15 +146,16 @@ const REASONING_RULES: readonly { matches: (id: string) => boolean; config: Reas
       isOpenAIModel(id, [
         "gpt-6-sol",
         "gpt-6-luna",
+        "gpt-6.1-terra",
         "gpt-5.6-sol",
         "gpt-5.6-terra",
         "gpt-5.6-luna",
       ]),
     config: OPENAI_GPT56,
   },
-  { matches: (id) => isOpenAIModel(id, ["gpt-5.5-pro"], true), config: OPENAI_GPT55_PRO },
+  { matches: (id) => isOpenAIModel(id, ["gpt-5.5-pro"]), config: OPENAI_GPT55_PRO },
   { matches: (id) => isOpenAIModel(id, ["gpt-5.5"]), config: OPENAI_GPT55 },
-  { matches: (id) => isOpenAIModel(id, ["gpt-5.4-pro"], true), config: OPENAI_GPT54_PRO },
+  { matches: (id) => isOpenAIModel(id, ["gpt-5.4-pro"]), config: OPENAI_GPT54_PRO },
   {
     matches: (id) => isOpenAIModel(id, ["gpt-5.4", "gpt-5.4-mini", "gpt-5.4-nano"]),
     config: OPENAI_GPT52,
@@ -232,9 +233,9 @@ export function pickDefaultReasoningEffort(modelId: string): ReasoningEffortOpti
  * Whether `id` is one of the named OpenAI models or its `:batch` twin. Exact, because a family
  * prefix also matches the `-pro` and `-image` ids OpenAI documents no reasoning values for.
  */
-function isOpenAIModel(id: string, names: readonly string[], pro = false): boolean {
+function isOpenAIModel(id: string, names: readonly string[]): boolean {
   const name = id.replace(/^openai\//, "").replace(/:batch$/, "");
-  return id.startsWith("openai/") && names.includes(name) && (pro || !name.endsWith("-pro"));
+  return id.startsWith("openai/") && names.includes(name);
 }
 
 function includesAny(text: string, needles: readonly string[]): boolean {

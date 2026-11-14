@@ -69,6 +69,7 @@ describe("Reasoning Config", () => {
         ["openai/gpt-6-sol", NONE_TO_MAX, "medium"],
         ["openai/gpt-6-luna", NONE_TO_MAX, "medium"],
         ["openai/gpt-5.6-terra", NONE_TO_MAX, "medium"],
+        ["openai/gpt-6.1-terra:batch", NONE_TO_MAX, "medium"],
         ["openai/gpt-5.5", NONE_TO_XHIGH, "medium"],
         ["openai/gpt-5.5-pro", ["medium", "high", "xhigh"], "high"],
         ["openai/gpt-5.4-mini", NONE_TO_XHIGH, "none"],
@@ -81,12 +82,14 @@ describe("Reasoning Config", () => {
       });
 
       /** @scenario "GPT 5.4 and later models offer the reasoning efforts OpenAI documents" */
-      it.each(["openai/gpt-6-astra-pro", "openai/gpt-5.6-sol-pro", "openai/gpt-5.4-image-2"])(
-        "leaves %s, which OpenAI documents no efforts for, without a configuration",
-        (id) => {
-          expect(pickReasoningConfig(id)).toBeUndefined();
-        },
-      );
+      it.each([
+        "openai/gpt-6-astra-pro",
+        "openai/gpt-6.1-terra-pro",
+        "openai/gpt-5.6-sol-pro",
+        "openai/gpt-5.4-image-2",
+      ])("leaves %s, which OpenAI documents no efforts for, without a configuration", (id) => {
+        expect(pickReasoningConfig(id)).toBeUndefined();
+      });
     });
 
     it("GPT-4 models don't have reasoning config", () => {

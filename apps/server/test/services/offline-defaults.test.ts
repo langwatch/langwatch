@@ -68,6 +68,7 @@ vi.mock("../../src/services/node-deps.ts", async (importOriginal) => ({
 
 const { startLangwatch } = await import("../../src/services/langwatch.ts");
 const { startLangevals } = await import("../../src/services/langevals.ts");
+const { startNlpgo } = await import("../../src/services/nlpgo.ts");
 const { ensureTiktokenEncodings, ensureLangevalsTiktokenCache } =
   await import("../../src/services/offline-defaults.ts");
 
@@ -81,12 +82,14 @@ function ctx() {
       langevals: 5562,
       workerHealth: 5565,
       backend: 5566,
+      nlp: 5561,
       postgres: 6560,
       clickhouseHttp: 6562,
     },
     paths: { root: home, bin: join(home, "bin"), logs: join(home, "logs") },
     predeps: {
       uv: { resolvedPath: "/usr/bin/uv", version: "x", preInstalled: false },
+      aigateway: { resolvedPath: "/usr/bin/service", version: "x", preInstalled: false },
     },
     envFile: join(home, ".env"),
     version: "test",
@@ -99,6 +102,7 @@ const OVERRIDABLE_KEYS = [
   "TIKTOKENS_PATH",
   "RAGAS_DO_NOT_TRACK",
   "LANGWATCH_MODEL_PRICING_DIR",
+  "LANGWATCH_MODEL_CATALOG_DIR",
   "TIKTOKEN_CACHE_DIR",
   "CUSTOM_TIKTOKEN_CACHE_DIR",
 ];
@@ -153,6 +157,17 @@ describe("outbound defaults in the service env", () => {
       expect(env?.TIKTOKEN_CACHE_DIR).toBe(join(home, "cache", "tiktoken"));
       expect(env?.CUSTOM_TIKTOKEN_CACHE_DIR).toBe(join(home, "cache", "tiktoken"));
       expect(env?.RAGAS_DO_NOT_TRACK).toBe("true");
+    });
+  });
+
+  describe("when the launcher starts nlpgo", () => {
+    /** @scenario nlpgo reads the model catalog the app ships with */
+    it("points nlpgo at the app's model catalog", async () => {
+      await startNlpgo(ctx(), bus, {});
+
+      expect(spawnedEnvs.nlpgo?.LANGWATCH_MODEL_CATALOG_DIR).toBe(
+        join(appRootDir, "modules", "model-provider", "contract", "src", "catalog"),
+      );
     });
   });
 

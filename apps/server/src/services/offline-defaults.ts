@@ -59,6 +59,16 @@ export function appOfflineEnv(input: OfflineCacheInput): Record<string, string> 
   };
 }
 
+/** The model catalog the app ships with, which LangEvals and nlpgo both read. */
+function modelCatalogDir({ appRootDir }: { appRootDir: string }): string {
+  return join(appRootDir, "modules", "model-provider", "contract", "src", "catalog");
+}
+
+/** Defaults for nlpgo: the catalog decides the name each model takes its output limit as. */
+export function nlpgoOfflineEnv({ appRootDir }: { appRootDir: string }): Record<string, string> {
+  return { LANGWATCH_MODEL_CATALOG_DIR: modelCatalogDir({ appRootDir }) };
+}
+
 /**
  * Defaults for LangEvals. LiteLLM points tiktoken at CUSTOM_TIKTOKEN_CACHE_DIR
  * when it is imported, so both cache variables carry the same directory.
@@ -70,14 +80,7 @@ export function langevalsOfflineEnv({
   const cache = offlineCachePaths({ paths, appRootDir }).tiktokenCache;
   return {
     RAGAS_DO_NOT_TRACK: "true",
-    LANGWATCH_MODEL_PRICING_DIR: join(
-      appRootDir,
-      "modules",
-      "model-provider",
-      "contract",
-      "src",
-      "catalog",
-    ),
+    LANGWATCH_MODEL_PRICING_DIR: modelCatalogDir({ appRootDir }),
     TIKTOKEN_CACHE_DIR: cache,
     CUSTOM_TIKTOKEN_CACHE_DIR: cache,
   };

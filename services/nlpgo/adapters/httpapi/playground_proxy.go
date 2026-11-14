@@ -71,13 +71,9 @@ type playgroundProxyStream interface {
 func playgroundProxyDispatch(proxy PlaygroundProxy, catalog litellm.OutputTokensLookup) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
-		req, isStream, err := buildPlaygroundProxyRequest(r, catalog)
-		if err != nil {
-			var refused herr.E
-			if !errors.As(err, &refused) {
-				refused = herr.New(ctx, nlpgodomain.ErrBadRequest, nil, err)
-			}
-			writeHandlerError(ctx, w, refused)
+		req, isStream, refused := buildPlaygroundProxyRequest(r, catalog)
+		if refused != nil {
+			writeHandlerError(ctx, w, *refused)
 			return
 		}
 		if isStream {
@@ -89,27 +85,29 @@ func playgroundProxyDispatch(proxy PlaygroundProxy, catalog litellm.OutputTokens
 }
 
 // buildPlaygroundProxyRequest reads an inbound /go/proxy/v1/* request into
-// the dispatcher's shape, and whether it streams. Every error is a herr.E 400.
-func buildPlaygroundProxyRequest(r *http.Request, catalog litellm.OutputTokensLookup) (playgroundProxyRequest, bool, error) {
+// the dispatcher's shape, and whether it streams, or the 400 that refuses it.
+func buildPlaygroundProxyRequest(r *http.Request, catalog litellm.OutputTokensLookup) (playgroundProxyRequest, bool, *herr.E) {
 	ctx := r.Context()
 
 	cred, err := gatewayproxy.ParseCredentialFromHeaders(r.Header)
 	if err != nil {
-		return playgroundProxyRequest{}, false, herr.New(ctx, nlpgodomain.ErrBadRequest, herr.M{
+		e := herr.New(ctx, nlpgodomain.ErrBadRequest, herr.M{
 			"reason": "missing_provider",
 		}, err)
+		return playgroundProxyRequest{}, false, &e
 	}
 
 	raw, err := io.ReadAll(r.Body)
 	if err != nil {
-		return playgroundProxyRequest{}, false, herr.New(ctx, nlpgodomain.ErrBadRequest, herr.M{
+		e := herr.New(ctx, nlpgodomain.ErrBadRequest, herr.M{
 			"reason": "read_body",
 		}, err)
+		return playgroundProxyRequest{}, false, &e
 	}
 
-	prepared, err := preparePlaygroundBody(ctx, raw, catalog)
-	if err != nil {
-		return playgroundProxyRequest{}, false, err
+	prepared, refused := preparePlaygroundBody(ctx, raw, catalog)
+	if refused != nil {
+		return playgroundProxyRequest{}, false, refused
 	}
 
 	reqType, httpPath := classifyPath(r.URL.Path)
@@ -160,13 +158,14 @@ type playgroundBody struct {
 
 // preparePlaygroundBody reads the model and stream flag from the body (so
 // the caller doesn't duplicate them in headers), sends the bare model id and
-// applies the reasoning overrides. Every error is a herr.E 400.
-func preparePlaygroundBody(ctx context.Context, body []byte, catalog litellm.OutputTokensLookup) (playgroundBody, error) {
+// applies the reasoning overrides, or returns the 400 that refuses it.
+func preparePlaygroundBody(ctx context.Context, body []byte, catalog litellm.OutputTokensLookup) (playgroundBody, *herr.E) {
 	model, isStream, err := peekBodyMetadata(body)
 	if err != nil {
-		return playgroundBody{}, herr.New(ctx, nlpgodomain.ErrBadRequest, herr.M{
+		e := herr.New(ctx, nlpgodomain.ErrBadRequest, herr.M{
 			"reason": "invalid_json_body",
 		}, err)
+		return playgroundBody{}, &e
 	}
 	bareModel := gatewayproxy.BareModel(model)
 
@@ -185,9 +184,10 @@ func preparePlaygroundBody(ctx context.Context, body []byte, catalog litellm.Out
 	if model != "" && bareModel != model {
 		body, err = rewriteBodyModel(body, bareModel)
 		if err != nil {
-			return playgroundBody{}, herr.New(ctx, nlpgodomain.ErrBadRequest, herr.M{
+			e := herr.New(ctx, nlpgodomain.ErrBadRequest, herr.M{
 				"reason": "rewrite_body_model",
 			}, err)
+			return playgroundBody{}, &e
 		}
 	}
 
@@ -207,9 +207,10 @@ func preparePlaygroundBody(ctx context.Context, body []byte, catalog litellm.Out
 	if litellm.NeedsReasoningOverrides(overrideID, catalog) {
 		body, err = applyReasoningOverridesToBody(body, overrideID, catalog)
 		if err != nil {
-			return playgroundBody{}, herr.New(ctx, nlpgodomain.ErrBadRequest, herr.M{
+			e := herr.New(ctx, nlpgodomain.ErrBadRequest, herr.M{
 				"reason": "apply_reasoning_overrides",
 			}, err)
+			return playgroundBody{}, &e
 		}
 	}
 	return playgroundBody{body: body, bareModel: bareModel, isStream: isStream}, nil
