@@ -11,12 +11,13 @@ import { Temporal, fromDate, nowInstant, type Instant } from "@langwatch/time";
 const MINT_GUARD_TTL_MS = 60_000;
 const MINT_GUARD_MAX_ENTRIES = 10_000;
 
-type AuthzBindingIdDeriver = (input: {
+/** Authz's own grant id, asked for: the stored one, revoked or not, else a new one. */
+type AuthzBindingIdResolver = (input: {
   organizationId: string;
   principal: LedgerPrincipal;
   scope: LedgerScope;
   occurredAtMs: number;
-}) => string;
+}) => Promise<string>;
 
 /**
  * Records the implicit organization grant held by credentials created before
@@ -36,33 +37,41 @@ export class LegacyApiKeyGrantService {
     );
   }
 
-  static findLegacyGrantForApiKey(
-    apiKey: ApiKey,
-    deriveBindingId: AuthzBindingIdDeriver,
-  ): AuthzLedgerBindingAttach | null {
-    if (apiKey.grants.length > 0 || apiKey.ingestSourceType !== null || apiKey.userId !== null) {
-      return null;
-    }
+  /** The grant a credential with no grant of its own implies; empty when it implies none. */
+  static async findLegacyGrantsForApiKey({
+    apiKey,
+    resolveBindingId,
+  }: {
+    apiKey: ApiKey;
+    resolveBindingId: AuthzBindingIdResolver;
+  }): Promise<AuthzLedgerBindingAttach[]> {
+    if (!LegacyApiKeyGrantService.impliesLegacyGrant(apiKey)) return [];
 
-    return {
-      bindingId: deriveBindingId({
-        organizationId: apiKey.organizationId,
-        principal: { type: "apiKey", id: apiKey.id },
-        scope: { type: "ORGANIZATION", id: apiKey.organizationId },
-        occurredAtMs: apiKey.createdAt.getTime(),
-      }),
-      principal: { apiKeyId: apiKey.id },
-      role: "ADMIN",
-      customRoleId: null,
-      scopeType: "ORGANIZATION",
-      scopeId: apiKey.organizationId,
-    };
+    return [
+      {
+        bindingId: await resolveBindingId({
+          organizationId: apiKey.organizationId,
+          principal: { type: "apiKey", id: apiKey.id },
+          scope: { type: "ORGANIZATION", id: apiKey.organizationId },
+          occurredAtMs: apiKey.createdAt.getTime(),
+        }),
+        principal: { apiKeyId: apiKey.id },
+        role: "ADMIN",
+        customRoleId: null,
+        scopeType: "ORGANIZATION",
+        scopeId: apiKey.organizationId,
+      },
+    ];
+  }
+
+  private static impliesLegacyGrant(apiKey: ApiKey): boolean {
+    return apiKey.grants.length === 0 && apiKey.ingestSourceType === null && apiKey.userId === null;
   }
 
   static create(options: {
     authz: AuthzApi;
     grants: AuthzApi;
-    deriveBindingId: AuthzBindingIdDeriver;
+    resolveBindingId: AuthzBindingIdResolver;
     diagnostics: Pick<Logger, "warn">;
     now?: () => number;
   }): LegacyApiKeyGrantService {
@@ -73,30 +82,22 @@ export class LegacyApiKeyGrantService {
     private readonly options: {
       authz: AuthzApi;
       grants: AuthzApi;
-      deriveBindingId: AuthzBindingIdDeriver;
+      resolveBindingId: AuthzBindingIdResolver;
       diagnostics: Pick<Logger, "warn">;
       now?: () => number;
     },
   ) {}
 
   mint(apiKey: ApiKey): void {
-    try {
-      const binding = LegacyApiKeyGrantService.findLegacyGrantForApiKey(
-        apiKey,
-        this.options.deriveBindingId,
-      );
-      if (!binding || this.guardHeld(apiKey.id)) {
-        return;
-      }
-
-      this.holdGuard(apiKey.id);
-      void this.persist(apiKey, binding).catch((error: unknown) => this.failed(apiKey, error));
-    } catch (error) {
-      this.failed(apiKey, error);
+    if (!LegacyApiKeyGrantService.impliesLegacyGrant(apiKey) || this.guardHeld(apiKey.id)) {
+      return;
     }
+
+    this.holdGuard(apiKey.id);
+    void this.persist(apiKey).catch((error: unknown) => this.failed(apiKey, error));
   }
 
-  private async persist(apiKey: ApiKey, binding: AuthzLedgerBindingAttach): Promise<void> {
+  private async persist(apiKey: ApiKey): Promise<void> {
     const cutoverAt = await this.options.authz.findEngineCutoverAt({
       organizationId: apiKey.organizationId,
     });
@@ -115,9 +116,14 @@ export class LegacyApiKeyGrantService {
       return;
     }
 
+    // After the cutover reads: an organization off the engine costs no grant lookup.
+    const bindings = await LegacyApiKeyGrantService.findLegacyGrantsForApiKey({
+      apiKey,
+      resolveBindingId: this.options.resolveBindingId,
+    });
     await this.options.grants.attachBindings({
       organizationId: apiKey.organizationId,
-      bindings: [binding],
+      bindings,
       caller: { type: "system" },
       actor: { type: "system", id: "system:read-through-mint" },
       source: "read-through-mint",

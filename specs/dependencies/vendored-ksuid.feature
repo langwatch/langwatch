@@ -42,3 +42,29 @@ Feature: Vendored KSUID packages
     # no code at all — and PyPI never received a release to prove it.
     When the Python build configuration is read
     Then the wheel target names the directory the module actually lives in
+
+  @unit
+  Scenario: Generated identifiers sort by creation time across 65,536-second boundaries
+    # Up to 2.0.2 the writer used `>> 40` and `>> 32`, which JavaScript takes
+    # mod 32, so bytes 2-3 held the timestamp's low 16 bits and wrapped to zero
+    # every 65,536 seconds (issue #9575).
+    Given two identifiers generated one second apart across a 65,536-second boundary
+    When they are compared as strings
+    Then the older identifier sorts first
+
+  @unit
+  Scenario: The TypeScript and Python packages encode the same identifier
+    Given the same environment, resource, timestamp, instance and sequence number
+    When the TypeScript package encodes them
+    Then it produces the string langwatch-ksuid produces
+    And parsing it recovers every component, including a sequence number with the top bit set
+
+  @unit
+  Scenario: Identifiers in the legacy layout keep their string and their time
+    # Identifiers derived from stored inputs (span, trace summary, evaluation,
+    # grant, identifier and audit ids) are re-derived later, so they stay on
+    # the legacy layout until each row records its own layout.
+    Given an identifier written in the legacy layout
+    When it is parsed and written again
+    Then the string is unchanged
+    And the parsed timestamp is the one it was written with

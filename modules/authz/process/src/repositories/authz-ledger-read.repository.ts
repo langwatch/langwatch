@@ -104,6 +104,12 @@ export abstract class AuthzLedgerReadRepository {
   /** The ids of the live grants a translated compat filter names. */
   abstract findLiveGrantIds(input: { where: AuthzGrantFilter }): Promise<string[]>;
 
+  /** Which of these ids a grant of the organization holds, live or revoked. */
+  abstract findStoredGrantIds(input: {
+    organizationId: string;
+    grantIds: readonly string[];
+  }): Promise<string[]>;
+
   /** A live role head's definition. */
   abstract findLiveRole(input: {
     roleId: string;

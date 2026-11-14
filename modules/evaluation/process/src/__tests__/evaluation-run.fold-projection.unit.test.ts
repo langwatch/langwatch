@@ -157,6 +157,13 @@ function createAttemptFailedEvent({
 }
 
 describe("evaluationRun foldProjection", () => {
+  describe("init()", () => {
+    /** @scenario "A new evaluation run mints a corrected id and records its layout" */
+    it("starts a run never stored in the v2 id layout", () => {
+      expect(createInitState().idLayout).toBe("v2");
+    });
+  });
+
   describe("apply()", () => {
     describe("when EvaluationCompletedEvent arrives after EvaluationStartedEvent", () => {
       /** @scenario "A completion folded after a start applies the run's completed state normally" */

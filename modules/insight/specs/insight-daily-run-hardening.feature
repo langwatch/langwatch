@@ -201,6 +201,24 @@ Feature: The daily insights run before a wider rollout
       Then both writes carry the same key, an audit key stamped with the run's slot
 
     @unit
+    Scenario: An outcome stored before key layouts were recorded keeps its legacy audit key
+      Given a run's recorded outcome that names no key layout
+      When the audit subscriber is handed it
+      Then the line's key is written in the v1-legacy layout, the key that outcome always had
+
+    @unit
+    Scenario: A new run's outcome records the v2 key layout
+      Given a run that ends for the first time
+      When its outcome is recorded
+      Then the outcome names the v2 key layout
+
+    @unit
+    Scenario: A new run's outcome delivered twice writes one audit line in the v2 layout
+      Given a run's recorded outcome that names the v2 key layout
+      When the audit subscriber is handed it twice
+      Then both writes carry the same key, written in the v2 layout and stamped with the run's slot
+
+    @unit
     Scenario: Each recorded outcome is counted by outcome and reason
       Given runs that end filed, skipped for no_access and failed for timeout
       When each is recorded

@@ -214,10 +214,10 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrg
       legacyGrants: LegacyApiKeyGrantService.create({
         authz: authorization,
         grants: authorization,
-        // The peer's own derivation, asked for rather than reimplemented: a
+        // The peer's own grant id, asked for rather than reimplemented: a
         // second copy that drifted would write bindings the revocation
         // queries never find.
-        deriveBindingId: (input) => authorization.deriveGrantId(input),
+        resolveBindingId: (input) => authorization.resolveGrantId(input),
         diagnostics: createLogger("langwatch:api-key"),
       }),
       tokens: ApiKeyTokenService.create(pepper, previousPepper),

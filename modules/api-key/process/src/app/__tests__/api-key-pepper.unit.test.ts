@@ -70,7 +70,7 @@ async function appAndKeysOver({
     dependencies: {
       authorization: createApiFixture<AuthzApi>({
         listApiKeyBindings: async () => [],
-        deriveGrantId: () => "grant-1",
+        resolveGrantId: async () => "grant-1",
         findEngineCutoverAt: async () => null,
       }),
       organizations: createApiFixture<OrganizationApi>({}),

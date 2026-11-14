@@ -14,7 +14,17 @@ export interface KsuidComponents {
   instance: Instance;
   /** Sequence number for collision avoidance */
   sequenceId: number;
+  /** Byte layout; defaults to "v2". Only identifiers derived from stored inputs keep "v1-legacy" */
+  layout?: KsuidLayout;
 }
+
+/**
+ * "v2" writes the 48-bit timestamp big-endian, matching langwatch-ksuid and pkg/ksuid.
+ * "v1-legacy" is the layout this package wrote up to 2.0.2: bytes 2-3 repeat the timestamp's
+ * low 16 bits, so it does not sort across 65,536-second boundaries. Kept for deterministic ids.
+ */
+export const KSUID_LAYOUTS = ["v2", "v1-legacy"] as const;
+export type KsuidLayout = (typeof KSUID_LAYOUTS)[number];
 
 /**
  * Parsed KSUID components from string parsing

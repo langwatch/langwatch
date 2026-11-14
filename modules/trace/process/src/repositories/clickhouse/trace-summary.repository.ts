@@ -1,13 +1,16 @@
 import type { Authorization } from "@langwatch/authorization";
 import {
   type AuthorizedClickHouse,
+  ClickHouseColumns,
   type IdBoundOptions,
+  ownProjectIdOf,
   type TenantScopedReader,
   tenantScope,
   tenantScopeKey,
   tenantSet,
 } from "@langwatch/clickhouse-client";
 import { EventUtils } from "@langwatch/eventing";
+import { KSUID_LAYOUTS, type KsuidLayout } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
@@ -86,6 +89,9 @@ interface TraceSummaryFieldsBase {
 
 const TABLE_NAME = "trace_summaries" as const;
 
+/** Goose 00130's column, read as NULL ("v1-legacy") until the tenant's target has it (NO-HOLDS). */
+const ID_LAYOUT_COLUMN = { IdLayout: "CAST(NULL AS Nullable(String))" } as const;
+
 const logger = createLogger("langwatch:trace:trace-summary-repository");
 
 function validateBatchTenants<T extends { tenantId: string }>(
@@ -140,6 +146,8 @@ interface ClickHouseSummaryRecord extends TraceSummaryFieldsBase {
    * this too; ADR-087 split them. Absent pre-00072 (version gate handles it).
    */
   EarliestSpanStartMs?: number | string;
+  /** KSUID byte layout of ProjectionId; NULL on rows written before goose 00130. */
+  IdLayout: KsuidLayout | null;
   _retention_days: number;
 }
 
@@ -191,6 +199,7 @@ const summaryReadRowSchema = z.looseObject({
   AnnotationIds: z.array(chString),
   HasAnnotation: chBoolean.nullable(),
   TraceName: chString,
+  IdLayout: z.enum(KSUID_LAYOUTS).nullable().optional(),
 });
 
 const summaryReadRowsSchema = z.array(summaryReadRowSchema);
@@ -246,18 +255,11 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
   async upsert(data: TraceSummaryData, tenantId: string, retentionDays: number): Promise<void> {
     EventUtils.validateTenantId({ tenantId }, "TraceSummaryClickHouseRepository.upsert");
 
-    const projectionId = createTraceSummaryProjectionId({
-      tenantId,
-      traceId: data.traceId,
-      occurredAtMs: data.occurredAt,
-    });
-
     try {
       const client = await this.options.resolveClient(tenantId);
       const record = this.toClickHouseRecord({
         data,
         tenantId,
-        projectionId,
         version: TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
         retentionDays,
       });
@@ -291,20 +293,14 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
 
     try {
       const client = await this.options.resolveClient(tenantId);
-      const records = entries.map(({ data, tenantId: tid, retentionDays: rd }) => {
-        const projectionId = createTraceSummaryProjectionId({
-          tenantId: tid,
-          traceId: data.traceId,
-          occurredAtMs: data.occurredAt,
-        });
-        return this.toClickHouseRecord({
+      const records = entries.map(({ data, tenantId: tid, retentionDays: rd }) =>
+        this.toClickHouseRecord({
           data,
           tenantId: tid,
-          projectionId,
           version: TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
           retentionDays: rd,
-        });
-      });
+        }),
+      );
 
       await client.insert({
         table: TABLE_NAME,
@@ -468,6 +464,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
     idBound: IdBoundOptions;
   }): Promise<TraceSummaryRead | null> {
     const client = this.reader(authorization);
+    const idLayout = await this.idLayoutColumn({ authorization });
     // IN-tuple dedup over the ReplacingMergeTree: the inner SELECT scans
     // only (TenantId, TraceId, UpdatedAt) — small, sparse — to find the
     // latest version, then the outer SELECT pulls the heavy columns
@@ -523,7 +520,8 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
           t.SubTopicId AS SubTopicId,
           t.AnnotationIds AS AnnotationIds,
           t.HasAnnotation AS HasAnnotation,
-          t.TraceName AS TraceName
+          t.TraceName AS TraceName,
+          ${idLayout}
         FROM ${TABLE_NAME} AS t
         WHERE ${tenantSet()}
           AND t.TraceId = {traceId:String}
@@ -548,6 +546,19 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
     const row = rows[0];
     if (!row) return null;
     return { ...this.fromClickHouseRecord(row), tenantId: row.TenantId };
+  }
+
+  /** The IdLayout select for the proof's own target; a cross-owner proof names the column. */
+  private async idLayoutColumn({
+    authorization,
+  }: {
+    authorization: Authorization;
+  }): Promise<string> {
+    const input = { table: TABLE_NAME, alias: "t", columns: ID_LAYOUT_COLUMN };
+    const client = await Promise.resolve()
+      .then(() => this.options.resolveClient(ownProjectIdOf({ authorization, reads: "traces" })))
+      .catch(() => undefined);
+    return (await client?.select?.(input)) ?? ClickHouseColumns.named(input);
   }
 
   private fromClickHouseRecord(record: SummaryReadRow): TraceSummaryData {
@@ -600,24 +611,30 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       createdAt: record.CreatedAt,
       updatedAt: record.UpdatedAtMs,
       LastEventOccurredAt: Number(record.LastEventOccurredAt ?? 0),
+      idLayout: record.IdLayout ?? "v1-legacy",
     };
   }
 
+  /** The row's id keeps the layout it was stored with; a state without one is pre-00130. */
   private toClickHouseRecord({
     data,
     tenantId,
-    projectionId,
     version,
     retentionDays,
   }: {
     data: TraceSummaryData;
     tenantId: string;
-    projectionId: string;
     version: string;
     retentionDays: number;
   }): ClickHouseSummaryWriteRecord {
+    const idLayout = data.idLayout ?? "v1-legacy";
     return {
-      ProjectionId: projectionId,
+      ProjectionId: createTraceSummaryProjectionId({
+        tenantId,
+        traceId: data.traceId,
+        occurredAtMs: data.occurredAt,
+        layout: idLayout,
+      }),
       TenantId: tenantId,
       TraceId: data.traceId,
       Version: version,
@@ -669,6 +686,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       AnnotationIds: data.annotationIds,
       HasAnnotation: data.annotationIds.length > 0 ? 1 : 0,
       TraceName: data.traceName,
+      IdLayout: idLayout,
       _retention_days: retentionDays,
     };
   }

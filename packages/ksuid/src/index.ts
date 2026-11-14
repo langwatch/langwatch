@@ -52,10 +52,17 @@ export function setInstance(value: Instance): void {
 
 // Export classes for advanced usage
 export { Ksuid, Node, Instance };
+export { KSUID_LAYOUTS } from "./types.ts";
 
 // Export types
 export type { InstanceScheme, InstanceSchemeType } from "./instance.ts";
-export type { KsuidComponents, ParsedKsuid, PlatformInfo, CryptoProvider } from "./types.ts";
+export type {
+  KsuidComponents,
+  KsuidLayout,
+  ParsedKsuid,
+  PlatformInfo,
+  CryptoProvider,
+} from "./types.ts";
 
 // Export constants
 export {

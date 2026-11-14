@@ -13,6 +13,7 @@ import {
   USER_ERASED_EVENT_TYPE,
 } from "./facts.ts";
 import { reduceIdentifier } from "./identifier-aggregate.ts";
+import { heldIdentifierFact } from "./identifier-id-layout.ts";
 
 /**
  * The pure identity reducer (ADR-101 §3). Live dispatch and the replay test
@@ -46,11 +47,12 @@ function deliver({
 
 export function reduceIdentity({
   heads,
-  fact,
+  fact: named,
 }: {
   heads: IdentityHeads;
   fact: IdentityFact;
 }): IdentityHeads {
+  const fact = heldIdentifierFact({ heads, fact: named });
   switch (fact.type) {
     case IDENTIFIER_ATTACHED_EVENT_TYPE:
     case IDENTIFIER_VERIFIED_EVENT_TYPE:

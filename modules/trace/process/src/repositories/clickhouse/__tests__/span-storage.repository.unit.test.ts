@@ -59,6 +59,7 @@ const STORED_SPAN_COLUMNS = [
   "CreatedAt",
   "UpdatedAt",
   "_retention_days",
+  "IdLayout",
 ];
 
 const STORED_SPAN_INSERT_SETTINGS = {
@@ -214,6 +215,15 @@ describe("SpanStorageClickHouseRepository", () => {
       await repo.insertSpan(span());
 
       expect(Object.keys(clickhouse.rows()[0]!)).toEqual(STORED_SPAN_COLUMNS);
+    });
+
+    /** @scenario "A span row records the layout its id was minted in" */
+    it("records IdLayout v2", async () => {
+      const { clickhouse, repo } = repository();
+
+      await repo.insertSpan(span());
+
+      expect(clickhouse.rows()[0]?.IdLayout).toBe("v2");
     });
 
     /** @scenario "The rows carry the columns the table declares" */

@@ -50,9 +50,12 @@ export class IdentityBackfillPlanService {
   planIdentifiers({
     user,
     accounts,
+    storedIdentifierIds,
   }: {
     user: BackfillUserRow & { email: string };
     accounts: BackfillAccountRow[];
+    /** The user's identifier rows already stored: an adopted id keeps its stored layout. */
+    storedIdentifierIds: ReadonlySet<string>;
   }): PlannedIdentifier[] {
     const normalizedValue = normalizeIdentifierValue(user.email);
     const planned = [
@@ -95,6 +98,7 @@ export class IdentityBackfillPlanService {
         providerAccountId: plan.providerAccountId,
         normalizedValue,
         occurredAtMs: plan.occurredAtMs,
+        storedIdentifierIds,
       }),
     }));
   }
