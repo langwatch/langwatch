@@ -19,6 +19,8 @@ declare module "@tanstack/react-table" {
   interface ColumnMeta<TData extends RowData, TValue> {
     columnType?: DatasetTableColumnType;
     columnId?: string;
+    /** The name a header shows; also its hover title when the name is cut short. */
+    columnName?: string;
     dataType?: DatasetColumnType; // The actual data type (string, json, list, etc.)
     /**
      * The column sits at a fixed pixel width rather than sharing the flexible
