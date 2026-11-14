@@ -61,14 +61,6 @@ const anonymized = (text: string): PiiDetectionOutcome => ({
 });
 
 /** Answers the configured probe, then never answers a real batch until it is aborted. */
-/** A model that refuses every batch, as the real channel does on a function error or a non-2xx. */
-const refusingModel: PresidioChannel = {
-  detect: (input: PiiDetectionRequest) =>
-    input.texts.length === 0
-      ? Promise.resolve({ kind: "detected", results: [] })
-      : Promise.reject(new LangevalsPiiDetectionError("PII redaction model answered 500 for Ana")),
-};
-
 const hangingModel: PresidioChannel = {
   detect: (input: PiiDetectionRequest) =>
     input.texts.length === 0
@@ -589,7 +581,9 @@ describe("PiiRedactionModelService", () => {
 
     /** @scenario "Each PII redaction model call leaves one usage log line" */
     it("logs a refusal as an error with its class name only, and counts it", async () => {
-      const { analysis, presidio, fallbacks, usage } = setup({ model: refusingModel });
+      const { analysis, presidio, fallbacks, usage } = setup({
+        model: scriptedModel([{ kind: "refuse" }]).channel,
+      });
       presidio.answerWith(anonymized("call <PERSON>"));
 
       await analysis.clearPresidio(strictBatch());

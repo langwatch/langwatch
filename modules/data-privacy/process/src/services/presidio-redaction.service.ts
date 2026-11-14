@@ -24,10 +24,6 @@ type PresidioClearInput = {
   spareNamesAndPlaces?: readonly boolean[] | undefined;
 };
 
-/**
- * A batch through langevals' Presidio, reached directly (R5, 2026-10-06): `clearPresidio`.
- * The PII redaction model answers the same exchange, so it runs through a second instance.
- */
 type PresidioRedactionDependencies = {
   presidio: PresidioChannel;
   metrics: Pick<
@@ -39,6 +35,10 @@ type PresidioRedactionDependencies = {
   method: PiiAnalysisMethod;
 };
 
+/**
+ * A batch through langevals' Presidio, reached directly (R5, 2026-10-06): `clearPresidio`.
+ * The PII redaction model answers the same exchange, so it runs through a second instance.
+ */
 export class PresidioRedactionService {
   static create(
     input: Omit<PresidioRedactionDependencies, "method"> & { method?: PiiAnalysisMethod },
