@@ -16,6 +16,7 @@ import {
   TEST_CONSTANTS,
 } from "../../services/__tests__/testHelpers.ts";
 import { type JobRegistryEntry, QueueManager } from "../../services/queues/queueManager.ts";
+import { MAX_APPLIED_EVENT_IDS } from "../foldCache/foldCacheEntry.ts";
 import { FoldProjectionExecutor } from "../foldProjectionExecutor.ts";
 import type { ProjectionStoreContext } from "../projectionStoreContext.ts";
 
@@ -190,6 +191,18 @@ describe("rebuilding a fold's aggregate for a missed hand-off", () => {
         expect(paged.mock.calls.length).toBeGreaterThan(1);
         for (const [request] of paged.mock.calls) expect(request.limit).toBe(2);
         expect(current()?.state.seen).toEqual(log.map((e) => e.id));
+      });
+
+      /** @scenario "A fold that does not depend on event order rebuilds a page at a time" */
+      it("stores only the newest applied ids once the history outgrows the applied set", async () => {
+        const log = Array.from({ length: 2 * MAX_APPLIED_EVENT_IDS + 1 }, (_, i) => at(i + 1));
+        const { fold, current } = pagedCountingFold({ log: () => log });
+        await executor.execute(fold, log[0]!, context);
+
+        await executor.rebuild(fold, log[1]!, context);
+
+        expect(current()?.state.count).toBe(log.length);
+        expect(current()?.applied).toEqual(log.slice(-MAX_APPLIED_EVENT_IDS).map((e) => e.id));
       });
 
       /** @scenario "A live event arriving during the rebuild is not lost" */
