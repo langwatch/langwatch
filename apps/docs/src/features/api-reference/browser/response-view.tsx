@@ -3,11 +3,13 @@ import type { Outcome } from "../model/playground-outcome.ts";
 
 export function ResponseView({
   outcome,
+  showConfirmation,
   retry,
   cancel,
   curl,
 }: {
   outcome: Outcome;
+  showConfirmation: () => void;
   retry: () => void;
   cancel: () => void;
   curl: string;
@@ -17,6 +19,17 @@ export function ResponseView({
     <section className="docs-response-panel" aria-label="Live response">
       <h2>Live response</h2>
       <div aria-live="polite" className="docs-response-content">
+        {outcome.kind === "confirming" ? (
+          <>
+            <p>Confirm this request in the LangWatch box above to send it.</p>
+            <button className="docs-island-button" type="button" onClick={showConfirmation}>
+              Show confirmation
+            </button>
+            <button className="docs-island-button" type="button" onClick={cancel}>
+              Cancel
+            </button>
+          </>
+        ) : null}
         {outcome.kind === "sending" ? (
           <>
             <p>Waiting for a response...</p>

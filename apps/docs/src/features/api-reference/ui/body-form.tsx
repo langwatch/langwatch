@@ -104,6 +104,12 @@ function ListBodyField({ field, entries }: { field: ListField; entries: FormEntr
         required={field.required}
         deprecated={field.deprecated}
       />
+      {/* Under the name it describes, not after Add item where it reads as the button's. */}
+      {field.description ? (
+        <Box marginBottom="2">
+          <FieldHint id={`${id}-hint`} text={field.description} utc={false} />
+        </Box>
+      ) : null}
       <Flex direction="column" gap="2" data-body-rows="">
         {rows.map((value, index) => (
           <ListRow
@@ -130,7 +136,6 @@ function ListBodyField({ field, entries }: { field: ListField; entries: FormEntr
       >
         <Plus size={14} aria-hidden="true" /> Add item
       </Button>
-      <FieldHint id={`${id}-hint`} text={field.description} utc={false} />
     </chakra.fieldset>
   );
 }
