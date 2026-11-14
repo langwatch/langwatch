@@ -107,14 +107,17 @@ export function ruleContextForTarget(target: FeatureFlagTarget): {
   organizationId?: string;
   bucketingId?: string;
   userEmail?: string;
+  userId?: string;
 } {
-  const userEmail =
-    target.kind === "anonymous" || target.kind === "system" ? void 0 : target.userEmail;
+  const signedIn = target.kind !== "anonymous" && target.kind !== "system";
+  const userEmail = signedIn ? target.userEmail : void 0;
+  const userId = signedIn ? target.userId : void 0;
 
   return {
     projectId: projectIdForTarget(target),
     organizationId: pickTargetOrganizationId(target),
     bucketingId: pickBucketingId(target),
     userEmail,
+    userId,
   };
 }
