@@ -1,4 +1,3 @@
-import { AuthorizedClickHouse } from "@langwatch/clickhouse-client";
 import {
   idIndexedClientDouble,
   type ScriptedStatements,
@@ -29,7 +28,7 @@ function storeOver({ storedAtMs }: { storedAtMs: number }) {
     Attributes: {},
     OccurredAtMs: String(storedAtMs),
     EarliestSpanStartMs: String(storedAtMs),
-    CreatedAt: String(storedAtMs),
+    CreatedAtMs: String(storedAtMs),
     UpdatedAtMs: String(storedAtMs),
     ComputedIOSchemaVersion: "v1",
     ComputedInput: null,
@@ -85,7 +84,7 @@ function storeOver({ storedAtMs }: { storedAtMs: number }) {
   const store = TraceSummaryStore.create({
     storage: TraceSummaryProjectionClickHouseRepository.create({
       resolveClient: async () => clickHouseClientDouble(),
-      clickhouse: new AuthorizedClickHouse({ resolveClient: async () => client }),
+      reader: client,
     }),
     defaultRetentionDays: () => 30,
     authorize: ownProofAuthorizer,

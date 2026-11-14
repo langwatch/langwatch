@@ -1,12 +1,10 @@
 import type { Authorization } from "@langwatch/authorization";
 import {
-  type AuthorizedClickHouse,
+  type ClickHouseQueryClient,
   type IdBoundOptions,
-  type TenantScopedReader,
-  tenantScope,
   tenantScopeKey,
-  tenantSet,
 } from "@langwatch/clickhouse-client";
+import { clickhouseRead, fn, tenantScope } from "@langwatch/clickhouse-client/builder";
 import { EventUtils } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
@@ -29,6 +27,7 @@ import type {
   TraceSummaryRepository,
 } from "../trace-summary.repository.ts";
 import type { TraceClickHouseWriteResolver } from "./clickhouse.trace-member-client.repository.ts";
+import { traceSummaries } from "./clickhouse.trace-summaries.table.ts";
 import { chBoolean, chNumber, chString, chStringMap } from "./stored-span-row.mapper.ts";
 import { createTraceSummaryProjectionId } from "./trace-summary-id.mapper.ts";
 
@@ -152,7 +151,7 @@ const summaryReadRowSchema = z.looseObject({
   Attributes: chStringMap,
   OccurredAtMs: chNumber,
   EarliestSpanStartMs: chNumber.optional(),
-  CreatedAt: chNumber,
+  CreatedAtMs: chNumber,
   UpdatedAtMs: chNumber,
   LastEventOccurredAt: chNumber.optional(),
   ComputedIOSchemaVersion: chString,
@@ -203,6 +202,120 @@ const occurredAtCountRowsSchema = z.array(
   z.looseObject({ rowCount: chNumber, occurredAtMs: chNumber.nullable() }),
 );
 
+/** The proof's reading scope: summaries are read as traces. */
+function summaryScope(authorization: Authorization) {
+  return tenantScope.fromProof({ authorization, reads: "traces" });
+}
+
+/** The tenants holding a trace, of those the proof reads, in tenant order. */
+function tenantIdsStatement({
+  authorization,
+  traceId,
+}: {
+  authorization: Authorization;
+  traceId: string;
+}) {
+  return clickhouseRead({ scope: summaryScope(authorization) })
+    .from(traceSummaries)
+    .withinWindows()
+    .select({ TenantId: traceSummaries.TenantId })
+    .distinct()
+    .where(({ idBound }) => idBound(traceSummaries.TraceId, traceId))
+    .orderBy(traceSummaries.TenantId, "ASC")
+    .build();
+}
+
+/** Whether the trace has a summary and its earliest OccurredAt, by a sort-key seek. */
+function occurredAtStatement({
+  authorization,
+  traceId,
+}: {
+  authorization: Authorization;
+  traceId: string;
+}) {
+  return clickhouseRead({ scope: summaryScope(authorization) })
+    .from(traceSummaries)
+    .withinWindows()
+    .select({
+      rowCount: fn.count(),
+      occurredAtMs: fn.toUnixTimestamp64Milli(fn.min(traceSummaries.OccurredAt)),
+    })
+    .where(({ eq }) => eq(traceSummaries.TraceId, traceId))
+    .build();
+}
+
+/** The columns a summary read returns; no output takes a name the fence reads (ADR-201 §3). */
+const SUMMARY_READ_SELECTION = {
+  ProjectionId: traceSummaries.ProjectionId,
+  TenantId: traceSummaries.TenantId,
+  TraceId: traceSummaries.TraceId,
+  Version: traceSummaries.Version,
+  Attributes: traceSummaries.Attributes,
+  OccurredAtMs: fn.toUnixTimestamp64Milli(traceSummaries.OccurredAt),
+  EarliestSpanStartMs: traceSummaries.EarliestSpanStartMs,
+  CreatedAtMs: fn.toUnixTimestamp64Milli(traceSummaries.CreatedAt),
+  UpdatedAtMs: fn.toUnixTimestamp64Milli(traceSummaries.UpdatedAt),
+  ComputedIOSchemaVersion: traceSummaries.ComputedIOSchemaVersion,
+  ComputedInput: traceSummaries.ComputedInput,
+  ComputedOutput: traceSummaries.ComputedOutput,
+  TimeToFirstTokenMs: traceSummaries.TimeToFirstTokenMs,
+  TimeToLastTokenMs: traceSummaries.TimeToLastTokenMs,
+  TotalDurationMs: traceSummaries.TotalDurationMs,
+  TokensPerSecond: traceSummaries.TokensPerSecond,
+  SpanCount: traceSummaries.SpanCount,
+  ContainsErrorStatus: traceSummaries.ContainsErrorStatus,
+  ContainsOKStatus: traceSummaries.ContainsOKStatus,
+  ErrorMessage: traceSummaries.ErrorMessage,
+  Models: traceSummaries.Models,
+  TotalCost: traceSummaries.TotalCost,
+  NonBilledCost: traceSummaries.NonBilledCost,
+  UnpricedSpanCount: traceSummaries.UnpricedSpanCount,
+  UnpricedModels: traceSummaries.UnpricedModels,
+  TokensEstimated: traceSummaries.TokensEstimated,
+  TotalPromptTokenCount: traceSummaries.TotalPromptTokenCount,
+  TotalCompletionTokenCount: traceSummaries.TotalCompletionTokenCount,
+  OutputFromRootSpan: traceSummaries.OutputFromRootSpan,
+  OutputSpanEndTimeMs: traceSummaries.OutputSpanEndTimeMs,
+  BlockedByGuardrail: traceSummaries.BlockedByGuardrail,
+  RootSpanType: traceSummaries.RootSpanType,
+  ContainsAi: traceSummaries.ContainsAi,
+  ContainsPrompt: traceSummaries.ContainsPrompt,
+  SelectedPromptId: traceSummaries.SelectedPromptId,
+  SelectedPromptSpanId: traceSummaries.SelectedPromptSpanId,
+  LastUsedPromptId: traceSummaries.LastUsedPromptId,
+  LastUsedPromptVersionNumber: traceSummaries.LastUsedPromptVersionNumber,
+  LastUsedPromptVersionId: traceSummaries.LastUsedPromptVersionId,
+  LastUsedPromptSpanId: traceSummaries.LastUsedPromptSpanId,
+  TopicId: traceSummaries.TopicId,
+  SubTopicId: traceSummaries.SubTopicId,
+  AnnotationIds: traceSummaries.AnnotationIds,
+  HasAnnotation: traceSummaries.HasAnnotation,
+  TraceName: traceSummaries.TraceName,
+};
+
+/**
+ * A trace's latest summary of each tenant holding it: the election reads only the sort key and
+ * version, the outer read the heavy columns. Two members may hold the same trace id (ADR-177),
+ * so the winners are ordered by tenant and the first is the same row on every read.
+ */
+function summaryByTraceIdStatement({
+  authorization,
+  traceId,
+}: {
+  authorization: Authorization;
+  traceId: string;
+}) {
+  return clickhouseRead({ scope: summaryScope(authorization) })
+    .from(traceSummaries)
+    .withinWindows()
+    .select(SUMMARY_READ_SELECTION)
+    .where(({ idBound }) => idBound(traceSummaries.TraceId, traceId))
+    .latestVersion()
+    .orderBy(traceSummaries.TenantId, "ASC")
+    .limit(1)
+    .build();
+}
+
 /** A failed summary read, logged with the fence it ran under. */
 function logSummaryReadFailure({
   authorization,
@@ -224,23 +337,19 @@ function logSummaryReadFailure({
 }
 
 export class TraceSummaryClickHouseRepository implements TraceSummaryRepository {
-  /** Writes resolve the tenant's own client; reads go through the proof's fence (ADR-177). */
+  /** Writes resolve the tenant's own client; reads are built under the proof (ADR-202). */
   private constructor(
     private readonly options: {
       resolveClient: TraceClickHouseWriteResolver;
-      clickhouse: AuthorizedClickHouse;
+      reader: Pick<ClickHouseQueryClient, "read">;
     },
   ) {}
 
   static create(options: {
     resolveClient: TraceClickHouseWriteResolver;
-    clickhouse: AuthorizedClickHouse;
+    reader: Pick<ClickHouseQueryClient, "read">;
   }): TraceSummaryClickHouseRepository {
     return new TraceSummaryClickHouseRepository(options);
-  }
-
-  private reader(authorization: Authorization): TenantScopedReader {
-    return this.options.clickhouse.as(authorization, { reads: "traces" });
   }
 
   async upsert(data: TraceSummaryData, tenantId: string, retentionDays: number): Promise<void> {
@@ -384,22 +493,13 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
     authorization: Authorization;
     traceId: string;
   }): Promise<string[]> {
-    const reader = this.reader(authorization);
     try {
-      const result = await reader.query({
-        query: `
-          SELECT DISTINCT TenantId
-          FROM ${TABLE_NAME}
-          WHERE ${tenantScope("OccurredAt")}
-            AND TraceId = {traceId:String}
-            {{idBound:trace_summaries.TraceId:traceId}}
-          ORDER BY TenantId
-        `,
-        query_params: { traceId },
-        format: "JSONEachRow",
+      const result = await this.options.reader.read({
+        statement: tenantIdsStatement({ authorization, traceId }),
+        table: traceSummaries.$table.name,
         idBound: { fallback: "unbounded" },
       });
-      return tenantIdRowsSchema.parse(await result.json()).map((row) => row.TenantId);
+      return tenantIdRowsSchema.parse(result.rows).map((row) => row.TenantId);
     } catch (error) {
       logger.warn(
         {
@@ -423,22 +523,13 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
     authorization: Authorization;
     traceId: string;
   }): Promise<{ found: boolean; occurredAtMs?: number }> {
-    const result = await this.reader(authorization).query({
-      // ID_BOUND_SKIP: the not-ready hint resolver; the index path never runs it.
-      query: `
-        SELECT
-          count() AS rowCount,
-          toUnixTimestamp64Milli(min(OccurredAt)) AS occurredAtMs
-        FROM ${TABLE_NAME}
-        WHERE ${tenantScope("OccurredAt")}
-          AND TraceId = {traceId:String}
-      `,
-      query_params: { traceId },
-      format: "JSONEachRow",
+    const result = await this.options.reader.read({
+      statement: occurredAtStatement({ authorization, traceId }),
+      table: traceSummaries.$table.name,
       // Reached only by callers holding no time (settlement digests, evaluation alerts).
-      SKIP_COLD_SCAN_CHECK: true,
+      declaresFullScan: true,
     });
-    const rows = occurredAtCountRowsSchema.parse(await result.json());
+    const rows = occurredAtCountRowsSchema.parse(result.rows);
     const rowCountRaw = rows[0]?.rowCount;
     const raw = rows[0]?.occurredAtMs;
     const rowCount = typeof rowCountRaw === "string" ? Number(rowCountRaw) : (rowCountRaw ?? NaN);
@@ -467,84 +558,13 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
     traceId: string;
     idBound: IdBoundOptions;
   }): Promise<TraceSummaryRead | null> {
-    const client = this.reader(authorization);
-    // IN-tuple dedup over the ReplacingMergeTree: the inner SELECT scans
-    // only (TenantId, TraceId, UpdatedAt) — small, sparse — to find the
-    // latest version, then the outer SELECT pulls the heavy columns
-    // (ComputedInput, ComputedOutput, Attributes, etc.) for that one row.
-    // See dev/docs/best_practices/clickhouse-queries.md.
-
-    // The windowed fence sits in the inner SELECT only. No output takes a name
-    // the fence reads (ADR-201 §3), so those times leave as `OccurredAtMs` and `UpdatedAtMs`.
-    const result = await client.query({
-      query: `
-        SELECT
-          t.ProjectionId AS ProjectionId,
-          t.TenantId,
-          t.TraceId,
-          t.Version AS Version,
-          t.Attributes AS Attributes,
-          toUnixTimestamp64Milli(t.OccurredAt) AS OccurredAtMs,
-          t.EarliestSpanStartMs AS EarliestSpanStartMs,
-          toUnixTimestamp64Milli(t.CreatedAt) AS CreatedAt,
-          toUnixTimestamp64Milli(t.UpdatedAt) AS UpdatedAtMs,
-          t.ComputedIOSchemaVersion AS ComputedIOSchemaVersion,
-          t.ComputedInput AS ComputedInput,
-          t.ComputedOutput AS ComputedOutput,
-          t.TimeToFirstTokenMs AS TimeToFirstTokenMs,
-          t.TimeToLastTokenMs AS TimeToLastTokenMs,
-          t.TotalDurationMs AS TotalDurationMs,
-          t.TokensPerSecond AS TokensPerSecond,
-          t.SpanCount AS SpanCount,
-          t.ContainsErrorStatus AS ContainsErrorStatus,
-          t.ContainsOKStatus AS ContainsOKStatus,
-          t.ErrorMessage AS ErrorMessage,
-          t.Models AS Models,
-          t.TotalCost AS TotalCost,
-          t.NonBilledCost AS NonBilledCost,
-          t.UnpricedSpanCount AS UnpricedSpanCount,
-          t.UnpricedModels AS UnpricedModels,
-          t.TokensEstimated AS TokensEstimated,
-          t.TotalPromptTokenCount AS TotalPromptTokenCount,
-          t.TotalCompletionTokenCount AS TotalCompletionTokenCount,
-          t.OutputFromRootSpan AS OutputFromRootSpan,
-          t.OutputSpanEndTimeMs AS OutputSpanEndTimeMs,
-          t.BlockedByGuardrail AS BlockedByGuardrail,
-          t.RootSpanType AS RootSpanType,
-          t.ContainsAi AS ContainsAi,
-          t.ContainsPrompt AS ContainsPrompt,
-          t.SelectedPromptId AS SelectedPromptId,
-          t.SelectedPromptSpanId AS SelectedPromptSpanId,
-          t.LastUsedPromptId AS LastUsedPromptId,
-          t.LastUsedPromptVersionNumber AS LastUsedPromptVersionNumber,
-          t.LastUsedPromptVersionId AS LastUsedPromptVersionId,
-          t.LastUsedPromptSpanId AS LastUsedPromptSpanId,
-          t.TopicId AS TopicId,
-          t.SubTopicId AS SubTopicId,
-          t.AnnotationIds AS AnnotationIds,
-          t.HasAnnotation AS HasAnnotation,
-          t.TraceName AS TraceName
-        FROM ${TABLE_NAME} AS t
-        WHERE ${tenantSet()}
-          AND t.TraceId = {traceId:String}
-          {{idBound:trace_summaries.TraceId:traceId:t}}
-          AND (t.TenantId, t.TraceId, t.UpdatedAt) IN (
-            SELECT TenantId, TraceId, max(UpdatedAt)
-            FROM ${TABLE_NAME}
-            WHERE ${tenantScope("OccurredAt")}
-              AND TraceId = {traceId:String}
-              {{idBound:trace_summaries.TraceId:traceId}}
-            GROUP BY TenantId, TraceId
-          )
-        ORDER BY t.TenantId ASC
-        LIMIT 1
-      `,
-      query_params: { traceId },
-      format: "JSONEachRow",
+    const result = await this.options.reader.read({
+      statement: summaryByTraceIdStatement({ authorization, traceId }),
+      table: traceSummaries.$table.name,
       idBound,
     });
 
-    const rows = summaryReadRowsSchema.parse(await result.json());
+    const rows = summaryReadRowsSchema.parse(result.rows);
     const row = rows[0];
     if (!row) return null;
     return { ...this.fromClickHouseRecord(row), tenantId: row.TenantId };
@@ -597,7 +617,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       occurredAt: isStorageAnchoredVersion(record.Version)
         ? Number(record.EarliestSpanStartMs ?? 0)
         : record.OccurredAtMs,
-      createdAt: record.CreatedAt,
+      createdAt: record.CreatedAtMs,
       updatedAt: record.UpdatedAtMs,
       LastEventOccurredAt: Number(record.LastEventOccurredAt ?? 0),
     };
@@ -686,7 +706,7 @@ export class TraceSummaryProjectionClickHouseRepository extends TraceSummaryProj
 
   static create(options: {
     resolveClient: TraceClickHouseWriteResolver;
-    clickhouse: AuthorizedClickHouse;
+    reader: Pick<ClickHouseQueryClient, "read">;
   }): TraceSummaryProjectionClickHouseRepository {
     return new TraceSummaryProjectionClickHouseRepository(
       TraceSummaryClickHouseRepository.create(options),

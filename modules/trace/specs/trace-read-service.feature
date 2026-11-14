@@ -201,3 +201,20 @@ Feature: Trace span-tree read service
     Then each statement is a reader statement over the proof's tenants with the tenant setting
     And the rollup elects each span's latest version over the page's traces and time range, keeps only spans whose latest version has events, and unrolls the events after the election
     And the model sample reads its candidate traces from the trace summaries under the same fence
+
+  @unit
+  Scenario: A trace's LangWatch signals and the models in use are read within the reader's proof
+    Given a reader whose proof covers its own project
+    When a trace's LangWatch signals are read, or the models in use since a time are counted
+    Then each statement is a reader statement over the proof's tenants with the tenant setting
+    And the signals read elects each span's latest attribute keys, earliest spans first, and binds every key and bucket name it matches
+    And under a braid each owner's span is read under the braid's condition and names its owner
+    And the model count counts each span once across its stored versions, without electing a version
+
+  @unit
+  Scenario: A trace's summary and the tenants holding it are read within the reader's proof
+    Given a reader whose proof covers its own project
+    When a trace's summary is read, or the tenants holding the trace are listed
+    Then each statement is a reader statement over the proof's tenants with the tenant setting
+    And the summary read elects each tenant's latest summary and returns the first tenant's, the same row on every read
+    And the tenant list reads each tenant once, in tenant order, without electing a version

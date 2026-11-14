@@ -1,4 +1,4 @@
-import { AuthorizedClickHouse } from "@langwatch/clickhouse-client";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import {
   idIndexedClientDouble,
   type ScriptedStatements,
@@ -32,7 +32,7 @@ const heavyRow = {
   Attributes: {},
   OccurredAtMs: "0",
   EarliestSpanStartMs: "0",
-  CreatedAt: "0",
+  CreatedAtMs: "0",
   UpdatedAtMs: "0",
   ComputedIOSchemaVersion: "v1",
   ComputedInput: "log-input",
@@ -75,7 +75,6 @@ const heavyRow = {
 function makeRepo(responder: (sql: string) => unknown[]) {
   const queries: string[] = [];
   const parameters: Record<string, unknown>[] = [];
-  const resolvedFor: (string | undefined)[] = [];
   const boundTenants: string[] = [];
   const declaredFullScans: string[] = [];
   const client = idIndexedClientDouble({
@@ -95,18 +94,12 @@ function makeRepo(responder: (sql: string) => unknown[]) {
   return {
     repo: TraceSummaryClickHouseRepository.create({
       resolveClient: async () => clickHouseClientDouble(),
-      clickhouse: new AuthorizedClickHouse({
-        resolveClient: async (tenantId?: string) => {
-          resolvedFor.push(tenantId);
-          return client;
-        },
-      }),
+      reader: client,
     }),
     boundTenants,
     declaredFullScans,
     queries,
     parameters,
-    resolvedFor,
   };
 }
 
@@ -117,13 +110,13 @@ describe("TraceSummaryClickHouseRepository.findByTraceId (tenancy)", () => {
     it("picks the tenant's own ClickHouse client", () => {
       // The tenant chooses which cluster is read, so a mix-up here is not a
       // filter that misses — it is a read of somebody else's storage.
-      const { repo, resolvedFor } = makeRepo((sql) =>
+      const { repo, boundTenants } = makeRepo((sql) =>
         isResolve(sql) ? [{ rowCount: "1", occurredAtMs: "0" }] : [heavyRow],
       );
 
       return repo
         .findByTraceId({ authorization, traceId: "t1" })
-        .then(() => expect(resolvedFor).toContain("tenant-1"));
+        .then(() => expect(boundTenants).toContain("tenant-1"));
     });
 
     it("binds the tenant, not the trace, as the tenant parameter", async () => {
@@ -135,7 +128,8 @@ describe("TraceSummaryClickHouseRepository.findByTraceId (tenancy)", () => {
 
       expect(parameters.length).toBeGreaterThan(0);
       expect(boundTenants.every((tenantId) => tenantId === "tenant-1")).toBe(true);
-      expect(parameters.every((params) => params.traceId === "t1")).toBe(true);
+      // A built read names its parameters `v<n>`: the trace is bound by value, never as the tenant.
+      expect(parameters.every((params) => Object.values(params).includes("t1"))).toBe(true);
     });
   });
 });
@@ -321,9 +315,7 @@ describe("given the trace-summary row carries a storage anchor", () => {
       return {
         repo: TraceSummaryClickHouseRepository.create({
           resolveClient: async () => client,
-          clickhouse: new AuthorizedClickHouse({
-            resolveClient: async () => clickHouseQueryClientDouble(),
-          }),
+          reader: clickHouseQueryClientDouble(),
         }),
         insert,
       };
@@ -383,6 +375,70 @@ describe("given the trace-summary row carries a storage anchor", () => {
       // createdAt, rather than jumping straight to fold time.
       const record = insert.mock.calls[0]?.[0]?.values[0];
       expect(record.OccurredAt).toEqual(new Date(anchorMs));
+    });
+  });
+});
+
+describe("TraceSummaryClickHouseRepository built reads", () => {
+  type ReadRequest = Parameters<ClickHouseQueryClient["read"]>[0];
+
+  /** A reader answering `rows` to each request and keeping them. */
+  function builtRepo(rows: Record<string, unknown>[]) {
+    const requests: ReadRequest[] = [];
+    const repo = TraceSummaryClickHouseRepository.create({
+      resolveClient: async () => clickHouseClientDouble(),
+      reader: clickHouseQueryClientDouble({
+        async read(request: ReadRequest) {
+          requests.push(request);
+          return { rows };
+        },
+      }),
+    });
+    return { repo, requests };
+  }
+
+  function expectReaderFence(request: ReadRequest | undefined) {
+    expect(request?.table).toBe("trace_summaries");
+    expect(request?.statement).toMatchObject({
+      kind: "tenant",
+      identity: "reader",
+      tenantIds: ["tenant-1"],
+      settings: { SQL_langwatch_tenant_ids: "tenant-1" },
+    });
+  }
+
+  describe("given a trace's summary read with its time", () => {
+    /** @scenario "A trace's summary and the tenants holding it are read within the reader's proof" */
+    it("elects the latest version of each tenant's summary and returns the first tenant's", async () => {
+      const { repo, requests } = builtRepo([heavyRow]);
+
+      const summary = await repo.findByTraceId({ authorization, traceId: "t1", occurredAtMs: 5 });
+
+      expect(requests).toHaveLength(1);
+      expectReaderFence(requests[0]);
+      const sql = requests[0]?.statement.sql ?? "";
+      expect(sql).toContain("max(UpdatedAt)");
+      expect(sql).toMatch(/ORDER BY TenantId ASC LIMIT 1$/);
+      expect(sql).not.toContain("t1");
+      expect(requests[0]?.idBound).toMatchObject({ occurredAtHint: 5, fallback: "none" });
+      expect(summary?.traceId).toBe("t1");
+    });
+  });
+
+  describe("given the tenants holding a trace", () => {
+    /** @scenario "A trace's summary and the tenants holding it are read within the reader's proof" */
+    it("reads each distinct tenant once, in tenant order, without an election", async () => {
+      const { repo, requests } = builtRepo([{ TenantId: "tenant-1" }]);
+
+      const tenants = await repo.findTenantIdsByTraceId({ authorization, traceId: "t1" });
+
+      expect(requests).toHaveLength(1);
+      expectReaderFence(requests[0]);
+      const sql = requests[0]?.statement.sql ?? "";
+      expect(sql).toMatch(/^SELECT DISTINCT TenantId FROM trace_summaries/);
+      expect(sql).not.toContain("max(UpdatedAt)");
+      expect(requests[0]?.idBound).toEqual({ fallback: "unbounded" });
+      expect(tenants).toEqual(["tenant-1"]);
     });
   });
 });

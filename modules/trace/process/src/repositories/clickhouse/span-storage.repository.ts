@@ -5,15 +5,13 @@ import {
   DEFAULT_PARTITION_WINDOW_MS,
   type IdBoundOptions,
   RESOLVER_RECENT_WINDOW_MS,
-  type TenantScopedReader,
-  tenantScope,
   tenantScopeKey,
-  tenantScopeForLatestVersion,
-  tenantScopeWithConditions,
   type WindowFallback,
 } from "@langwatch/clickhouse-client";
 import {
   clickhouseRead,
+  type Condition,
+  cond,
   type Expression,
   fn,
   param,
@@ -107,9 +105,6 @@ const SPAN_INSERT_SETTINGS = {
   wait_for_async_insert: 1,
   input_format_json_throw_on_bad_escape_sequence: 0,
 } as const;
-
-/** Where a single-trace read is bounded by the stored_spans id index (id-index plan §4). */
-const STORED_SPANS_ID_BOUND = "{{idBound:stored_spans.TraceId:traceId}}";
 
 /**
  * The full-span projection minus the `Events.*` / `Links.*` nested columns, for internal
@@ -697,13 +692,109 @@ function recentModelSpansStatement({
     .build();
 }
 
+/** Each model's span count since a time; `uniq` so a span's stored versions count once. */
+function modelUsageStatement({
+  authorization,
+  fromMs,
+  limit,
+}: {
+  authorization: Authorization;
+  fromMs: number;
+  limit: number;
+}) {
+  const model = attributeOr("gen_ai.response.model", "gen_ai.request.model");
+  return clickhouseRead({ scope: builtTenantScope.fromProof({ authorization, reads: "traces" }) })
+    .from(storedSpans)
+    .withinWindows()
+    .select({
+      Model: model,
+      SpanCount: fn.uniq(storedSpans.TraceId, storedSpans.SpanId),
+      LastSeenMs: fn.toUnixTimestamp64Milli(fn.max(storedSpans.StartTime)),
+    })
+    .where(({ and, gte, ne }) => and(gte(storedSpans.StartTime, fromMs), ne(model, "")))
+    .groupBy(model)
+    .orderBy("SpanCount", "DESC")
+    .orderBy("Model", "ASC")
+    .limit(limit)
+    .build();
+}
+
+type SpanKeys = Expression<readonly string[], "span_keys">;
+
+const keyStartsWith = (prefix: string) => (keys: SpanKeys) =>
+  fn.arrayExists((key) => fn.startsWith(key, prefix), keys);
+
+/** Per-bucket key matchers for LangWatch signals; order must match LANGWATCH_SIGNAL_BUCKETS. */
+const SIGNAL_BUCKET_PREDICATES: Record<
+  LangwatchSignalBucket,
+  (keys: SpanKeys) => Condition<"span_keys">
+> = {
+  prompt: keyStartsWith("langwatch.prompt."),
+  scenario: (keys) =>
+    fn.arrayExists(
+      (key) => cond.or(fn.startsWith(key, "langwatch.scenario."), cond.eq(key, "scenario.run_id")),
+      keys,
+    ),
+  user: (keys) =>
+    fn.arrayExists(
+      (key) => cond.or(cond.eq(key, "langwatch.user_id"), fn.startsWith(key, "langwatch.user.")),
+      keys,
+    ),
+  thread: (keys) =>
+    fn.arrayExists(
+      (key) =>
+        cond.or(
+          cond.eq(key, "gen_ai.conversation.id"),
+          cond.eq(key, "langgraph.thread_id"),
+          fn.startsWith(key, "langwatch.thread."),
+        ),
+      keys,
+    ),
+  evaluation: keyStartsWith("langwatch.evaluation"),
+  rag: keyStartsWith("langwatch.rag."),
+  metadata: keyStartsWith("langwatch.metadata."),
+  genai: keyStartsWith("gen_ai."),
+};
+
 /**
- * Canonical model-name expression: response model wins over request model.
+ * A trace's spans' LangWatch signals from their latest attribute keys only, never the heavy
+ * values. Ordered before the cap so a runaway trace always yields its earliest-starting spans.
  */
-const MODEL_ATTR_SELECT = `coalesce(
-    nullIf(SpanAttributes['gen_ai.response.model'], ''),
-    SpanAttributes['gen_ai.request.model']
-  )`;
+function langwatchSignalsStatement({
+  authorization,
+  braided,
+  traceId,
+}: {
+  authorization: Authorization;
+  braided: boolean;
+  traceId: string;
+}) {
+  const scope = traceScope({ authorization, braided });
+  const spanKeys = traceSpansFrom({ scope, braided, traceId })
+    .select({
+      TenantId: storedSpans.TenantId,
+      SpanId: storedSpans.SpanId,
+      keys: fn.mapKeys(storedSpans.SpanAttributes),
+    })
+    .where(({ idBound }) => idBound(storedSpans.TraceId, traceId))
+    .latestVersion()
+    .orderBy(storedSpans.StartTime, "ASC")
+    .limit(MAX_LIGHT_SPAN_READ_ROWS)
+    .as("span_keys");
+  const signals = fn.arrayFilter(
+    (signal) => cond.ne(signal, ""),
+    fn.array(
+      ...LANGWATCH_SIGNAL_BUCKETS.map((bucket) =>
+        fn.if(SIGNAL_BUCKET_PREDICATES[bucket](spanKeys.keys), param.string(bucket), ""),
+      ),
+    ),
+  );
+  const selection = { SpanId: spanKeys.SpanId, Signals: signals };
+  return clickhouseRead({ scope })
+    .from(spanKeys)
+    .select(braided ? { TenantId: spanKeys.TenantId, ...selection } : selection)
+    .build();
+}
 
 /**
  * Candidate trace pool size for model-cost sample read.
@@ -758,35 +849,6 @@ function mapModelSpanSampleRow(row: ModelSpanSampleQueryRow): ModelSpanSampleRow
   };
 }
 
-/**
- * IN-tuple dedup subquery body. Renders the inner `SELECT … GROUP BY` that picks
- * the latest version (max UpdatedAt) per spanId. Caller assembles the surrounding
- * `AND (TenantId, TraceId, SpanId, UpdatedAt) IN (…)`.
- */
-function dedupInTuple(extraInnerWhere: string): string {
-  // ID_BOUND_SKIP: a dedup subquery fragment; its statement carries the marker or its own window.
-  return `(TenantId, TraceId, SpanId, UpdatedAt) IN (
-    SELECT TenantId, TraceId, SpanId, max(UpdatedAt)
-    FROM ${TABLE_NAME}
-    WHERE ${tenantScopeForLatestVersion("StartTime")}
-      AND TraceId = {traceId:String}
-      ${extraInnerWhere}
-    GROUP BY TenantId, TraceId, SpanId
-  )`;
-}
-
-/** The outer select's fence: under braids it carries the conditions, beside a bare election. */
-function outerScope(braided: boolean): string {
-  return braided
-    ? tenantScopeWithConditions("StartTime", { traceId: "traceId" })
-    : tenantScope("StartTime");
-}
-
-/** A braided read selects each row's tenant to name its owner; any other read, nothing more. */
-function ownerColumn(braided: boolean, indent: string): string {
-  return braided ? `TenantId,\n${indent}` : "";
-}
-
 /** Spans mapped from full rows; under braids each owner's span names its owner. */
 function ownedSpansOf({
   rows,
@@ -831,21 +893,6 @@ function toTraceEventRollups(rows: TraceEventRollupRow[]): Record<string, TraceE
   }
   return rollups;
 }
-
-/**
- * Per-bucket key matchers for LangWatch signals; order must match LANGWATCH_SIGNAL_BUCKETS.
- */
-const SIGNAL_BUCKET_PREDICATES: Record<LangwatchSignalBucket, string> = {
-  prompt: "arrayExists(k -> startsWith(k, 'langwatch.prompt.'), keys)",
-  scenario: "arrayExists(k -> startsWith(k, 'langwatch.scenario.') OR k = 'scenario.run_id', keys)",
-  user: "arrayExists(k -> k = 'langwatch.user_id' OR startsWith(k, 'langwatch.user.'), keys)",
-  thread:
-    "arrayExists(k -> k = 'gen_ai.conversation.id' OR k = 'langgraph.thread_id' OR startsWith(k, 'langwatch.thread.'), keys)",
-  evaluation: "arrayExists(k -> startsWith(k, 'langwatch.evaluation'), keys)",
-  rag: "arrayExists(k -> startsWith(k, 'langwatch.rag.'), keys)",
-  metadata: "arrayExists(k -> startsWith(k, 'langwatch.metadata.'), keys)",
-  genai: "arrayExists(k -> startsWith(k, 'gen_ai.'), keys)",
-};
 
 const spanSummaryQueryRowSchema = z.looseObject({
   TenantId: chString.optional(),
@@ -1158,7 +1205,6 @@ function storedTraceSpanOf(row: z.infer<typeof storedSpanRowSchema>): StoredTrac
  * authorized client, which fences every statement by the proof (ADR-177 block C).
  */
 export class SpanStorageClickHouseRepository implements SpanStorageRepository {
-  /** `reader` sends the reads already built; `clickhouse` the ones still raw, until they are. */
   static create(deps: {
     resolveClient: ClickHouseClientResolver;
     clickhouse: AuthorizedClickHouse;
@@ -1174,19 +1220,6 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       reader: Pick<ClickHouseQueryClient, "read">;
     },
   ) {}
-
-  private reader(authorization: Authorization): TenantScopedReader {
-    return this.deps.clickhouse.as(authorization, { reads: "traces" });
-  }
-
-  /** The trace view's reader: braided owner spans under their conditions (ADR-201 §5). */
-  private spanReader(authorization: Authorization): TenantScopedReader {
-    return this.deps.clickhouse.as(authorization, { reads: "spans" });
-  }
-
-  private readerOf(authorization: Authorization, braided: boolean): TenantScopedReader {
-    return braided ? this.spanReader(authorization) : this.reader(authorization);
-  }
 
   async insertSpan(span: SpanInsertData): Promise<void> {
     EventUtils.validateTenantId(
@@ -1857,46 +1890,13 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     const bySpan = await this.readTraceSpans<SpanLangwatchSignalsRow[]>(
       { authorization, traceId, occurredAtMs },
       async (idBound) => {
-        const client = this.readerOf(authorization, braided);
-        // Reads `mapKeys(SpanAttributes)` once per row into a CTE-style
-        // alias (`keys`) so each bucket predicate doesn't re-materialize
-        // the key array. Heavy attribute *values* are never read — only
-        // their keys — keeping this scan an order of magnitude lighter
-        // than getSpansByTraceId.
-        const result = await client.query({
-          query: `
-            SELECT
-              ${ownerColumn(braided, "              ")}SpanId,
-              arrayFilter(x -> x != '', [
-                ${LANGWATCH_SIGNAL_BUCKETS.map(
-                  (bucket) => `if(${SIGNAL_BUCKET_PREDICATES[bucket]}, '${bucket}', '')`,
-                ).join(",\n                ")}
-              ]) AS Signals
-            FROM (
-              SELECT
-                ${ownerColumn(braided, "                ")}SpanId,
-                mapKeys(SpanAttributes) AS keys
-              FROM ${TABLE_NAME}
-              WHERE ${outerScope(braided)}
-                AND TraceId = {traceId:String}
-                ${STORED_SPANS_ID_BOUND}
-                AND ${dedupInTuple(STORED_SPANS_ID_BOUND)}
-              -- Order before the cap so a runaway trace consistently yields the
-              -- same earliest-starting prefix; an unordered LIMIT would let
-              -- ClickHouse return an arbitrary subset that varies with merges
-              -- and part ordering, making which spans carry signals
-              -- nondeterministic across calls. Must be the raw StartTime
-              -- column — this subquery computes no StartTimeMs alias.
-              ORDER BY StartTime ASC
-              LIMIT ${MAX_LIGHT_SPAN_READ_ROWS}
-            )
-          `,
-          query_params: { traceId },
-          format: "JSONEachRow",
+        const result = await this.deps.reader.read({
+          statement: langwatchSignalsStatement({ authorization, braided, traceId }),
+          table: storedSpans.$table.name,
           idBound,
         });
 
-        const rows = signalsRowsSchema.parse(await result.json());
+        const rows = signalsRowsSchema.parse(result.rows);
 
         const validBuckets = new Set<string>(LANGWATCH_SIGNAL_BUCKETS);
         return rows.map((r) => ({
@@ -2003,30 +2003,13 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     fromMs: number;
     limit: number;
   }): Promise<ModelUsageStatsRow[]> {
-    const client = this.reader(authorization);
-    // Cross-trace scan bounded by the StartTime window (partition pruning)
-    // and reading only two Map subscripts, no heavy attribute values.
-    // `uniq` (approximate) instead of count() so ReplacingMergeTree row
-    // versions don't inflate the per-model span counts.
-    const result = await client.query({
-      query: `
-        SELECT
-          ${MODEL_ATTR_SELECT} AS Model,
-          uniq(TraceId, SpanId) AS SpanCount,
-          toUnixTimestamp64Milli(max(StartTime)) AS LastSeenMs
-        FROM ${TABLE_NAME}
-        WHERE ${tenantScope("StartTime")}
-          AND StartTime >= fromUnixTimestamp64Milli({fromMs:Int64})
-          AND Model != ''
-        GROUP BY Model
-        ORDER BY SpanCount DESC, Model ASC
-        LIMIT {limit:UInt32}
-      `,
-      query_params: { fromMs, limit },
-      format: "JSONEachRow",
+    // A cross-trace scan bounded by the StartTime window, reading two Map subscripts only.
+    const result = await this.deps.reader.read({
+      statement: modelUsageStatement({ authorization, fromMs, limit }),
+      table: storedSpans.$table.name,
     });
 
-    const rows = modelUsageRowsSchema.parse(await result.json());
+    const rows = modelUsageRowsSchema.parse(result.rows);
     return rows.map((row) => ({
       model: row.Model,
       spanCount: Number(row.SpanCount),

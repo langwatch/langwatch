@@ -505,3 +505,79 @@ describe("SpanStorageClickHouseRepository page, rollup and model-sample reads", 
     });
   });
 });
+
+describe("SpanStorageClickHouseRepository signal and model-usage reads", () => {
+  describe("given a trace's LangWatch signals", () => {
+    /** @scenario "A trace's LangWatch signals and the models in use are read within the reader's proof" */
+    it("reads each span's latest attribute keys under the proof and binds every key it matches", async () => {
+      const { repository, requests } = reader([
+        { SpanId: SPAN, Signals: ["prompt", "not-a-bucket"] },
+        { SpanId: "span-2", Signals: [] },
+      ]);
+
+      const signals = await repository.findLangwatchSignalsByTraceId({ authorization, ...at });
+
+      expect(requests).toHaveLength(1);
+      expectReaderFence(requests[0]);
+      const sql = requests[0]?.statement.sql ?? "";
+      expect(sql).toContain("mapKeys(SpanAttributes)");
+      expect(sql).toContain("max(UpdatedAt)");
+      expect(sql).toMatch(/ORDER BY StartTime ASC\s+LIMIT 10000/);
+      expect(sql).not.toContain("'");
+      expect(Object.values(requests[0]?.statement.params ?? {})).toEqual(
+        expect.arrayContaining(["langwatch.prompt.", "scenario.run_id", "genai"]),
+      );
+      expect(requests[0]?.idBound).toMatchObject({ occurredAtHint: at.occurredAtMs });
+      expect(signals).toEqual([{ spanId: SPAN, signals: ["prompt"] }]);
+    });
+
+    /** @scenario "A trace's LangWatch signals and the models in use are read within the reader's proof" */
+    it("names each owner's span under a braid's condition", async () => {
+      const braided = braidedProof({
+        projectId: PROJECT,
+        braids: [{ owner: OWNER, compiledWhere: WEB }],
+      });
+      const { repository, requests } = reader([
+        { TenantId: OWNER, SpanId: SPAN, Signals: ["genai"] },
+      ]);
+
+      const signals = await repository.findLangwatchSignalsByTraceId({
+        authorization: braided,
+        reads: "spans",
+        ...at,
+      });
+
+      const sql = requests[0]?.statement.sql ?? "";
+      expect(sql).toContain("{tenantScope_c0_ids:Array(String)}");
+      expect(sql).not.toContain(OWNER);
+      expect(sql).not.toContain("'web'");
+      expect(signals).toEqual([
+        expect.objectContaining({ spanId: SPAN, signals: ["genai"], ownerProjectId: OWNER }),
+      ]);
+    });
+  });
+
+  describe("given the models in use since a time", () => {
+    /** @scenario "A trace's LangWatch signals and the models in use are read within the reader's proof" */
+    it("counts each model's spans once per span across versions, without an election", async () => {
+      const { repository, requests } = reader([
+        { Model: "gpt-4", SpanCount: "3", LastSeenMs: String(at.occurredAtMs) },
+      ]);
+
+      const models = await repository.findModelUsageStats({
+        authorization,
+        fromMs: at.occurredAtMs,
+        limit: 5,
+      });
+
+      expect(requests).toHaveLength(1);
+      expectReaderFence(requests[0]);
+      const sql = requests[0]?.statement.sql ?? "";
+      expect(sql).toContain("uniq(TraceId, SpanId) AS SpanCount");
+      expect(sql).not.toContain("max(UpdatedAt)");
+      expect(sql).toMatch(/GROUP BY coalesce\([^]*\) ORDER BY SpanCount DESC, Model ASC LIMIT 5$/);
+      expect(requests[0]?.idBound).toBeUndefined();
+      expect(models).toEqual([{ model: "gpt-4", spanCount: 3, lastSeenMs: at.occurredAtMs }]);
+    });
+  });
+});

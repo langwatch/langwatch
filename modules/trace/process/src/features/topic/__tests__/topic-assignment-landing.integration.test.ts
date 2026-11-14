@@ -17,10 +17,7 @@ import {
 import { TraceSummaryFoldProjection } from "../../../eventing/trace-summary.projection.ts";
 import { TraceSummaryStore } from "../../../eventing/trace-summary.store.ts";
 import { EventingTraceTopicAdapter } from "../../../eventing/trace-topic-assignment.commands.ts";
-import {
-  authorizedClickHouseFor,
-  traceQueryClientFor,
-} from "../../../repositories/clickhouse/__tests__/support/authorized-clickhouse.support.ts";
+import { traceQueryClientFor } from "../../../repositories/clickhouse/__tests__/support/authorized-clickhouse.support.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
@@ -107,7 +104,7 @@ beforeAll(async () => {
   store = TraceSummaryStore.create({
     storage: TraceSummaryProjectionClickHouseRepository.create({
       resolveClient: async () => ch,
-      clickhouse: authorizedClickHouseFor(ch),
+      reader: traceQueryClientFor(ch),
     }),
     defaultRetentionDays: () => 0,
     authorize: ownProofAuthorizer,

@@ -164,7 +164,7 @@ beforeAll(async () => {
   summaries = TraceSummaryService.create({
     repository: TraceSummaryClickHouseRepository.create({
       resolveClient: async () => ch,
-      clickhouse,
+      reader: traceQueryClientFor(ch),
     }),
   });
   spanTree = ClickHouseTraceSpanRepository.create({ clickhouse: traceQueryClientFor(ch) });

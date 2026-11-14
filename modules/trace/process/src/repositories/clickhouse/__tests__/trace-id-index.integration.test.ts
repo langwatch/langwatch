@@ -210,7 +210,7 @@ beforeAll(async () => {
   });
   summaries = TraceSummaryClickHouseRepository.create({
     resolveClient: async () => ch,
-    clickhouse,
+    reader,
   });
 }, 120_000);
 

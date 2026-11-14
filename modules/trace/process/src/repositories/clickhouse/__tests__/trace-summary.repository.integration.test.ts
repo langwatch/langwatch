@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { ownProof } from "../../../__tests__/support/authorization-proofs.fixture.ts";
 import { TraceSummaryClickHouseRepository } from "../trace-summary.repository.ts";
-import { authorizedClickHouseFor } from "./support/authorized-clickhouse.support.ts";
+import { traceQueryClientFor } from "./support/authorized-clickhouse.support.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
@@ -67,7 +67,7 @@ beforeAll(async () => {
   ch = await startMigratedTraceClickHouse();
   repo = TraceSummaryClickHouseRepository.create({
     resolveClient: async () => ch,
-    clickhouse: authorizedClickHouseFor(ch),
+    reader: traceQueryClientFor(ch),
   });
 
   await ch.insert({
@@ -109,7 +109,7 @@ function recordingRepo(): {
   return {
     repo: TraceSummaryClickHouseRepository.create({
       resolveClient: async () => recordingClient,
-      clickhouse: authorizedClickHouseFor(recordingClient),
+      reader: traceQueryClientFor(recordingClient),
     }),
     queries,
   };
