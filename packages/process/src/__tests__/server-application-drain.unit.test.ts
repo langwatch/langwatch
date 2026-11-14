@@ -63,6 +63,12 @@ async function serverWithHeldRequest(events: string[]) {
         events.push("handler unwound");
         return;
       }
+      if (request.url === "/stuck") {
+        entered();
+        // Stands in for a handler that ignores its cut response and never settles.
+        await new Promise(() => undefined);
+        return;
+      }
       if (request.url !== "/slow") {
         response.writeHead(200).end("fast");
         return;
@@ -177,6 +183,25 @@ describe("Server", () => {
           "stores stopped",
         ]);
         expect(lines.findLine("info", "outlived the drain grace")).toBeDefined();
+      }, 15_000);
+    });
+
+    describe("when the handler never settles after its response is cut", () => {
+      /** @scenario "A handler cut at the drain grace gets a short unwind before the stores close" */
+      it("stops the components once the unwind budget runs out under a handler that never settles", async () => {
+        const events: string[] = [];
+        const { server, handlerEntered } = await serverWithHeldRequest(events);
+        const port = portOf(server);
+
+        const cut = fetch(`http://localhost:${port}/stuck`).catch(() => undefined);
+        await handlerEntered;
+        await server.close();
+        await cut;
+
+        expect(events).toEqual(["stores stopping", "runtime stopped", "stores stopped"]);
+        expect(
+          lines.findLine("warn", "handlers still running after their requests were cut"),
+        ).toBeDefined();
       }, 15_000);
     });
   });
