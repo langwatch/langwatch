@@ -20,7 +20,14 @@ import { ClickHouseContainer, type StartedClickHouseContainer } from "@testconta
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { boundRows } from "../builder/bound-rows.ts";
-import { column, type ConditionOps, param } from "../builder/expression.ts";
+import {
+  column,
+  cond,
+  type Condition,
+  type ConditionOps,
+  type Expression,
+  param,
+} from "../builder/expression.ts";
 import { fn } from "../builder/functions.ts";
 import { clickhouseRead, type MetadataReadStatement } from "../builder/read.ts";
 import { tenantScope } from "../builder/scope.ts";
@@ -691,6 +698,172 @@ const RAW_VERSIONED = `SELECT SpanId, SpanName FROM versioned_spans
       FROM versioned_spans WHERE TenantId = {tenantId:String} AND TraceId = {traceId:String}
       GROUP BY TenantId, TraceId, SpanId)`;
 
+/** The columns of stored_spans the signals read touches, in a table no other shape reads. */
+const signalSpans = defineClickHouseTable({
+  name: "signal_spans",
+  tenantColumn: "TenantId",
+  timeColumn: "StartTime",
+  versionColumn: "UpdatedAt",
+  sortKey: ["TenantId", "TraceId", "SpanId"],
+  columns: {
+    TenantId: column.string(),
+    TraceId: column.string(),
+    SpanId: column.string(),
+    StartTime: column.dateTime64({ precision: 9 }),
+    UpdatedAt: column.dateTime64({ precision: 3 }),
+    SpanAttributes: column.stringMap(),
+  },
+});
+const signalSpan = (
+  TenantId: string,
+  SpanId: string,
+  keys: readonly string[],
+  startAgo: number,
+  updatedAgo = startAgo,
+) => ({
+  TenantId,
+  TraceId: "tsig",
+  SpanId,
+  StartTime: at(NOW - startAgo),
+  UpdatedAt: at(NOW - updatedAgo),
+  SpanAttributes: Object.fromEntries(keys.map((key) => [key, "v"])),
+});
+const EVERY_SIGNAL_KEY = [
+  "langwatch.prompt.id",
+  "scenario.run_id",
+  "langwatch.user_id",
+  "langgraph.thread_id",
+  "langwatch.evaluation.passed",
+  "langwatch.rag.contexts",
+  "langwatch.metadata.k",
+  "gen_ai.system",
+];
+/** s7's latest version holds no signal key, its older one a prompt; B reuses s5 with every key. */
+const SIGNAL_SPANS = [
+  signalSpan(A, "s1", ["langwatch.prompt.id", "gen_ai.request.model"], 900),
+  signalSpan(A, "s2", ["scenario.run_id", "service.name"], 800),
+  signalSpan(A, "s3", ["langwatch.user_id", "langwatch.thread.id"], 700),
+  signalSpan(A, "s4", ["gen_ai.conversation.id"], 600),
+  signalSpan(A, "s5", ["service.name"], 500),
+  signalSpan(
+    A,
+    "s6",
+    [
+      "langwatch.scenario.id",
+      "langwatch.user.email",
+      "langgraph.thread_id",
+      "langwatch.evaluation.passed",
+      "langwatch.rag.contexts",
+      "langwatch.metadata.k",
+    ],
+    400,
+  ),
+  signalSpan(A, "s7", ["langwatch.prompt.id"], 300, 300),
+  signalSpan(A, "s7", ["service.name"], 300, 100),
+  signalSpan(B, "s5", EVERY_SIGNAL_KEY, 500, 10),
+  signalSpan(B, "s9", EVERY_SIGNAL_KEY, 50),
+];
+
+type SignalKeys = Expression<readonly string[], "span_keys">;
+const prefixed = (prefix: string) => (keys: SignalKeys) =>
+  fn.arrayExists((key) => fn.startsWith(key, prefix), keys);
+/** main's SIGNAL_BUCKET_PREDICATES (span-storage repository): each bucket's text and its build. */
+const SIGNAL_BUCKETS: readonly (readonly [
+  string,
+  string,
+  (keys: SignalKeys) => Condition<"span_keys">,
+])[] = [
+  [
+    "prompt",
+    "arrayExists(k -> startsWith(k, 'langwatch.prompt.'), keys)",
+    prefixed("langwatch.prompt."),
+  ],
+  [
+    "scenario",
+    "arrayExists(k -> startsWith(k, 'langwatch.scenario.') OR k = 'scenario.run_id', keys)",
+    (keys) =>
+      fn.arrayExists(
+        (key) =>
+          cond.or(fn.startsWith(key, "langwatch.scenario."), cond.eq(key, "scenario.run_id")),
+        keys,
+      ),
+  ],
+  [
+    "user",
+    "arrayExists(k -> k = 'langwatch.user_id' OR startsWith(k, 'langwatch.user.'), keys)",
+    (keys) =>
+      fn.arrayExists(
+        (key) => cond.or(cond.eq(key, "langwatch.user_id"), fn.startsWith(key, "langwatch.user.")),
+        keys,
+      ),
+  ],
+  [
+    "thread",
+    "arrayExists(k -> k = 'gen_ai.conversation.id' OR k = 'langgraph.thread_id' OR startsWith(k, 'langwatch.thread.'), keys)",
+    (keys) =>
+      fn.arrayExists(
+        (key) =>
+          cond.or(
+            cond.eq(key, "gen_ai.conversation.id"),
+            cond.eq(key, "langgraph.thread_id"),
+            fn.startsWith(key, "langwatch.thread."),
+          ),
+        keys,
+      ),
+  ],
+  [
+    "evaluation",
+    "arrayExists(k -> startsWith(k, 'langwatch.evaluation'), keys)",
+    prefixed("langwatch.evaluation"),
+  ],
+  ["rag", "arrayExists(k -> startsWith(k, 'langwatch.rag.'), keys)", prefixed("langwatch.rag.")],
+  [
+    "metadata",
+    "arrayExists(k -> startsWith(k, 'langwatch.metadata.'), keys)",
+    prefixed("langwatch.metadata."),
+  ],
+  ["genai", "arrayExists(k -> startsWith(k, 'gen_ai.'), keys)", prefixed("gen_ai.")],
+];
+/** main's findLangwatchSignalsByTraceId for one project, its id-bound marker left out. */
+const RAW_SIGNALS = `SELECT SpanId,
+    arrayFilter(x -> x != '', [
+      ${SIGNAL_BUCKETS.map(([bucket, text]) => `if(${text}, '${bucket}', '')`).join(",\n      ")}
+    ]) AS Signals
+  FROM (
+    SELECT SpanId, mapKeys(SpanAttributes) AS keys
+    FROM signal_spans
+    WHERE TenantId = {tenantId:String} AND TraceId = {traceId:String}
+      AND (TenantId, TraceId, SpanId, UpdatedAt) IN (SELECT TenantId, TraceId, SpanId, max(UpdatedAt)
+        FROM signal_spans WHERE TenantId = {tenantId:String} AND TraceId = {traceId:String}
+        GROUP BY TenantId, TraceId, SpanId)
+    ORDER BY StartTime ASC
+    LIMIT 10000
+  )`;
+function builtSignals() {
+  const spanKeys = clickhouseRead({ scope: single })
+    .from(signalSpans)
+    .select({ SpanId: signalSpans.SpanId, keys: fn.mapKeys(signalSpans.SpanAttributes) })
+    .where(({ eq }) => eq(signalSpans.TraceId, "tsig"))
+    .latestVersion()
+    .orderBy(signalSpans.StartTime)
+    .limit(10_000)
+    .as("span_keys");
+  return clickhouseRead({ scope: single })
+    .from(spanKeys)
+    .select({
+      SpanId: spanKeys.SpanId,
+      Signals: fn.arrayFilter(
+        (signal) => cond.ne(signal, ""),
+        fn.array(
+          ...SIGNAL_BUCKETS.map(([bucket, , has]) =>
+            fn.if(has(spanKeys.keys), param.string(bucket), ""),
+          ),
+        ),
+      ),
+    })
+    .build();
+}
+
 /** The second census's shapes: nested columns, AggregateFunction merges, lambdas and casts. */
 const CENSUS_SHAPES: Record<string, { statement: () => Sendable; rows: string[] }> = {
   "nested columns on the latest version": {
@@ -1126,6 +1299,11 @@ describe("given builder statements sent as a reader under a row policy on ClickH
          ENGINE = ReplacingMergeTree(StartTime) ORDER BY (TenantId, TraceId, SpanId)`,
       `CREATE ROW POLICY ${READER}_versioned ON ${DATABASE}.versioned_spans USING ${POLICY} TO ${READER}`,
       `SYSTEM STOP MERGES ${DATABASE}.versioned_spans`,
+      `CREATE TABLE ${DATABASE}.signal_spans (TenantId String, TraceId String, SpanId String,
+         StartTime DateTime64(9), UpdatedAt DateTime64(3), SpanAttributes Map(String, String))
+         ENGINE = ReplacingMergeTree(UpdatedAt) ORDER BY (TenantId, TraceId, SpanId)`,
+      `CREATE ROW POLICY ${READER}_signals ON ${DATABASE}.signal_spans USING ${POLICY} TO ${READER}`,
+      `SYSTEM STOP MERGES ${DATABASE}.signal_spans`,
       ...ROLLUP_PARTS.map(
         ([tenant, trace, cost, roles, spend, count, ms]) =>
           `INSERT INTO ${DATABASE}.metrics_rollup SELECT '${tenant}', '${trace}',
@@ -1172,6 +1350,12 @@ describe("given builder statements sent as a reader under a row policy on ClickH
     await admin.insert({
       table: `${DATABASE}.versioned_spans`,
       values: VERSIONED_SPANS,
+      format: "JSONEachRow",
+      clickhouse_settings: { optimize_on_insert: 0 },
+    });
+    await admin.insert({
+      table: `${DATABASE}.signal_spans`,
+      values: SIGNAL_SPANS,
       format: "JSONEachRow",
       clickhouse_settings: { optimize_on_insert: 0 },
     });
@@ -1344,6 +1528,32 @@ describe("given builder statements sent as a reader under a row policy on ClickH
       });
 
       expect(main).toEqual(["s1|first", "s1|second", "s2|only"]);
+      expect(await rowsOf({ statement: built })).toEqual(main);
+      expect(await rowsOf({ statement: built, tenants: EVERY_TENANT })).toEqual(main);
+    });
+  });
+
+  describe("when trace's LangWatch signals read is built from an array literal and conditions", () => {
+    /** @scenario "Trace's LangWatch signals read runs on 26.8 as main's raw query does" */
+    it("returns the rows main's raw query returns, also when the setting lists every tenant", async () => {
+      const built = builtSignals();
+      const main = await rowsOf({
+        statement: {
+          sql: RAW_SIGNALS,
+          params: { tenantId: A, traceId: "tsig" },
+          settings: built.settings,
+        },
+      });
+
+      expect(main).toEqual([
+        "s1|prompt,genai",
+        "s2|scenario",
+        "s3|user,thread",
+        "s4|thread,genai",
+        "s5|",
+        "s6|scenario,user,thread,evaluation,rag,metadata",
+        "s7|",
+      ]);
       expect(await rowsOf({ statement: built })).toEqual(main);
       expect(await rowsOf({ statement: built, tenants: EVERY_TENANT })).toEqual(main);
     });

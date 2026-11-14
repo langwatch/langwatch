@@ -444,3 +444,31 @@ Feature: A typed ClickHouse read builder renders the tenant predicate and the te
     Given ClickHouse 26.8, the reader identity and a span with two versions sharing its latest StartTime
     When the read elects on StartTime and is sent
     Then both versions come back with the span's other keys, as main's raw read returns them, and an older StartTime does not
+
+  @unit
+  Scenario: An array literal of typed expressions shares one element type
+    Given expressions of one value type, such as a column and an if of bound strings
+    When a read selects an array literal of them
+    Then it renders array(…) of the elements, and a lambda over it binds a compared value as the elements bind
+    And elements binding as two types and an empty literal are refused, and mixed value types do not compile
+
+  @unit
+  Scenario: Conditions are Bool expressions outside a read's callback, binding their values
+    Given equalities, prefix tests and their OR written outside a where, having or selection callback
+    When they form a lambda body, an if's condition, a selected value or a where callback's term
+    Then each value binds as a parameter the way its left side binds, a lambda parameter included
+    And a value against a lambda parameter with no binding is refused rather than written as text
+    And a condition over a column of a table the read does not read does not compile and is refused at build
+
+  @unit
+  Scenario: Trace's LangWatch signals read binds every value and passes the tenant guard
+    Given each span's attribute keys read once in a derived read of its latest version
+    When the signals are selected as arrayFilter over an array literal of one if per bucket
+    Then the statement holds no string literal: every key, prefix and bucket name is bound
+    And it carries the tenant predicate and setting, and the client's tenant guard passes it under a single and a set scope
+
+  @integration
+  Scenario: Trace's LangWatch signals read runs on 26.8 as main's raw query does
+    Given ClickHouse 26.8, the reader identity, spans whose keys fill each bucket, a span whose latest version drops its signal, and another tenant holding every key
+    When the signals read is built from an array literal and conditions, and sent
+    Then it returns the rows main's raw query returns, also when the setting lists every tenant

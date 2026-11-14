@@ -62,6 +62,17 @@ function elementBinding(array: E<unknown, string>): Binding | undefined {
 
 const arrayOf = (element: Binding | undefined): Binding | undefined =>
   element === undefined ? undefined : { paramType: `Array(${element.paramType})`, element };
+const typeOfBinding = ({ paramType, conversion }: Binding) =>
+  conversion === undefined ? paramType : `${conversion}(${paramType})`;
+
+/** The binding an array literal's elements share; elements binding as two types are refused. */
+function sharedBinding(items: readonly E<unknown, string>[]): Binding | undefined {
+  if (items.length === 0) throw new QueryBuilderError({ kind: "empty-array" });
+  const known = items.flatMap((item) => (item.binding === undefined ? [] : [item.binding]));
+  const types = [...new Set(known.map(typeOfBinding))];
+  if (types.length > 1) throw new QueryBuilderError({ kind: "mixed-array", types });
+  return known[0];
+}
 const bound = (value: unknown, binding: Binding): ExpressionNode => ({
   kind: "value",
   value,
@@ -711,6 +722,13 @@ export const fn = {
         ...(length === undefined ? [] : [bound(length, INT64)]),
       ],
       binding: of.binding,
+    }),
+  /** `array(e1, e2, …)`, ClickHouse's spelling of `[e1, e2, …]`: one element type for all. */
+  array: <V, T extends string = never>(...items: readonly E<V, T>[]) =>
+    call<readonly V[], T>({
+      name: "array",
+      args: nodesOf(items),
+      binding: arrayOf(sharedBinding(items)),
     }),
   arrayZip: <const A extends readonly [AnyArray, ...AnyArray[]]>(...arrays: A) =>
     call<Zipped<A>, TablesOfExpression<A[number]>>({

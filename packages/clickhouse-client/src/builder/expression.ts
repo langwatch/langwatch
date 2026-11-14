@@ -497,6 +497,13 @@ function idBoundOf(keys: readonly (readonly [Expression<unknown, string>, unknow
   return expression<boolean>({ kind: "idBound", keys: pairs });
 }
 
+const nullTest =
+  (negated: boolean) =>
+  (term: Expression<unknown, string>): Condition =>
+    expression<boolean>({ kind: "isNull", term: term.node, negated });
+const not = (term: Condition<string>): Condition =>
+  expression<boolean>({ kind: "not", term: term.node });
+
 /** The operations typed for one read; its tables and CTE names exist at compile time only. */
 export function conditionOpsFor<Tables extends string, Ctes>(): ConditionOps<Tables, Ctes> {
   return {
@@ -508,15 +515,65 @@ export function conditionOpsFor<Tables extends string, Ctes>(): ConditionOps<Tab
     lte: compare("<="),
     oneOf,
     range,
-    isNull: (term) => expression<boolean>({ kind: "isNull", term: term.node, negated: false }),
-    isNotNull: (term) => expression<boolean>({ kind: "isNull", term: term.node, negated: true }),
+    isNull: nullTest(false),
+    isNotNull: nullTest(true),
     idBound: (key, id) => idBoundOf([[key, id]]),
     idBoundKeys: (...keys) => idBoundOf(keys),
     and: logic("AND"),
     or: logic("OR"),
-    not: (term) => expression<boolean>({ kind: "not", term: term.node }),
+    not,
   };
 }
+
+type Compared = <V, T extends string, U extends string = never>(
+  left: Expression<V, T>,
+  right: NoInfer<V> | Expression<V, U>,
+) => Condition<T | U>;
+type Terms = readonly [Condition<string>, ...Condition<string>[]];
+
+/** A read's condition operations as Bool expressions carrying the tables they read. */
+export type Conditions = {
+  eq: Compared;
+  ne: Compared;
+  gt: Compared;
+  gte: Compared;
+  lt: Compared;
+  lte: Compared;
+  /** Membership in bound values or a constant array of them; a CTE set is a callback's. */
+  oneOf: <V, T extends string, U extends string = never>(
+    left: Expression<V, T>,
+    set: readonly NoInfer<V>[] | Expression<readonly NoInfer<V>[], U>,
+  ) => Condition<T | U>;
+  range: <V, T extends string>(
+    left: Expression<V, T>,
+    bounds: { from?: NoInfer<V>; until?: NoInfer<V> },
+  ) => Condition<T>;
+  isNull: <T extends string>(term: Expression<unknown, T>) => Condition<T>;
+  isNotNull: <T extends string>(term: Expression<unknown, T>) => Condition<T>;
+  and: <const C extends Terms>(...terms: C) => Condition<TablesOfExpression<C[number]>>;
+  or: <const C extends Terms>(...terms: C) => Condition<TablesOfExpression<C[number]>>;
+  not: <T extends string>(term: Condition<T>) => Condition<T>;
+};
+
+/**
+ * The same operations for a lambda body, an `if` or a selection outside a callback. A value binds
+ * as its left side does, a lambda parameter included; `{{idBound}}` markers stay a read's `where`.
+ */
+export const cond: Conditions = {
+  eq: compare("="),
+  ne: compare("!="),
+  gt: compare(">"),
+  gte: compare(">="),
+  lt: compare("<"),
+  lte: compare("<="),
+  oneOf,
+  range,
+  isNull: nullTest(false),
+  isNotNull: nullTest(true),
+  and: (...terms) => logic("AND")(...terms),
+  or: (...terms) => logic("OR")(...terms),
+  not,
+};
 
 /** Values bound by name with an explicit type, for a function argument or a tuple comparison. */
 export const param = {

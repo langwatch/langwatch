@@ -36,6 +36,7 @@ export { systemColumns, systemReplicas, systemServerSettings } from "./system-ta
 export { boundRows, type BoundRowColumns } from "./bound-rows.ts";
 export {
   column,
+  cond,
   param,
   sql,
   type AggregateState,
@@ -43,6 +44,7 @@ export {
   type ColumnType,
   type Condition,
   type ConditionOps,
+  type Conditions,
   type Direction,
   type Expression,
 } from "./expression.ts";

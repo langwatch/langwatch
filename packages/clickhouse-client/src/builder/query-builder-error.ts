@@ -44,7 +44,9 @@ export type QueryBuilderViolation =
   | { kind: "settings-in-union" }
   | { kind: "bound-rows-not-arrays"; column: string }
   | { kind: "bound-rows-uneven"; lengths: readonly number[] }
-  | { kind: "no-tenant-table" };
+  | { kind: "no-tenant-table" }
+  | { kind: "empty-array" }
+  | { kind: "mixed-array"; types: readonly string[] };
 
 /** A read the builder will not build. Named so a test can tell which refusal fired. */
 export class QueryBuilderError extends Error {
@@ -137,5 +139,9 @@ function describe(violation: QueryBuilderViolation): string {
       return `Bound rows zip arrays of one length, not of lengths ${violation.lengths.join(", ")}.`;
     case "no-tenant-table":
       return "A read names at least one tenant table; bound rows alone carry no tenant predicate.";
+    case "empty-array":
+      return "An array literal holds at least one element; an empty typed array is a cast of [].";
+    case "mixed-array":
+      return `An array literal's elements share one type, not ${violation.types.join(", ")}.`;
   }
 }
