@@ -1,3 +1,4 @@
+/** Spec: modules/entitlement/specs/entitlement-meter-counts.feature, usage.feature */
 import {
   ClickHouseQueryClient,
   routingDriver,
@@ -10,19 +11,25 @@ import { describe, expect, it } from "vitest";
 
 import { BillableEventsMeterClickHouseRepository } from "../clickhouse.billable-events-meter.repository.ts";
 
-/** A routed ClickHouse that answers one organization, recording every lookup and statement. */
+type Sent = {
+  query: string;
+  query_params: Record<string, unknown>;
+  clickhouse_settings?: Record<string, unknown>;
+};
+
+/** A routed ClickHouse answering only the tenant-set accessor, recording lookups and statements. */
 function meterOver(rows: unknown[]) {
-  const organizationsResolved: string[] = [];
-  const statements: { query: string; query_params: Record<string, unknown> }[] = [];
+  const tenantSetsResolved: { tenantIds: string[]; organizationId: string | undefined }[] = [];
+  const statements: Sent[] = [];
   const vendor = createApiFixture<RoutableStatementClient>({
     query: async (params) => {
-      statements.push(params as (typeof statements)[number]);
+      statements.push(params as Sent);
       return { json: async () => rows, stream: async function* () {} };
     },
   });
   const connection = createApiFixture<ClickHouseConnection<RoutableStatementClient>>({
-    resolveOrganization: (organizationId) => {
-      organizationsResolved.push(organizationId);
+    resolveTenantSet: async ({ tenantIds, organizationId }) => {
+      tenantSetsResolved.push({ tenantIds: [...tenantIds], organizationId });
       return vendor;
     },
   });
@@ -33,7 +40,7 @@ function meterOver(rows: unknown[]) {
     }),
   );
 
-  return { meter, organizationsResolved, statements };
+  return { meter, tenantSetsResolved, statements };
 }
 
 const READ = {
@@ -41,6 +48,8 @@ const READ = {
   projectIds: ["project_1", "project_2"],
   window: { startDate: "2026-09-01 00:00:00.000", endDate: "2026-10-01 00:00:00.000" },
 };
+
+const sqlOf = (sent: Sent | undefined) => sent?.query.replace(/\s+/g, " ") ?? "";
 
 describe("BillableEventsMeterClickHouseRepository.countByProjects", () => {
   describe("given an organization whose plan meters it in events", () => {
@@ -53,42 +62,89 @@ describe("BillableEventsMeterClickHouseRepository.countByProjects", () => {
         { projectId: "project_1", count: 7 },
       ]);
       expect(statements).toHaveLength(1);
-      const sql = statements[0]?.query.replace(/\s+/g, " ");
-      expect(sql).toContain("SELECT TenantId as projectId, uniq(DeduplicationKeyHash) as total");
-      expect(sql).toContain("FROM billable_events WHERE OrganizationId = {organizationId:String}");
-      expect(sql).toContain("AND TenantId IN {projectIds:Array(String)}");
+      const sql = sqlOf(statements[0]);
+      expect(sql).toContain("uniq(DeduplicationKeyHash) AS total");
+      expect(sql).toContain("FROM billable_events");
+      expect(sql).toContain(
+        "WHERE TenantId IN ({tenantIds:Array(String)}) AND (OrganizationId = {",
+      );
       expect(sql).toContain("GROUP BY TenantId");
-      expect(statements[0]?.query_params).toEqual({
-        organizationId: "org_1",
-        projectIds: ["project_1", "project_2"],
-        startDate: "2026-09-01 00:00:00.000",
-        endDate: "2026-10-01 00:00:00.000",
-      });
+      expect(Object.values(statements[0]?.query_params ?? {})).toEqual(
+        expect.arrayContaining([
+          "org_1",
+          ["project_1", "project_2"],
+          Date.UTC(2026, 8, 1),
+          Date.UTC(2026, 9, 1),
+        ]),
+      );
     });
 
     /** @scenario "The organization id never reaches the tenant resolver" */
-    it("asks only the organization-keyed accessor, never the tenant, set or shared ones", async () => {
-      const { meter, organizationsResolved } = meterOver([{ projectId: "project_1", total: 3 }]);
+    it("asks the tenant-set accessor for the projects, never the organization id as a tenant", async () => {
+      const { meter, tenantSetsResolved } = meterOver([{ projectId: "project_1", total: 3 }]);
 
       await meter.countByProjects(READ);
 
-      expect(organizationsResolved).toEqual(["org_1"]);
+      expect(tenantSetsResolved).toEqual([
+        { tenantIds: ["project_1", "project_2"], organizationId: undefined },
+      ]);
+    });
+
+    it("asks nothing for an organization with no projects", async () => {
+      const { meter, statements } = meterOver([]);
+
+      await expect(meter.countByProjects({ ...READ, projectIds: [] })).resolves.toEqual([]);
+      expect(statements).toHaveLength(0);
+    });
+  });
+});
+
+describe("BillableEventsMeterClickHouseRepository.findTotal", () => {
+  describe("given an organization metered in events", () => {
+    /** @scenario "The meters read on the reader, bounded by the organization's projects" */
+    it("counts distinct keys once across the projects, on the reader's tenant set", async () => {
+      const { meter, statements } = meterOver([{ total: "11" }]);
+
+      await expect(
+        meter.findTotal({
+          organizationId: READ.organizationId,
+          projectIds: READ.projectIds,
+          ...READ.window,
+        }),
+      ).resolves.toBe(11);
+      const sql = sqlOf(statements[0]);
+      expect(sql).toContain("countDistinct(DeduplicationKeyHash) AS total");
+      expect(sql).not.toContain("GROUP BY");
+      expect(statements[0]?.clickhouse_settings).toMatchObject({
+        SQL_langwatch_tenant_ids: "project_1,project_2",
+      });
+    });
+
+    it("counts zero for an organization with no projects, asking nothing", async () => {
+      const { meter, statements } = meterOver([]);
+
+      await expect(
+        meter.findTotal({ organizationId: READ.organizationId, projectIds: [], ...READ.window }),
+      ).resolves.toBe(0);
+      expect(statements).toHaveLength(0);
     });
   });
 });
 
 describe("BillableEventsMeterClickHouseRepository.countByDay", () => {
   describe("given an organization metered in events", () => {
+    /** @scenario "The meters read on the reader, bounded by the organization's projects" */
     it("reads uniq keys per UTC day across the named projects", async () => {
       const { meter, statements } = meterOver([{ day: "2026-09-02", total: "4" }]);
 
       await expect(meter.countByDay(READ)).resolves.toEqual([{ day: "2026-09-02", count: 4 }]);
-      const sql = statements[0]?.query.replace(/\s+/g, " ");
-      expect(sql).toContain(
-        "SELECT toString(toDate(EventTimestamp, 'UTC')) as day, uniq(DeduplicationKeyHash) as total",
-      );
-      expect(sql).toContain("AND TenantId IN {projectIds:Array(String)}");
-      expect(sql).toContain("GROUP BY day ORDER BY day");
+      const sql = sqlOf(statements[0]);
+      expect(sql).toContain("toString(toDate(toStartOfDay(EventTimestamp, {");
+      expect(sql).toContain("uniq(DeduplicationKeyHash) AS total");
+      expect(sql).toContain("ORDER BY day");
+      expect(statements[0]?.clickhouse_settings).toMatchObject({
+        SQL_langwatch_tenant_ids: "project_1,project_2",
+      });
     });
 
     it("asks nothing for an organization with no projects", async () => {

@@ -1,21 +1,25 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import {
+  clickhouseRead,
+  fn,
+  param,
+  tenantScope,
+  type TenantSetScope,
+} from "@langwatch/clickhouse-client/builder";
 import { Temporal } from "@langwatch/time";
 
 import { TraceCountRepository, type TraceUsageRow } from "../trace-count.repository.ts";
+import { usageTraceMeter as meter } from "./clickhouse.usage-trace-meter.table.ts";
 
-const TABLE_NAME = "usage_trace_meter" as const;
-
-type TotalRow = { total: string | number };
-type ProjectTotalRow = TotalRow & { projectId: string };
+/** Inserts as written; every read is built and sent on the reader over a project set (ADR-202). */
+type TraceCountClickHouse = Pick<ClickHouseQueryClient, "insert" | "read">;
 
 /**
  * The month's reads group every trace of two months, so their hash table grows with the
  * organization's volume. Spilling the GROUP BY to disk past this size keeps a large organization's
  * count under the per-query memory cap instead of failing it; the ingest doors ask it per batch.
  */
-const COUNT_SETTINGS = {
-  max_bytes_before_external_group_by: String(256 * 1024 * 1024),
-} as const;
+const SPILL_GROUP_BY_BYTES = 256 * 1024 * 1024;
 
 /**
  * ClickHouse twin of the trace count (migration 00104). Reads group by a 64-bit hash of each trace,
@@ -23,14 +27,14 @@ const COUNT_SETTINGS = {
  * it has a row, looking back one month.
  */
 export class TraceCountClickHouseRepository extends TraceCountRepository {
-  readonly #clickhouse: ClickHouseQueryClient;
+  readonly #clickhouse: TraceCountClickHouse;
 
-  private constructor(clickhouse: ClickHouseQueryClient) {
+  private constructor(clickhouse: TraceCountClickHouse) {
     super();
     this.#clickhouse = clickhouse;
   }
 
-  static create(clickhouse: ClickHouseQueryClient): TraceCountClickHouseRepository {
+  static create(clickhouse: TraceCountClickHouse): TraceCountClickHouseRepository {
     return new TraceCountClickHouseRepository(clickhouse);
   }
 
@@ -46,7 +50,7 @@ export class TraceCountClickHouseRepository extends TraceCountRepository {
     await this.#clickhouse.insert({
       tenantId: first.projectId,
       organizationId,
-      table: TABLE_NAME,
+      table: meter.$table.name,
       rows: rows.map((row) => ({
         OrganizationId: organizationId,
         TenantId: row.projectId,
@@ -59,31 +63,28 @@ export class TraceCountClickHouseRepository extends TraceCountRepository {
 
   async findTotal({
     organizationId,
+    projectIds,
     month,
   }: {
     organizationId: string;
+    projectIds: readonly string[];
     month: string;
   }): Promise<number> {
-    const result = await this.#clickhouse.query<TotalRow>({
-      tenantId: "",
-      organizationId,
-      table: TABLE_NAME,
-      sql: `
-        SELECT countIf(FirstMonth = {month:Date}) AS total
-        FROM (
-          SELECT sipHash64(TenantId, TraceId) AS TraceKey, min(Month) AS FirstMonth
-          FROM ${TABLE_NAME}
-          WHERE OrganizationId = {organizationId:String}
-            AND Month >= {previousMonth:Date}
-            AND Month <= {month:Date}
-          GROUP BY TraceKey
-        )
-      `,
-      params: { organizationId, ...monthParams(month) },
-      settings: COUNT_SETTINGS,
-      // The organization's count sums every project the organization owns.
-      SKIP_TENANT_CHECK: true,
-    });
+    if (projectIds.length === 0) return 0;
+    const months = monthParams(month);
+    const scope = tenantScope.set({ tenantIds: projectIds });
+    const read = organizationMonths({ scope, organizationId, months });
+    const traceKey = fn.sipHash64(fn.tuple(meter.TenantId, meter.TraceId));
+    const firstSeen = read
+      .select({ TraceKey: traceKey, FirstMonth: fn.min(meter.Month) })
+      .groupBy(traceKey)
+      .as("first_seen");
+    const statement = clickhouseRead({ scope })
+      .from(firstSeen)
+      .select(({ eq }) => ({ total: fn.countIf(eq(firstSeen.FirstMonth, months.month)) }))
+      .settings({ max_bytes_before_external_group_by: SPILL_GROUP_BY_BYTES })
+      .build();
+    const result = await this.#clickhouse.read({ statement, table: meter.$table.name });
     return totalOf(result.rows[0]?.total);
   }
 
@@ -97,37 +98,53 @@ export class TraceCountClickHouseRepository extends TraceCountRepository {
     month: string;
   }): Promise<{ projectId: string; count: number }[]> {
     if (projectIds.length === 0) return [];
-    const result = await this.#clickhouse.query<ProjectTotalRow>({
-      tenantId: "",
-      organizationId,
-      table: TABLE_NAME,
-      sql: `
-        SELECT {projectIds:Array(String)}[ProjectIndex] AS projectId, total
-        FROM (
-          SELECT ProjectIndex, countIf(FirstMonth = {month:Date}) AS total
-          FROM (
-            SELECT
-              indexOf({projectIds:Array(String)}, TenantId) AS ProjectIndex,
-              sipHash64(TraceId) AS TraceKey,
-              min(Month) AS FirstMonth
-            FROM ${TABLE_NAME}
-            WHERE OrganizationId = {organizationId:String}
-              AND Month >= {previousMonth:Date}
-              AND Month <= {month:Date}
-              AND TenantId IN {projectIds:Array(String)}
-            GROUP BY ProjectIndex, TraceKey
-          )
-          GROUP BY ProjectIndex
-          HAVING total > 0
-        )
-      `,
-      params: { organizationId, projectIds: [...projectIds], ...monthParams(month) },
-      settings: COUNT_SETTINGS,
-      // The organization's count reads every project the organization owns.
-      SKIP_TENANT_CHECK: true,
+    const months = monthParams(month);
+    const scope = tenantScope.set({ tenantIds: projectIds });
+    const read = organizationMonths({ scope, organizationId, months });
+    // The project's position in the set, not its id, keeps each group's key two integers wide.
+    const projectIndex = fn.indexOf(param.strings(projectIds), meter.TenantId);
+    const traceKey = fn.sipHash64(meter.TraceId);
+    const firstSeen = read
+      .select({ ProjectIndex: projectIndex, TraceKey: traceKey, FirstMonth: fn.min(meter.Month) })
+      .groupBy(projectIndex, traceKey)
+      .as("first_seen");
+    const statement = clickhouseRead({ scope })
+      .from(firstSeen)
+      .select(({ eq }) => ({
+        ProjectIndex: firstSeen.ProjectIndex,
+        total: fn.countIf(eq(firstSeen.FirstMonth, months.month)),
+      }))
+      .groupBy(firstSeen.ProjectIndex)
+      .having(({ eq, gt }) => gt(fn.countIf(eq(firstSeen.FirstMonth, months.month)), 0))
+      .settings({ max_bytes_before_external_group_by: SPILL_GROUP_BY_BYTES })
+      .build();
+    const result = await this.#clickhouse.read({ statement, table: meter.$table.name });
+    return result.rows.flatMap((row) => {
+      const projectId = projectIds[totalOf(row.ProjectIndex) - 1];
+      return projectId === undefined ? [] : [{ projectId, count: totalOf(row.total) }];
     });
-    return result.rows.map((row) => ({ projectId: row.projectId, count: totalOf(row.total) }));
   }
+}
+
+/** The organization's rows of the month and the one before, on the reader over its projects. */
+function organizationMonths({
+  scope,
+  organizationId,
+  months,
+}: {
+  scope: TenantSetScope;
+  organizationId: string;
+  months: { month: string; previousMonth: string };
+}) {
+  return clickhouseRead({ scope })
+    .from(meter)
+    .where(({ and, eq, gte, lte }) =>
+      and(
+        eq(meter.OrganizationId, organizationId),
+        gte(meter.Month, months.previousMonth),
+        lte(meter.Month, months.month),
+      ),
+    );
 }
 
 function monthParams(month: string): { month: string; previousMonth: string } {

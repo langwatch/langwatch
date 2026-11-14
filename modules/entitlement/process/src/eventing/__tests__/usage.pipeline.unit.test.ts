@@ -26,6 +26,7 @@ function build({ saas }: { saas: boolean }) {
       counting: UsageCountingService.create({
         meter,
         traceMeter: MemoryTraceCountRepository.create(),
+        tenancy: { findProjectIds: refuse },
         plans: { getActivePlan: refuse },
         billing: { getPricingModel: refuse },
       }),

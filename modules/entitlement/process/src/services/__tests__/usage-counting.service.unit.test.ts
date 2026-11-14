@@ -44,7 +44,11 @@ class ReadCountingTraceMeter extends MemoryTraceCountRepository {
     super();
   }
 
-  override async findTotal(input: { organizationId: string; month: string }): Promise<number> {
+  override async findTotal(input: {
+    organizationId: string;
+    projectIds: readonly string[];
+    month: string;
+  }): Promise<number> {
     this.reads += 1;
     return super.findTotal(input);
   }
@@ -98,6 +102,7 @@ function compose({
   const counting = UsageCountingService.create({
     meter,
     traceMeter,
+    tenancy: { findProjectIds: async () => ["project_a"] },
     plans: { getActivePlan: async () => plan({ allowance }) },
     billing: { getPricingModel: async () => ({ pricingModel }) },
     logger: log,
@@ -225,6 +230,7 @@ describe("UsageCountingService", () => {
         const counting = UsageCountingService.create({
           meter,
           traceMeter: new ReadCountingTraceMeter(),
+          tenancy: { findProjectIds: async () => ["project_a"] },
           plans: { getActivePlan: async () => plan({ allowance: 1_000 }) },
           billing: { getPricingModel: async () => ({ pricingModel: PricingModel.SEAT_EVENT }) },
         });

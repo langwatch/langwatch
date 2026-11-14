@@ -75,14 +75,14 @@ Feature: The API process routes its three ClickHouse reads by the right id
       Given an organization whose plan meters it in events
       When the usage panel is read
       Then the count comes back as a number
-      And the read is issued against `billable_events` scoped by the organization
+      And the read is issued against `billable_events` scoped by the organization and bounded by its projects
 
     @unit
     Scenario: The organization id never reaches the tenant resolver
       Given an organization whose plan meters it in events
       When the usage panel is read
-      Then only the organization-keyed accessor is asked
-      And the tenant-keyed resolver is not asked at all
+      Then the organization's projects are asked of the tenant-set accessor, which answers on the organization's server
+      And the organization id is never asked as a tenant
 
   Rule: The operator's event log is searchable where there is an install-wide endpoint
 

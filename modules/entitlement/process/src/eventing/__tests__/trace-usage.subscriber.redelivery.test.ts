@@ -41,7 +41,11 @@ describe("trace usage subscribers on redelivery", () => {
 
     expect(counts.rows).toHaveLength(1);
     await expect(
-      counts.findTotal({ organizationId: ORGANIZATION, month: "2026-10" }),
+      counts.findTotal({
+        organizationId: ORGANIZATION,
+        projectIds: ["project-1"],
+        month: "2026-10",
+      }),
     ).resolves.toBe(1);
   });
 
@@ -61,7 +65,11 @@ describe("trace usage subscribers on redelivery", () => {
 
     expect(counts.rows).toHaveLength(2);
     await expect(
-      counts.findTotal({ organizationId: ORGANIZATION, month: "2026-10" }),
+      counts.findTotal({
+        organizationId: ORGANIZATION,
+        projectIds: ["project-1"],
+        month: "2026-10",
+      }),
     ).resolves.toBe(2);
   });
 });

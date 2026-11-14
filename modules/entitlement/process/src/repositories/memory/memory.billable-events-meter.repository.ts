@@ -26,10 +26,12 @@ export class MemoryBillableEventsMeterRepository extends BillableEventsMeterRepo
     this.rows.push({ ...record, organizationId });
   }
 
-  async findTotal(input: { organizationId: string } & MeterWindow): Promise<number> {
-    const keys = this.#inWindow({ organizationId: input.organizationId, window: input }).map(
-      (row) => row.deduplicationKey,
-    );
+  async findTotal(
+    input: { organizationId: string; projectIds: readonly string[] } & MeterWindow,
+  ): Promise<number> {
+    const keys = this.#inWindow({ organizationId: input.organizationId, window: input })
+      .filter((row) => input.projectIds.includes(row.tenantId))
+      .map((row) => row.deduplicationKey);
     return new Set(keys).size;
   }
 

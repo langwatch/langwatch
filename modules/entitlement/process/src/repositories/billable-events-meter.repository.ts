@@ -20,8 +20,10 @@ export type DayMeterCount = { day: string; count: number };
 /** The `billable_events` table, keyed by organization so private instances keep their cluster. */
 export abstract class BillableEventsMeterRepository {
   abstract insert(input: { record: BillableEventRecord; organizationId: string }): Promise<void>;
-  /** Distinct deduplication keys the organization was metered for in the window. */
-  abstract findTotal(input: { organizationId: string } & MeterWindow): Promise<number>;
+  /** Distinct deduplication keys the organization was metered for across the named projects. */
+  abstract findTotal(
+    input: { organizationId: string; projectIds: readonly string[] } & MeterWindow,
+  ): Promise<number>;
   /** Approximate distinct keys per named project; a project with none is absent. */
   abstract countByProjects(input: {
     organizationId: string;

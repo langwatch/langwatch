@@ -4,6 +4,7 @@ import { createLogger, type Logger } from "@langwatch/observability";
 import { Temporal } from "@langwatch/time";
 
 import type { BillableEventsMeterRepository } from "../repositories/billable-events-meter.repository.ts";
+import type { TenancyRepository } from "../repositories/tenancy.repository.ts";
 import type { TraceCountRepository } from "../repositories/trace-count.repository.ts";
 import { isCapped, usageLimitOf, usageUnitOf } from "../rules/usage-limit.rules.ts";
 
@@ -12,6 +13,7 @@ const defaultLogger = createLogger("langwatch:usage:count");
 type UsageCountingDependencies = Readonly<{
   meter: BillableEventsMeterRepository;
   traceMeter: TraceCountRepository;
+  tenancy: Pick<TenancyRepository, "findProjectIds">;
   plans: Pick<EntitlementApi, "getActivePlan">;
   billing: Pick<BillingApi, "getPricingModel">;
   logger?: Pick<Logger, "warn">;
@@ -21,6 +23,7 @@ type UsageCountingDependencies = Readonly<{
 export class UsageCountingService {
   private readonly meter: BillableEventsMeterRepository;
   private readonly traceMeter: TraceCountRepository;
+  private readonly tenancy: Pick<TenancyRepository, "findProjectIds">;
   private readonly plans: Pick<EntitlementApi, "getActivePlan">;
   private readonly billing: Pick<BillingApi, "getPricingModel">;
   private readonly logger: Pick<Logger, "warn">;
@@ -28,6 +31,7 @@ export class UsageCountingService {
   private constructor(deps: UsageCountingDependencies) {
     this.meter = deps.meter;
     this.traceMeter = deps.traceMeter;
+    this.tenancy = deps.tenancy;
     this.plans = deps.plans;
     this.billing = deps.billing;
     this.logger = deps.logger ?? defaultLogger;
@@ -48,7 +52,8 @@ export class UsageCountingService {
 
   /**
    * Billable events are always counted, for billing's Stripe report; traces only when a capped
-   * plan is held in them. A meter that cannot answer throws, so nothing is decided and it retries.
+   * plan is held in them. Both count over the organization's projects, archived ones included.
+   * A meter that cannot answer throws, so nothing is decided and it retries.
    */
   async countMonth(input: {
     organizationId: string;
@@ -60,14 +65,16 @@ export class UsageCountingService {
     const { pricingModel } = await this.billing.getPricingModel({ organizationId });
     const limit = usageLimitOf({ plan, unit: usageUnitOf({ plan, pricingModel }) });
     const start = Temporal.PlainYearMonth.from(month);
+    const projectIds = await this.tenancy.findProjectIds({ organizationId });
     try {
       const billableEvents = await this.meter.findTotal({
         organizationId,
+        projectIds,
         startDate: `${start.toString()}-01 00:00:00.000`,
         endDate: `${start.add({ months: 1 }).toString()}-01 00:00:00.000`,
       });
       if (limit.unit !== "traces" || !isCapped(limit)) return { ...input, billableEvents, limit };
-      const traces = await this.traceMeter.findTotal({ organizationId, month });
+      const traces = await this.traceMeter.findTotal({ organizationId, projectIds, month });
       return { ...input, billableEvents, traces, limit };
     } catch (error) {
       this.logger.warn(

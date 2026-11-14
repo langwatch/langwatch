@@ -13,8 +13,12 @@ export interface TraceUsageRow {
 export abstract class TraceCountRepository {
   /** Writes every row under one organization; an empty list writes nothing. */
   abstract insert(input: { organizationId: string; rows: readonly TraceUsageRow[] }): Promise<void>;
-  /** Distinct traces first seen in the month across the organization's projects. */
-  abstract findTotal(input: { organizationId: string; month: string }): Promise<number>;
+  /** Distinct traces first seen in the month across the organization's named projects. */
+  abstract findTotal(input: {
+    organizationId: string;
+    projectIds: readonly string[];
+    month: string;
+  }): Promise<number>;
   /** {@link findTotal} per named project; a project with no trace is absent from the answer. */
   abstract countByProjects(input: {
     organizationId: string;

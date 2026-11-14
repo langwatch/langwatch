@@ -1,4 +1,5 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import { clickhouseRead, fn, tenantScope } from "@langwatch/clickhouse-client/builder";
 import { Temporal, toDate, toEpochMs } from "@langwatch/time";
 
 import {
@@ -8,23 +9,21 @@ import {
   type MeterWindow,
   type ProjectMeterCount,
 } from "../billable-events-meter.repository.ts";
+import { billableEvents } from "./clickhouse.billable-events.table.ts";
 
-const TABLE_NAME = "billable_events" as const;
-
-type TotalRow = { total: string | number };
-type ProjectRow = { projectId: string; total: string | number };
-type DayRow = { day: string; total: string | number };
+/** Inserts as written; every read is built and sent on the reader over a project set (ADR-202). */
+type MeterClickHouse = Pick<ClickHouseQueryClient, "insert" | "read">;
 
 /** ClickHouse twin of the meter, moved from billing under the same table and row shape. */
 export class BillableEventsMeterClickHouseRepository extends BillableEventsMeterRepository {
-  readonly #clickhouse: ClickHouseQueryClient;
+  readonly #clickhouse: MeterClickHouse;
 
-  private constructor(clickhouse: ClickHouseQueryClient) {
+  private constructor(clickhouse: MeterClickHouse) {
     super();
     this.#clickhouse = clickhouse;
   }
 
-  static create(clickhouse: ClickHouseQueryClient): BillableEventsMeterClickHouseRepository {
+  static create(clickhouse: MeterClickHouse): BillableEventsMeterClickHouseRepository {
     return new BillableEventsMeterClickHouseRepository(clickhouse);
   }
 
@@ -38,7 +37,7 @@ export class BillableEventsMeterClickHouseRepository extends BillableEventsMeter
     await this.#clickhouse.insert({
       tenantId: record.tenantId,
       organizationId,
-      table: TABLE_NAME,
+      table: billableEvents.$table.name,
       rows: [
         {
           OrganizationId: organizationId,
@@ -55,25 +54,22 @@ export class BillableEventsMeterClickHouseRepository extends BillableEventsMeter
     });
   }
 
-  async findTotal(input: { organizationId: string } & MeterWindow): Promise<number> {
-    const result = await this.#clickhouse.query<TotalRow>({
-      tenantId: "",
-      organizationId: input.organizationId,
-      sql: `
-        SELECT countDistinct(DeduplicationKeyHash) as total
-        FROM ${TABLE_NAME}
-        WHERE OrganizationId = {organizationId:String}
-          AND EventTimestamp >= {startDate:DateTime64(3)}
-          AND EventTimestamp < {endDate:DateTime64(3)}
-      `,
-      params: {
-        organizationId: input.organizationId,
-        startDate: input.startDate,
-        endDate: input.endDate,
-      },
-      // The organization's meter counts every project the organization owns.
-      SKIP_TENANT_CHECK: true,
-    });
+  /** The window's distinct keys over the organization's projects, counted as one set. */
+  async findTotal({
+    organizationId,
+    projectIds,
+    startDate,
+    endDate,
+  }: { organizationId: string; projectIds: readonly string[] } & MeterWindow): Promise<number> {
+    if (projectIds.length === 0) return 0;
+    const statement = organizationWindow({
+      organizationId,
+      projectIds,
+      window: { startDate, endDate },
+    })
+      .select({ total: fn.countDistinct(billableEvents.DeduplicationKeyHash) })
+      .build();
+    const result = await this.#clickhouse.read({ statement });
     return numberOf(result.rows[0]?.total);
   }
 
@@ -83,65 +79,62 @@ export class BillableEventsMeterClickHouseRepository extends BillableEventsMeter
     projectIds: readonly string[];
     window: MeterWindow;
   }): Promise<ProjectMeterCount[]> {
-    const result = await this.#clickhouse.query<ProjectRow>({
-      tenantId: "",
-      organizationId: input.organizationId,
-      sql: `
-        SELECT TenantId as projectId, uniq(DeduplicationKeyHash) as total
-        FROM ${TABLE_NAME}
-        WHERE OrganizationId = {organizationId:String}
-          AND TenantId IN {projectIds:Array(String)}
-          AND EventTimestamp >= {startDate:DateTime64(3)}
-          AND EventTimestamp < {endDate:DateTime64(3)}
-        GROUP BY TenantId
-      `,
-      params: {
-        organizationId: input.organizationId,
-        projectIds: [...input.projectIds],
-        startDate: input.window.startDate,
-        endDate: input.window.endDate,
-      },
-      // The organization's meter counts every project the organization owns.
-      SKIP_TENANT_CHECK: true,
-    });
+    if (input.projectIds.length === 0) return [];
+    const statement = organizationWindow(input)
+      .select({
+        projectId: billableEvents.TenantId,
+        total: fn.uniq(billableEvents.DeduplicationKeyHash),
+      })
+      .groupBy(billableEvents.TenantId)
+      .build();
+    const result = await this.#clickhouse.read({ statement });
     return result.rows.map((row) => ({ projectId: row.projectId, count: numberOf(row.total) }));
   }
 
   /** Counted `uniq` per day, as `countByProjects` counts per project, so the two agree. */
-  async countByDay({
-    organizationId,
-    projectIds,
-    window,
-  }: {
+  async countByDay(input: {
     organizationId: string;
     projectIds: readonly string[];
     window: MeterWindow;
   }): Promise<DayMeterCount[]> {
-    if (projectIds.length === 0) return [];
-    const result = await this.#clickhouse.query<DayRow>({
-      tenantId: "",
-      organizationId,
-      sql: `
-      SELECT toString(toDate(EventTimestamp, 'UTC')) as day, uniq(DeduplicationKeyHash) as total
-      FROM ${TABLE_NAME}
-      WHERE OrganizationId = {organizationId:String}
-        AND TenantId IN {projectIds:Array(String)}
-        AND EventTimestamp >= {startDate:DateTime64(3)}
-        AND EventTimestamp < {endDate:DateTime64(3)}
-      GROUP BY day
-      ORDER BY day
-    `,
-      params: {
-        organizationId,
-        projectIds: [...projectIds],
-        startDate: window.startDate,
-        endDate: window.endDate,
-      },
-      // The organization's meter counts every project the organization owns.
-      SKIP_TENANT_CHECK: true,
-    });
+    if (input.projectIds.length === 0) return [];
+    const day = fn.toString(
+      fn.toDate(fn.toStartOfDay(billableEvents.EventTimestamp, { timeZone: "UTC" })),
+    );
+    const statement = organizationWindow(input)
+      .select({ day, total: fn.uniq(billableEvents.DeduplicationKeyHash) })
+      .groupBy(day)
+      .orderBy("day")
+      .build();
+    const result = await this.#clickhouse.read({ statement });
     return result.rows.map((row) => ({ day: row.day, count: numberOf(row.total) }));
   }
+}
+
+/** The organization's rows in a `[start, end)` UTC window, read over its named projects. */
+function organizationWindow({
+  organizationId,
+  projectIds,
+  window,
+}: {
+  organizationId: string;
+  projectIds: readonly string[];
+  window: MeterWindow;
+}) {
+  return clickhouseRead({ scope: tenantScope.set({ tenantIds: projectIds }) })
+    .from(billableEvents)
+    .where(({ and, eq, gte, lt }) =>
+      and(
+        eq(billableEvents.OrganizationId, organizationId),
+        gte(billableEvents.EventTimestamp, epochMsOf(window.startDate)),
+        lt(billableEvents.EventTimestamp, epochMsOf(window.endDate)),
+      ),
+    );
+}
+
+/** A window bound written as a UTC `DateTime64(3)` literal, as epoch ms. */
+function epochMsOf(timestamp: string): number {
+  return Temporal.Instant.from(`${timestamp.replace(" ", "T")}Z`).epochMilliseconds;
 }
 
 function numberOf(value: string | number | undefined): number {

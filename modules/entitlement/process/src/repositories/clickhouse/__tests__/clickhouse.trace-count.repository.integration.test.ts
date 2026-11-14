@@ -26,6 +26,7 @@ const organizationId = `${randomUUID()}-trace-count`;
 const projectA = `${organizationId}-a`;
 const projectB = `${organizationId}-b`;
 const projectQuiet = `${organizationId}-quiet`;
+const projectIds = [projectA, projectB, projectQuiet];
 
 let ch: ClickHouseClient;
 let counts: TraceCountClickHouseRepository;
@@ -65,8 +66,12 @@ describe.skipIf(clickHouseUrl === null)("TraceCountClickHouseRepository on Click
   describe("given trace usage rows for two projects over two months", () => {
     /** @scenario The trace count's statements run on the shipped schema */
     it("counts each trace once, in the earliest month it has a row", async () => {
-      await expect(counts.findTotal({ organizationId, month: "2026-10" })).resolves.toBe(3);
-      await expect(counts.findTotal({ organizationId, month: "2026-09" })).resolves.toBe(1);
+      await expect(
+        counts.findTotal({ organizationId, projectIds, month: "2026-10" }),
+      ).resolves.toBe(3);
+      await expect(
+        counts.findTotal({ organizationId, projectIds, month: "2026-09" }),
+      ).resolves.toBe(1);
     });
 
     /** @scenario The trace count's statements run on the shipped schema */

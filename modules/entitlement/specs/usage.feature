@@ -67,6 +67,13 @@ Feature: Entitlement's meters, decisions and who learns them
     When the month is counted
     Then distinct traces are counted on the organization's cluster, grouped by trace and never with FINAL
 
+  @unit @usage
+  Scenario: The meters read on the reader, bounded by the organization's projects
+    Given an organization owning two projects, one of them archived
+    When its month is counted on either meter, in total, per project or per day
+    Then each read is a reader statement whose tenant set is exactly those projects, with no skip-check flag
+    And an organization with no project counts zero without asking ClickHouse
+
   # Prod 2026-10-22: one organization's count hit the per-query memory cap on every ingested batch.
   @unit @usage
   Scenario: A large organization's trace count spills rather than failing the ingest check

@@ -36,16 +36,14 @@ export class MemoryTraceCountRepository extends TraceCountRepository {
 
   async findTotal({
     organizationId,
+    projectIds,
     month,
   }: {
     organizationId: string;
+    projectIds: readonly string[];
     month: string;
   }): Promise<number> {
-    const counts = await this.countByProjects({
-      organizationId,
-      projectIds: [...new Set(this.rows.map((row) => row.projectId))],
-      month,
-    });
+    const counts = await this.countByProjects({ organizationId, projectIds, month });
     return counts.reduce((total, { count }) => total + count, 0);
   }
 

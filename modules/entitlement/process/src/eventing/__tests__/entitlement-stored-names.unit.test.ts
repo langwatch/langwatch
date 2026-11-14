@@ -71,6 +71,7 @@ function metering({ send }: { send?: Parameters<typeof buildUsagePipeline>[0]["s
       counting: UsageCountingService.create({
         meter: MemoryBillableEventsMeterRepository.create(),
         traceMeter: MemoryTraceCountRepository.create(),
+        tenancy: { findProjectIds: async () => ["project-1"] },
         plans: { getActivePlan: async () => plan },
         billing: { getPricingModel: async () => ({ pricingModel: PricingModel.TIERED }) },
       }),

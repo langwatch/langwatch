@@ -236,6 +236,7 @@ export class EntitlementModule implements EntitlementApiContract {
     const counting = UsageCountingService.create({
       meter: repositories.billableEvents,
       traceMeter: repositories.traces,
+      tenancy: repositories.tenancy,
       plans,
       billing: dependencies.billing,
     });

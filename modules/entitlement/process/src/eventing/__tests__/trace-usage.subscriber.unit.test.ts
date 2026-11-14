@@ -19,6 +19,7 @@ import { buildUsagePipeline } from "../usage.pipeline.ts";
 const ORGANIZATION = "organization-1";
 const OCT_8 = Date.UTC(2026, 9, 8, 12);
 const SEP_30 = Date.UTC(2026, 8, 30, 23, 59);
+const PROJECTS = ["project-1", "project-2"];
 
 const refuse = async (): Promise<never> => {
   throw new Error("counting is not asked by trace usage");
@@ -38,6 +39,7 @@ function compose({ placed = true } = {}) {
       counting: UsageCountingService.create({
         meter: MemoryBillableEventsMeterRepository.create(),
         traceMeter: counts,
+        tenancy: { findProjectIds: refuse },
         plans: { getActivePlan: refuse },
         billing: { getPricingModel: refuse },
       }),
@@ -181,7 +183,7 @@ describe("trace usage subscribers", () => {
       await deliver("traceUsageMonthIds", monthPage(["trace-1", "trace-2", "trace-3"]));
 
       await expect(
-        counts.findTotal({ organizationId: ORGANIZATION, month: "2026-10" }),
+        counts.findTotal({ organizationId: ORGANIZATION, projectIds: PROJECTS, month: "2026-10" }),
       ).resolves.toBe(3);
       await expect(
         counts.countByProjects({
@@ -203,10 +205,10 @@ describe("trace usage subscribers", () => {
       await deliver("traceUsageSpan", span({ traceId: "new", createdAt: OCT_8 }));
 
       await expect(
-        counts.findTotal({ organizationId: ORGANIZATION, month: "2026-10" }),
+        counts.findTotal({ organizationId: ORGANIZATION, projectIds: PROJECTS, month: "2026-10" }),
       ).resolves.toBe(1);
       await expect(
-        counts.findTotal({ organizationId: ORGANIZATION, month: "2026-09" }),
+        counts.findTotal({ organizationId: ORGANIZATION, projectIds: PROJECTS, month: "2026-09" }),
       ).resolves.toBe(1);
     });
   });
