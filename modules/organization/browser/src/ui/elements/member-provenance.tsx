@@ -49,9 +49,10 @@ export function ProvenanceChip({
       />
     );
   }
+  // "Invited" is what an outstanding invitation reads, so a member who accepted one says so.
   return (
     <IdentityChip
-      label="Invited"
+      label="Joined by invite"
       title="Somebody here invited them, and they accepted."
       data-testid="provenance-invited"
     />

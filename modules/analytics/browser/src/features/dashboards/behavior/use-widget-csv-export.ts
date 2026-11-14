@@ -5,6 +5,7 @@
  * @see modules/analytics/specs/dashboard-widget-export.feature
  */
 
+import { useUiAnalytics } from "@langwatch/browser-host/analytics";
 import { downloadCsv } from "@langwatch/csv/download";
 import { useState } from "react";
 
@@ -19,6 +20,7 @@ import {
   widgetExportFileName,
   type WidgetExportStatus,
 } from "../../../model/dashboard-widget/widget-export.ts";
+import { widgetExported } from "../model/dashboard-usage-events.ts";
 
 /** "Export CSV" as a menu draws it: ready to run, or not yet and why. */
 export type WidgetCsvExportItem = { readonly run: () => void } | { readonly unavailable: string };
@@ -38,6 +40,7 @@ function exportItem({
 
 export function useWidgetCsvExport({ board, widget }: { board: string; widget: string }) {
   const host = useAnalyticsHost();
+  const analytics = useUiAnalytics();
   const [widgetExport, setWidgetExport] = useState<WidgetExport>(NO_WIDGET_EXPORT);
   const { status, results } = widgetExport;
 
@@ -47,6 +50,7 @@ export function useWidgetCsvExport({ board, widget }: { board: string; widget: s
       fileName: widgetExportFileName({ board, widget, results }),
       byteOrderMark: true,
     });
+    analytics.track(widgetExported({ format: "csv" }));
     host.succeeded({
       title: "CSV downloaded",
       ...(hitRowLimit(results) ? { description: ROW_LIMIT_NOTICE } : {}),

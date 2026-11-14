@@ -17,6 +17,7 @@ export const planOverrideSchema = z.object({
     .object({
       members: planLimitSchema,
       membersLite: planLimitSchema,
+      membersDeveloper: planLimitSchema,
       volume: planLimitSchema,
       seats: planLimitSchema,
       automationDailyDispatch: planLimitSchema,

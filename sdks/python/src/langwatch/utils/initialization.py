@@ -10,6 +10,7 @@ from opentelemetry import trace
 from opentelemetry.instrumentation.instrumentor import BaseInstrumentor
 from opentelemetry.sdk.trace import TracerProvider
 
+from langwatch.braids import BraidBaggageSpanProcessor
 from langwatch.client import Client
 from langwatch.domain import BaseAttributes, SpanProcessingExcludeRule
 from langwatch.state import get_instance, set_instance
@@ -45,6 +46,7 @@ def setup(
     skip_open_telemetry_setup: Optional[bool] = None,
     prompts_path: Optional[str] = None,
     disable_sending: Optional[bool] = None,
+    braid_copy_entries: Optional[Sequence[str]] = None,
 ) -> Client:
     """
     Initialize the LangWatch client.
@@ -60,6 +62,7 @@ def setup(
         skip_open_telemetry_setup: Whether to skip setting up the OpenTelemetry tracer provider. If this is skipped, instrumentors will be added to the global tracer provider. Reads LANGWATCH_SKIP_OTEL_SETUP when not given.
         prompts_path: The base path for local prompt files. If not set, defaults to the current working directory.
         disable_sending: Optional. If True, no traces will be sent to the server.
+        braid_copy_entries: Optional. Baggage entries copied, with ``langwatch.signature``, onto every span started on the tracer provider (ADR-201 braids).
     Returns:
         The LangWatch client.
     """
@@ -105,9 +108,24 @@ def setup(
     if debug:
         logger.info("LangWatch client setup complete")
 
+    if braid_copy_entries:
+        _add_braid_copy_processor(tracer_provider, braid_copy_entries)
+
     # Update the state module to track the instance
     set_instance(client)
     return client
+
+
+def _add_braid_copy_processor(
+    tracer_provider: Optional[TracerProvider], copy_entries: Sequence[str]
+) -> None:
+    provider = tracer_provider or trace.get_tracer_provider()
+    if not isinstance(provider, TracerProvider):
+        logger.warning(
+            "braid_copy_entries needs an SDK TracerProvider; the braid copy processor was not added"
+        )
+        return
+    provider.add_span_processor(BraidBaggageSpanProcessor(copy_entries))
 
 
 def ensure_setup(api_key: Optional[str] = None) -> None:

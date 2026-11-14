@@ -33,6 +33,7 @@ export function WidgetCardShell({
   description,
   controls,
   footer,
+  viewRef,
   children,
 }: {
   name: string;
@@ -41,6 +42,8 @@ export function WidgetCardShell({
   controls?: ReactNode;
   /** One quiet line under the body, such as the sources its queries count. */
   footer?: string;
+  /** Told the card's root, so a caller can tell when it is on screen. */
+  viewRef?: (node: HTMLElement | null) => void;
   children: ReactNode;
 }) {
   const [completeness, setCompleteness] = useState<WidgetCompleteness | null>(null);
@@ -48,6 +51,7 @@ export function WidgetCardShell({
     completenessNotes(completeness).length > 0 || sampleNote(completeness) !== undefined;
   return (
     <VStack
+      ref={viewRef}
       className="group"
       position="relative"
       align="stretch"

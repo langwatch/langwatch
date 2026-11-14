@@ -103,6 +103,7 @@ func TestAgentsTemplate_ReportsSandboxCredentialFailureAsInternalError(t *testin
 		"never claim you lack the CLI or tools",
 		"say you hit an internal error, name the read or write that failed",
 		"`forbidden` or `permission_denied` is a permission refusal: name the access they lack",
+		"if `meta.denialReason` is `owner-ceiling`, `no-membership` or `membership-disabled`, their access was removed or reduced",
 	} {
 		if !strings.Contains(tmpl, phrase) {
 			t.Errorf("AGENTS.md failure rule never says %q", phrase)

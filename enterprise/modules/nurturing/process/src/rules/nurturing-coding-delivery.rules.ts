@@ -19,6 +19,7 @@ const CODING_AND_APP_KINDS = [
   "sessions_page_viewed",
   "usage_page_opened",
   "usage_page_viewed",
+  "langy_first_message_seen",
 ] as const;
 
 /** The signals of the coding-agent and app-open facts: Customer.io only, never PostHog. */
@@ -87,6 +88,8 @@ export function fireCodingOrApp(signal: CodingOrAppSignal): CioBatchCall[] {
       return [
         { type: "track", userId, event: "usage_page_viewed", properties: { page: signal.page } },
       ];
+    case "langy_first_message_seen":
+      return [{ type: "identify", userId, traits: { saw_langy_first_message: true } }];
     default: {
       signal satisfies never;
       return [];

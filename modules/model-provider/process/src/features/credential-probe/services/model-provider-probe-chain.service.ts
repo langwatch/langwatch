@@ -8,8 +8,11 @@ import {
   AGENT_PLATFORM_API_ROOT,
   AGENT_PLATFORM_PROBE_BODY,
   AGENT_PLATFORM_PROBE_MODEL,
+  AZURE_PROBE_BODY,
   type AuthStrategy,
+  azureChatCompletionsUrl,
   buildModelsEndpointUrl,
+  isReachableRefusal,
   modelsEndpointUrl,
 } from "../../../rules/model-provider-probe-targets.rules.ts";
 import { refused, verified } from "../../../rules/model-provider-probe-upstream.rules.ts";
@@ -36,6 +39,8 @@ export type ProbeContext = {
   hasConfigurableEndpoint: boolean;
   /** Which Google door: the two doors disagree on what a 400 response means for the key. */
   googleDoor?: "gemini-api" | "agent-platform";
+  /** The model the probe asked for by name, so a missing deployment can be named back. */
+  model?: string;
 };
 
 /**
@@ -79,6 +84,89 @@ function agentPlatformRequest({
   };
 }
 
+/**
+ * Azure has no models route to list: one chat completion against the chosen
+ * deployment proves the key, the endpoint and the deployment name together.
+ */
+function azureRequests({
+  baseUrl,
+  apiKey,
+  headers,
+  model,
+  azureApiVersion,
+}: {
+  baseUrl: string;
+  apiKey: string;
+  headers: Record<string, string>;
+  model?: string;
+  azureApiVersion?: string;
+}): ProbeRequest[] {
+  if (!model) return [];
+  return [
+    {
+      url: azureChatCompletionsUrl({
+        endpoint: baseUrl,
+        deployment: model,
+        apiVersion: azureApiVersion,
+      }),
+      headers: { ...headers, "api-key": apiKey },
+      method: "POST",
+      body: AZURE_PROBE_BODY,
+    },
+  ];
+}
+
+function geminiRequests({
+  url,
+  baseUrl,
+  apiKey,
+  apiRoot,
+  agentPlatform,
+  headers,
+}: {
+  url: string;
+  baseUrl: string;
+  apiKey: string;
+  apiRoot?: string;
+  agentPlatform?: { project: string; location: string };
+  headers: Record<string, string>;
+}): ProbeRequest[] {
+  // A credential carrying a project and location is an Agent Platform key: it
+  // names the door it opens, so only that door is asked. The Gemini API host is
+  // not probed at all — the key is refused there by its own restrictions, and
+  // that refusal would outrank nothing while costing a request. See
+  // specs/model-providers/google-agent-platform.feature.
+  if (agentPlatform?.project && agentPlatform.location) {
+    return [agentPlatformRequest({ ...agentPlatform, apiKey, headers })];
+  }
+
+  const key = encodeURIComponent(apiKey);
+
+  // Which paths a provider serves is provider knowledge, so the root
+  // comes from the registry rather than being recovered from
+  // `defaultBaseUrl` by parsing a URL for its own structure. With no root
+  // stated — or a base URL the customer set themselves, whose layout we
+  // cannot assume — only the documented shape is probed.
+  if (!apiRoot || baseUrl) {
+    return [{ url: `${url}?key=${key}`, headers }];
+  }
+
+  const root = apiRoot.replace(/\/$/, "");
+
+  return [
+    { url: `${root}/v1/models?key=${key}`, headers },
+    { url: `${root}/v1beta/models?key=${key}`, headers },
+    {
+      url: `${root}/v1/models`,
+      headers: { ...headers, "x-goog-api-key": apiKey },
+    },
+    {
+      url: `${root}/v1beta/openai/models`,
+      headers: { ...headers, Authorization: `Bearer ${apiKey}` },
+    },
+  ];
+}
+
 export function buildProbeCandidates({
   provider,
   strategy,
@@ -87,6 +175,8 @@ export function buildProbeCandidates({
   defaultBaseUrl,
   apiRoot,
   agentPlatform,
+  model,
+  azureApiVersion,
 }: {
   /** The registry key, which decides how the gateway reads the base URL. */
   provider: string;
@@ -98,6 +188,10 @@ export function buildProbeCandidates({
   apiRoot?: string;
   /** The project and location Agent Platform's path is built from. */
   agentPlatform?: { project: string; location: string };
+  /** The model a deployment-addressed provider (Azure) is asked to run. */
+  model?: string;
+  /** Azure's api-version override, when the credential carries one. */
+  azureApiVersion?: string;
 }): ProbeRequest[] {
   const url = buildModelsEndpointUrl(baseUrl, defaultBaseUrl);
   const normalisedUrl = modelsEndpointUrl({ provider, baseUrl, defaultBaseUrl });
@@ -117,44 +211,12 @@ export function buildProbeCandidates({
           },
         },
       ];
+    case "azure":
+      return azureRequests({ baseUrl, apiKey, headers, model, azureApiVersion });
     case "elevenlabs":
       return [{ url, headers: { ...headers, "xi-api-key": apiKey } }];
-    case "gemini": {
-      // A credential carrying a project and location is an Agent Platform key: it
-      // names the door it opens, so only that door is asked. The Gemini API host is
-      // not probed at all — the key is refused there by its own restrictions, and
-      // that refusal would outrank nothing while costing a request. See
-      // specs/model-providers/google-agent-platform.feature.
-      if (agentPlatform?.project && agentPlatform.location) {
-        return [agentPlatformRequest({ ...agentPlatform, apiKey, headers })];
-      }
-
-      const key = encodeURIComponent(apiKey);
-
-      // Which paths a provider serves is provider knowledge, so the root
-      // comes from the registry rather than being recovered from
-      // `defaultBaseUrl` by parsing a URL for its own structure. With no root
-      // stated — or a base URL the customer set themselves, whose layout we
-      // cannot assume — only the documented shape is probed.
-      if (!apiRoot || baseUrl) {
-        return [{ url: `${url}?key=${key}`, headers }];
-      }
-
-      const root = apiRoot.replace(/\/$/, "");
-
-      return [
-        { url: `${root}/v1/models?key=${key}`, headers },
-        { url: `${root}/v1beta/models?key=${key}`, headers },
-        {
-          url: `${root}/v1/models`,
-          headers: { ...headers, "x-goog-api-key": apiKey },
-        },
-        {
-          url: `${root}/v1beta/openai/models`,
-          headers: { ...headers, Authorization: `Bearer ${apiKey}` },
-        },
-      ];
-    }
+    case "gemini":
+      return geminiRequests({ url, baseUrl, apiKey, apiRoot, agentPlatform, headers });
     case "bearer":
     default:
       return [
@@ -227,7 +289,9 @@ async function probeOnce({
     };
   }
 
-  if (response.ok) return { accepted: true };
+  if (response.ok || isReachableRefusal({ provider: context.provider, status: response.status })) {
+    return { accepted: true };
+  }
 
   return {
     accepted: false,

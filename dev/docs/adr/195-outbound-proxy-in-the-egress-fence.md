@@ -53,7 +53,8 @@ its value, since the value may carry credentials.
 
 **Callers opt in.** Leaving `proxy` out keeps today's behaviour. A module passes
 `parseOutboundProxyConfig(config.outboundProxy)` from the leaf it picks. Identity
-does so for issuer discovery and the domain proof file.
+does so for issuer discovery at registration and the domain proof file (see
+Revisions for the sign-in read).
 
 ## Alternatives
 
@@ -86,6 +87,18 @@ Webhooks, model provider credential checks, web push and external images use the
 same fetch and do not pass a proxy yet. SSO sign-in (token exchange, signing
 keys) goes through better-auth's use of Node's global `fetch`, which this does
 not touch. Both are parked as `@unimplemented` scenarios, in the egress spec and the issuer endpoint spec.
+
+## Revisions
+
+- **2026-11-06, sign-in trust lookup.** Identity reads an issuer's discovery
+  document twice: at registration, and at every sign-in to learn which origins
+  its endpoints live on. Only registration (and the domain proof file) goes
+  through the proxy. The sign-in read takes the SSO engine's own route, since
+  the origins it trusts must come from the document the engine is about to read:
+  direct by default, through the proxy when `NODE_USE_ENV_PROXY=1` or
+  `--use-env-proxy` sends Node's global `fetch` there. Sending the sign-in read
+  through the proxy while the engine went direct refused sign-in when the proxy
+  did not allow the identity provider (PR #9369).
 
 ## References
 

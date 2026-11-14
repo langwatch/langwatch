@@ -29,6 +29,23 @@ vi.mock("@/client-sdk/services/traces/traces-api.service", async (importOriginal
   };
 });
 
+const recordedCounts = vi.hoisted(() => [] as { count: number; message: string }[]);
+
+vi.mock("../../../telemetry/events", async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    createCommandEvents: () => ({
+      started: () => undefined,
+      count: (args: { count: number; message: string }) => recordedCounts.push(args),
+      progress: () => undefined,
+      completed: () => undefined,
+      failed: () => undefined,
+      flush: () => Promise.resolve(),
+    }),
+  };
+});
+
 vi.mock("../../../utils/apiKey", () => ({
   resolveCredentials: vi.fn(async () => ({
     apiKey: "test-key",
@@ -507,7 +524,7 @@ describe("exportTracesCommand()", () => {
       expect(bodies[0]!.pageSize).toBe(1000);
       expect(bodies[1]!.scrollId).toBe("s1");
       expect(bodies[2]!.scrollId).toBe("s2");
-      expect(bodies[2]!.pageSize).toBe(500);
+      expect(bodies[2]!.pageSize).toBe(1000);
       expect(writtenOutput().trim().split("\n")).toHaveLength(2500);
     });
 
@@ -544,7 +561,7 @@ describe("exportTracesCommand()", () => {
     });
 
     /** @scenario export requests one page when the limit fits in a single page */
-    it("makes exactly one request with pageSize matching the limit", async () => {
+    it("makes exactly one request asking for the limit", async () => {
       fetchMock.mockResolvedValueOnce(
         pageResponse({ count: 50, from: 0, scrollId: "s1", totalHits: 500 }),
       );
@@ -553,18 +570,43 @@ describe("exportTracesCommand()", () => {
 
       expect(fetchMock).toHaveBeenCalledTimes(1);
       expect(requestBodies()[0]!.pageSize).toBe(50);
+      expect(writtenOutput().trim().split("\n")).toHaveLength(50);
     });
 
-    /** @scenario export ends the walk on a short page without skipped rows */
-    it("stops on a short page whose shortfall is not accounted for by skipped", async () => {
-      fetchMock.mockResolvedValueOnce(
-        pageResponse({ count: 990, from: 0, scrollId: "s1", totalHits: 5000 }),
-      );
+    /** @scenario export reports the match count once, from the first page */
+    it("reports the match count once when the first page held only skipped rows", async () => {
+      recordedCounts.length = 0;
+      fetchMock
+        .mockResolvedValueOnce(
+          pageResponse({ count: 0, from: 0, scrollId: "s1", totalHits: 5000, skipped: 10 }),
+        )
+        .mockResolvedValueOnce(
+          pageResponse({ count: 1000, from: 0, scrollId: "s2", totalHits: 5000 }),
+        );
+
+      await exportTracesCommand({ limit: "1000" });
+
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(recordedCounts.map(({ count }) => count)).toEqual([5000]);
+    });
+
+    /** @scenario export keeps paging through a page the server answered short */
+    it("follows the cursor past a short page and stops on an empty one", async () => {
+      fetchMock
+        .mockResolvedValueOnce(
+          pageResponse({ count: 990, from: 0, scrollId: "s1", totalHits: 5000 }),
+        )
+        .mockResolvedValueOnce(
+          pageResponse({ count: 10, from: 990, scrollId: "s2", totalHits: 5000 }),
+        )
+        .mockResolvedValueOnce(
+          pageResponse({ count: 0, from: 1000, scrollId: "s3", totalHits: 5000 }),
+        );
 
       await exportTracesCommand({ limit: "3000" });
 
-      expect(fetchMock).toHaveBeenCalledTimes(1);
-      expect(writtenOutput().trim().split("\n")).toHaveLength(990);
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+      expect(writtenOutput().trim().split("\n")).toHaveLength(1000);
     });
 
     /** @scenario export rejects a non-numeric limit */
@@ -602,12 +644,34 @@ describe("exportTracesCommand()", () => {
     });
 
     /** @scenario export with --include-spans requests smaller pages */
-    it("caps each page at 200 so per-trace span joining stays bounded", async () => {
-      fetchMock.mockResolvedValueOnce(pageResponse({ count: 200, from: 0, totalHits: 200 }));
+    it("asks for at most the server's 100-trace cap per page", async () => {
+      fetchMock.mockResolvedValueOnce(pageResponse({ count: 100, from: 0, totalHits: 100 }));
 
       await exportTracesCommand({ includeSpans: true });
 
-      expect(requestBodies()[0]!.pageSize).toBe(200);
+      expect(requestBodies()[0]!.pageSize).toBe(100);
+    });
+
+    /** @scenario export with --include-spans walks past the server's page cap */
+    it("follows the cursor past the server's page cap until the limit is met", async () => {
+      fetchMock
+        .mockResolvedValueOnce(
+          pageResponse({ count: 100, from: 0, scrollId: "s1", totalHits: 400 }),
+        )
+        .mockResolvedValueOnce(
+          pageResponse({ count: 100, from: 100, scrollId: "s2", totalHits: 400 }),
+        )
+        .mockResolvedValueOnce(
+          pageResponse({ count: 100, from: 200, scrollId: "s3", totalHits: 400 }),
+        );
+
+      await exportTracesCommand({ includeSpans: true, limit: "250" });
+
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+      expect(requestBodies()[2]!.scrollId).toBe("s2");
+      // A limit that is not a multiple of the cap still asks the cap, so the cursor holds.
+      expect(requestBodies().map((body) => body.pageSize)).toEqual([100, 100, 100]);
+      expect(writtenOutput().trim().split("\n")).toHaveLength(250);
     });
 
     /** @scenario export without --include-spans keeps the legacy request shape */

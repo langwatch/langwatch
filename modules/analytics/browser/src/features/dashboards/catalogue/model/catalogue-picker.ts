@@ -118,7 +118,7 @@ export const PICKER_SECTIONS: readonly PickerSection[] = pickerSections({
 });
 
 /** The stored widget a picked catalogue widget adds. */
-export function pickerWidgets(id: string): readonly BoardTemplateWidget[] {
+export function pickerWidgets(id: string): readonly [BoardTemplateWidget] {
   const widget = implementedWidget(id);
   if (!widget) throw new Error(`No code for catalogue widget "${id}"`);
   return [widget];

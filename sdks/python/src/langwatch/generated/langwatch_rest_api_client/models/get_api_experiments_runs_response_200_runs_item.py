@@ -33,6 +33,7 @@ class GetApiExperimentsRunsResponse200RunsItem:
         summary (GetApiExperimentsRunsResponse200RunsItemSummary):
         progress (float | None | Unset):
         total (float | None | Unset):
+        concurrency (int | None | Unset): Cells the run executed at once. Null for a run that recorded none.
     """
 
     experiment_id: str
@@ -42,6 +43,7 @@ class GetApiExperimentsRunsResponse200RunsItem:
     summary: GetApiExperimentsRunsResponse200RunsItemSummary
     progress: float | None | Unset = UNSET
     total: float | None | Unset = UNSET
+    concurrency: int | None | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         from ..models.get_api_experiments_runs_response_200_runs_item_workflow_version_type_0 import (
@@ -74,6 +76,12 @@ class GetApiExperimentsRunsResponse200RunsItem:
         else:
             total = self.total
 
+        concurrency: int | None | Unset
+        if isinstance(self.concurrency, Unset):
+            concurrency = UNSET
+        else:
+            concurrency = self.concurrency
+
         field_dict: dict[str, Any] = {}
 
         field_dict.update(
@@ -89,6 +97,8 @@ class GetApiExperimentsRunsResponse200RunsItem:
             field_dict["progress"] = progress
         if total is not UNSET:
             field_dict["total"] = total
+        if concurrency is not UNSET:
+            field_dict["concurrency"] = concurrency
 
         return field_dict
 
@@ -148,6 +158,15 @@ class GetApiExperimentsRunsResponse200RunsItem:
 
         total = _parse_total(d.pop("total", UNSET))
 
+        def _parse_concurrency(data: object) -> int | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(int | None | Unset, data)
+
+        concurrency = _parse_concurrency(d.pop("concurrency", UNSET))
+
         get_api_experiments_runs_response_200_runs_item = cls(
             experiment_id=experiment_id,
             run_id=run_id,
@@ -156,6 +175,7 @@ class GetApiExperimentsRunsResponse200RunsItem:
             summary=summary,
             progress=progress,
             total=total,
+            concurrency=concurrency,
         )
 
         return get_api_experiments_runs_response_200_runs_item

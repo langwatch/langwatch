@@ -36,6 +36,11 @@ vi.mock("../authz-api.ts", () => ({
   },
 }));
 
+// The drawer navigator reads the router; these suites read the plan and structure only.
+vi.mock("@langwatch/browser-host/drawer", () => ({
+  useDrawer: () => ({ openDrawer: () => void 0, closeDrawer: () => void 0 }),
+}));
+
 import { useAuthzHost } from "../../model/authz-host.ts";
 import AuthzHostMount from "../authz-host-mount.tsx";
 
