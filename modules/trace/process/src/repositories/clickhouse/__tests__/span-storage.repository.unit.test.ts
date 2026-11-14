@@ -1,5 +1,9 @@
 import { ForgedAuthorizationError } from "@langwatch/authorization";
-import { AuthorizedClickHouse } from "@langwatch/clickhouse-client";
+import {
+  AuthorizedClickHouse,
+  coalesceKeyOf,
+  type InsertRequest,
+} from "@langwatch/clickhouse-client";
 import {
   idIndexedClientDouble,
   type ScriptedStatements,
@@ -13,9 +17,10 @@ import { ownProof } from "../../../__tests__/support/authorization-proofs.fixtur
 import { createTestSpan } from "../../../eventing/__tests__/trace-summary-test.fixtures.ts";
 import { SpanStorageStore } from "../../../eventing/span-storage.store.ts";
 import { TRACE_ID_INDEXES } from "../clickhouse.trace-id-indexes.database.ts";
-import type {
-  TraceClickHouseWriteClient,
-  TraceClickHouseWriteResolver,
+import {
+  MemberTraceClickHouseClientRepository,
+  type TraceClickHouseWriteClient,
+  type TraceClickHouseWriteResolver,
 } from "../clickhouse.trace-member-client.repository.ts";
 import { SpanStorageClickHouseRepository } from "../span-storage.repository.ts";
 
@@ -64,6 +69,7 @@ const STORED_SPAN_COLUMNS = [
 const STORED_SPAN_INSERT_SETTINGS = {
   async_insert: 1,
   wait_for_async_insert: 1,
+  async_insert_deduplicate: 0,
   input_format_json_throw_on_bad_escape_sequence: 0,
 };
 
@@ -101,6 +107,24 @@ function repository() {
     }),
   });
   return { clickhouse, repo };
+}
+
+/** The repository over the real member client, recording the requests the query client is sent. */
+function repositoryOverQueryClient() {
+  const sent: InsertRequest[] = [];
+  const repo = SpanStorageClickHouseRepository.create({
+    resolveClient: MemberTraceClickHouseClientRepository.resolverFor(
+      clickHouseQueryClientDouble({
+        insert: async (request: InsertRequest) => {
+          sent.push(request);
+        },
+      }),
+    ),
+    clickhouse: new AuthorizedClickHouse({
+      resolveClient: async () => clickHouseQueryClientDouble(),
+    }),
+  });
+  return { repo, sent };
 }
 
 function span(overrides: Partial<SpanInsertData> = {}): SpanInsertData {
@@ -168,6 +192,26 @@ describe("SpanStorageClickHouseRepository", () => {
       await repo.insertSpans([span({ tenantId: "project-9" })]);
 
       expect(clickhouse.resolvedTenants).toEqual(["project-9"]);
+    });
+  });
+
+  describe("when spans are written while every insert slot is taken", () => {
+    it("sends a single span as an insert that may share a statement (ADR-187)", async () => {
+      const { repo, sent } = repositoryOverQueryClient();
+
+      await repo.insertSpan(span());
+
+      expect(sent).toHaveLength(1);
+      expect(coalesceKeyOf(sent[0]!)).not.toBeNull();
+    });
+
+    it("sends a batch of spans as an insert that may share a statement (ADR-187)", async () => {
+      const { repo, sent } = repositoryOverQueryClient();
+
+      await repo.insertSpans([span(), span({ spanId: "span-2" })]);
+
+      expect(sent).toHaveLength(1);
+      expect(coalesceKeyOf(sent[0]!)).not.toBeNull();
     });
   });
 

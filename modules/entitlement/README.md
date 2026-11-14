@@ -19,8 +19,8 @@ What a plan allows, and what has been used and spent against it, so the allowanc
 | Kind                           | Name                                                           | Declared at                                                                             |
 | ------------------------------ | -------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
 | Postgres, accessed not claimed | `Organization`, `Project`                                      | `process/src/repositories/prisma/prisma.tenancy.repository.ts:7`                        |
-| ClickHouse table (writes)      | `billable_events`                                              | `process/src/repositories/clickhouse/clickhouse.billable-events-meter.repository.ts:38` |
-| ClickHouse table (writes)      | `usage_trace_meter`                                            | `process/src/repositories/clickhouse/clickhouse.trace-count.repository.ts:46`           |
+| ClickHouse table (writes)      | `billable_events`                                              | `process/src/repositories/clickhouse/clickhouse.billable-events-meter.repository.ts:41` |
+| ClickHouse table (writes)      | `usage_trace_meter`                                            | `process/src/repositories/clickhouse/clickhouse.trace-count.repository.ts:49`           |
 | Stores required                | prisma, clickhouse                                             | `process/src/repositories/live/live.entitlement.repositories.ts:11`                     |
 | Stores required                | prisma                                                         | `process/src/repositories/prisma/prisma.entitlement.repositories.ts:15`                 |
 | Config                         | `requestBounds` (LANGWATCH_REQUEST_BOUNDS), `isSaas` (IS_SAAS) | `contract/src/entitlement.config.ts:20`                                                 |

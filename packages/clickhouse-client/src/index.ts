@@ -88,6 +88,7 @@ export type {
   ClickHouseVendorClientOptions,
 } from "./managed-client.ts";
 export {
+  COALESCABLE_ASYNC_INSERT_SETTINGS,
   coalesceKeyOf,
   DEFAULT_INSERT_COALESCE_MAX_ROWS,
   InsertCoalescer,
