@@ -2,15 +2,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const query = vi.fn();
 
-import { createActivityMonitorTestService } from "../../../__tests__/testing.ts";
+import {
+  clickHouseAnswering,
+  createActivityMonitorTestService,
+} from "../../../__tests__/testing.ts";
 import type { ActivityMonitorTraces } from "../../../features/ingestion-source/services/ingestion-source-activity.service.ts";
-import type { GovernanceClickHouseResolver } from "../../clickhouse/clickhouse.governance-clickhouse.repositories.ts";
-
-class FakeClickHouseResolver implements GovernanceClickHouseResolver {
-  async getClient() {
-    return { query };
-  }
-}
 
 /** Trace's side of the source: one pushed trace, and its 24h/7d/30d counts. */
 const PUSHED: Partial<ActivityMonitorTraces> = {
@@ -35,7 +31,7 @@ const PUSHED: Partial<ActivityMonitorTraces> = {
 function activityMonitor(prisma: unknown) {
   return createActivityMonitorTestService({
     prisma: prisma as never,
-    clickhouse: new FakeClickHouseResolver(),
+    clickhouse: clickHouseAnswering(query),
     traces: PUSHED,
   });
 }

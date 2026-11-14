@@ -4,10 +4,7 @@ import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { Encryption, RateLimiter } from "@langwatch/process-stores";
 
 import { ClickHouseAnomalySpendRepository } from "../clickhouse/clickhouse.anomaly-spend.repository.ts";
-import {
-  memberClickHouseResolver,
-  memberGovernanceClickHouseResolver,
-} from "../clickhouse/clickhouse.governance-clickhouse.repositories.ts";
+import { memberClickHouseResolver } from "../clickhouse/clickhouse.governance-clickhouse.repositories.ts";
 import { ClickHouseGovernanceCostChargeRepository } from "../clickhouse/clickhouse.governance-cost-charge.repository.ts";
 import { ClickHouseGovernanceCostRollupRepository } from "../clickhouse/clickhouse.governance-cost-rollup.repository.ts";
 import { ClickHouseOcsfEventsRepository } from "../clickhouse/clickhouse.ocsf-events.repository.ts";
@@ -51,7 +48,7 @@ export class LiveGovernanceRepositories {
       suppressionSnapshot: PrismaSuppressionSnapshotRepository.create({ operatorReads }),
       activityMonitor: PrismaActivityMonitorRepository.create({
         prisma,
-        clickhouse: memberGovernanceClickHouseResolver(clickhouse),
+        clickhouse: memberClickHouseResolver(clickhouse),
       }),
       costRollup: ClickHouseGovernanceCostRollupRepository.create(
         memberClickHouseResolver(clickhouse),

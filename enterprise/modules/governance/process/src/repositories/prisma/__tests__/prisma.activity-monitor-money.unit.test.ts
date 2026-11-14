@@ -7,20 +7,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const query = vi.fn();
 
-import { createActivityMonitorTestService } from "../../../__tests__/testing.ts";
+import {
+  clickHouseAnswering,
+  createActivityMonitorTestService,
+} from "../../../__tests__/testing.ts";
 import type { ActivityMonitorTraces } from "../../../features/ingestion-source/services/ingestion-source-activity.service.ts";
-import type { GovernanceClickHouseResolver } from "../../clickhouse/clickhouse.governance-clickhouse.repositories.ts";
-
-class FakeClickHouseResolver implements GovernanceClickHouseResolver {
-  async getClient() {
-    return { query };
-  }
-}
 
 function activityMonitor(prisma: unknown, traces: Partial<ActivityMonitorTraces> = {}) {
   return createActivityMonitorTestService({
     prisma: prisma as never,
-    clickhouse: new FakeClickHouseResolver(),
+    clickhouse: clickHouseAnswering(query),
     traces,
   });
 }

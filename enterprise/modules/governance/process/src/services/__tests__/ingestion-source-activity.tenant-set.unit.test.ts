@@ -25,10 +25,8 @@ describe("ActivityMonitorService.spendByDepartment", () => {
           department: { findMany: async () => [] },
           organizationUser: { findMany: async () => [] },
         }),
-        clickhouse: {
-          getClient: async () => {
-            throw new Error("spend by department reads no governance table");
-          },
+        clickhouse: async () => {
+          throw new Error("spend by department reads no governance table");
         },
         traces: {
           findSpendByProjectAndValue: async ({ projectIds, valueKey }) => {

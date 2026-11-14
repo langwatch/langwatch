@@ -109,7 +109,7 @@ const READS: {
 
 describe("governance's cost reads as built reads", () => {
   describe("when each cost summary read is sent", () => {
-    /** @scenario "Every cost summary read passes the tenant guard" */
+    /** @scenario "Every cost summary read is sent as the reader under the tenant setting" */
     it.each(READS)("$name is scoped to the one tenant it names, on the reader", async (read) => {
       const { client, resolve, statements } = recordingClient();
 

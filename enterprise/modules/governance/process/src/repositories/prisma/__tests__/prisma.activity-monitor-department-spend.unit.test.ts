@@ -88,10 +88,8 @@ function departmentSpend() {
         ]),
       },
     }),
-    clickhouse: {
-      getClient: async () => {
-        throw new Error("spend by department reads no governance table");
-      },
+    clickhouse: async () => {
+      throw new Error("spend by department reads no governance table");
     },
     traces: {
       findSpendByProjectAndValue: async ({ projectIds }) => {

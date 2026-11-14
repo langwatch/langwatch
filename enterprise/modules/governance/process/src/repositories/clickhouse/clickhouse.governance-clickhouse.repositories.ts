@@ -9,25 +9,6 @@ import type {
 import { ClickHouseAnomalySpendRepository } from "./clickhouse.anomaly-spend.repository.ts";
 import { ClickHouseOcsfEventsRepository } from "./clickhouse.ocsf-events.repository.ts";
 
-export type GovernanceClickHouseResult = {
-  json(): Promise<unknown>;
-};
-
-export interface GovernanceClickHouseClient {
-  query(input: {
-    query: string;
-    query_params?: Record<string, unknown>;
-    format: "JSONEachRow";
-    clickhouse_settings?: Record<string, number>;
-    /** One organisation's projects a `TenantId IN (...)` read binds, exactly. */
-    tenantIds?: readonly string[];
-  }): Promise<GovernanceClickHouseResult>;
-}
-
-export interface GovernanceClickHouseResolver {
-  getClient(organizationId: string): Promise<GovernanceClickHouseClient>;
-}
-
 /**
  * The routed ClickHouse member, adapted to the vendor-shaped client every
  * ClickHouse-tier governance repository asks its resolver for. One tenant
@@ -74,44 +55,6 @@ function memberClickHouseResolver(
 }
 
 /**
- * The same member, as the `getClient`-shaped resolver
- * `PrismaActivityMonitorRepository` takes for `activityClickhouse`
- * (`repositories/prisma/prisma.ingestion-source-activity.repository.ts:342,373`).
- * That repository resolves per organization id but scopes every statement it
- * sends by the org's hidden governance Project id instead — a different
- * value from the id `getClient` is called with — so this client reads the
- * tenant each statement is actually scoped to out of the statement's own
- * `tenantId` query param rather than out of `getClient`'s argument. Never
- * null: the member this factory closes over exists whenever it is called.
- */
-function memberGovernanceClickHouseResolver(
-  clickhouse: ClickHouseQueryClient,
-): GovernanceClickHouseResolver {
-  return {
-    async getClient(): Promise<GovernanceClickHouseClient> {
-      return {
-        async query(input) {
-          const tenantId = input.tenantIds?.[0] ?? input.query_params?.tenantId;
-          if (typeof tenantId !== "string" || tenantId === "") {
-            throw new Error(
-              "GovernanceClickHouseClient.query: every statement must bind its own tenantId query param or declare its tenantIds",
-            );
-          }
-          const result = await clickhouse.query({
-            tenantId,
-            sql: input.query,
-            params: input.query_params ?? {},
-            ...(input.tenantIds ? { tenantIds: input.tenantIds } : {}),
-            ...(input.clickhouse_settings ? { settings: input.clickhouse_settings } : {}),
-          });
-          return { json: async () => result.rows };
-        },
-      };
-    },
-  };
-}
-
-/**
  * Live tier for the ClickHouse-backed governance repositories. The process
  * hands this class the real `clickhouse` process member — one
  * `ClickHouseQueryClient` instance, not a resolver function — and this file
@@ -133,4 +76,4 @@ export class ClickHouseGovernanceRepositories {
   }
 }
 
-export { memberClickHouseResolver, memberGovernanceClickHouseResolver };
+export { memberClickHouseResolver };

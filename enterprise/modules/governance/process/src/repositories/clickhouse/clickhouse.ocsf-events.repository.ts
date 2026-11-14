@@ -29,7 +29,7 @@ import { governanceOcsfEvents as events } from "./clickhouse.governance-ocsf-eve
  *       + specs/ai-gateway/governance/siem-export.feature
  * Migration: 00023_create_governance_ocsf_events.sql
  */
-const TABLE_NAME = events.$table.stored;
+const TABLE_NAME = events.$table.name;
 
 /**
  * Rows per INSERT. A run's kept events arrive as one array and each carries

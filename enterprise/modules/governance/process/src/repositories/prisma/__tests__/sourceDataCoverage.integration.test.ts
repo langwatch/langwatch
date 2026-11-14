@@ -117,10 +117,8 @@ describe("given a source that has been unhealthy since its last successful pull"
     it("reports the day as uncovered with no spend figure at all", async () => {
       const service = createActivityMonitorTestService({
         prisma,
-        clickhouse: {
-          getClient: async () => {
-            throw new Error("source coverage reads no ClickHouse");
-          },
+        clickhouse: async () => {
+          throw new Error("source coverage reads no ClickHouse");
         },
       });
 
@@ -153,10 +151,8 @@ describe("given a source that has been unhealthy since its last successful pull"
     it("still covers the days the last successful pull reached", async () => {
       const service = createActivityMonitorTestService({
         prisma,
-        clickhouse: {
-          getClient: async () => {
-            throw new Error("source coverage reads no ClickHouse");
-          },
+        clickhouse: async () => {
+          throw new Error("source coverage reads no ClickHouse");
         },
       });
 
@@ -195,10 +191,8 @@ describe("given a source whose runs are succeeding", () => {
       });
       const service = createActivityMonitorTestService({
         prisma,
-        clickhouse: {
-          getClient: async () => {
-            throw new Error("source coverage reads no ClickHouse");
-          },
+        clickhouse: async () => {
+          throw new Error("source coverage reads no ClickHouse");
         },
       });
 

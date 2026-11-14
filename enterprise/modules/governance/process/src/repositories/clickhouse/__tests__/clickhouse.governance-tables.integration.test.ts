@@ -16,6 +16,7 @@ import { governanceCostRollupCharges } from "../clickhouse.governance-cost-rollu
 import { governanceCostRollupRestatementIndex } from "../clickhouse.governance-cost-rollup-restatement-index.table.ts";
 import { governanceKpis } from "../clickhouse.governance-kpis.table.ts";
 import { governanceOcsfEvents } from "../clickhouse.governance-ocsf-events.table.ts";
+import { storedLogRecords } from "../clickhouse.stored-log-records.table.ts";
 
 const DESCRIPTORS: readonly { readonly $table: ClickHouseTableFacts }[] = [
   governanceOcsfEvents,
@@ -23,6 +24,11 @@ const DESCRIPTORS: readonly { readonly $table: ClickHouseTableFacts }[] = [
   governanceCostRollup1d,
   governanceCostRollupRestatementIndex,
   governanceCostRollupCharges,
+];
+
+/** Tables governance reads but does not own: it declares only the columns it reads. */
+const READ_ONLY_DESCRIPTORS: readonly { readonly $table: ClickHouseTableFacts }[] = [
+  storedLogRecords,
 ];
 
 /** The parameter type a stored column binds as: storage wrappers that change no value go. */
@@ -67,6 +73,35 @@ describe("governance's descriptors against the migrated schema", () => {
       );
 
       expect(declared).toEqual(stored);
+    },
+    60_000,
+  );
+
+  it.each(READ_ONLY_DESCRIPTORS.map((table) => [table.$table.stored, table] as const))(
+    "declares only %s columns the schema has, binding as their stored types",
+    async (name, table) => {
+      const result = await client.query({
+        query:
+          "SELECT name, type FROM system.columns WHERE database = currentDatabase() AND table = {table:String}",
+        query_params: { table: name },
+        format: "JSONEachRow",
+      });
+      const stored = new Map(
+        ((await result.json()) as { name: string; type: string }[]).map((each) => [
+          each.name,
+          bindingOf(each.type),
+        ]),
+      );
+      const declared = Object.fromEntries(
+        table.$table.columns.map((each) => {
+          const ref = Reflect.get(table, each) as { binding: { paramType: string } };
+          return [each, ref.binding.paramType];
+        }),
+      );
+
+      expect(declared).toEqual(
+        Object.fromEntries(table.$table.columns.map((each) => [each, stored.get(each)])),
+      );
     },
     60_000,
   );

@@ -11,10 +11,10 @@ Feature: Daily cost rollup that can always be rebuilt and never lies
     Given an organization with recorded cost events
 
   @unit
-  Scenario: Every cost summary read passes the tenant guard
-    When each summary read the costs screen makes runs through the tenant guard
-    Then none is refused as a statement that could read another tenant's rows
-    And each stays scoped to the one tenant it names
+  Scenario: Every cost summary read is sent as the reader under the tenant setting
+    When each summary read the costs screen makes is sent
+    Then it is sent on the reader identity with the one tenant it names as its tenant setting
+    And it stays scoped to that tenant
 
   @integration
   Scenario: A day's spend lands as one summary row per dimension combination

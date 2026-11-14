@@ -9,12 +9,14 @@ import { createClient, type ClickHouseClient } from "@clickhouse/client";
 import {
   migrateTestClickHouseOnce,
   startTestClickHouseEndpoints,
+  vendorQueryClient,
 } from "@langwatch/clickhouse-client/testing";
 import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { createActivityMonitorTestService } from "../../../__tests__/testing.ts";
+import { memberClickHouseResolver } from "../../clickhouse/clickhouse.governance-clickhouse.repositories.ts";
 
 const DAY_MS = 86_400_000;
 
@@ -122,7 +124,9 @@ describe("source health during a historical provider import", () => {
       });
       const repository = createActivityMonitorTestService({
         prisma: prismaDouble({ project: { findFirst: async () => ({ id: tenantId }) } }),
-        clickhouse: { getClient: async () => clickhouse },
+        clickhouse: memberClickHouseResolver(
+          vendorQueryClient({ vendor: clickhouse, indexes: [] }),
+        ),
         traces: {
           getAttributedTraceRecency: async () => ({ counts: [0, 0, 0], lastOccurredAtMs: 0 }),
         },

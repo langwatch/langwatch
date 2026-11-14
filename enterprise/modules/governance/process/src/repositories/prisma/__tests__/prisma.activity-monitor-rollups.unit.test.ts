@@ -1,3 +1,4 @@
+import type { ReaderReadStatement } from "@langwatch/clickhouse-client/builder";
 import type {
   GovernanceSortDirection as SortDir,
   SpendOverTimeGroupBy,
@@ -9,39 +10,36 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createActivityMonitorTestService } from "../../../__tests__/testing.ts";
 import type { ActivityMonitorTraces } from "../../../features/ingestion-source/services/ingestion-source-activity.service.ts";
-import type {
-  GovernanceClickHouseClient,
-  GovernanceClickHouseResult,
-  GovernanceClickHouseResolver,
-} from "../../clickhouse/clickhouse.governance-clickhouse.repositories.ts";
+import type { GovernanceClickHouseReadResolver } from "../../governance.repositories.ts";
 
-type ClickHouseQuery = {
-  query: string;
-  query_params?: Record<string, unknown>;
-  tenantIds?: string[];
-  format: "JSONEachRow";
-};
+/** One built read the repository sent, with its rendered SQL. */
+type ClickHouseQuery = { query: string; statement: ReaderReadStatement };
 
-class RecordedClickHouseClient implements GovernanceClickHouseClient {
+class RecordedClickHouseClient {
   readonly queries: ClickHouseQuery[] = [];
 
   constructor(private readonly rowsForQuery: (query: ClickHouseQuery) => unknown) {}
 
-  async query(input: ClickHouseQuery): Promise<GovernanceClickHouseResult> {
-    this.queries.push(input);
-    return { json: async () => this.rowsForQuery(input) };
+  async read({ statement }: { statement: ReaderReadStatement }) {
+    const query = { query: statement.sql, statement };
+    this.queries.push(query);
+    return { rows: this.rowsForQuery(query) as never[] };
+  }
+
+  async insert(): Promise<undefined> {
+    return undefined;
   }
 }
 
-class RecordedClickHouseResolver implements GovernanceClickHouseResolver {
-  readonly organizationIds: string[] = [];
+class RecordedClickHouseResolver {
+  readonly tenantIds: string[] = [];
 
-  constructor(private readonly client: GovernanceClickHouseClient) {}
+  constructor(private readonly client: RecordedClickHouseClient) {}
 
-  async getClient(organizationId: string): Promise<GovernanceClickHouseClient> {
-    this.organizationIds.push(organizationId);
-    return this.client;
-  }
+  readonly resolve: GovernanceClickHouseReadResolver = async (tenantId) => {
+    this.tenantIds.push(tenantId);
+    return this.client as never;
+  };
 }
 
 /** Every trace read the service made, by operation name, with its input. */
@@ -66,7 +64,7 @@ function activityMonitor(options: {
   ) as Partial<ActivityMonitorTraces>;
   const service = createActivityMonitorTestService({
     prisma: prismaDouble(options.prisma),
-    clickhouse: resolver,
+    clickhouse: resolver.resolve,
     traces,
   });
 
@@ -127,7 +125,7 @@ describe("ActivityMonitorService rollups", () => {
     });
     expect(users).toEqual([]);
     expect(teams).toEqual([]);
-    expect(resolver.organizationIds).toEqual([]);
+    expect(resolver.tenantIds).toEqual([]);
     expect(clickhouse.queries).toEqual([]);
     expect(traceCalls).toEqual([]);
   });
@@ -436,11 +434,14 @@ describe("ActivityMonitorService rollups", () => {
       },
     ]);
     expect(clickhouse.queries).toHaveLength(2);
-    for (const query of clickhouse.queries) {
-      expect(query.query_params).toMatchObject({
+    for (const { statement } of clickhouse.queries) {
+      expect(statement).toMatchObject({
+        identity: "reader",
+        kind: "tenant",
         tenantId: "governance-project",
-        sourceIds: ["source-a", "source-b"],
       });
+      expect(statement.settings).toMatchObject({ SQL_langwatch_tenant_ids: "governance-project" });
+      expect(Object.values(statement.params)).toContainEqual(["source-a", "source-b"]);
     }
     expect(traceCalls[0]!.input).toMatchObject({
       projectId: "governance-project",

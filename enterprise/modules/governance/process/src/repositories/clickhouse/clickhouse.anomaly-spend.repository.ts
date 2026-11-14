@@ -40,7 +40,7 @@ import { governanceKpis as kpis } from "./clickhouse.governance-kpis.table.ts";
  * Spec: specs/ai-gateway/governance/folds.feature
  * Migration: 00031_create_governance_kpis.sql
  */
-const TABLE_NAME = kpis.$table.stored;
+const TABLE_NAME = kpis.$table.name;
 
 type KpisTable = "governance_kpis";
 

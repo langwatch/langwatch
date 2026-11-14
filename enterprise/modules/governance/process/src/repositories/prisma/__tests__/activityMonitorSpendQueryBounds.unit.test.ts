@@ -26,10 +26,8 @@ function service(endsAsked: number[]) {
       organizationUser: { findMany: async () => [] },
       ingestionSource: { findMany: async () => [] },
     }),
-    clickhouse: {
-      getClient: async () => {
-        throw new Error("a spend read reads no governance table");
-      },
+    clickhouse: async () => {
+      throw new Error("a spend read reads no governance table");
     },
     traces: {
       getAttributedSpendComparison: async ({ endMs }) => {

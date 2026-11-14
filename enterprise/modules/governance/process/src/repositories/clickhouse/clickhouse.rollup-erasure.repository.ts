@@ -10,7 +10,7 @@ import { governanceCostRollup1d as rollup } from "./clickhouse.governance-cost-r
 
 const logger = createLogger("langwatch:governance:rollup-erasure");
 
-const GOVERNANCE_COST_ROLLUP_TABLE = rollup.$table.stored;
+const GOVERNANCE_COST_ROLLUP_TABLE = rollup.$table.name;
 const GOVERNANCE_COST_ROLLUP_RESTATEMENT_INDEX_TABLE = "governance_cost_rollup_restatement_index";
 
 /** `mutations_sync` so the erasure does not return while the rows still exist. */

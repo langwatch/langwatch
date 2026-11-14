@@ -36,8 +36,8 @@ import type { GovernanceClickHouseReadResolver } from "../governance.repositorie
 import { governanceCostRollup1d as rollup } from "./clickhouse.governance-cost-rollup-1d.table.ts";
 import { governanceCostRollupRestatementIndex as restatements } from "./clickhouse.governance-cost-rollup-restatement-index.table.ts";
 
-const TABLE = rollup.$table.stored;
-const RESTATEMENT_INDEX_TABLE = restatements.$table.stored;
+const TABLE = rollup.$table.name;
+const RESTATEMENT_INDEX_TABLE = restatements.$table.name;
 const SYNCHRONOUS_INSERT = { async_insert: 0, wait_for_async_insert: 0 };
 const UNPRICED_CURRENCIES = { max: 8 };
 const NULL_INT64 = column.nullable(column.int64());

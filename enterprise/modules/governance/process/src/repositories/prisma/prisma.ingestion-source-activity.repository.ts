@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { clickhouseRead, fn, tenantScope } from "@langwatch/clickhouse-client/builder";
 import {
   type ActivityEventDetailRow,
   GOVERNANCE_ATTR,
@@ -26,10 +27,12 @@ import type {
   AnomalyBreakdown,
   SourceEventWindows,
 } from "../activity-monitor.repository.ts";
+import { governanceOcsfEvents as events } from "../clickhouse/clickhouse.governance-ocsf-events.table.ts";
+import { storedLogRecords as logs } from "../clickhouse/clickhouse.stored-log-records.table.ts";
 import type {
-  GovernanceClickHouseClient,
-  GovernanceClickHouseResolver,
-} from "../clickhouse/clickhouse.governance-clickhouse.repositories.ts";
+  GovernanceClickHouseReadClient,
+  GovernanceClickHouseReadResolver,
+} from "../governance.repositories.ts";
 
 const ATTR_ORIGIN_KIND = GOVERNANCE_ATTR.ORIGIN_KIND;
 const ATTR_INGESTION_SOURCE_ID = GOVERNANCE_ATTR.INGESTION_SOURCE_ID;
@@ -60,9 +63,6 @@ const pulledUsageExtensionSchema = z
   })
   .catch(ZERO_PULLED_USAGE);
 
-/** One `(sourceId, count)` pair from either per-source count query. */
-type SourceEventCountRow = { sourceId: string; c: string };
-
 /** The 24h/7d/30d counters plus newest timestamp one table contributes. */
 type WindowCountRow = {
   c24: number | string;
@@ -71,8 +71,11 @@ type WindowCountRow = {
   lastMs: string | null;
 };
 
+/** A pulled event is one a puller wrote under the synthetic `pull:` trace id. */
+const PULLED_TRACE_PREFIX = "pull:";
+
 type WindowCountArgs = {
-  ch: GovernanceClickHouseClient;
+  ch: GovernanceClickHouseReadClient;
   tenantId: string;
   sourceId: string;
   since24h: number;
@@ -81,23 +84,10 @@ type WindowCountArgs = {
 };
 
 type SourceCountArgs = {
-  ch: GovernanceClickHouseClient;
+  ch: GovernanceClickHouseReadClient;
   tenantId: string;
   sourceIds: readonly string[];
   since: number;
-};
-
-type PulledEventRow = {
-  eventId: string;
-  eventType: string;
-  actorUserId: string;
-  actorEmail: string;
-  actorEnduserId: string;
-  action: string;
-  target: string;
-  occurredMs: string;
-  createdMs: string;
-  rawPayload: string;
 };
 
 /**
@@ -112,12 +102,12 @@ export type ActivityMonitorDatabase = Pick<
 export class PrismaActivityMonitorRepository implements ActivityMonitorRepository {
   private constructor(
     private readonly prisma: ActivityMonitorDatabase,
-    private readonly clickhouse: GovernanceClickHouseResolver,
+    private readonly clickhouse: GovernanceClickHouseReadResolver,
   ) {}
 
   static create(options: {
     prisma: ActivityMonitorDatabase;
-    clickhouse: GovernanceClickHouseResolver;
+    clickhouse: GovernanceClickHouseReadResolver;
   }): PrismaActivityMonitorRepository {
     return new PrismaActivityMonitorRepository(options.prisma, options.clickhouse);
   }
@@ -252,7 +242,7 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
     sinceMs: number;
   }): Promise<{ sourceId: string; count: number }[]> {
     const args: SourceCountArgs = {
-      ch: await this.clickhouse.getClient(input.organizationId),
+      ch: await this.clickhouse(input.tenantId),
       tenantId: input.tenantId,
       sourceIds: input.sourceIds,
       since: input.sinceMs,
@@ -266,60 +256,43 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
 
   private static async countLoggedEventsBySource(
     args: SourceCountArgs,
-  ): Promise<SourceEventCountRow[]> {
-    const result = await args.ch.query({
-      query: `
-        SELECT lr.Attributes[{sourceKey:String}] AS sourceId, toString(count()) AS c
-        FROM stored_log_records lr
-        WHERE lr.TenantId = {tenantId:String}
-          AND lr.TimeUnixMs >= fromUnixTimestamp64Milli({since:UInt64})
-          AND lr.Attributes[{originKey:String}] = {originValue:String}
-          AND lr.Attributes[{sourceKey:String}] IN ({sourceIds:Array(String)})
-        GROUP BY sourceId
-      `,
-      query_params: {
-        tenantId: args.tenantId,
-        since: args.since,
-        originKey: ATTR_ORIGIN_KIND,
-        originValue: ORIGIN_KIND_VALUE,
-        sourceKey: ATTR_INGESTION_SOURCE_ID,
-        sourceIds: args.sourceIds,
-      },
-      format: "JSONEachRow",
-    });
-    return (await result.json()) as SourceEventCountRow[];
+  ): Promise<{ sourceId: string; c: string }[]> {
+    if (args.sourceIds.length === 0) return [];
+    const sourceOf = fn.mapGet(logs.Attributes, ATTR_INGESTION_SOURCE_ID);
+    const statement = clickhouseRead({ scope: tenantScope.single({ tenantId: args.tenantId }) })
+      .from(logs)
+      .select({ sourceId: sourceOf, c: fn.toString(fn.count()) })
+      .where(({ and, eq, gte, oneOf }) =>
+        and(
+          gte(logs.TimeUnixMs, args.since),
+          eq(fn.mapGet(logs.Attributes, ATTR_ORIGIN_KIND), ORIGIN_KIND_VALUE),
+          oneOf(sourceOf, args.sourceIds),
+        ),
+      )
+      .groupBy(sourceOf)
+      .build();
+    return (await args.ch.read({ statement })).rows;
   }
 
   private static async countPulledEventsBySource(
     args: SourceCountArgs,
-  ): Promise<SourceEventCountRow[]> {
-    const result = await args.ch.query({
-      query: `
-        SELECT SourceId AS sourceId, toString(count()) AS c
-        FROM governance_ocsf_events
-        WHERE TenantId = {tenantId:String}
-          AND startsWith(TraceId, 'pull:')
-          AND EventTime >= fromUnixTimestamp64Milli({since:UInt64})
-          AND SourceId IN ({sourceIds:Array(String)})
-          AND (TenantId, EventId, LastUpdatedAt) IN (
-            SELECT TenantId, EventId, max(LastUpdatedAt)
-            FROM governance_ocsf_events
-            WHERE TenantId = {tenantId:String}
-              AND startsWith(TraceId, 'pull:')
-              AND EventTime >= fromUnixTimestamp64Milli({since:UInt64})
-              AND SourceId IN ({sourceIds:Array(String)})
-            GROUP BY TenantId, EventId
-          )
-        GROUP BY sourceId
-      `,
-      query_params: {
-        tenantId: args.tenantId,
-        since: args.since,
-        sourceIds: args.sourceIds,
-      },
-      format: "JSONEachRow",
-    });
-    return (await result.json()) as SourceEventCountRow[];
+  ): Promise<{ sourceId: string; c: string }[]> {
+    if (args.sourceIds.length === 0) return [];
+    const statement = clickhouseRead({ scope: tenantScope.single({ tenantId: args.tenantId }) })
+      .from(events)
+      .select({ sourceId: events.SourceId, c: fn.toString(fn.count()) })
+      .where(({ and, gte, oneOf }) =>
+        and(
+          fn.startsWith(events.TraceId, PULLED_TRACE_PREFIX),
+          gte(events.EventTime, args.since),
+          oneOf(events.SourceId, args.sourceIds),
+        ),
+      )
+      // TraceId, SourceId and EventTime are the event's own: they never change across versions.
+      .latestVersion({ repeat: [events.TraceId, events.SourceId, events.EventTime] })
+      .groupBy(events.SourceId)
+      .build();
+    return (await args.ch.read({ statement })).rows;
   }
 
   /** Rows a puller wrote to `governance_ocsf_events` under the synthetic `pull:` trace id. */
@@ -330,48 +303,36 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
     beforeMs: number;
     limit: number;
   }): Promise<ActivityEventDetailRow[]> {
-    const ch = await this.clickhouse.getClient(input.organizationId);
-    const result = await ch.query({
-      query: `
-        SELECT
-          EventId AS eventId,
-          SourceType AS eventType,
-          ActorUserId AS actorUserId,
-          ActorEmail AS actorEmail,
-          ActorEnduserId AS actorEnduserId,
-          ActionName AS action,
-          TargetName AS target,
-          toString(toUnixTimestamp64Milli(EventTime)) AS occurredMs,
-          toString(toUnixTimestamp64Milli(CreatedAt)) AS createdMs,
-          RawOcsfJson AS rawPayload
-        FROM governance_ocsf_events
-        WHERE TenantId = {tenantId:String}
-          AND startsWith(TraceId, 'pull:')
-          AND SourceId = {sourceId:String}
-          AND EventTime < fromUnixTimestamp64Milli({beforeMs:UInt64})
-          AND (TenantId, EventId, LastUpdatedAt) IN (
-            SELECT TenantId, EventId, max(LastUpdatedAt)
-            FROM governance_ocsf_events
-            WHERE TenantId = {tenantId:String}
-              AND startsWith(TraceId, 'pull:')
-              AND SourceId = {sourceId:String}
-              AND EventTime < fromUnixTimestamp64Milli({beforeMs:UInt64})
-            GROUP BY TenantId, EventId
-          )
-        ORDER BY EventTime DESC, EventId DESC
-        LIMIT {limit:UInt32}
-      `,
-      query_params: {
-        tenantId: input.tenantId,
-        sourceId: input.sourceId,
-        beforeMs: input.beforeMs,
-        limit: input.limit,
-      },
-      format: "JSONEachRow",
-    });
-    return ((await result.json()) as PulledEventRow[]).map((row) =>
-      PrismaActivityMonitorRepository.toPulledEvent(row),
-    );
+    const ch = await this.clickhouse(input.tenantId);
+    const statement = clickhouseRead({ scope: tenantScope.single({ tenantId: input.tenantId }) })
+      .from(events)
+      .select({
+        eventId: events.EventId,
+        eventType: events.SourceType,
+        actorUserId: events.ActorUserId,
+        actorEmail: events.ActorEmail,
+        actorEnduserId: events.ActorEnduserId,
+        action: events.ActionName,
+        target: events.TargetName,
+        occurredMs: fn.toString(fn.toUnixTimestamp64Milli(events.EventTime)),
+        createdMs: fn.toString(fn.toUnixTimestamp64Milli(events.CreatedAt)),
+        rawPayload: events.RawOcsfJson,
+      })
+      .where(({ and, eq, lt }) =>
+        and(
+          fn.startsWith(events.TraceId, PULLED_TRACE_PREFIX),
+          eq(events.SourceId, input.sourceId),
+          lt(events.EventTime, input.beforeMs),
+        ),
+      )
+      // TraceId, SourceId and EventTime are the event's own: they never change across versions.
+      .latestVersion({ repeat: [events.TraceId, events.SourceId, events.EventTime] })
+      .orderBy(events.EventTime, "DESC")
+      .orderBy(events.EventId, "DESC")
+      .limit(input.limit)
+      .build();
+    const { rows } = await ch.read({ statement });
+    return rows.map((row) => PrismaActivityMonitorRepository.toPulledEvent(row));
   }
 
   async findLoggedAndPulledEventWindows(input: {
@@ -383,7 +344,7 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
     since30d: number;
   }): Promise<SourceEventWindows[]> {
     const args: WindowCountArgs = {
-      ch: await this.clickhouse.getClient(input.organizationId),
+      ch: await this.clickhouse(input.tenantId),
       tenantId: input.tenantId,
       sourceId: input.sourceId,
       since24h: input.since24h,
@@ -407,73 +368,73 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
   private static async loggedEventWindowCounts(
     args: WindowCountArgs,
   ): Promise<WindowCountRow | undefined> {
-    const result = await args.ch.query({
-      query: `
-        SELECT
-          countIf(lr.TimeUnixMs >= fromUnixTimestamp64Milli({since24h:UInt64})) AS c24,
-          countIf(lr.TimeUnixMs >= fromUnixTimestamp64Milli({since7d:UInt64})) AS c7,
-          count() AS c30,
-          (SELECT toString(toUnixTimestamp64Milli(max(TimeUnixMs)))
-           FROM stored_log_records
-           WHERE TenantId = {tenantId:String} AND Attributes[{originKey:String}] = {originValue:String} AND Attributes[{sourceKey:String}] = {sourceId:String}) AS lastMs
-        FROM stored_log_records lr
-        WHERE lr.TenantId = {tenantId:String}
-          AND lr.TimeUnixMs >= fromUnixTimestamp64Milli({since30d:UInt64})
-          AND lr.Attributes[{originKey:String}] = {originValue:String}
-          AND lr.Attributes[{sourceKey:String}] = {sourceId:String}
-      `,
-      query_params: {
-        tenantId: args.tenantId,
-        since24h: args.since24h,
-        since7d: args.since7d,
-        since30d: args.since30d,
-        originKey: ATTR_ORIGIN_KIND,
-        originValue: ORIGIN_KIND_VALUE,
-        sourceKey: ATTR_INGESTION_SOURCE_ID,
-        sourceId: args.sourceId,
-      },
-      format: "JSONEachRow",
-    });
-    return ((await result.json()) as WindowCountRow[])[0];
+    const scope = tenantScope.single({ tenantId: args.tenantId });
+    const ofSource = () =>
+      [
+        fn.mapGet(logs.Attributes, ATTR_ORIGIN_KIND),
+        fn.mapGet(logs.Attributes, ATTR_INGESTION_SOURCE_ID),
+      ] as const;
+    const statement = clickhouseRead({ scope })
+      .from(logs)
+      .select(({ gte, scalar, and, eq }) => ({
+        c24: fn.countIf(gte(logs.TimeUnixMs, args.since24h)),
+        c7: fn.countIf(gte(logs.TimeUnixMs, args.since7d)),
+        c30: fn.count(),
+        lastMs: scalar((sub) =>
+          sub
+            .from(logs)
+            .select({ lastMs: fn.toString(fn.toUnixTimestamp64Milli(fn.max(logs.TimeUnixMs))) })
+            .where(() => {
+              const [origin, source] = ofSource();
+              return and(eq(origin, ORIGIN_KIND_VALUE), eq(source, args.sourceId));
+            }),
+        ),
+      }))
+      .where(({ and, eq, gte }) => {
+        const [origin, source] = ofSource();
+        return and(
+          gte(logs.TimeUnixMs, args.since30d),
+          eq(origin, ORIGIN_KIND_VALUE),
+          eq(source, args.sourceId),
+        );
+      })
+      .build();
+    return (await args.ch.read({ statement })).rows[0];
   }
 
   private static async pulledEventWindowCounts(
     args: WindowCountArgs,
   ): Promise<WindowCountRow | undefined> {
-    const result = await args.ch.query({
-      query: `
-        SELECT
-          countIf(EventTime >= fromUnixTimestamp64Milli({since24h:UInt64})) AS c24,
-          countIf(EventTime >= fromUnixTimestamp64Milli({since7d:UInt64})) AS c7,
-          count() AS c30,
-          (SELECT toString(toUnixTimestamp64Milli(max(EventTime)))
-           FROM governance_ocsf_events
-           WHERE TenantId = {tenantId:String} AND startsWith(TraceId, 'pull:') AND SourceId = {sourceId:String}) AS lastMs
-        FROM governance_ocsf_events
-        WHERE TenantId = {tenantId:String}
-          AND startsWith(TraceId, 'pull:')
-          AND SourceId = {sourceId:String}
-          AND EventTime >= fromUnixTimestamp64Milli({since30d:UInt64})
-          AND (TenantId, EventId, LastUpdatedAt) IN (
-            SELECT TenantId, EventId, max(LastUpdatedAt)
-            FROM governance_ocsf_events
-            WHERE TenantId = {tenantId:String}
-              AND startsWith(TraceId, 'pull:')
-              AND SourceId = {sourceId:String}
-              AND EventTime >= fromUnixTimestamp64Milli({since30d:UInt64})
-            GROUP BY TenantId, EventId
-          )
-      `,
-      query_params: {
-        tenantId: args.tenantId,
-        since24h: args.since24h,
-        since7d: args.since7d,
-        since30d: args.since30d,
-        sourceId: args.sourceId,
-      },
-      format: "JSONEachRow",
-    });
-    return ((await result.json()) as WindowCountRow[])[0];
+    const scope = tenantScope.single({ tenantId: args.tenantId });
+    const statement = clickhouseRead({ scope })
+      .from(events)
+      .select(({ gte, scalar, and, eq }) => ({
+        c24: fn.countIf(gte(events.EventTime, args.since24h)),
+        c7: fn.countIf(gte(events.EventTime, args.since7d)),
+        c30: fn.count(),
+        lastMs: scalar((sub) =>
+          sub
+            .from(events)
+            .select({ lastMs: fn.toString(fn.toUnixTimestamp64Milli(fn.max(events.EventTime))) })
+            .where(() =>
+              and(
+                fn.startsWith(events.TraceId, PULLED_TRACE_PREFIX),
+                eq(events.SourceId, args.sourceId),
+              ),
+            ),
+        ),
+      }))
+      .where(({ and, eq, gte }) =>
+        and(
+          fn.startsWith(events.TraceId, PULLED_TRACE_PREFIX),
+          eq(events.SourceId, args.sourceId),
+          gte(events.EventTime, args.since30d),
+        ),
+      )
+      // TraceId, SourceId and EventTime are the event's own: they never change across versions.
+      .latestVersion({ repeat: [events.TraceId, events.SourceId, events.EventTime] })
+      .build();
+    return (await args.ch.read({ statement })).rows[0];
   }
 
   /** Alerts newest first; an organisation with none reads `[]`. */
@@ -534,7 +495,18 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
     };
   }
 
-  private static toPulledEvent(row: PulledEventRow): ActivityEventDetailRow {
+  private static toPulledEvent(row: {
+    eventId: string;
+    eventType: string;
+    actorUserId: string;
+    actorEmail: string;
+    actorEnduserId: string;
+    action: string;
+    target: string;
+    occurredMs: string;
+    createdMs: string;
+    rawPayload: string;
+  }): ActivityEventDetailRow {
     return {
       eventId: row.eventId,
       eventType: row.eventType ?? "",

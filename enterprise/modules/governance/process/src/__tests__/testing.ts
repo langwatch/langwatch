@@ -17,7 +17,7 @@ import {
   ActivityMonitorService,
   type ActivityMonitorTraces,
 } from "../features/ingestion-source/services/ingestion-source-activity.service.ts";
-import type { GovernanceClickHouseResolver } from "../repositories/clickhouse/clickhouse.governance-clickhouse.repositories.ts";
+import type { GovernanceClickHouseReadResolver } from "../repositories/governance.repositories.ts";
 import {
   PrismaDepartmentRepository,
   type DepartmentDatabase,
@@ -78,7 +78,7 @@ export function createSupportContactOrganizations(
  */
 export function createActivityMonitorTestService(options: {
   prisma: ActivityMonitorDatabase;
-  clickhouse: GovernanceClickHouseResolver;
+  clickhouse: GovernanceClickHouseReadResolver;
   traces?: Partial<ActivityMonitorTraces>;
 }): ActivityMonitorService {
   return ActivityMonitorService.create({
@@ -107,4 +107,29 @@ export function createDepartmentTestService(
     organizations,
     projects,
   });
+}
+
+/** The vendor-shaped `query` a suite mocks, answering each built read by its rendered SQL. */
+export type AnsweredClickHouseQuery = (input: {
+  query: string;
+  query_params: Record<string, unknown>;
+}) => Promise<{ json(): Promise<unknown> }>;
+
+/** A ClickHouse double whose built reads are answered by the suite's mocked `query`. */
+export function clickHouseAnswering(
+  query: AnsweredClickHouseQuery,
+): GovernanceClickHouseReadResolver {
+  const client = {
+    read: async ({
+      statement,
+    }: {
+      statement: { sql: string; params: Record<string, unknown> };
+    }) => ({
+      rows: (await (
+        await query({ query: statement.sql, query_params: statement.params })
+      ).json()) as never[],
+    }),
+    insert: async () => undefined,
+  };
+  return async () => client as never;
 }
