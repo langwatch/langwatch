@@ -43,7 +43,7 @@ Feature: LangWatchQL never answers across a tenant or an instance
     Given a self-hosted install whose ClickHouse has no LangWatchQL access model
     When a LangWatchQL query runs
     Then it is refused with error code lwql_not_provisioned
-    And once the access model is provisioned and the last answer has expired, the same query is answered
+    And once the access model is provisioned and a worker's check has stored that answer, the same query is answered
 
   @unit
   Scenario: Every LangWatchQL entry point passes the gate
