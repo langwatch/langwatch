@@ -124,23 +124,70 @@ function pruneCustomProperties({ nodes, mentioned }: { nodes: CssNode[]; mention
   });
 }
 
-/**
- * The rules of `nodes` a page can match (a name no page carries counts as present), keeping
- * only the custom properties something reads. `mentioned` lists the custom properties the
- * page markup and client bundles name.
- */
+const KEYFRAMES = /^@(?:-webkit-)?keyframes\s+([^\s{]+)/i;
+
+/** Every word (`[\w-]+`) of `text`: a superset of the animation names it can refer to. */
+export function wordsOf({ text }: { text: string }) {
+  return new Set(Array.from(text.matchAll(/[\w-]+/g), ([word]) => word));
+}
+
+/* Adds to `named` every word outside a `@keyframes` block: the names that can start one. */
+function collectAnimationWords({ nodes, named }: { nodes: CssNode[]; named: Set<string> }) {
+  for (const node of nodes) {
+    if (node.kind === "group") {
+      collectAnimationWords({ nodes: node.children, named });
+      continue;
+    }
+    const text = node.kind === "rule" ? node.body : node.text;
+    if (node.kind === "verbatim" && KEYFRAMES.test(text)) continue;
+    for (const word of wordsOf({ text })) named.add(word);
+  }
+}
+
+/* The tree without the `@keyframes` `named` lacks; groups left empty go too. */
+function keepNamedKeyframes({ nodes, named }: { nodes: CssNode[]; named: Set<string> }): CssNode[] {
+  return nodes.flatMap((node): CssNode[] => {
+    if (node.kind === "rule") return [node];
+    if (node.kind === "verbatim") {
+      const name = KEYFRAMES.exec(node.text)?.[1];
+      return name === undefined || named.has(name) ? [node] : [];
+    }
+    const children = keepNamedKeyframes({ nodes: node.children, named });
+    return children.length > 0 ? [{ ...node, children }] : [];
+  });
+}
+
+/* Drops `@keyframes` no kept rule, custom property, client script or page style names: Chakra
+   declares every animation of the system, and a page uses a handful. */
+function pruneKeyframes({
+  nodes,
+  animationWords,
+}: {
+  nodes: CssNode[];
+  animationWords: Set<string>;
+}) {
+  const named = new Set(animationWords);
+  collectAnimationWords({ nodes, named });
+  return keepNamedKeyframes({ nodes, named });
+}
+
+/** The rules of `nodes` a page can match (a name no page carries counts as present), with the
+    custom properties and keyframes something reads. `mentioned`: custom properties the page and
+    bundles name; `animationWords`: words of the bundles and the page's style attributes. */
 export function criticalCss({
   nodes,
   page,
   known,
   scripted,
   mentioned,
+  animationWords,
 }: {
   nodes: CssNode[];
   page: Set<string>;
   known: Set<string>;
   scripted: Set<string>;
   mentioned: Set<string>;
+  animationWords: Set<string>;
 }) {
   const present = (name: string) =>
     page.has(name) || !known.has(name) || scripted.has(name) || THEME_CLASSES.includes(name);
@@ -149,5 +196,6 @@ export function criticalCss({
       requiredNames({ selector: complex }).every(present),
     );
   const matched = filterStylesheet({ nodes, keep });
-  return serializeStylesheet({ nodes: pruneCustomProperties({ nodes: matched, mentioned }) });
+  const pruned = pruneCustomProperties({ nodes: matched, mentioned });
+  return serializeStylesheet({ nodes: pruneKeyframes({ nodes: pruned, animationWords }) });
 }

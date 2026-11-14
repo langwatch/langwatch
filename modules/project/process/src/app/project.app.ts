@@ -62,6 +62,12 @@ import {
   type ProjectFactsBackfillReport,
   type ProjectFactsBackfillRun,
 } from "../services/project-facts-backfill.service.ts";
+import {
+  ProjectHistoryListingService,
+  type ProjectHistoryListingReport,
+  type ProjectHistoryListingRun,
+  type ProjectHistoryListingSenders,
+} from "../services/project-history-listing.service.ts";
 import { ProjectOperationsService } from "../services/project-operations.service.ts";
 import { ProjectRequestService } from "../services/project-request.service.ts";
 import { ProjectService as ProjectApplicationService } from "../services/project.service.ts";
@@ -123,6 +129,7 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
   readonly #operations: ProjectOperationsService;
   readonly #lifecycle: ProjectCreatedNoticeService;
   readonly #factsBackfill: ProjectFactsBackfillService;
+  readonly #historyListing: ProjectHistoryListingService;
   readonly #authorization: AuthzApi;
   readonly #dataPrivacy: DataPrivacyApi;
   readonly #organizations: Pick<OrganizationApi, "isMember" | "getMember">;
@@ -141,6 +148,7 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     operations,
     lifecycle,
     factsBackfill,
+    historyListing,
     authorization,
     dataPrivacy,
     organizations,
@@ -152,6 +160,7 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     operations: ProjectOperationsService;
     lifecycle: ProjectCreatedNoticeService;
     factsBackfill: ProjectFactsBackfillService;
+    historyListing: ProjectHistoryListingService;
     authorization: AuthzApi;
     dataPrivacy: DataPrivacyApi;
     organizations: Pick<OrganizationApi, "isMember" | "getMember">;
@@ -163,6 +172,7 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     this.#operations = operations;
     this.#lifecycle = lifecycle;
     this.#factsBackfill = factsBackfill;
+    this.#historyListing = historyListing;
     this.#authorization = authorization;
     this.#dataPrivacy = dataPrivacy;
     this.#organizations = organizations;
@@ -204,6 +214,10 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
         lifecycle,
         logger: createLogger("langwatch:project:facts-backfill"),
       }),
+      historyListing: ProjectHistoryListingService.create({
+        projects: repositories.projects,
+        logger: createLogger("langwatch:project:history-listing"),
+      }),
       authorization: dependencies.authorization,
       dataPrivacy: dependencies.dataPrivacy,
       organizations: dependencies.organizations,
@@ -235,6 +249,11 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     this.#lifecycle.connect(senders);
   }
 
+  /** The history listing's senders, from the same pipeline. */
+  connectHistoryListing(senders: ProjectHistoryListingSenders): void {
+    this.#historyListing.connect(senders);
+  }
+
   /** Records a project organization created (a personal one, §9); throws so the queue retries. */
   recordProjectCreated(
     input: Readonly<{ projectId: string; organizationId: string }>,
@@ -250,6 +269,11 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
   /** The `project:record-created-facts` step's body: every project's facts, one pass. */
   recordExistingFacts(input: ProjectFactsBackfillRun): Promise<ProjectFactsBackfillReport> {
     return this.#factsBackfill.recordExisting(input);
+  }
+
+  /** The `project:list-personal-owner-and-first-message-facts` step's body, one pass. */
+  sendHistoryFacts(input: ProjectHistoryListingRun): Promise<ProjectHistoryListingReport> {
+    return this.#historyListing.sendHistory(input);
   }
 
   /**

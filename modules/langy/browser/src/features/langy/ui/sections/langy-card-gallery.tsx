@@ -619,6 +619,43 @@ export function LangyCardGallery() {
   );
 }
 
+const ESC = "\u001b";
+
+/** A uv run that failed, as the worker renders it: colours, a redrawn progress bar, warnings. */
+const FAILED_UV_COMMAND = [
+  "exit code: 1",
+  "",
+  "stdout:",
+  "(empty)",
+  "",
+  "stderr:",
+  `${ESC}[2mResolved ${ESC}[1m42 packages${ESC}[0m ${ESC}[2min 1.21s${ESC}[0m`,
+  `⠙ Preparing packages... (0/3)\r${ESC}[2K⠹ numpy==2.1.3 ${ESC}[32m━━━━━━${ESC}[0m 4.1 MiB\r${ESC}[2K`,
+  `${ESC}[33mwarning${ESC}[0m: \`VIRTUAL_ENV=/Users/ada/.venv\` does not match the project environment path \`.venv\``,
+  "DeprecationWarning: pkg_resources is deprecated as an API",
+  "Traceback (most recent call last):",
+  '  File "/Users/ada/acme-app/main.py", line 3, in <module>',
+  "    from langwatch import connect_agent",
+  "ImportError: cannot import name 'connect_agent' from 'langwatch'",
+].join("\n");
+
+/** One shell call on the developer's machine, running or failed, as the stream delivers it. */
+function localCommandMessage({ state, errorText }: { state: string; errorText?: string }) {
+  return {
+    id: `gallery-local-${state}`,
+    role: "assistant",
+    parts: [
+      {
+        type: "tool-local_bash",
+        toolCallId: `local-${state}`,
+        state,
+        input: { command: "uv run --with langwatch python main.py" },
+        ...(errorText ? { errorText } : {}),
+      },
+    ],
+  } as never;
+}
+
 /** The local-control cards: one permission card per state, plus the ask. */
 function LangyLocalControlGallery() {
   const { project } = useOrganizationTeamProject();
@@ -666,6 +703,11 @@ function LangyLocalControlGallery() {
         {...shared}
         card={{ ...permission, status: "expired" }}
         skipAllowed
+      />
+      <StreamingStatusLine status="Running on Ada's machine" />
+      <LangyToolActivity message={localCommandMessage({ state: "input-available" })} />
+      <LangyToolActivity
+        message={localCommandMessage({ state: "output-error", errorText: FAILED_UV_COMMAND })}
       />
       {project?.id && conversationId ? (
         <LangyCodeAccessCard

@@ -1,5 +1,5 @@
 import { formatDatasetByteLimit } from "@langwatch/dataset-contract";
-import { HandledError } from "@langwatch/handled-error";
+import { HandledError, remediation } from "@langwatch/handled-error";
 
 export class WorkflowNotFoundError extends HandledError {
   declare readonly code: "workflow_not_found";
@@ -66,6 +66,24 @@ export class WorkflowExecutionFailedError extends HandledError {
       ...options,
     });
     this.name = "WorkflowExecutionFailedError";
+  }
+}
+
+/**
+ * The workflow ran, but what it returned is larger than the engine can answer with in one
+ * synchronous call (Lambda caps a response at 6 MB). The run's own output is the cause, so it is
+ * the sender's to shrink, not an engine fault.
+ */
+export class WorkflowResultTooLargeError extends HandledError {
+  declare readonly code: "workflow_result_too_large";
+
+  constructor() {
+    super(
+      "workflow_result_too_large",
+      "The workflow's result is too large to return. Make it return less data, for example fewer rows or shorter text.",
+      { httpStatus: 422, fault: "customer", ...remediation("workflow_result_too_large") },
+    );
+    this.name = "WorkflowResultTooLargeError";
   }
 }
 

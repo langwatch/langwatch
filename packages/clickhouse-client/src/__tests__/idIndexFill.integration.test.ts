@@ -124,7 +124,11 @@ async function indexOf({
 
 const ms = (iso: string) => Date.parse(iso);
 
-/** The id-index dedup setting each finished insert into one table ran with, from the query log. */
+/**
+ * The view dedup setting each finished insert into one table ran with. The query log records only
+ * a value off the session default (26.2 made 1 the default), so an absent key reads as the
+ * default this same user's session has.
+ */
 async function dedupSettingOfInserts({
   probe,
   source,
@@ -134,11 +138,12 @@ async function dedupSettingOfInserts({
 }): Promise<string[]> {
   await probe.command({ query: "SYSTEM FLUSH LOGS" });
   const result = await probe.query({
-    query: `SELECT Settings['deduplicate_blocks_in_dependent_materialized_views'] AS dedup
+    query: `SELECT if(mapContains(Settings, {setting:String}), Settings[{setting:String}],
+        (SELECT value FROM system.settings WHERE name = {setting:String})) AS dedup
       FROM system.query_log
       WHERE type = 'QueryFinish' AND query_kind = 'Insert' AND has(tables, currentDatabase() || '.' || {source:String})
         AND event_date >= yesterday()`,
-    query_params: { source },
+    query_params: { source, setting: "deduplicate_blocks_in_dependent_materialized_views" },
     format: "JSONEachRow",
   });
   const rows = await result.json<{ dedup: string }>();

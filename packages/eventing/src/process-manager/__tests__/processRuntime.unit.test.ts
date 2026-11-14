@@ -405,7 +405,49 @@ describe("ProcessRuntime", () => {
     });
   });
 
-  describe("given the store reports a revision conflict on commit", () => {
+  describe("given the store reports a revision conflict once, then commits", () => {
+    /** @scenario "An event that loses a revision race is re-applied to the winning revision" */
+    it("handles the event without failing the delivery", async () => {
+      let commits = 0;
+      const store = makeStubStore({
+        commit: async () => {
+          commits++;
+          if (commits === 1) return { outcome: "revisionConflict" as const, actualRevision: 3 };
+          return {
+            outcome: "committed" as const,
+            revision: 4,
+            insertedMessageKeys: [],
+            duplicateMessageKeys: [],
+          };
+        },
+      });
+      const runtime = new ProcessRuntime({ store, consumersEnabled: false });
+      const definition = buildProcessManager<ProcessTestEvent>({
+        name: "raceInbox",
+        applier: (pm) =>
+          pm
+            .state(z.object({ count: z.number() }), { count: 0 })
+            .intent("noop", z.object({}), async () => {})
+            .on(testProcessEventSchema, (state) => ({
+              state: { count: state.count + 1 },
+            })),
+      });
+      const [subscriber] = runtime.registerPipeline<ProcessTestEvent>({
+        pipelineName: "automations",
+        processManagers: new Map([["raceInbox", definition]]),
+      }).subscribers;
+
+      await expect(
+        subscriber!.handle(physicalEvent("physical-1"), { tenantId, aggregateId: "trigger-1" }),
+      ).resolves.toBeUndefined();
+      expect(commits).toBe(2);
+
+      await runtime.stop();
+    });
+  });
+
+  describe("given the store reports a revision conflict on every commit", () => {
+    /** @scenario "An event that keeps losing its revision race is handed back to the queue" */
     it("throws naming the process manager and the source event", async () => {
       const store = makeStubStore({
         commit: async () => ({

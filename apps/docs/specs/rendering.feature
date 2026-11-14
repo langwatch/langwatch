@@ -90,6 +90,73 @@ Feature: Read and navigate the generated documentation
     Then keys, strings and other values take the code blocks' colours as they type
     And text that is not yet valid JSON is still shown, uncoloured where it cannot be read
 
+  @integration
+  Scenario: Fill a request body in a form built from its schema
+    Given an endpoint whose JSON request body is an object
+    When the reader opens Try it
+    Then the body is a form of its fields, each labelled with its name and type, marked when required, with its description as a hint
+    And a field the schema formats as a date or date-time is a date picker that sends that format, in UTC
+    And a number field the schema describes as epoch milliseconds is a date-time picker that sends milliseconds
+    And a field with an enum is a select, a boolean is an Omit, true or false switch (a checkbox when required), and a number is a number field with the schema's minimum and maximum
+    And a list of plain values has a row per value, with Add and Remove
+    And a nested object is a group of its own fields
+    And a field the form cannot represent, such as a union or a free-form object, is a small JSON field inside the form
+    And a field left empty is left out of the request
+    But a field the schema gives no date format stays a text field, whatever its name
+
+  @integration
+  Scenario: Switch the request body between the form and JSON
+    Given the reader has filled the body form
+    When they choose JSON
+    Then the editor shows the form's value, pretty-printed
+    When they edit the JSON and choose Form
+    Then the form shows the edited value
+    But JSON that does not parse, or a value the form cannot show, keeps them in JSON with the reason under the editor
+
+  @integration
+  Scenario: Send and show the form's value as the request body
+    Given the reader has filled the body form
+    Then the Python, TypeScript and curl examples and the agent prompt carry that value
+    And Send request sends that value as the body
+    And a required field left empty, or a JSON sub-field that does not parse, prevents sending and is marked on its field
+
+  @unit
+  Scenario: Switch to JSON with a required field empty inside a nested object
+    Given the reader filled part of a nested object in the body form and left its required field empty
+    When they choose JSON
+    Then the editor shows the form's value and the empty field is left for them to fill in JSON
+
+  @unit
+  Scenario: A broken JSON sub-field inside an empty optional object still blocks sending
+    Given an optional object whose only filled field is a JSON sub-field that does not parse
+    When the reader sends or chooses JSON
+    Then the sub-field is marked as invalid JSON and nothing is sent
+
+  @unit
+  Scenario: A date with milliseconds stays in JSON
+    Given the reader's JSON holds a timestamp with milliseconds in a date field
+    When they choose Form
+    Then they stay in JSON with the reason to edit that field as JSON, and the value is unchanged
+
+  @unit
+  Scenario: An empty value the form would drop stays in JSON
+    Given the reader's JSON holds an empty string, an empty optional list or an empty optional object
+    When they choose Form
+    Then they stay in JSON with the reason to edit that field as JSON, and the value is unchanged
+
+  @integration
+  Scenario: Keep what the reader typed while the typed fields load
+    Given the reader opened Try it and the typed fields have not loaded yet
+    When they fill a body field and a parameter
+    Then the prerendered form stays in place and takes their input
+    And once the typed fields load, the body and every example carry what they typed
+
+  @integration
+  Scenario: Type each parameter by its schema
+    Given an endpoint with date-time, enum, boolean and number parameters
+    Then a date-time parameter is a date picker sent as an ISO timestamp in UTC
+    And an enum parameter is a select, a boolean is an Omit, true or false switch, and a number is a number field with the schema's limits
+
   @e2e
   Scenario: Start with a coding agent
     Given the reader opens the introduction

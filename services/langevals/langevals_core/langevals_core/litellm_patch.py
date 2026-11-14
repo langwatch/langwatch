@@ -10,8 +10,10 @@ import litellm.cost_calculator
 from openai import OpenAI, AzureOpenAI
 import json
 
+from langevals_core.model_capabilities import output_tokens_parameter
 from langevals_core.model_pricing import register_langwatch_model_pricing
 from langevals_core.request_env import current_request_env
+from langevals_core.usage_ledger import record_usage
 
 # Necessary for running DSPy on AWS lambdas
 os.environ["DSP_CACHEDIR"] = mkdtemp()
@@ -457,6 +459,30 @@ def apply_anthropic_sampling_compatibility(kwargs: dict) -> dict:
     return kwargs
 
 
+def apply_output_tokens_parameter(
+    kwargs: dict, requested_model: Optional[str] = None
+) -> dict:
+    """
+    Send the output token limit under the name the catalog records for the
+    model. OpenAI's reasoning models refuse `max_tokens`, and litellm renames it
+    only for the models it recognises by name.
+
+    Looked up by the model the caller named, before any Azure deployment
+    rewrite, since a deployment name says nothing about the model behind it. A
+    limit the caller already sent as `max_completion_tokens` is kept.
+    """
+    if kwargs.get("max_tokens") is None:
+        return kwargs
+    model = requested_model or kwargs.get("model")
+    if output_tokens_parameter(model) != "max_completion_tokens":
+        return kwargs
+
+    limit = kwargs.pop("max_tokens")
+    if kwargs.get("max_completion_tokens") is None:
+        kwargs["max_completion_tokens"] = limit
+    return kwargs
+
+
 def convert_param_type(key: str, value: str):
     """Convert string env var value to proper type for litellm params."""
     if key in INT_PARAMS:
@@ -674,6 +700,9 @@ def patch_litellm_params_with_requested_model(
     # each came from — an evaluator argument or a request's X_LITELLM_*
     # setting — so this is the first point the conflict is even visible.
     kwargs = apply_anthropic_sampling_compatibility(kwargs)
+    # The limit can arrive from an evaluator argument or a request's
+    # X_LITELLM_max_tokens, so this too waits until both have landed.
+    kwargs = apply_output_tokens_parameter(kwargs, requested_model=requested_model)
 
     return kwargs, requested_model
 
@@ -784,15 +813,18 @@ def patch_litellm():
             return await acomplete_with_auto_tool_choice(args, kwargs)
 
     def patched_completion(*args, **kwargs):
-        kwargs, requested_model = patch_litellm_params_with_requested_model(kwargs)
+        requested_model = kwargs.get("model")
+        kwargs, asked_model = patch_litellm_params_with_requested_model(kwargs)
         while True:
             try:
-                return complete(args, kwargs)
+                response = complete(args, kwargs)
+                record_usage(requested_model, response)
+                return response
             except Exception as exception:
                 adjusted = adjusted_after_refusal(kwargs, exception)
                 if adjusted is None:
                     conflict = tool_reasoning_conflict(
-                        kwargs, exception, requested_model=requested_model
+                        kwargs, exception, requested_model=asked_model
                     )
                     if conflict is not None:
                         raise conflict from exception
@@ -802,15 +834,18 @@ def patch_litellm():
     litellm.completion = patched_completion
 
     async def patched_acompletion(*args, **kwargs):
-        kwargs, requested_model = patch_litellm_params_with_requested_model(kwargs)
+        requested_model = kwargs.get("model")
+        kwargs, asked_model = patch_litellm_params_with_requested_model(kwargs)
         while True:
             try:
-                return await acomplete(args, kwargs)
+                response = await acomplete(args, kwargs)
+                record_usage(requested_model, response)
+                return response
             except Exception as exception:
                 adjusted = adjusted_after_refusal(kwargs, exception)
                 if adjusted is None:
                     conflict = tool_reasoning_conflict(
-                        kwargs, exception, requested_model=requested_model
+                        kwargs, exception, requested_model=asked_model
                     )
                     if conflict is not None:
                         raise conflict from exception
@@ -820,8 +855,11 @@ def patch_litellm():
     litellm.acompletion = patched_acompletion
 
     def patched_embedding(*args, **kwargs):
+        requested_model = kwargs.get("model")
         kwargs = patch_litellm_embedding_params(kwargs)
-        return originals["embedding"](*args, **kwargs)
+        response = originals["embedding"](*args, **kwargs)
+        record_usage(requested_model, response)
+        return response
 
     litellm.embedding = patched_embedding
 

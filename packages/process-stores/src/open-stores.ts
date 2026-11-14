@@ -113,6 +113,7 @@ function clickhouseConfigOf({
     ? {
         clickhouse: {
           ...(url ? { url: url } : {}),
+          ...(config.clickhousePasswordFile ? { passwordFile: config.clickhousePasswordFile } : {}),
           ...(clickhouseRoutes.routes.length > 0 ? { privateRoutes: clickhouseRoutes.routes } : {}),
           ...(clickhouseRoutes.malformed.length > 0
             ? { malformedRoutes: clickhouseRoutes.malformed }

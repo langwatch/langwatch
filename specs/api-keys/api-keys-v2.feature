@@ -75,7 +75,7 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
 
     @unit
     Scenario: A run nobody started is refused a trace read cleanly
-      Given the key of a run nobody started, for project "alpha"
+      Given the key of a run that names neither a person nor a starting key, for project "alpha"
       When a trace search is sent with that key
       Then the answer is 403 "permission_denied"
 

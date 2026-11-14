@@ -9,6 +9,7 @@ import {
   type LangWatchQLAcceptedGranularityStep,
   type LangWatchQLGranularityStep,
   type LangWatchQLQueryResult,
+  type LangWatchQLRunTelemetryRequest,
 } from "@langwatch/analytics-contract";
 import type {
   ChartFrameDashboardContext,
@@ -70,6 +71,29 @@ export interface DashboardWidgetExecutorOverrides {
   readonly timeWindow?: { start: number; end: number };
   /** Replaces {@link DEFAULT_GRANULARITY} — the dashboard's own step. */
   readonly granularitySeconds?: LangWatchQLAcceptedGranularityStep;
+  /** The placed widget its runs are for, for their log line; absent in the editor's preview. */
+  readonly telemetry?: LangWatchQLRunTelemetryRequest;
+}
+
+/** The ids a widget's runs are logged under, apart, so a hook can depend on them by value. */
+function telemetryIdsOf(
+  overrides: DashboardWidgetExecutorOverrides | undefined,
+): Partial<LangWatchQLRunTelemetryRequest> {
+  return overrides?.telemetry ?? {};
+}
+
+/** The ids put back together for the request; none when the run is no placed widget's. */
+function runTelemetryOf({
+  dashboardId,
+  widgetId,
+  templateId,
+}: Partial<LangWatchQLRunTelemetryRequest>): LangWatchQLRunTelemetryRequest | undefined {
+  if (widgetId === void 0) return void 0;
+  return {
+    widgetId,
+    ...(dashboardId === void 0 ? {} : { dashboardId }),
+    ...(templateId === void 0 ? {} : { templateId }),
+  };
 }
 
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: splits would scatter closured state.
@@ -89,6 +113,8 @@ export function useDashboardWidgetExecutor(
   const pageWindow = overrides?.timeWindow ?? mountWindow;
   const granularitySeconds: LangWatchQLAcceptedGranularityStep =
     overrides?.granularitySeconds ?? DEFAULT_GRANULARITY;
+  // By value, not by object: a caller that builds the ids afresh each render keeps one run.
+  const { dashboardId, widgetId, templateId } = telemetryIdsOf(overrides);
   const execute = useMemo(
     () =>
       createLangWatchQLExecute({
@@ -135,6 +161,7 @@ export function useDashboardWidgetExecutor(
           // What the query stores; null asks the server for the default (dashboards-v2 AC200f).
           sources: query.sources ?? null,
           ...(query.projects ? { projects: query.projects } : {}),
+          telemetry: runTelemetryOf({ dashboardId, widgetId, templateId }),
         },
         // `execute` requires a signal; callers without one (e.g. `runStandalone`)
         // get a fresh controller's signal, which simply never aborts.
@@ -143,7 +170,7 @@ export function useDashboardWidgetExecutor(
       noteLimits({ query: query.sql, result });
       return toChartQueryResult(result);
     },
-    [execute, pageWindow, granularitySeconds, noteLimits],
+    [execute, pageWindow, granularitySeconds, noteLimits, dashboardId, widgetId, templateId],
   );
 
   const executeQuery: ChartFrameExecuteQuery = useCallback(

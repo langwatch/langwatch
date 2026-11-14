@@ -57,7 +57,11 @@ export function testNamespace(prefix: string): string {
 /** Reads real project + team rows this integration suite created; other reads throw. */
 export function createPrismaProjects(prisma: PrismaClient): ProjectApi {
   const findWithTeam = async (id: string): Promise<ProjectWithTeam | null> => {
-    const project = await prisma.project.findUnique({ where: { id }, include: { team: true } });
+    const project = await prisma.project.findUnique({
+      where: { id },
+      include: { team: true },
+      omit: { legacyApiKeyLastUsedAt: true },
+    });
     return projectWithTeamSchema.nullable().parse(project);
   };
   return createApiFixture<ProjectApi>(

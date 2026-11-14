@@ -4,9 +4,11 @@
  * check names are the ones the dashboards dev seed sends, so the demo fills every panel.
  */
 
+import { gatheredRows } from "../../templates/model/lwql-gathered.ts";
 import {
   bucketOf,
   END,
+  firstTraceMetricsRow,
   inPeriod,
   inPeriodAndPrevious,
   MIDPOINT,
@@ -39,6 +41,8 @@ export const UNIT_KEYS = [
   { attribute: "langwatch.labels", one: "label", many: "labels", things: "conversations" },
 ] as const;
 
+type UnitAttribute = (typeof UNIT_KEYS)[number]["attribute"];
+
 const LABELS = "langwatch.labels";
 
 /** The deterministic check that fails a reply which repeats an earlier sentence. */
@@ -47,89 +51,178 @@ export const REPEAT_CHECK = "Repeated Sentence Check";
 export const FIELD_CHECK = "Field accuracy per field";
 const WRONG_PREFIX = "Wrong: ";
 
-/** At least one trace in the period carries the attribute; labels need a non-empty list. */
-const carries = (attribute: string) =>
-  attribute === LABELS
-    ? `countIf(Attributes['${LABELS}'] NOT IN ('', '[]')) > 0, '${attribute}'`
-    : `countIf(Attributes['${attribute}'] != '') > 0, '${attribute}'`;
-
-/** The one attribute this project's period groups by, empty when no trace carries any. */
-const UNIT_KEY = `(
-  SELECT multiIf(
-    ${UNIT_KEYS.map(({ attribute }) => carries(attribute)).join(",\n    ")},
-    '')
-  FROM traces
-  WHERE ${inPeriod("OccurredAt")}
-) AS unit_key`;
-
-/** A trace's unit: the chosen attribute's value, the first label for labels. */
-const UNIT = `if(unit_key = '${LABELS}', JSONExtractString(Attributes['${LABELS}'], 1),
-  Attributes[unit_key])`;
-
 /** A conversation is its thread; a trace with no thread is a conversation of one. */
 const CONVERSATION = `if(Attributes['langwatch.thread.id'] != '', Attributes['langwatch.thread.id'],
   TraceId)`;
 
-/** The prompt or config version a trace ran on: its managed prompt, else its metadata. */
-const VERSION = `coalesce(nullIf(Attributes['metadata.prompt_version'], ''),
-  LastUsedPromptVersionId, '')`;
+/**
+ * The one attribute this project's period groups by, read from `trace_metrics`' typed columns
+ * (tasks#1117), never the `traces` map, which runs out of memory on large projects.
+ */
+const METRICS_UNIT_COLUMNS: Readonly<Record<UnitAttribute, string>> = {
+  "langwatch.customer_id": "ifNull(CustomerId, '')",
+  "metadata.document_type": "MetadataDocumentType",
+  "metadata.language": "MetadataLanguage",
+  "metadata.team": "MetadataTeam",
+  "metadata.flow": "MetadataFlow",
+  "metadata.segment": "MetadataSegment",
+  "metadata.topic": "MetadataTopic",
+  [LABELS]: "Labels[1]",
+};
+
+const metricsCarries = (attribute: UnitAttribute) =>
+  attribute === LABELS
+    ? `countIf(notEmpty(Labels)) > 0, '${attribute}'`
+    : `countIf(${METRICS_UNIT_COLUMNS[attribute]} != '') > 0, '${attribute}'`;
+
+const METRICS_UNIT_KEY = `(
+  SELECT multiIf(
+    ${UNIT_KEYS.map(({ attribute }) => metricsCarries(attribute)).join(",\n    ")},
+    '')
+  FROM trace_metrics
+  WHERE ${inPeriod("OccurredAt")}
+) AS unit_key`;
+
+const metricsUnitOf = ({ attribute }: { attribute: UnitAttribute }) =>
+  `unit_key = '${attribute}', ${METRICS_UNIT_COLUMNS[attribute]}`;
+
+const METRICS_UNIT = `multiIf(
+    ${UNIT_KEYS.map(metricsUnitOf).join(",\n    ")},
+    '')`;
+
+const METRICS_CONVERSATION = "coalesce(nullIf(ConversationId, ''), TraceId)";
+
+/** A trace's key in the judged-trace joins: 16 bytes instead of the id (analytics ADR-004). */
+const TRACE_KEY = "sipHash128(TraceId)";
+
+/** The time a managed-version row carries, after every trace row, so no `min` picks it. */
+const AFTER_EVERY_ROW = "toDateTime64('2200-01-01 00:00:00', 3)";
 
 /**
- * Judges' verdicts joined to the unit, version and time of the answer they judged, over the
- * period and the one before: an evaluation is stamped when it ran, maybe long after the answer.
- * Guardrails guard, they do not grade.
+ * Judges' verdicts over both periods, dated by the trace on their own row: an evaluation may run
+ * long after the answer, and no join to `trace_metrics` (analytics ADR-007). Guardrails guard.
  */
-const JUDGED_TRACES = `FROM evaluation_metrics AS e
-INNER JOIN (
-  SELECT TraceId, ${UNIT} AS unit, ${VERSION} AS version, OccurredAt AS at
-  FROM traces
-  WHERE ${inPeriodAndPrevious("OccurredAt")}
-) AS t ON t.TraceId = e.TraceId
-WHERE e.OccurredAt >= ${PREVIOUS_START}
-  AND e.Passed IS NOT NULL
-  AND e.IsGuardrail = false`;
+const JUDGED_IN_BOTH_PERIODS = `OccurredAt >= ${PREVIOUS_START} AND ${inPeriodAndPrevious("TraceOccurredAt")}
+      AND Passed IS NOT NULL
+      AND IsGuardrail = false`;
 
-export const UNIT_VOLUME_SQL = `WITH ${UNIT_KEY}
-SELECT unit_key, ${UNIT} AS unit,
-  uniqExact(${CONVERSATION}) AS conversations,
+/** Each judged trace once, with the unit and metadata version of its first evaluation row. */
+const JUDGED_UNIT_TRACES = `SELECT ${TRACE_KEY} AS trace,
+    argMin(unit, TraceOccurredAt) AS unit,
+    argMin(MetadataPromptVersion, TraceOccurredAt) AS version,
+    min(TraceOccurredAt) AS at,
+    countIf(Passed = 1) AS passed,
+    count() AS judged
+  FROM (SELECT TraceId, TraceOccurredAt, MetadataPromptVersion, Passed, ${METRICS_UNIT} AS unit
+    FROM trace_evaluation_metrics
+    WHERE ${JUDGED_IN_BOTH_PERIODS})
+  GROUP BY trace`;
+
+/**
+ * Each judged trace once, as {@link JUDGED_UNIT_TRACES}, with the managed prompt version
+ * streamed in beside the verdicts, so no second join (analytics ADR-004); a trace with only a
+ * managed-version row is no judged trace and is left out.
+ */
+const JUDGED_VERSION_TRACES = `SELECT t.trace AS trace,
+    argMin(t.unit, t.at) AS unit,
+    argMin(t.version, t.at) AS version,
+    min(t.at) AS at,
+    any(t.managed) AS managed,
+    countIf(t.judged = 1 AND t.passed = 1) AS passed,
+    countIf(t.judged = 1) AS judged
+  FROM (
+    SELECT ${TRACE_KEY} AS trace, ${METRICS_UNIT} AS unit, MetadataPromptVersion AS version,
+      TraceOccurredAt AS at,
+      CAST(NULL AS Nullable(String)) AS managed, Passed AS passed, 1 AS judged
+    FROM trace_evaluation_metrics
+    WHERE ${JUDGED_IN_BOTH_PERIODS}
+    UNION ALL
+    SELECT ${TRACE_KEY} AS trace, '' AS unit, '' AS version, ${AFTER_EVERY_ROW} AS at,
+      LastUsedPromptVersionId AS managed, CAST(NULL AS Nullable(Bool)) AS passed, 0 AS judged
+    FROM traces
+    WHERE ${inPeriodAndPrevious("OccurredAt")}
+      AND LastUsedPromptVersionId != ''
+  ) AS t
+  GROUP BY t.trace
+  HAVING at < ${AFTER_EVERY_ROW}`;
+
+export const UNIT_VOLUME_SQL = `WITH ${METRICS_UNIT_KEY}
+SELECT unit_key, ${METRICS_UNIT} AS unit,
+  uniqExact(${METRICS_CONVERSATION}) AS conversations,
   sum(TotalCost) AS cost
-FROM traces
+FROM trace_metrics
 WHERE ${inPeriod("OccurredAt")}
+  AND ${firstTraceMetricsRow()}
 GROUP BY unit
 ORDER BY conversations DESC
 LIMIT 8`;
 
-export const UNIT_TOTALS_SQL = `WITH ${UNIT_KEY}
-SELECT uniqExact(${CONVERSATION}) AS conversations,
-  uniqExact(${UNIT}) AS units,
+/**
+ * `conversations` is the share denominator, so it counts (unit, conversation) pairs: a thread
+ * whose traces fall in two units counts once in each unit row, and so twice here too.
+ */
+export const UNIT_TOTALS_SQL = `WITH ${METRICS_UNIT_KEY}
+SELECT uniqExact((${METRICS_UNIT}, ${METRICS_CONVERSATION})) AS conversations,
+  uniqExact(${METRICS_UNIT}) AS units,
   sum(TotalCost) AS cost
-FROM traces
-WHERE ${inPeriod("OccurredAt")}`;
-
-export const UNIT_COST_SQL = `WITH ${UNIT_KEY}
-SELECT unit_key, ${UNIT} AS unit, sum(TotalCost) AS cost
-FROM traces
+FROM trace_metrics
 WHERE ${inPeriod("OccurredAt")}
+  AND ${firstTraceMetricsRow()}`;
+
+export const UNIT_COST_SQL = `WITH ${METRICS_UNIT_KEY}
+SELECT unit_key, ${METRICS_UNIT} AS unit, sum(TotalCost) AS cost
+FROM trace_metrics
+WHERE ${inPeriod("OccurredAt")}
+  AND ${firstTraceMetricsRow()}
 GROUP BY unit
 ORDER BY cost DESC
 LIMIT 6`;
 
-/** Each unit's judged answers in the period and in the equally long window before it. */
-export const UNIT_PASS_RATES_SQL = `WITH ${UNIT_KEY}
+/**
+ * Each unit's judged answers in the period and in the equally long window before it. Most judged
+ * first: the cap keeps the units that can show a rate, the same each run.
+ */
+export const UNIT_PASS_RATES_SQL = `WITH ${METRICS_UNIT_KEY}
 SELECT t.unit AS unit,
-  countIf(e.Passed = 1 AND t.at >= ${START}) AS passed,
-  countIf(t.at >= ${START}) AS judged,
-  countIf(e.Passed = 1 AND t.at < ${START}) AS passed_before,
-  countIf(t.at < ${START}) AS judged_before
-${JUDGED_TRACES}
+  sumIf(t.passed, t.at >= ${START}) AS passed,
+  sumIf(t.judged, t.at >= ${START}) AS judged,
+  sumIf(t.passed, t.at < ${START}) AS passed_before,
+  sumIf(t.judged, t.at < ${START}) AS judged_before
+FROM (
+  ${JUDGED_UNIT_TRACES}
+) AS t
 GROUP BY unit
+ORDER BY judged + judged_before DESC, unit
 LIMIT 200`;
 
-const VERSIONS = `SELECT ${VERSION} AS version, min(OccurredAt) AS first_seen
-    FROM traces
-    WHERE ${inPeriodAndPrevious("OccurredAt")}
-    GROUP BY version
-    HAVING version != ''`;
+/**
+ * A trace's version is its metadata's (`trace_metrics`), else its managed prompt version, never
+ * the map (analytics ADR-004). The id set holds 64-bit hashes of the traces that send a metadata
+ * version: id strings outgrew the memory limit on 2M traces a month.
+ */
+const METADATA_VERSIONED = `SELECT cityHash64(TraceId)
+        FROM trace_metrics
+        WHERE ${inPeriodAndPrevious("OccurredAt")}
+          AND MetadataPromptVersion != ''`;
+
+const VERSIONS = `SELECT version, min(first_seen) AS first_seen
+    FROM (
+      SELECT MetadataPromptVersion AS version, min(OccurredAt) AS first_seen
+      FROM trace_metrics
+      WHERE ${inPeriodAndPrevious("OccurredAt")}
+        AND MetadataPromptVersion != ''
+      GROUP BY version
+      UNION ALL
+      SELECT ifNull(LastUsedPromptVersionId, '') AS version, min(OccurredAt) AS first_seen
+      FROM traces
+      WHERE ${inPeriodAndPrevious("OccurredAt")}
+        AND LastUsedPromptVersionId != ''
+        AND cityHash64(TraceId) NOT IN (
+          ${METADATA_VERSIONED}
+        )
+      GROUP BY version
+    )
+    GROUP BY version`;
 
 /** The newest version and the one it replaced, when the newest started in the period. */
 export const LAST_CHANGE_SQL = `SELECT versions[1].2 AS version,
@@ -144,15 +237,23 @@ FROM (
 WHERE length(versions) > 1
   AND changed_at >= ${START}`;
 
-/** Each unit's judged answers per version; the widget compares the newest with the one before. */
-export const VERSION_PASS_RATES_SQL = `WITH ${UNIT_KEY}
-SELECT unit_key, t.unit AS unit, t.version AS version,
+/**
+ * Each unit's judged answers per version; the widget compares the newest with the one before.
+ * The managed prompt version is read beside the judged traces' rows, never joined to them.
+ * Most judged first: the cap keeps the rows that can reach the judged minimum, the same each run.
+ */
+export const VERSION_PASS_RATES_SQL = `WITH ${METRICS_UNIT_KEY}
+SELECT unit_key, t.unit AS unit,
+  coalesce(nullIf(t.version, ''), t.managed, '') AS version,
   min(t.at) AS first_seen,
-  countIf(e.Passed = 1) AS passed,
-  count() AS judged
-${JUDGED_TRACES}
-  AND t.version != ''
+  sum(t.passed) AS passed,
+  sum(t.judged) AS judged
+FROM (
+  ${JUDGED_VERSION_TRACES}
+) AS t
+WHERE version != ''
 GROUP BY unit, version
+ORDER BY judged DESC, unit, version
 LIMIT 500`;
 
 /** One row per voice reply: a trace with a speech span, its stage times summed. */
@@ -160,9 +261,9 @@ const VOICE_REPLIES = `SELECT TraceId,
     min(StartTime) AS started,
     dateDiff('millisecond', min(StartTime), max(EndTime)) AS reply_ms,
     sumIf(DurationMs, SpanName = 'stt') AS listening_ms,
-    sumIf(DurationMs, SpanAttributes['langwatch.span.type'] = 'llm') AS thinking_ms,
+    sumIf(DurationMs, SpanType = 'llm') AS thinking_ms,
     sumIf(DurationMs, SpanName = 'tts') AS speaking_ms
-  FROM spans
+  FROM span_metrics
   WHERE ${inPeriod("StartTime")}
   GROUP BY TraceId
   HAVING countIf(SpanName IN ('stt', 'tts')) > 0`;
@@ -189,22 +290,34 @@ FROM (
   ${VOICE_REPLIES}
 )`;
 
+/**
+ * The traces with a speech span, gathered, like the failed repeat checks, before the calls are
+ * grouped: read side by side, the `traces` map and the checks ran past the memory cap at 60 days.
+ */
+const VOICE_TRACES = gatheredRows({
+  sql: `SELECT TraceId, ${CONVERSATION} AS call, OccurredAt AS at, ContainsErrorStatus
+    FROM traces
+    WHERE ${inPeriod("OccurredAt")}
+      AND TraceId IN (
+        SELECT TraceId FROM span_metrics WHERE ${inPeriod("StartTime")} AND SpanName IN ('stt', 'tts')
+      )`,
+  // Named apart from OccurredAt: an alias of that name keeps the evaluation reads unfloored.
+  columns: ["TraceId", "call", "at", "ContainsErrorStatus"],
+});
+
 /** One row per call: a conversation with a speech span, whether it ended on an error. */
-const VOICE_CALLS = `SELECT ${CONVERSATION} AS call,
-    min(OccurredAt) AS started,
-    argMax(ContainsErrorStatus, OccurredAt) AS not_ended,
-    max(TraceId IN (
-      SELECT TraceId
-      FROM evaluation_metrics
-      WHERE ${inPeriod("OccurredAt")}
-        AND EvaluatorName = '${REPEAT_CHECK}'
-        AND Passed = 0
-    )) AS repeated
-  FROM traces
-  WHERE ${inPeriod("OccurredAt")}
-    AND TraceId IN (
-      SELECT TraceId FROM spans WHERE ${inPeriod("StartTime")} AND SpanName IN ('stt', 'tts')
-    )
+const VOICE_CALLS = `SELECT call,
+    min(at) AS started,
+    argMax(ContainsErrorStatus, at) AS not_ended,
+    max(TraceId IN (${gatheredRows({
+      sql: `SELECT TraceId
+        FROM evaluation_metrics
+        WHERE ${inPeriod("OccurredAt")}
+          AND EvaluatorName = '${REPEAT_CHECK}'
+          AND Passed = 0`,
+      columns: ["TraceId"],
+    })})) AS repeated
+  FROM (${VOICE_TRACES})
   GROUP BY call`;
 
 export const VOICE_CALL_TREND_SQL = `SELECT ${bucketOf("started")} AS bucket,
@@ -233,61 +346,73 @@ FROM (
   ${VOICE_CALLS}
 )`;
 
-const FIELD_CHECKS = `FROM evaluations AS e
-INNER JOIN (
-  SELECT TraceId, ${UNIT} AS unit
-  FROM traces
-  WHERE ${inPeriod("OccurredAt")}
-) AS t ON t.TraceId = e.TraceId
-WHERE ${inPeriod("e.ScheduledAt")}
-  AND e.EvaluatorName = '${FIELD_CHECK}'
-  AND e.Status = 'processed'`;
+/**
+ * Each field check once, with its trace's unit. The checks are the joined side, so the trace
+ * rows stream past them, and a trace with two rows still counts its checks once.
+ */
+const fieldChecks = (condition = "") => `FROM (
+  SELECT e.EvaluationId AS id,
+    argMin(t.unit, t.at) AS unit,
+    any(e.Details) AS details
+  FROM (
+    SELECT TraceId, ${METRICS_UNIT} AS unit, OccurredAt AS at
+    FROM trace_metrics
+    WHERE ${inPeriod("OccurredAt")}
+  ) AS t
+  INNER JOIN (
+    SELECT EvaluationId, TraceId, Details
+    FROM evaluations
+    WHERE ${inPeriod("ScheduledAt")}
+      AND EvaluatorName = '${FIELD_CHECK}'
+      AND Status = 'processed'${condition}
+  ) AS e ON e.TraceId = t.TraceId
+  GROUP BY e.EvaluationId
+) AS c`;
 
-export const FIELD_CHECKS_SQL = `WITH ${UNIT_KEY}
-SELECT unit_key, t.unit AS unit, count() AS checked
-${FIELD_CHECKS}
+export const FIELD_CHECKS_SQL = `WITH ${METRICS_UNIT_KEY}
+SELECT unit_key, c.unit AS unit, count() AS checked
+${fieldChecks()}
 GROUP BY unit
 ORDER BY checked DESC
 LIMIT 50`;
 
 /** Each field a check named wrong, per unit. */
-export const WRONG_FIELDS_SQL = `WITH ${UNIT_KEY}
-SELECT t.unit AS unit,
-  arrayJoin(splitByString(', ', substring(ifNull(e.Details, ''), ${WRONG_PREFIX.length + 1}))) AS field,
+export const WRONG_FIELDS_SQL = `WITH ${METRICS_UNIT_KEY}
+SELECT c.unit AS unit,
+  arrayJoin(splitByString(', ', substring(ifNull(c.details, ''), ${WRONG_PREFIX.length + 1}))) AS field,
   count() AS wrong
-${FIELD_CHECKS}
-  AND startsWith(e.Details, '${WRONG_PREFIX}')
+${fieldChecks(`\n      AND startsWith(Details, '${WRONG_PREFIX}')`)}
 GROUP BY unit, field
 LIMIT 500`;
 
 /** Sent to a person: the metadata flag, or the hand-over outcome. */
-const SENT_TO_REVIEW = `(Attributes['metadata.sent_to_review'] = 'true'
-    OR Attributes['metadata.outcome'] = 'handover')`;
-const REPORTS_REVIEW = `(Attributes['metadata.sent_to_review'] != ''
-    OR Attributes['metadata.outcome'] != '')`;
+const SENT_TO_REVIEW = "(MetadataSentToReview = 'true' OR MetadataOutcome = 'handover')";
+const REPORTS_REVIEW = "(MetadataSentToReview != '' OR MetadataOutcome != '')";
 
 export const REVIEW_TREND_SQL = `SELECT ${bucketOf("OccurredAt")} AS bucket,
-  countIf(${REPORTS_REVIEW}) AS documents,
-  countIf(${SENT_TO_REVIEW}) AS sent
-FROM traces
+  uniqExactIf(TraceId, ${REPORTS_REVIEW}) AS documents,
+  uniqExactIf(TraceId, ${SENT_TO_REVIEW}) AS sent
+FROM trace_metrics
 WHERE ${inPeriod("OccurredAt")}
+  AND ${firstTraceMetricsRow()}
 GROUP BY bucket
 ORDER BY bucket`;
 
-export const REVIEW_SUMMARY_SQL = `SELECT count() AS traces,
-  countIf(${REPORTS_REVIEW}) AS documents,
-  countIf(${SENT_TO_REVIEW}) AS sent,
-  countIf(${REPORTS_REVIEW} AND OccurredAt < ${MIDPOINT}) AS documents_first,
-  countIf(${SENT_TO_REVIEW} AND OccurredAt < ${MIDPOINT}) AS sent_first
-FROM traces
-WHERE ${inPeriod("OccurredAt")}`;
+export const REVIEW_SUMMARY_SQL = `SELECT uniqExact(TraceId) AS traces,
+  uniqExactIf(TraceId, ${REPORTS_REVIEW}) AS documents,
+  uniqExactIf(TraceId, ${SENT_TO_REVIEW}) AS sent,
+  uniqExactIf(TraceId, ${REPORTS_REVIEW} AND OccurredAt < ${MIDPOINT}) AS documents_first,
+  uniqExactIf(TraceId, ${SENT_TO_REVIEW} AND OccurredAt < ${MIDPOINT}) AS sent_first
+FROM trace_metrics
+WHERE ${inPeriod("OccurredAt")}
+  AND ${firstTraceMetricsRow()}`;
 
 /** The unit sent most, by share of its own documents; a unit under 30 documents ranks last. */
-export const REVIEW_BY_UNIT_SQL = `WITH ${UNIT_KEY}
-SELECT unit_key, ${UNIT} AS unit,
-  countIf(${REPORTS_REVIEW}) AS documents,
-  countIf(${SENT_TO_REVIEW}) AS sent
-FROM traces
+export const REVIEW_BY_UNIT_SQL = `WITH ${METRICS_UNIT_KEY}
+SELECT unit_key, ${METRICS_UNIT} AS unit,
+  uniqExactIf(TraceId, ${REPORTS_REVIEW}) AS documents,
+  uniqExactIf(TraceId, ${SENT_TO_REVIEW}) AS sent
+FROM trace_metrics
 WHERE ${inPeriod("OccurredAt")}
 GROUP BY unit
 HAVING documents > 0
@@ -295,11 +420,11 @@ ORDER BY documents >= 30 DESC, sent / documents DESC
 LIMIT 1`;
 
 /** What users did with each output, as the app reports it in `output_action`. */
-export const OUTPUT_ACTIONS_SQL = `SELECT count() AS traces,
-  countIf(Attributes['metadata.output_action'] != '') AS generated,
-  countIf(Attributes['metadata.output_action'] IN ('accepted', 'edited')) AS used,
-  countIf(Attributes['metadata.output_action'] = 'accepted') AS accepted
-FROM traces
+export const OUTPUT_ACTIONS_SQL = `SELECT uniqExact(TraceId) AS traces,
+  uniqExactIf(TraceId, MetadataOutputAction != '') AS generated,
+  uniqExactIf(TraceId, MetadataOutputAction IN ('accepted', 'edited')) AS used,
+  uniqExactIf(TraceId, MetadataOutputAction = 'accepted') AS accepted
+FROM trace_metrics
 WHERE ${inPeriod("OccurredAt")}`;
 
 /** Per guardrail: traces checked, and answers flagged but not blocked now and the period before. */

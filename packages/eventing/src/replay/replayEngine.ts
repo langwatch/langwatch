@@ -1,5 +1,6 @@
 import { nowInstant, toEpochMs } from "@langwatch/time";
 
+import { isQueryMemoryLimitExceeded } from "../services/errorHandling.ts";
 import { pMapLimited } from "./pMapLimited.ts";
 import { pauseProjection, unpauseProjection, waitForAllActiveJobs } from "./replayDrain.ts";
 import {
@@ -421,6 +422,7 @@ class FoldMapReplayRun {
       this.callbacks?.onProgress?.({ ...progress });
     };
 
+    const mapWrites: MapWrites = { started: false };
     let batchResult: { eventsReplayed: number };
     try {
       batchResult = await replayBatch({
@@ -432,8 +434,12 @@ class FoldMapReplayRun {
         batchNum,
         log: this.log,
         emit,
+        mapWrites,
       });
     } catch (error) {
+      if (batchKeys.length > 1 && isQueryMemoryLimitExceeded(error) && !mapWrites.started) {
+        return this.splitBatch({ error, batchKeys, batchNum });
+      }
       await this.handleBatchFailure({ error, batchKeys, batchNum, progress });
       this.callbacks?.signal?.throwIfAborted();
       return false;
@@ -457,6 +463,55 @@ class FoldMapReplayRun {
     return true;
   }
 
+  /**
+   * Over its own memory limit a statement fails on the batch's size: clear markers, rerun halves.
+   * Fold writes follow the stream, so a half re-folds from init() (a failed flush only rewrote
+   * rows that replace each other). Map rows land mid-stream: split only before any map write.
+   */
+  private async splitBatch({
+    error,
+    batchKeys,
+    batchNum,
+  }: {
+    error: unknown;
+    batchKeys: string[];
+    batchNum: number;
+  }): Promise<boolean> {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    this.log.write({
+      step: "split-batch",
+      batch: batchNum,
+      aggregates: batchKeys.length,
+      error: errorMsg,
+    });
+    await clearFailedBatchMarkers({
+      redis: this.ctx.redis,
+      projectionNames: this.selected.allProjectionNames,
+      aggKeys: batchKeys,
+      log: this.log,
+    });
+    const middle = Math.ceil(batchKeys.length / 2);
+    for (const half of [batchKeys.slice(0, middle), batchKeys.slice(middle)]) {
+      // A stop between halves keeps the completed sets, as a stop between batches does.
+      this.callbacks?.signal?.throwIfAborted();
+      if (!(await this.runOneBatch({ batchKeys: half, batchNum }))) return false;
+    }
+    return true;
+  }
+
+  /**
+   * The failure's text; a lone aggregate still over the memory limit is named, never its tenant.
+   */
+  private describeFailure({ error, batchKeys }: { error: unknown; batchKeys: string[] }): string {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    const [onlyKey] = batchKeys;
+    if (batchKeys.length !== 1 || onlyKey === undefined || !isQueryMemoryLimitExceeded(error)) {
+      return errorMsg;
+    }
+    const entry = this.aggregateProjectionMap.get(onlyKey)!;
+    return `${errorMsg} (aggregate ${entry.aggregateType} ${entry.aggregateId})`;
+  }
+
   private async handleBatchFailure({
     error,
     batchKeys,
@@ -469,7 +524,7 @@ class FoldMapReplayRun {
     progress: ReplayProgress;
   }): Promise<void> {
     this.totalBatchErrors++;
-    const errorMsg = error instanceof Error ? error.message : String(error);
+    const errorMsg = this.describeFailure({ error, batchKeys });
     if (!this.firstError) this.firstError = errorMsg;
     this.log.write({ step: "error", batch: batchNum, error: errorMsg });
 
@@ -798,6 +853,11 @@ interface BatchAccumulators {
   mapAccumulators: Map<string, MapReplayAccumulator>;
 }
 
+/** Whether a batch attempt's map lanes began writing rows: a rerun would append them twice. */
+interface MapWrites {
+  started: boolean;
+}
+
 /** The projection's own pipeline retention, else the runtime's (eventSourcing.ts, registration). */
 function accumulatorOptsFor({
   ctx,
@@ -854,10 +914,12 @@ function applyEventToProjections({
   entry,
   accumulators,
   event,
+  mapWrites,
 }: {
   entry: AggregateEntry;
   accumulators: BatchAccumulators;
   event: ReplayEvent;
+  mapWrites: MapWrites;
 }): Promise<void>[] | undefined {
   let pendingDrains: Promise<void>[] | undefined;
   for (const projName of entry.projections) {
@@ -866,7 +928,10 @@ function applyEventToProjections({
     if (mapAcc) {
       mapAcc.apply(event);
       const drain = mapAcc.drainIfNeeded();
-      if (drain) (pendingDrains ??= []).push(drain);
+      if (drain) {
+        mapWrites.started = true;
+        (pendingDrains ??= []).push(drain);
+      }
     }
   }
   return pendingDrains;
@@ -882,13 +947,19 @@ function makeOnEvent({
   accumulators,
   counter,
   emit,
+  mapWrites,
+  abort,
 }: {
   aggregateProjectionMap: AggregateProjectionMap;
   accumulators: BatchAccumulators;
   counter: { eventsProcessed: number };
   emit: EmitFn;
+  mapWrites: MapWrites;
+  abort: AbortSignal;
 }): (event: ReplayEvent) => void | Promise<void> {
   return (event) => {
+    // A sibling stream failed: stop applying and draining so this attempt's map writes are final.
+    abort.throwIfAborted();
     const key = aggregateKey({
       tenantId: event.tenantId,
       aggregateType: event.aggregateType,
@@ -901,6 +972,7 @@ function makeOnEvent({
       entry,
       accumulators,
       event,
+      mapWrites,
     });
 
     counter.eventsProcessed++;
@@ -931,6 +1003,7 @@ async function streamApplyAndWrite({
   boundsByTenant,
   concurrency,
   emit,
+  mapWrites,
 }: {
   ctx: ReplayContext;
   groups: BatchGroups;
@@ -940,40 +1013,58 @@ async function streamApplyAndWrite({
   boundsByTenant: Map<string, OccurredAtBounds>;
   concurrency: number;
   emit: EmitFn;
+  mapWrites: MapWrites;
 }): Promise<{ eventsProcessed: number }> {
   emit("replay", 0);
   const accumulators = buildAccumulators({ ctx, groups, selected });
   const counter = { eventsProcessed: 0 };
+  const abort = new AbortController();
   const onEvent = makeOnEvent({
     aggregateProjectionMap,
     accumulators,
     counter,
     emit,
+    mapWrites,
+    abort: abort.signal,
   });
 
+  // pMapLimited abandons in-flight calls on a rejection, so streams settle here instead: the
+  // first failure aborts the siblings and is rethrown once every one has stopped writing.
+  const failure: { failed: boolean; error: unknown } = { failed: false, error: undefined };
   await pMapLimited({
     items: [...groups.byTenant.entries()],
     fn: async ([tenantId, entries]) => {
+      if (abort.signal.aborted) return;
       const aggIds = entries.filter((e) => allCutoffs.has(e.key)).map((e) => e.aggregateId);
       if (aggIds.length === 0) return;
 
-      await ctx.eventSource.streamEventsForAggregates({
-        tenantId,
-        aggregateIds: aggIds,
-        eventTypes: selected.allEventTypes,
-        cutoffs: allCutoffs,
-        occurredAtBounds: boundsByTenant.get(tenantId),
-        onEvent,
-      });
+      try {
+        await ctx.eventSource.streamEventsForAggregates({
+          tenantId,
+          aggregateIds: aggIds,
+          eventTypes: selected.allEventTypes,
+          cutoffs: allCutoffs,
+          occurredAtBounds: boundsByTenant.get(tenantId),
+          onEvent,
+        });
+      } catch (error) {
+        if (!failure.failed) {
+          failure.failed = true;
+          failure.error = error;
+          abort.abort(error);
+        }
+      }
     },
     concurrency,
   });
+  if (failure.failed) throw failure.error;
 
   emit("write", counter.eventsProcessed);
   for (const [, acc] of accumulators.foldAccumulators) {
     await acc.flush();
   }
   for (const [, acc] of accumulators.mapAccumulators) {
+    if (acc.processed > 0) mapWrites.started = true;
     await acc.flush();
   }
 
@@ -1034,6 +1125,7 @@ async function replayBatch({
   batchNum,
   log,
   emit,
+  mapWrites,
 }: {
   ctx: ReplayContext;
   batchKeys: string[];
@@ -1043,6 +1135,7 @@ async function replayBatch({
   batchNum: number;
   log: ReplayLogWriter;
   emit: EmitFn;
+  mapWrites: MapWrites;
 }): Promise<{ eventsReplayed: number }> {
   const groups = groupBatch({ batchKeys, aggregateProjectionMap });
 
@@ -1071,6 +1164,7 @@ async function replayBatch({
     boundsByTenant,
     concurrency,
     emit,
+    mapWrites,
   });
 
   log.write({
