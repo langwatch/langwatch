@@ -5,6 +5,9 @@
 import type { ClickHouseTableFacts } from "@langwatch/clickhouse-client/builder";
 import { describe, expect, it } from "vitest";
 
+import { evaluationRuns } from "../clickhouse.evaluation-runs.table.ts";
+import { instantEvalRuns } from "../clickhouse.instant-eval-runs.table.ts";
+import { logRecords } from "../clickhouse.log-records.table.ts";
 import { spanAnalytics } from "../clickhouse.span-analytics.table.ts";
 import { storedSpans } from "../clickhouse.stored-spans.table.ts";
 import { traceAnalyticsRollup } from "../clickhouse.trace-analytics-rollup.table.ts";
@@ -20,15 +23,23 @@ const DESCRIPTORS: readonly { readonly $table: ClickHouseTableFacts }[] = [
   traceEvaluationAnalytics,
   traceAnalyticsRollup,
   spanAnalytics,
+  // Declared shares (clickhouse-table-ownership.ts): only the columns trace reads.
+  evaluationRuns,
+  logRecords,
+  instantEvalRuns,
 ];
 
-/** The parameter type a stored column binds as: storage wrappers that change no value go. */
+/**
+ * The parameter type a stored column binds as: storage wrappers that change no value go, and a
+ * FixedString binds as String.
+ */
 const bindingOf = (type: string): string =>
   type
     .replace(/^SimpleAggregateFunction\(\w+, (.+)\)$/, "$1")
     .replaceAll(/LowCardinality\(([^()]*(?:\([^()]*\))?)\)/g, "$1")
     .replaceAll(/Nullable\(([^()]*(?:\([^()]*\))?)\)/g, "$1")
-    .replace(/^DateTime64\(\d\)$/, "Int64");
+    .replace(/^DateTime64\(\d\)$/, "Int64")
+    .replace(/^FixedString\(\d+\)$/, "String");
 
 describe("trace's descriptors against the migrated schema", () => {
   it.each(DESCRIPTORS.map((table) => [table.$table.stored, table] as const))(

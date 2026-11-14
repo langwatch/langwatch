@@ -171,6 +171,25 @@ describe.skipIf(!testClickHouseConfigured())(
           ["t-c", null],
         ]);
       });
+
+      it("pages after the cursor, and nothing before the run's window end", async () => {
+        const after = await clustering.findPageRows({
+          tenantId,
+          windowStartMs: now - 30 * DAY_MS,
+          unassignedFrom: { topicIds: ["topic-2"], subtopicIds: ["subtopic-1"] },
+          searchAfter: [atMs, "t-a"],
+        });
+
+        expect(after.map((each) => each.traceId).toSorted()).toEqual(["t-b", "t-c"]);
+        expect(after.every((each) => each.occurredAtMs === atMs)).toBe(true);
+        await expect(
+          clustering.findPageRows({
+            tenantId,
+            windowStartMs: now - 30 * DAY_MS,
+            windowEndMs: atMs,
+          }),
+        ).resolves.toEqual([]);
+      });
     });
 
     describe("when usage counts read the tenant's traces", () => {

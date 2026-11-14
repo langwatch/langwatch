@@ -1,15 +1,11 @@
 // Spec: modules/trace/specs/trace-cross-owner-reads.feature. Each read against the old query.
 import type { ClickHouseClient } from "@clickhouse/client";
-import {
-  ClickHouseQueryClient,
-  type QueryDriver,
-  type QueryRequest,
-  TenantGuard,
-} from "@langwatch/clickhouse-client";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { ClickHouseTraceAttributedRollupRepository } from "../clickhouse.trace-attributed-rollup.repository.ts";
+import { traceQueryClientFor } from "./support/authorized-clickhouse.support.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
@@ -32,23 +28,17 @@ const clickHouseConfigured = testClickHouseConfigured();
 
 let ch: ClickHouseClient;
 let repository: ClickHouseTraceAttributedRollupRepository;
-const requests: QueryRequest[] = [];
+const statements: Parameters<ClickHouseQueryClient["read"]>[0]["statement"][] = [];
 
-function queryClient(raw: ClickHouseClient): ClickHouseQueryClient {
-  const driver: QueryDriver = {
-    async execute(request) {
-      requests.push(request);
-      const result = await raw.query({
-        query: request.sql,
-        format: "JSONEachRow",
-        ...(request.params === undefined ? {} : { query_params: request.params }),
-      });
-      return { rows: await result.json() };
+/** The real guard and tenant setting, remembering each built statement. */
+function queryClient(raw: ClickHouseClient): Pick<ClickHouseQueryClient, "read"> {
+  const client = traceQueryClientFor(raw);
+  return {
+    read: (request) => {
+      statements.push(request.statement);
+      return client.read(request);
     },
-    insert: () => Promise.reject(new Error("the attributed rollups never insert")),
-    command: () => Promise.reject(new Error("the attributed rollups never command")),
   };
-  return new ClickHouseQueryClient({ tenantGuard: new TenantGuard(), driver });
 }
 
 async function oracle<Row>(query: string, params: Record<string, unknown>): Promise<Row[]> {
@@ -335,7 +325,7 @@ describe.skipIf(!clickHouseConfigured)("ClickHouseTraceAttributedRollupRepositor
         windowEnd: now,
       },
     );
-    requests.length = 0;
+    statements.length = 0;
     const answer = await repository.findSpendByProjectAndValue({
       tenantIds: tenants,
       valueKey: USER,
@@ -355,7 +345,7 @@ describe.skipIf(!clickHouseConfigured)("ClickHouseTraceAttributedRollupRepositor
         })),
       ),
     );
-    expect(requests[0]?.tenantIds).toEqual(tenants);
+    expect(statements[0]).toMatchObject({ tenantIds: tenants });
   });
 
   /** @scenario "Daily attributed spend groups by an attribute or by the first model" */

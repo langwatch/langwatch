@@ -19,28 +19,25 @@ const countsRowsSchema = z.array(
 
 const pageRowsSchema = z.array(
   z.object({
-    TraceId: z.string(),
-    ComputedInput: z.string().nullable(),
-    TopicId: z.string().nullable(),
-    SubTopicId: z.string().nullable(),
-    OccurredAtMs: z.string(),
+    traceId: z.string(),
+    computedInput: z.string().nullable(),
+    topicId: z.string().nullable(),
+    subtopicId: z.string().nullable(),
+    occurredAtMs: z.string(),
   }),
 );
 
-/**
- * Topic clustering's two reads of trace_summaries, as topic ran them before trace owned them. The
- * page read stays raw: `latestVersion()` elects without the `OccurredAt` window (handoff Risk 6).
- */
+/** Topic clustering's two reads of trace_summaries, as topic ran them before trace owned them. */
 export class ClickHouseTraceClusteringSampleRepository extends TraceClusteringSampleRepository {
-  readonly #clickhouse: Pick<ClickHouseQueryClient, "query" | "read">;
+  readonly #clickhouse: Pick<ClickHouseQueryClient, "read">;
 
   static create(
-    clickhouse: Pick<ClickHouseQueryClient, "query" | "read">,
+    clickhouse: Pick<ClickHouseQueryClient, "read">,
   ): ClickHouseTraceClusteringSampleRepository {
     return new ClickHouseTraceClusteringSampleRepository(clickhouse);
   }
 
-  private constructor(clickhouse: Pick<ClickHouseQueryClient, "query" | "read">) {
+  private constructor(clickhouse: Pick<ClickHouseQueryClient, "read">) {
     super();
     this.#clickhouse = clickhouse;
   }
@@ -87,95 +84,73 @@ export class ClickHouseTraceClusteringSampleRepository extends TraceClusteringSa
     unassignedFrom?: { topicIds: readonly string[]; subtopicIds: readonly string[] };
     searchAfter?: readonly [number, string];
   }): Promise<TraceClusteringSampleRow[]> {
-    const windowEnd =
-      input.windowEndMs === undefined
-        ? "now64(3)"
-        : "fromUnixTimestamp64Milli({fetchWindowEndMs:UInt64})";
-    const topicIds = input.unassignedFrom?.topicIds ?? [];
-    const subtopicIds = input.unassignedFrom?.subtopicIds ?? [];
-    const pageHaving: string[] = [];
-
-    if (input.unassignedFrom) {
-      const topicCondition =
-        topicIds.length > 0
-          ? `(argMax(TopicId, UpdatedAt) IS NULL OR argMax(TopicId, UpdatedAt) NOT IN ({topicIds:Array(String)}))`
-          : "1=1";
-      const subtopicCondition =
-        subtopicIds.length > 0
-          ? `(argMax(SubTopicId, UpdatedAt) IS NULL OR argMax(SubTopicId, UpdatedAt) NOT IN ({subtopicIds:Array(String)}))`
-          : "1=1";
-      pageHaving.push(`(${topicCondition} OR ${subtopicCondition})`);
-    }
-
-    if (input.searchAfter) {
-      // Mixed sort (OccurredAt DESC, TraceId ASC), so a tuple comparison cannot express it.
-      pageHaving.push(`(
-        toUnixTimestamp64Milli(argMax(OccurredAt, UpdatedAt)) < {lastTs:UInt64}
-        OR (
-          toUnixTimestamp64Milli(argMax(OccurredAt, UpdatedAt)) = {lastTs:UInt64}
-          AND TraceId > {lastTraceId:String}
-        )
-      )`);
-    }
-
-    const pageHavingClause = pageHaving.length ? `HAVING ${pageHaving.join(" AND ")}` : "";
-    // The page CTE picks keys only; no outer ORDER BY/LIMIT, which buffered full rows at 3.5 GiB.
-    const result = await this.#clickhouse.query<unknown>({
-      tenantId: input.tenantId,
-      table: summaries.$table.name,
-      sql: `
-        WITH page AS (
-          SELECT TraceId
-          FROM trace_summaries
-          WHERE TenantId = {tenantId:String}
-            AND OccurredAt >= fromUnixTimestamp64Milli({fetchWindowStartMs:UInt64})
-            AND OccurredAt < ${windowEnd}
-          GROUP BY TenantId, TraceId
-          ${pageHavingClause}
-          ORDER BY argMax(OccurredAt, UpdatedAt) DESC, TraceId ASC
-          LIMIT 2000
-        )
-        SELECT
-          t.TraceId AS TraceId,
-          t.ComputedInput AS ComputedInput,
-          t.TopicId AS TopicId,
-          t.SubTopicId AS SubTopicId,
-          toString(toUnixTimestamp64Milli(t.OccurredAt)) AS OccurredAtMs
-        FROM trace_summaries t
-        WHERE TenantId = {tenantId:String}
-          AND OccurredAt >= fromUnixTimestamp64Milli({fetchWindowStartMs:UInt64})
-          AND OccurredAt < ${windowEnd}
-          AND (t.TenantId, t.TraceId, t.UpdatedAt) IN (
-            SELECT TenantId, TraceId, max(UpdatedAt)
-            FROM trace_summaries
-            WHERE TenantId = {tenantId:String}
-              AND OccurredAt >= fromUnixTimestamp64Milli({fetchWindowStartMs:UInt64})
-              AND OccurredAt < ${windowEnd}
-              AND TraceId IN (SELECT TraceId FROM page)
-            GROUP BY TenantId, TraceId
+    const scope = tenantScope.single({ tenantId: input.tenantId });
+    const until = input.windowEndMs ?? fn.now64(3);
+    const latestOccurredAt = fn.argMax(summaries.OccurredAt, summaries.UpdatedAt);
+    const latestTopicId = fn.argMax(summaries.TopicId, summaries.UpdatedAt);
+    const latestSubtopicId = fn.argMax(summaries.SubTopicId, summaries.UpdatedAt);
+    const topicIds = [...(input.unassignedFrom?.topicIds ?? [])];
+    const subtopicIds = [...(input.unassignedFrom?.subtopicIds ?? [])];
+    const { searchAfter } = input;
+    // An empty known list makes `NOT IN` hold for every trace, so the either-or filter drops out.
+    const filtersTopics = topicIds.length > 0 && subtopicIds.length > 0;
+    const statement = clickhouseRead({ scope })
+      .from(summaries)
+      // The page picks keys only; no outer ORDER BY/LIMIT, which buffered full rows at 3.5 GiB.
+      .with("page", (sub) => {
+        const keys = sub
+          .from(summaries)
+          .select({ TraceId: summaries.TraceId })
+          .where(({ and, gte, lt }) =>
+            and(gte(summaries.OccurredAt, input.windowStartMs), lt(summaries.OccurredAt, until)),
           )
-      `,
-      params: {
-        tenantId: input.tenantId,
-        fetchWindowStartMs: input.windowStartMs,
-        ...(input.windowEndMs === undefined ? {} : { fetchWindowEndMs: input.windowEndMs }),
-        topicIds: topicIds.length > 0 ? [...topicIds] : ["__none__"],
-        subtopicIds: subtopicIds.length > 0 ? [...subtopicIds] : ["__none__"],
-        ...(input.searchAfter
-          ? { lastTs: input.searchAfter[0], lastTraceId: input.searchAfter[1] }
-          : {}),
-      },
-      // A page holds up to 2000 heavy ComputedInput values; fewer read streams
-      // keep it under the per-query memory cap.
-      settings: { max_threads: "2" },
-    });
+          .groupBy(summaries.TenantId, summaries.TraceId);
+        const unassigned = filtersTopics
+          ? keys.having(({ isNull, not, oneOf, or }) =>
+              or(
+                or(isNull(latestTopicId), not(oneOf(latestTopicId, topicIds))),
+                or(isNull(latestSubtopicId), not(oneOf(latestSubtopicId, subtopicIds))),
+              ),
+            )
+          : keys;
+        // Mixed sort (OccurredAt DESC, TraceId ASC), so a tuple comparison cannot express it.
+        const after =
+          searchAfter === undefined
+            ? unassigned
+            : unassigned.having(({ and, eq, gt, lt, or }) =>
+                or(
+                  lt(latestOccurredAt, searchAfter[0]),
+                  and(eq(latestOccurredAt, searchAfter[0]), gt(summaries.TraceId, searchAfter[1])),
+                ),
+              );
+        return after
+          .orderBy(latestOccurredAt, "DESC")
+          .orderBy(summaries.TraceId, "ASC")
+          .limit(2000);
+      })
+      .select({
+        traceId: summaries.TraceId,
+        computedInput: summaries.ComputedInput,
+        topicId: summaries.TopicId,
+        subtopicId: summaries.SubTopicId,
+        occurredAtMs: fn.toString(fn.toUnixTimestamp64Milli(summaries.OccurredAt)),
+      })
+      .where(({ and, gte, lt, oneOf }) =>
+        and(
+          gte(summaries.OccurredAt, input.windowStartMs),
+          lt(summaries.OccurredAt, until),
+          oneOf(summaries.TraceId, { cte: "page" }),
+        ),
+      )
+      .latestVersion()
+      // A page holds up to 2000 heavy ComputedInput values; fewer streams keep it under the cap.
+      .settings({ max_threads: 2 })
+      .build();
+    const result = await this.#clickhouse.read({ statement, table: summaries.$table.name });
 
     return pageRowsSchema.parse(result.rows).map((row) => ({
-      traceId: row.TraceId,
-      computedInput: row.ComputedInput,
-      topicId: row.TopicId,
-      subtopicId: row.SubTopicId,
-      occurredAtMs: parseInt(row.OccurredAtMs, 10),
+      ...row,
+      occurredAtMs: parseInt(row.occurredAtMs, 10),
     }));
   }
 }

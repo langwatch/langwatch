@@ -1,4 +1,10 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import {
+  clickhouseRead,
+  type ConditionOps,
+  fn,
+  tenantScope,
+} from "@langwatch/clickhouse-client/builder";
 import type {
   TraceAttributedRecency,
   TraceAttributedSpendComparison,
@@ -14,56 +20,48 @@ import type {
 } from "@langwatch/trace-contract";
 
 import { TraceAttributedRollupRepository } from "../trace-attributed-rollup.repository.ts";
+import { traceSummaries as summaries } from "./clickhouse.trace-summaries.table.ts";
 
 /** A spend rollup's ceiling on threads and runtime (#8072 step 3, as on main). */
 const SPEND_ROLLUP_SETTINGS = { max_threads: 2, max_execution_time: 45 };
 
-/** Sort keys to the aggregate they order by; never interpolated from caller text. */
-const SORT_EXPRESSION: Record<TraceAttributedSpendSort, string> = {
-  spend: "sum(spendUsd)",
-  requests: "count()",
-  lastActivity: "max(occurredAt)",
+type Ops = ConditionOps<typeof summaries.$table.name, unknown>;
+
+/** `Attributes[key] = value` per match, each bound as a parameter. */
+const matching = (matches: readonly TraceAttributeMatch[]) => (ops: Pick<Ops, "and" | "eq">) =>
+  ops.and(
+    ...matches.map((match) => ops.eq(fn.mapGet(summaries.Attributes, match.key), match.value)),
+  );
+
+/** One tenant's reads; a derived read and the read over it share one scope. */
+const readsOf = ({ tenantId }: { tenantId: string }) => {
+  const scope = tenantScope.single({ tenantId });
+  return () => clickhouseRead({ scope });
 };
 
-type Numeric = number | string | null;
+const costOf = () => fn.ifNull(summaries.TotalCost, 0);
 
-/** `AND ts.Attributes[key] = value` per match, bound as parameters. */
-function matchClause(matches: readonly TraceAttributeMatch[]) {
-  const params: Record<string, string> = {};
-  const sql = matches
-    .map((match, index) => {
-      params[`matchKey${index}`] = match.key;
-      params[`matchValue${index}`] = match.value;
-      return `AND ts.Attributes[{matchKey${index}:String}] = {matchValue${index}:String}`;
-    })
-    .join("\n            ");
-  return { sql, params };
-}
+/** The row's `attribute<index>` value; the selection's keys are known only at run time. */
+const attributeOf = ({ row, index }: { row: Record<string, unknown>; index: number }) => {
+  const value = row[`attribute${index}`];
+  return typeof value === "string" ? value : "";
+};
 
-/** The latest version of each trace in the tenant's `OccurredAt` range. */
-function latestVersion(where: string): string {
-  return `(ts.TenantId, ts.TraceId, ts.UpdatedAt) IN (
-              SELECT TenantId, TraceId, max(UpdatedAt)
-              FROM trace_summaries
-              WHERE ${where}
-              GROUP BY TenantId, TraceId
-            )`;
-}
-
-const SINGLE_TENANT_RANGE = `TenantId = {tenantId:String}
-                AND OccurredAt >= fromUnixTimestamp64Milli({windowStart:UInt64})
-                AND OccurredAt < fromUnixTimestamp64Milli({windowEnd:UInt64})`;
-
-/** Main's governance activity-monitor reads, answered by trace over trace_summaries. */
+/**
+ * Main's governance activity-monitor reads, answered by trace over trace_summaries. Each read keeps
+ * its `OccurredAt` window in its own `where`, so `latestVersion()` repeats it in the election.
+ */
 export class ClickHouseTraceAttributedRollupRepository extends TraceAttributedRollupRepository {
-  readonly #clickhouse: ClickHouseQueryClient;
+  readonly #clickhouse: Pick<ClickHouseQueryClient, "read">;
 
-  private constructor(clickhouse: ClickHouseQueryClient) {
+  private constructor(clickhouse: Pick<ClickHouseQueryClient, "read">) {
     super();
     this.#clickhouse = clickhouse;
   }
 
-  static create(clickhouse: ClickHouseQueryClient): ClickHouseTraceAttributedRollupRepository {
+  static create(
+    clickhouse: Pick<ClickHouseQueryClient, "read">,
+  ): ClickHouseTraceAttributedRollupRepository {
     return new ClickHouseTraceAttributedRollupRepository(clickhouse);
   }
 
@@ -75,40 +73,25 @@ export class ClickHouseTraceAttributedRollupRepository extends TraceAttributedRo
     currentStartMs: number;
     endMs: number;
   }): Promise<TraceAttributedSpendComparison> {
-    const match = matchClause(input.matches);
-    const result = await this.#clickhouse.query<{
-      thisSpend: Numeric;
-      prevSpend: Numeric;
-      thisUsers: Numeric;
-    }>({
-      tenantId: input.tenantId,
-      table: "trace_summaries",
-      settings: SPEND_ROLLUP_SETTINGS,
-      sql: `
-        SELECT
-          sumIf(coalesce(ts.TotalCost, 0), ts.OccurredAt >= fromUnixTimestamp64Milli({thisStart:UInt64})) AS thisSpend,
-          sumIf(coalesce(ts.TotalCost, 0), ts.OccurredAt < fromUnixTimestamp64Milli({thisStart:UInt64})) AS prevSpend,
-          uniqExactIf(
-            ts.Attributes[{userKey:String}],
-            ts.OccurredAt >= fromUnixTimestamp64Milli({thisStart:UInt64})
-              AND ts.Attributes[{userKey:String}] != ''
-          ) AS thisUsers
-        FROM trace_summaries ts
-        WHERE ts.TenantId = {tenantId:String}
-          AND ts.OccurredAt >= fromUnixTimestamp64Milli({windowStart:UInt64})
-          AND ts.OccurredAt < fromUnixTimestamp64Milli({windowEnd:UInt64})
-          ${match.sql}
-          AND ${latestVersion(SINGLE_TENANT_RANGE)}
-      `,
-      params: {
-        ...match.params,
-        tenantId: input.tenantId,
-        windowStart: input.previousStartMs,
-        windowEnd: input.endMs,
-        thisStart: input.currentStartMs,
-        userKey: input.actorKey,
-      },
-    });
+    const actor = fn.mapGet(summaries.Attributes, input.actorKey);
+    const statement = readsOf(input)()
+      .from(summaries)
+      .select(({ and, gte, lt, ne }) => ({
+        thisSpend: fn.sumIf(costOf(), gte(summaries.OccurredAt, input.currentStartMs)),
+        prevSpend: fn.sumIf(costOf(), lt(summaries.OccurredAt, input.currentStartMs)),
+        thisUsers: fn.uniqExactIf(
+          actor,
+          and(gte(summaries.OccurredAt, input.currentStartMs), ne(actor, "")),
+        ),
+      }))
+      .where(({ range }) =>
+        range(summaries.OccurredAt, { from: input.previousStartMs, until: input.endMs }),
+      )
+      .where(matching(input.matches))
+      .latestVersion()
+      .settings(SPEND_ROLLUP_SETTINGS)
+      .build();
+    const result = await this.#clickhouse.read({ statement, table: summaries.$table.name });
     const row = result.rows[0];
     return {
       currentSpendUsd: Number(row?.thisSpend ?? 0),
@@ -127,55 +110,44 @@ export class ClickHouseTraceAttributedRollupRepository extends TraceAttributedRo
     limit: number;
     offset: number;
   }): Promise<TraceAttributedValueSpend[]> {
-    const match = matchClause(input.matches);
-    const orderExpression = SORT_EXPRESSION[input.sortBy];
-    const orderDirection = input.sortDirection === "asc" ? "ASC" : "DESC";
-    // The outer string alias is disjoint from the inner `spendUsd`, so ORDER BY sums the Float64.
-    const result = await this.#clickhouse.query<{
-      actor: string;
-      spendUsdStr: string;
-      requests: Numeric;
-      lastActivityMs: Numeric;
-      mostUsedTarget: string | null;
-    }>({
-      tenantId: input.tenantId,
-      table: "trace_summaries",
-      settings: SPEND_ROLLUP_SETTINGS,
-      sql: `
-        SELECT
-          actor,
-          toString(sum(spendUsd)) AS spendUsdStr,
-          toString(count()) AS requests,
-          toString(toUnixTimestamp64Milli(max(occurredAt))) AS lastActivityMs,
-          any(model) AS mostUsedTarget
-        FROM (
-          SELECT
-            ts.Attributes[{valueKey:String}] AS actor,
-            coalesce(ts.TotalCost, 0) AS spendUsd,
-            ts.OccurredAt AS occurredAt,
-            arrayElement(ts.Models, 1) AS model
-          FROM trace_summaries ts
-          WHERE ts.TenantId = {tenantId:String}
-            AND ts.OccurredAt >= fromUnixTimestamp64Milli({windowStart:UInt64})
-            AND ts.OccurredAt < fromUnixTimestamp64Milli({windowEnd:UInt64})
-            ${match.sql}
-            AND ts.Attributes[{valueKey:String}] != ''
-            AND ${latestVersion(SINGLE_TENANT_RANGE)}
-        )
-        GROUP BY actor
-        ORDER BY ${orderExpression} ${orderDirection}
-        LIMIT {limit:UInt32} OFFSET {offset:UInt32}
-      `,
-      params: {
-        ...match.params,
-        tenantId: input.tenantId,
-        windowStart: input.window.startMs,
-        windowEnd: input.window.endMs,
-        valueKey: input.valueKey,
-        limit: input.limit,
-        offset: Math.max(0, input.offset),
-      },
-    });
+    const read = readsOf(input);
+    const value = fn.mapGet(summaries.Attributes, input.valueKey);
+    const traces = read()
+      .from(summaries)
+      .select({
+        actor: value,
+        spendUsd: costOf(),
+        occurredAt: summaries.OccurredAt,
+        model: fn.arrayElement(summaries.Models, 1),
+      })
+      .where(({ range }) =>
+        range(summaries.OccurredAt, { from: input.window.startMs, until: input.window.endMs }),
+      )
+      .where((ops) => ops.and(matching(input.matches)(ops), ops.ne(value, "")))
+      .latestVersion()
+      .as("traces");
+    // Sort keys to the aggregate they order by; the outer string sum stays out of the order.
+    const order = {
+      spend: fn.sum(traces.spendUsd),
+      requests: fn.count(),
+      lastActivity: fn.max(traces.occurredAt),
+    }[input.sortBy];
+    const statement = read()
+      .from(traces)
+      .select({
+        actor: traces.actor,
+        spendUsdStr: fn.toString(fn.sum(traces.spendUsd)),
+        requests: fn.toString(fn.count()),
+        lastActivityMs: fn.toString(fn.toUnixTimestamp64Milli(fn.max(traces.occurredAt))),
+        mostUsedTarget: fn.any(traces.model),
+      })
+      .groupBy(traces.actor)
+      .orderBy(order, input.sortDirection === "asc" ? "ASC" : "DESC")
+      .limit(input.limit)
+      .offset(Math.max(0, input.offset))
+      .settings(SPEND_ROLLUP_SETTINGS)
+      .build();
+    const result = await this.#clickhouse.read({ statement, table: summaries.$table.name });
     return result.rows.map((row) => ({
       value: row.actor,
       spentUsd: row.spendUsdStr,
@@ -193,48 +165,37 @@ export class ClickHouseTraceAttributedRollupRepository extends TraceAttributedRo
     currentStartMs: number;
     endMs: number;
   }): Promise<TraceAttributedValueComparison[]> {
-    const match = matchClause(input.matches);
-    const result = await this.#clickhouse.query<{
-      sourceId: string;
-      thisSpendStr: string;
-      prevSpendStr: string;
-      thisRequests: Numeric;
-      lastActivityMs: Numeric;
-    }>({
-      tenantId: input.tenantId,
-      table: "trace_summaries",
-      settings: SPEND_ROLLUP_SETTINGS,
-      sql: `
-        SELECT
-          sourceId,
-          toString(sumIf(spendUsd, occurredAt >= fromUnixTimestamp64Milli({thisStart:UInt64}))) AS thisSpendStr,
-          toString(sumIf(spendUsd, occurredAt < fromUnixTimestamp64Milli({thisStart:UInt64}))) AS prevSpendStr,
-          toString(countIf(occurredAt >= fromUnixTimestamp64Milli({thisStart:UInt64}))) AS thisRequests,
-          toString(toUnixTimestamp64Milli(maxIf(occurredAt, occurredAt >= fromUnixTimestamp64Milli({thisStart:UInt64})))) AS lastActivityMs
-        FROM (
-          SELECT
-            ts.Attributes[{valueKey:String}] AS sourceId,
-            coalesce(ts.TotalCost, 0) AS spendUsd,
-            ts.OccurredAt AS occurredAt
-          FROM trace_summaries ts
-          WHERE ts.TenantId = {tenantId:String}
-            AND ts.OccurredAt >= fromUnixTimestamp64Milli({windowStart:UInt64})
-            AND ts.OccurredAt < fromUnixTimestamp64Milli({windowEnd:UInt64})
-            ${match.sql}
-            AND ts.Attributes[{valueKey:String}] != ''
-            AND ${latestVersion(SINGLE_TENANT_RANGE)}
-        )
-        GROUP BY sourceId
-      `,
-      params: {
-        ...match.params,
-        tenantId: input.tenantId,
-        windowStart: input.previousStartMs,
-        windowEnd: input.endMs,
-        thisStart: input.currentStartMs,
-        valueKey: input.valueKey,
-      },
-    });
+    const read = readsOf(input);
+    const value = fn.mapGet(summaries.Attributes, input.valueKey);
+    const traces = read()
+      .from(summaries)
+      .select({ sourceId: value, spendUsd: costOf(), occurredAt: summaries.OccurredAt })
+      .where(({ range }) =>
+        range(summaries.OccurredAt, { from: input.previousStartMs, until: input.endMs }),
+      )
+      .where((ops) => ops.and(matching(input.matches)(ops), ops.ne(value, "")))
+      .latestVersion()
+      .as("traces");
+    const statement = read()
+      .from(traces)
+      .select(({ gte, lt }) => {
+        const current = gte(traces.occurredAt, input.currentStartMs);
+        return {
+          sourceId: traces.sourceId,
+          thisSpendStr: fn.toString(fn.sumIf(traces.spendUsd, current)),
+          prevSpendStr: fn.toString(
+            fn.sumIf(traces.spendUsd, lt(traces.occurredAt, input.currentStartMs)),
+          ),
+          thisRequests: fn.toString(fn.countIf(current)),
+          lastActivityMs: fn.toString(
+            fn.toUnixTimestamp64Milli(fn.maxIf(traces.occurredAt, current)),
+          ),
+        };
+      })
+      .groupBy(traces.sourceId)
+      .settings(SPEND_ROLLUP_SETTINGS)
+      .build();
+    const result = await this.#clickhouse.read({ statement, table: summaries.$table.name });
     return result.rows.map((row) => ({
       value: row.sourceId,
       currentSpendUsd: row.thisSpendStr,
@@ -249,47 +210,27 @@ export class ClickHouseTraceAttributedRollupRepository extends TraceAttributedRo
     valueKey: string;
     window: TraceModelSpendWindow;
   }): Promise<TraceProjectValueSpend[]> {
-    const [firstTenantId] = input.tenantIds;
-    if (firstTenantId === undefined) return [];
+    if (input.tenantIds.length === 0) return [];
     // A declared tenant set (ARCHITECTURE.md "Routing is folded into the `clickhouse` member").
-    const placeholders = input.tenantIds.map((_, index) => `{tenant${index}:String}`).join(", ");
-    const tenantParams = Object.fromEntries(
-      input.tenantIds.map((id, index) => [`tenant${index}`, id]),
-    );
-    const result = await this.#clickhouse.query<{
-      projectId: string;
-      actor: string;
-      spendUsdStr: string;
-      requests: Numeric;
-      lastActivityMs: Numeric;
-    }>({
-      tenantId: firstTenantId,
-      tenantIds: input.tenantIds,
-      table: "trace_summaries",
-      settings: SPEND_ROLLUP_SETTINGS,
-      sql: `
-        SELECT
-          ts.TenantId AS projectId,
-          ts.Attributes[{valueKey:String}] AS actor,
-          toString(sum(coalesce(ts.TotalCost, 0))) AS spendUsdStr,
-          toString(count()) AS requests,
-          toString(toUnixTimestamp64Milli(max(ts.OccurredAt))) AS lastActivityMs
-        FROM trace_summaries ts
-        WHERE ts.TenantId IN (${placeholders})
-          AND ts.OccurredAt >= fromUnixTimestamp64Milli({windowStart:UInt64})
-          AND ts.OccurredAt < fromUnixTimestamp64Milli({windowEnd:UInt64})
-          AND ${latestVersion(`TenantId IN (${placeholders})
-                AND OccurredAt >= fromUnixTimestamp64Milli({windowStart:UInt64})
-                AND OccurredAt < fromUnixTimestamp64Milli({windowEnd:UInt64})`)}
-        GROUP BY projectId, actor
-      `,
-      params: {
-        ...tenantParams,
-        windowStart: input.window.startMs,
-        windowEnd: input.window.endMs,
-        valueKey: input.valueKey,
-      },
-    });
+    const scope = tenantScope.set({ tenantIds: input.tenantIds });
+    const actor = fn.mapGet(summaries.Attributes, input.valueKey);
+    const statement = clickhouseRead({ scope })
+      .from(summaries)
+      .select({
+        projectId: summaries.TenantId,
+        actor,
+        spendUsdStr: fn.toString(fn.sum(costOf())),
+        requests: fn.toString(fn.count()),
+        lastActivityMs: fn.toString(fn.toUnixTimestamp64Milli(fn.max(summaries.OccurredAt))),
+      })
+      .where(({ range }) =>
+        range(summaries.OccurredAt, { from: input.window.startMs, until: input.window.endMs }),
+      )
+      .latestVersion()
+      .groupBy(summaries.TenantId, actor)
+      .settings(SPEND_ROLLUP_SETTINGS)
+      .build();
+    const result = await this.#clickhouse.read({ statement, table: summaries.$table.name });
     return result.rows.map((row) => ({
       projectId: row.projectId,
       value: row.actor,
@@ -305,42 +246,29 @@ export class ClickHouseTraceAttributedRollupRepository extends TraceAttributedRo
     groupBy: TraceDailySpendGroup;
     window: TraceModelSpendWindow;
   }): Promise<TraceDailyGroupSpend[]> {
-    const match = matchClause(input.matches);
-    const groupExpression =
+    const group =
       input.groupBy.kind === "attribute"
-        ? "ts.Attributes[{groupKey:String}]"
-        : "arrayElement(ts.Models, 1)";
+        ? fn.mapGet(summaries.Attributes, input.groupBy.key)
+        : fn.arrayElement(summaries.Models, 1);
     // toStartOfDay gives a DateTime, which toUnixTimestamp64Milli refuses: seconds times 1000.
-    const result = await this.#clickhouse.query<{
-      bucketMs: Numeric;
-      groupKey: string | null;
-      spendUsdStr: string;
-    }>({
-      tenantId: input.tenantId,
-      table: "trace_summaries",
-      settings: SPEND_ROLLUP_SETTINGS,
-      sql: `
-        SELECT
-          toString(toUnixTimestamp(toStartOfDay(ts.OccurredAt)) * 1000) AS bucketMs,
-          ${groupExpression} AS groupKey,
-          toString(sum(coalesce(ts.TotalCost, 0))) AS spendUsdStr
-        FROM trace_summaries ts
-        WHERE ts.TenantId = {tenantId:String}
-          AND ts.OccurredAt >= fromUnixTimestamp64Milli({windowStart:UInt64})
-          AND ts.OccurredAt < fromUnixTimestamp64Milli({windowEnd:UInt64})
-          ${match.sql}
-          AND ${latestVersion(SINGLE_TENANT_RANGE)}
-        GROUP BY bucketMs, groupKey
-        ORDER BY bucketMs ASC
-      `,
-      params: {
-        ...match.params,
-        tenantId: input.tenantId,
-        windowStart: input.window.startMs,
-        windowEnd: input.window.endMs,
-        ...(input.groupBy.kind === "attribute" ? { groupKey: input.groupBy.key } : {}),
-      },
-    });
+    const bucket = fn.multiply(fn.toUnixTimestamp(fn.toStartOfDay(summaries.OccurredAt)), 1000);
+    const statement = readsOf(input)()
+      .from(summaries)
+      .select({
+        bucketMs: fn.toString(bucket),
+        groupKey: group,
+        spendUsdStr: fn.toString(fn.sum(costOf())),
+      })
+      .where(({ range }) =>
+        range(summaries.OccurredAt, { from: input.window.startMs, until: input.window.endMs }),
+      )
+      .where(matching(input.matches))
+      .latestVersion()
+      .groupBy(bucket, group)
+      .orderBy(bucket, "ASC")
+      .settings(SPEND_ROLLUP_SETTINGS)
+      .build();
+    const result = await this.#clickhouse.read({ statement, table: summaries.$table.name });
     return result.rows.map((row) => ({
       dayStartMs: Number(row.bucketMs),
       value: row.groupKey,
@@ -356,29 +284,16 @@ export class ClickHouseTraceAttributedRollupRepository extends TraceAttributedRo
     sinceMs: number;
   }): Promise<{ value: string; count: number }[]> {
     if (input.values.length === 0) return [];
-    const match = matchClause(input.matches);
-    const result = await this.#clickhouse.query<{ sourceId: string; c: Numeric }>({
-      tenantId: input.tenantId,
-      table: "trace_summaries",
-      sql: `
-        SELECT ts.Attributes[{valueKey:String}] AS sourceId, toString(count()) AS c
-        FROM trace_summaries ts
-        WHERE ts.TenantId = {tenantId:String}
-          AND ts.OccurredAt >= fromUnixTimestamp64Milli({since:UInt64})
-          ${match.sql}
-          AND ts.Attributes[{valueKey:String}] IN ({values:Array(String)})
-          AND ${latestVersion(`TenantId = {tenantId:String}
-                AND OccurredAt >= fromUnixTimestamp64Milli({since:UInt64})`)}
-        GROUP BY sourceId
-      `,
-      params: {
-        ...match.params,
-        tenantId: input.tenantId,
-        since: input.sinceMs,
-        valueKey: input.valueKey,
-        values: input.values,
-      },
-    });
+    const value = fn.mapGet(summaries.Attributes, input.valueKey);
+    const statement = readsOf(input)()
+      .from(summaries)
+      .select({ sourceId: value, c: fn.toString(fn.count()) })
+      .where(({ range }) => range(summaries.OccurredAt, { from: input.sinceMs }))
+      .where((ops) => ops.and(matching(input.matches)(ops), ops.oneOf(value, [...input.values])))
+      .latestVersion()
+      .groupBy(value)
+      .build();
+    const result = await this.#clickhouse.read({ statement, table: summaries.$table.name });
     return result.rows.map((row) => ({ value: row.sourceId, count: Number(row.c) }));
   }
 
@@ -389,56 +304,36 @@ export class ClickHouseTraceAttributedRollupRepository extends TraceAttributedRo
     beforeMs: number;
     limit: number;
   }): Promise<TraceAttributedTraceDetail[]> {
-    const match = matchClause(input.matches);
-    const attributeColumns = input.attributeKeys
-      .map((_, index) => `ts.Attributes[{attributeKey${index}:String}] AS attribute${index},`)
-      .join("\n          ");
-    const attributeParams = Object.fromEntries(
-      input.attributeKeys.map((key, index) => [`attributeKey${index}`, key]),
+    const attributes = Object.fromEntries(
+      input.attributeKeys.map((key, index) => [
+        `attribute${index}`,
+        fn.mapGet(summaries.Attributes, key),
+      ]),
     );
-    const result = await this.#clickhouse.query<
-      Record<string, string> & {
-        eventId: string;
-        target: string | null;
-        costUsd: number;
-        tokensInput: Numeric;
-        tokensOutput: Numeric;
-        occurredMs: Numeric;
-        createdMs: Numeric;
-      }
-    >({
-      tenantId: input.tenantId,
-      table: "trace_summaries",
-      sql: `
-        SELECT
-          ts.TraceId AS eventId,
-          ${attributeColumns}
-          arrayElement(ts.Models, 1) AS target,
-          coalesce(ts.TotalCost, 0) AS costUsd,
-          coalesce(ts.TotalPromptTokenCount, 0) AS tokensInput,
-          coalesce(ts.TotalCompletionTokenCount, 0) AS tokensOutput,
-          toString(toUnixTimestamp64Milli(ts.OccurredAt)) AS occurredMs,
-          toString(toUnixTimestamp64Milli(ts.CreatedAt)) AS createdMs
-        FROM trace_summaries ts
-        WHERE ts.TenantId = {tenantId:String}
-          AND ts.OccurredAt < fromUnixTimestamp64Milli({beforeMs:UInt64})
-          ${match.sql}
-          AND ${latestVersion("TenantId = {tenantId:String}")}
-        ORDER BY ts.OccurredAt DESC, ts.TraceId DESC
-        LIMIT {limit:UInt32}
-      `,
-      params: {
-        ...match.params,
-        ...attributeParams,
-        tenantId: input.tenantId,
-        beforeMs: input.beforeMs,
-        limit: input.limit,
-      },
-    });
+    const statement = readsOf(input)()
+      .from(summaries)
+      .select({
+        ...attributes,
+        eventId: summaries.TraceId,
+        target: fn.arrayElement(summaries.Models, 1),
+        costUsd: costOf(),
+        tokensInput: fn.ifNull(summaries.TotalPromptTokenCount, 0),
+        tokensOutput: fn.ifNull(summaries.TotalCompletionTokenCount, 0),
+        occurredMs: fn.toString(fn.toUnixTimestamp64Milli(summaries.OccurredAt)),
+        createdMs: fn.toString(fn.toUnixTimestamp64Milli(summaries.CreatedAt)),
+      })
+      .where(({ range }) => range(summaries.OccurredAt, { until: input.beforeMs }))
+      .where(matching(input.matches))
+      .latestVersion()
+      .orderBy(summaries.OccurredAt, "DESC")
+      .orderBy(summaries.TraceId, "DESC")
+      .limit(input.limit)
+      .build();
+    const result = await this.#clickhouse.read({ statement, table: summaries.$table.name });
     return result.rows.map((row) => ({
       traceId: row.eventId,
       attributes: Object.fromEntries(
-        input.attributeKeys.map((key, index) => [key, row[`attribute${index}`] ?? ""]),
+        input.attributeKeys.map((key, index) => [key, attributeOf({ row, index })]),
       ),
       firstModel: row.target ?? "",
       costUsd: Number(row.costUsd ?? 0),
@@ -455,44 +350,36 @@ export class ClickHouseTraceAttributedRollupRepository extends TraceAttributedRo
     countSinceMs: readonly number[];
   }): Promise<TraceAttributedRecency> {
     if (input.countSinceMs.length === 0) return { counts: [], lastOccurredAtMs: 0 };
-    const match = matchClause(input.matches);
-    const lastMatch = match.sql.replaceAll("ts.Attributes", "Attributes");
-    const countColumns = input.countSinceMs
-      .map(
-        (_, index) =>
-          `toString(countIf(ts.OccurredAt >= fromUnixTimestamp64Milli({since${index}:UInt64}))) AS c${index},`,
+    const read = readsOf(input);
+    const counts = read()
+      .from(summaries)
+      .select(({ gte }) =>
+        Object.fromEntries(
+          input.countSinceMs.map((sinceMs, index) => [
+            `c${index}`,
+            fn.toString(fn.countIf(gte(summaries.OccurredAt, sinceMs))),
+          ]),
+        ),
       )
-      .join("\n          ");
-    const sinceParams = Object.fromEntries(
-      input.countSinceMs.map((sinceMs, index) => [`since${index}`, sinceMs]),
-    );
-    const result = await this.#clickhouse.query<Record<string, Numeric>>({
-      tenantId: input.tenantId,
-      table: "trace_summaries",
-      sql: `
-        SELECT
-          ${countColumns}
-          (SELECT toString(toUnixTimestamp64Milli(max(OccurredAt)))
-           FROM trace_summaries
-           WHERE TenantId = {tenantId:String} ${lastMatch}) AS lastMs
-        FROM trace_summaries ts
-        WHERE ts.TenantId = {tenantId:String}
-          AND ts.OccurredAt >= fromUnixTimestamp64Milli({earliest:UInt64})
-          ${match.sql}
-          AND ${latestVersion(`TenantId = {tenantId:String}
-                AND OccurredAt >= fromUnixTimestamp64Milli({earliest:UInt64})`)}
-      `,
-      params: {
-        ...match.params,
-        ...sinceParams,
-        tenantId: input.tenantId,
-        earliest: Math.min(...input.countSinceMs),
-      },
-    });
-    const row = result.rows[0];
+      .where(({ range }) => range(summaries.OccurredAt, { from: Math.min(...input.countSinceMs) }))
+      .where(matching(input.matches))
+      .latestVersion()
+      .build();
+    // The last match over every version, as main's scalar subquery read it: a second statement.
+    const last = read()
+      .from(summaries)
+      .select({ lastMs: fn.toString(fn.toUnixTimestamp64Milli(fn.max(summaries.OccurredAt))) })
+      .where(matching(input.matches))
+      .build();
+    const [countRows, lastRows] = await Promise.all([
+      this.#clickhouse.read({ statement: counts, table: summaries.$table.name }),
+      this.#clickhouse.read({ statement: last, table: summaries.$table.name }),
+    ]);
+    const row = countRows.rows[0];
+    const lastMs = lastRows.rows[0]?.lastMs;
     return {
       counts: input.countSinceMs.map((_, index) => Number(row?.[`c${index}`] ?? 0)),
-      lastOccurredAtMs: row?.lastMs ? Number(row.lastMs) : 0,
+      lastOccurredAtMs: lastMs ? Number(lastMs) : 0,
     };
   }
 }

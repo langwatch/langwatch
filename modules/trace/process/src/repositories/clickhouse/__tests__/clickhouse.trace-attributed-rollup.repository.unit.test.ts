@@ -5,9 +5,12 @@ import {
   type QueryRequest,
   TenantGuard,
 } from "@langwatch/clickhouse-client";
+import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { describe, expect, it } from "vitest";
 
 import { ClickHouseTraceAttributedRollupRepository } from "../clickhouse.trace-attributed-rollup.repository.ts";
+
+type ReadRequest = Parameters<ClickHouseQueryClient["read"]>[0];
 
 class RecordingDriver implements QueryDriver {
   readonly requests: QueryRequest[] = [];
@@ -65,7 +68,88 @@ describe("ClickHouseTraceAttributedRollupRepository guards", () => {
           endMs: 2,
         }),
       ).rejects.toMatchObject({ code: "159" });
-      expect(driver.requests[0]?.settings).toEqual({ max_threads: 2, max_execution_time: 45 });
+      expect(driver.requests[0]?.sql).toMatch(/SETTINGS max_threads = 2, max_execution_time = 45$/);
+    });
+  });
+
+  describe("when each rollup builds its statement", () => {
+    it("reads one tenant on the reader identity, and the project read its declared set", async () => {
+      const statements: ReadRequest["statement"][] = [];
+      const repository = ClickHouseTraceAttributedRollupRepository.create(
+        clickHouseQueryClientDouble({
+          async read({ statement }: ReadRequest) {
+            statements.push(statement);
+            return { rows: [] };
+          },
+        }),
+      );
+      const tenantId = "project-1";
+      const matches = [{ key: "langwatch.origin.kind", value: "ingestion_source" }];
+      const window = { startMs: 1, endMs: 3 };
+      const comparison = { previousStartMs: 1, currentStartMs: 2, endMs: 3 };
+      await repository.getAttributedSpendComparison({
+        tenantId,
+        matches,
+        actorKey: "u",
+        ...comparison,
+      });
+      await repository.findAttributedSpendByValue({
+        tenantId,
+        matches,
+        valueKey: "u",
+        window,
+        sortBy: "spend",
+        sortDirection: "desc",
+        limit: 5,
+        offset: 0,
+      });
+      await repository.findAttributedSpendComparisonByValue({
+        tenantId,
+        matches,
+        valueKey: "s",
+        ...comparison,
+      });
+      await repository.findDailyAttributedSpend({
+        tenantId,
+        matches,
+        groupBy: { kind: "firstModel" },
+        window,
+      });
+      await repository.countAttributedTracesByValue({
+        tenantId,
+        matches,
+        valueKey: "s",
+        values: ["a"],
+        sinceMs: 1,
+      });
+      await repository.findAttributedTracesBefore({
+        tenantId,
+        matches,
+        attributeKeys: ["k"],
+        beforeMs: 9,
+        limit: 3,
+      });
+      await repository.getAttributedTraceRecency({ tenantId, matches, countSinceMs: [5, 7] });
+      await repository.findSpendByProjectAndValue({
+        tenantIds: ["project-1", "project-2"],
+        valueKey: "u",
+        window,
+      });
+
+      const single = statements.slice(0, -1);
+      expect(single).toHaveLength(8);
+      for (const statement of single) {
+        expect(statement).toMatchObject({ identity: "reader", tenantId, tenantIds: undefined });
+        expect(statement.settings).toMatchObject({ SQL_langwatch_tenant_ids: tenantId });
+        expect(statement.sql).toContain("WHERE TenantId = {tenantId:String}");
+      }
+      expect(statements.at(-1)).toMatchObject({
+        identity: "reader",
+        tenantIds: ["project-1", "project-2"],
+      });
+      expect(statements.at(-1)?.settings).toMatchObject({
+        SQL_langwatch_tenant_ids: "project-1,project-2",
+      });
     });
   });
 });
