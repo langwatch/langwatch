@@ -1,7 +1,7 @@
 Feature: Use my LangWatch account in the API playground
-  A signed-in reader sends real requests from the docs as themselves in one project, for at
-  most five minutes. The key stays in a frame on the app's origin and never enters the docs
-  page, which carries analytics. See ADR-185 and its amendment of 2026-10-28.
+  A signed-in reader sends real requests from the docs as themselves in one project, for the
+  5 to 60 minutes they chose. The key stays in a frame on the app's origin and never enters the
+  docs page, which carries analytics. See ADR-185 and its amendments of 2026-10-28 and 2026-11-13.
 
   @integration
   Scenario: Embed the app's session frame where a project key answers
@@ -56,10 +56,20 @@ Feature: Use my LangWatch account in the API playground
     Then the playground says the request was not sent
 
   @integration
-  Scenario: End the connection when I leave the page
-    Given the frame is embedded
-    When I leave the page
-    Then the frame is removed, which ends its connection
+  Scenario: Keep the connection when I move to another docs page, not across a reload
+    Given the frame is embedded and connected
+    When I open another docs page and the docs swap it in place
+    Then the same frame stays, outside the swapped content, still connected in the same project
+    And it lies over the room the new page leaves for it, or stays hidden on a page with none
+    And a reload or a full page load unloads it, and the key with it
+
+  @integration
+  Scenario: Leaving a page cancels the requests still waiting in the frame
+    Given the frame is connected and waiting for me to confirm a request
+    When I open another docs page and the docs swap it in place
+    Then the docs page asks the frame to cancel that request
+    And the request answers that it was not sent
+    And the frame lies only over the room inside the new page's playground
 
   @unit
   Scenario: Offer only the pasted key when the build names no app

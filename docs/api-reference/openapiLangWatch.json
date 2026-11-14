@@ -10814,12 +10814,14 @@
                 "type": "object",
                 "properties": {
                   "startDate": {
+                    "description": "Epoch milliseconds, or an ISO 8601 date string.",
                     "type": [
                       "number",
                       "string"
                     ]
                   },
                   "endDate": {
+                    "description": "Epoch milliseconds, or an ISO 8601 date string.",
                     "type": [
                       "number",
                       "string"
@@ -13439,12 +13441,14 @@
                 "type": "object",
                 "properties": {
                   "startDate": {
+                    "description": "Epoch milliseconds, or an ISO 8601 date string.",
                     "type": [
                       "number",
                       "string"
                     ]
                   },
                   "endDate": {
+                    "description": "Epoch milliseconds, or an ISO 8601 date string.",
                     "type": [
                       "number",
                       "string"
@@ -126407,12 +126411,14 @@
                     ]
                   },
                   "startDate": {
+                    "description": "Epoch milliseconds, or an ISO 8601 date string.",
                     "type": [
                       "number",
                       "string"
                     ]
                   },
                   "endDate": {
+                    "description": "Epoch milliseconds, or an ISO 8601 date string.",
                     "type": [
                       "number",
                       "string"
@@ -126999,14 +127005,16 @@
             "name": "startDate",
             "schema": {
               "type": "string"
-            }
+            },
+            "description": "Epoch milliseconds, or an ISO 8601 date string."
           },
           {
             "in": "query",
             "name": "endDate",
             "schema": {
               "type": "string"
-            }
+            },
+            "description": "Epoch milliseconds, or an ISO 8601 date string."
           }
         ]
       }

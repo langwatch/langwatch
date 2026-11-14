@@ -42,6 +42,16 @@ export type ApiKeyUpdateRecord = {
   lookupId?: string;
 };
 
+/** What the auth path reads about a key's ancestor: whether it is live, its kind and its parent. */
+export type KeyLiveness = {
+  revokedAt: Instant | null;
+  expiresAt: Instant | null;
+  createdAt: Instant;
+  name: string;
+  isSystemManaged: boolean;
+  parentApiKeyId: string | null;
+};
+
 /** Private persistence boundary for the API-key aggregate. */
 export abstract class ApiKeyRepository {
   abstract create(input: ApiKeyCreateRecord): Promise<ApiKeyRow>;
@@ -114,13 +124,11 @@ export abstract class ApiKeyRepository {
     organizationId: string;
   }): Promise<{ id: string }[]>;
   /**
-   * Whether one key is still usable, by id, without its bindings. The auth
-   * path asks this about a key's parent on every request presenting a
-   * session-minted key, so it reads only the two columns that decide it.
+   * Whether one key is still usable, by id, without its bindings, and whether it is a docs
+   * session key and since when. The auth path asks this about a key's parent on every request
+   * presenting a session-minted key, so it reads only the columns that decide it.
    */
-  abstract findLivenessById(input: {
-    id: string;
-  }): Promise<{ revokedAt: Instant | null; expiresAt: Instant | null } | null>;
+  abstract findLivenessById(input: { id: string }): Promise<KeyLiveness | null>;
   /**
    * One member's live keys of one system-managed name that the named browser sessions minted,
    * across every organization they belong to: sign-out knows the person, not the organization.
@@ -130,6 +138,12 @@ export abstract class ApiKeyRepository {
     name: string;
     browserSessionIds: readonly string[];
   }): Promise<{ id: string; organizationId: string }[]>;
+  /** An organization's unrevoked system-managed keys of one name made by `createdAtOrBefore`. */
+  abstract findLiveSystemManagedByName(input: {
+    organizationId: string;
+    name: string;
+    createdAtOrBefore: Instant;
+  }): Promise<{ id: string }[]>;
   /** One organization's unrevoked CLI login keys past their session at `now`. */
   abstract findElapsedLoginKeys(input: {
     organizationId: string;

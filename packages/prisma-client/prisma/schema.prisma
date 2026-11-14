@@ -1285,6 +1285,15 @@ model Organization {
   /// session, ever. Turning it on signs nobody out.
   /// Spec: specs/identity/mfa-and-session-shape.feature.
   mfaRequired                Boolean              @default(false)
+  /// Whether members may connect the documentation playground to their own access with a
+  /// short-lived docs session key (ADR-185, amendment of 2026-11-13). On by default; turned off,
+  /// no key is minted and live ones stop authenticating. The pasted-key path is untouched.
+  /// Spec: modules/api-key/specs/docs-session-keys.feature.
+  docsPlaygroundSessionsEnabled Boolean           @default(true)
+  /// When the docs playground was last turned off, written in the same update as the switch. A
+  /// docs session key minted at or before it never authenticates again, nor any key minted under
+  /// one, so turning it back on revives none of them (ADR-185, amendment of 2026-11-14).
+  docsPlaygroundSessionsDisabledAt DateTime?
   /// How many consecutive failed sign-ins lock an account (GAC-09).
   /// 0 = never lock, which is the default and what every organization that
   /// has not asked for this keeps. Counts EVERY credential together - a

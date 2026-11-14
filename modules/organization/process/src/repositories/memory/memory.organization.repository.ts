@@ -18,6 +18,7 @@ import {
   type OrganizationUsageCount,
   type PricingModel,
   type SignInSecurityPolicy,
+  type DocsPlaygroundPolicy,
   type OrganizationCurrency,
   ORGANIZATION_KIND,
 } from "@langwatch/organization-contract";
@@ -177,6 +178,36 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
     maxSessionDurationDays: number;
   }): Promise<void> {
     this.requireOrganization(organizationId).maxSessionDurationDays = maxSessionDurationDays;
+  }
+
+  async getDocsPlaygroundPolicy({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<DocsPlaygroundPolicy> {
+    const organization = this.memory.organizations.get(organizationId);
+    if (!organization)
+      return { docsPlaygroundSessionsEnabled: false, docsPlaygroundSessionsDisabledAt: null };
+    return {
+      docsPlaygroundSessionsEnabled: organization.docsPlaygroundSessionsEnabled ?? true,
+      docsPlaygroundSessionsDisabledAt: organization.docsPlaygroundSessionsDisabledAt
+        ? toDate(organization.docsPlaygroundSessionsDisabledAt)
+        : null,
+    };
+  }
+
+  async saveDocsPlaygroundPolicy({
+    organizationId,
+    docsPlaygroundSessionsEnabled,
+    changedAt,
+  }: {
+    organizationId: string;
+    docsPlaygroundSessionsEnabled: boolean;
+    changedAt: Instant;
+  }): Promise<void> {
+    const organization = this.requireOrganization(organizationId);
+    organization.docsPlaygroundSessionsEnabled = docsPlaygroundSessionsEnabled;
+    if (!docsPlaygroundSessionsEnabled) organization.docsPlaygroundSessionsDisabledAt = changedAt;
   }
 
   async getSignInSecurityPolicy({

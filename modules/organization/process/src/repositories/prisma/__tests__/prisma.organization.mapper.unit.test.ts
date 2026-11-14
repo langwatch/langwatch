@@ -79,6 +79,8 @@ describe("organizationFromRecord", () => {
       joinerRole: "MEMBER",
       presenceEnabled: true,
       traceSharingEnabled: true,
+      docsPlaygroundSessionsEnabled: true,
+      docsPlaygroundSessionsDisabledAt: null,
       supportContact: null,
       primaryIntent: null,
       promoCode: null,

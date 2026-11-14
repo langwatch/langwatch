@@ -27,6 +27,7 @@ import {
   type ApiKeyCreateRecord,
   type ApiKeyRow,
   type ApiKeyUpdateRecord,
+  type KeyLiveness,
 } from "../api-key.repository.ts";
 import { MemoryApiKeyAnswerCacheRepository } from "../memory/memory.api-key-answer-cache.repository.ts";
 
@@ -81,6 +82,9 @@ async function listApiKeyBindings({
 class MemoryApiKeys extends ApiKeyRepository {
   private rows: ApiKeyRow[] = [];
   findLiveBySessions(): Promise<{ id: string; organizationId: string }[]> {
+    return Promise.resolve([]);
+  }
+  findLiveSystemManagedByName(): Promise<{ id: string }[]> {
     return Promise.resolve([]);
   }
   create(input: ApiKeyCreateRecord): Promise<ApiKeyRow> {
@@ -218,15 +222,17 @@ class MemoryApiKeys extends ApiKeyRepository {
         .map(({ id }) => ({ id })),
     );
   }
-  findLivenessById(input: {
-    id: string;
-  }): Promise<{ revokedAt: Instant | null; expiresAt: Instant | null } | null> {
+  findLivenessById(input: { id: string }): Promise<KeyLiveness | null> {
     const row = this.rows.find(({ id }) => id === input.id);
     return Promise.resolve(
       row
         ? {
             revokedAt: row.revokedAt ? fromDate(row.revokedAt) : null,
             expiresAt: row.expiresAt ? fromDate(row.expiresAt) : null,
+            createdAt: fromDate(row.createdAt),
+            name: row.name,
+            isSystemManaged: row.isSystemManaged === true,
+            parentApiKeyId: row.parentApiKeyId ?? null,
           }
         : null,
     );
