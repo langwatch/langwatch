@@ -34,14 +34,17 @@ const VERB =
 const DATABASE_PREFIX = "(?:\\$\\{[^}]*\\}\\.)?";
 const NAMED_TABLE = new RegExp(`\\b${VERB}\\s+${DATABASE_PREFIX}\`?([A-Za-z_]\\w*)\`?`, "gi");
 const SUBSTITUTED_TABLE = new RegExp(
-  `\\b${VERB}\\s+${DATABASE_PREFIX}\\$\\{\\s*([A-Za-z_$][\\w$]*)\\s*\\}`,
+  `\\b${VERB}\\s+${DATABASE_PREFIX}\\$\\{\\s*([A-Za-z_$][\\w$]*(?:\\.[\\w$]+)*)\\s*\\}`,
   "gi",
 );
 const NAMES_TABLE_BY_BINDING = new RegExp(
-  `\\b${VERB}\\s+${DATABASE_PREFIX}\\$\\{|\\btable\\s*:\\s*[A-Za-z_$]`,
+  `\\b${VERB}\\s+${DATABASE_PREFIX}\\$\\{|\\btable\\s*:\\s*[A-Za-z_$]|\\$table\\.name|\\.(?:from|innerJoin|leftJoin)\\(`,
   "i",
 );
 const READING_VERBS = new Set(["from", "join"]);
+/** The builder methods that take a table descriptor as the table they read (ADR-202). */
+const DESCRIPTOR_READS = new Set(["from", "innerJoin", "leftJoin"]);
+const DESCRIPTOR_NAME = ".$table.name";
 
 export type Access = { module: string; table: string; file: string; line: number; write: boolean };
 type ScanRoot = { module: string; directory: string };
@@ -336,18 +339,53 @@ function literalConstants(source: ts.SourceFile): Map<string, string> {
   const constants = new Map<string, string>();
 
   for (const statement of source.statements.filter(ts.isVariableStatement)) {
-    for (const declaration of statement.declarationList.declarations) {
-      if (!ts.isIdentifier(declaration.name)) continue;
-
-      const initialiser = declaration.initializer;
-      if (!initialiser) continue;
-
-      const value = ts.isAsExpression(initialiser) ? initialiser.expression : initialiser;
-      if (ts.isStringLiteralLike(value)) constants.set(declaration.name.text, value.text);
-    }
+    for (const declaration of statement.declarationList.declarations)
+      addLiteral(constants, declaration);
   }
 
   return constants;
+}
+
+/** A string constant, or a descriptor keyed by `<name>.$table.name`. */
+function addLiteral(constants: Map<string, string>, declaration: ts.VariableDeclaration): void {
+  const initialiser = declaration.initializer;
+  if (!ts.isIdentifier(declaration.name) || !initialiser) return;
+
+  const value = ts.isAsExpression(initialiser) ? initialiser.expression : initialiser;
+  if (ts.isStringLiteralLike(value)) constants.set(declaration.name.text, value.text);
+
+  const described = describedTable(value);
+  if (described) constants.set(declaration.name.text + DESCRIPTOR_NAME, described);
+}
+
+/** `defineClickHouseTable({ name: "table" })`: the descriptor's table name. */
+function describedTable(node: ts.Expression): string | undefined {
+  if (!ts.isCallExpression(node) || !ts.isIdentifier(node.expression)) return void 0;
+
+  if (node.expression.text !== "defineClickHouseTable") return void 0;
+
+  const [options] = node.arguments;
+  if (!options || !ts.isObjectLiteralExpression(options)) return void 0;
+
+  const name = options.properties.find(
+    (entry): entry is ts.PropertyAssignment =>
+      ts.isPropertyAssignment(entry) && ts.isIdentifier(entry.name) && entry.name.text === "name",
+  )?.initializer;
+
+  return name && ts.isStringLiteralLike(name) ? name.text : void 0;
+}
+
+/** `const TABLE = descriptor.$table.name`: a constant naming a descriptor's table. */
+function addDescriptorNames(constants: Map<string, string>, source: ts.SourceFile): void {
+  for (const statement of source.statements.filter(ts.isVariableStatement)) {
+    for (const declaration of statement.declarationList.declarations) {
+      const value = declaration.initializer;
+      if (!ts.isIdentifier(declaration.name) || !value) continue;
+
+      if (ts.isPropertyAccessExpression(value))
+        addMissing(constants, declaration.name.text, constants.get(value.getText(source)));
+    }
+  }
 }
 
 type ConstantScope = {
@@ -380,8 +418,10 @@ function addImports(constants: Map<string, string>, statement: ts.Statement, thr
 
   const target = through(statement.moduleSpecifier.text);
 
-  for (const { local, imported } of importedNames(statement))
+  for (const { local, imported } of importedNames(statement)) {
     addMissing(constants, local, target.get(imported));
+    addMissing(constants, local + DESCRIPTOR_NAME, target.get(imported + DESCRIPTOR_NAME));
+  }
 }
 
 function addReExports(constants: Map<string, string>, statement: ts.Statement, through: Through) {
@@ -400,12 +440,15 @@ function addReExports(constants: Map<string, string>, statement: ts.Statement, t
 
   if (!ts.isNamedExports(clause)) return;
 
-  for (const element of clause.elements)
+  for (const element of clause.elements) {
+    const exported = (element.propertyName ?? element.name).text;
+    addMissing(constants, element.name.text, target.get(exported));
     addMissing(
       constants,
-      element.name.text,
-      target.get((element.propertyName ?? element.name).text),
+      element.name.text + DESCRIPTOR_NAME,
+      target.get(exported + DESCRIPTOR_NAME),
     );
+  }
 }
 
 /**
@@ -444,6 +487,8 @@ function constantsOf({
     addImports(constants, statement, through);
     addReExports(constants, statement, through);
   }
+
+  addDescriptorNames(constants, source);
 
   if (scope.cut.count === cutBefore) scope.scopes.set(file, constants);
 
@@ -512,7 +557,27 @@ function insertedTable(reader: Reader, node: ts.CallExpression): string | undefi
 
   if (ts.isTemplateExpression(value)) return qualifiedConstant(reader, value);
 
-  return ts.isIdentifier(value) ? reader.constant(value.text) : void 0;
+  return namedTable(reader, value);
+}
+
+/** A constant, or a descriptor's `$table.name`, naming a table. */
+function namedTable(reader: Reader, value: ts.Expression): string | undefined {
+  if (ts.isIdentifier(value)) return reader.constant(value.text);
+
+  return ts.isPropertyAccessExpression(value)
+    ? reader.constant(value.getText(reader.source))
+    : void 0;
+}
+
+/** `.from(descriptor)` and the builder's joins: the descriptor names the table read. */
+function descriptorRead(reader: Reader, node: ts.CallExpression): string | undefined {
+  if (!ts.isPropertyAccessExpression(node.expression)) return void 0;
+
+  if (!DESCRIPTOR_READS.has(node.expression.name.text)) return void 0;
+
+  const [table] = node.arguments;
+
+  return table && ts.isIdentifier(table) ? reader.constant(table.text + DESCRIPTOR_NAME) : void 0;
 }
 
 function isInsertOptions(node: ts.Node): boolean {
@@ -532,7 +597,7 @@ function readTable(reader: Reader, property: ts.Node): string | undefined {
   const { name, initializer } = property;
   if (!ts.isIdentifier(name) || name.text !== "table") return void 0;
 
-  return ts.isIdentifier(initializer) ? reader.constant(initializer.text) : void 0;
+  return namedTable(reader, initializer);
 }
 
 /** `${database}.${CONSTANT}`: the table is the declared constant after the database dot. */
@@ -545,6 +610,15 @@ function qualifiedConstant(reader: Reader, template: ts.TemplateExpression): str
 
   const before = spans[spans.length - 2]?.literal.text;
   return before === "." ? reader.constant(last.expression.text) : void 0;
+}
+
+/** An insert's table is a write; a builder read from a descriptor is a read. */
+function readCall(reader: Reader, node: ts.CallExpression): void {
+  const table = insertedTable(reader, node);
+  if (table) record({ reader, node, table, write: true });
+
+  const described = descriptorRead(reader, node);
+  if (described) record({ reader, node, table: described, write: false });
 }
 
 function readFile({
@@ -579,10 +653,7 @@ function readFile({
 
     if (ts.isTemplateExpression(node)) readSql(reader, node);
 
-    if (ts.isCallExpression(node)) {
-      const table = insertedTable(reader, node);
-      if (table) record({ reader, node, table, write: true });
-    }
+    if (ts.isCallExpression(node)) readCall(reader, node);
 
     const read = readTable(reader, node);
     if (read) record({ reader, node, table: read, write: false });
