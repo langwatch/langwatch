@@ -118,7 +118,8 @@ function isEmptyScope(filter: ResultsFilter): boolean {
 
 /**
  * The window's runs at their latest version, as the table the typed atom reads select from. The
- * election repeats only the widened window, so the exact window applies over this table.
+ * election repeats the widened window and the ScenarioSetId terms (a run never changes set), so
+ * the exact window applies over this table.
  * @see dev/docs/best_practices/clickhouse-queries.md — "A range filter on a MOVABLE column"
  */
 function atomRunsOf({ filter, scope }: { filter: ResultsFilter; scope: SingleTenantScope }) {
@@ -164,7 +165,7 @@ function atomRunsOf({ filter, scope }: { filter: ResultsFilter; scope: SingleTen
       : runs.where(({ lte }) => lte(t.StartedAt, endDate + DEDUP_WINDOW_SLACK_MS));
   return windowed
     .where(({ isNull }) => isNull(t.ArchivedAt))
-    .latestVersion()
+    .latestVersion({ repeat: [t.ScenarioSetId] })
     .as("atoms");
 }
 

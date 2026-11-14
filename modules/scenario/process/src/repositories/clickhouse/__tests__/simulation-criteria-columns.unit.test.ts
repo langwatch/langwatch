@@ -20,13 +20,13 @@ function readRunOver(columnList: readonly { table: string; name: string }[]) {
   const statements: string[] = [];
   const columns = ClickHouseColumns.over({ read: async () => columnList });
   const repository = SimulationClickHouseRepository.create(async () => ({
-    query: async ({ query }) => {
-      statements.push(query);
-      return { json: async () => [] };
-    },
+    query: () => Promise.reject(new Error("the run read is a built read")),
     select: (input) => columns.select(input),
     holds: (input) => columns.holds(input),
-    read: () => Promise.reject(new Error("the criteria reads send no built read")),
+    read: async ({ statement }) => {
+      statements.push(statement.sql);
+      return { rows: [] };
+    },
   }));
   return { statements, repository };
 }
@@ -39,10 +39,9 @@ describe("SimulationClickHouseRepository criteria columns", () => {
 
       await repository.findScenarioRunData({ projectId: "project_1", scenarioRunId: "run_1" });
 
-      expect(statements[0]).toContain("CAST([] AS Array(String)) AS `Criteria.Criterion`");
-      expect(statements[0]).toContain(
-        "CAST([] AS Array(LowCardinality(String))) AS `Criteria.Status`",
-      );
+      expect(statements[0]).not.toContain("`Criteria.Criterion`");
+      expect(statements[0]).toMatch(/Array\(String\)\) AS criteriaCriterion/);
+      expect(statements[0]).toMatch(/Array\(LowCardinality\(String\)\)\) AS criteriaStatus/);
     });
   });
 
@@ -53,8 +52,8 @@ describe("SimulationClickHouseRepository criteria columns", () => {
 
       await repository.findScenarioRunData({ projectId: "project_1", scenarioRunId: "run_1" });
 
-      expect(statements[0]).toContain("`Criteria.Criterion`, `Criteria.Requirement`");
-      expect(statements[0]).not.toContain("AS `Criteria.Criterion`");
+      expect(statements[0]).toContain("`Criteria.Criterion` AS criteriaCriterion");
+      expect(statements[0]).toContain("`Criteria.Requirement` AS criteriaRequirement");
     });
   });
 });

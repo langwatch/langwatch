@@ -80,6 +80,21 @@ describe("the typed atom reads", () => {
     });
   });
 
+  describe("when the filter names a scenario set", () => {
+    it("carries the set filter and the agent test exclusion into the election", () => {
+      const statement = ResultAtomsClickHouseRepository.totalsRead({
+        ...filter,
+        scenarioSetIds: ["set_1"],
+      });
+      const election = statement.sql.split(" IN (SELECT TenantId, ScenarioRunId,")[1] ?? "";
+      const electionBody = election.slice(0, election.indexOf("GROUP BY"));
+
+      expect(electionBody).toContain("ScenarioSetId IN (");
+      expect(electionBody).toContain("NOT (endsWith(ScenarioSetId, {");
+      expect(electionBody).not.toContain("ArchivedAt");
+    });
+  });
+
   describe("when no end date is given", () => {
     it("bounds the window only from below", () => {
       const statement = ResultAtomsClickHouseRepository.seriesRead({

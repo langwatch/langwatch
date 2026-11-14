@@ -31,10 +31,7 @@ import {
 } from "@langwatch/scenario-contract";
 import { nowInstant } from "@langwatch/time";
 
-import {
-  EVALUATION_COLUMNS_SQL,
-  EVALUATION_LIST_COLUMNS_SQL,
-} from "../../rules/simulation-evaluation-columns.rules.ts";
+import { EVALUATION_COLUMNS_SQL } from "../../rules/simulation-evaluation-columns.rules.ts";
 import { SimulationRepository } from "../simulation.repository.ts";
 import { simulationRuns } from "./clickhouse.simulation-runs.table.ts";
 import { CRITERIA_COLUMNS } from "./simulation-criteria.mapper.ts";
@@ -56,9 +53,6 @@ export const RUN_ID_CAP = 10000;
  * them.
  */
 const SET_BOUND = "{{idBound:simulation_runs.ScenarioSetId:scenarioSetIds}}";
-const SET_BOUND_T = "{{idBound:simulation_runs.ScenarioSetId:scenarioSetIds:t}}";
-const BATCHES_BOUND = "{{idBound:simulation_runs.BatchRunId:batchRunIds}}";
-const BATCHES_BOUND_T = "{{idBound:simulation_runs.BatchRunId:batchRunIds:t}}";
 const ID_BOUND_READ: { idBound: IdBoundOptions } = { idBound: { fallback: "unbounded" } };
 
 /**
@@ -164,34 +158,6 @@ const runColumns = (criteria: string) => `
   TraceIds,
   Verdict, Reasoning, MetCriteria, UnmetCriteria, InconclusiveCriteria, Error,
   ${EVALUATION_COLUMNS_SQL},
-  ${criteria},
-  toString(DurationMs) AS DurationMs,
-  TotalCost, RoleCosts, RoleLatencies,
-  toString(toUnixTimestamp64Milli(StartedAt)) AS StartedAt,
-  toString(toUnixTimestamp64Milli(CreatedAt)) AS CreatedAt,
-  toString(toUnixTimestamp64Milli(UpdatedAt)) AS UpdatedAt,
-  toString(toUnixTimestamp64Milli(FinishedAt)) AS FinishedAt,
-  toString(toUnixTimestamp64Milli(ArchivedAt)) AS ArchivedAt`;
-
-/**
- * Columns for list/grid views: truncated messages (first 6), excludes heavy JSON data.
- * `TotalMessageCount` must be table-qualified or it measures the sliced array only.
- */
-const listColumns = (criteria: string) => `
-  ScenarioRunId, ScenarioId, BatchRunId, ScenarioSetId,
-  Status, Name, Description, Metadata,
-  toString(length(t.\`Messages.Role\`)) AS TotalMessageCount,
-  arraySlice(\`Messages.Id\`, 1, 6) AS \`Messages.Id\`,
-  arraySlice(\`Messages.Role\`, 1, 6) AS \`Messages.Role\`,
-  arraySlice(\`Messages.Content\`, 1, 6) AS \`Messages.Content\`,
-  CAST([] AS Array(String)) AS \`Messages.TraceId\`,
-  CAST([] AS Array(String)) AS \`Messages.Rest\`,
-  CAST([] AS Array(String)) AS TraceIds,
-  Verdict,
-  CAST(NULL AS Nullable(String)) AS Reasoning,
-  MetCriteria, UnmetCriteria, InconclusiveCriteria,
-  CAST(NULL AS Nullable(String)) AS Error,
-  ${EVALUATION_LIST_COLUMNS_SQL},
   ${criteria},
   toString(DurationMs) AS DurationMs,
   TotalCost, RoleCosts, RoleLatencies,
@@ -407,37 +373,21 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     projectId: string;
     scenarioRunId: string;
   }): Promise<SimulationRunData | null> {
-    // Uses a scalar subquery to find the latest UpdatedAt, avoiding the old
-    // pattern that read all heavy columns (Messages, RoleCosts, etc.) across
-    // entire granules (~8K rows) for dedup, causing OOM on parts with large
-    // payloads.
-    const criteria = await this.criteriaColumns(projectId);
     const client = await this.getClient(projectId);
-    const result = await client.query({
-      query: `SELECT ${runColumns(criteria)},
-        toString(${EXPORT_SORT_KEY}) AS ExportSortKey
-       FROM ${TABLE_NAME} AS t
-       WHERE t.TenantId = {tenantId:String}
-         AND t.ScenarioRunId = {scenarioRunId:String}
-         AND t.ArchivedAt IS NULL
-         {{idBound:simulation_runs.ScenarioRunId:scenarioRunId:t}}
-         AND t.UpdatedAt = (
-           SELECT max(s.UpdatedAt)
-           FROM ${TABLE_NAME} AS s
-           WHERE s.TenantId = {tenantId:String}
-             AND s.ScenarioRunId = {scenarioRunId:String}
-             {{idBound:simulation_runs.ScenarioRunId:scenarioRunId:s}}
-         )
-       LIMIT 1`,
-      query_params: { tenantId: projectId, scenarioRunId },
-      format: "JSONEachRow",
-      idBound: { fallback: "unbounded" },
+    const holds = await client.holds({ table: simulationRuns.$table.name });
+    const { rows } = await client.read({
+      statement: SimulationClickHouseRepository.scenarioRunRead({
+        projectId,
+        scenarioRunId,
+        holds,
+      }),
+      table: simulationRuns.$table.name,
+      ...ID_BOUND_READ,
     });
-    const rows = await result.json<ClickHouseSimulationRunRow & { ExportSortKey: string }>();
 
     const row = rows[0];
     if (!row) return null;
-    return mapClickHouseRowToScenarioRunData(row);
+    return mapClickHouseRowToScenarioRunData(runRowOf(row));
   }
 
   private static mapPreviewItem(r: PreviewItemRow) {
@@ -724,33 +674,15 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     projectId: string;
     scenarioSetId: string;
   }): Promise<SimulationRunData[]> {
-    const criteria = await this.criteriaColumns(projectId);
-    const rows = await this.queryRows<ClickHouseSimulationRunRow & { ExportSortKey: string }>(
-      `SELECT ${runColumns(criteria)},
-        toString(${EXPORT_SORT_KEY}) AS ExportSortKey
-       FROM ${TABLE_NAME} AS t
-       WHERE t.TenantId = {tenantId:String}
-         AND t.ScenarioSetId IN ({scenarioSetIds:Array(String)})
-         ${SET_BOUND_T}
-         AND t.ArchivedAt IS NULL
-         AND (t.TenantId, t.ScenarioSetId, t.BatchRunId, t.ScenarioRunId, t.UpdatedAt) IN (
-           SELECT TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, max(UpdatedAt)
-           FROM ${TABLE_NAME}
-           WHERE TenantId = {tenantId:String}
-             AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
-             ${SET_BOUND}
-           GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
-         )
-       ORDER BY BatchRunId ASC, CreatedAt ASC
-       LIMIT 10000`,
-      {
-        tenantId: projectId,
-        scenarioSetIds: SimulationClickHouseRepository.expandSetIdFilter(scenarioSetId),
-      },
-      ID_BOUND_READ,
-    );
+    const client = await this.getClient(projectId);
+    const holds = await client.holds({ table: simulationRuns.$table.name });
+    const { rows } = await client.read({
+      statement: SimulationClickHouseRepository.setRunsRead({ projectId, scenarioSetId, holds }),
+      table: simulationRuns.$table.name,
+      ...ID_BOUND_READ,
+    });
 
-    return rows.map((row) => mapClickHouseRowToScenarioRunData(row));
+    return rows.map((row) => mapClickHouseRowToScenarioRunData(runRowOf(row)));
   }
 
   async listRunDataForScenarioSet({
@@ -863,15 +795,12 @@ export class SimulationClickHouseRepository extends SimulationRepository {
    * since it never reaches the page and would report a phantom change.
    */
   private async readMaxUpdatedAt(projectId: string): Promise<number> {
-    const tsRows = await this.queryRows<{ LastUpdatedAt: string }>(
-      `SELECT toString(toUnixTimestamp64Milli(max(UpdatedAt))) AS LastUpdatedAt
-       FROM ${TABLE_NAME}
-       WHERE TenantId = {tenantId:String}
-         AND ArchivedAt IS NULL
-         ${AGENT_TEST_SET_EXCLUSION}`,
-      { tenantId: projectId },
-    );
-    return Number(tsRows[0]?.LastUpdatedAt ?? "0");
+    const client = await this.getClient(projectId);
+    const { rows } = await client.read({
+      statement: SimulationClickHouseRepository.maxUpdatedAtRead({ projectId }),
+      table: simulationRuns.$table.name,
+    });
+    return Number(rows[0]?.LastUpdatedAt ?? 0);
   }
 
   /**
@@ -1077,31 +1006,18 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     // Freshness probes poll frequently, so an unbounded StartedAt window
     // (scanning every partition, including cold storage) is never acceptable
     // here — floor the window at 30 days when the caller omits it.
-    const dateFilter = SimulationClickHouseRepository.buildDateFilter({
-      startDate: startDate ?? nowInstant().subtract({ hours: 30 * 24 }).epochMilliseconds,
-      endDate,
+    const client = await this.getClient(projectId);
+    const { rows } = await client.read({
+      statement: SimulationClickHouseRepository.lastUpdatedAtRead({
+        projectId,
+        scenarioSetId,
+        startDate: startDate ?? nowInstant().subtract({ hours: 30 * 24 }).epochMilliseconds,
+        endDate,
+      }),
+      table: simulationRuns.$table.name,
     });
-    const setFilter = scenarioSetId ? "AND ScenarioSetId IN ({scenarioSetIds:Array(String)})" : "";
 
-    // max(UpdatedAt) over all versions equals the latest version's UpdatedAt
-    // (ReplacingMergeTree version column), so no dedup subquery is needed.
-    // Reads only light columns; the StartedAt window prunes partitions.
-    const rows = await this.queryRows<{ LastUpdatedAt: string | null }>(
-      `SELECT toString(toUnixTimestamp64Milli(max(UpdatedAt))) AS LastUpdatedAt
-       FROM ${TABLE_NAME}
-       WHERE TenantId = {tenantId:String}
-         ${setFilter}
-         ${dateFilter.whereClause}`,
-      {
-        tenantId: projectId,
-        ...(scenarioSetId
-          ? { scenarioSetIds: SimulationClickHouseRepository.expandSetIdFilter(scenarioSetId) }
-          : {}),
-        ...dateFilter.params,
-      },
-    );
-
-    return Number(rows[0]?.LastUpdatedAt ?? "0");
+    return Number(rows[0]?.LastUpdatedAt ?? 0);
   }
 
   async findExternalSetSummaries(params: {
@@ -1293,27 +1209,11 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     // vice-versa). Expand to both storage forms so archiving the default
     // set matches its rows — the same normalization every other set-scoped
     // query uses via expandSetIdFilter.
-    const scenarioSetIds = SimulationClickHouseRepository.expandSetIdFilter(scenarioSetId);
-    // Dedup to the latest version per run before applying ArchivedAt IS NULL.
-    // simulation_runs is ReplacingMergeTree(UpdatedAt); without dedup, an
-    // older non-archived row can satisfy the filter even after the run was
-    // archived, re-dispatching deletions for already-archived runs.
-    const result = await client.query({
-      query: `SELECT DISTINCT ScenarioRunId
-              FROM ${TABLE_NAME}
-              WHERE TenantId = {tenantId:String}
-                AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
-                ${SET_BOUND}
-                AND ArchivedAt IS NULL
-                ${SimulationClickHouseRepository.simulationRunDedupPredicate(
-                  `TenantId = {tenantId:String} AND ScenarioSetId IN ({scenarioSetIds:Array(String)}) ${SET_BOUND}`,
-                )}
-              LIMIT ${RUN_ID_CAP}`,
-      query_params: { tenantId: projectId, scenarioSetIds },
-      format: "JSONEachRow",
+    const { rows } = await client.read({
+      statement: SimulationClickHouseRepository.setRunIdsRead({ projectId, scenarioSetId }),
+      table: simulationRuns.$table.name,
       ...ID_BOUND_READ,
     });
-    const rows = await result.json<{ ScenarioRunId: string }>();
     const runIds = rows.map((r) => r.ScenarioRunId);
     return { runIds, reachedCap: runIds.length === RUN_ID_CAP };
   }
@@ -1452,7 +1352,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
 
   /**
    * Forward-only CSV export via keyset pagination (not OFFSET) on (StartedAt, ScenarioRunId),
-   * reading runColumns (not listColumns), unlike findRunDataForAllSuites which is capped.
+   * reading whole runs, not the trimmed list fields; findRunDataForAllSuites is capped.
    */
   async listRunsForExport({
     projectId,
@@ -1653,44 +1553,23 @@ export class SimulationClickHouseRepository extends SimulationRepository {
   }): Promise<SimulationRunData[]> {
     if (batchRunIds.length === 0) return [];
 
-    const setFilter = scenarioSetId
-      ? "AND t.ScenarioSetId IN ({scenarioSetIds:Array(String)})"
-      : "";
-    const innerSetFilter = scenarioSetId
-      ? "AND ScenarioSetId IN ({scenarioSetIds:Array(String)})"
-      : "";
-
-    const criteria = await this.criteriaColumns(projectId);
-    const rows = await this.queryRows<ClickHouseSimulationRunRow>(
-      `SELECT ${shouldIncludeMessages ? runColumns(criteria) : listColumns(criteria)}
-       FROM ${TABLE_NAME} AS t
-       WHERE t.TenantId = {tenantId:String}
-         AND t.BatchRunId IN ({batchRunIds:Array(String)})
-         ${BATCHES_BOUND_T}
-         ${setFilter}
-         AND t.ArchivedAt IS NULL
-         AND (t.TenantId, t.ScenarioSetId, t.BatchRunId, t.ScenarioRunId, t.UpdatedAt) IN (
-           SELECT TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, max(UpdatedAt)
-           FROM ${TABLE_NAME}
-           WHERE TenantId = {tenantId:String}
-             AND BatchRunId IN ({batchRunIds:Array(String)})
-             ${BATCHES_BOUND}
-             ${innerSetFilter}
-           GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
-         )
-       ORDER BY CreatedAt ASC
-       LIMIT 5000`,
-      {
-        tenantId: projectId,
-        batchRunIds,
-        ...(scenarioSetId
-          ? { scenarioSetIds: SimulationClickHouseRepository.expandSetIdFilter(scenarioSetId) }
-          : {}),
-      },
-      ID_BOUND_READ,
-    );
-
-    return rows.map((row) => mapClickHouseRowToScenarioRunData(row));
+    const client = await this.getClient(projectId);
+    const holds = await client.holds({ table: simulationRuns.$table.name });
+    const input = { projectId, batchRunIds, scenarioSetId, holds };
+    if (shouldIncludeMessages) {
+      const { rows } = await client.read({
+        statement: SimulationClickHouseRepository.batchesRunsRead(input),
+        table: simulationRuns.$table.name,
+        ...ID_BOUND_READ,
+      });
+      return rows.map((row) => mapClickHouseRowToScenarioRunData(runRowOf(row)));
+    }
+    const { rows } = await client.read({
+      statement: SimulationClickHouseRepository.batchesListRunsRead(input),
+      table: simulationRuns.$table.name,
+      ...ID_BOUND_READ,
+    });
+    return rows.map((row) => mapClickHouseRowToScenarioRunData(listRunRowOf(row)));
   }
 
   /**
@@ -1814,6 +1693,121 @@ export class SimulationClickHouseRepository extends SimulationRepository {
           ? undefined
           : SimulationClickHouseRepository.expandSetIdFilter(scenarioSetId),
     });
+  }
+
+  /**
+   * Newest UpdatedAt across every live run version, agent test runs excluded; a version column's
+   * max over all versions is the latest version's, so no election.
+   */
+  static maxUpdatedAtRead({
+    projectId,
+  }: {
+    projectId: string;
+  }): ReaderReadStatement<{ LastUpdatedAt: number }> {
+    const t = simulationRuns;
+    return clickhouseRead({ scope: tenantScope.single({ tenantId: projectId }) })
+      .from(t)
+      .select({ LastUpdatedAt: fn.toUnixTimestamp64Milli(fn.max(t.UpdatedAt)) })
+      .where(({ and, isNull, ne, not }) =>
+        and(
+          isNull(t.ArchivedAt),
+          not(fn.endsWith(t.ScenarioSetId, AGENT_TEST_SET_SUFFIX)),
+          ne(t.ScenarioSetId, VOICE_CALL_SCENARIO_SET_ID),
+        ),
+      )
+      .build();
+  }
+
+  /** Newest UpdatedAt of any version in the StartedAt window, optionally in one set. */
+  static lastUpdatedAtRead({
+    projectId,
+    scenarioSetId,
+    startDate,
+    endDate,
+  }: {
+    projectId: string;
+    scenarioSetId: string | undefined;
+    startDate: number;
+    endDate: number | undefined;
+  }): ReaderReadStatement<{ LastUpdatedAt: number }> {
+    const t = simulationRuns;
+    let read = clickhouseRead({ scope: tenantScope.single({ tenantId: projectId }) })
+      .from(t)
+      .select({ LastUpdatedAt: fn.toUnixTimestamp64Milli(fn.max(t.UpdatedAt)) })
+      .where(({ gte }) => gte(t.StartedAt, startDate));
+    if (endDate !== undefined) read = read.where(({ lte }) => lte(t.StartedAt, endDate));
+    if (scenarioSetId) {
+      const setIds = SimulationClickHouseRepository.expandSetIdFilter(scenarioSetId);
+      read = read.where(({ oneOf }) => oneOf(t.ScenarioSetId, setIds));
+    }
+    return read.build();
+  }
+
+  /**
+   * The ids of a set's live runs, capped at {@link RUN_ID_CAP}. Elected before ArchivedAt is
+   * tested: an older unarchived version would otherwise re-dispatch an archived run's deletion.
+   */
+  static setRunIdsRead({
+    projectId,
+    scenarioSetId,
+  }: {
+    projectId: string;
+    scenarioSetId: string;
+  }): ReaderReadStatement<{ ScenarioRunId: string }> {
+    const t = simulationRuns;
+    const setIds = SimulationClickHouseRepository.expandSetIdFilter(scenarioSetId);
+    return clickhouseRead({ scope: tenantScope.single({ tenantId: projectId }) })
+      .from(t)
+      .select({ ScenarioRunId: t.ScenarioRunId })
+      .distinct()
+      .where(({ idBound }) => idBound(t.ScenarioSetId, setIds))
+      .where(({ isNull }) => isNull(t.ArchivedAt))
+      .latestVersion()
+      .limit(RUN_ID_CAP)
+      .build();
+  }
+
+  /** One run's latest version: `UpdatedAt` equal to a scalar `max(UpdatedAt)`, both id-bound. */
+  static scenarioRunRead(input: {
+    projectId: string;
+    scenarioRunId: string;
+    holds: (name: string) => boolean;
+  }): ReaderReadStatement<BuiltRunRow> {
+    return scenarioRunReadOf(input);
+  }
+
+  /** A set's whole runs, latest versions, by batch then oldest, capped at {@link RUN_ID_CAP}. */
+  static setRunsRead({
+    scenarioSetId,
+    ...input
+  }: {
+    projectId: string;
+    scenarioSetId: string;
+    holds: (name: string) => boolean;
+  }): ReaderReadStatement<BuiltRunRow> {
+    return setRunsReadOf({
+      ...input,
+      setIds: SimulationClickHouseRepository.expandSetIdFilter(scenarioSetId),
+    });
+  }
+
+  /** A page of batches' whole runs, latest versions, oldest first. */
+  static batchesRunsRead(input: BatchesRunsInput): ReaderReadStatement<BuiltRunRow> {
+    return batchesRunsReadOf(SimulationClickHouseRepository.batchesInputOf(input));
+  }
+
+  /** A page of batches' runs trimmed for a list: six messages, no prose or traces. */
+  static batchesListRunsRead(input: BatchesRunsInput): ReaderReadStatement<BuiltListRunRow> {
+    return batchesListRunsReadOf(SimulationClickHouseRepository.batchesInputOf(input));
+  }
+
+  private static batchesInputOf({ scenarioSetId, ...input }: BatchesRunsInput) {
+    return {
+      ...input,
+      setIds: scenarioSetId
+        ? SimulationClickHouseRepository.expandSetIdFilter(scenarioSetId)
+        : undefined,
+    };
   }
 
   private static expandSetIdFilter(scenarioSetId: string): string[] {
@@ -2022,7 +2016,7 @@ function batchPreviewItemsReadOf({
   }
   return read
     .where(({ isNull }) => isNull(t.ArchivedAt))
-    .latestVersion()
+    .latestVersion({ repeat: [t.ScenarioSetId] })
     .orderBy(t.CreatedAt, "ASC")
     .build();
 }
@@ -2042,8 +2036,8 @@ function heldCriteria(holds: (name: string) => boolean) {
   };
 }
 
-/** A whole run's columns; dotted columns and timestamps (Unix milliseconds) under plain keys. */
-function runFieldsOf(holds: (name: string) => boolean) {
+/** The columns a list read and a whole-run read share; dotted ones under plain keys. */
+function sharedRunFieldsOf(holds: (name: string) => boolean) {
   const t = simulationRuns;
   const millis = fn.toUnixTimestamp64Milli;
   return {
@@ -2055,18 +2049,10 @@ function runFieldsOf(holds: (name: string) => boolean) {
     Name: t.Name,
     Description: t.Description,
     Metadata: t.Metadata,
-    messageIds: t["Messages.Id"],
-    messageRoles: t["Messages.Role"],
-    messageContents: t["Messages.Content"],
-    messageTraceIds: t["Messages.TraceId"],
-    messageRests: t["Messages.Rest"],
-    TraceIds: t.TraceIds,
     Verdict: t.Verdict,
-    Reasoning: t.Reasoning,
     MetCriteria: t.MetCriteria,
     UnmetCriteria: t.UnmetCriteria,
     InconclusiveCriteria: t.InconclusiveCriteria,
-    Error: t.Error,
     evaluationEvaluatorIds: t["Evaluations.EvaluatorId"],
     evaluationNames: t["Evaluations.Name"],
     evaluationStatuses: t["Evaluations.Status"],
@@ -2074,10 +2060,8 @@ function runFieldsOf(holds: (name: string) => boolean) {
     evaluationPassed: t["Evaluations.Passed"],
     evaluationScores: t["Evaluations.Score"],
     evaluationLabels: t["Evaluations.Label"],
-    evaluationDetails: t["Evaluations.Details"],
     evaluationCostAmounts: t["Evaluations.CostAmount"],
     evaluationCostCurrencies: t["Evaluations.CostCurrency"],
-    evaluationInputsJson: t["Evaluations.InputsJson"],
     ...heldCriteria(holds),
     DurationMs: t.DurationMs,
     TotalCost: t.TotalCost,
@@ -2088,6 +2072,39 @@ function runFieldsOf(holds: (name: string) => boolean) {
     updatedAtMs: millis(t.UpdatedAt),
     finishedAtMs: millis(t.FinishedAt),
     archivedAtMs: millis(t.ArchivedAt),
+  };
+}
+
+/** A whole run's columns; timestamps in Unix milliseconds. */
+function runFieldsOf(holds: (name: string) => boolean) {
+  const t = simulationRuns;
+  return {
+    ...sharedRunFieldsOf(holds),
+    messageIds: t["Messages.Id"],
+    messageRoles: t["Messages.Role"],
+    messageContents: t["Messages.Content"],
+    messageTraceIds: t["Messages.TraceId"],
+    messageRests: t["Messages.Rest"],
+    TraceIds: t.TraceIds,
+    Reasoning: t.Reasoning,
+    Error: t.Error,
+    evaluationDetails: t["Evaluations.Details"],
+    evaluationInputsJson: t["Evaluations.InputsJson"],
+  };
+}
+
+/**
+ * A list row's columns: the first six messages and the count of all of them; the prose, traces,
+ * evaluation details and inputs belong to the run drawer and are not read.
+ */
+function listRunFieldsOf(holds: (name: string) => boolean) {
+  const t = simulationRuns;
+  return {
+    ...sharedRunFieldsOf(holds),
+    TotalMessageCount: fn.length(t["Messages.Role"]),
+    messageIds: fn.arraySlice(t["Messages.Id"], 1, 6),
+    messageRoles: fn.arraySlice(t["Messages.Role"], 1, 6),
+    messageContents: fn.arraySlice(t["Messages.Content"], 1, 6),
   };
 }
 
@@ -2150,6 +2167,124 @@ function runRowOf(row: BuiltRunRow): ClickHouseSimulationRunRow {
   };
 }
 
+/** A row of {@link listRunFieldsOf}, as a built read answers it. */
+type BuiltListRunRow =
+  ReturnType<typeof batchesListRunsReadOf> extends ReaderReadStatement<infer Row> ? Row : never;
+
+/** A built list row in the run mapper's shape; the columns a list leaves out read empty. */
+function listRunRowOf({ TotalMessageCount, ...row }: BuiltListRunRow): ClickHouseSimulationRunRow {
+  return {
+    ...runRowOf({
+      ...row,
+      messageTraceIds: [],
+      messageRests: [],
+      TraceIds: [],
+      Reasoning: null,
+      Error: null,
+      evaluationDetails: [],
+      evaluationInputsJson: [],
+    }),
+    TotalMessageCount: String(TotalMessageCount),
+  };
+}
+
+type BatchesRunsInput = {
+  projectId: string;
+  batchRunIds: string[];
+  /** Narrows to one set when non-empty; `"default"` selects the default set under both ids. */
+  scenarioSetId: string | undefined;
+  holds: (name: string) => boolean;
+};
+
+type BatchesReadInput = Omit<BatchesRunsInput, "scenarioSetId"> & {
+  setIds: string[] | undefined;
+};
+
+function scenarioRunReadOf({
+  projectId,
+  scenarioRunId,
+  holds,
+}: {
+  projectId: string;
+  scenarioRunId: string;
+  holds: (name: string) => boolean;
+}) {
+  const t = simulationRuns;
+  return clickhouseRead({ scope: tenantScope.single({ tenantId: projectId }) })
+    .from(t)
+    .select(runFieldsOf(holds))
+    .where(({ and, eq, idBound, isNull, scalar }) => {
+      const latest = scalar((sub) =>
+        sub
+          .from(t)
+          .select({ latestUpdatedAt: fn.max(t.UpdatedAt) })
+          .where((inner) => inner.idBound(t.ScenarioRunId, scenarioRunId)),
+      );
+      return and(
+        idBound(t.ScenarioRunId, scenarioRunId),
+        isNull(t.ArchivedAt),
+        eq(t.UpdatedAt, latest),
+      );
+    })
+    .limit(1)
+    .build();
+}
+
+function setRunsReadOf({
+  projectId,
+  setIds,
+  holds,
+}: {
+  projectId: string;
+  setIds: string[];
+  holds: (name: string) => boolean;
+}) {
+  const t = simulationRuns;
+  return clickhouseRead({ scope: tenantScope.single({ tenantId: projectId }) })
+    .from(t)
+    .select(runFieldsOf(holds))
+    .where(({ idBound }) => idBound(t.ScenarioSetId, setIds))
+    .where(({ isNull }) => isNull(t.ArchivedAt))
+    .latestVersion()
+    .orderBy(t.BatchRunId, "ASC")
+    .orderBy(t.CreatedAt, "ASC")
+    .limit(RUN_ID_CAP)
+    .build();
+}
+
+/** The cap on one page of batches' runs, as before the port. */
+const BATCHES_RUNS_LIMIT = 5000;
+
+function batchesRunsReadOf({ projectId, batchRunIds, setIds, holds }: BatchesReadInput) {
+  const t = simulationRuns;
+  let read = clickhouseRead({ scope: tenantScope.single({ tenantId: projectId }) })
+    .from(t)
+    .select(runFieldsOf(holds))
+    .where(({ idBound }) => idBound(t.BatchRunId, batchRunIds));
+  if (setIds !== undefined) read = read.where(({ oneOf }) => oneOf(t.ScenarioSetId, setIds));
+  return read
+    .where(({ isNull }) => isNull(t.ArchivedAt))
+    .latestVersion({ repeat: [t.ScenarioSetId] })
+    .orderBy(t.CreatedAt, "ASC")
+    .limit(BATCHES_RUNS_LIMIT)
+    .build();
+}
+
+function batchesListRunsReadOf({ projectId, batchRunIds, setIds, holds }: BatchesReadInput) {
+  const t = simulationRuns;
+  let read = clickhouseRead({ scope: tenantScope.single({ tenantId: projectId }) })
+    .from(t)
+    .select(listRunFieldsOf(holds))
+    .where(({ idBound }) => idBound(t.BatchRunId, batchRunIds));
+  if (setIds !== undefined) read = read.where(({ oneOf }) => oneOf(t.ScenarioSetId, setIds));
+  return read
+    .where(({ isNull }) => isNull(t.ArchivedAt))
+    .latestVersion({ repeat: [t.ScenarioSetId] })
+    .orderBy(t.CreatedAt, "ASC")
+    .limit(BATCHES_RUNS_LIMIT)
+    .build();
+}
+
 function batchRunsReadOf({
   projectId,
   batchRunId,
@@ -2169,7 +2304,7 @@ function batchRunsReadOf({
   if (setIds !== undefined) read = read.where(({ oneOf }) => oneOf(t.ScenarioSetId, setIds));
   return read
     .where(({ isNull }) => isNull(t.ArchivedAt))
-    .latestVersion()
+    .latestVersion({ repeat: [t.ScenarioSetId] })
     .orderBy(t.CreatedAt, "ASC")
     .build();
 }

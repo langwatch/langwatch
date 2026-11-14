@@ -130,6 +130,11 @@ describe("SimulationClickHouseRepository.batchPreviewItemsRead()", () => {
     expect(Object.values(params)).toContainEqual(["batch_1", "batch_2"]);
   });
 
+  it("carries the set filter into the election", () => {
+    const election = read(null).sql.split(" IN (SELECT TenantId, ScenarioRunId,")[1] ?? "";
+    expect(election.slice(0, election.indexOf("GROUP BY"))).toContain("ScenarioSetId IN (");
+  });
+
   it("bounds the read and its election by the page's StartedAt window when it has one", () => {
     const { sql, params } = read({ fromMs: 1_000, toMs: 2_000 });
     expect(sql.match(/StartedAt >= /g)).toHaveLength(2);
@@ -170,7 +175,7 @@ describe("SimulationClickHouseRepository.batchRunsRead()", () => {
 
   it("narrows to the default set under both of its ids when the caller names it", () => {
     const { sql, params } = read({ scenarioSetId: "" });
-    expect(sql).toContain("ScenarioSetId IN");
+    expect(sql.match(/ScenarioSetId IN \(/g)).toHaveLength(2);
     expect(Object.values(params)).toContainEqual(["default", ""]);
   });
 
@@ -181,5 +186,153 @@ describe("SimulationClickHouseRepository.batchRunsRead()", () => {
     });
     expect(sql).not.toContain("`Criteria.Criterion`");
     expect(sql).toContain("Array(LowCardinality(String))");
+  });
+});
+
+describe("SimulationClickHouseRepository.scenarioRunRead()", () => {
+  const statement = SimulationClickHouseRepository.scenarioRunRead({
+    projectId: "project_1",
+    scenarioRunId: "run_1",
+    holds: () => true,
+  });
+
+  it("scopes the read to its one tenant with the tenant setting", () => {
+    scoped(statement);
+    expect(statement.sql).toContain("FROM simulation_runs");
+  });
+
+  it("elects the run's latest version by a scalar max(UpdatedAt), both id-bound", () => {
+    expect(statement.sql).toMatch(/UpdatedAt = \(SELECT max\(UpdatedAt\)/);
+    expect(statement.sql.match(/\{\{idBound:simulation_runs\.ScenarioRunId:/g)).toHaveLength(2);
+    expect(statement.sql).toContain("ArchivedAt IS NULL");
+    expect(statement.sql).toContain("LIMIT 1");
+  });
+});
+
+describe("SimulationClickHouseRepository.setRunsRead()", () => {
+  const statement = SimulationClickHouseRepository.setRunsRead({
+    projectId: "project_1",
+    scenarioSetId: "default",
+    holds: () => true,
+  });
+
+  it("scopes the read to its one tenant with the tenant setting", () => {
+    scoped(statement);
+    expect(statement.sql).toContain("FROM simulation_runs");
+  });
+
+  it("elects the default set's latest runs under both ids, by batch then oldest, capped", () => {
+    expect(statement.sql).toContain("IN (SELECT TenantId, ScenarioRunId, max(UpdatedAt)");
+    expect(statement.sql.match(/\{\{idBound:simulation_runs\.ScenarioSetId:/g)).toHaveLength(2);
+    expect(Object.values(statement.params)).toContainEqual(["default", ""]);
+    expect(statement.sql).toContain("ORDER BY BatchRunId ASC, CreatedAt ASC LIMIT 10000");
+  });
+});
+
+describe("SimulationClickHouseRepository.batchesRunsRead() and batchesListRunsRead()", () => {
+  const input = {
+    projectId: "project_1",
+    batchRunIds: ["batch_1", "batch_2"],
+    scenarioSetId: "set_1",
+    holds: () => true,
+  };
+  const whole = SimulationClickHouseRepository.batchesRunsRead(input);
+  const list = SimulationClickHouseRepository.batchesListRunsRead(input);
+
+  it("scopes both reads to their one tenant with the tenant setting", () => {
+    for (const statement of [whole, list]) {
+      expect(statement.kind).toBe("tenant");
+      scoped(statement);
+    }
+  });
+
+  it("elects the page's batches' latest runs by the batch id index, in the set, oldest first", () => {
+    for (const { sql, params } of [whole, list]) {
+      expect(sql.match(/\{\{idBound:simulation_runs\.BatchRunId:/g)).toHaveLength(2);
+      expect(sql).toContain("ScenarioSetId IN");
+      expect(Object.values(params)).toContainEqual(["batch_1", "batch_2"]);
+      expect(sql).toContain("ORDER BY CreatedAt ASC LIMIT 5000");
+    }
+  });
+
+  it("carries the set filter into the election, and not the archive test", () => {
+    for (const { sql } of [whole, list]) {
+      const election = sql.split(" IN (SELECT TenantId, ScenarioRunId,")[1] ?? "";
+      const electionBody = election.slice(0, election.indexOf("GROUP BY"));
+      expect(electionBody).toContain("ScenarioSetId IN (");
+      expect(electionBody).not.toContain("ArchivedAt");
+    }
+  });
+
+  it("trims the list to six messages and counts every message", () => {
+    expect(list.sql).toMatch(/arraySlice\([\w.]*`Messages\.Role`, \{\w+:Int64\}, \{\w+:Int64\}\)/);
+    expect(list.sql).toMatch(/length\([\w.]*`Messages\.Role`\) AS TotalMessageCount/);
+    expect(Object.values(list.params)).toEqual(expect.arrayContaining([1, 6]));
+    expect(list.sql).not.toContain("Messages.Rest");
+    expect(list.sql).not.toContain("Evaluations.InputsJson");
+    expect(whole.sql).toContain("Messages.Rest");
+  });
+
+  it("reads every set's runs when the caller names no set", () => {
+    const { sql } = SimulationClickHouseRepository.batchesListRunsRead({
+      ...input,
+      scenarioSetId: undefined,
+    });
+    expect(sql).not.toContain("ScenarioSetId IN");
+  });
+});
+
+describe("SimulationClickHouseRepository.maxUpdatedAtRead()", () => {
+  const statement = SimulationClickHouseRepository.maxUpdatedAtRead({ projectId: "project_1" });
+
+  it("reads the newest live version without an election, agent test runs left out", () => {
+    scoped(statement);
+    expect(statement.sql).toContain("max(UpdatedAt)");
+    expect(statement.sql).toContain("ArchivedAt IS NULL");
+    expect(statement.sql).toContain("NOT (endsWith(ScenarioSetId");
+    expect(statement.sql).not.toContain("GROUP BY");
+  });
+});
+
+describe("SimulationClickHouseRepository.lastUpdatedAtRead()", () => {
+  it("bounds the probe by its StartedAt window and narrows to the set when named", () => {
+    const statement = SimulationClickHouseRepository.lastUpdatedAtRead({
+      projectId: "project_1",
+      scenarioSetId: "default",
+      startDate: 1_000,
+      endDate: 2_000,
+    });
+    scoped(statement);
+    expect(statement.sql).toContain("StartedAt >= ");
+    expect(statement.sql).toContain("StartedAt <= ");
+    expect(statement.sql).toContain("ScenarioSetId IN");
+    expect(Object.values(statement.params)).toContainEqual(["default", ""]);
+    expect(statement.sql).not.toContain("GROUP BY");
+  });
+
+  it("reads every set when the caller names none", () => {
+    const { sql } = SimulationClickHouseRepository.lastUpdatedAtRead({
+      projectId: "project_1",
+      scenarioSetId: undefined,
+      startDate: 1_000,
+      endDate: undefined,
+    });
+    expect(sql).not.toContain("ScenarioSetId IN");
+    expect(sql).not.toContain("StartedAt <= ");
+  });
+});
+
+describe("SimulationClickHouseRepository.setRunIdsRead()", () => {
+  const statement = SimulationClickHouseRepository.setRunIdsRead({
+    projectId: "project_1",
+    scenarioSetId: "set_1",
+  });
+
+  it("elects the set's live run ids by the set id index, capped", () => {
+    scoped(statement);
+    expect(statement.sql).toContain("SELECT DISTINCT ScenarioRunId");
+    expect(statement.sql).toContain("IN (SELECT TenantId, ScenarioRunId, max(UpdatedAt)");
+    expect(statement.sql.match(/\{\{idBound:simulation_runs\.ScenarioSetId:/g)).toHaveLength(2);
+    expect(statement.sql).toContain("LIMIT 10000");
   });
 });

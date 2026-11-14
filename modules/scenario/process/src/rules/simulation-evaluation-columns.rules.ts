@@ -33,19 +33,6 @@ export const EVALUATION_COLUMNS_SQL = `
   \`Evaluations.CostAmount\`, \`Evaluations.CostCurrency\`,
   \`Evaluations.InputsJson\``;
 
-/**
- * The columns a list read selects: everything but the prose. Details and
- * the resolved inputs belong to the run drawer, and reading them for every
- * row of a list is what the trimmed list projections exist to avoid.
- */
-export const EVALUATION_LIST_COLUMNS_SQL = `
-  \`Evaluations.EvaluatorId\`, \`Evaluations.Name\`, \`Evaluations.Status\`,
-  \`Evaluations.Required\`, \`Evaluations.Passed\`, \`Evaluations.Score\`,
-  \`Evaluations.Label\`,
-  CAST([] AS Array(String)) AS \`Evaluations.Details\`,
-  \`Evaluations.CostAmount\`, \`Evaluations.CostCurrency\`,
-  CAST([] AS Array(String)) AS \`Evaluations.InputsJson\``;
-
 /** The evaluations of a run as the parallel arrays its row stores. */
 export function evaluationsToColumns(
   evaluations: ScenarioEvaluationResult[],
