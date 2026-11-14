@@ -71,6 +71,48 @@ const summaries = defineClickHouseTable({
   },
 });
 
+const runs = defineClickHouseTable({
+  name: "simulation_runs",
+  tenantColumn: "TenantId",
+  versionColumn: "UpdatedAt",
+  sortKey: ["TenantId", "ScenarioRunId"],
+  columns: {
+    TenantId: column.string(),
+    ScenarioRunId: column.string(),
+    TraceId: column.string(),
+    Name: column.string(),
+    UpdatedAt: column.dateTime64({ precision: 3 }),
+    Metadata: column.nullable(column.string()),
+    "Messages.Id": column.array(column.string()),
+    "Messages.Role": column.array(column.string()),
+    "Criteria.Status": column.array(column.lowCardinality(column.string())),
+  },
+});
+
+const rollup = defineClickHouseTable({
+  name: "metrics_rollup",
+  tenantColumn: "TenantId",
+  sortKey: ["TenantId", "TraceId"],
+  columns: {
+    TenantId: column.string(),
+    TraceId: column.string(),
+    HourBucket: column.dateTime(),
+    TotalCost: column.aggregateFunction({
+      fn: "argMax",
+      args: [column.float64(), column.dateTime64({ precision: 3 })],
+    }),
+    RoleCosts: column.aggregateFunction({
+      fn: "argMax",
+      args: [
+        column.map({ key: column.string(), value: column.float64() }),
+        column.dateTime64({ precision: 3 }),
+      ],
+    }),
+    SpendNano: column.aggregateFunction({ fn: "sum", args: [column.int64()] }),
+    SpanCount: column.simpleAggregate({ fn: "sum", of: column.uint64() }),
+  },
+});
+
 const at = (ms: number) => new Date(ms).toISOString().replace("T", " ").replace("Z", "");
 const span = (
   TenantId: string,
@@ -113,6 +155,62 @@ const SUMMARIES = [
   summary(B, "t1", 200),
   summary(C, "t0", 1000),
 ];
+
+const agents = (...named: readonly (readonly [string, string])[]) =>
+  JSON.stringify({ labels: ["x", "y"], agents: named.map(([name, role]) => ({ name, role })) });
+const RUNS = [
+  {
+    TenantId: A,
+    ScenarioRunId: "r1",
+    TraceId: "t0",
+    Name: "  List agents!",
+    UpdatedAt: at(NOW - 200),
+    Metadata: agents(["Bot", "agent"], ["Ann", "user"]),
+    "Messages.Id": ["m1", "m2"],
+    "Messages.Role": ["user", "assistant"],
+    "Criteria.Status": ["PASSED"],
+  },
+  {
+    TenantId: A,
+    ScenarioRunId: "r1",
+    TraceId: "t0",
+    Name: "  List agents!",
+    UpdatedAt: at(NOW - 100),
+    Metadata: agents(["Bot", "agent"], ["Cat", "agent"]),
+    "Messages.Id": ["m1", "m2", "m3"],
+    "Messages.Role": ["user", "assistant", "user"],
+    "Criteria.Status": ["PASSED", "FAILED"],
+  },
+  {
+    TenantId: A,
+    ScenarioRunId: "r2",
+    TraceId: "t1",
+    Name: "second",
+    UpdatedAt: at(NOW - 100),
+    Metadata: null,
+    "Messages.Id": ["m9"],
+    "Messages.Role": ["assistant"],
+    "Criteria.Status": [],
+  },
+  {
+    TenantId: B,
+    ScenarioRunId: "r1",
+    TraceId: "t0",
+    Name: "spy",
+    UpdatedAt: at(NOW - 100),
+    Metadata: agents(["Spy", "agent"]),
+    "Messages.Id": ["b1"],
+    "Messages.Role": ["user"],
+    "Criteria.Status": ["PASSED"],
+  },
+];
+/** One rollup part per row: AggregateFunction states are written by -State functions. */
+const ROLLUP_PARTS = [
+  [A, "t0", 1.5, "map('agent', 1.0)", 10, 2, NOW - 200],
+  [A, "t0", 2.5, "map('agent', 2.0, 'user', 0.5)", 5, 3, NOW - 100],
+  [A, "t1", 4, "map('agent', 1.0)", 7, 1, NOW - 100],
+  [B, "t0", 100, "map('agent', 50.0)", 1000, 9, NOW - 100],
+] as const;
 
 const POLICY =
   "has(arrayFilter(tenant -> notEmpty(tenant), " +
@@ -181,6 +279,126 @@ async function rowsOf({
 }
 
 const single = tenantScope.single({ tenantId: A });
+
+/** The second census's shapes: nested columns, AggregateFunction merges, lambdas and casts. */
+const CENSUS_SHAPES: Record<string, { statement: () => Sendable; rows: string[] }> = {
+  "nested columns on the latest version": {
+    statement: () =>
+      clickhouseRead({ scope: single })
+        .from(runs)
+        .latestVersion()
+        .select({
+          run: runs.ScenarioRunId,
+          first: fn.arraySlice(runs["Messages.Id"], 1, 1),
+          messages: fn.length(runs["Messages.Role"]),
+          passed: fn.has(runs["Criteria.Status"], "PASSED"),
+        })
+        .build(),
+    rows: ["r1|m1|3|1", "r2|m9|1|0"],
+  },
+  "a nested column read through a join side": {
+    statement: () =>
+      clickhouseRead({ scope: single })
+        .from(spans)
+        .innerJoin(runs, ({ eq }) => eq(runs.TraceId, spans.TraceId), { latestVersion: true })
+        .latestVersion()
+        .select({ span: spans.SpanId, messages: fn.length(runs["Messages.Role"]) })
+        .build(),
+    rows: ["s0|3", "s1|3", "s2|1"],
+  },
+  "AggregateFunction states merged, under a DateTime range": {
+    statement: () =>
+      clickhouseRead({ scope: single })
+        .from(rollup)
+        .select({
+          trace: rollup.TraceId,
+          cost: fn.argMaxMerge(rollup.TotalCost),
+          spend: fn.sumMerge(rollup.SpendNano),
+          spans: fn.sum(rollup.SpanCount),
+        })
+        .where(({ range }) =>
+          range(rollup.HourBucket, { from: NOW - 3_600_000, until: NOW + 3_600_000 }),
+        )
+        .groupBy(rollup.TraceId)
+        .build(),
+    rows: ["t0|2.5|15|5", "t1|4|7|1"],
+  },
+  "a merged map state summed per key over a derived table": {
+    statement: () => {
+      const latest = clickhouseRead({ scope: single })
+        .from(rollup)
+        .select({ trace: rollup.TraceId, roles: fn.argMaxMerge(rollup.RoleCosts) })
+        .groupBy(rollup.TraceId)
+        .as("latest");
+      const summed = fn.sumMap(fn.mapKeys(latest.roles), fn.mapValues(latest.roles));
+      return clickhouseRead({ scope: single })
+        .from(latest)
+        .select({
+          roles: fn.toString(
+            fn.mapFromArrays(fn.tupleElement(summed, "0"), fn.tupleElement(summed, "1")),
+          ),
+        })
+        .build();
+    },
+    rows: ["{'agent':3,'user':0.5}"],
+  },
+  "lambdas over JSON arrays and over two nested arrays": {
+    statement: () =>
+      clickhouseRead({ scope: single })
+        .from(runs)
+        .latestVersion()
+        .select(({ and, eq }) => ({
+          run: runs.ScenarioRunId,
+          agents: fn.arrayStringConcat(
+            fn.arrayMap(
+              (agent) => fn.JSONExtractString(agent, "name"),
+              fn.arrayFilter(
+                (agent) => eq(fn.JSONExtractString(agent, "role"), "agent"),
+                fn.JSONExtractArrayRaw(fn.ifNull(runs.Metadata, "{}"), "agents"),
+              ),
+            ),
+            " vs ",
+          ),
+          asked: fn.arrayExists(
+            (id, role) => and(eq(role, "user"), eq(id, "m3")),
+            runs["Messages.Id"],
+            runs["Messages.Role"],
+          ),
+        }))
+        .build(),
+    rows: ["r1|Bot vs Cat|1", "r2||0"],
+  },
+  "bound patterns, types, formats, units and zones, casts and a held default": {
+    statement: () =>
+      clickhouseRead({ scope: single })
+        .from(runs)
+        .latestVersion()
+        .select({
+          run: runs.ScenarioRunId,
+          slug: fn.trimBoth(
+            fn.replaceRegexpAll(fn.lowerUTF8(runs.Name), "[^\\p{L}\\p{N}]+", "-"),
+            "-",
+          ),
+          labels: fn.JSONExtract(
+            fn.ifNull(runs.Metadata, "{}"),
+            column.array(column.string()),
+            "labels",
+          ),
+          day: fn.formatDateTime(runs.UpdatedAt, "%Y-%m-%d", "UTC"),
+          lag: fn.dateDiff("second", runs.UpdatedAt, param.epochMs(NOW + 4_900)),
+          week: fn.toStartOfWeek(runs.UpdatedAt, { mode: 1, timeZone: "UTC" }),
+          nothing: fn.nullAs(column.nullable(column.string())),
+          none: fn.emptyArrayAs(column.array(column.string())),
+          held: fn.heldOr(runs["Criteria.Status"], {
+            holds: () => false,
+            otherwise: fn.emptyArrayAs(column.array(column.lowCardinality(column.string()))),
+          }),
+        })
+        .where(({ eq }) => eq(runs.ScenarioRunId, "r1"))
+        .build(),
+    rows: ["r1|list-agents|x,y|2027-01-15|5|2027-01-11|null||"],
+  },
+};
 
 /** Each shape and the exact rows tenant A gets; none names another tenant's values. */
 const SHAPES: Record<string, { statement: () => Sendable; rows: string[] }> = {
@@ -323,6 +541,24 @@ describe("given builder statements sent as a reader under a row policy on ClickH
       `GRANT SELECT ON ${DATABASE}.* TO ${READER}`,
       `CREATE ROW POLICY ${READER}_spans ON ${DATABASE}.stored_spans USING ${POLICY} TO ${READER}`,
       `CREATE ROW POLICY ${READER}_summaries ON ${DATABASE}.trace_summaries USING ${POLICY} TO ${READER}`,
+      `CREATE TABLE ${DATABASE}.simulation_runs (TenantId String, ScenarioRunId String,
+         TraceId String, Name String, UpdatedAt DateTime64(3), Metadata Nullable(String),
+         Messages Nested(Id String, Role String), \`Criteria.Status\` Array(LowCardinality(String)))
+         ENGINE = ReplacingMergeTree(UpdatedAt) ORDER BY (TenantId, ScenarioRunId)`,
+      `CREATE TABLE ${DATABASE}.metrics_rollup (TenantId String, TraceId String,
+         HourBucket DateTime, TotalCost AggregateFunction(argMax, Float64, DateTime64(3)),
+         RoleCosts AggregateFunction(argMax, Map(String, Float64), DateTime64(3)),
+         SpendNano AggregateFunction(sum, Int64), SpanCount SimpleAggregateFunction(sum, UInt64))
+         ENGINE = AggregatingMergeTree ORDER BY (TenantId, TraceId)`,
+      `CREATE ROW POLICY ${READER}_runs ON ${DATABASE}.simulation_runs USING ${POLICY} TO ${READER}`,
+      `CREATE ROW POLICY ${READER}_rollup ON ${DATABASE}.metrics_rollup USING ${POLICY} TO ${READER}`,
+      ...ROLLUP_PARTS.map(
+        ([tenant, trace, cost, roles, spend, count, ms]) =>
+          `INSERT INTO ${DATABASE}.metrics_rollup SELECT '${tenant}', '${trace}',
+             toDateTime(${NOW / 1000}), argMaxState(toFloat64(${cost}), toDateTime64(${ms / 1000}, 3)),
+             argMaxState(${roles}, toDateTime64(${ms / 1000}, 3)), sumState(toInt64(${spend})),
+             toUInt64(${count})`,
+      ),
     ]) {
       await admin.command({ query });
     }
@@ -334,6 +570,11 @@ describe("given builder statements sent as a reader under a row policy on ClickH
     await admin.insert({
       table: `${DATABASE}.trace_summaries`,
       values: SUMMARIES,
+      format: "JSONEachRow",
+    });
+    await admin.insert({
+      table: `${DATABASE}.simulation_runs`,
+      values: RUNS,
       format: "JSONEachRow",
     });
     reader = createClient({ url, username: READER, password: READER_PASSWORD, database: DATABASE });
@@ -353,6 +594,22 @@ describe("given builder statements sent as a reader under a row policy on ClickH
       });
 
       /** @scenario "Built statements return their tenant's rows under the reader's row policy on 26.8" */
+      it("keeps another tenant's rows out by its own text when the setting lists every tenant", async () => {
+        expect(await rowsOf({ statement: shape.statement(), tenants: EVERY_TENANT })).toEqual(
+          shape.rows,
+        );
+      });
+    });
+  }
+
+  for (const [name, shape] of Object.entries(CENSUS_SHAPES)) {
+    describe(`when ${name} is built and sent`, () => {
+      /** @scenario "Nested columns, AggregateFunction merges, lambdas and bound constants run on 26.8" */
+      it("returns exactly its tenant's rows", async () => {
+        expect(await rowsOf({ statement: shape.statement() })).toEqual(shape.rows);
+      });
+
+      /** @scenario "Nested columns, AggregateFunction merges, lambdas and bound constants run on 26.8" */
       it("keeps another tenant's rows out by its own text when the setting lists every tenant", async () => {
         expect(await rowsOf({ statement: shape.statement(), tenants: EVERY_TENANT })).toEqual(
           shape.rows,

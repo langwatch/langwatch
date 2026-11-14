@@ -48,7 +48,8 @@ export type ReaderReadStatement<Row = unknown> = {
   readonly params: Readonly<Record<string, unknown>>;
   readonly settings: Settings & { readonly [TENANT_IDS_SETTING]: string };
   readonly tenantId: string;
-  readonly tenantIds: readonly string[];
+  /** Set for set and proof scopes; a single scope is checked by its `TenantId = {tenantId}`. */
+  readonly tenantIds: readonly string[] | undefined;
   readonly routeTenantId: string;
   /** A braided proof's expiry: the sender cuts the statement's time limit to it. */
   readonly expiresAt: number | undefined;
@@ -132,6 +133,8 @@ type ReadState = {
   readonly latestVersion: "where" | "prewhere" | undefined;
   readonly ctes: readonly { name: string; read: ReadState }[];
   readonly arms: readonly ReadState[];
+  /** The read's own `SETTINGS` clause: never a `SQL_` key, never a pinned setting. */
+  readonly settings: Readonly<Record<string, number | string>>;
 };
 
 type NoCtes = Record<never, never>;
@@ -182,6 +185,7 @@ const initialState = ({
   latestVersion: undefined,
   ctes: [],
   arms: [],
+  settings: {},
 });
 
 /** Refuses a table the scope may not read: tenants read tenant tables, metadata the allow-list. */
@@ -242,6 +246,35 @@ const rowCount = (value: number): number => {
     throw new QueryBuilderError({ kind: "bad-row-count", value });
   return value;
 };
+
+const PINNED_KEYS = new Set(Object.keys(PINNED_SETTINGS).map((key) => key.toLowerCase()));
+const SETTING_WORD = /^[A-Za-z0-9_]+$/;
+
+/** A setting a read may name: a plain key outside `SQL_*` and the pinned set, a plain value. */
+function checkedSetting({ key, value }: { key: string; value: number | string }): void {
+  const refused =
+    !IDENTIFIER.test(key) ||
+    /^sql_/i.test(key) ||
+    PINNED_KEYS.has(key.toLowerCase()) ||
+    (typeof value === "number" ? !Number.isFinite(value) : !SETTING_WORD.test(value));
+  if (refused) throw new QueryBuilderError({ kind: "refused-setting", setting: key });
+}
+
+function settingsClauseOf(state: ReadState): string {
+  const entries = Object.entries(state.settings);
+  if (entries.length === 0) return "";
+  const rendered = entries.map(([key, value]) =>
+    typeof value === "number" ? `${key} = ${value}` : `${key} = '${value}'`,
+  );
+  return `SETTINGS ${rendered.join(", ")}`;
+}
+
+/** A SETTINGS clause binds one SELECT, so neither a union nor its arms may carry one. */
+function refuseSettingsInUnion(state: ReadState): void {
+  if ([state, ...state.arms].some((each) => Object.keys(each.settings).length > 0)) {
+    throw new QueryBuilderError({ kind: "settings-in-union" });
+  }
+}
 
 type JoinOptions = { latestVersion?: boolean };
 
@@ -390,6 +423,14 @@ export class ClickHouseRead<
 
   offset(count: number): ClickHouseRead<Scope, Tables, Row, Ctes> {
     return this.#next({ offset: rowCount(count) });
+  }
+
+  /** A query-level `SETTINGS` clause on this SELECT; the scope's own settings are refused. */
+  settings(
+    values: Readonly<Record<string, number | string>>,
+  ): ClickHouseRead<Scope, Tables, Row, Ctes> {
+    for (const [key, value] of Object.entries(values)) checkedSetting({ key, value });
+    return this.#next({ settings: { ...this.#state.settings, ...values } });
   }
 
   /** `FINAL`, only where the sort key holds the tenant column, so versions never cross tenants. */
@@ -561,7 +602,7 @@ function readerStatement<Row>({
     params,
     settings: { ...PINNED_SETTINGS, [TENANT_IDS_SETTING]: scope.tenantIds.join(",") },
     tenantId: scope.tenantId,
-    tenantIds: scope.tenantIds,
+    tenantIds: scope.kind === "single" ? undefined : scope.tenantIds,
     routeTenantId: scope.routeTenantId,
     expiresAt: scope.kind === "proof" ? scope.expiresAt : undefined,
   };
@@ -599,6 +640,7 @@ const isOrdered = (state: ReadState): boolean =>
 /** A read and its arms; an ordered or limited union is wrapped so the order covers every arm. */
 function renderBody({ state, context, keys }: Render): string {
   if (state.arms.length === 0) return renderSelect({ state, context, keys });
+  refuseSettingsInUnion(state);
   const order = keys ?? state.select.map((each) => each.key);
   const ordered = isOrdered(state);
   const head = ordered
@@ -714,6 +756,7 @@ function tailClausesOf({
     limitBy === undefined ? "" : `LIMIT ${limitBy.count} BY ${limitBy.by.map(render).join(", ")}`,
     state.limit === undefined ? "" : `LIMIT ${state.limit}`,
     state.offset === undefined ? "" : `OFFSET ${state.offset}`,
+    settingsClauseOf(state),
   ];
 }
 

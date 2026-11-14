@@ -36,6 +36,7 @@ export {
   column,
   param,
   sql,
+  type AggregateState,
   type ColumnRef,
   type ColumnType,
   type Condition,

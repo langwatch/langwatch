@@ -13,8 +13,15 @@ const EXPRESSION = Symbol("clickhouse.expression");
 /** The one conversion a bound value passes through: epoch milliseconds into a DateTime64. */
 type Conversion = "fromUnixTimestamp64Milli";
 
-/** How a value compared with an expression is bound: its parameter type and any conversion. */
-export type Binding = { readonly paramType: string; readonly conversion?: Conversion };
+/**
+ * How a value compared with an expression is bound: its parameter type and any conversion, and
+ * for an array or a map the binding of a member it holds.
+ */
+export type Binding = {
+  readonly paramType: string;
+  readonly conversion?: Conversion;
+  readonly element?: Binding;
+};
 
 /** A column's declared ClickHouse type, carrying the TypeScript value a bound value of it takes. */
 export type ColumnType<Value> = Binding & {
@@ -26,12 +33,77 @@ const columnType = <Value>(spec: Binding & { clickhouse: string }): ColumnType<V
 const plain = <Value>(clickhouse: string) =>
   columnType<Value>({ clickhouse, paramType: clickhouse });
 
-/** The column types a table descriptor declares. A DateTime64 binds epoch milliseconds. */
+/** A type's binding without its ClickHouse text. */
+export function bindingOf(type: Binding): Binding {
+  return {
+    paramType: type.paramType,
+    ...(type.conversion === undefined ? {} : { conversion: type.conversion }),
+    ...(type.element === undefined ? {} : { element: bindingOf(type.element) }),
+  };
+}
+
+declare const stateBrand: unique symbol;
+/** An AggregateFunction column's stored state: read only through its `-Merge` function. */
+export type AggregateState<Fn extends string, Result> = {
+  readonly [stateBrand]: { readonly fn: Fn; readonly result: Result };
+};
+const STATE_FUNCTIONS = ["sum", "count", "max", "min", "any", "argMax", "argMin", "avg", "uniq"];
+type StateFunction = "sum" | "count" | "max" | "min" | "any" | "argMax" | "argMin" | "avg" | "uniq";
+const SIMPLE_FUNCTIONS = ["sum", "max", "min", "any", "anyLast"];
+type SimpleFunction = "sum" | "max" | "min" | "any" | "anyLast";
+/** The result binding of a state whose value is a count or a mean, not its argument's type. */
+const COUNTED_RESULTS: Readonly<Partial<Record<string, Binding>>> = {
+  count: { paramType: "UInt64" },
+  uniq: { paramType: "UInt64" },
+  avg: { paramType: "Float64" },
+};
+type ValueOfType<C> = C extends ColumnType<infer Value> ? Value : never;
+type StateResult<Fn, Args> = Fn extends "count" | "uniq" | "avg"
+  ? number
+  : Args extends readonly [infer First, ...unknown[]]
+    ? ValueOfType<First>
+    : never;
+
+function checkedInteger({ value, min, max }: { value: number; min: number; max: number }) {
+  if (!Number.isSafeInteger(value) || value < min || value > max) {
+    throw new QueryBuilderError({ kind: "bad-constant", value });
+  }
+  return value;
+}
+
+/**
+ * A type's ClickHouse text, checked against the type grammar (`Name`, `Name(arg, …)`, each arg a
+ * type or an integer), so a type written as text by a CAST carries nothing else.
+ */
+export function typeTextOf(type: { readonly clickhouse: string }): string {
+  const tokens = type.clickhouse.match(/[A-Za-z_][A-Za-z0-9_]*|\d+|[(),]|\s+|./g) ?? [];
+  const words = tokens.filter((token) => !/^\s+$/.test(token));
+  let at = 0;
+  const parse = (): boolean => {
+    const word = words[at];
+    if (word === undefined || !/^([A-Za-z_][A-Za-z0-9_]*|\d+)$/.test(word)) return false;
+    at += 1;
+    if (words[at] !== "(") return true;
+    if (/^\d/.test(word)) return false;
+    do at += 1;
+    while (parse() && words[at] === ",");
+    if (words[at] !== ")") return false;
+    at += 1;
+    return true;
+  };
+  if (!parse() || at !== words.length || /^\d/.test(words[0] ?? "")) {
+    throw new QueryBuilderError({ kind: "unsupported-operand", column: type.clickhouse });
+  }
+  return type.clickhouse;
+}
+
+/** The column types a table descriptor declares. A DateTime64 or DateTime binds epoch ms. */
 export const column = {
   string: () => plain<string>("String"),
   lowCardinalityString: () =>
     columnType<string>({ clickhouse: "LowCardinality(String)", paramType: "String" }),
   bool: () => plain<boolean>("Bool"),
+  int8: () => plain<number>("Int8"),
   uint8: () => plain<number>("UInt8"),
   uint16: () => plain<number>("UInt16"),
   uint32: () => plain<number>("UInt32"),
@@ -46,16 +118,80 @@ export const column = {
       paramType: "Int64",
       conversion: "fromUnixTimestamp64Milli",
     }),
-  stringMap: () => plain<Readonly<Record<string, string>>>("Map(String, String)"),
-  stringArray: () => plain<readonly string[]>("Array(String)"),
-  int64Array: () => plain<readonly number[]>("Array(Int64)"),
+  dateTime: () =>
+    columnType<number>({
+      clickhouse: "DateTime",
+      paramType: "Int64",
+      conversion: "fromUnixTimestamp64Milli",
+    }),
+  fixedString: ({ length }: { length: number }) =>
+    columnType<string>({
+      clickhouse: `FixedString(${checkedInteger({ value: length, min: 1, max: 65_535 })})`,
+      paramType: "String",
+    }),
+  decimal: ({ precision, scale }: { precision: number; scale: number }) => {
+    const p = checkedInteger({ value: precision, min: 1, max: 76 });
+    return plain<number>(`Decimal(${p}, ${checkedInteger({ value: scale, min: 0, max: p })})`);
+  },
+  stringMap: () => column.map({ key: column.string(), value: column.string() }),
+  stringArray: () => column.array(column.string()),
+  int64Array: () => column.array(column.int64()),
   /** A Nullable column binds a compared value as its inner type does. */
   nullable: <Value>(inner: ColumnType<Value>): ColumnType<Value | null> =>
-    columnType<Value | null>({
-      clickhouse: `Nullable(${inner.clickhouse})`,
-      paramType: inner.paramType,
-      ...(inner.conversion === undefined ? {} : { conversion: inner.conversion }),
+    columnType<Value | null>({ ...bindingOf(inner), clickhouse: `Nullable(${inner.clickhouse})` }),
+  /** LowCardinality changes storage, not values: it binds as its inner type does. */
+  lowCardinality: <Value>(inner: ColumnType<Value>): ColumnType<Value> =>
+    columnType<Value>({ ...bindingOf(inner), clickhouse: `LowCardinality(${inner.clickhouse})` }),
+  /** An array, nested columns included: a member tested against it binds as `of` does. */
+  array: <Value>(of: ColumnType<Value>): ColumnType<readonly Value[]> =>
+    columnType<readonly Value[]>({
+      clickhouse: `Array(${of.clickhouse})`,
+      paramType: `Array(${of.paramType})`,
+      element: bindingOf(of),
     }),
+  map: <Value>({
+    key,
+    value,
+  }: {
+    key: ColumnType<string>;
+    value: ColumnType<Value>;
+  }): ColumnType<Readonly<Record<string, Value>>> =>
+    columnType<Readonly<Record<string, Value>>>({
+      clickhouse: `Map(${key.clickhouse}, ${value.clickhouse})`,
+      paramType: `Map(${key.paramType}, ${value.paramType})`,
+      element: bindingOf(value),
+    }),
+  tuple: <const Items extends readonly ColumnType<unknown>[]>(...items: Items) =>
+    columnType<{ readonly [K in keyof Items]: ValueOfType<Items[K]> }>({
+      clickhouse: `Tuple(${items.map((each) => each.clickhouse).join(", ")})`,
+      paramType: `Tuple(${items.map((each) => each.paramType).join(", ")})`,
+    }),
+  /** A SimpleAggregateFunction column holds a plain value, read and compared as `of`. */
+  simpleAggregate: <Value>({ fn, of }: { fn: SimpleFunction; of: ColumnType<Value> }) => {
+    if (!SIMPLE_FUNCTIONS.includes(fn))
+      throw new QueryBuilderError({ kind: "unsupported-operand", column: fn });
+    return columnType<Value>({
+      ...bindingOf(of),
+      clickhouse: `SimpleAggregateFunction(${fn}, ${of.clickhouse})`,
+    });
+  },
+  /** An AggregateFunction column: a state no value compares with, read by `fn.<fn>Merge`. */
+  aggregateFunction: <
+    const Fn extends StateFunction,
+    const Args extends readonly [ColumnType<unknown>, ...ColumnType<unknown>[]],
+  >({
+    fn,
+    args,
+  }: {
+    fn: Fn;
+    args: Args;
+  }): ColumnType<AggregateState<Fn, StateResult<Fn, Args>>> => {
+    if (!STATE_FUNCTIONS.includes(fn))
+      throw new QueryBuilderError({ kind: "unsupported-operand", column: fn });
+    const clickhouse = `AggregateFunction(${[fn, ...args.map((each) => each.clickhouse)].join(", ")})`;
+    const result = COUNTED_RESULTS[fn] ?? bindingOf(args[0]);
+    return columnType({ clickhouse, paramType: clickhouse, element: result });
+  },
 } as const;
 
 type CompareOperator = "=" | "!=" | ">" | ">=" | "<" | "<=";
@@ -80,6 +216,18 @@ export type ExpressionNode =
   | ValueNode
   /** A finite number the grammar needs as a constant: a tuple index or a quantile level. */
   | { readonly kind: "literal"; readonly value: number }
+  /** The two typeless constants a CAST gives a type to. */
+  | { readonly kind: "constant"; readonly text: "NULL" | "[]" }
+  /** `type` is checked against the type grammar before it is stored. */
+  | { readonly kind: "cast"; readonly term: ExpressionNode; readonly type: string }
+  | { readonly kind: "trim"; readonly term: ExpressionNode; readonly chars: ExpressionNode }
+  /** Named by the render, in the order lambdas are written, so no caller text names it. */
+  | { readonly kind: "lambdaParam" }
+  | {
+      readonly kind: "lambda";
+      readonly params: readonly ExpressionNode[];
+      readonly body: ExpressionNode;
+    }
   | {
       readonly kind: "call";
       /** Set only by the `fn` catalogue, never from caller input. */
@@ -122,7 +270,8 @@ export type Expression<Value, Tables extends string = never> = {
   /** How a value compared with this expression binds; absent where no comparison applies. */
   readonly binding: Binding | undefined;
   readonly [valueBrand]?: Value;
-  readonly [tablesBrand]?: Tables;
+  /** A getter type, so a value-only expression infers `never` tables, not `string`. */
+  readonly [tablesBrand]?: () => Tables;
 };
 
 export type Condition<Tables extends string = never> = Expression<boolean, Tables>;
@@ -169,11 +318,7 @@ export function columnRef<Table extends string, Name extends string, Value>({
   name: Name;
   type: ColumnType<Value>;
 }): ColumnRef<Table, Name, Value> {
-  const binding: Binding =
-    type.conversion === undefined
-      ? { paramType: type.paramType }
-      : { paramType: type.paramType, conversion: type.conversion };
-  return refOf({ table, stored: table, name, binding });
+  return refOf({ table, stored: table, name, binding: bindingOf(type) });
 }
 
 export const isExpression = (value: unknown): value is Expression<unknown, string> =>
@@ -356,10 +501,13 @@ export const param = {
   string: (value: string) => valueExpression<string>({ value, paramType: "String" }),
   strings: (values: readonly string[]) =>
     valueExpression<readonly string[]>({ value: [...values], paramType: "Array(String)" }),
+  uint16: (value: number) => valueExpression<number>({ value, paramType: "UInt16" }),
   uint32: (value: number) => valueExpression<number>({ value, paramType: "UInt32" }),
   uint64: (value: number) => valueExpression<number>({ value, paramType: "UInt64" }),
   int64: (value: number) => valueExpression<number>({ value, paramType: "Int64" }),
   float64: (value: number) => valueExpression<number>({ value, paramType: "Float64" }),
+  int64s: (values: readonly number[]) =>
+    valueExpression<readonly number[]>({ value: [...values], paramType: "Array(Int64)" }),
   date: (value: string) => valueExpression<string>({ value, paramType: "Date" }),
   /** Epoch milliseconds as a DateTime64, the way a DateTime64 column binds. */
   epochMs: (value: number) =>
@@ -402,12 +550,15 @@ export type RenderContext = {
   readonly params: Record<string, unknown>;
   readonly slots: Map<ExpressionNode, string>;
   readonly counter: { next: number };
+  /** Each lambda parameter's name, given when its lambda is written. */
+  readonly lambdas: Map<ExpressionNode, string>;
 };
 
 export const renderContext = (): RenderContext => ({
   params: {},
   slots: new Map(),
   counter: { next: 0 },
+  lambdas: new Map(),
 });
 
 /** Binds a value node and returns its parameter name. */
@@ -462,12 +613,27 @@ export function renderExpression({
 }): string {
   const render = (inner: ExpressionNode) => renderExpression({ node: inner, context, qualify });
   switch (node.kind) {
-    case "column":
-      return qualify ? `${node.table}.${node.name}` : node.name;
+    case "column": {
+      const name = node.name.includes(".") ? `\`${node.name}\`` : node.name;
+      return qualify ? `${node.table}.${name}` : name;
+    }
     case "value":
       return slotOf({ node, context });
     case "literal":
       return String(node.value);
+    case "constant":
+      return node.text;
+    case "cast":
+      return `CAST(${render(node.term)} AS ${node.type})`;
+    case "trim":
+      return `trim(BOTH ${render(node.chars)} FROM ${render(node.term)})`;
+    case "lambdaParam": {
+      const name = context.lambdas.get(node);
+      if (name === undefined) throw unsupported(node);
+      return name;
+    }
+    case "lambda":
+      return lambdaText({ node, context, render });
     case "call": {
       const parameters = node.parameters.length > 0 ? `(${node.parameters.join(", ")})` : "";
       return `${node.name}${parameters}(${node.args.map(render).join(", ")})`;
@@ -520,6 +686,25 @@ function idBoundText({
   return `(${equalities.join(" AND ")} ${marker})`;
 }
 
+/** `x0 -> body` or `(x0, x1) -> body`, each parameter named once, in writing order. */
+function lambdaText({
+  node,
+  context,
+  render,
+}: {
+  node: ExpressionNode & { kind: "lambda" };
+  context: RenderContext;
+  render: (inner: ExpressionNode) => string;
+}): string {
+  const names = node.params.map((param) => {
+    const name = context.lambdas.get(param) ?? `__x${context.lambdas.size}`;
+    context.lambdas.set(param, name);
+    return name;
+  });
+  const head = names.length === 1 ? (names[0] ?? "") : `(${names.join(", ")})`;
+  return `${head} -> ${render(node.body)}`;
+}
+
 /** `<call> OVER (PARTITION BY … ORDER BY …)`. */
 function overText({
   node,
@@ -542,8 +727,16 @@ export function columnsOf(node: ExpressionNode): { table: string; name: string }
       return [{ table: node.table, name: node.name }];
     case "value":
     case "literal":
+    case "constant":
     case "cte":
+    case "lambdaParam":
       return [];
+    case "cast":
+      return columnsOf(node.term);
+    case "trim":
+      return [...columnsOf(node.term), ...columnsOf(node.chars)];
+    case "lambda":
+      return columnsOf(node.body);
     case "fragment":
       return REVIEWED_FRAGMENTS[node.id].columns.map((name) => ({ table: node.table, name }));
     case "call":

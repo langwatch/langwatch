@@ -33,7 +33,9 @@ export type QueryBuilderViolation =
   | { kind: "unjoinable"; table: string }
   | { kind: "prewhere-in-join" }
   | { kind: "id-bound-in-join" }
-  | { kind: "bad-union-order" };
+  | { kind: "bad-union-order" }
+  | { kind: "refused-setting"; setting: string }
+  | { kind: "settings-in-union" };
 
 /** A read the builder will not build. Named so a test can tell which refusal fired. */
 export class QueryBuilderError extends Error {
@@ -104,5 +106,9 @@ function describe(violation: QueryBuilderViolation): string {
       return "An {{idBound}} marker is written on a one-table read, a CTE or a derived table.";
     case "bad-union-order":
       return "A UNION ALL read is ordered by the keys it selects, not by an expression.";
+    case "refused-setting":
+      return `"${violation.setting}" cannot be set by a read: SQL_ and pinned settings are the scope's, and a value is a finite number or a plain word.`;
+    case "settings-in-union":
+      return "A SETTINGS clause binds one SELECT; set it on a read that selects from the union.";
   }
 }

@@ -43,6 +43,8 @@ export type ClickHouseTable<
 
 /** Identifiers the builder writes into text: a descriptor's names and a read's aliases. */
 export const IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
+/** A descriptor's column name: an identifier, or a nested column's `Parent.Member`. */
+export const COLUMN_NAME = /^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$/;
 
 function refsOf({ name, columns }: { name: string; columns: ColumnsSpec }) {
   return Object.fromEntries(
@@ -72,8 +74,9 @@ export function defineClickHouseTable<
   columns: Columns;
 }): ClickHouseTable<Name, Columns> {
   const names = Object.keys(columns);
-  for (const identifier of [name, ...names]) {
-    if (!IDENTIFIER.test(identifier)) throw new Error(`"${identifier}" is not a plain identifier`);
+  if (!IDENTIFIER.test(name)) throw new Error(`"${name}" is not a plain identifier`);
+  for (const each of names) {
+    if (!COLUMN_NAME.test(each)) throw new Error(`"${each}" is not a plain or nested column name`);
   }
   const facts = {
     kind: "tenant" as const,

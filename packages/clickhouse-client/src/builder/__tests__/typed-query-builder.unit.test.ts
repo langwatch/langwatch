@@ -25,6 +25,7 @@ import {
   type ReadResource,
 } from "../../authorized-reads.ts";
 import { TENANT_IDS_SETTING } from "../../identity/tenantSetting.ts";
+import { checkTenantScope } from "../../tenantGuard.ts";
 import { column, sql } from "../expression.ts";
 import { fn } from "../functions.ts";
 import { clickhouseRead, type ReaderReadStatement, readerStatementOf } from "../read.ts";
@@ -177,6 +178,33 @@ describe("the typed read builder", () => {
       expect(objects.sql).toBe(
         "SELECT id FROM stored_objects WHERE project_id = {tenantId:String}",
       );
+    });
+  });
+
+  describe("when the client's tenant guard checks a built statement", () => {
+    it("accepts a single-tenant read by its own predicate and a set read by its set", () => {
+      const singleRead = clickhouseRead({ scope: single })
+        .from(traceSummaries)
+        .select({ TraceId: traceSummaries.TraceId })
+        .build();
+      const setRead = clickhouseRead({
+        scope: tenantScope.set({ tenantIds: ["proj_a", "proj_b"] }),
+      })
+        .from(traceSummaries)
+        .select({ TraceId: traceSummaries.TraceId })
+        .build();
+
+      expect(singleRead.tenantIds).toBeUndefined();
+      for (const built of [singleRead, setRead]) {
+        expect(
+          checkTenantScope({
+            sql: built.sql,
+            params: built.params,
+            tenantId: built.tenantId,
+            tenantIds: built.tenantIds,
+          }),
+        ).toBeNull();
+      }
     });
   });
 

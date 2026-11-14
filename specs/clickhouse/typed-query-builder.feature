@@ -231,3 +231,60 @@ Feature: A typed ClickHouse read builder renders the tenant predicate and the te
     Given ClickHouse 26.8 and the reader identity
     When a server-metadata read of system.columns and a table-less read are built and sent
     Then both return their rows without a tenant setting
+
+  @unit
+  Scenario: A read sets its own query-level settings but never the scope's
+    Given a single-tenant read that sets max_execution_time, timeout_overflow_mode and max_threads
+    When it is built
+    Then its SQL ends with a SETTINGS clause naming them, and its statement settings are still the pinned settings and the tenant setting
+    And a SQL_ key, a pinned key, a value that is not a finite number or a plain word, or settings on a union are refused by code
+
+  @unit
+  Scenario: A descriptor declares nested columns and every column type the migrations declare
+    Given descriptors with nested columns such as "Messages.Id" and the array, map, tuple, LowCardinality, SimpleAggregateFunction, AggregateFunction, FixedString, Decimal, DateTime and Int8 types the migrations declare
+    When reads over them are built
+    Then each type writes the ClickHouse text its migration declares
+    And a nested column is backquoted, qualified by its table in a join, and a member tested against an array or a map binds as the member's own type
+    And a value compared with a wrapped type binds as the type it wraps
+
+  @unit
+  Scenario: An AggregateFunction state is read only through its merge function
+    Given a rollup whose columns are AggregateFunction states
+    When a read merges them with argMaxMerge, sumMerge and countMerge
+    Then each renders its -Merge function and types the merged value as the state's result
+    And a merge of another function's state, or a bound value compared with a state, does not compile
+
+  @unit
+  Scenario: A lambda's parameters are named by the builder and typed by the arrays it reads
+    Given a read that calls arrayMap, arrayFilter, arrayExists, arrayReverseSort and mapFilter with lambdas, one nested in another
+    When it is built
+    Then each lambda parameter takes a name the builder gives it, distinct across nested lambdas, and is typed by the array it ranges over
+    And a parameter read outside its lambda is refused by code
+
+  @unit
+  Scenario: The census functions render with every value bound
+    Given a read calling the JSON, string, date, array and parameterised aggregate functions the second census found
+    When it is built
+    Then every JSON key, pattern, replacement, format, unit and time zone is a bound value
+    And a constant the grammar needs as text is checked inside its bounds or the build is refused by code
+
+  @unit
+  Scenario: A CAST names its type by a column type checked against the type grammar
+    Given a read selecting a typed NULL, a typed empty array and a conversion
+    When it is built
+    Then each CAST writes the column type's ClickHouse text
+    And a type whose text is not a type name with type or integer arguments, or a NULL or empty array of a type that cannot hold one, is refused by code
+
+  @unit
+  Scenario: A per-target select list reads the held column or its typed default
+    Given a read selecting columns a pending ClickHouse step adds, and what the target holds
+    When it is built for a target missing one of them
+    Then the missing column reads as its typed default and the held one as itself
+    And a default of another type than the column's does not compile
+
+  @integration
+  Scenario: Nested columns, AggregateFunction merges, lambdas and bound constants run on 26.8
+    Given ClickHouse 26.8, the reader identity and tables with Nested, AggregateFunction, SimpleAggregateFunction and DateTime columns
+    When the second census's shapes are built and sent
+    Then each returns exactly its tenant's rows, also when the setting lists every tenant
+    And a JSON type, a trim character set, a date unit and a time zone sent as bound values run as constants
