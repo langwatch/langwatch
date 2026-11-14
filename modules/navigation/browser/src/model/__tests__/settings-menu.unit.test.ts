@@ -24,6 +24,7 @@ const EVERYTHING_CLOSED: SettingsMenuGates = {
   isLiteMember: false,
   hasOpsAccess: false,
   isPlatformAdmin: false,
+  braidsEnabled: false,
 };
 
 function hrefsIn(gates: Partial<SettingsMenuGates>): string[] {
@@ -268,9 +269,32 @@ describe("given the People & access group", () => {
   });
 });
 
+describe("given release_braids is off for the organisation", () => {
+  describe("when the menu is built for an organisation admin on Enterprise", () => {
+    /** @scenario "With release_braids off the settings menu offers no Braids entry" */
+    it("offers no Braids entry, for the project page or the organisation page", () => {
+      const gates = {
+        enterprisePlan: "included",
+        hasPermission: () => true,
+        hasOrganizationPermission: () => true,
+      } as const;
+
+      expect(hrefsIn({ ...gates, braidsEnabled: true })).toContain("/settings/braids");
+      for (const href of ["/settings/braids", "/settings/organization-braids"]) {
+        expect(hrefsIn({ ...gates, braidsEnabled: false })).not.toContain(href);
+      }
+    });
+  });
+});
+
 describe("given a plan that lacks Enterprise", () => {
   function lockedHrefsIn(gates: Partial<SettingsMenuGates>): string[] {
-    return settingsMenu({ ...EVERYTHING_CLOSED, enterprisePlan: "locked", ...gates })
+    return settingsMenu({
+      ...EVERYTHING_CLOSED,
+      enterprisePlan: "locked",
+      braidsEnabled: true,
+      ...gates,
+    })
       .flatMap((group) => group.items)
       .filter((item) => item.isLocked)
       .map((item) => item.href);
@@ -289,6 +313,7 @@ describe("given a plan that lacks Enterprise", () => {
       const braids = settingsMenu({
         ...EVERYTHING_CLOSED,
         enterprisePlan: "locked",
+        braidsEnabled: true,
         hasPermission: () => true,
         hasOrganizationPermission: () => true,
       })
@@ -304,6 +329,7 @@ describe("given a plan that lacks Enterprise", () => {
       const items = settingsMenu({
         ...EVERYTHING_CLOSED,
         enterprisePlan: "locked",
+        braidsEnabled: true,
         hasPermission: () => true,
         hasOrganizationPermission: () => true,
       }).flatMap((group) => group.items);

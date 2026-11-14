@@ -41,6 +41,7 @@ import {
 } from "../../repositories/memory/memory.authz.repositories.ts";
 import { authzTrpcTransport } from "../../transport/authz.trpc.ts";
 import { AuthzModule, type AuthzSetup } from "../authz.app.ts";
+import { memoryAuthzChannels } from "./authz-channels.fixture.ts";
 
 export const ORG = "org_acme";
 export const SPECIALISTS = "proj_specialists";
@@ -137,10 +138,12 @@ function faultable(commands: Readonly<Record<string, unknown>>) {
 export async function braidWorld({
   enterprise = true,
   epochCacheEnabled = false,
-}: { enterprise?: boolean; epochCacheEnabled?: boolean } = {}) {
+  braidsReleased = true,
+}: { enterprise?: boolean; epochCacheEnabled?: boolean; braidsReleased?: boolean } = {}) {
   const memory = AuthzMemoryStore.create();
   seedOrganisation(memory);
   const repositories = repositoriesOver(memory);
+  const channels = memoryAuthzChannels({ braidsReleased });
   const app = AuthzModule.create({
     dependencies: {},
     config: {
@@ -152,6 +155,7 @@ export async function braidWorld({
     resources: { own: () => void 0, ownService: () => void 0 },
     secrets: createApiFixture<AuthzSetup["secrets"]>(),
     repositories,
+    channels,
   });
   const eventStore = EventStoreMemory.createForTesting<AuthzGrantsEvent>();
   const eventing = new EventSourcing({ eventStore });
@@ -224,6 +228,8 @@ export async function braidWorld({
     memory,
     repositories,
     plan,
+    /** `release_braids` as the memory tier answers it: release or withhold it mid-test. */
+    flags: channels.flags,
     seat,
     /** The next sends of one ledger command fail, as a queue that is down would. */
     failNext: senders.failNext,

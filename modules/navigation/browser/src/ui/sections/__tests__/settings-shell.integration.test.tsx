@@ -73,6 +73,8 @@ function renderSettingsSidebar({
         plan: { isEnterprise, isLoading: false, isLiteMember },
         opsAccess: { hasAccess: hasOpsAccess, isAdmin: isOpsAdmin },
         deployment: { isSaaS, hasCloudOps },
+        // Braids released, so the menu's Braids entry renders as the organisation would see it.
+        flags: { release_braids: { enabled: true, isLoading: false } },
         commandBar: { shortcut: "⌘K", open: commandBarOpenMock, trigger: null },
       }}
     >

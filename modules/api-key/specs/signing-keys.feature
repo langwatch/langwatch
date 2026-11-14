@@ -127,3 +127,21 @@ Feature: Signing keys
       When whether "orchestrator" signs its calls is asked
       Then the answer names the key used an hour ago
       And a project with only revoked keys signs nothing
+
+  Rule: Signing keys are braid management, behind release_braids
+    # The flag itself: modules/authz/specs/braids-release-flag.feature.
+
+    @unit
+    Scenario: With release_braids off every signing key procedure refuses with braids_not_enabled
+      Given "orchestrator" holds a signing key
+      And release_braids is off for the organisation
+      When its keys are listed, its signing is asked, or a key is created, rotated or revoked
+      Then each call is refused with braids_not_enabled
+      And no key is issued
+
+    @unit
+    Scenario: Signed calls are still verified while release_braids is off
+      Given "orchestrator" holds a signing key issued while release_braids was on
+      And release_braids is then switched off for the organisation
+      When a span arrives signed with that key
+      Then its signature is still verified as orchestrator's

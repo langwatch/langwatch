@@ -335,6 +335,13 @@ export const FEATURE_FLAGS = [
       "Opens the Insights inbox (/[project]/insights): each person's own saved insights for the project, which only they read, in Inbox, Stale and Archived folders, the sidebar entry with its unread count, the topbar bell, and 'Save as insight' under a Langy answer (spec: modules/insight/specs/insight-inbox.feature). Default off; while off the page answers not-found, the chrome shows nothing and every insights procedure refuses with insights_not_enabled. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_insights.",
   },
   {
+    key: "release_braids",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Opens braid management (spec: modules/authz/specs/braids-release-flag.feature): the project and organisation Braids settings pages and their settings entry, and every procedure behind them, which creates, changes, removes and lists braids, sets who may braid, and issues, rotates, revokes and lists braid signing keys. Default off, switched on per organisation; while off both pages answer not-found, the entry is hidden and those procedures refuse with braids_not_enabled. Braids that already exist keep applying either way: trace reads still show braided spans, signed calls are still verified and braided reads are still audited. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_braids.",
+  },
+  {
     key: "release_ui_comparison_leaderboard_enabled",
     scope: "PRODUCT",
     defaultValue: false,

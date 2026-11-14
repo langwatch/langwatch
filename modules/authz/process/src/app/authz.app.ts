@@ -28,6 +28,7 @@ import type { EventingCommandSender } from "@langwatch/eventing";
 import type { FeatureSetup } from "@langwatch/process";
 import type { SystemMigration } from "@langwatch/system-migrations";
 
+import type { AuthzChannels } from "../channels/authz.channels.ts";
 import type { RecordAggregateReadCommandData } from "../eventing/authz-aggregate-read.events.ts";
 import {
   type AuthzAggregateReadDefinition,
@@ -56,6 +57,7 @@ import { EventingAuthzGrantRepository } from "../repositories/eventing/eventing.
 import { bindingWire } from "../rules/role-binding-read-back.rules.ts";
 import { AuthzAdmissionService } from "../services/authz-admission.service.ts";
 import { AuthzBillingRoleService } from "../services/authz-billing-role.service.ts";
+import { AuthzBraidReleaseService } from "../services/authz-braid-release.service.ts";
 import { AuthzBraidTargetsService } from "../services/authz-braid-targets.service.ts";
 import { AuthzBraidService } from "../services/authz-braid.service.ts";
 import { AuthzCutoverGateService } from "../services/authz-cutover-gate.service.ts";
@@ -98,7 +100,12 @@ export interface AuthzCompatibilityLedger {
   deleteRole(args: AuthzDeleteRoleInput): Promise<void>;
 }
 
-export type AuthzSetup = FeatureSetup<Readonly<{}>, AuthzServerConfig, AuthzRepositories>;
+export type AuthzSetup = FeatureSetup<
+  Readonly<{}>,
+  AuthzServerConfig,
+  AuthzRepositories,
+  AuthzChannels
+>;
 
 /**
  * The legacy import speaks the command vocabulary directly: it supplies
@@ -196,6 +203,8 @@ export class AuthzModule implements AuthzApi {
   #braidTargets: AuthzBraidTargetsService | undefined;
   /** Absent on an app built by {@link AuthzModule.fromServices}, which records no offboarding. */
   #memberOffboardings: AuthzMemberOffboardedNoticeService | undefined;
+  /** Absent on an app built by {@link AuthzModule.fromServices}, which manages no braid. */
+  #braidRelease: AuthzBraidReleaseService | undefined;
 
   private constructor(
     permissions: AuthzPermissions,
@@ -216,6 +225,7 @@ export class AuthzModule implements AuthzApi {
       projectMembers?: AuthzProjectMembersService;
       braidTargets?: AuthzBraidTargetsService;
       memberOffboardings?: AuthzMemberOffboardedNoticeService;
+      braidRelease?: AuthzBraidReleaseService;
       eventing?: Readonly<{
         pipeline: AuthzPipeline;
         dispatcher: AuthzCommandDispatcherService;
@@ -241,6 +251,7 @@ export class AuthzModule implements AuthzApi {
     this.#projectMembers = options.projectMembers;
     this.#braidTargets = options.braidTargets;
     this.#memberOffboardings = options.memberOffboardings;
+    this.#braidRelease = options.braidRelease;
   }
 
   /** authz_aggregate_read: authz records the fact, governance writes the audit row (§9). */
@@ -288,7 +299,7 @@ export class AuthzModule implements AuthzApi {
    * Build AuthZ graph; dispatcher constructed here, connected by eventing
    * (needs pipeline's registered senders). Metrics optional for non-scrape.
    */
-  static create({ config: serverConfig, repositories }: AuthzSetup): AuthzModule {
+  static create({ config: serverConfig, repositories, channels }: AuthzSetup): AuthzModule {
     const dispatcher = AuthzCommandDispatcherService.create();
     const config = authzRuntimeConfig(serverConfig);
     const { epoch } = repositories;
@@ -377,6 +388,10 @@ export class AuthzModule implements AuthzApi {
       lineage: repositories.read,
       decisions: permissions,
     });
+    const braidRelease = AuthzBraidReleaseService.create({
+      flags: channels.flags,
+      lineage: repositories.read,
+    });
     const sessionVersions = AuthzSessionVersionService.create({
       versions: repositories.sessionVersions,
       bindings: repositories.bindings,
@@ -414,6 +429,7 @@ export class AuthzModule implements AuthzApi {
       projectMembers,
       braidTargets,
       memberOffboardings,
+      braidRelease,
       eventing: { pipeline, dispatcher },
     });
   }
@@ -692,23 +708,59 @@ export class AuthzModule implements AuthzApi {
     return this.#memberships;
   }
 
-  listBraids: AuthzApi["listBraids"] = (a) => this.braids().listBraids(a);
-  createBraid: AuthzApi["createBraid"] = (a) => this.braids().createBraid(a);
-  changeBraid: AuthzApi["changeBraid"] = (a) => this.braids().changeBraid(a);
-  removeBraid: AuthzApi["removeBraid"] = (a) => this.braids().removeBraid(a);
+  // Braid management asks `release_braids` first; the read path below it never does.
+  listBraids: AuthzApi["listBraids"] = async (a) => {
+    await this.braidRelease().assertEnabledForProject(a);
+    return this.braids().listBraids(a);
+  };
+  createBraid: AuthzApi["createBraid"] = async (a) => {
+    await this.braidRelease().assertEnabledForProject(a);
+    return this.braids().createBraid(a);
+  };
+  changeBraid: AuthzApi["changeBraid"] = async (a) => {
+    await this.braidRelease().assertEnabledForProject(a);
+    return this.braids().changeBraid(a);
+  };
+  removeBraid: AuthzApi["removeBraid"] = async (a) => {
+    await this.braidRelease().assertEnabledForProject(a);
+    return this.braids().removeBraid(a);
+  };
   /** An app composing no audit trail refuses, so a braided read is never shown unaudited. */
   recordBraidedSpansView: AuthzApi["recordBraidedSpansView"] = (a) =>
     this.braidedReads().recordBraidedSpansView(a);
 
-  listOrganizationBraids: AuthzApi["listOrganizationBraids"] = (a) =>
-    this.braids().listOrganizationBraids(a);
-  countProjectMembersHolding: AuthzApi["countProjectMembersHolding"] = (a) =>
-    this.projectMembers().countProjectMembersHolding(a);
-  listBraidTargets: AuthzApi["listBraidTargets"] = (a) => this.braidTargets().listBraidTargets(a);
-  getOrganizationPolicy: AuthzApi["getOrganizationPolicy"] = (a) =>
-    this.organizationPolicies().getOrganizationPolicy(a);
-  setBraidsPolicy: AuthzApi["setBraidsPolicy"] = (a) =>
-    this.organizationPolicies().setBraidsPolicy(a);
+  listOrganizationBraids: AuthzApi["listOrganizationBraids"] = async (a) => {
+    await this.braidRelease().assertEnabledForOrganization(a);
+    return this.braids().listOrganizationBraids(a);
+  };
+  /** The braid dialog's "<n> people will see these spans", so it is braid management too. */
+  countProjectMembersHolding: AuthzApi["countProjectMembersHolding"] = async (a) => {
+    await this.braidRelease().assertEnabledForProject(a);
+    return this.projectMembers().countProjectMembersHolding(a);
+  };
+  listBraidTargets: AuthzApi["listBraidTargets"] = async (a) => {
+    await this.braidRelease().assertEnabledForProject(a);
+    return this.braidTargets().listBraidTargets(a);
+  };
+  /** The policy holds only who may braid, so reading it is braid management. */
+  getOrganizationPolicy: AuthzApi["getOrganizationPolicy"] = async (a) => {
+    await this.braidRelease().assertEnabledForOrganization(a);
+    return this.organizationPolicies().getOrganizationPolicy(a);
+  };
+  setBraidsPolicy: AuthzApi["setBraidsPolicy"] = async (a) => {
+    await this.braidRelease().assertEnabledForOrganization(a);
+    return this.organizationPolicies().setBraidsPolicy(a);
+  };
+
+  private braidRelease(): AuthzBraidReleaseService {
+    if (!this.#braidRelease) {
+      throw new Error(
+        "This AuthzModule was composed from already-built services, so it reads no release flag: " +
+          "compose it through AuthzModule.create to manage a braid.",
+      );
+    }
+    return this.#braidRelease;
+  }
 
   private braidedReads(): AuthzBraidedReadAuditService {
     if (!this.#braidedReads) {

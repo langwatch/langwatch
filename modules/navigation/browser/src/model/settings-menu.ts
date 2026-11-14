@@ -153,6 +153,8 @@ export interface SettingsMenuGates {
   isLiteMember: boolean;
   hasOpsAccess: boolean;
   isPlatformAdmin: boolean;
+  /** `release_braids` answered on; false while it is still loading, so no entry flickers. */
+  braidsEnabled: boolean;
 }
 
 export type EnterprisePlanGate = "included" | "locked" | "pending";
@@ -349,7 +351,11 @@ function dataControlsGroup({ hasPermission }: SettingsMenuGates): SettingsMenuGr
   };
 }
 
-function projectGroup({ isLiteMember, enterprisePlan }: SettingsMenuGates): SettingsMenuGroup {
+function projectGroup({
+  isLiteMember,
+  enterprisePlan,
+  braidsEnabled,
+}: SettingsMenuGates): SettingsMenuGroup {
   return {
     id: "settings-project",
     label: "Project",
@@ -370,7 +376,7 @@ function projectGroup({ isLiteMember, enterprisePlan }: SettingsMenuGates): Sett
           ]
         : []),
       { label: "Integrations", href: "/settings/integrations", icon: Blocks },
-      ...(!isLiteMember
+      ...(!isLiteMember && braidsEnabled
         ? enterpriseEntry({
             item: {
               label: "Braids",

@@ -2,9 +2,11 @@
  * Issuing, rotating, revoking and listing a project's signing keys over the memory tier.
  * @see modules/api-key/specs/signing-keys.feature
  */
+import { BRAIDS_FLAG } from "@langwatch/authz-contract";
 import { fromDate, type Instant, toDate } from "@langwatch/time";
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { MemoryReleaseFlagsChannel } from "../../channels/memory/memory.release-flags.channel.ts";
 import { MemorySigningKeyUsageRepository } from "../../repositories/memory/memory.signing-key-usage.repository.ts";
 import { MemorySigningKeyRepository } from "../../repositories/memory/memory.signing-key.repository.ts";
 import { SIGNING_KEY_USAGE_HOUR_MS } from "../../rules/signing-key.rules.ts";
@@ -20,12 +22,15 @@ describe("managing a project's signing keys", () => {
   let organizationLookups: string[];
   let keys: MemorySigningKeyRepository;
   let usage: MemorySigningKeyUsageRepository;
+  let flags: MemoryReleaseFlagsChannel;
 
   beforeEach(() => {
     now = fromDate(new Date(Date.UTC(2026, 9, 21, 12)));
     organizationLookups = [];
     keys = MemorySigningKeyRepository.create();
     usage = MemorySigningKeyUsageRepository.create();
+    flags = MemoryReleaseFlagsChannel.create();
+    flags.release({ flag: BRAIDS_FLAG });
     service = SigningKeyService.create({
       keys,
       usage,
@@ -36,8 +41,42 @@ describe("managing a project's signing keys", () => {
           return ORGANIZATION_OF[projectId]!;
         },
       },
+      flags,
       braidSignatures: BraidSignatureVerificationService.create({ keys, usage }),
       now: () => now,
+    });
+  });
+
+  describe("given release_braids is off for the project", () => {
+    /** @scenario "With release_braids off every signing key procedure refuses with braids_not_enabled" */
+    it("refuses listing, reading, creating, rotating and revoking keys, and issues none", async () => {
+      const issued = await service.create({
+        projectId: "orchestrator",
+        name: "Production",
+        userId: "ana",
+      });
+      flags.withhold({ flag: BRAIDS_FLAG });
+      const keyId = issued.signingKey.id;
+      const projectId = "orchestrator";
+
+      const refusals = await Promise.all(
+        [
+          service.find({ projectId }),
+          service.findProjectSigning({ projectId }),
+          service.create({ projectId, name: "Second", userId: "ana" }),
+          service.rotate({ projectId, keyId, userId: "ana" }),
+          service.revoke({ projectId, keyId }),
+        ].map((call) =>
+          call.then(
+            () => undefined,
+            (error: { code?: string }) => error.code,
+          ),
+        ),
+      );
+
+      expect(refusals).toEqual(Array.from({ length: 5 }, () => "braids_not_enabled"));
+      flags.release({ flag: BRAIDS_FLAG });
+      await expect(service.find({ projectId })).resolves.toEqual([issued.signingKey]);
     });
   });
 

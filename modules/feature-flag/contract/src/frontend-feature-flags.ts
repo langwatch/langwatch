@@ -46,6 +46,8 @@ export const FRONTEND_FEATURE_FLAGS = [
   "release_dashboards",
   // The Insights inbox, its sidebar entry, the topbar bell and "Save as insight" on Langy answers.
   "release_insights",
+  // The Braids pages and their settings entry; braids already made still apply.
+  "release_braids",
   // LangWatchQL; with release_dashboards, the reports page's widget drawer.
   "release_lwql_workbench",
   // Gates the `eval:"..."` chip on the Trace Explorer search bar. Off, the

@@ -13,6 +13,7 @@ import { MemoryAuthzReadRepository } from "../../repositories/memory/memory.auth
 import { MemoryAuthzRepositories } from "../../repositories/memory/memory.authz.repositories.ts";
 import { PROJECT_MEMBERS_DECIDED_LIMIT } from "../../services/authz-project-members.service.ts";
 import { AuthzModule, type AuthzSetup } from "../authz.app.ts";
+import { memoryAuthzChannels } from "./authz-channels.fixture.ts";
 
 const ORG = "org_acme";
 const READER = "proj_orchestrator";
@@ -31,6 +32,7 @@ function composeOver(memory: AuthzMemoryStore) {
     },
     resources: { own: () => void 0, ownService: () => void 0 },
     secrets: createApiFixture<AuthzSetup["secrets"]>(),
+    channels: memoryAuthzChannels({ braidsReleased: true }),
     repositories: {
       ...MemoryAuthzRepositories.create(),
       read: MemoryAuthzReadRepository.create({ memory }),
@@ -127,7 +129,9 @@ describe("AuthzApi.countProjectMembersHolding", () => {
   });
 
   describe("when the project is unknown", () => {
-    it("counts nobody", async () => {
+    // No organisation answers release_braids for it, so the gate fails closed before counting.
+    /** @scenario "A project with no organisation is refused as braids not enabled" */
+    it("refuses as braids not enabled", async () => {
       const { memory } = organisation();
 
       await expect(
@@ -135,7 +139,7 @@ describe("AuthzApi.countProjectMembersHolding", () => {
           projectId: "proj_gone",
           permission: "traces:view",
         }),
-      ).resolves.toEqual({ count: 0, exact: true });
+      ).rejects.toMatchObject({ code: "braids_not_enabled" });
     });
   });
 
