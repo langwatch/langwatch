@@ -99,7 +99,7 @@ async function expire({ personalTeamSlugs }: { personalTeamSlugs: string[] }) {
     requesterUserId: "user_morgan",
   });
 
-  return { guard, prisma, sendRequestExpired: recording.sendRequestExpired };
+  return { guard, sendRequestExpired: recording.sendRequestExpired };
 }
 
 describe("PrismaJoinRequestNotificationContextRepository", () => {
