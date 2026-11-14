@@ -1,10 +1,10 @@
 // Spec: specs/ai-gateway/budgets.feature. Gateway's per-key spend reads, over real ClickHouse.
 import type { ClickHouseClient } from "@clickhouse/client";
-import { ClickHouseQueryClient, type QueryDriver, TenantGuard } from "@langwatch/clickhouse-client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { ClickHouseTraceAttributeSpendRepository } from "../clickhouse.trace-attribute-spend.repository.ts";
+import { traceQueryClientFor } from "./support/authorized-clickhouse.support.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
@@ -20,22 +20,6 @@ const clickHouseConfigured = testClickHouseConfigured();
 
 let ch: ClickHouseClient;
 let repository: ClickHouseTraceAttributeSpendRepository;
-
-function queryClient(raw: ClickHouseClient): ClickHouseQueryClient {
-  const driver: QueryDriver = {
-    async execute(request) {
-      const result = await raw.query({
-        query: request.sql,
-        format: "JSONEachRow",
-        ...(request.params === undefined ? {} : { query_params: request.params }),
-      });
-      return { rows: await result.json() };
-    },
-    insert: () => Promise.reject(new Error("the attribute spend reads never insert")),
-    command: () => Promise.reject(new Error("the attribute spend reads never command")),
-  };
-  return new ClickHouseQueryClient({ tenantGuard: new TenantGuard(), driver });
-}
 
 function row(args: {
   tenant?: string;
@@ -89,7 +73,7 @@ function row(args: {
 beforeAll(async () => {
   if (!clickHouseConfigured) return;
   ch = await startMigratedTraceClickHouse();
-  repository = ClickHouseTraceAttributeSpendRepository.create(queryClient(ch));
+  repository = ClickHouseTraceAttributeSpendRepository.create(traceQueryClientFor(ch));
   await ch.insert({
     table: "trace_summaries",
     values: [

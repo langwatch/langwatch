@@ -1,5 +1,5 @@
 /** Main's gateway virtual-key spend reads, ported to the table's owner. */
-import type { QueryRequest } from "@langwatch/clickhouse-client";
+import type { ClickHouseQueryClient, QueryRequest } from "@langwatch/clickhouse-client";
 import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { describe, expect, it } from "vitest";
 
@@ -9,21 +9,32 @@ import { ClickHouseTraceAttributeSpendRepository } from "../clickhouse.trace-att
 const WINDOW = { startMs: 1_788_220_800_000, endMs: 1_789_000_000_000 };
 const KEY = "langwatch.virtual_key_id";
 
+type ReadRequest = Parameters<ClickHouseQueryClient["read"]>[0];
+
 function createRepository(rows: unknown[]) {
   const queries: QueryRequest[] = [];
+  const statements: ReadRequest["statement"][] = [];
   const clickhouse = clickHouseQueryClientDouble({
     async query(request: QueryRequest): Promise<{ rows: unknown[] }> {
       queries.push(request);
       return { rows };
     },
+    async read({ statement }: ReadRequest) {
+      statements.push(statement);
+      return { rows };
+    },
   });
-  return { queries, repository: ClickHouseTraceAttributeSpendRepository.create(clickhouse) };
+  return {
+    queries,
+    statements,
+    repository: ClickHouseTraceAttributeSpendRepository.create(clickhouse),
+  };
 }
 
 describe("ClickHouseTraceAttributeSpendRepository", () => {
   describe("when spend is read per attribute value", () => {
     it("scopes to the tenant first, bounds the partition key and dedupes by UpdatedAt", async () => {
-      const { queries, repository } = createRepository([]);
+      const { statements, repository } = createRepository([]);
 
       await repository.findSpendByAttributeValue({
         tenantId: "project-1",
@@ -32,16 +43,21 @@ describe("ClickHouseTraceAttributeSpendRepository", () => {
         window: WINDOW,
       });
 
-      expect(queries[0]?.tenantId).toBe("project-1");
-      expect(queries[0]?.sql).toMatch(/WHERE TenantId = \{tenantId:String\}\s+AND OccurredAt >=/);
-      expect(queries[0]?.sql).toContain("argMax(coalesce(TotalCost, 0), UpdatedAt)");
-      expect(queries[0]?.params).toEqual({
-        tenantId: "project-1",
-        attributeKey: KEY,
-        fromMs: WINDOW.startMs,
-        toMs: WINDOW.endMs,
-        values: ["vk-1"],
+      expect(statements[0]).toMatchObject({
+        kind: "tenant",
+        identity: "reader",
+        tenantIds: undefined,
       });
+      expect(statements[0]?.settings).toMatchObject({ SQL_langwatch_tenant_ids: "project-1" });
+      expect(statements[0]?.sql).toMatch(
+        /WHERE TenantId = \{tenantId:String\} AND \(\(OccurredAt >= fromUnixTimestamp64Milli/,
+      );
+      expect(statements[0]?.sql).toMatch(
+        /argMax\(ifNull\(TotalCost, \{v\d+:Float64\}\), UpdatedAt\)/,
+      );
+      expect(Object.values(statements[0]?.params ?? {})).toEqual(
+        expect.arrayContaining(["project-1", KEY, WINDOW.startMs, WINDOW.endMs, ["vk-1"]]),
+      );
     });
 
     it("answers nothing without querying when no values are asked for", async () => {
@@ -133,10 +149,10 @@ describe("ClickHouseTraceAttributeSpendRepository", () => {
 
   describe("when recent traces are read for one model", () => {
     it("filters the winning version's first model and orders newest first under the limit", async () => {
-      const { queries, repository } = createRepository([]);
+      const { statements, repository } = createRepository([]);
 
       await repository.findAttributedTraces({
-        tenantIds: ["project-1"],
+        tenantIds: ["project-1", "project-2"],
         attributeKey: KEY,
         window: WINDOW,
         values: ["vk-1"],
@@ -144,9 +160,22 @@ describe("ClickHouseTraceAttributeSpendRepository", () => {
         limit: 20,
       });
 
-      expect(queries[0]?.sql).toContain("arrayElement(TraceModels, 1)) = {model:String}");
-      expect(queries[0]?.sql).toContain("ORDER BY OccurredAtMs DESC");
-      expect(queries[0]?.params).toMatchObject({ model: "gpt-5", limit: 20 });
+      expect(statements).toHaveLength(1);
+      expect(statements[0]).toMatchObject({
+        kind: "tenant",
+        tenantIds: ["project-1", "project-2"],
+      });
+      expect(statements[0]?.settings).toMatchObject({
+        SQL_langwatch_tenant_ids: "project-1,project-2",
+      });
+      expect(statements[0]?.sql).toContain("GROUP BY TenantId, TraceId");
+      expect(statements[0]?.sql).toMatch(
+        /arrayElement\(TraceModels, \{v\d+:Int64\}\), \{v\d+:String\}\) = \{v\d+:String\}/,
+      );
+      expect(statements[0]?.sql).toMatch(
+        /ORDER BY OccurredAtMs DESC LIMIT 20 SETTINGS .*max_execution_time = 28/,
+      );
+      expect(Object.values(statements[0]?.params ?? {})).toContain("gpt-5");
     });
   });
 });

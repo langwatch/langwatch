@@ -1,4 +1,10 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import {
+  clickhouseRead,
+  type ConditionOps,
+  fn,
+  tenantScope,
+} from "@langwatch/clickhouse-client/builder";
 import type {
   TraceDailySpend,
   TraceModelRequests,
@@ -8,42 +14,52 @@ import type {
 } from "@langwatch/trace-contract";
 
 import { TraceModelSpendRepository } from "../trace-model-spend.repository.ts";
-
-type ModelSpendRow = {
-  Model: string;
-  SpentUsd: number | string;
-  BilledUsd: number | string;
-  Requests: number | string;
-};
-
-type SummaryRow = {
-  TotalCost: number | string | null;
-  BilledCost: number | string | null;
-  RequestCount: number | string | null;
-  PromptTokens: number | string | null;
-  CompletionTokens: number | string | null;
-};
-type TopModelRow = { Model: string; Requests: number | string };
-type DailySpendRow = {
-  Day: string;
-  SpentUsd: number | string;
-  BilledUsd: number | string;
-  Requests: number | string;
-};
+import { traceSummaries as summaries } from "./clickhouse.trace-summaries.table.ts";
 
 const SPEND_SETTINGS = { max_bytes_before_external_group_by: 500_000_000 };
-const NON_BILLED_USD = `argMax(coalesce(NonBilledCost, if(Attributes['langwatch.cost.non_billable'] = 'true', TotalCost, 0), 0), UpdatedAt)`;
+
+type Eq = ConditionOps<typeof summaries.$table.name, unknown>["eq"];
+
+/** A trace's latest non-billed spend: its own figure, else its cost when marked non-billable. */
+const nonBilledUsd = (eq: Eq) =>
+  fn.argMax(
+    fn.ifNull(
+      summaries.NonBilledCost,
+      fn.ifNull(
+        fn.if(
+          eq(fn.mapGet(summaries.Attributes, "langwatch.cost.non_billable"), "true"),
+          summaries.TotalCost,
+          0,
+        ),
+        0,
+      ),
+    ),
+    summaries.UpdatedAt,
+  );
+
+/** One tenant's reads: the per-trace fold and the read over it share one scope. */
+const readsOf = ({ tenantId }: { tenantId: string }) => {
+  const scope = tenantScope.single({ tenantId });
+  return () => clickhouseRead({ scope });
+};
+
+const inWindow = (window: TraceModelSpendWindow) => (ops: { range: Range }) =>
+  ops.range(summaries.OccurredAt, { from: window.startMs, until: window.endMs });
+
+type Range = ConditionOps<typeof summaries.$table.name, unknown>["range"];
 
 /** Main's `PersonalUsageClickHouseRepository` trace reads, deduped by `argMax(..., UpdatedAt)`. */
 export class ClickHouseTraceModelSpendRepository extends TraceModelSpendRepository {
-  readonly #clickhouse: ClickHouseQueryClient;
+  readonly #clickhouse: Pick<ClickHouseQueryClient, "read">;
 
-  private constructor(clickhouse: ClickHouseQueryClient) {
+  private constructor(clickhouse: Pick<ClickHouseQueryClient, "read">) {
     super();
     this.#clickhouse = clickhouse;
   }
 
-  static create(clickhouse: ClickHouseQueryClient): ClickHouseTraceModelSpendRepository {
+  static create(
+    clickhouse: Pick<ClickHouseQueryClient, "read">,
+  ): ClickHouseTraceModelSpendRepository {
     return new ClickHouseTraceModelSpendRepository(clickhouse);
   }
 
@@ -52,40 +68,34 @@ export class ClickHouseTraceModelSpendRepository extends TraceModelSpendReposito
     window: TraceModelSpendWindow;
     limit: number;
   }): Promise<TraceModelSpend[]> {
-    const result = await this.#clickhouse.query<ModelSpendRow>({
-      tenantId: input.tenantId,
-      table: "trace_summaries",
-      sql: `
-        SELECT
-          Model,
-          sum(TraceSpentUsd) AS SpentUsd,
-          sum(coalesce(TraceSpentUsd, 0) - NonBilledUsd) AS BilledUsd,
-          count() AS Requests
-        FROM (
-          SELECT
-            TraceId,
-            arrayJoin(argMax(Models, UpdatedAt)) AS Model,
-            argMax(TotalCost, UpdatedAt) AS TraceSpentUsd,
-            argMax(coalesce(NonBilledCost, if(Attributes['langwatch.cost.non_billable'] = 'true', TotalCost, 0), 0), UpdatedAt) AS NonBilledUsd
-          FROM trace_summaries
-          WHERE TenantId = {tenantId:String}
-            AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
-            AND OccurredAt <  fromUnixTimestamp64Milli({toMs:Int64})
-            AND notEmpty(Models)
-          GROUP BY TraceId
-        )
-        GROUP BY Model
-        ORDER BY SpentUsd DESC
-        LIMIT {lim:UInt32}
-      `,
-      params: {
-        tenantId: input.tenantId,
-        fromMs: input.window.startMs,
-        toMs: input.window.endMs,
-        lim: input.limit,
-      },
-      settings: SPEND_SETTINGS,
-    });
+    const read = readsOf(input);
+    const traces = read()
+      .from(summaries)
+      .select(({ eq }) => ({
+        TraceId: summaries.TraceId,
+        Model: fn.arrayJoin(fn.argMax(summaries.Models, summaries.UpdatedAt)),
+        TraceSpentUsd: fn.argMax(summaries.TotalCost, summaries.UpdatedAt),
+        NonBilledUsd: nonBilledUsd(eq),
+      }))
+      .where(({ and, range }) =>
+        and(inWindow(input.window)({ range }), fn.notEmpty(summaries.Models)),
+      )
+      .groupBy(summaries.TraceId)
+      .as("traces");
+    const statement = read()
+      .from(traces)
+      .select({
+        Model: traces.Model,
+        SpentUsd: fn.sum(traces.TraceSpentUsd),
+        BilledUsd: fn.sum(fn.minus(fn.ifNull(traces.TraceSpentUsd, 0), traces.NonBilledUsd)),
+        Requests: fn.count(),
+      })
+      .groupBy(traces.Model)
+      .orderBy("SpentUsd", "DESC")
+      .limit(input.limit)
+      .settings(SPEND_SETTINGS)
+      .build();
+    const result = await this.#clickhouse.read({ statement, table: summaries.$table.name });
 
     return result.rows.map((row) => ({
       label: row.Model,
@@ -99,41 +109,39 @@ export class ClickHouseTraceModelSpendRepository extends TraceModelSpendReposito
     tenantId: string;
     window: TraceModelSpendWindow;
   }): Promise<TraceSpendSummary> {
-    const result = await this.#clickhouse.query<SummaryRow>({
-      tenantId: input.tenantId,
-      table: "trace_summaries",
-      sql: `
-        SELECT
-          sum(SpentUsd) AS TotalCost,
-          sum(coalesce(SpentUsd, 0) - NonBilledUsd) AS BilledCost,
-          countDistinct(TraceId) AS RequestCount,
-          sum(PromptTokens) AS PromptTokens,
-          sum(CompletionTokens) AS CompletionTokens
-        FROM (
-          SELECT
-            TraceId,
-            argMax(TotalCost, UpdatedAt) AS SpentUsd,
-            ${NON_BILLED_USD} AS NonBilledUsd,
-            argMax(TotalPromptTokenCount, UpdatedAt) AS PromptTokens,
-            argMax(TotalCompletionTokenCount, UpdatedAt) AS CompletionTokens
-          FROM trace_summaries
-          WHERE TenantId = {tenantId:String}
-            AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
-            AND OccurredAt <  fromUnixTimestamp64Milli({toMs:Int64})
-          GROUP BY TraceId
-        )
-      `,
-      params: { tenantId: input.tenantId, fromMs: input.window.startMs, toMs: input.window.endMs },
-      settings: SPEND_SETTINGS,
-    });
+    const read = readsOf(input);
+    const traces = read()
+      .from(summaries)
+      .select(({ eq }) => ({
+        TraceId: summaries.TraceId,
+        SpentUsd: fn.argMax(summaries.TotalCost, summaries.UpdatedAt),
+        NonBilledUsd: nonBilledUsd(eq),
+        PromptTokens: fn.argMax(summaries.TotalPromptTokenCount, summaries.UpdatedAt),
+        CompletionTokens: fn.argMax(summaries.TotalCompletionTokenCount, summaries.UpdatedAt),
+      }))
+      .where(inWindow(input.window))
+      .groupBy(summaries.TraceId)
+      .as("traces");
+    const statement = read()
+      .from(traces)
+      .select({
+        TotalSpentUsd: fn.sum(traces.SpentUsd),
+        BilledUsd: fn.sum(fn.minus(fn.ifNull(traces.SpentUsd, 0), traces.NonBilledUsd)),
+        RequestCount: fn.countDistinct(traces.TraceId),
+        PromptTokenSum: fn.sum(traces.PromptTokens),
+        CompletionTokenSum: fn.sum(traces.CompletionTokens),
+      })
+      .settings(SPEND_SETTINGS)
+      .build();
+    const result = await this.#clickhouse.read({ statement, table: summaries.$table.name });
 
     const row = result.rows[0];
     return {
-      totalCost: Number(row?.TotalCost) || 0,
-      billedCost: Number(row?.BilledCost) || 0,
+      totalCost: Number(row?.TotalSpentUsd) || 0,
+      billedCost: Number(row?.BilledUsd) || 0,
       requestCount: Number(row?.RequestCount) || 0,
-      promptTokens: Number(row?.PromptTokens) || 0,
-      completionTokens: Number(row?.CompletionTokens) || 0,
+      promptTokens: Number(row?.PromptTokenSum) || 0,
+      completionTokens: Number(row?.CompletionTokenSum) || 0,
     };
   }
 
@@ -142,36 +150,27 @@ export class ClickHouseTraceModelSpendRepository extends TraceModelSpendReposito
     window: TraceModelSpendWindow;
     limit: number;
   }): Promise<TraceModelRequests[]> {
-    const result = await this.#clickhouse.query<TopModelRow>({
-      tenantId: input.tenantId,
-      table: "trace_summaries",
-      sql: `
-        SELECT
-          Model,
-          count() AS Requests
-        FROM (
-          SELECT
-            TraceId,
-            arrayJoin(argMax(Models, UpdatedAt)) AS Model
-          FROM trace_summaries
-          WHERE TenantId = {tenantId:String}
-            AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
-            AND OccurredAt <  fromUnixTimestamp64Milli({toMs:Int64})
-            AND notEmpty(Models)
-          GROUP BY TraceId
-        )
-        GROUP BY Model
-        ORDER BY Requests DESC
-        LIMIT {limit:UInt32}
-      `,
-      params: {
-        tenantId: input.tenantId,
-        fromMs: input.window.startMs,
-        toMs: input.window.endMs,
-        limit: input.limit,
-      },
-      settings: SPEND_SETTINGS,
-    });
+    const read = readsOf(input);
+    const traces = read()
+      .from(summaries)
+      .select({
+        TraceId: summaries.TraceId,
+        Model: fn.arrayJoin(fn.argMax(summaries.Models, summaries.UpdatedAt)),
+      })
+      .where(({ and, range }) =>
+        and(inWindow(input.window)({ range }), fn.notEmpty(summaries.Models)),
+      )
+      .groupBy(summaries.TraceId)
+      .as("traces");
+    const statement = read()
+      .from(traces)
+      .select({ Model: traces.Model, Requests: fn.count() })
+      .groupBy(traces.Model)
+      .orderBy("Requests", "DESC")
+      .limit(input.limit)
+      .settings(SPEND_SETTINGS)
+      .build();
+    const result = await this.#clickhouse.read({ statement, table: summaries.$table.name });
 
     return result.rows.map((row) => ({ model: row.Model, requests: Number(row.Requests) || 0 }));
   }
@@ -180,33 +179,32 @@ export class ClickHouseTraceModelSpendRepository extends TraceModelSpendReposito
     tenantId: string;
     window: TraceModelSpendWindow;
   }): Promise<TraceDailySpend[]> {
-    const result = await this.#clickhouse.query<DailySpendRow>({
-      tenantId: input.tenantId,
-      table: "trace_summaries",
-      sql: `
-        SELECT
-          toDate(LatestOccurredAt) AS Day,
-          sum(TraceSpentUsd) AS SpentUsd,
-          sum(coalesce(TraceSpentUsd, 0) - NonBilledUsd) AS BilledUsd,
-          count() AS Requests
-        FROM (
-          SELECT
-            TraceId,
-            argMax(OccurredAt, UpdatedAt) AS LatestOccurredAt,
-            argMax(TotalCost, UpdatedAt) AS TraceSpentUsd,
-            ${NON_BILLED_USD} AS NonBilledUsd
-          FROM trace_summaries
-          WHERE TenantId = {tenantId:String}
-            AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
-            AND OccurredAt <  fromUnixTimestamp64Milli({toMs:Int64})
-          GROUP BY TraceId
-        )
-        GROUP BY Day
-        ORDER BY Day
-      `,
-      params: { tenantId: input.tenantId, fromMs: input.window.startMs, toMs: input.window.endMs },
-      settings: SPEND_SETTINGS,
-    });
+    const read = readsOf(input);
+    const traces = read()
+      .from(summaries)
+      .select(({ eq }) => ({
+        TraceId: summaries.TraceId,
+        LatestOccurredAt: fn.argMax(summaries.OccurredAt, summaries.UpdatedAt),
+        TraceSpentUsd: fn.argMax(summaries.TotalCost, summaries.UpdatedAt),
+        NonBilledUsd: nonBilledUsd(eq),
+      }))
+      .where(inWindow(input.window))
+      .groupBy(summaries.TraceId)
+      .as("traces");
+    const day = fn.toDate(traces.LatestOccurredAt);
+    const statement = read()
+      .from(traces)
+      .select({
+        Day: day,
+        SpentUsd: fn.sum(traces.TraceSpentUsd),
+        BilledUsd: fn.sum(fn.minus(fn.ifNull(traces.TraceSpentUsd, 0), traces.NonBilledUsd)),
+        Requests: fn.count(),
+      })
+      .groupBy(day)
+      .orderBy("Day")
+      .settings(SPEND_SETTINGS)
+      .build();
+    const result = await this.#clickhouse.read({ statement, table: summaries.$table.name });
 
     return result.rows.map((row) => ({
       day: row.Day,

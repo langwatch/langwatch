@@ -106,9 +106,7 @@ export class PostgresTraceRepositories {
       }),
       list: TraceListClickHouseRepository.create({ clickhouse }),
       sessionGroups: SessionGroupsClickHouseRepository.create({ clickhouse }),
-      clusteringSample: ClickHouseTraceClusteringSampleRepository.create({
-        resolveClient: traceClickHouse,
-      }),
+      clusteringSample: ClickHouseTraceClusteringSampleRepository.create(members.clickhouse),
       usageCount: TraceUsageCountClickHouseRepository.create(members.clickhouse),
       indexMaterialisation: ClickHouseTraceIndexMaterialisationRepository.create(
         members.clickhouse,

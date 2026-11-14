@@ -1,4 +1,10 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import {
+  clickhouseRead,
+  fn,
+  type TenantScope,
+  tenantScope,
+} from "@langwatch/clickhouse-client/builder";
 import type {
   TraceAttributedTrace,
   TraceAttributeUsageBucket,
@@ -7,8 +13,8 @@ import type {
 } from "@langwatch/trace-contract";
 
 import { TraceAttributeSpendRepository } from "../trace-attribute-spend.repository.ts";
+import { traceSummaries as summaries } from "./clickhouse.trace-summaries.table.ts";
 
-type ValueSpendRow = { Value: string; SpentUsd: string; Requests: number | string };
 type BucketRow = {
   Value: string;
   Model: string;
@@ -17,38 +23,33 @@ type BucketRow = {
   Requests: number | string;
   BlockedRequests: number | string;
 };
-type TraceRow = {
-  TraceId: string;
-  Value: string;
-  CostUsd: string;
-  Models: string[] | null;
-  OccurredAtMs: number | string;
-  PromptTokens: number | string;
-  CompletionTokens: number | string;
-  DurationMs: number | string | null;
-  HasError: boolean | number;
-  Blocked: boolean | number;
-};
 
 const FIRST_MODEL = `if(length(argMax(Models, UpdatedAt)) = 0, 'unknown', arrayElement(argMax(Models, UpdatedAt), 1))`;
 
-/** The window on the `OccurredAt` partition key; `values` absent means any non-empty value. */
-function attributeFilter(input: {
-  tenantId: string;
+/**
+ * Each trace's latest version in the window, one row per (tenant, trace): the window on the
+ * `OccurredAt` partition key; `values` absent means any non-empty value.
+ */
+const latestTraces = (input: {
+  scope: TenantScope;
   attributeKey: string;
   window: TraceModelSpendWindow;
   values?: string[];
-}) {
-  return windowedAttributeFilter({
-    tenantPredicate: "TenantId = {tenantId:String}",
-    tenantParams: { tenantId: input.tenantId },
-    ...input,
-  });
-}
+}) =>
+  clickhouseRead({ scope: input.scope })
+    .from(summaries)
+    .where(({ and, ne, oneOf, range }) => {
+      const value = fn.mapGet(summaries.Attributes, input.attributeKey);
+      return and(
+        range(summaries.OccurredAt, { from: input.window.startMs, until: input.window.endMs }),
+        input.values ? oneOf(value, input.values) : ne(value, ""),
+      );
+    })
+    .groupBy(summaries.TenantId, summaries.TraceId);
 
 /**
- * The same filter over a declared tenant set, so a read across an organization's projects is one
- * statement (ARCHITECTURE.md "Routing is folded into the `clickhouse` member"): one statement per
+ * A read across an organization's projects is one statement over a declared tenant set
+ * (ARCHITECTURE.md "Routing is folded into the `clickhouse` member"): one statement per
  * project fills the ClickHouse statement queue in an organization with many projects.
  */
 function tenantSetAttributeFilter(input: {
@@ -94,14 +95,16 @@ const SPEND_ROLLUP_SETTINGS = { max_threads: 2, max_execution_time: 28 };
 
 /** Main's gateway `GatewayVirtualKeySpendRepository` reads; the usage reads span a tenant set. */
 export class ClickHouseTraceAttributeSpendRepository extends TraceAttributeSpendRepository {
-  readonly #clickhouse: ClickHouseQueryClient;
+  readonly #clickhouse: Pick<ClickHouseQueryClient, "query" | "read">;
 
-  private constructor(clickhouse: ClickHouseQueryClient) {
+  private constructor(clickhouse: Pick<ClickHouseQueryClient, "query" | "read">) {
     super();
     this.#clickhouse = clickhouse;
   }
 
-  static create(clickhouse: ClickHouseQueryClient): ClickHouseTraceAttributeSpendRepository {
+  static create(
+    clickhouse: Pick<ClickHouseQueryClient, "query" | "read">,
+  ): ClickHouseTraceAttributeSpendRepository {
     return new ClickHouseTraceAttributeSpendRepository(clickhouse);
   }
 
@@ -112,25 +115,24 @@ export class ClickHouseTraceAttributeSpendRepository extends TraceAttributeSpend
     window: TraceModelSpendWindow;
   }): Promise<TraceAttributeValueSpend[]> {
     if (input.values.length === 0) return [];
-    const { where, params } = attributeFilter(input);
-    const result = await this.#clickhouse.query<ValueSpendRow>({
-      tenantId: input.tenantId,
-      table: "trace_summaries",
-      sql: `
-        SELECT Value, toString(sum(TraceCost)) AS SpentUsd, count() AS Requests
-        FROM (
-          SELECT
-            TraceId,
-            argMax(Attributes[{attributeKey:String}], UpdatedAt) AS Value,
-            argMax(coalesce(TotalCost, 0), UpdatedAt) AS TraceCost
-          FROM trace_summaries
-          ${where}
-          GROUP BY TraceId
-        )
-        GROUP BY Value
-      `,
-      params,
-    });
+    const scope = tenantScope.single({ tenantId: input.tenantId });
+    const traces = latestTraces({ ...input, scope })
+      .select({
+        TraceId: summaries.TraceId,
+        Value: fn.argMax(fn.mapGet(summaries.Attributes, input.attributeKey), summaries.UpdatedAt),
+        TraceCost: fn.argMax(fn.ifNull(summaries.TotalCost, 0), summaries.UpdatedAt),
+      })
+      .as("traces");
+    const statement = clickhouseRead({ scope })
+      .from(traces)
+      .select({
+        Value: traces.Value,
+        SpentUsd: fn.toString(fn.sum(traces.TraceCost)),
+        Requests: fn.count(),
+      })
+      .groupBy(traces.Value)
+      .build();
+    const result = await this.#clickhouse.read({ statement, table: summaries.$table.name });
     return result.rows.map((row) => ({
       value: row.Value,
       spentUsd: row.SpentUsd,
@@ -194,60 +196,57 @@ export class ClickHouseTraceAttributeSpendRepository extends TraceAttributeSpend
     model?: string;
     limit: number;
   }): Promise<TraceAttributedTrace[]> {
-    const [firstTenantId] = input.tenantIds;
-    if (firstTenantId === undefined || input.values?.length === 0) return [];
-    const { where, params } = tenantSetAttributeFilter(input);
-    const modelFilter = input.model
-      ? `WHERE if(length(TraceModels) = 0, 'unknown', arrayElement(TraceModels, 1)) = {model:String}`
-      : "";
-    const result = await this.#clickhouse.query<TraceRow>({
-      tenantId: firstTenantId,
-      tenantIds: input.tenantIds,
-      table: "trace_summaries",
-      settings: SPEND_ROLLUP_SETTINGS,
-      sql: `
-        SELECT
-          TraceId,
-          Value,
-          toString(TraceCost) AS CostUsd,
-          TraceModels AS Models,
-          toUnixTimestamp64Milli(LatestOccurredAt) AS OccurredAtMs,
-          PromptTokens,
-          CompletionTokens,
-          DurationMs,
-          HasError,
-          Blocked
-        FROM (
-          SELECT
-            TraceId,
-            argMax(Attributes[{attributeKey:String}], UpdatedAt) AS Value,
-            argMax(coalesce(TotalCost, 0), UpdatedAt) AS TraceCost,
-            argMax(Models, UpdatedAt) AS TraceModels,
-            argMax(OccurredAt, UpdatedAt) AS LatestOccurredAt,
-            argMax(coalesce(TotalPromptTokenCount, 0), UpdatedAt) AS PromptTokens,
-            argMax(coalesce(TotalCompletionTokenCount, 0), UpdatedAt) AS CompletionTokens,
-            argMax(TotalDurationMs, UpdatedAt) AS DurationMs,
-            argMax(ContainsErrorStatus, UpdatedAt) AS HasError,
-            argMax(BlockedByGuardrail, UpdatedAt) AS Blocked
-          FROM trace_summaries
-          ${where}
-          GROUP BY TenantId, TraceId
-        )
-        ${modelFilter}
-        ORDER BY OccurredAtMs DESC
-        LIMIT {limit:UInt32}
-      `,
-      params: {
-        ...params,
-        ...(input.model ? { model: input.model } : {}),
-        limit: Math.max(1, Math.floor(input.limit)),
-      },
-    });
+    if (input.tenantIds.length === 0 || input.values?.length === 0) return [];
+    const scope = tenantScope.set({ tenantIds: [...input.tenantIds] });
+    const traces = latestTraces({ ...input, scope })
+      .select({
+        TraceId: summaries.TraceId,
+        Value: fn.argMax(fn.mapGet(summaries.Attributes, input.attributeKey), summaries.UpdatedAt),
+        TraceCost: fn.argMax(fn.ifNull(summaries.TotalCost, 0), summaries.UpdatedAt),
+        TraceModels: fn.argMax(summaries.Models, summaries.UpdatedAt),
+        LatestOccurredAt: fn.argMax(summaries.OccurredAt, summaries.UpdatedAt),
+        PromptTokens: fn.argMax(fn.ifNull(summaries.TotalPromptTokenCount, 0), summaries.UpdatedAt),
+        CompletionTokens: fn.argMax(
+          fn.ifNull(summaries.TotalCompletionTokenCount, 0),
+          summaries.UpdatedAt,
+        ),
+        DurationMs: fn.argMax(summaries.TotalDurationMs, summaries.UpdatedAt),
+        HasError: fn.argMax(summaries.ContainsErrorStatus, summaries.UpdatedAt),
+        Blocked: fn.argMax(summaries.BlockedByGuardrail, summaries.UpdatedAt),
+      })
+      .as("traces");
+    const { model } = input;
+    const read = clickhouseRead({ scope })
+      .from(traces)
+      .select({
+        TraceId: traces.TraceId,
+        Value: traces.Value,
+        CostUsd: fn.toString(traces.TraceCost),
+        Models: traces.TraceModels,
+        OccurredAtMs: fn.toUnixTimestamp64Milli(traces.LatestOccurredAt),
+        PromptTokens: traces.PromptTokens,
+        CompletionTokens: traces.CompletionTokens,
+        DurationMs: traces.DurationMs,
+        HasError: traces.HasError,
+        Blocked: traces.Blocked,
+      });
+    // The winning version's first model, `unknown` when it named none.
+    const firstModel = fn.if(
+      fn.notEmpty(traces.TraceModels),
+      fn.arrayElement(traces.TraceModels, 1),
+      "unknown",
+    );
+    const statement = (model ? read.where(({ eq }) => eq(firstModel, model)) : read)
+      .orderBy("OccurredAtMs", "DESC")
+      .limit(Math.max(1, Math.floor(input.limit)))
+      .settings(SPEND_ROLLUP_SETTINGS)
+      .build();
+    const result = await this.#clickhouse.read({ statement, table: summaries.$table.name });
     return result.rows.map((row) => ({
       traceId: row.TraceId,
       value: row.Value,
       costUsd: row.CostUsd,
-      models: row.Models ?? [],
+      models: [...(row.Models ?? [])],
       occurredAtMs: Number(row.OccurredAtMs),
       promptTokens: Number(row.PromptTokens) || 0,
       completionTokens: Number(row.CompletionTokens) || 0,

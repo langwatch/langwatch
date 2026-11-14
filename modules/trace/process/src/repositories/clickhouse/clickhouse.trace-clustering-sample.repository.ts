@@ -1,3 +1,5 @@
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import { clickhouseRead, fn, tenantScope } from "@langwatch/clickhouse-client/builder";
 import { z } from "zod";
 
 import {
@@ -5,7 +7,7 @@ import {
   TraceClusteringSampleRepository,
   type TraceClusteringSampleRow,
 } from "../../features/topic/repositories/trace-clustering-sample.repository.ts";
-import type { TraceClickHouseResolver } from "./clickhouse.trace-member-client.repository.ts";
+import { traceSummaries as summaries } from "./clickhouse.trace-summaries.table.ts";
 
 const countsRowsSchema = z.array(
   z.object({
@@ -25,16 +27,22 @@ const pageRowsSchema = z.array(
   }),
 );
 
-/** Topic clustering's two reads of trace_summaries, as topic ran them before trace owned them. */
+/**
+ * Topic clustering's two reads of trace_summaries, as topic ran them before trace owned them. The
+ * page read stays raw: `latestVersion()` elects without the `OccurredAt` window (handoff Risk 6).
+ */
 export class ClickHouseTraceClusteringSampleRepository extends TraceClusteringSampleRepository {
-  static create(options: {
-    resolveClient: TraceClickHouseResolver;
-  }): ClickHouseTraceClusteringSampleRepository {
-    return new ClickHouseTraceClusteringSampleRepository(options.resolveClient);
+  readonly #clickhouse: Pick<ClickHouseQueryClient, "query" | "read">;
+
+  static create(
+    clickhouse: Pick<ClickHouseQueryClient, "query" | "read">,
+  ): ClickHouseTraceClusteringSampleRepository {
+    return new ClickHouseTraceClusteringSampleRepository(clickhouse);
   }
 
-  private constructor(private readonly resolveClient: TraceClickHouseResolver) {
+  private constructor(clickhouse: Pick<ClickHouseQueryClient, "query" | "read">) {
     super();
+    this.#clickhouse = clickhouse;
   }
 
   async countTraces(input: {
@@ -42,33 +50,29 @@ export class ClickHouseTraceClusteringSampleRepository extends TraceClusteringSa
     recentSinceMs: number;
     windowStartMs: number;
   }): Promise<TraceClusteringSampleCounts> {
-    const client = await this.resolveClient(input.tenantId);
+    const scope = tenantScope.single({ tenantId: input.tenantId });
     // One GROUP BY pass folds each trace to its latest version; a cleared topic reads unassigned.
-    const result = await client.query({
-      query: `
-        SELECT
-          toString(count(*)) AS total,
-          toString(countIf(latestOccurredAt >= fromUnixTimestamp64Milli({thirtyDaysAgo:UInt64}))) AS recent,
-          toString(countIf(latestAssigned)) AS assigned
-        FROM (
-          SELECT
-            argMax(OccurredAt, UpdatedAt) AS latestOccurredAt,
-            argMax(TopicId IS NOT NULL AND TopicId != '', UpdatedAt) AS latestAssigned
-          FROM trace_summaries
-          WHERE TenantId = {tenantId:String}
-            AND OccurredAt >= fromUnixTimestamp64Milli({twelveMonthsAgo:UInt64})
-          GROUP BY TenantId, TraceId
-        )
-      `,
-      query_params: {
-        tenantId: input.tenantId,
-        thirtyDaysAgo: input.recentSinceMs,
-        twelveMonthsAgo: input.windowStartMs,
-      },
-      format: "JSONEachRow",
-    });
+    const traces = clickhouseRead({ scope })
+      .from(summaries)
+      .select({
+        LatestOccurredAt: fn.argMax(summaries.OccurredAt, summaries.UpdatedAt),
+        // ifNull keeps a cleared (NULL) topic in the election: argMax skips NULL values.
+        LatestTopicId: fn.argMax(fn.ifNull(summaries.TopicId, ""), summaries.UpdatedAt),
+      })
+      .where(({ range }) => range(summaries.OccurredAt, { from: input.windowStartMs }))
+      .groupBy(summaries.TenantId, summaries.TraceId)
+      .as("traces");
+    const statement = clickhouseRead({ scope })
+      .from(traces)
+      .select(({ gte, ne }) => ({
+        total: fn.toString(fn.count()),
+        recent: fn.toString(fn.countIf(gte(traces.LatestOccurredAt, input.recentSinceMs))),
+        assigned: fn.toString(fn.countIf(ne(traces.LatestTopicId, ""))),
+      }))
+      .build();
+    const result = await this.#clickhouse.read({ statement, table: summaries.$table.name });
 
-    const row = countsRowsSchema.parse(await result.json())[0];
+    const row = countsRowsSchema.parse(result.rows)[0];
     return {
       total: parseInt(row?.total ?? "0", 10),
       recent: parseInt(row?.recent ?? "0", 10),
@@ -115,10 +119,11 @@ export class ClickHouseTraceClusteringSampleRepository extends TraceClusteringSa
     }
 
     const pageHavingClause = pageHaving.length ? `HAVING ${pageHaving.join(" AND ")}` : "";
-    const client = await this.resolveClient(input.tenantId);
     // The page CTE picks keys only; no outer ORDER BY/LIMIT, which buffered full rows at 3.5 GiB.
-    const result = await client.query({
-      query: `
+    const result = await this.#clickhouse.query<unknown>({
+      tenantId: input.tenantId,
+      table: summaries.$table.name,
+      sql: `
         WITH page AS (
           SELECT TraceId
           FROM trace_summaries
@@ -150,7 +155,7 @@ export class ClickHouseTraceClusteringSampleRepository extends TraceClusteringSa
             GROUP BY TenantId, TraceId
           )
       `,
-      query_params: {
+      params: {
         tenantId: input.tenantId,
         fetchWindowStartMs: input.windowStartMs,
         ...(input.windowEndMs === undefined ? {} : { fetchWindowEndMs: input.windowEndMs }),
@@ -160,13 +165,12 @@ export class ClickHouseTraceClusteringSampleRepository extends TraceClusteringSa
           ? { lastTs: input.searchAfter[0], lastTraceId: input.searchAfter[1] }
           : {}),
       },
-      format: "JSONEachRow",
       // A page holds up to 2000 heavy ComputedInput values; fewer read streams
       // keep it under the per-query memory cap.
-      clickhouse_settings: { max_threads: "2" },
+      settings: { max_threads: "2" },
     });
 
-    return pageRowsSchema.parse(await result.json()).map((row) => ({
+    return pageRowsSchema.parse(result.rows).map((row) => ({
       traceId: row.TraceId,
       computedInput: row.ComputedInput,
       topicId: row.TopicId,

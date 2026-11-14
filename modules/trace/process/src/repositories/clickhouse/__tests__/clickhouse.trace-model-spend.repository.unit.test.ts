@@ -2,7 +2,7 @@
  * Main's personal-usage model breakdown, ported to the table's owner: `TenantId` first, the window
  * on the `OccurredAt` partition key, deduped by `argMax(..., UpdatedAt)`, most spent first.
  */
-import type { QueryRequest } from "@langwatch/clickhouse-client";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { describe, expect, it } from "vitest";
 
@@ -11,15 +11,32 @@ import { ClickHouseTraceModelSpendRepository } from "../clickhouse.trace-model-s
 
 const WINDOW = { startMs: 1_788_220_800_000, endMs: 1_789_000_000_000 };
 
+type ReadRequest = Parameters<ClickHouseQueryClient["read"]>[0];
+
 function createRepository(rows: unknown[]) {
-  const queries: QueryRequest[] = [];
+  const queries: ReadRequest["statement"][] = [];
   const clickhouse = clickHouseQueryClientDouble({
-    async query(request: QueryRequest): Promise<{ rows: unknown[] }> {
-      queries.push(request);
+    async read({ statement }: ReadRequest) {
+      queries.push(statement);
       return { rows };
     },
   });
   return { queries, repository: ClickHouseTraceModelSpendRepository.create(clickhouse) };
+}
+
+/** One tenant's reader read: its predicate first, its setting, the window on `OccurredAt`. */
+function expectTenantWindow(statement: ReadRequest["statement"] | undefined) {
+  expect(statement?.kind).toBe("tenant");
+  expect(statement?.identity).toBe("reader");
+  expect(statement).toMatchObject({ tenantIds: undefined });
+  expect(statement?.settings).toMatchObject({ SQL_langwatch_tenant_ids: "project-1" });
+  expect(statement?.sql).toMatch(
+    /WHERE TenantId = \{tenantId:String\} AND \(?\(?OccurredAt >= fromUnixTimestamp64Milli/,
+  );
+  expect(statement?.sql).toContain("SETTINGS max_bytes_before_external_group_by = 500000000");
+  expect(Object.values(statement?.params ?? {})).toEqual(
+    expect.arrayContaining(["project-1", WINDOW.startMs, WINDOW.endMs]),
+  );
 }
 
 describe("ClickHouseTraceModelSpendRepository", () => {
@@ -29,16 +46,9 @@ describe("ClickHouseTraceModelSpendRepository", () => {
 
       await repository.findModelSpend({ tenantId: "project-1", window: WINDOW, limit: 3 });
 
-      expect(queries[0]?.tenantId).toBe("project-1");
-      expect(queries[0]?.sql).toMatch(/WHERE TenantId = \{tenantId:String\}\s+AND OccurredAt >=/);
+      expectTenantWindow(queries[0]);
       expect(queries[0]?.sql).toContain("argMax(Models, UpdatedAt)");
-      expect(queries[0]?.sql).toContain("ORDER BY SpentUsd DESC");
-      expect(queries[0]?.params).toEqual({
-        tenantId: "project-1",
-        fromMs: WINDOW.startMs,
-        toMs: WINDOW.endMs,
-        lim: 3,
-      });
+      expect(queries[0]?.sql).toContain("ORDER BY SpentUsd DESC LIMIT 3");
     });
 
     it("answers each model's spend, billed spend and requests as numbers", async () => {
@@ -75,11 +85,11 @@ describe("ClickHouseTraceModelSpendRepository personal-usage reads", () => {
     it("scopes to the tenant first, bounds the partition key and dedupes by UpdatedAt", async () => {
       const { queries, repository } = createRepository([
         {
-          TotalCost: "4",
-          BilledCost: "3",
+          TotalSpentUsd: "4",
+          BilledUsd: "3",
           RequestCount: "2",
-          PromptTokens: "10",
-          CompletionTokens: "20",
+          PromptTokenSum: "10",
+          CompletionTokenSum: "20",
         },
       ]);
 
@@ -92,7 +102,7 @@ describe("ClickHouseTraceModelSpendRepository personal-usage reads", () => {
         promptTokens: 10,
         completionTokens: 20,
       });
-      expect(queries[0]?.sql).toMatch(/WHERE TenantId = \{tenantId:String\}\s+AND OccurredAt >=/);
+      expectTenantWindow(queries[0]);
       expect(queries[0]?.sql).toContain("argMax(TotalPromptTokenCount, UpdatedAt)");
     });
 
@@ -124,8 +134,10 @@ describe("ClickHouseTraceModelSpendRepository personal-usage reads", () => {
       await expect(
         daily.repository.findDailySpend({ tenantId: "project-1", window: WINDOW }),
       ).resolves.toEqual([{ day: "2026-08-01", spentUsd: 4, billedUsd: 3, requests: 4 }]);
-      expect(top.queries[0]?.params).toMatchObject({ tenantId: "project-1", limit: 1 });
-      expect(daily.queries[0]?.sql).toContain("ORDER BY Day");
+      expectTenantWindow(top.queries[0]);
+      expect(top.queries[0]?.sql).toContain("ORDER BY Requests DESC LIMIT 1");
+      expectTenantWindow(daily.queries[0]);
+      expect(daily.queries[0]?.sql).toContain("ORDER BY Day ASC");
     });
   });
 });

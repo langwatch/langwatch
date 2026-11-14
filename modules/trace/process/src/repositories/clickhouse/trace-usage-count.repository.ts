@@ -1,26 +1,27 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import { clickhouseRead, fn, tenantScope } from "@langwatch/clickhouse-client/builder";
+import { nowInstant } from "@langwatch/time";
 import type { TraceAttributeMatch } from "@langwatch/trace-contract";
 
 import { TraceUsageCountRepository } from "../trace-usage-count.repository.ts";
+import { traceSummaries as summaries } from "./clickhouse.trace-summaries.table.ts";
 
-type TotalRow = { total: string | number };
-type HitRow = { hit: number };
 /** How far before a window a counted trace may have started, and been seen first. */
 const FIRST_SEEN_LOOKBACK_MS = 31 * 24 * 60 * 60 * 1_000;
+const LAST_DAY_MS = 24 * 60 * 60 * 1_000;
 
-type TraceIdRow = { traceId: string };
-type AttributeCountRow = { value: string; count: string | number };
-
-/** ClickHouse reads of per-project trace counts over `trace_summaries`. */
+/** ClickHouse reads of per-project trace counts over `trace_summaries`, as typed reads. */
 export class TraceUsageCountClickHouseRepository extends TraceUsageCountRepository {
-  readonly #clickhouse: ClickHouseQueryClient;
+  readonly #clickhouse: Pick<ClickHouseQueryClient, "read">;
 
-  private constructor(clickhouse: ClickHouseQueryClient) {
+  private constructor(clickhouse: Pick<ClickHouseQueryClient, "read">) {
     super();
     this.#clickhouse = clickhouse;
   }
 
-  static create(clickhouse: ClickHouseQueryClient): TraceUsageCountClickHouseRepository {
+  static create(
+    clickhouse: Pick<ClickHouseQueryClient, "read">,
+  ): TraceUsageCountClickHouseRepository {
     return new TraceUsageCountClickHouseRepository(clickhouse);
   }
 
@@ -36,47 +37,35 @@ export class TraceUsageCountClickHouseRepository extends TraceUsageCountReposito
     afterTraceId: string;
     limit: number;
   }): Promise<string[]> {
-    const result = await this.#clickhouse.query<TraceIdRow>({
-      tenantId: input.tenantId,
-      table: "trace_summaries",
-      sql: `
-        SELECT TraceId AS traceId
-        FROM trace_summaries
-        WHERE TenantId = {tenantId:String}
-          AND TraceId > {afterTraceId:String}
-          AND OccurredAt >= fromUnixTimestamp64Milli({lookbackFrom:Int64})
-          AND CreatedAt >= fromUnixTimestamp64Milli({lookbackFrom:Int64})
-          AND CreatedAt < fromUnixTimestamp64Milli({to:Int64})
-        GROUP BY TraceId
-        HAVING min(CreatedAt) >= fromUnixTimestamp64Milli({from:Int64})
-        ORDER BY TraceId
-        LIMIT {limit:UInt32}
-      `,
-      params: {
-        tenantId: input.tenantId,
-        afterTraceId: input.afterTraceId,
-        lookbackFrom: input.fromMs - FIRST_SEEN_LOOKBACK_MS,
-        from: input.fromMs,
-        to: input.toMs,
-        limit: input.limit,
-      },
-    });
+    const lookbackFrom = input.fromMs - FIRST_SEEN_LOOKBACK_MS;
+    const statement = clickhouseRead({ scope: tenantScope.single({ tenantId: input.tenantId }) })
+      .from(summaries)
+      .select({ traceId: summaries.TraceId })
+      .where(({ and, gt, gte, range }) =>
+        and(
+          gt(summaries.TraceId, input.afterTraceId),
+          gte(summaries.OccurredAt, lookbackFrom),
+          range(summaries.CreatedAt, { from: lookbackFrom, until: input.toMs }),
+        ),
+      )
+      .groupBy(summaries.TraceId)
+      .having(({ gte }) => gte(fn.min(summaries.CreatedAt), input.fromMs))
+      .orderBy(summaries.TraceId)
+      .limit(input.limit)
+      .build();
+    const result = await this.#clickhouse.read({ statement, table: summaries.$table.name });
     return result.rows.map((row) => row.traceId);
   }
 
   /** Main's automation runaway count: exact distinct traces over the trailing 24 hours. */
   async countTracesInLastDay(input: { tenantId: string }): Promise<number> {
-    const result = await this.#clickhouse.query<TotalRow>({
-      tenantId: input.tenantId,
-      table: "trace_summaries",
-      sql: `
-        SELECT toString(count(DISTINCT TraceId)) AS total
-        FROM trace_summaries
-        WHERE TenantId = {tenantId:String}
-          AND OccurredAt >= now() - INTERVAL 24 HOUR
-      `,
-      params: { tenantId: input.tenantId },
-    });
+    const since = nowInstant().epochMilliseconds - LAST_DAY_MS;
+    const statement = clickhouseRead({ scope: tenantScope.single({ tenantId: input.tenantId }) })
+      .from(summaries)
+      .select({ total: fn.toString(fn.countDistinct(summaries.TraceId)) })
+      .where(({ gte }) => gte(summaries.OccurredAt, since))
+      .build();
+    const result = await this.#clickhouse.read({ statement, table: summaries.$table.name });
 
     return Number.parseInt(String(result.rows[0]?.total ?? "0"), 10);
   }
@@ -86,24 +75,18 @@ export class TraceUsageCountClickHouseRepository extends TraceUsageCountReposito
     sinceMs: number;
     attribute: TraceAttributeMatch;
   }): Promise<boolean> {
-    const result = await this.#clickhouse.query<HitRow>({
-      tenantId: input.tenantId,
-      table: "trace_summaries",
-      sql: `
-        SELECT 1 AS hit
-        FROM trace_summaries ts
-        WHERE ts.TenantId = {tenantId:String}
-          AND ts.OccurredAt >= fromUnixTimestamp64Milli({since:UInt64})
-          AND ts.Attributes[{attributeKey:String}] = {attributeValue:String}
-        LIMIT 1
-      `,
-      params: {
-        tenantId: input.tenantId,
-        since: input.sinceMs,
-        attributeKey: input.attribute.key,
-        attributeValue: input.attribute.value,
-      },
-    });
+    const statement = clickhouseRead({ scope: tenantScope.single({ tenantId: input.tenantId }) })
+      .from(summaries)
+      .select({ traceId: summaries.TraceId })
+      .where(({ and, eq, gte }) =>
+        and(
+          gte(summaries.OccurredAt, input.sinceMs),
+          eq(fn.mapGet(summaries.Attributes, input.attribute.key), input.attribute.value),
+        ),
+      )
+      .limit(1)
+      .build();
+    const result = await this.#clickhouse.read({ statement, table: summaries.$table.name });
 
     return result.rows.length > 0;
   }
@@ -115,28 +98,20 @@ export class TraceUsageCountClickHouseRepository extends TraceUsageCountReposito
     attribute: TraceAttributeMatch;
     groupByKey: string;
   }): Promise<{ value: string; count: number }[]> {
-    const result = await this.#clickhouse.query<AttributeCountRow>({
-      tenantId: input.tenantId,
-      table: "trace_summaries",
-      sql: `
-        SELECT
-          ts.Attributes[{groupByKey:String}] AS value,
-          count() AS count
-        FROM trace_summaries ts
-        WHERE ts.TenantId = {tenantId:String}
-          AND ts.OccurredAt >= fromUnixTimestamp64Milli({since:UInt64})
-          AND ts.Attributes[{attributeKey:String}] = {attributeValue:String}
-        GROUP BY value
-        ORDER BY count DESC
-      `,
-      params: {
-        tenantId: input.tenantId,
-        since: input.sinceMs,
-        attributeKey: input.attribute.key,
-        attributeValue: input.attribute.value,
-        groupByKey: input.groupByKey,
-      },
-    });
+    const value = fn.mapGet(summaries.Attributes, input.groupByKey);
+    const statement = clickhouseRead({ scope: tenantScope.single({ tenantId: input.tenantId }) })
+      .from(summaries)
+      .select({ value, count: fn.count() })
+      .where(({ and, eq, gte }) =>
+        and(
+          gte(summaries.OccurredAt, input.sinceMs),
+          eq(fn.mapGet(summaries.Attributes, input.attribute.key), input.attribute.value),
+        ),
+      )
+      .groupBy(value)
+      .orderBy("count", "DESC")
+      .build();
+    const result = await this.#clickhouse.read({ statement, table: summaries.$table.name });
 
     return result.rows.map((row) => ({ value: row.value, count: Number(row.count ?? 0) }));
   }

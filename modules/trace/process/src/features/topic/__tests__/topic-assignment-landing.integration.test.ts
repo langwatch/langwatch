@@ -17,7 +17,10 @@ import {
 import { TraceSummaryFoldProjection } from "../../../eventing/trace-summary.projection.ts";
 import { TraceSummaryStore } from "../../../eventing/trace-summary.store.ts";
 import { EventingTraceTopicAdapter } from "../../../eventing/trace-topic-assignment.commands.ts";
-import { authorizedClickHouseFor } from "../../../repositories/clickhouse/__tests__/support/authorized-clickhouse.support.ts";
+import {
+  authorizedClickHouseFor,
+  traceQueryClientFor,
+} from "../../../repositories/clickhouse/__tests__/support/authorized-clickhouse.support.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
@@ -115,7 +118,7 @@ beforeAll(async () => {
     runtime: createTestRuntime(),
   });
   readService = TraceTopicClusteringReadService.create({
-    repository: ClickHouseTraceClusteringSampleRepository.create({ resolveClient: async () => ch }),
+    repository: ClickHouseTraceClusteringSampleRepository.create(traceQueryClientFor(ch)),
   });
 }, 120_000);
 
