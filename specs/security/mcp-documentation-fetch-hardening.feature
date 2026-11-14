@@ -95,3 +95,29 @@ Feature: MCP outbound request and browser capability hardening
       When the MCP tool runs that agent
       Then it returns a validation error
       And LangWatch does not request the private destination
+
+  Rule: The anonymous docs endpoint's shared fetcher keeps its cache bounded
+
+    @unit
+    Scenario: A cached docs page is fetched again once its time to live has passed
+      Given the shared documentation fetcher has served a page
+      When the same page is asked for again after its 60 second time to live
+      Then it is fetched from the docs again
+
+    @unit
+    Scenario: The docs cache drops its oldest page past the entry limit
+      Given the shared documentation fetcher holds as many pages as its entry limit
+      When another page is fetched
+      Then the oldest cached page is dropped and fetched again when next asked for
+
+    @unit
+    Scenario: A docs page larger than the whole cache is served but not kept
+      Given a docs page larger than the cache's byte limit
+      When it is asked for twice
+      Then it is served both times and fetched both times
+
+    @unit
+    Scenario: The shared fetcher refuses a URL outside the docs before fetching it
+      Given the shared documentation fetcher
+      When it is asked for a URL outside the trusted docs
+      Then it refuses with a validation error, without fetching or counting it

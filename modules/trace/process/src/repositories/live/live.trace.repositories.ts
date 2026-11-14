@@ -44,10 +44,14 @@ export class LiveTraceRepositories {
     rateLimiter: RateLimiter;
     eventReadSeat: EventReadSeat;
     objectStorage: ObjectStorage;
-    config: Pick<TraceServerConfig, "foldCacheTtlSeconds">;
+    config: Pick<TraceServerConfig, "foldCacheTtlSeconds" | "evaluationAnalyticsQuorumReads">;
   }>): TraceRepositories {
     return {
-      ...PostgresTraceRepositories.create({ prisma, clickhouse }),
+      ...PostgresTraceRepositories.create({
+        prisma,
+        clickhouse,
+        evaluationAnalyticsQuorumReads: config.evaluationAnalyticsQuorumReads,
+      }),
       summaryFoldCache: RedisTraceSummaryFoldCacheRepository.create({
         redis,
         ttlSeconds: config.foldCacheTtlSeconds,

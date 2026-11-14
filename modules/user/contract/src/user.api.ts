@@ -154,10 +154,20 @@ export interface UserApi {
   countUsage(): Promise<UserUsageCount>;
   /** The same figures for one organization, counted over the members the caller names. */
   countUsageForMembers(input: { memberUserIds: readonly string[] }): Promise<UserUsageCount>;
+  /** Which of these people last signed in at or after `since` (epoch ms). */
+  findSignedInSince(input: {
+    userIds: readonly string[];
+    since: number;
+  }): Promise<readonly string[]>;
   /** Whether anybody with an address on this domain has an account; no address leaves. */
   hasAccountOnDomain(input: { domain: string }): Promise<boolean>;
   /** Whether the installation holds any account at all; false only on a fresh install. */
   hasAnyAccount(): Promise<boolean>;
+  /**
+   * Whether this account is the install's first-created one, deactivated or not. Once the first
+   * account was erased no remaining one is.
+   */
+  isFirstCreatedAccount(input: { userId: string }): Promise<boolean>;
 }
 
 export const UserApi = moduleApi<UserApi>()("user");

@@ -49,6 +49,7 @@ export interface LicenseMinter {
     planType: string;
     maxMembers: number;
     maxMembersLite: number | undefined;
+    maxMembersDeveloper?: number;
     expiresAt: Instant;
     terms?: { services?: ConnectService[] };
     operatorId: string;
@@ -110,6 +111,8 @@ export class ActivationCodeService {
           maxMembersLite: input.maxMembersLite,
         }),
       }),
+      // 0 sells none, so it is stored as none, the way a signed licence leaves it out.
+      maxMembersDeveloper: input.maxMembersDeveloper || null,
       licenseTermDays: input.licenseTermDays,
       services: input.services ?? [],
       expiresAt: Temporal.Instant.from(input.expiresAt),
@@ -196,7 +199,7 @@ export class ActivationCodeService {
 
     const now = this.#now();
     const claimed = await this.#claim({ row, instanceId, at: now });
-    if (!claimed) throw await this.#whyTheClaimLost({ row, at: now });
+    if (!claimed) throw await this.#whyTheClaimLost({ row, instanceId, at: now });
 
     try {
       return await this.#mint({ row, instanceId, now });
@@ -228,13 +231,26 @@ export class ActivationCodeService {
 
   /** Why a claim found no row: read back rather than guessed, since it can
    *  only lose to a change between the read and the write. */
-  async #whyTheClaimLost({ row, at }: { row: ActivationCodeRecord; at: Instant }): Promise<Error> {
+  async #whyTheClaimLost({
+    row,
+    instanceId,
+    at,
+  }: {
+    row: ActivationCodeRecord;
+    instanceId: string;
+    at: Instant;
+  }): Promise<Error> {
     const current = await this.collaborators.repository.findById(row.id);
     if (!current || current.revokedAt) return new ActivationCodeNotFoundError();
     if (Temporal.Instant.compare(at, current.expiresAt) >= 0) {
       return new ActivationCodeExpiredError();
     }
-    return new ActivationCodeAlreadyRedeemedError();
+    // The caller already holds the code and names its own install, so whether
+    // the claim was its own tells it nothing about anyone else.
+    const claimer = current.redeemedByInstanceId;
+    return new ActivationCodeAlreadyRedeemedError(
+      claimer === null ? {} : { sameInstall: claimer === instanceId },
+    );
   }
 
   /** The license this code describes, signed and handed over once. */
@@ -252,7 +268,11 @@ export class ActivationCodeService {
       customer: { organizationId: row.organizationId },
       email: row.email,
       planType: row.planType,
-      ...licenseSeats({ members: row.maxMembers, membersLite: signedLiteSeats(row).membersLite }),
+      ...licenseSeats({
+        members: row.maxMembers,
+        membersLite: signedLiteSeats(row).membersLite,
+        membersDeveloper: row.maxMembersDeveloper ?? undefined,
+      }),
       expiresAt,
       terms: { services: entitledConnectServices(row.services) },
       operatorId: this.collaborators.systemActorId,

@@ -89,6 +89,10 @@ const PARAMETERIZED_CODES = new Set([
   "upgrade_invalid_cursor",
   "upgrade_not_found",
   "upgrade_plan_unavailable",
+  // BraidConditionRefusedError raises the compiler's refusal code.
+  "braid_condition_syntax",
+  "braid_condition_too_large",
+  "braid_condition_unsupported",
 ]);
 
 /**

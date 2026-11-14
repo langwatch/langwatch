@@ -6,6 +6,7 @@ import { Switch } from "@langwatch/design-system/switch";
 import { Cloud } from "lucide-react";
 
 import { connectApi } from "../../behavior/connect-api.ts";
+import { areHostedServicesClosed } from "../../model/connect-sync.ts";
 import { HOSTED_SERVICES, type HostedService } from "../../model/hosted-services.ts";
 import { useLicensingHost } from "../../model/licensing-host.ts";
 import type { ConnectEnabledStatus } from "./connect-status.ts";
@@ -27,6 +28,7 @@ export function ConnectServicesSection({
       host.failed({ error, fallbackTitle: "Couldn't change this service" }),
   });
   const entitled = status.entitledServices;
+  const isClosed = areHostedServicesClosed(status);
 
   return (
     <SettingsSection
@@ -40,7 +42,8 @@ export function ConnectServicesSection({
           <ServiceRow
             key={service.id}
             service={service}
-            isOn={status.enabledServices.includes(service.id)}
+            isOn={!isClosed && status.enabledServices.includes(service.id)}
+            isClosed={isClosed}
             isEntitled={entitled === null || entitled.includes(service.id)}
             canManage={host.canManageOrganization()}
             isSaving={setService.isPending}
@@ -58,6 +61,7 @@ function ServiceRow({
   service,
   isOn,
   isEntitled,
+  isClosed,
   canManage,
   isSaving,
   onToggle,
@@ -65,6 +69,8 @@ function ServiceRow({
   service: HostedService;
   isOn: boolean;
   isEntitled: boolean;
+  /** The license itself is refused, so no service can run whatever its switch. */
+  isClosed: boolean;
   canManage: boolean;
   isSaving: boolean;
   onToggle: (next: boolean) => void;
@@ -75,10 +81,10 @@ function ServiceRow({
       description={service.description}
       badge={
         <HStack gap={3}>
-          <ServiceBadge isOn={isOn} isEntitled={isEntitled} />
+          <ServiceBadge isOn={isOn} isEntitled={isEntitled} isClosed={isClosed} />
           <Switch
             checked={isOn}
-            disabled={!canManage || !isEntitled || isSaving}
+            disabled={!canManage || !isEntitled || isClosed || isSaving}
             aria-label={service.name}
             inputProps={{ "data-testid": `connect-service-switch-${service.id}` }}
             onCheckedChange={(event) => onToggle(event.checked)}
@@ -100,7 +106,16 @@ function ServiceRow({
   );
 }
 
-function ServiceBadge({ isOn, isEntitled }: { isOn: boolean; isEntitled: boolean }) {
+function ServiceBadge({
+  isOn,
+  isEntitled,
+  isClosed,
+}: {
+  isOn: boolean;
+  isEntitled: boolean;
+  isClosed: boolean;
+}) {
+  if (isClosed) return <StatusChip label="Unavailable" tone="warning" />;
   if (!isEntitled) return <StatusChip label="Not included in your license" tone="warning" />;
   return (
     <StatusChip label={isOn ? "On" : "Available, switched off"} tone={isOn ? "good" : "neutral"} />

@@ -39,7 +39,15 @@ Feature: Helm install routing and disruption budgets
       When the chart renders
       Then the gateway Ingress turns off proxy buffering, sets a 3600s read timeout and a 32m body size
       And ingress.gateway.annotations win over those defaults
-      And the app Ingress keeps only its own annotations
+      And the app Ingress gets none of the gateway's streaming settings
+
+    @unit
+    Scenario: an nginx app Ingress waits longer than an analytics query
+      Given the app Ingress uses class "nginx"
+      When the chart renders
+      Then the app Ingress sets a 120s proxy read timeout and a 120s proxy send timeout
+      And ingress.annotations win over those defaults
+      And an app Ingress of another class gets no ingress-nginx annotations
 
     @unit
     Scenario: a gateway host without an enabled Ingress is refused

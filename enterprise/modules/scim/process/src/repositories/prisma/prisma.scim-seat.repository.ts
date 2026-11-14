@@ -22,7 +22,12 @@ const teamAssignmentsSchema = z.array(
 );
 const permissionsSchema = z.array(z.string());
 
-type Holder = Readonly<{ role: OrganizationUserRole; permissions: string[] | undefined }>;
+type Holder = Readonly<{
+  role: OrganizationUserRole;
+  permissions: string[] | undefined;
+  userId?: string;
+  email?: string | null;
+}>;
 
 /** Seat counts over organization's membership and invitation rows, through its shares (PC-SCIM-SEAT). */
 export class PrismaScimSeatRepository implements ScimSeatRepository {
@@ -35,7 +40,26 @@ export class PrismaScimSeatRepository implements ScimSeatRepository {
   async countMemberSeats({
     organizationId,
   }: Readonly<{ organizationId: string }>): Promise<OrganizationMemberSeats> {
-    return countMemberSeats(await this.seatHolders(organizationId));
+    const [holders, holds] = await Promise.all([
+      this.seatHolders(organizationId),
+      // A full seat stays counted until its hold ends (seat-rotation.feature).
+      this.prisma.seatHold.findMany({
+        where: { organizationId, heldUntil: { gt: toDate(nowInstant()) } },
+        select: { userId: true, email: true },
+      }),
+    ]);
+    return countMemberSeats(holders, holds);
+  }
+
+  async findLiveHoldUserIds({
+    organizationId,
+    userId,
+  }: Readonly<{ organizationId: string; userId: string }>): Promise<string[]> {
+    const holds = await this.prisma.seatHold.findMany({
+      where: { organizationId, userId, heldUntil: { gt: toDate(nowInstant()) } },
+      select: { userId: true },
+    });
+    return holds.map((hold) => hold.userId);
   }
 
   /** Every active membership and live invitation, with the custom-role permissions it carries. */
@@ -57,7 +81,7 @@ export class PrismaScimSeatRepository implements ScimSeatRepository {
           status: INVITE_STATUS.PENDING,
           OR: [{ expiration: { gt: toDate(nowInstant()) } }, { expiration: null }],
         },
-        select: { role: true, teamAssignments: true },
+        select: { role: true, teamAssignments: true, email: true },
       }),
     ]);
     const rolePermissions = new Map(
@@ -75,9 +99,14 @@ export class PrismaScimSeatRepository implements ScimSeatRepository {
     });
 
     return [
-      ...users.map((u) => ({ role: u.role, permissions: externalPermissions.get(u.userId) })),
+      ...users.map((u) => ({
+        role: u.role,
+        permissions: externalPermissions.get(u.userId),
+        userId: u.userId,
+      })),
       ...invites.map((invite) => ({
         role: invite.role,
+        email: invite.email,
         permissions: permissionsOf(
           (teamAssignmentsSchema.safeParse(invite.teamAssignments).data ?? []).map(
             (assignment) => assignment.customRoleId,

@@ -77,6 +77,9 @@ export const STABLE_AUTH_ERRORS = [
   // usually because its administrator has not assigned them to the LangWatch app. Their IT
   // administrator has to grant access; a retry or a bounce gets the same answer.
   "access_denied",
+  // The provider refused the person, and their organization is out of seats for them: the
+  // administrators were asked to approve one, so only their answer changes the outcome.
+  "seat_limit_reached",
 ] as const;
 
 export const isStableAuthError = (error: string | null | undefined): boolean =>

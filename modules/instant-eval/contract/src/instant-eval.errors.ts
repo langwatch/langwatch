@@ -36,28 +36,31 @@ export class InstantEvalQueryBudgetExceededError extends HandledError {
   }
 }
 
+/** What each refusal of the switch says, by who refused it. */
+const NOT_OFFERED_MESSAGES = {
+  enterprise: "LangWatch switches Instant Evals on for an enterprise plan. Contact us to get them.",
+  self_hosted:
+    "A self-hosted install gets Instant Evals from its license, or from whoever runs it when it has judging turned off, never from this switch. Contact us to add them to your license.",
+  hosted_off:
+    "LangWatch's hosted model is turned off for this organization. Run Instant Evals on your own decision model: pick one in the Instant Evals column of Default models.",
+} as const;
+
 /**
- * The organization's own switch was thrown where the popover does not offer it.
- * `meta.deployment` says which refused, since each reads differently: an enterprise
- * plan is switched on by us; a self-hosted install by its license, or by its operator.
+ * The organization's own switch was thrown where the popover does not offer it. `meta.deployment`
+ * says which refused: an enterprise plan is switched on by us; a self-hosted install by its
+ * license or operator; `hosted_off` is an organization LangWatch keeps on its own models.
  * @see modules/instant-eval/specs/instant-eval-opt-in.feature
  */
 export class InstantEvalOptInNotOfferedError extends HandledError {
   declare readonly code: "instant_eval_opt_in_not_offered";
 
-  constructor({ deployment }: { readonly deployment: "enterprise" | "self_hosted" }) {
-    super(
-      "instant_eval_opt_in_not_offered",
-      deployment === "self_hosted"
-        ? "A self-hosted install gets Instant Evals from its license, or from whoever runs it when it has judging turned off, never from this switch. Contact us to add them to your license."
-        : "LangWatch switches Instant Evals on for an enterprise plan. Contact us to get them.",
-      {
-        httpStatus: 403,
-        fault: "customer",
-        meta: { deployment },
-        ...remediation("instant_eval_opt_in_not_offered"),
-      },
-    );
+  constructor({ deployment }: { readonly deployment: keyof typeof NOT_OFFERED_MESSAGES }) {
+    super("instant_eval_opt_in_not_offered", NOT_OFFERED_MESSAGES[deployment], {
+      httpStatus: 403,
+      fault: "customer",
+      meta: { deployment },
+      ...remediation("instant_eval_opt_in_not_offered"),
+    });
     this.name = "InstantEvalOptInNotOfferedError";
   }
 }

@@ -195,13 +195,13 @@ Feature: Enterprise governance package boundary
   Scenario: An ingestion source secret is not rotated while an operator acts as another member
     Given an operator acting as a member through impersonation
     When they rotate an ingestion source's secret
-    Then the rotation is refused with permission_denied before the source is read
+    Then the rotation is refused with impersonation_cannot_mint_credential before the source is read
 
   @unit
   Scenario: A personal ingestion key is not minted while an operator acts as another member
     Given an operator acting as a member through impersonation
     When they install or rotate a personal ingestion key
-    Then the mint is refused with permission_denied before any key is created
+    Then the mint is refused with impersonation_cannot_mint_credential before any key is created
 
   Rule: Governance-origin trace activity feeds the KPI rows and the OCSF export, as on main
 

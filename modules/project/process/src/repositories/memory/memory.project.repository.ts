@@ -268,6 +268,8 @@ export class MemoryProjectRepository implements ProjectRepository {
           presenceEnabled: project.presenceEnabled,
           isArchived: project.archivedAt !== null,
           adminUserId: organization.adminUserIds[0] ?? null,
+          ownerUserId: project.ownerUserId,
+          firstMessage: project.firstMessage,
         },
       };
     });

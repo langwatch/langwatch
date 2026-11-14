@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 
 import { syntheticRouteTable } from "../../__tests__/support/instant-eval-judge-route.test-fakes.ts";
 import { HttpInstantEvalJudgeChannels } from "../../channels/http/http.instant-eval-judge.channels.ts";
+import { MemoryInstantEvalProviderSpendChannel } from "../../channels/memory/memory.instant-eval-provider-spend.channel.ts";
 import { MemoryInstantEvalJudgeRepositories } from "../../repositories/memory/memory.instant-eval-judge.repositories.ts";
 import { InstantEvalJudgeModule } from "../instant-eval-judge.app.ts";
 
@@ -52,7 +53,11 @@ async function boot({
   return InstantEvalJudgeModule.create({
     dependencies: {},
     repositories: MemoryInstantEvalJudgeRepositories.create(),
-    channels: await HttpInstantEvalJudgeChannels.create({ config, secrets }),
+    channels: await HttpInstantEvalJudgeChannels.create({
+      config,
+      secrets,
+      bound: { spend: MemoryInstantEvalProviderSpendChannel.create() },
+    }),
     config,
     resources: { own: () => void 0, ownService: () => void 0 },
     secrets,
