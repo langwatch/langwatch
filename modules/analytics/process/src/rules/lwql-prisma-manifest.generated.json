@@ -15691,6 +15691,88 @@
       ]
     },
     {
+      "name": "RetroactiveRetentionStatus",
+      "tableName": "RetroactiveRetentionStatus",
+      "documentation": "One project's retroactive retention progress (ADR-202 Decided 13): data-retention's worker folds\nits own facts into every column but `issued`, which only the apply intent writes. No relation.",
+      "primaryKey": [
+        "projectId"
+      ],
+      "fields": [
+        {
+          "name": "projectId",
+          "columnName": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "pending",
+          "columnName": "pending",
+          "type": "Json",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "mutations",
+          "columnName": "mutations",
+          "type": "Json",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "failed",
+          "columnName": "failed",
+          "type": "Json",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "closedRequestIds",
+          "columnName": "closedRequestIds",
+          "type": "Json",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "issued",
+          "columnName": "issued",
+          "type": "Json",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "lastAppliedEventId",
+          "columnName": "lastAppliedEventId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "updatedAt",
+          "columnName": "updatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
       "name": "InstantEvalJudgeProject",
       "tableName": "InstantEvalJudgeProject",
       "documentation": "",

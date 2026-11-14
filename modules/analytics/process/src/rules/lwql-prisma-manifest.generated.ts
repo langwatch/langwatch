@@ -1483,6 +1483,16 @@ export interface LwqlPrismaRows {
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
   };
+  readonly RetroactiveRetentionStatus: {
+    readonly projectId: "String";
+    readonly pending: "Json";
+    readonly mutations: "Json";
+    readonly failed: "Json";
+    readonly closedRequestIds: "Json";
+    readonly issued: "Json";
+    readonly lastAppliedEventId: "String";
+    readonly updatedAt: "DateTime";
+  };
   readonly InstantEvalJudgeProject: {
     readonly projectId: "String";
     readonly organizationId: "String";
