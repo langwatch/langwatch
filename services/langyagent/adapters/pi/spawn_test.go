@@ -168,9 +168,6 @@ func TestProvision_ModelLanes(t *testing.T) {
 		if compatOf(model)["supportsLongCacheRetention"] != true {
 			t.Errorf("anthropic lane must allow long cache retention, got %v", compatOf(model))
 		}
-		if model["reasoning"] != true {
-			t.Errorf("anthropic lane should enable reasoning")
-		}
 	})
 
 	t.Run("openai models use the responses lane", func(t *testing.T) {
@@ -227,6 +224,26 @@ func TestProvision_ModelLanes(t *testing.T) {
 			t.Errorf("default model = %v", modelOf(t, cfg)["id"])
 		}
 	})
+}
+
+// @scenario "A model that cannot reason is never asked to"
+func TestProvision_NoLaneDeclaresReasoning(t *testing.T) {
+	for _, id := range []string{
+		"openai/gpt-4.1",
+		"openai/gpt-5-mini",
+		"anthropic/claude-haiku-4-5",
+		"openai_codex/gpt-5-codex",
+		"gemini/gemini-2.5-pro",
+	} {
+		t.Run(id, func(t *testing.T) {
+			creds := testCreds()
+			creds.Model = id
+			_, cfg := provisionHome(t, creds)
+			if reasoning, present := modelOf(t, cfg)["reasoning"]; present {
+				t.Errorf("the lane must leave reasoning to the worker's catalog, got %v", reasoning)
+			}
+		})
+	}
 }
 
 // recordingRunner is testRunner with a chown ledger, for pinning that every

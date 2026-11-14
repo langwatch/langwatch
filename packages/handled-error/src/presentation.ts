@@ -3759,6 +3759,10 @@ const presentations = {
   },
 
   // ---- governance ----
+  agent_registry_entry_not_found: {
+    title: "Agent not found in the registry",
+    describe: () => "No agent in this organisation's registry has that id.",
+  },
   anomaly_rule_not_found: {
     title: "Anomaly rule not found",
     describe: () => "It may have been deleted. Reload to see the current list.",
@@ -3919,6 +3923,11 @@ const presentations = {
   ingestion_source_cap_reached: {
     title: "You've hit the limit for ingestion sources",
     describe: () => "Archive one you no longer use, or upgrade your plan to raise the limit.",
+  },
+  ingestion_source_disabled: {
+    title: "This ingestion source is disabled",
+    describe: () =>
+      "An admin turned this source off, so it takes no new events. Set it back to active to resume.",
   },
   ingestion_source_unauthorized: {
     title: "That ingestion source secret wasn't recognized",

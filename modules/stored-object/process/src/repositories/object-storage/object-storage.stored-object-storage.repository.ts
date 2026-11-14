@@ -25,8 +25,11 @@ export class ObjectStorageStoredObjectStorageRepository extends StoredObjectStor
     super();
   }
 
-  get = async (uri: string): Promise<Readable> =>
-    Readable.from(await this.objects.read(this.addressOf(uri)), { objectMode: false });
+  get = async (uri: string): Promise<Readable> => {
+    const body = await this.objects.read(this.addressOf(uri));
+    // The member's own stream frees its socket however a reader stops; a wrapper would not.
+    return body instanceof Readable ? body : Readable.from(body, { objectMode: false });
+  };
 
   put = async (uri: string, bytes: Buffer, mediaType: string): Promise<void> => {
     await this.objects.write(this.addressOf(uri), bodyOf(bytes), {
@@ -37,16 +40,7 @@ export class ObjectStorageStoredObjectStorageRepository extends StoredObjectStor
 
   delete = (uri: string): Promise<void> => this.objects.remove(this.addressOf(uri));
 
-  exists = async (uri: string): Promise<boolean> => {
-    try {
-      const body = await this.objects.read(this.addressOf(uri));
-      await body[Symbol.asyncIterator]().return?.();
-      return true;
-    } catch (error) {
-      if (error instanceof Error && error.name === "StoredObjectNotFoundError") return false;
-      throw error;
-    }
-  };
+  exists = (uri: string): Promise<boolean> => this.objects.exists(this.addressOf(uri));
 
   private addressOf(uri: string): StoredObjectAddress {
     getStoredObjectStorageScheme(uri);

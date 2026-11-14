@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`TraceApi`)
 
-Peers call these through the token, declared at `../contract/src/trace.api.ts:199`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/trace.api.ts:200`; nothing else in this package is public.
 It extends `TraceOtlpIngestApi`.
 
 #### `extractInlineMediaFromEvent`
@@ -1135,6 +1135,14 @@ Rows carrying `attribute` since `sinceMs`, counted per `groupByKey` value, most 
 
 ```typescript
 findTraceCountsByAttribute(input: { projectId: string; sinceMs: number; attribute: TraceAttributeMatch; groupByKey: string; }): Promise<{ value: string; count: number }[]>;
+```
+
+#### `findAgentsSeen`
+
+Distinct `gen_ai.agent.name` values in the project's spans since `sinceMs`, busiest first.
+
+```typescript
+findAgentsSeen(input: { projectId: string; sinceMs: number; limit: number; }): Promise<TraceAgentSeen[]>;
 ```
 
 ## REST transport

@@ -23,6 +23,10 @@ function recordingStorage() {
       reached.push("read");
       return inner.read(at);
     },
+    exists: (at) => {
+      reached.push("exists");
+      return inner.exists(at);
+    },
     digest: (at) => {
       reached.push("digest");
       return inner.digest(at);
@@ -115,6 +119,9 @@ describe("ObjectStorageStoredObjectBytesRepository", () => {
         "outside the requested project",
       );
       await expect(storage.getStat({ projectId: "project-1", address })).rejects.toThrow(
+        "outside the requested project",
+      );
+      await expect(storage.exists({ projectId: "project-1", address })).rejects.toThrow(
         "outside the requested project",
       );
       await expect(storage.delete({ projectId: "project-1", address })).rejects.toThrow(
