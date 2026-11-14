@@ -19,10 +19,24 @@ const row = (eventId: string, timestamp: number): ClickHouseEventRow => ({
   EventPayload: "{}",
 });
 
+const SCOPED_TO_PROJECT_A = {
+  identity: "reader",
+  kind: "tenant",
+  tenantId: "project_a",
+  settings: expect.objectContaining({ SQL_langwatch_tenant_ids: "project_a" }),
+};
+
+/** The built statement of the read'th call the member received. */
+const sentAt = (client: { read: ReturnType<typeof vi.fn> }, call: number) => {
+  const [request] = client.read.mock.calls[call] ?? [];
+  if (!request) throw new Error(`no read at call ${call}`);
+  return request as { statement: { sql: string; identity: string; kind: string } };
+};
+
 /** The routed member's surface, answering nothing unless a test scripts it. */
 function member() {
   const client = {
-    query: vi.fn().mockResolvedValue({ rows: [] }),
+    read: vi.fn().mockResolvedValue({ rows: [] }),
     stream: vi.fn(),
     command: vi.fn().mockResolvedValue(undefined),
   };
@@ -59,7 +73,7 @@ describe("EventingClickHouseReplayEventSource", () => {
       expect(client.stream).toHaveBeenCalledWith(
         expect.objectContaining({ tenantId: "project_a" }),
       );
-      expect(client.query).not.toHaveBeenCalled();
+      expect(client.read).not.toHaveBeenCalled();
     });
   });
 
@@ -70,13 +84,15 @@ describe("EventingClickHouseReplayEventSource", () => {
 
       await source.discoverAffectedAggregates({ eventTypes: ["lw.span.received"], sinceMs: 0 });
 
-      expect(client.query).toHaveBeenCalledWith(
-        expect.objectContaining({
-          tenantId: "",
-          // The discovery sweep reads every tenant's events, so it must skip the check.
-          SKIP_TENANT_CHECK: true,
+      // The member sends an all-tenants statement to the shared server on the system identity.
+      expect(client.read).toHaveBeenCalledWith({
+        statement: expect.objectContaining({
+          identity: "system",
+          kind: "allTenants",
+          reason: expect.stringContaining("ops_projection_replay"),
         }),
-      );
+        declaresFullScan: true,
+      });
     });
 
     /** @scenario "A replay across every tenant discovers on the shared server, as main did" */
@@ -89,7 +105,9 @@ describe("EventingClickHouseReplayEventSource", () => {
         tenantId: "project_a",
       });
 
-      expect(client.query).toHaveBeenCalledWith(expect.objectContaining({ tenantId: "project_a" }));
+      expect(client.read).toHaveBeenCalledWith(
+        expect.objectContaining({ statement: expect.objectContaining(SCOPED_TO_PROJECT_A) }),
+      );
     });
   });
 
@@ -105,9 +123,10 @@ describe("EventingClickHouseReplayEventSource", () => {
         aggregateIds: ["trace_1"],
       });
 
-      expect(client.query).toHaveBeenCalledWith(
-        expect.objectContaining({ tenantId: "project_a", SKIP_COLD_SCAN_CHECK: true }),
-      );
+      expect(client.read).toHaveBeenCalledWith({
+        statement: expect.objectContaining(SCOPED_TO_PROJECT_A),
+        declaresFullScan: true,
+      });
     });
   });
 
@@ -120,6 +139,65 @@ describe("EventingClickHouseReplayEventSource", () => {
 
       expect(client.command).toHaveBeenCalledWith(
         expect.objectContaining({ tenantId: "project_a", params: { table: "stored_spans" } }),
+      );
+    });
+  });
+
+  describe("given each read a replay batch makes of one tenant", () => {
+    it("sends every one on the reader identity, scoped to that tenant alone", async () => {
+      const { client, source } = member();
+      client.read.mockResolvedValue({ rows: [{ cnt: 1, minOccurredAt: 5, maxOccurredAt: 9 }] });
+      const batch = { tenantId: "project_a", eventTypes: ["lw.span.received"] };
+
+      await source.countEventsForAggregates({ ...batch, sinceMs: 0 });
+      await source.getBoundedCutoffs({ ...batch, aggregateTypes: ["trace"], aggregateIds: ["t1"] });
+      await source.loadAggregateEvents({
+        ...batch,
+        aggregateIds: ["t1"],
+        maxCutoff: { timestamp: 9, eventId: "e9" },
+        cursor: { timestamp: 2, eventId: "e2" },
+        batchSize: 100,
+        occurredAtBounds: { minMs: 5, maxMs: 9 },
+      });
+
+      expect(client.read).toHaveBeenCalledTimes(4);
+      for (let call = 0; call < 4; call++) {
+        expect(sentAt(client, call).statement).toMatchObject(SCOPED_TO_PROJECT_A);
+        expect(sentAt(client, call).statement.sql).toContain(
+          "FROM event_log WHERE TenantId = {tenantId:String}",
+        );
+      }
+      expect(sentAt(client, 0).statement.sql).toMatch(
+        /^WITH discovered AS \(SELECT tuple\(AggregateType, AggregateId\) AS aggregateKey FROM event_log WHERE TenantId = \{tenantId:String\}/,
+      );
+      expect(sentAt(client, 0).statement.sql).toMatch(
+        /tuple\(AggregateType, AggregateId\) IN discovered/,
+      );
+      expect(sentAt(client, 2).statement.sql).toContain(
+        "argMax(EventId, tuple(EventTimestamp, EventId)) AS cutoffEventId",
+      );
+      expect(sentAt(client, 3).statement.sql).toMatch(
+        /ORDER BY EventTimestamp ASC, EventId ASC LIMIT 100$/,
+      );
+    });
+  });
+
+  describe("given a replay listing or counting every tenant", () => {
+    it("sends the tenant list and the count as all-tenants statements with their reason", async () => {
+      const { client, source } = member();
+
+      await source.discoverTenants({ eventTypes: ["lw.span.received"], sinceMs: 0 });
+      await source.countEventsForAggregates({ eventTypes: ["lw.span.received"], sinceMs: 0 });
+
+      for (let call = 0; call < 2; call++) {
+        expect(sentAt(client, call).statement).toMatchObject({
+          identity: "system",
+          kind: "allTenants",
+        });
+        expect(sentAt(client, call).statement.sql).not.toContain("{tenantId:String}");
+      }
+      expect(sentAt(client, 0).statement.sql).toMatch(
+        /^SELECT DISTINCT TenantId AS tenantId FROM event_log/,
       );
     });
   });

@@ -2,12 +2,19 @@ import {
   type CutoffInfo,
   type DiscoveredAggregateWithEventTypes,
   type OccurredAtBounds,
-  REPLAY_ALL_TENANTS,
   type ReplayEvent,
   type ReplayEventSource,
 } from "../../../replay/replayEventSource.ts";
 import type { EventingClickHouseReplayClient } from "../../clickhouse-client-resolver.ts";
 import { type EventLogIdIndex, eventLogOccurredRange } from "../../tables/event-log-id-index.ts";
+import {
+  affectedAggregatesRead,
+  aggregateEventsPageRead,
+  cutoffEventsRead,
+  discoveredEventCountRead,
+  occurredAtBoundsRead,
+  replayTenantsRead,
+} from "./replay-reads.clickhouse.ts";
 
 /** ClickHouse event_log row shape. */
 export interface ClickHouseEventRow {
@@ -81,38 +88,8 @@ export async function discoverAffectedAggregates({
   sinceMs: number;
   tenantId?: string;
 }): Promise<DiscoveredAggregateWithEventTypes[]> {
-  const tenantFilter = tenantId ? "AND TenantId = {tenantId:String}" : "";
-  const params: Record<string, unknown> = {
-    eventTypes: [...eventTypes],
-    sinceMs,
-  };
-  if (tenantId) params.tenantId = tenantId;
-
-  const { rows } = await client.query<DiscoveredAggregateWithEventTypes>({
-    tenantId: tenantId ?? REPLAY_ALL_TENANTS,
-    sql: `
-      SELECT
-        TenantId AS tenantId,
-        AggregateType AS aggregateType,
-        AggregateId AS aggregateId,
-        groupUniqArray(EventType) AS eventTypes
-      FROM event_log
-      WHERE EventType IN ({eventTypes:Array(String)})
-        AND EventTimestamp >= {sinceMs:UInt64}
-        ${tenantFilter}
-      GROUP BY TenantId, AggregateType, AggregateId
-      ORDER BY TenantId
-    `,
-    params,
-    // Replay discovery: a replay is asked for one tenant or for every tenant, and the tenant
-    // predicate is present only in the first case.
-    SKIP_TENANT_CHECK: true,
-    // The window is on EventTimestamp (recording time), which the EventOccurredAt partition key
-    // does not carry: a late event can have occurred any number of weeks before it was recorded.
-    SKIP_COLD_SCAN_CHECK: true,
-  });
-
-  return rows;
+  const { rows } = await client.read(affectedAggregatesRead({ eventTypes, sinceMs, tenantId }));
+  return rows.map((row) => ({ ...row, eventTypes: [...row.eventTypes] }));
 }
 
 /**
@@ -129,23 +106,7 @@ export async function discoverTenants({
   eventTypes: readonly string[];
   sinceMs: number;
 }): Promise<string[]> {
-  const { rows } = await client.query<{ tenantId: string }>({
-    tenantId: REPLAY_ALL_TENANTS,
-    sql: `
-      SELECT DISTINCT TenantId AS tenantId
-      FROM event_log
-      WHERE EventType IN ({eventTypes:Array(String)})
-        AND EventTimestamp >= {sinceMs:UInt64}
-      ORDER BY TenantId
-    `,
-    params: { eventTypes: [...eventTypes], sinceMs },
-    // Replay tenant listing: a replay lists the tenants holding a lane's events before it discovers
-    // each tenant's aggregates under that tenant.
-    SKIP_TENANT_CHECK: true,
-    // The window is on EventTimestamp (recording time), which the EventOccurredAt partition key
-    // does not carry: a late event can have occurred any number of weeks before it was recorded.
-    SKIP_COLD_SCAN_CHECK: true,
-  });
+  const { rows } = await client.read(replayTenantsRead({ eventTypes, sinceMs }));
   return rows.map((row) => row.tenantId);
 }
 
@@ -163,55 +124,8 @@ export async function countEventsForAggregates({
   sinceMs: number;
   tenantId?: string;
 }): Promise<number> {
-  const params: Record<string, unknown> = {
-    eventTypes: [...eventTypes],
-    sinceMs,
-  };
-  if (tenantId) params.tenantId = tenantId;
-
-  const { rows } = await client.query<{ totalEvents: string }>({
-    tenantId: tenantId ?? REPLAY_ALL_TENANTS,
-    sql: `
-      SELECT count() as totalEvents
-      FROM event_log
-      WHERE ${tenantId ? "TenantId = {tenantId:String} AND" : ""} EventType IN ({eventTypes:Array(String)})
-        AND (AggregateType, AggregateId) IN (
-          SELECT DISTINCT AggregateType, AggregateId
-          FROM event_log
-          WHERE ${tenantId ? "TenantId = {tenantId:String} AND" : ""} EventType IN ({eventTypes:Array(String)})
-            AND EventTimestamp >= {sinceMs:UInt64}
-        )
-    `,
-    params,
-    // Replay discovery: a replay is asked for one tenant or for every tenant, and the tenant
-    // predicate is present only in the first case.
-    SKIP_TENANT_CHECK: true,
-    // Counts every event of the discovered aggregates across all history, as replay applies them.
-    SKIP_COLD_SCAN_CHECK: true,
-  });
-
-  return parseInt(rows[0]?.totalEvents ?? "0", 10);
-}
-
-/**
- * SQL fragment + params for an optional occurred-at pruning predicate. Rows with no occurred time
- * (0) are always kept: the index's bounds leave them out, the event log's own include them.
- */
-function occurredAtPredicate(bounds?: OccurredAtBounds): {
-  sql: string;
-  params: Record<string, unknown>;
-} {
-  if (!bounds) return { sql: "", params: {} };
-  return {
-    sql: `AND (
-          EventOccurredAt = 0
-          OR (
-            EventOccurredAt >= {minOccurredAtMs:UInt64}
-            AND EventOccurredAt <= {maxOccurredAtMs:UInt64}
-          )
-        )`,
-    params: { minOccurredAtMs: bounds.minMs, maxOccurredAtMs: bounds.maxMs },
-  };
+  const { rows } = await client.read(discoveredEventCountRead({ eventTypes, sinceMs, tenantId }));
+  return Number(rows[0]?.totalEvents ?? 0);
 }
 
 /**
@@ -242,33 +156,16 @@ export async function getAggregateOccurredAtBounds({
   });
   if (indexed !== null) return { minMs: indexed.fromMs, maxMs: indexed.toMs };
 
-  const { rows } = await client.query<{
-    cnt: string;
-    minOccurredAt: string;
-    maxOccurredAt: string;
-  }>({
-    tenantId,
-    sql: `
-      SELECT
-        count() AS cnt,
-        min(EventOccurredAt) AS minOccurredAt,
-        max(EventOccurredAt) AS maxOccurredAt
-      FROM event_log
-      WHERE TenantId = {tenantId:String}
-        AND AggregateType IN ({aggregateTypes:Array(String)})
-        AND AggregateId IN ({aggregateIds:Array(String)})
-    `,
-    params: { tenantId, aggregateTypes, aggregateIds },
-    // This read finds the bounds the batch's later reads prune by, so it must see all history.
-    SKIP_COLD_SCAN_CHECK: true,
-  });
+  const { rows } = await client.read(
+    occurredAtBoundsRead({ tenantId, aggregateTypes, aggregateIds }),
+  );
 
   const row = rows[0];
-  if (!row || parseInt(row.cnt, 10) === 0) return undefined;
+  if (!row || Number(row.cnt) === 0) return undefined;
 
   return {
-    minMs: parseInt(row.minOccurredAt, 10),
-    maxMs: parseInt(row.maxOccurredAt, 10),
+    minMs: Number(row.minOccurredAt),
+    maxMs: Number(row.maxOccurredAt),
   };
 }
 
@@ -290,39 +187,14 @@ export async function batchGetCutoffEventIds({
   eventTypes: readonly string[];
   occurredAtBounds?: OccurredAtBounds;
 }): Promise<Map<string, CutoffInfo>> {
-  const pruning = occurredAtPredicate(occurredAtBounds);
-  const { rows } = await client.query<{
-    aggregateType: string;
-    aggregateId: string;
-    cutoffEventId: string;
-    cutoffTimestamp: string;
-  }>({
-    tenantId,
-    sql: `
-      SELECT
-        AggregateType AS aggregateType,
-        AggregateId AS aggregateId,
-        argMax(EventId, (EventTimestamp, EventId)) AS cutoffEventId,
-        max(EventTimestamp) AS cutoffTimestamp
-      FROM event_log
-      WHERE TenantId = {tenantId:String}
-        AND EventType IN ({eventTypes:Array(String)})
-        AND AggregateId IN ({aggregateIds:Array(String)})
-        ${pruning.sql}
-      GROUP BY AggregateType, AggregateId
-    `,
-    params: {
-      tenantId,
-      eventTypes: [...eventTypes],
-      aggregateIds,
-      ...pruning.params,
-    },
-  });
+  const { rows } = await client.read(
+    cutoffEventsRead({ tenantId, aggregateIds, eventTypes, occurredAtBounds }),
+  );
 
   const map = new Map<string, CutoffInfo>();
   for (const row of rows) {
     map.set(`${tenantId}:${row.aggregateType}:${row.aggregateId}`, {
-      timestamp: parseInt(row.cutoffTimestamp, 10),
+      timestamp: Number(row.cutoffTimestamp),
       eventId: row.cutoffEventId,
     });
   }
@@ -374,6 +246,27 @@ export async function getBoundedCutoffs({
     occurredAtBounds,
   });
   return { cutoffs, occurredAtBounds };
+}
+
+/**
+ * The stream's optional occurred-at pruning text: the client streams no built statement yet, so
+ * this one read stays raw. Rows with no occurred time (0) are always kept.
+ */
+function occurredAtPredicate(bounds?: OccurredAtBounds): {
+  sql: string;
+  params: Record<string, unknown>;
+} {
+  if (!bounds) return { sql: "", params: {} };
+  return {
+    sql: `AND (
+          EventOccurredAt = 0
+          OR (
+            EventOccurredAt >= {minOccurredAtMs:UInt64}
+            AND EventOccurredAt <= {maxOccurredAtMs:UInt64}
+          )
+        )`,
+    params: { minOccurredAtMs: bounds.minMs, maxOccurredAtMs: bounds.maxMs },
+  };
 }
 
 /**
@@ -471,58 +364,17 @@ export async function batchLoadAggregateEvents({
   occurredAtBounds?: OccurredAtBounds;
   lean: ReplayEventLean;
 }): Promise<ReplayEvent[]> {
-  const pruning = occurredAtPredicate(occurredAtBounds);
-
-  const query = `
-    SELECT EventId, EventTimestamp, EventOccurredAt, EventType, EventPayload,
-           EventVersion, TenantId, AggregateType, AggregateId, ProcessingTraceparent,
-           IdempotencyKey
-    FROM event_log
-    WHERE TenantId = {tenantId:String}
-      AND EventType IN ({eventTypes:Array(String)})
-      AND AggregateId IN ({aggregateIds:Array(String)})
-      AND (
-        EventTimestamp < {maxCutoffTimestamp:UInt64}
-        OR (
-          EventTimestamp = {maxCutoffTimestamp:UInt64}
-          AND EventId <= {maxCutoffEventId:String}
-        )
-      )
-      ${
-        cursor
-          ? `AND (
-        EventTimestamp > {cursorTimestamp:UInt64}
-        OR (
-          EventTimestamp = {cursorTimestamp:UInt64}
-          AND EventId > {cursorEventId:String}
-        )
-      )`
-          : ""
-      }
-      ${pruning.sql}
-    ORDER BY EventTimestamp ASC, EventId ASC
-    LIMIT {batchSize:UInt32}
-  `;
-
-  const { rows } = await client.query<ClickHouseEventRow>({
-    tenantId,
-    sql: query,
-    params: {
+  const { rows } = await client.read(
+    aggregateEventsPageRead({
       tenantId,
-      eventTypes: [...eventTypes],
       aggregateIds,
-      maxCutoffTimestamp: maxCutoff.timestamp,
-      maxCutoffEventId: maxCutoff.eventId,
-      ...(cursor
-        ? {
-            cursorTimestamp: cursor.timestamp,
-            cursorEventId: cursor.eventId,
-          }
-        : {}),
+      eventTypes,
+      maxCutoff,
+      cursor,
       batchSize,
-      ...pruning.params,
-    },
-  });
+      occurredAtBounds,
+    }),
+  );
 
   return rows.map((row) => rowToEvent(row, lean));
 }

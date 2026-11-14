@@ -1,4 +1,4 @@
-import type { QueryRequest } from "@langwatch/clickhouse-client";
+import type { ClickHouseQueryClient, QueryRequest } from "@langwatch/clickhouse-client";
 import type { EventingClickHouseReplayClient } from "@langwatch/eventing/server";
 import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 
@@ -147,11 +147,36 @@ function answerLoad(rows: FakeEventLogRow[], p: QueryParams): unknown[] {
 /** Each query shape the replay path issues, matched by the fragment that identifies it. */
 const QUERY_ANSWERS: readonly [string, (rows: FakeEventLogRow[], p: QueryParams) => unknown[]][] = [
   ["groupUniqArray(EventType)", answerDiscover],
-  ["as totalEvents", (rows) => [{ totalEvents: String(rows.length) }]],
+  ["AS totalEvents", (rows) => [{ totalEvents: String(rows.length) }]],
   ["AS minOccurredAt", answerOccurredAtBounds],
   ["cutoffEventId", answerCutoff],
   ["ORDER BY EventTimestamp ASC, EventId ASC", answerLoad],
 ];
+
+/** Each built statement's bound value, named as the raw replay reads named them. */
+const BOUND_NAMES: readonly [RegExp, string][] = [
+  [/EventType IN \(\{(v\d+):/, "eventTypes"],
+  [/EventTimestamp >= \{(v\d+):/, "sinceMs"],
+  [/AggregateType IN \(\{(v\d+):/, "aggregateTypes"],
+  [/AggregateId IN \(\{(v\d+):/, "aggregateIds"],
+  [/EventTimestamp < \{(v\d+):/, "maxCutoffTimestamp"],
+  [/EventId <= \{(v\d+):/, "maxCutoffEventId"],
+  [/EventTimestamp > \{(v\d+):/, "cursorTimestamp"],
+  [/EventId > \{(v\d+):/, "cursorEventId"],
+];
+
+function namedParams({ sql, params }: { sql: string; params: QueryParams }): QueryParams {
+  const named: QueryParams = { tenantId: params.tenantId };
+  for (const [pattern, name] of BOUND_NAMES) {
+    const bound = pattern.exec(sql)?.[1];
+    if (bound !== undefined) named[name] = params[bound];
+  }
+  const limit = /LIMIT (\d+)$/.exec(sql)?.[1];
+  if (limit !== undefined) named.batchSize = Number(limit);
+  return named;
+}
+
+type SentRead = Parameters<ClickHouseQueryClient["read"]>[0];
 
 /**
  * A faithful in-memory `event_log` behind the routed member's surface, answering the query shapes
@@ -174,7 +199,18 @@ export function makeFakeClickHouse(rows: FakeEventLogRow[]): {
     throw new Error(`unexpected query: ${sql.slice(0, 80)}`);
   };
   const client = clickHouseQueryClientDouble({
-    query: async (request: QueryRequest) => ({ rows: answer(request) }),
+    // An all-tenants statement names no tenant: the member reads it on the shared server.
+    read: async ({ statement }: SentRead) => ({
+      rows: JSON.parse(
+        JSON.stringify(
+          answer({
+            sql: statement.sql,
+            params: namedParams({ sql: statement.sql, params: statement.params }),
+            tenantId: statement.kind === "tenant" ? statement.tenantId : "",
+          }),
+        ),
+      ),
+    }),
     stream: async function* (request: QueryRequest) {
       yield answer(request);
     },

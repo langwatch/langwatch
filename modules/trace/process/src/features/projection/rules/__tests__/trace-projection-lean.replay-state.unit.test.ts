@@ -172,7 +172,7 @@ describe("replayStateProjection", () => {
     // Never merged with an existing row.
     expect(store.get).not.toHaveBeenCalled();
     // Only SELECTs — the state path reads CH, never writes it.
-    expect(queries.every((q) => q.trim().toUpperCase().startsWith("SELECT"))).toBe(true);
+    expect(queries.every((q) => /^(WITH|SELECT)\b/.test(q.trim().toUpperCase()))).toBe(true);
 
     // One row per (tenant, key).
     expect(writes).toHaveLength(2);

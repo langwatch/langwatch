@@ -1,28 +1,34 @@
 /** Spec: packages/eventing/specs/event-table-surfaces.feature */
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { describe, expect, it } from "vitest";
 
 import { ValidationError } from "../../../../services/errorHandling.ts";
-import type { EventingClickHouseReplayStatement } from "../../../clickhouse-client-resolver.ts";
 import { EventingClickHouseEventExplorer } from "../event-explorer.clickhouse.ts";
 
-/** The routed member, recording each statement the repository hands it. */
-const repoCapturingQuery = () => {
-  const statements: EventingClickHouseReplayStatement[] = [];
+type SentRead = Parameters<ClickHouseQueryClient["read"]>[0];
+
+/** The routed member, recording each built statement the repository hands it. */
+const repoCapturingQuery = (rows: Record<string, unknown>[] = []) => {
+  const statements: SentRead[] = [];
   const clickhouse = clickHouseQueryClientDouble({
-    query: async (request: EventingClickHouseReplayStatement) => {
+    read: async (request: SentRead) => {
       statements.push(request);
-      return { rows: [] };
+      return { rows: JSON.parse(JSON.stringify(rows)) };
     },
   });
   return { repo: EventingClickHouseEventExplorer.create({ clickhouse }), statements };
 };
 
-const capturedQuery = (statements: EventingClickHouseReplayStatement[]) => {
-  const statement = statements[0];
-  if (!statement) throw new Error("the repository issued no statement");
-  return { query: statement.sql, query_params: statement.params ?? {}, statement };
+const capturedQuery = (statements: SentRead[]) => {
+  const sent = statements[0];
+  if (!sent) throw new Error("the repository issued no statement");
+  const { statement } = sent;
+  return { query: statement.sql, values: Object.values(statement.params), statement };
 };
+
+const SENTINEL_OR_SINCE =
+  /\(EventOccurredAt = \{v\d+:UInt64\} OR EventOccurredAt >= \{v\d+:UInt64\}\)/;
 
 describe("EventingClickHouseEventExplorer.findAggregates", () => {
   describe("given a caller supplies a sinceMs", () => {
@@ -39,10 +45,10 @@ describe("EventingClickHouseEventExplorer.findAggregates", () => {
           sinceMs: 1_700_000_000_000,
         });
 
-        const { query: sql, query_params } = capturedQuery(statements);
-        expect(sql).toContain("EventOccurredAt >= {sinceMs:UInt64}");
+        const { query: sql, values } = capturedQuery(statements);
+        expect(sql).toMatch(/EventOccurredAt >= \{v\d+:UInt64\}/);
         expect(sql).not.toMatch(/EventTimestamp\s*>=/);
-        expect(query_params.sinceMs).toBe(1_700_000_000_000);
+        expect(values).toContain(1_700_000_000_000);
       });
 
       it("preserves the EventOccurredAt = 0 legacy-sentinel rows alongside the sinceMs cutoff", async () => {
@@ -58,9 +64,49 @@ describe("EventingClickHouseEventExplorer.findAggregates", () => {
         });
 
         const { query: sql } = capturedQuery(statements);
+        expect(sql).toMatch(SENTINEL_OR_SINCE);
+        expect(capturedQuery(statements).values).toContain(0);
+      });
+    });
+  });
+
+  describe("given an operator counting aggregates across tenants", () => {
+    describe("when findAggregates is called", () => {
+      it("sends an all-tenants statement on the system identity, with its reason", async () => {
+        const { repo, statements } = repoCapturingQuery();
+
+        await repo.findAggregates({ aggregateTypes: ["trace"], sinceMs: 1 });
+
+        const { statement, query: sql } = capturedQuery(statements);
+        expect(statement).toMatchObject({
+          identity: "system",
+          kind: "allTenants",
+          reason: expect.stringContaining("ops_event_log_search"),
+        });
+        expect(statement.settings).not.toHaveProperty("SQL_langwatch_tenant_ids");
+        expect(sql).not.toContain("TenantId IN");
         expect(sql).toMatch(
-          /EventOccurredAt\s*=\s*0\s+OR\s+EventOccurredAt\s*>=\s*\{sinceMs:UInt64\}/,
+          /GROUP BY AggregateType, TenantId ORDER BY AggregateType ASC, TenantId ASC$/,
         );
+      });
+
+      it("narrows to the tenants the operator named", async () => {
+        const { repo, statements } = repoCapturingQuery([
+          { aggregateType: "trace", tenantId: "project_x", aggregateCount: "4" },
+        ]);
+
+        const found = await repo.findAggregates({
+          aggregateTypes: ["trace"],
+          sinceMs: 1,
+          tenantIds: ["project_x"],
+        });
+
+        const { query: sql, values } = capturedQuery(statements);
+        expect(sql).toMatch(/AND TenantId IN \(\{v\d+:Array\(String\)\}\) GROUP BY/);
+        expect(values).toContainEqual(["project_x"]);
+        expect(found).toEqual([
+          { aggregateType: "trace", tenantId: "project_x", aggregateCount: 4 },
+        ]);
       });
     });
   });
@@ -103,12 +149,14 @@ describe("EventingClickHouseEventExplorer.searchAggregates", () => {
           sinceMs: 1_700_000_000_000,
         });
 
-        const { query: sql, query_params } = capturedQuery(statements);
+        const { query: sql, values } = capturedQuery(statements);
+        expect(sql).toMatch(SENTINEL_OR_SINCE);
+        expect(values).toContain(1_700_000_000_000);
+        expect(values).toContainEqual(["project_x"]);
+        expect(values).toContain("%abc%");
         expect(sql).toMatch(
-          /EventOccurredAt\s*=\s*0\s+OR\s+EventOccurredAt\s*>=\s*\{sinceMs:UInt64\}/,
+          /\(like\(AggregateId, \{v\d+:String\}\) OR like\(TenantId, \{v\d+:String\}\)\)/,
         );
-        expect(query_params.sinceMs).toBe(1_700_000_000_000);
-        expect(query_params.tenantIds).toEqual(["project_x"]);
       });
     });
   });
@@ -116,14 +164,20 @@ describe("EventingClickHouseEventExplorer.searchAggregates", () => {
   describe("given an operator searching across tenants", () => {
     describe("when searchAggregates is called", () => {
       /** @scenario "One aggregate's history reads its tenant's server, a cross-tenant search the shared one" */
-      it("names no tenant and gives its reason, so the member reads the shared server", async () => {
+      it("sends an all-tenants statement with its reason, which the member reads on the shared server", async () => {
         const { repo, statements } = repoCapturingQuery();
 
         await repo.searchAggregates({ query: "abc" });
 
-        const { statement } = capturedQuery(statements);
-        expect(statement.tenantId).toBe("");
-        expect(statement.SKIP_TENANT_CHECK).toBe(true);
+        const { statement, query: sql } = capturedQuery(statements);
+        expect(statement).toMatchObject({
+          identity: "system",
+          kind: "allTenants",
+          reason: expect.stringContaining("ops_event_log_search"),
+        });
+        expect(statement.settings).not.toHaveProperty("SQL_langwatch_tenant_ids");
+        expect(statements[0]?.organizationId).toBeUndefined();
+        expect(sql).toMatch(/ORDER BY lastEventTime DESC LIMIT 50$/);
       });
     });
   });
@@ -132,24 +186,15 @@ describe("EventingClickHouseEventExplorer.searchAggregates", () => {
     describe("when an operator searches for an aggregate", () => {
       /** @scenario "The operator searches the event log through the composed explorer" */
       it("reads event_log and returns the matching aggregates", async () => {
-        const statements: EventingClickHouseReplayStatement[] = [];
-        const clickhouse = clickHouseQueryClientDouble({
-          query: async (request: EventingClickHouseReplayStatement) => {
-            statements.push(request);
-            return {
-              rows: [
-                {
-                  aggregateId: "trace-1",
-                  aggregateType: "trace",
-                  tenantId: "project-1",
-                  eventCount: "3",
-                  lastEventTime: "2026-10-06 10:00:00",
-                },
-              ],
-            };
+        const { repo, statements } = repoCapturingQuery([
+          {
+            aggregateId: "trace-1",
+            aggregateType: "trace",
+            tenantId: "project-1",
+            eventCount: "3",
+            lastEventTime: "2026-10-06 10:00:00",
           },
-        });
-        const repo = EventingClickHouseEventExplorer.create({ clickhouse });
+        ]);
 
         const found = await repo.searchAggregates({ query: "trace-1" });
 
@@ -174,9 +219,9 @@ describe("EventingClickHouseEventExplorer.searchAggregates", () => {
 
         await repo.searchAggregates({ query: "abc" });
 
-        const { query: sql, query_params } = capturedQuery(statements);
+        const { query: sql, values } = capturedQuery(statements);
         expect(sql).not.toContain("EventOccurredAt");
-        expect(query_params.sinceMs).toBeUndefined();
+        expect(values).toEqual(["%abc%", "%abc%"]);
       });
     });
   });
@@ -194,13 +239,10 @@ describe("EventingClickHouseEventExplorer.findEventsByAggregate", () => {
           limit: 10,
         });
 
-        const { query: sql, query_params } = capturedQuery(statements);
+        const { query: sql, values } = capturedQuery(statements);
         expect(sql).not.toContain("EventOccurredAt");
-        expect(query_params).toEqual({
-          tenantId: "project_test",
-          aggregateId: "agg-1",
-          limit: 10,
-        });
+        expect(values).toEqual(expect.arrayContaining(["project_test", "agg-1"]));
+        expect(sql).toMatch(/ORDER BY EventTimestamp ASC, EventId ASC LIMIT 10$/);
       });
 
       /** @scenario "One aggregate's history reads its tenant's server, a cross-tenant search the shared one" */
@@ -213,8 +255,15 @@ describe("EventingClickHouseEventExplorer.findEventsByAggregate", () => {
           limit: 10,
         });
 
-        expect(capturedQuery(statements).statement.tenantId).toBe("project_test");
-        expect(capturedQuery(statements).statement.SKIP_TENANT_CHECK).toBeUndefined();
+        expect(capturedQuery(statements).statement).toMatchObject({
+          identity: "reader",
+          kind: "tenant",
+          tenantId: "project_test",
+          settings: { SQL_langwatch_tenant_ids: "project_test" },
+        });
+        expect(capturedQuery(statements).query).toContain(
+          "FROM event_log WHERE TenantId = {tenantId:String}",
+        );
       });
     });
   });

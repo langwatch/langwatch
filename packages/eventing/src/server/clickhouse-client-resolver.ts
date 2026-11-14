@@ -35,12 +35,11 @@ export interface EventingClickHouseReplayStatement {
 }
 
 /**
- * The reads replay needs, which the routed member answers itself, so no adapter stands between
- * them: whole results, streamed rows (a batch's memory stays bounded by the accumulators rather
- * than its event count), and `command` for the post-replay `OPTIMIZE TABLE`.
+ * What replay sends the routed member itself, so no adapter stands between them: built reads,
+ * streamed rows (a batch's memory stays bounded by the accumulators rather than its event count),
+ * and `command` for the post-replay `OPTIMIZE TABLE`.
  */
-export interface EventingClickHouseReplayClient {
-  query<Row>(request: EventingClickHouseReplayStatement): Promise<{ rows: Row[] }>;
+export type EventingClickHouseReplayClient = Pick<ClickHouseQueryClient, "read"> & {
   stream<Row>(request: EventingClickHouseReplayStatement): AsyncIterable<Row[]>;
   command(request: EventingClickHouseReplayStatement): Promise<void>;
-}
+};
