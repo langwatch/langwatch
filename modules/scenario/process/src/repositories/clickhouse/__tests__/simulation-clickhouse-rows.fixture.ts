@@ -79,7 +79,7 @@ export function useSimulationClickHouse({ tenantId }: { tenantId: string }) {
       clickhouse_settings: { date_time_input_format: "best_effort" },
     });
     client = opened;
-    repo = SimulationClickHouseRepository.create(scenarioClickHouseOver(opened));
+    repo = simulationRepositoryOver(opened);
   });
 
   afterAll(async () => {
@@ -120,7 +120,21 @@ export function useSimulationClickHouse({ tenantId }: { tenantId: string }) {
 export function scenarioClickHouseOver(
   vendor: VendorStatements,
 ): SimulationEventingClickHouseResolver {
-  return ClickHouseSimulationSession.resolver(
-    vendorQueryClient({ vendor, indexes: [...SCENARIO_ID_INDEXES, ...SCENARIO_SECOND_ID_INDEXES] }),
-  );
+  return ClickHouseSimulationSession.resolver(scenarioQueryClientOver(vendor));
+}
+
+/** The simulation repository over a suite's connection: tenant sessions, the reader for sets. */
+export function simulationRepositoryOver(vendor: VendorStatements): SimulationClickHouseRepository {
+  const clickhouse = scenarioQueryClientOver(vendor);
+  return SimulationClickHouseRepository.create({
+    sessions: ClickHouseSimulationSession.resolver(clickhouse),
+    clickhouse,
+  });
+}
+
+function scenarioQueryClientOver(vendor: VendorStatements) {
+  return vendorQueryClient({
+    vendor,
+    indexes: [...SCENARIO_ID_INDEXES, ...SCENARIO_SECOND_ID_INDEXES],
+  });
 }

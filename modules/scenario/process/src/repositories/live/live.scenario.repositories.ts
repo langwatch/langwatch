@@ -49,9 +49,10 @@ export class LiveScenarioRepositories {
       resultAtoms: ResultAtomsClickHouseRepository.create(sessions),
       runConfigurations: RunConfigurationsClickHouseRepository.create(sessions),
       voiceNonces: RedisVoiceNonceRepository.create(redis),
-      simulations: SimulationClickHouseRepository.create(
-        ClickHouseScenarioSession.resolverOver(clickhouse),
-      ),
+      simulations: SimulationClickHouseRepository.create({
+        sessions: ClickHouseScenarioSession.resolverOver(clickhouse),
+        clickhouse,
+      }),
       rateLimits: RedisScenarioRateLimitRepository.create(rateLimiter),
       cancellations: RedisScenarioCancellationRepository.create(redis),
     };

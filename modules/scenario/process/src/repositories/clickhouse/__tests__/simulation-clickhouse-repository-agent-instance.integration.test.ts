@@ -15,8 +15,11 @@ import {
   type SimulationRunState,
 } from "../../../eventing/simulation-run-state.projection.ts";
 import { ClickHouseSimulationRunStateRepository } from "../clickhouse.simulation-run-state.repository.ts";
-import { SimulationClickHouseRepository } from "../simulation-clickhouse.repository.ts";
-import { scenarioClickHouseOver } from "./simulation-clickhouse-rows.fixture.ts";
+import type { SimulationClickHouseRepository } from "../simulation-clickhouse.repository.ts";
+import {
+  scenarioClickHouseOver,
+  simulationRepositoryOver,
+} from "./simulation-clickhouse-rows.fixture.ts";
 
 const configuredClickHouseUrl = process.env.TEST_CLICKHOUSE_URL ?? process.env.CI_CLICKHOUSE_URL;
 const databaseUrl = configuredClickHouseUrl ? new URL(configuredClickHouseUrl) : null;
@@ -85,7 +88,7 @@ beforeAll(() => {
     resolveClient: scenarioClickHouseOver(ch),
     defaultRetentionDays: () => 30,
   });
-  runs = SimulationClickHouseRepository.create(scenarioClickHouseOver(ch));
+  runs = simulationRepositoryOver(ch);
 });
 
 afterAll(async () => {

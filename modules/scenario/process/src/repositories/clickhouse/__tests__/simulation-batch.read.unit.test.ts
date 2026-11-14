@@ -504,11 +504,123 @@ describe("SimulationClickHouseRepository.lastResultsRead()", () => {
     expect(Object.values(statement.params)).toContainEqual(["scenario_1"]);
   });
 
-  it("carries the agent test exclusion and the window into the election, not the scenario filter", () => {
+  it("carries the agent test exclusion, the window and the named scenarios into the election", () => {
     const election = electionOf(statement.sql);
     expect(election).toContain("NOT (endsWith(ScenarioSetId");
     expect(election).toContain("StartedAt >= ");
-    expect(election).not.toContain("ScenarioId");
+    expect(election).toContain("ScenarioId IN ({");
     expect(election).not.toContain("ArchivedAt");
+  });
+
+  it("elects over every scenario's runs when the caller names none", () => {
+    const every = SimulationClickHouseRepository.lastResultsRead({
+      projectId: "project_1",
+      scenarioIds: undefined,
+    });
+    scoped(every);
+    expect(electionOf(every.sql)).not.toContain("ScenarioId");
+  });
+});
+
+/** A read over one organization's two projects: the reader, both tenants in the setting. */
+const setScoped = (statement: { identity: string; settings: Record<string, unknown> }) => {
+  expect(statement.identity).toBe("reader");
+  expect(statement.settings.SQL_langwatch_tenant_ids).toBe("project_1,project_2");
+};
+
+describe("SimulationClickHouseRepository.externalSetIdsRead()", () => {
+  const statement = SimulationClickHouseRepository.externalSetIdsRead({
+    projectIds: ["project_1", "project_2"],
+  });
+
+  it("scopes the read to the organization's project set with the tenant setting", () => {
+    setScoped(statement);
+    expect(statement.sql).toContain("TenantId IN ({");
+  });
+
+  it("keeps each run's set when its latest version is live, internal and agent test sets out", () => {
+    expect(statement.sql).toMatch(/^SELECT DISTINCT /);
+    expect(statement.sql).toContain("argMax(ArchivedAt IS NULL, UpdatedAt) AS LatestIsActive");
+    expect(statement.sql).toContain("GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId");
+    expect(statement.sql).toContain("NOT (startsWith(ScenarioSetId");
+    expect(statement.sql).toContain("NOT (endsWith(ScenarioSetId");
+    expect(statement.sql).toMatch(/AS runs WHERE LatestIsActive$/);
+  });
+});
+
+describe("SimulationClickHouseRepository.organizationRunCountRead()", () => {
+  const statement = SimulationClickHouseRepository.organizationRunCountRead({
+    projectIds: ["project_1", "project_2"],
+  });
+
+  it("counts the organization's live runs in one read over its project set", () => {
+    setScoped(statement);
+    expect(statement.sql).toContain("count() AS Total");
+    expect(statement.sql).toContain("IN (SELECT TenantId, ScenarioRunId, max(UpdatedAt)");
+    expect(statement.sql).toContain("ArchivedAt IS NULL");
+  });
+});
+
+describe("SimulationClickHouseRepository.usageCountRead()", () => {
+  it("counts one project's live runs, the window repeated in the election", () => {
+    const statement = SimulationClickHouseRepository.usageCountRead({
+      projectId: "project_1",
+      since: 1_000,
+    });
+    scoped(statement);
+    expect(statement.sql).toContain("count() AS Total");
+    expect(electionOf(statement.sql)).toContain("StartedAt >= ");
+    expect(electionOf(statement.sql)).not.toContain("ArchivedAt");
+  });
+
+  it("counts every live run when no window is given", () => {
+    const statement = SimulationClickHouseRepository.usageCountRead({ projectId: "project_1" });
+    scoped(statement);
+    expect(statement.sql).not.toContain("StartedAt");
+  });
+});
+
+describe("SimulationClickHouseRepository.exportRunCountRead() and exportRunPageRead()", () => {
+  const filters = {
+    projectId: "project_1",
+    scenarioSetId: "default",
+    scenarioId: "scenario_1",
+    startDate: 1_000,
+    endDate: 2_000,
+  };
+  const count = SimulationClickHouseRepository.exportRunCountRead(filters);
+  const page = SimulationClickHouseRepository.exportRunPageRead({
+    ...filters,
+    limit: 50,
+    after: { ts: "1500", scenarioRunId: "run_1" },
+    holds: () => true,
+  });
+
+  it("scopes both reads to their one tenant with the tenant setting", () => {
+    scoped(count);
+    scoped(page);
+    expect(count.sql).toContain("count() AS Total");
+  });
+
+  it("repeats the set bound and the scenario in the election, not the StartedAt range", () => {
+    for (const { sql } of [count, page]) {
+      const election = electionOf(sql);
+      expect(sql.match(/\{\{idBound:simulation_runs\.ScenarioSetId:/g)).toHaveLength(2);
+      expect(election).toContain("ScenarioId = {");
+      expect(election).not.toContain("StartedAt");
+      expect(sql).toContain("StartedAt >= ");
+      expect(sql).toContain("StartedAt <= ");
+    }
+  });
+
+  it("pages whole runs in sort-key order after the cursor, one row past the page", () => {
+    expect(page.sql).toContain(
+      "toUnixTimestamp64Milli(ifNull(StartedAt, CreatedAt)) AS ExportSortKey",
+    );
+    expect(page.sql).toContain("`Messages.Content`");
+    expect(electionOf(page.sql)).not.toContain("ScenarioRunId >");
+    expect(page.sql).toMatch(
+      /ORDER BY toUnixTimestamp64Milli\(ifNull\(StartedAt, CreatedAt\)\) ASC, ScenarioRunId ASC LIMIT 51$/,
+    );
   });
 });

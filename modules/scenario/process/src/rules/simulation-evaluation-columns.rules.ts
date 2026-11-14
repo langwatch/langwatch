@@ -25,14 +25,6 @@ const clickHouseEvaluationColumnsSchema = z.object({
 });
 export type ClickHouseEvaluationColumns = z.infer<typeof clickHouseEvaluationColumnsSchema>;
 
-/** The columns as a SELECT fragment, in the order the schema lists them. */
-export const EVALUATION_COLUMNS_SQL = `
-  \`Evaluations.EvaluatorId\`, \`Evaluations.Name\`, \`Evaluations.Status\`,
-  \`Evaluations.Required\`, \`Evaluations.Passed\`, \`Evaluations.Score\`,
-  \`Evaluations.Label\`, \`Evaluations.Details\`,
-  \`Evaluations.CostAmount\`, \`Evaluations.CostCurrency\`,
-  \`Evaluations.InputsJson\``;
-
 /** The evaluations of a run as the parallel arrays its row stores. */
 export function evaluationsToColumns(
   evaluations: ScenarioEvaluationResult[],

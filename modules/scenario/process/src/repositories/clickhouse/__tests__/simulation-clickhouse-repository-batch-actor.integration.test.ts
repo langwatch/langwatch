@@ -8,10 +8,9 @@
 import { nanoid } from "nanoid";
 import { describe, expect, it } from "vitest";
 
-import { SimulationClickHouseRepository } from "../simulation-clickhouse.repository.ts";
 import {
   databaseUrl,
-  scenarioClickHouseOver,
+  simulationRepositoryOver,
   simulationRunRow,
   useSimulationClickHouse,
 } from "./simulation-clickhouse-rows.fixture.ts";
@@ -204,9 +203,7 @@ describe.skipIf(databaseUrl === null)("the cost of reading who started a batch",
           return Reflect.get(target, prop, receiver);
         },
       });
-      const recordingRepo = SimulationClickHouseRepository.create(
-        scenarioClickHouseOver(recordingClient),
-      );
+      const recordingRepo = simulationRepositoryOver(recordingClient);
 
       const result = await recordingRepo.listBatchHistoryForScenarioSet({
         projectId: tenantId,

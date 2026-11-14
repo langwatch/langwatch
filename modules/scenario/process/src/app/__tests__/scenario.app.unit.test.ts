@@ -410,12 +410,12 @@ describe("ScenarioModule.getRunDataForAllSuites", () => {
 describe("given a live process whose scenario registry reads ClickHouse", () => {
   /** @scenario "Simulation reads are derived from the deployment's own ClickHouse" */
   it("serves the read from ClickHouse instead of refusing", async () => {
-    const asked: { tenantId: string }[] = [];
+    const asked: { tenantId: string | undefined }[] = [];
     const clickhouse = createApiFixture<ClickHouseQueryClient>({
-      query: <Row>(input: { tenantId: string }) => {
-        asked.push({ tenantId: input.tenantId });
+      read: ({ statement }) => {
+        asked.push({ tenantId: "tenantId" in statement ? statement.tenantId : undefined });
 
-        return Promise.resolve({ rows: [] as Row[] });
+        return Promise.resolve({ rows: [] });
       },
     });
     const app = await ScenarioModule.create({

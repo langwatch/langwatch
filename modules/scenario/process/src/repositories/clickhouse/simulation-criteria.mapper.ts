@@ -12,17 +12,6 @@ export interface ClickHouseCriteriaColumns {
   "Criteria.Reasoning": string[];
 }
 
-/**
- * The columns, each with the typed default it reads as until goose 00101 adds it, for
- * `ClickHouseColumns.select` (NO-HOLDS, ARCHITECTURE.md section 7).
- */
-export const CRITERIA_COLUMNS = {
-  "Criteria.Criterion": "CAST([] AS Array(String))",
-  "Criteria.Requirement": "CAST([] AS Array(String))",
-  "Criteria.Status": "CAST([] AS Array(LowCardinality(String)))",
-  "Criteria.Reasoning": "CAST([] AS Array(String))",
-} as const;
-
 /** The criteria of a run as the parallel arrays its row stores. */
 export function criteriaToColumns(criteria: ScenarioCriterionResult[]): ClickHouseCriteriaColumns {
   return {

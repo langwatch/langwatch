@@ -116,3 +116,66 @@ describe.skipIf(databaseUrl === null)(
     });
   },
 );
+
+const firstProjectId = `test-org-a-${nanoid()}`;
+const secondProjectId = `test-org-b-${nanoid()}`;
+const firstProject = useSimulationClickHouse({ tenantId: firstProjectId });
+const secondProject = useSimulationClickHouse({ tenantId: secondProjectId });
+
+const projectRun = (projectId: string, scenarioSetId: string) =>
+  simulationRunRow({
+    tenantId: projectId,
+    scenarioSetId,
+    batchRunId: `batch-${nanoid(6)}`,
+    metadata: null,
+  });
+
+describe.skipIf(databaseUrl === null)(
+  "SimulationClickHouseRepository reads over one organization's projects",
+  () => {
+    describe("given live, archived, agent test and internal runs in two projects", () => {
+      const gone = projectRun(firstProjectId, "set-gone");
+      const seed = async () => {
+        await firstProject.insertRows([
+          projectRun(firstProjectId, ""),
+          projectRun(firstProjectId, "set-a"),
+          gone,
+          archived(gone),
+          projectRun(firstProjectId, getAgentTestSetId(firstProjectId)),
+          projectRun(firstProjectId, "__internal__suite_1__suite"),
+        ]);
+        await secondProject.insertRows([projectRun(secondProjectId, "set-b")]);
+      };
+      let seeded: Promise<void> | undefined;
+      const seededOnce = () => (seeded ??= seed());
+
+      it("lists the external sets whose runs are live, the default set under its one id", async () => {
+        await seededOnce();
+
+        const sets = await firstProject.repo.findDistinctExternalSetIds({
+          projectIds: [firstProjectId, secondProjectId],
+        });
+
+        expect([...sets].toSorted()).toEqual(["default", "set-a", "set-b"]);
+      });
+
+      it("counts every live run across both projects in one read", async () => {
+        await seededOnce();
+
+        await expect(
+          firstProject.repo.countOrganizationRuns({
+            projectIds: [firstProjectId, secondProjectId],
+          }),
+        ).resolves.toBe(5);
+      });
+
+      it("counts each project's live runs and adds them up", async () => {
+        await seededOnce();
+
+        await expect(
+          firstProject.repo.countUsage({ projectIds: [firstProjectId, secondProjectId] }),
+        ).resolves.toBe(5);
+      });
+    });
+  },
+);

@@ -19,15 +19,16 @@ const AFTER_00101 = [
 function readRunOver(columnList: readonly { table: string; name: string }[]) {
   const statements: string[] = [];
   const columns = ClickHouseColumns.over({ read: async () => columnList });
-  const repository = SimulationClickHouseRepository.create(async () => ({
-    query: () => Promise.reject(new Error("the run read is a built read")),
-    select: (input) => columns.select(input),
-    holds: (input) => columns.holds(input),
-    read: async ({ statement }) => {
-      statements.push(statement.sql);
-      return { rows: [] };
-    },
-  }));
+  const repository = SimulationClickHouseRepository.create({
+    sessions: async () => ({
+      holds: (input) => columns.holds(input),
+      read: async ({ statement }) => {
+        statements.push(statement.sql);
+        return { rows: [] };
+      },
+    }),
+    clickhouse: { read: () => Promise.reject(new Error("a run read is one tenant's")) },
+  });
   return { statements, repository };
 }
 

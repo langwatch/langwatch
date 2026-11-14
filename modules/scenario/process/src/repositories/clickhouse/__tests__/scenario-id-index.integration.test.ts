@@ -186,13 +186,19 @@ afterAll(async () => {
   await ch.close();
 });
 
+/** Scenario's simulation reads over one routing member: its sessions, and it for set reads. */
+function repositoryOver(member: Parameters<typeof ClickHouseScenarioSession.resolverOver>[0]) {
+  return SimulationClickHouseRepository.create({
+    sessions: ClickHouseScenarioSession.resolverOver(member),
+    clickhouse: member,
+  });
+}
+
 describe("scenario lookups by id with the id index", () => {
   describe("given a simulation run written eight weeks ago", () => {
     /** @scenario "a lookup by id reads only the partitions the index names" */
     it("reads the run's data by id alone inside the index's range", async () => {
-      const repository = SimulationClickHouseRepository.create(
-        ClickHouseScenarioSession.resolverOver(clickhouse),
-      );
+      const repository = repositoryOver(clickhouse);
 
       const found = await repository.findScenarioRunData({
         projectId: tenantId,
@@ -207,9 +213,7 @@ describe("scenario lookups by id with the id index", () => {
         idBound_toMs: eightWeeksAgoMs + DAY_MS,
       });
       statements = [];
-      await SimulationClickHouseRepository.create(
-        ClickHouseScenarioSession.resolverOver(unready),
-      ).findScenarioRunData({ projectId: tenantId, scenarioRunId });
+      await repositoryOver(unready).findScenarioRunData({ projectId: tenantId, scenarioRunId });
       expect(await partsAfterPartitionPruning({ query: queryRows, request: bounded })).toBeLessThan(
         await partsAfterPartitionPruning({
           query: queryRows,
@@ -251,10 +255,8 @@ describe("scenario lookups by id with the id index", () => {
   });
 
   describe("given a batch and a scenario set written eight weeks ago (the second id indexes)", () => {
-    const readyRepository = () =>
-      SimulationClickHouseRepository.create(ClickHouseScenarioSession.resolverOver(clickhouse));
-    const unreadyRepository = () =>
-      SimulationClickHouseRepository.create(ClickHouseScenarioSession.resolverOver(unready));
+    const readyRepository = () => repositoryOver(clickhouse);
+    const unreadyRepository = () => repositoryOver(unready);
     const batchRunId = `${scenarioRunId}-batch`;
     const scenarioSetId = `${scenarioRunId}-set`;
 

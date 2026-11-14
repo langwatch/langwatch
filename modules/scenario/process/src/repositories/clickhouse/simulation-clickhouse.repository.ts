@@ -1,7 +1,6 @@
 import { Buffer } from "node:buffer";
 
 import {
-  ClickHouseColumns,
   type ClickHouseQueryClient,
   type IdBoundOptions,
   queryWindowed,
@@ -31,10 +30,8 @@ import {
 } from "@langwatch/scenario-contract";
 import { nowInstant } from "@langwatch/time";
 
-import { EVALUATION_COLUMNS_SQL } from "../../rules/simulation-evaluation-columns.rules.ts";
 import { SimulationRepository } from "../simulation.repository.ts";
 import { simulationRuns } from "./clickhouse.simulation-runs.table.ts";
-import { CRITERIA_COLUMNS } from "./simulation-criteria.mapper.ts";
 import {
   type ClickHouseSimulationRunRow,
   mapClickHouseRowToScenarioRunData,
@@ -55,7 +52,9 @@ const ID_BOUND_READ: { idBound: IdBoundOptions } = { idBound: { fallback: "unbou
  * Sort key for export sweep: ORDER BY, cursor predicate and returned cursor must align or
  * silently drops/repeats boundary runs. Coalesces NULL StartedAt preventing row stranding.
  */
-const EXPORT_SORT_KEY = "toUnixTimestamp64Milli(ifNull(t.StartedAt, t.CreatedAt))";
+const exportSortKey = fn.toUnixTimestamp64Milli(
+  fn.ifNull(simulationRuns.StartedAt, simulationRuns.CreatedAt),
+);
 
 /** The keys of {@link batchAggregateFields}. SettledCount is every run not running. */
 type BatchAggregateRow = {
@@ -165,24 +164,6 @@ function batchAggregateFields(ops: RunConditionOps) {
   };
 }
 
-/** A whole run's columns, given the criteria select list its target answers. */
-const runColumns = (criteria: string) => `
-  ScenarioRunId, ScenarioId, BatchRunId, ScenarioSetId,
-  Status, Name, Description, Metadata,
-  \`Messages.Id\`, \`Messages.Role\`, \`Messages.Content\`,
-  \`Messages.TraceId\`, \`Messages.Rest\`,
-  TraceIds,
-  Verdict, Reasoning, MetCriteria, UnmetCriteria, InconclusiveCriteria, Error,
-  ${EVALUATION_COLUMNS_SQL},
-  ${criteria},
-  toString(DurationMs) AS DurationMs,
-  TotalCost, RoleCosts, RoleLatencies,
-  toString(toUnixTimestamp64Milli(StartedAt)) AS StartedAt,
-  toString(toUnixTimestamp64Milli(CreatedAt)) AS CreatedAt,
-  toString(toUnixTimestamp64Milli(UpdatedAt)) AS UpdatedAt,
-  toString(toUnixTimestamp64Milli(FinishedAt)) AS FinishedAt,
-  toString(toUnixTimestamp64Milli(ArchivedAt)) AS ArchivedAt`;
-
 /**
  * Page size ceilings for set-level list reads: the trimmed projection caps
  * at 100, a whole-conversation read caps far lower since it reads the full
@@ -216,20 +197,8 @@ interface CursorPayload {
   batchRunId: string;
 }
 
+/** One tenant's session: every read is a built statement naming its own scope (ADR-202). */
 export type SimulationClickHouseClient = {
-  query(input: {
-    query: string;
-    query_params: Record<string, string | string[] | number>;
-    format: "JSONEachRow";
-    /** A declared tenant set: one organization's projects, bound by `TenantId IN (...)`. */
-    tenantIds?: readonly string[];
-    /** Set when the read must walk every partition; see the member's cold-scan warning. */
-    SKIP_COLD_SCAN_CHECK?: true | undefined;
-    /** For a statement carrying `{{idBound}}`: a time the caller has, and today's fallback. */
-    idBound?: IdBoundOptions;
-  }): Promise<{ json<Result>(): Promise<Result[]> }>;
-  /** Absent on a bare driver client (tests): every column is then named. */
-  select?(input: Parameters<ClickHouseColumns["select"]>[0]): Promise<string>;
   /** A statement the typed builder built; it names its own tenant scope. */
   read: ClickHouseQueryClient["read"];
   /** Which columns of a table this tenant's target holds, for `fn.heldOr`. */
@@ -238,9 +207,16 @@ export type SimulationClickHouseClient = {
 
 type SimulationClickHouseClientResolver = (tenantId: string) => Promise<SimulationClickHouseClient>;
 
+/** A tenant's session per one-project read; the plain reader only for a declared project set. */
+type SimulationClickHouseClients = Readonly<{
+  sessions: SimulationClickHouseClientResolver;
+  /** Sends `tenantScope.set` reads over one organization's projects, which the caller holds. */
+  clickhouse: Pick<ClickHouseQueryClient, "read">;
+}>;
+
 export class SimulationClickHouseRepository extends SimulationRepository {
-  static create(resolveClient: SimulationClickHouseClientResolver): SimulationClickHouseRepository {
-    return new SimulationClickHouseRepository(resolveClient);
+  static create(clients: SimulationClickHouseClients): SimulationClickHouseRepository {
+    return new SimulationClickHouseRepository(clients);
   }
 
   /**
@@ -300,8 +276,13 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     return { minMs, maxMs };
   }
 
-  private constructor(private readonly resolveClient: SimulationClickHouseClientResolver) {
+  readonly #resolveClient: SimulationClickHouseClientResolver;
+  readonly #setReads: Pick<ClickHouseQueryClient, "read">;
+
+  private constructor({ sessions, clickhouse }: SimulationClickHouseClients) {
     super();
+    this.#resolveClient = sessions;
+    this.#setReads = clickhouse;
   }
 
   /** Guards against empty/missing tenantId before delegating to the injected resolver. */
@@ -309,30 +290,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     if (!tenantId) {
       throw new Error("tenantId is required for ClickHouse client resolution");
     }
-    return this.resolveClient(tenantId);
-  }
-
-  /** The criteria select list the tenant's target answers (goose 00101; NO-HOLDS). */
-  private async criteriaColumns(tenantId: string): Promise<string> {
-    const client = await this.getClient(tenantId);
-    const input = { table: TABLE_NAME, columns: CRITERIA_COLUMNS };
-    return client.select?.(input) ?? ClickHouseColumns.named(input);
-  }
-
-  private async queryRows<T>(
-    query: string,
-    params: { tenantId: string } & Record<string, string | string[]>,
-    options: { declaresFullScan?: boolean; idBound?: IdBoundOptions } = {},
-  ): Promise<T[]> {
-    const client = await this.getClient(params.tenantId);
-    const result = await client.query({
-      query,
-      query_params: params,
-      format: "JSONEachRow",
-      ...(options.declaresFullScan === true ? { SKIP_COLD_SCAN_CHECK: true as const } : {}),
-      ...(options.idBound === undefined ? {} : { idBound: options.idBound }),
-    });
-    return result.json<T>();
+    return this.#resolveClient(tenantId);
   }
 
   async findScenarioSetsData({
@@ -1084,34 +1042,12 @@ export class SimulationClickHouseRepository extends SimulationRepository {
   }
 
   async findDistinctExternalSetIds({ projectIds }: { projectIds: string[] }): Promise<Set<string>> {
-    const [firstProjectId] = projectIds;
-    if (!firstProjectId) {
-      return new Set();
-    }
-
-    // simulation_runs is a ReplacingMergeTree; fold each run to its latest
-    // version in one GROUP BY (light columns only) rather than the two-scan
-    // IN-tuple dedup. Folds on `argMax(ArchivedAt IS NULL, UpdatedAt)`, not
-    // `argMax(ArchivedAt, ...)`, since argMax skips NULL-first-arg rows and
-    // would otherwise miss a freshly un-archived run's true latest version.
-    const rows = await this.queryRows<{ ScenarioSetId: string }>(
-      `SELECT DISTINCT IF(ScenarioSetId = '', '${DEFAULT_SET_ID}', ScenarioSetId) AS ScenarioSetId
-       FROM (
-         SELECT
-           ScenarioSetId,
-           argMax(ArchivedAt IS NULL, UpdatedAt) AS latestIsActive
-         FROM ${TABLE_NAME}
-         WHERE TenantId IN ({projectIds:Array(String)})
-           AND NOT startsWith(ScenarioSetId, '${INTERNAL_SET_PREFIX}')
-           AND NOT endsWith(ScenarioSetId, '${AGENT_TEST_SET_SUFFIX}')
-           AND ScenarioSetId != '${VOICE_CALL_SCENARIO_SET_ID}'
-         GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
-       )
-       WHERE latestIsActive`,
-      { tenantId: firstProjectId, projectIds },
-    );
-
-    return new Set(rows.map((r) => (r.ScenarioSetId === "" ? DEFAULT_SET_ID : r.ScenarioSetId)));
+    if (projectIds.length === 0) return new Set();
+    const { rows } = await this.#setReads.read({
+      statement: SimulationClickHouseRepository.externalSetIdsRead({ projectIds }),
+      table: simulationRuns.$table.name,
+    });
+    return new Set(rows.map((row) => row.NormalizedSetId));
   }
 
   // ---- Export sweep ----
@@ -1122,34 +1058,20 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     scenarioId,
     startDate,
     endDate,
-  }: {
-    projectId: string;
-    scenarioSetId?: string;
-    scenarioId?: string;
-    startDate?: number;
-    endDate?: number;
-  }): Promise<number> {
-    const { stableClause, setBound, dateClause, params } = this.buildExportFilters({
-      scenarioSetId,
-      scenarioId,
-      startDate,
-      endDate,
+  }: ExportFilterInput): Promise<number> {
+    const client = await this.getClient(projectId);
+    const { rows } = await client.read({
+      statement: SimulationClickHouseRepository.exportRunCountRead({
+        projectId,
+        scenarioSetId,
+        scenarioId,
+        startDate,
+        endDate,
+      }),
+      table: simulationRuns.$table.name,
+      ...ID_BOUND_READ,
     });
-
-    const rows = await this.queryRows<{ Total: string }>(
-      `SELECT toString(count()) AS Total
-       FROM ${TABLE_NAME} AS t
-       WHERE t.TenantId = {tenantId:String}
-         ${stableClause}
-         ${setBound.outer}
-         ${dateClause}
-         AND t.ArchivedAt IS NULL
-         ${SimulationClickHouseRepository.qualifiedDedupPredicate(`TenantId = {tenantId:String} ${SimulationClickHouseRepository.unqualify(stableClause)} ${setBound.inner}`)}`,
-      { tenantId: projectId, ...params },
-      ID_BOUND_READ,
-    );
-
-    return Number(rows[0]?.Total ?? "0");
+    return Number(rows[0]?.Total ?? 0);
   }
 
   /** One project at a time, so each read routes to the tenant's server, and added up. */
@@ -1160,60 +1082,28 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     projectIds: readonly string[];
     since?: number;
   }): Promise<number> {
-    const window = (column: string) =>
-      since === undefined
-        ? ""
-        : `AND ${column} >= fromUnixTimestamp64Milli(toUInt64({since:String}))`;
     const totals = await Promise.all(
-      [...new Set(projectIds)].map(async (tenantId) => {
-        const rows = await this.queryRows<{ Total: string }>(
-          `SELECT toString(count()) AS Total
-           FROM ${TABLE_NAME} AS t
-           WHERE t.TenantId = {tenantId:String}
-             ${window("t.StartedAt")}
-             AND t.ArchivedAt IS NULL
-             AND (t.TenantId, t.ScenarioSetId, t.BatchRunId, t.ScenarioRunId, t.UpdatedAt) IN (
-               SELECT TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, max(UpdatedAt)
-               FROM ${TABLE_NAME}
-               WHERE TenantId = {tenantId:String}
-                 ${window("StartedAt")}
-               GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
-             )`,
-          since === undefined ? { tenantId } : { tenantId, since: String(since) },
-        );
-        return Number(rows[0]?.Total ?? "0");
+      [...new Set(projectIds)].map(async (projectId) => {
+        const client = await this.getClient(projectId);
+        const { rows } = await client.read({
+          statement: SimulationClickHouseRepository.usageCountRead({ projectId, since }),
+          table: simulationRuns.$table.name,
+        });
+        return Number(rows[0]?.Total ?? 0);
       }),
     );
     return totals.reduce((sum, total) => sum + total, 0);
   }
 
-  /**
-   * One read for the whole organization, routed by its first project
-   * (gateway-spend-events precedent).
-   */
+  /** One read over the organization's projects, which the caller holds. */
   async countOrganizationRuns({ projectIds }: { projectIds: readonly string[] }): Promise<number> {
     const tenantIds = [...new Set(projectIds)];
-    const [routingTenant] = tenantIds;
-    if (routingTenant === undefined) return 0;
-    const placeholders = tenantIds.map((_, i) => `{tenant${i}:String}`).join(", ");
-    const client = await this.getClient(routingTenant);
-    const result = await client.query({
-      query: `SELECT toString(count()) AS Total
-       FROM ${TABLE_NAME} AS t
-       WHERE t.TenantId IN (${placeholders})
-         AND t.ArchivedAt IS NULL
-         AND (t.TenantId, t.ScenarioSetId, t.BatchRunId, t.ScenarioRunId, t.UpdatedAt) IN (
-           SELECT TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, max(UpdatedAt)
-           FROM ${TABLE_NAME}
-           WHERE TenantId IN (${placeholders})
-           GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
-         )`,
-      query_params: Object.fromEntries(tenantIds.map((id, i) => [`tenant${i}`, id])),
-      format: "JSONEachRow",
-      tenantIds,
+    if (tenantIds.length === 0) return 0;
+    const { rows } = await this.#setReads.read({
+      statement: SimulationClickHouseRepository.organizationRunCountRead({ projectIds: tenantIds }),
+      table: simulationRuns.$table.name,
     });
-    const [row] = await result.json<{ Total: string }>();
-    return Number(row?.Total ?? "0");
+    return Number(rows[0]?.Total ?? 0);
   }
 
   /**
@@ -1228,130 +1118,45 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     endDate,
     limit,
     cursor,
-  }: {
-    projectId: string;
-    scenarioSetId?: string;
-    scenarioId?: string;
-    startDate?: number;
-    endDate?: number;
-    limit: number;
-    cursor?: string;
-  }): Promise<{
+  }: ExportFilterInput & { limit: number; cursor?: string }): Promise<{
     runs: SimulationExportRun[];
     nextCursor?: string;
     hasMore: boolean;
   }> {
-    const validatedLimit = Math.min(Math.max(1, limit), 500);
-    const decoded = cursor ? this.decodeExportCursor(cursor) : null;
-
-    const { stableClause, setBound, dateClause, params } = this.buildExportFilters({
-      scenarioSetId,
-      scenarioId,
-      startDate,
-      endDate,
+    const pageLimit = Math.min(Math.max(1, limit), 500);
+    const client = await this.getClient(projectId);
+    const holds = await client.holds({ table: simulationRuns.$table.name });
+    const { rows } = await client.read({
+      statement: SimulationClickHouseRepository.exportRunPageRead({
+        projectId,
+        scenarioSetId,
+        scenarioId,
+        startDate,
+        endDate,
+        limit: pageLimit,
+        after: cursor ? this.decodeExportCursor(cursor) : null,
+        holds,
+      }),
+      table: simulationRuns.$table.name,
+      ...ID_BOUND_READ,
     });
 
-    const cursorPredicate = decoded
-      ? `AND (
-          (${EXPORT_SORT_KEY} > toUInt64({cursorTs:String}))
-          OR (${EXPORT_SORT_KEY} = toUInt64({cursorTs:String}) AND t.ScenarioRunId > {cursorRunId:String})
-        )`
-      : "";
-
-    const criteria = await this.criteriaColumns(projectId);
-    const rows = await this.queryRows<ClickHouseSimulationRunRow & { ExportSortKey: string }>(
-      `SELECT ${runColumns(criteria)},
-        toString(${EXPORT_SORT_KEY}) AS ExportSortKey
-       FROM ${TABLE_NAME} AS t
-       WHERE t.TenantId = {tenantId:String}
-         ${stableClause}
-         ${setBound.outer}
-         ${dateClause}
-         ${cursorPredicate}
-         AND t.ArchivedAt IS NULL
-         ${SimulationClickHouseRepository.qualifiedDedupPredicate(`TenantId = {tenantId:String} ${SimulationClickHouseRepository.unqualify(stableClause)} ${setBound.inner}`)}
-       ORDER BY ${EXPORT_SORT_KEY} ASC, t.ScenarioRunId ASC
-       LIMIT {fetchLimit:UInt32}`,
-      {
-        tenantId: projectId,
-        ...params,
-        ...(decoded ? { cursorTs: decoded.ts, cursorRunId: decoded.scenarioRunId } : {}),
-        fetchLimit: String(validatedLimit + 1),
-      },
-      ID_BOUND_READ,
-    );
-
-    const hasMore = rows.length > validatedLimit;
-    const pageRows = hasMore ? rows.slice(0, validatedLimit) : rows;
-
-    const lastRow = pageRows[pageRows.length - 1];
+    const hasMore = rows.length > pageLimit;
+    const pageRows = hasMore ? rows.slice(0, pageLimit) : rows;
+    const lastRow = pageRows.at(-1);
     const nextCursor =
       hasMore && lastRow
-        ? this.encodeExportCursor(lastRow.ExportSortKey, lastRow.ScenarioRunId)
+        ? this.encodeExportCursor(String(lastRow.ExportSortKey), lastRow.ScenarioRunId)
         : undefined;
 
     return {
       runs: pageRows.map((row) => ({
-        ...mapClickHouseRowToScenarioRunData(row),
+        ...mapClickHouseRowToScenarioRunData(runRowOf(row)),
         scenarioSetId: row.ScenarioSetId === "" ? DEFAULT_SET_ID : row.ScenarioSetId,
-        traceIds: row.TraceIds ?? [],
+        traceIds: [...row.TraceIds],
       })),
       nextCursor,
       hasMore,
-    };
-  }
-
-  /**
-   * Keeps export rows and their count on one filter definition. StartedAt
-   * range applies only after the latest version wins (it changes between
-   * row versions); outcome filtering stays after mapping (run history's derived categories).
-   */
-  private buildExportFilters({
-    scenarioSetId,
-    scenarioId,
-    startDate,
-    endDate,
-  }: {
-    scenarioSetId?: string;
-    scenarioId?: string;
-    startDate?: number;
-    endDate?: number;
-  }): {
-    stableClause: string;
-    /** The set's id-index markers, outer (`t`) and inner; empty when no set narrows the read. */
-    setBound: { outer: string; inner: string };
-    dateClause: string;
-    params: Record<string, string | string[]>;
-  } {
-    const stableParts: string[] = [];
-    const params: Record<string, string | string[]> = {};
-
-    if (scenarioSetId) {
-      stableParts.push("t.ScenarioSetId IN ({exportSetIds:Array(String)})");
-      params.exportSetIds = SimulationClickHouseRepository.expandSetIdFilter(scenarioSetId);
-    }
-
-    if (scenarioId) {
-      stableParts.push("t.ScenarioId = {exportScenarioId:String}");
-      params.exportScenarioId = scenarioId;
-    }
-
-    const dateFilter = SimulationClickHouseRepository.buildDateFilter({ startDate, endDate });
-    let dateClause = "";
-    if (dateFilter.whereClause) {
-      // buildDateFilter emits unqualified column names; the export queries read
-      // through the `t` alias, so qualify them here.
-      dateClause = dateFilter.whereClause.replace(/StartedAt/g, "t.StartedAt");
-      Object.assign(params, dateFilter.params);
-    }
-
-    const exportSetBound = (alias: string) =>
-      scenarioSetId ? `{{idBound:simulation_runs.ScenarioSetId:exportSetIds${alias}}}` : "";
-    return {
-      stableClause: stableParts.length > 0 ? `AND ${stableParts.join(" AND ")}` : "",
-      setBound: { outer: exportSetBound(":t"), inner: exportSetBound("") },
-      dateClause,
-      params,
     };
   }
 
@@ -1715,6 +1520,60 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     return lastResultsReadOf(input);
   }
 
+  /** The external set ids holding a live run, over one organization's projects. */
+  static externalSetIdsRead({
+    projectIds,
+  }: {
+    projectIds: readonly string[];
+  }): ReaderReadStatement<ExternalSetIdRow> {
+    return externalSetIdsReadOf({ projectIds });
+  }
+
+  /** How many live runs one organization's projects hold, in one read. */
+  static organizationRunCountRead(input: {
+    projectIds: readonly string[];
+  }): ReaderReadStatement<RunCountRow> {
+    return organizationRunCountReadOf(input);
+  }
+
+  /** How many live runs one project started since `since`, or ever. */
+  static usageCountRead(input: {
+    projectId: string;
+    since?: number;
+  }): ReaderReadStatement<RunCountRow> {
+    return usageCountReadOf(input);
+  }
+
+  /** How many live runs the export's filters hold. */
+  static exportRunCountRead({
+    scenarioSetId,
+    ...input
+  }: ExportFilterInput): ReaderReadStatement<RunCountRow> {
+    return exportRunsOf({
+      ...input,
+      setIds: SimulationClickHouseRepository.exportSetIds(scenarioSetId),
+    })
+      .select({ Total: fn.count() })
+      .build();
+  }
+
+  /** One export page of whole runs after `after`, one row past the page when more follow. */
+  static exportRunPageRead({
+    scenarioSetId,
+    ...input
+  }: ExportPageInput): ReaderReadStatement<ExportRunRow> {
+    return exportRunPageReadOf({
+      ...input,
+      setIds: SimulationClickHouseRepository.exportSetIds(scenarioSetId),
+    });
+  }
+
+  private static exportSetIds(scenarioSetId: string | undefined): string[] | undefined {
+    return scenarioSetId
+      ? SimulationClickHouseRepository.expandSetIdFilter(scenarioSetId)
+      : undefined;
+  }
+
   private static batchesInputOf({ scenarioSetId, ...input }: BatchesRunsInput) {
     return {
       ...input,
@@ -1752,62 +1611,6 @@ export class SimulationClickHouseRepository extends SimulationRepository {
       lastUpdatedAt: Number(row.LastUpdatedAt),
       firstCompletedAt: firstCompletedAt > 0 ? firstCompletedAt : null,
       allCompletedAt: allCompletedAt > 0 ? allCompletedAt : null,
-    };
-  }
-
-  /**
-   * Dedup predicate with `t.`-qualified outer columns (runColumns aliases timestamps).
-   * Unqualified columns silently match zero rows instead of erroring.
-   */
-  private static qualifiedDedupPredicate(whereFilters: string): string {
-    return `AND (t.TenantId, t.ScenarioSetId, t.BatchRunId, t.ScenarioRunId, t.UpdatedAt) IN (
-      SELECT TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, max(UpdatedAt)
-      FROM ${TABLE_NAME}
-      WHERE ${whereFilters}
-      GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
-    )`;
-  }
-
-  /**
-   * Strips the `t.` qualifier for reuse inside the dedup subquery, which selects
-   * from the bare table and has no such alias in scope.
-   */
-  private static unqualify(clause: string): string {
-    return clause.replace(/\bt\./g, "");
-  }
-
-  /**
-   * Date filters: `whereClause` filters StartedAt for partition pruning (skips cold storage scans).
-   * `havingClause` filters max(CreatedAt) post-aggregation for exact edge cases.
-   */
-  private static buildDateFilter({
-    startDate,
-    endDate,
-  }: {
-    startDate?: number;
-    endDate?: number;
-  }): {
-    havingClause: string | null;
-    whereClause: string;
-    params: Record<string, string>;
-  } {
-    const havingParts: string[] = [];
-    const whereParts: string[] = [];
-    const params: Record<string, string> = {};
-    if (startDate !== undefined) {
-      havingParts.push("toUnixTimestamp64Milli(max(CreatedAt)) >= toUInt64({startDateMs:String})");
-      whereParts.push("StartedAt >= fromUnixTimestamp64Milli(toUInt64({startDateMs:String}))");
-      params.startDateMs = String(startDate);
-    }
-    if (endDate !== undefined) {
-      havingParts.push("toUnixTimestamp64Milli(max(CreatedAt)) <= toUInt64({endDateMs:String})");
-      whereParts.push("StartedAt <= fromUnixTimestamp64Milli(toUInt64({endDateMs:String}))");
-      params.endDateMs = String(endDate);
-    }
-    return {
-      havingClause: havingParts.length > 0 ? havingParts.join(" AND ") : null,
-      whereClause: whereParts.length > 0 ? `AND ${whereParts.join(" AND ")}` : "",
-      params,
     };
   }
 }
@@ -2364,7 +2167,7 @@ type LastResultRow =
 /**
  * Duration and cost ride the same argMax as the verdict, stringified with '' for NULL first: an
  * aggregate over the raw Nullable column would skip NULL rows and serve an older run's value for
- * a latest run that has none yet. The set exclusion repeats in the election.
+ * a latest run that has none yet. The set exclusion, and named scenarios, repeat in the election.
  */
 function lastResultsReadOf({
   projectId,
@@ -2379,6 +2182,8 @@ function lastResultsReadOf({
 }) {
   const t = simulationRuns;
   const latest = t.UpdatedAt;
+  // A run keeps its ScenarioId across versions, so naming scenarios narrows the election too.
+  const named = scenarioIds === undefined ? [] : [t.ScenarioId];
   let read = clickhouseRead({ scope: tenantScope.single({ tenantId: projectId }) })
     .from(t)
     .select({
@@ -2399,7 +2204,129 @@ function lastResultsReadOf({
   return read
     .where((ops) => notAgentTestRun(ops))
     .where(({ isNull }) => isNull(t.ArchivedAt))
-    .latestVersion({ repeat: [t.ScenarioSetId] })
+    .latestVersion({ repeat: [t.ScenarioSetId, ...named] })
     .groupBy(t.ScenarioId)
+    .build();
+}
+
+/** A row of {@link SimulationClickHouseRepository.externalSetIdsRead}. */
+type ExternalSetIdRow =
+  ReturnType<typeof externalSetIdsReadOf> extends ReaderReadStatement<infer Row> ? Row : never;
+
+/**
+ * Each run folded to its latest version over light columns, its set kept when that version is
+ * live. Folds `isNull(ArchivedAt)`, not ArchivedAt: argMax skips a NULL first argument and would
+ * miss a freshly un-archived run's latest version.
+ */
+function externalSetIdsReadOf({ projectIds }: { projectIds: readonly string[] }) {
+  const t = simulationRuns;
+  const scope = tenantScope.set({ tenantIds: projectIds });
+  const runs = clickhouseRead({ scope })
+    .from(t)
+    .select(({ isNull }) => ({
+      NormalizedSetId: normalizedSetId,
+      LatestIsActive: fn.argMax(isNull(t.ArchivedAt), t.UpdatedAt),
+    }))
+    .where((ops) =>
+      ops.and(ops.not(fn.startsWith(t.ScenarioSetId, INTERNAL_SET_PREFIX)), notAgentTestRun(ops)),
+    )
+    .groupBy(t.TenantId, t.ScenarioSetId, t.BatchRunId, t.ScenarioRunId)
+    .as("runs");
+  return clickhouseRead({ scope })
+    .from(runs)
+    .select({ NormalizedSetId: runs.NormalizedSetId })
+    .where(() => runs.LatestIsActive)
+    .distinct()
+    .build();
+}
+
+/** A row of a live-run count. */
+type RunCountRow =
+  ReturnType<typeof organizationRunCountReadOf> extends ReaderReadStatement<infer Row>
+    ? Row
+    : never;
+
+function organizationRunCountReadOf({ projectIds }: { projectIds: readonly string[] }) {
+  const t = simulationRuns;
+  return clickhouseRead({ scope: tenantScope.set({ tenantIds: projectIds }) })
+    .from(t)
+    .select({ Total: fn.count() })
+    .where(({ isNull }) => isNull(t.ArchivedAt))
+    .latestVersion()
+    .build();
+}
+
+/** The window repeats in the election, as StartedAt is the partition key. */
+function usageCountReadOf({ projectId, since }: { projectId: string; since?: number }) {
+  const t = simulationRuns;
+  let read = clickhouseRead({ scope: tenantScope.single({ tenantId: projectId }) })
+    .from(t)
+    .select({ Total: fn.count() });
+  if (since !== undefined) read = read.where(({ gte }) => gte(t.StartedAt, since));
+  return read
+    .where(({ isNull }) => isNull(t.ArchivedAt))
+    .latestVersion()
+    .build();
+}
+
+type ExportFilterInput = {
+  projectId: string;
+  scenarioSetId?: string;
+  scenarioId?: string;
+  startDate?: number;
+  endDate?: number;
+};
+
+type ExportPageInput = ExportFilterInput & {
+  limit: number;
+  after: { ts: string; scenarioRunId: string } | null;
+  holds: (name: string) => boolean;
+};
+
+type ExportReadInput = Omit<ExportFilterInput, "scenarioSetId"> & { setIds: string[] | undefined };
+
+/**
+ * The export's live runs: the set and scenario repeat in the election; the StartedAt range
+ * applies only after the latest version wins, since it changes between a run's versions.
+ */
+function exportRunsOf({ projectId, setIds, scenarioId, startDate, endDate }: ExportReadInput) {
+  const t = simulationRuns;
+  const outside = { inElection: false };
+  let read = clickhouseRead({ scope: tenantScope.single({ tenantId: projectId }) }).from(t);
+  if (setIds !== undefined) read = read.where(({ idBound }) => idBound(t.ScenarioSetId, setIds));
+  if (scenarioId) read = read.where(({ eq }) => eq(t.ScenarioId, scenarioId));
+  if (startDate !== undefined) read = read.where(({ gte }) => gte(t.StartedAt, startDate), outside);
+  if (endDate !== undefined) read = read.where(({ lte }) => lte(t.StartedAt, endDate), outside);
+  return read.where(({ isNull }) => isNull(t.ArchivedAt)).latestVersion({ repeat: [t.ScenarioId] });
+}
+
+/** A row of {@link SimulationClickHouseRepository.exportRunPageRead}. */
+type ExportRunRow =
+  ReturnType<typeof exportRunPageReadOf> extends ReaderReadStatement<infer Row> ? Row : never;
+
+/** Whole runs in sort-key order after the cursor; one row past the page tells more follow. */
+function exportRunPageReadOf({
+  holds,
+  limit,
+  after,
+  ...filters
+}: Omit<ExportPageInput, "scenarioSetId"> & { setIds: string[] | undefined }) {
+  const t = simulationRuns;
+  let read = exportRunsOf(filters).select({ ...runFieldsOf(holds), ExportSortKey: exportSortKey });
+  if (after !== null) {
+    const ts = Number(after.ts);
+    read = read.where(
+      ({ and, eq, gt, or }) =>
+        or(
+          gt(exportSortKey, ts),
+          and(eq(exportSortKey, ts), gt(t.ScenarioRunId, after.scenarioRunId)),
+        ),
+      { inElection: false },
+    );
+  }
+  return read
+    .orderBy(exportSortKey, "ASC")
+    .orderBy(t.ScenarioRunId, "ASC")
+    .limit(limit + 1)
     .build();
 }

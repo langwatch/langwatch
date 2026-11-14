@@ -11,8 +11,8 @@ import { targetKeyOf, type SuiteTarget } from "@langwatch/suite-contract";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { SimulationClickHouseRepository } from "../simulation-clickhouse.repository.ts";
-import { scenarioClickHouseOver } from "./simulation-clickhouse-rows.fixture.ts";
+import type { SimulationClickHouseRepository } from "../simulation-clickhouse.repository.ts";
+import { simulationRepositoryOver } from "./simulation-clickhouse-rows.fixture.ts";
 
 const configuredClickHouseUrl = process.env.TEST_CLICKHOUSE_URL ?? process.env.CI_CLICKHOUSE_URL;
 const databaseUrl = configuredClickHouseUrl ? new URL(configuredClickHouseUrl) : null;
@@ -105,7 +105,7 @@ beforeAll(() => {
     url: databaseUrl,
     clickhouse_settings: { date_time_input_format: "best_effort" },
   });
-  repository = SimulationClickHouseRepository.create(scenarioClickHouseOver(client));
+  repository = simulationRepositoryOver(client);
 });
 
 afterAll(async () => {

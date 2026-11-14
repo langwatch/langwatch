@@ -12,9 +12,8 @@ type SentRead = { sql: string; kind: string; declaresFullScan?: true | undefined
 /** The repository over the real session adapter, keeping each built read that reaches it. */
 function compose() {
   const sent: SentRead[] = [];
-  const repository = SimulationClickHouseRepository.create(
-    ClickHouseScenarioSession.resolverOver({
-      query: () => Promise.reject(new Error("the set list is a built read")),
+  const repository = SimulationClickHouseRepository.create({
+    sessions: ClickHouseScenarioSession.resolverOver({
       columns: () => {
         throw new Error("the set list names its columns");
       },
@@ -23,7 +22,8 @@ function compose() {
         return { rows: [] };
       },
     }),
-  );
+    clickhouse: { read: () => Promise.reject(new Error("the set list is one tenant's")) },
+  });
   return { repository, sent };
 }
 
