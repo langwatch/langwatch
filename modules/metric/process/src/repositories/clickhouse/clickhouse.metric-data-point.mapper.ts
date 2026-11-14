@@ -1,11 +1,12 @@
 import { EventUtils, SecurityError } from "@langwatch/eventing";
 import type {
+  aggregationTemporalitySchema,
   MetricRollupSourcePoint,
   MetricSequencePoint,
   CanonicalMetricDataPoint,
   MetricRollupRow,
+  metricKindSchema,
 } from "@langwatch/metric-contract";
-import { aggregationTemporalitySchema, metricKindSchema } from "@langwatch/metric-contract";
 import { Temporal, toDate } from "@langwatch/time";
 import { z } from "zod";
 
@@ -27,6 +28,11 @@ const MAX_UINT64 = 18_446_744_073_709_551_615n;
 /** A UInt64 or Int64 cell: JSON quotes 64-bit integers unless the server is told otherwise. */
 const wideInteger = z.union([z.string(), z.number()]);
 
+/** Enum cells pass through unchecked, as main read them: a rollup never stops on an old row. */
+const storedMetricKind = z.custom<z.infer<typeof metricKindSchema>>();
+const storedTemporality = z.custom<z.infer<typeof aggregationTemporalitySchema>>();
+const storedValueType = z.custom<CanonicalMetricDataPoint["valueType"]>();
+
 /**
  * A row of the seek selection (clickhouse.metric-data-point-query.mapper.ts): order, bucket and
  * predecessor dependency only. `TimeMs` is TimeUnixMs as epoch milliseconds.
@@ -36,8 +42,8 @@ export const seekMetricRowSchema = z.object({
   PointId: z.string(),
   TimeMs: wideInteger,
   TimeUnixNano: wideInteger,
-  MetricKind: metricKindSchema,
-  AggregationTemporality: aggregationTemporalitySchema,
+  MetricKind: storedMetricKind,
+  AggregationTemporality: storedTemporality,
 });
 export type SeekMetricRow = z.infer<typeof seekMetricRowSchema>;
 
@@ -52,13 +58,13 @@ export const rollupSourceRowSchema = z.object({
   SeriesId: z.string(),
   MetricName: z.string(),
   MetricUnit: z.string(),
-  MetricKind: metricKindSchema,
-  AggregationTemporality: aggregationTemporalitySchema,
+  MetricKind: storedMetricKind,
+  AggregationTemporality: storedTemporality,
   IsMonotonic: z.union([z.boolean(), z.number()]).nullable(),
   StartTimeUnixNano: wideInteger,
   TimeUnixNano: wideInteger,
   TimeMs: wideInteger,
-  ValueType: z.enum(["none", "int", "double"]),
+  ValueType: storedValueType,
   ValueInt: wideInteger.nullable(),
   ValueDouble: z.number().nullable(),
   Count: wideInteger.nullable(),
@@ -77,7 +83,6 @@ export const rollupSourceRowSchema = z.object({
   DedupVersion: wideInteger,
 });
 export type RollupSourceRow = z.infer<typeof rollupSourceRowSchema>;
-
 
 /**
  * One of the three Array(UInt64) count columns, refusing rows without it. Validates

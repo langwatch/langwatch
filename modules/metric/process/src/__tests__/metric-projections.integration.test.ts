@@ -6,6 +6,7 @@ import { randomUUID } from "node:crypto";
  * The pipeline's three map projections over one point, against the migrated ClickHouse schema.
  */
 import type { ClickHouseClient } from "@clickhouse/client";
+import { vendorQueryClient } from "@langwatch/clickhouse-client/testing";
 import { createTenantId } from "@langwatch/eventing";
 import {
   METRIC_DATA_POINT_RECEIVED_EVENT_TYPE,
@@ -48,16 +49,7 @@ let ch: ClickHouseClient;
 function metricClient(client: ClickHouseClient): MetricClickHouseClient {
   return {
     insert: async (params) => client.insert(params),
-    query: async ({ SKIP_TENANT_CHECK: _skip, ...params }) => {
-      const resultSet = await client.query(params);
-      return {
-        json: async <T>(): Promise<T[]> => {
-          const parsed = await resultSet.json<T>();
-          if (!Array.isArray(parsed)) throw new Error("Expected a JSONEachRow row array");
-          return parsed;
-        },
-      };
-    },
+    read: (input) => vendorQueryClient({ vendor: client, indexes: [] }).read(input),
   };
 }
 

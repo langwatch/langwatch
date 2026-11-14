@@ -10,6 +10,7 @@ import {
   type ConditionOps,
   fn,
   param,
+  type ReaderReadStatement,
   type SingleTenantScope,
   tenantScope,
 } from "@langwatch/clickhouse-client/builder";
@@ -87,7 +88,7 @@ export function bucketRangeStatement({
   tenantId: string;
   lookbackMs: number;
   ranges: readonly BucketReadRange[];
-}) {
+}): ReaderReadStatement {
   const lookback = param.int64(lookbackMs);
   const bucket = param.int64(METRIC_ROLLUP_INTERVAL_MS);
   return clickhouseRead({ scope: scopeOf(tenantId) })
@@ -98,7 +99,10 @@ export function bucketRangeStatement({
         ...ranges.map(({ seriesId, from, to }) =>
           and(
             eq(points.SeriesId, seriesId),
-            gte(points.TimeUnixMs, fn.fromUnixTimestamp64Milli(fn.minus(param.int64(from), lookback))),
+            gte(
+              points.TimeUnixMs,
+              fn.fromUnixTimestamp64Milli(fn.minus(param.int64(from), lookback)),
+            ),
             lt(points.TimeUnixMs, fn.fromUnixTimestamp64Milli(fn.plus(param.int64(to), bucket))),
           ),
         ),
@@ -148,7 +152,7 @@ export function farPredecessorStatement({
   tenantId: string;
   seeks: readonly [BucketSeek, ...BucketSeek[]];
   predecessor: { fromMs: number; toMs: number };
-}) {
+}): ReaderReadStatement {
   const scope = scopeOf(tenantId);
   const fromAgo = param.int64(predecessor.fromMs);
   const toAgo = param.int64(predecessor.toMs);
@@ -180,7 +184,7 @@ export function payloadStatement({
 }: {
   tenantId: string;
   windows: readonly SeriesWindow[];
-}) {
+}): ReaderReadStatement {
   return clickhouseRead({ scope: scopeOf(tenantId) })
     .from(points)
     .select(payloadSelection)
@@ -209,7 +213,7 @@ export function successorSeekStatement({
 }: {
   tenantId: string;
   spans: readonly SeekSpan[];
-}) {
+}): ReaderReadStatement {
   const scope = scopeOf(tenantId);
   const seriesIds = param.strings(spans.map((span) => span.seriesId));
   const rows = boundRows({
@@ -255,7 +259,15 @@ export function successorSeekStatement({
 
   type SeekOps = ConditionOps<"series_points" | "spans", Record<never, never>>;
   /** (SeekTime, TimeUnixNano, PointId) strictly past one end of the joined span. */
-  const past = ({ ops, beyond, end }: { ops: SeekOps; beyond: "gt" | "lt"; end: "From" | "To" }) => {
+  const past = ({
+    ops,
+    beyond,
+    end,
+  }: {
+    ops: SeekOps;
+    beyond: "gt" | "lt";
+    end: "From" | "To";
+  }) => {
     const { and, eq, or } = ops;
     const [time, nano, point] =
       end === "From"

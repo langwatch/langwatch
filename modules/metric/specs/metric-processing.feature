@@ -37,6 +37,19 @@ Feature: Canonical OTLP metric processing
     Then each read is a typed-builder statement on the reader identity
     And it names only that tenant, in its predicate and in its tenant setting
 
+  @integration
+  Scenario: The built seek reads return the rows the hand-written reads returned
+    Given two tenants on a migrated server whose points share series ids
+    When the successor, bucket-range and far-predecessor reads run as built statements
+    Then each returns the rows its hand-written predecessor returned
+    And none returns a row of the other tenant
+
+  @integration
+  Scenario: The metric_data_points descriptor matches the migrated schema
+    Given the shipped migrations applied to a ClickHouse server
+    When the metric_data_points descriptor is compared with the table's columns
+    Then every stored column is declared, binding as its stored type
+
   @unit
   Scenario: Canonical metric identity and retries are stable
     Given the same tenant submits the same canonical metric point twice

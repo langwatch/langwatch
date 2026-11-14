@@ -80,13 +80,7 @@ function refusingClient(): MetricClickHouseClient {
     insert: async () => {
       throw REFUSED;
     },
-    query: async () => ({
-      json: async <Row>() => {
-        const rows: Row[] = [];
-
-        return rows;
-      },
-    }),
+    read: async () => ({ rows: [] }),
   };
 }
 

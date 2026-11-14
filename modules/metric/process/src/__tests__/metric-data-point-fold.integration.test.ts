@@ -7,6 +7,7 @@ import { randomUUID } from "node:crypto";
  * multi-series handling; verifies data point landing and affected-bucket computation.
  */
 import type { ClickHouseClient } from "@clickhouse/client";
+import { vendorQueryClient } from "@langwatch/clickhouse-client/testing";
 import {
   METRIC_ROLLUP_INTERVAL_MS,
   type CanonicalMetricDataPoint,
@@ -24,26 +25,13 @@ let ch: ClickHouseClient;
 let repo: ClickHouseMetricDataPointAppendRepository;
 
 /**
- * The narrow port the repository takes, over the real client. The port carries
- * the tenant-scope escape hatch the driver knows nothing about, so the two
- * shapes are related by this delegation rather than by a cast.
+ * The narrow port the repository takes, over the real client: inserts go to the
+ * driver, reads through the vendor reader with the tenant setting.
  */
 function metricClient(client: ClickHouseClient): MetricClickHouseClient {
   return {
     insert: async (params) => client.insert(params),
-    query: async ({ SKIP_TENANT_CHECK: _skip, ...params }) => {
-      const resultSet = await client.query(params);
-      return {
-        json: async <T>(): Promise<T[]> => {
-          // Every statement this port issues asks for JSONEachRow, which parses
-          // to rows. The driver's return type also admits the single-object
-          // formats, so anything else here is a caller bug worth failing on.
-          const parsed = await resultSet.json<T>();
-          if (!Array.isArray(parsed)) throw new Error("Expected a JSONEachRow row array");
-          return parsed;
-        },
-      };
-    },
+    read: (input) => vendorQueryClient({ vendor: client, indexes: [] }).read(input),
   };
 }
 
@@ -344,9 +332,9 @@ describe("given a cumulative series long enough to span several rollup buckets",
       reads = 0;
       const delegate = metricClient(ch);
       const counting: MetricClickHouseClient = {
-        query: async (args) => {
+        read: async (args) => {
           reads += 1;
-          return delegate.query(args);
+          return delegate.read(args);
         },
         insert: async (args) => delegate.insert(args),
       };

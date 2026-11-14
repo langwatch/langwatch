@@ -61,7 +61,7 @@ describe("given the metric ClickHouse repository over a recording client", () =>
       insert: async ({ table, values }) => {
         if (table === "metric_data_points") rows += values.length;
       },
-      query: async () => ({ json: async () => [] }),
+      read: async () => ({ rows: [] }),
     };
     const repository = ClickHouseMetricDataPointAppendRepository.create({
       resolveClient: async () => client,

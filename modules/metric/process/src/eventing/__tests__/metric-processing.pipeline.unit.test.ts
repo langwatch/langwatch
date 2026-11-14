@@ -8,7 +8,7 @@ import { buildMetricProcessingPipeline } from "../metric.pipeline.ts";
 function client(overrides: Partial<MetricClickHouseClient> = {}): MetricClickHouseClient {
   return {
     insert: async () => undefined,
-    query: async () => ({ json: async () => [] }),
+    read: async () => ({ rows: [] }),
     ...overrides,
   };
 }

@@ -1,4 +1,5 @@
 import { formatQueryParams } from "@clickhouse/client/dist/common";
+import type { ReaderReadStatement } from "@langwatch/clickhouse-client/builder";
 import type { CanonicalMetricDataPoint } from "@langwatch/metric-contract";
 import { METRIC_ROLLUP_INTERVAL_MS } from "@langwatch/metric-contract";
 import { describe, expect, it, vi, type Mock } from "vitest";
@@ -8,7 +9,6 @@ import {
   ClickHouseMetricDataPointAppendRepository,
   type MetricClickHouseClient,
 } from "../clickhouse.metric-data-point-append.repository.ts";
-import type { ReaderReadStatement } from "@langwatch/clickhouse-client/builder";
 
 type InsertCall = { table: string; values: readonly unknown[] };
 
@@ -38,7 +38,8 @@ function client({
   onQuery?: (query: string) => unknown[];
   query?: Query;
 } = {}): MetricClickHouseClient {
-  const query: Query = queryOverride ?? (async ({ query: sql }) => response(onQuery?.(sql) ?? rows));
+  const query: Query =
+    queryOverride ?? (async ({ query: sql }) => response(onQuery?.(sql) ?? rows));
   return {
     insert,
     read: async ({ statement }) => {
