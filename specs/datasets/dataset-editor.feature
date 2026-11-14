@@ -22,6 +22,36 @@ Feature: Dataset editor
     And I see one column per dataset column
     And long cell values are clamped with a fade instead of stretching the row
 
+  Rule: Every column stays wide enough to read, however many there are
+    # Thirty columns once shared one card width, one letter per line.
+
+    @integration
+    Scenario: A dataset with many columns scrolls sideways instead of squeezing them
+      Given the dataset has thirty columns
+      When I open the dataset in the editor
+      Then no column is narrower than its minimum width
+      And the grid scrolls sideways to reach the last column
+
+    @integration
+    Scenario: A dataset with few columns still fills the grid
+      When I open the dataset in the editor
+      Then the columns share the grid's full width
+      And the grid does not scroll sideways
+
+    @integration
+    Scenario: A column name too long for its header is cut short, not overlapped
+      Given a column is named "gold_skill_reason_for_the_thread_analysis"
+      When I open the dataset in the editor
+      Then its header shows the name on one line ending in an ellipsis
+      And hovering the header shows the full name
+
+    @integration
+    Scenario: Moving with the keyboard to a column off screen scrolls it into view
+      Given the dataset has thirty columns
+      And a cell in the first column is selected
+      When I press Tab until the last column is selected
+      Then the selected cell is scrolled into view
+
   @integration @unimplemented
   Scenario: Large datasets stay responsive
     Given the dataset has thousands of records

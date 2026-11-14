@@ -125,6 +125,91 @@ describe("given an in-memory dataset", () => {
     });
   });
 
+  describe("when the dataset has thirty columns", () => {
+    const thirtyColumns: DatasetColumns = Array.from({ length: 30 }, (_, i) => ({
+      name: `column_${i}`,
+      type: "string",
+    }));
+    const renderWide = () =>
+      renderInMemory({
+        inMemoryDataset: {
+          name: "Wide",
+          columnTypes: thirtyColumns,
+          datasetRecords: [{ id: "r1", column_0: "hello" }],
+        },
+      });
+
+    /** @scenario A dataset with many columns scrolls sideways instead of squeezing them */
+    it("floors the grid at a minimum width per column so it scrolls sideways", () => {
+      renderWide();
+
+      const grid = screen.getByTestId("dataset-editor-grid");
+      const columns = grid.querySelectorAll("colgroup col");
+      expect(columns).toHaveLength(31);
+      const floor = Number.parseInt(grid.style.minWidth, 10);
+      expect(floor).toBeGreaterThanOrEqual(30 * 160);
+      expect(getComputedStyle(grid.parentElement!).overflowX).toBe("auto");
+    });
+
+    /** @scenario Moving with the keyboard to a column off screen scrolls it into view */
+    it("scrolls each cell the keyboard selects into view", async () => {
+      // jsdom has no scrollIntoView to spy on until one is defined.
+      if (!(Element.prototype as { scrollIntoView?: unknown }).scrollIntoView) {
+        Element.prototype.scrollIntoView = () => {};
+      }
+      const scrollIntoView = vi
+        .spyOn(Element.prototype, "scrollIntoView")
+        .mockImplementation(() => {});
+      try {
+        const user = userEvent.setup();
+        renderWide();
+
+        await user.click(screen.getByText("hello"));
+        for (let i = 0; i < 29; i++) await user.keyboard("{Tab}");
+
+        const lastColumnIndex = 30;
+        const row = screen.getByText("hello").closest("tr")!;
+        const lastCell = row.querySelectorAll("td")[lastColumnIndex];
+        expect(scrollIntoView.mock.contexts.at(-1)).toBe(lastCell);
+      } finally {
+        scrollIntoView.mockRestore();
+      }
+    });
+  });
+
+  describe("when the dataset has two columns", () => {
+    /** @scenario A dataset with few columns still fills the grid */
+    it("keeps the grid at the card's full width with a floor below it", () => {
+      renderInMemory();
+
+      const grid = screen.getByTestId("dataset-editor-grid");
+      expect(getComputedStyle(grid).width).toBe("100%");
+      expect(Number.parseInt(grid.style.minWidth, 10)).toBeLessThan(600);
+    });
+  });
+
+  describe("when a column name is too long for its header", () => {
+    /** @scenario A column name too long for its header is cut short, not overlapped */
+    it("truncates the name on one line and offers the full name on hover", () => {
+      const longName = "gold_skill_reason_for_the_thread_analysis";
+      renderInMemory({
+        inMemoryDataset: {
+          name: "Long",
+          columnTypes: [{ name: longName, type: "string" }],
+          datasetRecords: [{ id: "r1", [longName]: "x" }],
+        },
+      });
+
+      const label = screen.getByText(longName);
+      expect(label.closest("th")).toHaveAttribute("title", longName);
+      expect(getComputedStyle(label).textOverflow).toBe("ellipsis");
+      expect(getComputedStyle(label).whiteSpace).toBe("nowrap");
+      // A flex child only shrinks below its text with min-width 0, at every level.
+      expect(getComputedStyle(label).minWidth).toBe("0px");
+      expect(getComputedStyle(label.parentElement!).minWidth).toBe("0px");
+    });
+  });
+
   describe("when the page hands the editor a header slot", () => {
     it("puts the count and buttons in the slot and keeps the grid outside it", () => {
       const slot = document.createElement("div");
