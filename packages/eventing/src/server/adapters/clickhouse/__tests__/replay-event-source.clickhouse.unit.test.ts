@@ -5,6 +5,7 @@ import {
   type EventingClickHouseReplayClient,
   getAggregateOccurredAtBounds,
 } from "@langwatch/eventing/server";
+import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { describe, expect, it, vi } from "vitest";
 
 import type { ReplayEvent } from "../../../../replay/replayEventSource.ts";
@@ -172,14 +173,15 @@ describe("streamSliceOrHalves", () => {
     Object.assign(new Error("Memory limit (total) exceeded: would use 3.3 GiB"), { code: "241" });
 
   function slice(
-    stream: (request: { params?: Record<string, unknown> }) => AsyncIterable<ClickHouseEventRow[]>,
+    stream: (request: { params?: Record<string, unknown> }) => AsyncGenerator<ClickHouseEventRow[]>,
   ) {
     const applied: string[] = [];
-    const client: EventingClickHouseReplayClient = {
-      query: vi.fn().mockResolvedValue({ rows: [] }),
-      stream: vi.fn().mockImplementation(stream),
-      command: vi.fn().mockResolvedValue(undefined),
-    };
+    const client = clickHouseQueryClientDouble({
+      query: async () => ({ rows: [] }),
+      stream: async function* (request) {
+        yield* stream(request);
+      },
+    });
     const read = {
       client,
       tenantId: "project_a",
