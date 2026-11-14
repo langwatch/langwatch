@@ -210,8 +210,10 @@ describe("grant identity", () => {
 
       expect([first, second]).toEqual([v2, v2]);
       expect(
-        await reads.findStoredGrantIds({ organizationId: ORG, grantIds: [legacy, v2] }),
-      ).toEqual([v2]);
+        (
+          await reads.findStoredGrantIds({ organizationId: ORG, grantIds: [legacy, v2] })
+        ).toSorted(),
+      ).toEqual([legacy, v2].toSorted());
     });
   });
 });

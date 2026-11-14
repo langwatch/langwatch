@@ -84,29 +84,3 @@ describe("generateDeterministicSpanRecordIdFromData", () => {
     });
   });
 });
-
-describe("generateDeterministicTraceSummaryIdFromData", () => {
-  const previous = getEnvironment();
-  beforeAll(() => setEnvironment("local"));
-  afterAll(() => setEnvironment(previous));
-
-  describe.each(["v1-legacy", "v2"] as const)("when the stored layout is %s", (layout) => {
-    it.each(cases)("derives the id in that layout for $tenantId", (input) => {
-      const id = SpanRecordIdentityService.create().generateDeterministicTraceSummaryIdFromData({
-        tenantId: input.tenantId,
-        traceId: input.traceId,
-        startTimeUnixMs: input.startTimeUnixMs,
-        layout,
-      });
-      expect(id).toBe(
-        derivedId({
-          resource: "tracesummary",
-          hashKey: `${input.tenantId}:${input.traceId}`,
-          timestampMs: input.startTimeUnixMs,
-          layout,
-        }),
-      );
-      expect(parse(id).layout).toBe(layout);
-    });
-  });
-});

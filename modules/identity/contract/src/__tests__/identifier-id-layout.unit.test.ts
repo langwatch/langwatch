@@ -8,11 +8,17 @@ const USER = "user_sam";
 // Low 16 bits non-zero, so the legacy and v2 spellings differ.
 const SECONDS = 1_690_000_123;
 
-function identifierId({ layout }: { layout: KsuidLayout }): string {
+function identifierId({
+  layout,
+  timestamp = SECONDS,
+}: {
+  layout: KsuidLayout;
+  timestamp?: number;
+}): string {
   return new Ksuid({
     environment: "prod",
     resource: "idf",
-    timestamp: SECONDS,
+    timestamp,
     instance: new Instance(Instance.schemes.RANDOM, new Uint8Array(8).fill(7)),
     sequenceId: 42,
     layout,
@@ -69,5 +75,12 @@ describe("reduceIdentity across id layouts", () => {
     ]);
 
     expect(Object.keys(heads.identifiers)).toEqual([v2]);
+  });
+
+  it("folds a v2 id past 2106, which has no legacy spelling, under its own id", () => {
+    const late = identifierId({ layout: "v2", timestamp: 2 ** 32 + 0x1234 });
+    const heads = fold([attached({ id: late, occurredAt: SECONDS * 1000 })]);
+
+    expect(Object.keys(heads.identifiers)).toEqual([late]);
   });
 });

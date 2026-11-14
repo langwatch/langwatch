@@ -11,15 +11,13 @@ import {
 import { OtlpTraceRequestService } from "./otlp-trace-request.ts";
 
 /**
- * KSUID resource prefixes for the two identifiers this module mints. The
- * literals are the identity of every span record and trace-summary row
- * ever written, so they are pinned here rather than derived.
+ * KSUID resource prefix for span records. The literal is the identity of
+ * every span record ever written, so it is pinned here rather than derived.
  */
 const SPAN_KSUID_RESOURCE = "span";
-const TRACE_SUMMARY_KSUID_RESOURCE = "tracesummary";
 
 /**
- * Deterministic identities for a span record and its trace summary.
+ * Deterministic identities for a span record.
  * Derived, never random, so a redelivered span replaces the earlier row
  * instead of landing beside it. The KSUID's timestamp is the span's own.
  */
@@ -104,49 +102,6 @@ export class SpanRecordIdentityService {
       resource: SPAN_KSUID_RESOURCE,
       timestampMs: startTimeUnixMs,
       layout: "v2",
-    });
-  }
-
-  /** `layout` is the stored summary row's own; a trace never stored takes "v2" (#9575). */
-  generateDeterministicTraceSummaryId({
-    event,
-    layout,
-  }: {
-    event: SpanReceivedEvent;
-    layout: KsuidLayout;
-  }): string {
-    const { traceId } = OtlpTraceRequestService.normalizeOtlpSpanIds(event.data.span);
-    const startTimeUnixMs = convertUnixNanoToUnixMs(
-      normalizeOtlpUnixNano(event.data.span.startTimeUnixNano),
-    );
-
-    return this.generateDeterministicTraceSummaryIdFromData({
-      tenantId: String(event.tenantId),
-      traceId,
-      startTimeUnixMs,
-      layout,
-    });
-  }
-
-  /** `layout` is the stored summary row's own; a trace never stored takes "v2" (#9575). */
-  generateDeterministicTraceSummaryIdFromData({
-    tenantId,
-    traceId,
-    startTimeUnixMs,
-    layout,
-  }: {
-    tenantId: string;
-    traceId: string;
-    startTimeUnixMs: number;
-    layout: KsuidLayout;
-  }): string {
-    checkTenantIsolation({ tenantId, operation: "generateDeterministicTraceSummaryIdFromData" });
-
-    return this.makeDeterministicKsuid({
-      hashKey: `${tenantId}:${traceId}`,
-      resource: TRACE_SUMMARY_KSUID_RESOURCE,
-      timestampMs: startTimeUnixMs,
-      layout,
     });
   }
 }
