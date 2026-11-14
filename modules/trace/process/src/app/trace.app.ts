@@ -365,10 +365,7 @@ import {
 } from "../features/span/services/span-cost-suggestion.service.ts";
 import { SpanCostService } from "../features/span/services/span-cost.service.ts";
 import { TraceTopicClusteringReadService } from "../features/topic/services/trace-topic-clustering-read.service.ts";
-import {
-  ResolverTraceClickHouse,
-  type TraceClickHouseResolver,
-} from "../repositories/clickhouse/clickhouse.trace-member-client.repository.ts";
+import type { TraceClickHouseResolver } from "../repositories/clickhouse/clickhouse.trace-member-client.repository.ts";
 import { ClickHouseTraceFullRecordRepository } from "../repositories/clickhouse/trace-full-record.repository.ts";
 import type { SpanAnalyticsFloorRepository } from "../repositories/span-analytics-floor.repository.ts";
 import type {
@@ -380,6 +377,7 @@ import type { TraceAttributeSpendRepository } from "../repositories/trace-attrib
 import type { TraceAttributedRollupRepository } from "../repositories/trace-attributed-rollup.repository.ts";
 import type { TraceEvaluationRunsReadRepository } from "../repositories/trace-evaluation-runs.repository.ts";
 import type { TraceExistenceRepository } from "../repositories/trace-existence.repository.ts";
+import type { TraceFullRecordRowsRepository } from "../repositories/trace-full-record-rows.repository.ts";
 import type { TraceModelSpendRepository } from "../repositories/trace-model-spend.repository.ts";
 import type { TracePayloadReaderRepository } from "../repositories/trace-payload-reader.repository.ts";
 import type { TraceProjectedReadRepository } from "../repositories/trace-projected-read.repository.ts";
@@ -949,7 +947,8 @@ type TraceLegacyReadCompositionOptions = {
 };
 
 type TraceTreeCompositionOptions = {
-  resolveClient: TraceClickHouseResolver;
+  /** The full record's summary, span and thread rows; the registry's `fullRecordRows`. */
+  fullRecordRows: TraceFullRecordRowsRepository;
   /** The span tree's summary rows; the registry's `spanTree`. */
   repository: TraceProjectedReadRepository;
   modelProviders: ModelProviderApi;
@@ -1213,7 +1212,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     const tree = !resolve
       ? undefined
       : TraceModule.composeTree({
-          resolveClient: resolve,
+          fullRecordRows: options.repositories.fullRecordRows,
           repository: options.repositories.spanTree,
           modelProviders: options.modelProviders,
           queryFieldValues: TraceReadQueryFieldValues.create(list),
@@ -1391,7 +1390,6 @@ export class TraceModule implements TraceApi, CollectorApp {
 
   /** The trace-tree read over this process's ClickHouse and query-value boundaries. */
   static composeTree(options: TraceTreeCompositionOptions): TraceService {
-    const clickhouse = ResolverTraceClickHouse.create(options.resolveClient);
     return TraceService.create({
       repository: options.repository,
       modelProviders: options.modelProviders,
@@ -1402,7 +1400,7 @@ export class TraceModule implements TraceApi, CollectorApp {
       records: options.records ?? new NullTraceRecordRepository(),
       eventDerivation: options.eventDerivation ?? new NullTraceEventDerivation(),
       fullRecords: ClickHouseTraceFullRecordRepository.create(
-        clickhouse,
+        options.fullRecordRows,
         options.payloads,
         options.fullIo,
       ),

@@ -146,3 +146,10 @@ Feature: Trace span-tree read service
     Then each statement is a reader statement over the proof's tenants with the tenant setting
     And it elects each span's latest version within the stored_spans id bound and the memory ceiling
     And a braided read applies the owner's condition without naming the owner
+
+  @unit
+  Scenario: A full trace record's summary and thread rows are read within the record's own tenant
+    Given a full record read or a thread read for one project
+    When the trace's summary or the thread's traces are read
+    Then each statement is a reader statement over that project alone with the tenant setting
+    And it elects each trace's latest summary, the thread read repeating its conversation filter in the election

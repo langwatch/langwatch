@@ -12,10 +12,10 @@ import { TraceSummaryReaderRepository } from "#repositories/trace-summary-reader
 
 import type { TraceFullIo } from "../features/read/services/trace-read-full-io.service.ts";
 import { TRACE_ID_INDEXES } from "../repositories/clickhouse/clickhouse.trace-id-indexes.database.ts";
+import { ClickHouseTraceSpanRepository } from "../repositories/clickhouse/trace-span.repository.ts";
 // From the port that defines them: an in-package test does not need the
 // package's public surface, and `index.ts` publishes what CONSUMERS import.
-import type { TraceClickHouseResolver } from "../repositories/clickhouse/clickhouse.trace-member-client.repository.ts";
-import { ClickHouseTraceSpanRepository } from "../repositories/clickhouse/trace-span.repository.ts";
+import { MemoryTraceFullRecordRowsRepository } from "../repositories/memory/memory.trace-full-record-rows.repository.ts";
 import { aggregateProof, ownProof } from "./support/authorization-proofs.fixture.ts";
 import { TestModelProviderService } from "./support/model-provider.service.fake.ts";
 import { TestTraceQueryClassification } from "./support/query-classification.fake.ts";
@@ -120,8 +120,8 @@ function fencedClickHouse(
   });
 }
 
-const refusingResolver: TraceClickHouseResolver = () =>
-  Promise.reject(new Error("the tree reads go through the fence"));
+/** The tree reads go through the fence; the full record's rows refuse, as on the memory tier. */
+const refusingFullRecordRows = MemoryTraceFullRecordRowsRepository.create();
 
 /** The span-tree repository with every summary read behind the fence. */
 function fencedTree(
@@ -135,7 +135,7 @@ describe("TraceModule.composeTree", () => {
   it("constructs concrete repositories behind the public adapter", async () => {
     const calls: FencedCall[] = [];
     const service = TraceModule.composeTree({
-      resolveClient: refusingResolver,
+      fullRecordRows: refusingFullRecordRows,
       repository: fencedTree(calls, () => summaryRows(0.2)),
       modelProviders: new TestModelProviderService(),
       queryFieldValues: new EmptyQueryFieldValues(),
@@ -170,7 +170,7 @@ describe("TraceModule.composeTree", () => {
     const calls: FencedCall[] = [];
     const modelProviders = new TestModelProviderService(0.47);
     const service = TraceModule.composeTree({
-      resolveClient: refusingResolver,
+      fullRecordRows: refusingFullRecordRows,
       repository: fencedTree(calls, () => summaryRows("")),
       modelProviders,
       queryFieldValues: new EmptyQueryFieldValues(),

@@ -6,8 +6,12 @@ import { TraceLegacyReadClickHouseRepository } from "../../features/legacy/repos
 import { ClickHouseTraceAttributeSpendRepository } from "../clickhouse/clickhouse.trace-attribute-spend.repository.ts";
 import { ClickHouseTraceAttributedRollupRepository } from "../clickhouse/clickhouse.trace-attributed-rollup.repository.ts";
 import { ClickHouseTraceClusteringSampleRepository } from "../clickhouse/clickhouse.trace-clustering-sample.repository.ts";
+import { ClickHouseTraceFullRecordRowsRepository } from "../clickhouse/clickhouse.trace-full-record-rows.repository.ts";
 import { ClickHouseTraceIndexMaterialisationRepository } from "../clickhouse/clickhouse.trace-index-materialisation.repository.ts";
-import { MemberTraceClickHouseClientRepository } from "../clickhouse/clickhouse.trace-member-client.repository.ts";
+import {
+  ClickHouseTraceClientsRepository,
+  MemberTraceClickHouseClientRepository,
+} from "../clickhouse/clickhouse.trace-member-client.repository.ts";
 import { ClickHouseTraceModelSpendRepository } from "../clickhouse/clickhouse.trace-model-spend.repository.ts";
 import { LogRecordStorageClickHouseRepository } from "../clickhouse/log-record-storage.repository.ts";
 import { SessionGroupsClickHouseRepository } from "../clickhouse/session-groups.repository.ts";
@@ -112,6 +116,10 @@ export class PostgresTraceRepositories {
       list: TraceListClickHouseRepository.create({ clickhouse }),
       sessionGroups: SessionGroupsClickHouseRepository.create({ clickhouse }),
       clusteringSample: ClickHouseTraceClusteringSampleRepository.create(members.clickhouse),
+      fullRecordRows: ClickHouseTraceFullRecordRowsRepository.create({
+        reader: members.clickhouse,
+        clients: ClickHouseTraceClientsRepository.create(members.clickhouse),
+      }),
       usageCount: TraceUsageCountClickHouseRepository.create(members.clickhouse),
       indexMaterialisation: ClickHouseTraceIndexMaterialisationRepository.create(
         members.clickhouse,

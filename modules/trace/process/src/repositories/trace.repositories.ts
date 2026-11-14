@@ -25,6 +25,7 @@ import type { TraceDerivationSpanReaderRepository } from "./trace-derivation-spa
 import type { TraceEvaluationAnalyticsRepository } from "./trace-evaluation-analytics.repository.ts";
 import type { TraceEvaluationRunsReadRepository } from "./trace-evaluation-runs.repository.ts";
 import type { TraceExistenceRepository } from "./trace-existence.repository.ts";
+import type { TraceFullRecordRowsRepository } from "./trace-full-record-rows.repository.ts";
 import type { TraceIndexMaterialisationRepository } from "./trace-index-materialisation.repository.ts";
 import type { TraceInstantEvalRunsReadRepository } from "./trace-instant-eval-runs.repository.ts";
 import type { TraceModelSpendRepository } from "./trace-model-spend.repository.ts";
@@ -83,6 +84,8 @@ export interface TraceRepositories {
   /** Claim-check reads for fields the fold offloaded out of the summary. */
   readonly eventPayloads: TracePayloadReaderRepository;
   readonly clusteringSample: TraceClusteringSampleRepository;
+  /** The summary, span and thread rows the full trace record is assembled from. */
+  readonly fullRecordRows: TraceFullRecordRowsRepository;
   readonly usageCount: TraceUsageCountRepository;
   /** Goose 00103's `idx_updated_at` materialisation, which a background step waits on. */
   readonly indexMaterialisation: TraceIndexMaterialisationRepository;

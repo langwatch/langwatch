@@ -1,14 +1,12 @@
 import { EventUtils } from "@langwatch/eventing";
 import {
   EVENTREF_ATTR_PREFIX,
-  TraceNotFoundError,
   traceFullRecordSchema,
   type NormalizedSpan,
   type TraceFullRecord,
   type TraceFullReadInput,
   type TraceFullThreadReadInput,
 } from "@langwatch/trace-contract";
-import { z } from "zod";
 
 import {
   applyTraceFullReadProtections,
@@ -27,78 +25,19 @@ import {
   withoutEventReferences,
 } from "../../rules/trace-full-record.rules.ts";
 import { offloadedFieldKey } from "../../rules/trace-offload-recall.rules.ts";
+import type {
+  TraceFullRecordRowsRepository,
+  TraceFullSummaryRow,
+} from "../trace-full-record-rows.repository.ts";
 import { TraceFullRecordRepository } from "../trace-full-record.repository.ts";
 import type { TracePayloadReaderRepository } from "../trace-payload-reader.repository.ts";
-import type {
-  TraceClickHouseClient,
-  TraceClickHouse,
-} from "./clickhouse.trace-member-client.repository.ts";
-import { chBoolean, chNumber, chString, chStringMap } from "./stored-span-row.mapper.ts";
 
-const PARTITION_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
-const MAX_SPANS = 10_000;
-const MAX_THREAD_TRACES = 1_000;
 const PAYLOAD_READ_CONCURRENCY = 25;
 
-const summaryRowSchema = z.looseObject({
-  TraceId: chString,
-  Attributes: chStringMap,
-  ComputedInput: chString.nullable(),
-  ComputedOutput: chString.nullable(),
-  ContainsErrorStatus: chBoolean,
-  ErrorMessage: chString.nullable(),
-  TimeToFirstTokenMs: chNumber.nullable(),
-  TotalDurationMs: chNumber.nullable(),
-  TotalPromptTokenCount: chNumber.nullable(),
-  TotalCompletionTokenCount: chNumber.nullable(),
-  TotalCost: chNumber.nullable(),
-  TokensEstimated: chBoolean,
-  OccurredAtMs: chNumber,
-  CreatedAtMs: chNumber,
-  UpdatedAtMs: chNumber,
-});
-
-const summaryRowsSchema = z.array(summaryRowSchema);
-
-type SummaryRow = z.infer<typeof summaryRowSchema>;
-
-const threadTraceRowSchema = z.looseObject({ TraceId: chString, OccurredAtMs: chNumber });
-
-const threadTraceRowsSchema = z.array(threadTraceRowSchema);
-
-const storedSpanRowSchema: z.ZodType<StoredSpanRow> = z.looseObject({
-  SpanId: chString,
-  TraceId: chString,
-  TenantId: chString,
-  ParentSpanId: chString.nullable(),
-  ParentTraceId: chString.nullable(),
-  ParentIsRemote: chBoolean.nullable(),
-  Sampled: chBoolean,
-  StartTimeMs: chNumber,
-  EndTimeMs: chNumber,
-  DurationMs: chNumber,
-  SpanName: chString,
-  SpanKind: chNumber,
-  ResourceAttributes: chStringMap,
-  SpanAttributes: chStringMap,
-  StatusCode: chNumber.nullable(),
-  StatusMessage: chString.nullable(),
-  ScopeName: chString.nullable(),
-  ScopeVersion: chString.nullable(),
-  Events_Timestamp: z.array(chNumber).nullable(),
-  Events_Name: z.array(chString).nullable(),
-  Events_Attributes: z.array(chStringMap).nullable(),
-  Links_TraceId: z.array(chString).nullable(),
-  Links_SpanId: z.array(chString).nullable(),
-  Links_Attributes: z.array(chStringMap).nullable(),
-});
-
-const storedSpanRowsSchema = z.array(storedSpanRowSchema);
-
-/** Full-record reader with package-owned normalized mapping and bounded recall. */
+/** Assembles a full record from its summary, span and thread rows, with bounded payload recall. */
 export class ClickHouseTraceFullRecordRepository extends TraceFullRecordRepository {
   private constructor(
-    private readonly clickhouse: TraceClickHouse,
+    private readonly rows: TraceFullRecordRowsRepository,
     private readonly payloads: TracePayloadReaderRepository,
     private readonly io: TraceFullIo,
   ) {
@@ -106,11 +45,11 @@ export class ClickHouseTraceFullRecordRepository extends TraceFullRecordReposito
   }
 
   static create(
-    clickhouse: TraceClickHouse,
+    rows: TraceFullRecordRowsRepository,
     payloads: TracePayloadReaderRepository,
     io: TraceFullIo,
   ): ClickHouseTraceFullRecordRepository {
-    return new ClickHouseTraceFullRecordRepository(clickhouse, payloads, io);
+    return new ClickHouseTraceFullRecordRepository(rows, payloads, io);
   }
 
   async get(input: TraceFullReadInput): Promise<TraceFullRecord> {
@@ -118,11 +57,12 @@ export class ClickHouseTraceFullRecordRepository extends TraceFullRecordReposito
       { tenantId: input.tenantId },
       "ClickHouseTraceFullRecordRepository.get",
     );
-    const client = await this.clickhouse.resolve(input.tenantId);
-    const summary = await this.summary(client, input);
-    if (!summary) throw new TraceNotFoundError(input.traceId);
-
-    const rows = await this.spans(client, input, input.occurredAtMs ?? summary.OccurredAtMs);
+    const summary = await this.rows.getSummary(input);
+    const rows = await this.rows.findSpans({
+      tenantId: input.tenantId,
+      traceId: input.traceId,
+      occurredAtMs: input.occurredAtMs ?? summary.OccurredAtMs,
+    });
     const resolved = await this.resolveAll(input.tenantId, rows);
     const normalized = resolved.map(({ row, attributes }) => mapStoredSpanRow(row, attributes));
     const spans = normalized.map((span) => mapNormalizedSpanToFullRecordSpan(span));
@@ -172,21 +112,7 @@ export class ClickHouseTraceFullRecordRepository extends TraceFullRecordReposito
       { tenantId: input.tenantId },
       "ClickHouseTraceFullRecordRepository.findThread",
     );
-    const client = await this.clickhouse.resolve(input.tenantId);
-    const result = await client.query({
-      query: `SELECT TraceId, toUnixTimestamp64Milli(OccurredAt) AS OccurredAtMs FROM trace_summaries
-        WHERE TenantId = {tenantId:String} AND Attributes['gen_ai.conversation.id'] = {threadId:String}
-        AND (TenantId, TraceId, UpdatedAt) IN (SELECT TenantId, TraceId, max(UpdatedAt) FROM trace_summaries
-          WHERE TenantId = {tenantId:String} AND Attributes['gen_ai.conversation.id'] = {threadId:String} GROUP BY TenantId, TraceId)
-        ORDER BY OccurredAt ASC, TraceId ASC LIMIT {limit:UInt32}`,
-      query_params: {
-        tenantId: input.tenantId,
-        threadId: input.threadId,
-        limit: MAX_THREAD_TRACES,
-      },
-      format: "JSONEachRow",
-    });
-    const rows = threadTraceRowsSchema.parse(await result.json());
+    const rows = await this.rows.findThreadTraces(input);
     const records = await ClickHouseTraceFullRecordRepository.mapWithConcurrency(
       rows,
       PAYLOAD_READ_CONCURRENCY,
@@ -202,67 +128,6 @@ export class ClickHouseTraceFullRecordRepository extends TraceFullRecordReposito
         left.timestamps.started_at - right.timestamps.started_at ||
         left.trace_id.localeCompare(right.trace_id),
     );
-  }
-
-  /** Bounded by the id index once ready; an id it has never seen reads unbounded, as before. */
-  private async summary(
-    client: TraceClickHouseClient,
-    input: TraceFullReadInput,
-  ): Promise<SummaryRow | null> {
-    const result = await client.query({
-      query: `SELECT TraceId, Attributes, ComputedInput, ComputedOutput, ContainsErrorStatus, ErrorMessage,
-        TimeToFirstTokenMs, TotalDurationMs, TotalPromptTokenCount, TotalCompletionTokenCount, TotalCost, TokensEstimated,
-        toUnixTimestamp64Milli(OccurredAt) AS OccurredAtMs, toUnixTimestamp64Milli(CreatedAt) AS CreatedAtMs,
-        toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAtMs FROM trace_summaries WHERE TenantId = {tenantId:String}
-        AND TraceId = {traceId:String} {{idBound:trace_summaries.TraceId:traceId}} AND (TenantId, TraceId, UpdatedAt) IN (SELECT TenantId, TraceId, max(UpdatedAt)
-          FROM trace_summaries WHERE TenantId = {tenantId:String} AND TraceId = {traceId:String} {{idBound:trace_summaries.TraceId:traceId}} GROUP BY TenantId, TraceId) LIMIT 1`,
-      query_params: { tenantId: input.tenantId, traceId: input.traceId },
-      format: "JSONEachRow",
-      idBound: { occurredAtHint: input.occurredAtMs ?? null, onMiss: "unbounded" },
-    });
-    return summaryRowsSchema.parse(await result.json())[0] ?? null;
-  }
-
-  private async spans(
-    client: TraceClickHouseClient,
-    input: TraceFullReadInput,
-    occurredAtMs: number,
-  ): Promise<StoredSpanRow[]> {
-    const read = async (bounded: boolean): Promise<StoredSpanRow[]> => {
-      const filter = bounded
-        ? "AND StartTime BETWEEN fromUnixTimestamp64Milli({fromMs:Int64}) AND fromUnixTimestamp64Milli({toMs:Int64})"
-        : "";
-      const result = await client.query({
-        // ID_BOUND_SKIP: bounded by the summary's own occurred time, which the read above found.
-        query: `SELECT SpanId, TraceId, TenantId, ParentSpanId, ParentTraceId, ParentIsRemote, Sampled,
-          toUnixTimestamp64Milli(StartTime) AS StartTimeMs, toUnixTimestamp64Milli(EndTime) AS EndTimeMs, DurationMs,
-          SpanName, SpanKind, ResourceAttributes, SpanAttributes, StatusCode, StatusMessage, ScopeName, ScopeVersion,
-          arrayMap(x -> toUnixTimestamp64Milli(x), \`Events.Timestamp\`) AS Events_Timestamp, \`Events.Name\` AS Events_Name,
-          \`Events.Attributes\` AS Events_Attributes, \`Links.TraceId\` AS Links_TraceId, \`Links.SpanId\` AS Links_SpanId,
-          \`Links.Attributes\` AS Links_Attributes FROM stored_spans WHERE TenantId = {tenantId:String} AND TraceId = {traceId:String}
-          ${filter} AND (TenantId, TraceId, SpanId, StartTime) IN (SELECT TenantId, TraceId, SpanId, max(StartTime) FROM stored_spans
-            WHERE TenantId = {tenantId:String} AND TraceId = {traceId:String} ${filter} GROUP BY TenantId, TraceId, SpanId)
-          ORDER BY StartTime ASC, SpanId ASC LIMIT {limit:UInt32}`,
-        query_params: {
-          tenantId: input.tenantId,
-          traceId: input.traceId,
-          limit: MAX_SPANS,
-          ...(bounded
-            ? {
-                fromMs: occurredAtMs - PARTITION_WINDOW_MS,
-                toMs: occurredAtMs + PARTITION_WINDOW_MS,
-              }
-            : {}),
-        },
-        clickhouse_settings: { max_memory_usage: String(2 * 1024 * 1024 * 1024) },
-        format: "JSONEachRow",
-      });
-      return storedSpanRowsSchema.parse(await result.json());
-    };
-    // A summary occurrence anchor is authoritative for this trace. An empty
-    // window means there are no matching spans there; widening to every cold
-    // partition would turn ordinary span-less reads into unbounded scans.
-    return occurredAtMs > 0 ? read(true) : read(false);
   }
 
   private async resolveAll(
@@ -347,7 +212,9 @@ export class ClickHouseTraceFullRecordRepository extends TraceFullRecordReposito
     return value === null ? null : { type: "text", value };
   }
 
-  private static traceMetrics(summary: SummaryRow): Record<string, number | boolean | null> {
+  private static traceMetrics(
+    summary: TraceFullSummaryRow,
+  ): Record<string, number | boolean | null> {
     return {
       first_token_ms: summary.TimeToFirstTokenMs,
       total_time_ms: summary.TotalDurationMs,

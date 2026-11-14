@@ -33,6 +33,7 @@ import { MemoryTraceEvaluationAnalyticsRepository } from "./memory.trace-evaluat
 import { MemoryTraceEvaluationRunsRepository } from "./memory.trace-evaluation-runs.repository.ts";
 import { MemoryTraceExistenceRepository } from "./memory.trace-existence.repository.ts";
 import { MemoryTraceExportSlotRepository } from "./memory.trace-export-slot.repository.ts";
+import { MemoryTraceFullRecordRowsRepository } from "./memory.trace-full-record-rows.repository.ts";
 import { MemoryTraceIndexMaterialisationRepository } from "./memory.trace-index-materialisation.repository.ts";
 import { MemoryTraceIngestSourceBillingRepository } from "./memory.trace-ingest-source-billing.repository.ts";
 import { MemoryTraceInstantEvalRunsRepository } from "./memory.trace-instant-eval-runs.repository.ts";
@@ -178,6 +179,7 @@ export class MemoryTraceRepositories {
       sessionGroups: new NullSessionGroupsRepository(),
       eventPayloads: MemoryTracePayloadReaderRepository.create(),
       clusteringSample: MemoryNullTraceClusteringSampleRepository.create(),
+      fullRecordRows: MemoryTraceFullRecordRowsRepository.create(),
       usageCount: MemoryTraceUsageCountRepository.create(),
       indexMaterialisation: MemoryTraceIndexMaterialisationRepository.create(),
       modelSpend: MemoryTraceModelSpendRepository.create(),
