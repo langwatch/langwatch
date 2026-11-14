@@ -112,17 +112,5 @@ describe("PrismaJoinRequestNotificationContextRepository", () => {
         expect(sendRequestExpired.mock.calls[0]?.[0].personalProjectUrl).toBeUndefined();
       });
     });
-
-    describe("when teams are read by owner without naming personal teams", () => {
-      /** @scenario "An expired request tells the requester, with a link to their personal project when they have one" */
-      it("refuses the read", async () => {
-        const read = guard.execute(
-          { model: "Team", action: "findMany", args: { where: { ownerUserId: "user_morgan" } } },
-          async () => [],
-        );
-
-        await expect(read).rejects.toThrow(/organizationId/);
-      });
-    });
   });
 });

@@ -82,7 +82,7 @@ Feature: Composing the join-request ledger in a background worker
 
   # The personal project may sit in any organization, so the lookup is bounded
   # by its owner, not by an organization; the tenancy guard admits that read only.
-  @unit
+  @integration
   Scenario: An expired request tells the requester, with a link to their personal project when they have one
     Given the organization tenancy guard is in force
     And a requester who owns a personal project in another organization
