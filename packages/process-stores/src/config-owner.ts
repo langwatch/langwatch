@@ -8,6 +8,8 @@ import {
 } from "@langwatch/secrets";
 import { z } from "zod";
 
+import { READER_ROUTE_ENV_PREFIX } from "./clickhouse-routes.ts";
+
 /** Main's per-organisation S3 family prefix, parsed in object-storage-private-accounts.ts. */
 export const DATAPLANE_S3_ENV_PREFIX = "DATAPLANE_S3__";
 
@@ -121,6 +123,10 @@ export const storesOwner = {
     clickhouse: Secret.load("CLICKHOUSE_URL", { optional: true }),
     /** Main's `CLICKHOUSE_URL__<label>__<orgId>` family: each organization's own server. */
     clickhouseRoutes: Secret.family(PRIVATE_ROUTE_ENV_PREFIX),
+    /** The app reader's credential on the shared server (ADR-202); absent keeps one identity. */
+    clickhouseReader: Secret.load("CLICKHOUSE_READER_URL", { optional: true }),
+    /** `CLICKHOUSE_READER_URL__<label>__<orgId>`: the app reader on each organization's server. */
+    clickhouseReaderRoutes: Secret.family(READER_ROUTE_ENV_PREFIX),
     redis: Secret.load("REDIS_URL", { optional: true }),
     /** The previous release's cluster Redis: endpoints read instead of REDIS_URL when set. */
     redisClusterEndpoints: Secret.load("REDIS_CLUSTER_ENDPOINTS", { optional: true }),

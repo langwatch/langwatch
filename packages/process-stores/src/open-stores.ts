@@ -1,6 +1,6 @@
 import type { ScopedSecrets } from "@langwatch/secrets";
 
-import { clickhouseRouteFamilyOf } from "./clickhouse-routes.ts";
+import { clickhouseRouteFamilyOf, READER_ROUTE_ENV_PREFIX } from "./clickhouse-routes.ts";
 import { storesOwner, type StoresConfig } from "./config-owner.ts";
 import type { ObjectStorageAzureConfig, ObjectStorageConfig, ProcessConfig } from "./config.ts";
 import { buildProcessStores, type ProcessStores } from "./create-members.ts";
@@ -99,20 +99,39 @@ function objectStorageConfig(options: {
   }
 }
 
+/** The app reader's credentials (ADR-202), beside the system's; all absent keeps one identity. */
+interface ClickHouseReaderSecrets {
+  readonly url: string | undefined;
+  readonly routes: ReturnType<typeof clickhouseRouteFamilyOf>;
+}
+
+function readerConfigOf(reader: ClickHouseReaderSecrets) {
+  return {
+    ...(reader.url ? { readerUrl: reader.url } : {}),
+    ...(reader.routes.routes.length > 0 ? { readerPrivateRoutes: reader.routes.routes } : {}),
+    ...(reader.routes.malformed.length > 0
+      ? { malformedReaderRoutes: reader.routes.malformed }
+      : {}),
+  };
+}
+
 /** A deployment whose every tenant is private names no shared URL, and still has ClickHouse. */
 function clickhouseConfigOf({
   config,
   url,
   clickhouseRoutes,
+  reader,
 }: {
   config: StoresConfig;
   url: string | undefined;
   clickhouseRoutes: ReturnType<typeof clickhouseRouteFamilyOf>;
+  reader: ClickHouseReaderSecrets;
 }) {
-  return url || clickhouseRoutes.routes.length > 0
+  return url || clickhouseRoutes.routes.length > 0 || reader.url || reader.routes.routes.length > 0
     ? {
         clickhouse: {
           ...(url ? { url: url } : {}),
+          ...readerConfigOf(reader),
           ...(config.clickhousePasswordFile ? { passwordFile: config.clickhousePasswordFile } : {}),
           ...(clickhouseRoutes.routes.length > 0 ? { privateRoutes: clickhouseRoutes.routes } : {}),
           ...(clickhouseRoutes.malformed.length > 0
@@ -138,6 +157,7 @@ function processConfigOf(options: {
     redisClusterEndpoints: string | undefined;
   }>;
   clickhouseRoutes: ReturnType<typeof clickhouseRouteFamilyOf>;
+  clickhouseReader: ClickHouseReaderSecrets;
   encryption: string | undefined;
   previousEncryption: string | undefined;
   storage: StorageSecrets;
@@ -146,7 +166,12 @@ function processConfigOf(options: {
   const { name, config, pipelines, urls, clickhouseRoutes, encryption, storage, production } =
     options;
   const previousEncryptionKey = options.previousEncryption;
-  const clickhouse = clickhouseConfigOf({ config, url: urls.clickhouse, clickhouseRoutes });
+  const clickhouse = clickhouseConfigOf({
+    config,
+    url: urls.clickhouse,
+    clickhouseRoutes,
+    reader: options.clickhouseReader,
+  });
   return {
     processName: name,
     encryptionKey: encryption ?? "",
@@ -191,25 +216,35 @@ export function openStores(options: {
   return secrets.into(storesOwner.secrets.database, (database) =>
     secrets.into(storesOwner.secrets.clickhouse, (clickhouse) =>
       secrets.into(storesOwner.secrets.clickhouseRoutes, (routes) =>
-        secrets.into(storesOwner.secrets.redis, (redis) =>
-          secrets.into(storesOwner.secrets.redisClusterEndpoints, (redisClusterEndpoints) =>
-            secrets.into(storesOwner.secrets.encryption, (credentials) =>
-              secrets.into(storesOwner.secrets.encryptionFallback, (session) =>
-                secrets.into(storesOwner.secrets.encryptionPrevious, (previous) =>
-                  withStorageSecrets(secrets, (storage) =>
-                    buildProcessStores({
-                      config: processConfigOf({
-                        name,
-                        config,
-                        pipelines,
-                        urls: { database, clickhouse, redis, redisClusterEndpoints },
-                        clickhouseRoutes: clickhouseRouteFamilyOf(routes),
-                        encryption: credentials ?? session,
-                        previousEncryption: previous,
-                        storage,
-                        production,
-                      }),
-                    }),
+        secrets.into(storesOwner.secrets.clickhouseReader, (readerUrl) =>
+          secrets.into(storesOwner.secrets.clickhouseReaderRoutes, (readerRoutes) =>
+            secrets.into(storesOwner.secrets.redis, (redis) =>
+              secrets.into(storesOwner.secrets.redisClusterEndpoints, (redisClusterEndpoints) =>
+                secrets.into(storesOwner.secrets.encryption, (credentials) =>
+                  secrets.into(storesOwner.secrets.encryptionFallback, (session) =>
+                    secrets.into(storesOwner.secrets.encryptionPrevious, (previous) =>
+                      withStorageSecrets(secrets, (storage) =>
+                        buildProcessStores({
+                          config: processConfigOf({
+                            name,
+                            config,
+                            pipelines,
+                            urls: { database, clickhouse, redis, redisClusterEndpoints },
+                            clickhouseRoutes: clickhouseRouteFamilyOf(routes),
+                            clickhouseReader: {
+                              url: readerUrl,
+                              routes: clickhouseRouteFamilyOf(readerRoutes, {
+                                prefix: READER_ROUTE_ENV_PREFIX,
+                              }),
+                            },
+                            encryption: credentials ?? session,
+                            previousEncryption: previous,
+                            storage,
+                            production,
+                          }),
+                        }),
+                      ),
+                    ),
                   ),
                 ),
               ),

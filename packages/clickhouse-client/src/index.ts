@@ -319,3 +319,21 @@ export {
   TenantScopedReader,
   tenantScopeKey,
 } from "./authorized-reads.ts";
+export {
+  identityOf,
+  SystemIdentityAbsentError,
+  SystemIdentityAbsentErrorFactory,
+  type ClickHouseIdentity,
+  type IdentityOperation,
+} from "./identity/statementIdentity.ts";
+export {
+  ShadowSampler,
+  type ShadowDivergence,
+  type ShadowSamplerOptions,
+} from "./identity/shadowSampler.ts";
+export {
+  TENANT_IDS_SETTING,
+  TENANT_SETTING_PREFIX,
+  TenantSettingError,
+  type TenantSettingViolation,
+} from "./identity/tenantSetting.ts";

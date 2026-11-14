@@ -153,7 +153,12 @@ function prismaMember({
 
 function clickhouseConfigured(config: ProcessConfig): boolean {
   const clickhouse = config.clickhouse;
-  return Boolean(clickhouse?.url?.trim()) || (clickhouse?.privateRoutes?.length ?? 0) > 0;
+  return (
+    Boolean(clickhouse?.url?.trim()) ||
+    (clickhouse?.privateRoutes?.length ?? 0) > 0 ||
+    Boolean(clickhouse?.readerUrl?.trim()) ||
+    (clickhouse?.readerPrivateRoutes?.length ?? 0) > 0
+  );
 }
 
 function clickhouseMember({
@@ -167,7 +172,7 @@ function clickhouseMember({
   if (!clickhouse || !clickhouseConfigured(config)) {
     throw new MemberNotConfiguredError(
       "clickhouse",
-      "set CLICKHOUSE_URL or a CLICKHOUSE_URL__<label>__<orgId> route",
+      "set CLICKHOUSE_URL, CLICKHOUSE_READER_URL or a CLICKHOUSE_URL__<label>__<orgId> route",
     );
   }
   return buildClickHouse({ config: clickhouse, directory: tenantDirectory() });

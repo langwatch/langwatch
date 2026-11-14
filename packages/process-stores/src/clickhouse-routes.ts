@@ -14,12 +14,18 @@ import type { ClickHousePrivateRoute, MalformedPrivateVariable } from "./config.
 
 const logger = createLogger("langwatch:stores:clickhouse-routes");
 
+/** `CLICKHOUSE_READER_URL__<label>__<orgId>`: each private server as the app reader (ADR-202). */
+export const READER_ROUTE_ENV_PREFIX = "CLICKHOUSE_READER_URL__";
+
 /** Each organization's own server, and the variables present but unusable, from the family. */
-export function clickhouseRouteFamilyOf(family: ReadonlyMap<string, string>): {
+export function clickhouseRouteFamilyOf(
+  family: ReadonlyMap<string, string>,
+  { prefix = PRIVATE_ROUTE_ENV_PREFIX }: { prefix?: string } = {},
+): {
   routes: readonly ClickHousePrivateRoute[];
   malformed: readonly MalformedPrivateVariable[];
 } {
-  const table = parseRoutingTable(Object.fromEntries(family));
+  const table = parseRoutingTable(Object.fromEntries(family), { prefix });
 
   for (const { envVar, reason } of table.skipped) {
     logger.warn({ envVar, reason }, "ClickHouse private route skipped");
@@ -28,8 +34,7 @@ export function clickhouseRouteFamilyOf(family: ReadonlyMap<string, string>): {
     logger.warn({ envVar, organizationId }, "ClickHouse private route name is ambiguous");
   }
 
-  const labelOf = (variable: string) =>
-    privateRouteNameOf({ prefix: PRIVATE_ROUTE_ENV_PREFIX, variable }).label;
+  const labelOf = (variable: string) => privateRouteNameOf({ prefix, variable }).label;
   const routes = [...table.routes].map(([organizationId, url]) => {
     const variable = table.variables?.get(organizationId);
     return variable === undefined

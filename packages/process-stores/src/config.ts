@@ -50,6 +50,15 @@ export interface ClickHouseConfig {
   readonly privateRoutes?: readonly ClickHousePrivateRoute[];
   /** Route variables that did not parse: those organizations are refused, never shared. */
   readonly malformedRoutes?: readonly MalformedPrivateVariable[];
+  /**
+   * `CLICKHOUSE_READER_URL` — the shared server as the app reader (ADR-202). With any reader
+   * credential set, tenant reads go as the reader and a target lacking one refuses them by name.
+   */
+  readonly readerUrl?: string;
+  /** `CLICKHOUSE_READER_URL__<label>__<orgId>`: each private server as the app reader. */
+  readonly readerPrivateRoutes?: readonly ClickHousePrivateRoute[];
+  /** Reader route variables that did not parse: refused, never shared. */
+  readonly malformedReaderRoutes?: readonly MalformedPrivateVariable[];
   /** What sizes the per-endpoint pool, as main's `CLICKHOUSE_*` pool variables state it. */
   readonly poolSizing?: PoolSizingInput;
   /** How long one statement may take before the driver abandons it. */

@@ -8,7 +8,7 @@ import {
 } from "@clickhouse/client";
 import {
   ClickHouseClientFactory,
-  ClickHouseConfigService,
+  type ClickHouseConfiguration,
   ClickHouseConnectionService,
   ClickHouseManagedClientTelemetry,
   ClickHouseOverloadErrorFactory,
@@ -30,6 +30,7 @@ import {
   type ClickHouseClientCreationInput,
   type ClickHouseLaneStats,
   type ClickHouseStatementOperation,
+  type IdentityOperation,
   type TenantDirectory,
 } from "@langwatch/clickhouse-client";
 import { CLICKHOUSE_STATEMENT_RETRY_MESSAGE_FRAGMENTS } from "@langwatch/eventing";
@@ -38,6 +39,7 @@ import type { LimiterStats } from "@langwatch/limiter";
 import { createLogger } from "@langwatch/observability";
 import { counter, histogram, observableGauge } from "@langwatch/observability/metrics";
 
+import { clickhouseIdentitiesOf } from "./clickhouse-identities.ts";
 import {
   authenticatedFromFile,
   ClickHousePasswordFile,
@@ -204,6 +206,29 @@ export class UnavailableRefusal extends ClickHouseUnavailableErrorFactory {
   }
 }
 
+/** A reader-only process asked for a statement only the system identity sends (ADR-202). */
+class ClickHouseSystemIdentityAbsentError extends HandledError {
+  declare readonly code: "clickhouse_system_identity_absent";
+
+  constructor(
+    readonly operation: IdentityOperation,
+    readonly table: string | undefined,
+  ) {
+    super("clickhouse_system_identity_absent", "This process cannot write analytics data", {
+      httpStatus: 500,
+      fault: "platform",
+    });
+    this.name = "ClickHouseSystemIdentityAbsentError";
+  }
+}
+
+/** Satisfies `SystemIdentityAbsentErrorFactory` by shape until the index exports it. */
+export class SystemIdentityAbsentRefusal {
+  create({ operation, table }: { operation: IdentityOperation; table: string | undefined }) {
+    return new ClickHouseSystemIdentityAbsentError(operation, table);
+  }
+}
+
 /** One entry per lane, so a saturated insert lane cannot hide behind an idle read lane. */
 const limiterProbes = new Map<string, () => readonly ClickHouseLaneStats[]>();
 
@@ -281,6 +306,47 @@ export class StatementBoundTelemetry extends ClickHouseManagedClientTelemetry {
   }
 }
 
+/** One connection per identity this process holds (ADR-202); the system's comes first. */
+function connectIdentities({
+  config,
+  directory,
+}: {
+  config: ClickHouseConfig;
+  directory: TenantDirectory;
+}) {
+  const identities = clickhouseIdentitiesOf({ config });
+  // Read before anything opens, so an unreadable file stops the boot by name.
+  const sharedPasswordFile =
+    identities.system?.shared !== undefined && config.passwordFile
+      ? ClickHousePasswordFile.open({ path: config.passwordFile })
+      : undefined;
+  const connect = (
+    configuration: ClickHouseConfiguration,
+    passwordFile: ClickHousePasswordFile | undefined,
+  ) =>
+    ClickHouseConnectionService.create({
+      directory,
+      clientFactory: new VendorClickHouseClientFactory({
+        config,
+        sharedPasswordFile: passwordFile,
+      }),
+      refusal: PrivateDataplaneRefusals.create().forClickHouse(),
+      ...(config.maxTenantCacheEntries === undefined
+        ? {}
+        : { maxTenantCacheEntries: config.maxTenantCacheEntries }),
+    }).connect(configuration);
+  // The password file is the system user's; the reader's credential is in its URL.
+  const system = identities.system && connect(identities.system, sharedPasswordFile);
+  const reader = identities.reader && connect(identities.reader, undefined);
+  const connections = [system, reader].filter((each) => each !== undefined);
+  const [connection] = connections;
+  const configuration = identities.system ?? identities.reader;
+  if (connection === undefined || configuration === undefined) {
+    throw new Error("ClickHouse names no endpoint for the system or the reader identity.");
+  }
+  return { system, reader, connections, connection, configuration };
+}
+
 /**
  * The routed client, and the close that shuts every endpoint it opened. The
  * tenant guard is outermost, so a statement that cannot name its tenant is
@@ -291,33 +357,10 @@ export function buildClickHouse(options: {
   directory: TenantDirectory;
 }): BuiltMember<ClickHouseQueryClient> {
   const { config } = options;
-  const sharedUrl = config.url?.trim();
-  // Read before anything opens, so an unreadable file stops the boot by name.
-  const sharedPasswordFile =
-    sharedUrl && config.passwordFile
-      ? ClickHousePasswordFile.open({ path: config.passwordFile })
-      : undefined;
-  const configuration = ClickHouseConfigService.create().resolve({
-    ...(sharedUrl ? { shared: { url: sharedUrl, cluster: "shared" } } : {}),
-    privateRoutes: (config.privateRoutes ?? []).map((route) => ({
-      organizationId: route.organizationId,
-      url: route.url,
-      // A credential-free operator label. The organization's own id is the
-      // only name this process knows that is safe to print.
-      cluster: route.organizationId,
-    })),
-    malformedPrivateRoutes: config.malformedRoutes ?? [],
-    ...(config.poolSizing === undefined ? {} : { poolSizing: config.poolSizing }),
-  });
-
-  const connection = ClickHouseConnectionService.create({
-    directory: options.directory,
-    clientFactory: new VendorClickHouseClientFactory({ config, sharedPasswordFile }),
-    refusal: PrivateDataplaneRefusals.create().forClickHouse(),
-    ...(config.maxTenantCacheEntries === undefined
-      ? {}
-      : { maxTenantCacheEntries: config.maxTenantCacheEntries }),
-  }).connect(configuration);
+  const { system, reader, connections, connection, configuration } = connectIdentities(options);
+  const routes = system === undefined ? config.readerPrivateRoutes : config.privateRoutes;
+  const malformedRoutes =
+    system === undefined ? config.malformedReaderRoutes : config.malformedRoutes;
 
   setWindowedReadMetrics(clickHouseWindowedReadMetrics());
   setIdIndexMissLogger(createLogger("langwatch:clickhouse:id-index"));
@@ -344,7 +387,8 @@ export function buildClickHouse(options: {
   });
 
   const client = new ClickHouseQueryClient({
-    driver: routingDriver(connection),
+    driver: system && routingDriver(system),
+    readerDriver: reader && routingDriver(reader),
     tenantGuard: skippedTenantChecks(),
     retries: new RetryPolicy({
       transientMessageFragments: CLICKHOUSE_STATEMENT_RETRY_MESSAGE_FRAGMENTS,
@@ -362,16 +406,15 @@ export function buildClickHouse(options: {
     limiter: admission,
     unavailableErrorFactory: new UnavailableRefusal(),
     overloadErrorFactory: new OverloadedRefusal(),
-    privateRoutes: new Map(
-      (config.privateRoutes ?? []).map((route) => [route.organizationId, route.url]),
-    ),
+    systemIdentityAbsentErrorFactory: new SystemIdentityAbsentRefusal(),
+    privateRoutes: new Map((routes ?? []).map((route) => [route.organizationId, route.url])),
     privateRouteVariables: [
-      ...(config.privateRoutes ?? []).flatMap(({ organizationId, label, variable }) =>
+      ...(routes ?? []).flatMap(({ organizationId, label, variable }) =>
         variable === undefined
           ? []
           : [{ organizationId, label: label ?? "", variable, state: "present" as const }],
       ),
-      ...(config.malformedRoutes ?? []).map((route) => ({
+      ...(malformedRoutes ?? []).map((route) => ({
         ...route,
         state: "malformed" as const,
       })),
@@ -384,7 +427,9 @@ export function buildClickHouse(options: {
     value: client,
     close: () => {
       telemetry.unregisterLimiter(STATEMENT_BOUND_INSTANCE);
-      return ClickHouseShutdownService.create().shutdown(connection);
+      return Promise.all(
+        connections.map((each) => ClickHouseShutdownService.create().shutdown(each)),
+      ).then(() => undefined);
     },
     // The shared endpoint only: one organisation's private route never makes the process unready.
     ...(configuration.shared === undefined

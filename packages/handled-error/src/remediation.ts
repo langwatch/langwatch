@@ -311,6 +311,11 @@ const registry = {
       "Narrow the time range or add filters so the query costs less to run",
     ],
   },
+  clickhouse_system_identity_absent: {
+    tips: [
+      "Give this process the ClickHouse system credential, or send the statement from the worker (ADR-202)",
+    ],
+  },
 
   // ---- api keys ----
   api_key_not_found: {
