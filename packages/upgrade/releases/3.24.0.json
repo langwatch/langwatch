@@ -1,0 +1,333 @@
+{
+  "release": "3.24.0",
+  "previous": "3.23.0",
+  "cutAt": "2026-11-14T13:28:52+01:00",
+  "steps": [
+    {
+      "id": "prisma:20261104120000_nurturing_organization_last_trace_at",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "nurturing",
+      "description": "Postgres schema: nurturing organization last trace at"
+    },
+    {
+      "id": "prisma:20261104120100_nurturing_organization_coding_first_days",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "nurturing",
+      "description": "Postgres schema: nurturing organization coding first days"
+    },
+    {
+      "id": "prisma:20261104120101_nurturing_organization_coding_terminal_and_repositories",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "nurturing",
+      "description": "Postgres schema: nurturing organization coding terminal and repositories"
+    },
+    {
+      "id": "prisma:20261106120000_billing_license_renewal_claim",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: billing license renewal claim"
+    },
+    {
+      "id": "prisma:20261106120001_organization_seat_requests",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "organization",
+      "description": "Postgres schema: organization seat requests"
+    },
+    {
+      "id": "prisma:20261106120002_organization_seat_lease",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "organization",
+      "description": "Postgres schema: organization seat lease"
+    },
+    {
+      "id": "prisma:20261107120000_seat_request_seat_pending",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "organization",
+      "description": "Postgres schema: seat request seat pending"
+    },
+    {
+      "id": "prisma:20261107130000_billing_subscription_seats_kept",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: billing subscription seats kept"
+    },
+    {
+      "id": "prisma:20261107130100_organization_seat_holds",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "organization",
+      "description": "Postgres schema: organization seat holds"
+    },
+    {
+      "id": "prisma:20261107130200_billing_subscription_seat_line_quantity",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: billing subscription seat line quantity"
+    },
+    {
+      "id": "prisma:20261108120000_user_erasure",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "user",
+      "description": "Postgres schema: user erasure"
+    },
+    {
+      "id": "prisma:20261112120000_braids_grant_replaces_grant_id",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "share",
+      "description": "Postgres schema: braids grant replaces grant id"
+    },
+    {
+      "id": "prisma:20261112170000_nurturing_project_usage_view",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "nurturing",
+      "description": "Postgres schema: nurturing project usage view"
+    },
+    {
+      "id": "prisma:20261112170100_nurturing_project_trace_day",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "nurturing",
+      "description": "Postgres schema: nurturing project trace day"
+    },
+    {
+      "id": "prisma:20261112170200_nurturing_personal_and_traced_projects",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "nurturing",
+      "description": "Postgres schema: nurturing personal and traced projects"
+    },
+    {
+      "id": "prisma:20261112170300_nurturing_organization_created",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "nurturing",
+      "description": "Postgres schema: nurturing organization created"
+    },
+    {
+      "id": "prisma:20261112170400_nurturing_organization_member",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "nurturing",
+      "description": "Postgres schema: nurturing organization member"
+    },
+    {
+      "id": "prisma:20261112170500_nurturing_uncopied_project",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "nurturing",
+      "description": "Postgres schema: nurturing uncopied project"
+    },
+    {
+      "id": "prisma:20261112170600_nurturing_organization_created_created_at_idx",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "nurturing",
+      "description": "Postgres schema: nurturing organization created created at idx"
+    },
+    {
+      "id": "prisma:20261112170601_organization_seat_peak",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: organization seat peak"
+    },
+    {
+      "id": "prisma:20261113120000_subscription_max_members_developer",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: subscription max members developer"
+    },
+    {
+      "id": "prisma:20261113180001_braids_authz_organization_policy",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: braids authz organization policy"
+    },
+    {
+      "id": "prisma:20261113180002_braids_signing_keys",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: braids signing keys"
+    },
+    {
+      "id": "prisma:20261113180003_braids_grant_replaced_lookup",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "share",
+      "description": "Postgres schema: braids grant replaced lookup"
+    },
+    {
+      "id": "prisma:20261113200000_licence_developer_seats",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: licence developer seats"
+    },
+    {
+      "id": "prisma:20261113200001_governance_agent_registry",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: governance agent registry"
+    },
+    {
+      "id": "clickhouse:00124",
+      "kind": "clickhouse-schema",
+      "mode": "blocking",
+      "owner": "gateway",
+      "description": "ClickHouse schema: gateway spend web search requests"
+    },
+    {
+      "id": "clickhouse:00125",
+      "kind": "clickhouse-schema",
+      "mode": "blocking",
+      "owner": "experiment",
+      "description": "ClickHouse schema: add experiment runs concurrency"
+    },
+    {
+      "id": "clickhouse:00126",
+      "kind": "clickhouse-schema",
+      "mode": "blocking",
+      "owner": "trace",
+      "description": "ClickHouse schema: trace analytics metadata columns"
+    },
+    {
+      "id": "clickhouse:00127",
+      "kind": "clickhouse-schema",
+      "mode": "blocking",
+      "owner": "experiment",
+      "description": "ClickHouse schema: repair experiment runs concurrency"
+    },
+    {
+      "id": "clickhouse:00128",
+      "kind": "clickhouse-schema",
+      "mode": "blocking",
+      "owner": "trace",
+      "description": "ClickHouse schema: stock widget light columns"
+    },
+    {
+      "id": "clickhouse:00129",
+      "kind": "clickhouse-schema",
+      "mode": "blocking",
+      "owner": "trace",
+      "description": "ClickHouse schema: trace evaluation analytics"
+    },
+    {
+      "id": "agent:backfill-versions",
+      "kind": "data",
+      "mode": "background",
+      "owner": "agent",
+      "description": "Records version 1 of every agent written before versions existed, with its creator from the audit log.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "dataset:fill-empty-slugs",
+      "kind": "data",
+      "mode": "background",
+      "owner": "dataset",
+      "description": "Gives each dataset stored without a slug one made from its name."
+    },
+    {
+      "id": "dataset:create-first-versions",
+      "kind": "data",
+      "mode": "background",
+      "owner": "dataset",
+      "description": "Saves version 1 of every dataset that has rows and no version history yet."
+    },
+    {
+      "id": "evaluator:backfill-versions",
+      "kind": "data",
+      "mode": "background",
+      "owner": "evaluator",
+      "description": "Records version 1 of every evaluator written before versions existed, with its creator from the audit log.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "governance:record-coding-assistant-ingest-source-billing",
+      "kind": "data",
+      "mode": "background",
+      "owner": "governance",
+      "description": "Records each organisation's billed facts again, so every ingest source type has one.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "governance:seed-agent-registry",
+      "kind": "data",
+      "mode": "background",
+      "owner": "governance",
+      "description": "Builds each organisation's agent registry from its agents, sources and traffic.",
+      "needsOldWritersGone": false
+    },
+    {
+      "id": "organization:record-seat-peak-opening-snapshots",
+      "kind": "data",
+      "mode": "background",
+      "owner": "organization",
+      "description": "Records every organization's seat holders as they stand, to open its seat peak.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "project:list-personal-owner-and-first-message-facts",
+      "kind": "data",
+      "mode": "background",
+      "owner": "project",
+      "description": "Lists every personal project's owner and every project that already received its first message, archived ones included.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "trace:track-analytics-metadata-columns-materialisation",
+      "kind": "data",
+      "mode": "background",
+      "owner": "trace",
+      "description": "Waits for ClickHouse to store the trace analytics metadata columns in existing rows.",
+      "needsOldWritersGone": false
+    },
+    {
+      "id": "trace:replay-trace-analytics-widget-columns",
+      "kind": "data",
+      "mode": "background",
+      "owner": "trace",
+      "description": "Refolds the last 62 days of trace analytics rows so they carry the stock widgets' metadata columns.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "trace:replay-span-analytics",
+      "kind": "data",
+      "mode": "background",
+      "owner": "trace",
+      "description": "Fills span_analytics with the last 62 days of spans, the history the stock span widgets read.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "trace:record-evaluation-outcomes",
+      "kind": "data",
+      "mode": "background",
+      "owner": "trace",
+      "description": "Records each evaluation of the last 62 days on its trace, so the trace's evaluation rows can be written.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "trace:replay-trace-evaluation-analytics",
+      "kind": "data",
+      "mode": "background",
+      "owner": "trace",
+      "description": "Refolds the last 62 days of traces so each carries its evaluation rows for the stock widgets.",
+      "needsOldWritersGone": true
+    }
+  ]
+}
