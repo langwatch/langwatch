@@ -1,5 +1,5 @@
 import type { Authorization } from "@langwatch/authorization";
-import { AuthorizedClickHouse, type ClickHouseClientResolver } from "@langwatch/clickhouse-client";
+import type { ClickHouseClientResolver } from "@langwatch/clickhouse-client";
 import type {
   EvaluationOutcome,
   EvaluationOutcomeCursor,
@@ -37,7 +37,6 @@ export class ClickHouseEvaluationRepository extends EvaluationRunRepository {
   ) {
     super();
     this.reader = EvaluationRunClickHouseReadRepository.create({
-      clickhouse: new AuthorizedClickHouse({ resolveClient: options.resolveQueryClient }),
       resolveQueryClient: options.resolveQueryClient,
     });
     this.writer = EvaluationRunClickHouseWriteRepository.create({

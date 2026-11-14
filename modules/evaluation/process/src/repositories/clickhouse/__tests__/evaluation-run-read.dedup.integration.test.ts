@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { ownProof } from "../../../__tests__/support/authorization-proofs.fixture.ts";
 import { EvaluationRunClickHouseReadRepository } from "../evaluation-run-read.repository.ts";
-import { authorizedClickHouseFor } from "./support/authorized-clickhouse.support.ts";
+import { queryClientResolverFor } from "./support/authorized-clickhouse.support.ts";
 
 const TENANT = "tenant_dedup";
 const TRACE_ID = "trace_dedup_1";
@@ -105,7 +105,7 @@ describe("given an evaluation whose row was rewritten as it progressed", () => {
     /** @scenario "A rewritten evaluation is not hidden by the read's own column aliases" */
     it("returns it through the by-trace read as well", async () => {
       const repository = EvaluationRunClickHouseReadRepository.create({
-        clickhouse: authorizedClickHouseFor(client),
+        resolveQueryClient: queryClientResolverFor(client),
       });
 
       const result = await repository.findByTraceId({

@@ -76,6 +76,11 @@ function fixtureRow(overrides: Record<string, unknown> = {}): Record<string, unk
     CostId: null,
     LastProcessedEventId: "projection_1",
     LastEventOccurredAt: 1_700_000_001_000,
+    // The built run read renames the moments a declared column names (ADR-202).
+    CreatedAtMs: 1_700_000_000_000,
+    ArchivedAtMs: null,
+    CompletedAtMs: 1_700_000_001_000,
+    LastEventOccurredAtMs: 1_700_000_001_000,
     _retention_days: 49,
     ...overrides,
   };
@@ -237,9 +242,7 @@ describe("ClickHouseEvaluationRepository", () => {
       );
       expect(resolverQueries).toHaveLength(1);
       expect(resolverQueries[0]).toContain("ScheduledAt >=");
-      expect(client.queryParams[0]).toMatchObject({
-        sinceMs: expect.any(Number),
-      });
+      expect(Object.values(client.queryParams[0]!)).toContainEqual(expect.any(Number));
     } finally {
       vi.useRealTimers();
     }
@@ -270,11 +273,11 @@ describe("ClickHouseEvaluationRepository", () => {
         .map((query, index) => ({ query, params: client.queryParams[index]! }))
         .filter(({ query }) => query.includes("argMax(ScheduledAt"));
       expect(resolverRequests).toHaveLength(2);
-      expect(resolverRequests[1]?.params.sinceMs).toBe(floorMs);
+      expect(Object.values(resolverRequests[1]!.params)).toContain(floorMs);
 
       const heavyIndex = client.queries.findIndex((query) => query.includes("PREWHERE"));
-      expect(client.queries[heavyIndex]).toContain("t.ScheduledAt >=");
-      expect(client.queries[heavyIndex]).not.toContain("t.ScheduledAt <=");
+      expect(client.queries[heavyIndex]).toContain("ScheduledAt >=");
+      expect(client.queries[heavyIndex]).not.toContain("ScheduledAt <=");
       expect(client.queryParams[heavyIndex]).toMatchObject({
         idBound_fromMs: floorMs,
       });
@@ -328,7 +331,7 @@ describe("ClickHouseEvaluationRepository", () => {
   /** @scenario A single evaluation's inputs can be fetched without scanning the trace */
   it("reads one evaluation's inputs by its sort key and degrades unavailable reads", async () => {
     const { client, repository } = harness([
-      [{ TenantId: "org_1", Inputs: '{"input":"hello","output":"world"}' }],
+      [{ TenantId: "org_1", LatestInputs: '{"input":"hello","output":"world"}' }],
     ]);
 
     await expect(
@@ -337,10 +340,10 @@ describe("ClickHouseEvaluationRepository", () => {
         evaluationId: "evaluation_1",
       }),
     ).resolves.toEqual({ tenantId: "org_1", inputs: { input: "hello", output: "world" } });
-    expect(client.queries[0]).toContain("EvaluationId = {evaluationId:String}");
+    expect(client.queries[0]).toMatch(/EvaluationId = \{\w+:String\}/);
     expect(client.queries[0]).not.toContain("TraceId");
     // The tenant comes from the proof's fence, never from the caller.
-    expect(client.queryParams[0]).toMatchObject({ evaluationId: "evaluation_1" });
+    expect(Object.values(client.queryParams[0]!)).toContain("evaluation_1");
     expect(JSON.stringify(client.queryParams[0])).toContain("org_1");
 
     const down = async (): Promise<never> => {
@@ -385,6 +388,41 @@ describe("ClickHouseEvaluationRepository", () => {
 
       reader.mockRejectedValueOnce(new Error("Code: 62. Syntax error"));
       await expect(read()).rejects.toThrow("Code: 62");
+    });
+  });
+
+  describe("given the reads built on the typed builder", () => {
+    it("sends each as a tenant statement fenced by the proof with the tenant setting", async () => {
+      const queryClient = idIndexedClientDouble({
+        indexes: [...EVALUATION_ID_INDEXES, ...EVALUATION_SECOND_ID_INDEXES],
+        driver: { execute: async () => ({ rows: [] }) },
+      });
+      const read = vi.spyOn(queryClient, "read");
+      const repository = ClickHouseEvaluationRepository.create({
+        resolveClient: async () => harness().client,
+        resolveQueryClient: async () => queryClient,
+      });
+      const authorization = ownProof({ projectId: "org_1" });
+
+      await repository.findInputs({ authorization, evaluationId: "evaluation_1" });
+      await repository.findOutcomesSince({ authorization, sinceMs: 1, after: null, limit: 10 });
+      await expect(
+        repository.getByEvaluationId({
+          authorization,
+          evaluationId: "evaluation_1",
+          retention: new TestRetention(),
+        }),
+      ).rejects.toMatchObject({ code: "evaluation_not_found" });
+
+      // Inputs, outcomes, the ScheduledAt probes and the run read: every one built.
+      // The column list for the attempt columns is server metadata, not a run read.
+      const runReads = read.mock.calls.filter(([{ statement }]) => statement.kind !== "metadata");
+      expect(runReads.length).toBeGreaterThanOrEqual(5);
+      for (const [{ statement }] of runReads) {
+        expect(statement).toMatchObject({ identity: "reader", kind: "tenant", tenantId: "org_1" });
+        expect(statement.settings).toMatchObject({ SQL_langwatch_tenant_ids: "org_1" });
+        expect(statement.sql).not.toContain("{{tenantScope");
+      }
     });
   });
 });

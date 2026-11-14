@@ -1,8 +1,9 @@
 import type { Authorization } from "@langwatch/authorization";
 import {
-  type AuthorizedClickHouse,
+  AuthorizedClickHouse,
   type ClickHouseClientResolver,
   ClickHouseColumns,
+  type ClickHouseQueryClient,
   type IdBoundOptions,
   type IdBoundResolved,
   ownProjectIdOf,
@@ -13,6 +14,14 @@ import {
   tenantScopeKey,
   tenantSet,
 } from "@langwatch/clickhouse-client";
+import {
+  clickhouseRead,
+  column,
+  fn,
+  param,
+  tenantScope as builtScope,
+  type ProofScope,
+} from "@langwatch/clickhouse-client/builder";
 import {
   evaluationOutcomeSchema,
   evaluationRunDataSchema,
@@ -33,6 +42,7 @@ import type {
   EvaluationRunFloorLookup,
   EvaluationRetentionLookup,
 } from "../evaluation.repository.ts";
+import { evaluationRuns } from "./clickhouse.evaluation-runs.table.ts";
 import type { ClickHouseEvaluationRunRecord } from "./evaluation-run-write.repository.ts";
 
 const TABLE_NAME = "evaluation_runs" as const;
@@ -55,14 +65,15 @@ const outcomeRowsSchema = z.array(
   }),
 );
 const RUNS = "runs" as const;
-const inputsRowSchema = z.object({ TenantId: z.string(), Inputs: z.string().nullable() });
+const inputsRowSchema = z.object({ TenantId: z.string(), LatestInputs: z.string().nullable() });
 const inputsRowsSchema = z.array(inputsRowSchema);
 const logger = createLogger("langwatch:evaluation:clickhouse.evaluation-run-read");
 
-/**
- * The attempt columns goose 00122 adds, each with the default it reads as until the tenant's
- * target has it (`ClickHouseColumns.select`, NO-HOLDS, ARCHITECTURE.md section 7).
- */
+/** The NO-HOLDS defaults the attempt columns (goose 00122) read as until the target has them. */
+const NO_ATTEMPT_MOMENT = fn.nullAs(column.nullable(column.dateTime64({ precision: 3 })));
+const NO_ATTEMPT_ERROR = fn.nullAs(column.nullable(column.string()));
+
+/** The attempt columns the raw by-trace reads name, each with its NO-HOLDS default. */
 const ATTEMPT_COLUMNS = {
   Attempts: "toUInt16(0)",
   LastAttemptAt: "CAST(NULL AS Nullable(DateTime64(3)))",
@@ -79,7 +90,7 @@ const ATTEMPT_MOMENTS = [
 /** A read row: no output takes a name the fence reads (ADR-201 §3), so those times end `Ms`. */
 type ClickHouseEvaluationRunRow = Omit<
   ClickHouseEvaluationRunRecord,
-  "UpdatedAt" | "ScheduledAt" | "StartedAt"
+  "UpdatedAt" | "ScheduledAt" | "StartedAt" | "LastAttemptAt" | "NextAttemptAt" | "_retention_days"
 > & {
   UpdatedAtMs: number | string;
   ScheduledAtMs: number | string | null;
@@ -165,23 +176,46 @@ function parseObject(value: string | null): Record<string, unknown> | null {
 /** Owns evaluation_runs reads, bounded lookup windows, and row decoding. */
 export class EvaluationRunClickHouseReadRepository {
   static create(options: {
-    /** The proof-fenced reader every read goes through (ADR-177 block C; AGG-EVAL-PROOF). */
-    clickhouse: AuthorizedClickHouse;
-    /** The client whose column list says which attempt columns the tenant's target has. */
-    resolveQueryClient?: ClickHouseClientResolver;
+    /** The client every read resolves: built reads go through `read`, fenced by the proof. */
+    resolveQueryClient: ClickHouseClientResolver;
   }): EvaluationRunClickHouseReadRepository {
     return new EvaluationRunClickHouseReadRepository(options);
   }
 
   /** One floor per tenant lookup, so its cache outlives a read; built on first read. */
   private readonly floors = new WeakMap<EvaluationRetentionLookup, RetentionFloorService>();
+  /** The proof-fenced reader the two by-trace reads still go through (ADR-177 block C). */
+  private readonly clickhouse: AuthorizedClickHouse;
 
-  private constructor(
-    private readonly options: {
-      clickhouse: AuthorizedClickHouse;
-      resolveQueryClient?: ClickHouseClientResolver;
-    },
-  ) {}
+  private constructor(private readonly options: { resolveQueryClient: ClickHouseClientResolver }) {
+    this.clickhouse = new AuthorizedClickHouse({ resolveClient: options.resolveQueryClient });
+  }
+
+  /** The proof's fenced scope and the client of the project it routes to. */
+  private async readerFor(
+    authorization: Authorization,
+  ): Promise<{ scope: ProofScope; client: Pick<ClickHouseQueryClient, "read" | "columns"> }> {
+    const scope = builtScope.fromProof({ authorization, reads: "traces" });
+    // An unreachable client fails as the fenced reader's does, so callers degrade by kind.
+    const client = await this.options.resolveQueryClient(scope.routeTenantId).catch((cause) => {
+      throw new TenantReaderClientUnavailableError({ cause });
+    });
+    return { scope, client };
+  }
+
+  /** Which attempt columns the reader's own target holds; an unreadable list holds all. */
+  private static async attemptsHeld({
+    client,
+    tenantId,
+  }: {
+    client: Pick<ClickHouseQueryClient, "columns">;
+    tenantId: string;
+  }): Promise<(name: string) => boolean> {
+    return client
+      .columns({ tenantId })
+      .holds({ table: TABLE_NAME })
+      .catch(() => () => true);
+  }
 
   /** The attempt columns the reader's own target answers, the missing ones as defaults. */
   private async attemptColumns({
@@ -192,11 +226,9 @@ export class EvaluationRunClickHouseReadRepository {
     alias: string;
   }): Promise<string> {
     const input = { table: TABLE_NAME, alias, columns: ATTEMPT_COLUMNS };
-    const { resolveQueryClient } = this.options;
-    if (!resolveQueryClient) return ClickHouseColumns.named(input);
     const tenantId = ownProjectIdOf({ authorization, reads: "traces" });
     // An unreachable client names every column; the read itself then fails as it would have.
-    const client = await resolveQueryClient(tenantId).catch(() => undefined);
+    const client = await this.options.resolveQueryClient(tenantId).catch(() => undefined);
     if (!client) return ClickHouseColumns.named(input);
     return client.columns({ tenantId }).select(input);
   }
@@ -254,48 +286,69 @@ export class EvaluationRunClickHouseReadRepository {
     input: EvaluationRunFloorLookup;
     idBound: IdBoundOptions;
   }): Promise<ClickHouseEvaluationRunRow | undefined> {
-    const client = this.options.clickhouse.as(input.authorization, { reads: "traces" });
-    const attempts = await this.attemptColumns({ authorization: input.authorization, alias: "t" });
-    // No output takes a name the fence reads (ADR-201 §3): those times leave as `…Ms`. The
-    // windowed fence reads the raw column in the dedup subquery; the outer takes the tenant set.
-    const result = await client.query<ClickHouseEvaluationRunRow>({
-      query: `
-        SELECT
-          t.ProjectionId AS ProjectionId, t.TenantId,
-          t.EvaluationId AS EvaluationId, t.Version AS Version,
-          t.EvaluatorId AS EvaluatorId, t.EvaluatorType AS EvaluatorType,
-          t.EvaluatorName AS EvaluatorName, t.TraceId,
-          t.IsGuardrail AS IsGuardrail, t.Status AS Status, t.Score AS Score,
-          t.Passed AS Passed, t.Label AS Label, t.Details AS Details,
-          t.Inputs AS Inputs, t.Error AS Error, t.ErrorDetails AS ErrorDetails,
-          toUnixTimestamp64Milli(t.CreatedAt) AS CreatedAt,
-          toUnixTimestamp64Milli(t.UpdatedAt) AS UpdatedAtMs,
-          toUnixTimestamp64Milli(t.ArchivedAt) AS ArchivedAt,
-          toUnixTimestamp64Milli(t.ScheduledAt) AS ScheduledAtMs,
-          toUnixTimestamp64Milli(t.StartedAt) AS StartedAtMs,
-          toUnixTimestamp64Milli(t.CompletedAt) AS CompletedAt,
-          t.CostId AS CostId, ${attempts}, ${ATTEMPT_MOMENTS},
-          t.LastProcessedEventId AS LastProcessedEventId,
-          toUnixTimestamp64Milli(t.LastEventOccurredAt) AS LastEventOccurredAt
-        FROM ${TABLE_NAME} AS t
-        PREWHERE (t.TenantId, t.EvaluationId, t.UpdatedAt) IN (
-          SELECT TenantId, EvaluationId, max(UpdatedAt)
-          FROM ${TABLE_NAME}
-          WHERE ${tenantScope("ScheduledAt")}
-            AND EvaluationId = {evaluationId:String}
-            {{idBound:evaluation_runs.EvaluationId:evaluationId}}
-          GROUP BY TenantId, EvaluationId
-        )
-        WHERE ${tenantSet()}
-          AND t.EvaluationId = {evaluationId:String}
-          {{idBound:evaluation_runs.EvaluationId:evaluationId:t}}
-        LIMIT 1
-      `,
-      query_params: { evaluationId: input.evaluationId },
-      format: "JSONEachRow",
-      idBound,
+    const { scope, client } = await this.readerFor(input.authorization);
+    const holds = await EvaluationRunClickHouseReadRepository.attemptsHeld({
+      client,
+      tenantId: scope.routeTenantId,
     });
-    return (await result.json())[0];
+    const r = evaluationRuns;
+    // No output takes a name the fence reads (ADR-201 §3): those times leave as `…Ms`. The
+    // election repeats the windowed fence and the id bound under PREWHERE.
+    const statement = clickhouseRead({ scope })
+      .from(r)
+      .withinWindows()
+      .select({
+        ProjectionId: r.ProjectionId,
+        TenantId: r.TenantId,
+        EvaluationId: r.EvaluationId,
+        Version: r.Version,
+        EvaluatorId: r.EvaluatorId,
+        EvaluatorType: r.EvaluatorType,
+        EvaluatorName: r.EvaluatorName,
+        TraceId: r.TraceId,
+        IsGuardrail: r.IsGuardrail,
+        Status: r.Status,
+        Score: r.Score,
+        Passed: r.Passed,
+        Label: r.Label,
+        Details: r.Details,
+        Inputs: r.Inputs,
+        Error: r.Error,
+        ErrorDetails: r.ErrorDetails,
+        CreatedAtMs: fn.toUnixTimestamp64Milli(r.CreatedAt),
+        UpdatedAtMs: fn.toUnixTimestamp64Milli(r.UpdatedAt),
+        ArchivedAtMs: fn.toUnixTimestamp64Milli(r.ArchivedAt),
+        ScheduledAtMs: fn.toUnixTimestamp64Milli(r.ScheduledAt),
+        StartedAtMs: fn.toUnixTimestamp64Milli(r.StartedAt),
+        CompletedAtMs: fn.toUnixTimestamp64Milli(r.CompletedAt),
+        CostId: r.CostId,
+        AttemptCount: fn.heldOr(r.Attempts, { holds, otherwise: param.uint16(0) }),
+        LastAttemptAtMs: fn.toUnixTimestamp64Milli(
+          fn.heldOr(r.LastAttemptAt, { holds, otherwise: NO_ATTEMPT_MOMENT }),
+        ),
+        LastAttemptErrorText: fn.heldOr(r.LastAttemptError, { holds, otherwise: NO_ATTEMPT_ERROR }),
+        NextAttemptAtMs: fn.toUnixTimestamp64Milli(
+          fn.heldOr(r.NextAttemptAt, { holds, otherwise: NO_ATTEMPT_MOMENT }),
+        ),
+        LastProcessedEventId: r.LastProcessedEventId,
+        LastEventOccurredAtMs: fn.toUnixTimestamp64Milli(r.LastEventOccurredAt),
+      })
+      .where(({ idBound }) => idBound(r.EvaluationId, input.evaluationId))
+      .latestVersion({ prewhere: true })
+      .limit(1)
+      .build();
+    const result = await client.read({ statement, idBound });
+    const [row] = result.rows;
+    if (!row) return undefined;
+    return {
+      ...row,
+      CreatedAt: row.CreatedAtMs,
+      ArchivedAt: row.ArchivedAtMs,
+      CompletedAt: row.CompletedAtMs,
+      Attempts: row.AttemptCount,
+      LastAttemptError: row.LastAttemptErrorText,
+      LastEventOccurredAt: row.LastEventOccurredAtMs,
+    };
   }
 
   async findByTraceId(input: {
@@ -303,7 +356,7 @@ export class EvaluationRunClickHouseReadRepository {
     traceId: string;
   }): Promise<EvaluationRunData[]> {
     try {
-      const client = this.options.clickhouse.as(input.authorization, { reads: "traces" });
+      const client = this.clickhouse.as(input.authorization, { reads: "traces" });
       const attempts = await this.attemptColumns({
         authorization: input.authorization,
         alias: RUNS,
@@ -370,42 +423,50 @@ export class EvaluationRunClickHouseReadRepository {
     after: EvaluationOutcomeCursor | null;
     limit: number;
   }): Promise<EvaluationOutcome[]> {
-    const client = this.options.clickhouse.as(input.authorization, { reads: "traces" });
-    const result = await client.query({
-      // ID_BOUND_SKIP: a page by time range, not a read by id.
-      query: `
-        SELECT
-          EvaluationId,
-          argMax(TraceId, UpdatedAt) AS LatestTraceId,
-          argMax(EvaluatorName, UpdatedAt) AS LatestEvaluatorName,
-          argMax(IsGuardrail, UpdatedAt) AS LatestIsGuardrail,
-          argMax(Status, UpdatedAt) AS LatestStatus,
-          argMax(Passed, UpdatedAt) AS LatestPassed,
-          argMax(Label, UpdatedAt) AS LatestLabel,
-          toUnixTimestamp64Milli(argMax(LastEventOccurredAt, UpdatedAt)) AS LatestOccurredAt,
-          argMax(LastProcessedEventId, UpdatedAt) AS LatestEventId
-        FROM ${TABLE_NAME}
-        WHERE ${tenantScope("ScheduledAt")}
-          AND ScheduledAt >= fromUnixTimestamp64Milli({scheduledFrom:Int64})
-        GROUP BY TenantId, EvaluationId
-        HAVING LatestStatus IN ('processed', 'error', 'skipped')
-          AND ifNull(LatestTraceId, '') != ''
-          AND LatestOccurredAt >= {since:Int64}
-          AND (LatestOccurredAt, EvaluationId) > ({afterOccurredAt:Int64}, {afterEvaluationId:String})
-        ORDER BY LatestOccurredAt ASC, EvaluationId ASC
-        LIMIT {limit:UInt32}
-      `,
-      query_params: {
-        scheduledFrom:
-          Math.max(input.sinceMs, input.after?.occurredAt ?? input.sinceMs) -
-          OUTCOME_SCHEDULE_SLACK_MS,
-        since: input.sinceMs,
-        afterOccurredAt: input.after?.occurredAt ?? -1,
-        afterEvaluationId: input.after?.evaluationId ?? "",
-        limit: input.limit,
-      },
-      format: "JSONEachRow",
-    });
+    const { scope, client } = await this.readerFor(input.authorization);
+    const r = evaluationRuns;
+    const latest = <V>(
+      of: Parameters<typeof fn.argMax<V, "evaluation_runs", "evaluation_runs">>[0],
+    ) => fn.argMax(of, r.UpdatedAt);
+    const occurredAtMs = fn.toUnixTimestamp64Milli(latest(r.LastEventOccurredAt));
+    const scheduledFrom =
+      Math.max(input.sinceMs, input.after?.occurredAt ?? input.sinceMs) - OUTCOME_SCHEDULE_SLACK_MS;
+    // ID_BOUND_SKIP: a page by time range, not a read by id.
+    const statement = clickhouseRead({ scope })
+      .from(r)
+      .withinWindows()
+      .select({
+        EvaluationId: r.EvaluationId,
+        LatestTraceId: latest(r.TraceId),
+        LatestEvaluatorName: latest(r.EvaluatorName),
+        LatestIsGuardrail: latest(r.IsGuardrail),
+        LatestStatus: latest(r.Status),
+        LatestPassed: latest(r.Passed),
+        LatestLabel: latest(r.Label),
+        LatestOccurredAt: occurredAtMs,
+        LatestEventId: latest(r.LastProcessedEventId),
+      })
+      .where(({ gte }) => gte(r.ScheduledAt, scheduledFrom))
+      .groupBy(r.TenantId, r.EvaluationId)
+      .having(({ and, oneOf, ne, gte, gt }) =>
+        and(
+          oneOf(latest(r.Status), ["processed", "error", "skipped"]),
+          ne(fn.ifNull(latest(r.TraceId), ""), ""),
+          gte(occurredAtMs, param.int64(input.sinceMs)),
+          gt(
+            fn.tuple(occurredAtMs, r.EvaluationId),
+            fn.tuple(
+              param.int64(input.after?.occurredAt ?? -1),
+              param.string(input.after?.evaluationId ?? ""),
+            ),
+          ),
+        ),
+      )
+      .orderBy("LatestOccurredAt", "ASC")
+      .orderBy("EvaluationId", "ASC")
+      .limit(input.limit)
+      .build();
+    const result = { json: async () => (await client.read({ statement })).rows };
     return outcomeRowsSchema.parse(await result.json()).map((row) =>
       evaluationOutcomeSchema.parse({
         evaluationId: row.EvaluationId,
@@ -456,7 +517,7 @@ export class EvaluationRunClickHouseReadRepository {
     traceIds: readonly string[];
     columns: string;
   }): Promise<TraceEvaluationData[]> {
-    const client = this.options.clickhouse.as(input.authorization, { reads: "traces" });
+    const client = this.clickhouse.as(input.authorization, { reads: "traces" });
     const result = await client.query<TraceEvaluationRow>({
       query: `
         SELECT ${input.columns}
@@ -510,25 +571,24 @@ export class EvaluationRunClickHouseReadRepository {
     evaluationId: string;
   }): Promise<EvaluationInputsRead | null> {
     try {
-      const reader = this.options.clickhouse.as(input.authorization, { reads: "traces" });
+      const { scope, client } = await this.readerFor(input.authorization);
+      const r = evaluationRuns;
       // Today's read has no time bound at all; only the index narrows it.
-      const result = await reader.query({
-        query: `
-          SELECT TenantId, argMax(Inputs, UpdatedAt) AS Inputs
-          FROM ${TABLE_NAME}
-          WHERE ${tenantScope("ScheduledAt")}
-            AND EvaluationId = {evaluationId:String}
-            {{idBound:evaluation_runs.EvaluationId:evaluationId}}
-          GROUP BY TenantId
-          ORDER BY TenantId
-          LIMIT 1
-        `,
-        query_params: { evaluationId: input.evaluationId },
-        format: "JSONEachRow",
-        idBound: { fallback: "unbounded" },
-      });
+      const statement = clickhouseRead({ scope })
+        .from(r)
+        .withinWindows()
+        .select({ TenantId: r.TenantId, LatestInputs: fn.argMax(r.Inputs, r.UpdatedAt) })
+        .where(({ idBound }) => idBound(r.EvaluationId, input.evaluationId))
+        .groupBy(r.TenantId)
+        .orderBy(r.TenantId)
+        .limit(1)
+        .build();
+      const result = {
+        json: async () =>
+          (await client.read({ statement, idBound: { fallback: "unbounded" } })).rows,
+      };
       const row = inputsRowsSchema.parse(await result.json())[0];
-      return row ? { tenantId: row.TenantId, inputs: parseObject(row.Inputs) } : null;
+      return row ? { tenantId: row.TenantId, inputs: parseObject(row.LatestInputs) } : null;
     } catch (error) {
       // An unreachable cluster or the memory ceiling answers no inputs (bound scenario);
       // any other failure throws.
@@ -590,22 +650,20 @@ export class EvaluationRunClickHouseReadRepository {
     evaluationId: string;
     sinceMs: number;
   }): Promise<number | undefined> {
-    const client = this.options.clickhouse.as(input.authorization, { reads: "traces" });
-    const result = await client.query<{ scheduledAtMs: number | string | null }>({
-      // ID_BOUND_SKIP: the not-ready ladder's probe; the index path never runs it.
-      query: `
-        SELECT toUnixTimestamp64Milli(argMax(ScheduledAt, UpdatedAt)) AS scheduledAtMs
-        FROM ${TABLE_NAME}
-        WHERE ${tenantScope("ScheduledAt")}
-          AND EvaluationId = {evaluationId:String}
-          AND ScheduledAt >= fromUnixTimestamp64Milli({sinceMs:Int64})
-      `,
-      query_params: {
-        evaluationId: input.evaluationId,
-        sinceMs: input.sinceMs,
-      },
-      format: "JSONEachRow",
-    });
+    const { scope, client } = await this.readerFor(input.authorization);
+    const r = evaluationRuns;
+    // ID_BOUND_SKIP: the not-ready ladder's probe; the index path never runs it.
+    const statement = clickhouseRead({ scope })
+      .from(r)
+      .withinWindows()
+      .select({
+        scheduledAtMs: fn.toUnixTimestamp64Milli(fn.argMax(r.ScheduledAt, r.UpdatedAt)),
+      })
+      .where(({ and, eq, gte }) =>
+        and(eq(r.EvaluationId, input.evaluationId), gte(r.ScheduledAt, input.sinceMs)),
+      )
+      .build();
+    const result = { json: async () => (await client.read({ statement })).rows };
     const raw = (await result.json())[0]?.scheduledAtMs;
     if (raw === null || raw === undefined) return undefined;
     const value = Number(raw);

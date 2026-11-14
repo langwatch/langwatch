@@ -16,7 +16,7 @@ import {
 } from "../../../__tests__/support/authorization-proofs.fixture.ts";
 import { EvaluationRunClickHouseReadRepository } from "../evaluation-run-read.repository.ts";
 import { EvaluationRunClickHouseWriteRepository } from "../evaluation-run-write.repository.ts";
-import { authorizedClickHouseFor } from "./support/authorized-clickhouse.support.ts";
+import { queryClientResolverFor } from "./support/authorized-clickhouse.support.ts";
 
 const TENANT = "tenant_by_trace";
 const TRACE_ID = "trace_by_trace_1";
@@ -98,7 +98,7 @@ describe("given a trace whose evaluation runs are stored", () => {
     const resolveClient = async () => client as never;
     const writes = EvaluationRunClickHouseWriteRepository.create({ resolveClient });
     reads = EvaluationRunClickHouseReadRepository.create({
-      clickhouse: authorizedClickHouseFor(client),
+      resolveQueryClient: queryClientResolverFor(client),
     });
     const runs = [
       evaluationRun({}),

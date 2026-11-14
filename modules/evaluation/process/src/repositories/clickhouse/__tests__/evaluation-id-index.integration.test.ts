@@ -5,7 +5,6 @@
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import {
-  AuthorizedClickHouse,
   type ClickHouseQueryClient,
   type QueryRequest,
   setWindowedReadMetrics,
@@ -121,10 +120,10 @@ describe.skipIf(!clickHouseUrl)("a lookup of an evaluation run by id alone", () 
     const ready = recordingQueryClient({ client: clickHouse, ready: true });
     const unready = recordingQueryClient({ client: clickHouse, ready: false });
     repository = EvaluationRunClickHouseReadRepository.create({
-      clickhouse: new AuthorizedClickHouse({ resolveClient: () => ready }),
+      resolveQueryClient: () => ready,
     });
     notReady = EvaluationRunClickHouseReadRepository.create({
-      clickhouse: new AuthorizedClickHouse({ resolveClient: () => unready }),
+      resolveQueryClient: () => unready,
     });
     await clickHouse.insert({
       table: "evaluation_runs",
@@ -165,7 +164,7 @@ describe.skipIf(!clickHouseUrl)("a lookup of an evaluation run by id alone", () 
 
       expect(run.evaluationId).toBe(targetId);
       const read = statements.find(
-        (statement) => statement.sql.includes("FROM evaluation_runs AS t") && statement.params,
+        (statement) => statement.sql.includes("idBound_fromMs") && statement.params,
       );
       expect(read?.params).toMatchObject({
         idBound_fromMs: eightWeeksAgoMs - DAY_MS,

@@ -964,7 +964,8 @@ function tenantPredicate({
 
 /**
  * The latest-version election: keys and version from the descriptor, under the fence's
- * latest-version form, repeating the read's conjuncts that filter on that table's keys alone.
+ * latest-version form, repeating the read's conjuncts that filter on that table's keys or its
+ * time column alone (the time window keeps partition pruning).
  */
 function electionOf({
   state,

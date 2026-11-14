@@ -2,7 +2,7 @@
  * Evaluation reads the runs on a batch of traces from its own table, through its trace id index.
  * Spec: modules/evaluation/specs/evaluation-trace-evaluations.feature
  */
-import { AuthorizedClickHouse, type QueryRequest } from "@langwatch/clickhouse-client";
+import type { QueryRequest } from "@langwatch/clickhouse-client";
 import {
   idIndexedClientDouble,
   readyIdIndexedClientDouble,
@@ -65,7 +65,7 @@ async function readerOver({
   return {
     statements,
     repository: EvaluationRunClickHouseReadRepository.create({
-      clickhouse: new AuthorizedClickHouse({ resolveClient: async () => client }),
+      resolveQueryClient: async () => client,
     }),
   };
 }

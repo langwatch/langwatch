@@ -14,6 +14,13 @@ import {
 } from "../../clickhouse.evaluation-id-indexes.database.ts";
 
 export function authorizedClickHouseFor(client: ClickHouseClient): AuthorizedClickHouse {
+  return new AuthorizedClickHouse({ resolveClient: queryClientResolverFor(client) });
+}
+
+/** The same raw test ClickHouse as the resolver a built read sends through. */
+export function queryClientResolverFor(
+  client: ClickHouseClient,
+): () => Promise<ClickHouseQueryClient> {
   const driver: QueryDriver = {
     async execute(request) {
       const result = await client.query({
@@ -44,5 +51,5 @@ export function authorizedClickHouseFor(client: ClickHouseClient): AuthorizedCli
   queryClient.declareIdIndexes({
     indexes: [...EVALUATION_ID_INDEXES, ...EVALUATION_SECOND_ID_INDEXES],
   });
-  return new AuthorizedClickHouse({ resolveClient: async () => queryClient });
+  return async () => queryClient;
 }

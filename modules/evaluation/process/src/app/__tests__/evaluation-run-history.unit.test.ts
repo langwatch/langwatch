@@ -140,6 +140,12 @@ describe("given the live evaluation repositories over the process's ClickHouse m
           statements.push({ tenantId: request.tenantId, settings: request.settings });
           return { rows: [] };
         },
+        read: async ({ statement }) => {
+          // The column list is server metadata; every run read is a tenant statement.
+          if (statement.kind === "tenant")
+            statements.push({ tenantId: statement.tenantId, settings: statement.settings });
+          return { rows: [] };
+        },
         columns: () => ClickHouseColumns.over({ read: async () => [] }),
       });
       const repositories = LiveEvaluationRepositories.create({
@@ -185,8 +191,10 @@ describe("given the live run read over a tenant's retention from data retention"
         indexes: [...EVALUATION_ID_INDEXES, ...EVALUATION_SECOND_ID_INDEXES],
         driver: {
           execute: async (request: QueryRequest) => {
-            const sinceMs = request.params?.sinceMs;
-            if (typeof sinceMs === "number") probes.push(sinceMs);
+            // The probe binds its lower bound as its one number (the built read names it).
+            const sinceMs = Object.values(request.params ?? {}).find((v) => typeof v === "number");
+            if (request.sql.includes("argMax(ScheduledAt") && typeof sinceMs === "number")
+              probes.push(sinceMs);
             return { rows: [] };
           },
         },
