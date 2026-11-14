@@ -36,6 +36,7 @@ export const createMockPlan = (overrides: Partial<PlanInfo> = {}): PlanInfo => (
   free: true,
   maxMembers: 2,
   maxMembersLite: 0,
+  maxMembersDeveloper: 0,
   maxMessagesPerMonth: 50000,
   canPublish: false,
   prices: { USD: 0, EUR: 0 },
@@ -87,6 +88,17 @@ export const mockGetOrganizationWithMembers = vi.fn(() => ({
   refetch: vi.fn(),
 }));
 
+/** The server's held seats: none unless a test says otherwise. */
+export const mockListHeldSeats = vi.fn(
+  (): {
+    data:
+      | { heldSeats: { userId: string; email: string | null; seatFreesAt: string }[] }
+      | undefined;
+  } => ({
+    data: { heldSeats: [] },
+  }),
+);
+
 export const mockUpdateUsers = vi.fn(() => ({
   mutate: vi.fn(),
   mutateAsync: vi.fn(),
@@ -137,12 +149,30 @@ export type MockSeatLimitInfo = {
   message: string;
 };
 
+export type MockMessageLimitInfo = {
+  status: "ok" | "warning" | "exceeded";
+  current: number;
+  max: number;
+  currentFormatted: string;
+  maxFormatted: string;
+  percentageFormatted: string;
+  message: string;
+};
+
 // Defaults to the usage query not having answered yet, which is the state
 // the page falls back to its own member count in. Suites about the seat
 // limit set real usage data.
 export const mockGetUsage = vi.fn(
   (): {
-    data: { seatLimitInfo: MockSeatLimitInfo; membersCount: number } | undefined;
+    data:
+      | {
+          seatLimitInfo: MockSeatLimitInfo;
+          membersCount: number;
+          currentMonthMessagesCount?: number | null;
+          messageLimitInfo?: MockMessageLimitInfo;
+          usageUnit?: "traces" | "events";
+        }
+      | undefined;
     isLoading: boolean;
     refetch: () => void;
   } => ({
@@ -160,23 +190,55 @@ export const mockDetectCurrency = vi.fn(() => ({
 export const mockCreateInvitesMutate = vi.fn();
 export const mockCreateInvites = vi.fn(() => ({
   mutate: mockCreateInvitesMutate,
-  mutateAsync: vi.fn().mockResolvedValue({ success: true }),
+  mutateAsync: mockCreateInvitesMutateAsync,
   isLoading: false,
   isPending: false,
 }));
 
-export const mockListInvoices = vi.fn(() => ({
-  data: [] as DisplayInvoice[],
-  isLoading: false,
-  isError: false,
-}));
+export const mockListInvoices = vi.fn(
+  (): {
+    data: DisplayInvoice[] | undefined;
+    isLoading: boolean;
+    isError: boolean;
+    error?: { data: { httpStatus: number } };
+  } => ({ data: [], isLoading: false, isError: false }),
+);
 
-export const mockGetLastSubscription = vi.fn(() => ({
+export const mockGetLastSubscription = vi.fn((): { data: unknown; isLoading: boolean } => ({
   data: null,
   isLoading: false,
 }));
 
 export const mockOpenSeats = vi.fn();
+
+export const mockDeveloperSeatsRefetch = vi.fn(async () => undefined);
+
+/** Developer seats as billing answers them; unavailable until a test configures a price. */
+export const mockDeveloperSeats = vi.fn(
+  (): { data: unknown; isLoading: boolean; isError?: boolean } => ({
+    data: {
+      available: false,
+      quantity: 0,
+      unitAmountCents: null,
+      currency: "EUR",
+      billingInterval: "month",
+      periodEndsAt: Date.UTC(2026, 11, 1),
+    },
+    isLoading: false,
+  }),
+);
+export const mockPreviewDeveloperSeats = vi.fn(
+  (_input: { quantity: number }): { data: unknown; isLoading: boolean; isError: boolean } => ({
+    data: undefined,
+    isLoading: true,
+    isError: false,
+  }),
+);
+export const mockSetDeveloperSeats = vi.fn(async (_input: unknown) => ({ success: true }));
+/** What `createInvites` answers: the invitations it created. */
+export const mockCreateInvitesMutateAsync = vi.fn(async (_input: unknown): Promise<unknown> => [
+  { id: "invite-1" },
+]);
 
 // ---------------------------------------------------------------------------
 // resetMocks — call in every test file's beforeEach
@@ -198,6 +260,7 @@ export function resetMocks() {
     data: [],
     isLoading: false,
   });
+  mockListHeldSeats.mockReturnValue({ data: { heldSeats: [] } });
   mockGetUsage.mockReturnValue({
     data: undefined,
     isLoading: true,
@@ -216,4 +279,18 @@ export function resetMocks() {
     data: null,
     isLoading: false,
   });
+  mockDeveloperSeats.mockReturnValue({
+    data: {
+      available: false,
+      quantity: 0,
+      unitAmountCents: null,
+      currency: "EUR",
+      billingInterval: "month",
+      periodEndsAt: Date.UTC(2026, 11, 1),
+    },
+    isLoading: false,
+  });
+  mockPreviewDeveloperSeats.mockReturnValue({ data: undefined, isLoading: true, isError: false });
+  mockSetDeveloperSeats.mockResolvedValue({ success: true });
+  mockCreateInvitesMutateAsync.mockResolvedValue([{ id: "invite-1" }]);
 }

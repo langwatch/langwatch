@@ -56,7 +56,10 @@ export interface ProjectWithOrgAdmin {
   organizationCreatedAt: Instant | null;
 }
 
-/** One stored project as the project facts step reads it, with its organization's oldest admin. */
+/**
+ * One stored project as the project data steps read it (the facts step and the history listing),
+ * with its organization's oldest admin.
+ */
 export type ProjectBackfillRow = Readonly<{
   id: string;
   createdAt: Instant;
@@ -67,10 +70,13 @@ export type ProjectBackfillRow = Readonly<{
   presenceEnabled: boolean;
   isArchived: boolean;
   adminUserId: string | null;
+  /** A personal project's owner; null for a shared project. */
+  ownerUserId: string | null;
+  firstMessage: boolean;
 }>;
 
 /**
- * One row of the projects table for the facts step: a whole project, or an orphan whose team or
+ * One row of the projects table for the data steps: a whole project, or an orphan whose team or
  * organization is gone, so nothing can be recorded for it.
  */
 export type ProjectBackfillEntry =

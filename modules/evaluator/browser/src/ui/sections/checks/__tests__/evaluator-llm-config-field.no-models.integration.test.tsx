@@ -17,7 +17,7 @@ const OWN_DECISION_MODEL = {
 };
 const HOSTED_DECISION_MODEL = {
   value: "langwatch/instant-evals",
-  label: "Instant Preview",
+  label: "Evals Preview",
 };
 
 const state = vi.hoisted(() => ({

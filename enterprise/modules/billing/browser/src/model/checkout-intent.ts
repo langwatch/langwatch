@@ -1,7 +1,7 @@
 /**
- * The Growth checkout the plans page asks the subscription page to start, carried in the
- * address so the subscription page computes the seats and price it already owns.
- * @see specs/features/settings-plans-comparison.feature
+ * The Growth upgrade another page asks the subscription page to open, carried in the address:
+ * the seat dialog opens there, in the interval and currency asked for when the address names them.
+ * @see specs/licensing/seat-buying.feature
  */
 
 import { Currency } from "@langwatch/enterprise-billing-contract";
@@ -13,11 +13,14 @@ export const SUBSCRIPTION_PATH = "/settings/subscription";
 
 const checkoutIntentSchema = z.object({
   checkout: z.literal("growth"),
-  interval: z.enum(["monthly", "annual"]),
-  currency: z.enum([Currency.EUR, Currency.USD]),
+  interval: z.enum(["monthly", "annual"]).optional(),
+  currency: z.enum([Currency.EUR, Currency.USD]).optional(),
 });
 
 export type CheckoutIntent = Omit<z.infer<typeof checkoutIntentSchema>, "checkout">;
+
+/** The subscription address that opens the Growth seat dialog in the page's own choices. */
+export const UPGRADE_DIALOG_HREF = `${SUBSCRIPTION_PATH}?checkout=growth`;
 
 /** The subscription address that starts a Growth checkout for this interval and currency. */
 export function checkoutIntentHref({
@@ -25,7 +28,7 @@ export function checkoutIntentHref({
   currency,
 }: {
   interval: BillingInterval;
-  currency: CheckoutIntent["currency"];
+  currency: NonNullable<CheckoutIntent["currency"]>;
 }): string {
   const query = new URLSearchParams({ checkout: "growth", interval, currency });
   return `${SUBSCRIPTION_PATH}?${query.toString()}`;

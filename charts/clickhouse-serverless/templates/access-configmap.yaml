@@ -1,0 +1,19 @@
+{{- if and .Values.access.enabled (not .Values.access.existingConfigMap) }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "clickhouse-serverless.fullname" . }}-access
+  labels:
+    {{- include "clickhouse-serverless.selectorLabels" . | nindent 4 }}
+    {{- include "clickhouse-serverless.labels" . | nindent 4 }}
+data:
+  access.yaml: |
+    {{- $config := deepCopy .Values.access.config }}
+    {{- if .Values.access.dynamicOnly.enabled }}
+    {{- $_ := set $config "mode" "dynamic-only" }}
+    {{- end }}
+    {{- toYaml $config | nindent 4 }}
+  {{- range $name, $content := .Values.access.extraFiles }}
+  {{ $name }}: {{ $content | quote }}
+  {{- end }}
+{{- end }}

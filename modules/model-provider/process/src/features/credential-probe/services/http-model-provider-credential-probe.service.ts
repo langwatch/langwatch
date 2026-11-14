@@ -11,6 +11,7 @@ import {
 import {
   type DeployedBaseUrls,
   NOT_PROBEABLE,
+  PROBE_NEEDS_MODEL,
   PROVIDER_AUTH_OVERRIDES,
   VALIDATION_ONLY_BASE_URLS,
   providerApiRoots,
@@ -29,6 +30,8 @@ export abstract class ModelProviderCredentialProbe {
   abstract probe(input: {
     provider: string;
     customKeys: Record<string, string>;
+    /** The model about to run on it; Azure probes this deployment and skips without one. */
+    model?: string;
   }): Promise<ModelProviderCredentialVerdict>;
   /**
    * The stored (or this deployment's own environment) credential, probed
@@ -88,6 +91,29 @@ function agentPlatformPair({
     project: customKeys.GEMINI_PROJECT?.trim() ?? "",
     location: customKeys.GEMINI_LOCATION?.trim() ?? "",
   };
+}
+
+/**
+ * Whether this provider can be asked at all: some never, Azure only about a named
+ * deployment reached directly (an API gateway in front speaks its own auth).
+ */
+function isProbeable({
+  provider,
+  customKeys,
+  model,
+}: {
+  provider: string;
+  customKeys: Record<string, string>;
+  model: string | undefined;
+}): boolean {
+  if (NOT_PROBEABLE.has(provider)) return false;
+  if (PROBE_NEEDS_MODEL.has(provider) && !model?.trim()) return false;
+  return !(provider === "azure" && customKeys.AZURE_API_GATEWAY_BASE_URL?.trim());
+}
+
+/** Whether a check that names no model, such as a stored-credential one, can ask this provider. */
+function isProbeableWithoutModel(provider: string): boolean {
+  return !NOT_PROBEABLE.has(provider) && !PROBE_NEEDS_MODEL.has(provider);
 }
 
 /**
@@ -188,7 +214,8 @@ export class HttpModelProviderCredentialProbeService extends ModelProviderCreden
       return unchecked("unknown_provider");
     }
 
-    if (NOT_PROBEABLE.has(provider)) {
+    // A stored-credential check names no model, so a provider that probes one is skipped.
+    if (!isProbeableWithoutModel(provider)) {
       return unchecked("provider_not_probeable");
     }
 
@@ -255,11 +282,14 @@ export class HttpModelProviderCredentialProbeService extends ModelProviderCreden
   static async validateProviderApiKey({
     provider,
     customKeys,
+    model,
     egress,
     deployedBaseUrls = {},
   }: {
     provider: string;
     customKeys: Record<string, string>;
+    /** The model about to run on the credential, for providers that probe one deployment. */
+    model?: string;
     egress: ModelProviderEgress;
     deployedBaseUrls?: DeployedBaseUrls;
   }): Promise<ModelProviderCredentialVerdict> {
@@ -269,9 +299,10 @@ export class HttpModelProviderCredentialProbeService extends ModelProviderCreden
       return unchecked("unknown_provider");
     }
 
-    if (NOT_PROBEABLE.has(provider)) {
+    if (!isProbeable({ provider, customKeys, model })) {
       return unchecked("provider_not_probeable");
     }
+    const probedModel = model?.trim() || undefined;
 
     // Extract API key and base URL using registry field names
     const apiKeyField = providerDef.apiKey;
@@ -307,12 +338,15 @@ export class HttpModelProviderCredentialProbeService extends ModelProviderCreden
         defaultBaseUrl,
         apiRoot: deployedBaseUrl ? undefined : providerApiRoots[provider],
         agentPlatform,
+        model: probedModel,
+        azureApiVersion: customKeys.AZURE_OPENAI_API_VERSION,
       }),
       context: {
         provider,
         apiKey,
         hasConfigurableEndpoint: !!endpointField,
         ...googleDoorFor({ provider, agentPlatform }),
+        ...(probedModel ? { model: probedModel } : {}),
       },
       egress,
     });
@@ -347,10 +381,12 @@ export class HttpModelProviderCredentialProbeService extends ModelProviderCreden
   probe(input: {
     provider: string;
     customKeys: Record<string, string>;
+    model?: string;
   }): Promise<ModelProviderCredentialVerdict> {
     return HttpModelProviderCredentialProbeService.validateProviderApiKey({
       provider: input.provider,
       customKeys: input.customKeys,
+      model: input.model,
       egress: this.egress,
       deployedBaseUrls: this.deployedBaseUrls,
     });

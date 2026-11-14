@@ -3,7 +3,7 @@
 # stdlib only). Built here so the builder carries the binary and no Go
 # toolchain, and so this layer caches until those two directories change.
 # `go mod download` is skipped on purpose: the binary imports no module.
-FROM golang:1.27.3-alpine AS devscripts
+FROM golang:1.27.4-alpine AS devscripts
 WORKDIR /src
 COPY go.work go.work.sum ./
 COPY cmd/go.* cmd/
@@ -25,8 +25,8 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 # services/scenariorunner, the Go drop-in for the Node scenario child. Its own
 # binary, never a cmd/service subcommand: that refuses to boot with
 # LANGWATCH_API_KEY set, and a run's key arrives in exactly that variable.
-# Cross-compiled on the build host, like Dockerfile.go_service.
-FROM --platform=$BUILDPLATFORM golang:1.27.3-alpine AS scenariorunner
+# Cross-compiled on the build host, like Dockerfile.go-services.
+FROM --platform=$BUILDPLATFORM golang:1.27.4-alpine AS scenariorunner
 ARG TARGETOS
 ARG TARGETARCH
 WORKDIR /src

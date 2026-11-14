@@ -4,7 +4,7 @@
  * @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
 
-import type { IntentContext, IntentExecutor } from "@langwatch/eventing";
+import { isOutboxRetryRefused, type IntentContext, type IntentExecutor } from "@langwatch/eventing";
 import { HandledError } from "@langwatch/handled-error";
 import type { InstantEvalOutcome } from "@langwatch/instant-eval-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
@@ -247,7 +247,8 @@ async function handleInstantEvalIntentFailure({
   spend?: { inputTokens: number; requests: number; costNanoUsd?: number };
 }): Promise<void> {
   const maxAttempts = deps.maxAttempts ?? INSTANT_EVAL_MAX_ATTEMPTS;
-  if (intentContext.attempt < maxAttempts) {
+  // An error the outbox will not retry retires the message now: the last chance to fail the run.
+  if (intentContext.attempt < maxAttempts && !isOutboxRetryRefused(error)) {
     logger.warn(
       { ...context, attempt: intentContext.attempt, error: instantEvalErrorText(error) },
       "Instant Eval step failed; the outbox will retry",
