@@ -41,13 +41,17 @@ import type { LimiterStats } from "@langwatch/limiter";
 import { createLogger } from "@langwatch/observability";
 import { counter, histogram, observableGauge } from "@langwatch/observability/metrics";
 
-import { clickhouseIdentitiesOf, enforcingReaderIdentityOf } from "./clickhouse-identities.ts";
+import {
+  clickhouseIdentitiesOf,
+  enforcingReaderIdentityOf,
+  systemVariablesBesideReaderAndWriter,
+} from "./clickhouse-identities.ts";
 import {
   authenticatedFromFile,
   ClickHousePasswordFile,
   usernameOf,
 } from "./clickhouse-password-file.ts";
-import type { ClickHouseConfig } from "./config.ts";
+import type { ClickHouseConfig, ProcessConfig } from "./config.ts";
 import type { BuiltMember } from "./datastore-members.ts";
 import { PrivateDataplaneRefusals } from "./private-dataplane-refusal.ts";
 
@@ -349,6 +353,23 @@ export class StatementBoundTelemetry extends ClickHouseManagedClientTelemetry {
   }
 }
 
+/** Shadow posture (ADR-202 Decided 4): the api still boots, and says which variables to unset. */
+function warnOfSystemCredential({
+  config,
+  role,
+}: {
+  config: ClickHouseConfig;
+  role: ProcessConfig["role"] | undefined;
+}): void {
+  if (role !== "api") return;
+  const variables = systemVariablesBesideReaderAndWriter({ config });
+  if (variables.length === 0) return;
+  createLogger("langwatch:clickhouse:identities").warn(
+    { variables },
+    "the api holds the system ClickHouse credential beside the reader and the writer; ADR-202 gives it to the worker and the tasks only",
+  );
+}
+
 /** One connection per identity this process holds (ADR-202); the system's comes first. */
 function connectIdentities({
   config,
@@ -405,10 +426,12 @@ function connectIdentities({
 export function buildClickHouse(options: {
   config: ClickHouseConfig;
   directory: TenantDirectory;
+  role?: ProcessConfig["role"] | undefined;
 }): BuiltMember<ClickHouseQueryClient> {
   const { config } = options;
   const { system, reader, writer, enforcing, connections, connection, configuration } =
     connectIdentities(options);
+  warnOfSystemCredential({ config, role: options.role });
   const routes = system === undefined ? config.readerPrivateRoutes : config.privateRoutes;
   const malformedRoutes =
     system === undefined ? config.malformedReaderRoutes : config.malformedRoutes;

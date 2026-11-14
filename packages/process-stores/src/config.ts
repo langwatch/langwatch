@@ -213,6 +213,11 @@ export type ObjectStorageConfig = (
 export interface ProcessConfig {
   /** Names the process in every log line and every metric these members write. */
   readonly processName: string;
+  /**
+   * Which role this process boots as, as `ProcessServer.boot` states it. Only the api warns
+   * about the system ClickHouse credential beside the reader and the writer (ADR-202 Decided 14).
+   */
+  readonly role?: "api" | "worker" | "tasks";
   /** The 32-byte key stored values are encrypted under, hex-encoded. */
   readonly encryptionKey: string;
   /** The key before a rotation, hex-encoded: stored values open under it, none is sealed. */

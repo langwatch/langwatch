@@ -153,6 +153,7 @@ export class ProcessServer implements ProcessBoot {
     try {
       const stores = await openStores({
         name: this.server.name,
+        role,
         config,
         secrets,
         pipelines,

@@ -175,7 +175,7 @@ function clickhouseMember({
       "set CLICKHOUSE_URL, CLICKHOUSE_READER_URL or a CLICKHOUSE_URL__<label>__<orgId> route",
     );
   }
-  return buildClickHouse({ config: clickhouse, directory: tenantDirectory() });
+  return buildClickHouse({ config: clickhouse, directory: tenantDirectory(), role: config.role });
 }
 
 function objectStorageMember({

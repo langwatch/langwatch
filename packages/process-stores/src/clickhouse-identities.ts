@@ -98,6 +98,29 @@ export function enforcingReaderIdentityOf({
   });
 }
 
+/**
+ * The system credential's variables a process holds beside both the reader and the writer, by
+ * name only (ADR-202 Decided 14: the api must hold none). Empty unless reader and writer are set.
+ */
+export function systemVariablesBesideReaderAndWriter({
+  config,
+}: {
+  config: ClickHouseConfig;
+}): string[] {
+  const holds = (url: string | undefined, routes: readonly unknown[] | undefined) =>
+    Boolean(url?.trim()) || (routes?.length ?? 0) > 0;
+  if (!holds(config.readerUrl, config.readerPrivateRoutes)) return [];
+  if (!holds(config.writerUrl, config.writerPrivateRoutes)) return [];
+  return [
+    ...(config.url?.trim() ? ["CLICKHOUSE_URL"] : []),
+    ...(config.passwordFile?.trim() ? ["CLICKHOUSE_PASSWORD_FILE"] : []),
+    ...[...(config.privateRoutes ?? []), ...(config.malformedRoutes ?? [])].map(
+      ({ organizationId, label, variable }) =>
+        variable ?? `${PRIVATE_ROUTE_ENV_PREFIX}${label ?? "<label>"}__${organizationId}`,
+    ),
+  ];
+}
+
 /** What a private organisation's refusal names: the enforcing reader has no route family. */
 const ENFORCING_READER_SHARED_ONLY = "CLICKHOUSE_ENFORCING_READER_URL (shared server only)";
 

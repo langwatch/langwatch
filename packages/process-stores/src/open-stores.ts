@@ -166,6 +166,7 @@ function clickhouseConfigOf({
 
 function processConfigOf(options: {
   name: string;
+  role: ProcessConfig["role"] | undefined;
   config: StoresConfig;
   pipelines: PipelineParticipation;
   urls: Readonly<{
@@ -192,6 +193,7 @@ function processConfigOf(options: {
   });
   return {
     processName: name,
+    ...(options.role === undefined ? {} : { role: options.role }),
     encryptionKey: encryption ?? "",
     ...(previousEncryptionKey ? { previousEncryptionKey } : {}),
     secrets: {},
@@ -225,12 +227,14 @@ function processConfigOf(options: {
 /** Connection values remain inside the construction closure; only opened members escape. */
 export function openStores(options: {
   name: string;
+  /** The role `ProcessServer.boot` runs; absent states none and warns of nothing. */
+  role?: ProcessConfig["role"];
   config: StoresConfig;
   secrets: ScopedSecrets;
   pipelines: PipelineParticipation;
   production: boolean;
 }): Promise<ProcessStores> {
-  const { name, config, secrets, pipelines, production } = options;
+  const { name, role, config, secrets, pipelines, production } = options;
   return secrets.into(storesOwner.secrets.database, (database) =>
     secrets.into(storesOwner.secrets.clickhouse, (clickhouse) =>
       secrets.into(storesOwner.secrets.clickhouseRoutes, (routes) =>
@@ -250,6 +254,7 @@ export function openStores(options: {
                                 buildProcessStores({
                                   config: processConfigOf({
                                     name,
+                                    role,
                                     config,
                                     pipelines,
                                     urls: { database, clickhouse, redis, redisClusterEndpoints },
