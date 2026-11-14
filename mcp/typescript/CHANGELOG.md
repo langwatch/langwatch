@@ -1,5 +1,22 @@
 # Changelog
 
+## [3.2.0](https://github.com/langwatch/langwatch/compare/mcp-server@v3.1.0...mcp-server@v3.2.0) (2026-11-14)
+
+
+### Features
+
+* agent and evaluator versioning with deploy labels, plus experiment and dependency fixes ([#9124](https://github.com/langwatch/langwatch/issues/9124)) ([ec774cb](https://github.com/langwatch/langwatch/commit/ec774cb12756a472d7260f6ed5e2292e324906cd))
+* **experiments:** show the agent version a label resolved to and the concurrency each run used ([#9449](https://github.com/langwatch/langwatch/issues/9449)) ([cbabd19](https://github.com/langwatch/langwatch/commit/cbabd1909c3a20e3cd8ad25c8817294d3d990f9f))
+* **hosted-mcp:** anonymous docs-only MCP at /mcp/docs ([#9486](https://github.com/langwatch/langwatch/issues/9486)) ([73e7163](https://github.com/langwatch/langwatch/commit/73e7163c36fca148b1cadf9385b284812a398a30))
+
+
+### Bug Fixes
+
+* **analytics:** read the stock trace widgets from trace_metrics ([#9439](https://github.com/langwatch/langwatch/issues/9439)) ([8e3254c](https://github.com/langwatch/langwatch/commit/8e3254c45b69f28f80734518c5f708b97d2af58f))
+* **evaluator:** create custom code and workflow evaluators through the public API ([#9504](https://github.com/langwatch/langwatch/issues/9504)) ([2e36264](https://github.com/langwatch/langwatch/commit/2e36264f098b5cfdaf15f732c85ccf00b444233a))
+* **gateway:** record platform provider-key spend in the ledger and stop topic clustering re-embedding ([#9302](https://github.com/langwatch/langwatch/issues/9302)) ([5dacb3f](https://github.com/langwatch/langwatch/commit/5dacb3f3dc85bb2a433a81ad04bbdbfb43a85a19))
+* **mcp:** npx @langwatch/mcp-server installs again, and --http starts ([#9220](https://github.com/langwatch/langwatch/issues/9220)) ([8eeec0a](https://github.com/langwatch/langwatch/commit/8eeec0aa9001097d408167e9f0bfaef654235da0))
+
 ## [3.1.0](https://github.com/langwatch/langwatch/compare/mcp-server@v3.0.0...mcp-server@v3.1.0) (2026-11-02)
 
 
