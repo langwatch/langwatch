@@ -10,28 +10,48 @@ import (
 	"github.com/langwatch/langwatch/pkg/ciscan"
 )
 
-// PRReviewBotWorkflow is the workflow this guard reads.
-const PRReviewBotWorkflow = ".github/workflows/pr-review-bot.yml"
+// PRReviewBotWorkflow is the workflow this guard reads: the review is a job of
+// pr.yml so it can wait for ci-complete.
+const PRReviewBotWorkflow = PRWorkflowFile
 
 // prReviewBotGateClauses are the job-level `if:` clauses the review job
 // depends on to stay off Dependabot PRs (separate secret store), fork PRs (no
-// access to repo secrets), and drafts (not ready for review). Read as literal
-// text rather than evaluated — like goversion.go reading a Go directive, this
-// guard's job is to notice a clause disappearing, not to re-implement
-// GitHub's expression language.
+// access to repo secrets), drafts (not ready for review), the merge queue (the
+// bot reads github.event.pull_request) and a change CI did not pass. It also
+// needs !cancelled(): a job's implicit success() checks every job upstream,
+// transitively, so a call path-filtered away above ci-complete would skip the
+// review even though ci-complete passed, and a skipped required check passes.
+// Read as literal text rather than evaluated — like goversion.go reading a Go
+// directive, this guard's job is to notice a clause disappearing, not to
+// re-implement GitHub's expression language.
 var prReviewBotGateClauses = map[string]string{
-	"dependabot": "user.login != 'dependabot[bot]'",
-	"fork":       "head.repo.full_name == github.repository",
-	"draft":      "draft == false",
+	"dependabot":   "user.login != 'dependabot[bot]'",
+	"fork":         "head.repo.full_name == github.repository",
+	"draft":        "draft == false",
+	"pull request": "github.event_name == 'pull_request'",
+	"ci-complete":  "needs.ci-complete.result == 'success'",
+	"skipped call": "!cancelled()",
+	// pr.yml may declare more pull_request types for the product checks (a
+	// review per label or edit would burn tokens), so the job lists its own.
+	"event type": prReviewBotEventTypeClause(),
 }
 
 // prReviewBotTriggerTypes are the pull_request event types that (subject to
 // the gate above) can run a review.
 var prReviewBotTriggerTypes = []string{"opened", "synchronize", "reopened", "ready_for_review"}
 
+// prReviewBotEventTypeClause is the `if:` clause limiting the review job to
+// prReviewBotTriggerTypes, as pr.yml spells it.
+func prReviewBotEventTypeClause() string {
+	return `contains(fromJSON('["` + strings.Join(prReviewBotTriggerTypes, `","`) + `"]'), github.event.action)`
+}
+
 // prReviewBotRequiredPermissions are the exact permissions the review job must grant:
-// contents: write (for resolveReviewThread) and pull-requests: write (for posting reviews).
+// contents: write (for resolveReviewThread), pull-requests: write (for posting
+// reviews) and checks: read (for listing the head commit's check runs while
+// waiting for them).
 var prReviewBotRequiredPermissions = map[string]string{
+	"checks":        "read",
 	"contents":      "write",
 	"pull-requests": "write",
 }
@@ -41,10 +61,10 @@ var prReviewBotRequiredPermissions = map[string]string{
 var fullSHAPattern = regexp.MustCompile(`^[0-9a-f]{40}$`)
 
 // PRReviewBot reports every way the PR Review Bot workflow has drifted from
-// the invariants specs/ci/pr-review-bot.feature describes: the three-clause
-// skip gate, the trigger types that can run a review, single-review-in-flight
-// concurrency, full-SHA pinning on every action it uses, and the required
-// permissions block.
+// the invariants specs/ci/pr-review-bot.feature describes: the wait for
+// ci-complete, the wait for every other check, the skip gate, the trigger
+// types that can run a review, single-review-in-flight concurrency, full-SHA
+// pinning on every action it uses, and the required permissions block.
 func PRReviewBot(repoRoot string) ([]string, error) {
 	workflow, err := ciscan.Load(repoRoot, PRReviewBotWorkflow)
 	if err != nil {
@@ -52,7 +72,9 @@ func PRReviewBot(repoRoot string) ([]string, error) {
 	}
 
 	var problems []string
+	problems = append(problems, prReviewBotNeeds(workflow)...)
 	problems = append(problems, prReviewBotGates(workflow)...)
+	problems = append(problems, prReviewBotWaitsForChecks(workflow)...)
 	problems = append(problems, prReviewBotTriggers(workflow)...)
 	problems = append(problems, prReviewBotConcurrency(workflow)...)
 	problems = append(problems, prReviewBotPermissions(workflow)...)
@@ -61,12 +83,24 @@ func PRReviewBot(repoRoot string) ([]string, error) {
 	return problems, nil
 }
 
-// prReviewBotReviewJob is the workflow's single job. The skip clauses live on
+// prReviewBotReviewJob is the job that reviews. The skip clauses live on
 // its `if:`; a guard that joined every job's `if:` would keep passing after a
 // clause drifted onto some unrelated job, so the check reads this job alone.
 const prReviewBotReviewJob = "review"
 
-// prReviewBotGates checks the three skip clauses are still present on the
+// prReviewBotNeeds checks the review job waits for ci-complete. Without it the
+// needs.ci-complete clause reads empty and every review is skipped, and a
+// skipped job satisfies the required check, so nothing else would notice.
+func prReviewBotNeeds(workflow *ciscan.Workflow) []string {
+	job, ok := workflow.Jobs[prReviewBotReviewJob]
+	if !ok || needsJob(job.Needs, "ci-complete") { // prReviewBotGates reports a missing job
+		return nil
+	}
+
+	return []string{fmt.Sprintf("%s review job does not have needs: ci-complete", PRReviewBotWorkflow)}
+}
+
+// prReviewBotGates checks the skip clauses are still present on the
 // review job's `if:` condition, and reports when the job itself is gone.
 func prReviewBotGates(workflow *ciscan.Workflow) []string {
 	job, ok := workflow.Jobs[prReviewBotReviewJob]
@@ -93,31 +127,109 @@ func prReviewBotGates(workflow *ciscan.Workflow) []string {
 	return problems
 }
 
-// prReviewBotTriggers checks the pull_request trigger fires on exactly the
-// event types the review job's scenarios describe — no fewer (a dropped type
-// silently stops reviewing that event) and no more (an added type runs
-// against an event the gate above was never proven against).
+// prReviewBotWaitCommand is what the review job's wait step runs: it blocks
+// until every other check run on the head commit finished and exits non-zero
+// (failing the job) when one failed or the wait timed out. Its behavior is
+// tested in tools/waitforchecks; this guard only notices it going missing.
+const prReviewBotWaitCommand = "go run ./cmd/waitforchecks"
+
+// prReviewBotBotAction is the action that spends the tokens.
+const prReviewBotBotAction = "langwatch/langwatch-pr-review-bot@"
+
+// swallowedFailure matches a run line that turns the wait's non-zero exit into
+// success: `|| true`, `|| :`, `|| exit 0`, `; true`, or `set +e`.
+var swallowedFailure = regexp.MustCompile(`(?m)(\|\||;)\s*(true|:|exit\s+0)\s*(;|$)|set\s+\+e`)
+
+// prReviewBotWaitsForChecks checks the review job still waits for the checks of
+// the separate workflows (ci-complete covers only pr.yml's own calls) before
+// the bot step. A failed wait fails the job, so the bot never runs after it
+// unless the step is made unable to fail. Like the gate clauses, it reads
+// literal text: a wait that vanished, moved after the bot, or was defanged
+// would let the review start on a PR whose other checks are still running or
+// red, and nothing else would notice.
+func prReviewBotWaitsForChecks(workflow *ciscan.Workflow) []string {
+	job, ok := workflow.Jobs[prReviewBotReviewJob]
+	if !ok { // prReviewBotGates reports a missing job
+		return nil
+	}
+
+	waits := slices.IndexFunc(job.Steps, func(step ciscan.Step) bool {
+		return strings.Contains(step.Run, prReviewBotWaitCommand)
+	})
+	if waits < 0 {
+		return []string{fmt.Sprintf(
+			"%s review job has no step running %q to wait for the other checks", PRReviewBotWorkflow, prReviewBotWaitCommand)}
+	}
+
+	problems := waitStepProblems(job.Steps[waits])
+
+	return append(problems, botOrderProblems(job.Steps, waits)...)
+}
+
+// waitStepProblems reports every way the wait step can pass while the checks
+// it waits for have not: a swallowed failure, or a condition that skips it.
+func waitStepProblems(step ciscan.Step) []string {
+	var problems []string
+	if coe := step.ContinueOnError; coe != nil && fmt.Sprint(coe) != "false" {
+		problems = append(problems, fmt.Sprintf(
+			"%s review job's wait step sets continue-on-error, so a failed check would not stop the bot", PRReviewBotWorkflow))
+	}
+	if strings.TrimSpace(step.If) != "" {
+		problems = append(problems, fmt.Sprintf(
+			"%s review job's wait step has an `if:` of its own, so it can be skipped", PRReviewBotWorkflow))
+	}
+	if swallowedFailure.MatchString(step.Run) {
+		problems = append(problems, fmt.Sprintf(
+			"%s review job's wait step swallows its exit status (|| true, ; true, set +e)", PRReviewBotWorkflow))
+	}
+
+	return problems
+}
+
+// botOrderProblems requires the bot step, after the wait step.
+func botOrderProblems(steps []ciscan.Step, waits int) []string {
+	bot := slices.IndexFunc(steps, func(step ciscan.Step) bool {
+		return strings.HasPrefix(step.Uses, prReviewBotBotAction)
+	})
+	switch {
+	case bot < 0:
+		return []string{fmt.Sprintf("%s review job has no %s step after the wait", PRReviewBotWorkflow, prReviewBotBotAction)}
+	case bot < waits:
+		return []string{fmt.Sprintf("%s review job runs the bot before the wait for the other checks", PRReviewBotWorkflow)}
+	}
+
+	return nil
+}
+
+// prReviewBotTriggers checks the pull_request trigger still fires on every
+// event type the review job's scenarios describe (a dropped type silently
+// stops reviewing that event). Extra types are allowed: pr.yml is shared with
+// the product checks, which may need more.
 func prReviewBotTriggers(workflow *ciscan.Workflow) []string {
-	got := slices.Clone(workflow.On.PullRequest.Types)
+	got := workflow.On.PullRequest.Types
 	if len(got) == 0 {
 		return []string{fmt.Sprintf("%s declares no pull_request `types:` list", PRReviewBotWorkflow)}
 	}
-	sort.Strings(got)
 
-	want := slices.Clone(prReviewBotTriggerTypes)
-	sort.Strings(want)
-
-	if slices.Equal(got, want) {
+	var missing []string
+	for _, want := range prReviewBotTriggerTypes {
+		if !slices.Contains(got, want) {
+			missing = append(missing, want)
+		}
+	}
+	if len(missing) == 0 {
 		return nil
 	}
 
 	return []string{fmt.Sprintf(
-		"%s pull_request types are %v, want %v",
-		PRReviewBotWorkflow, workflow.On.PullRequest.Types, prReviewBotTriggerTypes)}
+		"%s pull_request types %v lack %v (the review needs all of %v)",
+		PRReviewBotWorkflow, got, missing, prReviewBotTriggerTypes)}
 }
 
-// prReviewBotConcurrency checks the workflow cancels a superseded run for the
-// same PR rather than letting two reviews for the same PR race to completion.
+// prReviewBotConcurrency checks only what the review depends on: a group keyed
+// on the PR number with cancel-in-progress, so a superseded run (and its wait)
+// is canceled rather than two reviews for the same PR racing. It does not pin
+// the rest of the shared workflow's concurrency block.
 func prReviewBotConcurrency(workflow *ciscan.Workflow) []string {
 	var problems []string
 
@@ -138,8 +250,9 @@ func prReviewBotConcurrency(workflow *ciscan.Workflow) []string {
 }
 
 // prReviewBotPermissions checks the review job's effective permissions block
-// grants exactly contents: write and pull-requests: write, with no extra
-// permissions. contents: write is required for resolveReviewThread. GitHub
+// grants exactly checks: read, contents: write and pull-requests: write, with
+// no extra permissions. contents: write is required for resolveReviewThread
+// and checks: read for listing the head commit's check runs. GitHub
 // permissions blocks do not merge: a job-level `permissions:` completely
 // replaces the workflow-level one when present, so the effective set is the
 // job's block if it declares one, else the workflow's.
@@ -148,13 +261,13 @@ func prReviewBotPermissions(workflow *ciscan.Workflow) []string {
 
 	if perms.Shorthand != "" {
 		return []string{fmt.Sprintf(
-			"%s permissions block uses shorthand %q, want an explicit contents/pull-requests mapping",
+			"%s permissions block uses shorthand %q, want an explicit checks/contents/pull-requests mapping",
 			PRReviewBotWorkflow, perms.Shorthand)}
 	}
 
 	scopes := perms.Scopes
 	if scopes == nil {
-		return []string{fmt.Sprintf("%s declares no top-level permissions block", PRReviewBotWorkflow)}
+		return []string{fmt.Sprintf("%s declares no permissions block for the review job", PRReviewBotWorkflow)}
 	}
 
 	return comparePRReviewBotPermissionScopes(scopes)
@@ -193,15 +306,15 @@ func comparePRReviewBotPermissionScopes(scopes map[string]string) []string {
 	for _, key := range grantedKeys {
 		if _, required := prReviewBotRequiredPermissions[key]; !required {
 			problems = append(problems, fmt.Sprintf(
-				"%s permissions block has extra key %q (only contents and pull-requests are needed)", PRReviewBotWorkflow, key))
+				"%s permissions block has extra key %q (only checks, contents and pull-requests are needed)", PRReviewBotWorkflow, key))
 		}
 	}
 
 	return problems
 }
 
-// prReviewBotPinning enforces the pinning invariant every `uses:` step in this
-// workflow must meet: a full 40-character commit SHA, never a floating tag or
+// prReviewBotPinning enforces the pinning invariant every `uses:` step of the
+// review job must meet: a full 40-character commit SHA, never a floating tag or
 // branch, with a trailing comment recording what it means. Both the ref and
 // its trailing comment come from ciscan's decoded step, so a quoted value or a
 // `uses:` line inside a run: script cannot fool the check the way a raw text
@@ -222,16 +335,14 @@ func prReviewBotPinning(workflow *ciscan.Workflow) []string {
 	return problems
 }
 
-// usesSteps collects every step with a non-empty `uses:` value across the
-// workflow's jobs, in sorted-job order so guard output is stable.
+// usesSteps collects every step of the review job with a non-empty `uses:`
+// value. The other jobs of pr.yml are not this guard's to police.
 func usesSteps(workflow *ciscan.Workflow) []ciscan.Step {
 	var steps []ciscan.Step
-	for _, job := range workflow.JobNames() {
-		jobSteps := workflow.Jobs[job].Steps
-		for i := range jobSteps {
-			if jobSteps[i].Uses != "" {
-				steps = append(steps, jobSteps[i])
-			}
+	jobSteps := workflow.Jobs[prReviewBotReviewJob].Steps
+	for i := range jobSteps {
+		if jobSteps[i].Uses != "" {
+			steps = append(steps, jobSteps[i])
 		}
 	}
 

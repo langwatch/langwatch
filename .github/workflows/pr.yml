@@ -189,3 +189,61 @@ jobs:
         with:
           jobs: ${{ toJSON(needs) }}
           allowed-skips: app, e2e, nlp, langevals, mcp, sdk-go, sdk-javascript, docs, codeql, clickhouse-serverless
+
+  # The LLM review, last so it spends tokens only on a change CI passed. The
+  # ruleset requires a check named `review`.
+  #
+  # ci-complete covers only the calls of this workflow. The separate workflows
+  # that also run on a pull_request (pr-conventions, go-ci, sdk-python-ci,
+  # code-scanners, ...) can still be running, so a step before the review
+  # waits until every other check run on the head commit has finished, and
+  # fails this job if any failed. A new push cancels this run (concurrency
+  # above), and with it the wait. A wait that times out fails the job too: the
+  # ruleset requires this check, and a silent pass would let an unreviewed
+  # change merge.
+  review:
+    needs: ci-complete
+    # !cancelled() replaces the implicit success(). On a job, success() checks
+    # every job upstream, transitively, not just `needs`: a call that path
+    # filters skipped anywhere above ci-complete would skip this job even
+    # though ci-complete passed, and a skipped required check passes, so the
+    # change would merge unreviewed. ci-complete's own result is checked below.
+    # Dependabot PRs read a separate secret store, so the token check would fail.
+    if: |
+      !cancelled() &&
+      needs.ci-complete.result == 'success' &&
+      github.event_name == 'pull_request' &&
+      contains(fromJSON('["opened","synchronize","reopened","ready_for_review"]'), github.event.action) &&
+      github.event.pull_request.user.login != 'dependabot[bot]' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      checks: read # to list the head commit's check runs while waiting for them
+      contents: write # so the default token can call resolveReviewThread; read would only lose thread auto-resolution
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache: true
+          cache-dependency-path: "*/go.sum"
+      # A failed or timed-out wait fails this job, so the review step below
+      # never runs on a red or unfinished change (tools/waitforchecks).
+      - name: Wait for every other check on the head commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+          # This job's own check run would wait on itself.
+          EXCLUDE_CHECK: review
+        run: go run ./cmd/waitforchecks
+      - uses: langwatch/langwatch-pr-review-bot@05d6c298cb28b0f67e2e7fda075b916a0294af5b # main 2026-10-24
+        with:
+          slack_notify: "false"
+          claude_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          langwatch_ingest_key: ${{ secrets.LANGWATCH_INGEST_KEY }}

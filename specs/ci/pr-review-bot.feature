@@ -3,11 +3,17 @@ Feature: PR Review Bot workflow
   I want the PR Review Bot to selectively run code reviews on pull requests
   So that reviews are accurate, timely, and respect repository permissions
 
-  # The workflow gates on three conditions to determine whether the review
-  # job runs at all:
+  # The review is the job `review` in pr.yml, the last job, so it spends tokens
+  # only on a change CI passed. The ruleset requires a check of that name.
+  #
+  # The job gates on these conditions to determine whether it runs at all:
   # (1) The PR is not from dependabot (Dependabot has separate secret management)
   # (2) The PR is from the same repository (forks cannot access repo secrets)
   # (3) The PR is not a draft (drafts are not ready for review)
+  # (4) ci-complete succeeded, and then every other check on the head commit
+  #     (the separate workflows: pr conventions, go-ci, code-scanners, ...) has
+  #     finished without failing
+  # (5) The event is a pull request (the bot reads github.event.pull_request)
   # Additionally, concurrency ensures only one review per PR runs at a time.
   #
   # Whether a job that runs actually POSTS a review is decided inside
@@ -17,7 +23,66 @@ Feature: PR Review Bot workflow
 
   Background:
     Given a pull request is created in the langwatch/langwatch repository
-    And the PR Review Bot workflow is triggered
+    And the pr workflow is triggered
+
+  # ============================================================================
+  # Gating: CI
+  # ============================================================================
+
+  @unit
+  Scenario: The review starts only after CI passed
+    Given a check pr.yml calls failed for the pull request
+    When ci-complete fails
+    Then the review job is skipped
+    And no review is posted to the PR
+
+  # On a job, GitHub's implicit success() checks every job upstream, not only
+  # `needs`. Path filters skip calls above ci-complete, so without !cancelled()
+  # the review would be skipped on most PRs, and a skipped check passes.
+  @unit
+  Scenario: The review still starts when CI skipped checks the change does not reach
+    Given pr.yml skipped a call the change does not reach
+    When ci-complete succeeds
+    Then the review job still starts
+
+  @unit
+  Scenario: The merge queue gets no review
+    Given a merge queue run of pr.yml
+    When ci-complete succeeds
+    Then the review job is skipped
+
+  # ============================================================================
+  # Gating: the other workflows' checks
+  # ============================================================================
+  #
+  # ci-complete covers only the calls of pr.yml. A step of the review job, run
+  # before the bot step (`go run ./cmd/waitforchecks`, tools/waitforchecks),
+  # lists the head commit's check runs, waits while any is unfinished, and fails
+  # the job if one failed or the wait timed out, so the bot step never runs.
+  # It retries transient API errors (network, 5xx, rate limits) until its
+  # deadline. A new push cancels the run (see Concurrency) and with it the wait.
+
+  @unit
+  Scenario: The review waits for every other check on the head commit
+    Given CI passed and another workflow's check on the head commit is still running
+    When the review job starts
+    Then its wait step keeps polling the check runs
+    And no review is posted until that check has finished
+
+  @unit
+  Scenario: The review does not start when another check failed
+    Given CI passed and another workflow's check on the head commit failed
+    When the wait step reads the check runs
+    Then the bot step does not run, because the wait step comes first and fails the job
+    And no review is posted to the PR
+
+  @unit
+  Scenario: a failed check fails the review job
+    Given CI passed and another workflow's check on the head commit failed
+    When the wait step reads the check runs
+    Then the wait step names the failed check in "another check failed: <names>; fix it and push"
+    And the wait step exits non-zero
+    And the review job ends red, never green-skipped
 
   # ============================================================================
   # Gating: Dependabot PRs
@@ -95,6 +160,15 @@ Feature: PR Review Bot workflow
     When the workflow runs
     Then the review job executes
 
+  # pr.yml is shared with the product checks, which may declare more
+  # pull_request types (edited, labeled, ...). A review costs tokens, so the job
+  # lists the four types itself.
+  @unit
+  Scenario: Review does not run on other pull request event types
+    Given pr.yml also triggers on a pull_request type other than the four above
+    When the workflow runs for that type
+    Then the review job is skipped
+
   # ============================================================================
   # Concurrency
   # ============================================================================
@@ -116,9 +190,9 @@ Feature: PR Review Bot workflow
   # contents: write is required so the default GITHUB_TOKEN can call
   # resolveReviewThread; anything less only loses thread auto-resolution.
   @unit
-  Scenario: The review workflow grants exactly contents write and pull-requests write
+  Scenario: The review workflow grants exactly checks read, contents write and pull-requests write
     When the workflow runs
-    Then the workflow grants permissions: contents: write, pull-requests: write
+    Then the workflow grants permissions: checks: read, contents: write, pull-requests: write
     And the workflow does not grant any extra permissions
 
   # ============================================================================
