@@ -1,5 +1,4 @@
-import { TupleParam } from "@clickhouse/client";
-import type { ClickHouseQueryClient, IdBoundOptions } from "@langwatch/clickhouse-client";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type {
   ExperimentRun,
   ExperimentRunAggregate,
@@ -25,10 +24,11 @@ import { runTargetFromStored } from "../../rules/experiment-run-stored-target.ru
 import { ExperimentRunRepository } from "../experiment-run.repository.ts";
 import type { ExperimentWorkflowVersionRepository } from "../experiment-workflow-version.repository.ts";
 import {
-  buildDedupedRunItemsWhere,
   type ColumnHolds,
   computeOccurredAtRangeForRuns,
   runAggregatesRead,
+  runBreakdownsRead,
+  runCostsRead,
   runCountRead,
   runItemsRead,
   runRead,
@@ -38,15 +38,7 @@ import {
   WARN_OLD_RUN_AGE_MS,
 } from "./clickhouse.experiment-run.mapper.ts";
 
-type QueryResult = { json<T>(): Promise<T[]> };
 type ExperimentClickHouseClient = Pick<ClickHouseQueryClient, "read"> & {
-  /** The run-pair enrichment reads only, until the builder binds Array(Tuple) parameters. */
-  query(input: {
-    query: string;
-    query_params: Record<string, unknown>;
-    format: "JSONEachRow";
-    idBound?: IdBoundOptions;
-  }): Promise<QueryResult>;
   /** Whether the tenant's target holds each column of `table`; absent, every column is held. */
   holds?(input: { table: string }): Promise<ColumnHolds>;
 };
@@ -54,7 +46,6 @@ type ExperimentClickHouseClient = Pick<ClickHouseQueryClient, "read"> & {
 type ClickHouseExperimentRunRepositoryOptions = {
   workflowVersions: ExperimentWorkflowVersionRepository;
   resolveClient: (projectId: string) => Promise<ExperimentClickHouseClient | null>;
-  tupleParam: (values: string[]) => unknown;
   telemetry: {
     trace<T>(
       input: {
@@ -158,18 +149,13 @@ const parseRecord = (value: string | null): Record<string, unknown> | undefined 
 const runKey = (experimentId: string, runId: string): string => `${experimentId}:${runId}`;
 
 /**
- * Runs per enrichment query. The `(experiment, run)` pairs travel as one URL query parameter,
+ * Runs per enrichment query. The `(experiment, run)` pairs travel as two URL query parameters,
  * and ClickHouse refuses a form field over 128 KiB ("Field value too long"). A list read can
  * hold 10,000 runs; 500 pairs of typical ids stay well under the limit.
  */
 export const RUN_PAIRS_PER_ENRICHMENT_QUERY = 500;
 
 export class ClickHouseExperimentRunRepository extends ExperimentRunRepository {
-  /** The `(experiment, run)` pair a keyset query binds as one ClickHouse tuple parameter. */
-  static tupleParam(values: string[]): unknown {
-    return new TupleParam(values);
-  }
-
   /** Run-history telemetry through this module's logger; the request's own span is the trace. */
   static loggedTelemetry(): ClickHouseExperimentRunRepositoryOptions["telemetry"] {
     const logger = createLogger("langwatch:experiment");
@@ -438,68 +424,24 @@ export class ClickHouseExperimentRunRepository extends ExperimentRunRepository {
     for (let start = 0; start < rows.length; start += RUN_PAIRS_PER_ENRICHMENT_QUERY) {
       const chunk = rows.slice(start, start + RUN_PAIRS_PER_ENRICHMENT_QUERY);
       const range = computeOccurredAtRangeForRuns(chunk);
-      const runPairs = chunk.map((row) => this.options.tupleParam([row.ExperimentId, row.RunId]));
-      const [breakdownResult, costResult] = await Promise.all([
-        client.query({
-          query: `
-            SELECT
-              ExperimentId,
-              RunId,
-              EvaluatorId,
-              max(EvaluatorName) AS EvaluatorName,
-              avg(Score) AS avgScore,
-              if(countIf(Passed IS NOT NULL) > 0, countIf(Passed = 1) / countIf(Passed IS NOT NULL), NULL) AS passRate,
-              countIf(Passed IS NOT NULL) AS hasPassedCount
-            FROM experiment_run_items
-            ${buildDedupedRunItemsWhere({
-              extraFilters: ["ResultType = 'evaluator'", "EvaluationStatus = 'processed'"],
-            })}
-            GROUP BY ExperimentId, RunId, EvaluatorId
-            LIMIT 10000
-          `,
-          query_params: {
-            tenantId: projectId,
-            runPairs,
-            minOccurredAt: range.minOccurredAt,
-            maxOccurredAt: range.maxOccurredAt,
-          },
-          format: "JSONEachRow",
-        }),
-        // `CarriedOver = 0` everywhere here: a run holds a snapshot of the whole
-        // board, and the cells it copied in were paid for by the run that
-        // produced them. What the run reports it spent, and how long it took, is
-        // its own work only. The per-evaluator breakdown above deliberately keeps
-        // carried rows, because a pass rate describes the board the run stands for.
-        client.query({
-          query: `
-            SELECT
-              ExperimentId,
-              RunId,
-              sumIf(TargetCost, ResultType = 'target' AND CarriedOver = 0) AS datasetCost,
-              sumIf(EvaluationCost, ResultType = 'evaluator' AND CarriedOver = 0) AS evaluationsCost,
-              avgIf(TargetCost, ResultType = 'target' AND CarriedOver = 0 AND TargetCost IS NOT NULL) AS datasetAverageCost,
-              avgIf(TargetDurationMs, ResultType = 'target' AND CarriedOver = 0 AND TargetDurationMs IS NOT NULL) AS datasetAverageDuration,
-              avgIf(EvaluationCost, ResultType = 'evaluator' AND CarriedOver = 0 AND EvaluationCost IS NOT NULL) AS evaluationsAverageCost,
-              avgIf(EvaluationDurationMs, ResultType = 'evaluator' AND CarriedOver = 0 AND EvaluationDurationMs IS NOT NULL) AS evaluationsAverageDuration
-            FROM experiment_run_items
-            ${buildDedupedRunItemsWhere()}
-            GROUP BY ExperimentId, RunId
-            LIMIT 10000
-          `,
-          query_params: {
-            tenantId: projectId,
-            runPairs,
-            minOccurredAt: range.minOccurredAt,
-            maxOccurredAt: range.maxOccurredAt,
-          },
-          format: "JSONEachRow",
-        }),
+      const window = {
+        projectId,
+        pairs: chunk,
+        fromMs: range.fromMs,
+        untilMs: range.untilMs,
+      };
+      const [{ rows: chunkBreakdowns }, { rows: chunkCosts }] = await Promise.all([
+        client.read({ statement: runBreakdownsRead(window) }),
+        client.read({ statement: runCostsRead(window) }),
       ]);
-      const [chunkBreakdowns, chunkCosts] = await Promise.all([
-        breakdownResult.json<BreakdownRow>(),
-        costResult.json<CostRow>(),
-      ]);
-      breakdowns.push(...chunkBreakdowns);
+      breakdowns.push(
+        ...chunkBreakdowns.map(({ ShownEvaluatorName, EvaluatorId, hasPassedCount, ...row }) => ({
+          ...row,
+          EvaluatorId: EvaluatorId ?? "",
+          EvaluatorName: ShownEvaluatorName,
+          hasPassedCount: Number(hasPassedCount),
+        })),
+      );
       costs.push(...chunkCosts);
     }
     return { breakdowns, costs };

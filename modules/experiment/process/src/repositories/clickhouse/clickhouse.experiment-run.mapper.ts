@@ -7,11 +7,13 @@
 import {
   clickhouseRead,
   column,
+  type ConditionOps,
   fn,
+  param,
   type ReaderReadStatement,
   tenantScope,
 } from "@langwatch/clickhouse-client/builder";
-import { Temporal, toEpochMs } from "@langwatch/time";
+import { toEpochMs } from "@langwatch/time";
 
 import { OCCURRED_AT_BUFFER_MS } from "../../rules/experiment-run-occurred-at.rules.ts";
 import { experimentRunItems as items } from "./clickhouse.experiment-run-items.table.ts";
@@ -19,37 +21,9 @@ import { experimentRuns as runs } from "./clickhouse.experiment-runs.table.ts";
 
 export const WARN_OLD_RUN_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
-const RUN_ITEMS_DEDUP_KEY =
-  "TenantId, ExperimentId, RunId, RowIndex, TargetId, ResultType, coalesce(EvaluatorId, '')";
-
-const RUN_ITEMS_SCOPE = `TenantId = {tenantId:String}
-          AND OccurredAt >= {minOccurredAt:DateTime64(3)}
-          AND OccurredAt <= {maxOccurredAt:DateTime64(3)}
-          AND (ExperimentId, RunId) IN {runPairs:Array(Tuple(String, String))}`;
-
-export function buildDedupedRunItemsWhere({
-  extraFilters = [],
-}: {
-  extraFilters?: string[];
-} = {}): string {
-  const extra = extraFilters.map((filter) => `\n          AND ${filter}`).join("");
-
-  return `WHERE ${RUN_ITEMS_SCOPE}${extra}
-          AND (${RUN_ITEMS_DEDUP_KEY}, OccurredAt) IN (
-            SELECT
-              ${RUN_ITEMS_DEDUP_KEY},
-              max(OccurredAt)
-            FROM experiment_run_items
-            WHERE ${RUN_ITEMS_SCOPE}
-            GROUP BY ${RUN_ITEMS_DEDUP_KEY}
-          )`;
-}
-
 export function computeOccurredAtRangeForRuns(
   runRows: { CreatedAt: string; UpdatedAt: string }[],
 ): {
-  minOccurredAt: string;
-  maxOccurredAt: string;
   minMs: number;
   /** The bounds above as epoch millis, inclusive both ends, for a built read. */
   fromMs: number;
@@ -67,19 +41,10 @@ export function computeOccurredAtRangeForRuns(
   }
 
   return {
-    minOccurredAt: formatClickHouseDateTime(minMs - OCCURRED_AT_BUFFER_MS),
-    maxOccurredAt: formatClickHouseDateTime(maxMs + OCCURRED_AT_BUFFER_MS),
     minMs,
     fromMs: minMs - OCCURRED_AT_BUFFER_MS,
     untilMs: maxMs + OCCURRED_AT_BUFFER_MS,
   };
-}
-
-function formatClickHouseDateTime(milliseconds: number): string {
-  return Temporal.Instant.fromEpochMilliseconds(milliseconds)
-    .toString({ fractionalSecondDigits: 3 })
-    .replace("T", " ")
-    .replace("Z", "");
 }
 
 function parseClickHouseDateTime(value: string): number {
@@ -399,5 +364,130 @@ export function runItemsRead({
     )
     .orderBy(items.RowIndex, "ASC")
     .orderBy(items.ResultType, "ASC")
+    .build();
+}
+
+/** The `(experiment, run)` pairs an enrichment read covers, with their `OccurredAt` window. */
+export interface RunPairsWindow {
+  projectId: string;
+  pairs: readonly { ExperimentId: string; RunId: string }[];
+  fromMs: number;
+  untilMs: number;
+}
+
+/** The pairs and window, for both the election and the outer read of an enrichment read. */
+function pairsInWindow({ pairs, fromMs, untilMs }: RunPairsWindow) {
+  return <Ctes>({ and, gte, lte, oneOf }: ConditionOps<"experiment_run_items", Ctes>) =>
+    and(
+      gte(items.OccurredAt, fromMs),
+      lte(items.OccurredAt, untilMs),
+      oneOf(
+        fn.tuple(items.ExperimentId, items.RunId),
+        fn.arrayZip(
+          param.strings(pairs.map((pair) => pair.ExperimentId)),
+          param.strings(pairs.map((pair) => pair.RunId)),
+        ),
+      ),
+    );
+}
+const itemsStart = (projectId: string) =>
+  clickhouseRead({ scope: tenantScope.single({ tenantId: projectId }) }).from(items);
+
+/** The pairs' items, the latest `OccurredAt` per cell (IN-tuple election over the same window). */
+function latestItemsOf(window: RunPairsWindow) {
+  return itemsStart(window.projectId).with("latest", (sub) =>
+    sub
+      .from(items)
+      .select({ Elected: fn.tuple(...itemKey(), fn.max(items.OccurredAt)) })
+      .where(pairsInWindow(window))
+      .groupBy(...itemKey()),
+  );
+}
+
+/** Per run and evaluator: mean score and pass rate over processed verdicts, carried cells kept. */
+export function runBreakdownsRead(window: RunPairsWindow): ReaderReadStatement<{
+  ExperimentId: string;
+  RunId: string;
+  EvaluatorId: string | null;
+  ShownEvaluatorName: string | null;
+  avgScore: number | null;
+  passRate: number | null;
+  hasPassedCount: number | string;
+}> {
+  return latestItemsOf(window)
+    .select(({ eq, gt, isNotNull }) => ({
+      ExperimentId: items.ExperimentId,
+      RunId: items.RunId,
+      EvaluatorId: items.EvaluatorId,
+      ShownEvaluatorName: fn.max(items.EvaluatorName),
+      avgScore: fn.avg(items.Score),
+      passRate: fn.if(
+        gt(fn.countIf(isNotNull(items.Passed)), 0),
+        fn.toNullable(
+          fn.divide(fn.countIf(eq(items.Passed, 1)), fn.countIf(isNotNull(items.Passed))),
+        ),
+        fn.nullAs(column.nullable(column.float64())),
+      ),
+      hasPassedCount: fn.countIf(isNotNull(items.Passed)),
+    }))
+    .where(pairsInWindow(window))
+    .where(({ and, eq, oneOf }) =>
+      and(
+        eq(items.ResultType, "evaluator"),
+        eq(items.EvaluationStatus, "processed"),
+        oneOf(fn.tuple(...itemKey(), items.OccurredAt), { cte: "latest" }),
+      ),
+    )
+    .groupBy(items.ExperimentId, items.RunId, items.EvaluatorId)
+    .limit(10_000)
+    .build();
+}
+
+/**
+ * Per run: what its own cells cost and took. `CarriedOver = 0` throughout: a run snapshots the
+ * whole board, and a carried cell was paid for by the run that produced it. The breakdown read
+ * keeps carried cells, because a pass rate describes the board the run stands for.
+ */
+export function runCostsRead(window: RunPairsWindow): ReaderReadStatement<{
+  ExperimentId: string;
+  RunId: string;
+  datasetCost: number | null;
+  evaluationsCost: number | null;
+  datasetAverageCost: number | null;
+  datasetAverageDuration: number | null;
+  evaluationsAverageCost: number | null;
+  evaluationsAverageDuration: number | null;
+}> {
+  return latestItemsOf(window)
+    .select(({ and, eq, isNotNull }) => {
+      const own = (resultType: string) =>
+        and(eq(items.ResultType, resultType), eq(items.CarriedOver, 0));
+      return {
+        ExperimentId: items.ExperimentId,
+        RunId: items.RunId,
+        datasetCost: fn.sumIf(items.TargetCost, own("target")),
+        evaluationsCost: fn.sumIf(items.EvaluationCost, own("evaluator")),
+        datasetAverageCost: fn.avgIf(
+          items.TargetCost,
+          and(own("target"), isNotNull(items.TargetCost)),
+        ),
+        datasetAverageDuration: fn.avgIf(
+          items.TargetDurationMs,
+          and(own("target"), isNotNull(items.TargetDurationMs)),
+        ),
+        evaluationsAverageCost: fn.avgIf(
+          items.EvaluationCost,
+          and(own("evaluator"), isNotNull(items.EvaluationCost)),
+        ),
+        evaluationsAverageDuration: fn.avgIf(
+          items.EvaluationDurationMs,
+          and(own("evaluator"), isNotNull(items.EvaluationDurationMs)),
+        ),
+      };
+    })
+    .where(pairsInWindow(window))
+    .where(({ oneOf }) => oneOf(fn.tuple(...itemKey(), items.OccurredAt), { cte: "latest" }))
+    .groupBy(items.ExperimentId, items.RunId)
+    .limit(10_000)
     .build();
 }

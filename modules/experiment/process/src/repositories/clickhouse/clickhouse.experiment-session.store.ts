@@ -1,4 +1,4 @@
-import { type ClickHouseQueryClient, type IdBoundOptions } from "@langwatch/clickhouse-client";
+import { type ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 
 import type { ExperimentEventingClickHouseClient } from "../experiment-clickhouse.repository.ts";
 
@@ -27,22 +27,6 @@ export class ClickHouseExperimentSession implements ExperimentEventingClickHouse
     clickhouse: ClickHouseQueryClient,
   ): (tenantId: string) => Promise<ClickHouseExperimentSession> {
     return (tenantId) => Promise.resolve(new ClickHouseExperimentSession(clickhouse, tenantId));
-  }
-
-  /** Raw, for the run-pair enrichment reads only, until the builder binds Array(Tuple). */
-  async query(input: {
-    query: string;
-    query_params?: Record<string, unknown>;
-    format: "JSONEachRow";
-    idBound?: IdBoundOptions;
-  }): Promise<{ json<T>(): Promise<T[]> }> {
-    const request = {
-      tenantId: this.tenantId,
-      sql: input.query,
-      params: input.query_params,
-      ...(input.idBound === undefined ? {} : { idBound: input.idBound }),
-    };
-    return { json: async <T>() => (await this.clickhouse.query<T>(request)).rows };
   }
 
   /** Whether this tenant's target holds each column of `table`; an unreadable list holds all. */

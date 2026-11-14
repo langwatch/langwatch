@@ -1,5 +1,5 @@
 import type { ReaderReadStatement } from "@langwatch/clickhouse-client/builder";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import {
   ClickHouseExperimentRunRepository,
@@ -27,6 +27,16 @@ const readRowOf = (row: {
   };
 };
 
+/** The `(experiment, run)` pairs an enrichment read binds as its two zipped string arrays. */
+const pairsOf = (statement: ReaderReadStatement): [string, string][] => {
+  const [experimentIds = [], runIds = []] = Object.values(statement.params).filter(
+    (value): value is string[] => Array.isArray(value),
+  );
+  return experimentIds.map((experimentId, index) => [experimentId, runIds[index] ?? ""]);
+};
+const isItemsRead = (statement: ReaderReadStatement) =>
+  statement.sql.includes("FROM experiment_run_items");
+
 const expectSingleTenantRead = (statement: ReaderReadStatement | undefined) => {
   expect(statement).toMatchObject({ identity: "reader", kind: "tenant", tenantId: "project_1" });
   expect(statement?.settings).toMatchObject({ SQL_langwatch_tenant_ids: "project_1" });
@@ -36,7 +46,6 @@ describe("ClickHouseExperimentRunRepository", () => {
   const options = {
     workflowVersions: { findByIds: async () => ({}) } as never,
     resolveClient: async () => null,
-    tupleParam: (values: string[]) => values,
     telemetry: {
       trace: async <T>(_input: unknown, operation: () => Promise<T>) => operation(),
       warnOldRuns: () => {},
@@ -63,7 +72,6 @@ describe("ClickHouseExperimentRunRepository", () => {
       resolveClient: async () =>
         ({
           read: async () => ({ rows: [] }),
-          query: async () => ({ json: async () => [] }),
         }) as never,
     });
 
@@ -113,10 +121,7 @@ describe("ClickHouseExperimentRunRepository", () => {
     expect(query).toMatch(/GROUP BY [^)]*RunId\s*\)[^(]*GROUP BY/s);
   });
 
-  it("uses the injected tuple wrapper for exact experiment/run pairs", async () => {
-    const tupleParam = vi.fn((values: string[]) => ({ tuple: values }));
-    const queries: string[] = [];
-    const queryParams: Record<string, unknown>[] = [];
+  it("reads exact experiment/run pairs, latest cell each, in the runs' OccurredAt window", async () => {
     const statements: ReaderReadStatement[] = [];
     const runs = [
       {
@@ -135,38 +140,30 @@ describe("ClickHouseExperimentRunRepository", () => {
     ];
     const repository = ClickHouseExperimentRunRepository.create({
       ...options,
-      tupleParam,
       resolveClient: async () =>
         ({
           read: async ({ statement }: { statement: ReaderReadStatement }) => {
             statements.push(statement);
-            return { rows: runs.map(readRowOf) };
-          },
-          query: async ({
-            query,
-            query_params,
-          }: {
-            query: string;
-            query_params: Record<string, unknown>;
-          }) => {
-            queries.push(query);
-            queryParams.push(query_params);
-            return { json: async () => [] };
+            return { rows: isItemsRead(statement) ? [] : runs.map(readRowOf) };
           },
         }) as never,
     });
 
     await repository.findAll({ projectId: "project_1", experimentIds: ["experiment_1"] });
 
-    expect(tupleParam).toHaveBeenCalledWith(["experiment_1", "run_1"]);
-    expect(queryParams[0]?.runPairs).toEqual([{ tuple: ["experiment_1", "run_1"] }]);
-    expect(queryParams[1]?.runPairs).toEqual([{ tuple: ["experiment_1", "run_1"] }]);
+    const enrichment = statements.filter(isItemsRead);
+    expect(enrichment).toHaveLength(2);
     expectSingleTenantRead(statements[0]);
-    expect([statements[0]?.sql, ...queries].join("\n")).not.toContain("LIMIT 1 BY");
     expect(statements[0]?.sql).toMatch(/max\(UpdatedAt\)/);
-    expect(queries[0]).toMatch(/max\(OccurredAt\)/);
-    expect(queries[0]).toContain("(ExperimentId, RunId) IN {runPairs");
-    expect(queries[0]).toContain("OccurredAt >= {minOccurredAt:DateTime64(3)}");
+    for (const statement of enrichment) {
+      expectSingleTenantRead(statement);
+      expect(pairsOf(statement)).toEqual([["experiment_1", "run_1"]]);
+      expect(statement.sql).not.toContain("LIMIT 1 BY");
+      expect(statement.sql).toMatch(/max\(OccurredAt\)/);
+      expect(statement.sql).toContain("tuple(ExperimentId, RunId) IN (arrayZip(");
+      expect(statement.sql).toMatch(/OccurredAt >= /);
+      expect(statement.sql.match(/arrayZip\(/g)).toHaveLength(2);
+    }
   });
 
   describe("when the listed runs outnumber one enrichment lookup", () => {
@@ -191,39 +188,32 @@ describe("ClickHouseExperimentRunRepository", () => {
         ...options,
         resolveClient: async () =>
           ({
-            read: async () => ({ rows: runRows.map(readRowOf) }),
-            query: async ({
-              query,
-              query_params,
-            }: {
-              query: string;
-              query_params: Record<string, unknown>;
-            }) => {
-              const pairs = query_params.runPairs as string[][];
+            read: async ({ statement }: { statement: ReaderReadStatement }) => {
+              if (!isItemsRead(statement)) return { rows: runRows.map(readRowOf) };
+              const pairs = pairsOf(statement);
               pairCounts.push(pairs.length);
-              const isCostQuery = query.includes("datasetCost");
+              const isCostQuery = statement.sql.includes("datasetCost");
               return {
-                json: async <T>() =>
-                  (isCostQuery
-                    ? pairs.map(([experimentId, runId]) => ({
-                        ExperimentId: experimentId,
-                        RunId: runId,
-                        datasetCost: Number(runId!.slice("run_".length)),
-                        evaluationsCost: null,
-                        datasetAverageCost: null,
-                        datasetAverageDuration: null,
-                        evaluationsAverageCost: null,
-                        evaluationsAverageDuration: null,
-                      }))
-                    : pairs.map(([experimentId, runId]) => ({
-                        ExperimentId: experimentId,
-                        RunId: runId,
-                        EvaluatorId: "evaluator_1",
-                        EvaluatorName: "Faithfulness",
-                        avgScore: Number(runId!.slice("run_".length)) / runCount,
-                        passRate: null,
-                        hasPassedCount: 0,
-                      }))) as T[],
+                rows: isCostQuery
+                  ? pairs.map(([experimentId, runId]) => ({
+                      ExperimentId: experimentId,
+                      RunId: runId,
+                      datasetCost: Number(runId.slice("run_".length)),
+                      evaluationsCost: null,
+                      datasetAverageCost: null,
+                      datasetAverageDuration: null,
+                      evaluationsAverageCost: null,
+                      evaluationsAverageDuration: null,
+                    }))
+                  : pairs.map(([experimentId, runId]) => ({
+                      ExperimentId: experimentId,
+                      RunId: runId,
+                      EvaluatorId: "evaluator_1",
+                      ShownEvaluatorName: "Faithfulness",
+                      avgScore: Number(runId.slice("run_".length)) / runCount,
+                      passRate: null,
+                      hasPassedCount: "0",
+                    })),
               };
             },
           }) as never,

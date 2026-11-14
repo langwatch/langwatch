@@ -53,7 +53,6 @@ export class LiveExperimentRepositories {
       runHistory: ClickHouseExperimentRunRepository.create({
         workflowVersions: PrismaExperimentWorkflowVersionRepository.create(prisma),
         resolveClient,
-        tupleParam: (values) => ClickHouseExperimentRunRepository.tupleParam(values),
         telemetry,
       }),
       dspySteps: ClickHouseExperimentDspyRepository.create({ resolveClient, telemetry }),

@@ -6,7 +6,7 @@
  * @integration
  * @vitest-environment node
  */
-import { TupleParam, type ClickHouseClient } from "@clickhouse/client";
+import type { ClickHouseClient } from "@clickhouse/client";
 import { vendorQueryClient } from "@langwatch/clickhouse-client/testing";
 import { createTenantId, type Event } from "@langwatch/eventing";
 import { nanoid } from "nanoid";
@@ -126,7 +126,6 @@ beforeAll(async () => {
         indexes: [...EXPERIMENT_ID_INDEXES, ...EXPERIMENT_SECOND_ID_INDEXES],
       }),
     ),
-    tupleParam: (values: string[]) => new TupleParam(values),
     telemetry: {
       trace: async <T>(_input: unknown, operation: () => Promise<T>) => operation(),
       warnOldRuns: () => {},

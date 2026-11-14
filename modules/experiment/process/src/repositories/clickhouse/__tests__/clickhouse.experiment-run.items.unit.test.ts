@@ -81,7 +81,6 @@ function runRepositoryOver(items: Record<string, unknown>[]): Options {
           rows: JSON.parse(JSON.stringify(rowsAnswering(statement, items))),
         }),
       }) as never,
-    tupleParam: (values: string[]) => values,
     telemetry: {
       trace: async <T>(_input: unknown, operation: () => Promise<T>) => operation(),
       warnOldRuns: () => {},

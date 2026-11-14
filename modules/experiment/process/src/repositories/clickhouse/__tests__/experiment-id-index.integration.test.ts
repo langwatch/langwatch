@@ -305,7 +305,6 @@ describe("experiment lookups by id with the id index", () => {
         ClickHouseExperimentRunRepository.create({
           workflowVersions: { findByIds: async () => ({}) },
           resolveClient: resolve,
-          tupleParam: (values) => values,
           telemetry: {
             trace: (_input, operation) => operation(),
             warnOldRuns: () => undefined,
@@ -374,7 +373,6 @@ describe("experiment lookups by id with the id index", () => {
       ClickHouseExperimentRunRepository.create({
         workflowVersions: { findByIds: async () => ({}) },
         resolveClient: resolve,
-        tupleParam: (values) => values,
         telemetry: {
           trace: (_input, operation) => operation(),
           warnOldRuns: () => undefined,
