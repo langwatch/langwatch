@@ -28,8 +28,8 @@
     "modules/trace/process/src/repositories/clickhouse/clickhouse.trace-index-materialisation.repository.ts": 4,
     "modules/trace/process/src/repositories/clickhouse/clickhouse.trace-member-client.repository.ts": 1,
     "modules/trace/process/src/repositories/clickhouse/log-record-storage.repository.ts": 2,
-    "modules/trace/process/src/repositories/clickhouse/session-groups.repository.ts": 6,
-    "modules/trace/process/src/repositories/clickhouse/trace-evaluation-runs.repository.ts": 3,
+    "modules/trace/process/src/repositories/clickhouse/session-groups.repository.ts": 5,
+    "modules/trace/process/src/repositories/clickhouse/trace-evaluation-runs.repository.ts": 2,
     "modules/trace/process/src/repositories/clickhouse/trace-instant-eval-runs.repository.ts": 1,
     "modules/trace/process/src/repositories/clickhouse/trace-list.repository.ts": 18
   }

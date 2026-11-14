@@ -10,7 +10,10 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { braidedProof } from "../../../__tests__/support/authorization-proofs.fixture.ts";
 import { ClickHouseTraceEvaluationRunsRepository } from "../trace-evaluation-runs.repository.ts";
-import { authorizedClickHouseFor } from "./support/authorized-clickhouse.support.ts";
+import {
+  authorizedClickHouseFor,
+  traceQueryClientFor,
+} from "./support/authorized-clickhouse.support.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
@@ -63,6 +66,7 @@ beforeAll(async () => {
   repo = ClickHouseTraceEvaluationRunsRepository.create({
     resolveClient: async () => ch,
     clickhouse: authorizedClickHouseFor(ch),
+    reader: traceQueryClientFor(ch),
   });
   await ch.insert({
     table: "evaluation_runs",

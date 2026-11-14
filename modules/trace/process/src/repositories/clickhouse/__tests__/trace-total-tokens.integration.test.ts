@@ -14,7 +14,10 @@ import { mapToTraceListItem } from "../../../features/read/rules/trace-list-row.
 import { traceQueryTranslation } from "../../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
 import { SessionGroupsClickHouseRepository } from "../session-groups.repository.ts";
 import { TraceListClickHouseRepository } from "../trace-list.repository.ts";
-import { authorizedClickHouseFor } from "./support/authorized-clickhouse.support.ts";
+import {
+  authorizedClickHouseFor,
+  traceQueryClientFor,
+} from "./support/authorized-clickhouse.support.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
@@ -90,7 +93,10 @@ describe.skipIf(!clickHouseConfigured)("a trace's total tokens on ClickHouse rea
   beforeAll(async () => {
     ch = await startMigratedTraceClickHouse();
     list = TraceListClickHouseRepository.create({ clickhouse: authorizedClickHouseFor(ch) });
-    groups = SessionGroupsClickHouseRepository.create({ clickhouse: authorizedClickHouseFor(ch) });
+    groups = SessionGroupsClickHouseRepository.create({
+      clickhouse: authorizedClickHouseFor(ch),
+      reader: traceQueryClientFor(ch),
+    });
     await ch.insert({
       table: "trace_summaries",
       values: [

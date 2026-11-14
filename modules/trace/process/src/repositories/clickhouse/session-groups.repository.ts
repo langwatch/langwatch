@@ -1,5 +1,14 @@
 import type { Authorization } from "@langwatch/authorization";
-import { type AuthorizedClickHouse, tenantScope, tenantSet } from "@langwatch/clickhouse-client";
+import {
+  type AuthorizedClickHouse,
+  type ClickHouseQueryClient,
+  tenantScope,
+  tenantSet,
+} from "@langwatch/clickhouse-client";
+import {
+  clickhouseRead,
+  tenantScope as builtTenantScope,
+} from "@langwatch/clickhouse-client/builder";
 import { z } from "zod";
 
 import { TRACE_SUMMARY_TOTAL_TOKENS_SQL } from "../../rules/trace-token-total.rules.ts";
@@ -10,6 +19,7 @@ import type {
   SessionGroupsQuery,
   SessionGroupsRepository,
 } from "../session-groups.repository.ts";
+import { traceSummaries } from "./clickhouse.trace-summaries.table.ts";
 import { chString } from "./stored-span-row.mapper.ts";
 
 const TABLE_NAME = "trace_summaries" as const;
@@ -113,16 +123,60 @@ function buildBaseWhere(timeRange: { from: number; to: number; live?: boolean })
   return { sql: parts.join(" AND "), params };
 }
 
+/**
+ * The latest version of each of a page's traces, under the proof's windowed fence. The page's
+ * time range bounds the election too, as the rollup's does.
+ */
+function previewsStatement({
+  authorization,
+  timeRange,
+  traceIds,
+}: {
+  authorization: Authorization;
+  timeRange: { from: number; to: number; live?: boolean };
+  traceIds: readonly string[];
+}) {
+  return clickhouseRead({
+    scope: builtTenantScope.fromProof({ authorization, reads: "traces" }),
+  })
+    .from(traceSummaries)
+    .withinWindows()
+    .select({
+      TenantId: traceSummaries.TenantId,
+      TraceId: traceSummaries.TraceId,
+      ComputedInput: traceSummaries.ComputedInput,
+      ComputedOutput: traceSummaries.ComputedOutput,
+    })
+    .where(({ and, gte, lte, oneOf }) =>
+      isLiveUpperBound(timeRange)
+        ? and(
+            gte(traceSummaries.OccurredAt, timeRange.from),
+            oneOf(traceSummaries.TraceId, traceIds),
+          )
+        : and(
+            gte(traceSummaries.OccurredAt, timeRange.from),
+            lte(traceSummaries.OccurredAt, timeRange.to),
+            oneOf(traceSummaries.TraceId, traceIds),
+          ),
+    )
+    .latestVersion()
+    .build();
+}
+
 export class SessionGroupsClickHouseRepository implements SessionGroupsRepository {
-  static create({
-    clickhouse,
-  }: {
+  static create(deps: {
     clickhouse: AuthorizedClickHouse;
+    reader: Pick<ClickHouseQueryClient, "read">;
   }): SessionGroupsClickHouseRepository {
-    return new SessionGroupsClickHouseRepository(clickhouse);
+    return new SessionGroupsClickHouseRepository(deps);
   }
 
-  private constructor(private readonly clickhouse: AuthorizedClickHouse) {}
+  private constructor(
+    private readonly deps: {
+      clickhouse: AuthorizedClickHouse;
+      reader: Pick<ClickHouseQueryClient, "read">;
+    },
+  ) {}
 
   async listSessionGroups(query: SessionGroupsQuery): Promise<SessionGroupsPage> {
     const { sql: baseWhere, params } = buildBaseWhere(query.timeRange);
@@ -173,7 +227,7 @@ export class SessionGroupsClickHouseRepository implements SessionGroupsRepositor
       }
     }
 
-    const client = this.clickhouse.as(query.authorization, { reads: "traces" });
+    const client = this.deps.clickhouse.as(query.authorization, { reads: "traces" });
 
     // Phase 1: the rollup itself, light columns only. Heavy previews
     // (ComputedInput/ComputedOutput) are read in phase 2 for the page's
@@ -325,29 +379,13 @@ export class SessionGroupsClickHouseRepository implements SessionGroupsRepositor
     const previews = new Map<string, { input: string | null; output: string | null }>();
     if (args.traceIds.length === 0) return previews;
 
-    const { sql: baseWhere, params } = buildBaseWhere(args.timeRange);
-
-    const client = this.clickhouse.as(args.authorization, { reads: "traces" });
-    const result = await client.query({
+    const result = await this.deps.reader.read({
       // ID_BOUND_SKIP: a page's previews, bounded by the page's time range.
-      query: `
-        SELECT TenantId, TraceId, ComputedInput, ComputedOutput
-        FROM ${TABLE_NAME}
-        WHERE ${baseWhere}
-          AND TraceId IN {previewTraceIds:Array(String)}
-          AND (TenantId, TraceId, UpdatedAt) IN (
-            SELECT TenantId, TraceId, max(UpdatedAt)
-            FROM ${TABLE_NAME}
-            WHERE ${baseWhere}
-              AND TraceId IN {previewTraceIds:Array(String)}
-            GROUP BY TenantId, TraceId
-          )
-      `,
-      query_params: { ...params, previewTraceIds: args.traceIds },
-      format: "JSONEachRow",
+      statement: previewsStatement(args),
+      table: traceSummaries.$table.name,
     });
 
-    const rows = previewRowsSchema.parse(await result.json());
+    const rows = previewRowsSchema.parse(result.rows);
     for (const row of rows) {
       previews.set(previewKey(row), {
         input: row.ComputedInput ?? null,

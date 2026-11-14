@@ -11,7 +11,10 @@ import {
 } from "../../../__tests__/support/authorization-proofs.fixture.ts";
 import type { SessionGroupsQuery } from "../../session-groups.repository.ts";
 import { SessionGroupsClickHouseRepository } from "../session-groups.repository.ts";
-import { authorizedClickHouseFor } from "./support/authorized-clickhouse.support.ts";
+import {
+  authorizedClickHouseFor,
+  traceQueryClientFor,
+} from "./support/authorized-clickhouse.support.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
@@ -219,6 +222,7 @@ describe.skipIf(!clickHouseConfigured)("given two sessions with several traces e
     ch = await startMigratedTraceClickHouse();
     repository = SessionGroupsClickHouseRepository.create({
       clickhouse: authorizedClickHouseFor(ch),
+      reader: traceQueryClientFor(ch),
     });
 
     await insertTraceSummaries([

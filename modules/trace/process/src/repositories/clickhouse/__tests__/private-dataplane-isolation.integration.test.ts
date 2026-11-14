@@ -206,7 +206,6 @@ describe("given one organization on a private ClickHouse instance and one on the
     });
     spans = SpanStorageClickHouseRepository.create({
       resolveClient: MemberTraceClickHouseClientRepository.resolverFor(member),
-      clickhouse: MemberTraceClickHouseClientRepository.authorizedFor(member),
       reader: member,
     });
     events = EventingClickHouseEventRepository.create({

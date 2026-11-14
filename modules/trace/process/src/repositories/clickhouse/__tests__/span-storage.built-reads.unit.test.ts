@@ -31,7 +31,6 @@ function reader(rows: Rows | ((request: ReadRequest) => Rows) = []) {
   const refuse = () => Promise.reject(new Error("a built read never reaches the raw client"));
   const repository = SpanStorageClickHouseRepository.create({
     resolveClient: refuse,
-    clickhouse: { as: () => ({ query: refuse }) } as never,
     reader: clickHouseQueryClientDouble({
       async read(request: ReadRequest) {
         requests.push(request);

@@ -217,11 +217,12 @@ beforeAll(async () => {
   });
   analytics = TraceAnalyticsClickHouseRepository.create({
     resolveClient,
-    clickhouse,
+    reader: traceQueryClientFor(ch),
   });
   evaluations = ClickHouseTraceEvaluationRunsRepository.create({
     resolveClient,
     clickhouse,
+    reader: traceQueryClientFor(ch),
   });
 
   await ch.insert({

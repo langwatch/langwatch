@@ -1,11 +1,10 @@
 import type { Authorization } from "@langwatch/authorization";
 import {
-  type AuthorizedClickHouse,
+  type ClickHouseQueryClient,
   queryWindowed,
-  type TenantScopedReader,
-  tenantScope,
   tenantScopeKey,
 } from "@langwatch/clickhouse-client";
+import { clickhouseRead, fn, tenantScope } from "@langwatch/clickhouse-client/builder";
 import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import {
@@ -27,6 +26,7 @@ import {
   TraceAnalyticsProjectionRepository,
   type TraceAnalyticsProjectionRead,
 } from "../trace-analytics-projection.repository.ts";
+import { traceAnalytics } from "./clickhouse.trace-analytics.table.ts";
 import type { TraceClickHouseWriteResolver } from "./clickhouse.trace-member-client.repository.ts";
 
 const analyticsRecordRowsSchema = z.array(z.record(z.string(), z.unknown()));
@@ -137,12 +137,159 @@ function writeColumns(
   return Object.keys(first) as [string, ...string[]];
 }
 
+/** The proof's reading scope: analytics rows are read as traces. */
+function analyticsScope(authorization: Authorization) {
+  return tenantScope.fromProof({ authorization, reads: "traces" });
+}
+
+/** The columns `latestOf` decodes; the MATERIALIZED metadata ones re-derive from the map. */
+const LATEST_ROW_SELECTION = {
+  TenantId: traceAnalytics.TenantId,
+  TraceId: traceAnalytics.TraceId,
+  Version: traceAnalytics.Version,
+  OccurredAt: traceAnalytics.OccurredAt,
+  CreatedAt: traceAnalytics.CreatedAt,
+  UpdatedAt: traceAnalytics.UpdatedAt,
+  TraceName: traceAnalytics.TraceName,
+  TopicId: traceAnalytics.TopicId,
+  SubTopicId: traceAnalytics.SubTopicId,
+  UserId: traceAnalytics.UserId,
+  ConversationId: traceAnalytics.ConversationId,
+  CustomerId: traceAnalytics.CustomerId,
+  Origin: traceAnalytics.Origin,
+  Models: traceAnalytics.Models,
+  Labels: traceAnalytics.Labels,
+  TotalCost: traceAnalytics.TotalCost,
+  NonBilledCost: traceAnalytics.NonBilledCost,
+  UnpricedSpanCount: traceAnalytics.UnpricedSpanCount,
+  UnpricedModels: traceAnalytics.UnpricedModels,
+  TotalDurationMs: traceAnalytics.TotalDurationMs,
+  TimeToFirstTokenMs: traceAnalytics.TimeToFirstTokenMs,
+  TokensPerSecond: traceAnalytics.TokensPerSecond,
+  PromptTokens: traceAnalytics.PromptTokens,
+  CompletionTokens: traceAnalytics.CompletionTokens,
+  CacheReadTokens: traceAnalytics.CacheReadTokens,
+  CacheWriteTokens: traceAnalytics.CacheWriteTokens,
+  ReasoningTokens: traceAnalytics.ReasoningTokens,
+  HasError: traceAnalytics.HasError,
+  HasAnnotation: traceAnalytics.HasAnnotation,
+  Attributes: traceAnalytics.Attributes,
+  SpanCount: traceAnalytics.SpanCount,
+  AnnotationIds: traceAnalytics.AnnotationIds,
+  RootSpanStartTimeMs: traceAnalytics.RootSpanStartTimeMs,
+  TraceNameFromFallback: traceAnalytics.TraceNameFromFallback,
+  RootMetadataFromFallback: traceAnalytics.RootMetadataFromFallback,
+  TraceNameUserOverridden: traceAnalytics.TraceNameUserOverridden,
+  LastEventOccurredAt: traceAnalytics.LastEventOccurredAt,
+  AppliedEventIds: traceAnalytics.AppliedEventIds,
+  EarliestSpanStartMs: traceAnalytics.EarliestSpanStartMs,
+  EvaluationOutcomes: traceAnalytics.EvaluationOutcomes,
+  EvaluationRowsDigest: traceAnalytics.EvaluationRowsDigest,
+};
+
+/** Each trace's anchor, its latest version's OccurredAt: by the caller's window, else the index. */
+function anchorsStatement({
+  authorization,
+  traceIds,
+  window,
+}: {
+  authorization: Authorization;
+  traceIds: readonly string[];
+  window?: { fromMs: number; toMs: number };
+}) {
+  const ids = [...new Set(traceIds)];
+  const read = clickhouseRead({ scope: analyticsScope(authorization) })
+    .from(traceAnalytics)
+    .withinWindows()
+    .select({
+      TraceId: traceAnalytics.TraceId,
+      OccurredAtMs: fn.toUnixTimestamp64Milli(
+        fn.argMax(traceAnalytics.OccurredAt, traceAnalytics.UpdatedAt),
+      ),
+    });
+  const bounded =
+    window === undefined
+      ? read.where(({ idBound }) => idBound(traceAnalytics.TraceId, ids))
+      : read.where(({ and, gte, lte, oneOf }) =>
+          and(
+            oneOf(traceAnalytics.TraceId, ids),
+            gte(traceAnalytics.OccurredAt, window.fromMs),
+            lte(traceAnalytics.OccurredAt, window.toMs),
+          ),
+        );
+  return bounded.groupBy(traceAnalytics.TenantId, traceAnalytics.TraceId).build();
+}
+
+/** One trace's analytics rows under the proof's windowed fence, before the election. */
+function latestRowRead(authorization: Authorization) {
+  return clickhouseRead({ scope: analyticsScope(authorization) })
+    .from(traceAnalytics)
+    .withinWindows()
+    .select(LATEST_ROW_SELECTION);
+}
+
+/**
+ * Elects the latest version, then ranks rows sharing `max(UpdatedAt)`: reachable because the
+ * fold's stamp is monotonic only per state chain, and the IN-tuple keeps every tie for this
+ * ORDER BY. Full tiebreak rationale in dev/docs/best_practices/clickhouse-queries.md.
+ */
+function rankedLatestVersion(read: ReturnType<typeof latestRowRead>) {
+  return read
+    .latestVersion()
+    .orderBy(traceAnalytics.TenantId, "ASC")
+    .orderBy(traceAnalytics.LastEventOccurredAt, "DESC")
+    .orderBy(traceAnalytics.SpanCount, "DESC")
+    .orderBy(fn.length(traceAnalytics.AppliedEventIds), "DESC")
+    .orderBy(traceAnalytics.OccurredAt, "ASC")
+    .orderBy(fn.toString(traceAnalytics.AppliedEventIds), "DESC")
+    .limit(1)
+    .build();
+}
+
+/** The latest version by the TraceId index, which bounds the election as well. */
+function latestVersionByIdStatement({
+  authorization,
+  traceId,
+}: {
+  authorization: Authorization;
+  traceId: string;
+}) {
+  return rankedLatestVersion(
+    latestRowRead(authorization).where(({ idBound }) => idBound(traceAnalytics.TraceId, traceId)),
+  );
+}
+
+/** The latest version; a caller's window bounds the outer read only, never the election. */
+function latestVersionStatement({
+  authorization,
+  traceId,
+  window,
+}: {
+  authorization: Authorization;
+  traceId: string;
+  window?: { fromMs: number; toMs: number };
+}) {
+  const read = latestRowRead(authorization).where(({ eq }) => eq(traceAnalytics.TraceId, traceId));
+  return rankedLatestVersion(
+    window === undefined
+      ? read
+      : read.where(
+          ({ and, gte, lte }) =>
+            and(
+              gte(traceAnalytics.OccurredAt, window.fromMs),
+              lte(traceAnalytics.OccurredAt, window.toMs),
+            ),
+          { inElection: false },
+        ),
+  );
+}
+
 export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjectionRepository {
   /** Writes resolve the tenant's own client; reads go through the proof's fence (ADR-177). */
   private constructor(
     private readonly options: {
       resolveClient: TraceClickHouseWriteResolver;
-      clickhouse: AuthorizedClickHouse;
+      reader: Pick<ClickHouseQueryClient, "read">;
     },
   ) {
     super();
@@ -150,13 +297,9 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
 
   static create(options: {
     resolveClient: TraceClickHouseWriteResolver;
-    clickhouse: AuthorizedClickHouse;
+    reader: Pick<ClickHouseQueryClient, "read">;
   }): TraceAnalyticsClickHouseRepository {
     return new TraceAnalyticsClickHouseRepository(options);
-  }
-
-  private reader(authorization: Authorization): TenantScopedReader {
-    return this.options.clickhouse.as(authorization, { reads: "traces" });
   }
 
   async upsert({
@@ -307,21 +450,12 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
   }): Promise<{ traceId: string; occurredAtMs: number }[]> {
     if (traceIds.length === 0) return [];
     if (window === undefined) return this.queryOccurredAtByTraceIds({ authorization, traceIds });
-    const result = await this.reader(authorization).query({
+    const result = await this.options.reader.read({
       // ID_BOUND_SKIP: many ids at once, bounded by the caller's OccurredAt window instead.
-      query: `
-        SELECT TraceId, toUnixTimestamp64Milli(argMax(OccurredAt, UpdatedAt)) AS OccurredAtMs
-        FROM ${TABLE_NAME}
-        WHERE ${tenantScope("OccurredAt")}
-          AND TraceId IN {traceIds:Array(String)}
-          AND OccurredAt BETWEEN fromUnixTimestamp64Milli({from:Int64})
-            AND fromUnixTimestamp64Milli({to:Int64})
-        GROUP BY TenantId, TraceId
-      `,
-      query_params: { traceIds: [...new Set(traceIds)], from: window.fromMs, to: window.toMs },
-      format: "JSONEachRow",
+      statement: anchorsStatement({ authorization, traceIds, window }),
+      table: traceAnalytics.$table.name,
     });
-    return TraceAnalyticsClickHouseRepository.anchorsOf(await result.json());
+    return TraceAnalyticsClickHouseRepository.anchorsOf(result.rows);
   }
 
   private static anchorsOf(rows: unknown): { traceId: string; occurredAtMs: number }[] {
@@ -339,35 +473,13 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
     authorization: Authorization;
     traceIds: readonly string[];
   }): Promise<{ traceId: string; occurredAtMs: number }[]> {
-    const result = await this.reader(authorization).query({
-      query: `
-        SELECT TraceId, toUnixTimestamp64Milli(argMax(OccurredAt, UpdatedAt)) AS OccurredAtMs
-        FROM ${TABLE_NAME}
-        WHERE ${tenantScope("OccurredAt")}
-          AND TraceId IN {traceIds:Array(String)}
-          {{idBound:trace_analytics.TraceId:traceIds}}
-        GROUP BY TenantId, TraceId
-      `,
-      query_params: { traceIds: [...new Set(traceIds)] },
-      format: "JSONEachRow",
+    const result = await this.options.reader.read({
+      statement: anchorsStatement({ authorization, traceIds }),
+      table: traceAnalytics.$table.name,
       idBound: { fallback: "unbounded" },
     });
-    return TraceAnalyticsClickHouseRepository.anchorsOf(await result.json());
+    return TraceAnalyticsClickHouseRepository.anchorsOf(result.rows);
   }
-
-  /**
-   * How two versions sharing `max(UpdatedAt)` are ranked, as SQL — reachable
-   * because the fold's monotonic stamp is only monotonic per state chain.
-   * Full tiebreak rationale in dev/docs/best_practices/clickhouse-queries.md.
-   */
-  private static readonly LATEST_VERSION_ORDER = `
-        ORDER BY
-          TenantId ASC,
-          LastEventOccurredAt DESC,
-          SpanCount DESC,
-          length(AppliedEventIds) DESC,
-          OccurredAt ASC,
-          toString(AppliedEventIds) DESC`;
 
   /**
    * {@link findByTraceId} with no window: the trace_analytics index's range bounds the inner
@@ -381,30 +493,13 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
     authorization: Authorization;
     traceId: string;
   }): Promise<TraceAnalyticsProjectionRead | null> {
-    const result = await this.reader(authorization).query({
-      query: `
-        SELECT *
-        FROM ${TABLE_NAME}
-        WHERE ${tenantScope("OccurredAt")}
-          AND TraceId = {traceId:String}
-          {{idBound:trace_analytics.TraceId:traceId}}
-          AND (TenantId, TraceId, UpdatedAt) IN (
-            SELECT TenantId, TraceId, max(UpdatedAt)
-            FROM ${TABLE_NAME}
-            WHERE ${tenantScope("OccurredAt")}
-              AND TraceId = {traceId:String}
-              {{idBound:trace_analytics.TraceId:traceId}}
-            GROUP BY TenantId, TraceId
-          )
-        ${TraceAnalyticsClickHouseRepository.LATEST_VERSION_ORDER}
-        LIMIT 1
-      `,
-      query_params: { traceId },
-      format: "JSONEachRow",
+    const result = await this.options.reader.read({
+      statement: latestVersionByIdStatement({ authorization, traceId }),
+      table: traceAnalytics.$table.name,
       idBound: { fallback: "none" },
     });
     return TraceAnalyticsClickHouseRepository.latestOf(
-      analyticsRecordRowsSchema.parse(await result.json()),
+      analyticsRecordRowsSchema.parse(result.rows),
     );
   }
 
@@ -421,40 +516,13 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
     traceId: string;
     window?: { fromMs: number; toMs: number };
   }): Promise<TraceAnalyticsProjectionRead | null> {
-    const client = this.reader(authorization);
-
-    const partitionFilter =
-      window !== undefined
-        ? "AND OccurredAt BETWEEN fromUnixTimestamp64Milli({from:Int64}) AND fromUnixTimestamp64Milli({to:Int64})"
-        : "";
-
-    const result = await client.query({
+    const result = await this.options.reader.read({
       // ID_BOUND_SKIP: a fold read-back's own window, on the outer read only (ADR-071).
-      query: `
-        SELECT *
-        FROM ${TABLE_NAME}
-        WHERE ${tenantScope("OccurredAt")}
-          AND TraceId = {traceId:String}
-          ${partitionFilter}
-          AND (TenantId, TraceId, UpdatedAt) IN (
-            SELECT TenantId, TraceId, max(UpdatedAt)
-            FROM ${TABLE_NAME}
-            WHERE ${tenantScope("OccurredAt")}
-              AND TraceId = {traceId:String}
-            GROUP BY TenantId, TraceId
-          )
-        ${TraceAnalyticsClickHouseRepository.LATEST_VERSION_ORDER}
-        LIMIT 1
-      `,
-      query_params: {
-        traceId,
-        ...(window !== undefined ? { from: window.fromMs, to: window.toMs } : {}),
-      },
-      format: "JSONEachRow",
+      statement: latestVersionStatement({ authorization, traceId, window }),
+      table: traceAnalytics.$table.name,
     });
-
     return TraceAnalyticsClickHouseRepository.latestOf(
-      analyticsRecordRowsSchema.parse(await result.json()),
+      analyticsRecordRowsSchema.parse(result.rows),
     );
   }
 

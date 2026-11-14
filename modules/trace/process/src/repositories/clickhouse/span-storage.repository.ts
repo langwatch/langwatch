@@ -1,6 +1,5 @@
 import type { Authorization } from "@langwatch/authorization";
 import {
-  type AuthorizedClickHouse,
   type ClickHouseQueryClient,
   DEFAULT_PARTITION_WINDOW_MS,
   type IdBoundOptions,
@@ -1201,13 +1200,12 @@ function storedTraceSpanOf(row: z.infer<typeof storedSpanRowSchema>): StoredTrac
 
 /**
  * Writes resolve the tenant's own client by the span's tenant id, the way the
- * projection hands it over. Reads never name a tenant: they go through the
- * authorized client, which fences every statement by the proof (ADR-177 block C).
+ * projection hands it over. Reads never name a tenant: each built statement
+ * carries the proof's fence (ADR-177 block C).
  */
 export class SpanStorageClickHouseRepository implements SpanStorageRepository {
   static create(deps: {
     resolveClient: ClickHouseClientResolver;
-    clickhouse: AuthorizedClickHouse;
     reader: Pick<ClickHouseQueryClient, "read">;
   }): SpanStorageClickHouseRepository {
     return new SpanStorageClickHouseRepository(deps);
@@ -1216,7 +1214,6 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
   constructor(
     private readonly deps: {
       resolveClient: ClickHouseClientResolver;
-      clickhouse: AuthorizedClickHouse;
       reader: Pick<ClickHouseQueryClient, "read">;
     },
   ) {}

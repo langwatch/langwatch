@@ -2,9 +2,14 @@ import type { Authorization } from "@langwatch/authorization";
 import {
   type AuthorizedClickHouse,
   ClickHouseColumns,
+  type ClickHouseQueryClient,
   ownProjectIdOf,
   tenantScope,
 } from "@langwatch/clickhouse-client";
+import {
+  clickhouseRead,
+  tenantScope as builtTenantScope,
+} from "@langwatch/clickhouse-client/builder";
 /**
  * Evaluation's `evaluation_runs`, shared with trace for reading (R40, EF-5): each
  * read collapses a run to its latest version, as evaluation's own reads collapse it.
@@ -22,6 +27,7 @@ import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 
 import { TraceEvaluationRunsReadRepository } from "../trace-evaluation-runs.repository.ts";
+import { evaluationRuns } from "./clickhouse.evaluation-runs.table.ts";
 import type {
   TraceClickHouseClient,
   TraceClickHouseResolver,
@@ -162,17 +168,59 @@ function summaryFields(row: SummaryRow) {
   };
 }
 
+/** Each run's latest version on a page's traces since `since`, under the fence on ScheduledAt. */
+function summariesStatement({
+  authorization,
+  traceIds,
+  since,
+}: {
+  authorization: Authorization;
+  traceIds: readonly string[];
+  since: number;
+}) {
+  return clickhouseRead({
+    scope: builtTenantScope.fromProof({ authorization, reads: "traces" }),
+  })
+    .from(evaluationRuns)
+    .withinWindows()
+    .select({
+      TenantId: evaluationRuns.TenantId,
+      EvaluationId: evaluationRuns.EvaluationId,
+      EvaluatorId: evaluationRuns.EvaluatorId,
+      EvaluatorType: evaluationRuns.EvaluatorType,
+      EvaluatorName: evaluationRuns.EvaluatorName,
+      TraceId: evaluationRuns.TraceId,
+      IsGuardrail: evaluationRuns.IsGuardrail,
+      Status: evaluationRuns.Status,
+      Score: evaluationRuns.Score,
+      Passed: evaluationRuns.Passed,
+      Label: evaluationRuns.Label,
+    })
+    .where(({ and, gte, oneOf }) =>
+      and(gte(evaluationRuns.ScheduledAt, since), oneOf(evaluationRuns.TraceId, [...traceIds])),
+    )
+    .latestVersion()
+    .orderBy(evaluationRuns.UpdatedAt, "DESC")
+    .build();
+}
+
 export class ClickHouseTraceEvaluationRunsRepository extends TraceEvaluationRunsReadRepository {
   static create(options: {
     resolveClient: TraceClickHouseResolver;
     clickhouse: AuthorizedClickHouse;
+    reader: Pick<ClickHouseQueryClient, "read">;
   }): ClickHouseTraceEvaluationRunsRepository {
-    return new ClickHouseTraceEvaluationRunsRepository(options.resolveClient, options.clickhouse);
+    return new ClickHouseTraceEvaluationRunsRepository(
+      options.resolveClient,
+      options.clickhouse,
+      options.reader,
+    );
   }
 
   private constructor(
     private readonly resolveClient: TraceClickHouseResolver,
     private readonly clickhouse: AuthorizedClickHouse,
+    private readonly reader: Pick<ClickHouseQueryClient, "read">,
   ) {
     super();
   }
@@ -289,31 +337,13 @@ export class ClickHouseTraceEvaluationRunsRepository extends TraceEvaluationRuns
   }): Promise<(EvaluationSummary & { tenantId: string })[]> {
     if (input.traceIds.length === 0) return [];
     try {
-      const client = this.clickhouse.as(input.authorization, { reads: "traces" });
-      // ID_BOUND_SKIP: evaluation's index, registered by evaluation; moves there with trace-review.
-      const result = await client.query({
-        query: `
-          SELECT TenantId, EvaluationId, EvaluatorId, EvaluatorType, EvaluatorName,
-            TraceId, IsGuardrail, Status, Score, Passed, Label
-          FROM ${EVALUATION_RUNS_TABLE}
-          WHERE ${tenantScope("ScheduledAt")}
-            AND ScheduledAt >= fromUnixTimestamp64Milli({since:Int64})
-            AND TraceId IN ({traceIds:Array(String)})
-            AND (TenantId, EvaluationId, UpdatedAt) IN (
-              SELECT TenantId, EvaluationId, max(UpdatedAt)
-              FROM ${EVALUATION_RUNS_TABLE}
-              WHERE ${tenantScope("ScheduledAt")}
-                AND ScheduledAt >= fromUnixTimestamp64Milli({since:Int64})
-                AND TraceId IN ({traceIds:Array(String)})
-              GROUP BY TenantId, EvaluationId
-            )
-          ORDER BY UpdatedAt DESC
-        `,
-        query_params: { traceIds: [...input.traceIds], since: input.since },
-        format: "JSONEachRow",
+      const result = await this.reader.read({
+        // ID_BOUND_SKIP: evaluation's index, registered by evaluation; moves with trace-review.
+        statement: summariesStatement(input),
+        table: evaluationRuns.$table.name,
       });
       return tenantSummaryRowsSchema
-        .parse(await result.json())
+        .parse(result.rows)
         .flatMap((row) =>
           row.TraceId
             ? [{ tenantId: row.TenantId, ...evaluationSummarySchema.parse(summaryFields(row)) }]

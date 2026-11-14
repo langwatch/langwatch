@@ -11,7 +11,7 @@ import type { TraceAnalyticsRow } from "#eventing/trace-derived.projection";
 
 import { ownProof } from "../../../__tests__/support/authorization-proofs.fixture.ts";
 import { TraceAnalyticsClickHouseRepository } from "../trace-metrics-analytics.repository.ts";
-import { authorizedClickHouseFor } from "./support/authorized-clickhouse.support.ts";
+import { traceQueryClientFor } from "./support/authorized-clickhouse.support.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
@@ -85,7 +85,7 @@ beforeAll(async () => {
   ch = await startMigratedTraceClickHouse();
   repo = TraceAnalyticsClickHouseRepository.create({
     resolveClient: async () => ch,
-    clickhouse: authorizedClickHouseFor(ch),
+    reader: traceQueryClientFor(ch),
   });
 }, 60_000);
 

@@ -218,3 +218,11 @@ Feature: Trace span-tree read service
     Then each statement is a reader statement over the proof's tenants with the tenant setting
     And the summary read elects each tenant's latest summary and returns the first tenant's, the same row on every read
     And the tenant list reads each tenant once, in tenant order, without electing a version
+
+  @unit
+  Scenario: A trace's analytics row and the anchors of many traces are read within the reader's proof
+    Given a reader whose proof covers its own project
+    When a trace's analytics row is read back, or the anchors of many traces are read
+    Then each statement is a reader statement over the proof's tenants with the tenant setting
+    And the row read elects the latest version and ranks versions tied on it by fold progress, the same row on every read
+    And a caller's window bounds the outer read only, and the anchors read is bounded by the window or else the trace id index

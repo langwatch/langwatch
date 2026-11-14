@@ -202,10 +202,9 @@ beforeAll(async () => {
     await insertSpans([spanRow({ traceId, startMs: Date.now() - daysAgo * DAY_MS })]);
     await insertSummary({ traceId, occurredAtMs: Date.now() - daysAgo * DAY_MS });
   }
-  const { clickhouse, reader } = await recordingAuthorizedClickHouse(ch);
+  const { reader } = await recordingAuthorizedClickHouse(ch);
   spans = SpanStorageClickHouseRepository.create({
     resolveClient: async () => ch,
-    clickhouse,
     reader,
   });
   summaries = TraceSummaryClickHouseRepository.create({

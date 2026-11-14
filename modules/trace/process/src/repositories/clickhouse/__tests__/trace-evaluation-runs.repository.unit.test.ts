@@ -2,7 +2,11 @@
  * Trace's read of evaluation's shared `evaluation_runs`.
  * @see modules/trace/specs/trace-evaluation-runs-read.feature
  */
-import { AuthorizedClickHouse, type QueryRequest } from "@langwatch/clickhouse-client";
+import {
+  AuthorizedClickHouse,
+  type ClickHouseQueryClient,
+  type QueryRequest,
+} from "@langwatch/clickhouse-client";
 import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { describe, expect, it, vi } from "vitest";
 
@@ -35,7 +39,9 @@ function client(answer: (request: ChQuery) => unknown[] | Error) {
   return { query };
 }
 
-function repositoryOver(ch: ReturnType<typeof client>) {
+type ReadRequest = Parameters<ClickHouseQueryClient["read"]>[0];
+
+function repositoryOver(ch: ReturnType<typeof client>, reads: ReadRequest[] = []) {
   // The proof-checked reader hands its expanded statement to the same recording client.
   const authorized = clickHouseQueryClientDouble({
     query: async (request: QueryRequest) => {
@@ -46,6 +52,17 @@ function repositoryOver(ch: ReturnType<typeof client>) {
   return ClickHouseTraceEvaluationRunsRepository.create({
     resolveClient: async () => ch,
     clickhouse: new AuthorizedClickHouse({ resolveClient: async () => authorized }),
+    // A built read is recorded, then answered by the same recording client.
+    reader: clickHouseQueryClientDouble({
+      read: async (request: ReadRequest) => {
+        reads.push(request);
+        const result = await ch.query({
+          query: request.statement.sql,
+          query_params: request.statement.params,
+        });
+        return { rows: await result.json() };
+      },
+    }),
   });
 }
 
@@ -114,20 +131,26 @@ describe("given evaluation has recorded runs against the traces on one list page
         },
       ]);
 
-      const summaries = await repositoryOver(ch).findSummariesByTraceIds({
+      const reads: ReadRequest[] = [];
+      const summaries = await repositoryOver(ch, reads).findSummariesByTraceIds({
         authorization,
         traceIds: ["trace-1", "trace-2"],
         since: 1_000,
       });
 
-      const request = ch.query.mock.calls[0]?.[0];
-      expect(request?.query).toContain("ScheduledAt >= fromUnixTimestamp64Milli({since:Int64})");
-      expect(request?.query).toContain("TenantId IN ({tenantScope");
-      expect(request?.query_params).toMatchObject({
-        traceIds: ["trace-1", "trace-2"],
-        since: 1_000,
+      const request = reads[0];
+      expect(request?.table).toBe("evaluation_runs");
+      expect(request?.statement).toMatchObject({
+        kind: "tenant",
+        identity: "reader",
+        tenantIds: [TENANT],
+        settings: { SQL_langwatch_tenant_ids: TENANT },
       });
-      expect(Object.values(request?.query_params ?? {})).toContainEqual([TENANT]);
+      expect(request?.statement.sql).toContain("ScheduledAt >= fromUnixTimestamp64Milli(");
+      expect(request?.statement.sql).toContain("max(UpdatedAt)");
+      expect(Object.values(request?.statement.params ?? {})).toEqual(
+        expect.arrayContaining([1_000, ["trace-1", "trace-2"]]),
+      );
       expect(summaries.map((summary) => summary.traceId)).toEqual(["trace-1", "trace-2"]);
       expect(summaries[1]).toMatchObject({
         tenantId: TENANT,
@@ -197,6 +220,7 @@ describe("given the target's evaluation_runs does not have the attempt columns y
         clickhouse: new AuthorizedClickHouse({
           resolveClient: async () => clickHouseQueryClientDouble({}),
         }),
+        reader: clickHouseQueryClientDouble({}),
       });
 
       const read = await repository.findTraceEvaluations({
@@ -232,6 +256,7 @@ describe("given a run with failed attempts", () => {
         clickhouse: new AuthorizedClickHouse({
           resolveClient: async () => clickHouseQueryClientDouble({}),
         }),
+        reader: clickHouseQueryClientDouble({}),
       });
 
       const read = await repository.findTraceEvaluations({

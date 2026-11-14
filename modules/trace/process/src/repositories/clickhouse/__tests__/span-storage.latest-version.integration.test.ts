@@ -8,10 +8,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { ownProof } from "../../../__tests__/support/authorization-proofs.fixture.ts";
 import { SpanStorageClickHouseRepository } from "../span-storage.repository.ts";
-import {
-  authorizedClickHouseFor,
-  traceQueryClientFor,
-} from "./support/authorized-clickhouse.support.ts";
+import { traceQueryClientFor } from "./support/authorized-clickhouse.support.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
@@ -68,7 +65,6 @@ beforeAll(async () => {
   ch = await startMigratedTraceClickHouse();
   repo = SpanStorageClickHouseRepository.create({
     resolveClient: async () => ch,
-    clickhouse: authorizedClickHouseFor(ch),
     reader: traceQueryClientFor(ch),
   });
 

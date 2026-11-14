@@ -7,11 +7,12 @@ import { env as nodeProcessEnv } from "node:process";
 
 nodeProcessEnv.TZ = "Asia/Kolkata";
 
-import { AuthorizedClickHouse, setWindowedReadMetrics } from "@langwatch/clickhouse-client";
+import { type ClickHouseQueryClient, setWindowedReadMetrics } from "@langwatch/clickhouse-client";
 import {
   idIndexedClientDouble,
   type ScriptedStatements,
 } from "@langwatch/clickhouse-client/testing";
+import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { describe, expect, it, vi } from "vitest";
 
 import type { TraceAnalyticsRow } from "#eventing/trace-derived.projection";
@@ -36,30 +37,27 @@ const TABLE = "trace_analytics";
 const windowedReadMetrics = new TestWindowedReadMetrics();
 setWindowedReadMetrics(windowedReadMetrics);
 
-/** The authorized read path over a legacy-shaped double: expanded SQL in, `{ rows }` out. */
-function readsOver(client: TraceClickHouseWriteClient): AuthorizedClickHouse {
-  return new AuthorizedClickHouse({
-    resolveClient: async () =>
-      idIndexedClientDouble({
-        indexes: TRACE_ID_INDEXES,
-        driver: {
-          execute: vi.fn<ScriptedStatements["execute"]>(async ({ sql, params = {} }) => {
-            const result = await client.query({
-              query: sql,
-              query_params: params,
-              format: "JSONEachRow",
-            });
-            return { rows: await result.json() };
-          }),
-        },
+/** The built read path over a legacy-shaped double: rendered SQL in, `{ rows }` out. */
+function readsOver(client: TraceClickHouseWriteClient): Pick<ClickHouseQueryClient, "read"> {
+  return idIndexedClientDouble({
+    indexes: TRACE_ID_INDEXES,
+    driver: {
+      execute: vi.fn<ScriptedStatements["execute"]>(async ({ sql, params = {} }) => {
+        const result = await client.query({
+          query: sql,
+          query_params: params,
+          format: "JSONEachRow",
+        });
+        return { rows: await result.json() };
       }),
+    },
   });
 }
 
 function makeRepositoryReturning(record: Record<string, unknown>) {
   return TraceAnalyticsClickHouseRepository.create({
     resolveClient: async () => clientReturning(record),
-    clickhouse: readsOver(clientReturning(record)),
+    reader: readsOver(clientReturning(record)),
   });
 }
 
@@ -68,7 +66,7 @@ function makeOrderingRepository(rows: Record<string, unknown>[]) {
   return {
     repository: TraceAnalyticsClickHouseRepository.create({
       resolveClient: async () => client,
-      clickhouse: readsOver(client),
+      reader: readsOver(client),
     }),
     seen,
   };
@@ -301,8 +299,10 @@ describe("TraceAnalyticsClickHouseRepository windowed read", () => {
           window: { fromMs: 1_750_000_000_000, toMs: 1_750_000_345_679 },
         });
 
-        expect(seen[0]?.query_params?.from).toBe(1_750_000_000_000);
-        expect(seen[0]?.query_params?.to).toBe(1_750_000_345_679);
+        // Built parameters are named `v<n>`, so the bounds are found by value.
+        expect(Object.values(seen[0]?.query_params ?? {})).toEqual(
+          expect.arrayContaining([1_750_000_000_000, 1_750_000_345_679]),
+        );
       });
 
       it("bounds the outer scope only, leaving the dedup subquery unwindowed", async () => {
@@ -405,7 +405,7 @@ describe("TraceAnalyticsClickHouseRepository insert settings", () => {
         const { client, inserts } = capturingInsertClient();
         const repository = TraceAnalyticsClickHouseRepository.create({
           resolveClient: async () => client,
-          clickhouse: readsOver(client),
+          reader: readsOver(client),
         });
 
         await repository.upsert({ row: ROW, retentionDays: 30 });
@@ -422,7 +422,7 @@ describe("TraceAnalyticsClickHouseRepository insert settings", () => {
         const { client, inserts } = capturingInsertClient();
         const repository = TraceAnalyticsClickHouseRepository.create({
           resolveClient: async () => client,
-          clickhouse: readsOver(client),
+          reader: readsOver(client),
         });
 
         await repository.upsert({
@@ -457,7 +457,7 @@ describe("TraceAnalyticsClickHouseRepository insert settings", () => {
         const { client, inserts } = capturingInsertClient();
         const repository = TraceAnalyticsClickHouseRepository.create({
           resolveClient: async () => client,
-          clickhouse: readsOver(client),
+          reader: readsOver(client),
         });
 
         await repository.upsertBatch([{ row: ROW, retentionDays: 30 }]);
@@ -518,6 +518,102 @@ describe("TraceAnalyticsClickHouseRepository evaluation outcomes read-back", () 
         expect(read?.undecodable).toBeUndefined();
         expect(read?.row.evaluationOutcomes).toEqual({ "eval-1": outcome });
       });
+    });
+  });
+});
+
+describe("TraceAnalyticsClickHouseRepository built reads", () => {
+  type ReadRequest = Parameters<ClickHouseQueryClient["read"]>[0];
+
+  /** A reader answering `rows` to each request and keeping them. */
+  function builtRepository(rows: Record<string, unknown>[]) {
+    const requests: ReadRequest[] = [];
+    const repository = TraceAnalyticsClickHouseRepository.create({
+      resolveClient: async () => clientReturning({}),
+      reader: clickHouseQueryClientDouble({
+        async read(request: ReadRequest) {
+          requests.push(request);
+          return { rows };
+        },
+      }),
+    });
+    return { repository, requests };
+  }
+
+  function expectReaderFence(request: ReadRequest | undefined) {
+    expect(request?.table).toBe(TABLE);
+    expect(request?.statement).toMatchObject({
+      kind: "tenant",
+      identity: "reader",
+      tenantIds: [TENANT_ID],
+      settings: { SQL_langwatch_tenant_ids: TENANT_ID },
+    });
+  }
+
+  describe("given a trace's analytics row read back with no window", () => {
+    /** @scenario "A trace's analytics row and the anchors of many traces are read within the reader's proof" */
+    it("elects the latest version by the index and ranks tied versions", async () => {
+      const { repository, requests } = builtRepository([
+        tiedVersion({
+          lastEventOccurredAt: "2",
+          spanCount: 1,
+          appliedEventIds: ["e1"],
+          occurredAt: "2026-07-24 12:00:00.000",
+        }),
+      ]);
+
+      const read = await repository.findByTraceId({
+        authorization: AUTHORIZATION,
+        traceId: TRACE_ID,
+      });
+
+      expect(requests).toHaveLength(1);
+      expectReaderFence(requests[0]);
+      const sql = requests[0]?.statement.sql ?? "";
+      expect(sql).toContain("max(UpdatedAt)");
+      expect(sql).toMatch(
+        /ORDER BY TenantId ASC, LastEventOccurredAt DESC, SpanCount DESC, length\(AppliedEventIds\) DESC, OccurredAt ASC, toString\(AppliedEventIds\) DESC LIMIT 1$/,
+      );
+      expect(sql).not.toContain(TRACE_ID);
+      expect(requests[0]?.idBound).toEqual({ fallback: "none" });
+      expect(read?.appliedEventIds).toEqual(["e1"]);
+    });
+  });
+
+  describe("given many traces' anchors read with no window", () => {
+    /** @scenario "A trace's analytics row and the anchors of many traces are read within the reader's proof" */
+    it("reads each trace's latest OccurredAt once, bounded by the index", async () => {
+      const { repository, requests } = builtRepository([{ TraceId: TRACE_ID, OccurredAtMs: "5" }]);
+
+      const anchors = await repository.findOccurredAtByTraceIds({
+        authorization: AUTHORIZATION,
+        traceIds: [TRACE_ID, TRACE_ID],
+      });
+
+      expect(requests).toHaveLength(1);
+      expectReaderFence(requests[0]);
+      const sql = requests[0]?.statement.sql ?? "";
+      expect(sql).toContain("argMax(OccurredAt, UpdatedAt)");
+      expect(sql).toMatch(/GROUP BY TenantId, TraceId$/);
+      expect(requests[0]?.idBound).toEqual({ fallback: "unbounded" });
+      expect(anchors).toEqual([{ traceId: TRACE_ID, occurredAtMs: 5 }]);
+    });
+  });
+
+  describe("given many traces' anchors read within a window", () => {
+    /** @scenario "A trace's analytics row and the anchors of many traces are read within the reader's proof" */
+    it("bounds the read by the window, not the index", async () => {
+      const { repository, requests } = builtRepository([]);
+
+      await repository.findOccurredAtByTraceIds({
+        authorization: AUTHORIZATION,
+        traceIds: [TRACE_ID],
+        window: { fromMs: 1_750_000_000_000, toMs: 1_750_000_345_679 },
+      });
+
+      expectReaderFence(requests[0]);
+      expect(requests[0]?.statement.sql).toContain("OccurredAt >= fromUnixTimestamp64Milli(");
+      expect(requests[0]?.idBound).toBeUndefined();
     });
   });
 });

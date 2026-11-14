@@ -73,7 +73,7 @@ export class PostgresTraceRepositories {
         prisma: members.prisma,
       }),
       summaryProjection: TraceSummaryProjectionClickHouseRepository.create(summaries),
-      analyticsProjection: TraceAnalyticsClickHouseRepository.create(storage),
+      analyticsProjection: TraceAnalyticsClickHouseRepository.create(summaries),
       analyticsRollup: TraceAnalyticsRollupClickHouseRepository.create({
         resolveClient: traceClickHouse,
       }),
@@ -87,10 +87,7 @@ export class PostgresTraceRepositories {
         reader: members.clickhouse,
       }),
       spanAnalyticsFloor: PrismaSpanAnalyticsFloorRepository.create(members.prisma),
-      spanStorage: SpanStorageClickHouseRepository.create({
-        ...storage,
-        reader: members.clickhouse,
-      }),
+      spanStorage: SpanStorageClickHouseRepository.create(summaries),
       spanTree: ClickHouseTraceSpanRepository.create({ clickhouse: members.clickhouse }),
       braidReads: ClickHouseTraceBraidReadsRepository.create({ clickhouse }),
       existence: ClickHouseTraceExistenceRepository.create({ clickhouse: members.clickhouse }),
@@ -103,7 +100,10 @@ export class PostgresTraceRepositories {
       instantEvalRuns: ClickHouseTraceInstantEvalRunsRepository.create({
         resolveClient: traceClickHouse,
       }),
-      evaluationRuns: ClickHouseTraceEvaluationRunsRepository.create(storage),
+      evaluationRuns: ClickHouseTraceEvaluationRunsRepository.create({
+        ...storage,
+        reader: members.clickhouse,
+      }),
       annotations,
       annotationScores,
       legacyRead: TraceLegacyReadClickHouseRepository.create({
@@ -112,7 +112,10 @@ export class PostgresTraceRepositories {
         annotations: { rows: annotations, scores: annotationScores },
       }),
       list: TraceListClickHouseRepository.create({ clickhouse }),
-      sessionGroups: SessionGroupsClickHouseRepository.create({ clickhouse }),
+      sessionGroups: SessionGroupsClickHouseRepository.create({
+        clickhouse,
+        reader: members.clickhouse,
+      }),
       clusteringSample: ClickHouseTraceClusteringSampleRepository.create(members.clickhouse),
       fullRecordRows: ClickHouseTraceFullRecordRowsRepository.create({
         reader: members.clickhouse,

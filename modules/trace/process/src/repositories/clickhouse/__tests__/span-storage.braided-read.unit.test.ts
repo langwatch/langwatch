@@ -4,7 +4,6 @@
  * the statement it sent before. Spec: modules/trace/specs/braided-spans.feature
  */
 import type { Authorization, CompiledWhere } from "@langwatch/authorization";
-import { AuthorizedClickHouse } from "@langwatch/clickhouse-client";
 import {
   idIndexedClientDouble,
   type ScriptedStatements,
@@ -39,7 +38,6 @@ function spanRepository(rows: Record<string, unknown>[] = []) {
     resolveClient: async () => {
       throw new Error("this test writes nothing");
     },
-    clickhouse: new AuthorizedClickHouse({ resolveClient: async () => client }),
     reader: client,
   });
   const spanReads = () => statements.filter(({ sql }) => sql.includes("FROM stored_spans"));

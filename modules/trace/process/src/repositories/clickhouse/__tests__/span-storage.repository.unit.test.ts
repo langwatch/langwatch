@@ -5,7 +5,6 @@ import {
   type ScriptedStatements,
 } from "@langwatch/clickhouse-client/testing";
 import { createTenantId, SecurityError } from "@langwatch/eventing";
-import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import type { SpanInsertData } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -96,9 +95,6 @@ function repository() {
   const clickhouse = new RecordingClickHouse();
   const repo = SpanStorageClickHouseRepository.create({
     resolveClient: clickhouse.resolve,
-    clickhouse: new AuthorizedClickHouse({
-      resolveClient: async () => clickHouseQueryClientDouble(),
-    }),
     reader: { read: () => Promise.reject(new Error("this test sends no built read")) },
   });
   return { clickhouse, repo };
@@ -461,7 +457,6 @@ function readRepository() {
   const clickhouse = new QueryingClickHouse();
   const repo = SpanStorageClickHouseRepository.create({
     resolveClient: new RecordingClickHouse().resolve,
-    clickhouse: clickhouse.authorized,
     reader: clickhouse.reader,
   });
   return { clickhouse, repo };
@@ -728,7 +723,6 @@ describe("SpanStorageClickHouseRepository.listSpansPaginated", () => {
     const client = idIndexedClientDouble({ indexes: TRACE_ID_INDEXES, driver: { execute } });
     const repo = SpanStorageClickHouseRepository.create({
       resolveClient: new RecordingClickHouse().resolve,
-      clickhouse: new AuthorizedClickHouse({ resolveClient: async () => client }),
       reader: client,
     });
     return { repo, statements };

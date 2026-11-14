@@ -39,8 +39,10 @@ describe("the converted trace repositories", () => {
     it("finds the tenantScope marker in each and no hand-written tenant predicate", () => {
       const offending = CONVERTED_REPOSITORIES.flatMap((file) => {
         const source = readFileSync(path.resolve(import.meta.dirname, "..", file), "utf8");
-        // A file without the marker is the wrong file, and "nothing offends" would be vacuous.
-        expect(source, `${file} carries no tenantScope marker`).toContain("tenantScope(");
+        // Without the marker or a built read's proof scope it is the wrong file, and vacuous.
+        expect(source, `${file} carries no tenantScope marker or built proof scope`).toMatch(
+          /tenantScope(\(|\.fromProof\()/i,
+        );
         return handWrittenTenantPredicatesIn({ file, source });
       });
 

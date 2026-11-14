@@ -4,7 +4,6 @@
  * that does not ask for `spans`, the statement is the one sent before. Spec: braided-spans.feature
  */
 import type { Authorization, CompiledWhere } from "@langwatch/authorization";
-import { AuthorizedClickHouse } from "@langwatch/clickhouse-client";
 import {
   idIndexedClientDouble,
   type ScriptedStatements,
@@ -46,7 +45,6 @@ function spanRepository({ countsOwners = true }: { countsOwners?: boolean } = {}
     resolveClient: async () => {
       throw new Error("this test writes nothing");
     },
-    clickhouse: new AuthorizedClickHouse({ resolveClient: async () => client }),
     reader: client,
   });
   const spanReads = () => statements.filter(({ sql }) => sql.includes("FROM stored_spans"));
