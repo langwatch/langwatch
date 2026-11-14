@@ -152,6 +152,7 @@ export class SpanContentWithheldError extends HandledError {
         httpStatus: 403,
         fault: "customer",
         meta: { spanId, reason },
+        ...remediation("span_content_withheld"),
       },
     );
     this.name = "SpanContentWithheldError";
