@@ -81225,6 +81225,13 @@ To find failed evaluations across every evaluator, send
 `"filter": "evaluatorVerdict:fail"`.
 </Note>
 
+<Note>
+With `includeSpans: true`, a page holds at most 100 traces, and that is the
+default page size. A larger `pageSize` is refused with a 422
+`trace_page_size_too_large`. When a response carries a `scrollId`, send it to
+fetch the next page.
+</Note>
+
 ---
 
 # FILE: ./api-reference/traces/update-trace-metadata.mdx

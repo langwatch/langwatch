@@ -388,6 +388,33 @@ describe("AuthDoorService", () => {
     });
   });
 
+  describe("when a sign-in fails with a provider code we have not written down", () => {
+    /** @scenario "The logged cause names the provider's code" */
+    it("logs a SignInRefusal cause carrying that code", async () => {
+      loggerSpies.error.mockClear();
+      const world = door({
+        betterAuth: async () => ({
+          handler: async () =>
+            new Response(null, {
+              status: 302,
+              headers: { location: `${BASE_URL}/auth/error?error=state_not_found` },
+            }),
+        }),
+      });
+
+      await world.service.betterAuthHandshake(
+        new Request(`${BASE_URL}/api/auth/sso/callback/conn_1?code=c`),
+      );
+
+      expect(loggerSpies.error).toHaveBeenCalledTimes(1);
+      const [fields] = loggerSpies.error.mock.calls[0] ?? [];
+      const cause = (fields as { error?: Error & { code?: string } }).error;
+      expect(cause?.constructor.name).toBe("SignInRefusal");
+      expect(cause?.name).toBe("SignInRefusal");
+      expect(cause?.code).toBe("state_not_found");
+    });
+  });
+
   describe("when an identity provider refuses the person with access_denied", () => {
     /** @scenario "A provider's access_denied refusal crosses and is logged as a warning" */
     it("keeps only the code on the redirect and logs it at warn without the description", async () => {

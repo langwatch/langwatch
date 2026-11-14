@@ -14,6 +14,7 @@ import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import {
   explorerHiddenOrigins,
   FilterParseError,
+  TracePageSizeTooLargeError,
   type Evaluation,
   type TraceApi,
   type TracesForProjectResult,
@@ -236,6 +237,57 @@ describe("POST /search", () => {
       expect(listTraces).toHaveBeenCalledWith(
         expect.objectContaining({ options: expect.objectContaining({ includeSpans: true }) }),
       );
+    });
+  });
+
+  describe("when includeSpans names a page size", () => {
+    /** @scenario "Public trace search with spans refuses a page above 100 traces" */
+    it("hands the size to the app with spans asked, for it to refuse above the spans bound", async () => {
+      const { send, listTraces } = mount();
+      await send({ startDate: 1000, endDate: 5000, includeSpans: true, pageSize: 4000 });
+      expect(listTraces).toHaveBeenCalledWith(
+        expect.objectContaining({
+          query: expect.objectContaining({ pageSize: 4000 }),
+          options: expect.objectContaining({ includeSpans: true }),
+        }),
+      );
+    });
+
+    /** @scenario "Public trace search with spans refuses a page above 100 traces" */
+    it("answers the app's refusal as a 422 naming the code", async () => {
+      const { send } = mount({
+        listTraces: vi.fn(async () => {
+          throw new TracePageSizeTooLargeError({
+            maxPageSize: 100,
+            bound: "tracesWithSpansPageSizeMax",
+          });
+        }),
+      });
+      const res = await send({
+        startDate: 1000,
+        endDate: 5000,
+        includeSpans: true,
+        pageSize: 4000,
+      });
+      expect(res.status).toBe(422);
+      expect((await bodyOf(res)).code).toBe("trace_page_size_too_large");
+    });
+
+    /** @scenario "Public trace search with spans refuses a page above 100 traces" */
+    it("names no size when the caller named none, so the app answers the bound", async () => {
+      const { send, listTraces } = mount();
+      await send({ startDate: 1000, endDate: 5000, includeSpans: true });
+      const query = vi.mocked(listTraces).mock.calls[0]?.[0]?.query as { pageSize?: number };
+      expect(query.pageSize).toBeUndefined();
+    });
+
+    /** @scenario "Public trace search with spans refuses a page above 100 traces" */
+    it("leaves a search without spans to the list bound's clamp", async () => {
+      const { send, listTraces } = mount();
+      await send({ startDate: 1000, endDate: 5000, pageSize: 4000 });
+      const input = vi.mocked(listTraces).mock.calls[0]?.[0];
+      expect(input?.query).toMatchObject({ pageSize: 4000 });
+      expect(input?.options).not.toHaveProperty("refuseAbove");
     });
   });
 

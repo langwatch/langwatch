@@ -263,7 +263,7 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
       // not — traces carry trace-level input/output either way. Gating
       // resolveBlobs on includeSpans silently truncated spans-less downloads.
       return app.listTraces({
-        query: { ...input, pageSize: input.pageSize ?? 10_000 },
+        query: { ...input, pageSize: input.pageSize ?? (input.includeSpans ? undefined : 10_000) },
         protections,
         options: {
           downloadMode: true,
