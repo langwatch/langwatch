@@ -1,4 +1,12 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import {
+  clickhouseRead,
+  cond,
+  type Condition,
+  fn,
+  systemMutations,
+  tenantScope,
+} from "@langwatch/clickhouse-client/builder";
 import { z } from "zod";
 
 import {
@@ -25,6 +33,38 @@ const MATERIALISE_METADATA_COLUMNS = ANALYTICS_METADATA_COLUMNS.map(
   (column) => `MATERIALIZE COLUMN ${column}`,
 ).join(", ");
 
+/** A table's mutations whose `command` meets `matching`, newest first, on the system identity. */
+function mutationsStatement({
+  table,
+  matching,
+}: {
+  table: string;
+  matching: Condition<"system.mutations">;
+}) {
+  return clickhouseRead({
+    scope: tenantScope.allTenants({
+      reason:
+        "a materialisation is a whole-table mutation on the shared target, which no tenant owns",
+    }),
+  })
+    .from(systemMutations)
+    .select({
+      mutationId: systemMutations.mutation_id,
+      isDone: systemMutations.is_done,
+      partsToDo: fn.toUInt32(systemMutations.parts_to_do),
+      latestFailReason: systemMutations.latest_fail_reason,
+    })
+    .where(({ and, eq }) =>
+      and(
+        eq(systemMutations.database, fn.currentDatabase()),
+        eq(systemMutations.table, table),
+        matching,
+      ),
+    )
+    .orderBy(systemMutations.create_time, "DESC")
+    .build();
+}
+
 /** Reads and starts the trace module's materialisations on the shared ClickHouse target. */
 export class ClickHouseTraceIndexMaterialisationRepository extends TraceIndexMaterialisationRepository {
   readonly #clickhouse: ClickHouseQueryClient;
@@ -41,8 +81,10 @@ export class ClickHouseTraceIndexMaterialisationRepository extends TraceIndexMat
   async findUpdatedAtIndexMutations(): Promise<MaterialisationMutation[]> {
     return this.mutationsOf({
       table: "trace_summaries",
-      matching: "position(command, {index:String}) > 0",
-      params: { index: "MATERIALIZE INDEX idx_updated_at" },
+      matching: cond.gt(
+        fn.position(systemMutations.command, "MATERIALIZE INDEX idx_updated_at"),
+        0,
+      ),
     });
   }
 
@@ -50,9 +92,10 @@ export class ClickHouseTraceIndexMaterialisationRepository extends TraceIndexMat
     // Whole column names, all nine: a substring would also match a longer name or a lone column.
     return this.mutationsOf({
       table: "trace_analytics",
-      matching:
-        "hasAll(extractAll(command, 'MATERIALIZE COLUMN ([A-Za-z0-9_]+)'), {columns:Array(String)})",
-      params: { columns: [...ANALYTICS_METADATA_COLUMNS] },
+      matching: fn.hasAll(
+        fn.extractAll(systemMutations.command, "MATERIALIZE COLUMN ([A-Za-z0-9_]+)"),
+        [...ANALYTICS_METADATA_COLUMNS],
+      ),
     });
   }
 
@@ -104,35 +147,13 @@ export class ClickHouseTraceIndexMaterialisationRepository extends TraceIndexMat
     });
   }
 
-  /** The table's mutations whose `command` meets the `matching` condition, newest first. */
-  private async mutationsOf({
-    table,
-    matching,
-    params,
-  }: {
+  private async mutationsOf(input: {
     table: string;
-    matching: string;
-    params: Record<string, unknown>;
+    matching: Condition<"system.mutations">;
   }): Promise<MaterialisationMutation[]> {
-    const { rows } = await this.#clickhouse.query<unknown>({
-      tenantId: "",
+    const { rows } = await this.#clickhouse.read({
+      statement: mutationsStatement(input),
       table: "system.mutations",
-      kind: "read",
-      sql: `
-        SELECT
-          mutation_id AS mutationId,
-          is_done AS isDone,
-          toUInt32(parts_to_do) AS partsToDo,
-          latest_fail_reason AS latestFailReason
-        FROM system.mutations
-        WHERE database = currentDatabase()
-          AND table = {table:String}
-          AND ${matching}
-        ORDER BY create_time DESC
-      `,
-      params: { ...params, table },
-      // A materialisation is a whole-table mutation on the shared target, which no tenant owns.
-      SKIP_TENANT_CHECK: true,
     });
     return mutationRowsSchema.parse(rows);
   }

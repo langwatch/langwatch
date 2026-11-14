@@ -3,7 +3,12 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { describe, expect, it } from "vitest";
+
+import { ownProof } from "../../../../../__tests__/support/authorization-proofs.fixture.ts";
+import { SpanStorageClickHouseRepository } from "../../../../../repositories/clickhouse/span-storage.repository.ts";
 
 /** Read source file once and extract a named method body. */
 function extractMethodBody(source: string, methodName: string): string {
@@ -123,90 +128,46 @@ describe("trace dedup OOM safety", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // span-storage.clickhouse.repository.ts (app-layer): getSpansByTraceId
+  // span-storage.repository.ts: the full-span and event reads, as built statements
   // ---------------------------------------------------------------------------
-  describe("SpanStorageClickHouseRepository.getSpansByTraceId()", () => {
-    const spanStoragePath = path.resolve(
-      __dirname,
-      "../../../../../repositories/clickhouse/span-storage.repository.ts",
-    );
-    const spanStorageSource = fs.readFileSync(spanStoragePath, "utf-8");
-    const body = extractMethodBody(spanStorageSource, "findSpansByTraceId");
-    const dedupHelper = extractFunctionBody(spanStorageSource, "dedupInTuple");
+  describe("given SpanStorageClickHouseRepository's span and event reads", () => {
+    const at = { authorization: ownProof({ projectId: "project-1" }), traceId: "trace-1" };
+    const reads = {
+      findSpansByTraceId: (repository: SpanStorageClickHouseRepository) =>
+        repository.findSpansByTraceId(at),
+      findEventsByTraceId: (repository: SpanStorageClickHouseRepository) =>
+        repository.findEventsByTraceId(at),
+      findTraceEventsByTraceId: (repository: SpanStorageClickHouseRepository) =>
+        repository.findTraceEventsByTraceId(at),
+    };
 
-    describe("when the stored_spans query SQL is inspected", () => {
-      it("does not use LIMIT 1 BY for deduplication", () => {
-        expect(body).not.toContain("LIMIT 1 BY");
-        expect(dedupHelper).not.toContain("LIMIT 1 BY");
+    describe.each(Object.entries(reads))("when the %s statement is built", (_name, read) => {
+      async function builtSql(): Promise<string> {
+        const statements: string[] = [];
+        const repository = SpanStorageClickHouseRepository.create({
+          resolveClient: () =>
+            Promise.reject(new Error("a built read never reaches the raw client")),
+          reader: clickHouseQueryClientDouble({
+            async read(request: Parameters<ClickHouseQueryClient["read"]>[0]) {
+              statements.push(request.statement.sql);
+              return { rows: [] };
+            },
+          }),
+        });
+        await read(repository);
+        expect(statements).toHaveLength(1);
+        return statements[0] ?? "";
+      }
+
+      it("does not use LIMIT 1 BY for deduplication", async () => {
+        expect(await builtSql()).not.toContain("LIMIT 1 BY");
       });
 
-      it("delegates dedup to the builder's latest-version election", () => {
-        expect(body).toContain("fullSpansStatement");
-        expect(extractFunctionBody(spanStorageSource, "fullSpansStatement")).toContain(
-          ".latestVersion(",
-        );
-      });
-
-      it("uses max(UpdatedAt) GROUP BY for span dedup", () => {
-        expect(dedupHelper).toContain("max(UpdatedAt)");
-        expect(dedupHelper).toMatch(/GROUP BY\s+TenantId,\s*TraceId,\s*SpanId/);
-      });
-    });
-  });
-
-  // ---------------------------------------------------------------------------
-  // span-storage.clickhouse.repository.ts (app-layer): getEventsByTraceId
-  // ---------------------------------------------------------------------------
-  describe("SpanStorageClickHouseRepository.getEventsByTraceId()", () => {
-    const spanStoragePath = path.resolve(
-      __dirname,
-      "../../../../../repositories/clickhouse/span-storage.repository.ts",
-    );
-    const spanStorageSource = fs.readFileSync(spanStoragePath, "utf-8");
-    const body = extractMethodBody(spanStorageSource, "findEventsByTraceId");
-    const dedupHelper = extractFunctionBody(spanStorageSource, "dedupInTuple");
-
-    describe("when the stored_spans query SQL is inspected", () => {
-      it("does not use LIMIT 1 BY for deduplication", () => {
-        expect(body).not.toContain("LIMIT 1 BY");
-        expect(dedupHelper).not.toContain("LIMIT 1 BY");
-      });
-
-      it("delegates dedup to the builder's latest-version election", () => {
-        expect(body).toContain("spanEventsStatement");
-        expect(extractFunctionBody(spanStorageSource, "spanEventsStatement")).toContain(
-          ".latestVersion(",
-        );
-      });
-
-      it("uses max(UpdatedAt) GROUP BY for span dedup", () => {
-        expect(dedupHelper).toContain("max(UpdatedAt)");
-        expect(dedupHelper).toMatch(/GROUP BY\s+TenantId,\s*TraceId,\s*SpanId/);
-      });
-    });
-  });
-
-  // ---------------------------------------------------------------------------
-  // span-storage.clickhouse.repository.ts (app-layer): getTraceEventsByTraceId
-  // ---------------------------------------------------------------------------
-  describe("SpanStorageClickHouseRepository.getTraceEventsByTraceId()", () => {
-    const spanStoragePath = path.resolve(
-      __dirname,
-      "../../../../../repositories/clickhouse/span-storage.repository.ts",
-    );
-    const spanStorageSource = fs.readFileSync(spanStoragePath, "utf-8");
-    const body = extractMethodBody(spanStorageSource, "findTraceEventsByTraceId");
-
-    describe("when the events-only query SQL is inspected", () => {
-      it("does not use LIMIT 1 BY for deduplication", () => {
-        expect(body).not.toContain("LIMIT 1 BY");
-      });
-
-      it("delegates dedup to the builder's latest-version election", () => {
-        expect(body).toContain("spanEventsStatement");
-        expect(extractFunctionBody(spanStorageSource, "spanEventsStatement")).toContain(
-          ".latestVersion(",
-        );
+      it("elects each span's latest version with max(UpdatedAt) in an IN-tuple", async () => {
+        const sql = await builtSql();
+        expect(sql).toContain("max(UpdatedAt)");
+        expect(sql).toMatch(/GROUP BY\s+TenantId,\s*TraceId,\s*SpanId/);
+        expect(sql).toMatch(/\(TenantId, TraceId, SpanId, UpdatedAt\) IN/);
       });
     });
   });

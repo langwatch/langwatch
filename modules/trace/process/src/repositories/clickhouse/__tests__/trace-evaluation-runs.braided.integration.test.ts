@@ -105,4 +105,16 @@ describe.skipIf(!clickHouseConfigured)("evaluations of a trace holding braided s
       ]);
     });
   });
+
+  describe("when trace reads one project's runs of the trace on its own tenant", () => {
+    /** @scenario "A trace's evaluation runs are the latest version of each run from the last seven days" */
+    it("reads that project's runs, each moment in epoch milliseconds", async () => {
+      const runs = await repo.findRunsByTraceId({ tenantId: reader, traceId });
+
+      expect(runs.map((evaluation) => evaluation.evaluatorId)).toEqual([`monitor-of-${reader}`]);
+      expect(runs[0]).toMatchObject({ attempts: 0, lastAttemptError: null });
+      expect(typeof runs[0]?.createdAt).toBe("number");
+      expect(typeof runs[0]?.scheduledAt).toBe("number");
+    });
+  });
 });

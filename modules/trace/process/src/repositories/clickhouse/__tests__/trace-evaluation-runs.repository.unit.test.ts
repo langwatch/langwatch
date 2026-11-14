@@ -4,6 +4,7 @@
  */
 import {
   AuthorizedClickHouse,
+  ClickHouseColumns,
   type ClickHouseQueryClient,
   type QueryRequest,
 } from "@langwatch/clickhouse-client";
@@ -41,7 +42,21 @@ function client(answer: (request: ChQuery) => unknown[] | Error) {
 
 type ReadRequest = Parameters<ClickHouseQueryClient["read"]>[0];
 
-function repositoryOver(ch: ReturnType<typeof client>, reads: ReadRequest[] = []) {
+const ATTEMPT_COLUMNS = ["Attempts", "LastAttemptAt", "LastAttemptError", "NextAttemptAt"];
+
+/** A target's column list for evaluation_runs: the attempt columns only when `held`. */
+function targetColumns(held: boolean) {
+  const names = ["EvaluationId", "TraceId", ...(held ? ATTEMPT_COLUMNS : [])];
+  return ClickHouseColumns.over({
+    read: async () => names.map((name) => ({ table: "evaluation_runs", name })),
+  });
+}
+
+function repositoryOver(
+  ch: ReturnType<typeof client>,
+  reads: ReadRequest[] = [],
+  { held = true }: { held?: boolean } = {},
+) {
   // The proof-checked reader hands its expanded statement to the same recording client.
   const authorized = clickHouseQueryClientDouble({
     query: async (request: QueryRequest) => {
@@ -54,6 +69,7 @@ function repositoryOver(ch: ReturnType<typeof client>, reads: ReadRequest[] = []
     clickhouse: new AuthorizedClickHouse({ resolveClient: async () => authorized }),
     // A built read is recorded, then answered by the same recording client.
     reader: clickHouseQueryClientDouble({
+      columns: () => targetColumns(held),
       read: async (request: ReadRequest) => {
         reads.push(request);
         const result = await ch.query({
@@ -80,27 +96,47 @@ describe("given evaluation has recorded runs against a trace", () => {
           Inputs: '{"input":"hi"}',
           Error: null,
           ErrorDetails: null,
-          CreatedAt: "1758189600000",
+          CreatedAtMs: "1758189600000",
           UpdatedAtMs: "1758189660000",
-          ArchivedAt: null,
+          ArchivedAtMs: null,
           ScheduledAtMs: "1758189600000",
           StartedAtMs: null,
-          CompletedAt: "1758189660000",
+          CompletedAtMs: "1758189660000",
           CostId: null,
-          LastEventOccurredAt: "1758189660000",
+          AttemptCount: 1,
+          LastAttemptAtMs: "1758189650000",
+          LastAttemptErrorText: "timeout",
+          NextAttemptAtMs: null,
+          LastEventOccurredAtMs: "1758189660000",
         },
       ]);
+      const reads: ReadRequest[] = [];
 
-      const runs = await repositoryOver(ch).findRunsByTraceId({
+      const runs = await repositoryOver(ch, reads).findRunsByTraceId({
         tenantId: TENANT,
         traceId: "trace-1",
       });
 
-      const request = ch.query.mock.calls[0]?.[0];
-      expect(request?.query).toContain("FROM evaluation_runs AS runs");
-      expect(request?.query).toContain("ScheduledAt >= now() - INTERVAL 7 DAY");
-      expect(request?.query).toContain("SELECT TenantId, EvaluationId, max(UpdatedAt)");
-      expect(request?.query_params).toEqual({ tenantId: TENANT, traceId: "trace-1" });
+      const request = reads[0];
+      expect(request?.table).toBe("evaluation_runs");
+      expect(request?.statement).toMatchObject({
+        kind: "tenant",
+        identity: "reader",
+        settings: { SQL_langwatch_tenant_ids: TENANT },
+      });
+      const sql = request?.statement.sql ?? "";
+      expect(sql).toContain("TenantId = {tenantId:String}");
+      expect(sql).toContain("ScheduledAt >= subtractDays(now(), ");
+      expect(sql).toContain("max(UpdatedAt)");
+      expect(sql).toMatch(/GROUP BY\s+TenantId,\s*EvaluationId/);
+      // The window and the trace repeat inside the election, as main's dedup repeats them.
+      const [, election = ""] = sql.split("max(UpdatedAt)");
+      expect(election).toContain("ScheduledAt >= subtractDays(now(), ");
+      expect(election).toContain("TraceId = {");
+      expect(sql).not.toContain("toUInt16(");
+      expect(Object.values(request?.statement.params ?? {})).toEqual(
+        expect.arrayContaining(["trace-1", 7]),
+      );
       expect(runs).toEqual([
         expect.objectContaining({
           evaluationId: "eval-1",
@@ -110,8 +146,48 @@ describe("given evaluation has recorded runs against a trace", () => {
           createdAt: 1758189600000,
           completedAt: 1758189660000,
           startedAt: null,
+          attempts: 1,
+          lastAttemptAt: 1758189650000,
+          lastAttemptError: "timeout",
+          nextAttemptAt: null,
         }),
       ]);
+    });
+
+    /** @scenario "Attempt columns a target has not added yet read as no attempts" */
+    it("selects each attempt column the target lacks as its default", async () => {
+      const ch = client(() => []);
+      const reads: ReadRequest[] = [];
+
+      await repositoryOver(ch, reads, { held: false }).findRunsByTraceId({
+        tenantId: TENANT,
+        traceId: "trace-1",
+      });
+
+      const sql = reads[0]?.statement.sql ?? "";
+      expect(sql).toMatch(/toUInt16\(\{v\d+:UInt16\}\) AS AttemptCount/);
+      expect(sql).toContain("CAST(NULL AS Nullable(String)) AS LastAttemptErrorText");
+      expect(sql).not.toMatch(/\bLastAttemptError\b(?!Text)/);
+    });
+  });
+
+  describe("when trace reads the runs through the reader's proof", () => {
+    it("fences the run read by the proof's windows on ScheduledAt", async () => {
+      const ch = client(() => []);
+      const reads: ReadRequest[] = [];
+
+      await repositoryOver(ch, reads).findReadableRunsByTraceId({
+        authorization,
+        traceId: "trace-1",
+      });
+
+      expect(reads[0]?.statement).toMatchObject({
+        kind: "tenant",
+        identity: "reader",
+        tenantIds: [TENANT],
+        settings: { SQL_langwatch_tenant_ids: TENANT },
+      });
+      expect(reads[0]?.statement.sql).toContain("ScheduledAt >= subtractDays(now(), ");
     });
   });
 });

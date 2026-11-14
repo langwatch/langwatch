@@ -8,6 +8,10 @@ import {
 } from "@langwatch/clickhouse-client";
 import {
   clickhouseRead,
+  column,
+  fn,
+  param,
+  type ReaderScope,
   tenantScope as builtTenantScope,
 } from "@langwatch/clickhouse-client/builder";
 /**
@@ -104,14 +108,24 @@ const traceEvaluationRowSchema = summaryRowSchema.safeExtend({
   ...attemptRowShape,
 });
 
-const runRowSchema = traceEvaluationRowSchema.safeExtend({
+/** A run row as `runsStatement` names it: each epoch-ms alias apart from its column's name. */
+const runRowSchema = summaryRowSchema.safeExtend({
+  Details: nullableString,
+  Error: nullableString,
   Inputs: nullableString,
   ErrorDetails: nullableString,
-  CreatedAt: chNumber,
+  CreatedAtMs: chNumber,
   UpdatedAtMs: chNumber,
-  ArchivedAt: nullableNumber,
+  ArchivedAtMs: nullableNumber,
+  ScheduledAtMs: nullableNumber,
+  StartedAtMs: nullableNumber,
+  CompletedAtMs: nullableNumber,
   CostId: nullableString,
-  LastEventOccurredAt: nullableNumber.optional(),
+  AttemptCount: chNumber,
+  LastAttemptAtMs: nullableNumber,
+  LastAttemptErrorText: nullableString,
+  NextAttemptAtMs: nullableNumber,
+  LastEventOccurredAtMs: nullableNumber,
 });
 
 const tenantSummaryRowsSchema = z.array(summaryRowSchema.safeExtend({ TenantId: chString }));
@@ -204,11 +218,75 @@ function summariesStatement({
     .build();
 }
 
+const NULL_MOMENT = () => fn.nullAs(column.nullable(column.dateTime64({ precision: 3 })));
+
+/**
+ * A trace's runs of the last 7 days, each at its latest version; the attempt columns the target
+ * lacks read as their defaults. Window and trace are two conditions, so the election repeats both.
+ */
+function runsStatement({
+  scope,
+  windows,
+  traceId,
+  holds,
+}: {
+  scope: ReaderScope;
+  windows: boolean;
+  traceId: string;
+  holds: (name: string) => boolean;
+}) {
+  const from = clickhouseRead({ scope }).from(evaluationRuns);
+  return (windows ? from.withinWindows() : from)
+    .select({
+      EvaluationId: evaluationRuns.EvaluationId,
+      EvaluatorId: evaluationRuns.EvaluatorId,
+      EvaluatorType: evaluationRuns.EvaluatorType,
+      EvaluatorName: evaluationRuns.EvaluatorName,
+      TraceId: evaluationRuns.TraceId,
+      IsGuardrail: evaluationRuns.IsGuardrail,
+      Status: evaluationRuns.Status,
+      Score: evaluationRuns.Score,
+      Passed: evaluationRuns.Passed,
+      Label: evaluationRuns.Label,
+      Details: evaluationRuns.Details,
+      Inputs: evaluationRuns.Inputs,
+      Error: evaluationRuns.Error,
+      ErrorDetails: evaluationRuns.ErrorDetails,
+      CreatedAtMs: fn.toUnixTimestamp64Milli(evaluationRuns.CreatedAt),
+      UpdatedAtMs: fn.toUnixTimestamp64Milli(evaluationRuns.UpdatedAt),
+      ArchivedAtMs: fn.toUnixTimestamp64Milli(evaluationRuns.ArchivedAt),
+      ScheduledAtMs: fn.toUnixTimestamp64Milli(evaluationRuns.ScheduledAt),
+      StartedAtMs: fn.toUnixTimestamp64Milli(evaluationRuns.StartedAt),
+      CompletedAtMs: fn.toUnixTimestamp64Milli(evaluationRuns.CompletedAt),
+      CostId: evaluationRuns.CostId,
+      AttemptCount: fn.heldOr(evaluationRuns.Attempts, {
+        holds,
+        otherwise: fn.toUInt16(param.uint16(0)),
+      }),
+      LastAttemptAtMs: fn.toUnixTimestamp64Milli(
+        fn.heldOr(evaluationRuns.LastAttemptAt, { holds, otherwise: NULL_MOMENT() }),
+      ),
+      LastAttemptErrorText: fn.heldOr(evaluationRuns.LastAttemptError, {
+        holds,
+        otherwise: fn.nullAs(column.nullable(column.string())),
+      }),
+      NextAttemptAtMs: fn.toUnixTimestamp64Milli(
+        fn.heldOr(evaluationRuns.NextAttemptAt, { holds, otherwise: NULL_MOMENT() }),
+      ),
+      LastEventOccurredAtMs: fn.toUnixTimestamp64Milli(evaluationRuns.LastEventOccurredAt),
+    })
+    .where(({ gte }) => gte(evaluationRuns.ScheduledAt, fn.subtractDays(fn.now(), 7)))
+    .where(({ eq }) => eq(evaluationRuns.TraceId, traceId))
+    .latestVersion({ repeat: [evaluationRuns.TraceId] })
+    .orderBy(evaluationRuns.UpdatedAt, "DESC")
+    .build();
+}
+
 export class ClickHouseTraceEvaluationRunsRepository extends TraceEvaluationRunsReadRepository {
   static create(options: {
     resolveClient: TraceClickHouseResolver;
     clickhouse: AuthorizedClickHouse;
-    reader: Pick<ClickHouseQueryClient, "read">;
+    reader: Pick<ClickHouseQueryClient, "read" | "columns">;
   }): ClickHouseTraceEvaluationRunsRepository {
     return new ClickHouseTraceEvaluationRunsRepository(
       options.resolveClient,
@@ -220,7 +298,7 @@ export class ClickHouseTraceEvaluationRunsRepository extends TraceEvaluationRuns
   private constructor(
     private readonly resolveClient: TraceClickHouseResolver,
     private readonly clickhouse: AuthorizedClickHouse,
-    private readonly reader: Pick<ClickHouseQueryClient, "read">,
+    private readonly reader: Pick<ClickHouseQueryClient, "read" | "columns">,
   ) {
     super();
   }
@@ -231,11 +309,11 @@ export class ClickHouseTraceEvaluationRunsRepository extends TraceEvaluationRuns
   }): Promise<EvaluationRunData[]> {
     EventUtils.validateTenantId(input, "ClickHouseTraceEvaluationRunsRepository.findRunsByTraceId");
     try {
-      const own = await this.ownTenant(input.tenantId);
       return await this.queryRuns({
-        ...own,
+        scope: builtTenantScope.single({ tenantId: input.tenantId }),
+        windows: false,
+        tenantId: input.tenantId,
         traceId: input.traceId,
-        attempts: await this.attemptColumns({ client: own.client }),
       });
     } catch (error) {
       logger.warn(
@@ -253,12 +331,10 @@ export class ClickHouseTraceEvaluationRunsRepository extends TraceEvaluationRuns
   }): Promise<EvaluationRunData[]> {
     try {
       return await this.queryRuns({
-        client: this.clickhouse.as(input.authorization, { reads: "traces" }),
-        tenantPredicate: tenantScope("ScheduledAt"),
-        dedupTenantPredicate: tenantScope("ScheduledAt"),
-        params: {},
+        scope: builtTenantScope.fromProof({ authorization: input.authorization, reads: "traces" }),
+        windows: true,
+        tenantId: ownProjectIdOf({ authorization: input.authorization, reads: "traces" }),
         traceId: input.traceId,
-        attempts: await this.attemptColumnsOf({ authorization: input.authorization }),
       });
     } catch (error) {
       logger.warn(
@@ -269,59 +345,40 @@ export class ClickHouseTraceEvaluationRunsRepository extends TraceEvaluationRuns
     }
   }
 
+  /** `tenantId` names the target whose attempt columns the read selects. */
   private async queryRuns(input: {
-    client: TraceClickHouseClient;
-    tenantPredicate: string;
-    dedupTenantPredicate: string;
-    params: Record<string, string>;
+    scope: ReaderScope;
+    windows: boolean;
+    tenantId: string;
     traceId: string;
-    attempts: string;
   }): Promise<EvaluationRunData[]> {
-    // ID_BOUND_SKIP: evaluation's index, registered by evaluation; moves there with trace-review.
-    const result = await input.client.query({
-      query: `
-        SELECT EvaluationId, EvaluatorId, EvaluatorType, EvaluatorName, TraceId,
-          IsGuardrail, Status, Score, Passed, Label, Details, Inputs, Error, ErrorDetails,
-          toUnixTimestamp64Milli(${RUNS}.CreatedAt) AS CreatedAt,
-          toUnixTimestamp64Milli(${RUNS}.UpdatedAt) AS UpdatedAtMs,
-          toUnixTimestamp64Milli(${RUNS}.ArchivedAt) AS ArchivedAt,
-          toUnixTimestamp64Milli(${RUNS}.ScheduledAt) AS ScheduledAtMs,
-          toUnixTimestamp64Milli(${RUNS}.StartedAt) AS StartedAtMs,
-          toUnixTimestamp64Milli(${RUNS}.CompletedAt) AS CompletedAt, CostId, ${input.attempts}, ${ATTEMPT_MOMENTS},
-          toUnixTimestamp64Milli(${RUNS}.LastEventOccurredAt) AS LastEventOccurredAt
-        FROM ${EVALUATION_RUNS_TABLE} AS ${RUNS}
-        WHERE ${input.tenantPredicate}
-          AND ${RUNS}.ScheduledAt >= now() - INTERVAL 7 DAY
-          AND ${RUNS}.TraceId = {traceId:String}
-          AND (${RUNS}.TenantId, ${RUNS}.EvaluationId, ${RUNS}.UpdatedAt) IN (
-            SELECT TenantId, EvaluationId, max(UpdatedAt)
-            FROM ${EVALUATION_RUNS_TABLE}
-            WHERE ${input.dedupTenantPredicate}
-              AND ScheduledAt >= now() - INTERVAL 7 DAY
-              AND TraceId = {traceId:String}
-            GROUP BY TenantId, EvaluationId
-          )
-        ORDER BY ${RUNS}.UpdatedAt DESC
-      `,
-      query_params: { ...input.params, traceId: input.traceId },
-      format: "JSONEachRow",
+    const holds = await this.reader
+      .columns({ tenantId: input.tenantId })
+      .holds({ table: evaluationRuns.$table.name });
+    const result = await this.reader.read({
+      // ID_BOUND_SKIP: evaluation's index, registered by evaluation; moves there with trace-review.
+      statement: runsStatement({ ...input, holds }),
+      table: evaluationRuns.$table.name,
     });
-    return runRowsSchema.parse(await result.json()).map((row) =>
+    return runRowsSchema.parse(result.rows).map((row) =>
       evaluationRunDataSchema.parse({
         ...summaryFields(row),
         details: row.Details,
         inputs: row.Inputs ? (JSON.parse(row.Inputs) as Record<string, unknown>) : null,
         error: row.Error,
         errorDetails: row.ErrorDetails,
-        createdAt: row.CreatedAt,
+        createdAt: row.CreatedAtMs,
         updatedAt: row.UpdatedAtMs,
-        LastEventOccurredAt: row.LastEventOccurredAt ?? 0,
-        archivedAt: row.ArchivedAt,
+        LastEventOccurredAt: row.LastEventOccurredAtMs ?? 0,
+        archivedAt: row.ArchivedAtMs,
         scheduledAt: row.ScheduledAtMs,
         startedAt: row.StartedAtMs,
-        completedAt: row.CompletedAt,
+        completedAt: row.CompletedAtMs,
         costId: row.CostId,
-        ...attemptFields(row),
+        attempts: row.AttemptCount,
+        lastAttemptAt: row.LastAttemptAtMs,
+        lastAttemptError: row.LastAttemptErrorText,
+        nextAttemptAt: row.NextAttemptAtMs,
       }),
     );
   }
