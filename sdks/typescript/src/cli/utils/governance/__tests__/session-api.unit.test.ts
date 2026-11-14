@@ -8,6 +8,7 @@ const saveConfig = vi.fn();
 vi.mock("../config", () => ({
   loadConfig: vi.fn(),
   saveConfig: (...args: unknown[]) => saveConfig(...args),
+  assertConfigWritable: vi.fn(),
 }));
 
 import { loadConfig } from "../config";

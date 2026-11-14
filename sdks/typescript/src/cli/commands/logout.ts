@@ -23,10 +23,10 @@ const revokeAndClearSession = async (): Promise<void> => {
     clearConfig();
     return;
   }
-  if (cfg.refresh_token) {
+  if (cfg.refresh_token || cfg.access_token) {
     try {
-      // Send both tokens so the access_token is invalidated immediately,
-      // not just at its 1h expiry.
+      // Send every token held so each is invalidated now, not at its expiry.
+      // A `login --token` session has only an access token; it is revoked too.
       await serverRevokeLogout(
         { baseUrl: cfg.control_plane_url },
         cfg.refresh_token,

@@ -37,7 +37,7 @@ import {
   mintIngestionKey,
 } from "./cli-api";
 import { assertCodexAgentGuidance } from "./codex-agents-md";
-import { isIsolatedConfig, type GovernanceConfig } from "./config";
+import { assertConfigWritable, isIsolatedConfig, type GovernanceConfig } from "./config";
 import { buildOtelEnvBlock, SOURCE_TYPE_BY_TOOL, telemetryEnvVarNames } from "./otel-env-block";
 import { resolvePlatformToolPolicy } from "./platform-tool-policy";
 import { runningCodeRestartNotice } from "./running-code";
@@ -165,6 +165,8 @@ export async function resolveLiveIngestionKey({
       };
     }
   }
+  // A key the config cannot hold would be minted again on the next run, and none is revoked.
+  assertConfigWritable();
   const r = await mintIngestionKey(cfg, sourceType);
   return {
     token: r.token,
@@ -302,7 +304,7 @@ export function refreshCodexOtelBlockTo({
   return `codex [otel] block (${displayCodexConfigPath()})`;
 }
 
-export type ClaudeProjectPinAction = "created" | "updated" | "unchanged" | "skipped";
+export type ClaudeProjectPinAction = "created" | "updated" | "unchanged" | "skipped" | "tracked";
 
 export interface ClaudeProjectPinResult {
   action: ClaudeProjectPinAction;
@@ -311,9 +313,9 @@ export interface ClaudeProjectPinResult {
 }
 
 /**
- * Write (or re-sync) telemetry env into `.claude/settings.local.json`, which Claude Code
- * applies above user-level settings so a wrapped run always emits to the login that spawned
- * it. `skipped` means the file already carries non-langwatch OTLP wiring the user owns.
+ * Write (or re-sync) telemetry env into `.claude/settings.local.json`, which Claude Code applies
+ * above user-level settings so a wrapped run always emits to the login that spawned it.
+ * `skipped`: the file carries OTLP wiring the user owns. `tracked`: git tracks the file, so no key.
  */
 export function ensureClaudeProjectTelemetryPin({
   vars,
@@ -324,6 +326,10 @@ export function ensureClaudeProjectTelemetryPin({
 }): ClaudeProjectPinResult {
   const target = claudeProjectSettingsTarget(cwd);
   const base = { path: target.path, displayPath: target.displayPath };
+  if (gitTracksClaudeLocalSettings(cwd)) return { action: "tracked", ...base };
+  // Every run, not only on create: a pin written before the exclude existed, or
+  // into a file the user made, would otherwise stay one `git add .` from history.
+  excludeClaudeLocalSettingsFromGit(cwd);
   if (appEnvHasAllVars(target, vars)) return { action: "unchanged", ...base };
   const current = appEnvValues(target);
   const hasOwnedKey = Object.keys(vars).some((k) => k in current);
@@ -332,7 +338,6 @@ export function ensureClaudeProjectTelemetryPin({
   }
   const existedBefore = fs.existsSync(target.path);
   installAppEnv(target, vars);
-  if (!existedBefore) excludeClaudeLocalSettingsFromGit(cwd);
   return { action: existedBefore ? "updated" : "created", ...base };
 }
 
@@ -369,12 +374,31 @@ function removeSettingsFileIfEmpty(filePath: string): void {
   }
 }
 
+const CLAUDE_LOCAL_SETTINGS = ".claude/settings.local.json";
+
+/** Git's exit status for `args` run in `cwd`; null when git is missing or hangs. */
+function gitStatus(cwd: string, args: string[]): number | null {
+  try {
+    return spawnSync("git", args, { cwd, stdio: "ignore", timeout: 2000 }).status;
+  } catch {
+    return null;
+  }
+}
+
+/** True when git already tracks the pin file: writing a key there puts it in the next commit. */
+function gitTracksClaudeLocalSettings(cwd: string): boolean {
+  return gitStatus(cwd, ["ls-files", "--error-unmatch", "--", CLAUDE_LOCAL_SETTINGS]) === 0;
+}
+
 /**
- * Best-effort: keep the pin (it carries an ingest key) out of history via
- * `.git/info/exclude` — local-only, the same mechanism Claude Code uses for this file.
- * Resolves the common git dir so worktrees share it; no-ops outside a repo or without git.
+ * Best-effort: keep the pin (it carries an ingest key) out of history via `.git/info/exclude`,
+ * the local-only mechanism Claude Code uses for this file, in the common git dir worktrees share.
+ * No-op outside a repo, without git, or when an ignore rule already covers the file.
  */
 function excludeClaudeLocalSettingsFromGit(cwd: string): void {
+  if (gitStatus(cwd, ["check-ignore", "-q", "--no-index", "--", CLAUDE_LOCAL_SETTINGS]) !== 1) {
+    return;
+  }
   try {
     const probe = spawnSync("git", ["rev-parse", "--git-common-dir"], {
       cwd,

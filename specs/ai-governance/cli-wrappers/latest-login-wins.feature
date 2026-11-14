@@ -88,6 +88,25 @@ Feature: The latest login wins over stale persisted telemetry wiring
       And the pin is kept out of the repository history via the local git
         exclude file
 
+    @unit
+    Scenario: a pin in a file that already existed is still kept out of git
+      Given .claude/settings.local.json exists and git does not ignore it
+      When the user runs `langwatch claude`
+      Then the local git exclude file covers .claude/settings.local.json
+
+    @unit
+    Scenario: a pin file git already ignores is not excluded twice
+      Given .gitignore already covers .claude/settings.local.json
+      When the user runs `langwatch claude`
+      Then the local git exclude file is left as it was
+
+    @unit
+    Scenario: no key is written into a pin file git tracks
+      Given git tracks .claude/settings.local.json
+      When the user runs `langwatch claude`
+      Then the ingest key is not written into that file
+      And a warning says git tracks it and how to stop tracking it
+
     Scenario: the pin is refreshed when a different login runs next
       Given .claude/settings.local.json carries a pin from a previous login
       When the user runs `langwatch claude` under a new login
