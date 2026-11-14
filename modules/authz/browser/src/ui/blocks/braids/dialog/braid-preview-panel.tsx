@@ -120,9 +120,12 @@ function Counts({
 }) {
   if (traces.total === 0) {
     return (
-      <Text textStyle="bodySm" color="fg.muted" data-testid="braid-preview-counts">
-        {`${readerName} has no traces in the last 7 days, so there is nothing to count yet.`}
-      </Text>
+      <Stack gap={3} data-testid="braid-preview-counts">
+        <Text textStyle="bodySm" color="fg.muted">
+          {`${readerName} has no traces in the last 7 days, so there is nothing to count yet.`}
+        </Text>
+        {viewers ? <Viewers viewers={viewers} readerName={readerName} /> : null}
+      </Stack>
     );
   }
   const share = (value: number) => value / traces.total;

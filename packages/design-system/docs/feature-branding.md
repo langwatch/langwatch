@@ -5,11 +5,11 @@ semantic tokens. A few features earn a brand of their own inside it: a name, a m
 colour roles and a small set of illustrations. This guide is how any feature gets one, with
 Braids (spans from one project shown in another project's traces) as the worked example.
 
-| Export                                          | Component             | What it draws                                                  |
-| ----------------------------------------------- | --------------------- | -------------------------------------------------------------- |
-| `@langwatch/design-system/feature-mark`         | `FeatureMark`         | The mark: colour, one colour, or the small master              |
-| `@langwatch/design-system/feature-illustration` | `FeatureIllustration` | The feature's art: `empty-state` and `enterprise`              |
-| `@langwatch/design-system/enterprise-badge`     | `EnterpriseBadge`     | The quiet Enterprise badge, alike in the sidebar, title, field |
+| Export                                          | Component             | What it draws                                                    |
+| ----------------------------------------------- | --------------------- | ---------------------------------------------------------------- |
+| `@langwatch/design-system/feature-mark`         | `FeatureMark`         | The mark: colour, one colour, or the small master                |
+| `@langwatch/design-system/feature-illustration` | `FeatureIllustration` | The feature's art: `empty-state` and `enterprise`                |
+| `@langwatch/design-system/enterprise-badge`     | `EnterpriseBadge`     | The quiet Enterprise badge, on a gated title and a gated setting |
 
 In Storybook: Brand/Feature branding (the whole kit on one page), Brand/Feature mark,
 Brand/Feature illustration, Brand/Enterprise badge and the feature rows in
@@ -36,8 +36,9 @@ and the mark on whatever the feature adds to other screens.
   `SettingsSection` and `SettingsField`, `NoDataInfoBlock`, `AccessState`. No custom panels.
 - **The mark leads the title, in colour.** `FeatureMark` at 20px sits before the page title, and
   the Enterprise chip after it when the plan gates the feature. Buttons and table rows carry none.
-- **One Enterprise badge.** `EnterpriseBadge` is the quiet "Enterprise" badge the sidebar shows; a
-  gated page's title and a gated setting wear the same one. Never an orange pill, an abbreviation
+- **One Enterprise badge.** `EnterpriseBadge` is the quiet "Enterprise" badge that marks a gated page
+  title and a gated setting. The sidebar shows only the "Included in Enterprise" lock on locked
+  entries, nothing on included ones. Never an orange pill, an abbreviation
   or a second wording.
 - **The art explains, once.** The empty state before anything exists and the upgrade show the
   illustration inside a `Card` or `AccessState`, with the app's type scale around it. Its lines
@@ -63,7 +64,7 @@ and a braided span carries the mark and a chip naming its project, like the mode
 | Tagline          | One short line for landing pages                                           | One trace. Every project.                                    |
 | Colour roles     | Named tokens under `feature.<name>.*`, light and dark values               | `lead`, `weave`, `project.1-3`, `projectInk.1-3`             |
 | Illustration set | An empty state and an Enterprise upsell, 760 wide                          | Three projects braided into one trace                        |
-| Enterprise badge | The sidebar's badge, after the title of any page or setting the plan gates | `EnterpriseBadge`                                            |
+| Enterprise badge | The badge after the title of any page or setting the plan gates            | `EnterpriseBadge`                                            |
 
 Inside the product, page titles stay in Inter. Sentient appears only on landing or docs pages, as Langy and the front door already use it.
 

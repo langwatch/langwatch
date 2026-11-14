@@ -3,7 +3,7 @@
  * signed spans over 24 hours; create, rotate and revoke for whoever may braid out of the project.
  * A secret lives only in panel state. Spec: modules/api-key/specs/signing-keys.feature
  */
-import type { SigningKeysPanelProps } from "@langwatch/api-key-client";
+import { SIGNING_KEY_QUERY_KEY, type SigningKeysPanelProps } from "@langwatch/api-key-client";
 import type { SigningKey } from "@langwatch/api-key-contract";
 import type { WireOf } from "@langwatch/api/web";
 import { AccessState } from "@langwatch/design-system/access-state";
@@ -35,8 +35,6 @@ const COLUMNS = 6;
 const MANAGE_PERMISSION = "braids:manage";
 /** A mutation answer that may carry a secret is dropped from the client's cache at once. */
 const NO_CACHE = { gcTime: 0 } as const;
-/** The Braids page's Signing keys section writes `?signingKey=new`; the panel opens on it. */
-const CREATE_QUERY_KEY = "signingKey";
 
 function StatusBadge({ signingKey }: { signingKey: SigningKeyRow }) {
   if (signingKey.status === "active") {
@@ -182,7 +180,7 @@ export function SigningKeysPanel({ projectId }: SigningKeysPanelProps) {
   const revoke = apiKeyApi.signingKeys.revoke.useMutation();
 
   const { query } = host.route();
-  const asked = canManage && query[CREATE_QUERY_KEY] === "new";
+  const asked = canManage && query[SIGNING_KEY_QUERY_KEY] === "new";
   const [creating, setCreating] = useState(false);
   // The ask opens the dialog once, adjusted during render; the effect clears it from the address.
   const [taken, setTaken] = useState(false);
@@ -191,7 +189,7 @@ export function SigningKeysPanel({ projectId }: SigningKeysPanelProps) {
     if (asked) setCreating(true);
   }
   useEffect(() => {
-    if (asked) host.setQuery({ ...query, [CREATE_QUERY_KEY]: undefined }, { replace: true });
+    if (asked) host.setQuery({ ...query, [SIGNING_KEY_QUERY_KEY]: undefined }, { replace: true });
   }, [asked, host, query]);
   const [createRound, setCreateRound] = useState(0);
   const [pending, setPending] = useState<PendingAction | null>(null);

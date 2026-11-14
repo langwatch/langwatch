@@ -452,7 +452,7 @@ export default function AuditLogScreen() {
         onExport={(span) => void downloadCsv(span)}
       />
 
-      <VStack gap={4} width="full" align="start" paddingTop={4}>
+      <VStack gap={4} width="full" align="start">
         <VStack align="start" gap={1} width="full">
           {backLink && (
             <Link href={backLink.href} color="fg.muted" fontSize="sm">

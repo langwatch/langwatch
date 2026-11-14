@@ -569,6 +569,9 @@ describe("the braid dialog", () => {
       expect(await screen.findByTestId("braid-preview-counts")).toHaveTextContent(
         "orchestrator has no traces in the last 7 days, so there is nothing to count yet.",
       );
+      expect(screen.getByTestId("braid-viewers")).toHaveTextContent(
+        /14 people\s*in orchestrator will see these spans/,
+      );
     });
   });
 

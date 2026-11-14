@@ -4,6 +4,7 @@
  * Spec: modules/authz/specs/braids-screen.feature (design: dev/docs/plans/braids/).
  */
 
+import { SIGNING_KEY_QUERY_KEY } from "@langwatch/api-key-client";
 import { Link } from "@langwatch/browser-host/link";
 import { Banner, BannerAction } from "@langwatch/design-system/banner";
 import { PageLayout } from "@langwatch/design-system/page-layout";
@@ -36,19 +37,14 @@ import { BraidsTable } from "../../blocks/braids/braids-table.tsx";
 import { RemoveBraidDialog } from "../../blocks/braids/remove-braid-dialog.tsx";
 import { BraidsPageLinks } from "../../elements/braids-page-links.tsx";
 import { BraidsTitle } from "../../elements/braids-title.tsx";
+import { NO_RULE_UNDER_HEADER } from "../../elements/no-rule-under-header.ts";
 import { SectionErrorNotice } from "../../elements/section-error-notice.tsx";
 import { BraidDialog } from "./braid-dialog.tsx";
 import { BraidsSigningKeys } from "./braids-signing-keys.tsx";
 
 const BRAIDS_MANAGE_PERMISSION = "braids:manage";
-/** The api-key panel opens New signing key on `?signingKey=new`, as Edit opens on `?braid=`. */
-const SIGNING_KEY_QUERY_KEY = "signingKey";
-
 /** The braid dialog is URL-routed: `?braid=new`, or `?braid=<id>` for Edit. */
 const BRAID_QUERY_KEY = "braid";
-
-/** The header already ends on a rule: a band that opens the body draws none of its own. */
-const NO_RULE_UNDER_HEADER = { "& > section:first-child": { borderTopWidth: 0, paddingTop: 0 } };
 
 /** Where `?section=` scrolls to. */
 const SECTION_ANCHORS: Record<BraidsSection, string> = {

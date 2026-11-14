@@ -24,12 +24,10 @@ import { BRAIDS_GUIDE_HREF, organizationBraidRows } from "../../../model/braids/
 import { OrganizationBraidsTable } from "../../blocks/braids/organization-braids-table.tsx";
 import { BraidsPageLinks } from "../../elements/braids-page-links.tsx";
 import { BraidsTitle } from "../../elements/braids-title.tsx";
+import { NO_RULE_UNDER_HEADER } from "../../elements/no-rule-under-header.ts";
 import { SectionErrorNotice } from "../../elements/section-error-notice.tsx";
 
 const KEEP_TO_ADMINS = "Keep braids to organisation admins";
-
-/** The header already ends on a rule: a band that opens the body draws none of its own. */
-const NO_RULE_UNDER_HEADER = { "& > section:first-child": { borderTopWidth: 0, paddingTop: 0 } };
 
 function OrganizationBraidsHeader({ locked = false }: { locked?: boolean }) {
   return (
