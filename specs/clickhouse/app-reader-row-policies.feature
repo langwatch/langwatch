@@ -46,7 +46,7 @@ Feature: ClickHouse row policies bound the application's reads to the request's 
   Scenario: The app reader cannot read its own query log
     Given the access-model definition built with the app reader's credential
     Then the app reader carries a row policy admitting no row on "system.user_query_log"
-    And it is granted nothing in the "system" database
+    And in the "system" database it is granted SELECT only on "columns", "replicas" and "server_settings"
     And the DDL and users.d emitters both render that policy
 
   @unit
@@ -55,9 +55,10 @@ Feature: ClickHouse row policies bound the application's reads to the request's 
     Then no app reader policy has the name of a LangWatchQL policy on the same table
 
   @unit
-  Scenario: The app reader is granted SELECT on the tenant tables and nothing else
+  Scenario: The app reader is granted SELECT on the tenant tables and the server-metadata tables, nothing else
     Given the access-model definition built with the app reader's credential
     Then the app reader's grants are SELECT on exactly the tables its row policies bound
+    And SELECT on system.columns, system.replicas and system.server_settings, and no other system table
 
   @unit
   Scenario: The DDL and users.d emitters render the same app reader

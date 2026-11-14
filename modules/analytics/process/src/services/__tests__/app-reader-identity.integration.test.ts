@@ -365,6 +365,40 @@ describe("given ClickHouse 26.8 with the shipped migrations", () => {
     });
   });
 
+  describe("when the app reader reads server metadata with no tenant setting", () => {
+    beforeAll(async () => {
+      await provision(admin, factDatabase);
+    }, 120_000);
+
+    /** @scenario "The app reader reads the three server-metadata tables on 26.8 and no other system table" */
+    it("answers system.columns, system.replicas and system.server_settings", async () => {
+      const reader = clientAs(APP_READER_NAMES.user, READER_LOGIN);
+      const columns = await rows<{ name: string }>(
+        reader,
+        `SELECT name FROM system.columns WHERE database = '${factDatabase}' AND table = 'stored_spans'`,
+      );
+      const replicas = await rows(reader, "SELECT max(total_replicas) AS n FROM system.replicas");
+      const setting = await rows(
+        reader,
+        "SELECT value FROM system.server_settings WHERE name = 'max_server_memory_usage'",
+      );
+
+      expect(columns.map(({ name }) => name)).toContain("TenantId");
+      expect(replicas).toHaveLength(1);
+      expect(setting).toHaveLength(1);
+    });
+
+    /** @scenario "The app reader reads the three server-metadata tables on 26.8 and no other system table" */
+    it.each(["system.query_log", "system.processes", "system.mutations"])(
+      "refuses %s",
+      async (table) => {
+        await expect(
+          rows(clientAs(APP_READER_NAMES.user, READER_LOGIN), `SELECT count() AS n FROM ${table}`),
+        ).rejects.toMatchObject({ code: ACCESS_DENIED });
+      },
+    );
+  });
+
   describe("when the reader leaves the query condition cache on", () => {
     let truth: Record<string, Record<string, number>> = {};
 

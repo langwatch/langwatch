@@ -1,4 +1,11 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import {
+  clickhouseRead,
+  fn,
+  systemReplicas,
+  systemServerSettings,
+  tenantScope,
+} from "@langwatch/clickhouse-client/builder";
 import { createLogger } from "@langwatch/observability";
 
 import type { AppFunctionStoreProbe } from "../../features/app-functions/rules/langwatch-ql-app-function-store.rules.ts";
@@ -24,18 +31,24 @@ export class ClickHouseLangWatchQLAppFunctionStoreRepository extends LangWatchQL
 
   async findProbe(): Promise<AppFunctionStoreProbe[]> {
     try {
+      const metadata = tenantScope.serverMetadata({
+        reason: "the replica layout and server settings describe the server, which no tenant owns",
+      });
       const [replicas, setting] = await Promise.all([
-        this.clickhouse.query<{ max_total_replicas: string }>({
-          tenantId: "",
-          sql: "SELECT toString(max(total_replicas)) AS max_total_replicas FROM system.replicas",
-          // The replica layout and server settings describe the server, which no tenant owns.
-          SKIP_TENANT_CHECK: true,
+        this.clickhouse.read({
+          statement: clickhouseRead({ scope: metadata })
+            .from(systemReplicas)
+            .select({ max_total_replicas: fn.max(systemReplicas.total_replicas) })
+            .build(),
+          table: "system.replicas",
         }),
-        this.clickhouse.query<{ value: string }>({
-          tenantId: "",
-          sql: "SELECT value FROM system.server_settings WHERE name = 'user_defined_zookeeper_path'",
-          // The replica layout and server settings describe the server, which no tenant owns.
-          SKIP_TENANT_CHECK: true,
+        this.clickhouse.read({
+          statement: clickhouseRead({ scope: metadata })
+            .from(systemServerSettings)
+            .select({ value: systemServerSettings.value })
+            .where(({ eq }) => eq(systemServerSettings.name, "user_defined_zookeeper_path"))
+            .build(),
+          table: "system.server_settings",
         }),
       ]);
       return [

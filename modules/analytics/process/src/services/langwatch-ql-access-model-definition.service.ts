@@ -559,7 +559,10 @@ export class LangWatchQLAccessModelDefinitionService {
         name: names.settingsProfile,
         settings: this.appReaderProfileSettings({ enforce }),
       },
-      grants: APP_READER_TENANT_TABLES.map(({ table }) => ({ database: sourceDatabase, table })),
+      grants: [
+        ...APP_READER_TENANT_TABLES.map(({ table }) => ({ database: sourceDatabase, table })),
+        ...APP_READER_SERVER_METADATA_GRANTS,
+      ],
       rowPolicies: [
         ...APP_READER_TENANT_TABLES.map(({ table, tenantColumn }) => ({
           name: policyName(table),
@@ -572,6 +575,17 @@ export class LangWatchQLAccessModelDefinitionService {
     };
   }
 }
+
+/**
+ * The server-metadata tables a reader may read with no tenant setting (ADR-202 Decided 3): the
+ * builder's `SERVER_METADATA_TABLES`, and nothing else. query_log, processes and mutations stay
+ * refused (app-reader-identity.integration.test.ts proves both on 26.8).
+ */
+const APP_READER_SERVER_METADATA_GRANTS: readonly LwqlGrantTarget[] = [
+  { database: "system", table: "columns" },
+  { database: "system", table: "replicas" },
+  { database: "system", table: "server_settings" },
+];
 
 /** LangWatchQL's identity first, then each reader the definition carries. */
 function identitiesOf(definition: LwqlAccessModelDefinition): LwqlAccessIdentity[] {

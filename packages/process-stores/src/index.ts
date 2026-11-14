@@ -42,6 +42,10 @@ export {
   ConsumerPipelines,
 } from "./pipeline-selection.ts";
 export { openStores } from "./open-stores.ts";
-export { clickhouseRoutesOf } from "./clickhouse-routes.ts";
+export {
+  clickhouseRouteFamilyOf,
+  clickhouseRoutesOf,
+  READER_ROUTE_ENV_PREFIX,
+} from "./clickhouse-routes.ts";
 export { OverloadedRefusal, StatementBoundTelemetry } from "./clickhouse-member.ts";
 export { memoryObjectStorage } from "./object-storage-memory.ts";

@@ -1,4 +1,5 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import { clickhouseRead, param, tenantScope } from "@langwatch/clickhouse-client/builder";
 
 import { ClickHouseHealthRepository } from "../datastore-health.repository.ts";
 
@@ -17,11 +18,12 @@ export class ClickHouseClickHouseHealthRepository extends ClickHouseHealthReposi
   }
 
   async ping(): Promise<void> {
-    await this.clickhouse.query({
-      tenantId: "",
-      sql: "SELECT 1",
-      // The checkup asks whether the server answers, which no tenant owns.
-      SKIP_TENANT_CHECK: true,
-    });
+    const statement = clickhouseRead({
+      scope: tenantScope.serverMetadata({ reason: "the checkup asks whether the server answers" }),
+    })
+      .withoutTable()
+      .select({ one: param.uint32(1) })
+      .build();
+    await this.clickhouse.read({ statement });
   }
 }

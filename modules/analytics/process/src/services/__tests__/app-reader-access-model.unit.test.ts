@@ -55,6 +55,13 @@ interface UsersD {
   >;
 }
 
+/** The server-metadata reads the reader is granted, and no other system table (ADR-202). */
+const SERVER_METADATA_GRANTS = [
+  { database: "system", table: "columns" },
+  { database: "system", table: "replicas" },
+  { database: "system", table: "server_settings" },
+];
+
 describe("given the access-model definition built with the app reader's credential", () => {
   const definition = built({ passwordSha256Hex: READER_HASH });
   const reader = definition.appReader;
@@ -132,7 +139,10 @@ describe("given the access-model definition built with the app reader's credenti
         predicate: "0",
       },
     ]);
-    expect(reader.grants.filter(({ database }) => database === "system")).toEqual([]);
+    expect(reader.grants.filter(({ database }) => database === "system")).toEqual(
+      SERVER_METADATA_GRANTS,
+    );
+    expect(reader.grants.some(({ table }) => table === "user_query_log")).toBe(false);
     expect(ddl).toContain(
       "CREATE ROW POLICY OR REPLACE user_query_log_app_hidden ON system.user_query_log\n" +
         "  USING 0\n  TO langwatch_app_reader",
@@ -163,16 +173,21 @@ describe("given the access-model definition built with the app reader's credenti
     expect(definition.rowPolicies.some((p) => p.table === "stored_spans")).toBe(true);
   });
 
-  /** @scenario "The app reader is granted SELECT on the tenant tables and nothing else" */
-  it("grants SELECT on exactly the tables its policies bound, every column", () => {
-    expect(reader.grants).toEqual(
-      tenantPolicies.map(({ database, table }) => ({ database, table })),
-    );
+  /** @scenario "The app reader is granted SELECT on the tenant tables and the server-metadata tables, nothing else" */
+  it("grants SELECT on exactly the tables its policies bound and the three server-metadata tables", () => {
+    expect(reader.grants).toEqual([
+      ...tenantPolicies.map(({ database, table }) => ({ database, table })),
+      ...SERVER_METADATA_GRANTS,
+    ]);
     const readerGrants = ddl.filter(
       (s) => s.startsWith("GRANT") && s.endsWith(" TO langwatch_app_reader"),
     );
     expect(readerGrants).toHaveLength(reader.grants.length);
-    expect(readerGrants.every((s) => s.startsWith("GRANT SELECT ON langwatch."))).toBe(true);
+    expect(readerGrants.filter((s) => !s.startsWith("GRANT SELECT ON langwatch."))).toEqual([
+      "GRANT SELECT ON system.columns TO langwatch_app_reader",
+      "GRANT SELECT ON system.replicas TO langwatch_app_reader",
+      "GRANT SELECT ON system.server_settings TO langwatch_app_reader",
+    ]);
   });
 
   /** @scenario "The DDL and users.d emitters render the same app reader" */

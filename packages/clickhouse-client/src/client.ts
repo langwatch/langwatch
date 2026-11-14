@@ -7,8 +7,23 @@
 import { AuthorizationExpiredError } from "@langwatch/authorization";
 import { nowInstant } from "@langwatch/time";
 
-import type { ClickHouseReadStatement } from "./builder/read.ts";
-import { hasIdBound, type IdBound, idBoundOf, IdIndexRegistry, readIdBound } from "./idBound.ts";
+import { fn } from "./builder/functions.ts";
+import {
+  clickhouseRead,
+  type ClickHouseReadStatement,
+  type MetadataReadStatement,
+} from "./builder/read.ts";
+import { tenantScope } from "./builder/scope.ts";
+import { systemColumns } from "./builder/system-tables.ts";
+import { SERVER_METADATA_TABLES } from "./builder/table.ts";
+import {
+  hasIdBound,
+  type IdBound,
+  idBoundOf,
+  type IdBoundOptions,
+  IdIndexRegistry,
+  readIdBound,
+} from "./idBound.ts";
 import type { ShadowSampler } from "./identity/shadowSampler.ts";
 import {
   identityOf,
@@ -39,7 +54,7 @@ import type {
   ClickHouseOverloadErrorFactory,
   ClickHouseStatementAdmission,
 } from "./managed-client.ts";
-import { CLICKHOUSE_COLUMNS_QUERY, ClickHouseColumns } from "./present-columns.ts";
+import { ClickHouseColumns } from "./present-columns.ts";
 import type { InsertRequest, QueryDriver, QueryRequest, QueryResult } from "./query.ts";
 import { TRANSIENT_NETWORK_CODES } from "./resilience.ts";
 import type { RetryPolicy } from "./retry.ts";
@@ -128,8 +143,8 @@ class InsertNotRetriedInPlace extends Error {
   }
 }
 
-/** Raw SQL from a repository, or a statement the typed builder built (ADR-202). */
-type StatementOrigin = "raw" | "built";
+/** Raw SQL, a statement the typed builder built, or its server-metadata read (ADR-202). */
+type StatementOrigin = "raw" | "built" | "metadata";
 
 /** One statement as it leaves: the identity's driver, and the request that driver receives. */
 interface Sending {
@@ -300,17 +315,17 @@ export class ClickHouseQueryClient {
   columns({ tenantId }: { tenantId: string }): ClickHouseColumns {
     const known = this.columnLists.get(tenantId);
     if (known !== undefined) return known;
+    const statement = clickhouseRead({
+      scope: tenantScope.serverMetadata({
+        reason: "the schema's column list, which no tenant owns",
+      }),
+    })
+      .from(systemColumns)
+      .select({ table: systemColumns.table, name: systemColumns.name })
+      .where(({ eq }) => eq(systemColumns.database, fn.currentDatabase()))
+      .build();
     const columns = ClickHouseColumns.over({
-      read: async () =>
-        (
-          await this.query<{ table: string; name: string }>({
-            tenantId,
-            sql: CLICKHOUSE_COLUMNS_QUERY,
-            table: "system.columns",
-            // The schema's column list describes the server, which no tenant owns.
-            SKIP_TENANT_CHECK: true,
-          })
-        ).rows,
+      read: async () => (await this.read({ statement, table: "system.columns", tenantId })).rows,
     });
     this.columnLists.set(tenantId, columns);
     return columns;
@@ -321,6 +336,17 @@ export class ClickHouseQueryClient {
    * `{{idBound}}` marker runs once per window its id index read takes, each under every policy.
    */
   async query<Row>(request: QueryRequest): Promise<QueryResult<Row>> {
+    return this.boundedOrPlain<Row>({ request, origin: "raw" });
+  }
+
+  /** A statement carrying an `{{idBound}}` marker runs per window; any other runs once. */
+  private async boundedOrPlain<Row>({
+    request,
+    origin,
+  }: {
+    request: QueryRequest;
+    origin: StatementOrigin;
+  }): Promise<QueryResult<Row>> {
     const bound = hasIdBound(request)
       ? idBoundOf({
           sql: request.sql,
@@ -329,8 +355,8 @@ export class ClickHouseQueryClient {
           openEnded: request.idBound?.openEnded,
         })
       : null;
-    if (bound !== null) return this.boundedQuery<Row>({ request, bound });
-    return this.statement<Row>(request);
+    if (bound !== null) return this.boundedQuery<Row>({ request, bound, origin });
+    return this.statement<Row>(request, origin);
   }
 
   /**
@@ -342,18 +368,41 @@ export class ClickHouseQueryClient {
     statement,
     table,
     organizationId,
+    tenantId,
+    idBound,
+    declaresFullScan,
     signal,
   }: {
-    statement: ClickHouseReadStatement<Row>;
+    statement: ClickHouseReadStatement<Row> | MetadataReadStatement<Row>;
     table?: string | undefined;
     /** Sends an all-tenants statement to this organisation's server rather than the shared one. */
     organizationId?: string | undefined;
+    /** Sends a server-metadata statement to this tenant's server rather than the shared one. */
+    tenantId?: string | undefined;
+    /** How the statement's `{{idBound}}` marker reads its window, as `query()` takes it. */
+    idBound?: IdBoundOptions | undefined;
+    /** The read scans every partition on purpose; sent as `SKIP_COLD_SCAN_CHECK`. */
+    declaresFullScan?: true | undefined;
     signal?: QueryRequest["signal"];
   }): Promise<QueryResult<Row>> {
-    const sent = { sql: statement.sql, params: { ...statement.params }, table, signal };
-    if (statement.identity === "system") {
+    const sent = {
+      sql: statement.sql,
+      params: { ...statement.params },
+      table,
+      signal,
+      ...(idBound === undefined ? {} : { idBound }),
+      ...(declaresFullScan === true ? { SKIP_COLD_SCAN_CHECK: true as const } : {}),
+    };
+    if (statement.kind === "metadata") {
+      refuseMetadataOutsideAllowList({ sql: statement.sql });
       return this.statement<Row>(
-        {
+        { ...sent, tenantId: tenantId ?? "", settings: { ...statement.settings } },
+        "metadata",
+      );
+    }
+    if (statement.identity === "system") {
+      return this.boundedOrPlain<Row>({
+        request: {
           ...sent,
           tenantId: "",
           ...(organizationId === undefined ? {} : { organizationId }),
@@ -361,12 +410,12 @@ export class ClickHouseQueryClient {
           // An all-tenants scope, built only with its reason (`tenantScope.allTenants`).
           SKIP_TENANT_CHECK: true,
         },
-        "built",
-      );
+        origin: "built",
+      });
     }
     refuseExpired({ expiresAt: statement.expiresAt });
-    const result = await this.statement<Row>(
-      {
+    const result = await this.boundedOrPlain<Row>({
+      request: {
         ...sent,
         tenantId: statement.routeTenantId,
         tenantIds: statement.tenantIds,
@@ -375,8 +424,8 @@ export class ClickHouseQueryClient {
           expiresAt: statement.expiresAt,
         }),
       },
-      "built",
-    );
+      origin: "built",
+    });
     // A slow statement or a retry may outlast the proof: its rows are refused, never released.
     refuseExpired({ expiresAt: statement.expiresAt });
     return result;
@@ -386,9 +435,11 @@ export class ClickHouseQueryClient {
   private async boundedQuery<Row>({
     request,
     bound,
+    origin,
   }: {
     request: QueryRequest;
     bound: IdBound;
+    origin: StatementOrigin;
   }): Promise<QueryResult<Row>> {
     const { tenantId } = request;
     const rows = await readIdBound<Row>({
@@ -399,7 +450,8 @@ export class ClickHouseQueryClient {
       indexBounds: (lookup) =>
         this.indexBounds({ tenantId, tenantIds: request.tenantIds, ...lookup }),
       options: request.idBound,
-      run: async ({ sql, params }) => (await this.statement<Row>({ ...request, sql, params })).rows,
+      run: async ({ sql, params }) =>
+        (await this.statement<Row>({ ...request, sql, params }, origin)).rows,
     });
     return { rows };
   }
@@ -413,7 +465,8 @@ export class ClickHouseQueryClient {
     request: QueryRequest,
     origin: StatementOrigin = "raw",
   ): Promise<QueryResult<Row>> {
-    this.tenantGuard.assert(request);
+    // A metadata read names only allow-listed system tables (checked in `read`), no tenant rows.
+    if (origin !== "metadata") this.tenantGuard.assert(request);
     refuseUnexpandedIdBound({ request });
     const sending = this.sendingOf({ operation: "read", request, origin });
 
@@ -449,7 +502,7 @@ export class ClickHouseQueryClient {
       const result = await (this.tracer === undefined
         ? withSlot()
         : this.tracer.trace({ request: sending.request, task: withSlot }));
-      if (sending.driver === this.readerDriver) {
+      if (sending.driver === this.readerDriver && origin !== "metadata") {
         void this.shadow?.observe({ request: sending.request, returned: result.rows.length });
       }
       return result;
@@ -577,6 +630,13 @@ export class ClickHouseQueryClient {
     origin?: StatementOrigin;
   }): Sending {
     refuseTenantSettingInText({ request });
+    if (origin === "metadata") {
+      // The reader, with no tenant setting: the system tables it names carry no tenant rows.
+      return {
+        driver: this.readerDriver ?? this.systemFor({ operation, table: request.table }),
+        request,
+      };
+    }
     const skipsTenantCheck = request.SKIP_TENANT_CHECK === true;
     if (identityOf({ operation, skipsTenantCheck }) === "system") {
       return { driver: this.systemFor({ operation, table: request.table }), request };
@@ -678,6 +738,31 @@ function settingsWithinExpiry({
 }
 
 /** The last check before a statement leaves: an unexpanded marker never reaches the server. */
+/** Every table a metadata statement's text names is on the allow-list, whoever built it. */
+function refuseMetadataOutsideAllowList({ sql }: { sql: string }): void {
+  const allowed: ReadonlySet<string> = new Set(SERVER_METADATA_TABLES);
+  for (const [, table] of sql.matchAll(METADATA_TABLE_REFERENCE)) {
+    if (table === undefined || !allowed.has(table.toLowerCase())) {
+      throw new MetadataTableRefusedError(table ?? "unknown");
+    }
+  }
+}
+
+/** A server-metadata statement naming a table off the allow-list; never sent. */
+export class MetadataTableRefusedError extends Error {
+  readonly code = "clickhouse_metadata_table_refused";
+
+  constructor(readonly table: string) {
+    super(
+      `A server-metadata read names "${table}", which is not an allow-listed system table; only ` +
+        `${SERVER_METADATA_TABLES.join(", ")} may be read without a tenant.`,
+    );
+    this.name = "MetadataTableRefusedError";
+  }
+}
+
+const METADATA_TABLE_REFERENCE = /\b(?:FROM|JOIN)\s+`?([\w.]+)`?/gi;
+
 function refuseUnexpandedIdBound({ request }: { request: QueryRequest }): void {
   if (hasIdBound(request)) throw new StatementScopeError({ kind: "unexpanded-id-bound" });
 }

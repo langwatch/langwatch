@@ -1,4 +1,3 @@
-import type { QueryRequest } from "@langwatch/clickhouse-client";
 /**
  * @vitest-environment node
  * The checkup's ClickHouse ping as ops' registries build it: the live one over the
@@ -27,18 +26,24 @@ describe("given ops' ClickHouse health repository", () => {
 
   describe("when the live registry built it over the routed member", () => {
     /** @scenario "The checkup's ClickHouse ping is answered by ops' registry" */
-    it("asks the server one unscoped SELECT 1", async () => {
-      const statements: QueryRequest[] = [];
+    it("asks the server one table-less metadata read on the reader, never a skip-check statement", async () => {
+      const statements: unknown[] = [];
       const clickhouse = clickHouseQueryClientDouble({
-        query: async (request: QueryRequest) => {
-          statements.push(request);
+        read: async ({ statement }) => {
+          statements.push(statement);
           return { rows: [] };
         },
       });
 
       await ClickHouseClickHouseHealthRepository.create({ clickhouse }).ping();
 
-      expect(statements.map((statement) => statement.sql)).toEqual(["SELECT 1"]);
+      expect(statements).toEqual([
+        expect.objectContaining({
+          identity: "reader",
+          kind: "metadata",
+          sql: "SELECT {v0:UInt32} AS one",
+        }),
+      ]);
     });
   });
 });

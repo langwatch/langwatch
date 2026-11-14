@@ -263,3 +263,58 @@ Feature: The ClickHouse client sends reads as the app reader and everything else
     When the upgrade's reconciler runs "lwql-provision"
     Then no reader statement runs on that server and the other servers are still provisioned
     And the run fails naming the organisation
+
+  # The enforce switch (ADR-202 Rollout 4, Decided 4): off by default, read per server.
+
+  @unit
+  Scenario: The upgrade enforces the reader's tenant set where its server's switch is on
+    Given "CLICKHOUSE_TENANCY_ENFORCE", or a route's "CLICKHOUSE_TENANCY_ENFORCE__<label>__<orgId>", set to true
+    When "pnpm task upgrade lwql-provision" runs
+    Then the reader on that server pins "SQL_langwatch_tenancy_enforce" to 1
+    And every server whose switch is unset keeps it pinned to 0
+
+  @unit
+  Scenario: An enforce switch the upgrade cannot read is named, and its server is not provisioned
+    Given an enforce switch set to neither true nor false, or two organisations on one server with different switches
+    When the upgrade plans its walk
+    Then that server is named with the switch's variable
+    And no reader is created or replaced there
+
+  @unit
+  Scenario: The rendered access config carries the app reader beside LangWatchQL
+    Given the LangWatchQL inputs and "CLICKHOUSE_READER_URL" set
+    When "lwql-render-access-config" renders the users.d file
+    Then it carries "langwatch_app_reader" with its password's hash, never the password
+    And its profile pins "SQL_langwatch_tenancy_enforce" to what "CLICKHOUSE_TENANCY_ENFORCE" names, 0 when unset
+    And with "CLICKHOUSE_ENFORCING_READER_URL" set, it carries "langwatch_app_reader_enforcing" too
+
+  @unit
+  Scenario: The rendered access config refuses an unreadable enforce switch by name
+    Given "CLICKHOUSE_READER_URL" set and "CLICKHOUSE_TENANCY_ENFORCE" set to neither true nor false
+    When "lwql-render-access-config" runs
+    Then it fails naming "CLICKHOUSE_TENANCY_ENFORCE" and writes no file
+
+  # The chart (ADR-202 Decided 4): the reader stays off until the clickhouse-serverless image declares SQL_.
+
+  @integration
+  Scenario: A chart install that sets no reader value renders as before
+    Given the chart's default values
+    When the chart renders
+    Then no workload carries "CLICKHOUSE_READER_URL", "CLICKHOUSE_ENFORCING_READER_URL" or "CLICKHOUSE_TENANCY_ENFORCE"
+    And no app reader Secret is rendered
+
+  @integration
+  Scenario: The chart provisions and wires the app reader when it is enabled
+    Given "clickhouse.appReader.enabled" set on chart-managed ClickHouse
+    When the chart renders
+    Then a hook Secret holds the reader's password before the access-render Job runs
+    And the app, the workers and the access-render Job read "CLICKHOUSE_READER_URL" built from it
+    And "clickhouse.appReader.shadowSampleRate" above 0 adds the enforcing reader's URL and the sample rate
+    And "clickhouse.appReader.enforce" sets "CLICKHOUSE_TENANCY_ENFORCE"
+
+  @integration
+  Scenario: The app reader reads the three server-metadata tables on 26.8 and no other system table
+    Given ClickHouse 26.8 with the app reader provisioned
+    When the reader reads system.columns, system.replicas and system.server_settings with no tenant setting
+    Then each answers
+    And system.query_log, system.processes and system.mutations are refused as access denied
