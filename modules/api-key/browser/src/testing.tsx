@@ -170,6 +170,7 @@ export class FakeApiKeyHost extends ApiKeyHostApi {
         expiresAt: nowInstant().epochMilliseconds + 10 * 60_000,
         credentialType: "device_session",
         management: false,
+        client: null,
       },
     );
   }

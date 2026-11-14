@@ -10,6 +10,11 @@ const deviceCodeRequestSchemaDefinition = z.object({
    * the ones the approving person holds.
    */
   management: z.boolean().default(false),
+  /**
+   * A known app connecting a project, named on the approval page. A fixed list,
+   * never free text, so no caller can pose as an app it is not. Project grants only.
+   */
+  client: z.enum(["laze"]).optional(),
 });
 export interface DeviceCodeRequestSchema extends Named<typeof deviceCodeRequestSchemaDefinition> {}
 export const deviceCodeRequestSchema: DeviceCodeRequestSchema = deviceCodeRequestSchemaDefinition;

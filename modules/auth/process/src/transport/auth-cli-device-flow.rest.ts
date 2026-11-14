@@ -55,8 +55,8 @@ function protocolAnswer(
 }
 
 /**
- * Every refusal on the family, the handler's and the runtime's alike, in the
- * two-field body RFC 8628 clients parse; a shape they cannot parse reads as an outage.
+ * Every refusal on the family in the `{ error, error_description }` body RFC 8628 clients
+ * parse (an expired lookup may add `client`); a shape they cannot parse reads as an outage.
  */
 const cliDeviceFlowRefusal: RestProtocolRefusal = ({ failure, response }) => {
   const { status, refusal } = cliDeviceFlowRefusalDocument(failure);

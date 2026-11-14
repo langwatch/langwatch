@@ -37,6 +37,7 @@ import {
   type CliAccessTokenRecord,
   type CliClientInfo,
   type CliCredentialType,
+  type CliDeviceClient,
   type CliDeviceCodeRecord,
   type CliMintedSession,
   type CliRefreshTokenRecord,
@@ -120,6 +121,7 @@ export class CliDeviceSessionService {
   async startDeviceCode(input: {
     credentialType: CliCredentialType;
     management?: boolean | undefined;
+    client?: CliDeviceClient | undefined;
   }): Promise<CliDeviceCodeRecord> {
     const now = nowInstant().epochMilliseconds;
     const record: CliDeviceCodeRecord = {
@@ -130,6 +132,7 @@ export class CliDeviceSessionService {
       expires_at: now + DEVICE_CODE_TTL_SECONDS * 1000,
       credential_type: input.credentialType,
       ...(input.management ? { management: true } : {}),
+      ...(input.client ? { client: input.client } : {}),
     };
     await this.store.set({
       key: deviceCodeKey(record.device_code),
