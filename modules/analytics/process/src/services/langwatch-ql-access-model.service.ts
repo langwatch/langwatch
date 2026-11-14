@@ -190,6 +190,11 @@ export class LangWatchQLAccessModelService {
     return `${sqlText.assertIdentifier(table, "table")}_app_enforcing_hidden`;
   }
 
+  /** The policy hiding one system table from the api's insert-only writer (ADR-202 Decided 12). */
+  appWriterHiddenPolicyName(table: string): string {
+    return `${sqlText.assertIdentifier(table, "table")}_app_writer_hidden`;
+  }
+
   /**
    * The LangWatchQL user's policy hiding one system table. Named per user, since the table is
    * server-wide: two installs sharing a server never replace each other's.

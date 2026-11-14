@@ -8,7 +8,7 @@ import {
 } from "@langwatch/secrets";
 import { z } from "zod";
 
-import { READER_ROUTE_ENV_PREFIX } from "./clickhouse-routes.ts";
+import { READER_ROUTE_ENV_PREFIX, WRITER_ROUTE_ENV_PREFIX } from "./clickhouse-routes.ts";
 
 /** Main's per-organisation S3 family prefix, parsed in object-storage-private-accounts.ts. */
 export const DATAPLANE_S3_ENV_PREFIX = "DATAPLANE_S3__";
@@ -132,6 +132,10 @@ export const storesOwner = {
     clickhouseReader: Secret.load("CLICKHOUSE_READER_URL", { optional: true }),
     /** `CLICKHOUSE_READER_URL__<label>__<orgId>`: the app reader on each organization's server. */
     clickhouseReaderRoutes: Secret.family(READER_ROUTE_ENV_PREFIX),
+    /** The insert-only writer on the shared server (ADR-202 Decided 12): the api's inserts. */
+    clickhouseWriter: Secret.load("CLICKHOUSE_WRITER_URL", { optional: true }),
+    /** `CLICKHOUSE_WRITER_URL__<label>__<orgId>`: the writer on each organization's server. */
+    clickhouseWriterRoutes: Secret.family(WRITER_ROUTE_ENV_PREFIX),
     /** The shadow sampler's reader, enforcement pinned on; read only while sampling is on. */
     clickhouseEnforcingReader: Secret.load("CLICKHOUSE_ENFORCING_READER_URL", { optional: true }),
     redis: Secret.load("REDIS_URL", { optional: true }),

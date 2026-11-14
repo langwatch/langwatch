@@ -17,6 +17,9 @@ const logger = createLogger("langwatch:stores:clickhouse-routes");
 /** `CLICKHOUSE_READER_URL__<label>__<orgId>`: each private server as the app reader (ADR-202). */
 export const READER_ROUTE_ENV_PREFIX = "CLICKHOUSE_READER_URL__";
 
+/** `CLICKHOUSE_WRITER_URL__<label>__<orgId>`: each private server as the insert-only writer. */
+export const WRITER_ROUTE_ENV_PREFIX = "CLICKHOUSE_WRITER_URL__";
+
 /** Each organization's own server, and the variables present but unusable, from the family. */
 export function clickhouseRouteFamilyOf(
   family: ReadonlyMap<string, string>,

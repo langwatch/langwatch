@@ -1,6 +1,10 @@
 import type { ScopedSecrets } from "@langwatch/secrets";
 
-import { clickhouseRouteFamilyOf, READER_ROUTE_ENV_PREFIX } from "./clickhouse-routes.ts";
+import {
+  clickhouseRouteFamilyOf,
+  READER_ROUTE_ENV_PREFIX,
+  WRITER_ROUTE_ENV_PREFIX,
+} from "./clickhouse-routes.ts";
 import { storesOwner, type StoresConfig } from "./config-owner.ts";
 import type { ObjectStorageAzureConfig, ObjectStorageConfig, ProcessConfig } from "./config.ts";
 import { buildProcessStores, type ProcessStores } from "./create-members.ts";
@@ -105,6 +109,9 @@ interface ClickHouseReaderSecrets {
   readonly routes: ReturnType<typeof clickhouseRouteFamilyOf>;
   /** The shadow sampler's enforcing reader on the shared server. */
   readonly enforcingUrl: string | undefined;
+  /** The insert-only writer (ADR-202 Decided 12), shared and per route. */
+  readonly writerUrl: string | undefined;
+  readonly writerRoutes: ReturnType<typeof clickhouseRouteFamilyOf>;
 }
 
 function readerConfigOf(reader: ClickHouseReaderSecrets) {
@@ -114,6 +121,13 @@ function readerConfigOf(reader: ClickHouseReaderSecrets) {
     ...(reader.routes.routes.length > 0 ? { readerPrivateRoutes: reader.routes.routes } : {}),
     ...(reader.routes.malformed.length > 0
       ? { malformedReaderRoutes: reader.routes.malformed }
+      : {}),
+    ...(reader.writerUrl ? { writerUrl: reader.writerUrl } : {}),
+    ...(reader.writerRoutes.routes.length > 0
+      ? { writerPrivateRoutes: reader.writerRoutes.routes }
+      : {}),
+    ...(reader.writerRoutes.malformed.length > 0
+      ? { malformedWriterRoutes: reader.writerRoutes.malformed }
       : {}),
   };
 }
@@ -223,34 +237,44 @@ export function openStores(options: {
         secrets.into(storesOwner.secrets.clickhouseReader, (readerUrl) =>
           secrets.into(storesOwner.secrets.clickhouseReaderRoutes, (readerRoutes) =>
             secrets.into(storesOwner.secrets.clickhouseEnforcingReader, (enforcingUrl) =>
-              secrets.into(storesOwner.secrets.redis, (redis) =>
-                secrets.into(storesOwner.secrets.redisClusterEndpoints, (redisClusterEndpoints) =>
-                  secrets.into(storesOwner.secrets.encryption, (credentials) =>
-                    secrets.into(storesOwner.secrets.encryptionFallback, (session) =>
-                      secrets.into(storesOwner.secrets.encryptionPrevious, (previous) =>
-                        withStorageSecrets(secrets, (storage) =>
-                          buildProcessStores({
-                            config: processConfigOf({
-                              name,
-                              config,
-                              pipelines,
-                              urls: { database, clickhouse, redis, redisClusterEndpoints },
-                              clickhouseRoutes: clickhouseRouteFamilyOf(routes),
-                              clickhouseReader: {
-                                url: readerUrl,
-                                routes: clickhouseRouteFamilyOf(readerRoutes, {
-                                  prefix: READER_ROUTE_ENV_PREFIX,
+              secrets.into(storesOwner.secrets.clickhouseWriter, (writerUrl) =>
+                secrets.into(storesOwner.secrets.clickhouseWriterRoutes, (writerRoutes) =>
+                  secrets.into(storesOwner.secrets.redis, (redis) =>
+                    secrets.into(
+                      storesOwner.secrets.redisClusterEndpoints,
+                      (redisClusterEndpoints) =>
+                        secrets.into(storesOwner.secrets.encryption, (credentials) =>
+                          secrets.into(storesOwner.secrets.encryptionFallback, (session) =>
+                            secrets.into(storesOwner.secrets.encryptionPrevious, (previous) =>
+                              withStorageSecrets(secrets, (storage) =>
+                                buildProcessStores({
+                                  config: processConfigOf({
+                                    name,
+                                    config,
+                                    pipelines,
+                                    urls: { database, clickhouse, redis, redisClusterEndpoints },
+                                    clickhouseRoutes: clickhouseRouteFamilyOf(routes),
+                                    clickhouseReader: {
+                                      url: readerUrl,
+                                      routes: clickhouseRouteFamilyOf(readerRoutes, {
+                                        prefix: READER_ROUTE_ENV_PREFIX,
+                                      }),
+                                      enforcingUrl,
+                                      writerUrl,
+                                      writerRoutes: clickhouseRouteFamilyOf(writerRoutes, {
+                                        prefix: WRITER_ROUTE_ENV_PREFIX,
+                                      }),
+                                    },
+                                    encryption: credentials ?? session,
+                                    previousEncryption: previous,
+                                    storage,
+                                    production,
+                                  }),
                                 }),
-                                enforcingUrl,
-                              },
-                              encryption: credentials ?? session,
-                              previousEncryption: previous,
-                              storage,
-                              production,
-                            }),
-                          }),
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
                     ),
                   ),
                 ),

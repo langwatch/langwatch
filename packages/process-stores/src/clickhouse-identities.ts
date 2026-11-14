@@ -1,7 +1,7 @@
 /**
- * The two ClickHouse identities a process may hold (ADR-202 Decided 2, 6). A private route one
- * identity has and the other lacks is refused for the other by the variable to set, never shared.
- * Spec: specs/clickhouse/app-reader-identity.feature
+ * The ClickHouse identities a process may hold (ADR-202 Decided 2, 6, 12). A private route one
+ * identity has and another lacks is refused for that other by the variable to set, never shared.
+ * Spec: specs/clickhouse/app-reader-identity.feature · specs/clickhouse/app-writer-identity.feature
  */
 import {
   type ClickHouseConfiguration,
@@ -9,7 +9,7 @@ import {
   PRIVATE_ROUTE_ENV_PREFIX,
 } from "@langwatch/clickhouse-client";
 
-import { READER_ROUTE_ENV_PREFIX } from "./clickhouse-routes.ts";
+import { READER_ROUTE_ENV_PREFIX, WRITER_ROUTE_ENV_PREFIX } from "./clickhouse-routes.ts";
 import type {
   ClickHouseConfig,
   ClickHousePrivateRoute,
@@ -21,6 +21,8 @@ export interface ClickHouseIdentityConfigurations {
   readonly system: ClickHouseConfiguration | undefined;
   /** `CLICKHOUSE_READER_URL` and its routes: tenant reads. Absent keeps one identity. */
   readonly reader: ClickHouseConfiguration | undefined;
+  /** `CLICKHOUSE_WRITER_URL` and its routes: inserts where the system is absent (Decided 12). */
+  readonly writer: ClickHouseConfiguration | undefined;
 }
 
 interface IdentityEndpoints {
@@ -48,9 +50,21 @@ export function clickhouseIdentitiesOf({
     malformed: config.malformedReaderRoutes ?? [],
     prefix: READER_ROUTE_ENV_PREFIX,
   };
-  const resolve = (own: IdentityEndpoints, other: IdentityEndpoints) =>
-    holdsEndpoint(own) ? resolveIdentity({ own, other, poolSizing: config.poolSizing }) : undefined;
-  return { system: resolve(system, reader), reader: resolve(reader, system) };
+  const writer: IdentityEndpoints = {
+    url: config.writerUrl?.trim() || undefined,
+    routes: config.writerPrivateRoutes ?? [],
+    malformed: config.malformedWriterRoutes ?? [],
+    prefix: WRITER_ROUTE_ENV_PREFIX,
+  };
+  const resolve = (own: IdentityEndpoints, others: readonly IdentityEndpoints[]) =>
+    holdsEndpoint(own)
+      ? resolveIdentity({ own, others, poolSizing: config.poolSizing })
+      : undefined;
+  return {
+    system: resolve(system, [reader, writer]),
+    reader: resolve(reader, [system, writer]),
+    writer: resolve(writer, [system, reader]),
+  };
 }
 
 /** One socket: the shadow sampler re-runs one read at a time. */
@@ -93,13 +107,20 @@ function holdsEndpoint(identity: IdentityEndpoints): boolean {
 
 function resolveIdentity({
   own,
-  other,
+  others,
   poolSizing,
 }: {
   own: IdentityEndpoints;
-  other: IdentityEndpoints;
+  others: readonly IdentityEndpoints[];
   poolSizing: ClickHouseConfig["poolSizing"];
 }): ClickHouseConfiguration {
+  const missing = new Map<string, string | undefined>();
+  for (const { organizationId, label } of others.flatMap((other) => [
+    ...other.routes,
+    ...other.malformed,
+  ])) {
+    if (!missing.has(organizationId)) missing.set(organizationId, label);
+  }
   return ClickHouseConfigService.create().resolve({
     ...(own.url === undefined ? {} : { shared: { url: own.url, cluster: "shared" } }),
     // The organization's own id is the only credential-free name this process knows for it.
@@ -109,12 +130,10 @@ function resolveIdentity({
       cluster: organizationId,
     })),
     malformedPrivateRoutes: own.malformed,
-    missingPrivateRoutes: [...other.routes, ...other.malformed].map(
-      ({ organizationId, label }) => ({
-        organizationId,
-        variable: `${own.prefix}${label ?? "<label>"}__${organizationId}`,
-      }),
-    ),
+    missingPrivateRoutes: [...missing].map(([organizationId, label]) => ({
+      organizationId,
+      variable: `${own.prefix}${label ?? "<label>"}__${organizationId}`,
+    })),
     ...(poolSizing === undefined ? {} : { poolSizing }),
   });
 }

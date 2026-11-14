@@ -28,6 +28,7 @@ import {
 import {
   type AppReaderTarget,
   appReaderInputOf,
+  appWriterInputOf,
   planAppReaderWalk,
   SHARED_APP_READER_TARGET,
 } from "./lwql-provision.task.ts";
@@ -69,14 +70,16 @@ export function lwqlAccessModelDefinitionFromSource(
 }
 
 /**
- * The shared server's readers once `CLICKHOUSE_READER_URL` is set, read as the upgrade walk reads
- * them, with its enforce switch (ADR-202 slice 4). A reader it cannot render is refused by name.
+ * The shared server's readers once `CLICKHOUSE_READER_URL` is set, and the writer beside them,
+ * read as the upgrade walk reads them (ADR-202 slice 4, Decided 12). One it cannot render is
+ * refused by name.
  */
 export function appReaderFromSource(source: Record<string, string | undefined>): {
   appReader?: ReturnType<typeof appReaderInputOf>;
+  appWriter?: ReturnType<typeof appWriterInputOf>["appWriter"];
 } {
   const [shared] = findSharedAppReaders(source);
-  return shared ? { appReader: appReaderInputOf(shared) } : {};
+  return shared ? { appReader: appReaderInputOf(shared), ...appWriterInputOf(shared) } : {};
 }
 
 /** The shared server's entry in the upgrade walk: none until a reader URL is set. */
@@ -118,6 +121,7 @@ export function lwqlAccessConfigFilesFromSource(source: Record<string, string | 
         contents: accessModelDefinition.renderAppReaderUsersD({
           sourceDatabase: database,
           appReader,
+          ...appWriterInputOf(reader),
         }),
       },
       { relativePath: LWQL_CONFIG_D_RELATIVE_PATH, contents: "{}\n" },

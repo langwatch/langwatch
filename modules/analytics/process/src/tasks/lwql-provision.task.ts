@@ -48,6 +48,8 @@ import {
 } from "../rules/langwatch-ql-config-store.rules.ts";
 import {
   APP_READER_ENFORCING_NAMES,
+  APP_WRITER_NAMES,
+  type AppWriterInput,
   LangWatchQLAccessModelDefinitionService,
 } from "../services/langwatch-ql-access-model-definition.service.ts";
 import type { LangWatchQLNames } from "../services/langwatch-ql-access-model.service.ts";
@@ -731,19 +733,21 @@ export async function findLwqlAppOwnedDrift({
   return { clickHouse: clickHouse.objects, postgres, isKeyMapMissing: clickHouse.isKeyMapMissing };
 }
 
-/** The stores' route families: `PRIVATE_ROUTE_ENV_PREFIX` and `READER_ROUTE_ENV_PREFIX`. */
+/** The stores' route families: the system's, the reader's and the writer's. */
 const SYSTEM_ROUTE_PREFIX = "CLICKHOUSE_URL__";
 const READER_ROUTE_PREFIX = "CLICKHOUSE_READER_URL__";
+const WRITER_ROUTE_PREFIX = "CLICKHOUSE_WRITER_URL__";
 /** The enforce switch (ADR-202 Rollout 4): the shared server's, and each route's by its suffix. */
 const TENANCY_ENFORCE_VARIABLE = "CLICKHOUSE_TENANCY_ENFORCE";
 const TENANCY_ENFORCE_ROUTE_PREFIX = `${TENANCY_ENFORCE_VARIABLE}__`;
 export const SHARED_APP_READER_TARGET = "shared";
 
-/** The reader identities a config store may already define, for the statements to yield to. */
-const APP_READER_IDENTITY_NAMES = [APP_READER_NAMES, APP_READER_ENFORCING_NAMES].map((names) => ({
-  restrictedUser: names.user,
-  settingsProfile: names.settingsProfile,
-}));
+/** The app identities a config store may already define, for the statements to yield to. */
+const APP_READER_IDENTITY_NAMES = [
+  APP_READER_NAMES,
+  APP_READER_ENFORCING_NAMES,
+  APP_WRITER_NAMES,
+].map((names) => ({ restrictedUser: names.user, settingsProfile: names.settingsProfile }));
 
 /** One server the app reader is provisioned on (ADR-202 Decided 6). */
 export interface AppReaderTarget {
@@ -753,6 +757,8 @@ export interface AppReaderTarget {
   readonly readerPassword: string;
   /** The shadow sampler's reader: the shared server only. */
   readonly enforcingPassword?: string;
+  /** The api's insert-only writer (ADR-202 Decided 12), provisioned beside the reader. */
+  readonly writerPassword?: string;
   /** Its enforce switch; off keeps the reader in shadow (ADR-202 Decided 4). */
   readonly enforce: boolean;
   /** The shared server follows `LWQL_ACCESS_MODEL_MODE`; a private route is always `sql`. */
@@ -774,6 +780,7 @@ interface AppReaderCandidate {
   readonly target: AppReaderTarget;
   readonly variable: string;
   readonly enforceVariable: string;
+  readonly writerVariable: string;
 }
 
 type TenancySwitch = "enforce" | "shadow" | "unreadable";
@@ -848,11 +855,34 @@ function variableOf({
   return `${prefix}${label ?? "<label>"}__${organizationId}`;
 }
 
+/** The writer's password where a writer variable is set; one set but unreadable is named. */
+function writerOf({
+  url,
+  variable,
+  target,
+}: {
+  url: string | undefined;
+  variable: string;
+  target: string;
+}): { writerPassword?: string; unprovisioned: UnprovisionedAppReader[] } {
+  if (!url) return { unprovisioned: [] };
+  const writerPassword = passwordOf(url);
+  return writerPassword
+    ? { writerPassword, unprovisioned: [] }
+    : { unprovisioned: [{ target, variable }] };
+}
+
 function sharedReader({ source }: { source: Readonly<Record<string, string | undefined>> }): {
   candidates: AppReaderCandidate[];
   unprovisioned: UnprovisionedAppReader[];
 } {
-  if (!source.CLICKHOUSE_READER_URL) return { candidates: [], unprovisioned: [] };
+  if (!source.CLICKHOUSE_READER_URL) {
+    // The writer is provisioned beside the reader, never alone (ADR-202 Decided 12, 14).
+    const unprovisioned = source.CLICKHOUSE_WRITER_URL
+      ? [{ target: SHARED_APP_READER_TARGET, variable: "CLICKHOUSE_READER_URL" }]
+      : [];
+    return { candidates: [], unprovisioned };
+  }
   const readerPassword = passwordOf(source.CLICKHOUSE_READER_URL);
   if (!source.CLICKHOUSE_URL || !readerPassword) {
     const variable = source.CLICKHOUSE_URL ? "CLICKHOUSE_READER_URL" : "CLICKHOUSE_URL";
@@ -866,28 +896,40 @@ function sharedReader({ source }: { source: Readonly<Record<string, string | und
     };
   }
   const enforcingPassword = passwordOf(source.CLICKHOUSE_ENFORCING_READER_URL);
+  const writerVariable = "CLICKHOUSE_WRITER_URL";
+  const writer = writerOf({
+    url: source.CLICKHOUSE_WRITER_URL,
+    variable: writerVariable,
+    target: SHARED_APP_READER_TARGET,
+  });
   const target: AppReaderTarget = {
     target: SHARED_APP_READER_TARGET,
     adminUrl: source.CLICKHOUSE_URL,
     readerPassword,
     ...(enforcingPassword ? { enforcingPassword } : {}),
+    ...(writer.writerPassword ? { writerPassword: writer.writerPassword } : {}),
     enforce: tenancySwitch === "enforce",
     mode: selfProvisioning.accessModelMode({ source: { ...source } }),
   };
   const variable = "CLICKHOUSE_READER_URL";
   return {
-    candidates: [{ target, variable, enforceVariable: TENANCY_ENFORCE_VARIABLE }],
-    unprovisioned: [],
+    candidates: [{ target, variable, enforceVariable: TENANCY_ENFORCE_VARIABLE, writerVariable }],
+    unprovisioned: writer.unprovisioned,
   };
 }
 
 function routedReaders({
   system,
   reader,
+  writer,
+  writerHeld,
   enforce,
 }: {
   system: ReturnType<typeof routesOf>;
   reader: ReturnType<typeof routesOf>;
+  writer: ReturnType<typeof routesOf>;
+  /** A writer variable is set, so every routed server needs the writer too. */
+  writerHeld: boolean;
   enforce: ReturnType<typeof routeEnforceOf>;
 }): { candidates: AppReaderCandidate[]; unprovisioned: UnprovisionedAppReader[] } {
   const candidates: AppReaderCandidate[] = [];
@@ -899,10 +941,16 @@ function routedReaders({
     if (!readerPassword) unprovisioned.push({ target: organizationId, variable });
     else if (unreadable) unprovisioned.push({ target: organizationId, variable: unreadable });
     else {
+      const writerVariable = variableOf({ prefix: WRITER_ROUTE_PREFIX, organizationId, label });
+      const writerPassword = passwordOf(writer.get(organizationId)?.url);
+      if (writerHeld && !writerPassword) {
+        unprovisioned.push({ target: organizationId, variable: writerVariable });
+      }
       const target: AppReaderTarget = {
         target: organizationId,
         adminUrl: url,
         readerPassword,
+        ...(writerPassword ? { writerPassword } : {}),
         enforce: enforce.enforced.has(organizationId),
         mode: "sql",
       };
@@ -911,10 +959,10 @@ function routedReaders({
         organizationId,
         label,
       });
-      candidates.push({ target, variable, enforceVariable });
+      candidates.push({ target, variable, enforceVariable, writerVariable });
     }
   }
-  for (const [organizationId, { label }] of reader) {
+  for (const [organizationId, { label }] of new Map([...writer, ...reader])) {
     if (system.has(organizationId)) continue;
     const variable = variableOf({ prefix: SYSTEM_ROUTE_PREFIX, organizationId, label });
     unprovisioned.push({ target: organizationId, variable });
@@ -926,13 +974,15 @@ function routedReaders({
 function onePerServer(candidates: readonly AppReaderCandidate[]): AppReaderWalk {
   const targets: AppReaderTarget[] = [];
   const unprovisioned: UnprovisionedAppReader[] = [];
-  for (const { target, variable, enforceVariable } of candidates) {
+  for (const { target, variable, enforceVariable, writerVariable } of candidates) {
     const held = targets.find((other) => other.adminUrl === target.adminUrl);
     if (!held) targets.push(target);
     else if (held.readerPassword !== target.readerPassword) {
       unprovisioned.push({ target: target.target, variable });
     } else if (held.enforce !== target.enforce) {
       unprovisioned.push({ target: target.target, variable: enforceVariable });
+    } else if (held.writerPassword !== target.writerPassword) {
+      unprovisioned.push({ target: target.target, variable: writerVariable });
     }
   }
   return { targets, unprovisioned };
@@ -940,7 +990,8 @@ function onePerServer(candidates: readonly AppReaderCandidate[]): AppReaderWalk 
 
 /**
  * Every server the router knows, as goose walks them: the shared one and each private route,
- * once per admin URL. A process holding no reader walks none, so its upgrade is unchanged.
+ * once per admin URL, the writer beside each reader. A process holding neither a reader nor a
+ * writer walks none, so its upgrade is unchanged.
  */
 export function planAppReaderWalk({
   source,
@@ -948,11 +999,17 @@ export function planAppReaderWalk({
   source: Readonly<Record<string, string | undefined>>;
 }): AppReaderWalk {
   const reader = routesOf({ source, prefix: READER_ROUTE_PREFIX });
-  if (!source.CLICKHOUSE_READER_URL && reader.size === 0) return { targets: [], unprovisioned: [] };
+  const writer = routesOf({ source, prefix: WRITER_ROUTE_PREFIX });
+  const writerHeld = Boolean(source.CLICKHOUSE_WRITER_URL) || writer.size > 0;
+  if (!source.CLICKHOUSE_READER_URL && reader.size === 0 && !writerHeld) {
+    return { targets: [], unprovisioned: [] };
+  }
   const shared = sharedReader({ source });
   const routed = routedReaders({
     system: routesOf({ source, prefix: SYSTEM_ROUTE_PREFIX }),
     reader,
+    writer,
+    writerHeld,
     enforce: routeEnforceOf({ source }),
   });
   const walk = onePerServer([...shared.candidates, ...routed.candidates]);
@@ -981,6 +1038,13 @@ export function appReaderInputOf(target: AppReaderTarget): {
   };
 }
 
+/** The definition service's writer input for one target: its hash, where it holds a writer. */
+export function appWriterInputOf(target: AppReaderTarget): { appWriter?: AppWriterInput } {
+  return target.writerPassword
+    ? { appWriter: { passwordSha256Hex: sha256Hex(target.writerPassword) } }
+    : {};
+}
+
 /** The reader's DDL on one server, in shadow unless its switch is on (ADR-202 Decided 4). */
 async function convergeAppReaderTarget({
   target,
@@ -1003,6 +1067,7 @@ async function convergeAppReaderTarget({
   const statements = accessModelDefinition.renderAppReaderDdl({
     sourceDatabase,
     appReader: appReaderInputOf(target),
+    ...appWriterInputOf(target),
   });
   await withProvisioningRepository({
     open: () => open(target.adminUrl),
@@ -1021,7 +1086,12 @@ async function convergeAppReaderTarget({
     },
   });
   logger.info(
-    { target: target.target, sourceDatabase, enforce: target.enforce },
+    {
+      target: target.target,
+      sourceDatabase,
+      enforce: target.enforce,
+      writer: target.writerPassword !== undefined,
+    },
     target.enforce ? "app reader provisioned, enforcing" : "app reader provisioned in shadow",
   );
 }

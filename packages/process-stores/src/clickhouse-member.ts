@@ -381,15 +381,20 @@ function connectIdentities({
   // The password file is the system user's; the reader's credential is in its URL.
   const system = identities.system && connect(identities.system, sharedPasswordFile);
   const reader = identities.reader && connect(identities.reader, undefined);
+  // The writer only where the system is absent: beside it, every insert goes as the system.
+  const writer =
+    identities.system === undefined && identities.writer
+      ? connect(identities.writer, undefined)
+      : undefined;
   const enforcingIdentity = enforcingReaderIdentityOf({ config });
   const enforcing = enforcingIdentity && connect(enforcingIdentity, undefined);
-  const connections = [system, reader, enforcing].filter((each) => each !== undefined);
+  const connections = [system, reader, writer, enforcing].filter((each) => each !== undefined);
   const [connection] = connections;
   const configuration = identities.system ?? identities.reader;
   if (connection === undefined || configuration === undefined) {
     throw new Error("ClickHouse names no endpoint for the system or the reader identity.");
   }
-  return { system, reader, enforcing, connections, connection, configuration };
+  return { system, reader, writer, enforcing, connections, connection, configuration };
 }
 
 /**
@@ -402,7 +407,7 @@ export function buildClickHouse(options: {
   directory: TenantDirectory;
 }): BuiltMember<ClickHouseQueryClient> {
   const { config } = options;
-  const { system, reader, enforcing, connections, connection, configuration } =
+  const { system, reader, writer, enforcing, connections, connection, configuration } =
     connectIdentities(options);
   const routes = system === undefined ? config.readerPrivateRoutes : config.privateRoutes;
   const malformedRoutes =
@@ -435,6 +440,7 @@ export function buildClickHouse(options: {
   const client = new ClickHouseQueryClient({
     driver: system && routingDriver(system),
     readerDriver: reader && routingDriver(reader),
+    writerDriver: writer && routingDriver(writer),
     tenantGuard: skippedTenantChecks(),
     retries: new RetryPolicy({
       transientMessageFragments: CLICKHOUSE_STATEMENT_RETRY_MESSAGE_FRAGMENTS,

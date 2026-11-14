@@ -52,11 +52,12 @@ interface LwqlProfileSetting {
   readonly constraint: "const" | "changeable_in_readonly";
 }
 
-/** A SELECT grant; `columns` narrows it to a column list. */
+/** A SELECT grant, or an INSERT one; `columns` narrows a SELECT to a column list. */
 interface LwqlGrantTarget {
   readonly database: string;
   readonly table: string;
   readonly columns?: readonly string[];
+  readonly privilege?: "INSERT";
 }
 
 interface LwqlRowPolicyTarget {
@@ -83,6 +84,8 @@ export interface LwqlAccessModelDefinition extends LwqlAccessIdentity {
   readonly appReader?: LwqlAccessIdentity;
   /** The shadow sampler's reader: the app reader's policies with enforce pinned on. */
   readonly appReaderEnforcing?: LwqlAccessIdentity;
+  /** The api's insert-only writer (ADR-202 Decided 12), once its credential is supplied. */
+  readonly appWriter?: LwqlAccessIdentity;
 }
 
 /** The shadow sampler's identity (ADR-202 Rollout 3), named after the app reader it checks. */
@@ -90,6 +93,28 @@ export const APP_READER_ENFORCING_NAMES = {
   user: `${APP_READER_NAMES.user}_enforcing`,
   settingsProfile: `${APP_READER_NAMES.user}_enforcing_profile`,
 } as const;
+
+/** The api's insert-only writer (ADR-202 Decided 12), named beside the app reader. */
+export const APP_WRITER_NAMES = {
+  user: "langwatch_app_writer",
+  settingsProfile: "langwatch_app_writer_profile",
+} as const;
+
+/**
+ * The tables the api's three inserts write, and nothing else: the governance OTLP spend debit,
+ * `POST /api/dspy/log_steps` and the instant-eval run create. Two feed views, which on 26.8
+ * check the inserter's SELECT unless they run as their definer: open, ADR-202 Decided 12.
+ */
+export const APP_WRITER_TABLES: readonly string[] = [
+  "gateway_budget_ledger_events",
+  "dspy_steps",
+  "instant_eval_runs",
+];
+
+/** The writer's input to the emitters: its credential hash alone. */
+export interface AppWriterInput {
+  readonly passwordSha256Hex: string;
+}
 
 export interface RenderedConfigFile {
   readonly relativePath: string;
@@ -140,6 +165,7 @@ function settingYamlValue(setting: LwqlProfileSetting): YamlValue {
 }
 
 function selectClause(grant: LwqlGrantTarget): string {
+  if (grant.privilege === "INSERT") return "INSERT";
   return grant.columns
     ? `SELECT(${grant.columns.map((column) => `\`${column}\``).join(", ")})`
     : "SELECT";
@@ -226,6 +252,14 @@ export class LangWatchQLAccessModelDefinitionService {
     ];
   }
 
+  /** The writer reads nothing, so nothing is the client's to set; caches and introspection off. */
+  appWriterProfileSettings(): LwqlProfileSetting[] {
+    return [
+      { name: "use_query_cache", value: 0, constraint: "const" },
+      { name: "allow_introspection_functions", value: 0, constraint: "const" },
+    ];
+  }
+
   build({
     names,
     passwordSha256Hex,
@@ -235,6 +269,7 @@ export class LangWatchQLAccessModelDefinitionService {
     limits = DEFAULT_LWQL_RESOURCE_LIMITS,
     views = LWQL_VIEW_CATALOG,
     appReader,
+    appWriter,
   }: {
     names: LangWatchQLNames;
     passwordSha256Hex: string;
@@ -252,6 +287,8 @@ export class LangWatchQLAccessModelDefinitionService {
       enforce?: boolean;
       enforcing?: { passwordSha256Hex: string };
     };
+    /** The api's insert-only writer's credential hash (ADR-202 Decided 12). */
+    appWriter?: AppWriterInput;
   }): LwqlAccessModelDefinition {
     return {
       customSettingsPrefix: LWQL_CUSTOM_SETTINGS_PREFIX,
@@ -270,6 +307,7 @@ export class LangWatchQLAccessModelDefinitionService {
             }),
           }
         : {}),
+      ...(appWriter ? { appWriter: this.#appWriter({ ...appWriter, sourceDatabase }) } : {}),
     };
   }
 
@@ -279,12 +317,13 @@ export class LangWatchQLAccessModelDefinitionService {
   }
 
   /**
-   * The app reader alone, and its enforcing twin when given: what a target LangWatchQL is not
-   * provisioned on still needs (ADR-202 Decided 6). The same DDL `renderDdl` renders for them.
+   * The app reader alone, its enforcing twin and the writer when given: what a target LangWatchQL
+   * is not provisioned on still needs (ADR-202 Decided 6, 12). The DDL `renderDdl` renders them.
    */
   renderAppReaderDdl({
     sourceDatabase,
     appReader,
+    appWriter,
   }: {
     sourceDatabase: string;
     appReader: {
@@ -292,9 +331,10 @@ export class LangWatchQLAccessModelDefinitionService {
       enforce?: boolean;
       enforcing?: { passwordSha256Hex: string };
     };
+    appWriter?: AppWriterInput;
   }): string[] {
     sqlText.assertIdentifier(sourceDatabase, "database");
-    return this.#appReaderIdentities({ sourceDatabase, appReader }).flatMap((identity) =>
+    return this.#appReaderIdentities({ sourceDatabase, appReader, appWriter }).flatMap((identity) =>
       this.#identityDdl(identity),
     );
   }
@@ -310,6 +350,7 @@ export class LangWatchQLAccessModelDefinitionService {
   #appReaderIdentities({
     sourceDatabase,
     appReader,
+    appWriter,
   }: Parameters<
     LangWatchQLAccessModelDefinitionService["renderAppReaderDdl"]
   >[0]): LwqlAccessIdentity[] {
@@ -318,6 +359,7 @@ export class LangWatchQLAccessModelDefinitionService {
       ...(appReader.enforcing
         ? [this.#appReaderEnforcing({ ...appReader.enforcing, sourceDatabase })]
         : []),
+      ...(appWriter ? [this.#appWriter({ ...appWriter, sourceDatabase })] : []),
     ];
   }
 
@@ -561,6 +603,34 @@ export class LangWatchQLAccessModelDefinitionService {
     });
   }
 
+  /**
+   * INSERT on each of the api's three tables and no other grant; the implicitly granted system
+   * tables hidden by a policy admitting no row, so the writer reads nothing at all.
+   */
+  #appWriter({
+    passwordSha256Hex,
+    sourceDatabase,
+  }: {
+    passwordSha256Hex: string;
+    sourceDatabase: string;
+  }): LwqlAccessIdentity {
+    return {
+      user: { name: APP_WRITER_NAMES.user, passwordSha256Hex },
+      profile: {
+        name: APP_WRITER_NAMES.settingsProfile,
+        settings: this.appWriterProfileSettings(),
+      },
+      grants: APP_WRITER_TABLES.map((table) => ({
+        database: sourceDatabase,
+        table,
+        privilege: "INSERT" as const,
+      })),
+      rowPolicies: this.#hiddenSystemTablePolicies({
+        policyName: (table) => accessModel.appWriterHiddenPolicyName(table),
+      }),
+    };
+  }
+
   #tenantReader({
     names,
     passwordSha256Hex,
@@ -610,9 +680,12 @@ const APP_READER_SERVER_METADATA_GRANTS: readonly LwqlGrantTarget[] = [
   { database: "system", table: "server_settings" },
 ];
 
-/** LangWatchQL's identity first, then each reader the definition carries. */
+/** LangWatchQL's identity first, then each reader the definition carries, then the writer. */
 function identitiesOf(definition: LwqlAccessModelDefinition): LwqlAccessIdentity[] {
-  return [definition, definition.appReader, definition.appReaderEnforcing].filter(
-    (identity) => identity !== undefined,
-  );
+  return [
+    definition,
+    definition.appReader,
+    definition.appReaderEnforcing,
+    definition.appWriter,
+  ].filter((identity) => identity !== undefined);
 }

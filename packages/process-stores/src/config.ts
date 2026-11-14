@@ -59,6 +59,15 @@ export interface ClickHouseConfig {
   readonly readerPrivateRoutes?: readonly ClickHousePrivateRoute[];
   /** Reader route variables that did not parse: refused, never shared. */
   readonly malformedReaderRoutes?: readonly MalformedPrivateVariable[];
+  /**
+   * `CLICKHOUSE_WRITER_URL` — the shared server as the insert-only writer (ADR-202 Decided 12).
+   * Connected only where the system identity is absent: the api's inserts go as the writer.
+   */
+  readonly writerUrl?: string;
+  /** `CLICKHOUSE_WRITER_URL__<label>__<orgId>`: each private server as the writer. */
+  readonly writerPrivateRoutes?: readonly ClickHousePrivateRoute[];
+  /** Writer route variables that did not parse: refused, never shared. */
+  readonly malformedWriterRoutes?: readonly MalformedPrivateVariable[];
   /** `CLICKHOUSE_ENFORCING_READER_URL`: the shared server as the shadow sampler's reader. */
   readonly enforcingReaderUrl?: string;
   /** `CLICKHOUSE_SHADOW_SAMPLE_RATE`: share of reader reads re-run enforced; 0 samples none. */

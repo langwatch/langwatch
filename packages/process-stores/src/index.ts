@@ -46,6 +46,7 @@ export {
   clickhouseRouteFamilyOf,
   clickhouseRoutesOf,
   READER_ROUTE_ENV_PREFIX,
+  WRITER_ROUTE_ENV_PREFIX,
 } from "./clickhouse-routes.ts";
 export { OverloadedRefusal, StatementBoundTelemetry } from "./clickhouse-member.ts";
 export { memoryObjectStorage } from "./object-storage-memory.ts";
