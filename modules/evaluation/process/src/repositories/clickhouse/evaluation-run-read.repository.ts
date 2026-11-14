@@ -60,14 +60,16 @@ const inputsRowsSchema = z.array(inputsRowSchema);
 const logger = createLogger("langwatch:evaluation:clickhouse.evaluation-run-read");
 
 /**
- * The attempt columns goose 00122 adds, each with the default it reads as until the tenant's
- * target has it (`ClickHouseColumns.select`, NO-HOLDS, ARCHITECTURE.md section 7).
+ * The columns goose 00122 (attempts) and 00131 (IdLayout) add, each with the default it reads
+ * as until the tenant's target has it (`ClickHouseColumns.select`, NO-HOLDS, ARCHITECTURE.md
+ * section 7). A NULL IdLayout reads as "v1-legacy".
  */
-const ATTEMPT_COLUMNS = {
+const LATE_COLUMNS = {
   Attempts: "toUInt16(0)",
   LastAttemptAt: "CAST(NULL AS Nullable(DateTime64(3)))",
   LastAttemptError: "CAST(NULL AS Nullable(String))",
   NextAttemptAt: "CAST(NULL AS Nullable(DateTime64(3)))",
+  IdLayout: "CAST(NULL AS Nullable(String))",
 } as const;
 
 /** The attempt moments in epoch ms, read off the attempt columns' aliases. */
@@ -191,7 +193,7 @@ export class EvaluationRunClickHouseReadRepository {
     authorization: Authorization;
     alias: string;
   }): Promise<string> {
-    const input = { table: TABLE_NAME, alias, columns: ATTEMPT_COLUMNS };
+    const input = { table: TABLE_NAME, alias, columns: LATE_COLUMNS };
     const { resolveQueryClient } = this.options;
     if (!resolveQueryClient) return ClickHouseColumns.named(input);
     const tenantId = ownProjectIdOf({ authorization, reads: "traces" });
@@ -640,6 +642,7 @@ export class EvaluationRunClickHouseReadRepository {
       lastAttemptAt: toNumberOrNull(row.LastAttemptAtMs ?? null),
       lastAttemptError: row.LastAttemptError ?? null,
       nextAttemptAt: toNumberOrNull(row.NextAttemptAtMs ?? null),
+      idLayout: row.IdLayout ?? "v1-legacy",
     });
   }
 }

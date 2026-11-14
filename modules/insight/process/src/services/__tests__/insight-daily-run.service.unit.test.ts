@@ -115,9 +115,19 @@ describe("given Langy's turn outlasts the run's deadline", () => {
         filedCount: 0,
         renewedCount: 0,
         conversationId: "conversation-1",
+        idLayout: "v2",
       },
     ]);
     expect(filed).toEqual([]);
+  });
+
+  /** @scenario "A new run's outcome records the v2 key layout" */
+  it("names the v2 key layout on the outcome it records", async () => {
+    const { service, settled } = harness();
+
+    await service.run(RUN);
+
+    expect(settled.map(({ idLayout }) => idLayout)).toEqual(["v2"]);
   });
 
   it("records the outcome even when the turn cannot be stopped", async () => {

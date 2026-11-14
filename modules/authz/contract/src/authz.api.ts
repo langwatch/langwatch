@@ -314,17 +314,21 @@ export interface AuthzApi {
     permission: AuthzPermission;
   }): Promise<boolean>;
   /**
-   * Deterministic grant id to deduplicate replays and prevent drift from
-   * reimplementation across modules (ADR-092 s13).
+   * The deterministic grant id a writer that may run twice attaches under (ADR-092 s13): the
+   * stored one when a grant already holds either layout's id, revoked or not, else a new v2 id.
+   * A revoked grant is never minted afresh beside itself.
    */
-  deriveGrantId(input: {
-    organizationId: string;
-    principal: authzGrantEventsModule.LedgerPrincipal;
-    scope: authzGrantEventsModule.LedgerScope;
-    resourceToken?: string;
-    occurredAtMs: number;
-  }): string;
+  resolveGrantId(input: AuthzGrantIdInput): Promise<string>;
 }
+
+/** What a deterministic grant id is derived from. */
+export type AuthzGrantIdInput = {
+  organizationId: string;
+  principal: authzGrantEventsModule.LedgerPrincipal;
+  scope: authzGrantEventsModule.LedgerScope;
+  resourceToken?: string;
+  occurredAtMs: number;
+};
 
 export const AuthzApi = moduleApi<AuthzApi>()("authz");
 

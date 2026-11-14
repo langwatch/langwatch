@@ -40,7 +40,11 @@ describe("planning a user's identifiers from their legacy rows", () => {
   describe("given an Auth0 row naming a Google identity and a real Google row", () => {
     /** @scenario "Each account row is adopted under its own issuer, beside a real native row" */
     it("plans one identifier per row under that row's own provider and issuer", () => {
-      const planned = plans.planIdentifiers({ user: sam, accounts: [auth0Row, googleRow] });
+      const planned = plans.planIdentifiers({
+        user: sam,
+        accounts: [auth0Row, googleRow],
+        storedIdentifierIds: new Set(),
+      });
 
       expect(
         planned
@@ -72,7 +76,11 @@ describe("planning a user's identifiers from their legacy rows", () => {
   describe("given only the Auth0 row", () => {
     /** @scenario "An Auth0 row with nothing beside it plans one identifier under its own issuer" */
     it("plans the email and the Auth0 identifier, and derives no Google one", () => {
-      const planned = plans.planIdentifiers({ user: sam, accounts: [auth0Row] });
+      const planned = plans.planIdentifiers({
+        user: sam,
+        accounts: [auth0Row],
+        storedIdentifierIds: new Set(),
+      });
 
       expect(planned.map((plan) => plan.providerId)).toEqual([null, "auth0"]);
       expect(planned[1]?.issuer).toBe("https://acme.eu.auth0.com/");

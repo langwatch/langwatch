@@ -3,6 +3,7 @@
  * event names the person and the board, so each can be read, and folded, on its own.
  */
 
+import { KSUID_LAYOUTS } from "@langwatch/ksuid";
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
@@ -62,6 +63,11 @@ const insightRunSettledEventDataSchemaDefinition = z.object({
   filedCount: z.number().int().nonnegative(),
   renewedCount: z.number().int().nonnegative().default(0),
   conversationId: z.string().min(1).nullable(),
+  /**
+   * The run's audit key layout. An event stored before it, or by an older release, has none and
+   * reads as v1-legacy, so its key never changes (#9575).
+   */
+  idLayout: z.enum(KSUID_LAYOUTS).nullish(),
 });
 export interface InsightRunSettledEventDataSchema extends Named<
   typeof insightRunSettledEventDataSchemaDefinition

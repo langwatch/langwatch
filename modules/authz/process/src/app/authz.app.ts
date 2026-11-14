@@ -156,7 +156,8 @@ export class AuthzModule implements AuthzApi {
   static readonly config = authzServerConfig;
   static readonly publicConfig = authzBrowserConfig.project;
   #permissions: AuthzPermissions;
-  #grantIdentity = AuthzGrantIdentityService.create();
+  /** Absent on an app built by {@link AuthzModule.fromServices}, which composes no grant reads. */
+  #grantIdentity: AuthzGrantIdentityService | undefined;
   #grants: AuthzGrantsService;
   /**
    * Both absent on an app built by {@link AuthzModule.fromServices}: a hand
@@ -225,6 +226,7 @@ export class AuthzModule implements AuthzApi {
       projectMembers?: AuthzProjectMembersService;
       braidTargets?: AuthzBraidTargetsService;
       memberOffboardings?: AuthzMemberOffboardedNoticeService;
+      grantIdentity?: AuthzGrantIdentityService;
       braidRelease?: AuthzBraidReleaseService;
       eventing?: Readonly<{
         pipeline: AuthzPipeline;
@@ -251,6 +253,7 @@ export class AuthzModule implements AuthzApi {
     this.#projectMembers = options.projectMembers;
     this.#braidTargets = options.braidTargets;
     this.#memberOffboardings = options.memberOffboardings;
+    this.#grantIdentity = options.grantIdentity;
     this.#braidRelease = options.braidRelease;
   }
 
@@ -429,6 +432,7 @@ export class AuthzModule implements AuthzApi {
       projectMembers,
       braidTargets,
       memberOffboardings,
+      grantIdentity: AuthzGrantIdentityService.create({ grants: repositories.ledgerReads }),
       braidRelease,
       eventing: { pipeline, dispatcher },
     });
@@ -612,11 +616,11 @@ export class AuthzModule implements AuthzApi {
     return this.#permissions.hasPermission(a);
   }
   /**
-   * The one derivation, answered for every module that writes a binding it
-   * does not own the ledger for. It reads nothing and awaits nothing: the id
-   * is a function of the grant's own content.
+   * The one grant id, answered for every module that writes a binding it does
+   * not own the ledger for: derived from the grant's own content, and the
+   * stored one reused, revoked or not.
    */
-  deriveGrantId: AuthzApi["deriveGrantId"] = (a) => this.#grantIdentity.deriveGrantId(a);
+  resolveGrantId: AuthzApi["resolveGrantId"] = (a) => this.grantIdentity().resolveGrantId(a);
   revoke: AuthzApi["revoke"] = (a) => this.#grants.revoke(a);
   offboard: AuthzApi["offboard"] = (a) => this.#grants.offboard(a);
   invalidateOrganization: AuthzApi["invalidateOrganization"] = (a) =>
@@ -816,6 +820,16 @@ export class AuthzModule implements AuthzApi {
       );
     }
     return this.#braids;
+  }
+
+  private grantIdentity(): AuthzGrantIdentityService {
+    if (!this.#grantIdentity) {
+      throw new Error(
+        "This AuthzModule was composed from already-built services, so it holds no grant reads: " +
+          "compose it through AuthzModule.create to resolve a grant id.",
+      );
+    }
+    return this.#grantIdentity;
   }
 
   private admissions(): AuthzAdmissionService {

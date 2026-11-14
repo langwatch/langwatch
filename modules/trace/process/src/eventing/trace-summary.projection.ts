@@ -220,6 +220,8 @@ export class TraceSummaryFoldProjection
       attributes: {},
       // storageAnchorMs frozen on first contribution (ADR-087)
       storageAnchorMs: 0,
+      // A trace never stored mints its id in the corrected layout (#9575)
+      idLayout: "v2",
       // events/costs removed (O(n^2) perf); occurredAt used for first-span detection
       occurredAt: 0,
     };

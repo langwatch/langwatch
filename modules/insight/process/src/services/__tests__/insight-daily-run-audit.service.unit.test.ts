@@ -86,6 +86,20 @@ describe("given a run's recorded outcome", () => {
       expect(key.date.getTime()).toBe(Math.floor(RUN.slot / 1000) * 1000);
     });
 
+    /** @scenario "A new run's outcome delivered twice writes one audit line in the v2 layout" */
+    it("carries one v2 key both times when the outcome names the v2 layout", async () => {
+      const { written, record } = harness();
+
+      await record({ idLayout: "v2" });
+      await record({ idLayout: "v2" });
+      const [first, second] = written.map(({ idempotencyKey }) => idempotencyKey ?? "");
+      const key = parse(first ?? "");
+
+      expect(second).toBe(first);
+      expect(key.layout).toBe("v2");
+      expect(key.date.getTime()).toBe(Math.floor(RUN.slot / 1000) * 1000);
+    });
+
     it("names another line for another run, and for the same run id on another schedule", async () => {
       const { written, record } = harness();
 
@@ -103,6 +117,23 @@ describe("given a run's recorded outcome", () => {
       const resources = written.map(({ idempotencyKey }) => parse(idempotencyKey ?? "").resource);
 
       expect(new Set(resources)).toEqual(new Set(["audit"]));
+    });
+  });
+
+  describe("when the outcome was stored before key layouts were recorded", () => {
+    /** @scenario "An outcome stored before key layouts were recorded keeps its legacy audit key" */
+    it("writes the v1-legacy key that outcome always had", async () => {
+      const { written, record } = harness();
+
+      await record();
+      await record({ idLayout: null });
+      await record({ idLayout: "v2" });
+      const [absent, nulled, v2] = written.map(({ idempotencyKey }) => idempotencyKey ?? "");
+
+      expect(nulled).toBe(absent);
+      expect(parse(absent ?? "").layout).toBe("v1-legacy");
+      expect(parse(absent ?? "").date.getTime()).toBe(Math.floor(RUN.slot / 1000) * 1000);
+      expect(v2).not.toBe(absent);
     });
   });
 });

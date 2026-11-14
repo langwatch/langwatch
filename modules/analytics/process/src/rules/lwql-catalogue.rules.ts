@@ -201,6 +201,7 @@ export const LWQL_TRACES_CATALOGUE = defineTableCatalogue({
   access: { allOf: ["analytics:view", "traces:view"] },
   columns: {
     ProjectionId: "omit",
+    IdLayout: "omit",
     TenantId: "inherit",
     TraceId: "inherit",
     Version: "omit",

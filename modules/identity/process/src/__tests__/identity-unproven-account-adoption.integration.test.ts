@@ -339,6 +339,7 @@ function projectionWrites(prisma: PrismaClient) {
         providerAccountId: data.providerAccountId,
         normalizedValue: value,
         occurredAtMs: data.occurredAtMs,
+        storedIdentifierIds: new Set(),
       });
       await prisma.identifier.upsert({
         where: { id },

@@ -12,6 +12,7 @@ import {
   type WindowFallback,
 } from "@langwatch/clickhouse-client";
 import { EventUtils, SecurityError } from "@langwatch/eventing";
+import type { KsuidLayout } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { ATTR_KEYS } from "@langwatch/span-normalisation";
 import { nowInstant, toDate } from "@langwatch/time";
@@ -782,6 +783,8 @@ interface ClickHouseSpanRecord {
   CreatedAt: number;
   UpdatedAt: number;
   _retention_days: number;
+  /** KSUID byte layout of ProjectionId; NULL on rows written before goose 00130. */
+  IdLayout: KsuidLayout | null;
 }
 
 /** The columns {@link SpanStorageClickHouseRepository.findStoredSpansByTraceId} selects. */
@@ -2036,6 +2039,8 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       CreatedAt: toDate(nowInstant()),
       UpdatedAt: toDate(nowInstant()),
       _retention_days: span.retentionDays ?? PLATFORM_DEFAULT_RETENTION_DAYS,
+      // The decoder mints every span id at v2 (span-record-identity.ts, #9575)
+      IdLayout: "v2",
     } satisfies ClickHouseSpanWriteRecord;
   }
 

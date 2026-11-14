@@ -1,3 +1,4 @@
+import { KSUID_LAYOUTS } from "@langwatch/ksuid";
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
@@ -48,6 +49,11 @@ const evaluationRunDataSchemaDefinition = z.object({
   lastAttemptError: z.string().nullable().optional(),
   /** When the next attempt is due; null once the run ends. */
   nextAttemptAt: z.number().nullable().optional(),
+  /**
+   * KSUID byte layout of the stored row's ProjectionId; absent reads as
+   * "v1-legacy" so a row written before the column keeps its id (#9575).
+   */
+  idLayout: z.enum(KSUID_LAYOUTS).optional(),
 });
 export interface EvaluationRunDataSchema extends Named<typeof evaluationRunDataSchemaDefinition> {}
 export const evaluationRunDataSchema: EvaluationRunDataSchema = evaluationRunDataSchemaDefinition;
