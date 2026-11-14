@@ -1,10 +1,11 @@
 /**
- * Table body for virtualized rows; the virtualizer state lives here so a
- * scroll re-renders the body, not the whole table.
+ * Memoized table body for virtualized rows, extracted to prevent the
+ * entire EvaluationsV3Table re-rendering on every scroll event — the
+ * virtualizer state is contained here.
  */
 import type { Row } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { useEffect } from "react";
+import React, { useCallback, useEffect } from "react";
 
 import { type DatasetTableRowData, useDatasetTable } from "../../model/dataset-table-context.tsx";
 import { TableCell } from "../elements/table-cell.tsx";
@@ -28,8 +29,11 @@ type VirtualizedTableBodyProps<TData extends DatasetTableRowData> = {
   trailingSpacerWidth?: number;
 };
 
-/** Renders every row, or only the visible window once the dataset is large. */
-export function VirtualizedTableBody<TData extends DatasetTableRowData>({
+/**
+ * Memoized table body component that manages its own virtualizer state.
+ * This prevents the parent component from re-rendering on scroll.
+ */
+function VirtualizedTableBodyImpl<TData extends DatasetTableRowData>({
   rows,
   scrollContainer,
   columnCount,
@@ -41,8 +45,9 @@ export function VirtualizedTableBody<TData extends DatasetTableRowData>({
   displayRowCount,
   trailingSpacerWidth,
 }: VirtualizedTableBodyProps<TData>) {
-  const getScrollElement = () => scrollContainer;
-  const estimateSize = () => COMPACT_ROW_HEIGHT;
+  // Stable callbacks for virtualizer
+  const getScrollElement = useCallback(() => scrollContainer, [scrollContainer]);
+  const estimateSize = useCallback(() => COMPACT_ROW_HEIGHT, []);
 
   // Set up row virtualization (contained in this component to prevent parent re-renders)
   const rowVirtualizer = useVirtualizer({
@@ -170,10 +175,21 @@ function useScrollToSelectedRow({
   rowVirtualizer: ReturnType<typeof useVirtualizer<HTMLElement, Element>>;
   enabled: boolean;
 }) {
-  const selectedRow = useDatasetTable().selectedCell?.row;
+  const { selectedCell } = useDatasetTable();
+  // Any move, a row or only a column, can land on a row scrolled out of the window.
   useEffect(() => {
-    if (!enabled || selectedRow === undefined) return;
-    const isRendered = rowVirtualizer.getVirtualItems().some((item) => item.index === selectedRow);
-    if (!isRendered) rowVirtualizer.scrollToIndex(selectedRow, { align: "auto" });
-  }, [enabled, selectedRow, rowVirtualizer]);
+    if (!enabled || !selectedCell) return;
+    const { row } = selectedCell;
+    const isRendered = rowVirtualizer.getVirtualItems().some((item) => item.index === row);
+    if (!isRendered) rowVirtualizer.scrollToIndex(row, { align: "auto" });
+  }, [enabled, selectedCell, rowVirtualizer]);
 }
+
+/**
+ * Memoized by hand: the React Compiler skips components using TanStack
+ * Table/Virtual, so without this every editor render repaints every row.
+ * The cast keeps the generic row type, which React.memo would otherwise erase.
+ */
+export const VirtualizedTableBody = React.memo(
+  VirtualizedTableBodyImpl,
+) as typeof VirtualizedTableBodyImpl;
