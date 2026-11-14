@@ -109,7 +109,11 @@ function SearchStatus({
 }) {
   if (search.isError) {
     return (
-      <HandledErrorAlert error={search.error} fallbackTitle={`Couldn't search ${PLURAL[kind]}`} />
+      <HandledErrorAlert
+        error={search.error}
+        fallbackTitle={`Couldn't search ${PLURAL[kind]}`}
+        onRetry={() => void search.refetch()}
+      />
     );
   }
   if (!enabled || found > 0) return null;
