@@ -27,6 +27,11 @@ Feature: An npx install makes no outbound calls beyond license sync and usage re
     And RAGAS analytics are off
 
   @unit
+  Scenario: nlpgo reads the model catalog the app ships with
+    When the launcher starts nlpgo
+    Then the process env points LANGWATCH_MODEL_CATALOG_DIR at the app's model catalog
+
+  @unit
   Scenario: A value in the user's .env overrides a default
     Given the user's .env sets TIKTOKENS_PATH or RAGAS_DO_NOT_TRACK
     When the launcher starts the service

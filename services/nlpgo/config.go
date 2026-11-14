@@ -41,6 +41,9 @@ type Config struct {
 
 	// LangWatchEndpoint is where customer studio traces route (see configureNLPGoOTel).
 	LangWatchEndpoint string `env:"LANGWATCH_ENDPOINT"`
+	// ModelCatalogDir is where the image copies LangWatch's model catalog. Empty
+	// reads the checkout's (a development run).
+	ModelCatalogDir string `env:"LANGWATCH_MODEL_CATALOG_DIR"`
 	// SpanSync swaps the per-tenant batch processor for a synchronous one so
 	// integration tests can assert on persisted spans (nlpgo-eval-trace-id-roundtrip).
 	// Production leaves it off: batching keeps the hot path off collector RTT.
