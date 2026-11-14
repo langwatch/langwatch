@@ -5,16 +5,22 @@ import { useCallback, useEffect, useMemo, useState } from "react";
  * probe cannot tell a bad key from a network restriction or provider outage,
  * so the first refusal explains itself and the next Save goes through unprobed.
  * @param customKeys - The credentials as currently entered
+ * @param model - The model the probe asks for (Azure's deployment); changing it re-arms the probe
  * @param resetKey - Resets the refusal when the form targets a new provider
  */
 export function useCredentialProbeGate({
   customKeys,
+  model,
   resetKey,
 }: {
   customKeys: Record<string, string>;
+  model?: string;
   resetKey?: string;
 }) {
-  const credentialsFingerprint = useMemo(() => JSON.stringify(customKeys), [customKeys]);
+  const credentialsFingerprint = useMemo(
+    () => JSON.stringify(model ? { customKeys, model } : customKeys),
+    [customKeys, model],
+  );
   const [refusedCredentials, setRefusedCredentials] = useState<string | null>(null);
 
   // The component instance survives the drawer being reopened on a different

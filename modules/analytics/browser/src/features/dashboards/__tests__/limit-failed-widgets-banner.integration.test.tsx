@@ -95,7 +95,7 @@ const BANNER = "limit-failed-widgets-banner";
 const LIMIT_WORDS =
   "LangWatch limits the memory and time a widget's query may use. This is not a problem with your data.";
 /** Each card says these only when its failure's code reached it; a lost code reads as unknown. */
-const TIME_LIMIT_WORDS = "The query ran past the time a widget may take.";
+const TIME_LIMIT_WORDS = "This query took longer than 60 s, the most a widget may take.";
 const UNKNOWN_COLUMN_WORDS = "Check the column names against the dataset's columns.";
 
 /** The status the server answers each code with. */
@@ -108,7 +108,9 @@ const HTTP_STATUS = {
 /** The error code each widget id answers with; a widget not listed answers with rows. */
 type Failures = Record<string, keyof typeof HTTP_STATUS>;
 
-/** `dashboardWidgets.update` stores what it is sent, as the server does; an unset list is dropped. */
+/**
+ * `dashboardWidgets.update` stores what it is sent, as the server does; an unset list is dropped.
+ */
 function boardServer(failures: Failures, widgets: readonly StoredWidget[] = WIDGETS) {
   const stored = widgets.map((each) => structuredClone(each));
   return (call: UiProcedureCall): Promise<unknown> => {
@@ -208,7 +210,9 @@ class AddressedHost extends StubAnalyticsHost {
   }
 }
 
-/** The board under a new host object for each address, as the router hands one; the editor opens. */
+/**
+ * The board under a new host object for each address, as the router hands one; the editor opens.
+ */
 function AddressedBoard({ host }: { host: AddressedHost }) {
   const [atAddress, setAtAddress] = useState(host);
   useEffect(() => {

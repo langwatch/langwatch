@@ -1,5 +1,7 @@
 import type { AuthzAdmissionRepository } from "./authz-admission.repository.ts";
 import type { AuthzAuditTrailRepository } from "./authz-audit-trail.repository.ts";
+import type { AuthzBillingGrantRepository } from "./authz-billing-grant.repository.ts";
+import type { AuthzBraidLockRepository } from "./authz-braid-lock.repository.ts";
 import type { AuthzCutoverRepository } from "./authz-cutover.repository.ts";
 import type { AuthzEpochRepository } from "./authz-epoch.repository.ts";
 import type { AuthzGrantProjectionRepository } from "./authz-grant-projection.repository.ts";
@@ -9,6 +11,7 @@ import type { AuthzListingRepository } from "./authz-listing.repository.ts";
 import type { AuthzManagedGrantRepository } from "./authz-managed-grant.repository.ts";
 import type { AuthzMembershipStampRepository } from "./authz-membership-stamp.repository.ts";
 import type { AuthzMigrationRepository } from "./authz-migration.repository.ts";
+import type { AuthzOrganizationPolicyRepository } from "./authz-organization-policy.repository.ts";
 import type { AuthzPlatformGrantRepository } from "./authz-platform-grant.repository.ts";
 import type { AuthzReadRepository } from "./authz-read.repository.ts";
 import type { AuthzRevocationRepository } from "./authz-revocation.repository.ts";
@@ -27,6 +30,7 @@ export interface AuthzRepositories {
   readonly sessionVersions: AuthzSessionVersionRepository;
   readonly auditTrail: AuthzAuditTrailRepository;
   readonly platformGrants: AuthzPlatformGrantRepository;
+  readonly billingGrants: AuthzBillingGrantRepository;
   readonly membershipStamps: AuthzMembershipStampRepository;
   readonly grantProjection: AuthzGrantProjectionRepository;
   readonly revocation: AuthzRevocationRepository;
@@ -37,4 +41,8 @@ export interface AuthzRepositories {
   readonly migration: AuthzMigrationRepository;
   /** What the ledger's read-your-writes hold and the grant writer read. */
   readonly ledgerReads: AuthzLedgerReadRepository;
+  /** Serialises braid writes into one reader (ADR-201 §1). */
+  readonly braidLocks: AuthzBraidLockRepository;
+  /** An organisation's settings, read into its snapshot (ADR-201 §2). */
+  readonly organizationPolicies: AuthzOrganizationPolicyRepository;
 }

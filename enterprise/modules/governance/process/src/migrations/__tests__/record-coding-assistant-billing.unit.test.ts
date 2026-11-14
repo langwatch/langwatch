@@ -16,6 +16,7 @@ import {
 } from "./governance-deploy-steps.fixture.ts";
 
 const STEP_ID = "governance:record-coding-assistant-billing";
+const INGEST_SOURCE_STEP_ID = "governance:record-coding-assistant-ingest-source-billing";
 const ORGANIZATIONS = ["org_a", "org_b", "org_c"] as const;
 const CODEX_OFF_BUNDLED_PLAN = { assistantKind: "codex", bundledPlan: false };
 
@@ -88,6 +89,40 @@ describe("given a worker installing governance", () => {
         await expect(
           billedFacts({ organizationId: "org_c", sourceType: "codex" }),
         ).resolves.toEqual([true]);
+      } finally {
+        await runtime.stop();
+      }
+    });
+  });
+
+  describe("when the ingest source seed runs after the first seed completed", () => {
+    /** @scenario "The ingest source billing seed records the sources added after the first seed" */
+    it("records a billed fact for each Copilot ingest source of a Copilot config", async () => {
+      seedConfigs([
+        {
+          organizationId: "org_a",
+          config: { assistantKind: "github_copilot", bundledPlan: false },
+        },
+      ]);
+      const { runtime, step, billedFacts } = await bootOver();
+      try {
+        const ingestStep = step(INGEST_SOURCE_STEP_ID);
+        expect(ingestStep).toMatchObject({
+          kind: "data",
+          mode: "background",
+          needsOldWritersGone: true,
+        });
+
+        await runStep({ step: ingestStep });
+
+        for (const sourceType of ["copilot_cli", "copilot_app", "copilot_vscode"]) {
+          await expect(billedFacts({ organizationId: "org_a", sourceType })).resolves.toEqual([
+            true,
+          ]);
+        }
+        await expect(
+          billedFacts({ organizationId: "org_b", sourceType: "grok_cli" }),
+        ).resolves.toEqual([false]);
       } finally {
         await runtime.stop();
       }

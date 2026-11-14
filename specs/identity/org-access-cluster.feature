@@ -75,39 +75,62 @@ Feature: Roles and access assignments in one settings surface
 
   # ── The roles themselves ───────────────────────────────────────────────
 
-  Rule: a role card says what the role really grants
+  Rule: a role row says what the role really grants
 
-    @unit
-    Scenario: A predefined role card describes the role it actually is
+    @unit @integration
+    Scenario: A predefined role row describes the role it actually is
       When "ana" opens the roles tab
-      Then Admin, Member and Viewer each carry a sentence in plain words
+      Then Admin, Member, Viewer and Billing each take one line of one bordered list
+      And each line carries a coloured dot, the name and a sentence in plain words
+      And each line says how many permissions the role holds
       And each sentence is true of the permissions that role holds
-      And each card shows permission identifiers the role really grants
-      And each card says how many permissions there are in total
 
     @integration
-    Scenario: A predefined role card counts the people who hold it
+    Scenario: A predefined role row counts the people who hold it
       Given two people hold Admin, one of them through a group
       When "ana" opens the roles tab
-      Then the Admin card says two people hold it
+      Then the Admin line says two people hold it
       And nobody is counted twice for holding it two ways
       And a count that could not be read says so rather than showing a zero
 
     @integration
-    Scenario: A custom role card names who holds it and where
-      Given "acme" has a custom role assigned on a project and through a group
+    Scenario: Billing is the last line of the built-in roles and reads like the others
       When "ana" opens the roles tab
-      Then the card names the role, when it was written and what it grants
+      Then Billing is the last line of the built-in list, under Viewer
+      And it carries its own one-line description of what it can do
+      And neither its line nor its drawer adds a subheading or a chip about seats
+
+    @integration
+    Scenario: A role's drawer says what the role can do
+      When "ana" asks to see what a built-in role can do
+      Then the role's routed drawer opens over the roles page, named on the address
+      And it holds the role's description, its headline permissions and the total
+      And it is never a drawer opened inside another drawer
+
+    @integration
+    Scenario: A custom role's drawer names who holds it and where
+      Given "acme" has a custom role assigned on a project and through a group
+      When a reader opens that role's drawer
+      Then the drawer names the role, when it was written and what it grants
       And it names the project it is in force on
       And it names the people holding it, and the group they hold it through
       And a role nobody holds says so rather than showing an empty strip
 
     @integration
     Scenario: Every permission a role holds can be read in full
-      When "ana" asks to see everything a role grants
+      When "ana" opens a role's drawer
       Then every permission is listed, grouped by the part of the product it
       is about
       And each one carries both its identifier and a sentence
+
+    @integration
+    Scenario: Only a reader who may manage the organization writes roles
+      Given "ana" may manage the organization
+      When she opens the roles tab
+      Then she is offered New role, and Edit on each custom role line
+      And Edit offers to delete the role, confirmed first
+      But a reader who may only view members sees the same lines with no New role or Edit
+      And opens a custom role's drawer from its line instead
 
     @integration
     Scenario: Reading the roles does not depend on a second answer

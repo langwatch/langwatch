@@ -61,7 +61,7 @@ beforeEach(() => {
 
 afterEach(() => cleanup());
 
-function renderPage() {
+function renderPage({ isSaaS = true }: { isSaaS?: boolean } = {}) {
   renderWithDesignSystem(
     <WithStubNavigationHost
       readings={{
@@ -77,7 +77,7 @@ function renderPage() {
         },
         project: { id: "proj_1", name: "Project", slug: "acme" },
         organizationRole: "MEMBER",
-        deployment: { isSaaS: true },
+        deployment: { isSaaS },
         permissions: ["organization:view"],
       }}
     >
@@ -118,6 +118,25 @@ describe("<ShellPageBody/> seat limit banner", () => {
 
       expect(screen.getByTestId("seat-limit-banner")).toHaveTextContent(
         "Over the limit. Contact sales to add seats.",
+      );
+      expect(screen.queryByRole("link", { name: "Compare plans" })).toBeNull();
+    });
+  });
+
+  describe("when a self-hosted install uses more seats than its license holds", () => {
+    /** @scenario "The seat banner on a self-hosted install offers the license, not the plans" */
+    it("offers to manage the license instead of comparing plans", () => {
+      givenSeatLimit({ status: "exceeded", message: "Over the limit.", planType: "ENTERPRISE" });
+
+      renderPage({ isSaaS: false });
+
+      expect(screen.getByTestId("seat-limit-banner")).toHaveTextContent(
+        "Your organization has more members than your license includes Add seats to your license to keep everyone.",
+      );
+      expect(screen.getByTestId("seat-limit-banner")).not.toHaveTextContent("plan");
+      expect(screen.getByRole("link", { name: "Manage license" })).toHaveAttribute(
+        "href",
+        "/settings/license",
       );
       expect(screen.queryByRole("link", { name: "Compare plans" })).toBeNull();
     });

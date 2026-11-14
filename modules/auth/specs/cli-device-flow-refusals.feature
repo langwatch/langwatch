@@ -49,4 +49,4 @@ Feature: CLI device flow refusals keep the RFC 8628 wire
   Scenario: A CLI login is not approved while an operator acts as another member
     Given an operator signed in as a member through impersonation
     When they approve a device code for the member's organization
-    Then it is answered 403 with error "permission_denied" before any membership is read
+    Then it is answered 403 with error "impersonation_cannot_mint_credential" before any membership is read

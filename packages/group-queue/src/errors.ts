@@ -58,9 +58,17 @@ export class QueueStagingClosedError extends GroupQueueError {
   }
 }
 
-/** By name, not class, so a second copy of this package still recognises it. */
+/** Causes followed before giving up, so a cyclic chain cannot spin. */
+const MAX_CAUSE_DEPTH = 8;
+
+/** By name, not class, so a second copy of this package still recognises it; also as a cause. */
 export function isQueueStagingClosed(error: unknown): boolean {
-  return error instanceof Error && error.name === "QueueStagingClosedError";
+  let current = error;
+  for (let depth = 0; depth < MAX_CAUSE_DEPTH && current instanceof Error; depth += 1) {
+    if (current.name === "QueueStagingClosedError") return true;
+    current = current.cause;
+  }
+  return false;
 }
 
 export class NonRetryableGroupQueueError extends Error {

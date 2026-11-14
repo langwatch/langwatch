@@ -156,6 +156,9 @@ export type ValidationResult =
       error: LicenseError;
     };
 
+/** Where the license was installed: stored on the organization, or `LANGWATCH_LICENSE_KEY`. */
+export type LicenseSource = "stored" | "environment";
+
 /** License status for API responses - discriminated union for type safety */
 type NoLicenseStatus = {
   hasLicense: false;
@@ -189,10 +192,13 @@ type InvalidLicenseStatus = {
    * distinction and cannot derive it from `expiresAt`, which an unsigned payload controls.
    */
   expired: boolean;
+  /** A lapsed license that names a hosted service, so its renewal can still be collected. */
+  connected?: boolean;
   plan: string;
   planName: string;
   expiresAt: string;
   organizationName: string;
+  source?: LicenseSource;
 } & LicenseResourceLimits;
 
 type ValidLicenseStatus = {
@@ -202,6 +208,7 @@ type ValidLicenseStatus = {
   planName: string;
   expiresAt: string;
   organizationName: string;
+  source?: LicenseSource;
   /** The license names a hosted service, so an admin can sync it on demand (ADR-156, section 6). */
   connected: boolean;
 } & LicenseResourceLimits;
@@ -234,6 +241,7 @@ const licenseMetadataShape = {
   planName: z.string(),
   expiresAt: z.string(),
   organizationName: z.string(),
+  source: z.enum(["stored", "environment"]).optional(),
 } as const;
 
 /**
@@ -256,6 +264,7 @@ export const licenseStatusSchema: z.ZodType<LicenseStatus> = z.union([
        * signature does not check out. Only the first still meters seats.
        */
       expired: z.boolean(),
+      connected: z.boolean().optional(),
       ...licenseMetadataShape,
       ...licenseResourceLimitsShape,
     })

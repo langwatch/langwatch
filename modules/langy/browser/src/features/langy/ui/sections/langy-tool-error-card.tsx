@@ -9,7 +9,7 @@ import type { LangyToolErrorPresentation } from "../../model/logic/langy-tool-fa
  * A failed Langy tool call, separate from both assistant prose and raw JSON.
  */
 export function LangyToolErrorCard({ presentation }: { presentation: LangyToolErrorPresentation }) {
-  const hasActions = presentation.traceUrl || presentation.logsUrl || presentation.docsUrl;
+  const hasActions = hasToolErrorActions(presentation);
   const hasBody =
     !!presentation.detail ||
     !!presentation.tips?.length ||
@@ -36,51 +36,7 @@ export function LangyToolErrorCard({ presentation }: { presentation: LangyToolEr
           </VStack>
         </HStack>
       }
-      actions={
-        hasActions ? (
-          <HStack gap={1.5} flexWrap="wrap">
-            {presentation.docsUrl ? (
-              <Button size="xs" variant="outline" asChild>
-                <a
-                  href={presentation.docsUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label="Read the documentation for this problem"
-                >
-                  <BookOpen size={12} aria-hidden="true" />
-                  Read the docs
-                </a>
-              </Button>
-            ) : null}
-            {presentation.traceUrl ? (
-              <Button size="xs" variant="outline" asChild>
-                <a
-                  href={presentation.traceUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label="Open debug trace in Grafana"
-                >
-                  <ExternalLink size={12} aria-hidden="true" />
-                  Open trace
-                </a>
-              </Button>
-            ) : null}
-            {presentation.logsUrl ? (
-              <Button size="xs" variant="outline" asChild>
-                <a
-                  href={presentation.logsUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label="Open related logs in Grafana"
-                >
-                  <ScrollText size={12} aria-hidden="true" />
-                  Open logs
-                </a>
-              </Button>
-            ) : null}
-          </HStack>
-        ) : null
-      }
+      actions={hasActions ? <LangyToolErrorActions presentation={presentation} /> : null}
     >
       {hasBody ? (
         <VStack align="stretch" gap={1.5}>
@@ -109,5 +65,61 @@ export function LangyToolErrorCard({ presentation }: { presentation: LangyToolEr
         </VStack>
       ) : null}
     </LangyCard>
+  );
+}
+
+/** Whether a failure carries any link the reader can follow: docs, a trace or logs. */
+export function hasToolErrorActions(presentation: LangyToolErrorPresentation): boolean {
+  return !!(presentation.traceUrl || presentation.logsUrl || presentation.docsUrl);
+}
+
+/** The links a failure carries, each only when it exists: docs, trace, logs. */
+export function LangyToolErrorActions({
+  presentation,
+}: {
+  presentation: LangyToolErrorPresentation;
+}) {
+  return (
+    <HStack gap={1.5} flexWrap="wrap">
+      {presentation.docsUrl ? (
+        <Button size="xs" variant="outline" asChild>
+          <a
+            href={presentation.docsUrl}
+            target="_blank"
+            rel="noreferrer"
+            aria-label="Read the documentation for this problem"
+          >
+            <BookOpen size={12} aria-hidden="true" />
+            Read the docs
+          </a>
+        </Button>
+      ) : null}
+      {presentation.traceUrl ? (
+        <Button size="xs" variant="outline" asChild>
+          <a
+            href={presentation.traceUrl}
+            target="_blank"
+            rel="noreferrer"
+            aria-label="Open debug trace in Grafana"
+          >
+            <ExternalLink size={12} aria-hidden="true" />
+            Open trace
+          </a>
+        </Button>
+      ) : null}
+      {presentation.logsUrl ? (
+        <Button size="xs" variant="outline" asChild>
+          <a
+            href={presentation.logsUrl}
+            target="_blank"
+            rel="noreferrer"
+            aria-label="Open related logs in Grafana"
+          >
+            <ScrollText size={12} aria-hidden="true" />
+            Open logs
+          </a>
+        </Button>
+      ) : null}
+    </HStack>
   );
 }

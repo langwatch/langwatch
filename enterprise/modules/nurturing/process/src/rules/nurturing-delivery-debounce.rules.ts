@@ -80,6 +80,13 @@ export function pickCustomerIoDebounce(signal: NurturingSignal): Debounce | null
       claimKey: `nurturing:debounce:${signal.kind}:${signal.tenantId}`,
     };
   }
+  if (signal.kind === "langy_first_message_seen") {
+    // The fact's tenant is a project; the trait is the person's, so the claim is theirs.
+    return {
+      seconds: PERSON_ONCE_SECONDS,
+      claimKey: `nurturing:once:${signal.kind}:${signal.userId}`,
+    };
+  }
   if (PERSON_ONCE_KINDS.has(signal.kind)) {
     return {
       seconds: PERSON_ONCE_SECONDS,

@@ -26,6 +26,7 @@ import {
 } from "./object-storage-azure-credentials.ts";
 import { azureBackend } from "./object-storage-azure.ts";
 import {
+  releasingBody,
   UnknownStorageProjectError,
   UnreachableStorageLocationError,
   type ObjectBackend,
@@ -48,6 +49,7 @@ function lazyBackend(build: () => ObjectBackend): ObjectBackend {
     },
     write: async (at, body, facts) => held().write(at, body, facts),
     read: async (at) => held().read(at),
+    exists: async (at) => held().exists(at),
     digest: async (at) => held().digest(at),
     remove: async (at) => held().remove(at),
     signUpload: async (at, facts) => held().signUpload(at, facts),
@@ -235,7 +237,8 @@ export function buildObjectStorage(options: {
 
   const storage: ObjectStorage = {
     write: async (at, body, facts) => (await place(at.projectId)).write(at, body, facts),
-    read: async (at) => (await locate(at)).read(at),
+    read: async (at) => releasingBody(await (await locate(at)).read(at)),
+    exists: async (at) => (await locate(at)).exists(at),
     digest: async (at) => (await locate(at)).digest(at),
     remove: async (at) => (await locate(at)).remove(at),
     signUpload: async (at, facts) => (await place(at.projectId)).signUpload(at, facts),

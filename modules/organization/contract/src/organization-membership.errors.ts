@@ -145,6 +145,19 @@ export class MemberSeatLimitReachedError extends HandledError {
   }
 }
 
+/** Another seat change on the organization held its seat lock for the whole wait. */
+export class SeatChangeBusyError extends HandledError {
+  declare readonly code: "seat_change_busy";
+
+  constructor() {
+    super("seat_change_busy", "Another seat change is in progress. Try again in a moment.", {
+      httpStatus: 409,
+      retryable: true,
+    });
+    this.name = "SeatChangeBusyError";
+  }
+}
+
 /**
  * The requested organization slug is already claimed on this instance.
  * Deterministic 409 on the natural key, so provisioning tools can branch on

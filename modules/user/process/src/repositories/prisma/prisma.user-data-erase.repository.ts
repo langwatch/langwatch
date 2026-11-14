@@ -1,5 +1,7 @@
+import { isFullMember } from "@langwatch/entitlement-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { nowInstant } from "@langwatch/time";
+import { z } from "zod";
 
 import type {
   GdprOrganizationRow,
@@ -29,8 +31,11 @@ type Delegate<Model extends keyof PrismaClient, Methods extends keyof PrismaClie
  */
 type GdprUserDataEraseDatabase = {
   user: Delegate<"user", "findUnique" | "delete">;
+  userErasure: Delegate<"userErasure", "create">;
   organization: Delegate<"organization", "findMany" | "deleteMany">;
   organizationUser: Delegate<"organizationUser", "count" | "deleteMany" | "findMany" | "groupBy">;
+  roleBinding: Delegate<"roleBinding", "findMany">;
+  customRole: Delegate<"customRole", "findMany">;
   team: Delegate<"team", "findMany" | "deleteMany">;
   teamUser: Delegate<"teamUser", "deleteMany" | "groupBy">;
   project: Delegate<"project", "findMany" | "deleteMany">;
@@ -299,16 +304,21 @@ export class PrismaGdprUserDataEraseRepository implements GdprUserDataEraseRepos
 
         await tx.teamUser.deleteMany({ where: { userId } });
         // Sole-owned organisations are gone by now, so these are the seats the erasure takes.
-        const organizationIds = (
-          await tx.organizationUser.findMany({
-            where: { userId },
-            select: { organizationId: true },
-          })
-        ).map((membership) => membership.organizationId);
+        const memberships = await tx.organizationUser.findMany({
+          where: { userId },
+          select: { organizationId: true },
+        });
+        const organizationIds = memberships.map((membership) => membership.organizationId);
+        const fullSeatOrganizationIds = await fullSeatOrganizationIdsOf({ tx, userId });
         await tx.organizationUser.deleteMany({ where: { userId } });
         await tx.account.deleteMany({ where: { userId } });
         await tx.session.deleteMany({ where: { userId } });
-        await tx.user.delete({ where: { id: userId } });
+        const { createdAt } = await tx.user.delete({
+          where: { id: userId },
+          select: { createdAt: true },
+        });
+        // Only the creation time stays, so the first-created account survives the row.
+        await tx.userErasure.create({ data: { accountCreatedAt: createdAt } });
         // Committed with the erase, so a rolled-back erase records no erased fact.
         const occurredAt = nowInstant().epochMilliseconds;
         await this.#facts.append({
@@ -318,7 +328,13 @@ export class PrismaGdprUserDataEraseRepository implements GdprUserDataEraseRepos
           intents: [
             {
               type: "recordErased",
-              data: { tenantId: userId, userId, occurredAt, organizationIds },
+              data: {
+                tenantId: userId,
+                userId,
+                occurredAt,
+                organizationIds,
+                fullSeatOrganizationIds,
+              },
             },
           ],
         });
@@ -361,4 +377,59 @@ async function eraseDashboardsOf({
   await tx.dashboardsV2.updateMany({ where: { createdById: userId }, data: { createdById: null } });
   await tx.dashboard.updateMany({ where: { createdById: userId }, data: { createdById: null } });
   await tx.dashboardFavourite.deleteMany({ where: { userId } });
+}
+
+const permissionsSchema = z.array(z.string());
+
+/** The organisations where the person holds an active full seat, as the seat count classifies. */
+async function fullSeatOrganizationIdsOf({
+  tx,
+  userId,
+}: {
+  tx: Pick<GdprUserDataEraseDatabase, "organizationUser" | "roleBinding" | "customRole">;
+  userId: string;
+}): Promise<string[]> {
+  const memberships = await tx.organizationUser.findMany({
+    where: { userId, disabledAt: null, user: { deactivatedAt: null } },
+    select: { organizationId: true, role: true },
+  });
+  const externalOrgIds = memberships
+    .filter((membership) => membership.role === "EXTERNAL")
+    .map((membership) => membership.organizationId);
+  const bindings =
+    externalOrgIds.length === 0
+      ? []
+      : await tx.roleBinding.findMany({
+          where: {
+            userId,
+            organizationId: { in: externalOrgIds },
+            scopeType: "TEAM",
+            customRoleId: { not: null },
+          },
+          select: { organizationId: true, customRoleId: true },
+        });
+  const roleIds = bindings.flatMap((binding) =>
+    binding.customRoleId ? [binding.customRoleId] : [],
+  );
+  const roles =
+    roleIds.length === 0
+      ? []
+      : await tx.customRole.findMany({
+          where: { id: { in: roleIds } },
+          select: { id: true, organizationId: true, permissions: true },
+        });
+  return memberships
+    .filter((membership) => {
+      if (membership.role !== "EXTERNAL") return isFullMember(membership.role, undefined);
+      const ids = new Set(
+        bindings
+          .filter((binding) => binding.organizationId === membership.organizationId)
+          .map((binding) => binding.customRoleId),
+      );
+      const permissions = roles
+        .filter((role) => role.organizationId === membership.organizationId && ids.has(role.id))
+        .flatMap((role) => permissionsSchema.safeParse(role.permissions).data ?? []);
+      return isFullMember(membership.role, permissions.length > 0 ? permissions : undefined);
+    })
+    .map((membership) => membership.organizationId);
 }
