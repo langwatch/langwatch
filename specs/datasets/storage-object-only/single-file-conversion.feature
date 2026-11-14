@@ -83,6 +83,26 @@ Feature: Single-file datasets are converted to chunks
       And the step's report names it as missing its file
       And the step is not recorded done
 
+    # Without a way out, a file that is gone for good would block the step, the blocking move
+    # (postgres-layout-code-removal.feature) and the records-table drop forever.
+    # becomes @unit
+    @unimplemented
+    Scenario: An operator marks a dataset whose file is gone for good as lost
+      Given a single-file dataset whose file is not there
+      When the operator marks that dataset's content as lost, naming the dataset
+      Then the dataset is kept with its name and columns, holds no rows and is shown as content lost
+      And it is no longer a single-file dataset
+      And the next run of the single-file conversion step is recorded done
+      And the step's report names it as marked lost by the operator
+
+    # becomes @unit
+    @unimplemented
+    Scenario: A dataset is only marked lost when its file is really missing
+      Given a single-file dataset whose file is there and readable
+      When the operator marks that dataset's content as lost
+      Then it refuses, saying the file is readable and the dataset can be converted
+      And the dataset stays a single-file dataset
+
     # becomes @unit
     @unimplemented
     Scenario: A single-file dataset whose file is not a list of records is not converted

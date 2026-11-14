@@ -9,11 +9,9 @@
 # Out of this file on purpose: create and copy. They are fixed on their own branch, with scenarios
 # in specs/datasets/large-dataset-storage.feature ("A new dataset is created directly in object
 # storage", "A failed create leaves no dataset behind", "A copy of a dataset is created directly in
-# object storage"). Since the module split (#7536, shipped in 3.21.0) DatasetUpsertService.create
-# inserted a Postgres-layout row and wrote DatasetRecord rows
-# (modules/dataset/process/src/services/dataset-upsert.service.ts:196-214), and the repository's
-# create never names a layout (repositories/prisma/prisma.dataset.repository.ts:161-171), so the
-# schema default "postgres" applied (packages/prisma-client/prisma/schema.prisma:2212).
+# object storage"). From the module split (#7536, shipped in 3.21.0) until #9351,
+# DatasetUpsertService.create inserted a Postgres-layout row and wrote DatasetRecord rows; create
+# now goes through content.createDataset, which writes object storage directly.
 
 Feature: Every write puts dataset rows in object storage
   As a LangWatch operator
