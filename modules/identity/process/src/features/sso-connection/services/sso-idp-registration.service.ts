@@ -15,6 +15,7 @@ import { Extractor } from "samlify";
 import { z } from "zod";
 
 import type { SsoIssuerDiscoveryChannel } from "../../../channels/sso-issuer-discovery.channel.ts";
+import { unreachableDetail } from "../../../rules/outbound-proxy.rules.ts";
 import {
   looksLikeCertificate,
   looksLikeSamlDescriptor,
@@ -63,7 +64,10 @@ export class SsoIdpRegistrationService {
     const answer = await this.deps.discovery.discover({ issuer: registration.issuer });
     if (!answer.reachable) {
       throw new SsoIssuerUnreachableError(
-        `discovery at ${registration.issuer} did not answer: ${answer.reason}`,
+        unreachableDetail({
+          attempt: `discovery at ${registration.issuer}`,
+          reason: answer.reason,
+        }),
       );
     }
     const named = answer.issuer;

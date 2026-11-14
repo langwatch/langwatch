@@ -14,6 +14,7 @@ import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import {
   explorerHiddenOrigins,
   FilterParseError,
+  TracePageSizeTooLargeError,
   type Evaluation,
   type TraceApi,
   type TracesForProjectResult,
@@ -250,6 +251,26 @@ describe("POST /search", () => {
           options: expect.objectContaining({ includeSpans: true }),
         }),
       );
+    });
+
+    /** @scenario "Public trace search with spans refuses a page above 100 traces" */
+    it("answers the app's refusal as a 422 naming the code", async () => {
+      const { send } = mount({
+        listTraces: vi.fn(async () => {
+          throw new TracePageSizeTooLargeError({
+            maxPageSize: 100,
+            bound: "tracesWithSpansPageSizeMax",
+          });
+        }),
+      });
+      const res = await send({
+        startDate: 1000,
+        endDate: 5000,
+        includeSpans: true,
+        pageSize: 4000,
+      });
+      expect(res.status).toBe(422);
+      expect((await bodyOf(res)).code).toBe("trace_page_size_too_large");
     });
 
     /** @scenario "Public trace search with spans refuses a page above 100 traces" */

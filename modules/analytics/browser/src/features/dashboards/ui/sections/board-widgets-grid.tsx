@@ -18,6 +18,7 @@ export function BoardWidgetsGrid({
   boardName,
   widgets,
   period,
+  periodKey,
   isWriting,
   langyFor,
   onEdit,
@@ -25,6 +26,7 @@ export function BoardWidgetsGrid({
   onDelete,
   onPlacementsCommit,
   onEmptyChange,
+  onLimitFailureChange,
 }: {
   projectId: string;
   projectSlug: string;
@@ -32,6 +34,8 @@ export function BoardWidgetsGrid({
   boardName: string;
   widgets: readonly BoardWidget[];
   period: BoardPeriod;
+  /** The reader's chosen period, such as "1h:auto"; only a new choice restarts the widget. */
+  periodKey: string;
   isWriting: boolean;
   /** What each card may ask Langy; absent when Langy is not available. */
   langyFor?: (widget: BoardWidget) => WidgetCardLangy;
@@ -42,6 +46,8 @@ export function BoardWidgetsGrid({
   onPlacementsCommit?: (placements: ChartGridPlacement[]) => void;
   /** Told whether each widget shows none of its data. */
   onEmptyChange?: (input: { widget: BoardWidget; empty: boolean }) => void;
+  /** Told whether each widget's final failure is a resource limit. */
+  onLimitFailureChange?: (input: { widget: BoardWidget; limited: boolean }) => void;
 }) {
   const byId = new Map(widgets.map((widget) => [widget.id, widget]));
 
@@ -62,12 +68,16 @@ export function BoardWidgetsGrid({
             dashboardId={dashboardId}
             boardName={boardName}
             period={period}
+            periodKey={periodKey}
             isWriting={isWriting}
             {...(langyFor ? { langy: langyFor(widget) } : {})}
             onEdit={onEdit && (({ withLangy }) => onEdit({ widget, withLangy }))}
             onDuplicate={onDuplicate && (() => onDuplicate(widget))}
             onDelete={onDelete && (() => onDelete(widget))}
             onEmptyChange={onEmptyChange && ((empty) => onEmptyChange({ widget, empty }))}
+            onLimitFailureChange={
+              onLimitFailureChange && ((limited) => onLimitFailureChange({ widget, limited }))
+            }
           />
         );
       }}

@@ -16,6 +16,7 @@ import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type * as Observability from "@langwatch/observability";
+import { resetIngestDoorRefusalLog } from "@langwatch/otlp";
 import { LocalFeatureApis, type FeatureTransportDescriptor } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
 import { ShareApi } from "@langwatch/share-contract";
@@ -24,9 +25,10 @@ import type * as TestHarness from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { TraceApi, type RecordSpanCommandData } from "@langwatch/trace-contract";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { fakeTraceProcessingCommands } from "../../__tests__/support/trace-processing-commands.fake.ts";
+import { braidTwins } from "../../app/__tests__/support/trace-app.harness.ts";
 import { TraceModule } from "../../app/trace.app.ts";
 import { S3TraceLegacySpoolChannel } from "../../channels/s3/s3.trace-legacy-spool.channel.ts";
 import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
@@ -164,6 +166,7 @@ function deployment(
   const canonicalisation = TraceCanonicalisationService.create();
   const app = TraceModule.fromDependencies(
     TraceModule.composeDependencies({
+      ...braidTwins(),
       repositories: MemoryTraceRepositories.create(),
       storedObjects: createApiFixture<StoredObjectApi>(),
       canonicalisation,
@@ -318,6 +321,9 @@ function otlpTraceBody(count = 1) {
 }
 
 describe("given the trace module as a process composes it", () => {
+  // Refusal lines are sampled per caller; each scenario starts with a quiet throttle.
+  beforeEach(() => resetIngestDoorRefusalLog());
+
   describe("when an OTLP exporter posts a trace batch to /api/otel/v1/traces", () => {
     /** @scenario "The OTLP receiver accepts an exported trace batch" */
     it("accepts the batch", async () => {
@@ -501,6 +507,7 @@ describe("given the trace module as a process composes it", () => {
       expect(refusals()).toHaveLength(1);
       expect(refusals()[0]).toMatchObject({
         msg: "Authentication failed: X-Auth-Token sent but empty",
+        level: 40,
         hasEmptyAuthToken: true,
       });
     });

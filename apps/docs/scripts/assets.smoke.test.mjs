@@ -10,8 +10,18 @@ const outDir = path.resolve(values["out-dir"] ?? "dist");
 const FONT_DELAY_MS = 1200;
 
 /** Layout shift summed over a load whose web fonts (and, if asked, scripts) arrive late. */
-async function shiftWithLateFonts({ browser, base, slug, width, lateScripts = false }) {
-  const context = await browser.newContext({ viewport: { width, height: 900 } });
+async function shiftWithLateFonts({
+  browser,
+  base,
+  slug,
+  width,
+  lateScripts = false,
+  touch = false,
+}) {
+  const context = await browser.newContext({
+    viewport: { width, height: 900 },
+    ...(touch ? { hasTouch: true, isMobile: true } : {}),
+  });
   try {
     const page = await context.newPage();
     await page.addInitScript(() => {
@@ -99,6 +109,28 @@ await it("keeps a section index and a guide in place when the fonts swap in", as
   });
 });
 
+/** @scenario "Keep text in place while the web fonts load" */
+await it("keeps headings and their link icons in place on a touch screen", async () => {
+  await withPreviewBrowser({
+    outDir,
+    run: async ({ browser, base }) => {
+      /* Its first heading sits on the wrap point; touch shows every heading's link icon. */
+      const slug = "improve-your-agent/overview";
+      const { shift, shifted } = await shiftWithLateFonts({
+        browser,
+        base,
+        slug,
+        width: 412,
+        touch: true,
+      });
+      assert.ok(
+        shift <= 0.01,
+        `${slug} on touch shifts ${shift.toFixed(4)}: ${shifted.join("; ")}`,
+      );
+    },
+  });
+});
+
 /** @scenario "Keep an API reference in place while the page starts" */
 await it("keeps the endpoint reference in place when the examples settle", async () => {
   await withPreviewBrowser({
@@ -182,7 +214,7 @@ await it("preloads the body and title fonts and never fetches extended Latin", a
               preloaded
                 .map((name) => name.replace(/-[A-Za-z0-9_-]{8}\.woff2$/, ".woff2"))
                 .toSorted(),
-              ["Inter-Variable-latin.woff2", "Sentient-Regular.woff2"],
+              ["Inter-Variable-latin.woff2", "Sentient-Medium.woff2", "Sentient-Regular.woff2"],
             );
             assert.ok(
               preloaded.every((name) => name !== "Inter-Variable-latin.woff2"),

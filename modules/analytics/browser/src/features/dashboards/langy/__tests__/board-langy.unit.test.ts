@@ -74,7 +74,7 @@ describe("a draft about a board", () => {
   });
 
   describe("given a From LangWatch board", () => {
-    /** @scenario "From LangWatch: a template board asks Langy with the board as context" */
+    /** @scenario "From LangWatch: the ask bar asks Langy for a member who may not create dashboards" */
     it("names it as a read-only template rather than a stored board", () => {
       const request = boardQuestion({
         question: "Can it ship?",

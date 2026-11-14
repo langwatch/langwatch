@@ -1,6 +1,16 @@
+import { ATTR_KEYS } from "@langwatch/span-normalisation";
 import { accumulateTraceAttributes, stampTraceModelMetadata } from "@langwatch/trace-contract";
 
 import type { TraceOriginService } from "../../../services/trace-origin.service.ts";
+
+/**
+ * The keys a log's lifted attributes only fill when the trace has none: a span or the origin
+ * resolution names a trace's service and origin first, and a log never replaces them.
+ */
+export const LOG_FILL_ONLY_KEYS: ReadonlySet<string> = new Set([
+  ATTR_KEYS.SERVICE_NAME,
+  "langwatch.origin",
+]);
 
 /**
  * Merges per-span attributes into trace-level attributes; the rules, origin

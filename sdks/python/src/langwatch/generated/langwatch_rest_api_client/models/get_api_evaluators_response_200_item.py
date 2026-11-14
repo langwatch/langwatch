@@ -11,9 +11,16 @@ from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
     from ..models.get_api_evaluators_response_200_item_config_type_0 import GetApiEvaluatorsResponse200ItemConfigType0
+    from ..models.get_api_evaluators_response_200_item_created_by_type_0 import (
+        GetApiEvaluatorsResponse200ItemCreatedByType0,
+    )
     from ..models.get_api_evaluators_response_200_item_fields_item import GetApiEvaluatorsResponse200ItemFieldsItem
+    from ..models.get_api_evaluators_response_200_item_labels_item import GetApiEvaluatorsResponse200ItemLabelsItem
     from ..models.get_api_evaluators_response_200_item_output_fields_item import (
         GetApiEvaluatorsResponse200ItemOutputFieldsItem,
+    )
+    from ..models.get_api_evaluators_response_200_item_updated_by_type_0 import (
+        GetApiEvaluatorsResponse200ItemUpdatedByType0,
     )
 
 
@@ -36,6 +43,13 @@ class GetApiEvaluatorsResponse200Item:
         updated_at (datetime.datetime):
         fields (list[GetApiEvaluatorsResponse200ItemFieldsItem]):
         output_fields (list[GetApiEvaluatorsResponse200ItemOutputFieldsItem]):
+        version (int | None): The version this response shows: the latest, unless a label or a version was asked for.
+        labels (list[GetApiEvaluatorsResponse200ItemLabelsItem]): The deploy labels the evaluator carries, such as
+            production, and the version each points at.
+        created_by (GetApiEvaluatorsResponse200ItemCreatedByType0 | None): The user who created the evaluator. Null when
+            an API key created it, or it predates creators being recorded.
+        updated_by (GetApiEvaluatorsResponse200ItemUpdatedByType0 | None): The user who changed the evaluator last. Null
+            when an API key changed it.
         platform_url (str):
         workflow_name (str | Unset):
         workflow_icon (str | Unset):
@@ -53,6 +67,10 @@ class GetApiEvaluatorsResponse200Item:
     updated_at: datetime.datetime
     fields: list[GetApiEvaluatorsResponse200ItemFieldsItem]
     output_fields: list[GetApiEvaluatorsResponse200ItemOutputFieldsItem]
+    version: int | None
+    labels: list[GetApiEvaluatorsResponse200ItemLabelsItem]
+    created_by: GetApiEvaluatorsResponse200ItemCreatedByType0 | None
+    updated_by: GetApiEvaluatorsResponse200ItemUpdatedByType0 | None
     platform_url: str
     workflow_name: str | Unset = UNSET
     workflow_icon: str | Unset = UNSET
@@ -60,6 +78,12 @@ class GetApiEvaluatorsResponse200Item:
     def to_dict(self) -> dict[str, Any]:
         from ..models.get_api_evaluators_response_200_item_config_type_0 import (
             GetApiEvaluatorsResponse200ItemConfigType0,
+        )
+        from ..models.get_api_evaluators_response_200_item_created_by_type_0 import (
+            GetApiEvaluatorsResponse200ItemCreatedByType0,
+        )
+        from ..models.get_api_evaluators_response_200_item_updated_by_type_0 import (
+            GetApiEvaluatorsResponse200ItemUpdatedByType0,
         )
 
         id = self.id
@@ -99,6 +123,26 @@ class GetApiEvaluatorsResponse200Item:
             output_fields_item = output_fields_item_data.to_dict()
             output_fields.append(output_fields_item)
 
+        version: int | None
+        version = self.version
+
+        labels = []
+        for labels_item_data in self.labels:
+            labels_item = labels_item_data.to_dict()
+            labels.append(labels_item)
+
+        created_by: dict[str, Any] | None
+        if isinstance(self.created_by, GetApiEvaluatorsResponse200ItemCreatedByType0):
+            created_by = self.created_by.to_dict()
+        else:
+            created_by = self.created_by
+
+        updated_by: dict[str, Any] | None
+        if isinstance(self.updated_by, GetApiEvaluatorsResponse200ItemUpdatedByType0):
+            updated_by = self.updated_by.to_dict()
+        else:
+            updated_by = self.updated_by
+
         platform_url = self.platform_url
 
         workflow_name = self.workflow_name
@@ -121,6 +165,10 @@ class GetApiEvaluatorsResponse200Item:
                 "updatedAt": updated_at,
                 "fields": fields,
                 "outputFields": output_fields,
+                "version": version,
+                "labels": labels,
+                "createdBy": created_by,
+                "updatedBy": updated_by,
                 "platformUrl": platform_url,
             }
         )
@@ -136,9 +184,16 @@ class GetApiEvaluatorsResponse200Item:
         from ..models.get_api_evaluators_response_200_item_config_type_0 import (
             GetApiEvaluatorsResponse200ItemConfigType0,
         )
+        from ..models.get_api_evaluators_response_200_item_created_by_type_0 import (
+            GetApiEvaluatorsResponse200ItemCreatedByType0,
+        )
         from ..models.get_api_evaluators_response_200_item_fields_item import GetApiEvaluatorsResponse200ItemFieldsItem
+        from ..models.get_api_evaluators_response_200_item_labels_item import GetApiEvaluatorsResponse200ItemLabelsItem
         from ..models.get_api_evaluators_response_200_item_output_fields_item import (
             GetApiEvaluatorsResponse200ItemOutputFieldsItem,
+        )
+        from ..models.get_api_evaluators_response_200_item_updated_by_type_0 import (
+            GetApiEvaluatorsResponse200ItemUpdatedByType0,
         )
 
         d = dict(src_dict)
@@ -204,6 +259,50 @@ class GetApiEvaluatorsResponse200Item:
 
             output_fields.append(output_fields_item)
 
+        def _parse_version(data: object) -> int | None:
+            if data is None:
+                return data
+            return cast(int | None, data)
+
+        version = _parse_version(d.pop("version"))
+
+        labels = []
+        _labels = d.pop("labels")
+        for labels_item_data in _labels:
+            labels_item = GetApiEvaluatorsResponse200ItemLabelsItem.from_dict(labels_item_data)
+
+            labels.append(labels_item)
+
+        def _parse_created_by(data: object) -> GetApiEvaluatorsResponse200ItemCreatedByType0 | None:
+            if data is None:
+                return data
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                created_by_type_0 = GetApiEvaluatorsResponse200ItemCreatedByType0.from_dict(data)
+
+                return created_by_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(GetApiEvaluatorsResponse200ItemCreatedByType0 | None, data)
+
+        created_by = _parse_created_by(d.pop("createdBy"))
+
+        def _parse_updated_by(data: object) -> GetApiEvaluatorsResponse200ItemUpdatedByType0 | None:
+            if data is None:
+                return data
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                updated_by_type_0 = GetApiEvaluatorsResponse200ItemUpdatedByType0.from_dict(data)
+
+                return updated_by_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(GetApiEvaluatorsResponse200ItemUpdatedByType0 | None, data)
+
+        updated_by = _parse_updated_by(d.pop("updatedBy"))
+
         platform_url = d.pop("platformUrl")
 
         workflow_name = d.pop("workflowName", UNSET)
@@ -223,6 +322,10 @@ class GetApiEvaluatorsResponse200Item:
             updated_at=updated_at,
             fields=fields,
             output_fields=output_fields,
+            version=version,
+            labels=labels,
+            created_by=created_by,
+            updated_by=updated_by,
             platform_url=platform_url,
             workflow_name=workflow_name,
             workflow_icon=workflow_icon,

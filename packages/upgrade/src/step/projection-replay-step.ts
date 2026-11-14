@@ -1,11 +1,24 @@
 import {
   type MigrationStep,
+  type MigrationStepDefinition,
   type MigrationStepReport,
   defineMigrationStep,
 } from "./migration-step.ts";
 
 /** The report key holding a replay's cursor; a rollback reopen keeps a report that has it. */
 export const PROJECTION_REPLAY_CURSOR = "replayedThrough";
+
+/**
+ * The report key holding the instant the lane's first run replayed from: the earliest event time
+ * the lane is complete from once the step is done. Kept across resumes and the trailing pass.
+ */
+export const PROJECTION_REPLAY_SINCE = "replayedSince";
+
+/** The instant a replay step's report says its lane was first replayed from, if it says. */
+export function projectionReplaySinceOf(report: MigrationStepReport | null): string | null {
+  const since = report?.[PROJECTION_REPLAY_SINCE];
+  return typeof since === "string" ? since : null;
+}
 
 /** The report keys of an interrupted run: the cursor it completes through, its last done tenant. */
 const RUN_CURSOR = "runReplaysThrough";
@@ -50,6 +63,7 @@ export function defineProjectionReplayStep({
   since = PROJECTION_REPLAY_FROM_START,
   needsOldWritersGone,
   trailingPass = false,
+  after,
 }: {
   id: string;
   description: string;
@@ -60,21 +74,26 @@ export function defineProjectionReplayStep({
   needsOldWritersGone?: boolean;
   /** After the first pass, replay again from the cursor it completed through. */
   trailingPass?: boolean;
+  /** The background steps whose work must be in the log before this lane replays it. */
+  after?: MigrationStepDefinition["after"];
 }): MigrationStep {
   return defineMigrationStep({
     id,
     kind: "data",
     mode: "background",
     description,
-    ...(needsOldWritersGone === undefined ? {} : { needsOldWritersGone }),
+    ...declaredOrdering({ needsOldWritersGone, after }),
     run: async ({ checkpoint, dryRun, signal }) => {
       let cursor = resumeCursor({ resumeFrom: checkpoint.resumeFrom, lane, since });
-      if (signal.aborted) return { lane, replayedThrough: cursor };
+      const firstSince = resumeSince({ resumeFrom: checkpoint.resumeFrom, lane, since });
+      const origin = { [PROJECTION_REPLAY_SINCE]: firstSince };
+      if (signal.aborted) return { lane, replayedThrough: cursor, ...origin };
       const resume = resumeTenants({ resumeFrom: checkpoint.resumeFrom, lane });
       // The cursor stays the last completed one until the run ends; tenants done ride beside it.
       let progress: MigrationStepReport = {
         lane,
         [PROJECTION_REPLAY_CURSOR]: cursor,
+        ...origin,
         ...(resume
           ? { [RUN_CURSOR]: resume.replayedThrough, [LAST_TENANT]: resume.afterTenant }
           : {}),
@@ -91,6 +110,7 @@ export function defineProjectionReplayStep({
         progress = {
           lane,
           [PROJECTION_REPLAY_CURSOR]: cursor,
+          ...origin,
           [RUN_CURSOR]: done.replayedThrough,
           [LAST_TENANT]: done.tenantId,
         };
@@ -108,11 +128,11 @@ export function defineProjectionReplayStep({
         });
         if (!trailingPass || dryRun || signal.aborted) {
           await saving;
-          return { ...first };
+          return { ...first, ...origin };
         }
         // The first pass is done: commit its cursor, then replay what became readable after it.
         cursor = first.replayedThrough;
-        progress = { lane, [PROJECTION_REPLAY_CURSOR]: cursor };
+        progress = { lane, [PROJECTION_REPLAY_CURSOR]: cursor, ...origin };
         save(progress);
         const trailing = await replayer.replayLane({
           lane,
@@ -125,6 +145,7 @@ export function defineProjectionReplayStep({
         await saving;
         return {
           ...trailing,
+          ...origin,
           aggregatesReplayed: first.aggregatesReplayed + trailing.aggregatesReplayed,
           totalEvents: first.totalEvents + trailing.totalEvents,
         };
@@ -134,6 +155,20 @@ export function defineProjectionReplayStep({
       }
     },
   });
+}
+
+/** The ordering fields a replay step declares, each only when given. */
+function declaredOrdering({
+  needsOldWritersGone,
+  after,
+}: {
+  needsOldWritersGone: boolean | undefined;
+  after: MigrationStepDefinition["after"] | undefined;
+}): Pick<MigrationStepDefinition, "needsOldWritersGone" | "after"> {
+  return {
+    ...(needsOldWritersGone === undefined ? {} : { needsOldWritersGone }),
+    ...(after === undefined ? {} : { after }),
+  };
 }
 
 /** The cursor this lane last completed through, or the step's first-run instant. */
@@ -149,6 +184,20 @@ function resumeCursor({
   const cursor = resumeFrom?.[PROJECTION_REPLAY_CURSOR];
   if (resumeFrom?.lane !== lane || typeof cursor !== "string") return since;
   return cursor;
+}
+
+/** The instant this lane's first run replayed from, kept by every later run of it. */
+function resumeSince({
+  resumeFrom,
+  lane,
+  since,
+}: {
+  resumeFrom: MigrationStepReport | null;
+  lane: string;
+  since: string;
+}): string {
+  if (resumeFrom?.lane !== lane) return since;
+  return projectionReplaySinceOf(resumeFrom) ?? since;
 }
 
 /** An interrupted run of this lane: the cursor it completes through and the last tenant it did. */

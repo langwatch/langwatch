@@ -136,3 +136,17 @@ Feature: Trace summaries are filed under a real time, and their span reads stay 
       And the rest carry real ones
       When their spans are read
       Then the span read is bounded by the times the other traces supply
+
+    # Prod 2026-10-22: ~100 unbounded trace_summaries reads per 5 minutes, for ids with no filed summary.
+    @unit
+    Scenario: Traces the resolve finds no filed summary for read only the epoch partition
+      Given a page of trace ids for which no summary is filed under a real time
+      When their summaries are read by id alone
+      Then the summary read is bounded to the epoch partition the sentinel rows sit in
+      And it does not open every week of trace summaries
+
+    @unit
+    Scenario: A resolve that fails still reads the summaries
+      Given the resolve of a page's filing times fails
+      When their summaries are read by id alone
+      Then the summary read falls back to reading every partition, as before

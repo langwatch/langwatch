@@ -4,6 +4,12 @@ import litellm
 import numpy as np
 from scipy.spatial.distance import cdist
 import concurrent.futures
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 from langevals_topic_clustering.types import Trace, TraceWithEmbeddings
 from langevals_topic_clustering._logger import get_logger
@@ -110,13 +116,62 @@ def generate_embeddings_threaded(
     return embeddings
 
 
+# The batches of one call are requested this many at a time.
+EMBEDDING_BATCH_CONCURRENCY = 8
+
+
+# Concurrent batches meet a provider's rate limit sooner, so a 429 is retried in
+# place. One still limited after its retries is raised to the caller, never sent
+# to the per-input fallback, which would only add load to the same provider.
+@retry(
+    retry=retry_if_exception_type(litellm.exceptions.RateLimitError),
+    wait=wait_exponential(min=2, max=20),
+    stop=stop_after_attempt(4),
+    reraise=True,
+)
+def _embed_batch(
+    batch: list[str], params: dict[str, str], dimensions: int, single: bool
+) -> list[list[float]]:
+    response = litellm.embedding(
+        **params,  # type: ignore
+        input=batch[0] if single else batch,
+    )
+    return [
+        normalize_embedding_dimensions(item["embedding"], target_dim=dimensions)
+        for item in response.data
+    ]
+
+
+def _refusal_among(
+    futures: list[concurrent.futures.Future],
+) -> Optional[BaseException]:
+    """The first auth or rate-limit error among the batches that finished."""
+    for future in futures:
+        if not future.done() or future.cancelled():
+            continue
+        error = future.exception()
+        if isinstance(
+            error,
+            (litellm.exceptions.AuthenticationError, litellm.exceptions.RateLimitError),
+        ):
+            return error
+    return None
+
+
 def generate_embeddings(
-    texts: list[str], embeddings_litellm_params: dict[str, str], batch_size: int = 20
+    texts: list[str],
+    embeddings_litellm_params: dict[str, str],
+    batch_size: int = 20,
+    max_workers: int = EMBEDDING_BATCH_CONCURRENCY,
 ) -> list[Optional[list[float]]]:
-    embeddings = []
+    """Embeds `texts` in batches of `batch_size`, `max_workers` batches at a time, in order."""
+    embeddings: list[Optional[list[float]]] = []
     errors = 0
     last_error: Optional[Exception] = None
-    batches = list(range(0, len(texts), batch_size))
+    batches = [
+        [t if t else "<empty>" for t in texts[i : i + batch_size]]
+        for i in range(0, len(texts), batch_size)
+    ]
     total_batches = len(batches)
 
     dimensions = int(embeddings_litellm_params.get("dimensions", 1536))
@@ -127,42 +182,64 @@ def generate_embeddings(
 
     logger.info("Generating embeddings", text_count=len(texts), batch_count=total_batches)
 
-    for batch_idx, i in enumerate(batches):
-        batch = [t if t else "<empty>" for t in texts[i : i + batch_size]]
-        try:
-            response = litellm.embedding(
-                **params_copy,  # type: ignore
-                input=batch if batch_size > 1 else batch[0],
+    fall_back_to_threaded = False
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_workers)
+    try:
+        # Each batch runs in its own copy of the context, so the request's log
+        # context and usage ledger follow it onto the worker thread.
+        futures = [
+            executor.submit(
+                contextvars.copy_context().run,
+                _embed_batch,
+                batch,
+                params_copy,
+                dimensions,
+                batch_size == 1,
             )
-            embeddings += [
-                normalize_embedding_dimensions(
-                    item["embedding"],
-                    target_dim=dimensions,
-                )
-                for item in response.data
-            ]
-        except Exception as e:
-            if batch_size > 1:
-                # Don't fallback for auth errors — same key will fail for every individual request
-                if isinstance(e, litellm.exceptions.AuthenticationError):
-                    logger.warning("Embedding authentication failed, not retrying", error=str(e))
-                    raise
-                # For other errors, fall back to threaded implementation
-                logger.info("Batch embedding failed, falling back to threaded implementation")
-                return generate_embeddings_threaded(texts, embeddings_litellm_params)
+            for batch in batches
+        ]
+        for batch_idx, (batch, future) in enumerate(zip(batches, futures)):
+            try:
+                embeddings += future.result()
+            except Exception as e:
+                if batch_size > 1:
+                    # Don't fallback for auth errors — same key will fail for every individual request
+                    if isinstance(e, litellm.exceptions.AuthenticationError):
+                        logger.warning("Embedding authentication failed, not retrying", error=str(e))
+                        raise
+                    # Still limited after its retries: one call per input would only add load.
+                    if isinstance(e, litellm.exceptions.RateLimitError):
+                        logger.warning("Embedding still rate limited after retries", error=str(e))
+                        raise
+                    logger.info("Batch embedding failed, falling back to threaded implementation")
+                    fall_back_to_threaded = True
+                    break
 
-            embeddings += [None] * batch_size
+                embeddings += [None] * len(batch)
 
-            errors += 1
-            last_error = e
-            logger.warning("Error generating embeddings", error=str(e), batch_preview=batch[:3])
-            if errors >= 3:
-                logger.error("Too many errors generating embeddings, reraising", error_count=errors)
-                raise e
+                errors += 1
+                last_error = e
+                logger.warning("Error generating embeddings", error=str(e), batch_preview=batch[:3])
+                if errors >= 3:
+                    logger.error("Too many errors generating embeddings, reraising", error_count=errors)
+                    raise e
 
-        # Log progress every 5 batches or at the end
-        if (batch_idx + 1) % 5 == 0 or batch_idx == total_batches - 1:
-            logger.info("Embeddings progress", batches_processed=batch_idx + 1, total_batches=total_batches, embeddings_generated=len(embeddings), total_texts=len(texts))
+            # Log progress every 5 batches or at the end
+            if (batch_idx + 1) % 5 == 0 or batch_idx == total_batches - 1:
+                logger.info("Embeddings progress", batches_processed=batch_idx + 1, total_batches=total_batches, embeddings_generated=len(embeddings), total_texts=len(texts))
+    finally:
+        # Batches not yet started are dropped, and the ones in flight finish
+        # before any fallback adds its own calls on top of them.
+        executor.shutdown(wait=True, cancel_futures=True)
+
+    if fall_back_to_threaded:
+        # A batch that finished after the first failure may hold a refusal the
+        # fallback must not run into.
+        refusal = _refusal_among(futures)
+        if refusal is not None:
+            logger.warning("Embedding batch refused, not falling back", error=str(refusal))
+            raise refusal
+        return generate_embeddings_threaded(texts, embeddings_litellm_params)
 
     if last_error and errors == len(batches):
         logger.error("All embeddings failed to generate, reraising last error", error_count=errors, error=str(last_error))

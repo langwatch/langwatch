@@ -1,4 +1,3 @@
-import { applyTheme } from "../../../lib/theme.ts";
 import { fillMobileNav } from "./mobile-tree.ts";
 
 function closeMenus() {
@@ -6,13 +5,6 @@ function closeMenus() {
     menu.hidden = true;
     menu.previousElementSibling?.setAttribute("aria-expanded", "false");
   });
-}
-
-function chooseTheme({ choice }: { choice: string }) {
-  const dark =
-    choice === "dark" ||
-    (choice === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
-  applyTheme({ dark, choice });
 }
 
 function openMobile() {
@@ -53,14 +45,6 @@ function onMenuKey(event: KeyboardEvent) {
 export function installMenus() {
   document.addEventListener("click", onMenuClick);
   document.addEventListener("keydown", onMenuKey);
-  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
-    try {
-      if (!localStorage.getItem("theme") || localStorage.getItem("theme") === "system")
-        chooseTheme({ choice: "system" });
-    } catch {
-      /* The current theme is retained. */
-    }
-  });
 }
 
 installMenus();

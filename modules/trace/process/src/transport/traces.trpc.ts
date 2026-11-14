@@ -5,7 +5,6 @@
  */
 
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
-import { narrowAuthorization } from "@langwatch/authorization";
 import {
   customersAndLabelsResultSchema,
   discoverResultSchema,
@@ -14,7 +13,6 @@ import {
   facetValuesResultSchema,
   TraceApi,
   traceListPageSchema,
-  traceSummaryReadSchema,
   tracesEvaluationRunsSchema,
   tracesTrpc,
 } from "@langwatch/trace-contract";
@@ -23,23 +21,12 @@ import {
   traceDerivedAttrPrefixes,
   traceReadMapperPorts,
 } from "../rules/trace-read-mapper-ports.rules.ts";
-import {
-  buildSpanContentRedactions,
-  deriveTraceDropPrivacy,
-  gateTraceLogVisibility,
-  mapLegacySpanSummaryToTreeNode,
-  mapSpansToDetailDtos,
-  mapTraceSummaryToHeader,
-  redactV2Content,
-} from "../rules/trace-read-mappers.rules.ts";
-import {
-  gateHeaderCost,
-  gateResources,
-  gateTreeCost,
-  withoutHiddenResourceAttrs,
-} from "../rules/trace-view-gates.rules.ts";
+import { gateTraceLogVisibility, redactV2Content } from "../rules/trace-read-mappers.rules.ts";
 
 const evaluationsSchema = evaluationSchema.array();
+
+/** ADR-201 §9: the braid dialog's reads are Enterprise, named at the owner. */
+const braids = { feature: "BRAIDS" } as const;
 
 export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesTrpc> =
   defineTrpcRouter(TraceApi, tracesTrpc)
@@ -507,46 +494,9 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
 
     .procedure("header")
     .withPermission("traces:view")
-    .handle(async ({ app, input, authorization, actor }) => {
-      const protections = await app.resolveViewerProtections({
-        projectId: input.projectId,
-        userId: actor.id,
-        authorization,
-      });
-      const summary = traceSummaryReadSchema.parse(
-        await app.readTraceSummary({
-          authorization,
-          traceId: input.traceId,
-          tenantId: input.tenantId,
-          occurredAtMs: input.occurredAtMs,
-          visibilityCutoffMs: protections.visibilityCutoffMs,
-          full: input.full,
-        }),
-      );
-      const rawHeader = mapTraceSummaryToHeader(summary);
-      // Privacy follows the member the trace was found in (ADR-177 decision 9).
-      const memberProtections = await app.resolveViewerProtections({
-        projectId: input.projectId,
-        userId: actor.id,
-        authorization:
-          narrowAuthorization({ authorization, projectId: summary.tenantId }) ?? authorization,
-      });
-      // Cost is gated by the viewer's own `cost:view` (via `protections`), the
-      // same rule the detail-pane spans apply through `applySpanProtections`.
-      const header = gateHeaderCost({
-        header: redactV2Content(rawHeader, memberProtections, traceReadMapperPorts.contentPrivacy),
-        protections: memberProtections,
-      });
-      return {
-        ...header,
-        privacy: await deriveTraceDropPrivacy(
-          rawHeader,
-          summary.tenantId,
-          traceReadMapperPorts.contentPrivacy,
-        ),
-        projectId: summary.tenantId,
-      };
-    })
+    .handle(({ app, input, authorization, actor }) =>
+      app.readTraceHeaderForViewer({ ...input, authorization, viewerUserId: actor.id }),
+    )
 
     /**
      * Trim happens here so the event always carries a canonical form; rejections
@@ -602,115 +552,31 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
 
     .procedure("spansPaginated")
     .withPermission("traces:view")
-    .handle(async ({ app, input, authorization: routeProof, actor }) => {
-      const authorization = await app.authorizationForTrace({
-        authorization: routeProof,
-        traceId: input.traceId,
-        tenantId: input.tenantId,
-      });
-      const protections = await app.resolveViewerProtections({
-        projectId: input.projectId,
-        userId: actor.id,
-        authorization,
-      });
-      const page = await app.readSpansPage({
-        authorization,
-        traceId: input.traceId,
-        visibilityCutoffMs: protections.visibilityCutoffMs,
-        limit: input.limit,
-        offset: input.offset,
-        occurredAtMs: input.occurredAtMs,
-      });
-      const redactions = buildSpanContentRedactions(
-        page.spans,
-        protections,
-        traceReadMapperPorts.spanProtection,
-      );
-
-      return {
-        ...page,
-        spans: page.spans.map((span) =>
-          traceReadMapperPorts.spanProtection.applySpanProtections(span, protections, redactions),
-        ),
-      };
-    })
+    .handle(({ app, input, authorization, actor }) =>
+      app.readSpansPageForViewer({ ...input, authorization, viewerUserId: actor.id }),
+    )
 
     .procedure("spansDelta")
     .withPermission("traces:view")
-    .handle(async ({ app, input, authorization: routeProof, actor }) => {
-      const authorization = await app.authorizationForTrace({
-        authorization: routeProof,
-        traceId: input.traceId,
-        tenantId: input.tenantId,
-      });
-      const protections = await app.resolveViewerProtections({
-        projectId: input.projectId,
-        userId: actor.id,
-        authorization,
-      });
-      const sinceSpans = await app.readSpansSince({
-        authorization,
-        traceId: input.traceId,
-        sinceStartTimeMs: input.sinceStartTimeMs,
-        visibilityCutoffMs: protections.visibilityCutoffMs,
-        occurredAtMs: input.occurredAtMs,
-      });
-      const redactions = buildSpanContentRedactions(
-        sinceSpans,
-        protections,
-        traceReadMapperPorts.spanProtection,
-      );
-
-      return sinceSpans.map((span) =>
-        traceReadMapperPorts.spanProtection.applySpanProtections(span, protections, redactions),
-      );
-    })
+    .handle(({ app, input, authorization, actor }) =>
+      app.readSpansSinceForViewer({ ...input, authorization, viewerUserId: actor.id }),
+    )
 
     /**
-     * One page of the span tree in `(startTimeMs, spanId)` order — the only
+     * One page of the span tree in `(startTimeMs, spanId, owner)` order — the only
      * fetch path the frontend uses; traces can carry 20k-100k+ spans.
      */
     .procedure("spanTreePaginated")
     .withPermission("traces:view")
-    .handle(async ({ app, input, actor, authorization: routeProof }) => {
-      const authorization = await app.authorizationForTrace({
-        authorization: routeProof,
-        traceId: input.traceId,
-        tenantId: input.tenantId,
-      });
-      const protections = await app.resolveViewerProtections({
-        projectId: input.projectId,
-        userId: actor.id,
-        authorization,
-      });
-
-      return app.readSpanTreePage({
-        ...input,
-        authorization,
-        canSeeCosts: protections.canSeeCosts === true,
-      });
-    })
+    .handle(({ app, input, authorization, actor }) =>
+      app.readSpanTreePageForViewer({ ...input, authorization, viewerUserId: actor.id }),
+    )
 
     .procedure("spanTreeDelta")
     .withPermission("traces:view")
-    .handle(async ({ app, input, actor, authorization: routeProof }) => {
-      const authorization = await app.authorizationForTrace({
-        authorization: routeProof,
-        traceId: input.traceId,
-        tenantId: input.tenantId,
-      });
-      const protections = await app.resolveViewerProtections({
-        projectId: input.projectId,
-        userId: actor.id,
-        authorization,
-      });
-
-      return app.readSpanTreeDelta({
-        ...input,
-        authorization,
-        canSeeCosts: protections.canSeeCosts === true,
-      });
-    })
+    .handle(({ app, input, authorization, actor }) =>
+      app.readSpanTreeDeltaForViewer({ ...input, authorization, viewerUserId: actor.id }),
+    )
 
     /**
      * Whole-tree read in one response. The frontend no longer fetches through
@@ -719,25 +585,9 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
      */
     .procedure("spanTree")
     .withPermission("traces:view")
-    .handle(async ({ app, input, authorization: routeProof, actor }) => {
-      const authorization = await app.authorizationForTrace({
-        authorization: routeProof,
-        traceId: input.traceId,
-        tenantId: input.tenantId,
-      });
-      const protections = await app.resolveViewerProtections({
-        projectId: input.projectId,
-        userId: actor.id,
-        authorization,
-      });
-      const rows = await app.readSpanSummaries({
-        authorization,
-        traceId: input.traceId,
-        occurredAtMs: input.occurredAtMs,
-      });
-
-      return gateTreeCost({ nodes: rows.map(mapLegacySpanSummaryToTreeNode), protections });
-    })
+    .handle(({ app, input, authorization, actor }) =>
+      app.readSpanTreeForViewer({ ...input, authorization, viewerUserId: actor.id }),
+    )
 
     .procedure("spanLangwatchSignals")
     .withPermission("traces:view")
@@ -751,9 +601,14 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
         authorization,
         traceId: input.traceId,
         occurredAtMs: input.occurredAtMs,
+        reads: "spans",
       });
 
-      return rows.map((r) => ({ spanId: r.spanId, signals: r.signals }));
+      return rows.map((r) => ({
+        spanId: r.spanId,
+        signals: r.signals,
+        ...(r.ownerProjectId === undefined ? {} : { ownerProjectId: r.ownerProjectId }),
+      }));
     })
 
     /**
@@ -762,51 +617,14 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
      */
     .procedure("spansFull")
     .withPermission("traces:view")
-    .handle(async ({ app, input, authorization: routeProof, actor }) => {
-      const authorization = await app.authorizationForTrace({
-        authorization: routeProof,
-        traceId: input.traceId,
-        tenantId: input.tenantId,
-      });
-      const protections = await app.resolveViewerProtections({
-        projectId: input.projectId,
-        userId: actor.id,
-        authorization,
-      });
-      const storedSpans = await app.readSpans({
-        authorization,
-        traceId: input.traceId,
-        occurredAtMs: input.occurredAtMs,
-        visibilityCutoffMs: protections.visibilityCutoffMs,
-      });
-      // Claude Code's real `llm_request` spans carry tokens + `request_id` but NO
-      // message content, which lives in the trace's OTLP log records. Joined on
-      // BEFORE protections run, so it goes through the same redaction pass.
-      const spans = await app.enrichSpansFromCodingAgentLogs({
-        projectId: input.projectId,
-        traceId: input.traceId,
-        spans: storedSpans,
-        ...(input.occurredAtMs !== undefined ? { occurredAtMs: input.occurredAtMs } : {}),
-      });
-
-      return mapSpansToDetailDtos(spans, protections, traceReadMapperPorts);
-    })
+    .handle(({ app, input, authorization, actor }) =>
+      app.readSpansFullForViewer({ ...input, authorization, viewerUserId: actor.id }),
+    )
 
     .procedure("spanDetail")
     .withPermission("traces:view")
-    .handle(async ({ app, input, actor, authorization }) =>
-      app.readSpanDetailForViewer({
-        projectId: input.projectId,
-        authorization: await app.authorizationForTrace({
-          authorization,
-          traceId: input.traceId,
-          tenantId: input.tenantId,
-        }),
-        traceId: input.traceId,
-        spanId: input.spanId,
-        occurredAtMs: input.occurredAtMs,
-        viewerUserId: actor.id,
-      }),
+    .handle(({ app, input, authorization, actor }) =>
+      app.readSpanDetailForViewer({ ...input, authorization, viewerUserId: actor.id }),
     )
 
     /**
@@ -815,40 +633,9 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
      */
     .procedure("resourceInfo")
     .withPermission("traces:view")
-    .handle(async ({ app, input, authorization: routeProof, actor }) => {
-      const authorization = await app.authorizationForTrace({
-        authorization: routeProof,
-        traceId: input.traceId,
-        tenantId: input.tenantId,
-      });
-      const protections = await app.resolveViewerProtections({
-        projectId: input.projectId,
-        userId: actor.id,
-        authorization,
-      });
-      const rows = await app.readSpanResources({
-        authorization,
-        traceId: input.traceId,
-        occurredAtMs: input.occurredAtMs,
-      });
-      const resourceSpans = rows.map((r) => ({
-        spanId: r.spanId,
-        parentSpanId: r.parentSpanId,
-        resourceAttributes: withoutHiddenResourceAttrs(r.resourceAttributes),
-        scope: { name: r.scopeName ?? "", version: r.scopeVersion },
-      }));
-      const root = rows.find((r) => r.parentSpanId == null) ?? rows[0] ?? null;
-
-      return gateResources({
-        resources: {
-          rootSpanId: root?.spanId ?? null,
-          resourceAttributes: withoutHiddenResourceAttrs(root?.resourceAttributes ?? {}),
-          scope: root ? { name: root.scopeName ?? "", version: root.scopeVersion } : null,
-          spans: resourceSpans,
-        },
-        protections,
-      });
-    })
+    .handle(({ app, input, authorization, actor }) =>
+      app.readSpanResourcesForViewer({ ...input, authorization, viewerUserId: actor.id }),
+    )
 
     /**
      * Trace-level events for the drawer, split off the header so the header
@@ -856,26 +643,50 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
      */
     .procedure("traceEvents")
     .withPermission("traces:view")
-    .handle(async ({ app, input, authorization: routeProof, actor }) => {
-      const authorization = await app.authorizationForTrace({
-        authorization: routeProof,
-        traceId: input.traceId,
-        tenantId: input.tenantId,
-      });
-      const protections = await app.resolveViewerProtections({
-        projectId: input.projectId,
-        userId: actor.id,
-        authorization,
-      });
-      const events = await app.readTraceEvents({
-        authorization,
-        traceId: input.traceId,
-        occurredAtMs: input.occurredAtMs,
-      });
+    .handle(({ app, input, authorization, actor }) =>
+      app.readTraceEventsForViewer({ ...input, authorization, viewerUserId: actor.id }),
+    )
 
-      return traceReadMapperPorts.spanProtection.applyDerivedTraceEventProtections(
-        events,
-        protections,
-      );
-    })
+    .procedure("braidPreview")
+    .withEntitlement("enterprise", braids)
+    .withPermission("traces:view", { via: "projectId" })
+    .withPermission("traces:view", { via: "projectId", field: "readerProjectId" })
+    .handle(({ app, input, authorizations }) =>
+      app.previewBraid({
+        ownerAuthorization: authorizations.projectId,
+        readerAuthorization: authorizations.readerProjectId,
+        where: input.where,
+        fromMs: input.fromMs,
+        braidId: input.braidId,
+      }),
+    )
+
+    .procedure("braidAttributeKeys")
+    .withPermission("traces:view")
+    .handle(({ app, authorization }) => app.readBraidAttributeKeys({ authorization }))
+
+    .procedure("braidActivity")
+    .withPermission("traces:view")
+    .handle(({ app, input, authorization }) =>
+      app.readBraidActivity({
+        projectId: input.projectId,
+        authorization,
+        braidIds: input.braidIds,
+      }),
+    )
+
+    .procedure("braidTestTrace")
+    .withEntitlement("enterprise", braids)
+    .withPermission("traces:view", { via: "projectId" })
+    .withPermission("traces:view", { via: "projectId", field: "readerProjectId" })
+    .handle(({ app, input, authorizations }) =>
+      app.readBraidTestTrace({
+        ownerAuthorization: authorizations.projectId,
+        readerAuthorization: authorizations.readerProjectId,
+        where: input.where,
+        fromMs: input.fromMs,
+        traceId: input.traceId,
+        braidId: input.braidId,
+      }),
+    )
     .build();

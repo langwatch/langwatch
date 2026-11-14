@@ -62,6 +62,7 @@ export type SignalHandleResult<State> =
 
 const SLOW_PROCESS_MANAGER_OPERATION_MS = 1_000;
 export const DEFAULT_SIGNAL_REVISION_RETRIES = 3;
+export const DEFAULT_EVENT_REVISION_RETRIES = 3;
 
 /** Metric/log label for each evolve outcome, keyed by the result's own `outcome` tag. */
 const EVOLVE_OUTCOME_METRIC_LABEL: Record<
@@ -87,6 +88,8 @@ export interface ProcessManagerServiceOptions<State> {
   tracer?: Tracer;
   /** Number of compare-and-swap losses a synchronous signal retries. */
   signalRevisionRetries?: number;
+  /** Number of compare-and-swap losses an event delivery retries before the queue retries it. */
+  eventRevisionRetries?: number;
 }
 
 /** Generic process-manager core with idempotency contracts for events, signals, and wake-ups. */
@@ -95,6 +98,7 @@ export class ProcessManagerService<State> {
   private readonly store: ProcessStore;
   private readonly tracer: Tracer;
   private readonly signalRevisionRetries: number;
+  private readonly eventRevisionRetries: number;
   private readonly logger = createLogger("langwatch:event-sourcing:process-manager");
 
   constructor(options: ProcessManagerServiceOptions<State>) {
@@ -102,8 +106,14 @@ export class ProcessManagerService<State> {
     this.store = options.store;
     this.tracer = options.tracer ?? trace.getTracer("langwatch.process-manager");
     this.signalRevisionRetries = options.signalRevisionRetries ?? DEFAULT_SIGNAL_REVISION_RETRIES;
-    if (!Number.isSafeInteger(this.signalRevisionRetries) || this.signalRevisionRetries < 0) {
-      throw new RangeError("signalRevisionRetries must be a non-negative safe integer");
+    this.eventRevisionRetries = options.eventRevisionRetries ?? DEFAULT_EVENT_REVISION_RETRIES;
+    for (const [name, value] of [
+      ["signalRevisionRetries", this.signalRevisionRetries],
+      ["eventRevisionRetries", this.eventRevisionRetries],
+    ] as const) {
+      if (!Number.isSafeInteger(value) || value < 0) {
+        throw new RangeError(`${name} must be a non-negative safe integer`);
+      }
     }
   }
 
@@ -139,49 +149,92 @@ export class ProcessManagerService<State> {
         "project.id": envelope.projectId,
         ...(envelope.userId ? { "user.id": envelope.userId } : {}),
       },
-      run: async () => {
-        // Inbox first: a redelivery stands down before the read, evolve and locked
-        // commit. The commit's in-lock check stays the authority; a transient
-        // process writes no marker, so it keeps its one-write path unread.
-        if (
-          !this.definition.transient &&
-          (await this.store.hasConsumedSource({ ref, sourceEventId: envelope.eventId }))
-        ) {
-          return { outcome: "duplicateEvent" as const };
-        }
-        const existing = await this.store.findByRef<State>({ ref });
-        const evolution = this.definition.evolve({
-          previousState: existing?.state ?? this.definition.initialState,
-          input: { kind: "event", event: envelope, now },
-          ref,
-        });
+      run: () => this.runEventRetryLoop({ ref, envelope, now }),
+    });
+  }
 
-        // Transient path is decided after evolution runs, not speculated on initial state.
-        if (
-          this.definition.transient &&
-          existing === null &&
-          this.isTransientEvolution(evolution)
-        ) {
-          return this.appendIntents({
-            ref,
-            tenantId: envelope.tenantId,
-            userId: envelope.userId,
-            sourceEventId: envelope.eventId,
-            evolution,
-            now,
-          });
-        }
-
-        return this.commitEvolution({
-          ref,
-          tenantId: envelope.tenantId,
-          userId: envelope.userId,
+  /**
+   * Re-evolves an event against the winning revision when another commit (a
+   * wake, usually) lands between read and write. Evolution is pure, and the
+   * inbox check repeats. See specs/eventing/process-event-revision-conflict.feature.
+   */
+  private async runEventRetryLoop({
+    ref,
+    envelope,
+    now,
+  }: {
+    ref: ProcessRef;
+    envelope: ProcessEventEnvelope;
+    now: number;
+  }): Promise<HandleResult> {
+    let result = await this.attemptEventCommit({ ref, envelope, now });
+    for (
+      let conflictCount = 0;
+      result.outcome === "revisionConflict" && conflictCount < this.eventRevisionRetries;
+      conflictCount++
+    ) {
+      this.logger.debug(
+        {
+          processName: ref.processName,
+          processKey: ref.processKey,
+          projectId: ref.projectId,
           sourceEventId: envelope.eventId,
-          expectedRevision: existing?.revision ?? 0,
-          evolution,
-          now,
-        });
-      },
+          actualRevision: result.actualRevision,
+          conflictCount: conflictCount + 1,
+        },
+        "Process event lost its revision race; re-evolving against the winning revision",
+      );
+      result = await this.attemptEventCommit({ ref, envelope, now });
+    }
+    return result;
+  }
+
+  /** One read, evolve and commit of an event; a revision conflict is returned, not thrown. */
+  private async attemptEventCommit({
+    ref,
+    envelope,
+    now,
+  }: {
+    ref: ProcessRef;
+    envelope: ProcessEventEnvelope;
+    now: number;
+  }): Promise<HandleResult> {
+    // Inbox first: a redelivery stands down before the read, evolve and locked
+    // commit. The commit's in-lock check stays the authority; a transient
+    // process writes no marker, so it keeps its one-write path unread.
+    if (
+      !this.definition.transient &&
+      (await this.store.hasConsumedSource({ ref, sourceEventId: envelope.eventId }))
+    ) {
+      return { outcome: "duplicateEvent" as const };
+    }
+    const existing = await this.store.findByRef<State>({ ref });
+    const evolution = this.definition.evolve({
+      previousState: existing?.state ?? this.definition.initialState,
+      input: { kind: "event", event: envelope, now },
+      ref,
+    });
+
+    // Transient path is decided after evolution runs, not speculated on initial state.
+    if (this.definition.transient && existing === null && this.isTransientEvolution(evolution)) {
+      return this.appendIntents({
+        ref,
+        tenantId: envelope.tenantId,
+        userId: envelope.userId,
+        sourceEventId: envelope.eventId,
+        evolution,
+        now,
+      });
+    }
+
+    return this.commitEvolution({
+      ref,
+      tenantId: envelope.tenantId,
+      userId: envelope.userId,
+      sourceEventId: envelope.eventId,
+      expectedRevision: existing?.revision ?? 0,
+      evolution,
+      now,
     });
   }
 

@@ -6,8 +6,8 @@ Feature: Developer seat
 
   # Design record: dev/docs/adr/171-developer-seat.md (Accepted).
   # A Developer owns a personal project, may act inside it (CLI, queries,
-  # evaluations), never sees a shared project, is counted but never capped,
-  # and may be downgraded from a Full seat. One organisation setting decides
+  # evaluations), never sees a shared project, is counted against a
+  # Developer seat cap of its own (ADR v7), and may be downgraded from a Full seat. One organisation setting decides
   # which seat self-service and SSO joiners receive.
 
   Background:
@@ -201,6 +201,75 @@ Feature: Developer seat
     Then all ten are admitted
     And the plan page shows 5 Full, 5 Light and 10 Developer seats
     And the Full and Light counts did not change
+
+  # ============================================================================
+  # Developer seat cap (measured; admission enforces it in a later change)
+  # ============================================================================
+
+  Scenario: Ops sets the Developer seat cap on a subscription
+    Given an operator editing an organisation's subscription in Ops
+    When they set "Max developer members" to 4 and save
+    Then the subscription stores a Developer seat cap of 4
+
+  @unit
+  Scenario: A subscription's Developer seat cap overrides the plan's
+    Given a Growth plan, which includes no Developer seats
+    And the organisation's subscription states a Developer seat cap of 4
+    When the active plan is resolved
+    Then the plan allows 4 Developer seats
+
+  @unit
+  Scenario: Only the open source deployment leaves Developer seats uncapped
+    Given every cloud plan and the open source baseline
+    Then every cloud plan includes no Developer seats
+    And the open source baseline leaves Developer seats uncapped
+
+  @unit
+  Scenario: Developer seats bought on Growth become the Developer seat cap
+    Given a Growth subscription whose Developer seat line has a quantity of 3
+    When Stripe reports the subscription updated
+    Then the subscription stores a Developer seat cap of 3
+
+  @unit
+  Scenario: Removing the Developer seat line sets the Developer seat cap to none
+    Given a Growth subscription with a Developer seat cap of 3
+    When Stripe reports the subscription updated with no Developer seat line
+    Then the subscription stores a Developer seat cap of 0
+
+  @unit
+  Scenario: A subscription without Growth seats keeps the Developer seat cap Ops set
+    Given a tiered subscription whose Developer seat cap Ops set to 2
+    When Stripe reports the subscription updated
+    Then the subscription still stores a Developer seat cap of 2
+
+  @unit
+  Scenario: A licence that states no Developer seats sells none
+    Given a self-hosted licence signed before Developer seats were capped
+    When the licence's plan is resolved
+    Then the plan allows 0 Developer seats
+
+  @unit
+  Scenario: A licence states its Developer seats
+    Given a self-hosted licence minted with 6 Developer seats
+    When the licence's plan is resolved
+    Then the plan allows 6 Developer seats
+
+  @unit
+  Scenario: A licence minted without Developer seats signs as it did before
+    Given a licence minted without stating Developer seats
+    Then its signed plan carries no Developer seat field
+
+  Scenario: The member list shows Developer seats against the Developer seats paid for
+    Given a plan that allows 4 Developer seats and 3 Developers
+    When an administrator opens the member list
+    Then the Developer seat card reads "3 / 4"
+
+  @unit
+  Scenario: The usage page shows Developer seats against the Developer seats paid for
+    Given a plan that allows 4 Developer seats and 3 Developers
+    When an administrator opens the usage page
+    Then the seats card reads "3 / 4" Developer seats
+    And a plan with no Developer seats and no Developers shows no Developer row
 
   # ============================================================================
   # Directory sync

@@ -12,7 +12,7 @@ import {
   usageLimitWarningSchema,
 } from "./entitlement.schemas.ts";
 import { planSchema } from "./plan.ts";
-import { usageStatsSchema } from "./usage.ts";
+import { usageMonthBreakdownSchema, usageStatsSchema } from "./usage.ts";
 
 export const planTrpc = defineTrpcContract("plan")
   .query("getActivePlan")
@@ -24,6 +24,10 @@ export const usageLimitsTrpc = defineTrpcContract("limits")
   .query("getUsage")
   .withInput(entitlementOrganizationScopeSchema)
   .withOutput(usageStatsSchema)
+
+  .query("getMonthBreakdown")
+  .withInput(entitlementOrganizationScopeSchema)
+  .withOutput(usageMonthBreakdownSchema)
 
   .mutation("checkAndSendUsageLimitNotification")
   .withInput(sendUsageLimitWarningInputSchema)

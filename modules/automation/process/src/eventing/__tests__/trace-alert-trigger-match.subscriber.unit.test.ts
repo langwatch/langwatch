@@ -30,7 +30,7 @@ function trigger(id: string, filters: Record<string, unknown>): TriggerSummary {
 
 function harness() {
   const reads: string[] = [];
-  const counted: number[] = [];
+  const counted: { path: string; count: number }[] = [];
   const matches: (TriggerMatchRecordedEventData & { tenantId: string; occurredAt: number })[] = [];
   const deps = {
     triggers: {
@@ -48,8 +48,8 @@ function harness() {
       },
     },
     metrics: {
-      countRecorded: (count: number) => {
-        counted.push(count);
+      countRecorded: (input: { path: string; count: number }) => {
+        counted.push(input);
       },
     },
   };
@@ -129,7 +129,7 @@ describe("handleTraceAlertTriggerMatch", () => {
           { tenantId: "project-1", aggregateId: "trace-1" },
         );
 
-        expect(counted).toEqual([1]);
+        expect(counted).toEqual([{ path: "trace", count: 1 }]);
       });
 
       /** @scenario "Recording a match consumes nothing" */

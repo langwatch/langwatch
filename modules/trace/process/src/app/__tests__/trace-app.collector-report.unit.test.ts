@@ -44,7 +44,7 @@ describe("TraceModule.collectorReportError", () => {
 
       expect(loggerSpies.warn).toHaveBeenCalledWith(
         expect.objectContaining({ projectId: "project_1", traceId: "trace_1" }),
-        "the collector answered a failure",
+        "the collector refused a payload",
       );
       expect(loggerSpies.error).not.toHaveBeenCalled();
     });

@@ -45,6 +45,17 @@ import type {
   RevokeApiKeyInput,
   UpdateApiKeyInput,
 } from "./api-key.ts";
+import type {
+  BraidSignatureVerdict,
+  CreateSigningKeyInput,
+  FindSigningKeysInput,
+  IssuedSigningKey,
+  ProjectSigning,
+  RevokeSigningKeyInput,
+  RotateSigningKeyInput,
+  SigningKey,
+  VerifyBraidSignatureInput,
+} from "./signing-key.ts";
 
 const apiKeyVisibleProjectsInputSchemaDefinition = z
   .object({
@@ -266,6 +277,19 @@ export interface ApiKeyApi {
     by: ApiKeyManagementCaller,
   ): Promise<NamedApiKeyBinding[]>;
   /**
+   * What a restricted key bound to every one of these scopes may carry: what the owner (else
+   * the caller) holds at each, by the mint's own resolver, so group grants count. Only an
+   * organization admin may ask about another owner.
+   */
+  listGrantablePermissions(
+    input: {
+      organizationId: string;
+      scopes: { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }[];
+      ownerUserId?: string;
+    },
+    by: ApiKeyManagementCaller,
+  ): Promise<string[]>;
+  /**
    * One key id resolved to a display name. Answers null identically for an id
    * that does not exist and one in another organization, so it cannot enumerate.
    */
@@ -290,6 +314,14 @@ export interface ApiKeyApi {
     input: { organizationId: string; apiKeyId: string },
     by: ApiKeyManagementCaller,
   ): Promise<void>;
+  /**
+   * Swaps a key's secret for a new one, keeping its id, settings and grants, and answers the new
+   * token once. The old secret is refused at once: there is no grace period.
+   */
+  rotateKey(
+    input: { organizationId: string; apiKeyId: string },
+    by: ApiKeyManagementCaller,
+  ): Promise<{ token: string; apiKey: ApiKey }>;
   listOrganizationProjects(
     input: { organizationId: string },
     by: ApiKeyManagementCaller,
@@ -302,6 +334,18 @@ export interface ApiKeyApi {
     input: { organizationId: string },
     by: ApiKeyManagementCaller,
   ): Promise<ApiKeyUser[]>;
+  /** ADR-201 §4: a project's braid signing keys with their last 24 hours; never a secret. */
+  findSigningKeys(input: FindSigningKeysInput): Promise<SigningKey[]>;
+  /** Whether a project signs its calls, for the braid dialog of whoever braids into it. */
+  findProjectSigning(input: FindSigningKeysInput): Promise<ProjectSigning>;
+  /** Issues a signing key; the answer is the only place its secret is ever returned. */
+  createSigningKey(input: CreateSigningKeyInput): Promise<IssuedSigningKey>;
+  /** Issues a replacement; the old key keeps verifying for `SIGNING_KEY_ROTATION_OVERLAP_MS`. */
+  rotateSigningKey(input: RotateSigningKeyInput): Promise<IssuedSigningKey>;
+  /** Ends a key at once, bounded by the lookup cache (`SIGNING_KEY_LOOKUP_CACHE_MS`). */
+  revokeSigningKey(input: RevokeSigningKeyInput): Promise<SigningKey>;
+  /** Span admission's check of one `langwatch.signature`; the secret never leaves this module. */
+  verifyBraidSignature(input: VerifyBraidSignatureInput): Promise<BraidSignatureVerdict>;
 }
 
 export const ApiKeyApi = moduleApi<ApiKeyApi>()("api-key");

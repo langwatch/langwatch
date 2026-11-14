@@ -2,6 +2,8 @@ import type {
   Agent,
   AgentCopy,
   AgentHistoryEntry,
+  AgentLabel,
+  AgentVersions,
   AgentWithFields,
   CreateAgentCommand,
   RelatedAgentEntities,
@@ -125,6 +127,18 @@ class TestAgentBrowser implements AgentClient {
 
   getHistory(): Promise<AgentHistoryEntry[]> {
     return Promise.resolve([]);
+  }
+
+  listVersions(): Promise<AgentVersions> {
+    return Promise.resolve({ versions: [], labels: [], availableLabels: [] });
+  }
+
+  assignLabel(): Promise<AgentLabel> {
+    return Promise.reject(new Error("assignLabel is not used by these tests"));
+  }
+
+  removeLabel(): Promise<void> {
+    return Promise.resolve();
   }
 }
 

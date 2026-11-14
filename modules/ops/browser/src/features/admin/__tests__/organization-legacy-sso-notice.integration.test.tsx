@@ -23,6 +23,7 @@ vi.mock("../../../behavior/ops-api.ts", () => ({
         useQuery: () => ({ data: { connections: listState.connections, total: 1 } }),
       },
     },
+    organizationSeatPeak: { get: { useQuery: () => ({ data: undefined, isLoading: true }) } },
   },
 }));
 

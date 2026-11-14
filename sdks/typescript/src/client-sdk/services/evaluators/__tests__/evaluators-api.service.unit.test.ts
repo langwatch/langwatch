@@ -63,3 +63,26 @@ describe("given an EvaluatorsApiService whose transport answers an unreadable bo
     });
   });
 });
+
+describe("given an EvaluatorsApiService creating a custom code evaluator", () => {
+  /** @scenario The TypeScript SDK creates a code evaluator */
+  it("sends the kind and the program unchanged", async () => {
+    const client = clientWith({
+      data: { id: "evaluator_1", type: "code" },
+      response: new Response(null, { status: 200 }),
+    });
+    const service = new EvaluatorsApiService({ langwatchApiClient: client });
+    const body: CreateEvaluatorBody = {
+      name: "Exact",
+      type: "code",
+      config: {
+        code: "class Code:\n    def __call__(self, output: str):\n        return {}\n",
+        inputs: [{ identifier: "output", type: "str" }],
+      },
+    };
+
+    await service.create(body);
+
+    expect(client.POST).toHaveBeenCalledWith("/api/v1/evaluators", { body });
+  });
+});

@@ -3,6 +3,7 @@ import { defineProcessModule, type PublishedProcessModule } from "@langwatch/pro
 
 import { DataPrivacyModule } from "./app/data-privacy.app.ts";
 import { dataPrivacyChannels } from "./channels/data-privacy-channels.registry.ts";
+import { piiRedactionSpendEventing } from "./eventing/pii-redaction-spend.pipeline.ts";
 import { dataPrivacyRepositories } from "./repositories/data-privacy-repositories.registry.ts";
 import { dataPrivacyTrpcTransport } from "./transport/data-privacy.trpc.ts";
 
@@ -14,4 +15,5 @@ export const dataPrivacyProcessModule: PublishedProcessModule<
   .withRepositories(dataPrivacyRepositories)
   .withChannels(dataPrivacyChannels)
   .withApi(DataPrivacyModule)
-  .withTransports(dataPrivacyTrpcTransport);
+  .withTransports(dataPrivacyTrpcTransport)
+  .withEventing(piiRedactionSpendEventing);

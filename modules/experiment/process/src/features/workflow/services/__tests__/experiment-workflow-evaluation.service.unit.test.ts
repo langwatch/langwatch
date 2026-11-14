@@ -1,7 +1,14 @@
 import type { AgentApi } from "@langwatch/agent-contract";
-import type { DatasetApi } from "@langwatch/dataset-contract";
+import {
+  type DatasetApi,
+  type DatasetVersion,
+  DatasetVersionNotFoundError,
+} from "@langwatch/dataset-contract";
 import { createTenantId, EventUtils } from "@langwatch/eventing";
-import type { FindOrCreateWorkflowExperimentInput } from "@langwatch/experiment-contract";
+import {
+  experimentWorkflowEvaluateSchema,
+  type FindOrCreateWorkflowExperimentInput,
+} from "@langwatch/experiment-contract";
 import { resolveRequestBound, type RequestBoundKey } from "@langwatch/plans";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -156,6 +163,7 @@ function buildService(
     rowBound?: number;
     /** A worker that has not folded the request by the time the api answers. */
     workerIdle?: boolean;
+    datasets?: DatasetApi;
   } = {},
 ) {
   const workflows =
@@ -177,7 +185,7 @@ function buildService(
   const completionsSent: unknown[] = [];
   const worker = workerFold();
   const services = {
-    datasets: createApiFixture<DatasetApi>({}),
+    datasets: overrides.datasets ?? createApiFixture<DatasetApi>({}),
     prompts: createApiFixture<PromptApi>({}),
     agents: createApiFixture<AgentApi>({}),
     workflows: workflowSource,
@@ -495,3 +503,146 @@ function requestFor(runId: string): WorkflowEvaluationRequestedEventData & { ten
     total: 3,
   };
 }
+
+const SAVED_DATASET_ID = "dataset_1";
+
+/** The entry node attached to a saved dataset instead of carrying rows inline. */
+function savedEntryDsl() {
+  const dsl = entryDsl();
+  const entry = dsl.nodes[0];
+  if (entry?.type !== "entry") throw new Error("entry node expected first");
+  return {
+    ...dsl,
+    nodes: [
+      { ...entry, data: { ...entry.data, dataset: { id: SAVED_DATASET_ID, name: "Saved" } } },
+      ...dsl.nodes.slice(1),
+    ],
+  };
+}
+
+/** A saved dataset with versions 1 (one row) and 2 (two rows), answering what a run reads. */
+function versionedDataset() {
+  const rowsOf: Record<number, string[]> = { 1: ["v1-a"], 2: ["v2-a", "v2-b"] };
+  const read: number[] = [];
+  const links: { runId: string; versionId: string }[] = [];
+  const versionOf = (version: number): DatasetVersion => ({
+    id: `version-${version}`,
+    projectId: PROJECT_ID,
+    datasetId: SAVED_DATASET_ID,
+    version,
+    name: null,
+    trigger: "manual",
+    contentHash: `hash-${version}`,
+    columnTypes: [{ name: "question", type: "string" }],
+    rowCount: rowsOf[version]?.length ?? 0,
+    sizeBytes: 0,
+    chunkCount: 1,
+    restoredFromVersion: null,
+    authorId: null,
+    authorKind: "system",
+    pinned: false,
+    runCount: 0,
+    createdAt: new Date(0),
+  });
+  const api = createApiFixture<DatasetApi>({
+    resolveVersionForRun: async ({ version }) => {
+      if (version === undefined || !rowsOf[version]) {
+        throw new DatasetVersionNotFoundError({ version: version ?? 0 });
+      }
+      return versionOf(version);
+    },
+    readVersion: async ({ version }) => {
+      read.push(version);
+      return {
+        version: versionOf(version),
+        rows: (rowsOf[version] ?? []).map((question, index) => ({
+          id: `row-${index}`,
+          entry: { question },
+        })),
+      };
+    },
+    linkRunVersions: async ({ runId, versions }) => {
+      for (const { versionId } of versions) links.push({ runId, versionId });
+    },
+  });
+  return { api, read, links };
+}
+
+const savedWorkflow = (): Record<string, FakeWorkflow> => ({
+  [WORKFLOW_ID]: {
+    id: WORKFLOW_ID,
+    name: "Evaluate me",
+    versions: [{ id: "version_2", version: "2", dsl: savedEntryDsl() }],
+  },
+});
+
+describe("given a workflow whose attached saved dataset has versions 1 and 2", () => {
+  describe("when the evaluate API is called with dataset_version 1", () => {
+    /** @scenario "The workflow evaluate API takes a dataset version" */
+    it("reads version 1's rows and links version 1 to the run", async () => {
+      const dataset = versionedDataset();
+      const { service, sent, starts } = buildService({
+        workflows: savedWorkflow(),
+        datasets: dataset.api,
+      });
+
+      const started = await service.request({ ...baseInput, datasetVersion: 1 });
+      expect(sent[0]?.datasetVersion).toBe(1);
+      const request = sent[0];
+      if (!request) throw new Error("no request sent");
+      await service.run(request);
+
+      expect(dataset.read).toEqual([1, 1]);
+      expect(starts()[0]?.plan?.rows.map((row) => row.entry.question)).toEqual(["v1-a"]);
+      expect(dataset.links).toEqual([{ runId: started.runId, versionId: "version-1" }]);
+    });
+  });
+
+  describe("when the evaluate API is called with dataset_version 5", () => {
+    /** @scenario "The workflow evaluate API refuses a version the dataset does not have" */
+    it("refuses with dataset_version_not_found and sends nothing", async () => {
+      const { service, sent } = buildService({
+        workflows: savedWorkflow(),
+        datasets: versionedDataset().api,
+      });
+
+      await expect(service.request({ ...baseInput, datasetVersion: 5 })).rejects.toMatchObject({
+        code: "dataset_version_not_found",
+      });
+      expect(sent).toHaveLength(0);
+    });
+  });
+});
+
+describe("given a workflow whose attached dataset is inline", () => {
+  describe("when the evaluate API is called with dataset_version 1", () => {
+    /** @scenario "The workflow evaluate API refuses a dataset version with no saved dataset to read" */
+    it("refuses with experiment_evaluation_input_invalid and sends nothing", async () => {
+      const { service, sent } = buildService();
+
+      await expect(service.request({ ...baseInput, datasetVersion: 1 })).rejects.toMatchObject({
+        code: "experiment_evaluation_input_invalid",
+      });
+      expect(sent).toHaveLength(0);
+    });
+  });
+});
+
+describe("experimentWorkflowEvaluateSchema", () => {
+  describe("when the body sends inline data and a dataset_version", () => {
+    /** @scenario "The workflow evaluate API refuses a dataset version sent with inline data" */
+    it("fails validation on dataset_version", () => {
+      const parsed = experimentWorkflowEvaluateSchema.safeParse({
+        data: [{ question: "x" }],
+        dataset_version: 1,
+      });
+
+      expect(parsed.success).toBe(false);
+      expect(parsed.error?.issues.map((issue) => issue.path)).toEqual([["dataset_version"]]);
+    });
+  });
+
+  it("refuses a dataset_version below 1", () => {
+    expect(experimentWorkflowEvaluateSchema.validate({ dataset_version: 0 })).toBe(false);
+  });
+});

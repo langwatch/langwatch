@@ -350,6 +350,15 @@ Ask Langy for a code change in the LangWatch panel first. Its request appears in
 ╰─────────────────────────────────────────────────────────────────────────────╯
 ```
 
+The terminal only sees requests made by the account it is signed in as. With `--as <email>`, available in releases after 2.2.0 (an older CLI refuses the option), it checks that its login is the person who asked Langy. If it is not, it says so and offers to sign in as that person.
+
+After 30 seconds with no request, with or without `--as`, it names the account it is signed in as and tells you how to switch, then keeps waiting.
+
+```text
+Signed in as riley@acme.test, the request came from sam@acme.test.
+? Sign in as sam@acme.test? › (Y/n)
+```
+
 When two conversations asked for the same folder, you pick one first. After you share it, the command prints what Langy does, one line per call:
 
 ```text
@@ -519,6 +528,12 @@ Each command uses the values differently:
 - `run-plan run`, `test-suite run` and `scenario run` supply the parameters that the scenarios declare. A name that no scenario in the run declares is rejected before anything is scheduled. See [Scenario run parameters](/agent-testing/run-parameters).
 - `experiment run` merges the values into every dataset row. It also takes `--concurrency <n>`, from 1 to 24, for how many cells (one row against one target) run at once in this run only. Use `--concurrency 1` to run them one at a time, in order. See [Running experiments in CI/CD](/evaluations/experiments/ci-cd#choosing-what-to-evaluate).
 - `workflow run` sends the values as entry inputs. They are merged over `--input`, so a `--param` pair wins when both name the same key.
+
+`experiment run` also takes `--dataset-version <n>` to run a saved version of the experiment's dataset instead of its current content:
+
+```bash
+langwatch experiment run <experiment-slug> --dataset-version 1
+```
 
 ### Inspect simulation runs
 

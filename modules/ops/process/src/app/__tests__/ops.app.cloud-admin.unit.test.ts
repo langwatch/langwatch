@@ -50,6 +50,19 @@ describe("given the cloud-ops capability is off", () => {
   });
 });
 
+describe("given a self-hosted operator, where the cloud-ops capability is off", () => {
+  /** @scenario "A self-hosted operator is refused Cloud admin" */
+  it("holds ops:view and ops:manage yet is refused Cloud admin as not found", async () => {
+    const { app, run, adminOperation } = appOn({ cloudOps: false });
+
+    await expect(app.admitOperator(STAFF, "ops:view")).resolves.toBeUndefined();
+    await expect(app.admitOperator(STAFF, "ops:manage")).resolves.toBeUndefined();
+    await expect(app.admitCloudAdmin(STAFF)).rejects.toMatchObject({ code: "not_found" });
+    await expect(async () => run("subscriptions")).rejects.toMatchObject({ code: "not_found" });
+    expect(adminOperation).not.toHaveBeenCalled();
+  });
+});
+
 describe("given the cloud-ops capability is on", () => {
   it("answers subscriptions", async () => {
     const { run, adminOperation } = appOn({ cloudOps: true });

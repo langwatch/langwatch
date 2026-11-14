@@ -10,7 +10,7 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { ownProof } from "../../../__tests__/support/authorization-proofs.fixture.ts";
-import { mapToTraceListItem } from "../../../rules/trace-list-row.rules.ts";
+import { mapToTraceListItem } from "../../../features/read/rules/trace-list-row.rules.ts";
 import { traceQueryTranslation } from "../../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
 import { SessionGroupsClickHouseRepository } from "../session-groups.repository.ts";
 import { TraceListClickHouseRepository } from "../trace-list.repository.ts";

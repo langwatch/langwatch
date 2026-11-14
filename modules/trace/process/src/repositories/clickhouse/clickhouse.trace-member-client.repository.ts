@@ -28,8 +28,10 @@ export interface TraceClickHouseWriteClient extends TraceClickHouseClient {
      * client a background process composes) satisfies it without copying.
      */
     values: readonly unknown[];
+    /** The columns the rows carry; needed to write a MATERIALIZED one. Mutable, as the vendor's. */
+    columns?: [string, ...string[]];
     format: "JSONEachRow";
-    clickhouse_settings?: Record<string, number>;
+    clickhouse_settings?: Record<string, string | number>;
   }): Promise<unknown>;
 }
 
@@ -95,13 +97,15 @@ export class MemberTraceClickHouseClientRepository implements TraceClickHouseWri
   async insert(input: {
     table: string;
     values: readonly unknown[];
+    columns?: [string, ...string[]];
     format: "JSONEachRow";
-    clickhouse_settings?: Record<string, number>;
+    clickhouse_settings?: Record<string, string | number>;
   }): Promise<unknown> {
     return this.clickhouse.insert({
       tenantId: this.tenantId,
       table: input.table,
       rows: input.values as readonly Record<string, unknown>[],
+      ...(input.columns ? { columns: input.columns } : {}),
       ...(input.clickhouse_settings ? { settings: input.clickhouse_settings } : {}),
     });
   }

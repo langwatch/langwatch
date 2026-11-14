@@ -623,6 +623,12 @@ Feature: Terminating an organization's identity provider - OpenID Connect and SA
     And they appear above the fields the administrator has to fill in
 
   @integration
+  Scenario: The access error page address is shown for either protocol
+    When an administrator opens single sign-on setup for either protocol
+    Then the connection's access error page address is shown and can be copied
+    And it says where in Okta to paste it: General > App Embed Link > Edit > Application access error page
+
+  @integration
   Scenario: The deployment's own sign-in redirect address is named beside the connection's
     Given the deployment configures its own Microsoft sign-in
     When an administrator opens single sign-on setup and chooses OpenID Connect

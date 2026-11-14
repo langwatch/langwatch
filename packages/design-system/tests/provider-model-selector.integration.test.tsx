@@ -110,11 +110,68 @@ describe("<ProviderModelSelector/>", () => {
     });
   });
 
+  describe("given options from several providers", () => {
+    const OPENAI: ModelPickerOption = { label: "gpt-6-luna", value: "openai/gpt-6-luna" };
+    const AZURE: ModelPickerOption = { label: "gpt-6-luna", value: "azure/gpt-6-luna" };
+
+    it("lists them as one flat list in the order given, with no provider heading", () => {
+      renderSelector({ options: [AZURE, CUSTOM, OPENAI] });
+
+      expect(listbox().querySelector('[data-part="item-group-label"]')).toBeNull();
+      const values = within(listbox())
+        .getAllByRole("option", { hidden: true })
+        .map((option) => option.getAttribute("data-value"));
+      expect(values).toEqual([AZURE.value, CUSTOM.value, OPENAI.value]);
+    });
+  });
+
+  describe("given a disabled option with a description", () => {
+    const LOCKED: ModelPickerOption = {
+      label: "Inception Mercury Decide",
+      value: "inception/decisions:mercury-decide",
+      subtitle: "Add an Inception key in Model Providers to use it.",
+      disabled: true,
+    };
+
+    it("shows its description and cannot be picked", async () => {
+      const onChange = vi.fn();
+      renderSelector({ options: [MINI, LOCKED], onChange });
+
+      const row = within(listbox()).getByText(LOCKED.label).closest('[role="option"]');
+      expect(row?.getAttribute("aria-disabled")).toBe("true");
+      expect(within(listbox()).queryByText(LOCKED.subtitle ?? "")).not.toBeNull();
+
+      await userEvent.setup().click(trigger());
+      await userEvent.setup().click(within(listbox()).getByText(LOCKED.label));
+      expect(onChange).not.toHaveBeenCalled();
+    });
+  });
+
   describe("given a saved model that is not among the options", () => {
     it("labels it through labelFor", () => {
       renderSelector({ options: [MINI], model: "gone/old-model", labelFor: () => "Old model" });
 
       expect(within(trigger()).queryByText("Old model")).not.toBeNull();
+    });
+  });
+
+  describe("given a placeholder and nothing picked", () => {
+    it("shows the placeholder in the trigger", () => {
+      renderSelector({ options: [MINI], placeholder: "Choose a model" });
+
+      expect(within(trigger()).queryByText("Choose a model")).not.toBeNull();
+    });
+  });
+
+  describe("given a footer", () => {
+    it("pins it inside the dropdown, under the rows", async () => {
+      renderSelector({ options: [MINI], footer: <a href="/settings">Configure</a> });
+
+      await userEvent.setup().click(trigger());
+
+      const footer = screen.getByTestId("provider-model-selector-footer");
+      expect(within(footer).getByRole("link", { name: "Configure" })).toBeTruthy();
+      expect(listbox().contains(footer)).toBe(true);
     });
   });
 

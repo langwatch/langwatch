@@ -1,5 +1,34 @@
 # Changelog
 
+## [3.23.0](https://github.com/langwatch/langwatch/compare/langwatch@v3.22.0...langwatch@v3.23.0) (2026-11-03)
+
+
+### Features
+
+* agent and evaluator versioning with deploy labels, plus experiment and dependency fixes ([#9124](https://github.com/langwatch/langwatch/issues/9124)) ([ec774cb](https://github.com/langwatch/langwatch/commit/ec774cb12756a472d7260f6ed5e2292e324906cd))
+* **coding-agent:** capture Grok CLI sessions through its native OpenTelemetry ([#9224](https://github.com/langwatch/langwatch/issues/9224)) ([34c0f70](https://github.com/langwatch/langwatch/commit/34c0f700c4ff679717de20ad9bd15647631b8cec))
+* **coding-agent:** track pi as a natively instrumented coding agent ([#9203](https://github.com/langwatch/langwatch/issues/9203)) ([52eaa9e](https://github.com/langwatch/langwatch/commit/52eaa9e8f38533d84dfdde9896ac0edcd5cffb7a))
+* **dataset:** dataset version history with autosave, compare, restore, retention and run pinning ([#9121](https://github.com/langwatch/langwatch/issues/9121)) ([f50c6f0](https://github.com/langwatch/langwatch/commit/f50c6f0c999e9e1cadf7173db0e87b9d3f1108de))
+* **insight:** a board no longer pops the daily insights offer on open ([#9242](https://github.com/langwatch/langwatch/issues/9242)) ([e762c3d](https://github.com/langwatch/langwatch/commit/e762c3d313b2218c040755b5a897ed2bf8d40046))
+* **model-provider:** run Instant Evals on Jev, Azure, OpenRouter and Fireworks decision models ([#9249](https://github.com/langwatch/langwatch/issues/9249)) ([98482a1](https://github.com/langwatch/langwatch/commit/98482a1c52b4fb4bc41ac9ef9d34c24301ef9b95))
+
+
+### Bug Fixes
+
+* **analytics:** reconvergence replaces an LWQL view that lacks a catalog column ([#9246](https://github.com/langwatch/langwatch/issues/9246)) ([16bb190](https://github.com/langwatch/langwatch/commit/16bb190a878e8b69436bd6f67117aa519ca5e00f))
+* **auth:** leave the page when a reader signs out ([#9210](https://github.com/langwatch/langwatch/issues/9210)) ([7998642](https://github.com/langwatch/langwatch/commit/79986423102c5b32da2f74cf668e19f17eb864c0))
+* **codeblock:** include runner stderr tail in runner error message ([#9238](https://github.com/langwatch/langwatch/issues/9238)) ([02108a8](https://github.com/langwatch/langwatch/commit/02108a86e06f61fe16eb152dc346231746c83fc7))
+* **codeblock:** run code blocks on Lambda, where seccomp refuses PR_SET_DUMPABLE ([#9240](https://github.com/langwatch/langwatch/issues/9240)) ([7ddff2e](https://github.com/langwatch/langwatch/commit/7ddff2ed23d84655c8399bb24db83a6a2c31008d))
+* **design-system:** dialogs stay centred while Langy is docked ([#9254](https://github.com/langwatch/langwatch/issues/9254)) ([f36b967](https://github.com/langwatch/langwatch/commit/f36b967f1fc619b21f7d1fafe0eaf0e852aeb929))
+* **docs-site:** keep the changelog Markdown export within the page token budget ([#9259](https://github.com/langwatch/langwatch/issues/9259)) ([49f512b](https://github.com/langwatch/langwatch/commit/49f512b980a5a98c2a2ca56f529f4a3ad996779c))
+* email-domain auto-join respects the seat cap, and the SSO refusal says who to ask ([#9226](https://github.com/langwatch/langwatch/issues/9226)) ([95d4da8](https://github.com/langwatch/langwatch/commit/95d4da82e2b8ae51b6d0a9d6aab25bcab7b0814b))
+* **governance:** validate pull source config on save and let admins edit the Copilot Studio connection ([#9279](https://github.com/langwatch/langwatch/issues/9279)) ([862bc0e](https://github.com/langwatch/langwatch/commit/862bc0e00c2536e2d85cb8c57c7e1dfa11487c7a))
+* **langevals:** detect person names written in capitals ([#9213](https://github.com/langwatch/langwatch/issues/9213)) ([4c46055](https://github.com/langwatch/langwatch/commit/4c4605564ca5a354745a6d90619020e73ec3fff8))
+* **langevals:** skip the capitalised-name second pass for lone capital words ([#9256](https://github.com/langwatch/langwatch/issues/9256)) ([749e9f3](https://github.com/langwatch/langwatch/commit/749e9f3bfb1506e43a7998abcb029db83912e51b))
+* **lwql:** probe the approved view in the app's PostgreSQL schema ([#9264](https://github.com/langwatch/langwatch/issues/9264)) ([b3547c3](https://github.com/langwatch/langwatch/commit/b3547c3155964856876c7f14bd9a2e3049f6898f))
+* **model-provider:** judge Instant Evals on the saved decision model and the project's own key ([#9272](https://github.com/langwatch/langwatch/issues/9272)) ([1d4055e](https://github.com/langwatch/langwatch/commit/1d4055e049e6786ce2ecfde010f30843f81c06d9))
+* **model-provider:** offer and accept decision models per edited scope ([#9294](https://github.com/langwatch/langwatch/issues/9294)) ([a5114a1](https://github.com/langwatch/langwatch/commit/a5114a1b645c1694d86b1934e099dd0ae79cf399)), closes [#9293](https://github.com/langwatch/langwatch/issues/9293)
+
 ## [3.22.0](https://github.com/langwatch/langwatch/compare/langwatch@v3.21.0...langwatch@v3.22.0) (2026-11-02)
 
 

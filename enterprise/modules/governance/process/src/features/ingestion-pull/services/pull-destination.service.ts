@@ -3,6 +3,11 @@ import {
   GovernanceValidationError,
 } from "@langwatch/enterprise-governance-contract";
 
+import {
+  COPILOT_STUDIO_DATAVERSE_ADAPTER_ID,
+  isEnvironmentOrigin,
+} from "../../microsoft/rules/dataverse-environment-service.rules.ts";
+
 /**
  * The only hosts a Genie workspace is ever served from, one per cloud. Databricks owns all
  * three, so a customer cannot register a lookalike inside them and no config can name one that
@@ -20,11 +25,17 @@ const DATABRICKS_WORKSPACE_HOST_SUFFIXES = [
  * and the adapter still has to be pointable at a local fixture by its own tests.
  */
 export class PullDestinationService {
-  private constructor(private readonly configuredBase: string | undefined) {}
+  private constructor(
+    private readonly configuredBase: string | undefined,
+    private readonly dataverseEnvironmentBase: string | undefined,
+  ) {}
 
-  /** `configuredBase` is the one extra origin a Databricks workspace may be (a dev stand-in). */
-  static create({ configuredBase }: { configuredBase?: string } = {}): PullDestinationService {
-    return new PullDestinationService(configuredBase);
+  /** Each base is the one extra address its destination may be (a dev stand-in). */
+  static create({
+    configuredBase,
+    dataverseEnvironmentBase,
+  }: { configuredBase?: string; dataverseEnvironmentBase?: string } = {}): PullDestinationService {
+    return new PullDestinationService(configuredBase, dataverseEnvironmentBase);
   }
 
   /**
@@ -96,6 +107,11 @@ export class PullDestinationService {
       return;
     }
 
+    if (parserConfig.adapter === COPILOT_STUDIO_DATAVERSE_ADAPTER_ID) {
+      this.assertDataverseEnvironment(parserConfig.environmentUrl);
+      return;
+    }
+
     if (parserConfig.adapter !== DATABRICKS_GENIE_ADAPTER_ID) {
       return;
     }
@@ -112,6 +128,22 @@ export class PullDestinationService {
         formErrors: [message],
       });
     }
+  }
+
+  /** The app registration's secret is exchanged for a token scoped to this address. */
+  private assertDataverseEnvironment(environmentUrl: unknown): void {
+    if (
+      typeof environmentUrl === "string" &&
+      isEnvironmentOrigin(environmentUrl, this.dataverseEnvironmentBase)
+    ) {
+      return;
+    }
+
+    const message =
+      "Environment URL must be an https Power Platform environment address, such as " +
+      "https://org12345.crm.dynamics.com.";
+
+    throw new GovernanceValidationError(message, { formErrors: [message] });
   }
 
   /**

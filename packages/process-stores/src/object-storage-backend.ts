@@ -3,6 +3,7 @@
  * streaming measure each write and digest runs its bytes through (ADR-158).
  */
 import { createHash } from "node:crypto";
+import { Readable } from "node:stream";
 
 import { HandledError } from "@langwatch/handled-error";
 import type { Instant } from "@langwatch/time";
@@ -26,6 +27,7 @@ export interface ObjectBackend {
     facts: ObjectBodyFacts,
   ): Promise<ObjectDigest>;
   read(at: StoredObjectAddress): Promise<AsyncIterable<Uint8Array>>;
+  exists(at: StoredObjectAddress): Promise<boolean>;
   digest(at: StoredObjectAddress): Promise<ObjectDigest>;
   remove(at: StoredObjectAddress): Promise<void>;
   signUpload(at: StoredObjectAddress, facts: UploadFacts): Promise<SignedObjectUpload>;
@@ -173,6 +175,25 @@ export function measureBody(options: {
       return { byteLength: received, sha256 };
     },
   };
+}
+
+/**
+ * A body whose iterator frees its socket or file on `return()` even before the first read:
+ * Node's own iterator ignores that call until started, which held S3 sockets (tasks#1173).
+ */
+export function releasingBody(body: AsyncIterable<Uint8Array>): AsyncIterable<Uint8Array> {
+  if (!(body instanceof Readable)) return body;
+  const iterate = body[Symbol.asyncIterator].bind(body);
+  body[Symbol.asyncIterator] = () => {
+    const inner = iterate();
+    const finish = inner.return?.bind(inner);
+    inner.return = async () => {
+      body.destroy();
+      return finish ? finish() : { done: true, value: undefined };
+    };
+    return inner;
+  };
+  return body;
 }
 
 /** Reads a stream to its end through the hash, holding one chunk at a time. */

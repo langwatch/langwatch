@@ -5,6 +5,7 @@ import { Temporal, type Instant } from "@langwatch/time";
 
 import { mergeAgentMetadata } from "../../features/agents/rules/discovered-agent-metadata.rules.ts";
 import {
+  type DiscoveredAgentRegistryRow,
   DiscoveredAgentRepository,
   type DiscoveredAgentRow,
 } from "../discovered-agent.repository.ts";
@@ -31,6 +32,24 @@ export class MemoryDiscoveredAgentRepository extends DiscoveredAgentRepository {
         id,
         provider,
         displayText,
+        firstSeenAt,
+        lastSeenAt,
+      }));
+  }
+
+  async findForRegistry({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<DiscoveredAgentRegistryRow[]> {
+    return this.store.agents
+      .filter((agent) => agent.organizationId === organizationId)
+      .map(({ id, provider, rawAgentId, displayText, metadata, firstSeenAt, lastSeenAt }) => ({
+        id,
+        provider,
+        rawAgentId,
+        displayText,
+        metadata: { ...metadata },
         firstSeenAt,
         lastSeenAt,
       }));

@@ -18,6 +18,7 @@ export {
 export * from "./reader.schema.ts";
 export { type UpgradeReader, createUpgradeReader } from "./reader.service.ts";
 export { parseRunPhases } from "./run-phase-view.ts";
+export { type LedgerStepRecord, findLedgerStepRecords } from "./step-record.ts";
 export { UNRELEASED_IMAGE } from "./step-view.ts";
 export {
   type ReleaseOrder,

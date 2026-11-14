@@ -51,6 +51,7 @@ function placementOf(address: string): Placement | undefined {
 
 const everythingOpen = {
   hasPermission: () => true,
+  hasOrganizationPermission: () => true,
   isSaaS: true,
   hasCloudOps: true,
   hosting: "cloud" as const,

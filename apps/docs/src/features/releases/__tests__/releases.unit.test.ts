@@ -1,9 +1,11 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { approximateTokens } from "../../../lib/page-tokens.ts";
+import { pageMarkdown } from "../../discovery/compile.ts";
 import { parseReleases, readReleases, withReleaseNotes } from "../compile/releases.ts";
 
 const compare = "https://github.com/langwatch/langwatch/compare/v1...v2";
@@ -38,6 +40,21 @@ describe("when a release note links both its pull request and its commit", () =>
     expect(entry?.body).toContain(`* editor shows inputs ${lone}`);
   });
 });
+
+const leftOut = "## About this copy";
+
+function changelogProject({ changelog }: { changelog: string }) {
+  const project = mkdtempSync(path.join(os.tmpdir(), "docs-releases-budget-"));
+  const docsRoot = path.join(project, "docs");
+  mkdirSync(docsRoot);
+  writeFileSync(path.join(project, "CHANGELOG.md"), changelog);
+  writeFileSync(path.join(docsRoot, "docs.json"), "{}");
+  writeFileSync(
+    path.join(docsRoot, "changelog.mdx"),
+    "---\ntitle: Changelog\n---\n<ReleaseNotes />\n\n## Older releases",
+  );
+  return { docsRoot, dispose: () => rmSync(project, { recursive: true, force: true }) };
+}
 
 describe("when the repository publishes release notes", () => {
   /** @scenario "Read published release notes" */
@@ -90,6 +107,125 @@ describe("when the repository publishes release notes", () => {
       expect(placed.indexOf("## Release v2.1.1")).toBeLessThan(placed.indexOf("## Older releases"));
     } finally {
       rmSync(project, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("when the newest releases are longer than the page token budget", () => {
+  const pageTokens = 2000;
+  const note = "* **traces:** a long note\n";
+  const notesOf = ({ share }: { share: number }) =>
+    note.repeat(Math.ceil((pageTokens * 4 * share) / note.length));
+  /** @scenario "Keep the changelog Markdown export within the page token budget" */
+  it("exports the newest release and a note, while the page keeps every release", () => {
+    const long = notesOf({ share: 2 / 3 });
+    const { docsRoot, dispose } = changelogProject({
+      changelog:
+        `## [3.0.0](${compare}) (2026-11-02)\n### Features\n${long}` +
+        `## [2.9.0](${compare}) (2026-10-21)\n### Features\n${long}` +
+        `## [2.8.0](${compare}) (2026-10-01)\n### Features\n* Small fix\n`,
+    });
+    try {
+      const markdown = pageMarkdown({
+        docsRoot,
+        slug: "changelog",
+        pageTokens,
+      });
+      expect(approximateTokens({ text: markdown })).toBeLessThanOrEqual(pageTokens);
+      expect(markdown).toContain("## Release v3.0.0");
+      expect(markdown).not.toContain("## Release v2.9.0");
+      expect(markdown).not.toContain("## Release v2.8.0");
+      expect(markdown.indexOf("## Release v3.0.0")).toBeLessThan(markdown.indexOf(leftOut));
+      expect(markdown.indexOf(leftOut)).toBeLessThan(markdown.indexOf("## Older releases"));
+
+      const page = withReleaseNotes({
+        source: readFileSync(path.join(docsRoot, "changelog.mdx"), "utf8"),
+        slug: "changelog",
+        docsRoot,
+      });
+      for (const version of ["3.0.0", "2.9.0", "2.8.0"])
+        expect(page).toContain(`## Release v${version}`);
+      expect(page).not.toContain(leftOut);
+    } finally {
+      dispose();
+    }
+  });
+
+  /** @scenario "Keep the changelog Markdown export within the page token budget" */
+  it("keeps no release, only the note, when the newest alone is over the budget", () => {
+    const { docsRoot, dispose } = changelogProject({
+      changelog:
+        `## [3.0.0](${compare}) (2026-11-02)\n### Features\n${notesOf({ share: 1.2 })}` +
+        `## [2.9.0](${compare}) (2026-10-21)\n### Features\n* Small fix\n`,
+    });
+    try {
+      const markdown = pageMarkdown({
+        docsRoot,
+        slug: "changelog",
+        pageTokens,
+      });
+      expect(markdown).not.toContain("## Release v");
+      expect(markdown).toContain(leftOut);
+      expect(markdown).toContain("repository CHANGELOG");
+      expect(approximateTokens({ text: markdown })).toBeLessThanOrEqual(pageTokens);
+    } finally {
+      dispose();
+    }
+  });
+});
+
+describe("when only some of the older releases fit the page token budget", () => {
+  const long = "* **traces:** a long note\n".repeat(200);
+  const release = ({ version, day }: { version: string; day: string }) =>
+    `## [${version}](${compare}) (2026-10-${day})\n### Features\n${long}`;
+  const all =
+    release({ version: "3.0.0", day: "21" }) +
+    release({ version: "2.9.0", day: "11" }) +
+    release({ version: "2.8.0", day: "01" });
+
+  function exportOf({ changelog, pageTokens }: { changelog: string; pageTokens: number }) {
+    const { docsRoot, dispose } = changelogProject({ changelog });
+    try {
+      return pageMarkdown({ docsRoot, slug: "changelog", pageTokens });
+    } finally {
+      dispose();
+    }
+  }
+  const tokens = ({ text }: { text: string }) => approximateTokens({ text });
+
+  /** @scenario "Keep the changelog Markdown export within the page token budget" */
+  it("keeps the newest releases that fit and notes the rest are left out", () => {
+    // One token under the untrimmed export: three releases cannot fit, while two plus the note do.
+    const twoFit = tokens({ text: exportOf({ changelog: all, pageTokens: Infinity }) }) - 1;
+    const markdown = exportOf({ changelog: all, pageTokens: twoFit });
+    expect(markdown).toContain("## Release v3.0.0");
+    expect(markdown).toContain("## Release v2.9.0");
+    expect(markdown).not.toContain("## Release v2.8.0");
+    expect(markdown).toContain(leftOut);
+    expect(tokens({ text: markdown })).toBeLessThanOrEqual(twoFit);
+  });
+
+  /** @scenario "Keep the changelog Markdown export within the page token budget" */
+  it("keeps every release and adds no note when they all fit", () => {
+    const markdown = exportOf({
+      changelog: all,
+      pageTokens: tokens({ text: exportOf({ changelog: all, pageTokens: Infinity }) }),
+    });
+    for (const version of ["3.0.0", "2.9.0", "2.8.0"])
+      expect(markdown).toContain(`## Release v${version}`);
+    expect(markdown).not.toContain(leftOut);
+  });
+
+  /** @scenario "Keep the changelog Markdown export within the page token budget" */
+  it("keeps every release and adds no note when the caller sets no budget", () => {
+    const { docsRoot, dispose } = changelogProject({ changelog: all });
+    try {
+      const markdown = pageMarkdown({ docsRoot, slug: "changelog" });
+      for (const version of ["3.0.0", "2.9.0", "2.8.0"])
+        expect(markdown).toContain(`## Release v${version}`);
+      expect(markdown).not.toContain(leftOut);
+    } finally {
+      dispose();
     }
   });
 });

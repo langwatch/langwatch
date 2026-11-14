@@ -10,6 +10,7 @@ import {
 } from "./idIndexFlags.ts";
 import { writeIdIndexMarker } from "./idIndexReadiness.ts";
 import type { QueryRequest, QueryResult } from "./query.ts";
+import { isServerTimeout } from "./resilience.ts";
 
 /** A ClickHouse server the fill visits: one per URL; its markers serve each organisation on it. */
 export type IdIndexFillTarget = Readonly<{
@@ -88,7 +89,6 @@ const MAX_BATCH_RETRIES = 5;
 const FIRST_BACKOFF_MS = 1_000;
 const MAX_BACKOFF_MS = 30_000;
 const MEMORY_LIMIT_EXCEEDED = "241";
-const TIMEOUT_EXCEEDED = "159";
 
 const FILL_SETTINGS = {
   optimize_aggregation_in_order: 1,
@@ -409,10 +409,8 @@ function isBatchTooLarge(error: unknown): boolean {
   const message = messageOf(error);
   return (
     code === MEMORY_LIMIT_EXCEEDED ||
-    code === TIMEOUT_EXCEEDED ||
+    isServerTimeout(error) ||
     message.includes("MEMORY_LIMIT_EXCEEDED") ||
-    message.includes("TIMEOUT_EXCEEDED") ||
-    message.startsWith("Code: 159.") ||
     Reflect.get(error, "name") === "TimeoutError" ||
     /^timeout error\.?$/i.test(message.trim())
   );

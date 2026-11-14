@@ -24,6 +24,8 @@ interface DerivedDatasetDedup {
   readonly keyColumns?: readonly string[];
   readonly strategy?: LangWatchQLViewDefinition["dedup"]["strategy"];
   readonly versionColumn?: string;
+  readonly tieBreakColumns?: LangWatchQLViewDefinition["dedup"]["tieBreakColumns"];
+  readonly stableColumns?: LangWatchQLViewDefinition["dedup"]["stableColumns"];
   readonly aggregating?: boolean;
 }
 
@@ -239,15 +241,17 @@ function projectColumn({
       return {
         type: finalized,
         aggregate: true,
-        expression: (source) => contentFilteredMapSql(value(source)),
+        expression: (source) => `CAST(${contentFilteredMapSql(value(source))} AS ${finalized})`,
       };
     }
     return { type: finalized, aggregate: true, expression: value };
   }
   if (isMapType(type)) {
+    // Cast, as mapFilter keeps a LowCardinality key from 26.x and drops it before.
+    const plain = filteredMapType(type);
     return {
-      type: filteredMapType(type),
-      expression: (source) => contentFilteredMapSql(source(sourceColumn)),
+      type: plain,
+      expression: (source) => `CAST(${contentFilteredMapSql(source(sourceColumn))} AS ${plain})`,
     };
   }
   return { type };
@@ -390,6 +394,8 @@ function buildDedup(
     keyColumns: dedup.keyColumns ?? parseSortingKey(manifestTable.sortingKey),
     ...(dedup.strategy ? { strategy: dedup.strategy } : {}),
     ...(dedup.versionColumn ? { versionColumn: dedup.versionColumn } : {}),
+    ...(dedup.tieBreakColumns ? { tieBreakColumns: dedup.tieBreakColumns } : {}),
+    ...(dedup.stableColumns ? { stableColumns: dedup.stableColumns } : {}),
     ...(dedup.aggregating ? { aggregating: dedup.aggregating } : {}),
   };
 }

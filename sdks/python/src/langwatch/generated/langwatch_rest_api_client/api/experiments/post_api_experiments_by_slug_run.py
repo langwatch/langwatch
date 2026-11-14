@@ -82,7 +82,9 @@ def sync_detailed(
     """Run an experiment
 
      Start a run of a saved experiment, addressed by slug. Returns a runId to poll straight away. Send
-    `Accept: text/event-stream` instead to stream progress events until the run finishes.
+    `Accept: text/event-stream` instead to stream progress events until the run finishes. The run reads
+    a version of its saved dataset: `dataset_version` when given, else the version the experiment pins,
+    else the current content saved as a new version.
 
     Args:
         slug (str):
@@ -117,7 +119,9 @@ def sync(
     """Run an experiment
 
      Start a run of a saved experiment, addressed by slug. Returns a runId to poll straight away. Send
-    `Accept: text/event-stream` instead to stream progress events until the run finishes.
+    `Accept: text/event-stream` instead to stream progress events until the run finishes. The run reads
+    a version of its saved dataset: `dataset_version` when given, else the version the experiment pins,
+    else the current content saved as a new version.
 
     Args:
         slug (str):
@@ -147,7 +151,9 @@ async def asyncio_detailed(
     """Run an experiment
 
      Start a run of a saved experiment, addressed by slug. Returns a runId to poll straight away. Send
-    `Accept: text/event-stream` instead to stream progress events until the run finishes.
+    `Accept: text/event-stream` instead to stream progress events until the run finishes. The run reads
+    a version of its saved dataset: `dataset_version` when given, else the version the experiment pins,
+    else the current content saved as a new version.
 
     Args:
         slug (str):
@@ -180,7 +186,9 @@ async def asyncio(
     """Run an experiment
 
      Start a run of a saved experiment, addressed by slug. Returns a runId to poll straight away. Send
-    `Accept: text/event-stream` instead to stream progress events until the run finishes.
+    `Accept: text/event-stream` instead to stream progress events until the run finishes. The run reads
+    a version of its saved dataset: `dataset_version` when given, else the version the experiment pins,
+    else the current content saved as a new version.
 
     Args:
         slug (str):

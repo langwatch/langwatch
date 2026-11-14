@@ -112,6 +112,8 @@ const datasetReferenceSchemaDefinition = z.object({
   type: z.enum(["inline", "saved"]),
   inline: inlineDatasetSchema.optional(),
   datasetId: z.string().optional(),
+  /** The saved dataset's version a run reads; absent or null runs the latest content. */
+  datasetVersion: z.number().int().positive().nullish(),
   columns: z.array(datasetColumnSchema),
   savedRecords: z.array(savedRecordSchema).optional(),
   savedRecordsCut: z
@@ -133,6 +135,8 @@ export type DatasetReference = {
   type: "inline" | "saved";
   inline?: InlineDataset;
   datasetId?: string;
+  /** The saved dataset's version a run reads; absent or null runs the latest content. */
+  datasetVersion?: number | null;
   columns: DatasetColumn[];
   savedRecords?: SavedRecord[];
   savedRecordsCut?: SavedRecordsCut;
@@ -301,6 +305,8 @@ const targetConfigObjectSchemaDefinition = z.object({
   promptVersionNumber: z.number().optional(),
   localPromptConfig: localPromptConfigSchema.optional(),
   dbAgentId: z.string().optional(),
+  /** The agent deploy label the target runs, such as production; absent runs the latest. */
+  agentLabel: z.string().min(1).max(64).optional(),
   /**
    * The specific agent type (code, signature, workflow, http).
    * Used by DSL adapter to determine which node type to generate.
@@ -583,6 +589,23 @@ export type EvaluationsV3Actions = {
   addColumn: (datasetId: string, column: DatasetColumn) => void;
   removeColumn: (datasetId: string, columnId: string) => void;
   renameColumn: (datasetId: string, columnId: string, newName: string) => void;
+  /**
+   * Drop dataset mappings that read a column the dataset no longer has; with
+   * `targetId`, only that target's own and the evaluators' mappings for it.
+   */
+  removeMappingsToMissingColumns: (args: { datasetId: string; targetId?: string }) => void;
+  /**
+   * Apply the columns drawer's edit. A column's `id` names the column it was
+   * edited from, so values, queued saved edits and mappings follow a rename.
+   */
+  applyDatasetColumnsEdit: (args: {
+    datasetId: string;
+    edited: {
+      datasetId: string;
+      name: string;
+      columnTypes: { name: string; type: string; id?: string }[];
+    };
+  }) => void;
   updateColumnType: (datasetId: string, columnId: string, type: DatasetColumnType) => void;
 
   // Target actions
@@ -803,6 +826,8 @@ export const createInitialResults = (): EvaluationResults => ({
 
 // Default concurrency limit for parallel execution
 export const DEFAULT_CONCURRENCY = 10;
+/** The most cells a run may hold in flight at once. */
+export const MAX_CONCURRENCY = 24;
 
 export const createInitialUIState = (): UIState => ({
   selectedRows: new Set(),

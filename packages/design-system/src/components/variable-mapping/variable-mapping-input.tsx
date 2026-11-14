@@ -263,6 +263,22 @@ function sourceTagLabel({ source, path }: { source: AvailableSource; path: strin
   return `${source.name || source.id}.${path.join(".")}`;
 }
 
+/**
+ * Whether a dataset mapping names a column the dataset does not have. Such a
+ * mapping reads nothing; a column that is only empty is still a column.
+ */
+function isMissingDatasetColumn({
+  source,
+  path,
+}: {
+  source: AvailableSource;
+  path: string[];
+}): boolean {
+  const column = path[0];
+  if (source.type !== "dataset" || column === undefined) return false;
+  return !source.fields.some((field) => field.name === column);
+}
+
 // ============================================================================
 // State transitions
 // ============================================================================
@@ -679,8 +695,8 @@ function fieldFrameStyle(isMissing: boolean) {
     borderColor: "border",
     background: undefined,
     paddingX: undefined,
-    focusBorderColor: "blue.500",
-    focusShadow: "var(--chakra-colors-blue-500) 0px 1px 0px 0px",
+    focusBorderColor: "blue.emphasized",
+    focusShadow: "var(--chakra-colors-blue-emphasized) 0px 1px 0px 0px",
     placeholderColor: undefined,
     testId: undefined,
   };
@@ -767,6 +783,11 @@ function MappingField({
           paddingX={0}
           data-testid={inputTestId}
         />
+        {isSourceMapping && sourceInfo && isMissingDatasetColumn(sourceInfo) && (
+          <Text flexBasis="100%" textStyle="xs" color="red.fg" data-testid="missing-column-note">
+            {`"${sourceInfo.path.join(".")}" is not in the dataset`}
+          </Text>
+        )}
       </HStack>
     </Box>
   );
@@ -782,8 +803,20 @@ function SourceMappingTag({
   renderSourceIcon: RenderSourceIcon | undefined;
   onClear: () => void;
 }) {
+  const isMissingColumn = isMissingDatasetColumn(sourceInfo);
   return (
-    <Tag.Root size="md" colorPalette="blue" variant="subtle" data-testid="source-mapping-tag">
+    <Tag.Root
+      size="md"
+      colorPalette={isMissingColumn ? "red" : "blue"}
+      variant="subtle"
+      data-testid="source-mapping-tag"
+      {...(isMissingColumn
+        ? {
+            title: "This column is not in the dataset, so nothing is sent for it",
+            "data-missing-column": "true",
+          }
+        : {})}
+    >
       {renderSourceIcon?.(sourceInfo.source.type)}
       <Tag.Label textStyle="monoSm">{sourceTagLabel(sourceInfo)}</Tag.Label>
       <Tag.EndElement>
@@ -932,10 +965,10 @@ function PathBreadcrumb({ path }: { path: string[] }) {
       borderRadius="4px"
       marginBottom={1}
     >
-      <Text fontSize="xs" color="blue.600">
+      <Text fontSize="xs" color="blue.fg">
         {path.map((s) => s.replace(/_/g, " ")).join(" → ")}
       </Text>
-      <Text fontSize="xs" color="blue.400">
+      <Text fontSize="xs" color="blue.fg">
         →
       </Text>
     </HStack>
@@ -1116,7 +1149,7 @@ function UseAsValueOption({ view }: { view: MappingView }) {
         data-highlighted={isHighlighted}
         data-testid="use-as-value-option"
       >
-        <Type size={14} color="var(--chakra-colors-gray-500)" />
+        <Type size={14} color="var(--chakra-colors-fg-muted)" />
         <Text textStyle="bodySm" color="fg.muted">
           Use "
           <Text as="span" fontWeight="medium" color="fg">

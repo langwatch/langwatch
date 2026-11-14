@@ -12,6 +12,7 @@ import { TraceIdsTooManyError } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { ownProof } from "../../__tests__/support/authorization-proofs.fixture.ts";
+import { MemoryNullTraceBraidReadsRepository } from "../../features/braid/repositories/memory/memory.null-trace-braid-reads.repository.ts";
 import type { TraceSpanCostSuggestion } from "../../features/span/services/span-cost-suggestion.service.ts";
 import { MemoryTraceEvaluationRunsRepository } from "../../repositories/memory/memory.trace-evaluation-runs.repository.ts";
 import type { TraceLegacyRead } from "../../services/trace-viewer.service.ts";
@@ -24,6 +25,7 @@ import {
   type TracesSessionGroupsReader,
   type TracesSpanReader,
 } from "../trace.app.ts";
+import { braidTwins } from "./support/trace-app.harness.ts";
 import { createTraceTestRequestBounds } from "./trace-bounds.fixture.ts";
 
 const PROTECTIONS = { canSeeCosts: true };
@@ -56,10 +58,12 @@ function harness(
   const summary: TraceSummaryReader = { getByTraceId: async () => ({}) as never };
 
   const app = TraceModule.fromDependencies({
+    ...braidTwins(),
     authorizeRead: async ({ projectId }) => ownProof({ projectId }),
     storedObjects: createApiFixture<StoredObjectApi>(),
     spanCostSuggestions: createApiFixture<TraceSpanCostSuggestion>(),
     traces: {
+      braidReads: MemoryNullTraceBraidReadsRepository.create(),
       existence: {
         findExistingTraceIds: async ({ traceIds }) => [...traceIds],
         countUsage: async () => ({ traces: 0, spans: 0 }),

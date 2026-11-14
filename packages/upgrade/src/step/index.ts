@@ -25,8 +25,10 @@ export {
 } from "./migration-step.ts";
 export {
   PROJECTION_REPLAY_FROM_START,
+  PROJECTION_REPLAY_SINCE,
   type LaneReplayer,
   defineProjectionReplayStep,
+  projectionReplaySinceOf,
 } from "./projection-replay-step.ts";
 export {
   LEDGER_TEXT_MAX_CHARS,

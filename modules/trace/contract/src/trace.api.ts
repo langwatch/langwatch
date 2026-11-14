@@ -3,6 +3,7 @@ import type { InstantEvalRunReference } from "@langwatch/instant-eval-contract";
 import { moduleApi } from "@langwatch/module";
 
 import type { ConversationView } from "./conversation/conversation-steps.ts";
+import type { TraceAgentSeen } from "./features/analytics/trace-agent-traffic.ts";
 import type {
   TraceAttributedRecency,
   TraceAttributedSpendComparison,
@@ -38,6 +39,12 @@ import type {
   DeriveClaudeResponseContentInput,
   DeriveClaudeResponseContentResult,
 } from "./features/attribute/trace-canonicalisation.ts";
+import type {
+  BraidActivity,
+  BraidAttributeKeys,
+  BraidPreview,
+  BraidTestTrace,
+} from "./features/braid/trace-braid.schemas.ts";
 import type {
   TraceEditOverlayDto,
   TraceEditOverlayPatch,
@@ -85,7 +92,7 @@ import type {
   ModelUsageStatsRow,
   ModelSpanSampleRow,
 } from "./features/span/trace-span-read-model.ts";
-import type { Trace, Span, ElasticSearchEvent } from "./trace-format.schemas.ts";
+import type { Trace, Span, OwnedSpan, ElasticSearchEvent } from "./trace-format.schemas.ts";
 import type {
   TraceFullReadInput,
   TraceFullRecord,
@@ -108,7 +115,12 @@ import type {
   TraceMetadataUpdate,
 } from "./trace-rest.schemas.ts";
 import type { SharedTraceDto } from "./trace-share.schemas.ts";
-import type { SpanDetail, SpanLangwatchSignals } from "./trace-view.contract.ts";
+import type {
+  SpanDetail,
+  SpanLangwatchSignals,
+  TraceHeader,
+  TraceResourceInfoDto,
+} from "./trace-view.contract.ts";
 import type { Protections } from "./trace-viewer-protections.contract.ts";
 import type { TracePageSizeBound } from "./trace.errors.ts";
 import type {
@@ -165,7 +177,27 @@ export interface TraceUsageCount {
   readonly spans: number;
 }
 
+/**
+ * Where the span widgets' history starts: `span_analytics` holds every span from `from` on, the
+ * instant its replay step recorded (analytics ADR-006); null when it is whole. `rebuilding` while
+ * no replay has recorded a start, when older span history may still be missing.
+ */
+export interface SpanAnalyticsFloor {
+  readonly from: string | null;
+  readonly rebuilding: boolean;
+}
+
 /** Public Trace operations shared by process peers after boot composition. */
+/** A drawer read for one viewer: the route's proof, narrowed to the trace's member inside. */
+export type TraceDrawerReadInput = {
+  projectId: string;
+  authorization: Authorization;
+  traceId: string;
+  tenantId?: string | undefined;
+  occurredAtMs?: number | undefined;
+  viewerUserId: string;
+};
+
 export interface TraceApi extends TraceOtlpIngestApi {
   extractInlineMediaFromEvent(input: {
     event: unknown;
@@ -198,6 +230,8 @@ export interface TraceApi extends TraceOtlpIngestApi {
    * readable conversation at all, which is a different answer from an empty one.
    */
   renderTraceMessages(input: { trace: Trace; side: TraceMessagesSide }): Promise<string | null>;
+  /** Where the span widgets' history starts, from the span_analytics replay's recorded since. */
+  getSpanAnalyticsFloor(): Promise<SpanAnalyticsFloor>;
   /** One named span's chat messages as JSON, and whether the trace holds it. */
   renderSpanMessages(input: { trace: Trace; spanId: string }): Promise<TraceRenderedSpanMessages>;
   /** The whole trace as one JSON object, spans included. */
@@ -287,15 +321,74 @@ export interface TraceApi extends TraceOtlpIngestApi {
     authorization: Authorization;
     tenantId?: string | undefined;
   }): Promise<TracesConversationContext>;
+  /** ADR-201 §7: the reader's trace ids under its proof, then the owner's spans under its own. */
+  previewBraid(input: {
+    ownerAuthorization: Authorization;
+    readerAuthorization: Authorization;
+    where?: string | undefined;
+    fromMs: number;
+    /** The braid being edited, which the draft replaces in the count; absent for a new braid. */
+    braidId?: string | undefined;
+  }): Promise<BraidPreview>;
+  /** The owner's span attribute keys over the last 7 days, most frequent first. */
+  readBraidAttributeKeys(input: { authorization: Authorization }): Promise<BraidAttributeKeys>;
+  /** Each of the project's braids' spans in the last 24 hours, under the project's own proof. */
+  readBraidActivity(input: {
+    projectId: string;
+    authorization: Authorization;
+    braidIds: readonly string[];
+  }): Promise<BraidActivity>;
+  /** One reader trace, the owner's spans marked by the pair's live braids and the draft. */
+  readBraidTestTrace(input: {
+    ownerAuthorization: Authorization;
+    readerAuthorization: Authorization;
+    where?: string | undefined;
+    fromMs: number;
+    traceId: string;
+    /** The braid being edited, which the draft replaces; absent for a new braid. */
+    braidId?: string | undefined;
+  }): Promise<BraidTestTrace>;
   /** One span's detail through the viewer's protections; refuses with `SpanNotFoundError`. */
   readSpanDetailForViewer(input: {
     projectId: string;
     authorization: Authorization;
     traceId: string;
     spanId: string;
+    /** A braided span's owner (ADR-201 §5); absent, the reader's own span. */
+    ownerProjectId?: string | undefined;
     occurredAtMs?: number;
     viewerUserId: string;
+    /** The member the drawer named; the route's proof is narrowed to the trace's member inside. */
+    tenantId?: string | undefined;
   }): Promise<SpanDetail>;
+  /** The drawer header, its cost and its `braided` totals gated per owner (ADR-201 §5). */
+  readTraceHeaderForViewer(
+    input: TraceDrawerReadInput & { full?: boolean | undefined },
+  ): Promise<TraceHeader>;
+  /** One page of a trace's spans, each braided span protected by its owner; audited (§8). */
+  readSpansPageForViewer(
+    input: TraceDrawerReadInput & { limit: number; offset: number },
+  ): Promise<{ spans: Span[]; total: number }>;
+  /** A live trace's spans since a start-time mark, protected by owner; audited (§8). */
+  readSpansSinceForViewer(
+    input: TraceDrawerReadInput & { sinceStartTimeMs: number },
+  ): Promise<Span[]>;
+  /** One page of the span tree, each span's cost gated by its owner; audited (§8). */
+  readSpanTreePageForViewer(
+    input: TraceDrawerReadInput & Omit<SpanTreeInput, "canSeeCosts">,
+  ): Promise<SpanTreePage>;
+  /** The tree nodes of a live trace newer than a mark, cost gated by owner; audited (§8). */
+  readSpanTreeDeltaForViewer(
+    input: TraceDrawerReadInput & Omit<SpanTreeDeltaInput, "canSeeCosts">,
+  ): Promise<SpanTreeNode[]>;
+  /** The whole span tree in one answer, each span's cost gated by its owner. */
+  readSpanTreeForViewer(input: TraceDrawerReadInput): Promise<SpanTreeNode[]>;
+  /** Every span's detail, protected and described by its owner (ADR-201 §5). */
+  readSpansFullForViewer(input: TraceDrawerReadInput): Promise<SpanDetail[]>;
+  /** The resource pane, each braided span's resources gated by its owner. */
+  readSpanResourcesForViewer(input: TraceDrawerReadInput): Promise<TraceResourceInfoDto>;
+  /** The drawer timeline, each braided span's events protected by its owner. */
+  readTraceEventsForViewer(input: TraceDrawerReadInput): Promise<DerivedTraceEvent[]>;
   /** `GET /api/traces/facets` for an API key: the discovery payload or one field's paged values. */
   readTraceFacetsForApiKey(input: {
     projectId: string;
@@ -436,12 +529,13 @@ export interface TraceApi extends TraceOtlpIngestApi {
   recordAnnotation(input: TraceAnnotationMarker): Promise<void>;
   removeAnnotation(input: TraceAnnotationMarker): Promise<void>;
   isCodingAgentShapedSpan(span: Span): boolean;
+  /** The reader's own spans get their coding-agent log content; a braided span shows as stored. */
   enrichSpansFromCodingAgentLogs(input: {
     projectId: string;
     traceId: string;
-    spans: Span[];
+    spans: OwnedSpan[];
     occurredAtMs?: number;
-  }): Promise<Span[]>;
+  }): Promise<OwnedSpan[]>;
   enrichSpanFromCodingAgentLogs(input: {
     span: Span;
     modelCallRefs: unknown;
@@ -468,6 +562,8 @@ export interface TraceApi extends TraceOtlpIngestApi {
     authorization: Authorization;
     traceId: string;
     occurredAtMs?: number;
+    /** `spans`: the trace view's read, where the proof's braids show owners' spans (ADR-201 §5). */
+    reads?: "spans" | "traces";
   }): Promise<SpanSummaryRow[]>;
   readSpans(input: {
     authorization: Authorization;
@@ -475,7 +571,9 @@ export interface TraceApi extends TraceOtlpIngestApi {
     occurredAtMs?: number;
     visibilityCutoffMs?: number | null;
     limit?: number;
-  }): Promise<Span[]>;
+    /** `spans`: the trace view's read, where the proof's braids show owners' spans (ADR-201 §5). */
+    reads?: "spans" | "traces";
+  }): Promise<OwnedSpan[]>;
   readSpansPage(input: {
     authorization: Authorization;
     traceId: string;
@@ -483,18 +581,23 @@ export interface TraceApi extends TraceOtlpIngestApi {
     offset: number;
     occurredAtMs?: number;
     visibilityCutoffMs?: number | null;
-  }): Promise<{ spans: Span[]; total: number }>;
+    /** `spans`: the trace view's read, where the proof's braids show owners' spans (ADR-201 §5). */
+    reads?: "spans" | "traces";
+  }): Promise<{ spans: OwnedSpan[]; total: number }>;
   readSpansSince(input: {
     authorization: Authorization;
     traceId: string;
     sinceStartTimeMs: number;
     occurredAtMs?: number;
     visibilityCutoffMs?: number | null;
-  }): Promise<Span[]>;
+    /** `spans`: the trace view's read, where the proof's braids show owners' spans (ADR-201 §5). */
+    reads?: "spans" | "traces";
+  }): Promise<OwnedSpan[]>;
   findSpan(input: {
     authorization: Authorization;
     traceId: string;
     spanId: string;
+    ownerProjectId?: string | undefined;
     occurredAtMs?: number;
     visibilityCutoffMs?: number | null;
   }): Promise<Span | null>;
@@ -502,22 +605,31 @@ export interface TraceApi extends TraceOtlpIngestApi {
     authorization: Authorization;
     traceId: string;
     spanId: string;
+    ownerProjectId?: string | undefined;
     occurredAtMs?: number;
   }): Promise<ElasticSearchEvent[]>;
   readLangwatchSignals(input: {
     authorization: Authorization;
     traceId: string;
     occurredAtMs?: number;
-  }): Promise<{ spanId: string; signals: SpanLangwatchSignals["signals"] }[]>;
+    /** `spans`: the trace view's read, where the proof's braids show owners' spans (ADR-201 §5). */
+    reads?: "spans" | "traces";
+  }): Promise<
+    { spanId: string; signals: SpanLangwatchSignals["signals"]; ownerProjectId?: string }[]
+  >;
   readSpanResources(input: {
     authorization: Authorization;
     traceId: string;
     occurredAtMs?: number;
+    /** `spans`: the trace view's read, where the proof's braids show owners' spans (ADR-201 §5). */
+    reads?: "spans" | "traces";
   }): Promise<SpanResourceInfo[]>;
   readTraceEvents(input: {
     authorization: Authorization;
     traceId: string;
     occurredAtMs?: number;
+    /** `spans`: the trace view's read, where the proof's braids show owners' spans (ADR-201 §5). */
+    reads?: "spans" | "traces";
   }): Promise<DerivedTraceEvent[]>;
   readTraceEventRollups(input: {
     authorization: Authorization;
@@ -562,16 +674,16 @@ export interface TraceApi extends TraceOtlpIngestApi {
     values: string[];
     window: TraceModelSpendWindow;
   }): Promise<TraceAttributeValueSpend[]>;
-  /** The project's traces carrying the attribute (or one of `values`), per value, model and day. */
+  /** Traces with the attribute (or one of `values`) across `projectIds`, per value, model, day. */
   findAttributeUsageBuckets(input: {
-    projectId: string;
+    projectIds: readonly string[];
     attributeKey: string;
     window: TraceModelSpendWindow;
     values?: string[];
   }): Promise<TraceAttributeUsageBucket[]>;
-  /** The project's newest traces carrying the attribute, at most `limit`; `model` is the first. */
+  /** Newest traces with the attribute across `projectIds`, at most `limit`; `model` is first. */
   findAttributedTraces(input: {
-    projectId: string;
+    projectIds: readonly string[];
     attributeKey: string;
     window: TraceModelSpendWindow;
     values?: string[];
@@ -965,6 +1077,12 @@ export interface TraceApi extends TraceOtlpIngestApi {
     attribute: TraceAttributeMatch;
     groupByKey: string;
   }): Promise<{ value: string; count: number }[]>;
+  /** Distinct `gen_ai.agent.name` values in the project's spans since `sinceMs`, busiest first. */
+  findAgentsSeen(input: {
+    projectId: string;
+    sinceMs: number;
+    limit: number;
+  }): Promise<TraceAgentSeen[]>;
 }
 
 export type TracePreconditionSampleInput = {

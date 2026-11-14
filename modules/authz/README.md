@@ -11,16 +11,16 @@ Authorization: who may do what, answered from grants and effective permissions. 
 | Classification | core (`modules/catalogue.json`)                                                                |
 | Subjects       | authz, authz-grant                                                                             |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser)                       |
-| Api token      | `AuthzApi` = `moduleApi<AuthzApi>()("authz")`, `contract/src/authz.api.ts:280` (78 operations) |
+| Api token      | `AuthzApi` = `moduleApi<AuthzApi>()("authz")`, `contract/src/authz.api.ts:319` (90 operations) |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                     |
 
 ## What authz owns
 
-| Kind                           | Name                                                                                                                                                          | Declared at                                                                |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| Postgres, accessed not claimed | `CustomRole`, `Grant`, `Role`, `RoleBinding`, `ShareLink`                                                                                                     | `process/src/repositories/prisma/prisma.authz-projection.repository.ts:75` |
-| Stores required                | prisma, redis                                                                                                                                                 | `process/src/repositories/live/live.authz.repositories.ts:19`              |
-| Config                         | `epochCacheEnabled` (AUTHZ_EPOCH_CACHE), `demoProjectId` (DEMO_PROJECT_ID), `demoProjectUserId` (DEMO_PROJECT_USER_ID), `demoProjectSlug` (DEMO_PROJECT_SLUG) | `contract/src/authz.config.ts:19`                                          |
+| Kind                           | Name                                                                                                                                                          | Declared at                                                                  |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| Postgres, accessed not claimed | `CustomRole`, `Grant`, `OrganizationUser`, `Role`, `RoleBinding`, `ShareLink`                                                                                 | `process/src/repositories/prisma/prisma.authz-ledger-read.repository.ts:466` |
+| Stores required                | prisma, redis                                                                                                                                                 | `process/src/repositories/live/live.authz.repositories.ts:19`                |
+| Config                         | `epochCacheEnabled` (AUTHZ_EPOCH_CACHE), `demoProjectId` (DEMO_PROJECT_ID), `demoProjectUserId` (DEMO_PROJECT_USER_ID), `demoProjectSlug` (DEMO_PROJECT_SLUG) | `contract/src/authz.config.ts:19`                                            |
 
 Anything else authz needs belongs to another module and is reached through its `*Api`.
 

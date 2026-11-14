@@ -51,13 +51,17 @@ const storages: Storage[] = [
   },
 ];
 
-async function setup(storage: Storage, file: unknown[] | "none" = previousReleaseFile) {
+async function setup(
+  storage: Storage,
+  file: unknown[] | "none" = previousReleaseFile,
+  columnTypes: { name: string; type: "string" }[] = [{ name: "question", type: "string" }],
+) {
   const repositories = await storage.repositories();
   const dataset = await repositories.content.create({
     projectId,
     name: "Legacy Questions",
     slug: "legacy-questions",
-    columnTypes: [{ name: "question", type: "string" }],
+    columnTypes,
     useS3: true,
     s3RecordCount: file === "none" ? 0 : file.length,
   });
@@ -305,15 +309,21 @@ describe.each(storages)("a single-file dataset in $name", (storage) => {
   });
 
   describe("when it is copied", () => {
-    /** @scenario "A single-file dataset copies its records into the new dataset" */
+    /**
+     * @scenario "A single-file dataset copies its records into the new dataset"
+     * @scenario "Copying a legacy single-file dataset"
+     */
     it("copies every entry from the file", async () => {
-      const { app, datasetId } = await setup(storage);
+      const { app, repositories, datasetId } = await setup(storage);
 
       const copy = await app.copyDataset({
         sourceDatasetId: datasetId,
         sourceProjectId: projectId,
         targetProjectId: projectId,
       });
+
+      expect(copy).toMatchObject({ contentLayout: "s3_jsonl", useS3: false });
+      expect(await repositories.records.count({ datasetId: copy.id, projectId })).toBe(0);
 
       const page = await app.getDatasetPage({ slugOrId: copy.id, projectId, page: 1, limit: 10 });
       // The scenario promises the same entries, not their order (the read sorts by copied ids).
@@ -349,6 +359,89 @@ describe("a dataset in today's layout", () => {
     ]);
   });
 });
+
+describe.each(storages)(
+  "a single-file dataset in $name, edited in the columns drawer",
+  (storage) => {
+    describe("when a save renames its column", () => {
+      /** @scenario "A save that deletes one column and renames another keeps the renamed column's values" */
+      it("re-keys every record in the file and stores the new columns", async () => {
+        const { app, datasetId, stored } = await setup(storage);
+
+        await app.upsertDataset({
+          projectId,
+          datasetId,
+          name: "Legacy Questions",
+          columnTypes: [{ name: "prompt", type: "string" }],
+          columnRenames: [{ from: "question", to: "prompt" }],
+        });
+
+        const file = (await stored()) as { id: string; entry: Record<string, unknown> }[];
+        expect(file.map((record) => record.entry)).toEqual([
+          { prompt: "What is LangWatch?" },
+          { prompt: "How are traces stored?" },
+          { prompt: "Where do datasets live?" },
+        ]);
+        const dataset = await app.getBySlugOrId({ projectId, slugOrId: datasetId });
+        expect(dataset.columnTypes).toEqual([{ name: "prompt", type: "string" }]);
+      });
+    });
+
+    describe("when a save swaps two column names and keeps the column list", () => {
+      it("swaps the values in the file", async () => {
+        const columns = [
+          { name: "first", type: "string" as const },
+          { name: "second", type: "string" as const },
+        ];
+        const { app, datasetId, stored } = await setup(
+          storage,
+          [{ id: "rec_1", entry: { first: "one", second: "two" } }],
+          columns,
+        );
+
+        await app.upsertDataset({
+          projectId,
+          datasetId,
+          name: "Legacy Questions",
+          columnTypes: columns,
+          columnRenames: [
+            { from: "first", to: "second" },
+            { from: "second", to: "first" },
+          ],
+        });
+
+        const file = (await stored()) as { entry: Record<string, unknown> }[];
+        expect(file.map((record) => record.entry)).toEqual([{ second: "one", first: "two" }]);
+      });
+    });
+
+    describe("when a record write keyed by the column a rename removed arrives after it", () => {
+      /** @scenario "A record write that arrives during a column edit waits for it and is refused when keyed by a removed column" */
+      it("refuses the write as stale and leaves the file as the rename wrote it", async () => {
+        const { app, datasetId, stored } = await setup(storage);
+        await app.upsertDataset({
+          projectId,
+          datasetId,
+          name: "Legacy Questions",
+          columnTypes: [{ name: "prompt", type: "string" }],
+          columnRenames: [{ from: "question", to: "prompt" }],
+        });
+
+        await expect(
+          app.upsertRecord({
+            projectId,
+            slugOrId: datasetId,
+            recordId: "rec_1",
+            updatedRecord: { question: "Edited" },
+            columns: ["question"],
+          }),
+        ).rejects.toMatchObject({ code: "dataset_stale_columns" });
+        const file = (await stored()) as { entry: Record<string, unknown> }[];
+        expect(file[0]?.entry).toEqual({ prompt: "What is LangWatch?" });
+      });
+    });
+  },
+);
 
 async function* bytesOf(content: string): AsyncGenerator<Uint8Array> {
   yield new TextEncoder().encode(content);

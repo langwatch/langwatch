@@ -3,10 +3,11 @@
  * @vitest-environment node
  * Spec: enterprise/modules/governance/specs/governance-deploy-steps.feature
  */
-import { ASSISTANT_KINDS } from "@langwatch/enterprise-governance-contract";
+
 import { ORGANIZATION_ID_PAGE_LIMIT } from "@langwatch/organization-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { CODING_ASSISTANT_BILLING_SOURCE_TYPES } from "../../features/cost/rules/coding-assistant-billing.rules.ts";
 import { MemoryCostAttributionPolicyRepository } from "../../repositories/memory/memory.cost-attribution-policy.repository.ts";
 import {
   bootGovernanceWorker,
@@ -15,6 +16,7 @@ import {
 } from "./governance-deploy-steps.fixture.ts";
 
 const STEP_ID = "governance:record-coding-assistant-billing";
+const INGEST_SOURCE_STEP_ID = "governance:record-coding-assistant-ingest-source-billing";
 const ORGANIZATIONS = ["org_a", "org_b", "org_c"] as const;
 const CODEX_OFF_BUNDLED_PLAN = { assistantKind: "codex", bundledPlan: false };
 
@@ -62,7 +64,10 @@ describe("given a worker installing governance", () => {
           { after: "org_b", limit: ORGANIZATION_ID_PAGE_LIMIT },
         ]);
         expect(saves).toEqual([{ afterOrganizationId: "org_b" }, { afterOrganizationId: "org_c" }]);
-        expect(report).toMatchObject({ organizations: 3, recorded: 3 * ASSISTANT_KINDS.length });
+        expect(report).toMatchObject({
+          organizations: 3,
+          recorded: 3 * CODING_ASSISTANT_BILLING_SOURCE_TYPES.length,
+        });
         await expect(
           billedFacts({ organizationId: "org_b", sourceType: "codex" }),
         ).resolves.toEqual([true]);
@@ -84,6 +89,40 @@ describe("given a worker installing governance", () => {
         await expect(
           billedFacts({ organizationId: "org_c", sourceType: "codex" }),
         ).resolves.toEqual([true]);
+      } finally {
+        await runtime.stop();
+      }
+    });
+  });
+
+  describe("when the ingest source seed runs after the first seed completed", () => {
+    /** @scenario "The ingest source billing seed records the sources added after the first seed" */
+    it("records a billed fact for each Copilot ingest source of a Copilot config", async () => {
+      seedConfigs([
+        {
+          organizationId: "org_a",
+          config: { assistantKind: "github_copilot", bundledPlan: false },
+        },
+      ]);
+      const { runtime, step, billedFacts } = await bootOver();
+      try {
+        const ingestStep = step(INGEST_SOURCE_STEP_ID);
+        expect(ingestStep).toMatchObject({
+          kind: "data",
+          mode: "background",
+          needsOldWritersGone: true,
+        });
+
+        await runStep({ step: ingestStep });
+
+        for (const sourceType of ["copilot_cli", "copilot_app", "copilot_vscode"]) {
+          await expect(billedFacts({ organizationId: "org_a", sourceType })).resolves.toEqual([
+            true,
+          ]);
+        }
+        await expect(
+          billedFacts({ organizationId: "org_b", sourceType: "grok_cli" }),
+        ).resolves.toEqual([false]);
       } finally {
         await runtime.stop();
       }

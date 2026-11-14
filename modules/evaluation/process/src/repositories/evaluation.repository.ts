@@ -1,6 +1,8 @@
 import type { Authorization } from "@langwatch/authorization";
 import type { RetentionDaysProvider } from "@langwatch/clickhouse-client";
 import type {
+  EvaluationOutcome,
+  EvaluationOutcomeCursor,
   EvaluationRunData,
   EvaluationRunLookup,
   TraceEvaluationData,
@@ -35,6 +37,13 @@ export abstract class EvaluationRunRepository {
     authorization: Authorization;
     traceIds: readonly string[];
   }): Promise<TraceEvaluationData[]>;
+  /** Finished runs on a trace whose last event is at or after `sinceMs`, after the cursor. */
+  abstract findOutcomesSince(input: {
+    authorization: Authorization;
+    sinceMs: number;
+    after: EvaluationOutcomeCursor | null;
+    limit: number;
+  }): Promise<EvaluationOutcome[]>;
   /** The newest inputs in the first project the proof reads that holds the run. */
   abstract findInputs(input: {
     authorization: Authorization;

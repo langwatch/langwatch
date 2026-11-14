@@ -218,8 +218,28 @@ export interface TenantRouterOptions {
   refusal?: PrivateRouteRefusalFactory | undefined;
 }
 
+/** The router's whole answer for a tenant, refusing nothing: a caller decides on disagreement. */
+export interface TenantPlacement {
+  readonly organizationId: string;
+  /** Recorded as keeping its data on its own server, or its route variable is malformed. */
+  readonly recordedPrivate: boolean;
+  /** Where this process resolves it: its private route, or shared where it has none. */
+  readonly route: TenantRoute;
+}
+
+/** A tenant's placement as the routed client reports it: a server's origin, never its URL. */
+export interface ClickHouseTenantPlacement {
+  /** `"shared"`, or the organisation whose private route it resolves to. */
+  readonly target: string;
+  readonly recordedPrivate: boolean;
+  /** The credential-free origin of the resolved server; null where this process has none. */
+  readonly origin: string | null;
+}
+
 export interface TenantRouter {
   route(tenantId: string): Promise<TenantRoute>;
+  /** The recorded placement beside the resolved route, so a gate can refuse when they disagree. */
+  placementOf(tenantId: string): Promise<TenantPlacement>;
   /** Where a known organization's statements go; refuses a recorded private one with no route. */
   routeOrganization(organizationId: string): Promise<TenantRoute>;
   /** The organisation a tenant belongs to, from the same cached directory `route` reads. */
@@ -296,6 +316,29 @@ async function routeForOrganization({
   return { kind: "shared" };
 }
 
+/** What was recorded beside the route resolved, for {@link TenantRouter.placementOf}. */
+async function placementForOrganization({
+  table,
+  directory,
+  organizationId,
+}: {
+  table: TenantRouterOptions["table"];
+  directory: TenantDirectory;
+  organizationId: string;
+}): Promise<TenantPlacement> {
+  if (organizationId === PLATFORM_TENANT) {
+    return { organizationId, recordedPrivate: false, route: { kind: "shared" } };
+  }
+  const recorded = await directory.recordedPrivateDataplaneOf?.(organizationId);
+  const url = table.routes.get(organizationId);
+  return {
+    organizationId,
+    recordedPrivate:
+      recorded?.clickhouseLabel != null || table.malformed?.has(organizationId) === true,
+    route: url === undefined ? { kind: "shared" } : { kind: "private", organizationId, url },
+  };
+}
+
 export function createTenantRouter({
   table,
   directory,
@@ -332,6 +375,12 @@ export function createTenantRouter({
 
       const organizationId = await organizationFor(tenantId);
       return routeForOrganization({ table, directory, refusal, organizationId });
+    },
+    async placementOf(tenantId) {
+      if (tenantId === "") throw new UnknownTenantError(tenantId);
+
+      const organizationId = await organizationFor(tenantId);
+      return placementForOrganization({ table, directory, organizationId });
     },
     routeOrganization(organizationId) {
       return routeForOrganization({ table, directory, refusal, organizationId });

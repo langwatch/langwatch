@@ -5,6 +5,7 @@ import {
   InvalidAuthOriginError,
   type VerifiedBrowserSession,
 } from "@langwatch/auth-contract";
+import type { RefusedSignInClassification, RefusedSignInInput } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
 import { getActiveTraceId } from "@langwatch/observability/tracing";
 import type { Instant } from "@langwatch/time";
@@ -19,13 +20,25 @@ import { sessionPollOf, type AuthSessionPoll } from "../rules/auth-session-poll.
 import { issuerMismatchRedirectOf } from "../rules/id-token-issuer-mismatch.rules.ts";
 import { microsoftCallbackRouteOf } from "../rules/legacy-microsoft-callback.rules.ts";
 import { queryCacheEpochOf, type QueryCacheKeyOwner } from "../rules/query-cache-key.rules.ts";
+import {
+  isSamlAssertionConsumerPost,
+  samlResponseOutcomeOf,
+} from "../rules/saml-response-status.rules.ts";
 import { presentedSessionCookie } from "../rules/session-cookie.rules.ts";
 import {
+  extractRefusalPageConnection,
   isSignInCallbackPath,
   signInErrorRedirectOf,
   signInFailureLocation,
 } from "../rules/sign-in-callback-failure.rules.ts";
+import {
+  extractEchoedRoundTrip,
+  isUnfinishedSignInRead,
+  type SignInHintSealer,
+} from "../rules/sign-in-hint.rules.ts";
 import { findConnectionIdsInPath } from "../rules/sso-request-target.rules.ts";
+import { RefusedSignInLandingService } from "./refused-sign-in-landing.service.ts";
+import { SignInHintService } from "./sign-in-hint.service.ts";
 
 const logger = createLogger("langwatch:auth");
 
@@ -66,8 +79,16 @@ export interface AuthDoorDeps {
   }>;
   /** The key a signed-in browser seals its mirrored reads under in one epoch. */
   deriveQueryCacheKey(input: QueryCacheKeyOwner & { epoch: number }): string;
-  /** The server's clock, which alone decides the cache-key epoch. */
+  /** The server's clock, which alone decides the cache-key epoch and a sign-in hint's age. */
   now(): Instant;
+  /** Seals the address typed at a sign-in start for its callback. */
+  signInHints(): SignInHintSealer;
+  /** Who refused a sign-in, and of what kind; recorded when the address is known. */
+  refusedSignIns: Readonly<{
+    classifyRefusedSignIn(input: RefusedSignInInput): Promise<RefusedSignInClassification>;
+  }>;
+  /** A reference for a refusal no trace was active for. */
+  newReferenceId(): string;
 }
 
 /** The `/api/auth` door: Better Auth's handshake, the browser's session poll and its sign-out. */
@@ -76,7 +97,13 @@ export class AuthDoorService {
     return new AuthDoorService(deps);
   }
 
-  private constructor(private readonly deps: AuthDoorDeps) {}
+  readonly #hints: SignInHintService;
+  readonly #refusals: RefusedSignInLandingService;
+
+  private constructor(private readonly deps: AuthDoorDeps) {
+    this.#hints = SignInHintService.create(deps);
+    this.#refusals = RefusedSignInLandingService.create(deps);
+  }
 
   async getSessionByCookie(input: { cookie: string | undefined }): Promise<AuthSessionPoll> {
     const verification = await this.deps.verifyBrowserSession({ headers: cookieHeaders(input) });
@@ -167,34 +194,53 @@ export class AuthDoorService {
     return new Response(response.body, { status: response.status, headers });
   }
 
-  /** Better Auth's own fetch handler, behind the origin gate. */
-  async betterAuthHandshake(request: Request): Promise<Response> {
+  /** The 403 for a call from another origin, or undefined when the origin gate lets it through. */
+  private refuseForeignOrigin(request: Request): Response | undefined {
     const origin = request.headers.get("origin");
     const referer = request.headers.get("referer");
     const baseUrl = this.deps.baseUrl();
+    const pathname = new URL(request.url).pathname;
+    const method = request.method;
+    const allowed = isAllowedAuthOrigin({
+      method,
+      pathname,
+      origin: origin ?? undefined,
+      referer: referer ?? undefined,
+      baseUrl,
+    });
+    if (allowed) return undefined;
+
+    // The 403 body carries no detail on purpose, so this line is the only record of why.
+    logger.warn(
+      {
+        path: pathname,
+        method,
+        expectedOrigin: baseUrl,
+        receivedOrigin: origin,
+        receivedReferer: referer,
+      },
+      "rejected auth request: origin does not match the deployment's base URL",
+    );
+    return Response.json({ message: "Invalid origin", code: "INVALID_ORIGIN" }, { status: 403 });
+  }
+
+  /** Better Auth's own fetch handler, behind the origin gate. */
+  async betterAuthHandshake(request: Request): Promise<Response> {
+    const refused = this.refuseForeignOrigin(request);
+    if (refused) return refused;
+    const baseUrl = this.deps.baseUrl();
 
     if (
-      !isAllowedAuthOrigin({
-        method: request.method,
-        pathname: new URL(request.url).pathname,
-        origin: origin ?? undefined,
-        referer: referer ?? undefined,
-        baseUrl,
-      })
+      isUnfinishedSignInRead({ pathname: new URL(request.url).pathname, method: request.method })
     ) {
-      // The 403 body carries no detail on purpose, so this line is the only record of why.
-      logger.warn(
-        {
-          path: new URL(request.url).pathname,
-          method: request.method,
-          expectedOrigin: baseUrl,
-          receivedOrigin: origin,
-          receivedReferer: referer,
-        },
-        "rejected auth request: origin does not match the deployment's base URL",
-      );
-
-      return Response.json({ message: "Invalid origin", code: "INVALID_ORIGIN" }, { status: 403 });
+      return this.#refusals.readUnfinishedSignIn({ request });
+    }
+    const refusedConnectionId = extractRefusalPageConnection({
+      pathname: new URL(request.url).pathname,
+      method: request.method,
+    });
+    if (refusedConnectionId !== undefined) {
+      return this.#refusals.landOnRefusalCard({ request, connectionId: refusedConnectionId });
     }
 
     const betterAuth = await this.deps.betterAuth();
@@ -203,6 +249,17 @@ export class AuthDoorService {
       request: withMicrosoftCallbackPath(request),
       caller: ClientAddress.resolvedFor(request),
     });
+
+    const pathname = new URL(request.url).pathname;
+    const { startHint, callbackForm } = await this.#hints.readSignInBodies({
+      request: stated,
+      pathname,
+    });
+    const providerRefused =
+      callbackForm !== undefined &&
+      isSamlAssertionConsumerPost({ pathname, method: request.method }) &&
+      samlResponseOutcomeOf({ formBody: callbackForm }) === "refused";
+    const echoedRoundTrip = extractEchoedRoundTrip({ url: request.url, formBody: callbackForm });
 
     const answered = await this.deps.oauthProfileEmails.runWithScope(async () =>
       this.deps.idTokenIssuerRefusals.runWithScope(async () =>
@@ -214,12 +271,74 @@ export class AuthDoorService {
     // Each acts on a different status (a 3xx to the error page, a 5xx on a callback).
     const errorPageUrl = `${baseUrl}/auth/error`;
     const traceId = getActiveTraceId();
-    return landFailedSignInCallback({
-      response: withholdInternalSignInError({ response: answered, errorPageUrl, traceId }),
-      pathname: new URL(request.url).pathname,
+    const landed = await landFailedSignInCallback({
+      response: await this.withholdInternalSignInError({
+        request,
+        response: answered,
+        errorPageUrl,
+        traceId,
+        providerRefused,
+        echoedRoundTrip,
+      }),
+      pathname,
       errorPageUrl,
       traceId,
     });
+    return this.#hints.carrySignInHint({ request, response: landed, pathname, startHint });
+  }
+
+  /**
+   * A redirect to the sign-in error screen keeps its code only when a screen has words for it;
+   * anything else is sent the generic code, and its real cause is logged here with the trace id
+   * (specs/identity/sso-signin-error-boundary.feature).
+   */
+  private async withholdInternalSignInError({
+    request,
+    response,
+    errorPageUrl,
+    traceId,
+    providerRefused,
+    echoedRoundTrip,
+  }: {
+    request: Request;
+    response: Response;
+    errorPageUrl: string;
+    traceId: string | undefined;
+    providerRefused: boolean;
+    echoedRoundTrip: string | undefined;
+  }): Promise<Response> {
+    const redirect = signInErrorRedirectOf({
+      status: response.status,
+      location: response.headers.get("location"),
+      errorPageUrl,
+      traceId,
+      providerRefused,
+      isCallback: isSignInCallbackPath({ pathname: new URL(request.url).pathname }),
+    });
+    if (redirect.kind === "pass") return response;
+    let location = redirect.location;
+    if (redirect.kind === "provider_refused") {
+      location = await this.#refusals.classifyRefusal({
+        request,
+        location,
+        traceId,
+        echoedRoundTrip,
+        answeredCode: redirect.answeredCode,
+      });
+    } else if (redirect.kind === "withhold") {
+      logger.error(
+        {
+          error: new SignInRefusal(redirect.code),
+          code: redirect.code,
+          description: redirect.description,
+          traceId: traceId ?? null,
+        },
+        "a sign-in failed for a reason we have not written down; the person was sent a generic refusal",
+      );
+    }
+    const headers = new Headers(response.headers);
+    headers.set("location", location);
+    return new Response(response.body, { status: response.status, headers });
   }
 }
 
@@ -235,50 +354,6 @@ function withMicrosoftCallbackPath(request: Request): Request {
     ...(hasBody ? { body: request.body, duplex: "half" } : {}),
   };
   return new Request(route.url, init);
-}
-
-/**
- * A redirect to the sign-in error screen keeps its code only when a screen has words for it;
- * anything else is sent the generic code, and its real cause is logged here with the trace id
- * (specs/identity/sso-signin-error-boundary.feature).
- */
-function withholdInternalSignInError({
-  response,
-  errorPageUrl,
-  traceId,
-}: {
-  response: Response;
-  errorPageUrl: string;
-  traceId: string | undefined;
-}): Response {
-  const redirect = signInErrorRedirectOf({
-    status: response.status,
-    location: response.headers.get("location"),
-    errorPageUrl,
-    traceId,
-  });
-  if (redirect.kind === "pass") return response;
-  if (redirect.kind === "provider_refused") {
-    // An expected refusal (a cancelled consent, or e.g. Entra "Assignment required"): nothing
-    // for on-call.
-    logger.warn(
-      { code: redirect.code, traceId: traceId ?? null },
-      "an identity provider refused a sign-in; the person was told why",
-    );
-  } else {
-    logger.error(
-      {
-        error: new SignInRefusal(redirect.code),
-        code: redirect.code,
-        description: redirect.description,
-        traceId: traceId ?? null,
-      },
-      "a sign-in failed for a reason we have not written down; the person was sent a generic refusal",
-    );
-  }
-  const headers = new Headers(response.headers);
-  headers.set("location", redirect.location);
-  return new Response(response.body, { status: response.status, headers });
 }
 
 /**

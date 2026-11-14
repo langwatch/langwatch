@@ -33,6 +33,8 @@ class PatchApiMonitorsByIdBody:
         evaluator_id (None | str | Unset):
         level (PatchApiMonitorsByIdBodyLevel | Unset):
         thread_idle_timeout (int | None | Unset):
+        evaluator_label (None | str | Unset): Run the evaluator at this deploy label, such as production; null runs the
+            latest.
     """
 
     name: str | Unset = UNSET
@@ -46,6 +48,7 @@ class PatchApiMonitorsByIdBody:
     evaluator_id: None | str | Unset = UNSET
     level: PatchApiMonitorsByIdBodyLevel | Unset = UNSET
     thread_idle_timeout: int | None | Unset = UNSET
+    evaluator_label: None | str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -95,6 +98,12 @@ class PatchApiMonitorsByIdBody:
         else:
             thread_idle_timeout = self.thread_idle_timeout
 
+        evaluator_label: None | str | Unset
+        if isinstance(self.evaluator_label, Unset):
+            evaluator_label = UNSET
+        else:
+            evaluator_label = self.evaluator_label
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update({})
@@ -120,6 +129,8 @@ class PatchApiMonitorsByIdBody:
             field_dict["level"] = level
         if thread_idle_timeout is not UNSET:
             field_dict["threadIdleTimeout"] = thread_idle_timeout
+        if evaluator_label is not UNSET:
+            field_dict["evaluatorLabel"] = evaluator_label
 
         return field_dict
 
@@ -195,6 +206,15 @@ class PatchApiMonitorsByIdBody:
 
         thread_idle_timeout = _parse_thread_idle_timeout(d.pop("threadIdleTimeout", UNSET))
 
+        def _parse_evaluator_label(data: object) -> None | str | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(None | str | Unset, data)
+
+        evaluator_label = _parse_evaluator_label(d.pop("evaluatorLabel", UNSET))
+
         patch_api_monitors_by_id_body = cls(
             name=name,
             enabled=enabled,
@@ -207,6 +227,7 @@ class PatchApiMonitorsByIdBody:
             evaluator_id=evaluator_id,
             level=level,
             thread_idle_timeout=thread_idle_timeout,
+            evaluator_label=evaluator_label,
         )
 
         patch_api_monitors_by_id_body.additional_properties = d

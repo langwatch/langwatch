@@ -44,7 +44,6 @@ import { z } from "zod";
 
 /** An organization's membership milestones, and the integration method its founder chose. */
 export const ORGANIZATION_LIFECYCLE_PIPELINE_NAME = "organization_lifecycle" as const;
-export const ORGANIZATION_AGGREGATE_TYPE = "organization" as const;
 export const ORGANIZATION_LIFECYCLE_EVENT_VERSION = "2026-09-29" as const;
 
 export const RECORD_SIGNED_UP_COMMAND_TYPE = "lw.organization.record_signed_up" as const;

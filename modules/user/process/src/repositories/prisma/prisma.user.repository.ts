@@ -68,10 +68,10 @@ function storedPreferenceMap(value: Prisma.JsonValue): Prisma.JsonObject {
   return value;
 }
 
-/** The three models, the transaction runner, and the raw read of the database's clock. */
+/** The four models, the transaction runner, and the raw read of the database's clock. */
 export type UserDatabase = Pick<
   PrismaClient,
-  "user" | "account" | "passkey" | "$transaction" | "$queryRaw"
+  "user" | "account" | "passkey" | "userErasure" | "$transaction" | "$queryRaw"
 >;
 
 const userProfileSelect = {
@@ -101,7 +101,7 @@ const userFullProfileSelect = {
 const createdUserSelect = { id: true } satisfies Prisma.UserSelect;
 
 export class PrismaUserRepository
-  extends PrismaRepository.transactionalFor("User", "Account", "Passkey")
+  extends PrismaRepository.transactionalFor("User", "Account", "Passkey", "UserErasure")
   implements UserRepository
 {
   static create({ prisma }: { prisma: UserDatabase }): PrismaUserRepository {
@@ -180,6 +180,21 @@ export class PrismaUserRepository
     return { emailDomains: domainCounts(rows.map((row) => row.email ?? "")) };
   }
 
+  async findSignedInSince({
+    userIds,
+    since,
+  }: {
+    userIds: readonly string[];
+    since: number;
+  }): Promise<string[]> {
+    if (userIds.length === 0) return [];
+    const rows = await this.prisma.user.findMany({
+      where: { id: { in: [...userIds] }, lastLoginAt: { gte: new Date(since) } },
+      select: { id: true },
+    });
+    return rows.map((row) => row.id);
+  }
+
   /** Install-wide on purpose, like the report: one row at most, and only a yes or no leaves. */
   async hasAccountOnDomain(domain: string): Promise<boolean> {
     const row = await this.prisma.user.findFirst({
@@ -192,6 +207,22 @@ export class PrismaUserRepository
   async hasAnyAccount(): Promise<boolean> {
     const row = await this.prisma.user.findFirst({ select: { id: true } });
     return row !== null;
+  }
+
+  async findFirstCreatedId(): Promise<string | null> {
+    const [row, erased] = await Promise.all([
+      this.prisma.user.findFirst({
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        select: { id: true, createdAt: true },
+      }),
+      this.prisma.userErasure.findFirst({
+        orderBy: { accountCreatedAt: "asc" },
+        select: { accountCreatedAt: true },
+      }),
+    ]);
+    if (!row) return null;
+    if (erased && erased.accountCreatedAt.getTime() <= row.createdAt.getTime()) return null;
+    return row.id;
   }
 
   async findBackfillPage({

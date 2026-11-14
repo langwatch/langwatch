@@ -141,6 +141,25 @@ export type CreateDatasetOptions = {
   name: string;
   /** Column type definitions (defaults to empty array) */
   columnTypes?: DatasetColumnType[];
+  /** First rows, written with the dataset in one request. Each key must be a column. */
+  entries?: Record<string, unknown>[];
+};
+
+/**
+ * Options for upserting records by a key column.
+ */
+export type UpsertRecordsOptions = {
+  /** The column that identifies a row, such as "case_id". */
+  key: string;
+};
+
+/**
+ * Result of upserting records: what was created, what was updated, how many were left alone.
+ */
+export type UpsertRecordsResult = {
+  created: DatasetRecordResponse[];
+  updated: DatasetRecordResponse[];
+  unchanged: number;
 };
 
 /**

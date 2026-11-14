@@ -8,6 +8,7 @@ import { ZodError } from "zod";
 
 import {
   createDatasetTestAttachments,
+  createDatasetTestContent,
   createDatasetTestInlineAttachments,
   createDatasetTestRequestBounds,
 } from "../../app/__tests__/dataset.fixture.ts";
@@ -68,6 +69,7 @@ function serviceHolding(records: DatasetRecord[]) {
   return DatasetService.create({
     repository,
     records: recordsRepository,
+    content: createDatasetTestContent({ database }),
     requestBounds: createDatasetTestRequestBounds(),
     attachments: createDatasetTestAttachments(),
     inlineAttachments: createDatasetTestInlineAttachments(),
