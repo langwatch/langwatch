@@ -45,7 +45,7 @@ async function serve(environment: Readonly<Record<string, string>>) {
     },
   });
   const at = (doorPort: number) => (path: string, authorization?: string) =>
-    fetch(`http://127.0.0.1:${doorPort}${path}`, {
+    fetch(`http://localhost:${doorPort}${path}`, {
       headers: authorization === undefined ? {} : { authorization },
     });
   return { health: at(port), pull: at(pullPort) };

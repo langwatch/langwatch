@@ -6,11 +6,22 @@
 import { createModuleApi, type OutputsFromMap } from "@langwatch/api/web";
 import type { AuthzPermission } from "@langwatch/authorization";
 import type {
+  AuthzBraid,
+  AuthzBraidRemoved,
+  AuthzBraidTargets,
+  AuthzChangeBraidInput,
+  AuthzCreateBraidInput,
+  AuthzProjectMembersHolding,
+  AuthzBillingMember,
   AuthzChangeGrantRoleInput,
   AuthzCreateGrantInput,
   AuthzListGrantsInput,
   AuthzManagedOrganizationBinding,
+  AuthzOrganizationBraids,
+  AuthzOrganizationPolicy,
   AuthzOwnStanding,
+  AuthzProjectBraids,
+  AuthzRemoveBraidInput,
   AuthzRevokeGrantByIdInput,
   Grant,
   GrantPage,
@@ -26,11 +37,7 @@ type RoleScope = { roleId: string };
 
 export type AuthzApiMap = {
   role: {
-    /**
-     * Every custom role defined in the organization. Gated at
-     * `organization:manage` rather than `organization:view`: reading role
-     * definitions is a privilege-escalation surface (they show what's worth acquiring).
-     */
+    /** Every custom role defined in the organization; every role reads it at `members:view`. */
     getAll: { query: { input: OrganizationScope; output: Role[] } };
 
     /**
@@ -82,12 +89,62 @@ export type AuthzApiMap = {
         output: GrantRevoked;
       };
     };
-    /**
-     * Every grant in the organization, principals and scopes named: audit-grade
-     * data, which is why the procedure is gated at `organization:manage`.
-     */
+    /** Every grant in the organization, principals and scopes named; read at `members:view`. */
     listManagedGrants: {
       query: { input: OrganizationScope; output: AuthzManagedOrganizationBinding[] };
+    };
+    /** Who holds the Billing role; read by every role. */
+    listBillingMembers: {
+      query: { input: OrganizationScope; output: AuthzBillingMember[] };
+    };
+
+    /** A project's braids, both directions; any member of either project reads them. */
+    listBraids: {
+      query: { input: { projectId: string }; output: AuthzProjectBraids };
+    };
+    /** Either side's admins, on any plan: stopping a braid only narrows access. */
+    removeBraid: {
+      mutation: {
+        input: Omit<AuthzRemoveBraidInput, "caller" | "actor">;
+        output: AuthzBraidRemoved;
+      };
+    };
+    /** Whether only organisation admins may braid; any member reads it. */
+    getBraidsPolicy: { query: { input: OrganizationScope; output: AuthzOrganizationPolicy } };
+    setBraidsPolicy: {
+      mutation: {
+        input: OrganizationScope & { braidsOrganizationAdminsOnly: boolean };
+        output: AuthzOrganizationPolicy;
+      };
+    };
+    /** Every live braid in the organisation, for its admins. */
+    listOrganizationBraids: {
+      query: { input: OrganizationScope; output: AuthzOrganizationBraids };
+    };
+    /** The braid dialog's writes; Enterprise, and refused by code (`braid_*`). */
+    createBraid: {
+      mutation: { input: Omit<AuthzCreateBraidInput, "caller" | "actor">; output: AuthzBraid };
+    };
+    changeBraid: {
+      mutation: { input: Omit<AuthzChangeBraidInput, "caller" | "actor">; output: AuthzBraid };
+    };
+    /** The picker: of the projects named, those the viewer may braid into or why not. */
+    listBraidTargets: {
+      query: { input: { projectId: string; projectIds: string[] }; output: AuthzBraidTargets };
+    };
+    /** How many people can read the reader's traces; a floor when not `exact`. */
+    countProjectTraceViewers: {
+      query: { input: { projectId: string }; output: AuthzProjectMembersHolding };
+    };
+  };
+
+  /** Whether the reader signs its calls, which the only-signed-calls switch names. */
+  signingKeys: {
+    projectSigning: {
+      query: {
+        input: { projectId: string };
+        output: { keyName: string; lastUsedAt: string | null } | null;
+      };
     };
   };
 
@@ -109,7 +166,11 @@ export type AuthzApiMap = {
         output: {
           id: string;
           name: string;
-          teams: { id: string; name: string; projects: { id: string; name: string }[] }[];
+          teams: {
+            id: string;
+            name: string;
+            projects: { id: string; slug: string; name: string }[];
+          }[];
         }[];
       };
     };

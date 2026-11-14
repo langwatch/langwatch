@@ -178,10 +178,19 @@ export const TOPIC_CLUSTERING_PROCESS_INTENT_TYPES = {
  * The clustering run intent payload. `searchAfter` is null for the first
  * page; continuation intents carry the cursor the previous page returned.
  */
+export const topicClusteringRunWindowSchema = z.object({
+  /** The previous finished run's `untilMs`; null reads the whole hot tier. */
+  sinceMs: z.number().nullable(),
+  untilMs: z.number(),
+});
+export type TopicClusteringRunWindow = z.infer<typeof topicClusteringRunWindowSchema>;
+
+/** `window` is absent on intents recorded before runs carried one; those read the whole tier. */
 export const topicClusteringRunIntentSchema = z.object({
   runId: z.string(),
   page: z.number(),
   searchAfter: topicClusteringSearchAfterSchema.nullable(),
+  window: topicClusteringRunWindowSchema.nullable().optional(),
 });
 export type TopicClusteringRunIntent = z.infer<typeof topicClusteringRunIntentSchema>;
 
@@ -240,6 +249,7 @@ export interface TopicClusteringRun {
     /** Logical run identity; keys the recordTopics dedupe per page. */
     runId: string;
     page: number;
+    window?: TopicClusteringRunWindow | null;
   }): Promise<TopicClusteringPageOutcome>;
 }
 
@@ -453,6 +463,7 @@ export function createTopicClusteringRunHandler(
         searchAfter: payload.searchAfter,
         runId: payload.runId,
         page: payload.page,
+        ...(payload.window ? { window: payload.window } : {}),
       });
     } catch (error) {
       // A user-actionable failure (no model configured, rejected credentials)

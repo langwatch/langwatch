@@ -180,6 +180,7 @@ const OPS_PROCEDURES: Readonly<Record<string, "query" | "mutation" | "subscripti
   getBlob: "query",
   runBlobCleanup: "mutation",
   deleteBlob: "mutation",
+  findSeatSharingChecks: "query",
   listPlatformOperators: "query",
   grantPlatformOperator: "mutation",
   revokePlatformOperator: "mutation",

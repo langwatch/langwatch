@@ -16,6 +16,7 @@ import {
   selectRows,
   selectScalar,
   startLangWatchQLClickHouse,
+  UNMAPPED_KEY_HASH,
 } from "./lwql-clickhouse-harness.ts";
 
 const accessModel = LangWatchQLAccessModelService.create();
@@ -215,7 +216,7 @@ describe("given a catalog view that joins two tenant-policed tables (#8085)", ()
 
   describe("when the key-hash context matches no project", () => {
     it("returns zero rows from the joined view, never an error", async () => {
-      const noProject = await harness.restrictedClient({ keyHash: "not-a-real-key-hash" });
+      const noProject = await harness.restrictedClient({ keyHash: UNMAPPED_KEY_HASH });
 
       expect(await selectRows(noProject, `SELECT Key FROM ${database}.join_probe`)).toHaveLength(0);
     });

@@ -42,6 +42,8 @@ interface InstanceAdminServiceOptions {
   /** Whether an organization's own connection decides its sign-in, asked of
    *  the module that owns connections. */
   ssoRouting?: OrganizationSsoRouting | undefined;
+  /** Where only staff operate, an operator's address is fixed; elsewhere they change their own. */
+  operatorAddressesFixed?: boolean | undefined;
 }
 
 /**
@@ -76,6 +78,7 @@ export class InstanceAdminService {
   private readonly shares: InstanceAdminShares;
   private readonly audit: AdminAuditSink;
   private readonly ssoRouting: OrganizationSsoRouting;
+  private readonly operatorAddressesFixed: boolean;
 
   private constructor(deps: {
     repository: InstanceAdminRepository;
@@ -86,6 +89,7 @@ export class InstanceAdminService {
     shares: InstanceAdminShares;
     audit: AdminAuditSink;
     ssoRouting: OrganizationSsoRouting;
+    operatorAddressesFixed: boolean;
   }) {
     this.repository = deps.repository;
     this.users = deps.users;
@@ -95,6 +99,7 @@ export class InstanceAdminService {
     this.shares = deps.shares;
     this.audit = deps.audit;
     this.ssoRouting = deps.ssoRouting;
+    this.operatorAddressesFixed = deps.operatorAddressesFixed;
   }
 
   static create(options: InstanceAdminServiceOptions): InstanceAdminService {
@@ -107,6 +112,7 @@ export class InstanceAdminService {
       shares: options.shares ?? NO_SHARING_DOOR,
       audit: options.audit,
       ssoRouting: options.ssoRouting ?? STRINGS_STILL_DECIDE,
+      operatorAddressesFixed: options.operatorAddressesFixed ?? true,
     });
   }
 
@@ -265,14 +271,29 @@ export class InstanceAdminService {
     await this.refuseOperatorAccount(input);
   }
 
-  /** Operators manage each other on the Operators page; the grant is revoked there first. */
+  /**
+   * Operators manage each other on the Operators page; the grant is revoked there first. Where
+   * operating is not kept to staff, an operator may still change their own address.
+   */
   private async refuseOperatorAccount(input: AdminOperationInput): Promise<void> {
     if (!MUTATING_METHODS.has(input.method) || input.params.id === undefined) return;
+    if (this.isOwnAddressChange(input)) return;
     if (!(await this.operators.isAdmin({ id: String(input.params.id) }))) return;
 
     throw new ValidationError("An operator's account is not edited in the Back office", {
       meta: { fieldErrors: { id: ["Revoke the operator on the Operators page first."] } },
     });
+  }
+
+  private isOwnAddressChange(input: AdminOperationInput): boolean {
+    const fields = Object.keys(input.params.data ?? {});
+    return (
+      !this.operatorAddressesFixed &&
+      input.method === "update" &&
+      String(input.params.id) === input.actorId &&
+      fields.length === 1 &&
+      fields[0] === "email"
+    );
   }
 
   /** Refused before the audit entry, so a refused write leaves nothing recorded. */

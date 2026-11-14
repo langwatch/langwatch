@@ -27,6 +27,14 @@ describe("given the committed model catalog", () => {
     );
   });
 
+  describe("when the catalog lists a model's batch-priced tier beside it", () => {
+    it("offers only models a chat can run on, never a :batch tier", () => {
+      const models = findRecommendedChatModels({ provider: "openai", limit: 4 });
+
+      expect(models.filter((model) => model.endsWith(":batch"))).toEqual([]);
+    });
+  });
+
   describe("when the catalog has no chat models for the provider", () => {
     it("offers none rather than a typed guess", () => {
       expect(findRecommendedChatModels({ provider: "custom", limit: 4 })).toEqual([]);

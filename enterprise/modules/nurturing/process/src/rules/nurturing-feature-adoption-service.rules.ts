@@ -39,20 +39,20 @@ export function fireWorkflowCreated({
   ];
 }
 
-/** Decides the calls a created scenario raises. */
+/**
+ * Decides the calls a created scenario raises. scenario_count is not sent here: the
+ * organization's usage traits carry it to each member, and a second writer would overwrite it.
+ */
 export function fireScenarioCreated({
   userId,
-  scenarioCount,
   scenarioId,
   projectId,
 }: {
   userId: string;
-  scenarioCount: number;
   scenarioId: string;
   projectId: string;
 }): CioBatchCall[] {
   return [
-    { type: "identify", userId, traits: { scenario_count: scenarioCount } },
     {
       type: "track",
       userId,

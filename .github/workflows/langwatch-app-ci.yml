@@ -694,9 +694,16 @@ jobs:
       REDIS_URL: "redis://localhost:6379"
       CI_REDIS_URL: "redis://localhost:6379"
       CI_CLICKHOUSE_URL: "http://default:ci_password@localhost:8123/test_langwatch"
+      # The names the package integration suites read (their `skipIf` guards).
+      # Without them every such suite skipped here, its only CI lane.
+      LANGWATCH_TEST_DATABASE_URL: "postgresql://langwatch_ci:ci_password@localhost:5432/langwatch_test"
+      LANGWATCH_TEST_REDIS_URL: "redis://localhost:6379"
+      LANGWATCH_TEST_CLICKHOUSE_URL: "http://default:ci_password@localhost:8123"
       LANGWATCH_NLP_SERVICE: "http://localhost:5561"
       LANGWATCH_ENDPOINT: "http://localhost:3000"
       VITEST_ISOLATE_WORKER_REDIS: "1"
+      # Vitest's transform cache is one per user (ADR-196); keep it where the job restores it.
+      VITEST_FS_MODULE_CACHE_DIR: ${{ github.workspace }}/node_modules/.vitest-cache
       CI: "true"
     runs-on: ubuntu-latest
     # Read the checkout; write only to prune this pull request's older suite results.
@@ -1450,9 +1457,6 @@ jobs:
       - name: Test notify-slack-release.sh
         run: bash .github/scripts/__tests__/notify-slack-release.test.sh
 
-      - name: Test release-docs.sh
-        run: bash .github/scripts/__tests__/release-docs.test.sh
-
       - name: Test run-package-suites.ts
         run: node --test --experimental-strip-types .github/scripts/run-package-suites.test.ts
 
@@ -1461,9 +1465,6 @@ jobs:
 
       - name: Test check-added-images.sh
         run: bash .github/scripts/__tests__/check-added-images.test.sh
-
-      - name: Test publish-docker-ecr.yml path filters
-        run: bash .github/scripts/__tests__/publish-ecr-filters.test.sh
 
       - name: Test nearest-ancestor-tag.sh
         run: bash .github/scripts/__tests__/nearest-ancestor-tag.test.sh

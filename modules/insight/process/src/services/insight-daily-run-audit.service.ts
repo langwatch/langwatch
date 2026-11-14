@@ -13,16 +13,19 @@ const AUDIT_KEY_RESOURCE = "audit";
 /**
  * The key of one run's line: the run's own name and slot, so an outcome recorded or delivered
  * twice names one line. The audit log reads the line's moment from the key: the run's slot.
+ * The layout is the stored outcome's own, so a key minted before v2 never changes (#9575).
  */
-function auditKeyOf({ scheduleId, runId, slot }: InsightRunSettledEventData): string {
+function auditKeyOf({ scheduleId, runId, slot, idLayout }: InsightRunSettledEventData): string {
   const digest = createHash("sha256").update(`${scheduleId}\u001f${runId}`).digest();
+  const timestamp = Math.floor(slot / 1000);
   return new Ksuid({
     environment: getEnvironment(),
     resource: AUDIT_KEY_RESOURCE,
-    timestamp: Math.floor(slot / 1000),
+    timestamp,
     instance: new Instance(Instance.schemes.RANDOM, new Uint8Array(digest.subarray(0, 8))),
-    // The KSUID parser reads the sequence as a signed number: its top bit stays clear.
+    // Top bit clear: written when the parser read the sequence signed; kept so keys stay stable.
     sequenceId: digest.readUInt32BE(8) >>> 1,
+    layout: idLayout ?? "v1-legacy",
   }).toString();
 }
 

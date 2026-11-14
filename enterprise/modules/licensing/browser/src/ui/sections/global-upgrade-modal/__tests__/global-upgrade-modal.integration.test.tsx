@@ -94,7 +94,8 @@ describe("<GlobalUpgradeModal/>", () => {
       expect(screen.queryByText(/disable a membership/i)).toBeNull();
     });
 
-    it("links to the license page on a self-hosted deployment", async () => {
+    /** @scenario "A self-hosted install that used every licensed seat is told so in license words" */
+    it("speaks of the license, not a plan, on a self-hosted deployment", async () => {
       renderGate(false);
 
       act(() => {
@@ -103,6 +104,11 @@ describe("<GlobalUpgradeModal/>", () => {
 
       const link = await screen.findByRole("link", { name: "Manage license" });
       expect(link).toHaveAttribute("href", "/settings/license");
+      expect(screen.getByText("All seats on your license are in use")).toBeInTheDocument();
+      expect(
+        screen.getByText("You've reached the limit of 5 team members on your license."),
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/plan/i)).toBeNull();
     });
   });
 
@@ -143,7 +149,7 @@ describe("<GlobalUpgradeModal/>", () => {
       fireEvent.click(link, { ctrlKey: true });
 
       expect(navigate).not.toHaveBeenCalled();
-      expect(screen.getByText("Upgrade required")).toBeInTheDocument();
+      expect(screen.getByText("No seats left on your license")).toBeInTheDocument();
       expect(link).toHaveAttribute("href", "/settings/license");
     });
 

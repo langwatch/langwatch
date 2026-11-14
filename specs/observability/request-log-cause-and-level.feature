@@ -57,6 +57,15 @@ Feature: Request log level and where the cause is attached
     Then the access record carries the handled code and fault
     And it does not say the request failed without a cause attached
 
+  # The host also wrote "tRPC call failed" for every failure the "trpc call"
+  # record already carried at error: the same failure twice.
+  @unit @regression
+  Scenario: A failed tRPC call writes its failure once
+    Given a tRPC procedure that fails with an unhandled error
+    When the dashboard calls it
+    Then one "trpc call" record at error carries the cause
+    And no second "tRPC call failed" record is written
+
   # A client that gave up mid-upload made the body read throw, which answered
   # 500 and logged "error handling request" at error: hundreds a day, none ours.
 
@@ -70,7 +79,8 @@ Feature: Request log level and where the cause is attached
   @unit @regression
   Scenario: A handled customer failure is logged below error
     When the failure is attributed to the customer
-    Then the record is logged at warning level
+    Then the first record for its family, code and status in a minute is logged at warning level
+    And the repeats in that minute are logged at debug
     And the handled code and fault are carried on the record
 
   @unit @regression
@@ -198,3 +208,10 @@ Feature: Request log level and where the cause is attached
   Scenario: Credentials in a failed Redis command never reach the summary
     When a failed AUTH command error is logged
     Then the emitted line does not contain the password
+
+  @unit
+  Scenario: A forwarded server failure names its status as the cause, never its body
+    Given a route that passes another service's 5xx answer through
+    When the request is logged
+    Then the record's cause names the forwarded status
+    And the forwarded body is neither read nor quoted

@@ -9,23 +9,42 @@ import (
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 )
 
+// metricSink is one OTLP metric destination: its URL, auth headers and the
+// extra producers its reader pulls.
+type metricSink struct {
+	endpointURL string
+	headers     map[string]string
+	producers   []sdkmetric.Producer
+}
+
 // newMetricReader builds an OTLP/HTTP metric reader (an otlpmetrichttp exporter
-// behind a PeriodicReader) for endpointURL — the FULL per-signal URL, already
+// behind a PeriodicReader) for the sink's endpointURL — the FULL per-signal URL, already
 // carrying /v1/metrics. Callers assemble one or more readers into a single
 // MeterProvider (see installMetrics) so the same instruments fan out to every
 // configured sink.
-func newMetricReader(ctx context.Context, endpointURL string, headers map[string]string) (sdkmetric.Reader, error) {
+//
+// producers are extra metric sources the reader pulls on every export, for
+// services that keep instruments outside the OTel API (a Prometheus registry
+// bridged in, say). Without one, those instruments exist only on a pull door.
+func newMetricReader(ctx context.Context, sink metricSink) (sdkmetric.Reader, error) {
 	exporterOpts := []otlpmetrichttp.Option{
-		otlpmetrichttp.WithEndpointURL(endpointURL),
+		otlpmetrichttp.WithEndpointURL(sink.endpointURL),
 	}
-	if len(headers) > 0 {
-		exporterOpts = append(exporterOpts, otlpmetrichttp.WithHeaders(headers))
+	if len(sink.headers) > 0 {
+		exporterOpts = append(exporterOpts, otlpmetrichttp.WithHeaders(sink.headers))
 	}
 	exp, err := otlpmetrichttp.New(ctx, exporterOpts...)
 	if err != nil {
 		return nil, err
 	}
-	return sdkmetric.NewPeriodicReader(exp), nil
+	var readerOpts []sdkmetric.PeriodicReaderOption
+	for _, p := range sink.producers {
+		if p == nil {
+			continue
+		}
+		readerOpts = append(readerOpts, sdkmetric.WithProducer(p))
+	}
+	return sdkmetric.NewPeriodicReader(exp, readerOpts...), nil
 }
 
 // metricsEndpointFromTraces derives the /v1/metrics URL from the primary traces

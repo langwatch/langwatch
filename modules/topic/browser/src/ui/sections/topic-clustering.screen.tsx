@@ -89,7 +89,7 @@ export default function TopicClusteringScreen() {
       <PageLayout.Header>
         <PageLayout.Heading>Topic Clustering</PageLayout.Heading>
       </PageLayout.Header>
-      <VStack gap={6} width="full" align="start" paddingTop={4}>
+      <VStack gap={6} width="full" align="start">
         <Text color="fg.muted">
           Groups your traces into topics and subtopics on a schedule, so you can see what your users
           talk about.

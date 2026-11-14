@@ -23,12 +23,12 @@ import {
   mapTraceEvaluationsToLegacyEvaluations,
   type ClickHouseEvaluationRunRow,
 } from "../../../rules/trace-evaluation-mapping.rules.ts";
+import type { ResolvedTraceSpans } from "../../../services/trace-offload-resolution.service.ts";
 import {
   applyEventProtections,
   applyTraceProtections,
   extractRedactionsForObject,
-} from "../../../rules/trace-read-redaction.rules.ts";
-import type { ResolvedTraceSpans } from "../../../services/trace-offload-resolution.service.ts";
+} from "../../read/rules/trace-read-redaction.rules.ts";
 import type {
   ResolveTraceSpansBatchFn,
   ResolveTraceSpansFn,
