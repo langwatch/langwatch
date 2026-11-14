@@ -138,12 +138,14 @@ function saveBlockedReason({
   return "Change the braid to save it";
 }
 
+/** Room for a focus ring inside a scroll box: padding and an equal negative margin. */
+const FOCUS_RING_INSET = { padding: 1, margin: -1 } as const;
+
 /** Side by side, each column scrolls on its own, so the form stays put while the preview grows. */
 const COLUMN_SCROLL = {
   maxHeight: { lg: "full" },
   overflowY: { lg: "auto" },
-  padding: 1,
-  margin: -1,
+  ...FOCUS_RING_INSET,
 } as const;
 
 /** A group of the form under a heading a step above its field labels: Which spans, Active. */
@@ -288,6 +290,7 @@ export function BraidDialog({
         minHeight={0}
         overflowY={{ base: "auto", lg: "hidden" }}
         height={{ lg: "full" }}
+        {...FOCUS_RING_INSET}
       >
         <Stack gap={7} {...COLUMN_SCROLL}>
           {save.refusal ? (
