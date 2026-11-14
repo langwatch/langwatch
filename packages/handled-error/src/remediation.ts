@@ -820,6 +820,15 @@ const registry = {
     docsPath: "/platform/model-providers",
   },
 
+  model_provider_unavailable: {
+    tips: [
+      "meta.reason is not_configured when the project has no row for the provider, disabled when the row is switched off",
+      "Add or enable the provider in Settings, then Model Providers, or name a model from a provider that is enabled",
+      "Retrying without changing the settings fails the same way",
+    ],
+    docsPath: "/platform/model-providers",
+  },
+
   // ---- langy ----
   langy_conversation_not_found: {
     tips: [

@@ -1,7 +1,9 @@
 import { LANGY_TITLE_GENERATION } from "@langwatch/langy-contract";
 import {
+  AiCallFailedError,
   ModelExecutionUnavailableError,
   ModelNotConfiguredError,
+  ModelProviderUnavailableError,
   type ModelProviderApi,
   type ModelProviderResolution,
 } from "@langwatch/model-provider-contract";
@@ -43,6 +45,17 @@ function unconfigured(): ModelNotConfiguredError {
     role: "FAST",
     featureDisplayName: "Langy chat titles",
     projectId: "project_1",
+  });
+}
+
+/** model-provider's wrapped failure, retryable or not as the provider's answer decided. */
+function aiCallFailed({ retryable }: { retryable: boolean }): AiCallFailedError {
+  return new AiCallFailedError({
+    featureKey: "langy.conversation_title",
+    role: "FAST",
+    featureDisplayName: "Langy chat titles",
+    originalErrorMessage: "provider said no",
+    retryable,
   });
 }
 
@@ -174,6 +187,60 @@ describe("LangyTitleGeneratorService", () => {
       }).generator();
 
       await expect(generate(args)).resolves.toEqual({ outcome: "unchanged" });
+    });
+  });
+
+  describe("when the title model's provider is missing or turned off", () => {
+    /** @scenario "A title model whose provider is missing or turned off is not retried" */
+    it.each(["not_configured", "disabled"] as const)(
+      "keeps the placeholder title on %s and raises nothing",
+      async (reason) => {
+        const { api } = modelProviders({
+          generateText: async () => {
+            throw new ModelProviderUnavailableError({ providerKey: "openai", reason });
+          },
+        });
+        const generate = LangyTitleGeneratorService.create({
+          messages: messages(),
+          models: api,
+        }).generator();
+
+        await expect(generate(args)).resolves.toEqual({ outcome: "unchanged" });
+      },
+    );
+  });
+
+  describe("when the provider refuses the title request outright", () => {
+    /** @scenario "A title request the provider refuses outright is not retried" */
+    it("keeps the placeholder title and raises nothing", async () => {
+      const { api } = modelProviders({
+        generateText: async () => {
+          throw aiCallFailed({ retryable: false });
+        },
+      });
+      const generate = LangyTitleGeneratorService.create({
+        messages: messages(),
+        models: api,
+      }).generator();
+
+      await expect(generate(args)).resolves.toEqual({ outcome: "unchanged" });
+    });
+  });
+
+  describe("when the title model fails in a way a retry could fix", () => {
+    /** @scenario "A provider failure a retry could fix is still raised" */
+    it("raises the failure so the outbox retries it", async () => {
+      const { api } = modelProviders({
+        generateText: async () => {
+          throw aiCallFailed({ retryable: true });
+        },
+      });
+      const generate = LangyTitleGeneratorService.create({
+        messages: messages(),
+        models: api,
+      }).generator();
+
+      await expect(generate(args)).rejects.toMatchObject({ code: "ai_call_failed" });
     });
   });
 

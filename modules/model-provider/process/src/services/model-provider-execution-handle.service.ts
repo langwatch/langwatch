@@ -5,6 +5,7 @@ import {
   ModelExecutionUnavailableError,
   ModelProviderDisabledError,
   type ModelProviderApi,
+  ModelProviderUnavailableError,
 } from "@langwatch/model-provider-contract";
 import type { LanguageModel } from "ai";
 
@@ -198,17 +199,11 @@ export class ModelProviderExecutionHandleService {
     const modelProvider = modelProviders[providerKey];
 
     if (!modelProvider) {
-      throw new Error(
-        `Model provider "${providerKey}" is not configured for this project. ` +
-          "Go to Settings → Model Providers to add it.",
-      );
+      throw new ModelProviderUnavailableError({ providerKey, reason: "not_configured" });
     }
 
     if (!modelProvider.enabled) {
-      throw new Error(
-        `Model provider "${providerKey}" is configured but disabled. ` +
-          "Go to Settings → Model Providers to enable it.",
-      );
+      throw new ModelProviderUnavailableError({ providerKey, reason: "disabled" });
     }
 
     // Codex never goes through the nlpgo chat-completions proxy: the codex
