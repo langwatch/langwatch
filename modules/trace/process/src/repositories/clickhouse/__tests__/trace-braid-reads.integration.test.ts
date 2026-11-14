@@ -188,7 +188,10 @@ beforeAll(async () => {
   const clickhouse = authorizedClickHouseFor(ch);
   const spans = ClickHouseTraceSpanRepository.create({ clickhouse: traceQueryClientFor(ch) });
   service = TraceBraidPreviewService.create({
-    reads: ClickHouseTraceBraidReadsRepository.create({ clickhouse }),
+    reads: ClickHouseTraceBraidReadsRepository.create({
+      clickhouse,
+      reader: traceQueryClientFor(ch),
+    }),
     readerSpans: async ({ authorization, traceId }) =>
       (await spans.listSummaryPage({ authorization, traceId, limit: 100, occurredAtMs: base }))
         .rows,

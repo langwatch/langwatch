@@ -41,24 +41,26 @@ type Statement = { sql: string; params: Record<string, unknown> };
 
 function braidReads(rows: Record<string, unknown>[] = []) {
   const statements: Statement[] = [];
-  const clickhouse = new AuthorizedClickHouse({
-    resolveClient: async () =>
-      idIndexedClientDouble({
-        indexes: TRACE_ID_INDEXES,
-        driver: {
-          execute: vi.fn<ScriptedStatements["execute"]>(async (request) => {
-            statements.push({ sql: request.sql, params: request.params ?? {} });
-            return { rows: /FROM (stored_spans|trace_summaries)/.test(request.sql) ? rows : [] };
-          }),
-        },
+  // The fenced reads and the built reads reach the same recording client.
+  const queryClient = idIndexedClientDouble({
+    indexes: TRACE_ID_INDEXES,
+    driver: {
+      execute: vi.fn<ScriptedStatements["execute"]>(async (request) => {
+        statements.push({ sql: request.sql, params: request.params ?? {} });
+        return { rows: /FROM (stored_spans|trace_summaries)/.test(request.sql) ? rows : [] };
       }),
+    },
   });
+  const clickhouse = new AuthorizedClickHouse({ resolveClient: async () => queryClient });
   const read = (): Statement => {
     const found = statements.find(({ sql }) => /FROM (stored_spans|trace_summaries)/.test(sql));
     if (found === undefined) throw new Error("no braid statement was sent");
     return found;
   };
-  return { repo: ClickHouseTraceBraidReadsRepository.create({ clickhouse }), read };
+  return {
+    repo: ClickHouseTraceBraidReadsRepository.create({ clickhouse, reader: queryClient }),
+    read,
+  };
 }
 
 /** The projects a statement's fence reads: every project named by a fence parameter. */
@@ -94,7 +96,7 @@ describe("ClickHouseTraceBraidReadsRepository", () => {
       expect(ids).toEqual(["trace-1"]);
       expect(read().sql).toContain("FROM trace_summaries");
       expect(fencedProjects(read())).toEqual([READER]);
-      expect(read().params).toMatchObject({ limit: 10_001 });
+      expect(read().sql).toContain("LIMIT 10001");
     });
   });
 

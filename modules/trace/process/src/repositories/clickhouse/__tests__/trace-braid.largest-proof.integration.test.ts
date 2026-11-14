@@ -175,7 +175,10 @@ beforeAll(async () => {
     reader: traceQueryClientFor(ch),
   });
   totals = TraceBraidedTotalsService.create({
-    reads: ClickHouseTraceBraidReadsRepository.create({ clickhouse }),
+    reads: ClickHouseTraceBraidReadsRepository.create({
+      clickhouse,
+      reader: traceQueryClientFor(ch),
+    }),
     prices: { estimateCost: () => 0 },
   });
   await ch.insert({

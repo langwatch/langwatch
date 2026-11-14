@@ -9,6 +9,7 @@ import { evaluationRuns } from "../clickhouse.evaluation-runs.table.ts";
 import { instantEvalRuns } from "../clickhouse.instant-eval-runs.table.ts";
 import { logRecords } from "../clickhouse.log-records.table.ts";
 import { spanAnalytics } from "../clickhouse.span-analytics.table.ts";
+import { storedLogRecords } from "../clickhouse.stored-log-records.table.ts";
 import { storedSpans } from "../clickhouse.stored-spans.table.ts";
 import { traceAnalyticsRollup } from "../clickhouse.trace-analytics-rollup.table.ts";
 import { traceAnalytics } from "../clickhouse.trace-analytics.table.ts";
@@ -27,6 +28,8 @@ const DESCRIPTORS: readonly { readonly $table: ClickHouseTableFacts }[] = [
   evaluationRuns,
   logRecords,
   instantEvalRuns,
+  // A legacy table trace reads as a fallback (clickhouse-table-ownership.ts records).
+  storedLogRecords,
 ];
 
 /**

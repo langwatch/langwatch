@@ -12,7 +12,10 @@ import { braidedProof } from "../../../__tests__/support/authorization-proofs.fi
 import { ClickHouseTraceBraidReadsRepository } from "../../../features/braid/repositories/clickhouse/clickhouse.trace-braid-reads.repository.ts";
 import { braidedTraceSummaryOf } from "../../../features/braid/rules/braided-trace-totals.rules.ts";
 import { TraceBraidedTotalsService } from "../../../features/read/services/trace-braided-totals.service.ts";
-import { authorizedClickHouseFor } from "./support/authorized-clickhouse.support.ts";
+import {
+  authorizedClickHouseFor,
+  traceQueryClientFor,
+} from "./support/authorized-clickhouse.support.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
@@ -86,7 +89,10 @@ beforeAll(async () => {
   if (!clickHouseConfigured) return;
   ch = await startMigratedTraceClickHouse();
   service = TraceBraidedTotalsService.create({
-    reads: ClickHouseTraceBraidReadsRepository.create({ clickhouse: authorizedClickHouseFor(ch) }),
+    reads: ClickHouseTraceBraidReadsRepository.create({
+      clickhouse: authorizedClickHouseFor(ch),
+      reader: traceQueryClientFor(ch),
+    }),
     prices: { estimateCost: () => 0 },
   });
   const web = { orchestrator: "web" };

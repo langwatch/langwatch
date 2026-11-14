@@ -1,6 +1,7 @@
-import { checkTenantScope } from "@langwatch/clickhouse-client";
+import { checkTenantScope, type ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { buildCodingAgentTranscript } from "@langwatch/coding-agent-contract";
-import { describe, expect, it, vi } from "vitest";
+import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
+import { describe, expect, it } from "vitest";
 
 import { LogRecordStorageClickHouseRepository } from "../log-record-storage.repository.ts";
 
@@ -14,7 +15,7 @@ function codexRow({
   return {
     TraceId: "trace-1",
     SpanId: "span-1",
-    TimeUnixMs: "2000",
+    TimeMs: "2000",
     BodyText: null,
     AttributesFlatJson: JSON.stringify(attributes),
     ResourceAttributesFlatJson: "{}",
@@ -24,12 +25,24 @@ function codexRow({
   };
 }
 
+type ReadRequest = Parameters<ClickHouseQueryClient["read"]>[0];
+
+function repositoryOver({ rows, reads = [] }: { rows: unknown[]; reads?: ReadRequest[] }) {
+  return LogRecordStorageClickHouseRepository.create({
+    reader: clickHouseQueryClientDouble({
+      read: async (request: ReadRequest) => {
+        reads.push(request);
+        return { rows };
+      },
+    }),
+  });
+}
+
 async function readLogs(rows: unknown[]) {
-  const query = vi.fn(async () => ({ json: async () => rows }));
-  const repository = LogRecordStorageClickHouseRepository.create((async () => ({
-    query,
-  })) as never);
-  return repository.findLogRecordsByTraceId({ tenantId: "project-1", traceId: "trace-1" });
+  return repositoryOver({ rows }).findLogRecordsByTraceId({
+    tenantId: "project-1",
+    traceId: "trace-1",
+  });
 }
 
 describe("given a codex session whose events name themselves the OTel Event API way", () => {
@@ -76,24 +89,72 @@ describe("given a codex session whose events name themselves the OTel Event API 
 describe("given the Terminal replay reading a session's logs", () => {
   /** @scenario "The Terminal replay's log read passes the tenant guard" */
   it("sends a statement the tenant guard accepts (WEB-5506)", async () => {
-    const query = vi.fn(
-      async (_request: { query: string; query_params: Record<string, unknown> }) => ({
-        json: async () => [],
-      }),
-    );
-    const repository = LogRecordStorageClickHouseRepository.create((async () => ({
-      query,
-    })) as never);
+    const reads: ReadRequest[] = [];
+    await repositoryOver({ rows: [], reads }).findLogRecordsByTraceId({
+      tenantId: "project-1",
+      traceId: "trace-1",
+    });
 
-    await repository.findLogRecordsByTraceId({ tenantId: "project-1", traceId: "trace-1" });
-
-    const request = query.mock.calls[0]?.[0];
+    const request = reads[0];
+    expect(request?.table).toBe("log_records");
+    expect(request?.statement).toMatchObject({
+      kind: "tenant",
+      identity: "reader",
+      settings: { SQL_langwatch_tenant_ids: "project-1" },
+    });
+    expect(request?.statement.sql).toContain("FINAL");
     expect(
       checkTenantScope({
-        sql: request?.query ?? "",
-        params: request?.query_params,
+        sql: request?.statement.sql ?? "",
+        params: request?.statement.params,
         tenantId: "project-1",
       }),
     ).toBeNull();
+  });
+});
+
+describe("given a release still rolling out that wrote the legacy stored logs", () => {
+  describe("when trace reads a trace's stored logs", () => {
+    /** @scenario "The legacy stored-log read is built on the tenant's own scope" */
+    it("elects each record's latest version inside the partition window, on the tenant's scope", async () => {
+      const reads: ReadRequest[] = [];
+      const logs = await repositoryOver({
+        rows: [
+          {
+            TraceId: "trace-1",
+            SpanId: "span-1",
+            TimeMs: 2000,
+            Body: "hello",
+            Attributes: { a: "1" },
+            ResourceAttributes: {},
+            ScopeName: "scope",
+            ScopeVersion: null,
+          },
+        ],
+        reads,
+      }).findLogsByTraceId({ tenantId: "project-1", traceId: "trace-1", occurredAtMs: 10_000 });
+
+      const request = reads[0];
+      expect(request?.table).toBe("stored_log_records");
+      expect(request?.statement).toMatchObject({
+        kind: "tenant",
+        identity: "reader",
+        settings: { SQL_langwatch_tenant_ids: "project-1" },
+      });
+      expect(request?.statement.sql).toContain("max(UpdatedAt)");
+      expect(request?.statement.sql).toContain("TimeUnixMs >= fromUnixTimestamp64Milli(");
+      expect(logs).toEqual([
+        {
+          traceId: "trace-1",
+          spanId: "span-1",
+          timeUnixMs: 2000,
+          body: "hello",
+          attributes: { a: "1" },
+          resourceAttributes: {},
+          scopeName: "scope",
+          scopeVersion: null,
+        },
+      ]);
+    });
   });
 });

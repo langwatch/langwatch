@@ -1,7 +1,13 @@
-import { DEFAULT_PARTITION_WINDOW_MS, queryWindowed } from "@langwatch/clickhouse-client";
+import {
+  type ClickHouseQueryClient,
+  DEFAULT_PARTITION_WINDOW_MS,
+  queryWindowed,
+  type WindowFragment,
+} from "@langwatch/clickhouse-client";
+import { clickhouseRead, fn, tenantScope } from "@langwatch/clickhouse-client/builder";
 import { EventUtils } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import { nowInstant, Temporal, toDate } from "@langwatch/time";
+import { nowInstant } from "@langwatch/time";
 import { z } from "zod";
 
 import {
@@ -9,13 +15,14 @@ import {
   type StoredLogRecordRow,
   TRACE_LOG_READ_CAP,
 } from "../log-record-storage.repository.ts";
-import type { TraceClickHouseResolver as ClickHouseClientResolver } from "./clickhouse.trace-member-client.repository.ts";
+import { logRecords } from "./clickhouse.log-records.table.ts";
+import { storedLogRecords } from "./clickhouse.stored-log-records.table.ts";
 import { chNumber, chString, chStringMap } from "./stored-span-row.mapper.ts";
 
 const logRecordRowSchema = z.looseObject({
   TraceId: chString,
   SpanId: chString,
-  TimeUnixMs: chNumber,
+  TimeMs: chNumber,
   Body: chString.nullable(),
   Attributes: chStringMap,
   ResourceAttributes: chStringMap,
@@ -25,11 +32,6 @@ const logRecordRowSchema = z.looseObject({
 
 const logRecordRowsSchema = z.array(logRecordRowSchema);
 
-const TABLE_NAME = "stored_log_records" as const;
-
-/** Log's canonical log table, shared for reading with trace (clickhouse-table-ownership). */
-const LOG_RECORDS_TABLE = "log_records" as const;
-
 /** log_records is read 14 days back and 2 days forward of the hint, as log read it. */
 const LOG_RECORDS_LOOKBACK_MS = 14 * 24 * 60 * 60 * 1000;
 const LOG_RECORDS_LOOKAHEAD_MS = 2 * 24 * 60 * 60 * 1000;
@@ -37,7 +39,7 @@ const LOG_RECORDS_LOOKAHEAD_MS = 2 * 24 * 60 * 60 * 1000;
 const logRecordsRowSchema = z.object({
   TraceId: z.string(),
   SpanId: z.string(),
-  TimeUnixMs: z.union([z.number(), z.string()]),
+  TimeMs: z.union([z.number(), z.string()]),
   BodyText: z.string().nullable(),
   AttributesFlatJson: z.string(),
   ResourceAttributesFlatJson: z.string(),
@@ -57,16 +59,95 @@ const FALLBACK_LOOKBACK_MS = 90 * 24 * 60 * 60 * 1000;
 
 const logger = createLogger("langwatch:app-layer:traces:log-record-storage-repository");
 
-function clickHouseTimestamp(epochMs: number): Date {
-  return toDate(Temporal.Instant.fromEpochMilliseconds(epochMs));
+/**
+ * The newest version of each stored log on the trace (elected on max(UpdatedAt) per record,
+ * TenantId first), inside the window on the TimeUnixMs partition key, oldest first.
+ */
+function storedLogsStatement({
+  tenantId,
+  traceId,
+  window,
+  limit,
+}: {
+  tenantId: string;
+  traceId: string;
+  window: WindowFragment | null;
+  limit: number;
+}) {
+  const read = clickhouseRead({ scope: tenantScope.single({ tenantId }) })
+    .from(storedLogRecords)
+    .select({
+      TraceId: storedLogRecords.TraceId,
+      SpanId: storedLogRecords.SpanId,
+      TimeMs: fn.toUnixTimestamp64Milli(storedLogRecords.TimeUnixMs),
+      Body: storedLogRecords.Body,
+      Attributes: storedLogRecords.Attributes,
+      ResourceAttributes: storedLogRecords.ResourceAttributes,
+      ScopeName: storedLogRecords.ScopeName,
+      ScopeVersion: storedLogRecords.ScopeVersion,
+    })
+    .where(({ eq }) => eq(storedLogRecords.TraceId, traceId));
+  const windowed =
+    window === null
+      ? read
+      : read.where(({ and, gte, lte }) =>
+          and(
+            gte(storedLogRecords.TimeUnixMs, window.fromMs),
+            lte(storedLogRecords.TimeUnixMs, window.toMs),
+          ),
+        );
+  return windowed.latestVersion().orderBy(storedLogRecords.TimeUnixMs, "ASC").limit(limit).build();
+}
+
+/** Log's merged records correlated to the trace, 14 days back and 2 forward of `center`. */
+function logRecordsStatement({
+  tenantId,
+  traceId,
+  center,
+  limit,
+}: {
+  tenantId: string;
+  traceId: string;
+  center: number;
+  limit: number;
+}) {
+  return clickhouseRead({ scope: tenantScope.single({ tenantId }) })
+    .from(logRecords)
+    .final()
+    .select({
+      TraceId: logRecords.CorrelationTraceId,
+      SpanId: logRecords.CorrelationSpanId,
+      TimeMs: fn.toUnixTimestamp64Milli(logRecords.TimeUnixMs),
+      BodyText: logRecords.BodyText,
+      AttributesFlatJson: logRecords.AttributesFlatJson,
+      ResourceAttributesFlatJson: logRecords.ResourceAttributesFlatJson,
+      ScopeName: logRecords.ScopeName,
+      ScopeVersion: logRecords.ScopeVersion,
+      EventName: logRecords.EventName,
+    })
+    .where(({ and, eq, gte, lte }) =>
+      and(
+        eq(logRecords.CorrelationTraceId, traceId),
+        gte(logRecords.TimeUnixMs, center - LOG_RECORDS_LOOKBACK_MS),
+        lte(logRecords.TimeUnixMs, center + LOG_RECORDS_LOOKAHEAD_MS),
+      ),
+    )
+    .orderBy(logRecords.TimeUnixNano, "ASC")
+    .orderBy(logRecords.RecordId, "ASC")
+    .limit(limit)
+    .build();
 }
 
 export class LogRecordStorageClickHouseRepository implements LogRecordStorageRepository {
-  static create(resolveClient: ClickHouseClientResolver): LogRecordStorageClickHouseRepository {
-    return new LogRecordStorageClickHouseRepository(resolveClient);
+  static create({
+    reader,
+  }: {
+    reader: Pick<ClickHouseQueryClient, "read">;
+  }): LogRecordStorageClickHouseRepository {
+    return new LogRecordStorageClickHouseRepository(reader);
   }
 
-  constructor(private readonly resolveClient: ClickHouseClientResolver) {}
+  private constructor(private readonly reader: Pick<ClickHouseQueryClient, "read">) {}
 
   async findLogsByTraceId({
     tenantId,
@@ -84,71 +165,24 @@ export class LogRecordStorageClickHouseRepository implements LogRecordStorageRep
       "LogRecordStorageClickHouseRepository.getLogsByTraceId",
     );
 
-    const client = await this.resolveClient(tenantId);
-
-    // Bounds the read on the TimeUnixMs partition key to prune weekly
-    // partitions instead of cold-scanning every one. With a turn-time hint,
-    // ±2d around it; without, now-90d..now+2d. Routed through
-    // queryWindowed for the metric, but stays
-    // SINGLE-SHOT and byte-identical to the previous inline window.
+    // Bounds the read on the TimeUnixMs partition key: with a turn-time hint, ±2d around it;
+    // without, now-90d..now+2d. Single-shot; queryWindowed only counts the outcome.
     const hasWindow = typeof occurredAtMs === "number" && occurredAtMs > 0;
 
     return queryWindowed<StoredLogRecordRow[]>({
-      table: TABLE_NAME,
+      table: storedLogRecords.$table.name,
       hintMs: hasWindow ? occurredAtMs : null,
       windowMs: DEFAULT_PARTITION_WINDOW_MS,
       fallback: hasWindow ? "none" : { lookbackMs: FALLBACK_LOOKBACK_MS },
       isEmpty: (rows) => rows.length === 0,
       run: async (window) => {
-        // Qualifies the bound with the table name: the outer SELECT aliases
-        // toUnixTimestamp64Milli(TimeUnixMs) AS TimeUnixMs, and CH would
-        // otherwise resolve a bare TimeUnixMs in WHERE to that ms-integer
-        // alias instead of the DateTime64 column, making the partition bound
-        // nonsensical. window is always present here (hinted or lookback).
-        const timeFilter = window ? window.sqlFor(`${TABLE_NAME}.TimeUnixMs`) : "";
-
-        // Dedup to the latest version of each stored log (RMT(UpdatedAt) keyed
-        // TenantId,TraceId,SpanId,ProjectionId); IN-tuple over max(UpdatedAt)
-        // returns one row per record, TenantId first (no other id is unique
-        // across tenants). Inner subquery reads only light key columns; heavy
-        // Body/Attributes/ResourceAttributes materialise per matched row only.
-        const result = await client.query({
-          query: `
-        SELECT
-          TraceId,
-          SpanId,
-          toUnixTimestamp64Milli(TimeUnixMs) AS TimeUnixMs,
-          Body,
-          Attributes,
-          ResourceAttributes,
-          ScopeName,
-          ScopeVersion
-        FROM ${TABLE_NAME}
-        WHERE TenantId = {tenantId:String}
-          AND TraceId = {traceId:String}
-          ${timeFilter}
-          AND (TenantId, TraceId, SpanId, ProjectionId, UpdatedAt) IN (
-            SELECT TenantId, TraceId, SpanId, ProjectionId, max(UpdatedAt)
-            FROM ${TABLE_NAME}
-            WHERE TenantId = {tenantId:String}
-              AND TraceId = {traceId:String}
-              ${timeFilter}
-            GROUP BY TenantId, TraceId, SpanId, ProjectionId
-          )
-        ORDER BY TimeUnixMs ASC
-        LIMIT {limitPlusOne:UInt32}
-      `,
-          query_params: {
-            tenantId,
-            traceId,
-            // One row past the cap so truncation is detectable without a count.
-            limitPlusOne: limit + 1,
-            ...window?.params,
-          },
-          format: "JSONEachRow",
+        // One row past the cap so truncation is detectable without a count.
+        const result = await this.reader.read({
+          statement: storedLogsStatement({ tenantId, traceId, window, limit: limit + 1 }),
+          table: storedLogRecords.$table.name,
         });
 
-        const rows = logRecordRowsSchema.parse(await result.json());
+        const rows = logRecordRowsSchema.parse(result.rows);
 
         if (rows.length > limit) {
           rows.length = limit;
@@ -161,7 +195,7 @@ export class LogRecordStorageClickHouseRepository implements LogRecordStorageRep
         return rows.map((row) => ({
           traceId: row.TraceId,
           spanId: row.SpanId,
-          timeUnixMs: row.TimeUnixMs,
+          timeUnixMs: row.TimeMs,
           body: row.Body ?? "",
           attributes: row.Attributes ?? {},
           resourceAttributes: row.ResourceAttributes ?? {},
@@ -191,38 +225,11 @@ export class LogRecordStorageClickHouseRepository implements LogRecordStorageRep
       typeof occurredAtMs === "number" && occurredAtMs > 0
         ? occurredAtMs
         : nowInstant().epochMilliseconds;
-    const client = await this.resolveClient(tenantId);
-    const result = await client.query({
-      query: `
-        SELECT
-          CorrelationTraceId AS TraceId,
-          CorrelationSpanId AS SpanId,
-          toUnixTimestamp64Milli(TimeUnixMs) AS TimeUnixMs,
-          BodyText,
-          AttributesFlatJson,
-          ResourceAttributesFlatJson,
-          ScopeName,
-          ScopeVersion,
-          EventName
-        FROM ${LOG_RECORDS_TABLE} FINAL
-        WHERE TenantId = {tenantId:String}
-          AND CorrelationTraceId = {traceId:String}
-          AND ${LOG_RECORDS_TABLE}.TimeUnixMs >= {windowStart:DateTime64(3)}
-          AND ${LOG_RECORDS_TABLE}.TimeUnixMs <= {windowEnd:DateTime64(3)}
-        ORDER BY TimeUnixNano ASC, RecordId ASC
-        LIMIT {limit:UInt64}
-      `,
-      query_params: {
-        tenantId,
-        traceId,
-        // Not `from`/`to`: the tenant guard reads a bare `{from:` as a FROM clause and refuses it.
-        windowStart: clickHouseTimestamp(center - LOG_RECORDS_LOOKBACK_MS),
-        windowEnd: clickHouseTimestamp(center + LOG_RECORDS_LOOKAHEAD_MS),
-        limit,
-      },
-      format: "JSONEachRow",
+    const result = await this.reader.read({
+      statement: logRecordsStatement({ tenantId, traceId, center, limit }),
+      table: logRecords.$table.name,
     });
-    const rows = logRecordsRowsSchema.parse(await result.json());
+    const rows = logRecordsRowsSchema.parse(result.rows);
     if (rows.length >= limit) {
       logger.warn({ tenantId, traceId, limit }, "Trace's log_records read hit its row cap");
     }
@@ -234,7 +241,7 @@ export class LogRecordStorageClickHouseRepository implements LogRecordStorageRep
       return {
         traceId: row.TraceId,
         spanId: row.SpanId,
-        timeUnixMs: Number(row.TimeUnixMs),
+        timeUnixMs: Number(row.TimeMs),
         body: row.BodyText ?? "",
         attributes,
         resourceAttributes: flatAttributesSchema.parse(JSON.parse(row.ResourceAttributesFlatJson)),

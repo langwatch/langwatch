@@ -226,3 +226,10 @@ Feature: Trace span-tree read service
     Then each statement is a reader statement over the proof's tenants with the tenant setting
     And the row read elects the latest version and ranks versions tied on it by fold progress, the same row on every read
     And a caller's window bounds the outer read only, and the anchors read is bounded by the window or else the trace id index
+
+  @unit
+  Scenario: The legacy stored-log read is built on the tenant's own scope
+    Given a release still rolling out wrote a trace's logs to the legacy stored logs
+    When trace reads that trace's stored logs
+    Then the statement is a reader statement on the tenant's own scope with the tenant setting
+    And it elects each record's latest version inside the partition window, in both the outer read and the election

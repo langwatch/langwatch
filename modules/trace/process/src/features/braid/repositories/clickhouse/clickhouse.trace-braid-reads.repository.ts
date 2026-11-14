@@ -11,12 +11,19 @@ import {
 import {
   type AuthorizedClickHouse,
   braidConditionExpression,
+  type ClickHouseQueryClient,
   tenantScope,
   tenantScopeForLatestVersion,
   tenantScopeWithConditions,
 } from "@langwatch/clickhouse-client";
+import {
+  clickhouseRead,
+  fn,
+  tenantScope as builtTenantScope,
+} from "@langwatch/clickhouse-client/builder";
 import { z } from "zod";
 
+import { traceSummaries } from "../../../../repositories/clickhouse/clickhouse.trace-summaries.table.ts";
 import { ClickHouseTraceSpanRepository } from "../../../../repositories/clickhouse/trace-span.repository.ts";
 import type { TraceSpanSummaryRecord } from "../../../../repositories/trace-projected-read.repository.ts";
 import {
@@ -158,15 +165,41 @@ function verifiedPartsOf(compiledWhere: CompiledWhere | undefined): VerifiedPart
   return { kind: "signed", rest: rest.length === 0 ? undefined : of(rest), verified: of(verified) };
 }
 
+/** The reader's own traces since `sinceMs` under its proof's windows, newest first. */
+function readerTraceIdsStatement({
+  authorization,
+  sinceMs,
+  limit,
+}: {
+  authorization: Authorization;
+  sinceMs: number;
+  limit: number;
+}) {
+  return clickhouseRead({ scope: builtTenantScope.fromProof({ authorization, reads: "traces" }) })
+    .from(traceSummaries)
+    .withinWindows()
+    .select({ TraceId: traceSummaries.TraceId })
+    .where(({ gte }) => gte(traceSummaries.OccurredAt, sinceMs))
+    .groupBy(traceSummaries.TraceId)
+    .orderBy(fn.max(traceSummaries.OccurredAt), "DESC")
+    .orderBy(traceSummaries.TraceId, "ASC")
+    .limit(limit)
+    .build();
+}
+
 export class ClickHouseTraceBraidReadsRepository extends TraceBraidReadsRepository {
-  private constructor(private readonly clickhouse: AuthorizedClickHouse) {
+  private constructor(
+    private readonly clickhouse: AuthorizedClickHouse,
+    private readonly reader: Pick<ClickHouseQueryClient, "read">,
+  ) {
     super();
   }
 
   static create(options: {
     clickhouse: AuthorizedClickHouse;
+    reader: Pick<ClickHouseQueryClient, "read">;
   }): ClickHouseTraceBraidReadsRepository {
-    return new ClickHouseTraceBraidReadsRepository(options.clickhouse);
+    return new ClickHouseTraceBraidReadsRepository(options.clickhouse, options.reader);
   }
 
   async findReaderTraceIds(input: {
@@ -174,22 +207,12 @@ export class ClickHouseTraceBraidReadsRepository extends TraceBraidReadsReposito
     sinceMs: number;
     limit: number;
   }): Promise<string[]> {
-    const client = this.clickhouse.as(input.authorization, { reads: "traces" });
-    const result = await client.query({
+    const result = await this.reader.read({
       // ID_BOUND_SKIP: a window read over the reader's own traces, bounded by OccurredAt.
-      query: `
-        SELECT TraceId
-        FROM trace_summaries
-        WHERE ${tenantScope("OccurredAt")}
-          AND OccurredAt >= ${millis("sinceMs")}
-        GROUP BY TraceId
-        ORDER BY max(OccurredAt) DESC, TraceId ASC
-        LIMIT {limit:UInt32}
-      `,
-      query_params: { sinceMs: input.sinceMs, limit: input.limit },
-      format: "JSONEachRow",
+      statement: readerTraceIdsStatement(input),
+      table: traceSummaries.$table.name,
     });
-    return traceIdRowsSchema.parse(await result.json()).map((row) => row.TraceId);
+    return traceIdRowsSchema.parse(result.rows).map((row) => row.TraceId);
   }
 
   /**
