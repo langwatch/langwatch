@@ -497,6 +497,27 @@ describe("POST /api/experiments/:slug/run", () => {
     });
   });
 
+  describe("when the body names a concurrency and the experiment saved another", () => {
+    /** @scenario "A per-run concurrency is answered by the run API and leaves the saved setting alone" */
+    it("answers the run's concurrency on start and poll, leaving the saved one at 10", async () => {
+      const saved = { ...savedState(), concurrency: 10 };
+      const { request } = await harness({
+        experiments: { ...found(saved), isActive: async () => true },
+        redis: true,
+        registers: false,
+      });
+
+      const response = await request("/checkout-eval/run", runOf('{"concurrency":1}'));
+      const body = await response.json();
+      const poll = await (await request(`/runs/${body.runId}`)).json();
+
+      expect(response.status).toBe(200);
+      expect(body).toMatchObject({ status: "running", concurrency: 1 });
+      expect(poll).toMatchObject({ runId: body.runId, status: "running", concurrency: 1 });
+      expect(saved.concurrency).toBe(10);
+    });
+  });
+
   describe("when the body names no concurrency", () => {
     /** @scenario "A run call that names no concurrency uses the deployment's default" */
     it("plans the run with the deployment's concurrency", async () => {
@@ -550,6 +571,7 @@ describe("POST /api/experiments/:slug/run", () => {
         runId: expect.any(String),
         status: "running",
         total: 0,
+        concurrency: 10,
         runUrl: `https://app.test/acme/experiments/checkout-eval?runId=${body.runId}`,
       });
       expect(starts).toMatchObject([
@@ -612,6 +634,7 @@ describe("POST /api/experiments/:slug/run", () => {
         status: "running",
         progress: 0,
         total: 0,
+        concurrency: 10,
         startedAt: expect.any(Number),
       });
     });
@@ -1344,6 +1367,7 @@ describe("/api/evaluations/v3/*, the SDKs' older name for the workbench doors", 
       runId: expect.any(String),
       status: "running",
       total: 0,
+      concurrency: 10,
       runUrl: `https://app.test/acme/experiments/checkout-eval?runId=${body.runId}`,
     });
     expect(starts).toHaveLength(1);

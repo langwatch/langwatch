@@ -1,7 +1,7 @@
 import type { PlanGates } from "./gates.ts";
 import { ENTERPRISE_CAPABILITIES } from "./gates.ts";
 import type { PlanLimits } from "./limits.ts";
-import { UNLIMITED, UNLIMITED_MESSAGES } from "./limits.ts";
+import { UNLIMITED, UNLIMITED_MESSAGES, UNLIMITED_SEATS } from "./limits.ts";
 import type { MoneyByCurrency, PlanType } from "./plan-type.ts";
 import type { Plan } from "./plan.ts";
 
@@ -27,7 +27,7 @@ const ALL_GATES: PlanGates = {
 };
 
 /** Lite seats are uncapped on every paid cloud plan; the free tier sells none. */
-const PAID_MEMBERS_LITE = 9_999;
+const PAID_MEMBERS_LITE = UNLIMITED_SEATS;
 
 function tieredLimits({
   automationDailyDispatch,
@@ -41,6 +41,7 @@ function tieredLimits({
   return {
     members: { value: members, unit: "members" },
     membersLite: { value: PAID_MEMBERS_LITE, unit: "members" },
+    membersDeveloper: { value: 0, unit: "members" },
     volume: { value: volume, unit: "messages-per-month" },
     seats: null,
     automationDailyDispatch: { value: automationDailyDispatch, unit: "dispatches-per-day" },
@@ -101,6 +102,7 @@ function growthSeatPlan({ period, type }: { period: "monthly" | "annual"; type: 
     limits: {
       members: { value: 20, unit: "members" },
       membersLite: { value: PAID_MEMBERS_LITE, unit: "members" },
+      membersDeveloper: { value: 0, unit: "members" },
       volume: { value: UNLIMITED_MESSAGES, unit: "events-per-month" },
       seats: { value: 20, unit: "seats" },
       automationDailyDispatch: { value: 500, unit: "dispatches-per-day" },
@@ -108,7 +110,7 @@ function growthSeatPlan({ period, type }: { period: "monthly" | "annual"; type: 
     },
     gates: NO_ENTERPRISE_GATES,
     selfServe: { ladder: "SEAT_EVENT", rung: GROWTH_SEAT_RUNG, order: 0 },
-    disputed: [],
+    disputed: ["growth-seat-member-ceiling"],
   };
 }
 
@@ -122,6 +124,7 @@ const FREE_PLAN: Plan = {
   limits: {
     members: { value: 2, unit: "members" },
     membersLite: { value: 0, unit: "members" },
+    membersDeveloper: { value: 0, unit: "members" },
     volume: { value: 50_000, unit: "messages-per-month" },
     seats: null,
     automationDailyDispatch: { value: 50, unit: "dispatches-per-day" },
@@ -165,6 +168,7 @@ const OPEN_SOURCE_PLAN: Plan = {
   limits: {
     members: { value: UNLIMITED, unit: "members" },
     membersLite: { value: UNLIMITED, unit: "members" },
+    membersDeveloper: { value: UNLIMITED, unit: "members" },
     volume: { value: UNLIMITED, unit: "messages-per-month" },
     seats: null,
     automationDailyDispatch: { value: UNLIMITED, unit: "dispatches-per-day" },

@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 
 import { TestClock } from "../../../__tests__/fixtures/coding-agent.fixture.ts";
 import { NoopCodingAgentReadMetricsService } from "../../../__tests__/support/coding-agent-read-metrics-noop.service.ts";
+import { sessionIdIndexNotReady } from "../../../__tests__/support/session-id-index-not-ready.fixture.ts";
 import { CodingAgentSessionEventsClickHouseRepository } from "../clickhouse.coding-agent-session-event.repository.ts";
 import { CodingAgentSessionClickHouseRepository } from "../clickhouse.coding-agent-session.repository.ts";
 
@@ -18,6 +19,7 @@ function guardedClient() {
   const guard = new TenantGuard();
   const requests: QueryRequest[] = [];
   const clickhouse = clickHouseQueryClientDouble({
+    ...sessionIdIndexNotReady,
     query: async (request: QueryRequest) => {
       guard.assert(request);
       requests.push(request);

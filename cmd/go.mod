@@ -1,6 +1,6 @@
 module github.com/langwatch/langwatch/cmd
 
-go 1.27.3
+go 1.27.4
 
 require (
 	cloud.google.com/go v0.123.0 // indirect
@@ -11,7 +11,7 @@ require (
 	github.com/AzureAD/microsoft-authentication-library-for-go v1.7.2 // indirect
 	github.com/Code-Hex/dd v1.1.0 // indirect
 	github.com/alecthomas/participle/v2 v2.1.4 // indirect
-	github.com/andybalholm/brotli v1.2.1 // indirect
+	github.com/andybalholm/brotli v1.2.7 // indirect
 	github.com/antchfx/xmlquery v1.5.1 // indirect
 	github.com/antchfx/xpath v1.3.6 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.43.2 // indirect
@@ -82,7 +82,7 @@ require (
 	github.com/invopop/jsonschema v0.13.0 // indirect
 	github.com/jonboulle/clockwork v0.5.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/klauspost/compress v1.18.7 // indirect
+	github.com/klauspost/compress v1.20.2 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/langwatch/langwatch/sdks/go v1.0.0 // indirect
@@ -118,7 +118,6 @@ require (
 	github.com/rs/zerolog v1.34.0 // indirect
 	github.com/russellhaering/goxmldsig v1.6.0 // indirect
 	github.com/spf13/cast v1.10.0 // indirect
-	github.com/stretchr/testify v1.12.1 // indirect
 	github.com/thessem/zap-prettyconsole v0.6.0 // indirect
 	github.com/tidwall/gjson v1.19.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
@@ -188,6 +187,7 @@ require (
 	github.com/langwatch/langwatch/pkg v0.0.0-00010101000000-000000000000
 	github.com/langwatch/langwatch/services v0.0.0-00010101000000-000000000000
 	github.com/langwatch/langwatch/tools v0.0.0-00010101000000-000000000000
+	github.com/stretchr/testify v1.12.1
 	go.uber.org/zap v1.28.0
 	golang.org/x/crypto v0.57.0
 	golang.org/x/sync v0.23.0

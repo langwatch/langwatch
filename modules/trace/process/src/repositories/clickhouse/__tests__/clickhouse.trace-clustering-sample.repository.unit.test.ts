@@ -90,6 +90,18 @@ describe("ClickHouseTraceClusteringSampleRepository", () => {
     expect(clickhouse.requests[0]?.query.match(/ORDER BY/gi)).toHaveLength(1);
   });
 
+  /** @scenario "A finished run moves the clustering watermark so the next run skips what it read" */
+  it("ends the page at the run's window end instead of now when given one", async () => {
+    const { repository, clickhouse } = repositoryOver([]);
+
+    await repository.findPageRows({ tenantId: "project-1", windowStartMs: 49, windowEndMs: 90 });
+
+    const request = clickhouse.requests[0];
+    expect(request?.query).not.toContain("now64(3)");
+    expect(request?.query.match(/fetchWindowEndMs:UInt64/g)).toHaveLength(3);
+    expect(request?.query_params).toMatchObject({ fetchWindowEndMs: 90 });
+  });
+
   it("keeps an incremental page to traces outside the known topics, after the cursor", async () => {
     const { repository, clickhouse } = repositoryOver([]);
 

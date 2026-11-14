@@ -93,6 +93,7 @@ export function getStaticModelCostRates(): readonly ModelCostRate[] {
           outputImageCostPerToken: model.pricing.imageOutputCostPerToken,
           inputCostPerCharacter: model.pricing.inputCostPerCharacter,
           inputCostPerSecond: model.pricing.inputCostPerSecond,
+          webSearchCostPerQuery: model.pricing.webSearchCostPerQuery,
         },
       ];
     })

@@ -284,9 +284,9 @@ export class DatasetNormalizeService implements DatasetNormalize, DatasetNormali
   }) {
     const { projectId, datasetId, filename } = payload;
     const storage = this.deps.chunks;
-    const { bytes, sizeBytes } = await this.openSource(payload);
     const format = detectFileFormat(filename);
     const limits = await this.deps.requestBounds.limits(projectId);
+    const { bytes, sizeBytes } = await this.openSource(payload);
     const writer = StreamingChunkWriterService.create({
       storage,
       projectId,
@@ -309,6 +309,7 @@ export class DatasetNormalizeService implements DatasetNormalize, DatasetNormali
     // pass a schema) → null, so parseInto leaves rows as-is and the types are
     // derived below.
     const confirmedColumns = (confirmed as DatasetColumns) ?? [];
+    // Ends the body on every path: a refusal before its first read would hold its socket.
     const { headers, appliedColumnTypes } = await parseInto({
       bytes,
       format,
@@ -323,7 +324,7 @@ export class DatasetNormalizeService implements DatasetNormalize, DatasetNormali
       targetColumns: confirmedColumns.length > 0 ? confirmedColumns : null,
       storeInlineFiles: (record, columns) =>
         this.deps.inlineAttachments.store(scopeFor(columns), record),
-    });
+    }).finally(() => bytes[Symbol.asyncIterator]().return?.());
     // I-MEM: finalize returns the aggregated meta built from per-chunk
     // metadata only — the chunk `jsonl` payloads were released at each flush,
     // so the whole normalized file is never accumulated in heap.

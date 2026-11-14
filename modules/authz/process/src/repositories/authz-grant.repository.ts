@@ -103,7 +103,7 @@ export abstract class AuthzGrantRepository extends ScopeLineageRepository {
     organizationId: string;
     actor: LedgerActor;
     prove: (txReader: AuthzReadRepository) => Promise<void>;
-  }): Promise<OffboardCounts>;
+  }): Promise<OffboardCounts & { heldFullSeat: boolean }>;
   /**
    * The organization-scoped grants the DIRECTORY itself wrote for these
    * people. `source` names the writer, so an administrator's own grant at the

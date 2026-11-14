@@ -695,6 +695,8 @@ const modelCostRateSchemaDefinition = z
     outputImageCostPerToken: z.number().optional(),
     inputCostPerCharacter: z.number().optional(),
     inputCostPerSecond: z.number().optional(),
+    /** USD per web search tool call, billed apart from the tokens the search results add. */
+    webSearchCostPerQuery: z.number().optional(),
   })
   .strict();
 export interface ModelCostRateSchema extends Named<typeof modelCostRateSchemaDefinition> {}

@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import type { CreateIngestionKeyInput } from "./api-key-rest.schemas.ts";
 import type {
+  DocsSessionAvailability,
   DocsSessionKeyMinted,
   DocsSessionRevoked,
   MintDocsSessionKeyInput,
@@ -45,6 +46,17 @@ import type {
   RevokeApiKeyInput,
   UpdateApiKeyInput,
 } from "./api-key.ts";
+import type {
+  BraidSignatureVerdict,
+  CreateSigningKeyInput,
+  FindSigningKeysInput,
+  IssuedSigningKey,
+  ProjectSigning,
+  RevokeSigningKeyInput,
+  RotateSigningKeyInput,
+  SigningKey,
+  VerifyBraidSignatureInput,
+} from "./signing-key.ts";
 
 const apiKeyVisibleProjectsInputSchemaDefinition = z
   .object({
@@ -132,11 +144,13 @@ export interface ApiKeyApi {
    */
   mintAgentSandboxKey(input: MintAgentSandboxKeyInput): Promise<string>;
   /**
-   * A docs session key (ADR-185): the member in one project, for at most five minutes and never
-   * past their browser session or the organization's session ceiling. Refuses an operator acting
-   * as the member and a docs origin this deployment does not register.
+   * A docs session key (ADR-185): the member in one project, read-only or with all they hold, for
+   * the 5 to 60 minutes chosen, never past their browser session or the session ceiling. Refuses
+   * an impersonator, an unregistered docs origin and an organization that turned this off.
    */
   mintDocsSessionKey(input: MintDocsSessionKeyInput): Promise<DocsSessionKeyMinted>;
+  /** Whether the project's organization lets the docs playground connect (the consent page). */
+  getDocsSessionAvailability(input: { projectId: string }): Promise<DocsSessionAvailability>;
   /**
    * Revokes the one docs key named, or every docs key the named browser sessions minted.
    * Idempotent, and silent about any key that is not a live docs session key.
@@ -323,6 +337,18 @@ export interface ApiKeyApi {
     input: { organizationId: string },
     by: ApiKeyManagementCaller,
   ): Promise<ApiKeyUser[]>;
+  /** ADR-201 §4: a project's braid signing keys with their last 24 hours; never a secret. */
+  findSigningKeys(input: FindSigningKeysInput): Promise<SigningKey[]>;
+  /** Whether a project signs its calls, for the braid dialog of whoever braids into it. */
+  findProjectSigning(input: FindSigningKeysInput): Promise<ProjectSigning>;
+  /** Issues a signing key; the answer is the only place its secret is ever returned. */
+  createSigningKey(input: CreateSigningKeyInput): Promise<IssuedSigningKey>;
+  /** Issues a replacement; the old key keeps verifying for `SIGNING_KEY_ROTATION_OVERLAP_MS`. */
+  rotateSigningKey(input: RotateSigningKeyInput): Promise<IssuedSigningKey>;
+  /** Ends a key at once, bounded by the lookup cache (`SIGNING_KEY_LOOKUP_CACHE_MS`). */
+  revokeSigningKey(input: RevokeSigningKeyInput): Promise<SigningKey>;
+  /** Span admission's check of one `langwatch.signature`; the secret never leaves this module. */
+  verifyBraidSignature(input: VerifyBraidSignatureInput): Promise<BraidSignatureVerdict>;
 }
 
 export const ApiKeyApi = moduleApi<ApiKeyApi>()("api-key");

@@ -279,12 +279,15 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   // The docs deploy's redirect store and its job (specs/ci/docs-deploy.feature).
   "tools/docsdeploy",
   "tools/chartheap",
+  "tools/charts3region",
   // How the package-suites weights are measured from main's job logs
   // (specs/ci/package-suites-weights.feature).
   "tools/suiteweights",
   // The gateway-matrix seed: which providers it seeds from which credentials,
   // and that Bedrock stays keyless (specs/ci/gateway-matrix-seed.feature).
   "tools/matrixseed",
+  // Its command writes the bootstrapped step output the later steps gate on.
+  "cmd/matrixseed",
   // The CLI half of the same tool: the verdict-to-exit-code step is the part
   // CI gates on, so the "check fails" / "check passes" scenarios bind here.
   "cmd/linkcheck",
@@ -419,7 +422,6 @@ const LEGACY_INERT: string[] = [
   "specs/ai-gateway/wrapper-e2e/gemini.feature",
   "specs/ai-gateway/wrapper-e2e/opencode.feature",
   "specs/ai-governance/cli-wrappers/request-increase.feature",
-  "specs/ai-governance/cli-wrappers/wrap-login-routing.feature",
   "specs/ai-governance/dogfood-seed/scope-runner.feature",
   "specs/ai-governance/ingestion-sources/claude-code-otlp.feature",
   "specs/ai-governance/ingestion-sources/native-receiver-lift.feature",
@@ -681,6 +683,10 @@ const LEGACY_INERT: string[] = [
 
 /** Feature files with mixed tagged/untagged scenarios (legacy tolerance; new files fail) */
 const LEGACY_PARTIAL: string[] = [
+  // Reason: left LEGACY_INERT when the not-found scenarios were bound: a tool
+  // that cannot start exits 127 with a docs link and no setup written. The
+  // login, env and routing scenarios stay untagged.
+  "specs/ai-governance/cli-wrappers/wrap-login-routing.feature",
   // Reason: left LEGACY_INERT when evaluator get gained name resolution; its
   // scenarios are enforced. The other CLI scenarios stay untagged.
   "specs/evaluators/evaluator-cli.feature",

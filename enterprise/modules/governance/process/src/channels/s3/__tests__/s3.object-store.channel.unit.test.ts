@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { describe, expect, it } from "vitest";
+import { S3Client } from "@aws-sdk/client-s3";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { MemoryObjectStoreChannel } from "../../memory/memory.object-store.channel.ts";
 import { S3ObjectStoreChannel } from "../s3.object-store.channel.ts";
@@ -20,6 +21,30 @@ describe("S3ObjectStoreChannel", () => {
           limit: 10,
         }),
       ).rejects.toThrow(/cloud metadata/);
+    });
+  });
+
+  describe("given an S3-compatible endpoint", () => {
+    afterEach(() => vi.restoreAllMocks());
+
+    /** @scenario "Every S3 client picks its region by the same rule" */
+    it("signs with the named region, else 'auto'", async () => {
+      const regions: string[] = [];
+      vi.spyOn(S3Client.prototype, "send").mockImplementation(async function (this: S3Client) {
+        regions.push(await this.config.region());
+        return { Contents: [], IsTruncated: false };
+      });
+      for (const region of ["", "eu-central-1"]) {
+        await S3ObjectStoreChannel.create().list({
+          bucket: "logs",
+          prefix: "",
+          region,
+          endpoint: "https://1.1.1.1:9000",
+          credentials,
+          limit: 10,
+        });
+      }
+      expect(regions).toEqual(["auto", "eu-central-1"]);
     });
   });
 

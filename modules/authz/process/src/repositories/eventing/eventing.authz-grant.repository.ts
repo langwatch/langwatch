@@ -308,7 +308,7 @@ export class EventingAuthzGrantRepository extends AuthzGrantRepository {
     organizationId: string;
     actor: LedgerActor;
     prove: (txReader: AuthzReadRepository) => Promise<void>;
-  }): Promise<OffboardCounts> {
+  }): Promise<OffboardCounts & { heldFullSeat: boolean }> {
     let revokedGrantIds: string[] = [];
     const counts = await this.options.reads.offboardUser({
       userId,

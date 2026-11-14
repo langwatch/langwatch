@@ -4,7 +4,7 @@
  * `into(handle, closure)` — only the constructed collaborator escapes.
  */
 import type { SecretsChain } from "./chain.ts";
-import type { SecretHandle } from "./secret.ts";
+import type { Into, SecretHandle } from "./secret.ts";
 import {
   SecretNotSetError,
   SealedSecretsError,
@@ -68,11 +68,6 @@ export class SecretsResolver {
 function claimOf(handle: SecretHandle<unknown>): string {
   return `${handle.family ? "family" : "value"}:${handle.id}`;
 }
-
-type Into = <Value, Out>(
-  handle: SecretHandle<Value>,
-  build: (value: Value) => Out | Promise<Out>,
-) => Promise<Out>;
 
 /** There is no `get()` returning a string to keep — only `into`. */
 export class ScopedSecrets {

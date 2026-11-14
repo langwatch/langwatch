@@ -12,8 +12,13 @@ Feature: App opens reach Customer.io on the opening user
     And tracks sessions_page_viewed on user-1
 
   @unit
+  Scenario: Any tracked page open identifies app_last_opened_at
+    When auth records an open of the sessions page, the personal overview, or a usage, cost or plan page for user-1
+    Then Customer.io identifies user-1 with app_last_opened_at in Unix seconds
+
+  @unit
   Scenario: Repeated opens inside an hour send once per user
-    When the same user opens the page twice inside an hour
+    When the same user opens the sessions page twice inside an hour
     Then one identify and one track are sent
     And after the hour both are sent again
 
@@ -77,3 +82,12 @@ Feature: App opens reach Customer.io on the opening user
     Given a self-hosted deployment, or one that has not answered yet
     When a person opens the usage, plans or subscription screen
     Then no page opened is recorded
+
+  # Langy's first message (2026-11-10): langy records first_message_seen against the
+  # conversation's owner; the trait is the person's, not the organization's.
+  @unit
+  Scenario: Langy's first answer to a person sets saw_langy_first_message on them, once
+    Given langy recorded that a person got an answer from Langy in a project
+    When nurturing delivers it
+    Then Customer.io identifies saw_langy_first_message true on that person
+    And the send is claimed once per person, so a later answer in another project sends nothing

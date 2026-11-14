@@ -23,7 +23,7 @@ import {
 // Replaying the shipped collapse, narrowed to this test's synthetic rows.
 const REPLAY = skipTenantCheck({ SKIP_TENANT_CHECK: true }).sql;
 
-const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../../..");
+const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../..");
 const MIGRATION_FILE = join(
   repositoryRoot,
   "packages/prisma-client/prisma/migrations/20260814120000_collapse_duplicate_model_default_scopes/migration.sql",

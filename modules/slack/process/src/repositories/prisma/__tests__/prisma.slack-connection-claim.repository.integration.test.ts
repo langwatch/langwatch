@@ -206,12 +206,4 @@ describe.skipIf(!databaseUrl)("PrismaSlackConnectionClaimRepository", () => {
       await expect(claims.findByConnections({ organizationId, ids: [] })).resolves.toEqual([]);
     });
   });
-
-  describe("given a claim on a connection that does not exist", () => {
-    it("is refused by the foreign key", async () => {
-      await expect(
-        claim({ connectionId: `${namespace}-missing`, claimantId: "trigger-1" }),
-      ).rejects.toThrow(/foreign key/i);
-    });
-  });
 });

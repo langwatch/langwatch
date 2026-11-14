@@ -126,6 +126,14 @@ Feature: Enterprise billing compatibility
     And onboard, add commit, renew, complete renewal and mark paid out of band are each refused with permission_denied
 
   @unit
+  Scenario: The connected-billing overview is refused outside LangWatch Cloud
+    Given a deployment that is not LangWatch Cloud, such as a self-hosted install
+    And a platform operator holding ops:view and ops:manage
+    When they read a customer's connected-billing overview
+    Then billing refuses with connected_billing_unavailable, as its writes do there
+    And nothing is read or audited
+
+  @unit
   Scenario: A Stripe customer reads alike over the provider and its memory twin
     Given the Stripe customers channel over the provider and over its memory twin
     When a customer is created, read back, deleted and read again

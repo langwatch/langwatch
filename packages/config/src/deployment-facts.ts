@@ -79,6 +79,17 @@ export const { outboundProxy } = Config.define((c) => ({
   },
 }));
 
+/**
+ * Node's own switch that sends global `fetch` through `HTTPS_PROXY`: `NODE_USE_ENV_PROXY=1`, or
+ * `--use-env-proxy` in `NODE_OPTIONS`. Read with `globalFetchUsesEnvProxy` in `@langwatch/egress`.
+ */
+export const { nodeEnvProxy } = Config.define((c) => ({
+  nodeEnvProxy: {
+    NODE_USE_ENV_PROXY: c.env("NODE_USE_ENV_PROXY", environmentOneOrTrueSchema),
+    NODE_OPTIONS: c.env("NODE_OPTIONS", z.string().optional()),
+  },
+}));
+
 /** The outbound address fence every egress-making owner judges a call by. */
 export const { blockLocalHttpCalls, allowedProxyHosts } = Config.define((c) => ({
   blockLocalHttpCalls: c.env("BLOCK_LOCAL_HTTP_CALLS", environmentOneOrTrueSchema),
@@ -128,6 +139,11 @@ export const { publicBaseUrl } = Config.define((c) => ({
       .optional()
       .transform((value) => value?.trim() || void 0),
   ),
+}));
+
+/** The replicated ClickHouse's cluster: analytics probes and ops reads backups on each replica. */
+export const { clickhouseCluster } = Config.define((c) => ({
+  clickhouseCluster: c.env("CLICKHOUSE_CLUSTER", z.string().optional()),
 }));
 
 /**

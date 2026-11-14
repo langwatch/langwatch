@@ -17,7 +17,7 @@ import {
 } from "./telemetry/coding-agent-normalization.ts";
 import { pickString } from "./telemetry/coding-agent-span.ts";
 import { grokAgent } from "./telemetry/grok.ts";
-import { toolDecisionOutcome } from "./telemetry/tool-decision.ts";
+import { toolDecisionByUser, toolDecisionOutcome } from "./telemetry/tool-decision.ts";
 
 export function collectLogEntries(
   logs: TranscriptLogRecord[],
@@ -128,7 +128,15 @@ function buildToolResultEntry({
 
   const decision = pickString(attrs, "decision");
   if (decision === "reject") {
-    return { kind: "tool_rejected", atMs, name, reason: decision, outcome: "denied" };
+    // This shape names no decision source, so the line cannot pin the refusal on the user.
+    return {
+      kind: "tool_rejected",
+      atMs,
+      name,
+      reason: decision,
+      outcome: "denied",
+      byUser: false,
+    };
   }
 
   return {
@@ -215,14 +223,16 @@ function buildToolDecisionEntry(
   atMs: number,
 ): TranscriptEntry | null {
   const decision = pickString(attrs, "decision");
-  const outcome = toolDecisionOutcome({ decision, source: pickString(attrs, "source") });
+  const source = pickString(attrs, "source");
+  const outcome = toolDecisionOutcome({ decision, source });
   if (decision === null || outcome === "unknown" || outcome === "allowed") return null;
 
   return {
     kind: "tool_rejected",
     atMs,
     name: pickString(attrs, "tool_name"),
-    reason: pickString(attrs, "source") ?? decision,
+    reason: source ?? decision,
     outcome,
+    byUser: toolDecisionByUser({ source }),
   };
 }
