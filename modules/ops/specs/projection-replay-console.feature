@@ -151,3 +151,13 @@ Feature: Projection replay from the operator console
     Given the api registers its pipelines for commands only
     When the projections and subscribers are listed
     Then the list carries the consume side the worker runs
+
+  # The index check reads the marker row, whose tenant is none, so it skips the tenant check: only
+  # a process holding the system identity sends it, and the api holds the reader alone (ADR-202).
+  @unit @replay
+  Scenario: Only the worker building a replay runtime checks the event log's index
+    Given every role builds ops' replay runtime repository with its ops repositories
+    When no replay runtime has been built
+    Then no statement reaches ClickHouse
+    When the worker builds a runtime to execute a replay
+    Then it checks the event log's aggregate index on the system identity

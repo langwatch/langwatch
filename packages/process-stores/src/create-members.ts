@@ -253,21 +253,28 @@ function eventingMember({
       : eventLogMembers({
           clickhouse: read("clickhouse"),
           organizationOf: (tenantId: string) => tenantDirectory().organizationForTenant(tenantId),
+          indexed: eventing.store.kind !== "producer-only",
         })),
   });
 }
 
-/** The event log a role reads, and its aggregate index's readiness from the index's marker row. */
+/**
+ * The event log a role reads, and for a draining role its aggregate index's readiness from the
+ * marker row. The producer (the api) checks none: the check skips the tenant check, which the api
+ * never sends (ADR-202 Decided 3), so its few event reads stay unbounded.
+ */
 function eventLogMembers({
   clickhouse,
   organizationOf,
+  indexed,
 }: {
   clickhouse: ClickHouseQueryClient;
   organizationOf: (tenantId: string) => Promise<string | null>;
+  indexed: boolean;
 }) {
   return {
     eventLog: { clickhouse, organizationOf },
-    eventLogIndexReadiness: eventLogIdIndexReadiness({ clickhouse }),
+    ...(indexed ? { eventLogIndexReadiness: eventLogIdIndexReadiness({ clickhouse }) } : {}),
   };
 }
 

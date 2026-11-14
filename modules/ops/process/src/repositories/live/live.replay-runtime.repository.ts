@@ -12,6 +12,7 @@ import {
 import {
   EventingClickHouseReplayEventSource,
   type EventLogIndexReadiness,
+  eventLogIdIndexReadiness,
 } from "@langwatch/eventing/server";
 import type { RedisConnection } from "@langwatch/redis-client";
 
@@ -24,14 +25,18 @@ import { ReplayRuntimeRepository } from "../replay-runtime.repository.ts";
  * live traffic. A Cluster refuses replay's multi-key operations (CROSSSLOT), as on main.
  */
 export class LiveReplayRuntimeRepository extends ReplayRuntimeRepository {
+  /**
+   * Built with the first runtime, so only the worker that executes a replay checks the index:
+   * its marker reads skip the tenant check, which the api never sends (ADR-202 Decided 3).
+   */
+  #indexReadiness: EventLogIndexReadiness | undefined;
+
   private constructor(
     private readonly members: Readonly<{
       redis: RedisConnection;
       clickhouse: ClickHouseQueryClient;
       eventing: Pick<EventSourcing, "definitions">;
       privateTenants?: () => AsyncIterable<string>;
-      /** Whether the event log's aggregate index may bound a batch; none keeps it unbounded. */
-      eventLogIndexReadiness?: EventLogIndexReadiness;
     }>,
   ) {
     super();
@@ -42,27 +47,25 @@ export class LiveReplayRuntimeRepository extends ReplayRuntimeRepository {
     clickhouse: ClickHouseQueryClient;
     eventing: Pick<EventSourcing, "definitions">;
     privateTenants?: () => AsyncIterable<string>;
-    eventLogIndexReadiness?: EventLogIndexReadiness;
   }): LiveReplayRuntimeRepository {
     return new LiveReplayRuntimeRepository(members);
   }
 
   create({ retention }: { retention: RetentionPolicyResolver }): OpsReplayRuntime {
-    const { redis, clickhouse, eventing, privateTenants, eventLogIndexReadiness } = this.members;
+    const { redis, clickhouse, eventing, privateTenants } = this.members;
     if (redis.isCluster) {
       throw new Error(
         "Replay requires a standalone Redis: a Cluster refuses its multi-key operations.",
       );
     }
+    this.#indexReadiness ??= eventLogIdIndexReadiness({ clickhouse });
     const connection = redis.duplicate();
     const definitions = eventing.definitions;
     const logSource = upcastReplayEventSource({
       source: new EventingClickHouseReplayEventSource({
         clickhouse,
         lean: replayLeanOf(definitions),
-        ...(eventLogIndexReadiness === undefined
-          ? {}
-          : { eventLogIndex: { reader: clickhouse, readiness: eventLogIndexReadiness } }),
+        eventLogIndex: { reader: clickhouse, readiness: this.#indexReadiness },
       }),
       upcasts: pipelineUpcastsOf(definitions),
     });

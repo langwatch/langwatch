@@ -210,3 +210,10 @@ Feature: The ClickHouse client sends reads as the app reader and everything else
     When the stores build the ClickHouse client
     Then tenant reads are sent on the reader
     And inserts are refused with the handled error "clickhouse_system_identity_absent", a platform fault
+
+  @unit
+  Scenario: The api's eventing checks no event-log index, so it sends no skip-check statement
+    Given the api's producer eventing over a client holding only the reader
+    When its stores build the eventing member
+    Then it sends no statement that skips the tenant check
+    And a draining role over the same client checks the index, which the api no longer sends
