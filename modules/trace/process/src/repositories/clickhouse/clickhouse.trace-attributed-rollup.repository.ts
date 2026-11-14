@@ -350,33 +350,30 @@ export class ClickHouseTraceAttributedRollupRepository extends TraceAttributedRo
     countSinceMs: readonly number[];
   }): Promise<TraceAttributedRecency> {
     if (input.countSinceMs.length === 0) return { counts: [], lastOccurredAtMs: 0 };
-    const read = readsOf(input);
-    const counts = read()
+    const statement = readsOf(input)()
       .from(summaries)
-      .select(({ gte }) =>
-        Object.fromEntries(
+      .select(({ gte, scalar }) => ({
+        ...Object.fromEntries(
           input.countSinceMs.map((sinceMs, index) => [
             `c${index}`,
             fn.toString(fn.countIf(gte(summaries.OccurredAt, sinceMs))),
           ]),
         ),
-      )
+        // The last match over every version, as main read it: a scalar subquery.
+        lastMs: scalar((sub) =>
+          sub
+            .from(summaries)
+            .select({ v: fn.toString(fn.toUnixTimestamp64Milli(fn.max(summaries.OccurredAt))) })
+            .where(matching(input.matches)),
+        ),
+      }))
       .where(({ range }) => range(summaries.OccurredAt, { from: Math.min(...input.countSinceMs) }))
       .where(matching(input.matches))
       .latestVersion()
       .build();
-    // The last match over every version, as main's scalar subquery read it: a second statement.
-    const last = read()
-      .from(summaries)
-      .select({ lastMs: fn.toString(fn.toUnixTimestamp64Milli(fn.max(summaries.OccurredAt))) })
-      .where(matching(input.matches))
-      .build();
-    const [countRows, lastRows] = await Promise.all([
-      this.#clickhouse.read({ statement: counts, table: summaries.$table.name }),
-      this.#clickhouse.read({ statement: last, table: summaries.$table.name }),
-    ]);
-    const row = countRows.rows[0];
-    const lastMs = lastRows.rows[0]?.lastMs;
+    const result = await this.#clickhouse.read({ statement, table: summaries.$table.name });
+    const row: Record<string, unknown> | undefined = result.rows[0];
+    const lastMs = row?.lastMs;
     return {
       counts: input.countSinceMs.map((_, index) => Number(row?.[`c${index}`] ?? 0)),
       lastOccurredAtMs: lastMs ? Number(lastMs) : 0,

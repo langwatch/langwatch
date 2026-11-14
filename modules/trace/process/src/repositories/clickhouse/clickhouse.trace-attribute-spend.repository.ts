@@ -15,17 +15,6 @@ import type {
 import { TraceAttributeSpendRepository } from "../trace-attribute-spend.repository.ts";
 import { traceSummaries as summaries } from "./clickhouse.trace-summaries.table.ts";
 
-type BucketRow = {
-  Value: string;
-  Model: string;
-  Day: string;
-  TotalUsd: string;
-  Requests: number | string;
-  BlockedRequests: number | string;
-};
-
-const FIRST_MODEL = `if(length(argMax(Models, UpdatedAt)) = 0, 'unknown', arrayElement(argMax(Models, UpdatedAt), 1))`;
-
 /**
  * Each trace's latest version in the window, one row per (tenant, trace): the window on the
  * `OccurredAt` partition key; `values` absent means any non-empty value.
@@ -48,46 +37,6 @@ const latestTraces = (input: {
     .groupBy(summaries.TenantId, summaries.TraceId);
 
 /**
- * A read across an organization's projects is one statement over a declared tenant set
- * (ARCHITECTURE.md "Routing is folded into the `clickhouse` member"): one statement per
- * project fills the ClickHouse statement queue in an organization with many projects.
- */
-function tenantSetAttributeFilter(input: {
-  tenantIds: readonly string[];
-  attributeKey: string;
-  window: TraceModelSpendWindow;
-  values?: string[];
-}) {
-  return windowedAttributeFilter({
-    tenantPredicate: "TenantId IN ({tenantIds:Array(String)})",
-    tenantParams: { tenantIds: [...input.tenantIds] },
-    ...input,
-  });
-}
-
-function windowedAttributeFilter(input: {
-  tenantPredicate: string;
-  tenantParams: Record<string, string | string[]>;
-  attributeKey: string;
-  window: TraceModelSpendWindow;
-  values?: string[];
-}) {
-  return {
-    where: `WHERE ${input.tenantPredicate}
-            AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
-            AND OccurredAt <  fromUnixTimestamp64Milli({toMs:Int64})
-            AND ${input.values ? "Attributes[{attributeKey:String}] IN {values:Array(String)}" : "Attributes[{attributeKey:String}] != ''"}`,
-    params: {
-      ...input.tenantParams,
-      attributeKey: input.attributeKey,
-      fromMs: input.window.startMs,
-      toMs: input.window.endMs,
-      ...(input.values ? { values: input.values } : {}),
-    },
-  };
-}
-
-/**
  * A spend rollup's ceiling on threads and runtime. The runtime cap stays under the client's 30 s
  * request deadline, so a slow read ends with ClickHouse's own timeout, not a dropped request.
  */
@@ -95,15 +44,15 @@ const SPEND_ROLLUP_SETTINGS = { max_threads: 2, max_execution_time: 28 };
 
 /** Main's gateway `GatewayVirtualKeySpendRepository` reads; the usage reads span a tenant set. */
 export class ClickHouseTraceAttributeSpendRepository extends TraceAttributeSpendRepository {
-  readonly #clickhouse: Pick<ClickHouseQueryClient, "query" | "read">;
+  readonly #clickhouse: Pick<ClickHouseQueryClient, "read">;
 
-  private constructor(clickhouse: Pick<ClickHouseQueryClient, "query" | "read">) {
+  private constructor(clickhouse: Pick<ClickHouseQueryClient, "read">) {
     super();
     this.#clickhouse = clickhouse;
   }
 
   static create(
-    clickhouse: Pick<ClickHouseQueryClient, "query" | "read">,
+    clickhouse: Pick<ClickHouseQueryClient, "read">,
   ): ClickHouseTraceAttributeSpendRepository {
     return new ClickHouseTraceAttributeSpendRepository(clickhouse);
   }
@@ -146,38 +95,40 @@ export class ClickHouseTraceAttributeSpendRepository extends TraceAttributeSpend
     window: TraceModelSpendWindow;
     values?: string[];
   }): Promise<TraceAttributeUsageBucket[]> {
-    const [firstTenantId] = input.tenantIds;
-    if (firstTenantId === undefined || input.values?.length === 0) return [];
-    const { where, params } = tenantSetAttributeFilter(input);
-    const result = await this.#clickhouse.query<BucketRow>({
-      tenantId: firstTenantId,
-      tenantIds: input.tenantIds,
-      table: "trace_summaries",
-      settings: SPEND_ROLLUP_SETTINGS,
-      sql: `
-        SELECT
-          Value,
-          Model,
-          Day,
-          toString(sum(TraceCost)) AS TotalUsd,
-          count() AS Requests,
-          countIf(Blocked) AS BlockedRequests
-        FROM (
-          SELECT
-            TraceId,
-            argMax(Attributes[{attributeKey:String}], UpdatedAt) AS Value,
-            argMax(coalesce(TotalCost, 0), UpdatedAt) AS TraceCost,
-            ${FIRST_MODEL} AS Model,
-            formatDateTime(argMax(OccurredAt, UpdatedAt), '%Y-%m-%d', 'UTC') AS Day,
-            argMax(BlockedByGuardrail, UpdatedAt) AS Blocked
-          FROM trace_summaries
-          ${where}
-          GROUP BY TenantId, TraceId
-        )
-        GROUP BY Value, Model, Day
-      `,
-      params,
-    });
+    if (input.tenantIds.length === 0 || input.values?.length === 0) return [];
+    // A read across an organization's projects is one statement over a declared tenant set
+    // (ARCHITECTURE.md "Routing is folded into the `clickhouse` member").
+    const scope = tenantScope.set({ tenantIds: [...input.tenantIds] });
+    const latestModels = fn.argMax(summaries.Models, summaries.UpdatedAt);
+    const traces = latestTraces({ ...input, scope })
+      .select({
+        TraceId: summaries.TraceId,
+        Value: fn.argMax(fn.mapGet(summaries.Attributes, input.attributeKey), summaries.UpdatedAt),
+        TraceCost: fn.argMax(fn.ifNull(summaries.TotalCost, 0), summaries.UpdatedAt),
+        // The winning version's first model, `unknown` when it named none.
+        Model: fn.if(fn.notEmpty(latestModels), fn.arrayElement(latestModels, 1), "unknown"),
+        Day: fn.formatDateTime(
+          fn.argMax(summaries.OccurredAt, summaries.UpdatedAt),
+          "%Y-%m-%d",
+          "UTC",
+        ),
+        Blocked: fn.argMax(summaries.BlockedByGuardrail, summaries.UpdatedAt),
+      })
+      .as("traces");
+    const statement = clickhouseRead({ scope })
+      .from(traces)
+      .select({
+        Value: traces.Value,
+        Model: traces.Model,
+        Day: traces.Day,
+        TotalUsd: fn.toString(fn.sum(traces.TraceCost)),
+        Requests: fn.count(),
+        BlockedRequests: fn.countIf(traces.Blocked),
+      })
+      .groupBy(traces.Value, traces.Model, traces.Day)
+      .settings(SPEND_ROLLUP_SETTINGS)
+      .build();
+    const result = await this.#clickhouse.read({ statement, table: summaries.$table.name });
     return result.rows.map((row) => ({
       value: row.Value,
       model: row.Model,

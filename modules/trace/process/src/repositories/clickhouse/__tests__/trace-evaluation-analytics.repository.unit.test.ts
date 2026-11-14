@@ -2,7 +2,7 @@
  * The settings trace_evaluation_analytics writes and reads with, chosen by the quorum flag.
  * @see specs/trace/trace-evaluation-analytics.feature
  */
-import { AuthorizedClickHouse, type QueryRequest } from "@langwatch/clickhouse-client";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { describe, expect, it } from "vitest";
 
@@ -45,18 +45,20 @@ const write: TraceEvaluationAnalyticsWrite = {
   retentionDays: 30,
 };
 
+type ReadRequest = Parameters<ClickHouseQueryClient["read"]>[0];
+
 function repositoryWith({ readYourWrites }: { readYourWrites?: boolean }) {
   const { client, inserts } = capturingInsertClient();
-  const reads: QueryRequest[] = [];
-  const authorized = clickHouseQueryClientDouble({
-    query: async (request: QueryRequest) => {
-      reads.push(request);
+  const reads: ReadRequest["statement"][] = [];
+  const reader = clickHouseQueryClientDouble({
+    async read({ statement }: ReadRequest) {
+      reads.push(statement);
       return { rows: [] };
     },
   });
   const repository = TraceEvaluationAnalyticsClickHouseRepository.create({
     resolveClient: async () => client,
-    clickhouse: new AuthorizedClickHouse({ resolveClient: async () => authorized }),
+    reader,
     ...(readYourWrites === undefined ? {} : { readYourWrites }),
   });
   return { repository, inserts, reads };
@@ -83,7 +85,23 @@ describe("TraceEvaluationAnalyticsClickHouseRepository", () => {
         { async_insert: 1, wait_for_async_insert: 1 },
       ]);
       expect(reads).toHaveLength(1);
-      expect(reads[0]?.settings).not.toHaveProperty("select_sequential_consistency");
+      expect(reads[0]?.sql).not.toContain("select_sequential_consistency");
+    });
+
+    it("reads through the proof's fence, within its windows, on the reader identity", async () => {
+      const { repository, reads } = repositoryWith({});
+
+      await writeThenRead(repository);
+
+      expect(reads[0]).toMatchObject({
+        identity: "reader",
+        kind: "tenant",
+        tenantId: TENANT_ID,
+        tenantIds: [TENANT_ID],
+      });
+      expect(reads[0]?.settings).toMatchObject({ SQL_langwatch_tenant_ids: TENANT_ID });
+      expect(reads[0]?.sql).toContain("FROM trace_evaluation_analytics");
+      expect(reads[0]?.sql).toMatch(/HAVING sum\(Sign\) != /);
     });
   });
 
@@ -102,7 +120,7 @@ describe("TraceEvaluationAnalyticsClickHouseRepository", () => {
         },
       ]);
       expect(reads).toHaveLength(1);
-      expect(reads[0]?.settings).toMatchObject({ select_sequential_consistency: 1 });
+      expect(reads[0]?.sql).toContain("SETTINGS select_sequential_consistency = 1");
     });
   });
 });

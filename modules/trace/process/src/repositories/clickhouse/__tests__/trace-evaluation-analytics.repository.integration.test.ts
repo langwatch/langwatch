@@ -17,10 +17,7 @@ import {
   traceEvaluationRowWrites,
 } from "../../../rules/trace-evaluation-analytics.rules.ts";
 import { TraceEvaluationAnalyticsClickHouseRepository } from "../trace-evaluation-analytics.repository.ts";
-import {
-  authorizedClickHouseFor,
-  traceResolverFor,
-} from "./support/authorized-clickhouse.support.ts";
+import { traceQueryClientFor, traceResolverFor } from "./support/authorized-clickhouse.support.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
@@ -84,7 +81,7 @@ beforeAll(async () => {
   ch = await startMigratedTraceClickHouse();
   repo = TraceEvaluationAnalyticsClickHouseRepository.create({
     resolveClient: traceResolverFor(ch),
-    clickhouse: authorizedClickHouseFor(ch),
+    reader: traceQueryClientFor(ch),
   });
   // Unmerged parts are the case under test: a merge would collapse the pairs before the read.
   await ch.exec({ query: `SYSTEM STOP MERGES ${TABLE}` });

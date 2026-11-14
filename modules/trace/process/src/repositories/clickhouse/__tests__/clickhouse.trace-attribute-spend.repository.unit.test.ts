@@ -1,5 +1,5 @@
 /** Main's gateway virtual-key spend reads, ported to the table's owner. */
-import type { ClickHouseQueryClient, QueryRequest } from "@langwatch/clickhouse-client";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { describe, expect, it } from "vitest";
 
@@ -12,20 +12,14 @@ const KEY = "langwatch.virtual_key_id";
 type ReadRequest = Parameters<ClickHouseQueryClient["read"]>[0];
 
 function createRepository(rows: unknown[]) {
-  const queries: QueryRequest[] = [];
   const statements: ReadRequest["statement"][] = [];
   const clickhouse = clickHouseQueryClientDouble({
-    async query(request: QueryRequest): Promise<{ rows: unknown[] }> {
-      queries.push(request);
-      return { rows };
-    },
     async read({ statement }: ReadRequest) {
       statements.push(statement);
       return { rows };
     },
   });
   return {
-    queries,
     statements,
     repository: ClickHouseTraceAttributeSpendRepository.create(clickhouse),
   };
@@ -61,7 +55,7 @@ describe("ClickHouseTraceAttributeSpendRepository", () => {
     });
 
     it("answers nothing without querying when no values are asked for", async () => {
-      const { queries, repository } = createRepository([]);
+      const { statements, repository } = createRepository([]);
 
       await expect(
         repository.findSpendByAttributeValue({
@@ -71,13 +65,13 @@ describe("ClickHouseTraceAttributeSpendRepository", () => {
           window: WINDOW,
         }),
       ).resolves.toEqual([]);
-      expect(queries).toHaveLength(0);
+      expect(statements).toHaveLength(0);
     });
   });
 
   describe("when usage buckets are read for any value", () => {
     it("matches every non-empty value and maps counts to numbers", async () => {
-      const { queries, repository } = createRepository([
+      const { statements, repository } = createRepository([
         {
           Value: "vk-1",
           Model: "gpt-5",
@@ -104,14 +98,14 @@ describe("ClickHouseTraceAttributeSpendRepository", () => {
           blockedRequests: 1,
         },
       ]);
-      expect(queries[0]?.sql).toContain("Attributes[{attributeKey:String}] != ''");
-      expect(queries[0]?.params).not.toHaveProperty("values");
+      expect(statements[0]?.sql).toMatch(/Attributes\[\{v\d+:String\}\] != \{v\d+:String\}/);
+      expect(statements[0]?.sql).not.toMatch(/Attributes\[\{v\d+:String\}\] IN/);
     });
   });
 
   describe("when usage buckets are read across an organization's projects", () => {
     it("asks once over the declared tenant set, deduping each trace within its tenant", async () => {
-      const { queries, repository } = createRepository([]);
+      const { statements, repository } = createRepository([]);
 
       await repository.findAttributeUsageBuckets({
         tenantIds: ["project-1", "project-2"],
@@ -120,20 +114,30 @@ describe("ClickHouseTraceAttributeSpendRepository", () => {
         values: ["vk-1"],
       });
 
-      expect(queries).toHaveLength(1);
-      expect(queries[0]).toMatchObject({
+      expect(statements).toHaveLength(1);
+      expect(statements[0]).toMatchObject({
+        kind: "tenant",
+        identity: "reader",
         tenantId: "project-1",
         tenantIds: ["project-1", "project-2"],
       });
-      expect(queries[0]?.sql).toContain("TenantId IN ({tenantIds:Array(String)})");
-      expect(queries[0]?.sql).toContain("GROUP BY TenantId, TraceId");
-      expect(queries[0]?.params).toMatchObject({ tenantIds: ["project-1", "project-2"] });
+      expect(statements[0]?.settings).toMatchObject({
+        SQL_langwatch_tenant_ids: "project-1,project-2",
+      });
+      expect(statements[0]?.sql).toContain("GROUP BY TenantId, TraceId");
+      expect(statements[0]?.sql).toMatch(
+        /formatDateTime\(argMax\(OccurredAt, UpdatedAt\), \{v\d+:String\}, \{v\d+:String\}\)/,
+      );
+      expect(Object.values(statements[0]?.params ?? {})).toEqual(
+        expect.arrayContaining(["%Y-%m-%d", "UTC", ["vk-1"]]),
+      );
       // Under the client's 30 s request deadline, so ClickHouse ends a slow read first.
-      expect(Number(queries[0]?.settings?.max_execution_time)).toBeLessThan(30);
+      const runtime = /max_execution_time = (\d+)/.exec(statements[0]?.sql ?? "")?.[1];
+      expect(Number(runtime)).toBeLessThan(30);
     });
 
     it("answers nothing without querying when the organization has no projects", async () => {
-      const { queries, repository } = createRepository([]);
+      const { statements, repository } = createRepository([]);
 
       await expect(
         repository.findAttributedTraces({
@@ -143,7 +147,7 @@ describe("ClickHouseTraceAttributeSpendRepository", () => {
           limit: 20,
         }),
       ).resolves.toEqual([]);
-      expect(queries).toHaveLength(0);
+      expect(statements).toHaveLength(0);
     });
   });
 

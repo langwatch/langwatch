@@ -1,5 +1,6 @@
 import type { Authorization } from "@langwatch/authorization";
-import { type AuthorizedClickHouse, tenantScope } from "@langwatch/clickhouse-client";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import { clickhouseRead, fn, tenantScope } from "@langwatch/clickhouse-client/builder";
 import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
@@ -9,40 +10,71 @@ import type {
   TraceEvaluationAnalyticsWrite,
 } from "../../rules/trace-evaluation-analytics.rules.ts";
 import { TraceEvaluationAnalyticsRepository } from "../trace-evaluation-analytics.repository.ts";
+import { traceEvaluationAnalytics as evaluations } from "./clickhouse.trace-evaluation-analytics.table.ts";
 import type { TraceClickHouseWriteResolver } from "./clickhouse.trace-member-client.repository.ts";
 
 const TABLE_NAME = "trace_evaluation_analytics" as const;
 
 const logger = createLogger("langwatch:trace:trace-evaluation-analytics-repository");
 
-/** Every physical column but Sign, in one order: the live read groups by all of them. */
+/** Every physical column but Sign: the live read groups by all of them. */
 const ROW_COLUMNS = [
-  "TenantId",
-  "TraceId",
-  "EvaluationId",
-  "OccurredAt",
-  "UpdatedAt",
-  "TraceOccurredAt",
-  "EvaluatorName",
-  "Status",
-  "IsGuardrail",
-  "Passed",
-  "Label",
-  "Origin",
-  "TraceOrigin",
-  "CustomerId",
-  "TopicId",
-  "Labels",
-  "MetadataTopic",
-  "MetadataDocumentType",
-  "MetadataLanguage",
-  "MetadataTeam",
-  "MetadataFlow",
-  "MetadataSegment",
-  "MetadataPromptVersion",
-  "Revision",
-  "_retention_days",
-] as const;
+  evaluations.TenantId,
+  evaluations.TraceId,
+  evaluations.EvaluationId,
+  evaluations.OccurredAt,
+  evaluations.UpdatedAt,
+  evaluations.TraceOccurredAt,
+  evaluations.EvaluatorName,
+  evaluations.Status,
+  evaluations.IsGuardrail,
+  evaluations.Passed,
+  evaluations.Label,
+  evaluations.Origin,
+  evaluations.TraceOrigin,
+  evaluations.CustomerId,
+  evaluations.TopicId,
+  evaluations.Labels,
+  evaluations.MetadataTopic,
+  evaluations.MetadataDocumentType,
+  evaluations.MetadataLanguage,
+  evaluations.MetadataTeam,
+  evaluations.MetadataFlow,
+  evaluations.MetadataSegment,
+  evaluations.MetadataPromptVersion,
+  evaluations.Revision,
+  evaluations._retention_days,
+];
+
+/** What the fold reads back: every grouped column, times as epoch millis, the summed sign. */
+const LIVE_SELECTION = {
+  TenantId: evaluations.TenantId,
+  TraceId: evaluations.TraceId,
+  EvaluationId: evaluations.EvaluationId,
+  OccurredAtMs: fn.toUnixTimestamp64Milli(evaluations.OccurredAt),
+  UpdatedAtMs: fn.toUnixTimestamp64Milli(evaluations.UpdatedAt),
+  TraceOccurredAtMs: fn.toUnixTimestamp64Milli(evaluations.TraceOccurredAt),
+  EvaluatorName: evaluations.EvaluatorName,
+  Status: evaluations.Status,
+  IsGuardrail: evaluations.IsGuardrail,
+  Passed: evaluations.Passed,
+  Label: evaluations.Label,
+  Origin: evaluations.Origin,
+  TraceOrigin: evaluations.TraceOrigin,
+  CustomerId: evaluations.CustomerId,
+  TopicId: evaluations.TopicId,
+  Labels: evaluations.Labels,
+  MetadataTopic: evaluations.MetadataTopic,
+  MetadataDocumentType: evaluations.MetadataDocumentType,
+  MetadataLanguage: evaluations.MetadataLanguage,
+  MetadataTeam: evaluations.MetadataTeam,
+  MetadataFlow: evaluations.MetadataFlow,
+  MetadataSegment: evaluations.MetadataSegment,
+  MetadataPromptVersion: evaluations.MetadataPromptVersion,
+  Revision: evaluations.Revision,
+  _retention_days: evaluations._retention_days,
+  SignSum: fn.sum(evaluations.Sign),
+};
 
 /*
  * The fold reads its last write back to diff (trace ADR-003). Sequential reads see every quorum
@@ -199,7 +231,7 @@ export class TraceEvaluationAnalyticsClickHouseRepository extends TraceEvaluatio
   private constructor(
     private readonly options: {
       resolveClient: TraceClickHouseWriteResolver;
-      clickhouse: AuthorizedClickHouse;
+      reader: Pick<ClickHouseQueryClient, "read">;
       readYourWrites: boolean;
     },
   ) {
@@ -208,16 +240,16 @@ export class TraceEvaluationAnalyticsClickHouseRepository extends TraceEvaluatio
 
   static create({
     resolveClient,
-    clickhouse,
+    reader,
     readYourWrites = false,
   }: {
     resolveClient: TraceClickHouseWriteResolver;
-    clickhouse: AuthorizedClickHouse;
+    reader: Pick<ClickHouseQueryClient, "read">;
     readYourWrites?: boolean;
   }): TraceEvaluationAnalyticsClickHouseRepository {
     return new TraceEvaluationAnalyticsClickHouseRepository({
       resolveClient,
-      clickhouse,
+      reader,
       readYourWrites,
     });
   }
@@ -278,25 +310,21 @@ export class TraceEvaluationAnalyticsClickHouseRepository extends TraceEvaluatio
     if (traceIds.length === 0) return [];
     // Grouped by every column, so a row and its retraction cancel exactly. A negative group comes
     // back too, so the fold's next revision skips its number (trace ADR-003).
-    const result = await this.options.clickhouse.as(authorization, { reads: "traces" }).query({
-      query: `
-          SELECT
-            ${ROW_COLUMNS.join(",\n            ")},
-            toUnixTimestamp64Milli(OccurredAt) AS OccurredAtMs,
-            toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAtMs,
-            sum(Sign) AS SignSum,
-            toUnixTimestamp64Milli(TraceOccurredAt) AS TraceOccurredAtMs
-          FROM ${TABLE_NAME}
-          WHERE ${tenantScope("OccurredAt")}
-            AND TraceId IN {traceIds:Array(String)}
-            AND OccurredAt >= fromUnixTimestamp64Milli({occurredAtFrom:Int64})
-          GROUP BY ${ROW_COLUMNS.join(", ")}
-          HAVING sum(Sign) != 0
-        `,
-      query_params: { traceIds: [...traceIds], occurredAtFrom: occurredAtFromMs },
-      format: "JSONEachRow",
-      ...(this.options.readYourWrites ? { clickhouse_settings: READ_YOUR_WRITES_QUERY } : {}),
-    });
-    return liveRecordsSchema.parse(await result.json()).map(fromRecord);
+    const live = clickhouseRead({
+      scope: tenantScope.fromProof({ authorization, reads: "traces" }),
+    })
+      .from(evaluations)
+      .withinWindows()
+      .select(LIVE_SELECTION)
+      .where(({ and, gte, oneOf }) =>
+        and(oneOf(evaluations.TraceId, traceIds), gte(evaluations.OccurredAt, occurredAtFromMs)),
+      )
+      .groupBy(...ROW_COLUMNS)
+      .having(({ ne }) => ne(fn.sum(evaluations.Sign), 0));
+    const statement = (
+      this.options.readYourWrites ? live.settings(READ_YOUR_WRITES_QUERY) : live
+    ).build();
+    const result = await this.options.reader.read({ statement, table: TABLE_NAME });
+    return liveRecordsSchema.parse(result.rows).map(fromRecord);
   }
 }

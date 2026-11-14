@@ -10,6 +10,7 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { ClickHouseTraceExistenceRepository } from "../trace-existence.repository.ts";
+import { traceQueryClientFor } from "./support/authorized-clickhouse.support.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
@@ -76,7 +77,7 @@ describe.skipIf(!testClickHouseConfigured())(
   () => {
     beforeAll(async () => {
       ch = await startMigratedTraceClickHouse();
-      repo = ClickHouseTraceExistenceRepository.create({ resolveClient: async () => ch });
+      repo = ClickHouseTraceExistenceRepository.create({ clickhouse: traceQueryClientFor(ch) });
       for (const daysAgo of [3, 20, 40]) await store({ tenantId: install, daysAgo });
       await store({ tenantId: otherInstall, daysAgo: 3 });
     }, 120_000);

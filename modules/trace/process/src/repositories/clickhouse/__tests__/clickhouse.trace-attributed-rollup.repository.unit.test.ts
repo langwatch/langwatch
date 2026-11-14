@@ -137,12 +137,16 @@ describe("ClickHouseTraceAttributedRollupRepository guards", () => {
       });
 
       const single = statements.slice(0, -1);
-      expect(single).toHaveLength(8);
+      expect(single).toHaveLength(7);
       for (const statement of single) {
         expect(statement).toMatchObject({ identity: "reader", tenantId, tenantIds: undefined });
         expect(statement.settings).toMatchObject({ SQL_langwatch_tenant_ids: tenantId });
         expect(statement.sql).toContain("WHERE TenantId = {tenantId:String}");
       }
+      // The recency read's scalar subquery reads the same tenant as its outer read.
+      const recency = single.at(-1)?.sql ?? "";
+      expect(recency).toMatch(/\(SELECT toString\(toUnixTimestamp64Milli\(max\(OccurredAt\)\)\)/);
+      expect(recency.split("WHERE TenantId = {tenantId:String}")).toHaveLength(4);
       expect(statements.at(-1)).toMatchObject({
         identity: "reader",
         tenantIds: ["project-1", "project-2"],

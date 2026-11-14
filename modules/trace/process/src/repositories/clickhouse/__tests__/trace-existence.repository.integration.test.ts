@@ -6,7 +6,7 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { ClickHouseTraceExistenceRepository } from "../trace-existence.repository.ts";
-import { traceResolverFor } from "./support/authorized-clickhouse.support.ts";
+import { traceQueryClientFor } from "./support/authorized-clickhouse.support.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
@@ -66,9 +66,7 @@ function makeRow(tenant: string, traceId: string, occurredAtMs: number) {
 beforeAll(async () => {
   if (!clickHouseConfigured) return;
   ch = await startMigratedTraceClickHouse();
-  repo = ClickHouseTraceExistenceRepository.create({
-    resolveClient: traceResolverFor(ch),
-  });
+  repo = ClickHouseTraceExistenceRepository.create({ clickhouse: traceQueryClientFor(ch) });
 
   await ch.insert({
     table: "trace_summaries",

@@ -2,7 +2,7 @@ import { column, defineClickHouseTable } from "@langwatch/clickhouse-client/buil
 
 /**
  * Trace's evaluation rows beside their trace's columns (goose 00129, trace ADR-003). A
- * VersionedCollapsingMergeTree, so no version column; `Sign` (Int8) has no builder type yet.
+ * VersionedCollapsingMergeTree, so no version column: readers sum `Sign` instead.
  */
 export const traceEvaluationAnalytics = defineClickHouseTable({
   name: "trace_evaluation_analytics",
@@ -33,6 +33,8 @@ export const traceEvaluationAnalytics = defineClickHouseTable({
     MetadataFlow: column.string(),
     MetadataSegment: column.string(),
     MetadataPromptVersion: column.string(),
+    Sign: column.int8(),
     Revision: column.uint64(),
+    _retention_days: column.uint16(),
   },
 });

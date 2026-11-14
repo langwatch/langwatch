@@ -76,7 +76,8 @@ export class PostgresTraceRepositories {
         resolveClient: traceClickHouse,
       }),
       evaluationAnalytics: TraceEvaluationAnalyticsClickHouseRepository.create({
-        ...storage,
+        resolveClient: traceClickHouse,
+        reader: members.clickhouse,
         readYourWrites: members.evaluationAnalyticsQuorumReads,
       }),
       spanAnalytics: SpanAnalyticsClickHouseRepository.create({ resolveClient: traceClickHouse }),
@@ -84,9 +85,7 @@ export class PostgresTraceRepositories {
       spanStorage: SpanStorageClickHouseRepository.create(storage),
       spanTree: ClickHouseTraceSpanRepository.create(storage),
       braidReads: ClickHouseTraceBraidReadsRepository.create({ clickhouse }),
-      existence: ClickHouseTraceExistenceRepository.create({
-        resolveClient: traceClickHouse,
-      }),
+      existence: ClickHouseTraceExistenceRepository.create({ clickhouse: members.clickhouse }),
       derivationSpans: TraceDerivationSpanClickHouseRepository.create({
         resolveClient: traceClickHouse,
       }),
