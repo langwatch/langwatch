@@ -530,7 +530,8 @@ void describe("given a shard that runs several suites at once", () => {
   void describe("when an integration suite and a browser suite share a shard", () => {
     /** @scenario "An integration suite and a browser suite never run at the same time" */
     void it("never overlaps them, while the unit suites still run alongside", async () => {
-      const isLane = (id: string) => laneOf(id.slice(id.lastIndexOf(" ") + 1)) !== "shared";
+      const isLane = (id: string) =>
+        ["test:integration", "test:browser"].some((s) => id.endsWith(s));
       const packages = [pkg("@fix/a", ["test:integration"]), pkg("@fix/b", ["test:browser"])];
       const units = ["d", "e"].map((name) => pkg(`@fix/${name}`, ["test"]));
       const { overlaps, statuses } = await pool(jobsFor([...packages, ...units], new Map()), 3);
