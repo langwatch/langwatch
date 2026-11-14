@@ -80,10 +80,13 @@ export class PostgresTraceRepositories {
         reader: members.clickhouse,
         readYourWrites: members.evaluationAnalyticsQuorumReads,
       }),
-      spanAnalytics: SpanAnalyticsClickHouseRepository.create({ resolveClient: traceClickHouse }),
+      spanAnalytics: SpanAnalyticsClickHouseRepository.create({
+        resolveClient: traceClickHouse,
+        reader: members.clickhouse,
+      }),
       spanAnalyticsFloor: PrismaSpanAnalyticsFloorRepository.create(members.prisma),
       spanStorage: SpanStorageClickHouseRepository.create(storage),
-      spanTree: ClickHouseTraceSpanRepository.create(storage),
+      spanTree: ClickHouseTraceSpanRepository.create({ clickhouse: members.clickhouse }),
       braidReads: ClickHouseTraceBraidReadsRepository.create({ clickhouse }),
       existence: ClickHouseTraceExistenceRepository.create({ clickhouse: members.clickhouse }),
       derivationSpans: TraceDerivationSpanClickHouseRepository.create({

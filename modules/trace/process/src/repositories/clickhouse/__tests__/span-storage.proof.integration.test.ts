@@ -15,7 +15,10 @@ import {
 } from "../../../__tests__/support/authorization-proofs.fixture.ts";
 import { SpanStorageClickHouseRepository } from "../span-storage.repository.ts";
 import { ClickHouseTraceSpanRepository } from "../trace-span.repository.ts";
-import { authorizedClickHouseFor } from "./support/authorized-clickhouse.support.ts";
+import {
+  authorizedClickHouseFor,
+  traceQueryClientFor,
+} from "./support/authorized-clickhouse.support.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
@@ -142,7 +145,7 @@ beforeAll(async () => {
     resolveClient: async () => ch,
     clickhouse: authorizedClickHouseFor(ch),
   });
-  spanTree = ClickHouseTraceSpanRepository.create({ clickhouse: authorizedClickHouseFor(ch) });
+  spanTree = ClickHouseTraceSpanRepository.create({ clickhouse: traceQueryClientFor(ch) });
 
   await insert([
     spanRow({

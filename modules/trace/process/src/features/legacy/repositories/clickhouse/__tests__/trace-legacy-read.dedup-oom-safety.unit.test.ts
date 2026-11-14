@@ -220,9 +220,10 @@ describe("trace dedup OOM safety", () => {
         expect(body).not.toContain("LIMIT 1 BY");
       });
 
-      it("uses max(UpdatedAt) GROUP BY for trace dedup", () => {
-        expect(body).toContain("max(UpdatedAt)");
-        expect(body).toMatch(/GROUP BY\s+TenantId,\s*TraceId/);
+      // The builder renders the election from the descriptor: max(UpdatedAt) by TenantId, TraceId.
+      it("elects each trace's latest version with the builder's IN-tuple election", () => {
+        expect(body).toContain(".latestVersion(");
+        expect(body).not.toContain("FINAL");
       });
     });
   });

@@ -23,7 +23,10 @@ import { TraceSummaryService } from "../../../features/read/services/trace-summa
 import { SpanStorageClickHouseRepository } from "../span-storage.repository.ts";
 import { ClickHouseTraceSpanRepository } from "../trace-span.repository.ts";
 import { TraceSummaryClickHouseRepository } from "../trace-summary.repository.ts";
-import { authorizedClickHouseFor } from "./support/authorized-clickhouse.support.ts";
+import {
+  authorizedClickHouseFor,
+  traceQueryClientFor,
+} from "./support/authorized-clickhouse.support.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
@@ -164,7 +167,7 @@ beforeAll(async () => {
       clickhouse,
     }),
   });
-  spanTree = ClickHouseTraceSpanRepository.create({ clickhouse });
+  spanTree = ClickHouseTraceSpanRepository.create({ clickhouse: traceQueryClientFor(ch) });
   spanStorage = SpanStorageClickHouseRepository.create({
     resolveClient: async () => {
       throw new Error("this test reads only");

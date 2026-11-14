@@ -117,3 +117,24 @@ Feature: Trace span-tree read service
     When one of its traces is read with its spans
     Then the read is refused with private_dataplane_unavailable (503)
     And it is not wrapped into a bare internal_error
+
+  @unit
+  Scenario: A span tree page past a cursor elects each span's latest version over the whole trace
+    Given a span tree page is read after a cursor
+    When the statement elects each span's latest version
+    Then the cursor filters only the elected spans
+    And the election is bounded by the trace alone
+
+  @unit
+  Scenario: Every span-tree read is fenced by the reader's proof
+    Given a reader whose proof covers its own project
+    When the span tree, its live delta, its evaluation spans and events, its ingest lag and its occurrence lookup are read
+    Then each statement is a reader statement over the proof's tenants
+    And each carries the tenant setting the row policy checks
+
+  @integration
+  Scenario: A trace's evaluation spans, events, ingest lag and occurrence are read from its latest versions
+    Given a trace whose span was stored twice, and another project's span on the same trace id
+    When the trace's evaluation spans and events, its project's ingest lag and its occurrence are read
+    Then each read returns only the reader's latest version, events newest first without exceptions
+    And the occurrence is the trace summary's own time

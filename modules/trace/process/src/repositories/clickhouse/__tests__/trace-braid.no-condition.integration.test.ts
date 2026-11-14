@@ -12,7 +12,10 @@ import { braidedProof } from "../../../__tests__/support/authorization-proofs.fi
 import { TraceSummaryService } from "../../../features/read/services/trace-summary-read.service.ts";
 import { ClickHouseTraceSpanRepository } from "../trace-span.repository.ts";
 import { TraceSummaryClickHouseRepository } from "../trace-summary.repository.ts";
-import { authorizedClickHouseFor } from "./support/authorized-clickhouse.support.ts";
+import {
+  authorizedClickHouseFor,
+  traceQueryClientFor,
+} from "./support/authorized-clickhouse.support.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
@@ -112,7 +115,7 @@ beforeAll(async () => {
   if (!clickHouseConfigured) return;
   ch = await startMigratedTraceClickHouse();
   const clickhouse = authorizedClickHouseFor(ch);
-  spans = ClickHouseTraceSpanRepository.create({ clickhouse });
+  spans = ClickHouseTraceSpanRepository.create({ clickhouse: traceQueryClientFor(ch) });
   summaries = TraceSummaryService.create({
     repository: TraceSummaryClickHouseRepository.create({
       resolveClient: async () => ch,

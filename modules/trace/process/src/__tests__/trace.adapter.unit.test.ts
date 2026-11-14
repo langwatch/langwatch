@@ -1,4 +1,4 @@
-import { AuthorizedClickHouse } from "@langwatch/clickhouse-client";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import {
   idIndexedClientDouble,
   type ScriptedStatements,
@@ -49,7 +49,7 @@ class EmptyFullIo implements TraceFullIo {
 const ABSENT_ATTRIBUTE_COLUMNS = {
   ToolName: "",
   ResponseModel: "",
-  Cost: "",
+  UsageCost: "",
   InputTokens: "",
   OutputTokens: "",
   CacheReadTokens: "",
@@ -76,7 +76,7 @@ const summaryRows = (cost: string | number): unknown[] => [
     SpanType: "llm",
     ToolName: "",
     Model: "model",
-    Cost: cost,
+    UsageCost: cost,
     InputTokens: 2,
     OutputTokens: 2,
     CacheReadTokens: "",
@@ -92,12 +92,24 @@ const authorization = ownProof({ projectId: "project_1" });
 
 type FencedCall = { tenantId: string; sql: string; params: Record<string, unknown> };
 
+const CURSOR_POSITION =
+  /tuple\(toUnixTimestamp64Milli\(StartTime\), SpanId\) > tuple\(\{(v\d+):Int64\}, \{(v\d+):String\}\)/;
+const CURSOR_START = /StartTime >= fromUnixTimestamp64Milli\(\{(v\d+):Int64\}\) AND tuple\(/;
+const SINCE_UPDATED_AT = /UpdatedAt > fromUnixTimestamp64Milli\(\{(v\d+):Int64\}\)/;
+
+/** The values a statement binds to the parameters `pattern` captures, in order. */
+function boundIn({ call, pattern }: { call: FencedCall; pattern: RegExp }): unknown[] {
+  const names = pattern.exec(call.sql)?.slice(1) ?? [];
+  if (names.length === 0) throw new Error(`the statement has no ${String(pattern)}`);
+  return names.map((name) => call.params[name ?? ""]);
+}
+
 /** The proof-checked reader over a scripted client; each statement is logged as it ran. */
 function fencedClickHouse(
   calls: FencedCall[],
   rowsFor: (callIndex: number) => unknown[],
-): AuthorizedClickHouse {
-  const client = idIndexedClientDouble({
+): ClickHouseQueryClient {
+  return idIndexedClientDouble({
     indexes: TRACE_ID_INDEXES,
     driver: {
       execute: vi.fn<ScriptedStatements["execute"]>(async ({ sql, params, tenantId }) => {
@@ -106,7 +118,6 @@ function fencedClickHouse(
       }),
     },
   });
-  return new AuthorizedClickHouse({ resolveClient: async () => client });
 }
 
 const refusingResolver: TraceClickHouseResolver = () =>
@@ -271,7 +282,7 @@ describe("ClickHouseTraceSpanRepository evaluation reads", () => {
     expect(calls).toHaveLength(1);
     expect(calls[0]?.tenantId).toBe("project_1");
     expect(calls[0]?.sql).toContain("Events.Timestamp");
-    expect(calls[0]?.sql).toContain("ORDER BY event_timestamp DESC");
+    expect(calls[0]?.sql).toContain("ORDER BY tupleElement(Event, 1) DESC");
     expect(calls[0]?.sql).not.toContain("elasticsearch");
     expect(calls[0]?.sql).not.toContain("{tenantId:String}");
   });
@@ -321,7 +332,7 @@ describe("ClickHouseTraceSpanRepository page parity", () => {
         ToolName: "",
         Model: "request-model",
         ResponseModel: "response-model",
-        Cost: "0.3",
+        UsageCost: "0.3",
         InputTokens: "4",
         OutputTokens: "5",
         CacheReadTokens: "",
@@ -343,20 +354,15 @@ describe("ClickHouseTraceSpanRepository page parity", () => {
     expect(calls).toHaveLength(1);
     const call = calls[0]!;
     expect(call.tenantId).toBe("project_1");
-    expect(call.params).toMatchObject({
-      cursorStart: 10,
-      cursorSpan: "span_1",
-      limit: 2,
-    });
-    expect(call.sql).toContain(
-      "(toUnixTimestamp64Milli(StartTime), SpanId) > ({cursorStart:Int64}, {cursorSpan:String})",
-    );
-    expect(call.sql).toContain("AND StartTime >= fromUnixTimestamp64Milli({cursorStart:Int64})");
+    expect(boundIn({ call, pattern: CURSOR_POSITION })).toEqual([10, "span_1"]);
+    expect(boundIn({ call, pattern: CURSOR_START })).toEqual([10]);
+    expect(call.sql).toMatch(/ LIMIT 2$/);
     expect(call.sql).not.toContain("StartTime <=");
     const innerElection = call.sql.slice(
       call.sql.indexOf("SELECT TenantId, TraceId, SpanId, max(UpdatedAt)"),
     );
-    expect(innerElection).not.toContain("cursorStart");
+    expect(innerElection).not.toContain("tuple(toUnixTimestamp64Milli(StartTime)");
+    expect(innerElection).not.toMatch(/StartTime >= fromUnixTimestamp64Milli\(\{v\d+:Int64\}\)/);
     expect(page.rows).toEqual([
       expect.objectContaining({
         spanId: "span_2",
@@ -385,7 +391,7 @@ describe("ClickHouseTraceSpanRepository page parity", () => {
               ToolName: "tool",
               Model: "model",
               ResponseModel: "",
-              Cost: "1",
+              UsageCost: "1",
               InputTokens: "",
               OutputTokens: "",
               CacheReadTokens: "",
@@ -441,7 +447,7 @@ describe("ClickHouseTraceSpanRepository page parity", () => {
         ToolName: "",
         Model: "model",
         ResponseModel: "",
-        Cost: "",
+        UsageCost: "",
         InputTokens: "2",
         OutputTokens: "3",
         CacheReadTokens: "",
@@ -462,10 +468,9 @@ describe("ClickHouseTraceSpanRepository page parity", () => {
 
     expect(calls).toHaveLength(1);
     expect(calls[0]?.tenantId).toBe("project_1");
-    expect(calls[0]?.params).toMatchObject({ traceId: "trace_1", sinceUpdatedAtMs: 29 });
-    expect(calls[0]?.sql).toContain(
-      "UpdatedAt > fromUnixTimestamp64Milli({sinceUpdatedAtMs:Int64})",
-    );
+    const [call] = calls;
+    expect(call && boundIn({ call, pattern: /TraceId = \{(v\d+):String\}/ })).toEqual(["trace_1"]);
+    expect(call && boundIn({ call, pattern: SINCE_UPDATED_AT })).toEqual([29]);
     expect(calls[0]?.sql).toContain("LIMIT 10000");
     expect(calls[0]?.sql).toContain(
       "StartTime >= fromUnixTimestamp64Milli({idBound_fromMs:Int64})",

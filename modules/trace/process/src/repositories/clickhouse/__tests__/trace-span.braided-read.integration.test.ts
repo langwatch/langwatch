@@ -11,7 +11,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { braidedProof } from "../../../__tests__/support/authorization-proofs.fixture.ts";
 import { ClickHouseTraceSpanRepository } from "../trace-span.repository.ts";
-import { authorizedClickHouseFor } from "./support/authorized-clickhouse.support.ts";
+import { traceQueryClientFor } from "./support/authorized-clickhouse.support.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
@@ -89,7 +89,7 @@ function spanRow(input: {
 beforeAll(async () => {
   if (!clickHouseConfigured) return;
   ch = await startMigratedTraceClickHouse();
-  repo = ClickHouseTraceSpanRepository.create({ clickhouse: authorizedClickHouseFor(ch) });
+  repo = ClickHouseTraceSpanRepository.create({ clickhouse: traceQueryClientFor(ch) });
   const web = { orchestrator: "web" };
   for (const row of [
     spanRow({ tenantId: reader, spanId: "reader-root", offsetMs: 0 }),

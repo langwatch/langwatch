@@ -13,7 +13,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { SpanAnalyticsRow } from "../../../eventing/span-analytics.projection.ts";
 import { SpanAnalyticsStore } from "../../../eventing/span-analytics.store.ts";
 import { SpanAnalyticsClickHouseRepository } from "../span-analytics.repository.ts";
-import { traceResolverFor } from "./support/authorized-clickhouse.support.ts";
+import { traceQueryClientFor, traceResolverFor } from "./support/authorized-clickhouse.support.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
@@ -81,7 +81,10 @@ beforeAll(async () => {
   if (!clickHouseConfigured) return;
   ch = await startMigratedTraceClickHouse();
   store = SpanAnalyticsStore.create({
-    storage: SpanAnalyticsClickHouseRepository.create({ resolveClient: traceResolverFor(ch) }),
+    storage: SpanAnalyticsClickHouseRepository.create({
+      resolveClient: traceResolverFor(ch),
+      reader: traceQueryClientFor(ch),
+    }),
     defaultRetentionDays: () => 30,
   });
   // Unmerged parts: a merge would hide a duplicate the lookup failed to prevent.

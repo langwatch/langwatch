@@ -14,7 +14,10 @@ import { traceQueryTranslation } from "../../../services/__tests__/fixtures/trac
 import { TraceListClickHouseRepository } from "../trace-list.repository.ts";
 import { ClickHouseTraceSpanRepository } from "../trace-span.repository.ts";
 import { TraceSummaryClickHouseRepository } from "../trace-summary.repository.ts";
-import { authorizedClickHouseFor } from "./support/authorized-clickhouse.support.ts";
+import {
+  authorizedClickHouseFor,
+  traceQueryClientFor,
+} from "./support/authorized-clickhouse.support.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
@@ -112,7 +115,7 @@ beforeAll(async () => {
   ch = await startMigratedTraceClickHouse();
   const clickhouse = authorizedClickHouseFor(ch);
   list = TraceListClickHouseRepository.create({ clickhouse });
-  spans = ClickHouseTraceSpanRepository.create({ clickhouse });
+  spans = ClickHouseTraceSpanRepository.create({ clickhouse: traceQueryClientFor(ch) });
   summaries = TraceSummaryService.create({
     repository: TraceSummaryClickHouseRepository.create({
       resolveClient: async () => ch,

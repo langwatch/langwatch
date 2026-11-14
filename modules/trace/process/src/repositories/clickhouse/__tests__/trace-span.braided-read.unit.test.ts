@@ -4,7 +4,6 @@
  * the reader. Spec: modules/trace/specs/braided-spans.feature
  */
 import type { Authorization, CompiledWhere } from "@langwatch/authorization";
-import { AuthorizedClickHouse } from "@langwatch/clickhouse-client";
 import {
   idIndexedClientDouble,
   type ScriptedStatements,
@@ -19,14 +18,21 @@ const READER = "proj_orchestrator";
 const OWNER = "proj_specialists";
 const LATEST_VERSION = "SELECT TenantId, TraceId, SpanId, max(UpdatedAt)";
 const HELD_IN_TRACE =
-  "TraceId IN (SELECT TraceId FROM stored_spans WHERE TenantId IN ({tenantScope_own:Array(String)})" +
-  " AND StartTime >= fromUnixTimestamp64Milli({tenantScope_heldFrom:Int64}) AND TraceId = {traceId:String})";
+  /TraceId IN \(SELECT TraceId FROM stored_spans WHERE TenantId IN \(\{tenantScope_own:Array\(String\)\}\) AND StartTime >= fromUnixTimestamp64Milli\(\{tenantScope_heldFrom:Int64\}\) AND TraceId = \{(v\d+):String\}\)/;
 const WEB: CompiledWhere = {
   version: 1,
   tree: { kind: "attributeEquals", on: "span", key: "orchestrator", value: "web" },
 };
 
 type Row = Record<string, unknown>;
+type Sent = { sql: string; params: Record<string, unknown> };
+
+/** The values a statement binds to the parameters `pattern` captures, in order. */
+function boundIn({ sent, pattern }: { sent: Sent; pattern: RegExp }): unknown[] {
+  const names = pattern.exec(sent.sql)?.slice(1) ?? [];
+  if (names.length === 0) throw new Error(`the statement has no ${String(pattern)}`);
+  return names.map((name) => sent.params[name ?? ""]);
+}
 
 function summaryRow({ spanId, tenantId }: { spanId: string; tenantId?: string }): Row {
   const blank = Object.fromEntries(
@@ -35,7 +41,7 @@ function summaryRow({ spanId, tenantId }: { spanId: string; tenantId?: string })
       "ToolName",
       "Model",
       "ResponseModel",
-      "Cost",
+      "UsageCost",
       "InputTokens",
       "OutputTokens",
       "CacheReadTokens",
@@ -67,18 +73,15 @@ function summaryRow({ spanId, tenantId }: { spanId: string; tenantId?: string })
 }
 
 function treeRepository(rows: Row[]) {
-  const statements: { sql: string; params: Record<string, unknown> }[] = [];
-  const clickhouse = new AuthorizedClickHouse({
-    resolveClient: async () =>
-      idIndexedClientDouble({
-        indexes: TRACE_ID_INDEXES,
-        driver: {
-          execute: vi.fn<ScriptedStatements["execute"]>(async (request) => {
-            statements.push({ sql: request.sql, params: request.params ?? {} });
-            return { rows: request.sql.includes("FROM stored_spans") ? rows : [] };
-          }),
-        },
+  const statements: Sent[] = [];
+  const clickhouse = idIndexedClientDouble({
+    indexes: TRACE_ID_INDEXES,
+    driver: {
+      execute: vi.fn<ScriptedStatements["execute"]>(async (request) => {
+        statements.push({ sql: request.sql, params: request.params ?? {} });
+        return { rows: request.sql.includes("FROM stored_spans") ? rows : [] };
       }),
+    },
   });
   const spanRead = () => {
     const read = statements.find((statement) => statement.sql.includes("FROM stored_spans"));
@@ -119,11 +122,14 @@ describe("ClickHouseTraceSpanRepository braided reads", () => {
 
         await read(repo, authorization);
 
-        const { sql, params } = spanRead();
+        const sent = spanRead();
+        const { sql, params } = sent;
         const [outer = "", election = ""] = sql.split(LATEST_VERSION);
         expect(outer).toContain("{tenantScope_c0_ids:Array(String)}");
         expect(outer).toContain("SpanAttributes[{tenantScope_p0_k:Array(String)}[1]]");
-        expect(outer).toContain(HELD_IN_TRACE);
+        expect(boundIn({ sent: { sql: outer, params }, pattern: HELD_IN_TRACE })).toEqual([
+          "trace-1",
+        ]);
         expect(election).not.toMatch(/tenantScope_[cp]0/);
         expect(sql).not.toContain("'web'");
         expect(params).toMatchObject({
@@ -178,9 +184,10 @@ describe("ClickHouseTraceSpanRepository braided reads", () => {
 
 describe("ClickHouseTraceSpanRepository span tree cursor", () => {
   const TENANT_TUPLE =
-    "(toUnixTimestamp64Milli(StartTime), SpanId, TenantId) > ({cursorStart:Int64}, {cursorSpan:String}, {cursorTenant:String})";
+    /tuple\(toUnixTimestamp64Milli\(StartTime\), SpanId, TenantId\) > tuple\(\{(v\d+):Int64\}, \{(v\d+):String\}, \{(v\d+):String\}\)/;
   const SPAN_TUPLE =
-    "(toUnixTimestamp64Milli(StartTime), SpanId) > ({cursorStart:Int64}, {cursorSpan:String})";
+    /tuple\(toUnixTimestamp64Milli\(StartTime\), SpanId\) > tuple\(\{(v\d+):Int64\}, \{(v\d+):String\}\)/;
+  const CURSOR_START = /StartTime >= fromUnixTimestamp64Milli\(\{(v\d+):Int64\}\) AND tuple\(/;
   const braided = braidedProof({
     projectId: READER,
     braids: [{ owner: OWNER, compiledWhere: WEB }],
@@ -210,39 +217,51 @@ describe("ClickHouseTraceSpanRepository span tree cursor", () => {
   describe("when the reader holds a braid", () => {
     /** @scenario "Two projects holding the same span id show both spans" */
     it("starts after the owner's span, so the reader's span of that id is its own position", async () => {
-      const { sql, params } = await pageAfter({ authorization: braided, ownerProjectId: OWNER });
+      const sent = await pageAfter({ authorization: braided, ownerProjectId: OWNER });
 
-      expect(sql).toContain(TENANT_TUPLE);
-      expect(sql).toContain("AND StartTime >= fromUnixTimestamp64Milli({cursorStart:Int64})");
-      expect(sql).toContain("ORDER BY StartTimeMs ASC, SpanId ASC, TenantId ASC");
-      expect(params).toMatchObject({ cursorSpan: "shared", cursorTenant: OWNER });
+      expect(boundIn({ sent, pattern: TENANT_TUPLE })).toEqual([
+        1_700_000_000_000,
+        "shared",
+        OWNER,
+      ]);
+      expect(boundIn({ sent, pattern: CURSOR_START })).toEqual([1_700_000_000_000]);
+      expect(sent.sql).toContain("ORDER BY StartTimeMs ASC, SpanId ASC, TenantId ASC");
     });
 
     /** @scenario "Two projects holding the same span id show both spans" */
     it("places a cursor on the reader's own span in the reader's project", async () => {
-      const { sql, params } = await pageAfter({ authorization: braided, ownerProjectId: null });
+      const sent = await pageAfter({ authorization: braided, ownerProjectId: null });
 
-      expect(sql).toContain(TENANT_TUPLE);
-      expect(params).toMatchObject({ cursorTenant: READER });
+      expect(boundIn({ sent, pattern: TENANT_TUPLE })[2]).toBe(READER);
     });
 
     it("pages a cursor made before braids by start and span id, as before", async () => {
-      const { sql, params } = await pageAfter({ authorization: braided });
+      const sent = await pageAfter({ authorization: braided });
 
-      expect(sql).toContain(SPAN_TUPLE);
-      expect(params).not.toHaveProperty("cursorTenant");
+      expect(boundIn({ sent, pattern: SPAN_TUPLE })).toEqual([1_700_000_000_000, "shared"]);
+      expect(sent.sql).not.toMatch(TENANT_TUPLE);
     });
   });
 
   describe("when the reader holds no braid", () => {
     it("pages by start and span id, naming no tenant", async () => {
-      const { sql, params } = await pageAfter({
+      const sent = await pageAfter({
         authorization: ownProof({ projectId: READER }),
         ownerProjectId: null,
       });
 
-      expect(sql).toContain(SPAN_TUPLE);
-      expect(params).not.toHaveProperty("cursorTenant");
+      expect(boundIn({ sent, pattern: SPAN_TUPLE })).toEqual([1_700_000_000_000, "shared"]);
+      expect(sent.sql).not.toMatch(TENANT_TUPLE);
+    });
+
+    /** @scenario "A span tree page past a cursor elects each span's latest version over the whole trace" */
+    it("filters the elected spans by the cursor, never the election itself", async () => {
+      const { sql } = await pageAfter({ authorization: ownProof({ projectId: READER }) });
+
+      const [outer = "", election = ""] = sql.split(LATEST_VERSION);
+      expect(outer).toMatch(SPAN_TUPLE);
+      expect(election).not.toContain("tuple(");
+      expect(election).not.toMatch(/StartTime >= fromUnixTimestamp64Milli\(\{v\d+:Int64\}\)/);
     });
   });
 });
@@ -262,7 +281,7 @@ describe("ClickHouseTraceSpanRepository span tree page end", () => {
       limit: PAGE,
       cursor: { startTimeMs: 1_699_999_999_000, spanId: "a" },
     });
-    return { page, params: spanRead().params };
+    return { page, sql: spanRead().sql };
   }
 
   describe("when the reader holds a braid", () => {
@@ -273,9 +292,9 @@ describe("ClickHouseTraceSpanRepository span tree page end", () => {
 
     /** @scenario "A span tree page under a braid reads no span past its end" */
     it("reads no row past the page, so an owner's next span is never read before its audit", async () => {
-      const { params } = await pageOf({ authorization: braided, rows: [] });
+      const { sql } = await pageOf({ authorization: braided, rows: [] });
 
-      expect(params).toMatchObject({ limit: PAGE });
+      expect(sql).toMatch(new RegExp(` LIMIT ${PAGE}$`));
     });
 
     /** @scenario "A span tree page under a braid reads no span past its end" */
@@ -297,9 +316,9 @@ describe("ClickHouseTraceSpanRepository span tree page end", () => {
     const own = ownProof({ projectId: READER });
 
     it("reads one row past the page to learn whether another follows", async () => {
-      const { params } = await pageOf({ authorization: own, rows: [] });
+      const { sql } = await pageOf({ authorization: own, rows: [] });
 
-      expect(params).toMatchObject({ limit: PAGE + 1 });
+      expect(sql).toMatch(new RegExp(` LIMIT ${PAGE + 1}$`));
     });
 
     it("offers no next page when the page is full and nothing follows", async () => {

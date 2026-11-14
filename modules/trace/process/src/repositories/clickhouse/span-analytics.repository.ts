@@ -1,3 +1,5 @@
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import { clickhouseRead, fn, param, tenantScope } from "@langwatch/clickhouse-client/builder";
 import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant, toDate } from "@langwatch/time";
@@ -5,6 +7,7 @@ import { z } from "zod";
 
 import type { SpanAnalyticsRow } from "../../eventing/span-analytics.projection.ts";
 import { type SpanAnalyticsKey, SpanAnalyticsRepository } from "../span-analytics.repository.ts";
+import { spanAnalytics } from "./clickhouse.span-analytics.table.ts";
 import type { TraceClickHouseWriteResolver } from "./clickhouse.trace-member-client.repository.ts";
 
 const TABLE_NAME = "span_analytics" as const;
@@ -70,12 +73,18 @@ function toClickHouseRecord({
 
 /** Appends span_analytics rows through the tenant's own ClickHouse. */
 export class SpanAnalyticsClickHouseRepository extends SpanAnalyticsRepository {
-  private constructor(private readonly options: { resolveClient: TraceClickHouseWriteResolver }) {
+  private constructor(
+    private readonly options: {
+      resolveClient: TraceClickHouseWriteResolver;
+      reader: Pick<ClickHouseQueryClient, "read">;
+    },
+  ) {
     super();
   }
 
   static create(options: {
     resolveClient: TraceClickHouseWriteResolver;
+    reader: Pick<ClickHouseQueryClient, "read">;
   }): SpanAnalyticsClickHouseRepository {
     return new SpanAnalyticsClickHouseRepository(options);
   }
@@ -142,27 +151,29 @@ export class SpanAnalyticsClickHouseRepository extends SpanAnalyticsRepository {
     if (keys.length === 0) return [];
     EventUtils.validateTenantId({ tenantId }, "SpanAnalyticsClickHouseRepository.existingSpanKeys");
     try {
-      const client = await this.options.resolveClient(tenantId);
       // The StartTime bound keeps the lookup to the few weekly partitions the batch can sit in.
-      const result = await client.query({
-        query: `
-          SELECT TraceId, SpanId
-          FROM ${TABLE_NAME}
-          WHERE TenantId = {tenantId:String}
-            AND (TraceId, SpanId) IN arrayZip({traceIds:Array(String)}, {spanIds:Array(String)})
-            AND StartTime BETWEEN fromUnixTimestamp64Milli({fromMs:Int64}) AND fromUnixTimestamp64Milli({toMs:Int64})
-        `,
-        query_params: {
-          tenantId,
-          traceIds: keys.map((key) => key.traceId),
-          spanIds: keys.map((key) => key.spanId),
-          fromMs: startTimeFromMs,
-          toMs: startTimeToMs,
-        },
-        format: "JSONEachRow",
-      });
+      const statement = clickhouseRead({ scope: tenantScope.single({ tenantId }) })
+        .from(spanAnalytics)
+        .select({ TraceId: spanAnalytics.TraceId, SpanId: spanAnalytics.SpanId })
+        .where(({ oneOf }) =>
+          oneOf(
+            fn.tuple(spanAnalytics.TraceId, spanAnalytics.SpanId),
+            fn.arrayZip(
+              param.strings(keys.map((key) => key.traceId)),
+              param.strings(keys.map((key) => key.spanId)),
+            ),
+          ),
+        )
+        .where(({ and, gte, lte }) =>
+          and(
+            gte(spanAnalytics.StartTime, startTimeFromMs),
+            lte(spanAnalytics.StartTime, startTimeToMs),
+          ),
+        )
+        .build();
+      const result = await this.options.reader.read({ statement, table: TABLE_NAME });
       return spanKeysSchema
-        .parse(await result.json())
+        .parse(result.rows)
         .map((row) => ({ traceId: row.TraceId, spanId: row.SpanId }));
     } catch (error) {
       logger.warn(
