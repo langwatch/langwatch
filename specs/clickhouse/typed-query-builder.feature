@@ -367,3 +367,32 @@ Feature: A typed ClickHouse read builder renders the tenant predicate and the te
     Given ClickHouse 26.8, the reader identity and tables whose other tenant reuses the same ids
     When an election repeating an id bound and a JSON path keyed by a lambda's parameter are built and sent
     Then each returns exactly its tenant's rows, also when the setting lists every tenant
+
+  @unit
+  Scenario: A latest-version read repeats the conditions on the columns it declares stable per key
+    Given a latest-version read filtering a column that never changes between a key's versions
+    When the read names that column in the election's repeat list
+    Then the election repeats each term reading only that column, the keys or the time column, sharing its parameters
+    And terms on undeclared columns stay out of the election, and a read declaring none elects as before
+    And a repeat list naming the tenant column or another table's column is refused
+
+  @unit
+  Scenario: A where condition marked outside the election filters the elected rows only
+    Given a latest-version read paged by a cursor on its key and time columns
+    When the cursor condition is marked inElection false
+    Then the outer WHERE carries the cursor and the election elects over every version of the key
+    And an unmarked cursor is repeated inside the election, as before
+
+  @unit
+  Scenario: A key tuple is a member of zipped bound arrays
+    Given a lookup of span keys sent as two parallel arrays
+    When the key tuple is tested against arrayZip of the two bound arrays
+    Then the read renders the tuple's membership in arrayZip of two bound String arrays
+    And a membership set that reads a column is refused
+
+  @integration
+  Scenario: An outer-only cursor and zipped tuple membership run on 26.8 as main's reads do
+    Given ClickHouse 26.8, the reader identity and a span whose latest version moved before the page cursor
+    When the page is built with its cursor outside the election and sent
+    Then the span is not on the page, as main pages it, while a repeated cursor returns its stale version
+    And a zipped tuple membership returns exactly its tenant's keys and prunes the primary key as the raw form does

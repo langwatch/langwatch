@@ -10,6 +10,7 @@ import { refuseOverBudget } from "../statementBudget.ts";
 import { StatementScopeError } from "../statementScopeError.ts";
 import {
   type Binding,
+  type ColumnRef,
   type ColumnType,
   type Condition,
   type ConditionOps,
@@ -134,6 +135,10 @@ type ReadState = {
   readonly tenancy: Tenancy;
   /** Where the latest-version election renders: WHERE or PREWHERE. */
   readonly latestVersion: "where" | "prewhere" | undefined;
+  /** The elected table's columns the caller declared stable per key; the election repeats them. */
+  readonly repeats: readonly string[];
+  /** The indices of `where` conditions that filter the elected rows only, never the election. */
+  readonly outerOnly: readonly number[];
   readonly ctes: readonly { name: string; read: ReadState }[];
   readonly arms: readonly ReadState[];
   /** The read's own `SETTINGS` clause: never a `SQL_` key, never a pinned setting. */
@@ -186,6 +191,8 @@ const initialState = ({
   offset: undefined,
   tenancy: { kind: "unstated" },
   latestVersion: undefined,
+  repeats: [],
+  outerOnly: [],
   ctes: [],
   arms: [],
   settings: {},
@@ -295,6 +302,8 @@ function refuseSettingsInUnion(state: ReadState): void {
 }
 
 type JoinOptions = { latestVersion?: boolean };
+/** `inElection: false`: the condition filters the elected rows only, as main's page cursors do. */
+type WhereOptions = { inElection?: boolean };
 
 /** A read's own clause operations: the condition operations and a scalar subquery. */
 export type ReadOps<
@@ -381,9 +390,13 @@ export class ClickHouseRead<
 
   where(
     build: (ops: ReadOps<Scope, Tables, Ctes>) => Condition<Tables>,
+    { inElection = true }: WhereOptions = {},
   ): ClickHouseRead<Scope, Tables, Row, Ctes> {
+    const where = [...this.#state.where, build(this.#ops()).node];
+    const { outerOnly } = this.#state;
     return this.#next({
-      where: [...this.#state.where, build(this.#ops()).node],
+      where,
+      outerOnly: inElection ? outerOnly : [...outerOnly, where.length - 1],
     });
   }
 
@@ -496,20 +509,29 @@ export class ClickHouseRead<
   /**
    * The IN-tuple election of keys and version (clickhouse-queries.md) under the same scope. On a
    * join it elects the FROM side inside its own subquery; `prewhere` places it in PREWHERE.
+   * `repeat` names the FROM table's columns that never change between a key's versions.
    */
-  latestVersion({ prewhere = false }: { prewhere?: boolean } = {}): ClickHouseRead<
-    Scope,
-    Tables,
-    Row,
-    Ctes
-  > {
+  latestVersion({
+    prewhere = false,
+    repeat = [],
+  }: {
+    prewhere?: boolean;
+    repeat?: readonly ColumnRef<Tables, string, unknown>[];
+  } = {}): ClickHouseRead<Scope, Tables, Row, Ctes> {
     const { table } = this.#state;
     if (table.versionColumn === undefined) {
       throw new QueryBuilderError({ kind: "no-version-column", table: table.name });
     }
     if (prewhere && this.#state.joins.length > 0)
       throw new QueryBuilderError({ kind: "prewhere-in-join" });
-    return this.#next({ latestVersion: prewhere ? "prewhere" : "where" });
+    const repeats = repeat.map(({ node }) => {
+      const own =
+        node.kind === "column" && node.table === table.name && node.name !== table.tenantColumn;
+      if (own) return node.name;
+      const column = node.kind === "column" ? `${node.table}.${node.name}` : node.kind;
+      throw new QueryBuilderError({ kind: "repeat-outside-election", table: table.name, column });
+    });
+    return this.#next({ latestVersion: prewhere ? "prewhere" : "where", repeats });
   }
 
   /** A proof's shared windows, as `{{tenantScope:<TimeColumn>}}` renders them. */
@@ -1058,10 +1080,55 @@ function tenantPredicate({
 }
 
 /**
- * The latest-version election: keys and version from the descriptor, under the fence's
- * latest-version form, repeating the read's conjuncts on that table's keys or time column alone
- * (the window keeps partition pruning) and its id bounds on any of the table's own columns.
+ * The conditions an election repeats: conjuncts on the table's keys or time column alone (the
+ * window keeps partition pruning), id bounds and terms reading a declared `repeat` column. An
+ * outer-only `where` never repeats.
  */
+function repeatedConditionsOf({
+  state,
+  table,
+}: {
+  state: ReadState;
+  table: ClickHouseTableFacts;
+}): ExpressionNode[] {
+  const repeats = table === state.table ? state.repeats : [];
+  const onKeys = (name: string) => table.sortKey.includes(name) || name === table.timeColumn;
+  const stable = (name: string) => onKeys(name) || repeats.includes(name);
+  // An id bound on any of the table's own columns repeats too, as the raw reads repeat it.
+  const repeatsTerm = (node: ExpressionNode) =>
+    (node.kind === "idBound" && readsOnly({ node, table, allowed: () => true })) ||
+    (columnsOf(node).some((each) => repeats.includes(each.name)) &&
+      readsOnly({ node, table, allowed: stable }));
+  const termsOf = (node: ExpressionNode): ExpressionNode[] => {
+    if (repeatsTerm(node)) return [node];
+    return node.kind === "logic" && node.operator === "AND" ? node.terms.flatMap(termsOf) : [];
+  };
+  const outer = new Set(state.outerOnly);
+  return [...state.prewhere, ...state.where.filter((_, index) => !outer.has(index))].flatMap(
+    (node) => (readsOnly({ node, table, allowed: onKeys }) ? [node] : termsOf(node)),
+  );
+}
+
+/** Whether a condition reads columns, each one of the table's own, non-tenant and `allowed`. */
+function readsOnly({
+  node,
+  table,
+  allowed,
+}: {
+  node: ExpressionNode;
+  table: ClickHouseTableFacts;
+  allowed: (name: string) => boolean;
+}): boolean {
+  const read = columnsOf(node);
+  return (
+    read.length > 0 &&
+    read.every(
+      (each) => each.table === table.name && each.name !== table.tenantColumn && allowed(each.name),
+    )
+  );
+}
+
+/** The latest-version election: keys and version from the descriptor, under the fence's form. */
 function electionOf({
   state,
   table,
@@ -1073,31 +1140,10 @@ function electionOf({
 }): string {
   const version = table.versionColumn ?? "";
   const keys = table.sortKey;
-  const filtersKeys = (node: ExpressionNode) => {
-    const read = columnsOf(node);
-    return (
-      read.length > 0 &&
-      read.every(
-        (each) =>
-          each.table === table.name &&
-          each.name !== table.tenantColumn &&
-          (keys.includes(each.name) || each.name === table.timeColumn),
-      )
-    );
-  };
-  // An id bound on any of the table's own columns repeats too, as the raw reads repeat it.
-  const boundsIds = (node: ExpressionNode) =>
-    node.kind === "idBound" &&
-    columnsOf(node).every((each) => each.table === table.name && each.name !== table.tenantColumn);
-  const idBoundsOf = (node: ExpressionNode): ExpressionNode[] => {
-    if (boundsIds(node)) return [node];
-    return node.kind === "logic" && node.operator === "AND" ? node.terms.flatMap(idBoundsOf) : [];
-  };
-  const repeated = (node: ExpressionNode) => (filtersKeys(node) ? [node] : idBoundsOf(node));
   const where: string[] = [];
   const predicate = tenantPredicate({ state, table, context, election: true });
   if (predicate !== undefined) where.push(predicate);
-  for (const node of [...state.prewhere, ...state.where].flatMap(repeated)) {
+  for (const node of repeatedConditionsOf({ state, table })) {
     where.push(renderExpression({ node, context, qualify: false }));
   }
   const filter = where.length > 0 ? ` WHERE ${where.join(" AND ")}` : "";

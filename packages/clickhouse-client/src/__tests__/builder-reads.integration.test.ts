@@ -59,6 +59,22 @@ const spans = defineClickHouseTable({
   },
 });
 
+/** One granule per row, so EXPLAIN shows which rows the primary key keeps. */
+const pagedSpans = defineClickHouseTable({
+  name: "paged_spans",
+  tenantColumn: "TenantId",
+  timeColumn: "StartTime",
+  versionColumn: "UpdatedAt",
+  sortKey: ["TenantId", "TraceId", "SpanId"],
+  columns: {
+    TenantId: column.string(),
+    TraceId: column.string(),
+    SpanId: column.string(),
+    StartTime: column.dateTime64({ precision: 9 }),
+    UpdatedAt: column.dateTime64({ precision: 3 }),
+  },
+});
+
 const summaries = defineClickHouseTable({
   name: "trace_summaries",
   tenantColumn: "TenantId",
@@ -298,6 +314,30 @@ type Sendable = {
   settings: Readonly<Record<string, unknown>>;
 };
 
+const pagedSpan = (
+  TenantId: string,
+  TraceId: string,
+  SpanId: string,
+  startAgo: number,
+  updatedAgo = 100,
+) => ({
+  TenantId,
+  TraceId,
+  SpanId,
+  StartTime: at(NOW - startAgo),
+  UpdatedAt: at(NOW - updatedAgo),
+});
+const KEYS = Array.from({ length: 32 }, (_, index) => `k${String(index).padStart(2, "0")}`);
+/** s1's latest version moved before the cursor at NOW - 500; its older version sits after it. */
+const PAGED_SPANS = [
+  pagedSpan(A, "tc", "s0", 950),
+  pagedSpan(A, "tc", "s1", 100, 200),
+  pagedSpan(A, "tc", "s1", 900, 100),
+  pagedSpan(A, "tc", "s2", 50),
+  pagedSpan(B, "tc", "s1", 100),
+  ...[A, B].flatMap((tenant) => KEYS.map((key) => pagedSpan(tenant, key, "s0", 500))),
+];
+
 let container: StartedClickHouseContainer | undefined;
 let admin: ClickHouseClient;
 let reader: ClickHouseClient;
@@ -326,6 +366,24 @@ async function rowsOf({
 }
 
 const single = tenantScope.single({ tenantId: A });
+
+/** What `EXPLAIN indexes = 1` reports for the primary key: the keys used and granules read. */
+async function primaryKeyOf({ statement }: { statement: Sendable }) {
+  const result = await reader.query({
+    query: `EXPLAIN indexes = 1 ${statement.sql}`,
+    query_params: { ...statement.params },
+    clickhouse_settings: statement.settings as Record<string, string | number>,
+    format: "JSONEachRow",
+  });
+  const lines = (await result.json<{ explain: string }>()).map((row) => row.explain.trim());
+  const section = lines.slice(lines.indexOf("PrimaryKey") + 1);
+  const keysEnd = section.findIndex((line) => line.startsWith("Condition:"));
+  const [read = NaN, total = NaN] = (section.find((line) => line.startsWith("Granules:")) ?? "")
+    .replace("Granules:", "")
+    .split("/")
+    .map(Number);
+  return { keys: section.slice(section.indexOf("Keys:") + 1, keysEnd), granules: { read, total } };
+}
 
 /** The second census's shapes: nested columns, AggregateFunction merges, lambdas and casts. */
 const CENSUS_SHAPES: Record<string, { statement: () => Sendable; rows: string[] }> = {
@@ -750,6 +808,11 @@ describe("given builder statements sent as a reader under a row policy on ClickH
          ScheduledAt DateTime64(3), UpdatedAt DateTime64(3))
          ENGINE = ReplacingMergeTree(UpdatedAt) ORDER BY (TenantId, EvaluationId)`,
       `CREATE ROW POLICY ${READER}_evaluations ON ${DATABASE}.evaluation_runs USING ${POLICY} TO ${READER}`,
+      `CREATE TABLE ${DATABASE}.paged_spans (TenantId String, TraceId String, SpanId String,
+         StartTime DateTime64(9), UpdatedAt DateTime64(3)) ENGINE = ReplacingMergeTree(UpdatedAt)
+         ORDER BY (TenantId, TraceId, SpanId) SETTINGS index_granularity = 1`,
+      `CREATE ROW POLICY ${READER}_paged ON ${DATABASE}.paged_spans USING ${POLICY} TO ${READER}`,
+      `SYSTEM STOP MERGES ${DATABASE}.paged_spans`,
       ...ROLLUP_PARTS.map(
         ([tenant, trace, cost, roles, spend, count, ms]) =>
           `INSERT INTO ${DATABASE}.metrics_rollup SELECT '${tenant}', '${trace}',
@@ -779,6 +842,13 @@ describe("given builder statements sent as a reader under a row policy on ClickH
       table: `${DATABASE}.evaluation_runs`,
       values: EVALUATIONS,
       format: "JSONEachRow",
+    });
+    // Both versions of s1 stay as rows: no merge, and no insert-time dedup.
+    await admin.insert({
+      table: `${DATABASE}.paged_spans`,
+      values: PAGED_SPANS,
+      format: "JSONEachRow",
+      clickhouse_settings: { optimize_on_insert: 0 },
     });
     reader = createClient({ url, username: READER, password: READER_PASSWORD, database: DATABASE });
   }, 300_000);
@@ -852,6 +922,75 @@ describe("given builder statements sent as a reader under a row policy on ClickH
       });
     });
   }
+
+  describe("when a span page's cursor is kept out of the election", () => {
+    const page = (options: { inElection: boolean }) =>
+      clickhouseRead({ scope: single })
+        .from(pagedSpans)
+        .latestVersion()
+        .select({ SpanId: pagedSpans.SpanId })
+        .where(({ eq }) => eq(pagedSpans.TraceId, "tc"))
+        .where(
+          ({ gt }) =>
+            gt(
+              fn.tuple(pagedSpans.StartTime, pagedSpans.SpanId),
+              fn.tuple(param.epochMs(NOW - 500), param.string("")),
+            ),
+          options,
+        )
+        .build();
+
+    /** @scenario "An outer-only cursor and zipped tuple membership run on 26.8 as main's reads do" */
+    it("leaves off the span whose latest version moved before the cursor, as main pages it", async () => {
+      expect(await rowsOf({ statement: page({ inElection: false }) })).toEqual(["s2"]);
+    });
+
+    /** @scenario "An outer-only cursor and zipped tuple membership run on 26.8 as main's reads do" */
+    it("returns that span's stale version when the cursor is repeated in the election", async () => {
+      expect(await rowsOf({ statement: page({ inElection: true }) })).toEqual(["s1", "s2"]);
+    });
+  });
+
+  describe("when span keys are looked up as a tuple in zipped bound arrays", () => {
+    const traceIds = ["k03", "k07", "k07"];
+    const spanIds = ["s0", "s0", "s9"];
+    const built = () =>
+      clickhouseRead({ scope: single })
+        .from(pagedSpans)
+        .select({ TraceId: pagedSpans.TraceId, SpanId: pagedSpans.SpanId })
+        .where(({ oneOf }) =>
+          oneOf(
+            fn.tuple(pagedSpans.TraceId, pagedSpans.SpanId),
+            fn.arrayZip(param.strings(traceIds), param.strings(spanIds)),
+          ),
+        )
+        .build();
+    const raw = () => ({
+      sql: `SELECT TraceId, SpanId FROM paged_spans WHERE TenantId = {tenantId:String}
+              AND (TraceId, SpanId) IN arrayZip({traceIds:Array(String)}, {spanIds:Array(String)})`,
+      params: { tenantId: A, traceIds, spanIds },
+      settings: built().settings,
+    });
+
+    /** @scenario "An outer-only cursor and zipped tuple membership run on 26.8 as main's reads do" */
+    it("returns exactly its tenant's keys, also when the setting lists every tenant", async () => {
+      expect(await rowsOf({ statement: built() })).toEqual(["k03|s0", "k07|s0"]);
+      expect(await rowsOf({ statement: built(), tenants: EVERY_TENANT })).toEqual([
+        "k03|s0",
+        "k07|s0",
+      ]);
+    });
+
+    /** @scenario "An outer-only cursor and zipped tuple membership run on 26.8 as main's reads do" */
+    it("prunes the primary key on TraceId and SpanId to the granules the raw form reads", async () => {
+      const ours = await primaryKeyOf({ statement: built() });
+      const main = await primaryKeyOf({ statement: raw() });
+
+      expect(ours).toEqual(main);
+      expect(ours.keys).toEqual(expect.arrayContaining(["TraceId", "SpanId"]));
+      expect(ours.granules.read).toBeLessThan(ours.granules.total / 4);
+    });
+  });
 
   describe("when tenant A's statement goes out under tenant B's setting", () => {
     /** @scenario "Built statements return their tenant's rows under the reader's row policy on 26.8" */

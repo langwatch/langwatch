@@ -402,10 +402,13 @@ export type ConditionOps<Tables extends string, Ctes> = {
     left: Expression<V, T>,
     right: NoInfer<V> | Expression<V, Tables>,
   ) => Condition;
-  /** Membership in bound values or in a common table expression of the read. */
+  /** Membership in bound values, a constant array such as `arrayZip(…)` of them, or a CTE. */
   oneOf: <V, T extends Tables>(
     left: Expression<V, T>,
-    set: readonly NoInfer<V>[] | CteSet<Ctes, NoInfer<V>>,
+    set:
+      | readonly NoInfer<V>[]
+      | Expression<readonly NoInfer<V>[], Tables>
+      | CteSet<Ctes, NoInfer<V>>,
   ) => Condition;
   /** `from` inclusive, `until` exclusive; either may be left open. */
   range: <V, T extends Tables>(
@@ -434,6 +437,13 @@ const MILLIS_OF: Readonly<Record<Conversion, string>> = {
 
 /** Bound values compare in the parameter's own type; a DateTime64 compares as epoch millis. */
 function oneOf(left: Expression<unknown, string>, set: unknown): Condition {
+  if (isExpression(set)) {
+    // A set reading a column would be evaluated per row, and ClickHouse refuses it as non-constant.
+    const [read] = columnsOf(set.node);
+    if (read !== undefined)
+      throw new QueryBuilderError({ kind: "set-reads-a-column", column: read.name });
+    return expression<boolean>({ kind: "in", left: left.node, set: set.node });
+  }
   if (!Array.isArray(set)) {
     const name = typeof set === "object" && set !== null && "cte" in set ? set.cte : undefined;
     if (typeof name !== "string") throw unsupported(left.node);
