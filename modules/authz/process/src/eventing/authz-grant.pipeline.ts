@@ -1,3 +1,5 @@
+import type { LedgerActor } from "@langwatch/authorization";
+import { GRANT_ATTACHED_EVENT_TYPE, GRANT_SOURCE_BRAID } from "@langwatch/authz-contract";
 import {
   defineAggregate,
   defineEventingModule,
@@ -25,8 +27,10 @@ import {
 import type { AuthzModule } from "../app/authz.app.ts";
 import type { AuthzAuditTrailRepository } from "../repositories/authz-audit-trail.repository.ts";
 import type { AuthzGrantProjectionRepository } from "../repositories/authz-grant-projection.repository.ts";
+import type { AuthzLedgerReadRepository } from "../repositories/authz-ledger-read.repository.ts";
 import type { AuthzRepositories } from "../repositories/authz.repositories.ts";
 import { isEngineMigrationStep } from "../rules/authz-engine-switch.rules.ts";
+import type { AuthzBraidService } from "../services/authz-braid.service.ts";
 import type { AuthzCutoverGateService } from "../services/authz-cutover-gate.service.ts";
 import type { AuthzSessionVersionService } from "../services/authz-session-version.service.ts";
 import type { AuthzUserStandingService } from "../services/authz-user-standing.service.ts";
@@ -40,7 +44,11 @@ import {
   GRANT_COALESCE_MAX_BATCH,
   RevokeGrantCommand,
 } from "./authz-grant.commands.ts";
-import { AUTHZ_GRANT_AGGREGATE_TYPE, authzGrantEventSchemas } from "./authz-grant.events.ts";
+import {
+  AUTHZ_GRANT_AGGREGATE_TYPE,
+  type AuthzGrantsEvent,
+  authzGrantEventSchemas,
+} from "./authz-grant.events.ts";
 import {
   AUTHZ_GRANTS_WRITE_PROJECTION_NAME,
   AuthzGrantProjection,
@@ -52,6 +60,8 @@ export const AUTHZ_GRANT_PIPELINE_NAME = "authz_grant" as const;
 interface EventingAuthzAdapterOptions {
   authzGrantsWriteStore: AuthzGrantProjectionRepository;
   authzAuditTrailStore: AuthzAuditTrailRepository;
+  /** Lets a revoked braid's audit entry name both projects and the condition (ADR-201 §2). */
+  authzBraidReads?: Pick<AuthzLedgerReadRepository, "findBraids">;
   /** Absent on the consumer-only twin, which bumps no session version. */
   sessionVersions?: AuthzSessionVersionService;
   /** Absent on the consumer-only twin, which keeps no user standing. */
@@ -60,6 +70,19 @@ interface EventingAuthzAdapterOptions {
   scopeLineage?: Pick<AuthzService, "lineageChanged">;
   /** Absent on the consumer-only twin, which keeps no engine switch. */
   engineSwitch?: Pick<AuthzCutoverGateService, "pin">;
+  /** Absent on the consumer-only twin, which revokes nothing a braid change replaced. */
+  braidChanges?: Pick<AuthzBraidService, "revokeReplacedGrant">;
+}
+
+export const BRAID_CHANGE_SUBSCRIBER_NAME = "braidChangeRevoke" as const;
+
+/** A braid change's attach and the grant it replaced (ADR-201 §2); empty for any other event. */
+function braidChangesIn(event: AuthzGrantsEvent): { grantId: string; actor: LedgerActor }[] {
+  if (event.type !== GRANT_ATTACHED_EVENT_TYPE || event.data.source !== GRANT_SOURCE_BRAID) {
+    return [];
+  }
+  const { replacesGrantId, actor } = event.data;
+  return replacesGrantId === undefined ? [] : [{ grantId: replacesGrantId, actor }];
 }
 
 const buildAuthzGrantPipeline = (options: EventingAuthzAdapterOptions) => {
@@ -75,6 +98,7 @@ const buildAuthzGrantPipeline = (options: EventingAuthzAdapterOptions) => {
       "auditTrail",
       EventingAuthzAuditAdapter.create({
         store: options.authzAuditTrailStore,
+        ...(options.authzBraidReads ? { braids: options.authzBraidReads } : {}),
       }),
     )
     // One grant per lane via serializeByAggregate: prevents same-grant
@@ -94,7 +118,25 @@ const buildAuthzGrantPipeline = (options: EventingAuthzAdapterOptions) => {
     .withCommand("defineRole", DefineRoleCommand)
     .withCommand("changeRolePermissions", ChangeRolePermissionsCommand)
     .withCommand("deleteRole", DeleteRoleCommand);
-  const { sessionVersions, userStandings, scopeLineage, engineSwitch } = options;
+  const { sessionVersions, userStandings, scopeLineage, engineSwitch, braidChanges } = options;
+  if (braidChanges) {
+    // The api sends a braid change's attach alone; its replaced grant is revoked here (§9).
+    pipeline.withEventSubscriber(BRAID_CHANGE_SUBSCRIBER_NAME, {
+      events: [GRANT_ATTACHED_EVENT_TYPE],
+      runIn: ["worker"],
+      when: (event) => braidChangesIn(event).length > 0,
+      handler: async (event) => {
+        for (const { grantId, actor } of braidChangesIn(event)) {
+          await braidChanges.revokeReplacedGrant({
+            organizationId: event.tenantId,
+            grantId,
+            actor,
+            commandId: `${BRAID_CHANGE_SUBSCRIBER_NAME}:${event.id}`,
+          });
+        }
+      },
+    });
+  }
   if (engineSwitch) {
     // An operator's rollback is ops' fact; authz turns its own switch off (Alex, 2026-10-12).
     pipeline.withPeerSubscriber("engineMigrationRolledBack", {

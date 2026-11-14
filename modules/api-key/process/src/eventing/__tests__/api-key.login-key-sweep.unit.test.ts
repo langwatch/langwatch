@@ -12,10 +12,13 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { ApiKeyModule } from "../../app/api-key.app.ts";
+import { MemoryApiKeyChannels } from "../../channels/memory/memory.api-key.channels.ts";
 import type { ApiKeyRow } from "../../repositories/api-key.repository.ts";
 import { MemoryApiKeyAnswerCacheRepository } from "../../repositories/memory/memory.api-key-answer-cache.repository.ts";
 import { MemoryApiKeyDatabase } from "../../repositories/memory/memory.api-key.database.ts";
 import { MemoryApiKeyRepository } from "../../repositories/memory/memory.api-key.repository.ts";
+import { MemorySigningKeyUsageRepository } from "../../repositories/memory/memory.signing-key-usage.repository.ts";
+import { MemorySigningKeyRepository } from "../../repositories/memory/memory.signing-key.repository.ts";
 import { apiKeyEventing } from "../api-key.pipeline.ts";
 import { CLI_LOGIN_KEY_REAP_PROCESS_NAME } from "../cli-login-key-reap.process.ts";
 
@@ -63,7 +66,10 @@ async function sweepOver(rows: ApiKeyRow[]) {
       answers: MemoryApiKeyAnswerCacheRepository.create(),
       sandboxKeys: MemorySharedCredentialStore.create(),
       runKeys: MemorySharedCredentialStore.create(),
+      signingKeys: MemorySigningKeyRepository.create(),
+      signingKeyUsage: MemorySigningKeyUsageRepository.create(),
     },
+    channels: MemoryApiKeyChannels.create(),
     dependencies: {
       authorization,
       organizations: createApiFixture<OrganizationApi>({}),
@@ -78,6 +84,8 @@ async function sweepOver(rows: ApiKeyRow[]) {
       answers: MemoryApiKeyAnswerCacheRepository.create(),
       sandboxKeys: MemorySharedCredentialStore.create(),
       runKeys: MemorySharedCredentialStore.create(),
+      signingKeys: MemorySigningKeyRepository.create(),
+      signingKeyUsage: MemorySigningKeyUsageRepository.create(),
     },
     app,
     processStore: InMemoryProcessStore.createForTesting(),

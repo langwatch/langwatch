@@ -6,6 +6,7 @@
  */
 
 import type { IntentContext } from "@langwatch/eventing";
+import { HandledError } from "@langwatch/handled-error";
 import { InstantEvalQueryInvalidError } from "@langwatch/instant-eval-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -21,6 +22,16 @@ import {
   type InstantEvalRunExecutor,
   type InstantEvalSpend,
 } from "../instant-eval-processing.intent.ts";
+
+/** A handled refusal the outbox will not retry, shaped like the hosted judge being unreachable. */
+class UnreachableRefusal extends HandledError {
+  constructor() {
+    super("connect_unreachable", "LangWatch-hosted services were not reached", {
+      httpStatus: 503,
+      fault: "customer",
+    });
+  }
+}
 
 const RUN_ID = "instanteval_1";
 const PROJECT_ID = "project-1";
@@ -240,6 +251,22 @@ describe("given a step that fails", () => {
         createInstantEvalJudgePageHandler(dispatch)(PAGE_PAYLOAD, intentContext(1)),
       ).rejects.toThrow("clickhouse is away");
       expect(commands.finishes).toEqual([]);
+    });
+  });
+
+  describe("when the outbox will not retry the refusal", () => {
+    /** @scenario "A step failing with a refusal the outbox will not retry fails the run on that attempt" */
+    it("fails the run on the first attempt instead of rethrowing", async () => {
+      const { deps: dispatch, commands } = deps({
+        raises: new UnreachableRefusal(),
+      });
+
+      await createInstantEvalJudgePageHandler(dispatch)(PAGE_PAYLOAD, intentContext(1));
+
+      expect(commands.finishes[0]).toMatchObject({
+        outcome: "failed",
+        errorCode: "connect_unreachable",
+      });
     });
   });
 

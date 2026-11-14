@@ -1,13 +1,17 @@
 package render
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 
 	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
 
+	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/access"
+	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/bootstrap"
 	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/config"
 	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/storage"
 )
@@ -39,7 +43,7 @@ func RenderAll(log *zap.Logger, input *config.Input, computed *config.Computed, 
 		}
 	}
 
-	config.ApplyEnvOverrides(log, computed)
+	config.ApplyOverrides(log, computed)
 
 	// Core config files (ordered slice for deterministic rendering).
 	type step struct {
@@ -48,52 +52,93 @@ func RenderAll(log *zap.Logger, input *config.Input, computed *config.Computed, 
 	}
 	for _, s := range []step{
 		{"limits", func() error { return renderLimits(input, computed, configD) }},
-		{"profiles", func() error { return renderProfiles(computed, usersD) }},
+		{"profiles", func() error { return renderProfiles(input, computed, usersD) }},
 		{"password", func() error { return renderDefaultPassword(input, usersD) }},
 		{"logging", func() error { return renderLogging(input, configD) }},
 		{"network", func() error { return renderNetwork(computed, configD) }},
 		{"custom-settings-prefixes", func() error { return renderCustomSettingsPrefixes(configD) }},
-		{"access-management", func() error { return renderAccessManagement(usersD) }},
 		{"access-control", func() error { return renderAccessControl(input, configD) }},
+		{"access-management", func() error { return renderAccessManagement(input, usersD) }},
 	} {
 		if err := s.fn(); err != nil {
 			return fmt.Errorf("%s: %w", s.name, err)
 		}
 	}
 
-	// Replicated mode: zookeeper client, macros and remote_servers for the
-	// ReplicatedMergeTree engine. The server writes NO keeper-backed access or
-	// named-collection store: the app owns the LangWatchQL access model, and on
-	// chart-managed ClickHouse (which this replicated topology is) the chart
-	// DELIVERS it as rendered users.d/config.d files mounted on every pod, not
-	// via SQL DDL — DDL is the bring-your-own path only (issue #8258). Either
-	// way the renderer never has to accept SQL-created entities into a replicated
-	// directory. That deletes the AC8 defect class outright — no
-	// `user_directories` merge hazard, no startup-fatal keeper-backed
-	// named-collection dependency — instead of patching it.
-	if input.Replicated {
-		if err := renderKeeper(input, configD); err != nil {
-			return fmt.Errorf("keeper: %w", err)
+	// Conditional files: rendered when enabled, otherwise a copy left by an
+	// earlier run is removed. Only these names, never anything else in the
+	// directories: a deployment may mount its own files there.
+	for _, s := range []struct {
+		name    string
+		path    string
+		enabled bool
+		fn      func() error
+	}{
+		// No keeper-backed access or named-collection store: the app owns the
+		// LangWatchQL access model (issue #8258).
+		{"keeper", filepath.Join(configD, "keeper.yaml"), input.Replicated,
+			func() error { return renderKeeper(input, configD) }},
+		{"interserver", filepath.Join(configD, "interserver.yaml"), input.InterserverPasswordFile != "",
+			func() error { return renderInterserver(input, configD) }},
+		{"query-masking", filepath.Join(configD, queryMaskingFile), len(input.MaskedSettings) > 0 || input.MaskSHA256Hex,
+			func() error { return renderQueryMasking(input, configD) }},
+		{"prometheus", filepath.Join(configD, "prometheus.yaml"), input.EnablePrometheus,
+			func() error { return renderPrometheus(configD) }},
+		{"storage", filepath.Join(configD, "storage.yaml"), input.ColdEnabled || input.BackupEnabled,
+			func() error { return renderStorage(input, computed, configD) }},
+		{"tiers", filepath.Join(usersD, access.TiersFileName), input.RendersTiers(),
+			func() error { return renderTiers(input, computed, usersD) }},
+		{"access-users", filepath.Join(usersD, access.UsersFileName), input.AccessFile != "",
+			func() error { return renderAccessUsers(log, input, usersD) }},
+		{"access-auth", filepath.Join(configD, access.AuthFileName), input.AccessFile != "",
+			func() error { return renderAccessAuth(input, configD) }},
+		{"local-admin", filepath.Join(usersD, bootstrap.UsersFileName), input.DynamicOnly,
+			func() error { return renderLocalAdmin(input, usersD) }},
+		{"dynamic-only", filepath.Join(configD, dynamicOnlyFile), input.DynamicOnly,
+			func() error { return renderDynamicOnlyServer(configD) }},
+	} {
+		if !s.enabled {
+			if err := os.Remove(s.path); err != nil && !errors.Is(err, fs.ErrNotExist) {
+				return fmt.Errorf("%s: remove stale %s: %w", s.name, s.path, err)
+			}
+			continue
+		}
+		if err := s.fn(); err != nil {
+			return fmt.Errorf("%s: %w", s.name, err)
 		}
 	}
 
-	if input.EnablePrometheus {
-		if err := renderPrometheus(configD); err != nil {
-			return fmt.Errorf("prometheus: %w", err)
-		}
+	if err := linkLWQLAccess(input.LWQLAccessDir, usersD, configD); err != nil {
+		return fmt.Errorf("lwql-access: %w", err)
 	}
 
-	// Object storage (cold tiering and/or backups).
-	if input.ColdEnabled || input.BackupEnabled {
-		if err := renderStorage(input, computed, configD); err != nil {
-			return fmt.Errorf("storage: %w", err)
+	if input.DynamicOnly {
+		if err := refuseStaticCredentials(outputDir); err != nil {
+			return err
 		}
-		if input.ColdEnabled {
-			log.Info("cold storage configured")
+	} else {
+		if input.AccessBootstrapDir != "" {
+			if err := bootstrap.Remove(input.AccessBootstrapDir); err != nil {
+				return fmt.Errorf("local-admin: remove stale password: %w", err)
+			}
 		}
-		if input.BackupEnabled {
-			log.Info("backups configured")
+		if w := input.WeakPasswordWarning(); w != "" {
+			log.Warn(w)
 		}
+	}
+	if input.Replicated && !input.ClusterSecretEnabled {
+		log.Warn("remote_servers carries no cluster secret; set CLICKHOUSE_CLUSTER_SECRET_ENABLED=true " +
+			"to apply CLICKHOUSE_CLUSTER_SECRET_FILE (README: Cluster secret)")
+	}
+	if input.RetiredCacheMaxSize != "" {
+		log.Warn("CACHE_MAX_SIZE is no longer read and can be unset: ClickHouse never built a cache " +
+			"from it on the s3 disk")
+	}
+	if input.ColdEnabled {
+		log.Info("cold storage configured")
+	}
+	if input.BackupEnabled {
+		log.Info("backups configured")
 	}
 
 	log.Info("configuration rendered", zap.String("dir", outputDir))

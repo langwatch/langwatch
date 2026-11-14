@@ -59,6 +59,16 @@ Feature: Project becomes integrated after first trace ingestion
     When a trace is processed through the trace-processing pipeline
     Then no "first_trace_integrated" PostHog event is tracked
 
+  # Per-email usage (2026-11-11): nurturing throttles its trace-usage sync per organization, and
+  # each project of a new organization sends a first trace, so that fact names it too.
+  @unit
+  Scenario: A project's first trace's fact names the admin's organization
+    Given a project with firstMessage set to false whose org admin resolves with its organization
+    When a trace is processed through the trace-processing pipeline
+    Then first_trace_recorded carries the organization's id
+    And when the lookup names no organization, the fact is still recorded without one
+    And a first_trace_recorded from before the field existed still parses
+
   @unit
   Scenario: PostHog integration milestone fires only on the firstMessage transition
     Given a project that already received its first message

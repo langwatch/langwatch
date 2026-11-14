@@ -103,10 +103,21 @@ export const organizationTrpcTransport: TrpcRouterDeclaration<
   .withMiddlewareContext(organizationSessionPersonContext)
   .withPermission("organization:manage")
   .handle(async ({ app, input, actor }, person) => {
-    await app.deleteMember(input, callerOf(actor, person));
+    const { seatGivenToUserId, seatHandoverFailed } = await app.removeMember(
+      input,
+      callerOf(actor, person),
+    );
 
-    return { success: true as const };
+    return { success: true as const, seatGivenToUserId, seatHandoverFailed };
   })
+
+  .procedure("getSeatRemovalPreview")
+  .withPermission("organization:manage")
+  .handle(({ app, input }) => app.getSeatRemovalPreview(input))
+
+  .procedure("listHeldSeats")
+  .withPermission("organization:manage")
+  .handle(({ app, input }) => app.listHeldSeats(input))
 
   /**
    * Disables or re-enables a membership so an organization can reconcile down
@@ -253,6 +264,23 @@ export const organizationTrpcTransport: TrpcRouterDeclaration<
     return { success: true as const, teamsLeftWithoutAdmin };
   })
 
+  /** A security policy of the organization's, so an administrator's to read and to change. */
+  .procedure("getDocsPlaygroundPolicy")
+  .withPermission("organization:manage")
+  .handle(({ app, input }) => app.getDocsPlaygroundPolicy({ organizationId: input.organizationId }))
+
+  .procedure("saveDocsPlaygroundPolicy")
+  .withPermission("organization:manage")
+  .handle(async ({ app, input, actor }) => {
+    await app.saveDocsPlaygroundPolicy({
+      organizationId: input.organizationId,
+      docsPlaygroundSessionsEnabled: input.docsPlaygroundSessionsEnabled,
+      changedByUserId: actor.id,
+    });
+
+    return { success: true as const };
+  })
+
   .procedure("getAuditLogs")
   .withEntitlement("enterprise", { feature: "AUDIT_LOGS" })
   .withMiddlewareContext(organizationSessionPersonContext)
@@ -382,6 +410,7 @@ function memberDirectoryOnWire(
       updatedAt: toDate(member.updatedAt),
       departmentId: member.departmentId,
       disabledAt: member.disabledAt && toDate(member.disabledAt),
+      seatPendingSince: member.seatPendingSince ? toDate(member.seatPendingSince) : null,
       user: {
         id: member.user.id,
         name: member.user.name,

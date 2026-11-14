@@ -10,8 +10,20 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 const packageRoot = path.resolve(import.meta.dirname, "../../..");
+const repoRoot = path.resolve(packageRoot, "../..");
 const entrypoint = readFileSync(path.join(packageRoot, "src/main.tsx"), "utf8");
 const globalStylesheet = readFileSync(path.join(packageRoot, "src/styles/globals.scss"), "utf8");
+
+/** Feature stylesheets the application bundles beside its global one. */
+const featureStylesheets = [
+  "packages/design-system/src/components/brand/langy-theme.css",
+  "modules/auth/browser/src/ui/elements/auth-front-door.css",
+].map((file) => ({ file, css: readFileSync(path.join(repoRoot, file), "utf8") }));
+
+const fontFaceUrls = (css: string) =>
+  [...css.matchAll(/@font-face\s*\{[^}]*\}/g)].flatMap((face) =>
+    [...face[0].matchAll(/url\(\s*["']?([^"')]+)/g)].map((url) => url[1] ?? ""),
+  );
 
 /** The display-face files the application actually ships, as the browser would ask for them. */
 const vendoredDisplayFaces = readdirSync(path.join(packageRoot, "public/fonts"))
@@ -44,6 +56,24 @@ describe("the browser entry's global stylesheet", () => {
       expect(globalStylesheet).toMatch(
         /@font-face\s*\{[^}]*Sentient-Bold\.woff2[^}]*font-weight:\s*700/,
       );
+    });
+  });
+
+  describe("when the stylesheets' font urls are read", () => {
+    /** @scenario A stylesheet's font files load from wherever the stylesheet is served */
+    it("names every font file by a path relative to the stylesheet", () => {
+      const urls = fontFaceUrls(globalStylesheet);
+
+      expect(urls.length).toBeGreaterThan(0);
+      expect(urls.filter((url) => url.startsWith("/"))).toEqual([]);
+    });
+
+    it("leaves the display face to the global stylesheet alone", () => {
+      const declaring = featureStylesheets
+        .filter(({ css }) => fontFaceUrls(css).length > 0)
+        .map(({ file }) => file);
+
+      expect(declaring).toEqual([]);
     });
   });
 });

@@ -69,6 +69,31 @@ export class MemoryOrganizationInviteRepository extends OrganizationInviteReposi
     );
   }
 
+  async hasPendingInviteForEmail(input: {
+    email: string;
+    organizationId: string;
+  }): Promise<boolean> {
+    const now = nowInstant();
+    return this.#invitesOf(input.organizationId).some(
+      (invite) =>
+        sameAddress(invite.email, input.email.trim()) &&
+        invite.status === "PENDING" &&
+        isUnexpired(invite, now),
+    );
+  }
+
+  async deletePaymentPendingInvitesForEmail(input: {
+    email: string;
+    organizationId: string;
+  }): Promise<number> {
+    const held = this.#invitesOf(input.organizationId).filter(
+      (invite) =>
+        sameAddress(invite.email, input.email.trim()) && invite.status === "PAYMENT_PENDING",
+    );
+    for (const invite of held) this.memory.invites.delete(invite.id);
+    return held.length;
+  }
+
   async findMemberEmails(input: { organizationId: string; emails: string[] }): Promise<string[]> {
     return this.#membersOf(input.organizationId).flatMap((member) => {
       const email = this.memory.users.get(member.userId)?.email ?? null;

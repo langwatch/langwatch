@@ -15,6 +15,7 @@ const PrivateImagesWorkflow = ".github/workflows/publish-docker-private.yml"
 const (
 	ecrtagPublished = "go run ./cmd/ecrtag published"
 	ecrtagLambda    = "go run ./cmd/ecrtag lambda"
+	ecrtagLwql      = "go run ./cmd/ecrtag lwql-access"
 	skipGate        = "steps.exists.outputs.exists != 'true'"
 	// manifestJob writes the index and Lambda tags itself, behind ecrtag
 	// calls inside its loop (imagesPublishCalls).
@@ -237,8 +238,9 @@ func topLevelAnd(expr string) []string {
 }
 
 // imagesPublishCalls: the tags create-manifest writes go through cmd/ecrtag,
-// its index check of a rebuilt image names the build, and a Lambda build
-// refuses the image a push run re-tagged.
+// its index check of a rebuilt image names the build, a Lambda build refuses
+// the image a push run re-tagged, and the app's access-model fingerprint is
+// rendered by the build and copied onto the index.
 func imagesPublishCalls(wf *ciscan.Workflow) []string {
 	var problems []string
 	if !jobRuns(wf.Jobs[manifestJob], ecrtagPublished+" ", "-source annotation") || !jobRuns(wf.Jobs[manifestJob], ecrtagLambda+" ") {
@@ -250,8 +252,22 @@ func imagesPublishCalls(wf *ciscan.Workflow) []string {
 	if !jobHasStep(wf.Jobs["build-and-push-lambda"], refusesRetag) {
 		problems = append(problems, ImagesWorkflow+" job build-and-push-lambda must check with `"+ecrtagPublished+" ... -refuse-retag`: a tag a push run re-tagged cannot be moved to this build")
 	}
+	if !jobHasStep(wf.Jobs["build-and-push"], lwqlCallPasses("image")) || !jobHasStep(wf.Jobs[manifestJob], lwqlCallPasses("from")) {
+		problems = append(problems, ImagesWorkflow+" must record the app's LangWatchQL access-model fingerprint: `"+ecrtagLwql+" ... -image` in build-and-push and `"+ecrtagLwql+" ... -from` in create-manifest, or Cloud re-renders its access model on every release")
+	}
 
 	return problems
+}
+
+// lwqlCallPasses holds for a step whose `ecrtag lwql-access` call passes flag.
+func lwqlCallPasses(flag string) func(*ciscan.Step) bool {
+	return func(step *ciscan.Step) bool {
+		return slices.ContainsFunc(ecrtagCalls(step.Run), func(call string) bool {
+			return strings.HasPrefix(call, ecrtagLwql+" ") && slices.ContainsFunc(ecrtagFlag.FindAllStringSubmatch(call, -1), func(m []string) bool {
+				return m[1] == flag
+			})
+		})
+	}
 }
 
 func passesBuiltFrom(step *ciscan.Step) bool {

@@ -1,12 +1,13 @@
 /**
  * @vitest-environment node
- * The membership-lifetime fence on the real Grant table: what a projected
- * USER fact does against a live, a rejoined and a disabled membership.
+ * The real Grant table: the membership-lifetime fence on a projected USER fact against a
+ * live, a rejoined and a disabled membership, and the columns a braid's row keeps.
  * @see specs/rbac/authz-grants.feature
  * @see specs/migration/authz-grants-rollout.feature
  */
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 
+import { Instance, Ksuid } from "@langwatch/ksuid";
 import { PrismaDriverAdapterService } from "@langwatch/prisma-client";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness/prisma";
@@ -16,6 +17,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { AuthzService } from "../../../services/authz.service.ts";
 import { EventingAuthzListingRepository } from "../../eventing/eventing.authz-listing.repository.ts";
 import { EventingAuthzReadRepository } from "../../eventing/eventing.authz-read.repository.ts";
+import { MemoryAuthzOrganizationPolicyRepository } from "../../memory/memory.authz-organization-policy.repository.ts";
 import { PrismaAuthzManagedGrantRepository } from "../prisma.authz-managed-grant.repository.ts";
 import { PrismaAuthzProjectionRepository } from "../prisma.authz-projection.repository.ts";
 
@@ -27,6 +29,7 @@ describe.skipIf(!DB_URL)("given the grants projection over a real database", () 
   });
   const projection = PrismaAuthzProjectionRepository.create(prisma);
   const authz = AuthzService.create({
+    policies: MemoryAuthzOrganizationPolicyRepository.create(),
     repository: EventingAuthzReadRepository.create(prisma),
     listing: EventingAuthzListingRepository.create(prisma),
     bindings: PrismaAuthzManagedGrantRepository.create({ database: prisma }),
@@ -178,6 +181,85 @@ describe.skipIf(!DB_URL)("given the grants projection over a real database", () 
       await expect(
         prisma.grant.findUnique({ where: { id: currentAttach.id } }),
       ).resolves.toMatchObject({ principalId: seeded.userId, revokedAt: null });
+    });
+  });
+
+  describe("when a braid's row is written and then written again", () => {
+    /** @scenario "A braid's row keeps the braid it replaces through a later write" */
+    it("reads back the braid it replaces, and the later write's in its place", async () => {
+      const seeded = await seedOrganization({ tag: "braid" });
+      const occurredAt = Temporal.Now.instant();
+      const braid = {
+        id: `grant-braid-${suffix}`,
+        organizationId: seeded.organizationId,
+        principalType: "PROJECT" as const,
+        principalId: `reader-${suffix}`,
+        roleKey: "project-reader",
+        legacyRole: null,
+        source: "braid",
+        scopeType: "PROJECT" as const,
+        scopeId: seeded.projectId,
+        token: null,
+        permission: null,
+        resourceKind: null,
+        projectId: null,
+        createdByUserId: seeded.userId,
+        expiresAt: null,
+        maxViews: null,
+        replacesGrantId: `grant-first-${suffix}`,
+        occurredAt,
+      };
+
+      await projection.append({ kind: "grant.upsert", row: braid });
+      await expect(prisma.grant.findUnique({ where: { id: braid.id } })).resolves.toMatchObject({
+        replacesGrantId: `grant-first-${suffix}`,
+      });
+
+      await projection.append({
+        kind: "grant.upsert",
+        row: {
+          ...braid,
+          replacesGrantId: `grant-second-${suffix}`,
+          occurredAt: occurredAt.add({ milliseconds: 1 }),
+        },
+      });
+      await expect(prisma.grant.findUnique({ where: { id: braid.id } })).resolves.toMatchObject({
+        replacesGrantId: `grant-second-${suffix}`,
+      });
+    });
+  });
+
+  describe("when an API key's grant is read-through minted in the v2 id layout", () => {
+    /** @scenario "A v2 read-through mint leaves a revoked row under its legacy id" */
+    it("keeps its legacy twin revoked, so a pre-v2 mint cannot restore access", async () => {
+      const seeded = await seedOrganization({ tag: "twin" });
+      const stamp = await joinOrganization(seeded);
+      const minted = new Ksuid({
+        environment: "prod",
+        resource: "grant",
+        timestamp: 1_700_003_839,
+        instance: new Instance(Instance.schemes.RANDOM, randomBytes(8)),
+        sequenceId: 7,
+      });
+      const legacyId = minted.withLayout("v1-legacy").toString();
+      const row = teamGrantRow({ id: minted.toString(), source: "read-through-mint", ...seeded });
+
+      await projection.append({ kind: "grant.upsert", row, membershipStamp: stamp });
+
+      await expect(prisma.grant.findUnique({ where: { id: row.id } })).resolves.toMatchObject({
+        revokedAt: null,
+      });
+      const twin = await prisma.grant.findUnique({ where: { id: legacyId } });
+      expect(twin).toMatchObject({ principalId: seeded.userId, token: null });
+      expect(twin?.revokedAt).not.toBeNull();
+
+      await projection.append({
+        kind: "grant.upsert",
+        row: { ...row, id: legacyId, occurredAt: Temporal.Now.instant() },
+        membershipStamp: stamp,
+      });
+      const after = await prisma.grant.findUnique({ where: { id: legacyId } });
+      expect(after?.revokedAt).not.toBeNull();
     });
   });
 
