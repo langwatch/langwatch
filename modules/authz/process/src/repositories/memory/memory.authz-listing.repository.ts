@@ -281,6 +281,7 @@ export class MemoryAuthzListingRepository extends AuthzListingRepository {
       .map(({ id, name, scimSource }) => ({ id, name, scimSource }));
     const apiKeys = this.memory.apiKeys
       .filter((row) => ids.apiKey.has(row.id) && row.organizationId === organizationId)
+      .filter((row) => !shouldDropUndecoratedPrincipals || row.isSystemManaged !== true)
       .map(({ id, name }) => ({ id, name }));
     const roles = this.rolesAsCustomRoles({ organizationId, roleIds: [...ids.role] });
     return decoratedBindings({

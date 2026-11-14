@@ -107,6 +107,8 @@ function identityOf(credentials: ResolvedCredentials): string {
   switch (credentials.source) {
     case "flag":
       return "the API key given on the command line";
+    case "ops-session":
+      return "the ops session's staff access key";
     case "env":
       return "the API key from the environment";
     case "session":

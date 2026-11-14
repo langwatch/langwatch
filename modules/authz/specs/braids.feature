@@ -98,9 +98,9 @@ Feature: Braids
   Rule: A braid's grant in a proof carries a permission of its own and its compiled condition
 
     @unit
-    Scenario: The braid permission is appended last in the registry and is never grantable
+    Scenario: The braid permission is appended right after braids:manage and is never grantable
       When the permission registry is read
-      Then spans:braided is its last entry, right after braids:manage, and no earlier index moved
+      Then spans:braided sits right after braids:manage, only later appends (opsRead:view) follow it, and no earlier index moved
       And it is declared at no scope, so nothing that grants permissions may list it
 
     @unit

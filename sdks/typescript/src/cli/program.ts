@@ -4,7 +4,11 @@
 
 import { Command, Option } from "commander";
 
-import { setRequestedProject, setRunsOutsideProject } from "../internal/credentialContext";
+import {
+  setRequestedProject,
+  setRunsOutsideProject,
+  setUsesOpsSession,
+} from "../internal/credentialContext";
 import {
   REDACTION_AUDIT_URL,
   SESSION_REDACTION_SUMMARY,
@@ -18,6 +22,7 @@ import { SOURCE_TYPE_BY_TOOL } from "./utils/governance/otel-env-block";
 import { resolveControlPlaneUrl } from "./utils/governance/resolveEndpoint";
 import { sessionContextHookArguments } from "./utils/governance/session-context-agents";
 import { trustLocalDevCa } from "./utils/localDevCa";
+import { applyOpsSessionOption, commandUsesOpsSession } from "./utils/opsSession";
 import {
   applyOutputContext,
   assertFormatIsSupported,
@@ -25,6 +30,7 @@ import {
   resolveActionOutputOptions,
   emitsResult,
   rendersOwnResult,
+  type CommandResult,
   type RawOutputFlags,
 } from "./utils/output";
 import {
@@ -335,6 +341,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     setRequestedProject(projectSelectorOf(actionCommand));
     const path = commandPath(actionCommand);
     setRunsOutsideProject(path in COMMANDS_WITHOUT_PROJECT || path in COMMANDS_ACROSS_PROJECTS);
+    setUsesOpsSession(commandUsesOpsSession(actionCommand));
     const endpointFlag: unknown = actionCommand.opts().endpoint;
     trustLocalDevCa({
       endpoint: resolveControlPlaneUrl({
@@ -419,6 +426,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   registerScimTokensCommands(program);
   registerOrganizationsCommands(program);
   registerDaemonCommands(program);
+  registerOpsCommands(program);
 
   // The output contract's global flags (`-o/--output`, `--json <fields>`,
   // `--jq`, `--agent`), added here — once, centrally — rather than per
@@ -432,6 +440,10 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   // with no way to name a project. The two exemption lists live with the
   // helper (utils/projectOption.ts).
   applyProjectOption(program);
+
+  // `--ops-session` on every command outside `ops`: the ops session acts on a customer
+  // organization, so a normal command uses it only when asked (ADR-202).
+  applyOpsSessionOption(program);
 
   return program;
 }
@@ -6197,6 +6209,135 @@ function registerDaemonCommands(program: Command): void {
       const { daemonStatusCommand: impl } = await import("./commands/daemon.js");
       await impl(options);
     });
+}
+
+/** `--scope` repeats, one value per occurrence. */
+const collectScope = (value: string, previous: string[] = []): string[] => [...previous, value];
+
+function registerOpsCommands(program: Command): void {
+  // `langwatch ops *`: the LangWatch ops agent's passkey-approved staff access (ADR-202).
+  // Hidden: only LangWatch operators hold a requester key.
+  const opsCmd = program
+    .command("ops", { hidden: true })
+    .description("LangWatch staff access for the ops agent, approved by an operator's passkey.");
+
+  const run =
+    <Args extends unknown[]>(
+      load: () => Promise<(...args: Args) => Promise<CommandResult> | CommandResult>,
+    ) =>
+    async (...args: Args): Promise<CommandResult | void> => {
+      try {
+        const impl = await load();
+        return await impl(...args);
+      } catch (error) {
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
+        process.exit(1);
+      }
+    };
+
+  emitsResult(
+    opsCmd
+      .command("setup")
+      .description(
+        "Store the requester key (from the Ops agents page) in a 0600 file beside the CLI config. Reads it from stdin (pbpaste | langwatch ops setup), or asks for it with hidden input in a terminal",
+      ),
+    run(async () => {
+      const { opsSetupCommand } = await import("./commands/ops/setup.js");
+      return () => opsSetupCommand();
+    }),
+  );
+
+  const accessCmd = opsCmd
+    .command("access")
+    .description("Request, inspect and end a staff access session");
+
+  emitsResult(
+    accessCmd
+      .command("request")
+      .description(
+        "Ask an operator to approve access, wait for the passkey approval and store the session in a 0600 file (never .env)",
+      )
+      .option(
+        "--scope <scope>",
+        "ops:read, org:metadata, org:content or org:support; repeat for more",
+        collectScope,
+        [],
+      )
+      .option("--org <idOrSlug>", "The organization an org:* scope applies to")
+      .option("--reason <text>", "Why the access is needed; shown to the approver and the customer")
+      .option(
+        "--project <idOrSlug>",
+        "Default project for commands run with --ops-session while the session lives",
+      )
+      .option("--no-wait", "Print the approval URL and exit; finish with `ops access redeem <id>`"),
+    run(async () => {
+      const { opsAccessRequestCommand } = await import("./commands/ops/access.js");
+      return (options: {
+        scope?: string[];
+        org?: string;
+        reason?: string;
+        project?: string;
+        wait?: boolean;
+      }) => opsAccessRequestCommand(options);
+    }),
+  );
+
+  emitsResult(
+    accessCmd
+      .command("redeem <requestId>")
+      .description("Finish a request made with --no-wait once it is approved")
+      .option(
+        "--project <idOrSlug>",
+        "Default project for commands run with --ops-session while the session lives",
+      ),
+    run(async () => {
+      const { opsAccessRedeemCommand } = await import("./commands/ops/access.js");
+      return (requestId: string, options: { project?: string }) =>
+        opsAccessRedeemCommand({ requestId, project: options.project });
+    }),
+  );
+
+  emitsResult(
+    accessCmd.command("status").description("Show the local ops session and its expiry"),
+    run(async () => {
+      const { opsAccessStatusCommand } = await import("./commands/ops/access.js");
+      return () => opsAccessStatusCommand();
+    }),
+  );
+
+  emitsResult(
+    accessCmd
+      .command("end")
+      .description("Revoke the ops session on the server and remove the local session file"),
+    run(async () => {
+      const { opsAccessEndCommand } = await import("./commands/ops/access.js");
+      return () => opsAccessEndCommand();
+    }),
+  );
+
+  emitsResult(
+    opsCmd
+      .command("orgs")
+      .description("List organizations across the platform (needs the ops:read scope)")
+      .option("--query <text>", "Filter by name, slug or id")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    run(async () => {
+      const { opsOrgsCommand } = await import("./commands/ops/read.js");
+      return (options: { query?: string }) => opsOrgsCommand({ query: options.query });
+    }),
+  );
+
+  emitsResult(
+    opsCmd
+      .command("usage <organization>")
+      .description("One organization's usage summary (needs the ops:read scope)")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    run(async () => {
+      const { opsUsageCommand } = await import("./commands/ops/read.js");
+      return (organization: string) => opsUsageCommand({ organization });
+    }),
+  );
 }
 
 function registerPromptTags(promptCmd: Command): void {

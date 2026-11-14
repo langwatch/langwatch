@@ -19,6 +19,7 @@ const FULL_ADMIN_MENU = adminMenu({
   hosting: "cloud",
   hasOpsAccess: true,
   isPlatformAdmin: true,
+  hasAgentAccess: true,
 });
 const ALL_ENTRIES = FULL_ADMIN_MENU.flatMap((group) => group.items);
 

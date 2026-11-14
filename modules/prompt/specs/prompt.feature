@@ -186,3 +186,11 @@ Feature: Prompt service
     Given the prompt editor with a template being typed
     When the editor loses focus right after the last keystroke
     Then the full typed text, including a closing "}}", reaches the form before the save reads it
+
+  @unit
+  Scenario: An update that moves a tag needs the permission to manage prompts
+    Given an API key that may update prompts but not manage them
+    When it updates a prompt through PUT /api/prompts/:id with tags in the body
+    Then the request is refused with 403 permission_denied and nothing is saved
+    And the same update without tags is saved
+    And a key that may manage prompts saves the update with its tags

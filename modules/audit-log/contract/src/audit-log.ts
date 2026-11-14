@@ -42,6 +42,8 @@ export type RecordedSinceInput = {
   targetKind: string;
   targetId: string;
   sinceMs: number;
+  /** Only rows in this organization count; absent, a row in any organization does. */
+  organizationId?: string;
 };
 
 const auditLogHistoryEntrySchemaDefinition = z.object({

@@ -41,6 +41,7 @@ import { secretWeb } from "@langwatch/secret-browser/declaration";
 import { shareWeb } from "@langwatch/share-browser/declaration";
 import { slackWeb } from "@langwatch/slack-browser/declaration";
 import { ssoWeb } from "@langwatch/enterprise-sso-browser/declaration";
+import { staffAccessWeb } from "@langwatch/staff-access-browser/declaration";
 import { suiteWeb } from "@langwatch/suite-browser/declaration";
 import { topicWeb } from "@langwatch/topic-browser/declaration";
 import { traceWeb } from "@langwatch/trace-browser/declaration";
@@ -89,14 +90,15 @@ export const browserModules = [
   shareWeb satisfies { readonly name: "share" },
   slackWeb satisfies { readonly name: "slack" },
   ssoWeb satisfies { readonly name: "sso" },
+  staffAccessWeb satisfies { readonly name: "staff-access" },
   suiteWeb satisfies { readonly name: "suite" },
   topicWeb satisfies { readonly name: "topic" },
   traceWeb satisfies { readonly name: "trace" },
   userWeb satisfies { readonly name: "user" },
   workflowWeb satisfies { readonly name: "workflow" },
 ] as const;
-type PairedOnDisk = "agent" | "analytics" | "annotation" | "api-key" | "auth" | "authz" | "automation" | "coding-agent" | "data-privacy" | "data-retention" | "dataset" | "evaluator" | "experiment" | "feature-flag" | "gateway" | "github" | "insight" | "langy" | "model-provider" | "monitor" | "notification" | "onboarding" | "ops" | "organization" | "presence" | "project" | "prompt" | "scenario" | "secret" | "share" | "slack" | "suite" | "topic" | "trace" | "user" | "workflow" | "billing" | "governance" | "licensing" | "managed-provider" | "saas" | "scim" | "sso";
-type ServerHalfOnDisk = "agent" | "analytics" | "annotation" | "api-key" | "audit-log" | "auth" | "authz" | "automation" | "billing" | "coding-agent" | "connect" | "dashboard" | "data-privacy" | "data-retention" | "dataset" | "demo-data" | "enterprise-gateway" | "enterprise-ops" | "entitlement" | "evaluation" | "evaluator" | "experiment" | "feature-flag" | "gateway" | "github" | "governance" | "hosted-mcp" | "identity" | "insight" | "instant-eval-judge" | "instant-eval" | "langy" | "licensing" | "log" | "managed-provider" | "metric" | "model-provider" | "monitor" | "notification" | "nurturing" | "onboarding" | "ops" | "organization" | "platform-health" | "presence" | "project" | "prompt" | "role" | "rum" | "saas" | "sample-agents" | "scenario" | "scim" | "secret" | "share" | "slack" | "sso" | "stored-object" | "suite" | "topic" | "trace" | "user" | "webhook" | "workflow";
+type PairedOnDisk = "agent" | "analytics" | "annotation" | "api-key" | "auth" | "authz" | "automation" | "coding-agent" | "data-privacy" | "data-retention" | "dataset" | "evaluator" | "experiment" | "feature-flag" | "gateway" | "github" | "insight" | "langy" | "model-provider" | "monitor" | "notification" | "onboarding" | "ops" | "organization" | "presence" | "project" | "prompt" | "scenario" | "secret" | "share" | "slack" | "staff-access" | "suite" | "topic" | "trace" | "user" | "workflow" | "billing" | "governance" | "licensing" | "managed-provider" | "saas" | "scim" | "sso";
+type ServerHalfOnDisk = "agent" | "analytics" | "annotation" | "api-key" | "audit-log" | "auth" | "authz" | "automation" | "billing" | "coding-agent" | "connect" | "dashboard" | "data-privacy" | "data-retention" | "dataset" | "demo-data" | "enterprise-gateway" | "enterprise-ops" | "entitlement" | "evaluation" | "evaluator" | "experiment" | "feature-flag" | "gateway" | "github" | "governance" | "hosted-mcp" | "identity" | "insight" | "instant-eval-judge" | "instant-eval" | "langy" | "licensing" | "log" | "managed-provider" | "metric" | "model-provider" | "monitor" | "notification" | "nurturing" | "onboarding" | "ops" | "organization" | "platform-health" | "presence" | "project" | "prompt" | "role" | "rum" | "saas" | "sample-agents" | "scenario" | "scim" | "secret" | "share" | "slack" | "sso" | "staff-access" | "stored-object" | "suite" | "topic" | "trace" | "user" | "webhook" | "workflow";
 type MissingWeb = Exclude<PairedOnDisk, (typeof browserModules)[number]["name"]>;
 type MissingServer = Exclude<PairedOnDisk, ServerHalfOnDisk>;
 export const webModulePairing = {} satisfies {

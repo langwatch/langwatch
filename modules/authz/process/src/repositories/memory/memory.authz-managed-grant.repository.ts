@@ -197,7 +197,10 @@ export class MemoryAuthzManagedGrantRepository extends AuthzManagedGrantReposito
     apiKeyId: string;
   }): Promise<boolean> {
     return this.memory.apiKeys.some(
-      (row) => row.organizationId === input.organizationId && row.id === input.apiKeyId,
+      (row) =>
+        row.organizationId === input.organizationId &&
+        row.id === input.apiKeyId &&
+        row.isSystemManaged !== true,
     );
   }
 

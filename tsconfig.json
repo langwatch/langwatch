@@ -808,6 +808,15 @@
       "path": "./modules/insight/process"
     },
     {
+      "path": "./modules/staff-access/contract"
+    },
+    {
+      "path": "./modules/staff-access/browser"
+    },
+    {
+      "path": "./modules/staff-access/process"
+    },
+    {
       "path": "./modules/auth/client"
     }
   ]

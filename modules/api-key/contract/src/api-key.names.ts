@@ -32,6 +32,18 @@ export const CHECKUP_CANARY_API_KEY_NAME = "Checkup canary";
  */
 export const DOCS_SESSION_API_KEY_NAME = "Docs session";
 
+/** Name of the ownerless one-hour key an approved staff agent writes with (ADR-202). */
+export const STAFF_SUPPORT_KEY_NAME = "LangWatch Support";
+
+/** Name of the ownerless one-hour key an approved staff agent reads with (ADR-202). */
+export const STAFF_READ_KEY_NAME = "LangWatch Staff Read";
+
+/** The names a staff access key is minted under; only a system-managed key under one is one. */
+export const STAFF_ACCESS_KEY_NAMES: readonly string[] = [
+  STAFF_SUPPORT_KEY_NAME,
+  STAFF_READ_KEY_NAME,
+];
+
 /**
  * Name prefix of the key a `langwatch login` device session carries,
  * matched with the device label for re-login replacement and by the hourly
@@ -53,7 +65,16 @@ export const RESERVED_SYSTEM_KEY_NAMES: readonly string[] = [
   TRACE_EXPORT_API_KEY_NAME,
   CHECKUP_CANARY_API_KEY_NAME,
   DOCS_SESSION_API_KEY_NAME,
+  ...STAFF_ACCESS_KEY_NAMES,
 ];
+
+/** Whether a key is a staff access key: system-managed and minted under a staff key name. */
+export function isStaffAccessApiKey(key: {
+  name: string;
+  isSystemManaged?: boolean | undefined;
+}): boolean {
+  return key.isSystemManaged === true && STAFF_ACCESS_KEY_NAMES.includes(key.name);
+}
 
 /** A key LangWatch minted for itself: hidden from listings and never updated or revoked by hand. */
 export function isSystemApiKey(key: {

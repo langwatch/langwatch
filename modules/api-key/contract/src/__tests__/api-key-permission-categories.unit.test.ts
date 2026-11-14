@@ -56,7 +56,13 @@ describe("PERMISSION_CATEGORIES", () => {
     // the braid permission no grant confers; none may ride on an API key.
     const categorizable = new Set<string>(categorizablePermissions());
     const neverOnAKey = ALL_PERMISSIONS.filter((permission) => !categorizable.has(permission));
-    expect(neverOnAKey).toEqual(["ops:view", "ops:manage", "braids:manage", "spans:braided"]);
+    expect(neverOnAKey).toEqual([
+      "ops:view",
+      "ops:manage",
+      "braids:manage",
+      "spans:braided",
+      "opsRead:view",
+    ]);
 
     const neverOnAKeyInCategory = neverOnAKey.filter((permission) => owners.has(permission));
     expect(

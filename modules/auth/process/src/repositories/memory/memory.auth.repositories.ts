@@ -12,6 +12,7 @@ import { MemoryAuthDatabase, type MemoryUserRow } from "./memory.auth.database.t
 import { MemoryBetterAuthHooksRepository } from "./memory.better-auth-hooks.repository.ts";
 import { MemoryBetterAuthMapSecondaryStorageRepository } from "./memory.better-auth-map-secondary-storage.repository.ts";
 import { MemoryCliDeviceSessionRepository } from "./memory.cli-device-session.repository.ts";
+import { MemoryPasskeyRepository } from "./memory.passkey.repository.ts";
 import { MemoryPendingSsoSetupRepository } from "./memory.pending-sso-setup.repository.ts";
 import { MemorySignInAttemptLockRepository } from "./memory.sign-in-attempt-lock.repository.ts";
 import { MemorySignUpVerificationTokenRepository } from "./memory.signup-verification-token.repository.ts";
@@ -70,6 +71,7 @@ export class MemoryAuthRepositories {
   readonly betterAuthStorage: MemoryBetterAuthStorageRepository;
   readonly betterAuthSecondaryStorage: AuthRepositories["betterAuthSecondaryStorage"];
   readonly betterAuthHooks: MemoryBetterAuthHooksRepository;
+  readonly passkeys: MemoryPasskeyRepository;
   readonly directory: MemoryAuthDirectoryRepository;
   readonly pendingSsoSetup: MemoryPendingSsoSetupRepository;
   readonly sessionCache = null;
@@ -83,6 +85,7 @@ export class MemoryAuthRepositories {
     this.betterAuthStorage = MemoryBetterAuthStorageRepository.create({ memory });
     this.betterAuthSecondaryStorage = MemoryBetterAuthMapSecondaryStorageRepository.create();
     this.betterAuthHooks = MemoryBetterAuthHooksRepository.create({ memory });
+    this.passkeys = MemoryPasskeyRepository.create({ memory });
     this.directory = MemoryAuthDirectoryRepository.create({ memory });
     this.pendingSsoSetup = MemoryPendingSsoSetupRepository.create();
   }

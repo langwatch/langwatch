@@ -78,6 +78,9 @@ export type SessionImpersonation = Readonly<{
   expiresAt: Instant;
 }>;
 
+/** How long an operator's borrowed access lasts from the moment it starts. */
+export const IMPERSONATION_WINDOW_MS = 60 * 60 * 1_000;
+
 /** Whether a session acts as its own user or carries a live impersonation. */
 export type SessionImpersonationState =
   | Readonly<{ kind: "none" }>

@@ -321,6 +321,15 @@ export const FEATURE_FLAGS = [
       "Lets the agent drive the open page through typed UI actions (spec: specs/langy/langy-ui-actions.feature): `langwatch ui call` dispatches a manifest-validated action over the turn's live stream, the attached page claims and executes it, and the result returns to the agent in the same call. Off = the dispatch surface 404s like it was never deployed and the panel ignores `ui` stream entries; the rollback position loses live page control and nothing else. Managed only from the internal flag store (/ops/feature-flags).",
   },
   {
+    key: "ops_agent_access_enabled",
+    scope: "SYSTEM",
+    defaultValue: false,
+    envOverridable: false,
+    family: "Ops",
+    description:
+      "Opens ops agent access (ADR-202): operators enrol coding agents on /ops/agents and approve each one-hour access request with a passkey. Takes effect only where cloud ops is on. Off = every staff access route and procedure answers not found, and keys already minted are refused at the gate.",
+  },
+  {
     key: "release_dashboards",
     scope: "PRODUCT",
     defaultValue: false,

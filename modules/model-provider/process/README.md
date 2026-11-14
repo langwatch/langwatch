@@ -524,7 +524,7 @@ interface Body {
   messages: unknown[];
 }
 type Headers = z.infer<typeof playgroundRestHeadersSchema>; // ../contract/src/model-provider-rest.schemas.ts:205
-// Response: inline, src/transport/playground.rest.ts:28
+// Response: inline, src/transport/playground.rest.ts:29
 type Response = unknown;
 ```
 

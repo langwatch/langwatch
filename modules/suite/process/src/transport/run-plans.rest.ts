@@ -177,6 +177,7 @@ export function createRunPlansRest(): Readonly<{
     )
 
     .post("/run", "runRunPlan")
+    .spends()
     .keepsRecords()
     .withInput(runPlanRunInputSchema)
     .withPermission("scenarios:create")
@@ -215,6 +216,7 @@ export function createRunPlansRest(): Readonly<{
     )
 
     .post("/:id/run", "rerunRunPlan")
+    .spends()
     .keepsRecords()
     .withParams(runPlanIdParamsSchema)
     .withInput(rerunInputSchema)

@@ -43,6 +43,7 @@ const writtenLinks = [
     hosting: "cloud",
     hasOpsAccess: true,
     isPlatformAdmin: true,
+    hasAgentAccess: true,
   }).flatMap((group) => group.items.map((item) => item.href)),
   ...gatewayNavItems.map((item) => item.href),
   ...governanceNavItems.map((item) => item.href),

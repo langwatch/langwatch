@@ -25,9 +25,8 @@ export class ApiDoorAuditService {
     return {
       record: async (row) => {
         const { organizationId, projectId } = await this.#auditScopeOf(row);
-        const metadata: Record<string, string> = { channel: "api" };
-        if (row.impersonatorId) metadata.impersonatorId = row.impersonatorId;
-        if (row.actorId && row.apiKeyId) metadata.apiKeyId = row.apiKeyId;
+        const metadata = restAuditMetadataOf(row);
+        const actorUserId = row.impersonatorId ?? row.staffAccess?.approverUserId;
         await audit.record({
           userId: auditUserIdOf(row),
           action: row.action,
@@ -37,7 +36,7 @@ export class ApiDoorAuditService {
           targetId: row.resultId || void 0,
           error: row.errorCode,
           metadata,
-          ...(row.impersonatorId ? { actorUserId: row.impersonatorId } : {}),
+          ...(actorUserId ? { actorUserId } : {}),
           ...(row.ipAddress ? { ipAddress: row.ipAddress } : {}),
           ...(row.userAgent ? { userAgent: row.userAgent } : {}),
         });
@@ -116,4 +115,16 @@ function auditUserIdOf(row: RestAuditRow): string {
   if (row.actorId) return row.actorId;
 
   return row.apiKeyId ? `apikey:${row.apiKeyId}` : "anonymous";
+}
+
+/** The REST row's metadata: its channel, who acted through it and any approved staff access. */
+function restAuditMetadataOf(row: RestAuditRow): Record<string, string> {
+  const metadata: Record<string, string> = { channel: "api" };
+  if (row.impersonatorId) metadata.impersonatorId = row.impersonatorId;
+  if (row.actorId && row.apiKeyId) metadata.apiKeyId = row.apiKeyId;
+  if (row.staffAccess) {
+    metadata.staffPrincipal = row.staffAccess.principal;
+    if (row.staffAccess.reason) metadata.staffReason = row.staffAccess.reason;
+  }
+  return metadata;
 }

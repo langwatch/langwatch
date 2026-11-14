@@ -37,8 +37,13 @@ const RAW_TENANT_COMPARISON_RE =
   /"?\b(?:projectId|organizationId|tenantId)"?\s*(?:=\s*(?:ANY\s*\(\s*)?|IN\s*\(\s*)(?:\?|\$\d+)/i;
 
 // An INSERT ... VALUES writes its own rows, so naming a tenant column in its column list scopes it.
-const RAW_TENANT_INSERT_RE =
-  /^\s*INSERT\s+INTO\s+[^(]+\([^)]*"?\b(?:projectId|organizationId|tenantId)\b"?[^)]*\)\s*VALUES\b/i;
+const RAW_INSERT_COLUMNS_RE = /^\s*INSERT\s+INTO\s+[^\s(][^(]*\(([^)]*)\)\s*VALUES\b/i;
+const RAW_TENANT_COLUMN_RE = /\b(?:projectId|organizationId|tenantId)\b/i;
+
+function insertNamesTenantColumn(sql: string): boolean {
+  const columns = RAW_INSERT_COLUMNS_RE.exec(sql)?.[1];
+  return columns !== undefined && RAW_TENANT_COLUMN_RE.test(columns);
+}
 
 // The table a skipped statement names first, for the skip counter's label.
 const RAW_TABLE_RE = /\b(?:FROM|INTO|UPDATE|JOIN)\s+"?([A-Za-z_][\w]*)"?/i;
@@ -129,6 +134,10 @@ const GLOBAL_MODELS = [
   // Identity's sign-in switch (sign-in-switch.feature): keyed by userId alone, read on the
   // sign-in path before any tenant is known, like AccountCredential; written in raw SQL only.
   "IdentitySignInSwitch",
+  // Staff access (ADR-202): an operator's enrolled agents and their passkey challenges, keyed by
+  // the operator, never a tenant, like Passkey.
+  "StaffAccessRequester",
+  "StaffAccessChallenge",
 ] as const;
 
 /**
@@ -926,7 +935,7 @@ function assertRawTenancy(params: GuardParams, onSkipped: OnSkippedTenantCheck):
     return;
   }
   if (RAW_TENANT_COMPARISON_RE.test(sql)) return;
-  if (RAW_TENANT_INSERT_RE.test(sql)) return;
+  if (insertNamesTenantColumn(sql)) return;
 
   throw new Error(
     "The raw query compares no tenant column with a bound parameter. Add " +

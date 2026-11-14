@@ -56,6 +56,16 @@ export interface AuthSessionRepository {
   writeImpersonation(input: { sessionId: string; claims: SessionImpersonation }): Promise<void>;
   /** Clears the claims; idempotent, and the session itself stays. */
   clearImpersonation(input: { sessionId: string }): Promise<void>;
+  /** Sessions whose impersonation window closed before `before` and still carry the claims. */
+  findLapsedImpersonations(input: {
+    before: Instant;
+    limit: number;
+  }): Promise<readonly LapsedImpersonation[]>;
+  /**
+   * Clears the claims only while they still name the window that lapsed, so an impersonation
+   * started since is kept. Answers whether it cleared anything.
+   */
+  clearLapsedImpersonation(input: { sessionId: string; expiresAt: Instant }): Promise<boolean>;
   /** Records that a session was used, for the idle window (GAC-10). */
   touch(input: { sessionId: string; at: Instant }): Promise<void>;
   /** Distinct people holding an unexpired session at `at` (epoch ms), install-wide. */
@@ -75,6 +85,15 @@ export interface AuthSessionRepository {
     at: Instant;
   }): Promise<string[]>;
 }
+
+/** An impersonation whose window closed without a stop, as the expiry sweep audits it. */
+export type LapsedImpersonation = Readonly<{
+  sessionId: string;
+  actorUserId: string | null;
+  subjectUserId: string | null;
+  reason: string | null;
+  expiresAt: Instant;
+}>;
 
 /** When a session stopped being usable, and whose it was. */
 export type SessionExpiry = { expires: Instant; userId: string };

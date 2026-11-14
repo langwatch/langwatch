@@ -28,3 +28,9 @@ export function keyRunTelemetry({
   if (reach.kind === "apiKey" && reach.isLangySessionKey === true) return { caller: "langy" };
   return { caller: door };
 }
+
+/** A staff key runs charged eval() functions only when its session was approved to spend. */
+export function keyMaySpend(reach: LangWatchQLKeyReach): boolean {
+  if (reach.kind !== "apiKey" || reach.isStaffAccessKey !== true) return true;
+  return reach.staffSpendApproved === true;
+}

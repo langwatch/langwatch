@@ -159,6 +159,8 @@
   "/ops/blobs",
   "/ops/feature-flags",
   "/ops/foundry",
+  "/ops/agents",
+  "/ops/agents/approve/:requestId",
   "/ops/migrations",
   "/ops/upgrades",
   "/ops/projections",

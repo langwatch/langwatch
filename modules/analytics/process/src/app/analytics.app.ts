@@ -109,7 +109,7 @@ import { readLegacyTimeseriesBody } from "../rules/analytics-legacy-body.rules.t
 import { savedWorkbenchChartPlatformUrl as savedWorkbenchChartPlatformUrl_ } from "../rules/analytics-platform-url.rules.ts";
 import type { LwqlAccessModelOwner } from "../rules/langwatch-ql-config-store.rules.ts";
 import { langWatchQLJudgementCalls } from "../rules/langwatch-ql-judgement-questions.rules.ts";
-import { keyRunTelemetry } from "../rules/langwatch-ql-key-caller.rules.ts";
+import { keyMaySpend, keyRunTelemetry } from "../rules/langwatch-ql-key-caller.rules.ts";
 import { DEFAULT_LWQL_RESULT_LIMITS } from "../rules/langwatch-ql-result-limits.rules.ts";
 import { langWatchQLQueryHashKey } from "../rules/langwatch-ql-run-telemetry.rules.ts";
 import { dashboardsEnabled, lwqlEnabled } from "../rules/lwql-access.rules.ts";
@@ -891,7 +891,9 @@ export class AnalyticsModule
       ...(signal ? { signal } : {}),
       telemetry: input.telemetry,
       isInstantEvalsEnabled:
-        statementMightCallEvalFunction(sql) && (await this.#isInstantEvalsEnabledFor({ projects })),
+        statementMightCallEvalFunction(sql) &&
+        keyMaySpend(reach) &&
+        (await this.#isInstantEvalsEnabledFor({ projects })),
     });
   }
 
@@ -899,7 +901,7 @@ export class AnalyticsModule
   async describeLangWatchQLSchemaForKey(
     input: Readonly<{ reach: LangWatchQLKeyReach }>,
   ): Promise<LangWatchQLSchema> {
-    return this.#schemaFor(await this.#queryScope.resolve(input));
+    return this.#schemaFor(await this.#queryScope.resolve(input), input.reach);
   }
 
   /**
@@ -915,14 +917,19 @@ export class AnalyticsModule
     return this.#queryReference({
       protections: scope.protections,
       canRunLangWatchQL: holdsQueryPermission && scope.projects.length > 0,
-      schema: () => this.#schemaFor(scope),
+      schema: () => this.#schemaFor(scope, input.reach),
     });
   }
 
-  async #schemaFor(scope: LangWatchQLQueryScope): Promise<LangWatchQLSchema> {
+  async #schemaFor(
+    scope: LangWatchQLQueryScope,
+    reach?: LangWatchQLKeyReach,
+  ): Promise<LangWatchQLSchema> {
     return this.#dependencies.langWatchQL.describeSchema({
       protections: scope.protections,
-      isInstantEvalsEnabled: await this.#isInstantEvalsEnabledFor(scope),
+      isInstantEvalsEnabled:
+        (reach === undefined || keyMaySpend(reach)) &&
+        (await this.#isInstantEvalsEnabledFor(scope)),
     });
   }
 

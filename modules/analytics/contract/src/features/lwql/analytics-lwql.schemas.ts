@@ -67,6 +67,8 @@ export const langWatchQLKeyReachSchema: z.ZodType<LangWatchQLKeyReach> = z.discr
           .strict()
           .optional(),
         isLangySessionKey: z.boolean().optional(),
+        isStaffAccessKey: z.boolean().optional(),
+        staffSpendApproved: z.boolean().optional(),
       })
       .strict(),
   ],

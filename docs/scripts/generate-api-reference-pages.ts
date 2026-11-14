@@ -78,6 +78,9 @@ const UNDOCUMENTED_SAVED_WORKBENCH_CHARTS =
 const UNDOCUMENTED_CHECKUP =
   "Not yet documented in the API reference: the checkup routes back Settings, Checkup and langwatch doctor on a self-hosted install, and the CLI documentation covers that flow.";
 
+const UNDOCUMENTED_STAFF_ACCESS =
+  "Live surface, intentionally undocumented: LangWatch platform operators' agent access on LangWatch Cloud (ADR-202), used only by langwatch ops access, not an API for integrations.";
+
 const RETIRED_LEGACY_AGENTS =
   "Retired surface, intentionally undocumented: superseded by /api/v1/agents (see the Agents family below); this bare form answers every request with a deprecation notice naming the successor.";
 
@@ -107,6 +110,13 @@ const SKIP_PATHS: Record<string, string> = {
   "/api/docs-session":
     "Live surface, intentionally undocumented: the docs playground's own revoke call for its session key (ADR-185), not an API for integrations.",
   "/api/checkup": UNDOCUMENTED_CHECKUP,
+  "/api/v1/staff-access/ops/organizations": UNDOCUMENTED_STAFF_ACCESS,
+  "/api/v1/staff-access/ops/organizations/{organization}/usage": UNDOCUMENTED_STAFF_ACCESS,
+  "/api/v1/staff-access/ops/queues": UNDOCUMENTED_STAFF_ACCESS,
+  "/api/v1/staff-access/requests": UNDOCUMENTED_STAFF_ACCESS,
+  "/api/v1/staff-access/requests/{requestId}": UNDOCUMENTED_STAFF_ACCESS,
+  "/api/v1/staff-access/requests/{requestId}/end": UNDOCUMENTED_STAFF_ACCESS,
+  "/api/v1/staff-access/requests/{requestId}/redeem": UNDOCUMENTED_STAFF_ACCESS,
   "/api/checkup/run": UNDOCUMENTED_CHECKUP,
   "/api/gateway/v1/providers": RETIRED_GATEWAY_PROVIDER_BINDINGS,
   "/api/gateway/v1/providers/{id}": RETIRED_GATEWAY_PROVIDER_BINDINGS,

@@ -75,6 +75,7 @@ const EXPECTED_PUBLIC_NAMESPACES = {
   "demo-data": "demo-data",
   slack: "slack",
   sso: "sso",
+  "staff-access": "staff-accesses",
   webhook: "webhooks",
 } as const satisfies { [F in ModuleName]: PublicNamespace<F> };
 

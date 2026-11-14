@@ -55,6 +55,7 @@ export class AdaptiveSlots {
   #windowStart: number;
   #windowSteps = 0;
   #finished = 0;
+  #completed = 0;
   #failed = 0;
   #busySum = 0;
   #durations: number[] = [];
@@ -91,6 +92,11 @@ export class AdaptiveSlots {
     }
     const index = Math.floor(Math.random() * this.#finished);
     if (index < DURATION_SAMPLES) this.#durations[index] = durationMs;
+  }
+
+  /** A job completed: only these count as throughput, never a failure or a hand-back. */
+  jobCompleted(): void {
+    this.#completed += 1;
   }
 
   /** A job's handler failed; a hand-back is not a failure. */
@@ -172,7 +178,7 @@ export class AdaptiveSlots {
     if (this.#finished < MIN_FINISHED && this.#windowSteps < MAX_WINDOW_STEPS) return undefined;
     const seconds = Math.max(this.now() - this.#windowStart, 1) / 1000;
     const sample = {
-      completedPerSecond: this.#finished / seconds,
+      completedPerSecond: this.#completed / seconds,
       medianDurationMs: median({ values: this.#durations }),
       failureShare: Math.min(1, this.#failed / Math.max(this.#finished, 1)),
       busyShare:
@@ -188,6 +194,7 @@ export class AdaptiveSlots {
     this.#windowStart = this.now();
     this.#windowSteps = 0;
     this.#finished = 0;
+    this.#completed = 0;
     this.#failed = 0;
     this.#busySum = 0;
     this.#durations = [];

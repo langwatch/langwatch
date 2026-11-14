@@ -3,7 +3,8 @@
  * the door asks (the impersonator's, where there is one). The grant is the test's `holders`.
  */
 import type { TrpcRuntimeMembers } from "@langwatch/api/trpc";
-import type { OpsOperator, OpsOperatorPermission } from "@langwatch/ops-contract";
+import type { PlatformTierPermission } from "@langwatch/authorization";
+import type { OpsOperator } from "@langwatch/ops-contract";
 import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
 
 export type OpsTrpcTestContext = { actor: { id: string } | null; operator: OpsOperator | null };
@@ -12,9 +13,9 @@ export function opsTrpcMembers({
   holders,
   asked = () => {},
 }: {
-  holders: Readonly<Record<string, readonly OpsOperatorPermission[]>>;
+  holders: Readonly<Record<string, readonly PlatformTierPermission[]>>;
   /** Told each platform permission the door asks, so a test can pin the grain. */
-  asked?: (permission: OpsOperatorPermission) => void;
+  asked?: (permission: PlatformTierPermission) => void;
 }): TrpcRuntimeMembers<OpsTrpcTestContext> {
   const members = trpcTestMembers<OpsTrpcTestContext>();
 

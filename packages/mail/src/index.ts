@@ -19,6 +19,7 @@ export { expressive } from "./templates/email-layout.tsx";
 export type { PlatformOperatorChangeEmailProps } from "./templates/platform-operator-change-email.tsx";
 export type { UpgradeAlertEmailProps } from "./templates/upgrade-alert-email.tsx";
 export type { MonitorAutoPausedEmailProps } from "./templates/monitor-auto-paused-email.tsx";
+export type { StaffAccessNoticeEmailProps } from "./templates/staff-access-notice-email.tsx";
 export { ReactEmailMailRenderer } from "./adapters/react-email.render.adapter.ts";
 export {
   renderTriggerDigestEmail,

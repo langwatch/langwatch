@@ -669,9 +669,14 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     );
     this.adaptiveSlots = new AdaptiveSlots({
       floor: this.globalConcurrency,
-      busy: () => this.processingQueue.running() + this.processingQueue.length(),
+      // During a backlog a slot waiting on its next claim still has work queued for it.
+      busy: () =>
+        this.dispatcher?.hasBacklog()
+          ? this.adaptiveSlots.current()
+          : this.processingQueue.running() + this.processingQueue.length(),
       onChange: (slots) => {
         this.processingQueue.concurrency = slots;
+        this.dispatcher?.slotsChanged();
       },
     });
     this.processingQueue.saturated = () => {
@@ -2061,6 +2066,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       );
       return;
     }
+
+    this.adaptiveSlots.jobCompleted();
 
     // PAST THE POINT OF NO RETURN: the slot is completed, so this needs its own
     // catch — the outer one treats a throw as a FAILED job and would re-stage the

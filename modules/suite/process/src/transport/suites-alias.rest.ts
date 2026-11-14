@@ -518,6 +518,7 @@ export function createSuitesAliasRest(): Readonly<{
       // ADMINISTERING IT. The run creates scenario runs; the suite definition, its scenarios
       // and its targets are left exactly as they were.
       .post("/:id/run", "postApiSuitesByIdRun")
+      .spends()
       .keepsRecords()
       .withParams(suiteAliasIdParamsSchema)
       .withInput(runSuiteInputSchema)

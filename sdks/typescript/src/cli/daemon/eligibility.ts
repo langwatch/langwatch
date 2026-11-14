@@ -33,6 +33,8 @@ const DENIED_COMMANDS = new Set([
   "instrument",
   "report",
   "push",
+  // writes the 0600 ops session files and waits on a passkey approval
+  "ops",
 ]);
 
 /**
@@ -75,6 +77,7 @@ export type Ineligible =
   | "unsupported-platform"
   | "disabled-by-env"
   | "disabled-by-config"
+  | "ops-session"
   | "interactive-tty"
   | "piped-stdin"
   | "reads-stdin"
@@ -90,6 +93,8 @@ export interface EligibilityInput {
   env: NodeJS.ProcessEnv;
   /** `langwatch config set daemon off` was persisted (see isDaemonDisabledByConfig). */
   daemonDisabledByConfig?: boolean;
+  /** An ops session file exists (see hasOpsSessionFile): its key never enters a shared daemon. */
+  opsSessionPresent?: boolean;
   /** process.stdout.isTTY */
   stdoutIsTty: boolean;
   /** process.stderr.isTTY */
@@ -121,6 +126,10 @@ export function evaluateEligibility(input: EligibilityInput): Eligibility {
 
   if (input.daemonDisabledByConfig) {
     return { eligible: false, reason: "disabled-by-config" };
+  }
+
+  if (input.opsSessionPresent) {
+    return { eligible: false, reason: "ops-session" };
   }
 
   if (input.stdoutIsTty || input.stderrIsTty || input.stdinIsTty) {
@@ -226,6 +235,20 @@ export function isDaemonDisabledByConfig(env: NodeJS.ProcessEnv): boolean {
     // properly on any command that actually reads config.
     return false;
   }
+}
+
+/**
+ * Whether an ops session file is on disk (live or not). Mirrors `opsSessionPath` in
+ * utils/opsSession.ts without importing it: this module must stay dependency-free.
+ */
+export function hasOpsSessionFile(env: NodeJS.ProcessEnv): boolean {
+  const override = env.LANGWATCH_OPS_SESSION?.trim();
+  const configFile =
+    env.LANGWATCH_CLI_CONFIG ?? path.join(os.homedir(), ".langwatch", "config.json");
+  const sessionFile = override
+    ? path.resolve(override)
+    : path.join(path.dirname(configFile), "ops-session.json");
+  return fs.existsSync(sessionFile);
 }
 
 /**

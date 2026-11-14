@@ -8,6 +8,7 @@ import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import {
   collectForwardedEnv,
   evaluateEligibility,
+  hasOpsSessionFile,
   isAutoSpawnEnabled,
   isDaemonDisabledByConfig,
   resolveColorLevel,
@@ -530,5 +531,39 @@ describe("isDaemonDisabledByConfig", () => {
     fs.writeFileSync(configFile, "not json {");
 
     expect(isDaemonDisabledByConfig({ LANGWATCH_CLI_CONFIG: configFile })).toBe(false);
+  });
+});
+
+describe("given an ops session on this machine", () => {
+  it("serves the command in-process so the staff key never enters a shared daemon", () => {
+    expect(evaluateEligibility(piped({ opsSessionPresent: true }))).toEqual({
+      eligible: false,
+      reason: "ops-session",
+    });
+  });
+
+  it("refuses to serve the ops commands themselves", () => {
+    expect(evaluateEligibility(piped({ args: ["ops", "orgs"] }))).toEqual({
+      eligible: false,
+      reason: "denied-command",
+    });
+  });
+
+  it("finds the session file beside the config, or where LANGWATCH_OPS_SESSION points", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "lw-ops-elig-"));
+    try {
+      const configFile = path.join(dir, "config.json");
+      expect(hasOpsSessionFile({ LANGWATCH_CLI_CONFIG: configFile })).toBe(false);
+      fs.writeFileSync(path.join(dir, "ops-session.json"), "{}");
+      expect(hasOpsSessionFile({ LANGWATCH_CLI_CONFIG: configFile })).toBe(true);
+      expect(
+        hasOpsSessionFile({
+          LANGWATCH_CLI_CONFIG: configFile,
+          LANGWATCH_OPS_SESSION: path.join(dir, "missing.json"),
+        }),
+      ).toBe(false);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

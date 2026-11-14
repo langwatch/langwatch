@@ -173,6 +173,8 @@ export const expectedUiRouteTranscript: readonly string[] = [
   "  route /ops/blobs -> pages/ops/blobs",
   "  route /ops/feature-flags -> pages/ops/feature-flags",
   "  route /ops/foundry -> pages/ops/foundry",
+  "  route /ops/agents -> pages/ops/agents",
+  "  route /ops/agents/approve/:requestId -> pages/ops/agents/approve/[requestId]",
   "  redirect /ops/migrations -> /ops/upgrades (from /ops/migrations) [pin tab=organizations]",
   "  route /ops/upgrades -> pages/ops/upgrades",
   "  redirect /ops/projections -> /ops/event-sourcing/projections (from /ops/projections) [pin replay=open]",

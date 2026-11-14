@@ -86,6 +86,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
 
   // ── POST /:slug/run  (CI/CD execution) ────────────────────────────────
   .post("/:slug/run", "postApiExperimentsBySlugRun")
+  .spends()
   .keepsRecords()
   .withParams(slugParamsSchema)
   // The body is read unparsed under any Content-Type, as main read it: an
@@ -188,6 +189,8 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   .withParams(runIdParamsSchema)
   .withQuery(runResultsQuerySchema)
   .withPermission("evaluations:view", { legacyKey: "legacy_project_key_experiments" })
+  // Each row carries the run's inputs and outputs: content, though asked under evaluations:view.
+  .servesContent()
   .withOutput(runResultsResponseSchema)
   .withDocs({
     summary: "Read run results",

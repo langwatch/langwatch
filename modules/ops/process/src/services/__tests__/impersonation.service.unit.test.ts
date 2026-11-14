@@ -5,6 +5,8 @@ import {
   CannotImpersonateWithoutSecondFactorError,
   UserToImpersonateNotFoundError,
 } from "@langwatch/ops-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
@@ -70,6 +72,7 @@ class InMemoryImpersonationRepository
 class RecordingAuditSink extends AdminAuditSink {
   readonly entries: {
     userId: string;
+    organizationId?: string | undefined;
     action: string;
     args: Record<string, unknown>;
     req: unknown;
@@ -95,13 +98,19 @@ const PLATFORM_OPERATOR_ID = "user_platform_operator";
 
 const platformGrants = platformOperatorAuthz({ holders: { [PLATFORM_OPERATOR_ID]: ["ops:view"] } });
 
-const serviceFor = (repository: InMemoryImpersonationRepository) => {
+const serviceFor = (
+  repository: InMemoryImpersonationRepository,
+  { organizationIds = ["org_acme"] }: { organizationIds?: string[] } = {},
+) => {
   const audit = new RecordingAuditSink();
   return {
     audit,
     service: ImpersonationService.create({
       repository,
       sessions: repository,
+      memberships: createApiFixture<OrganizationApi>({
+        organizationIdsForMember: async () => organizationIds,
+      }),
       access: AdminAccessService.create({
         authz: platformGrants,
         users: { findByEmail: async () => null },
@@ -132,7 +141,9 @@ describe("ImpersonationService", () => {
     expect(audit.entries).toEqual([
       {
         userId: "user_admin",
+        organizationId: "org_acme",
         action: "admin/impersonate",
+        target: { kind: "session", id: input.sessionId },
         args: {
           userIdToImpersonate: "user_target",
           reason: "Debugging trace 42",
@@ -145,6 +156,47 @@ describe("ImpersonationService", () => {
       subjectUserId: "user_target",
       reason: "Debugging trace 42",
       expiresAt: Temporal.Instant.from("2026-01-01T01:00:00.000Z"),
+    });
+  });
+
+  describe("when the target belongs to several organizations", () => {
+    /** @scenario "Each organization the target belongs to sees the impersonation start" */
+    it("writes one start row per organization, each with the operator and the reason", async () => {
+      const repository = new InMemoryImpersonationRepository(target());
+      const { audit, service } = serviceFor(repository, {
+        organizationIds: ["org_acme", "org_globex"],
+      });
+
+      await service.start(input);
+
+      expect(
+        audit.entries.map(({ organizationId, userId, action, args }) => ({
+          organizationId,
+          userId,
+          action,
+          args,
+        })),
+      ).toEqual(
+        ["org_acme", "org_globex"].map((organizationId) => ({
+          organizationId,
+          userId: "user_admin",
+          action: "admin/impersonate",
+          args: { userIdToImpersonate: "user_target", reason: "Debugging trace 42" },
+        })),
+      );
+    });
+  });
+
+  describe("when the target belongs to no organization", () => {
+    /** @scenario "Each organization the target belongs to sees the impersonation start" */
+    it("still writes one start row, with no organization", async () => {
+      const repository = new InMemoryImpersonationRepository(target());
+      const { audit, service } = serviceFor(repository, { organizationIds: [] });
+
+      await service.start(input);
+
+      expect(audit.entries).toHaveLength(1);
+      expect(audit.entries[0]?.organizationId).toBeUndefined();
     });
   });
 

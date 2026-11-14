@@ -33,10 +33,12 @@ import {
   type IdempotentRunner,
   loggerMiddleware,
   openConfirmationGate,
+  openStaffAccessGate,
   recordAnsweredCause,
   recordRequestPrincipal,
   RestHost,
   type RestConfirmationGate,
+  type RestStaffAccessGate,
 } from "@langwatch/api/rest";
 import {
   bindTrpcMiddlewareContext,
@@ -108,6 +110,8 @@ class ApiSurface {
 
     // The module that shows confirmation cards binds the gate; none bound refuses Langy deletes.
     const confirmations = openConfirmationGate(peers);
+    // The staff-access module binds the gate; none bound refuses every staff key.
+    const staffAccess = openStaffAccessGate(peers);
 
     return new ApiSurface({
       composition,
@@ -116,6 +120,7 @@ class ApiSurface {
       idempotency,
       rateLimiter,
       confirmations,
+      staffAccess,
     });
   }
 
@@ -133,6 +138,7 @@ class ApiSurface {
     idempotency,
     rateLimiter,
     confirmations,
+    staffAccess,
   }: {
     composition: ApiSurfaceComposition;
     door: ApiDoor;
@@ -140,12 +146,13 @@ class ApiSurface {
     idempotency: IdempotentRunner | undefined;
     rateLimiter: RateLimiter | undefined;
     confirmations: RestConfirmationGate | undefined;
+    staffAccess: RestStaffAccessGate | undefined;
   }) {
     this.composition = composition;
     this.door = door;
     this.sessions = sessions;
     if (composition.selection.selected.rest) {
-      this.#rest = this.#restHost({ idempotency, rateLimiter, confirmations });
+      this.#rest = this.#restHost({ idempotency, rateLimiter, confirmations, staffAccess });
     }
     if (composition.selection.selected.trpc) this.#trpc = this.#trpcHost(rateLimiter);
   }
@@ -154,10 +161,12 @@ class ApiSurface {
     idempotency,
     rateLimiter,
     confirmations,
+    staffAccess,
   }: {
     idempotency: IdempotentRunner | undefined;
     rateLimiter: RateLimiter | undefined;
     confirmations: RestConfirmationGate | undefined;
+    staffAccess: RestStaffAccessGate | undefined;
   }): RestHost {
     return RestHost.create({
       identities: {
@@ -171,6 +180,7 @@ class ApiSurface {
       entitlements: this.door.entitlements,
       authz: this.door.authz,
       confirmations,
+      staffAccess,
     });
   }
 

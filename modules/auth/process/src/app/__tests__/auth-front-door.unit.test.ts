@@ -58,6 +58,7 @@ function withRateLimits(
     betterAuthStorage: memory.betterAuthStorage,
     betterAuthSecondaryStorage: memory.betterAuthSecondaryStorage,
     betterAuthHooks: memory.betterAuthHooks,
+    passkeys: memory.passkeys,
     directory: memory.directory,
     pendingSsoSetup: memory.pendingSsoSetup,
     sessionCache: memory.sessionCache,

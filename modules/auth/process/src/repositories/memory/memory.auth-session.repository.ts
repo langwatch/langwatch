@@ -4,6 +4,7 @@ import { fromDate, Temporal, toDate, type Instant } from "@langwatch/time";
 import type {
   AuthSessionRepository,
   BrowserSessionRecord,
+  LapsedImpersonation,
   SessionExpiry,
   StoredBrowserSession,
 } from "../auth-session.repository.ts";
@@ -122,6 +123,45 @@ export class MemoryAuthSessionRepository implements AuthSessionRepository {
         impersonationExpiresAt: null,
       },
     });
+  }
+
+  async findLapsedImpersonations({
+    before,
+    limit,
+  }: {
+    before: Instant;
+    limit: number;
+  }): Promise<readonly LapsedImpersonation[]> {
+    const cutoff = toDate(before).getTime();
+    return this.memory.db.Session.flatMap((row) => {
+      const lapsedAt = row.impersonationExpiresAt;
+      if (!lapsedAt || lapsedAt.getTime() >= cutoff) return [];
+      return [
+        {
+          sessionId: row.id,
+          actorUserId: row.actorUserId ?? null,
+          subjectUserId: row.subjectUserId ?? null,
+          reason: row.impersonationReason ?? null,
+          expiresAt: fromDate(lapsedAt),
+        },
+      ];
+    })
+      .toSorted((a, b) => Temporal.Instant.compare(a.expiresAt, b.expiresAt))
+      .slice(0, limit);
+  }
+
+  async clearLapsedImpersonation({
+    sessionId,
+    expiresAt,
+  }: {
+    sessionId: string;
+    expiresAt: Instant;
+  }): Promise<boolean> {
+    const row = this.memory.db.Session.find((session) => session.id === sessionId);
+    const heldUntil = row?.impersonationExpiresAt?.getTime();
+    if (heldUntil !== toDate(expiresAt).getTime()) return false;
+    await this.clearImpersonation({ sessionId });
+    return true;
   }
 
   async touch({ sessionId, at }: { sessionId: string; at: Instant }): Promise<void> {

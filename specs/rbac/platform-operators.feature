@@ -4,7 +4,7 @@ Feature: Platform operators are a grant
   We want operator access to be a grant held by named users at the platform tier
   So that who operates the installation is recorded, audited and changed in the product
 
-  # A built-in role, platform-operator, carries ops:view and ops:manage. It is granted
+  # A built-in role, platform-operator, carries ops:view, ops:manage and opsRead:view. It is granted
   # at the PLATFORM tier, to users only, and asked with `can` at the platform scope.
   # ops permissions count only from that grant: no organization, team or project grant
   # confers them, whatever role it names. See dev/docs/ARCHITECTURE.md, "Platform

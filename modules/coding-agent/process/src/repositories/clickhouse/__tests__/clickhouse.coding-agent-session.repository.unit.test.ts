@@ -511,13 +511,14 @@ describe("Coding Agent session ClickHouse repository", () => {
         const { endpoint, repository } = await createRepository({ idIndexReady: true });
         endpoint.queryRows.push(
           spanRow(2),
-          [{ Total: "2", FirstMs: "0" }],
-          [{ Total: "3", FirstMs: String(SPAN_FROM_MS) }],
+          [{ Total: "2", FirstMs: "0", LastMs: "0" }],
+          [{ Total: "3", FirstMs: String(SPAN_FROM_MS), LastMs: String(SPAN_FROM_MS) }],
         );
 
         await expect(repository.countUsage({ projectIds: ["project-1"] })).resolves.toEqual({
           sessions: 2,
           firstSessionAt: SPAN_FROM_MS,
+          lastSessionAt: SPAN_FROM_MS,
         });
 
         const counts = endpoint.requests.slice(1);
@@ -617,7 +618,10 @@ describe("Coding Agent session ClickHouse repository", () => {
     it("counts usage unbounded, and counts the read once", async () => {
       const metrics = new NotReadyCounter();
       const { endpoint, repository } = await createRepository({ metrics });
-      endpoint.queryRows.push([{ Total: "0", FirstMs: "0" }], [{ Total: "0", FirstMs: "0" }]);
+      endpoint.queryRows.push(
+        [{ Total: "0", FirstMs: "0", LastMs: "0" }],
+        [{ Total: "0", FirstMs: "0", LastMs: "0" }],
+      );
 
       await repository.countUsage({ projectIds: ["project-1"] });
 

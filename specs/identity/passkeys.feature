@@ -474,3 +474,42 @@ Feature: Passkeys - the fastest way in, and the one phishing cannot take
     When better-auth's passkey plugin is configured
     Then the relying party id and origin are the public address
     And a passkey registered on the public host is recognized there
+
+  # ── A signature over one request ───────────────────────────────────────
+  #
+  # Some acts are approved per request rather than per session (ADR-202):
+  # the caller picks the challenge, usually the hash of what is approved,
+  # and the person signs it with one of their own passkeys. Verification
+  # uses the same library and relying party as the plugin's ceremonies, but
+  # user verification is required: a touch alone does not approve anything.
+  @integration
+  Scenario: A passkey signs one challenge with user verification
+    Given "sam" has registered a passkey
+    When "sam" signs the challenge with it, unlocking it with a fingerprint or PIN
+    Then the signature verifies and names the passkey that made it
+    And the passkey's signature counter moves forward
+
+  @integration
+  Scenario: A signature without user verification is refused
+    Given "sam" has registered a passkey
+    When the authenticator signs the challenge without verifying the person
+    Then it is refused as passkey_assertion_refused, reason user_verification_missing
+
+  @integration
+  Scenario: A signature over a different challenge is refused
+    Given "sam" has registered a passkey
+    When the signature was made over some other challenge
+    Then it is refused as passkey_assertion_refused, reason bad_signature
+    And the passkey's signature counter does not move
+
+  @integration
+  Scenario: Another person's passkey does not approve for them
+    Given "alex" has registered a passkey
+    When a signature by "alex"'s passkey is presented for "sam"
+    Then it is refused as passkey_assertion_refused, reason wrong_user
+
+  @integration
+  Scenario: An unregistered passkey is refused
+    When a signature by a credential no account holds is presented for "sam"
+    Then it is refused as passkey_assertion_refused, reason unknown_credential
+

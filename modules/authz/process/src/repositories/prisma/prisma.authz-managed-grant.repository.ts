@@ -366,7 +366,8 @@ export class PrismaAuthzManagedGrantRepository extends AuthzManagedGrantReposito
     apiKeyId: string;
   }): Promise<boolean> {
     const apiKey = await this.database.apiKey.findFirst({
-      where: { id: apiKeyId, organizationId },
+      // A system-managed key's reach is set by its owner module alone, never by a grant.
+      where: { id: apiKeyId, organizationId, isSystemManaged: false },
       select: { id: true },
     });
     return apiKey !== null;

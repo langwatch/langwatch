@@ -6,6 +6,7 @@
 import type { MonitorWithEvaluator } from "@langwatch/monitor-contract";
 import { describe, expect, it } from "vitest";
 
+import { createMonitorsRest } from "../monitor.rest.ts";
 import { errorCodeOf, mountMonitorRest, TEST_PROJECT } from "./monitor-rest.harness.ts";
 
 const NOW = new Date("2026-08-24T00:00:00.000Z");
@@ -479,5 +480,20 @@ describe("the monitors REST family", () => {
       expect(response.status).toBe(422);
       await expect(api.repository.findAll({ projectId: TEST_PROJECT.id })).resolves.toEqual([]);
     });
+  });
+});
+
+describe("the routes that can start evaluator runs", () => {
+  it("declares create, update and toggle as spending, so a staff session needs spend approval", () => {
+    const spending = createMonitorsRest()
+      .router()
+      .routes.filter((route) => route.spends)
+      .map((route) => route.operation);
+
+    expect(spending).toEqual([
+      "postApiMonitors",
+      "patchApiMonitorsById",
+      "postApiMonitorsByIdToggle",
+    ]);
   });
 });

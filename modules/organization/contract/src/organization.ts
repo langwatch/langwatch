@@ -179,6 +179,8 @@ export type EnrichedAuditLog = {
   channel: AuditChannel | null;
   /** The API key the call presented: a service key acting alone, or a person's own key. */
   apiKeyId: string | null;
+  /** Set on staff access rows (ADR-202); the approving operator is `actorUser`. */
+  staffAccess: AuditStaffAccess | null;
 };
 
 /** The door an audit row came through. */
@@ -192,6 +194,30 @@ export interface AuditImpersonationMetadataSchema extends Named<
 > {}
 export const auditImpersonationMetadataSchema: AuditImpersonationMetadataSchema =
   auditImpersonationMetadataSchemaDefinition;
+
+/** An operator a staff access row names; older rows carry only the id. */
+const auditStaffPersonSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().nullish(),
+  email: z.string().nullish(),
+});
+
+/**
+ * What a staff access row (ADR-202) carries: the principal that acted, the approval reason, the
+ * operator who approved it and, on a revoke, the operator who ended it.
+ */
+const auditStaffAccessMetadataSchemaDefinition = z.object({
+  principal: z.string().min(1),
+  reason: z.string().nullable().catch(null),
+  approvedBy: auditStaffPersonSchema.nullish().catch(null),
+  revokedBy: auditStaffPersonSchema.nullish().catch(null),
+});
+export interface AuditStaffAccessMetadataSchema extends Named<
+  typeof auditStaffAccessMetadataSchemaDefinition
+> {}
+export const auditStaffAccessMetadataSchema: AuditStaffAccessMetadataSchema =
+  auditStaffAccessMetadataSchemaDefinition;
+export type AuditStaffAccess = z.infer<typeof auditStaffAccessMetadataSchema>;
 
 /**
  * How colleagues on a matching domain get into an organization; identity's join ledger

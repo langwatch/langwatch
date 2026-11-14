@@ -972,6 +972,22 @@ describe("guardProjectId — raw queries (queryRaw / executeRaw)", () => {
         }),
       ).resolves.toBe("ok");
     });
+
+    it("does NOT throw for a tab-separated INSERT that writes its tenant column", async () => {
+      const query = 'INSERT\tINTO\t"GrantUsage"\t("organizationId")\tVALUES ($1)';
+      await expect(
+        runGuard({ model: undefined, action: "executeRaw", args: { query } }),
+      ).resolves.toBe("ok");
+    });
+
+    it("refuses a long run of whitespace after INSERT INTO in linear time", async () => {
+      const query = `insert\tinto\t${"\t".repeat(50_000)}x`;
+      const started = performance.now();
+      await expect(
+        runGuard({ model: undefined, action: "executeRaw", args: { query } }),
+      ).rejects.toThrow(/compares no tenant column/);
+      expect(performance.now() - started).toBeLessThan(500);
+    });
   });
 
   describe("when a raw query only mentions a tenant column", () => {

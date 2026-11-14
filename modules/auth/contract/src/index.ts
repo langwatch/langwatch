@@ -26,3 +26,4 @@ export * from "./sso-path-gate.ts";
 export * from "./account-ceremonies.ts";
 export * from "./auth.config.ts";
 export * from "./auth-lifecycle.events.ts";
+export * from "./passkey-assertion.ts";

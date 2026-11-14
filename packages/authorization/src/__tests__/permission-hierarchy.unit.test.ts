@@ -280,13 +280,13 @@ describe("the append-only registry", () => {
     expect(findPermissionIndex("braids:manage")).toBe(INDICES_BEFORE_BRAIDS.length);
   });
 
-  /** @scenario "The braid permission is appended last in the registry and is never grantable" */
-  it("appends spans:braided last, right after braids:manage", () => {
-    expect(ALL_PERMISSIONS.at(-1)).toBe(SPAN_BRAID_PERMISSION);
+  /** @scenario "The braid permission is appended right after braids:manage and is never grantable" */
+  it("appends spans:braided right after braids:manage, with only later appends behind it", () => {
     expect(findPermissionIndex(SPAN_BRAID_PERMISSION)).toBe(INDICES_BEFORE_BRAIDS.length + 1);
+    expect(ALL_PERMISSIONS.slice(INDICES_BEFORE_BRAIDS.length + 2)).toEqual(["opsRead:view"]);
   });
 
-  /** @scenario "The braid permission is appended last in the registry and is never grantable" */
+  /** @scenario "The braid permission is appended right after braids:manage and is never grantable" */
   it("declares spans:braided at no scope, so no role, custom role or key may list it", () => {
     expect(isGrantablePermission(SPAN_BRAID_PERMISSION)).toBe(false);
     expect(grantablePermissionSchema.validate(SPAN_BRAID_PERMISSION)).toBe(false);

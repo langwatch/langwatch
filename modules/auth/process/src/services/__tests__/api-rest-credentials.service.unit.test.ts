@@ -448,6 +448,38 @@ describe("the project door", () => {
       }
     });
 
+    /** @scenario "A staff key that names no project is told no project names" */
+    it("lists no project for a staff access key, whose calls are trailed only past the gate", async () => {
+      const staffKey: OrganizationApiKeyResolution = {
+        ok: true,
+        resolved: { ...ORG_KEY.resolved, isStaffAccessKey: true },
+      };
+      const staffDoor = ApiRestCredentialsService.create({
+        apiKeys: new KeyStore(new Map(), new Map([["sk-lw-staff", staffKey]]), {
+          projects: new Map([["org-2", [{ id: "project-a", name: "A", teamId: "team-1" }]]]),
+          named: new Map([["sk-lw-staff@project-a", keyAt("project-a")]]),
+        }),
+        authz: {
+          hasApiKeyPermission: () => Promise.resolve(true),
+          getApiKeyProjectDecision: () => Promise.reject(new Error("asked through the ceiling")),
+          hasProjectPermission: () => Promise.reject(new Error("no person is asked")),
+          listApiKeyBindings: () => Promise.reject(new Error("no bindings are listed")),
+          getScope: () => Promise.reject(new Error("no scope is read")),
+        },
+        featureFlags: KEEPS_FULL_ACCESS,
+        cliProjects: {
+          getCliAccessProject: () => Promise.reject(new Error("no CLI session is read")),
+        },
+        organizations: { getSettings: () => Promise.reject(new Error("no organization is read")) },
+      });
+
+      const refusal = await refusalOf(
+        staffDoor.identify({ request: request({ authorization: "Bearer sk-lw-staff" }) }),
+      );
+
+      expect(refusal).toMatchObject({ code: "project_required", meta: { projects: [] } });
+    });
+
     /** @scenario "A key asked no permission is told every project it reaches" */
     it("lists every project the key resolves when the route asks nothing of it", async () => {
       const refusal = await refusalOf(

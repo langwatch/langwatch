@@ -4,6 +4,8 @@ import {
   PasskeyCommandRefusedError,
 } from "@langwatch/identity-contract";
 
+import type { PasskeyAssertionRefusalReason } from "./passkey-assertion.ts";
+
 export class AuthValidateRateLimitedError extends HandledError {
   declare readonly code: "auth_validate_rate_limited";
 
@@ -272,5 +274,24 @@ export class IdentityPasskeyAlreadyRegisteredError extends PasskeyCommandRefused
       reasons: [new Error(detail)],
     });
     this.name = "IdentityPasskeyAlreadyRegisteredError";
+  }
+}
+
+/**
+ * A passkey signature over one challenge did not prove the person: no such credential, another
+ * person's credential, no user verification, or a signature that does not verify.
+ */
+export class PasskeyAssertionRefusedError extends HandledError {
+  declare readonly code: "passkey_assertion_refused";
+
+  constructor(input: { reason: PasskeyAssertionRefusalReason; detail?: string }) {
+    super("passkey_assertion_refused", "passkey_assertion_refused", {
+      httpStatus: 403,
+      fault: "customer",
+      meta: { reason: input.reason },
+      ...remediation("passkey_assertion_refused"),
+      ...(input.detail ? { reasons: [new Error(input.detail)] } : {}),
+    });
+    this.name = "PasskeyAssertionRefusedError";
   }
 }

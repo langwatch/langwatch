@@ -76,6 +76,8 @@ const resolvedApiKeyTokenSchemaDefinition = z.discriminatedUnion("type", [
       isLangySessionKey: z.boolean().optional(),
       /** An ownerless key minted for a run nobody started: its calls act as the system. */
       isUnattendedRunKey: z.boolean().optional(),
+      /** An approved staff agent's key (ADR-202): every request it makes passes the staff gate. */
+      isStaffAccessKey: z.boolean().optional(),
       ...resolvedApiKeyProjectShape,
     })
     .strict(),
@@ -110,6 +112,7 @@ const organizationApiKeyResolutionSchemaDefinition = z.discriminatedUnion("ok", 
           userId: z.string().min(1).nullable(),
           organizationId: z.string().min(1),
           isLangySessionKey: z.boolean().optional(),
+          isStaffAccessKey: z.boolean().optional(),
         })
         .strict(),
     })
