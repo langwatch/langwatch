@@ -37,7 +37,13 @@ Feature: What an operator can see about trace ingestion from either process
     Then nothing is written
 
   @unit
-  Scenario: The trigger match series carries no per-project label
+  Scenario: The trigger match series carries only its path label
     Given the trigger match counter
     When a count is recorded
-    Then the series carries no attributes
+    Then the series carries the path that wrote it and no per-project label
+
+  @unit
+  Scenario: Evaluation trigger match records are counted under their own path
+    Given a settled evaluation that produced trigger match records
+    When the count is recorded
+    Then the counter advances under the evaluation path

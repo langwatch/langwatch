@@ -12,7 +12,12 @@ import { addDays, nowInstant, toDate } from "@langwatch/time";
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 
 import { useActivationCodeCommands } from "../../behavior/use-activation-code-commands.ts";
-import { SERVICES, SERVICE_LABELS, type Service } from "../../model/license-terms.ts";
+import {
+  developerSeatsProblem,
+  SERVICES,
+  SERVICE_LABELS,
+  type Service,
+} from "../../model/license-terms.ts";
 import { dateInputToISO } from "../elements/admin-cells.tsx";
 
 /** The controls a failed submit can land on; wrappers that carry the state are skipped. */
@@ -37,6 +42,7 @@ interface Draft {
   planType: PlanType;
   maxMembers: string;
   maxMembersLite: string;
+  maxMembersDeveloper: string;
   licenseTermDays: string;
   services: Service[];
   expiresOn: string;
@@ -53,6 +59,7 @@ function emptyDraft(): Draft {
     planType: "ENTERPRISE",
     maxMembers: "25",
     maxMembersLite: "",
+    maxMembersDeveloper: "",
     licenseTermDays: String(DEFAULT_TERM_DAYS),
     services: [...SERVICES],
     expiresOn: isoDaysFromNow(DEFAULT_CODE_DAYS),
@@ -61,7 +68,10 @@ function emptyDraft(): Draft {
 }
 
 type Problems = Partial<
-  Record<"organizationId" | "organizationName" | "email" | "expiresOn", string>
+  Record<
+    "organizationId" | "organizationName" | "email" | "maxMembersDeveloper" | "expiresOn",
+    string
+  >
 >;
 
 function problemsOf(draft: Draft): Problems {
@@ -70,6 +80,8 @@ function problemsOf(draft: Draft): Problems {
   if (!draft.organizationName.trim()) problems.organizationName = "Enter the customer name.";
   if (!draft.email.trim()) problems.email = "Enter a contact email.";
   if (!dateInputToISO(draft.expiresOn)) problems.expiresOn = "Choose a valid expiry date.";
+  const developers = developerSeatsProblem(draft.maxMembersDeveloper);
+  if (developers) problems.maxMembersDeveloper = developers;
   return problems;
 }
 
@@ -125,6 +137,9 @@ export function IssueActivationCodeDrawer({
         ...(draft.maxMembersLite.trim() === ""
           ? {}
           : { maxMembersLite: Number(draft.maxMembersLite) }),
+        ...(draft.maxMembersDeveloper.trim() === ""
+          ? {}
+          : { maxMembersDeveloper: Number(draft.maxMembersDeveloper) }),
         licenseTermDays: Number(draft.licenseTermDays),
         services: draft.services,
         expiresAt,
@@ -266,6 +281,18 @@ function TermsFields({
             onChange={(event) => set("maxMembersLite", event.target.value)}
             placeholder="Plan default"
           />
+        </Field.Root>
+        <Field.Root invalid={problems.maxMembersDeveloper !== undefined}>
+          <Field.Label>Developer seats</Field.Label>
+          <Input
+            type="number"
+            min={0}
+            aria-invalid={problems.maxMembersDeveloper !== undefined || undefined}
+            value={draft.maxMembersDeveloper}
+            onChange={(event) => set("maxMembersDeveloper", event.target.value)}
+            placeholder="None"
+          />
+          <Field.ErrorText>{problems.maxMembersDeveloper}</Field.ErrorText>
         </Field.Root>
       </HStack>
       <HStack gap={4} width="full" align="start">

@@ -246,6 +246,41 @@ func TestStepsLeavesTheRestOfAReleasedStepFileAlone(t *testing.T) {
 	}
 }
 
+// @scenario "A released replay step freezes only its own call"
+func TestStepsFreezesOnlyAReleasedReplayStepCall(t *testing.T) {
+	const (
+		moduleFile = "modules/topic/process/src/topic.module.ts"
+		specFile   = "modules/topic/specs/topic-deploy-steps.feature"
+		replay     = "defineProjectionReplayStep({\n  id: \"topic:replay-clusters\",\n  lane: \"clusters\",\n})"
+		module     = "export const steps = [\n  " + replay + ",\n];\n"
+	)
+	findingsAfter := func(t *testing.T, moduleHead, specHead string) []migrationorder.Finding {
+		t.Helper()
+		root := initRepo(t)
+		writeAndCommit(t, root, moduleFile, module)
+		writeAndCommit(t, root, specFile, "Then it declares \"topic:replay-clusters\"\n")
+		writeAndCommit(t, root, "packages/upgrade/releases/3.21.0.json", `{"release":"3.21.0","steps":[
+  {"id":"topic:replay-clusters","kind":"data","mode":"background","owner":"topic","description":"z"}]}`)
+		gitIn(t, root, "checkout", "-q", "-b", "feature")
+		writeAndCommit(t, root, moduleFile, moduleHead)
+		writeAndCommit(t, root, specFile, specHead)
+		in, err := migrationorder.Repo{Root: root}.Steps(t.Context(), "main")
+		if err != nil {
+			t.Fatal(err)
+		}
+		return migrationorder.CheckSteps(in)
+	}
+	newStep := strings.Replace(module, "];", "  defineMigrationStep({ id: \"topic:next\", run: next }),\n];", 1)
+	if findings := findingsAfter(t, newStep, "Then it declares \"topic:replay-clusters\" again\n"); len(findings) != 0 {
+		t.Errorf("a new step beside a released replay step, want no finding, got %+v", findings)
+	}
+	edited := strings.Replace(module, "\"clusters\"", "\"clusters-v2\"", 1)
+	findings := findingsAfter(t, edited, "Then it still declares \"topic:replay-clusters\"\n")
+	if len(findings) != 1 || findings[0].Entry != moduleFile || !strings.Contains(findings[0].Problem, "declares topic:replay-clusters") {
+		t.Errorf("an edited replay call, want one finding on %s, got %+v", moduleFile, findings)
+	}
+}
+
 // @scenario "A code step no release manifest names yet may still change"
 func TestStepsLeavesAnUnreleasedStepFileAlone(t *testing.T) {
 	root := repoWithStep(t, "")

@@ -138,10 +138,17 @@ export interface UserRepository {
   countUsage(): Promise<UserUsageCount>;
   /** The same count, among these people only. */
   countUsageAmong(input: { userIds: readonly string[] }): Promise<UserUsageCount>;
+  /** Which of these people last signed in at or after `since` (epoch ms). */
+  findSignedInSince(input: { userIds: readonly string[]; since: number }): Promise<string[]>;
   /** Whether any account's address is on this domain, install-wide, case aside. */
   hasAccountOnDomain(domain: string): Promise<boolean>;
   /** Whether any account exists, install-wide. */
   hasAnyAccount(): Promise<boolean>;
+  /**
+   * The id of the earliest-created account, deactivated or not; null when there is none, or when
+   * an erased account was created at or before it, since that one came first.
+   */
+  findFirstCreatedId(): Promise<string | null>;
   /** One page of every account, in id order after `afterId`, for user's lifecycle-fact step. */
   findBackfillPage(input: { afterId: string | null; limit: number }): Promise<UserBackfillRow[]>;
   /** One page of accounts whose stored address is not lower-case, in id order after `afterId`. */

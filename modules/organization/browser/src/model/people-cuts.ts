@@ -53,3 +53,8 @@ export function peopleCutShows({
 }): boolean {
   return cut === "all" || cut === list;
 }
+
+/** A disabled membership admission wrote while no full seat was free: they wait for one. */
+export function waitsForSeat(member: { disabledAt: unknown; seatPendingSince?: unknown }): boolean {
+  return member.disabledAt != null && member.seatPendingSince != null;
+}

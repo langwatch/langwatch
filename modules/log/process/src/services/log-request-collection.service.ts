@@ -6,7 +6,7 @@ import type {
   LogRequestCollectionResult,
 } from "@langwatch/log-contract";
 import { createLogger } from "@langwatch/observability";
-import { NON_BILLABLE_ATTR } from "@langwatch/span-normalisation";
+import { ATTR_KEYS, NON_BILLABLE_ATTR } from "@langwatch/span-normalisation";
 import { nowInstant } from "@langwatch/time";
 import {
   type LogRecordReceivedEventData,
@@ -15,6 +15,8 @@ import {
 } from "@langwatch/trace-contract";
 import { SpanKind as ApiSpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
+
+const ORIGIN_ATTR = "langwatch.origin";
 
 /** Trace's share of a log: its canonical names, its I/O preview and its contribution command. */
 type LogTraceSlice = Pick<
@@ -236,6 +238,20 @@ function makeTraceContribution({
     if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
       liftedAttributes[key] = value;
     }
+  }
+
+  // A logs-only coding agent (Grok) has no span to name the trace's service, so its log does.
+  // Trace keeps the first service named; an agent's log and spans carry the same one.
+  const serviceName = normalized.resourceAttributes[ATTR_KEYS.SERVICE_NAME];
+  if (record.providerKind !== "generic" && typeof serviceName === "string" && serviceName) {
+    liftedAttributes[ATTR_KEYS.SERVICE_NAME] = serviceName;
+  }
+
+  // The receiver stamps the ingest key's origin on the resource; a log-only trace (Grok) has no
+  // span to carry it to the trace, so its records do. The trace folds never let it override.
+  const origin = normalized.resourceAttributes[ORIGIN_ATTR];
+  if (origin) {
+    liftedAttributes[ORIGIN_ATTR] = origin;
   }
 
   const { input, output, truncated } = traces.extractLogRecordIO(legacyView);

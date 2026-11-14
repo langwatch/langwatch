@@ -24,6 +24,8 @@ export type BillingSubscriptionItem = Readonly<{
   unitAmount: number | null;
   /** Null for a one-time price. */
   interval: string | null;
+  /** Units billed on this line; absent where a caller did not read it. */
+  quantity?: number | null;
 }>;
 
 /** The accrued amount at which the provider invoices mid-cycle, and whether that moves the anchor. */
@@ -39,6 +41,10 @@ export type BillingSubscription = Readonly<{
   canceledAt: number | null;
   billingThreshold: BillingThreshold | null;
   items: readonly BillingSubscriptionItem[];
+  /** End of the period already invoiced, in epoch seconds. */
+  currentPeriodEnd?: number | null;
+  /** Lower-case ISO code the subscription bills in. */
+  currency?: string | null;
 }>;
 
 /** A line change: an existing line by `id`, or a new one by `price`; these keys are the provider's. */
@@ -52,8 +58,8 @@ export type SubscriptionItemUpdate = {
 /** What a subscription change asks for; an absent field is left as it is. */
 export type BillingSubscriptionChange = {
   items?: SubscriptionItemUpdate[];
-  /** Invoice the proration now rather than on the next cycle's invoice. */
-  prorationBehavior?: "always_invoice";
+  /** `always_invoice` invoices the proration now; `none` changes the next cycle and prorates nothing. */
+  prorationBehavior?: "always_invoice" | "none";
   /** The instant, in epoch seconds, the proration is priced at. */
   prorationDate?: number;
   /** Lifts a cancellation scheduled for the period end. */
@@ -68,6 +74,8 @@ export type BillingSubscriptionPreviewChange = Omit<BillingSubscriptionChange, "
 export type BillingInvoicePreview = Readonly<{
   total: number;
   amountDue: number;
+  /** The tax inside `total`, added on top or included; absent when there is none. */
+  tax?: number;
   currency: string | null;
 }>;
 
@@ -102,6 +110,12 @@ export type BillingCheckoutRequest = {
 export type BillingPurchasedLineItem = Readonly<{
   priceId: string | null;
   quantity: number | null;
+}>;
+
+/** The checkout session a subscription was bought through, and its payment link if any. */
+export type BillingSubscriptionCheckout = Readonly<{
+  checkoutSessionId: string;
+  paymentLinkId: string | null;
 }>;
 
 type BillingInvoiceStatus = "draft" | "open" | "paid" | "uncollectible" | "void";

@@ -35,6 +35,17 @@ export class IngestionSourceNotFoundError extends NotFoundError {
   }
 }
 
+export class AgentRegistryEntryNotFoundError extends NotFoundError {
+  constructor(entryId: string) {
+    super(
+      "agent_registry_entry_not_found",
+      { resource: "Agent registry entry", id: entryId },
+      remediation("agent_registry_entry_not_found"),
+    );
+    this.name = "AgentRegistryEntryNotFoundError";
+  }
+}
+
 export class IngestionSourceCapReachedError extends HandledError {
   declare readonly code: "ingestion_source_cap_reached";
 
@@ -288,6 +299,23 @@ export class IngestionSourceUnauthorizedError extends HandledError {
       fault: "customer",
     });
     this.name = "IngestionSourceUnauthorizedError";
+  }
+}
+
+/**
+ * The secret and the path name the same source, but an admin disabled it. The caller has proved
+ * it holds the secret, so naming the state leaks nothing, and OTLP exporters drop a 403 for good.
+ */
+export class IngestionSourceDisabledError extends HandledError {
+  declare readonly code: "ingestion_source_disabled";
+
+  constructor() {
+    super("ingestion_source_disabled", "This ingestion source is disabled.", {
+      httpStatus: 403,
+      fault: "customer",
+      ...remediation("ingestion_source_disabled"),
+    });
+    this.name = "IngestionSourceDisabledError";
   }
 }
 

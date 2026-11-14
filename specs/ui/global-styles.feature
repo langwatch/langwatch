@@ -1,6 +1,8 @@
 # Implementation:
 #   apps/ui/src/ui.entrypoint.tsx
 #   apps/ui/src/styles/globals.scss
+#   packages/design-system/src/components/brand/langy-theme.css
+#   modules/auth/browser/src/ui/elements/auth-front-door.css
 
 Feature: The browser entry loads the shared global stylesheet
   `platform/app`'s `main.tsx` imported `styles/globals.scss`, which carries
@@ -23,3 +25,12 @@ Feature: The browser entry loads the shared global stylesheet
     Then it declares a face for each of those files
     And a heading asking for a bold weight is drawn from a real cut rather
       than a synthesised one
+
+  @unit
+  Scenario: A stylesheet's font files load from wherever the stylesheet is served
+    Given the hosted product serves the built stylesheets from the asset CDN
+    And the CDN serves the built assets folder and nothing else
+    When the browser stylesheets are read
+    Then every font url is relative, so the build emits the file beside the stylesheet
+    And only the global stylesheet declares the display face, so no feature
+      stylesheet overrides it with another url

@@ -4,8 +4,15 @@ import type {
   TopicClusteringResponse,
 } from "@langwatch/topic-contract";
 
-/** One topic-clustering call to langevals; the signal bounds the whole exchange. */
-export type TopicClusteringRequest = Readonly<{ projectId: string; signal: AbortSignal }> &
+/**
+ * One topic-clustering call to langevals; the signal bounds the whole exchange.
+ * `requestKey` names the work so a retry of it reports its provider usage once.
+ */
+export type TopicClusteringRequest = Readonly<{
+  projectId: string;
+  signal: AbortSignal;
+  requestKey?: string;
+}> &
   (
     | Readonly<{ mode: "batch"; params: BatchClusteringParams }>
     | Readonly<{ mode: "incremental"; params: IncrementalClusteringParams }>

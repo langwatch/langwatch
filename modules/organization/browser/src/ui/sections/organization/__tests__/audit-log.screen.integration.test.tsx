@@ -11,7 +11,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { FakeOrganizationHost, renderWithOrganizationHost } from "../../../../testing.tsx";
-import AuditLogScreen from "../audit-log.screen.tsx";
+import AuditLogScreen, { Forbidden } from "../audit-log.screen.tsx";
 
 const { state } = vi.hoisted(() => ({
   state: {
@@ -127,17 +127,21 @@ afterEach(() => cleanup());
 
 describe("given an organization below the Enterprise plan", () => {
   describe("when the audit page is opened", () => {
-    /** @scenario A deployment below the plan is told what the audit trail would show */
-    it("says what the capability covers instead of hiding it", async () => {
+    /**
+     * @scenario A deployment below the plan is told what the audit trail would show
+     * @scenario "Each Enterprise page names its feature in the shared lock"
+     */
+    it("says what the capability covers and leads a self-hosted admin to the License page", async () => {
       state.planType = "LAUNCH";
       renderWithOrganizationHost(<AuditLogScreen />, planHost());
 
       expect(screen.getByRole("heading", { name: "Audit log" })).toBeInTheDocument();
-      expect(screen.getByText("Audit log is included in Enterprise")).toBeInTheDocument();
-      expect(screen.getByRole("link", { name: "See plans" })).toHaveAttribute(
+      expect(screen.getByText("Audit log is part of LangWatch Enterprise")).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Activate a license" })).toHaveAttribute(
         "href",
-        "/settings/plans",
+        "/settings/license",
       );
+      expect(screen.queryByRole("link", { name: "See plans" })).toBeNull();
     });
 
     /** @scenario A deployment below the plan is told what the audit trail would show */
@@ -147,6 +151,38 @@ describe("given an organization below the Enterprise plan", () => {
       renderWithOrganizationHost(<AuditLogScreen />, planHost());
 
       expect(screen.queryByText("Timestamp")).not.toBeInTheDocument();
+    });
+  });
+});
+
+describe("given a member the route refuses for lack of auditLog:view", () => {
+  describe("when the organization has no Enterprise license", () => {
+    /** @scenario "A member whose role cannot open the audit log still sees the lock on a self-hosted install" */
+    it("shows the lock with the ask-an-admin line instead of a missing permission page", () => {
+      state.planType = "LAUNCH";
+      renderWithOrganizationHost(
+        <Forbidden permission="auditLog:view" />,
+        planHost({ grants: new Set() }),
+      );
+
+      expect(screen.getByText("Audit log is part of LangWatch Enterprise")).toBeInTheDocument();
+      expect(
+        screen.getByText(/Ask an organization admin to activate a license\./),
+      ).toBeInTheDocument();
+      expect(screen.queryByRole("link")).toBeNull();
+      expect(screen.queryByText(/Missing permission/)).toBeNull();
+    });
+  });
+
+  describe("when the organization is on Enterprise", () => {
+    /** @scenario "A member without permission to view the audit log on a licensed install is told what is missing" */
+    it("names the missing permission", () => {
+      renderWithOrganizationHost(
+        <Forbidden permission="auditLog:view" />,
+        planHost({ grants: new Set() }),
+      );
+
+      expect(screen.getByText("Missing permission: auditLog:view")).toBeInTheDocument();
     });
   });
 });

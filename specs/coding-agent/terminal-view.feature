@@ -14,28 +14,48 @@ Feature: Coding agent terminal view
   Background:
     Given a coding agent session with prompts, tool calls, and a final reply
 
+  @integration
   Scenario: The transcript shows every beat, not just the final turn
     Given the session's last model call is a single tool request with no reply text
     When the Terminal tab renders the session
     Then every prompt, message, and tool call from the whole session is shown
     And the session does not collapse to a single step
 
+  @integration
   Scenario: A tool the user denied is shown even though it left no span
     Given the user denied a tool call partway through the session
     When the Terminal tab renders the session
     Then the denied call is shown as rejected, not silently missing
 
+  @integration
   Scenario: A tool call that was aborted reads differently from one the user denied
     Given a tool call was cancelled or timed out before it ran
     When the Terminal tab renders the session
     Then the call is shown as aborted and never ran
     And it is not said to be denied, nor pinned on the user
 
+  # The agents' own decision source says who refused: Claude and Grok send "user_*",
+  # Codex "User"; "config", "hook", "classifier" or no source at all is a policy.
+  @integration
+  Scenario: A tool call a policy denied is not pinned on the user
+    Given a permission rule, hook or reviewer refused a tool call before it ran
+    When the Terminal tab renders the session
+    Then the call is shown as denied and never ran
+    And it is not said to be the user's denial
+
+  @integration
+  Scenario: A tool call the user answered instead of approving reads differently from a denial
+    Given the user typed a reply at a tool prompt instead of approving the call
+    When the Terminal tab renders the session
+    Then the call is shown as answered by the user and never ran
+    And it is not said to be denied
+
   Scenario: A tool call shows what actually ran, not just what the model was told
     Given a tool span carries real stdout, a real file's content, or a real structured patch
     When the Terminal tab renders that tool call
     Then the real output is shown in place of the model's capped echo
 
+  @integration
   Scenario: The top of the session identifies the agent, model, and repo
     Given the session was run by Claude Code version 2.1.207 against a repo
     When the Terminal tab renders the session
@@ -97,21 +117,26 @@ Feature: Coding agent terminal view
   # `pi.ai.request` is a model call (MODEL_CALL_SPAN_NAMES); anything else falls
   # through to the tool branch.
 
-  # pi declares no arguments and no result on pi.harness.tool, only the tool's
-  # name, its call id and whether it errored. A pi tool run therefore shows
-  # less than a Claude or Copilot one, and the transcript has to render that
-  # honestly rather than leave empty argument and result panes behind.
+  # pi's tool span carries its arguments and result only with content capture
+  # on. Without it a pi tool run shows its name, its call id and whether it
+  # errored, and the transcript renders that honestly rather than leave empty
+  # argument and result panes behind.
 
-  # Parked: a pi tool run is dropped from the transcript, not shown. The tool-name
-  # reader (deriveToolName) reads gen_ai.tool.name only on an execute_tool span.
-  # becomes @unit
-  @unimplemented
+  @unit
   Scenario: A pi session reads back as a transcript, not as a span tree
     Given a pi session whose run, turns and tool executions were captured
     When the Terminal tab renders the session
     Then its spans and logs read in timestamp order, not in parent order
     And each tool execution shows its name and whether it errored
     And no empty arguments or result pane is shown for it
+
+  # pi's model calls carry no prompt: the user's message rides only the run span.
+
+  @unit
+  Scenario: A pi session's prompt reads from its run span
+    Given a pi session whose run span carries the user's message
+    When the Terminal tab renders the session
+    Then the prompt shows once, before the first model call
 
   @unit
   Scenario: A pi model call is shown as a model call, not as a tool run
@@ -120,14 +145,32 @@ Feature: Coding agent terminal view
     Then each model call appears once with the tokens it used
     And none of them appears among the tool runs
 
-  # Parked: the model half holds, but the banner's agent list in
-  # modules/trace/browser has no pi, so the top of the session reads unknown.
-  # becomes @unit
-  @unimplemented
+  # pi stamps no service name the banner can test (`pi` is a substring of
+  # `copilot` and `api`), so the banner names it from its span namespace.
+
+  @unit
   Scenario: The banner of a pi session names the model pi called
     Given a pi session whose model calls name their model
     When the Terminal tab renders the session
     Then the top of the session shows pi and the model it called
+
+  # A trace with no name of its own is named after its root span (`pi.harness.run`),
+  # which the user never typed.
+
+  @unit
+  Scenario: The prompt line never shows a span name as if the user had typed it
+    Given a session whose trace is named after its own root span
+    When the Terminal tab renders the session
+    Then the bottom bar's prompt line shows the session's first prompt
+    And when the session has no prompt text it shows the untitled placeholder, not the span name
+
+  # A logs-only trace (Grok) has no span to name it, so it is named after its own id.
+
+  @unit
+  Scenario: The prompt line never shows a trace id as if the user had typed it
+    Given a logs-only session whose trace is named after its own id
+    When the Terminal tab renders the session
+    Then the bottom bar's prompt line shows the session's first prompt
 
   # The system prompt is the context the user pays for on every call - CLAUDE.md,
   # MCP tool definitions, skills. It rides the first request body of the session.

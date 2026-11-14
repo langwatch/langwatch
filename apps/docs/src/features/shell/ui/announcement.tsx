@@ -13,6 +13,7 @@ export function SiteAnnouncement({ announcement }: { announcement: Announcement 
       aria-label="Announcement"
       className="docs-banner docs-release-strip docs-announcement"
       data-docs-banner={announcement.id}
+      data-docs-dismissible={announcement.dismissible ? "" : undefined}
     >
       <Box as="p" className="docs-announcement-text" margin="0">
         <InlineContent nodes={announcement.content} />

@@ -42,6 +42,7 @@ function lifecycleSenders({
     recordMemberEnabled: accepts,
     recordMemberRemoved: accepts,
     recordMemberDepartmentChanged: accepts,
+    recordDocsPlaygroundSessionsDisabled: accepts,
     recordTraceSharingDisabled: {
       send: async (data) => {
         if (failing) throw new Error("the event store refused");

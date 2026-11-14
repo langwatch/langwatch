@@ -477,10 +477,13 @@ export class CodingAgentSessionStateProjection {
     state: next,
     attrs,
     fallbackDurationMs,
+    countsFreshInput = false,
   }: {
     state: CodingAgentSessionData;
     attrs: Record<string, unknown>;
     fallbackDurationMs: number;
+    /** The call's context is its whole prompt, fresh input included, not its cache alone. */
+    countsFreshInput?: boolean;
   }): CodingAgentSessionData {
     const agentId = this.coerceString(attrs.agent_id);
     if (agentId !== null) Object.assign(next, this.recordSubAgent(next, agentId));
@@ -492,7 +495,10 @@ export class CodingAgentSessionStateProjection {
 
     const cacheReadTokens = this.number(attrs.cache_read_tokens);
     const cacheCreationTokens = this.number(attrs.cache_creation_tokens);
-    const contextTokens = cacheReadTokens + cacheCreationTokens;
+    const contextTokens =
+      cacheReadTokens +
+      cacheCreationTokens +
+      (countsFreshInput ? this.number(attrs.input_tokens) : 0);
     // The first call is never a "rebuild" — there is nothing to reuse yet,
     // so a cold cache isn't the session's fault. `previousCallContextTokens`
     // starts at 0, which doubles as that gate.

@@ -27,3 +27,11 @@ Feature: The trace explorer says what its table and drawer are doing
     When the table has no rows
     Then it says these results are not judged
     And it does not claim that nothing matches
+
+  @unit
+  Scenario: An empty table under a failed run says the run failed
+    Given an eval chip whose run failed
+    When the table has no rows
+    Then it says the Instant Eval did not finish, with the reason
+    And it offers Retry
+    And it neither claims that nothing matches nor that the run is still judging
