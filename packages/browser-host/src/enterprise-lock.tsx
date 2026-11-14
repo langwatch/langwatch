@@ -4,7 +4,7 @@
  * Spec: specs/licensing/enterprise-lock.feature
  */
 import { AccessState } from "@langwatch/design-system/access-state";
-import { Box, Button, HStack, Text } from "@langwatch/design-system/primitives";
+import { Button, HStack, Text } from "@langwatch/design-system/primitives";
 import { Lock } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -111,7 +111,7 @@ export function EnterpriseLock({
       data-testid={testId}
     />
   );
-  return compact || inset ? lock : <Box paddingTop={4}>{lock}</Box>;
+  return lock;
 }
 
 function lockActions({
