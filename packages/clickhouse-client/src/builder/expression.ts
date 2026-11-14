@@ -578,7 +578,7 @@ export type RenderContext = {
   readonly ids: Map<string, string>;
   /** The CTE names the text being rendered may read: earlier CTEs and the enclosing ones. */
   readonly ctes: { visible: ReadonlySet<string> };
-  /** The tenant columns the rendered tenant predicates bind, which the client's guard checks. */
+  /** The tenant columns of the tenant tables rendered; a reader statement's guard checks them. */
   readonly tenantColumns: Set<string>;
 };
 

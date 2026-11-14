@@ -10,8 +10,8 @@ import { type ColumnRef, type ColumnType, columnRef, isExpression, refOf } from 
 export type ColumnsSpec = Readonly<Record<string, ColumnType<unknown>>>;
 type ValueOfColumn<C> = C extends ColumnType<infer Value> ? Value : never;
 
-/** A stored tenant table, a server-metadata system table, or a read used as a table. */
-export type TableKind = "tenant" | "system" | "derived";
+/** A stored tenant table, a server-metadata system table, a read used as a table, bound rows. */
+export type TableKind = "tenant" | "system" | "derived" | "rows";
 
 /** The descriptor's facts the builder renders from, apart from its typed columns. */
 export type ClickHouseTableFacts = {

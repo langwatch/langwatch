@@ -8,6 +8,7 @@ import { conditionsExpression, fenceExpression, PINNED_SETTINGS } from "../autho
 import { TENANT_IDS_SETTING } from "../identity/tenantSetting.ts";
 import { refuseOverBudget } from "../statementBudget.ts";
 import { StatementScopeError } from "../statementScopeError.ts";
+import { boundRowsSource, isBoundRows } from "./bound-rows.ts";
 import {
   type Binding,
   type ColumnRef,
@@ -137,6 +138,8 @@ type ReadState = {
   readonly latestVersion: "where" | "prewhere" | undefined;
   /** The elected table's columns the caller declared stable per key; the election repeats them. */
   readonly repeats: readonly string[];
+  /** The column the FROM side's election takes the max of, when not the descriptor's version. */
+  readonly version: string | undefined;
   /** The indices of `where` conditions that filter the elected rows only, never the election. */
   readonly outerOnly: readonly number[];
   readonly ctes: readonly { name: string; read: ReadState }[];
@@ -147,8 +150,10 @@ type ReadState = {
 
 type NoCtes = Record<never, never>;
 
-/** The table kinds a scope reads: server metadata reads system tables, other scopes tenants'. */
-type KindFor<Scope extends TenantScope> = Scope extends ServerMetadataScope ? "system" : "tenant";
+/** The table kinds a scope reads: server metadata reads system tables, others tenants' and rows. */
+type KindFor<Scope extends TenantScope> = Scope extends ServerMetadataScope
+  ? "system"
+  : "tenant" | "rows";
 
 /** A read used as a table: its selected keys, typed by the values they hold. */
 export type DerivedColumns<Row> = { readonly [Key in keyof Row & string]: ColumnType<Row[Key]> };
@@ -192,6 +197,7 @@ const initialState = ({
   tenancy: { kind: "unstated" },
   latestVersion: undefined,
   repeats: [],
+  version: undefined,
   outerOnly: [],
   ctes: [],
   arms: [],
@@ -204,6 +210,8 @@ function checkSource({ scope, table }: { scope: TenantScope; table: ClickHouseTa
     if (DERIVED.get(table)?.scope !== scope) throw new QueryBuilderError({ kind: "foreign-scope" });
     return;
   }
+  // Bound rows hold no tenant rows; `no-tenant-table` at build keeps them from standing in for one.
+  if (table.kind === "rows" && scope.kind !== "serverMetadata" && isBoundRows(table)) return;
   const allowed =
     scope.kind === "serverMetadata"
       ? table.kind === "system" &&
@@ -216,6 +224,22 @@ function checkSource({ scope, table }: { scope: TenantScope; table: ClickHouseTa
       scope: scope.kind,
     });
   }
+}
+
+/** The column an election takes the max of: the elected table's own, never its tenant column. */
+function electedVersionOf({
+  table,
+  version,
+}: {
+  table: ClickHouseTableFacts;
+  version: ColumnRef<string, string, unknown>;
+}): string {
+  const { node } = version;
+  if (node.kind === "column" && node.table === table.name && node.name !== table.tenantColumn) {
+    return node.name;
+  }
+  const column = node.kind === "column" ? `${node.table}.${node.name}` : node.kind;
+  throw new QueryBuilderError({ kind: "version-outside-election", table: table.name, column });
 }
 
 /** Whether a read selects its FROM side's tenant column as itself, under that column's name. */
@@ -410,7 +434,8 @@ export class ClickHouseRead<
 
   /**
    * `latestVersion` elects the joined side's latest version inside its own subquery. A derived
-   * side joins when it selects its tenant column: its own read carries the predicate.
+   * side joins when it selects its tenant column (its own read carries the predicate), or when it
+   * reads no tenant table, as a read of bound rows does: it then joins on `on` alone.
    */
   innerJoin<Name extends string, Columns extends ColumnsSpec>(
     table: ClickHouseTable<Name, Columns, "tenant" | "derived">,
@@ -441,7 +466,8 @@ export class ClickHouseRead<
   }): ClickHouseRead<Scope, NextTables, Row, Ctes> {
     for (const side of [this.#state.table, table]) {
       const joinable =
-        side.kind === "tenant" || (side.kind === "derived" && side.tenantColumn !== "");
+        side.kind === "tenant" ||
+        (side.kind === "derived" && (side.tenantColumn !== "" || !readsTenantTable(side)));
       if (!joinable) throw new QueryBuilderError({ kind: "unjoinable", table: side.name });
     }
     checkSource({ scope: this.#state.scope, table });
@@ -507,19 +533,22 @@ export class ClickHouseRead<
   }
 
   /**
-   * The IN-tuple election of keys and version (clickhouse-queries.md) under the same scope. On a
-   * join it elects the FROM side inside its own subquery; `prewhere` places it in PREWHERE.
-   * `repeat` names the FROM table's columns that never change between a key's versions.
+   * The IN-tuple election of keys and version (clickhouse-queries.md), in WHERE or `prewhere`.
+   * `repeat` names the FROM table's columns stable per key; `version` the column the engine
+   * replaces by, when it is not the descriptor's version column.
    */
   latestVersion({
     prewhere = false,
     repeat = [],
+    version,
   }: {
     prewhere?: boolean;
     repeat?: readonly ColumnRef<Tables, string, unknown>[];
+    version?: ColumnRef<Tables, string, unknown>;
   } = {}): ClickHouseRead<Scope, Tables, Row, Ctes> {
     const { table } = this.#state;
-    if (table.versionColumn === undefined) {
+    const elected = version === undefined ? undefined : electedVersionOf({ table, version });
+    if (table.versionColumn === undefined && elected === undefined) {
       throw new QueryBuilderError({ kind: "no-version-column", table: table.name });
     }
     if (prewhere && this.#state.joins.length > 0)
@@ -531,7 +560,11 @@ export class ClickHouseRead<
       const column = node.kind === "column" ? `${node.table}.${node.name}` : node.kind;
       throw new QueryBuilderError({ kind: "repeat-outside-election", table: table.name, column });
     });
-    return this.#next({ latestVersion: prewhere ? "prewhere" : "where", repeats });
+    return this.#next({
+      latestVersion: prewhere ? "prewhere" : "where",
+      repeats,
+      version: elected,
+    });
   }
 
   /** A proof's shared windows, as `{{tenantScope:<TimeColumn>}}` renders them. */
@@ -638,6 +671,9 @@ export class ClickHouseRead<
     const sql = renderStatement({ state: this.#state, context, nested: false, keys: undefined });
     refuseOverBudget({ statement: sql, params: context.params });
     const { scope } = this.#state;
+    if (scope.kind !== "serverMetadata" && context.tenantColumns.size === 0) {
+      throw new QueryBuilderError({ kind: "no-tenant-table" });
+    }
     const { params } = context;
     let statement: ClickHouseReadStatement<Row> | MetadataReadStatement<Row>;
     if (scope.kind === "allTenants") {
@@ -865,7 +901,7 @@ function sourceOf({ state, context }: { state: ReadState; context: RenderContext
   const { table } = state;
   if (table === NO_TABLE) return { from: undefined, predicate: undefined };
   if (state.joins.length === 0) {
-    const derived = derivedSide({ table, context });
+    const derived = derivedSide({ table, context }) ?? boundRowsSource({ table, context });
     if (derived !== undefined) return { from: derived, predicate: undefined };
     const alias = table.name === table.stored ? "" : ` AS ${table.name}`;
     return {
@@ -896,7 +932,9 @@ function sourceOf({ state, context }: { state: ReadState; context: RenderContext
         latestVersion: join.latestVersion,
       });
     const on = renderExpression({ node: join.on, context, qualify: true });
-    return `${join.kind} JOIN ${side} ON ${left} = ${right} AND ${on}`;
+    // A side with no tenant column reads no tenant table (`#join`): there is no tenant to match.
+    const both = table.tenantColumn !== "" && join.table.tenantColumn !== "";
+    return `${join.kind} JOIN ${side} ON ${both ? `${left} = ${right} AND ` : ""}${on}`;
   });
   return { from: [first, ...joined].join(" "), predicate: undefined };
 }
@@ -973,6 +1011,20 @@ function selectionOf({
   return ordered;
 }
 
+/** Whether a derived table's text reads a tenant table anywhere: a source, a CTE or a scalar. */
+function readsTenantTable(table: ClickHouseTableFacts): boolean {
+  const read = DERIVED.get(table);
+  if (read === undefined) return true;
+  const context = renderContext();
+  try {
+    renderStatement({ state: read, context, nested: false, keys: undefined });
+  } catch {
+    // A read that does not render is not shown to read no tenant table; its own render refuses it.
+    return true;
+  }
+  return context.tenantColumns.size > 0;
+}
+
 /** A derived join side: its own read, whose text carries the scope's predicate on its tables. */
 function derivedSide({
   table,
@@ -1037,9 +1089,7 @@ function tenantPredicate({
   const { scope, tenancy } = state;
   // A derived table's own read carries the predicate; a system table holds no tenant rows.
   if (table.kind !== "tenant") return undefined;
-  if (scope.kind !== "allTenants" && scope.kind !== "serverMetadata") {
-    context.tenantColumns.add(table.tenantColumn);
-  }
+  context.tenantColumns.add(table.tenantColumn);
   switch (scope.kind) {
     case "allTenants":
     case "serverMetadata":
@@ -1138,7 +1188,8 @@ function electionOf({
   table: ClickHouseTableFacts;
   context: RenderContext;
 }): string {
-  const version = table.versionColumn ?? "";
+  // A join side elects on its descriptor's version; the FROM side on the read's, when it names one.
+  const version = (table === state.table ? state.version : undefined) ?? table.versionColumn ?? "";
   const keys = table.sortKey;
   const where: string[] = [];
   const predicate = tenantPredicate({ state, table, context, election: true });

@@ -33,6 +33,7 @@ export {
   type TableKind,
 } from "./table.ts";
 export { systemColumns, systemReplicas, systemServerSettings } from "./system-tables.ts";
+export { boundRows, type BoundRowColumns } from "./bound-rows.ts";
 export {
   column,
   param,

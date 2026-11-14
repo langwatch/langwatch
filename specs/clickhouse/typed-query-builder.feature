@@ -396,3 +396,51 @@ Feature: A typed ClickHouse read builder renders the tenant predicate and the te
     When the page is built with its cursor outside the election and sent
     Then the span is not on the page, as main pages it, while a repeated cursor returns its stale version
     And a zipped tuple membership returns exactly its tenant's keys and prunes the primary key as the raw form does
+
+  @unit
+  Scenario: Rows zipped from bound arrays are a source that reads no table
+    Given parallel bound arrays of series ids, epoch milliseconds and point ids
+    When a read selects from rows zipped from those arrays
+    Then each row's columns are the arrays' elements, typed by their arrays, from arrayJoin of arrayZip of the bound arrays
+    And a column that is not a bound array, arrays of unequal length and a server-metadata read of the rows are refused
+
+  @unit
+  Scenario: Bound rows never stand in for a tenant table
+    Given a tenant scope and a read whose only sources are bound rows
+    When it is built
+    Then the builder refuses it, under a single, a set and an all-tenants scope
+    And a read joining the rows to a tenant read carries that read's tenant predicate and the tenant setting
+
+  @unit
+  Scenario: A derived read of bound rows joins a tenant read without a tenant equality
+    Given a derived tenant read selecting its tenant column and a derived read of bound rows
+    When one joins the other
+    Then the join's ON holds the caller's condition alone and the tenant side keeps its predicate in its own subquery
+    And a derived tenant read that drops its tenant column is still refused as a join side
+
+  @unit
+  Scenario: A UNION ALL arm keeps its own order and LIMIT BY under its own scope
+    Given a union whose second arm is ordered and limited to one row per series
+    When it is built
+    Then the arm renders its ORDER BY and LIMIT 1 BY inside its own parentheses
+    And each arm carries the tenant predicate, the statement carries the tenant setting, and the client's tenant guard passes it
+
+  @integration
+  Scenario: The metric successor seek runs on 26.8 as main's raw query does
+    Given ClickHouse 26.8, the reader identity and metric_data_points created by its goose migration, another tenant reusing the series ids
+    When the successor seek is built from bound span rows, a derived points read and an ordered union arm, and sent
+    Then it returns the rows main's raw query returns, also when the setting lists every tenant
+
+  @unit
+  Scenario: A latest-version read elects on the column its engine replaces by
+    Given a table whose engine replaces by StartTime while its descriptor's version column is UpdatedAt
+    When the read elects its latest version naming StartTime as the version
+    Then the election takes the max of StartTime over the descriptor's keys, under the same tenant predicate
+    And a read naming no version elects on the descriptor's version as before
+    And a version naming the tenant column or another table's column is refused
+
+  @integration
+  Scenario: An election on a named version column runs on 26.8 as main's read does
+    Given ClickHouse 26.8, the reader identity and a span with two versions sharing its latest StartTime
+    When the read elects on StartTime and is sent
+    Then both versions come back with the span's other keys, as main's raw read returns them, and an older StartTime does not

@@ -6,6 +6,8 @@
  * holds alone under a widened setting, and another tenant's rows never appear.
  * @see specs/clickhouse/typed-query-builder.feature
  */
+import { readFileSync } from "node:fs";
+
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import {
   type AuthorizationInput,
@@ -17,7 +19,8 @@ import {
 import { ClickHouseContainer, type StartedClickHouseContainer } from "@testcontainers/clickhouse";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { column, param } from "../builder/expression.ts";
+import { boundRows } from "../builder/bound-rows.ts";
+import { column, type ConditionOps, param } from "../builder/expression.ts";
 import { fn } from "../builder/functions.ts";
 import { clickhouseRead, type MetadataReadStatement } from "../builder/read.ts";
 import { tenantScope } from "../builder/scope.ts";
@@ -384,6 +387,309 @@ async function primaryKeyOf({ statement }: { statement: Sendable }) {
     .map(Number);
   return { keys: section.slice(section.indexOf("Keys:") + 1, keysEnd), granules: { read, total } };
 }
+
+/** metric_data_points as goose 00049 creates it on one node, with no storage policy. */
+function metricPointsDdl(): string {
+  const migration = readFileSync(
+    new URL(
+      "../../../clickhouse-migrations/migrations/00049_create_canonical_metrics.sql",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  const block = migration
+    .split("-- +goose StatementBegin")
+    .map((each) => each.split("-- +goose StatementEnd")[0] ?? "")
+    .find((each) =>
+      /TABLE IF NOT EXISTS \$\{CLICKHOUSE_DATABASE\}\.metric_data_points\s/.test(each),
+    );
+  if (block === undefined) throw new Error("goose 00049 creates metric_data_points");
+  const ddl = block
+    .replace(/\$\{CLICKHOUSE_DATABASE\}/g, DATABASE)
+    .replace(/\$\{CLICKHOUSE_ENGINE_REPLACING_PREFIX:-([^}]*)\}/g, "$1")
+    .replace(/\$\{CLICKHOUSE_STORAGE_POLICY_SETTING\}/g, "")
+    .trim()
+    .replace(/;$/, "");
+  if (/\$\{/.test(ddl)) throw new Error("goose 00049 names a variable this test does not set");
+  return ddl;
+}
+
+const metricPoints = defineClickHouseTable({
+  name: "metric_data_points",
+  tenantColumn: "TenantId",
+  versionColumn: "DedupVersion",
+  sortKey: ["TenantId", "SeriesId", "TimeUnixMs", "TimeUnixNano", "PointId"],
+  columns: {
+    TenantId: column.string(),
+    PointId: column.fixedString({ length: 64 }),
+    SeriesId: column.fixedString({ length: 64 }),
+    MetricKind: column.lowCardinalityString(),
+    AggregationTemporality: column.lowCardinalityString(),
+    TimeUnixNano: column.uint64(),
+    TimeUnixMs: column.dateTime64({ precision: 3 }),
+    DedupVersion: column.uint64(),
+  },
+});
+
+const SERIES_1 = "1".repeat(64);
+const SERIES_2 = "2".repeat(64);
+const pointIdOf = (point: number) => String(point).padStart(64, "0");
+const metricPoint = (
+  TenantId: string,
+  SeriesId: string,
+  ms: number,
+  nano: number,
+  point: number,
+) => ({
+  TenantId,
+  SeriesId,
+  PointId: pointIdOf(point),
+  TimeUnixMs: at(NOW + ms),
+  TimeUnixNano: nano,
+  MetricKind: "gauge",
+  AggregationTemporality: "unspecified",
+  DedupVersion: 1,
+});
+const METRIC_POINTS = [
+  metricPoint(A, SERIES_1, 100, 1, 1),
+  metricPoint(A, SERIES_1, 200, 1, 2),
+  metricPoint(A, SERIES_1, 200, 2, 3),
+  metricPoint(A, SERIES_1, 300, 1, 4),
+  metricPoint(A, SERIES_1, 400, 1, 5),
+  metricPoint(A, SERIES_1, 500, 1, 6),
+  metricPoint(A, SERIES_2, 100, 1, 11),
+  metricPoint(A, SERIES_2, 150, 1, 12),
+  metricPoint(A, SERIES_2, 300, 1, 13),
+  // Tenant B reuses the series ids: each point would join a span, or win an arm, if it leaked.
+  metricPoint(B, SERIES_1, 250, 1, 21),
+  metricPoint(B, SERIES_1, 350, 1, 22),
+  metricPoint(B, SERIES_2, 120, 1, 23),
+  metricPoint(B, SERIES_2, 200, 1, 24),
+];
+const SEEK_SPANS = [
+  { seriesId: SERIES_1, from: [100, "1", 1], to: [300, "1", 4] },
+  { seriesId: SERIES_2, from: [100, "1", 11], to: [150, "1", 12] },
+] as const;
+const seekParams = {
+  tenantId: A,
+  seriesIds: SEEK_SPANS.map((span) => span.seriesId),
+  fromTimes: SEEK_SPANS.map((span) => NOW + span.from[0]),
+  fromNanos: SEEK_SPANS.map((span) => span.from[1]),
+  fromPoints: SEEK_SPANS.map((span) => pointIdOf(span.from[2])),
+  toTimes: SEEK_SPANS.map((span) => NOW + span.to[0]),
+  toNanos: SEEK_SPANS.map((span) => span.to[1]),
+  toPoints: SEEK_SPANS.map((span) => pointIdOf(span.to[2])),
+  scanFrom: NOW + 100,
+  latestSpanEnd: NOW + 300,
+  earliestSpanEnd: NOW + 150,
+};
+
+/** The successor seek as the metric port writes it: bound span rows, a derived points read. */
+const seekSeriesIds = param.strings(seekParams.seriesIds);
+const spanRows = boundRows({
+  name: "span",
+  arrays: {
+    SeriesId: seekSeriesIds,
+    FromTime: param.int64s(seekParams.fromTimes),
+    FromNano: param.strings(seekParams.fromNanos),
+    FromPoint: param.strings(seekParams.fromPoints),
+    ToTime: param.int64s(seekParams.toTimes),
+    ToNano: param.strings(seekParams.toNanos),
+    ToPoint: param.strings(seekParams.toPoints),
+  },
+});
+const seekSpans = clickhouseRead({ scope: single })
+  .from(spanRows)
+  .select({
+    SpanSeriesId: spanRows.SeriesId,
+    SpanFromTime: fn.fromUnixTimestamp64Milli(spanRows.FromTime),
+    SpanFromNano: fn.cast(spanRows.FromNano, column.uint64()),
+    SpanFromPoint: spanRows.FromPoint,
+    SpanToTime: fn.fromUnixTimestamp64Milli(spanRows.ToTime),
+    SpanToNano: fn.cast(spanRows.ToNano, column.uint64()),
+    SpanToPoint: spanRows.ToPoint,
+  })
+  .as("spans");
+const seriesPoints = clickhouseRead({ scope: single })
+  .from(metricPoints)
+  .select({
+    TenantId: metricPoints.TenantId,
+    SeriesId: metricPoints.SeriesId,
+    PointId: metricPoints.PointId,
+    TimeUnixNano: metricPoints.TimeUnixNano,
+    MetricKind: metricPoints.MetricKind,
+    AggregationTemporality: metricPoints.AggregationTemporality,
+    SeekTime: metricPoints.TimeUnixMs,
+  })
+  .where(({ and, gte, oneOf }) =>
+    and(
+      oneOf(metricPoints.SeriesId, seekSeriesIds),
+      gte(metricPoints.TimeUnixMs, seekParams.scanFrom),
+    ),
+  )
+  .as("series_points");
+
+type SeekOps = ConditionOps<"series_points" | "spans", Record<never, never>>;
+/** main's orderedAfter and orderedBefore: (SeekTime, TimeUnixNano, PointId) past one span end. */
+function pastEnd({ ops, past, end }: { ops: SeekOps; past: "gt" | "lt"; end: "From" | "To" }) {
+  const { and, eq, or } = ops;
+  const beyond = ops[past];
+  const [time, nano, point] =
+    end === "From"
+      ? [seekSpans.SpanFromTime, seekSpans.SpanFromNano, seekSpans.SpanFromPoint]
+      : [seekSpans.SpanToTime, seekSpans.SpanToNano, seekSpans.SpanToPoint];
+  return or(
+    beyond(seriesPoints.SeekTime, time),
+    and(
+      eq(seriesPoints.SeekTime, time),
+      or(
+        beyond(seriesPoints.TimeUnixNano, nano),
+        and(eq(seriesPoints.TimeUnixNano, nano), beyond(seriesPoints.PointId, point)),
+      ),
+    ),
+  );
+}
+const seekOn = ({ eq }: SeekOps) =>
+  eq(fn.cast(seriesPoints.SeriesId, column.string()), seekSpans.SpanSeriesId);
+const seekSelection = {
+  SeriesId: seriesPoints.SeriesId,
+  PointId: seriesPoints.PointId,
+  TimeUnixMs: fn.toUnixTimestamp64Milli(seriesPoints.SeekTime),
+  TimeUnixNano: seriesPoints.TimeUnixNano,
+  MetricKind: seriesPoints.MetricKind,
+  AggregationTemporality: seriesPoints.AggregationTemporality,
+  SeekTime: seriesPoints.SeekTime,
+};
+const builtSeek = () =>
+  clickhouseRead({ scope: single })
+    .from(seriesPoints)
+    .innerJoin(seekSpans, seekOn)
+    .select(seekSelection)
+    .where((ops) =>
+      ops.and(
+        ops.lte(seriesPoints.SeekTime, seekParams.latestSpanEnd),
+        pastEnd({ ops, past: "gt", end: "From" }),
+        pastEnd({ ops, past: "lt", end: "To" }),
+      ),
+    )
+    .unionAll((arm) =>
+      arm
+        .from(seriesPoints)
+        .innerJoin(seekSpans, seekOn)
+        .select(seekSelection)
+        .where((ops) =>
+          ops.and(
+            ops.gte(seriesPoints.SeekTime, seekParams.earliestSpanEnd),
+            pastEnd({ ops, past: "gt", end: "To" }),
+          ),
+        )
+        .orderBy(seriesPoints.SeriesId)
+        .orderBy(seriesPoints.SeekTime)
+        .orderBy(seriesPoints.TimeUnixNano)
+        .orderBy(seriesPoints.PointId)
+        .limitBy(1, seriesPoints.SeriesId),
+    )
+    .build();
+
+/** main's SUCCESSOR_SEEK_QUERY (metric-data-point-append repository), SEEK_SELECT inlined. */
+const orderedPast = (operator: ">" | "<", bound: "From" | "To") =>
+  `(series_points.SeekTime ${operator} spans.Span${bound}Time
+     OR (series_points.SeekTime = spans.Span${bound}Time
+       AND (series_points.TimeUnixNano ${operator} spans.Span${bound}Nano
+         OR (series_points.TimeUnixNano = spans.Span${bound}Nano
+           AND series_points.PointId ${operator} spans.Span${bound}Point))))`;
+const RAW_SEEK = `
+  WITH spans AS (
+    SELECT
+      span.1 AS SpanSeriesId,
+      fromUnixTimestamp64Milli(span.2) AS SpanFromTime,
+      toUInt64(span.3) AS SpanFromNano,
+      span.4 AS SpanFromPoint,
+      fromUnixTimestamp64Milli(span.5) AS SpanToTime,
+      toUInt64(span.6) AS SpanToNano,
+      span.7 AS SpanToPoint
+    FROM (
+      SELECT arrayJoin(arrayZip(
+        {seriesIds:Array(String)},
+        {fromTimes:Array(Int64)}, {fromNanos:Array(String)}, {fromPoints:Array(String)},
+        {toTimes:Array(Int64)}, {toNanos:Array(String)}, {toPoints:Array(String)}
+      )) AS span
+    )
+  ),
+  series_points AS (
+    SELECT SeriesId, PointId, toUnixTimestamp64Milli(TimeUnixMs) AS TimeUnixMs, TimeUnixNano,
+      MetricKind, AggregationTemporality, metric_data_points.TimeUnixMs AS SeekTime
+    FROM metric_data_points
+    WHERE TenantId = {tenantId:String}
+      AND SeriesId IN {seriesIds:Array(String)}
+      AND metric_data_points.TimeUnixMs >= fromUnixTimestamp64Milli({scanFrom:Int64})
+  )
+  SELECT * FROM (
+    (SELECT series_points.*
+     FROM series_points INNER JOIN spans ON CAST(series_points.SeriesId AS String) = spans.SpanSeriesId
+     WHERE series_points.SeekTime <= fromUnixTimestamp64Milli({latestSpanEnd:Int64})
+       AND ${orderedPast(">", "From")} AND ${orderedPast("<", "To")})
+    UNION ALL
+    (SELECT series_points.*
+     FROM series_points INNER JOIN spans ON CAST(series_points.SeriesId AS String) = spans.SpanSeriesId
+     WHERE series_points.SeekTime >= fromUnixTimestamp64Milli({earliestSpanEnd:Int64})
+       AND ${orderedPast(">", "To")}
+     ORDER BY series_points.SeriesId ASC, series_points.SeekTime ASC,
+       series_points.TimeUnixNano ASC, series_points.PointId ASC
+     LIMIT 1 BY SeriesId)
+  )`;
+
+/** stored_spans' engine, ReplacingMergeTree(StartTime) (goose 00002); the version is UpdatedAt. */
+const versionedSpans = defineClickHouseTable({
+  name: "versioned_spans",
+  tenantColumn: "TenantId",
+  timeColumn: "StartTime",
+  versionColumn: "UpdatedAt",
+  sortKey: ["TenantId", "TraceId", "SpanId"],
+  columns: {
+    TenantId: column.string(),
+    TraceId: column.string(),
+    SpanId: column.string(),
+    SpanName: column.string(),
+    StartTime: column.dateTime64({ precision: 9 }),
+    UpdatedAt: column.dateTime64({ precision: 3 }),
+  },
+});
+const versionedSpan = (
+  TenantId: string,
+  SpanId: string,
+  SpanName: string,
+  startAgo: number,
+  updatedAgo: number,
+) => ({
+  TenantId,
+  TraceId: "tv",
+  SpanId,
+  SpanName,
+  StartTime: at(NOW - startAgo),
+  UpdatedAt: at(NOW - updatedAgo),
+});
+/** s1's two latest versions share a StartTime; its stale version is the most recently updated. */
+const VERSIONED_SPANS = [
+  versionedSpan(A, "s1", "stale", 900, 10),
+  versionedSpan(A, "s1", "first", 100, 200),
+  versionedSpan(A, "s1", "second", 100, 100),
+  versionedSpan(A, "s2", "only", 500, 100),
+  versionedSpan(B, "s1", "other", 50, 50),
+];
+const builtVersioned = () =>
+  clickhouseRead({ scope: single })
+    .from(versionedSpans)
+    .select({ SpanId: versionedSpans.SpanId, SpanName: versionedSpans.SpanName })
+    .where(({ eq }) => eq(versionedSpans.TraceId, "tv"))
+    .latestVersion({ version: versionedSpans.StartTime })
+    .build();
+/** main's full-record span election (trace-full-record-rows repository), unbounded. */
+const RAW_VERSIONED = `SELECT SpanId, SpanName FROM versioned_spans
+  WHERE TenantId = {tenantId:String} AND TraceId = {traceId:String}
+    AND (TenantId, TraceId, SpanId, StartTime) IN (SELECT TenantId, TraceId, SpanId, max(StartTime)
+      FROM versioned_spans WHERE TenantId = {tenantId:String} AND TraceId = {traceId:String}
+      GROUP BY TenantId, TraceId, SpanId)`;
 
 /** The second census's shapes: nested columns, AggregateFunction merges, lambdas and casts. */
 const CENSUS_SHAPES: Record<string, { statement: () => Sendable; rows: string[] }> = {
@@ -813,6 +1119,13 @@ describe("given builder statements sent as a reader under a row policy on ClickH
          ORDER BY (TenantId, TraceId, SpanId) SETTINGS index_granularity = 1`,
       `CREATE ROW POLICY ${READER}_paged ON ${DATABASE}.paged_spans USING ${POLICY} TO ${READER}`,
       `SYSTEM STOP MERGES ${DATABASE}.paged_spans`,
+      metricPointsDdl(),
+      `CREATE ROW POLICY ${READER}_metric_points ON ${DATABASE}.metric_data_points USING ${POLICY} TO ${READER}`,
+      `CREATE TABLE ${DATABASE}.versioned_spans (TenantId String, TraceId String, SpanId String,
+         SpanName String, StartTime DateTime64(9), UpdatedAt DateTime64(3))
+         ENGINE = ReplacingMergeTree(StartTime) ORDER BY (TenantId, TraceId, SpanId)`,
+      `CREATE ROW POLICY ${READER}_versioned ON ${DATABASE}.versioned_spans USING ${POLICY} TO ${READER}`,
+      `SYSTEM STOP MERGES ${DATABASE}.versioned_spans`,
       ...ROLLUP_PARTS.map(
         ([tenant, trace, cost, roles, spend, count, ms]) =>
           `INSERT INTO ${DATABASE}.metrics_rollup SELECT '${tenant}', '${trace}',
@@ -847,6 +1160,18 @@ describe("given builder statements sent as a reader under a row policy on ClickH
     await admin.insert({
       table: `${DATABASE}.paged_spans`,
       values: PAGED_SPANS,
+      format: "JSONEachRow",
+      clickhouse_settings: { optimize_on_insert: 0 },
+    });
+    await admin.insert({
+      table: `${DATABASE}.metric_data_points`,
+      values: METRIC_POINTS,
+      format: "JSONEachRow",
+    });
+    // Every version of s1 stays a row, as on a replica before its merge.
+    await admin.insert({
+      table: `${DATABASE}.versioned_spans`,
+      values: VERSIONED_SPANS,
       format: "JSONEachRow",
       clickhouse_settings: { optimize_on_insert: 0 },
     });
@@ -989,6 +1314,38 @@ describe("given builder statements sent as a reader under a row policy on ClickH
       expect(ours).toEqual(main);
       expect(ours.keys).toEqual(expect.arrayContaining(["TraceId", "SpanId"]));
       expect(ours.granules.read).toBeLessThan(ours.granules.total / 4);
+    });
+  });
+
+  describe("when the metric successor seek is built from bound span rows and sent", () => {
+    /** @scenario "The metric successor seek runs on 26.8 as main's raw query does" */
+    it("returns the rows main's raw query returns, also when the setting lists every tenant", async () => {
+      const built = builtSeek();
+      const main = await rowsOf({
+        statement: { sql: RAW_SEEK, params: seekParams, settings: built.settings },
+      });
+
+      expect(main.map((row) => Number(row.split("|")[1]))).toEqual([2, 3, 5, 13]);
+      expect(await rowsOf({ statement: built })).toEqual(main);
+      expect(await rowsOf({ statement: built, tenants: EVERY_TENANT })).toEqual(main);
+    });
+  });
+
+  describe("when a read elects on StartTime, the column its engine replaces by", () => {
+    /** @scenario "An election on a named version column runs on 26.8 as main's read does" */
+    it("returns both versions sharing the latest StartTime, as main's raw read does", async () => {
+      const built = builtVersioned();
+      const main = await rowsOf({
+        statement: {
+          sql: RAW_VERSIONED,
+          params: { tenantId: A, traceId: "tv" },
+          settings: built.settings,
+        },
+      });
+
+      expect(main).toEqual(["s1|first", "s1|second", "s2|only"]);
+      expect(await rowsOf({ statement: built })).toEqual(main);
+      expect(await rowsOf({ statement: built, tenants: EVERY_TENANT })).toEqual(main);
     });
   });
 

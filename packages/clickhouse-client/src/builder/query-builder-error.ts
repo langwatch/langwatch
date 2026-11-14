@@ -16,6 +16,7 @@ export type QueryBuilderViolation =
   | { kind: "final-without-tenant-key"; table: string }
   | { kind: "no-version-column"; table: string }
   | { kind: "repeat-outside-election"; table: string; column: string }
+  | { kind: "version-outside-election"; table: string; column: string }
   | { kind: "latest-version-in-join" }
   | { kind: "foreign-column"; table: string; column: string }
   | { kind: "missing-source" }
@@ -40,7 +41,10 @@ export type QueryBuilderViolation =
   | { kind: "scalar-not-one-value"; selected: number }
   | { kind: "bad-union-order" }
   | { kind: "refused-setting"; setting: string }
-  | { kind: "settings-in-union" };
+  | { kind: "settings-in-union" }
+  | { kind: "bound-rows-not-arrays"; column: string }
+  | { kind: "bound-rows-uneven"; lengths: readonly number[] }
+  | { kind: "no-tenant-table" };
 
 /** A read the builder will not build. Named so a test can tell which refusal fired. */
 export class QueryBuilderError extends Error {
@@ -75,6 +79,8 @@ function describe(violation: QueryBuilderViolation): string {
       return `Table "${violation.table}" declares no version column, so it has no latest version to elect.`;
     case "repeat-outside-election":
       return `An election over "${violation.table}" repeats only its own non-tenant columns, not "${violation.column}".`;
+    case "version-outside-election":
+      return `An election over "${violation.table}" takes the max of its own non-tenant column, not "${violation.column}".`;
     case "latest-version-in-join":
       return "A latest-version election is built on a single-table read.";
     case "foreign-column":
@@ -108,7 +114,7 @@ function describe(violation: QueryBuilderViolation): string {
     case "table-outside-scope":
       return `Table "${violation.table}" cannot be read under a ${violation.scope} scope.`;
     case "unjoinable":
-      return `"${violation.table}" is neither a stored tenant table nor a derived read selecting its tenant column, so it cannot be a join side.`;
+      return `"${violation.table}" is neither a stored tenant table, a derived read selecting its tenant column nor a derived read of no tenant table, so it cannot be a join side.`;
     case "prewhere-in-join":
       return "PREWHERE applies to a one-table read; a join side filters in its own subquery.";
     case "id-bound-in-join":
@@ -125,5 +131,11 @@ function describe(violation: QueryBuilderViolation): string {
       return `A membership set is bound values or a function of them; it cannot read column "${violation.column}".`;
     case "settings-in-union":
       return "A SETTINGS clause binds one SELECT; set it on a read that selects from the union.";
+    case "bound-rows-not-arrays":
+      return `Bound rows zip one or more bound arrays, each under a plain name; "${violation.column}" is not one.`;
+    case "bound-rows-uneven":
+      return `Bound rows zip arrays of one length, not of lengths ${violation.lengths.join(", ")}.`;
+    case "no-tenant-table":
+      return "A read names at least one tenant table; bound rows alone carry no tenant predicate.";
   }
 }

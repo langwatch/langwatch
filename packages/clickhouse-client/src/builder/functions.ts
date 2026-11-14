@@ -375,6 +375,8 @@ export const fn = {
 
   // Dates and times
   toUnixTimestamp64Milli: numeric("toUnixTimestamp64Milli", INT64),
+  /** Epoch milliseconds as a DateTime64(3): a value compared with it binds as epoch ms. */
+  fromUnixTimestamp64Milli: numeric("fromUnixTimestamp64Milli", EPOCH_MS),
   toUnixTimestamp: numeric("toUnixTimestamp", INT64),
   toDate: <T extends string>(of: E<Num, T>) =>
     call<string, T>({ name: "toDate", args: [of.node], binding: { paramType: "Date" } }),
