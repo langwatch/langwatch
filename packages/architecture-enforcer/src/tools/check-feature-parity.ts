@@ -286,6 +286,8 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   // The gateway-matrix seed: which providers it seeds from which credentials,
   // and that Bedrock stays keyless (specs/ci/gateway-matrix-seed.feature).
   "tools/matrixseed",
+  // Its command writes the bootstrapped step output the later steps gate on.
+  "cmd/matrixseed",
   // The CLI half of the same tool: the verdict-to-exit-code step is the part
   // CI gates on, so the "check fails" / "check passes" scenarios bind here.
   "cmd/linkcheck",
