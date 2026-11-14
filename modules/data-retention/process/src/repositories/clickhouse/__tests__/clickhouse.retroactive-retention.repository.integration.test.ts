@@ -316,6 +316,24 @@ describe.skipIf(!clickHouseUrl)("Id index retention on live ClickHouse", () => {
     expect(await indexRetention("stored_spans_id_index", project)).toEqual([365]);
     expect(await indexRetention("event_log_id_index", project)).toEqual([365]);
   });
+
+  it("reads system.mutations as built statements on the system identity, which the server accepts", async () => {
+    const project = `project-${generate("test").toString()}`;
+    await seedIndex("stored_spans_id_index", [
+      { TenantId: project, TraceId: "trace-1", _retention_days: 30 },
+    ]);
+    await repository.triggerUpdate({
+      projectId: project,
+      category: "traces",
+      newRetentionDays: 90,
+    });
+
+    const progress = await repository.findMutationProgress({ projectId: project });
+    const rewrites = await repository.findKeepForeverRewrites({});
+
+    expect(progress.every(({ isDone }) => !isDone)).toBe(true);
+    expect(Array.isArray(rewrites)).toBe(true);
+  });
 });
 
 /** The server alone: each suite makes its own scratch database; CI's URL names test_langwatch. */

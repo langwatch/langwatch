@@ -2,7 +2,11 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import type { QueryRequest } from "@langwatch/clickhouse-client";
+import {
+  type ClickHouseQueryClient,
+  type QueryRequest,
+  TENANT_IDS_SETTING,
+} from "@langwatch/clickhouse-client";
 import { RetroactiveMutationInProgressError } from "@langwatch/data-retention-contract";
 import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { describe, expect, it } from "vitest";
@@ -10,6 +14,19 @@ import { describe, expect, it } from "vitest";
 import { DECLARED_ID_INDEXES } from "../../../__tests__/support/declared-id-indexes.fixture.ts";
 import { MemoryRetroactiveRetentionRepository } from "../../memory/memory.retroactive-retention.repository.ts";
 import { ClickHouseRetroactiveRetentionRepository } from "../clickhouse.retroactive-retention.repository.ts";
+
+type BuiltRead = Parameters<ClickHouseQueryClient["read"]>[0];
+
+/** The one array a built statement binds: the tables it names. */
+function boundTables(built: BuiltRead): unknown[] {
+  return Object.values(built.statement.params).find(Array.isArray) ?? [];
+}
+
+/** A built read of a system table: all tenants, on the system identity, with no tenant setting. */
+function expectSystemRead(built: BuiltRead | undefined) {
+  expect(built?.statement).toMatchObject({ identity: "system", kind: "allTenants" });
+  expect(built?.statement.settings ?? {}).not.toHaveProperty(TENANT_IDS_SETTING);
+}
 
 /**
  * The process's one ClickHouse client, stood in for: each statement names the tenant it acts
@@ -25,10 +42,24 @@ function createRepository(
 ) {
   const commands: QueryRequest[] = [];
   const queries: QueryRequest[] = [];
+  const reads: BuiltRead[] = [];
   const clickhouse = clickHouseQueryClientDouble({
     idIndexes: () => ({ declarations: () => [...DECLARED_ID_INDEXES] }),
     async command(request: QueryRequest): Promise<void> {
       commands.push(request);
+    },
+    async read(built: BuiltRead): Promise<{ rows: unknown[] }> {
+      reads.push(built);
+      if (built.table === "system.tables") {
+        const named = boundTables(built);
+        return {
+          rows: heldTables.filter((name) => named.includes(name)).map((name) => ({ name })),
+        };
+      }
+      if (built.statement.sql.includes("SELECT DISTINCT TenantId")) {
+        return { rows: indexTenants.map((TenantId) => ({ TenantId })) };
+      }
+      return { rows: rows as unknown[] };
     },
     async query(request: QueryRequest): Promise<{ rows: unknown[] }> {
       queries.push(request);
@@ -50,6 +81,7 @@ function createRepository(
   return {
     commands,
     queries,
+    reads,
     repository: ClickHouseRetroactiveRetentionRepository.create({ clickhouse }),
   };
 }
@@ -328,7 +360,7 @@ describe("ClickHouseRetroactiveRetentionRepository", () => {
     });
 
     it("finds only the governed indexes the target holds, and their tenants", async () => {
-      const { queries, repository } = createRepository([], {
+      const { reads, repository } = createRepository([], {
         heldTables: ["trace_summaries_id_index"],
         indexTenants: ["project-b", "project-a"],
       });
@@ -344,10 +376,14 @@ describe("ClickHouseRetroactiveRetentionRepository", () => {
 
       expect(held).toEqual(["trace_summaries_id_index"]);
       expect(tenantIds).toEqual(["project-a", "project-b"]);
-      expect(queries[0]!.params).toEqual({
-        tables: ["trace_summaries_id_index", "dspy_steps_id_index"],
-      });
-      expect(queries.every((query) => query.organizationId === "org-private")).toBe(true);
+      expect(reads[0]?.table).toBe("system.tables");
+      expect(boundTables(required(reads[0]))).toEqual([
+        "trace_summaries_id_index",
+        "dspy_steps_id_index",
+      ]);
+      expect(reads[1]?.table).toBe("trace_summaries_id_index");
+      expect(reads.every((read) => read.organizationId === "org-private")).toBe(true);
+      for (const read of reads) expectSystemRead(read);
     });
   });
 
@@ -503,7 +539,7 @@ describe("ClickHouseRetroactiveRetentionRepository", () => {
   });
 
   it("maps progress categories and escapes the tenant filter through query parameters", async () => {
-    const { queries, repository } = createRepository([
+    const { reads, repository } = createRepository([
       {
         mutationId: "mut-1",
         table: "stored_spans",
@@ -534,11 +570,11 @@ describe("ClickHouseRetroactiveRetentionRepository", () => {
       "traces",
       "scenarios",
     ]);
-    const query = required(queries[0]);
-    expect(query.params).toEqual({
-      tenantFilterNeedle: "TenantId = 'weird\\'\\\\id'",
-    });
-    expect(query.sql).not.toContain("weird'\\id");
+    const read = required(reads[0]);
+    expect(Object.values(read.statement.params)).toContain("TenantId = 'weird\\'\\\\id'");
+    expect(read.statement.sql).not.toContain("weird'\\id");
+    expect(read).toMatchObject({ table: "system.mutations", tenantId: "weird'\\id" });
+    expectSystemRead(read);
   });
 
   /** @scenario "Retention settings show in-flight rewrites as ClickHouse reports them" */

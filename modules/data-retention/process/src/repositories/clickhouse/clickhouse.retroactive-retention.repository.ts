@@ -3,7 +3,15 @@ import {
   ID_INDEX_RETENTION_RAISE,
   idIndexRetentionDays,
   idIndexRetentionRaises,
+  idIndexTenantsStatement,
 } from "@langwatch/clickhouse-client";
+import {
+  clickhouseRead,
+  fn,
+  systemMutations,
+  systemTables,
+  tenantScope,
+} from "@langwatch/clickhouse-client/builder";
 import {
   RetroactiveMutationInProgressError,
   retentionCategorySchema,
@@ -69,9 +77,40 @@ const tableNameRowsSchema = z.array(z.object({ name: z.string() }));
 const tenantRowsSchema = z.array(z.object({ TenantId: z.string() }));
 
 // ClickHouse stores the command as `WHERE (TenantId = '..')` (25.x), so the needle omits WHERE.
-function tenantFilterParams(projectId: string): Record<string, string> {
+function tenantFilterParams(projectId: string): { tenantFilterNeedle: string } {
   const escapedProjectId = projectId.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
   return { tenantFilterNeedle: `TenantId = '${escapedProjectId}'` };
+}
+
+/** System tables carry no tenant column: each read spans its server, on the system identity. */
+const systemRead = ({ reason }: { reason: string }) =>
+  clickhouseRead({ scope: tenantScope.allTenants({ reason }) });
+
+/** One project's open retention rewrites, matched by its needle in each mutation's command. */
+function mutationsRead({ needle, tables }: { needle: string; tables?: readonly string[] }) {
+  const query = systemRead({
+    reason: "a project's retention rewrites, matched in each mutation's command",
+  })
+    .from(systemMutations)
+    .select({
+      mutationId: systemMutations.mutation_id,
+      table: systemMutations.table,
+      isDone: systemMutations.is_done,
+      partsToDo: systemMutations.parts_to_do,
+      createTime: fn.formatDateTime(systemMutations.create_time, "%Y-%m-%dT%H:%i:%S"),
+      command: systemMutations.command,
+    })
+    .where(({ and, eq, gt, oneOf }) =>
+      and(
+        ...(tables === undefined ? [] : [oneOf(systemMutations.table, tables)]),
+        gt(fn.position(systemMutations.command, "_retention_days"), 0),
+        gt(fn.position(systemMutations.command, needle), 0),
+        eq(systemMutations.is_done, 0),
+      ),
+    );
+  return tables === undefined
+    ? query.orderBy(systemMutations.create_time, "DESC").build()
+    : query.build();
 }
 
 /**
@@ -212,28 +251,13 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
   }
 
   async findMutationProgress(input: { projectId: string }): Promise<RetroactiveMutationProgress[]> {
-    const { rows } = await this.clickhouse.query<unknown>({
-      tenantId: input.projectId,
+    // System.mutations carries no tenant column: the project is matched inside each command.
+    const { rows } = await this.clickhouse.read({
+      statement: mutationsRead({
+        needle: tenantFilterParams(input.projectId).tenantFilterNeedle,
+      }),
       table: "system.mutations",
-      kind: "read",
-      sql: `
-        SELECT
-          mutation_id AS mutationId,
-          table AS table,
-          is_done AS isDone,
-          parts_to_do AS partsToDo,
-          formatDateTime(create_time, '%Y-%m-%dT%H:%i:%S') AS createTime,
-          command AS command
-        FROM system.mutations
-        WHERE position(command, '_retention_days') > 0
-          AND ${tenantFilterSql}
-          AND is_done = 0
-        ORDER BY create_time DESC
-      `,
-      params: tenantFilterParams(input.projectId),
-      // System.mutations carries no tenant column: the project is matched inside the recorded
-      // mutation command instead, which is what tenantFilterSql does.
-      SKIP_TENANT_CHECK: true,
+      tenantId: input.projectId,
     });
 
     return this.parseRows(rows);
@@ -263,29 +287,31 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
   }
 
   async findKeepForeverRewrites(input: ClickHouseTarget): Promise<KeepForeverRewrite[]> {
-    const { rows } = await this.clickhouse.query<unknown>({
-      tenantId: "",
-      ...input,
+    const statement = systemRead({
+      reason: "the event log's keep-forever rewrite spans every tenant on a target",
+    })
+      .from(systemMutations)
+      .select({
+        mutationId: systemMutations.mutation_id,
+        isDone: systemMutations.is_done,
+        partsToDo: fn.toUInt32(systemMutations.parts_to_do),
+        latestFailReason: systemMutations.latest_fail_reason,
+        table: systemMutations.table,
+        command: systemMutations.command,
+      })
+      .where(({ and, eq, gt, oneOf }) =>
+        and(
+          eq(systemMutations.database, fn.currentDatabase()),
+          oneOf(systemMutations.table, this.eventLogRetention.tables),
+          gt(fn.position(systemMutations.command, "_retention_days = 0"), 0),
+        ),
+      )
+      .orderBy(systemMutations.create_time, "DESC")
+      .build();
+    const { rows } = await this.clickhouse.read({
+      statement,
       table: "system.mutations",
-      kind: "read",
-      sql: `
-        SELECT
-          mutation_id AS mutationId,
-          is_done AS isDone,
-          toUInt32(parts_to_do) AS partsToDo,
-          latest_fail_reason AS latestFailReason,
-          table AS table,
-          command AS command
-        FROM system.mutations
-        WHERE database = currentDatabase()
-          AND table IN {tables:Array(String)}
-          AND position(command, '_retention_days = 0') > 0
-        ORDER BY create_time DESC
-      `,
-      params: { tables: this.eventLogRetention.tables },
-      // The event log's keep-forever rewrite spans every tenant on a target, so its mutation does
-      // too.
-      SKIP_TENANT_CHECK: true,
+      ...input,
     });
     return keepForeverRowsSchema
       .parse(rows)
@@ -318,14 +344,11 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
     const { indexes, ...target } = input;
     const tenantIds = new Set<string>();
     for (const index of this.governedIdIndexes({ indexes, categories: this.idIndexCategories() })) {
-      const { rows } = await this.clickhouse.query<unknown>({
-        tenantId: "",
-        ...target,
+      // Raising a target's index is one pass over every tenant on it, so it lists them all.
+      const { rows } = await this.clickhouse.read({
+        statement: idIndexTenantsStatement({ index }),
         table: index,
-        kind: "read",
-        sql: `SELECT DISTINCT TenantId FROM ${index}`,
-        // Raising a target's index is one pass over every tenant on it, so it lists them all.
-        SKIP_TENANT_CHECK: true,
+        ...target,
       });
       for (const { TenantId } of tenantRowsSchema.parse(rows)) tenantIds.add(TenantId);
     }
@@ -411,17 +434,16 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
     tables: readonly string[];
   }): Promise<string[]> {
     if (tables.length === 0) return [];
-    const { rows } = await this.clickhouse.query<unknown>({
-      ...route,
-      table: "system.tables",
-      kind: "read",
-      sql:
-        "SELECT name FROM system.tables " +
-        "WHERE database = currentDatabase() AND name IN {tables:Array(String)}",
-      params: { tables },
-      // System.tables carries no tenant column: this asks what the routed server holds.
-      SKIP_TENANT_CHECK: true,
-    });
+    const statement = systemRead({
+      reason: "which of the named tables the routed server holds",
+    })
+      .from(systemTables)
+      .select({ name: systemTables.name })
+      .where(({ and, eq, oneOf }) =>
+        and(eq(systemTables.database, fn.currentDatabase()), oneOf(systemTables.name, tables)),
+      )
+      .build();
+    const { rows } = await this.clickhouse.read({ statement, table: "system.tables", ...route });
     const held = new Set(tableNameRowsSchema.parse(rows).map(({ name }) => name));
     return tables.filter((table) => held.has(table));
   }
@@ -431,28 +453,14 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
     tables: string[];
     category: RetentionCategory;
   }): Promise<RetroactiveMutationProgress[]> {
-    const { rows } = await this.clickhouse.query<unknown>({
-      tenantId: input.projectId,
+    // System.mutations carries no tenant column: the project is matched inside each command.
+    const { rows } = await this.clickhouse.read({
+      statement: mutationsRead({
+        needle: tenantFilterParams(input.projectId).tenantFilterNeedle,
+        tables: input.tables,
+      }),
       table: "system.mutations",
-      kind: "read",
-      sql: `
-        SELECT
-          mutation_id AS mutationId,
-          table AS table,
-          is_done AS isDone,
-          parts_to_do AS partsToDo,
-          formatDateTime(create_time, '%Y-%m-%dT%H:%i:%S') AS createTime,
-          command AS command
-        FROM system.mutations
-        WHERE table IN {tables:Array(String)}
-          AND position(command, '_retention_days') > 0
-          AND ${tenantFilterSql}
-          AND is_done = 0
-      `,
-      params: { tables: input.tables, ...tenantFilterParams(input.projectId) },
-      // System.mutations carries no tenant column: the project is matched inside the recorded
-      // mutation command instead, which is what tenantFilterSql does.
-      SKIP_TENANT_CHECK: true,
+      tenantId: input.projectId,
     });
 
     return this.parseRows(rows, {

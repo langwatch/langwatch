@@ -1,4 +1,14 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import {
+  clickhouseRead,
+  cond,
+  fn,
+  systemBackupLog,
+  systemDisks,
+  systemParts,
+  systemTables,
+  tenantScope,
+} from "@langwatch/clickhouse-client/builder";
 
 import {
   type BackupStatusRow,
@@ -6,16 +16,23 @@ import {
 } from "../storage-footprint.repository.ts";
 import type { StorageStatsReading } from "../storage-stats-readings.repository.ts";
 
-/** One endpoint's system tables, read unscoped (`tenantId: ""`): none carries a tenant column. */
+/** No system table here carries a tenant column: each read spans the server, as the system. */
+const systemRead = ({ reason }: { reason: string }) =>
+  clickhouseRead({ scope: tenantScope.allTenants({ reason }) });
+
+/** ClickHouse's JSON output sends a UInt64 as a string. */
+const toNumber = (value: unknown): number => Number.parseInt(String(value), 10);
+
+/** One endpoint's system tables, read on the system identity (ADR-202). */
 export class ClickHouseStorageFootprintRepository extends StorageFootprintRepository {
-  private constructor(private readonly clickhouse: ClickHouseQueryClient) {
+  private constructor(private readonly clickhouse: Pick<ClickHouseQueryClient, "read">) {
     super();
   }
 
   static create({
     clickhouse,
   }: {
-    clickhouse: ClickHouseQueryClient;
+    clickhouse: Pick<ClickHouseQueryClient, "read">;
   }): ClickHouseStorageFootprintRepository {
     return new ClickHouseStorageFootprintRepository(clickhouse);
   }
@@ -25,99 +42,88 @@ export class ClickHouseStorageFootprintRepository extends StorageFootprintReposi
   }: {
     tables: readonly string[];
   }): Promise<StorageStatsReading["tables"]> {
-    const result = await this.clickhouse.query<{
-      table: string;
-      total_rows: string;
-      total_bytes: string;
-      parts_count: string;
-    }>({
-      tenantId: "",
-      sql: `
-        SELECT
-          table,
-          sum(rows) as total_rows,
-          sum(bytes_on_disk) as total_bytes,
-          count() as parts_count
-        FROM system.parts
-        WHERE database = currentDatabase()
-          AND active = 1
-          AND table IN ({tables:Array(String)})
-        GROUP BY table
-      `,
-      params: { tables: [...tables] },
-      // System.parts carries no tenant column: this is per-table storage size for the operator's
-      // dashboards.
-      SKIP_TENANT_CHECK: true,
-    });
-    return result.rows.map((row) => ({
+    const statement = systemRead({ reason: "per-table storage size for the operator's dashboards" })
+      .from(systemParts)
+      .select({
+        table: systemParts.table,
+        total_rows: fn.sum(systemParts.rows),
+        total_bytes: fn.sum(systemParts.bytes_on_disk),
+        parts_count: fn.count(),
+      })
+      .where(({ and, eq, oneOf }) =>
+        and(
+          eq(systemParts.database, fn.currentDatabase()),
+          eq(systemParts.active, 1),
+          oneOf(systemParts.table, tables),
+        ),
+      )
+      .groupBy(systemParts.table)
+      .build();
+    const { rows } = await this.clickhouse.read({ statement, table: "system.parts" });
+    return rows.map((row) => ({
       table: row.table,
-      rows: Number.parseInt(row.total_rows, 10),
-      bytes: Number.parseInt(row.total_bytes, 10),
-      parts: Number.parseInt(row.parts_count, 10),
+      rows: toNumber(row.total_rows),
+      bytes: toNumber(row.total_bytes),
+      parts: toNumber(row.parts_count),
     }));
   }
 
   async findDisks(): Promise<StorageStatsReading["disks"]> {
-    const result = await this.clickhouse.query<{
-      name: string;
-      total_space: string;
-      free_space: string;
-      used_space: string;
-    }>({
-      tenantId: "",
-      sql: `
-        SELECT name, total_space, free_space, (total_space - free_space) as used_space
-        FROM system.disks
-      `,
-      // System.disks carries no tenant column: this is the instance's disk capacity.
-      SKIP_TENANT_CHECK: true,
-    });
-    return result.rows.map((row) => ({
+    const statement = systemRead({ reason: "the instance's disk capacity" })
+      .from(systemDisks)
+      .select({
+        name: systemDisks.name,
+        total_space: systemDisks.total_space,
+        free_space: systemDisks.free_space,
+        used_space: fn.minus(systemDisks.total_space, systemDisks.free_space),
+      })
+      .build();
+    const { rows } = await this.clickhouse.read({ statement, table: "system.disks" });
+    return rows.map((row) => ({
       disk: row.name,
-      totalBytes: Number.parseInt(row.total_space, 10),
-      usedBytes: Number.parseInt(row.used_space, 10),
-      freeBytes: Number.parseInt(row.free_space, 10),
+      totalBytes: toNumber(row.total_space),
+      usedBytes: toNumber(row.used_space),
+      freeBytes: toNumber(row.free_space),
     }));
   }
 
   /** Read from `system.backup_log` rather than `system.backups`. */
   async findBackupStatuses(): Promise<BackupStatusRow[]> {
     if (!(await this.hasBackupLog())) return [];
-    const result = await this.clickhouse.query<{
-      status: string;
-      cnt: string;
-      last_success_time: string;
-      last_success_size: string;
-    }>({
-      tenantId: "",
-      sql: `
-        SELECT
-          status,
-          count() as cnt,
-          maxIf(end_time, status = 'BACKUP_CREATED') as last_success_time,
-          argMaxIf(total_size, end_time, status = 'BACKUP_CREATED') as last_success_size
-        FROM system.backup_log
-        GROUP BY status
-      `,
-      // System.backup_log carries no tenant column: this is the instance's backup history.
-      SKIP_TENANT_CHECK: true,
-    });
-    return result.rows.map((row) => ({
+    const created = cond.eq(systemBackupLog.status, "BACKUP_CREATED");
+    const statement = systemRead({ reason: "the instance's backup history" })
+      .from(systemBackupLog)
+      .select({
+        status: systemBackupLog.status,
+        cnt: fn.count(),
+        last_success_time: fn.maxIf(systemBackupLog.end_time, created),
+        last_success_size: fn.argMaxIf(
+          systemBackupLog.total_size,
+          systemBackupLog.end_time,
+          created,
+        ),
+      })
+      .groupBy(systemBackupLog.status)
+      .build();
+    const { rows } = await this.clickhouse.read({ statement, table: "system.backup_log" });
+    return rows.map((row) => ({
       status: row.status,
-      count: Number.parseInt(row.cnt, 10),
-      lastSuccessTime: row.last_success_time,
-      lastSuccessSizeBytes: Number.parseInt(row.last_success_size, 10),
+      count: toNumber(row.cnt),
+      lastSuccessTime: String(row.last_success_time),
+      lastSuccessSizeBytes: toNumber(row.last_success_size),
     }));
   }
 
   /** Asked first: a server without the table would log an HTTP error for the query. */
   private async hasBackupLog(): Promise<boolean> {
-    const result = await this.clickhouse.query<{ present: string }>({
-      tenantId: "",
-      sql: "SELECT count() AS present FROM system.tables WHERE database = 'system' AND name = 'backup_log'",
-      // System.tables carries no tenant column: this asks what the server has.
-      SKIP_TENANT_CHECK: true,
-    });
-    return Number.parseInt(result.rows[0]?.present ?? "0", 10) > 0;
+    const statement = systemRead({ reason: "whether the server keeps a backup log" })
+      .from(systemTables)
+      .select({ present: fn.count() })
+      .where(({ and, eq }) =>
+        and(eq(systemTables.database, "system"), eq(systemTables.name, "backup_log")),
+      )
+      .build();
+    const { rows } = await this.clickhouse.read({ statement, table: "system.tables" });
+    return toNumber(rows[0]?.present ?? "0") > 0;
   }
 }

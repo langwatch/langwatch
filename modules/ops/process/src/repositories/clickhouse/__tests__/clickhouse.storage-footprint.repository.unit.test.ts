@@ -1,43 +1,69 @@
 /** Spec: specs/ops/worker-operational-loops.feature */
-import type { QueryRequest } from "@langwatch/clickhouse-client";
+import { type ClickHouseQueryClient, TENANT_IDS_SETTING } from "@langwatch/clickhouse-client";
 import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { describe, expect, it } from "vitest";
 
 import { ClickHouseStorageFootprintRepository } from "../clickhouse.storage-footprint.repository.ts";
 
-/** The routed member, answering every statement with `rows` and recording what it was asked. */
+type Sent = Parameters<ClickHouseQueryClient["read"]>[0];
+
+/** The routed client's read, answering every statement with `rows` and recording it. */
 function repoAnswering(rows: Record<string, string>[], backupLogPresent = "1") {
-  const statements: QueryRequest[] = [];
+  const sent: Sent[] = [];
   const clickhouse = clickHouseQueryClientDouble({
-    query: async (request: QueryRequest) => {
-      statements.push(request);
-      if (request.sql.includes("system.tables")) return { rows: [{ present: backupLogPresent }] };
+    read: async (built: Sent) => {
+      sent.push(built);
+      if (built.table === "system.tables") return { rows: [{ present: backupLogPresent }] };
       return { rows };
     },
   });
-  return { repo: ClickHouseStorageFootprintRepository.create({ clickhouse }), statements };
+  return { repo: ClickHouseStorageFootprintRepository.create({ clickhouse }), sent };
+}
+
+/** Each footprint read is all-tenants, on the system identity, with no tenant setting. */
+function expectSystemRead(built: Sent | undefined) {
+  expect(built?.statement).toMatchObject({ identity: "system", kind: "allTenants" });
+  expect(built?.statement.settings ?? {}).not.toHaveProperty(TENANT_IDS_SETTING);
+  expect(built?.tenantId).toBeUndefined();
 }
 
 describe("given an endpoint's system tables", () => {
   describe("when the monitored tables are read", () => {
-    it("asks only for the named tables, skipping the tenant check, and reads the sums as numbers", async () => {
-      const { repo, statements } = repoAnswering([
+    it("asks system.parts on the system identity for only the named tables, and reads the sums as numbers", async () => {
+      const { repo, sent } = repoAnswering([
         { table: "stored_spans", total_rows: "10", total_bytes: "2048", parts_count: "3" },
       ]);
 
       const tables = await repo.findTables({ tables: ["stored_spans", "events"] });
 
       expect(tables).toEqual([{ table: "stored_spans", rows: 10, bytes: 2048, parts: 3 }]);
-      expect(statements[0]?.sql).toContain("FROM system.parts");
-      expect(statements[0]?.params).toEqual({ tables: ["stored_spans", "events"] });
-      expect(statements[0]?.tenantId).toBe("");
-      expect(statements[0]?.SKIP_TENANT_CHECK).toBe(true);
+      expect(sent[0]?.table).toBe("system.parts");
+      expect(sent[0]?.statement.sql).toContain("FROM system.parts");
+      expect(Object.values(sent[0]?.statement.params ?? {})).toContainEqual([
+        "stored_spans",
+        "events",
+      ]);
+      expectSystemRead(sent[0]);
+    });
+  });
+
+  describe("when the disks are read", () => {
+    it("asks system.disks on the system identity and reads the capacities as numbers", async () => {
+      const { repo, sent } = repoAnswering([
+        { name: "default", total_space: "100", free_space: "40", used_space: "60" },
+      ]);
+
+      expect(await repo.findDisks()).toEqual([
+        { disk: "default", totalBytes: 100, usedBytes: 60, freeBytes: 40 },
+      ]);
+      expect(sent[0]?.table).toBe("system.disks");
+      expectSystemRead(sent[0]);
     });
   });
 
   describe("when the backup log is read", () => {
     it("reads each status's count and the last success as ClickHouse returned it", async () => {
-      const { repo, statements } = repoAnswering([
+      const { repo, sent } = repoAnswering([
         {
           status: "BACKUP_CREATED",
           cnt: "2",
@@ -54,14 +80,19 @@ describe("given an endpoint's system tables", () => {
           lastSuccessSizeBytes: 4096,
         },
       ]);
-      expect(statements[1]?.sql).toContain("FROM system.backup_log");
+      expect(sent[0]?.table).toBe("system.tables");
+      expect(sent[1]?.statement.sql).toContain("FROM system.backup_log");
+      expectSystemRead(sent[0]);
+      expectSystemRead(sent[1]);
     });
 
     it("skips the query, so nothing errors, on a server without the table", async () => {
-      const { repo, statements } = repoAnswering([], "0");
+      const { repo, sent } = repoAnswering([], "0");
 
       expect(await repo.findBackupStatuses()).toEqual([]);
-      expect(statements.map(({ sql }) => sql).join()).not.toContain("FROM system.backup_log");
+      expect(sent.map(({ statement }) => statement.sql).join()).not.toContain(
+        "FROM system.backup_log",
+      );
     });
   });
 });
