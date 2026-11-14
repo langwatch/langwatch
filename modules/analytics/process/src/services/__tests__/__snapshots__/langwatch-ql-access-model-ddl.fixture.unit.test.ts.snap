@@ -418,6 +418,9 @@ exports[`the definition-driven access DDL > given fixed names, password hash and
   "CREATE ROW POLICY OR REPLACE workflows_pg_tenant ON langwatch.workflows_pg
   USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
   TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE user_query_log_hidden_langwatch_lwql ON system.user_query_log
+  USING 0
+  TO langwatch_lwql",
   "GRANT SELECT ON langwatch.lwql_api_key_tenant_map TO langwatch_lwql",
   "GRANT SELECT(\`Attributes\`, \`ComputedInput\`, \`ComputedOutput\`, \`ContainsErrorStatus\`, \`ContainsOKStatus\`, \`ContainsPrompt\`, \`LastUsedPromptId\`, \`LastUsedPromptVersionId\`, \`LastUsedPromptVersionNumber\`, \`Models\`, \`OccurredAt\`, \`SatisfactionScore\`, \`SelectedPromptId\`, \`SourceType\`, \`SpanCount\`, \`SubTopicId\`, \`TenantId\`, \`TimeToFirstTokenMs\`, \`TimeToLastTokenMs\`, \`TokensEstimated\`, \`TokensPerSecond\`, \`TopicId\`, \`TotalCompletionTokenCount\`, \`TotalCost\`, \`TotalDurationMs\`, \`TotalPromptTokenCount\`, \`TraceId\`, \`TraceName\`, \`UnpricedModels\`, \`UnpricedSpanCount\`, \`UpdatedAt\`, \`Version\`) ON langwatch.trace_summaries TO langwatch_lwql",
   "GRANT SELECT(\`Cost\`, \`DurationMs\`, \`EndTime\`, \`NonBilledCost\`, \`ParentSpanId\`, \`ResourceAttributes\`, \`Sampled\`, \`ScopeName\`, \`ServiceName\`, \`SpanAttributes\`, \`SpanId\`, \`SpanKind\`, \`SpanName\`, \`StartTime\`, \`StatusCode\`, \`TenantId\`, \`TraceId\`) ON langwatch.stored_spans TO langwatch_lwql",
