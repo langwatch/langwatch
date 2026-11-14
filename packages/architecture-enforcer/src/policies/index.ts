@@ -29,6 +29,7 @@ import {
   prismaModelNames,
 } from "./persistence/prisma-table-ownership.ts";
 import { lintRerunnableMigrations } from "./persistence/rerunnable-migrations.ts";
+import { lintSpanTableFence } from "./persistence/span-table-fence.ts";
 import { lintUpgradeSignInTables } from "./persistence/upgrade-sign-in-tables.ts";
 import { lintComposedExports } from "./quality/composed-exports.ts";
 import { lintStrictContractBuildConfigs } from "./quality/contract-build-config.ts";
@@ -221,6 +222,11 @@ export const POLICIES: readonly PolicyDefinition[] = [
     id: "eventing-table-access",
     spec: "specs/eventing-table-access.feature",
     run: lintEventingTableAccess,
+  }),
+  definePolicy({
+    id: "span-table-fence",
+    spec: "specs/tooling/lint-span-table-fence.feature",
+    run: lintSpanTableFence,
   }),
   definePolicy({
     id: "id-index-pairing",

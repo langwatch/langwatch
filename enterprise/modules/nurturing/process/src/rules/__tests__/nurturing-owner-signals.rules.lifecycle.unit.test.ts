@@ -194,7 +194,7 @@ describe("a created prompt, workflow or scenario", () => {
     });
   });
 
-  /** @scenario "Scenario creation updates scenario count and fires event" */
+  /** @scenario "Scenario creation fires its event; its count comes from the organization's usage traits" */
   it("raises the scenario, the project's count and the variant, keyed by the scenario", () => {
     const data = {
       scenarioId: "scenario-1",

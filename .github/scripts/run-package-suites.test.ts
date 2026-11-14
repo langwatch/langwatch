@@ -527,6 +527,25 @@ void describe("given a shard that runs several suites at once", () => {
     });
   });
 
+  void describe("when an integration suite and a browser suite share a shard", () => {
+    /** @scenario "An integration suite and a browser suite never run at the same time" */
+    void it("never overlaps them, while the unit suites still run alongside", async () => {
+      const isLane = (id: string) =>
+        ["test:integration", "test:browser"].some((s) => id.endsWith(s));
+      const packages = [pkg("@fix/a", ["test:integration"]), pkg("@fix/b", ["test:browser"])];
+      const units = ["d", "e"].map((name) => pkg(`@fix/${name}`, ["test"]));
+      const { overlaps, statuses } = await pool(jobsFor([...packages, ...units], new Map()), 3);
+      for (const running of overlaps) {
+        const serialRunning = running.filter(isLane);
+        assert.ok(serialRunning.length <= 1, running.join());
+      }
+      assert.equal(statuses.size, 4);
+      assert.ok(
+        overlaps.some((running) => running.some(isLane) && running.some((id) => !isLane(id))),
+      );
+    });
+  });
+
   void describe("when a package has a unit suite and an integration suite", () => {
     /** @scenario "A package's own suites run one after another, in order" */
     void it("starts its integration suite only after its unit suite finished", async () => {

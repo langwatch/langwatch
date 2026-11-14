@@ -7,6 +7,7 @@
 import chalk from "chalk";
 
 import { runDeviceFlowLogin } from "../../utils/governance/login-flow";
+import { matchAskerAccount, nothingYetMessage, signedInPerson } from "./account";
 import { platformProjectKeyReader } from "./project-key";
 import {
   chooseRequest,
@@ -25,6 +26,8 @@ import { noticeRows } from "./ui";
 export interface LangyCommandOptions {
   /** The one thing the command does today. A bare `langwatch langy` does it too. */
   shareControl?: boolean;
+  /** The email of whoever asked Langy, from the card's command; checked against the login. */
+  as?: string;
   /** Declared only so the refusal can say why, see `refuseStructuredOutput`. */
   output?: string;
   /** The global `--json` flag, passed on by the registration. */
@@ -64,22 +67,24 @@ export async function langyCommand(options: LangyCommandOptions = {}): Promise<v
   }
 
   try {
-    await shareControl(root);
+    await shareControl({ root, askedBy: options.as });
   } catch (error) {
     console.error(chalk.red(error instanceof Error ? error.message : String(error)));
     process.exitCode = 1;
   }
 }
 
-async function shareControl(root: string): Promise<void> {
-  const credentials = await ensureSignedIn({
-    // The flow itself rather than `langwatch login`: a failed sign-in comes
-    // back as an error this command words, not as an exit.
-    login: async () => {
-      await runDeviceFlowLogin({ isQuiet: true });
-    },
-    isAccepted: platformTakesTheKey,
-  });
+async function shareControl({ root, askedBy }: { root: string; askedBy?: string }): Promise<void> {
+  // The flow itself rather than `langwatch login`: a failed sign-in comes
+  // back as an error this command words, not as an exit.
+  const login = async () => {
+    await runDeviceFlowLogin({ isQuiet: true });
+  };
+  const signIn = () => ensureSignedIn({ login, isAccepted: platformTakesTheKey });
+  let credentials = await signIn();
+  if ((await matchAskerAccount({ askedBy, signIn: login })) === "switched") {
+    credentials = await signIn();
+  }
   const api = createControlApi(credentials);
 
   const requests = await waitForRequests({
@@ -90,6 +95,12 @@ async function shareControl(root: string): Promise<void> {
       console.log(
         chalk.gray("Ask Langy for a code change in the LangWatch panel; its request appears here."),
       );
+    },
+    onNothingYet: () => {
+      const [line, hint] = nothingYetMessage({ person: signedInPerson() });
+      console.log("");
+      console.log(chalk.yellow(line));
+      console.log(chalk.gray(hint));
     },
   });
 

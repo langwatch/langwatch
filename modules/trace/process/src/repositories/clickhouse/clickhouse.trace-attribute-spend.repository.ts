@@ -39,13 +39,45 @@ function attributeFilter(input: {
   window: TraceModelSpendWindow;
   values?: string[];
 }) {
+  return windowedAttributeFilter({
+    tenantPredicate: "TenantId = {tenantId:String}",
+    tenantParams: { tenantId: input.tenantId },
+    ...input,
+  });
+}
+
+/**
+ * The same filter over a declared tenant set, so a read across an organization's projects is one
+ * statement (ARCHITECTURE.md "Routing is folded into the `clickhouse` member"): one statement per
+ * project fills the ClickHouse statement queue in an organization with many projects.
+ */
+function tenantSetAttributeFilter(input: {
+  tenantIds: readonly string[];
+  attributeKey: string;
+  window: TraceModelSpendWindow;
+  values?: string[];
+}) {
+  return windowedAttributeFilter({
+    tenantPredicate: "TenantId IN ({tenantIds:Array(String)})",
+    tenantParams: { tenantIds: [...input.tenantIds] },
+    ...input,
+  });
+}
+
+function windowedAttributeFilter(input: {
+  tenantPredicate: string;
+  tenantParams: Record<string, string | string[]>;
+  attributeKey: string;
+  window: TraceModelSpendWindow;
+  values?: string[];
+}) {
   return {
-    where: `WHERE TenantId = {tenantId:String}
+    where: `WHERE ${input.tenantPredicate}
             AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
             AND OccurredAt <  fromUnixTimestamp64Milli({toMs:Int64})
             AND ${input.values ? "Attributes[{attributeKey:String}] IN {values:Array(String)}" : "Attributes[{attributeKey:String}] != ''"}`,
     params: {
-      tenantId: input.tenantId,
+      ...input.tenantParams,
       attributeKey: input.attributeKey,
       fromMs: input.window.startMs,
       toMs: input.window.endMs,
@@ -54,7 +86,13 @@ function attributeFilter(input: {
   };
 }
 
-/** Main's gateway `GatewayVirtualKeySpendRepository` reads, one tenant at a time. */
+/**
+ * A spend rollup's ceiling on threads and runtime. The runtime cap stays under the client's 30 s
+ * request deadline, so a slow read ends with ClickHouse's own timeout, not a dropped request.
+ */
+const SPEND_ROLLUP_SETTINGS = { max_threads: 2, max_execution_time: 28 };
+
+/** Main's gateway `GatewayVirtualKeySpendRepository` reads; the usage reads span a tenant set. */
 export class ClickHouseTraceAttributeSpendRepository extends TraceAttributeSpendRepository {
   readonly #clickhouse: ClickHouseQueryClient;
 
@@ -101,16 +139,19 @@ export class ClickHouseTraceAttributeSpendRepository extends TraceAttributeSpend
   }
 
   async findAttributeUsageBuckets(input: {
-    tenantId: string;
+    tenantIds: readonly string[];
     attributeKey: string;
     window: TraceModelSpendWindow;
     values?: string[];
   }): Promise<TraceAttributeUsageBucket[]> {
-    if (input.values?.length === 0) return [];
-    const { where, params } = attributeFilter(input);
+    const [firstTenantId] = input.tenantIds;
+    if (firstTenantId === undefined || input.values?.length === 0) return [];
+    const { where, params } = tenantSetAttributeFilter(input);
     const result = await this.#clickhouse.query<BucketRow>({
-      tenantId: input.tenantId,
+      tenantId: firstTenantId,
+      tenantIds: input.tenantIds,
       table: "trace_summaries",
+      settings: SPEND_ROLLUP_SETTINGS,
       sql: `
         SELECT
           Value,
@@ -129,7 +170,7 @@ export class ClickHouseTraceAttributeSpendRepository extends TraceAttributeSpend
             argMax(BlockedByGuardrail, UpdatedAt) AS Blocked
           FROM trace_summaries
           ${where}
-          GROUP BY TraceId
+          GROUP BY TenantId, TraceId
         )
         GROUP BY Value, Model, Day
       `,
@@ -146,21 +187,24 @@ export class ClickHouseTraceAttributeSpendRepository extends TraceAttributeSpend
   }
 
   async findAttributedTraces(input: {
-    tenantId: string;
+    tenantIds: readonly string[];
     attributeKey: string;
     window: TraceModelSpendWindow;
     values?: string[];
     model?: string;
     limit: number;
   }): Promise<TraceAttributedTrace[]> {
-    if (input.values?.length === 0) return [];
-    const { where, params } = attributeFilter(input);
+    const [firstTenantId] = input.tenantIds;
+    if (firstTenantId === undefined || input.values?.length === 0) return [];
+    const { where, params } = tenantSetAttributeFilter(input);
     const modelFilter = input.model
       ? `WHERE if(length(TraceModels) = 0, 'unknown', arrayElement(TraceModels, 1)) = {model:String}`
       : "";
     const result = await this.#clickhouse.query<TraceRow>({
-      tenantId: input.tenantId,
+      tenantId: firstTenantId,
+      tenantIds: input.tenantIds,
       table: "trace_summaries",
+      settings: SPEND_ROLLUP_SETTINGS,
       sql: `
         SELECT
           TraceId,
@@ -187,7 +231,7 @@ export class ClickHouseTraceAttributeSpendRepository extends TraceAttributeSpend
             argMax(BlockedByGuardrail, UpdatedAt) AS Blocked
           FROM trace_summaries
           ${where}
-          GROUP BY TraceId
+          GROUP BY TenantId, TraceId
         )
         ${modelFilter}
         ORDER BY OccurredAtMs DESC

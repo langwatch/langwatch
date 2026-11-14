@@ -118,11 +118,10 @@ For production with replicated ClickHouse.
 ```bash
 helm install langwatch langwatch/langwatch \
   -f examples/overlays/size-ha.yaml \
-  -f examples/overlays/access-ingress.yaml \
-  -f examples/overlays/cold-storage-s3.yaml \
-  --set clickhouse.objectStorage.bucket=my-langwatch-data \
-  --set clickhouse.objectStorage.region=us-east-1
+  -f examples/overlays/access-ingress.yaml
 ```
+
+Add ClickHouse backups to an object store as in [Backups](/self-hosting/configuration/backups).
 
 Both production overlays turn off the local-filesystem volume for stored objects, because more than one replica cannot share it. Set `app.dataplane.enabled: true` with an S3 or Azure Blob bucket, or stored objects (audio, images and documents) land on the pods' ephemeral disk and are lost on restart. Both commands also need the Secrets from [Provide the Secrets](/self-hosting/deployment/kubernetes-helm#1-provide-the-secrets), or `--set autogen.enabled=true` for a test install.
 
@@ -141,7 +140,7 @@ How much trace data each profile can take. Each profile accepts spans faster tha
 - Per day, per month and disk follow the processing rate, which is what the install keeps up with all day.
 - Treat these as ceilings and plan to run at about 70% of them. Long prompts and completions lower them.
 - Per day and per month assume the same rate around the clock. Size for your busiest hour.
-- Disk is an estimate at about 1 KB per span. `size-prod.yaml` gives ClickHouse 100Gi, which fills in under two days at full rate: give it more storage or turn on [cold storage](#clickhouse-cold-storage-s3).
+- Disk is an estimate at about 1 KB per span. `size-prod.yaml` gives ClickHouse 100Gi, which fills in under two days at full rate: give it more storage.
 - `size-dev.yaml` ships Redis at 256Mi. Raise `redis.master.resources.limits.memory` to 512Mi to reach its rate.
 - `size-minimal.yaml` is held back by ClickHouse memory. Setting `clickhouse.memory` to 2Gi roughly doubles its processing rate.
 
@@ -225,13 +224,13 @@ spec:
 - ~1 KB per span (compressed, varies with payload size)
 - 100K traces/day with avg 5 spans = ~500 MB/day = ~15 GB/month
 - 1M traces/day with avg 5 spans = ~5 GB/day = ~150 GB/month
-- Plan for 3-6 months of hot data before cold storage kicks in
+- Size the disk for all the data you keep: it stays on local disk unless you turn on cold storage
 
-### ClickHouse cold storage (S3)
+### ClickHouse cold storage (S3, optional)
 
-- Enable with `clickhouse.cold.enabled: true`
-- Default TTL: 49 days (data older than this moves to S3). We recommend multiples of 7 to align with ClickHouse's weekly partition boundaries
-- S3 cost is typically 10-20x cheaper than SSD storage
+- Off by default, and not needed: local disk is the simpler setup to run
+- Opt in with `clickhouse.cold.enabled: true`, plus `clickhouse.objectStorage.bucket` and its `region` or `endpoint` if disk cost matters more than query speed on older data
+- Data older than `clickhouse.cold.defaultTtlDays` (49) then moves to S3. Keep it a multiple of 7, to match ClickHouse's weekly partitions
 
 ### PostgreSQL
 

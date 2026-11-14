@@ -21,6 +21,7 @@ import {
   type OrganizationUsageCount,
   type PricingModel,
   type SignInSecurityPolicy,
+  type DocsPlaygroundPolicy,
   type OrganizationCurrency,
   ORGANIZATION_KIND,
 } from "@langwatch/organization-contract";
@@ -190,6 +191,38 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
     await this.database.organization.update({
       where: { id: organizationId },
       data: { maxSessionDurationDays },
+    });
+  }
+
+  async getDocsPlaygroundPolicy({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<DocsPlaygroundPolicy> {
+    const row = await this.database.organization.findUnique({
+      where: { id: organizationId },
+      select: { docsPlaygroundSessionsEnabled: true, docsPlaygroundSessionsDisabledAt: true },
+    });
+    return {
+      docsPlaygroundSessionsEnabled: row?.docsPlaygroundSessionsEnabled ?? false,
+      docsPlaygroundSessionsDisabledAt: row?.docsPlaygroundSessionsDisabledAt ?? null,
+    };
+  }
+
+  async saveDocsPlaygroundPolicy({
+    organizationId,
+    docsPlaygroundSessionsEnabled,
+    changedAt,
+  }: {
+    organizationId: string;
+    docsPlaygroundSessionsEnabled: boolean;
+    changedAt: Instant;
+  }): Promise<void> {
+    await this.database.organization.update({
+      where: { id: organizationId },
+      data: docsPlaygroundSessionsEnabled
+        ? { docsPlaygroundSessionsEnabled }
+        : { docsPlaygroundSessionsEnabled, docsPlaygroundSessionsDisabledAt: toDate(changedAt) },
     });
   }
 

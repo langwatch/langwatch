@@ -134,6 +134,14 @@ Feature: A queue drain accepts the work it is producing
     And an error carrying that name from another copy of the package is recognised too
 
   @unit @regression @drain-send-gate
+  Scenario: A refusal wrapped by the caller is still recognised
+    Given a queue whose drain has finished
+    And a caller that wraps the refusal in its own error, keeping it as the cause
+    When the wrapped error is checked
+    Then it is recognised as a refusal after the drain
+    And an error whose causes hold no such refusal is not
+
+  @unit @regression @drain-send-gate
   Scenario: A dispatch refused because the drain already ended is a warning
     Given a queue whose drain has finished during shutdown
     When the projection router dispatches events to it

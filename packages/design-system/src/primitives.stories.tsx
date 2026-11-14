@@ -77,6 +77,9 @@ export const Buttons: Story = {
         <Button colorPalette="red" variant="outline" size="sm">
           Delete dataset
         </Button>
+        <Button colorPalette="orange" variant="outline" size="sm">
+          Contact us to upgrade
+        </Button>
         <IconButton aria-label="Open settings" variant="ghost" size="sm">
           <Settings />
         </IconButton>

@@ -4,6 +4,7 @@ import { createElement } from "react";
 
 import { Badge, Box, Button, HStack, Text, VStack } from "../../primitives.ts";
 import { Card, CardGrid } from "./card.tsx";
+import { SettingList, SettingRow, StatusChip } from "./settings-card.tsx";
 
 const meta = {
   title: "Data display/Card",
@@ -58,6 +59,42 @@ export const SectionCard: Story = {
       <Button size="sm" variant="outline">
         Test connection
       </Button>
+    ),
+  },
+};
+
+/** A bill: the chip beside the title, the figures in a boxed list, the action ruled off below. */
+export const BillLike: Story = {
+  args: {
+    title: "Free plan",
+    description: undefined,
+    status: "ok",
+    badge: <StatusChip label="Current" tone="good" />,
+    badgePlacement: "title",
+    footerDivider: true,
+    footer: (
+      <HStack width="full" justify="flex-end">
+        <Button size="sm" colorPalette="orange">
+          Upgrade to Growth
+        </Button>
+      </HStack>
+    ),
+    children: (
+      <SettingList variant="boxed">
+        <SettingRow label="Events this month">
+          <Text textStyle="sm" fontWeight={600}>
+            12,000 / 50,000
+          </Text>
+        </SettingRow>
+        <SettingRow label="Members / seats">
+          <Text textStyle="sm" fontWeight={600}>
+            1 / 2
+          </Text>
+          <Button size="xs" variant="outline">
+            Manage seats
+          </Button>
+        </SettingRow>
+      </SettingList>
     ),
   },
 };

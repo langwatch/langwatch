@@ -35,8 +35,8 @@ interface Batch<Request> {
 
 /**
  * The batch key of an insert that may travel with others, or null when it must run alone: the
- * route, so a batch routes and is guarded as each insert, and an explicit async insert that waits
- * for the flush with deduplication off, whose identity a batch cannot change (ADR-187).
+ * route and columns, so a batch routes and is guarded as each insert, and an explicit async insert
+ * that waits for the flush with deduplication off, whose identity a batch cannot change (ADR-187).
  */
 export function coalesceKeyOf(request: InsertRequest): string | null {
   if (request.signal !== undefined || request.rows.length === 0) return null;
@@ -54,6 +54,7 @@ export function coalesceKeyOf(request: InsertRequest): string | null {
     request.tenantIds === undefined ? null : [...request.tenantIds].toSorted(),
     request.SKIP_TENANT_CHECK === true,
     request.table,
+    request.columns ?? null,
     sorted,
   ]);
 }
