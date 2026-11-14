@@ -1081,7 +1081,7 @@ function registerGovernanceCommands(program: Command): void {
   const templatesCmd = governanceCmd
     .command("ingestion-templates")
     .description(
-      "CRUD on IngestionTemplate rows. Reads use aiTools:view; mutations use aiTools:manage.",
+      "CRUD on IngestionTemplate rows, with your device login. Every verb needs aiTools:manage.",
     );
 
   templatesCmd
