@@ -198,21 +198,21 @@ export function makeFakeClickHouse(rows: FakeEventLogRow[]): {
     }
     throw new Error(`unexpected query: ${sql.slice(0, 80)}`);
   };
+  const answerBuilt = ({ statement }: Pick<SentRead, "statement">): unknown[] =>
+    JSON.parse(
+      JSON.stringify(
+        answer({
+          sql: statement.sql,
+          params: namedParams({ sql: statement.sql, params: statement.params }),
+          tenantId: statement.kind === "tenant" ? statement.tenantId : "",
+        }),
+      ),
+    );
   const client = clickHouseQueryClientDouble({
     // An all-tenants statement names no tenant: the member reads it on the shared server.
-    read: async ({ statement }: SentRead) => ({
-      rows: JSON.parse(
-        JSON.stringify(
-          answer({
-            sql: statement.sql,
-            params: namedParams({ sql: statement.sql, params: statement.params }),
-            tenantId: statement.kind === "tenant" ? statement.tenantId : "",
-          }),
-        ),
-      ),
-    }),
-    stream: async function* (request: QueryRequest) {
-      yield answer(request);
+    read: async (sent: SentRead) => ({ rows: answerBuilt(sent) }),
+    stream: async function* (sent: Pick<SentRead, "statement">) {
+      yield answerBuilt(sent);
     },
   });
 
