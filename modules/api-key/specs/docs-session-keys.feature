@@ -107,6 +107,26 @@ Feature: Docs session keys for the documentation playground
     Then the revoked keys still do not authenticate
     And a member can connect again with a new key
 
+  @unit
+  Scenario: Turning the playground session off records when, in the same write
+    Given an organisation admin turns docs playground sessions off
+    Then organization stores the time it was turned off with the switch itself
+    And turning it on again keeps that time
+
+  @integration
+  Scenario: Turning it on again before revocation runs revives no key minted before
+    Given an organisation admin turned docs playground sessions off and on again
+    And api-key has not revoked any key yet, because the record was late or never sent
+    Then a docs session key minted before it was turned off does not authenticate
+    And neither does a key minted under one
+    And a key minted after it was turned on again works
+
+  @integration
+  Scenario: A key minted under a docs session key stops when the playground is turned off
+    Given a run key minted under a docs session key
+    When an organisation admin turns docs playground sessions off
+    Then the run key stops authenticating at once, before any cleanup revokes it
+
   @integration
   Scenario: A late revocation leaves keys minted after the switch came back on
     Given an organisation admin turned docs playground sessions off and then on again

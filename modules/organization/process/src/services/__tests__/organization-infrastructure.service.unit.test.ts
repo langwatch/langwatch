@@ -16,6 +16,7 @@ import {
   TeamMembershipNotFoundError,
   TeamNotFoundError,
   UserNotInOrganizationError,
+  type DocsPlaygroundPolicy,
   type OrganizationBillingProfile,
   type OrganizationIdPage,
   type OrganizationTeam,
@@ -79,8 +80,8 @@ class StubRepository extends OrganizationRepository {
 
   async saveSessionPolicy(): Promise<void> {}
 
-  async getDocsPlaygroundPolicy(): Promise<{ docsPlaygroundSessionsEnabled: boolean }> {
-    return { docsPlaygroundSessionsEnabled: true };
+  async getDocsPlaygroundPolicy(): Promise<DocsPlaygroundPolicy> {
+    return { docsPlaygroundSessionsEnabled: true, docsPlaygroundSessionsDisabledAt: null };
   }
 
   async saveDocsPlaygroundPolicy(): Promise<void> {}

@@ -12,6 +12,7 @@ import type {
   ApiKeyRepository,
   ApiKeyRow,
   ApiKeyUpdateRecord,
+  KeyLiveness,
 } from "../api-key.repository.ts";
 import type { MemoryApiKeyDatabase } from "./memory.api-key.database.ts";
 
@@ -249,14 +250,15 @@ export class MemoryApiKeyRepository implements ApiKeyRepository {
     ).map((key) => ({ id: key.id }));
   }
 
-  async findLivenessById(input: {
-    id: string;
-  }): Promise<{ revokedAt: Instant | null; expiresAt: Instant | null } | null> {
+  async findLivenessById(input: { id: string }): Promise<KeyLiveness | null> {
     const key = this.#database.keys().find((row) => row.id === input.id);
     if (!key) return null;
     return {
       revokedAt: key.revokedAt ? fromDate(key.revokedAt) : null,
       expiresAt: key.expiresAt ? fromDate(key.expiresAt) : null,
+      createdAt: fromDate(key.createdAt),
+      name: key.name,
+      isSystemManaged: key.isSystemManaged === true,
     };
   }
 

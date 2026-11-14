@@ -4384,6 +4384,15 @@
           "documentation": "Whether members may connect the documentation playground to their own access with a\nshort-lived docs session key (ADR-185, amendment of 2026-11-13). On by default; turned off,\nno key is minted and live ones stop authenticating. The pasted-key path is untouched.\nSpec: modules/api-key/specs/docs-session-keys.feature."
         },
         {
+          "name": "docsPlaygroundSessionsDisabledAt",
+          "columnName": "docsPlaygroundSessionsDisabledAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "When the docs playground was last turned off, written in the same update as the switch. A\ndocs session key minted at or before it never authenticates again, nor any key minted under\none, so turning it back on revives none of them (ADR-185, amendment of 2026-11-14)."
+        },
+        {
           "name": "lockoutAfterFailedAttempts",
           "columnName": "lockoutAfterFailedAttempts",
           "type": "Int",

@@ -222,3 +222,26 @@ holds it. What fixes it is that the token never enters the docs page.
   stays on the docs without a reload, bounded by the key's own expiry, at most one hour.
 - A one-hour full-access key is a longer window for an XSS on the app's origin than five
   minutes; read-only and shorter lifetimes are the member's way to narrow it.
+
+## Amendment, 2026-11-14: turning it off is a durable cut-off
+
+### Decision
+
+- **Turning the playground session off records when.** The organisation row stores
+  `docsPlaygroundSessionsDisabledAt` in the same write as the switch. Turning it on again keeps
+  that time.
+- **The cut-off decides at authentication, not the revoke.** A docs session key minted at or
+  before the cut-off never authenticates again, and neither does any key minted under one (a
+  run key): api-key checks the governing docs key's creation time against the live policy on
+  every request, held answer or not. The time is recorded in the held answer, so a cached run
+  key is checked too.
+- **The revoke becomes cleanup.** api-key still revokes on
+  `lw.organization.docs_playground_sessions_disabled`, but nothing depends on it running, on
+  time or at all. This closes three gaps the 2026-11-13 decision left open: turning it on again
+  before the worker revoked, a lost record of the turn-off, and a run key whose cascade failed.
+
+### Consequences
+
+- Every request with a docs session key, or a key minted under one, reads the organisation's
+  policy, as docs keys already did. Other keys pay nothing.
+- A key minted in the same millisecond as the turn-off is refused, which errs on the safe side.

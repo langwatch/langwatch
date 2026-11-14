@@ -109,7 +109,10 @@ function projectWithTeam(id: string): ProjectWithTeam {
 async function appOver(
   options: { maxSessionDurationDays?: number; grants?: CollectedGrants } = {},
 ) {
-  const organization = { docsPlaygroundSessionsEnabled: true };
+  const organization = {
+    docsPlaygroundSessionsEnabled: true,
+    docsPlaygroundSessionsDisabledAt: null as Date | null,
+  };
   const engine = new AuthzEngine();
   const member = { grants: options.grants ?? memberGrants("member") };
   const apiKeys = MemoryApiKeyRepository.create({ memory: MemoryApiKeyDatabase.create() });
@@ -565,8 +568,8 @@ describe("given live docs session keys and a run key minted under one", () => {
     it("revokes every docs session key and the run key under one, and no other organisation's", async () => {
       const { app, apiKeys, organization, first, second, child, elsewhere } = await withKeys();
       organization.docsPlaygroundSessionsEnabled = false;
-      /* The switch alone stops the docs keys, not a key minted under one: only the revoke does. */
-      expect(await app.findVerifiedToken({ token: child.token })).not.toBeNull();
+      /* The switch alone already stops a key minted under a docs key; the revoke makes it final. */
+      expect(await app.findVerifiedToken({ token: child.token })).toBeNull();
 
       await revocationLane(app).handle(sessionsDisabled(), {
         tenantId: ORG_ID,
@@ -623,10 +626,38 @@ describe("given live docs session keys and a run key minted under one", () => {
       expect(await app.findVerifiedToken({ token: fresh.token })).not.toBeNull();
     });
 
+    /** @scenario "Turning it on again before revocation runs revives no key minted before" */
+    it("refuses the older keys and the keys minted under them, though no revocation ran", async () => {
+      const { app, organization, first, child } = await withKeys();
+      expect(await app.findVerifiedToken({ token: child.token })).not.toBeNull();
+
+      organization.docsPlaygroundSessionsEnabled = false;
+      organization.docsPlaygroundSessionsDisabledAt = new Date();
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      organization.docsPlaygroundSessionsEnabled = true;
+
+      expect(await app.findVerifiedToken({ token: first.token })).toBeNull();
+      expect(await app.findVerifiedToken({ token: child.token })).toBeNull();
+      const fresh = await app.mintDocsSessionKey(minting({ sessionId: "session-3" }));
+      expect(await app.findVerifiedToken({ token: fresh.token })).not.toBeNull();
+    });
+
+    /** @scenario "A key minted under a docs session key stops when the playground is turned off" */
+    it("refuses the run key at once, before any cleanup reaches it", async () => {
+      const { app, organization, child } = await withKeys();
+      expect(await app.findVerifiedToken({ token: child.token })).not.toBeNull();
+
+      organization.docsPlaygroundSessionsEnabled = false;
+
+      expect(await app.findVerifiedToken({ token: child.token })).toBeNull();
+      expect(await app.findResolvedToken({ token: child.token, projectId: PROJECT_ID })).toBeNull();
+    });
+
     /** @scenario "A late revocation leaves keys minted after the switch came back on" */
     it("revokes only the keys minted by the time it was turned off, however late it lands", async () => {
       const { app, organization, first, child } = await withKeys();
       const disabledAt = nowInstant().epochMilliseconds;
+      organization.docsPlaygroundSessionsDisabledAt = new Date(disabledAt);
       await new Promise((resolve) => setTimeout(resolve, 5));
       organization.docsPlaygroundSessionsEnabled = true;
       const fresh = await app.mintDocsSessionKey(minting({ sessionId: "session-3" }));

@@ -14,6 +14,7 @@ import type {
   ApiKeyRepository,
   ApiKeyRow,
   ApiKeyUpdateRecord,
+  KeyLiveness,
 } from "../api-key.repository.ts";
 
 /** The key rows, plus the raw SQL the fenced revoke and the fleet-wide sweeps need. */
@@ -236,17 +237,24 @@ export class PrismaApiKeyRepository implements ApiKeyRepository {
       select: { id: true },
     });
   }
-  async findLivenessById(input: {
-    id: string;
-  }): Promise<{ revokedAt: Instant | null; expiresAt: Instant | null } | null> {
+  async findLivenessById(input: { id: string }): Promise<KeyLiveness | null> {
     const row = await this.database.apiKey.findUnique({
       where: { id: input.id },
-      select: { revokedAt: true, expiresAt: true },
+      select: {
+        revokedAt: true,
+        expiresAt: true,
+        createdAt: true,
+        name: true,
+        isSystemManaged: true,
+      },
     });
     if (!row) return null;
     return {
       revokedAt: row.revokedAt ? fromDate(row.revokedAt) : null,
       expiresAt: row.expiresAt ? fromDate(row.expiresAt) : null,
+      createdAt: fromDate(row.createdAt),
+      name: row.name,
+      isSystemManaged: row.isSystemManaged === true,
     };
   }
   async findElapsedLoginKeys(input: {

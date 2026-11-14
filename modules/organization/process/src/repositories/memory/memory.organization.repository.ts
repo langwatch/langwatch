@@ -186,19 +186,28 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
     organizationId: string;
   }): Promise<DocsPlaygroundPolicy> {
     const organization = this.memory.organizations.get(organizationId);
-    if (!organization) return { docsPlaygroundSessionsEnabled: false };
-    return { docsPlaygroundSessionsEnabled: organization.docsPlaygroundSessionsEnabled ?? true };
+    if (!organization)
+      return { docsPlaygroundSessionsEnabled: false, docsPlaygroundSessionsDisabledAt: null };
+    return {
+      docsPlaygroundSessionsEnabled: organization.docsPlaygroundSessionsEnabled ?? true,
+      docsPlaygroundSessionsDisabledAt: organization.docsPlaygroundSessionsDisabledAt
+        ? toDate(organization.docsPlaygroundSessionsDisabledAt)
+        : null,
+    };
   }
 
   async saveDocsPlaygroundPolicy({
     organizationId,
     docsPlaygroundSessionsEnabled,
+    changedAt,
   }: {
     organizationId: string;
     docsPlaygroundSessionsEnabled: boolean;
+    changedAt: Instant;
   }): Promise<void> {
-    this.requireOrganization(organizationId).docsPlaygroundSessionsEnabled =
-      docsPlaygroundSessionsEnabled;
+    const organization = this.requireOrganization(organizationId);
+    organization.docsPlaygroundSessionsEnabled = docsPlaygroundSessionsEnabled;
+    if (!docsPlaygroundSessionsEnabled) organization.docsPlaygroundSessionsDisabledAt = changedAt;
   }
 
   async getSignInSecurityPolicy({

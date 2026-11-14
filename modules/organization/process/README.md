@@ -2269,9 +2269,10 @@ interface Output {
 
 // organization.getDocsPlaygroundPolicy
 type Input = z.infer<typeof organizationApiScopeSchema>; // ../contract/src/organization.trpc-schemas.ts:14
-// Output: docsPlaygroundPolicySchema, ../contract/src/organization.ts:254
+// Output: docsPlaygroundPolicySchema, ../contract/src/organization.ts:258
 interface Output {
   docsPlaygroundSessionsEnabled: boolean;
+  docsPlaygroundSessionsDisabledAt: unknown | null;
 }
 
 // organization.saveDocsPlaygroundPolicy

@@ -140,9 +140,11 @@ export abstract class OrganizationRepository {
   abstract getDocsPlaygroundPolicy(input: {
     organizationId: string;
   }): Promise<DocsPlaygroundPolicy>;
+  /** Turning it off also records `changedAt` as the cut-off, in the same write. */
   abstract saveDocsPlaygroundPolicy(input: {
     organizationId: string;
     docsPlaygroundSessionsEnabled: boolean;
+    changedAt: Instant;
   }): Promise<void>;
   /** The four sign-in security columns (GAC-09, GAC-10); throws OrganizationNotFoundError. */
   abstract getSignInSecurityPolicy(input: {

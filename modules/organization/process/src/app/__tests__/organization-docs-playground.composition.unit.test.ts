@@ -111,6 +111,31 @@ describe("given an organization whose docs playground sessions are on", () => {
     });
   });
 
+  describe("when an admin turns them off and on again", () => {
+    /** @scenario "Turning the playground session off records when, in the same write" */
+    it("keeps the time it was turned off, the cut-off api-key refuses older keys by", async () => {
+      const { app } = await application();
+      const before = Date.now();
+
+      await app.saveDocsPlaygroundPolicy({
+        organizationId: ORGANIZATION_ID,
+        docsPlaygroundSessionsEnabled: false,
+      });
+      const off = await app.getDocsPlaygroundPolicy({ organizationId: ORGANIZATION_ID });
+      await app.saveDocsPlaygroundPolicy({
+        organizationId: ORGANIZATION_ID,
+        docsPlaygroundSessionsEnabled: true,
+      });
+      const on = await app.getDocsPlaygroundPolicy({ organizationId: ORGANIZATION_ID });
+
+      expect(off.docsPlaygroundSessionsDisabledAt?.getTime()).toBeGreaterThanOrEqual(before);
+      expect(on).toEqual({
+        docsPlaygroundSessionsEnabled: true,
+        docsPlaygroundSessionsDisabledAt: off.docsPlaygroundSessionsDisabledAt,
+      });
+    });
+  });
+
   describe("when an admin turns them on", () => {
     it("records nothing, so no key is revoked", async () => {
       const { app, recorded } = await application();

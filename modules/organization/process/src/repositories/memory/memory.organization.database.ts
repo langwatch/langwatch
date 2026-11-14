@@ -58,6 +58,8 @@ export interface MemoryOrganizationRow {
   maxSessionDurationDays?: number;
   /** Whether the docs playground may connect (ADR-185); absent reads as on. */
   docsPlaygroundSessionsEnabled?: boolean;
+  /** When the docs playground was last turned off; absent reads as never. */
+  docsPlaygroundSessionsDisabledAt?: Instant;
   /** The sign-in security columns (GAC-09, GAC-10); absent reads as no rule. */
   lockoutAfterFailedAttempts?: number;
   lockoutMinutes?: number;

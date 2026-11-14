@@ -7,7 +7,6 @@ import {
   organizationApiKeyResolutionInputSchema,
   organizationApiKeyResolutionSchema,
   resolvedApiKeyTokenSchema,
-  type ApiKey,
   type OrganizationApiKeyResolution,
   type ResolvedApiKeyCredential,
   API_KEY_PREFIX,
@@ -18,7 +17,7 @@ import type * as apiKeyContractModule from "@langwatch/api-key-contract";
 import { createLogger } from "@langwatch/observability";
 import { noteRequestCredential } from "@langwatch/observability/credential-census";
 import { projectIdentitySchema, type ProjectIdentity } from "@langwatch/project-contract";
-import { Temporal, fromDate, nowInstant, type Instant } from "@langwatch/time";
+import { Temporal, fromDate, nowInstant, toDate, type Instant } from "@langwatch/time";
 import { z } from "zod";
 
 import {
@@ -26,12 +25,15 @@ import {
   API_KEY_UNKNOWN_TTL_MS,
   type ApiKeyAnswerCacheRepository,
 } from "../repositories/api-key-answer-cache.repository.ts";
-import type { ApiKeyRepository, StoredApiKey } from "../repositories/api-key.repository.ts";
+import type { ApiKeyRepository } from "../repositories/api-key.repository.ts";
 import { bindingsReachProject, findGrantedProjectIds } from "../rules/api-key-grant-reach.rules.ts";
 import {
+  isDocsSessionAllowed,
   isDocsSessionKey,
   keyCredentialTypeOf,
   parseHeld,
+  publicApiKey,
+  shared,
 } from "../rules/api-key-held-answer.rules.ts";
 import { ApiKeyGrantsService } from "./api-key-grants.service.ts";
 import { ApiKeyLastUsedService } from "./api-key-last-used.service.ts";
@@ -44,8 +46,14 @@ const heldVerificationSchema = z.object({
   tokenHash: z.string(),
   answer: apiKeyVerificationSchema,
   project: projectIdentitySchema.nullable(),
+  /** When the docs session key governing this key was minted: itself, or the key it came from. */
+  docsSessionSince: z.date().nullable().default(null),
 });
 type HeldAnswer = Omit<z.infer<typeof heldVerificationSchema>, "tokenHash">;
+type VerifiedRow = {
+  answer: apiKeyContractModule.ApiKeyVerification;
+  docsSessionSince: Instant | null;
+};
 const heldLegacySchema = z.object({ project: projectIdentitySchema.nullable() });
 /** What a revoke leaves in a key's entry: a refusal that no late fill can overwrite. */
 const REVOKED = "revoked";
@@ -55,12 +63,6 @@ const REVOKED_LEGACY_KEY_PREFIX = "lw-revoked-";
 const verifiedKey = (lookupId: string) => `pat:${lookupId}`;
 const unknownKey = (hash: string) => `unknown:${hash}`;
 const legacyKey = (hash: string) => `legacy:${hash}`;
-
-function publicApiKey(row: StoredApiKey): ApiKey {
-  const { hashedSecret: _hashedSecret, ...key } = row;
-
-  return key;
-}
 
 export class ApiKeyTokenResolutionService {
   static create(
@@ -122,8 +124,9 @@ export class ApiKeyTokenResolutionService {
   }
 
   /**
-   * A docs session key authenticates only while its organization lets the docs playground
-   * connect (ADR-185, 2026-11-13). Asked live, never held, so turning it off ends them at once.
+   * A docs session key, or a key minted under one, authenticates only while its organization
+   * lets the docs playground connect and only if minted after it last turned it off (ADR-185,
+   * 2026-11-14). Asked live, never held, so turning it off ends them at once and for good.
    */
   private async findAnswer(input: {
     token: string;
@@ -131,12 +134,16 @@ export class ApiKeyTokenResolutionService {
     withProject: boolean;
   }): Promise<HeldAnswer | null> {
     const held = await this.findHeldAnswer(input);
-    if (!held || !isDocsSessionKey({ key: held.answer })) return held;
+    const sinceDate =
+      held?.docsSessionSince ??
+      (held && isDocsSessionKey({ key: held.answer }) ? held.answer.createdAt : null);
+    if (!held || !sinceDate) return held;
+    const since = fromDate(sinceDate);
     const policy = await this.options.organizations.getDocsPlaygroundPolicy({
       organizationId: held.answer.organizationId,
     });
 
-    return policy.docsPlaygroundSessionsEnabled ? held : null;
+    return isDocsSessionAllowed({ since, policy }) ? held : null;
   }
 
   /**
@@ -158,7 +165,8 @@ export class ApiKeyTokenResolutionService {
       const held = heldVerificationSchema.safeParse(parseHeld({ raw }));
       if (held.success && held.data.tokenHash === hash) {
         const answer = this.unexpired(held.data.answer);
-        return answer ? { answer, project: held.data.project } : null;
+        const { project, docsSessionSince } = held.data;
+        return answer ? { answer, project, docsSessionSince } : null;
       }
     }
     if ((await this.findHeld(unknownKey(hash))).length > 0) return null;
@@ -186,12 +194,13 @@ export class ApiKeyTokenResolutionService {
     hash: string;
   }): Promise<HeldAnswer | null> {
     const startedMs = this.nowMs();
-    const answer = await this.readVerifiedToken({ token });
-    if (!answer) {
+    const verified = await this.readVerifiedToken({ token });
+    if (!verified) {
       const ttlMs = this.sinceRead({ startedMs, ttlMs: API_KEY_UNKNOWN_TTL_MS });
       await this.hold({ key: unknownKey(hash), value: "1", ttlMs });
       return null;
     }
+    const { answer, docsSessionSince } = verified;
     const grantedProjectIds = findGrantedProjectIds(answer.grants);
     const soleProjectId = grantedProjectIds.length === 1 ? grantedProjectIds[0] : undefined;
     const heldProjectId = withProject ? (projectId ?? soleProjectId ?? null) : null;
@@ -200,10 +209,14 @@ export class ApiKeyTokenResolutionService {
       this.sinceRead({ startedMs, ttlMs: API_KEY_ANSWER_TTL_MS }),
       answer.expiresAt ? answer.expiresAt.getTime() - this.nowMs() : API_KEY_ANSWER_TTL_MS,
     );
-    const value = JSON.stringify({ tokenHash: hash, answer, project });
+    const value = JSON.stringify({ tokenHash: hash, answer, project, docsSessionSince });
     await this.hold({ key: verifiedKey(lookupId), value, ttlMs });
 
-    return { answer, project };
+    return {
+      answer,
+      project,
+      docsSessionSince: docsSessionSince ? toDate(docsSessionSince) : null,
+    };
   }
 
   /** A held answer whose key expired since is refused, whatever the store's own clock says. */
@@ -213,11 +226,7 @@ export class ApiKeyTokenResolutionService {
     return answer.expiresAt && answer.expiresAt.getTime() <= this.nowMs() ? null : answer;
   }
 
-  private async readVerifiedToken({
-    token,
-  }: {
-    token: string;
-  }): Promise<apiKeyContractModule.ApiKeyVerification | null> {
+  private async readVerifiedToken({ token }: { token: string }): Promise<VerifiedRow | null> {
     const split = this.findTokenParts(token);
     if (!split) {
       return null;
@@ -234,9 +243,8 @@ export class ApiKeyTokenResolutionService {
     // key) cannot outlive it — the cascade retires it on revoke, but that is
     // one caller's work. A transient failure or a cascade-less revoke path
     // must not leave this key alive, so this checks the parent directly.
-    if (row.parentApiKeyId && !(await this.isParentLive(row.parentApiKeyId))) {
-      return null;
-    }
+    const parent = row.parentApiKeyId ? await this.findParent(row.parentApiKeyId) : null;
+    if (parent && !parent.live) return null;
 
     const verification = this.options.tokens.verify(split.secret, row.hashedSecret);
     if (verification === "no_match") {
@@ -249,10 +257,13 @@ export class ApiKeyTokenResolutionService {
         .catch(() => void 0);
     }
 
-    const key = publicApiKey(await this.bindings.attachOne(row));
+    const key = publicApiKey({ row: await this.bindings.attachOne(row) });
     this.options.legacyGrants.mint(key);
+    const docsSessionSince = isDocsSessionKey({ key: row })
+      ? fromDate(row.createdAt)
+      : (parent?.docsSessionSince ?? null);
 
-    return { ...key, tokenType: "apiKey" };
+    return { answer: { ...key, tokenType: "apiKey" }, docsSessionSince };
   }
 
   async findResolvedToken(input: {
@@ -314,14 +325,19 @@ export class ApiKeyTokenResolutionService {
   }
 
   /**
-   * Whether the parent key a key was minted under is still live. A
-   * parent that is gone reads as dead — its absence is not something to
+   * Whether the parent key a key was minted under is still live, and when it was minted if it
+   * is a docs session key. A parent that is gone reads as dead: its absence is not something to
    * authenticate past. Expiry counts too, ahead of the hourly sweep.
    */
-  private async isParentLive(parentApiKeyId: string): Promise<boolean> {
+  private async findParent(
+    parentApiKeyId: string,
+  ): Promise<{ live: boolean; docsSessionSince: Instant | null }> {
     const parent = await this.repository.findLivenessById({ id: parentApiKeyId });
-    if (!parent || parent.revokedAt) return false;
-    return !(parent.expiresAt && Temporal.Instant.compare(parent.expiresAt, this.now()) < 0);
+    if (!parent || parent.revokedAt) return { live: false, docsSessionSince: null };
+    const expired =
+      parent.expiresAt !== null && Temporal.Instant.compare(parent.expiresAt, this.now()) < 0;
+    const docsSessionSince = isDocsSessionKey({ key: parent }) ? parent.createdAt : null;
+    return { live: !expired, docsSessionSince };
   }
 
   private async findLegacyProjectKeyResolution(
@@ -470,25 +486,6 @@ export class ApiKeyTokenResolutionService {
   private nowMs(): number {
     return this.now().epochMilliseconds;
   }
-}
-
-/** Concurrent reads of one token in this process share one promise, dropped once it settles. */
-function shared<T>({
-  pending,
-  key,
-  read,
-}: {
-  pending: Map<string, Promise<T>>;
-  key: string;
-  read: () => Promise<T>;
-}): Promise<T> {
-  const inFlight = pending.get(key);
-  if (inFlight) return inFlight;
-
-  const started = read().finally(() => pending.delete(key));
-  pending.set(key, started);
-
-  return started;
 }
 
 function tokenHash({ token }: { token: string }): string {

@@ -686,6 +686,7 @@ export const prismaModelFieldCatalogue = {
     "maxSessionDurationDays",
     "mfaRequired",
     "docsPlaygroundSessionsEnabled",
+    "docsPlaygroundSessionsDisabledAt",
     "lockoutAfterFailedAttempts",
     "lockoutMinutes",
     "sessionIdleTimeoutMinutes",

@@ -43,6 +43,15 @@ export type ApiKeyUpdateRecord = {
 };
 
 /** Private persistence boundary for the API-key aggregate. */
+/** What the auth path reads about a key's parent: whether it is live, and what kind it is. */
+export type KeyLiveness = {
+  revokedAt: Instant | null;
+  expiresAt: Instant | null;
+  createdAt: Instant;
+  name: string;
+  isSystemManaged: boolean;
+};
+
 export abstract class ApiKeyRepository {
   abstract create(input: ApiKeyCreateRecord): Promise<ApiKeyRow>;
   abstract activate(input: { id: string }): Promise<ApiKeyRow>;
@@ -114,13 +123,11 @@ export abstract class ApiKeyRepository {
     organizationId: string;
   }): Promise<{ id: string }[]>;
   /**
-   * Whether one key is still usable, by id, without its bindings. The auth
-   * path asks this about a key's parent on every request presenting a
-   * session-minted key, so it reads only the two columns that decide it.
+   * Whether one key is still usable, by id, without its bindings, and whether it is a docs
+   * session key and since when. The auth path asks this about a key's parent on every request
+   * presenting a session-minted key, so it reads only the columns that decide it.
    */
-  abstract findLivenessById(input: {
-    id: string;
-  }): Promise<{ revokedAt: Instant | null; expiresAt: Instant | null } | null>;
+  abstract findLivenessById(input: { id: string }): Promise<KeyLiveness | null>;
   /**
    * One member's live keys of one system-managed name that the named browser sessions minted,
    * across every organization they belong to: sign-out knows the person, not the organization.

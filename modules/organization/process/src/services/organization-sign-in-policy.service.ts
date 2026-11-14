@@ -3,6 +3,7 @@ import type {
   OrganizationJoinSetting,
   SignInSecurityPolicy,
 } from "@langwatch/organization-contract";
+import { nowInstant } from "@langwatch/time";
 
 import type { OrganizationRepository } from "../repositories/organization.repository.ts";
 
@@ -55,7 +56,7 @@ export class OrganizationSignInPolicyService {
     organizationId: string;
     docsPlaygroundSessionsEnabled: boolean;
   }): Promise<void> {
-    return this.repository.saveDocsPlaygroundPolicy(input);
+    return this.repository.saveDocsPlaygroundPolicy({ ...input, changedAt: nowInstant() });
   }
 
   getSignInSecurityPolicy(input: { organizationId: string }): Promise<SignInSecurityPolicy> {

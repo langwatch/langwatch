@@ -11,6 +11,7 @@ import {
   PrismaTenancyGuardService,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { Temporal, toDate } from "@langwatch/time";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -42,33 +43,43 @@ describe.skipIf(!DB_URL)("PrismaOrganizationRepository docs playground policy", 
     await prisma.$disconnect();
   });
 
-  it("reads a new organization as on, the column's default", async () => {
+  it("reads a new organization as on, the column's default, never turned off", async () => {
     await expect(repository.getDocsPlaygroundPolicy({ organizationId })).resolves.toEqual({
       docsPlaygroundSessionsEnabled: true,
+      docsPlaygroundSessionsDisabledAt: null,
     });
   });
 
   it("reads an organization that does not exist as off", async () => {
     await expect(
       repository.getDocsPlaygroundPolicy({ organizationId: `${organizationId}-missing` }),
-    ).resolves.toEqual({ docsPlaygroundSessionsEnabled: false });
+    ).resolves.toEqual({
+      docsPlaygroundSessionsEnabled: false,
+      docsPlaygroundSessionsDisabledAt: null,
+    });
   });
 
-  it("stores the switch turned off and on again", async () => {
+  /** @scenario "Turning the playground session off records when, in the same write" */
+  it("stores the switch turned off with its time, and keeps that time once it is on again", async () => {
+    const offAt = Temporal.Instant.from("2026-11-14T10:00:00.000Z");
     await repository.saveDocsPlaygroundPolicy({
       organizationId,
       docsPlaygroundSessionsEnabled: false,
+      changedAt: offAt,
     });
     await expect(repository.getDocsPlaygroundPolicy({ organizationId })).resolves.toEqual({
       docsPlaygroundSessionsEnabled: false,
+      docsPlaygroundSessionsDisabledAt: toDate(offAt),
     });
 
     await repository.saveDocsPlaygroundPolicy({
       organizationId,
       docsPlaygroundSessionsEnabled: true,
+      changedAt: offAt.add({ minutes: 1 }),
     });
     await expect(repository.getDocsPlaygroundPolicy({ organizationId })).resolves.toEqual({
       docsPlaygroundSessionsEnabled: true,
+      docsPlaygroundSessionsDisabledAt: toDate(offAt),
     });
   });
 });

@@ -242,10 +242,14 @@ export type SignInSecurityPolicy = z.infer<typeof signInSecurityPolicySchema>;
 
 /**
  * Whether members may connect the docs playground to their own access (ADR-185, amendment of
- * 2026-11-13). On by default; off, no docs session key is minted and live ones stop working.
+ * 2026-11-13). Off, no key is minted; one minted at or before `docsPlaygroundSessionsDisabledAt`
+ * never authenticates again, even once it is back on (amendment of 2026-11-14).
  */
 const docsPlaygroundPolicySchemaDefinition = z
-  .object({ docsPlaygroundSessionsEnabled: z.boolean() })
+  .object({
+    docsPlaygroundSessionsEnabled: z.boolean(),
+    docsPlaygroundSessionsDisabledAt: z.date().nullable(),
+  })
   .strict();
 export interface DocsPlaygroundPolicySchema extends Named<
   typeof docsPlaygroundPolicySchemaDefinition

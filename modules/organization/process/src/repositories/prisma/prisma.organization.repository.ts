@@ -201,21 +201,28 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
   }): Promise<DocsPlaygroundPolicy> {
     const row = await this.database.organization.findUnique({
       where: { id: organizationId },
-      select: { docsPlaygroundSessionsEnabled: true },
+      select: { docsPlaygroundSessionsEnabled: true, docsPlaygroundSessionsDisabledAt: true },
     });
-    return { docsPlaygroundSessionsEnabled: row?.docsPlaygroundSessionsEnabled ?? false };
+    return {
+      docsPlaygroundSessionsEnabled: row?.docsPlaygroundSessionsEnabled ?? false,
+      docsPlaygroundSessionsDisabledAt: row?.docsPlaygroundSessionsDisabledAt ?? null,
+    };
   }
 
   async saveDocsPlaygroundPolicy({
     organizationId,
     docsPlaygroundSessionsEnabled,
+    changedAt,
   }: {
     organizationId: string;
     docsPlaygroundSessionsEnabled: boolean;
+    changedAt: Instant;
   }): Promise<void> {
     await this.database.organization.update({
       where: { id: organizationId },
-      data: { docsPlaygroundSessionsEnabled },
+      data: docsPlaygroundSessionsEnabled
+        ? { docsPlaygroundSessionsEnabled }
+        : { docsPlaygroundSessionsEnabled, docsPlaygroundSessionsDisabledAt: toDate(changedAt) },
     });
   }
 

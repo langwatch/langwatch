@@ -27,6 +27,7 @@ import {
   type ApiKeyCreateRecord,
   type ApiKeyRow,
   type ApiKeyUpdateRecord,
+  type KeyLiveness,
 } from "../api-key.repository.ts";
 import { MemoryApiKeyAnswerCacheRepository } from "../memory/memory.api-key-answer-cache.repository.ts";
 
@@ -221,15 +222,16 @@ class MemoryApiKeys extends ApiKeyRepository {
         .map(({ id }) => ({ id })),
     );
   }
-  findLivenessById(input: {
-    id: string;
-  }): Promise<{ revokedAt: Instant | null; expiresAt: Instant | null } | null> {
+  findLivenessById(input: { id: string }): Promise<KeyLiveness | null> {
     const row = this.rows.find(({ id }) => id === input.id);
     return Promise.resolve(
       row
         ? {
             revokedAt: row.revokedAt ? fromDate(row.revokedAt) : null,
             expiresAt: row.expiresAt ? fromDate(row.expiresAt) : null,
+            createdAt: fromDate(row.createdAt),
+            name: row.name,
+            isSystemManaged: row.isSystemManaged === true,
           }
         : null,
     );
