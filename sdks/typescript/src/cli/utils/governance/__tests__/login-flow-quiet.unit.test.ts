@@ -66,6 +66,7 @@ vi.mock("../config", () => ({
   })),
   saveConfig: vi.fn(),
   displayConfigPath: () => "~/.langwatch/config.json",
+  assertConfigWritable: vi.fn(),
 }));
 
 vi.mock("../../identityNotice", () => ({
