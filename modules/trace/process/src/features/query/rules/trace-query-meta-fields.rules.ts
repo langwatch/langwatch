@@ -28,7 +28,7 @@ import {
  * Built-in existence categories for `has:` and `none:`.
  * `attribute.<key>` is also accepted dynamically.
  */
-const HAS_VALUES = [
+export const HAS_VALUES = [
   "error",
   "eval",
   "feedback",
@@ -46,7 +46,7 @@ const HAS_VALUES = [
 ] as const;
 
 /** Stored simulation_runs.Status values, by their lowercase UI label. */
-const SCENARIO_STATUS_BY_LABEL: Record<string, string> = {
+export const SCENARIO_STATUS_BY_LABEL: Record<string, string> = {
   success: "SUCCESS",
   failed: "FAILED",
   failure: "FAILURE",
@@ -59,7 +59,7 @@ const SCENARIO_STATUS_BY_LABEL: Record<string, string> = {
   queued: "QUEUED",
 };
 
-const SCENARIO_VERDICT_BY_LABEL: Record<string, string> = {
+export const SCENARIO_VERDICT_BY_LABEL: Record<string, string> = {
   success: "SUCCESS",
   failure: "FAILURE",
   failed: "FAILURE",
@@ -249,7 +249,7 @@ const SCENARIO_STATUS_DEF: FieldDef = {
 /**
  * Extracts attribute key from trace.attribute.* or attribute.* prefix.
  */
-function traceAttributeKeyOf(
+export function traceAttributeKeyOf(
   value: string,
 ): { kind: "attribute"; key: string } | { kind: "other" } {
   if (value.startsWith("trace.attribute.")) {
@@ -278,7 +278,7 @@ function translateTraceId(tag: TagToken, negated: boolean, ctx: TranslationConte
  * whether sent to `POST /api/events/track` or reconstructed from an SDK
  * `langwatch.event` span event, is stored as an event of this name.
  */
-const FEEDBACK_TRACKED_EVENT_TYPE = "thumbs_up_down";
+export const FEEDBACK_TRACKED_EVENT_TYPE = "thumbs_up_down";
 
 function translateExistence(tag: TagToken, negated: boolean, ctx: TranslationContext): string {
   const value = extractStringValue(tag);

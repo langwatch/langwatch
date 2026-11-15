@@ -57,5 +57,7 @@ export const traceSummaries = defineClickHouseTable({
     SourceType: column.lowCardinalityString(),
     SourceId: column.string(),
     EarliestSpanStartMs: column.uint64(),
+    /** MATERIALIZED (goose 00032): read by the size facet and filter, never inserted. */
+    _size_bytes: column.uint32(),
   },
 });

@@ -43,9 +43,6 @@ const MAX_PARAM_COUNT = 50;
  */
 const MAX_CONTENT_TERMS = 8;
 
-/** Compiles an evaluator and the result conditions bound to it as one evaluation. */
-type EvaluationScopeTranslator = (scope: EvaluationScope, ctx: TranslationContext) => string;
-
 /**
  * Translates trace filters to ClickHouse SQL with value binding and free text.
  */
@@ -111,30 +108,54 @@ function freeTextTermsOf(tag: TagToken, negated: boolean): string[] {
   return value.length > 0 ? [value] : [];
 }
 
-function translateNode({
+/**
+ * How the walker joins what the tags compile to: SQL text for the text dialects, builder
+ * conditions for a built read. `group` is a parenthesis, which only text spells.
+ */
+export interface FilterLogic<T> {
+  always: () => T;
+  and: (left: T, right: T) => T;
+  or: (left: T, right: T) => T;
+  group: (inner: T) => T;
+}
+
+/** The text dialects' joins, byte for byte what the walker always wrote. */
+export const TEXT_FILTER_LOGIC: FilterLogic<string> = {
+  always: () => "1 = 1",
+  and: (left, right) => `(${left} AND ${right})`,
+  or: (left, right) => `(${left} OR ${right})`,
+  group: (inner) => `(${inner})`,
+};
+
+type TagTranslator<T> = (tag: TagToken, negated: boolean, ctx: TranslationContext) => T;
+type ScopeTranslator<T> = (scope: EvaluationScope, ctx: TranslationContext) => T;
+
+function translateNode<T>({
   node,
   negated,
   ctx,
   translateTag,
   translateScope,
+  logic,
 }: {
   node: LiqeQuery;
   negated: boolean;
   ctx: TranslationContext;
-  translateTag: FieldHandler;
-  translateScope: EvaluationScopeTranslator | undefined;
-}): string {
+  translateTag: TagTranslator<T>;
+  translateScope: ScopeTranslator<T> | undefined;
+  logic: FilterLogic<T>;
+}): T {
   ctx.nodeCount++;
   if (ctx.nodeCount > MAX_FILTER_NODE_COUNT) {
     throw new FilterTooComplexError({ maxNodes: MAX_FILTER_NODE_COUNT });
   }
 
-  const branch = (side: LiqeQuery, sideNegated: boolean): string =>
-    translateNode({ node: side, negated: sideNegated, ctx, translateTag, translateScope });
+  const branch = (side: LiqeQuery, sideNegated: boolean): T =>
+    translateNode({ node: side, negated: sideNegated, ctx, translateTag, translateScope, logic });
 
   switch (node.type) {
     case "EmptyExpression":
-      return "1 = 1";
+      return logic.always();
 
     case "Tag":
       return translateTag(node as TagToken, negated, ctx);
@@ -145,9 +166,12 @@ function translateNode({
         translateScope && !negated && logExpr.operator.operator !== "OR"
           ? buildAndChain(logExpr)
           : null;
-      if (chain && translateScope) return translateAndChain({ chain, ctx, branch, translateScope });
-      const op = logExpr.operator.operator === "OR" ? "OR" : "AND";
-      return `(${branch(logExpr.left, negated)} ${op} ${branch(logExpr.right, negated)})`;
+      if (chain && translateScope) {
+        return translateAndChain({ chain, ctx, branch, translateScope, logic });
+      }
+      // A negation reaches both sides with the operator kept: main's rows, De Morgan or not.
+      const join = logExpr.operator.operator === "OR" ? logic.or : logic.and;
+      return join(branch(logExpr.left, negated), branch(logExpr.right, negated));
     }
 
     case "UnaryOperator": {
@@ -158,7 +182,7 @@ function translateNode({
 
     case "ParenthesizedExpression": {
       const paren = node as ParenthesizedExpressionToken;
-      return `(${branch(paren.expression, negated)})`;
+      return logic.group(branch(paren.expression, negated));
     }
 
     default:
@@ -171,17 +195,19 @@ function translateNode({
  * one condition, ANDed with the chain's other operands walked as usual. The
  * operands are folded left, the shape the parser gave the chain.
  */
-function translateAndChain({
+function translateAndChain<T>({
   chain,
   ctx,
   branch,
   translateScope,
+  logic,
 }: {
   chain: AndChain;
   ctx: TranslationContext;
-  branch: (side: LiqeQuery, sideNegated: boolean) => string;
-  translateScope: EvaluationScopeTranslator;
-}): string {
+  branch: (side: LiqeQuery, sideNegated: boolean) => T;
+  translateScope: ScopeTranslator<T>;
+  logic: FilterLogic<T>;
+}): T {
   // The chain's own node is already counted; its nested AND nodes and the
   // bound group are not walked, so they are counted here.
   ctx.nodeCount += chain.nodeCount - 1;
@@ -192,9 +218,9 @@ function translateAndChain({
     ...(chain.scope ? [translateScope(chain.scope, ctx)] : []),
     ...chain.rest.map((operand) => branch(operand, false)),
   ];
-  const [first = "1 = 1", ...others] = parts;
-  if (others.length === 0) return `(${first})`;
-  return others.reduce((acc, part) => `(${acc} AND ${part})`, first);
+  const [first = logic.always(), ...others] = parts;
+  if (others.length === 0) return logic.group(first);
+  return others.reduce((acc, part) => logic.and(acc, part), first);
 }
 
 /** One tag of the `trace_summaries` dialect, its plain fields looked up in `fieldDefs`. */
@@ -221,11 +247,16 @@ export function translateTraceTag({
 
   const fieldName = tag.field.name;
 
-  const attribute = fieldTargetOf(fieldName);
+  const attribute = attributeTargetOf(fieldName);
   if (attribute.kind === "attribute") {
     // A value the viewer may not read is never matched; negated, nothing is excluded by it.
     if (isHiddenAttribute(attribute.key)) return negated ? "1 = 1" : "0 = 1";
-    return attribute.translate({ attrKey: attribute.key, tag, negated, ctx });
+    return TEXT_ATTRIBUTE_TRANSLATORS[attribute.target]({
+      attrKey: attribute.key,
+      tag,
+      negated,
+      ctx,
+    });
   }
 
   // `.get()` — own keys only. A plain-object index would resolve a field named
@@ -247,25 +278,34 @@ type AttributeTranslator = (input: {
   ctx: TranslationContext;
 }) => string;
 
+/** Which table a namespaced attribute field reads its key on. */
+export type AttributeTarget = "trace" | "span" | "event";
+
+const TEXT_ATTRIBUTE_TRANSLATORS: Readonly<Record<AttributeTarget, AttributeTranslator>> = {
+  trace: (input) => translateTraceAttribute(input),
+  span: (input) => translateSpanAttribute(input),
+  event: (input) => translateEventAttribute(input),
+};
+
 /**
  * The attribute a namespaced field names. `trace.attribute.<k>` and `span.attribute.<k>` are
  * canonical; `attribute.<k>` and `event.<k>` (one dot) stay as aliases for saved queries, and
  * the bare `event` field keeps routing to the static handler map.
  */
-function fieldTargetOf(
+export function attributeTargetOf(
   fieldName: string,
-): { kind: "attribute"; key: string; translate: AttributeTranslator } | { kind: "field" } {
-  const routes: [string, AttributeTranslator][] = [
-    [TRACE_ATTRIBUTE_PREFIX, translateTraceAttribute],
-    [SPAN_ATTRIBUTE_PREFIX, translateSpanAttribute],
-    [EVENT_ATTRIBUTE_PREFIX, translateEventAttribute],
-    [TRACE_ATTRIBUTE_PREFIX_LEGACY, translateTraceAttribute],
-    [EVENT_ATTRIBUTE_PREFIX_LEGACY, translateEventAttribute],
+): { kind: "attribute"; key: string; target: AttributeTarget } | { kind: "field" } {
+  const routes: [string, AttributeTarget][] = [
+    [TRACE_ATTRIBUTE_PREFIX, "trace"],
+    [SPAN_ATTRIBUTE_PREFIX, "span"],
+    [EVENT_ATTRIBUTE_PREFIX, "event"],
+    [TRACE_ATTRIBUTE_PREFIX_LEGACY, "trace"],
+    [EVENT_ATTRIBUTE_PREFIX_LEGACY, "event"],
   ];
-  for (const [prefix, translate] of routes) {
+  for (const [prefix, target] of routes) {
     if (prefix === EVENT_ATTRIBUTE_PREFIX_LEGACY && fieldName === "event") continue;
     if (fieldName.startsWith(prefix)) {
-      return { kind: "attribute", key: fieldName.slice(prefix.length), translate };
+      return { kind: "attribute", key: fieldName.slice(prefix.length), target };
     }
   }
   return { kind: "field" };
@@ -435,11 +475,60 @@ export function extractFreeTextTerms(queryText: string): string[] {
   return terms;
 }
 
+/** What a walk compiled: nothing for an empty query, else the compiled filter. */
+export type FilterWalk<T> = { kind: "empty" } | { kind: "compiled"; compiled: T };
+
 /**
- * The language's boolean structure, compiled with the tag translator given:
- * a second dialect over other tables supplies its own `translateTag`. Null
- * for an empty query, and the parameters land on `ctx.params`.
+ * The language's boolean structure, compiled with the tag translator and joins
+ * given: a second dialect over other tables supplies its own `translateTag`,
+ * a built read its conditions. Parameters land on `ctx.params`.
  */
+export function walkFilterAst<T>({
+  queryText,
+  ctx,
+  translateTag,
+  translateScope,
+  logic,
+}: {
+  queryText: string;
+  ctx: TranslationContext;
+  translateTag: TagTranslator<T>;
+  /**
+   * Compile an evaluator and the result conditions beside it as one
+   * evaluation. Only the `trace_summaries` dialect has the evaluator fields.
+   */
+  translateScope?: ScopeTranslator<T>;
+  logic: FilterLogic<T>;
+}): FilterWalk<T> {
+  const trimmed = normalizeQuery(queryText);
+  if (!trimmed) return { kind: "empty" };
+
+  let ast: LiqeQuery;
+  try {
+    ast = parseTraceQuerySyntax(trimmed);
+  } catch {
+    throw new FilterParseError("Invalid filter syntax");
+  }
+
+  if (ast.type === "EmptyExpression") return { kind: "empty" };
+
+  const compiled = translateNode({
+    node: ast,
+    negated: false,
+    ctx,
+    translateTag,
+    translateScope,
+    logic,
+  });
+
+  if (Object.keys(ctx.params).length > MAX_PARAM_COUNT) {
+    throw new FilterParseError("Too many filter conditions");
+  }
+
+  return { kind: "compiled", compiled };
+}
+
+/** {@link walkFilterAst} as SQL text, for LangWatchQL and the reads not yet built. */
 export function translateFilterAst({
   queryText,
   ctx,
@@ -449,29 +538,14 @@ export function translateFilterAst({
   queryText: string;
   ctx: TranslationContext;
   translateTag: FieldHandler;
-  /**
-   * Compile an evaluator and the result conditions beside it as one
-   * evaluation. Only the `trace_summaries` dialect has the evaluator fields.
-   */
-  translateScope?: EvaluationScopeTranslator;
+  translateScope?: ScopeTranslator<string>;
 }): string | null {
-  const trimmed = normalizeQuery(queryText);
-  if (!trimmed) return null;
-
-  let ast: LiqeQuery;
-  try {
-    ast = parseTraceQuerySyntax(trimmed);
-  } catch {
-    throw new FilterParseError("Invalid filter syntax");
-  }
-
-  if (ast.type === "EmptyExpression") return null;
-
-  const sql = translateNode({ node: ast, negated: false, ctx, translateTag, translateScope });
-
-  if (Object.keys(ctx.params).length > MAX_PARAM_COUNT) {
-    throw new FilterParseError("Too many filter conditions");
-  }
-
-  return sql;
+  const walk = walkFilterAst({
+    queryText,
+    ctx,
+    translateTag,
+    translateScope,
+    logic: TEXT_FILTER_LOGIC,
+  });
+  return walk.kind === "empty" ? null : walk.compiled;
 }

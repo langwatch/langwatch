@@ -6,8 +6,10 @@ import type { ClickHouseTableFacts } from "@langwatch/clickhouse-client/builder"
 import { describe, expect, it } from "vitest";
 
 import { evaluationRuns } from "../clickhouse.evaluation-runs.table.ts";
+import { instantEvalJudgments } from "../clickhouse.instant-eval-judgments.table.ts";
 import { instantEvalRuns } from "../clickhouse.instant-eval-runs.table.ts";
 import { logRecords } from "../clickhouse.log-records.table.ts";
+import { simulationRuns } from "../clickhouse.simulation-runs.table.ts";
 import { spanAnalytics } from "../clickhouse.span-analytics.table.ts";
 import { storedLogRecords } from "../clickhouse.stored-log-records.table.ts";
 import { storedSpans } from "../clickhouse.stored-spans.table.ts";
@@ -28,6 +30,9 @@ const DESCRIPTORS: readonly { readonly $table: ClickHouseTableFacts }[] = [
   evaluationRuns,
   logRecords,
   instantEvalRuns,
+  // Named exceptions: the side tables the scenario and Instant Eval filters read.
+  simulationRuns,
+  instantEvalJudgments,
   // A legacy table trace reads as a fallback (clickhouse-table-ownership.ts records).
   storedLogRecords,
 ];

@@ -136,6 +136,18 @@ export const DECLARED_OWNERSHIP: DeclaredOwnership = {
     {
       reader: "trace",
       table: "instant_eval_judgments",
+      file: "modules/trace/process/src/features/query/repositories/clickhouse/clickhouse.trace-filter-condition.mapper.ts",
+      reason: SUBQUERY,
+    },
+    {
+      reader: "trace",
+      table: "simulation_runs",
+      file: "modules/trace/process/src/features/query/repositories/clickhouse/clickhouse.trace-filter-condition.mapper.ts",
+      reason: SUBQUERY,
+    },
+    {
+      reader: "trace",
+      table: "instant_eval_judgments",
       file: "modules/trace/process/src/features/query/rules/trace-query-subquery.rules.ts",
       reason: SUBQUERY,
     },

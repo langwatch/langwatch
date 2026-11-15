@@ -14,6 +14,10 @@ import {
   type Unsupported,
 } from "@langwatch/trace-contract";
 
+import type {
+  ExpressionCategoricalDef,
+  RangeFacetDef,
+} from "../../facet/rules/trace-facet-registry.rules.ts";
 import type { TraceQueryFieldsService } from "../services/trace-query-fields.service.ts";
 import { latestEvaluationRunsSubquery, wrapMembership } from "./trace-query-subquery.rules.ts";
 import { translateNumericField, translateStringField } from "./trace-query-translators.rules.ts";
@@ -208,7 +212,7 @@ export function evaluateEvaluationScope({
  * The kept conditions grouped by facet, in first-seen order. A categorical
  * group is a set of alternatives (`anyOf`); a range group is joined.
  */
-function keptGroups({
+export function keptGroups({
   scope,
   fields,
 }: {
@@ -245,6 +249,12 @@ function conditionSql({
   return facet.kind === "range" ? translateNumericField(args) : translateStringField(args);
 }
 
-function scopedFacet({ field, fields }: { field: string; fields: TraceQueryFieldsService }) {
+export function scopedFacet({
+  field,
+  fields,
+}: {
+  field: string;
+  fields: TraceQueryFieldsService;
+}): ExpressionCategoricalDef | RangeFacetDef {
   return fields.getExpressionFacet(SCOPED_FACET_KEY_BY_FIELD.get(field) ?? field);
 }

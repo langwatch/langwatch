@@ -28,7 +28,7 @@ function normalise(question: string): string {
 }
 
 /** The runs a chip names; empty when the client registered none for it. */
-function findRuns({
+export function findRuns({
   ctx,
   question,
   target,
