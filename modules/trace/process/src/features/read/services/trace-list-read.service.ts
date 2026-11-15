@@ -1,7 +1,6 @@
 import { type Authorization, ownProjectIdReadBy, readScopeKeyOf } from "@langwatch/authorization";
 import type { PresenceApi } from "@langwatch/presence-contract";
 import {
-  TRACE_ORIGIN_CLICKHOUSE_EXPRESSION,
   TRACE_LIST_MAX_OFFSET_ROWS,
   PageTooDeepError,
   listedTraceKey,
@@ -21,7 +20,11 @@ import type {
 import type { FacetCatalog } from "#features/facet/rules/trace-facet-registry.rules";
 
 import type { TraceEvaluationRunsReadRepository } from "../../../repositories/trace-evaluation-runs.repository.ts";
-import type { TraceListQuery, TraceListRead } from "../../../repositories/trace-list.repository.ts";
+import {
+  TRACE_SUGGEST_FIELDS,
+  type TraceListQuery,
+  type TraceListRead,
+} from "../../../repositories/trace-list.repository.ts";
 import {
   facetCountWindowKey,
   type DiscoverParams,
@@ -89,13 +92,6 @@ interface SuggestParams {
   prefix: string;
   limit?: number;
 }
-
-const SUGGEST_COLUMN_MAP: Record<string, string> = {
-  model: "arrayJoin(Models)",
-  service: "Attributes['service.name']",
-  user: "Attributes['langwatch.user_id']",
-  origin: TRACE_ORIGIN_CLICKHOUSE_EXPRESSION,
-};
 
 export class TraceListService {
   static create({
@@ -311,14 +307,14 @@ export class TraceListService {
   }
 
   async getSuggestions(params: SuggestParams): Promise<string[]> {
-    const column = SUGGEST_COLUMN_MAP[params.field];
-    if (!column) {
+    const field = TRACE_SUGGEST_FIELDS.find((each) => each === params.field);
+    if (!field) {
       return [];
     }
 
     return this.repository.findDistinctValues({
       authorization: params.authorization,
-      column,
+      field,
       prefix: params.prefix,
       limit: params.limit ?? 20,
     });

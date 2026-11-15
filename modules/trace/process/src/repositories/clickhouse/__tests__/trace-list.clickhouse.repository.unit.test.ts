@@ -216,3 +216,83 @@ describe("TraceListClickHouseRepository.listAll (unit)", () => {
     });
   });
 });
+
+describe("TraceListClickHouseRepository value reads (unit)", () => {
+  const authorization = ownProof({ projectId: "tenant-1" });
+  const picker = {
+    authorization,
+    timeRange: { from: 1_000, to: 2_000 },
+    attributeKey: "env",
+    prefix: "pr",
+    limit: 10,
+    offset: 20,
+  };
+
+  async function statementsOf(run: (repo: TraceListClickHouseRepository) => Promise<unknown>) {
+    const { repo, client } = makeRepo();
+    const read = vi.spyOn(client, "read");
+    await run(repo);
+    return read.mock.calls.map(([{ statement }]) => statement);
+  }
+
+  describe("when the search bar suggests values or a picker samples a key's values", () => {
+    it("sends each as a tenant statement fenced by the proof with the tenant setting", async () => {
+      const statements = await statementsOf(async (repo) => {
+        await repo.findDistinctValues({ authorization, field: "model", prefix: "gpt", limit: 5 });
+        await repo.findAttributeValues(picker);
+        await repo.findSpanAttributeValues(picker);
+        await repo.findEventAttributeValues(picker);
+      });
+
+      expect(statements).toHaveLength(4);
+      for (const statement of statements) {
+        expect(statement).toMatchObject({
+          identity: "reader",
+          kind: "tenant",
+          tenantId: "tenant-1",
+        });
+        expect(statement.settings).toMatchObject({ SQL_langwatch_tenant_ids: "tenant-1" });
+        expect(statement.sql).not.toContain("{{tenantScope");
+      }
+    });
+  });
+
+  describe("when a field's values are suggested", () => {
+    it("matches the prefix after the version election, never inside it", async () => {
+      const [statement] = await statementsOf((repo) =>
+        repo.findDistinctValues({ authorization, field: "service", prefix: "api", limit: 5 }),
+      );
+      const election = statement!.sql.slice(statement!.sql.indexOf(" IN (SELECT"));
+
+      expect(statement!.sql).toContain(DEDUP_AGGREGATE);
+      expect(occurrences({ haystack: statement!.sql, needle: "like(" })).toBe(1);
+      expect(election).not.toContain("like(");
+    });
+  });
+
+  describe("when a picker samples a key's values", () => {
+    it.each([
+      [
+        "trace attributes",
+        (repo: TraceListClickHouseRepository) => repo.findAttributeValues(picker),
+      ],
+      [
+        "span attributes",
+        (repo: TraceListClickHouseRepository) => repo.findSpanAttributeValues(picker),
+      ],
+      [
+        "event attributes",
+        (repo: TraceListClickHouseRepository) => repo.findEventAttributeValues(picker),
+      ],
+    ])(
+      "caps the %s sample inside the read and pages its values outside it",
+      async (_kind, read) => {
+        const [statement] = await statementsOf(read);
+
+        expect(statement!.sql).toMatch(
+          /^SELECT facet_value FROM \(SELECT DISTINCT .+ LIMIT 50000 SETTINGS max_execution_time = 3, timeout_overflow_mode = 'break', max_threads = 8\) AS sample ORDER BY facet_value ASC LIMIT 10 OFFSET 20$/,
+        );
+      },
+    );
+  });
+});

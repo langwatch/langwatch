@@ -8,12 +8,15 @@ import {
 } from "@langwatch/clickhouse-client";
 import {
   type ClickHouseReadStart,
+  type ClickHouseTable,
   clickhouseRead,
   type Condition,
   cond,
+  type DerivedColumns,
   type Expression,
   fn,
   param,
+  type ProofScope,
   type ReaderScope,
   tenantScope as builtTenantScope,
 } from "@langwatch/clickhouse-client/builder";
@@ -37,6 +40,7 @@ import {
 } from "@langwatch/trace-contract";
 import { z } from "zod";
 
+import { TRACE_SUMMARY_CATEGORICAL_EXPRESSIONS } from "../../features/facet/repositories/clickhouse/clickhouse.trace-facet-expressions.mapper.ts";
 import { scopeTraceFilterToTable } from "../../features/facet/repositories/clickhouse/clickhouse.trace-facet-scope.mapper.ts";
 import type {
   TraceFilterCompilation,
@@ -44,11 +48,14 @@ import type {
   TraceFilterCondition,
 } from "../../features/query/repositories/clickhouse/clickhouse.trace-filter-condition.mapper.ts";
 import type { TraceFilterWhere } from "../../rules/trace-filter-hidden-origins.rules.ts";
-import type { TraceListQuery, TraceListRepository } from "../trace-list.repository.ts";
+import type {
+  TraceListQuery,
+  TraceListRepository,
+  TraceSuggestField,
+} from "../trace-list.repository.ts";
+import { storedSpans } from "./clickhouse.stored-spans.table.ts";
 import { traceSummaries } from "./clickhouse.trace-summaries.table.ts";
 import { chBoolean, chNumber, chString } from "./stored-span-row.mapper.ts";
-
-const TABLE_NAME = "trace_summaries" as const;
 
 const numeric = z.union([z.number(), z.string()]);
 const flag = z.union([z.boolean(), z.number()]);
@@ -57,9 +64,9 @@ const totalHitsRowsSchema = z.array(z.looseObject({ totalHits: numeric }));
 
 const countRowsSchema = z.array(z.looseObject({ cnt: numeric }));
 
-const traceRefRowsSchema = z.array(z.looseObject({ TenantId: chString, TraceId: chString }));
-
 const distinctValueRowsSchema = z.array(z.looseObject({ val: chString }));
+
+const traceRefRowsSchema = z.array(z.looseObject({ TenantId: chString, TraceId: chString }));
 
 /** Any column can be a discrete facet, so its value is read as whatever ClickHouse wrote. */
 const discreteValueRowsSchema = z.array(
@@ -364,6 +371,190 @@ function listCountStatement(query: TraceListQuery) {
     .build();
 }
 
+/** Each suggested field's stored value; a trace's models suggest one value each. */
+const SUGGEST_EXPRESSIONS: Record<
+  TraceSuggestField,
+  Expression<string | null, "trace_summaries">
+> = {
+  model: fn.arrayJoin(ts.Models),
+  service: TRACE_SUMMARY_CATEGORICAL_EXPRESSIONS.service,
+  user: TRACE_SUMMARY_CATEGORICAL_EXPRESSIONS.user,
+  origin: TRACE_SUMMARY_CATEGORICAL_EXPRESSIONS.origin,
+};
+
+/**
+ * A field's values from a prefix among the latest summaries since `fromMs`. The prefix applies
+ * after the election, so an old version's value is never suggested.
+ */
+function distinctValuesStatement({
+  authorization,
+  field,
+  prefix,
+  limit,
+  fromMs,
+}: {
+  authorization: Authorization;
+  field: TraceSuggestField;
+  prefix: string;
+  limit: number;
+  fromMs: number;
+}) {
+  const value = SUGGEST_EXPRESSIONS[field];
+  return clickhouseRead({
+    scope: builtTenantScope.fromProof({ authorization, reads: "traces" }),
+  })
+    .from(ts)
+    .withinWindows()
+    .where(() => cond.gte(ts.OccurredAt, fromMs))
+    .where(() => fn.like(value, `${prefix}%`), { inElection: false })
+    .select({ val: value })
+    .distinct()
+    .latestVersion()
+    .limit(limit)
+    .build();
+}
+
+/** A value picker's read: one key's values in the window, optionally from a prefix. */
+type ValuePickerQuery = {
+  authorization: Authorization;
+  timeRange: { from: number; to: number };
+  attributeKey: string;
+  prefix?: string;
+  limit: number;
+  offset: number;
+};
+
+/**
+ * A picker reads the distinct values in a bounded sample of rows, uncounted: a low-cardinality key
+ * shows every value, a high-cardinality one is narrowed by its prefix. The sample stops at 3s.
+ */
+const VALUE_SAMPLE_ROWS = 50_000;
+const VALUE_SAMPLE_SETTINGS = {
+  max_execution_time: 3,
+  timeout_overflow_mode: "break",
+  max_threads: 8,
+} as const;
+
+const pickedValueRowsSchema = z.array(z.looseObject({ facet_value: chString }));
+
+/** A non-empty value, and when the picker has a prefix, one that starts with it in lower case. */
+function pickable<T extends string>(
+  value: Expression<string, T>,
+  prefix: string | undefined,
+): Condition<T> {
+  const present = cond.ne(value, "");
+  return prefix ? cond.and(present, fn.like(fn.lower(value), `${prefix}%`)) : present;
+}
+
+/** The page of a picker's sampled values, in value order. */
+function sampledValuePage({
+  scope,
+  sample,
+  query,
+}: {
+  scope: ProofScope;
+  sample: ClickHouseTable<"sample", DerivedColumns<{ facet_value: string }>, "derived">;
+  query: ValuePickerQuery;
+}) {
+  return clickhouseRead({ scope })
+    .from(sample)
+    .select({ facet_value: sample.facet_value })
+    .orderBy(sample.facet_value, "ASC")
+    .limit(query.limit)
+    .offset(query.offset)
+    .build();
+}
+
+function pickerScopeOf(query: ValuePickerQuery): ProofScope {
+  return builtTenantScope.fromProof({ authorization: query.authorization, reads: "traces" });
+}
+
+/** One trace `Attributes` key's values. */
+function attributeValuesStatement(query: ValuePickerQuery) {
+  const scope = pickerScopeOf(query);
+  const value = attribute(query.attributeKey);
+  const sample = clickhouseRead({ scope })
+    .from(ts)
+    .withinWindows()
+    .select({ facet_value: value })
+    .distinct()
+    .prewhere(({ and, gte, lte }) =>
+      and(
+        gte(ts.OccurredAt, query.timeRange.from),
+        lte(ts.OccurredAt, query.timeRange.to),
+        fn.mapContains(ts.Attributes, query.attributeKey),
+      ),
+    )
+    .where(() => pickable(value, query.prefix))
+    .limit(VALUE_SAMPLE_ROWS)
+    .settings(VALUE_SAMPLE_SETTINGS)
+    .as("sample");
+  return sampledValuePage({ scope, sample, query });
+}
+
+/** One span attribute's values, from `stored_spans.SpanAttributes`. */
+function spanAttributeValuesStatement(query: ValuePickerQuery) {
+  const scope = pickerScopeOf(query);
+  const value = fn.mapGet(storedSpans.SpanAttributes, query.attributeKey);
+  const sample = clickhouseRead({ scope })
+    .from(storedSpans)
+    .withinWindows()
+    .select({ facet_value: value })
+    .distinct()
+    .prewhere(({ and, gte, lte }) =>
+      and(
+        gte(storedSpans.StartTime, query.timeRange.from),
+        lte(storedSpans.StartTime, query.timeRange.to),
+        fn.mapContains(storedSpans.SpanAttributes, query.attributeKey),
+      ),
+    )
+    .where(() => pickable(value, query.prefix))
+    .limit(VALUE_SAMPLE_ROWS)
+    .settings(VALUE_SAMPLE_SETTINGS)
+    .as("sample");
+  return sampledValuePage({ scope, sample, query });
+}
+
+/**
+ * One event attribute's values: `Events.Attributes` is an array of maps beside `Events.Name`, so a
+ * span gives one candidate per event carrying the key. The prefix filters inside the array.
+ */
+function eventAttributeValuesStatement(query: ValuePickerQuery) {
+  const scope = pickerScopeOf(query);
+  const events = storedSpans["Events.Attributes"];
+  const sample = clickhouseRead({ scope })
+    .from(storedSpans)
+    .withinWindows()
+    .select({
+      facet_value: fn.arrayJoin(
+        fn.arrayFilter(
+          (value) => pickable(value, query.prefix),
+          fn.arrayMap((attributes) => fn.mapGet(attributes, query.attributeKey), events),
+        ),
+      ),
+    })
+    .distinct()
+    .prewhere(({ and, gte, lte }) =>
+      and(
+        gte(storedSpans.StartTime, query.timeRange.from),
+        lte(storedSpans.StartTime, query.timeRange.to),
+        fn.arrayExists((attributes) => fn.mapContains(attributes, query.attributeKey), events),
+      ),
+    )
+    .limit(VALUE_SAMPLE_ROWS)
+    .settings(VALUE_SAMPLE_SETTINGS)
+    .as("sample");
+  return sampledValuePage({ scope, sample, query });
+}
+
+/** Sampled values carry no counts. */
+function pickedValues(rows: unknown): CategoricalFacetResult {
+  return {
+    values: pickedValueRowsSchema.parse(rows).map((row) => ({ value: row.facet_value, count: 0 })),
+    totalDistinct: 0,
+  };
+}
+
 /** Seconds a sidebar facet read may run before ClickHouse stops it. */
 const FACET_READ_MAX_EXECUTION_SECONDS = 20;
 
@@ -526,45 +717,20 @@ export class TraceListClickHouseRepository implements TraceListRepository {
 
   async findDistinctValues(params: {
     authorization: Authorization;
-    column: string;
+    field: TraceSuggestField;
     prefix: string;
     limit: number;
   }): Promise<string[]> {
-    // Bound the scan to the last 30 days so prefix-match suggest doesn't
-    // touch cold (S3-tier) partitions. Suggest is interactive, so we trade
-    // completeness on stale historical values for sub-second responses.
+    // Suggest is interactive: the last 30 days keep it off cold (S3-tier) partitions, trading
+    // completeness on stale values for sub-second answers.
     const SUGGEST_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
     const fromMs = nowInstant().epochMilliseconds - SUGGEST_WINDOW_MS;
-
-    const client = this.clickhouse.as(params.authorization, {
-      reads: "traces",
+    // ID_BOUND_SKIP: the last 30 days' summaries, bounded by OccurredAt and the limit.
+    const result = await this.reader.read({
+      statement: distinctValuesStatement({ ...params, fromMs }),
+      table: ts.$table.name,
     });
-    const result = await client.query({
-      query: `
-        SELECT DISTINCT ${params.column} AS val
-        FROM ${TABLE_NAME}
-        WHERE ${tenantScope("OccurredAt")}
-          AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
-          AND ${params.column} LIKE {prefix:String}
-          AND (TenantId, TraceId, UpdatedAt) IN (
-            SELECT TenantId, TraceId, max(UpdatedAt)
-            FROM ${TABLE_NAME}
-            WHERE ${tenantScope("OccurredAt")}
-              AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
-            GROUP BY TenantId, TraceId
-          )
-        LIMIT {limit:UInt32}
-      `,
-      query_params: {
-        fromMs,
-        prefix: `${params.prefix}%`,
-        limit: params.limit,
-      },
-      format: "JSONEachRow",
-    });
-
-    const rows = distinctValueRowsSchema.parse(await result.json());
-    return rows.map((r) => r.val);
+    return distinctValueRowsSchema.parse(result.rows).map((row) => row.val);
   }
 
   async findCategoricalFacet(params: {
@@ -973,198 +1139,31 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     return `'${key}'`;
   }
 
-  async findAttributeValues(params: {
-    authorization: Authorization;
-    timeRange: { from: number; to: number };
-    attributeKey: string;
-    prefix?: string;
-    limit: number;
-    offset: number;
-  }): Promise<CategoricalFacetResult> {
-    // Attribute values are typically low-cardinality; the picker needs only
-    // distinct values, fast, not exact counts. Strategy: scan a bounded
-    // prefix of rows with the key set and pull distinct values from that
-    // sample: low cardinality surfaces every value; high-cardinality keys
-    // re-query with a search prefix; counts return 0.
-    const ATTR_VALUE_SAMPLE_ROWS = 50_000;
-
-    const innerPrefix = params.prefix
-      ? "AND lower(Attributes[{attrKey:String}]) LIKE concat({prefix:String}, '%')"
-      : "";
-
-    const sql = `
-      SELECT
-        facet_value,
-        0 AS cnt,
-        0 AS total_distinct
-      FROM (
-        SELECT DISTINCT Attributes[{attrKey:String}] AS facet_value
-        FROM ${TABLE_NAME}
-        PREWHERE ${tenantScope("OccurredAt")}
-          AND OccurredAt >= fromUnixTimestamp64Milli({timeFrom:Int64})
-          AND OccurredAt <= fromUnixTimestamp64Milli({timeTo:Int64})
-          AND mapContains(Attributes, {attrKey:String})
-        WHERE Attributes[{attrKey:String}] != ''
-          ${innerPrefix}
-        LIMIT {sampleRows:UInt32}
-        SETTINGS
-          max_execution_time = 3,
-          timeout_overflow_mode = 'break',
-          max_threads = 8
-      )
-      ORDER BY facet_value
-      LIMIT {limit:UInt32} OFFSET {offset:UInt32}
-    `;
-
-    const client = this.clickhouse.as(params.authorization, {
-      reads: "traces",
+  async findAttributeValues(params: ValuePickerQuery): Promise<CategoricalFacetResult> {
+    // ID_BOUND_SKIP: a bounded sample of the window's summaries, by OccurredAt.
+    const result = await this.reader.read({
+      statement: attributeValuesStatement(params),
+      table: ts.$table.name,
     });
-    const result = await client.query({
-      query: sql,
-      query_params: {
-        timeFrom: params.timeRange.from,
-        timeTo: params.timeRange.to,
-        attrKey: params.attributeKey,
-        limit: params.limit,
-        offset: params.offset,
-        sampleRows: ATTR_VALUE_SAMPLE_ROWS,
-        ...(params.prefix ? { prefix: params.prefix } : {}),
-      },
-      format: "JSONEachRow",
-    });
-
-    const rows = facetRowsSchema.parse(await result.json());
-    return TraceListClickHouseRepository.mapFacetRows(rows);
+    return pickedValues(result.rows);
   }
 
-  async findEventAttributeValues(params: {
-    authorization: Authorization;
-    timeRange: { from: number; to: number };
-    attributeKey: string;
-    prefix?: string;
-    limit: number;
-    offset: number;
-  }): Promise<CategoricalFacetResult> {
-    // Same bounded-sample strategy as findAttributeValues, against the store
-    // the `event.attribute.` filter actually queries: `Events.Attributes` is
-    // an Array(Map) parallel to `Events.Name`, so a span contributes one
-    // candidate value per event that carries the key.
-    const ATTR_VALUE_SAMPLE_ROWS = 50_000;
-
-    // The prefix filter lives INSIDE arrayFilter (not a WHERE on the
-    // arrayJoin alias) so the sample keeps its one-pass shape.
-    const valuePredicate = params.prefix
-      ? "v -> v != '' AND lower(v) LIKE concat({prefix:String}, '%')"
-      : "v -> v != ''";
-
-    const sql = `
-      SELECT
-        facet_value,
-        0 AS cnt,
-        0 AS total_distinct
-      FROM (
-        SELECT DISTINCT arrayJoin(
-          arrayFilter(
-            ${valuePredicate},
-            arrayMap(m -> m[{attrKey:String}], \`Events.Attributes\`)
-          )
-        ) AS facet_value
-        FROM stored_spans
-        PREWHERE ${tenantScope("StartTime")}
-          AND StartTime >= fromUnixTimestamp64Milli({timeFrom:Int64})
-          AND StartTime <= fromUnixTimestamp64Milli({timeTo:Int64})
-          AND arrayExists(m -> mapContains(m, {attrKey:String}), \`Events.Attributes\`)
-        LIMIT {sampleRows:UInt32}
-        SETTINGS
-          max_execution_time = 3,
-          timeout_overflow_mode = 'break',
-          max_threads = 8
-      )
-      ORDER BY facet_value
-      LIMIT {limit:UInt32} OFFSET {offset:UInt32}
-    `;
-
-    const client = this.clickhouse.as(params.authorization, {
-      reads: "traces",
+  async findEventAttributeValues(params: ValuePickerQuery): Promise<CategoricalFacetResult> {
+    // ID_BOUND_SKIP: a bounded sample of the window's spans, by StartTime.
+    const result = await this.reader.read({
+      statement: eventAttributeValuesStatement(params),
+      table: storedSpans.$table.name,
     });
-    const result = await client.query({
-      query: sql,
-      query_params: {
-        timeFrom: params.timeRange.from,
-        timeTo: params.timeRange.to,
-        attrKey: params.attributeKey,
-        limit: params.limit,
-        offset: params.offset,
-        sampleRows: ATTR_VALUE_SAMPLE_ROWS,
-        ...(params.prefix ? { prefix: params.prefix } : {}),
-      },
-      format: "JSONEachRow",
-    });
-
-    const rows = facetRowsSchema.parse(await result.json());
-    return TraceListClickHouseRepository.mapFacetRows(rows);
+    return pickedValues(result.rows);
   }
 
-  async findSpanAttributeValues(params: {
-    authorization: Authorization;
-    timeRange: { from: number; to: number };
-    attributeKey: string;
-    prefix?: string;
-    limit: number;
-    offset: number;
-  }): Promise<CategoricalFacetResult> {
-    // Same bounded-sample strategy as findAttributeValues, against
-    // `stored_spans.SpanAttributes` — the store the `span.attribute.` filter
-    // actually queries.
-    const ATTR_VALUE_SAMPLE_ROWS = 50_000;
-
-    const innerPrefix = params.prefix
-      ? "AND lower(SpanAttributes[{attrKey:String}]) LIKE concat({prefix:String}, '%')"
-      : "";
-
-    const sql = `
-      SELECT
-        facet_value,
-        0 AS cnt,
-        0 AS total_distinct
-      FROM (
-        SELECT DISTINCT SpanAttributes[{attrKey:String}] AS facet_value
-        FROM stored_spans
-        PREWHERE ${tenantScope("StartTime")}
-          AND StartTime >= fromUnixTimestamp64Milli({timeFrom:Int64})
-          AND StartTime <= fromUnixTimestamp64Milli({timeTo:Int64})
-          AND mapContains(SpanAttributes, {attrKey:String})
-        WHERE SpanAttributes[{attrKey:String}] != ''
-          ${innerPrefix}
-        LIMIT {sampleRows:UInt32}
-        SETTINGS
-          max_execution_time = 3,
-          timeout_overflow_mode = 'break',
-          max_threads = 8
-      )
-      ORDER BY facet_value
-      LIMIT {limit:UInt32} OFFSET {offset:UInt32}
-    `;
-
-    const client = this.clickhouse.as(params.authorization, {
-      reads: "traces",
+  async findSpanAttributeValues(params: ValuePickerQuery): Promise<CategoricalFacetResult> {
+    // ID_BOUND_SKIP: a bounded sample of the window's spans, by StartTime.
+    const result = await this.reader.read({
+      statement: spanAttributeValuesStatement(params),
+      table: storedSpans.$table.name,
     });
-    const result = await client.query({
-      query: sql,
-      query_params: {
-        timeFrom: params.timeRange.from,
-        timeTo: params.timeRange.to,
-        attrKey: params.attributeKey,
-        limit: params.limit,
-        offset: params.offset,
-        sampleRows: ATTR_VALUE_SAMPLE_ROWS,
-        ...(params.prefix ? { prefix: params.prefix } : {}),
-      },
-      format: "JSONEachRow",
-    });
-
-    const rows = facetRowsSchema.parse(await result.json());
-    return TraceListClickHouseRepository.mapFacetRows(rows);
+    return pickedValues(result.rows);
   }
 
   private toTraceListRow(row: ClickHouseSummaryRow): TraceListRow {

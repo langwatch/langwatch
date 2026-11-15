@@ -14,6 +14,10 @@ import type {
 import type { TraceFilterCompile } from "../features/query/repositories/clickhouse/clickhouse.trace-filter-condition.mapper.ts";
 import type { TraceFilterWhere } from "../rules/trace-filter-hidden-origins.rules.ts";
 
+/** The search-bar fields whose stored values the list suggests. */
+export const TRACE_SUGGEST_FIELDS = ["model", "service", "user", "origin"] as const;
+export type TraceSuggestField = (typeof TRACE_SUGGEST_FIELDS)[number];
+
 export interface TraceListQuery {
   /** The proof the read is fenced by; the reader applies its tenant set. */
   authorization: Authorization;
@@ -50,7 +54,7 @@ export interface TraceListRepository {
 
   findDistinctValues(params: {
     authorization: Authorization;
-    column: string;
+    field: TraceSuggestField;
     prefix: string;
     limit: number;
   }): Promise<string[]>;

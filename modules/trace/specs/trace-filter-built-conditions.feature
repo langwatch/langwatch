@@ -55,3 +55,10 @@ Feature: Trace filters compile to built conditions
     And one of the member's traces was evaluated before that time
     When the aggregate's list is filtered by that evaluator
     Then the trace is not listed, though the member's own list still lists it
+
+  @integration
+  Scenario: Search suggestions and value pickers keep main's values under each scope
+    Given another tenant shares the trace ids of a member's traces and spans
+    When the search bar suggests a field's values, or a picker samples a trace, span or event attribute's values
+    Then each returns the values main's text returns under an own proof, a tenant set and a windowed share
+    And none of the other tenant's values, nor any from before a windowed share
