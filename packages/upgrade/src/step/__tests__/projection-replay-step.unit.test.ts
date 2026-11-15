@@ -64,6 +64,7 @@ function twoTenantReplayer({ stopAfterFirst = false }: { stopAfterFirst?: boolea
 }
 
 const PAGED_KEY = "tenant-1:directory:directory-a";
+const DEADLINE_CUT = "step_deadline_passed";
 
 /** A replayer whose lane holds one aggregate too large for a bulk read, paged and cut if told. */
 function pagingReplayer({ cut }: { cut: boolean }) {
@@ -72,7 +73,7 @@ function pagingReplayer({ cut }: { cut: boolean }) {
     async replayLane(input) {
       unfinishedSeen.push(input.paging?.unfinished.get(PAGED_KEY));
       await input.paging?.started({ key: PAGED_KEY });
-      if (cut) throw new Error("the run passed its 15-minute deadline");
+      if (cut) throw Object.assign(new Error("deadline passed"), { code: DEADLINE_CUT });
       input.paging?.finished({ key: PAGED_KEY });
       return {
         lane: input.lane,
@@ -385,7 +386,7 @@ describe("defineProjectionReplayStep", () => {
       for (let run = 1; run <= 3; run++) {
         const { replayer, unfinishedSeen } = pagingReplayer({ cut: true });
         const { report, saved } = runOnce({ replayer, resumeFrom });
-        await expect(report).rejects.toThrow("the run passed its 15-minute deadline");
+        await expect(report).rejects.toMatchObject({ code: DEADLINE_CUT });
         unfinishedAtStart.push(...unfinishedSeen);
         resumeFrom = saved.at(-1) ?? null;
       }

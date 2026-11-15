@@ -629,7 +629,7 @@ interface EventPage {
   occurredAtBounds?: OccurredAtBounds;
 }
 
-/** From `FROM` to `LIMIT`: a page of events after `cursor` up to `maxCutoff`, in event order. */
+/** From `FROM` to `ORDER BY`: the events after `cursor` up to `maxCutoff`, in event order. */
 function eventPageWhere({
   tenantId,
   aggregateIds,
@@ -666,7 +666,6 @@ function eventPageWhere({
       }
       ${pruning.sql}
     ORDER BY EventTimestamp ASC, EventId ASC
-    LIMIT {batchSize:UInt32}
   `,
     params: {
       tenantId,
@@ -686,20 +685,57 @@ function eventPageWhere({
   };
 }
 
-/** How many leading rows fit `maxPayloadBytes`: at least one, so a row over it alone is read. */
-export function rowsWithinPayload({
-  payloadBytes,
-  maxPayloadBytes,
-}: {
-  payloadBytes: readonly number[];
-  maxPayloadBytes: number;
-}): number {
-  let held = 0;
-  for (const [index, bytes] of payloadBytes.entries()) {
-    held += bytes;
-    if (held > maxPayloadBytes) return Math.max(index, 1);
+const PAGE_LIMIT = "LIMIT {batchSize:UInt32}";
+
+/** One sized row of a page: its `(EventTimestamp, EventId)` position and its payload bytes. */
+export interface SizedRow {
+  timestamp: number;
+  eventId: string;
+  payloadBytes: number;
+}
+
+/** The rows at each position in turn, as the row count through it and the bytes they hold. */
+function positionGroups(rows: readonly SizedRow[]): { end: number; bytes: number }[] {
+  const groups: { end: number; bytes: number }[] = [];
+  for (const [index, row] of rows.entries()) {
+    const previous = rows[index - 1];
+    const last = groups.at(-1);
+    const tied = previous?.timestamp === row.timestamp && previous.eventId === row.eventId;
+    if (last && tied) {
+      last.end = index + 1;
+      last.bytes += row.payloadBytes;
+    } else {
+      groups.push({ end: index + 1, bytes: row.payloadBytes });
+    }
   }
-  return payloadBytes.length;
+  return groups;
+}
+
+/**
+ * How many leading rows a page reads within `maxPayloadBytes`. It ends only between positions, so
+ * rows tied at one position (copies a merge has not yet collapsed) are read together; a first
+ * position over the cap is its own page. `truncated`: the sizing read stopped at its LIMIT, so its
+ * last position may hold rows it never saw and is left whole to the next page.
+ */
+export function rowsWithinPayload({
+  rows,
+  maxPayloadBytes,
+  truncated,
+}: {
+  rows: readonly SizedRow[];
+  maxPayloadBytes: number;
+  truncated: boolean;
+}): number {
+  const groups = positionGroups(rows);
+  const whole = truncated && groups.length > 1 ? groups.slice(0, -1) : groups;
+  let held = 0;
+  let end = 0;
+  for (const group of whole) {
+    held += group.bytes;
+    if (held > maxPayloadBytes && end > 0) return end;
+    end = group.end;
+  }
+  return end;
 }
 
 /**
@@ -722,12 +758,18 @@ async function payloadBoundedEnd({
     payloadBytes: string | number;
   }>({
     tenantId: page.tenantId,
-    sql: `SELECT EventTimestamp, EventId, length(EventPayload) AS payloadBytes ${where.sql}`,
+    sql: `SELECT EventTimestamp, EventId, length(EventPayload) AS payloadBytes ${where.sql}
+    ${PAGE_LIMIT}`,
     params: where.params,
   });
   const fit = rowsWithinPayload({
-    payloadBytes: rows.map((row) => Number(row.payloadBytes)),
+    rows: rows.map((row) => ({
+      timestamp: Number(row.EventTimestamp),
+      eventId: row.EventId,
+      payloadBytes: Number(row.payloadBytes),
+    })),
     maxPayloadBytes,
+    truncated: rows.length >= page.batchSize,
   });
   const end = rows[fit - 1];
   return end && { timestamp: Number(end.EventTimestamp), eventId: end.EventId };
@@ -735,7 +777,8 @@ async function payloadBoundedEnd({
 
 /**
  * Load events for a batch of aggregates up to a max cutoff, with cursor-based pagination. With
- * `maxPayloadBytes`, a first read of positions and sizes ends the page where its payloads fit.
+ * `maxPayloadBytes`, a first read of positions and sizes ends the page where its payloads fit, and
+ * the load reads that range whole, with no LIMIT to cut a tied position the cursor would then skip.
  */
 export async function batchLoadAggregateEvents({
   client,
@@ -760,7 +803,8 @@ export async function batchLoadAggregateEvents({
     SELECT EventId, EventTimestamp, EventOccurredAt, EventType, EventPayload,
            EventVersion, TenantId, AggregateType, AggregateId, ProcessingTraceparent,
            IdempotencyKey
-    ${where.sql}`,
+    ${where.sql}
+    ${maxPayloadBytes === undefined ? PAGE_LIMIT : ""}`,
     params: where.params,
   });
 

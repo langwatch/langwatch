@@ -234,7 +234,7 @@ Feature: A module fills a new read model at deploy by replaying a projection lan
     And the aggregate is replayed again from its pages
     And its read model equals a replay that never hit the limit
 
-  @unit
+  @integration
   Scenario: A paged trace writes the trace_analytics row its bulk read writes
     Given a small trace replayed by the trace analytics widget-columns lane
     When its bulk read succeeds in one replay and is over the per-query memory limit in another
@@ -259,6 +259,7 @@ Feature: A module fills a new read model at deploy by replaying a projection lan
     Given an aggregate's next events whose payloads together pass the page's byte cap
     When the page is read
     Then it ends at the last event whose payload fits, sized without sorting a payload
+    And copies of one event not yet merged are sized together and never split across pages
     And an event over the cap alone is a page of its own
 
   @unit

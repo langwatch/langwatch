@@ -3,9 +3,9 @@ import { nowInstant } from "@langwatch/time";
 
 import { compareOrdinal } from "../utils/compareOrdinal.ts";
 import { REPLAY_CURSOR_SKEW_MARGIN_MS } from "./replayConstants.ts";
+import type { ReplayLogWriter } from "./replayLog.ts";
 import type { ReplayProjections } from "./replayProjections.ts";
 import type { ReplayService } from "./replayService.ts";
-import type { ReplayLogWriter } from "./replayLog.ts";
 import type {
   BatchCompleteInfo,
   ProjectionKind,
@@ -148,11 +148,15 @@ async function replayTenants({
   return totals;
 }
 
-/** A paged aggregate's pages, numbers only, so its cost per page shows in the worker's log. */
+/** Paging's entries, numbers only, so a paged aggregate's cost shows in the worker's log. */
 function pageLog({ lane }: { lane: string }): ReplayLogWriter {
   return {
     write: (entry) => {
       if (entry.step === "page-aggregate") logger.info({ lane, ...entry }, "Replay read a page");
+      // Its error text is ClickHouse's and may quote the query, so only the batch number goes on.
+      if (entry.step === "page-batch") {
+        logger.info({ lane, step: entry.step, batch: entry.batch }, "Replay pages an aggregate");
+      }
     },
   };
 }

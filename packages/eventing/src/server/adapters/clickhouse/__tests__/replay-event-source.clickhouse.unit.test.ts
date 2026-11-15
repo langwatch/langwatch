@@ -1,4 +1,5 @@
 /** Spec: packages/eventing/specs/projection-replay.feature */
+import type { QueryRequest } from "@langwatch/clickhouse-client";
 import {
   type ClickHouseEventRow,
   EventingClickHouseReplayEventSource,
@@ -8,6 +9,7 @@ import {
 import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { describe, expect, it, vi } from "vitest";
 
+import { pageAggregateEvents } from "../../../../replay/replayEngine.ts";
 import type { ReplayEvent } from "../../../../replay/replayEventSource.ts";
 import {
   rowsWithinPayload,
@@ -26,6 +28,75 @@ const row = (eventId: string, timestamp: number): ClickHouseEventRow => ({
   EventVersion: "2025-12-14",
   EventPayload: "{}",
 });
+
+/** One stored copy of an event: rows sharing a position are copies a merge has not collapsed. */
+interface StoredCopy {
+  copy: string;
+  eventId: string;
+  timestamp: number;
+  payloadBytes: number;
+}
+
+const isAfter = (row: StoredCopy, at: { timestamp: number; eventId: string }) =>
+  row.timestamp > at.timestamp || (row.timestamp === at.timestamp && row.eventId > at.eventId);
+
+/** event_log as ClickHouse answers the page's two reads: the WHERE's range, then any LIMIT. */
+function eventLogOf(copies: readonly StoredCopy[]): EventingClickHouseReplayClient {
+  const at = (timestamp: unknown, eventId: unknown) => ({
+    timestamp: Number(timestamp),
+    eventId: String(eventId),
+  });
+  const inRange = (params: Record<string, unknown>) => {
+    const upTo = at(params.maxCutoffTimestamp, params.maxCutoffEventId);
+    const cursor = at(params.cursorTimestamp, params.cursorEventId);
+    const hasCursor = params.cursorEventId !== undefined;
+    return copies.filter((row) => !isAfter(row, upTo) && (!hasCursor || isAfter(row, cursor)));
+  };
+  const answer = ({ sql, params = {} }: QueryRequest): unknown[] => {
+    const range = inRange(params);
+    const read = sql.includes("LIMIT") ? range.slice(0, Number(params.batchSize)) : range;
+    if (!sql.includes("AS payloadBytes")) {
+      return read.map((copy) => ({
+        ...row(copy.eventId, copy.timestamp),
+        IdempotencyKey: copy.copy,
+      }));
+    }
+    return read.map((copy) => ({
+      EventTimestamp: copy.timestamp,
+      EventId: copy.eventId,
+      payloadBytes: copy.payloadBytes,
+    }));
+  };
+  return clickHouseQueryClientDouble({
+    query: async (request: QueryRequest) => ({ rows: answer(request) }),
+  });
+}
+
+/** Every copy a paged read of the aggregate applies, in order, by its copy name. */
+async function pagedCopies({ copies, maxEvents }: { copies: StoredCopy[]; maxEvents: number }) {
+  const source = new EventingClickHouseReplayEventSource({
+    clickhouse: eventLogOf(copies),
+    lean: (event) => event,
+  });
+  const last = copies.at(-1)!;
+  const applied: string[] = [];
+  await pageAggregateEvents({
+    eventSource: source,
+    signal: undefined,
+    log: { write: () => undefined },
+    page: { maxEvents, maxPayloadBytes: 1_000 },
+    tenantId: "project_a",
+    aggregateIds: ["trace_1"],
+    eventTypes: ["lw.span.received"],
+    cutoffs: new Map([
+      ["project_a:trace:trace_1", { timestamp: last.timestamp, eventId: last.eventId }],
+    ]),
+    onEvent: (event) => {
+      applied.push(event.idempotencyKey);
+    },
+  });
+  return applied;
+}
 
 /** The routed member's surface, answering nothing unless a test scripts it. */
 function member() {
@@ -150,6 +221,36 @@ describe("EventingClickHouseReplayEventSource", () => {
       const [sizes, read] = client.query.mock.calls.map(([request]) => request);
       expect(sizes.sql).not.toContain("EventPayload,");
       expect(read.params).toMatchObject({ maxCutoffTimestamp: 1, maxCutoffEventId: "event_1" });
+      expect(read.sql).not.toContain("LIMIT");
+    });
+
+    /** @scenario "A page ends before its payloads pass the byte cap" */
+    it.each([
+      {
+        across: "the byte cap",
+        maxEvents: 10,
+        copies: [
+          { copy: "copy_1", eventId: "event_1", timestamp: 1, payloadBytes: 400 },
+          { copy: "copy_2", eventId: "event_2", timestamp: 2, payloadBytes: 400 },
+          { copy: "copy_3", eventId: "event_2", timestamp: 2, payloadBytes: 400 },
+          { copy: "copy_4", eventId: "event_3", timestamp: 3, payloadBytes: 100 },
+        ],
+      },
+      {
+        across: "the sizing read's LIMIT",
+        maxEvents: 3,
+        copies: [
+          { copy: "copy_1", eventId: "event_1", timestamp: 1, payloadBytes: 400 },
+          { copy: "copy_2", eventId: "event_2", timestamp: 2, payloadBytes: 400 },
+          { copy: "copy_3", eventId: "event_2", timestamp: 2, payloadBytes: 400 },
+          { copy: "copy_4", eventId: "event_2", timestamp: 2, payloadBytes: 400 },
+          { copy: "copy_5", eventId: "event_3", timestamp: 3, payloadBytes: 100 },
+        ],
+      },
+    ])("reads every copy of a tied event across $across once, none lost", async (each) => {
+      const applied = await pagedCopies(each);
+
+      expect(applied).toEqual(each.copies.map((stored) => stored.copy));
     });
 
     /** @scenario "A page ends before its payloads pass the byte cap" */
@@ -213,19 +314,43 @@ describe("sliceByBudget", () => {
 });
 
 describe("rowsWithinPayload", () => {
+  const sized = (...rows: [eventId: string, payloadBytes: number][]) =>
+    rows.map(([eventId, payloadBytes]) => ({ timestamp: 1, eventId, payloadBytes }));
+  const within = (rows: ReturnType<typeof sized>, truncated = false) =>
+    rowsWithinPayload({ rows, maxPayloadBytes: 1_000, truncated });
+
   describe("when a page's payloads pass the cap", () => {
     it("ends the page before the row that passes it", () => {
-      expect(rowsWithinPayload({ payloadBytes: [400, 400, 400], maxPayloadBytes: 1_000 })).toBe(2);
+      expect(within(sized(["a", 400], ["b", 400], ["c", 400]))).toBe(2);
     });
 
     it("reads a first row over the cap alone", () => {
-      expect(rowsWithinPayload({ payloadBytes: [5_000, 10], maxPayloadBytes: 1_000 })).toBe(1);
+      expect(within(sized(["a", 5_000], ["b", 10]))).toBe(1);
+    });
+
+    /** @scenario "A page ends before its payloads pass the byte cap" */
+    it("counts the copies tied at the page's end whole, ending before them", () => {
+      expect(within(sized(["a", 300], ["b", 400], ["b", 400]))).toBe(1);
+    });
+
+    it("reads a first tied position over the cap whole, as its own page", () => {
+      expect(within(sized(["a", 600], ["a", 600], ["b", 10]))).toBe(2);
     });
   });
 
   describe("when a page's payloads fit the cap", () => {
-    it("reads every row", () => {
-      expect(rowsWithinPayload({ payloadBytes: [400, 600], maxPayloadBytes: 1_000 })).toBe(2);
+    it("reads every row, tied copies included", () => {
+      expect(within(sized(["a", 300], ["b", 300], ["b", 300]))).toBe(3);
+    });
+  });
+
+  describe("when the sizing read stopped at its LIMIT", () => {
+    it("leaves its last position, which may hold unseen copies, to the next page", () => {
+      expect(within(sized(["a", 100], ["b", 100], ["b", 100]), true)).toBe(1);
+    });
+
+    it("reads a lone position filling the LIMIT whole", () => {
+      expect(within(sized(["a", 100], ["a", 100]), true)).toBe(2);
     });
   });
 });

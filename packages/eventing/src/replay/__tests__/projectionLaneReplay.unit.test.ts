@@ -1,6 +1,6 @@
 /** Spec: specs/upgrade/projection-replay-step.feature. */
 import { memoryRedisDouble, memoryRedisStore } from "@langwatch/test-harness/client-doubles/redis";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { Event } from "../../domain/types.ts";
 import type { FoldProjectionDefinition } from "../../projections/foldProjection.types.ts";
@@ -33,6 +33,21 @@ import type {
   RegisteredMapProjection,
   ReplayPagingLedger,
 } from "../types.ts";
+
+/** What the lane replay logs to the worker's log; every other logger stays real. */
+const laneLog = vi.hoisted(() => [] as { fields: Record<string, unknown>; message: string }[]);
+vi.mock("@langwatch/observability", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@langwatch/observability")>();
+  const record = (fields: Record<string, unknown>, message: string) =>
+    void laneLog.push({ fields, message });
+  return {
+    ...actual,
+    createLogger: (name: string, options?: Parameters<typeof actual.createLogger>[1]) =>
+      name === "langwatch:event-sourcing:projection-lane-replay"
+        ? { info: record, warn: record }
+        : actual.createLogger(name, options),
+  };
+});
 
 const PAUSED_SET_KEY = "{event-sourcing/jobs}:gq:paused-jobs";
 const LANE = "directoryMembers";
@@ -911,6 +926,25 @@ describe("projectionLaneReplayer", () => {
     });
   });
 
+  describe("when a lone aggregate falls back to pages", () => {
+    /** @scenario "A paged aggregate logs each page's size and time, numbers only" */
+    it("logs the fallback and each page to the worker's log, with the lane and no id", async () => {
+      const { log, replayer } = setUp();
+      seedLoneAggregate(log);
+      failStreamsAbove({ log, maxAggregates: 0 });
+      laneLog.length = 0;
+
+      await replayer.replayLane({ lane: LANE, since: FROM_START, dryRun: false });
+
+      expect(laneLog.map(({ fields }) => fields)).toMatchObject([
+        { lane: LANE, step: "page-batch", batch: 1 },
+        { lane: LANE, step: "page-aggregate", page: 1, events: 2, totalEvents: 2 },
+      ]);
+      expect(laneLog[0]?.fields).toEqual({ lane: LANE, step: "page-batch", batch: 1 });
+      expect(JSON.stringify(laneLog)).not.toMatch(/tenant-1|directory-a/);
+    });
+  });
+
   describe("given an aggregate read in pages", () => {
     /** @scenario "A paged aggregate applies only events at or before its cutoff" */
     it("applies each aggregate's events only up to its own cutoff", async () => {
@@ -994,10 +1028,10 @@ describe("projectionLaneReplayer", () => {
       });
       const { pages } = recordPages(log);
 
-      await expect(
-        replayer.replayLane({ lane: LANE, since: FROM_START, dryRun: false }),
-      ).rejects.toThrow(`Replaying "${LANE}" failed in 1 batch(es): the log's connection dropped`);
+      const replay = replayer.replayLane({ lane: LANE, since: FROM_START, dryRun: false });
 
+      await expect(replay).rejects.toMatchObject({ code: "projection_lane_replay_failed" });
+      await expect(replay).rejects.toThrow("the log's connection dropped");
       expect(pages).toEqual([]);
     });
 
@@ -1066,12 +1100,10 @@ describe("projectionLaneReplayer", () => {
       failStreamsAbove({ log, maxAggregates: 0, eventsFirst: MAP_DRAIN_ROWS });
       const { pages } = recordPages(log);
 
-      await expect(
-        replayer.replayLane({ lane: MAP_LANE, since: FROM_START, dryRun: false }),
-      ).rejects.toThrow(
-        `Replaying "${MAP_LANE}" failed in 1 batch(es): ${queryMemoryLimitError().message}`,
-      );
+      const replay = replayer.replayLane({ lane: MAP_LANE, since: FROM_START, dryRun: false });
 
+      await expect(replay).rejects.toMatchObject({ code: "projection_lane_replay_failed" });
+      await expect(replay).rejects.toThrow(queryMemoryLimitError().message);
       expect(pages).toEqual([]);
       expect(mapRows).toHaveLength(MAP_DRAIN_ROWS);
     });

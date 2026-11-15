@@ -29,6 +29,8 @@ const EVENTS_PER_AGGREGATE = 15;
 const PAYLOAD_RANDOM_BYTES = 50_000;
 /** Under the batch's payload, well over one slice's. */
 const SERVER_MEMORY_CAP_BYTES = 80_000_000;
+/** 200 events of 100 KB: about 20 MB an insert. */
+const SEED_CHUNK_EVENTS = 200;
 
 const tenantId = `${randomUUID()}-replay-read-memory`;
 const aggregateIds = Array.from(
@@ -36,7 +38,7 @@ const aggregateIds = Array.from(
   (_, index) => `trace-${String(index).padStart(3, "0")}`,
 );
 
-/** One tenant holding a lone aggregate over the server's memory, and one a tenth its size. */
+/** One tenant: a lone aggregate of about 150 MB, near 2x the per-query cap, and one a tenth. */
 const pagedTenantId = `${randomUUID()}-replay-paged-aggregate`;
 const LONE_AGGREGATES = { "trace-large": 1_500, "trace-small": 150 } as const;
 /** Page caps scaled to the test server's memory, as AGGREGATE_PAGE is to production's. */
@@ -179,6 +181,46 @@ async function replayBatch(source: EventingClickHouseReplayEventSource): Promise
   return applied;
 }
 
+/**
+ * Inserts `events` events in sequential chunks of SEED_CHUNK_EVENTS, so no insert holds more than
+ * about 20 MB: the CI server caps its total memory at 1 GiB (Code 241, "(total)").
+ */
+async function seedEvents({
+  setup,
+  tenant,
+  aggregateIdSql,
+  params,
+  events,
+}: {
+  setup: QueryDriver;
+  tenant: string;
+  aggregateIdSql: string;
+  params: Record<string, unknown>;
+  events: number;
+}): Promise<void> {
+  for (let from = 0; from < events; from += SEED_CHUNK_EVENTS) {
+    await setup.command({
+      tenantId: tenant,
+      sql:
+        "INSERT INTO event_log (TenantId, IdempotencyKey, AggregateType, AggregateId, EventId, " +
+        "EventType, EventVersion, EventTimestamp, EventPayload, EventOccurredAt) " +
+        "SELECT {tenantId:String}, concat('event-', toString(number)), 'trace', " +
+        `${aggregateIdSql}, concat('event-', toString(number)), {eventType:String}, ` +
+        "'2026-11-14', 1700000000000 + number, " +
+        "concat('{\"blob\":\"', hex(randomString({payloadBytes:UInt32})), '\"}'), " +
+        "1700000000000 FROM numbers({from:UInt32}, {count:UInt32})",
+      params: {
+        ...params,
+        tenantId: tenant,
+        eventType: EVENT_TYPE,
+        payloadBytes: PAYLOAD_RANDOM_BYTES,
+        from,
+        count: Math.min(SEED_CHUNK_EVENTS, events - from),
+      },
+    });
+  }
+}
+
 beforeAll(async () => {
   const [endpoint] = await startTestClickHouseEndpoints({
     suite: "eventing-replay-read-memory",
@@ -207,43 +249,20 @@ beforeAll(async () => {
       "ORDER BY (TenantId, AggregateType, AggregateId, IdempotencyKey)",
   });
   // Event n belongs to aggregate n % 100 and was recorded at n, so aggregates interleave in time.
-  await setup.command({
-    tenantId,
-    sql:
-      "INSERT INTO event_log (TenantId, IdempotencyKey, AggregateType, AggregateId, EventId, " +
-      "EventType, EventVersion, EventTimestamp, EventPayload, EventOccurredAt) " +
-      "SELECT {tenantId:String}, concat('event-', toString(number)), 'trace', " +
-      "concat('trace-', leftPad(toString(number % {aggregates:UInt32}), 3, '0')), " +
-      "concat('event-', toString(number)), {eventType:String}, '2026-11-14', " +
-      "1700000000000 + number, " +
-      "concat('{\"blob\":\"', hex(randomString({payloadBytes:UInt32})), '\"}'), " +
-      "1700000000000 FROM numbers({events:UInt32})",
-    params: {
-      tenantId,
-      aggregates: AGGREGATES,
-      eventType: EVENT_TYPE,
-      payloadBytes: PAYLOAD_RANDOM_BYTES,
-      events: AGGREGATES * EVENTS_PER_AGGREGATE,
-    },
+  await seedEvents({
+    setup,
+    tenant: tenantId,
+    aggregateIdSql: "concat('trace-', leftPad(toString(number % {aggregates:UInt32}), 3, '0'))",
+    params: { aggregates: AGGREGATES },
+    events: AGGREGATES * EVENTS_PER_AGGREGATE,
   });
   for (const [aggregateId, events] of Object.entries(LONE_AGGREGATES)) {
-    await setup.command({
-      tenantId: pagedTenantId,
-      sql:
-        "INSERT INTO event_log (TenantId, IdempotencyKey, AggregateType, AggregateId, EventId, " +
-        "EventType, EventVersion, EventTimestamp, EventPayload, EventOccurredAt) " +
-        "SELECT {tenantId:String}, concat('event-', toString(number)), 'trace', " +
-        "{aggregateId:String}, concat('event-', toString(number)), {eventType:String}, " +
-        "'2026-11-14', 1700000000000 + number, " +
-        "concat('{\"blob\":\"', hex(randomString({payloadBytes:UInt32})), '\"}'), " +
-        "1700000000000 FROM numbers({events:UInt32})",
-      params: {
-        tenantId: pagedTenantId,
-        aggregateId,
-        eventType: EVENT_TYPE,
-        payloadBytes: PAYLOAD_RANDOM_BYTES,
-        events,
-      },
+    await seedEvents({
+      setup,
+      tenant: pagedTenantId,
+      aggregateIdSql: "{aggregateId:String}",
+      params: { aggregateId },
+      events,
     });
   }
 }, 120_000);
