@@ -108,10 +108,7 @@ export function defineProjectionReplayStep({
           : {}),
       };
       const paged = resumePaged({ resumeFrom: checkpoint.resumeFrom, lane });
-      const withPaged = (report: MigrationStepReport): MigrationStepReport =>
-        paged.size === 0
-          ? report
-          : { ...report, [PROJECTION_REPLAY_PAGED]: Object.fromEntries(paged) };
+      const withPaged = (report: MigrationStepReport) => withPagedAggregates({ report, paged });
       let saving: Promise<void> = Promise.resolve();
       // `done` and `total` are the step-progress keys the ledger reader shows (STEP-PROGRESS).
       const save = (report: MigrationStepReport) => {
@@ -119,19 +116,7 @@ export function defineProjectionReplayStep({
         const next = withPaged(report);
         saving = saving.then(() => checkpoint.save({ report: next }));
       };
-      // Past its deadline a run's saves are refused, so a paged attempt is counted as it starts.
-      const paging = {
-        unfinished: paged,
-        started: async ({ key }: { key: string }) => {
-          paged.set(key, (paged.get(key) ?? 0) + 1);
-          save(progress);
-          await saving;
-        },
-        finished: ({ key }: { key: string }) => {
-          paged.set(key, 0);
-          save(progress);
-        },
-      };
+      const paging = pagingLedger({ paged, save: () => save(progress), saved: () => saving });
       const onBatchComplete = (batch: { batchNum: number; totalBatches: number }) =>
         save({ ...progress, done: batch.batchNum, total: batch.totalBatches });
       const onTenantComplete = (done: { tenantId: string; replayedThrough: string }) => {
@@ -243,6 +228,47 @@ function resumeTenants({
   if (resumeFrom?.lane !== lane) return undefined;
   if (typeof replayedThrough !== "string" || typeof afterTenant !== "string") return undefined;
   return { replayedThrough, afterTenant };
+}
+
+type ReplayPaging = NonNullable<Parameters<LaneReplayer["replayLane"]>[0]["paging"]>;
+
+/** A report carrying the lane's paged aggregates, when it has any. */
+function withPagedAggregates({
+  report,
+  paged,
+}: {
+  report: MigrationStepReport;
+  paged: ReadonlyMap<string, number>;
+}): MigrationStepReport {
+  if (paged.size === 0) return report;
+  return { ...report, [PROJECTION_REPLAY_PAGED]: Object.fromEntries(paged) };
+}
+
+/**
+ * The paging ledger a replay updates, saving the run's progress on each change. Past its deadline
+ * a run's saves are refused, so a paged attempt is counted, and saved, as it starts.
+ */
+function pagingLedger({
+  paged,
+  save,
+  saved,
+}: {
+  paged: Map<string, number>;
+  save: () => void;
+  saved: () => Promise<void>;
+}): ReplayPaging {
+  return {
+    unfinished: paged,
+    started: async ({ key }) => {
+      paged.set(key, (paged.get(key) ?? 0) + 1);
+      save();
+      await saved();
+    },
+    finished: ({ key }) => {
+      paged.set(key, 0);
+      save();
+    },
+  };
 }
 
 /** The aggregates this lane's earlier runs paged, with their paged attempts not yet finished. */

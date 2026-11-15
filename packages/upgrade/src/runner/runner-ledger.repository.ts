@@ -304,10 +304,9 @@ export class UpgradeRunnerRepository {
   }
 
   /**
-   * Sets one failed step pending in a single conditional write, error cleared and checkpoint kept
-   * (paged attempts cleared).
-   * A Prisma step's report records the retry: the operator's consent to re-run the folder.
-   * Answers false when the step is not failed, so of two concurrent retries only one wins.
+   * Sets one failed step pending in a single conditional write: error and paged attempts cleared,
+   * checkpoint kept. A Prisma step's report records the retry: the operator's consent to re-run the
+   * folder. Answers false when the step is not failed, so of two concurrent retries only one wins.
    */
   async retryFailedStep({ id }: { id: string }): Promise<boolean> {
     const { rows } = await this.query<{ id: string }>(

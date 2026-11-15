@@ -61,7 +61,7 @@ function traceEvents(): ReplayEvent[] {
       occurredAt: at,
       startTimeUnixNano: msToUnixNano(at),
       endTimeUnixNano: msToUnixNano(at + 500),
-      attributes: { "gen_ai.request.model": "gpt-4o-mini" },
+      attributes: { "gen_ai.request.model": "gpt-5-mini" },
     });
     return leanReplayEvent({
       id: event.id,
@@ -83,7 +83,13 @@ type Position = Pick<ReplayEvent, "timestamp" | "id">;
 
 /** `(EventTimestamp, EventId)` order, as the event log sorts. */
 const byPosition = (a: Position, b: Position) =>
-  a.timestamp - b.timestamp || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+  a.timestamp - b.timestamp || compareIds(a.id, b.id);
+
+function compareIds(a: string, b: string): number {
+  if (a < b) return -1;
+  if (a > b) return 1;
+  return 0;
+}
 
 /** The event log, its bulk read over the memory limit when told; counts each kind of read. */
 function eventLog(events: ReplayEvent[], { bulkOverMemory }: { bulkOverMemory: boolean }) {
