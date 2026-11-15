@@ -30,6 +30,9 @@ export type ColumnType<Value> = Binding & {
 };
 
 const columnType = <Value>(spec: Binding & { clickhouse: string }): ColumnType<Value> => spec;
+/** A value of the JSON type: an object whose paths are read as Dynamic subcolumns. */
+export type JsonObject = Readonly<Record<string, unknown>>;
+
 const plain = <Value>(clickhouse: string) =>
   columnType<Value>({ clickhouse, paramType: clickhouse });
 
@@ -133,6 +136,8 @@ export const column = {
     const p = checkedInteger({ value: precision, min: 1, max: 76 });
     return plain<number>(`Decimal(${p}, ${checkedInteger({ value: scale, min: 0, max: p })})`);
   },
+  /** A JSON object, one per element of `JSONExtract(…, 'Array(JSON)')`; see getSubcolumn. */
+  json: () => plain<JsonObject>("JSON"),
   stringMap: () => column.map({ key: column.string(), value: column.string() }),
   stringArray: () => column.array(column.string()),
   int64Array: () => column.array(column.int64()),
@@ -256,7 +261,7 @@ export type ExpressionNode =
       readonly kind: "idBound";
       readonly keys: readonly { readonly column: ColumnNode; readonly value: ValueNode }[];
     }
-  /** A one-value subquery the read builder rendered under the enclosing read's scope. */
+  /** A `(SELECT …)` the read builder rendered under the enclosing read's scope: value or set. */
   | { readonly kind: "scalar"; readonly render: (context: RenderContext) => string }
   /** A braid's compiled condition over one table's columns, its keys and literals bound. */
   | {
@@ -574,6 +579,8 @@ export type Conditions = {
   not: <T extends string>(term: Condition<T>) => Condition<T>;
   /** A constant false, `0 = 1`, which the server folds: a branch that matches no row. */
   never: () => Condition;
+  /** A constant true, `1 = 1`: a branch that keeps every row, as main writes an empty filter. */
+  always: () => Condition;
 };
 
 /**
@@ -599,6 +606,13 @@ export const cond: Conditions = {
       kind: "compare",
       operator: "=",
       left: { kind: "literal", value: 0 },
+      right: { kind: "literal", value: 1 },
+    }),
+  always: () =>
+    expression<boolean>({
+      kind: "compare",
+      operator: "=",
+      left: { kind: "literal", value: 1 },
       right: { kind: "literal", value: 1 },
     }),
 };
@@ -786,7 +800,10 @@ export function renderExpression({
   }
 }
 
-/** `x IN (values)`, or `x IN cte`: a name no WITH in scope declares would read a stored table. */
+/**
+ * `x IN (values)`, `x IN (SELECT …)` or `x IN cte`: a CTE name no WITH in scope declares would
+ * read a stored table.
+ */
 function inText({
   node,
   context,
@@ -796,6 +813,8 @@ function inText({
   context: RenderContext;
   render: (inner: ExpressionNode) => string;
 }): string {
+  // A subquery renders its own parentheses: `x IN ((SELECT …))` would read one tuple, not a set.
+  if (node.set.kind === "scalar") return `${render(node.left)} IN ${render(node.set)}`;
   if (node.set.kind !== "cte") return `${render(node.left)} IN (${render(node.set)})`;
   if (!context.ctes.visible.has(node.set.name))
     throw new QueryBuilderError({ kind: "unknown-cte", name: node.set.name });

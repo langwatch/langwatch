@@ -603,3 +603,31 @@ Feature: A typed ClickHouse read builder renders the tenant predicate and the te
     Given ClickHouse 26.8, the reader identity, a span whose latest version leaves the braid, a span outside a braid's window, and another tenant's spans
     When the owner activity, the marked spans and the attribute keys are built and sent
     Then each returns the rows main's raw text returns, in main's order where main orders them
+
+  @unit
+  Scenario: A set subquery tests membership under the read's own scope
+    Given analytics' and the trace filter's membership of a trace in another table's keys, which main writes as IN (SELECT …)
+    When the read tests the tenant and trace tuple within a span read built from the same start
+    Then it renders main's IN (SELECT …), the inner read carrying its own tenant predicate and sharing the read's parameters
+    And an inner read started under another scope, one of no tenant table, or one selecting the wrong width is refused, and an empty filter renders 1 = 1
+
+  @unit
+  Scenario: A FULL OUTER JOIN matches tenants before the caller's key
+    Given analytics' metric reads grouped by one key, which main joins with FULL OUTER JOIN
+    When each is a derived read keeping its tenant column and the second is full-joined to the first
+    Then it renders FULL OUTER JOIN, the two tenant columns matched before the caller's key
+    And a side dropping its tenant column, a side of bound rows, or a side built under another scope is refused
+
+  @unit
+  Scenario: Zoned interval buckets, percentile variants and addDays render as main writes them
+    Given analytics' timeseries buckets, percentiles, day offsets, token sums, RAG document paths and log comment
+    When they are built with toStartOfInterval of a unit and zone, quantileExact and its array forms, addDays, toUInt64OrZero and getSubcolumn of Array(JSON)
+    Then each width, zone, day count and path is bound and each quantile level is a checked constant
+    And a width of two units or a fraction, a negative day count, and a quote in a setting are refused
+
+  @integration
+  Scenario: Analytics' and the trace filter's shapes return main's rows on 26.8
+    Given ClickHouse 26.8, the reader identity, and another tenant's spans sharing trace ids
+    When the set subquery, the full join, the zoned buckets, the percentiles, the day offset, the token sum and the JSON paths are built and sent
+    Then each returns the rows main's raw text returns, under the tenant's setting and under every tenant's
+    And an unscoped subquery admits the other tenant's keys where the built set does not

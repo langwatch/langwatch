@@ -16,6 +16,7 @@ import {
   type Expression,
   type ExpressionNode,
   expression,
+  type JsonObject,
   type TablesOfExpression,
   typeTextOf,
   unsupported,
@@ -228,6 +229,43 @@ const quantileOf =
       binding: FLOAT64,
       parameters: [constant({ value: level, min: 0, max: 1 })],
     });
+const quantileOverArray =
+  (name: string) =>
+  <T extends string>(level: number, of: Arr<Num, T>) =>
+    call<number, T>({
+      name,
+      args: [of.node],
+      binding: FLOAT64,
+      parameters: [constant({ value: level, min: 0, max: 1 })],
+    });
+
+/** One interval width: a whole count of one unit, as main's `INTERVAL n <UNIT>` writes it. */
+type IntervalWidth =
+  | { seconds: number }
+  | { minutes: number }
+  | { hours: number }
+  | { days: number };
+const INTERVAL_FUNCTIONS = {
+  seconds: "toIntervalSecond",
+  minutes: "toIntervalMinute",
+  hours: "toIntervalHour",
+  days: "toIntervalDay",
+} as const;
+
+/** The width's one unit and its count, a whole number from 1 to a century of seconds. */
+function intervalOf(width: IntervalWidth): [keyof typeof INTERVAL_FUNCTIONS, number] {
+  const [entry, ...rest] = Object.entries(width);
+  const unit = entry?.[0];
+  const count = entry?.[1];
+  if (rest.length > 0 || unit === undefined || !(unit in INTERVAL_FUNCTIONS)) {
+    throw new QueryBuilderError({ kind: "bad-constant", value: Number.NaN });
+  }
+  if (typeof count !== "number" || !Number.isInteger(count)) {
+    throw new QueryBuilderError({ kind: "bad-constant", value: Number(count) });
+  }
+  constant({ value: count, min: 1, max: 3_153_600_000 });
+  return [unit as keyof typeof INTERVAL_FUNCTIONS, count];
+}
 
 type Tuple<Items extends readonly E<unknown, string>[]> = {
   readonly [K in keyof Items]: ValueOfExpression<Items[K]>;
@@ -400,6 +438,10 @@ export const fn = {
   /** `quantile(level)(of)`: the level is a checked constant, as the grammar requires. */
   quantile: quantileOf("quantile"),
   quantileTDigest: quantileOf("quantileTDigest"),
+  quantileExact: quantileOf("quantileExact"),
+  /** `quantileExactArray(level)(values)`: the level over every element of every row's array. */
+  quantileExactArray: quantileOverArray("quantileExactArray"),
+  quantileTDigestArray: quantileOverArray("quantileTDigestArray"),
 
   // Dates and times
   toUnixTimestamp64Milli: numeric("toUnixTimestamp64Milli", INT64),
@@ -410,22 +452,32 @@ export const fn = {
     call<string, T>({ name: "toDate", args: [of.node], binding: { paramType: "Date" } }),
   toStartOfDay: zoned("toStartOfDay"),
   toStartOfHour: zoned("toStartOfHour"),
-  /** `toStartOfInterval(of, toIntervalSecond(seconds))`, the width bound as a parameter. */
-  toStartOfInterval: <T extends string>(of: E<Num, T>, { seconds }: { seconds: number }) =>
-    call<number, T>({
+  /**
+   * `toStartOfInterval(of, toInterval<Unit>(n)[, zone])`, the width and zone bound: a minute, hour
+   * or day width aligns to the zone's clock, as main's `INTERVAL n HOUR, 'tz'` does.
+   */
+  toStartOfInterval: <T extends string>(
+    of: E<Num, T>,
+    width: IntervalWidth,
+    { timeZone: zone }: { timeZone?: string } = {},
+  ) => {
+    const [unit, count] = intervalOf(width);
+    return call<number, T>({
       name: "toStartOfInterval",
       args: [
         of.node,
         {
           kind: "call",
-          name: "toIntervalSecond",
+          name: INTERVAL_FUNCTIONS[unit],
           parameters: [],
-          args: [{ kind: "value", value: seconds, binding: UINT32 }],
+          args: [bound(count, UINT32)],
         },
+        ...timeZone(zone),
       ],
       binding: of.binding,
-    }),
-  toStartOfMinute: unary("toStartOfMinute"),
+    });
+  },
+  toStartOfMinute: zoned("toStartOfMinute"),
   /** `mode` is the week's first day and range (0: Sunday, 1: Monday), a checked constant. */
   toStartOfWeek: <T extends string>(
     of: E<Num, T>,
@@ -468,6 +520,13 @@ export const fn = {
       binding: INT64,
     }),
   now: () => call<number, never>({ name: "now", args: [], binding: EPOCH_MS }),
+  /** `addDays(of, days)`, as `of + INTERVAL days DAY`; the count is bound as a parameter. */
+  addDays: <T extends string>(of: E<Num, T>, days: number) =>
+    call<number, T>({
+      name: "addDays",
+      args: [of.node, bound(wholeDays(days), UINT32)],
+      binding: of.binding,
+    }),
   /** `subtractDays(of, days)`, as `of - INTERVAL days DAY`; the count is bound as a parameter. */
   subtractDays: <T extends string>(of: E<Num, T>, days: number) =>
     call<number, T>({
@@ -605,6 +664,13 @@ export const fn = {
   JSONExtractArrayRaw: jsonRead<readonly string[]>("JSONExtractArrayRaw", STRINGS),
   JSONExtractKeys: jsonRead<readonly string[]>("JSONExtractKeys", STRINGS),
   /** `JSONExtract(of, path…, type)`: the type checked against the type grammar, then bound. */
+  /** `getSubcolumn(of, 'path')`: a JSON value's path, as main's `context.document_id` reads it. */
+  getSubcolumn: <T extends string>(of: E<JsonObject | null, T>, path: string) =>
+    call<unknown, T>({
+      name: "getSubcolumn",
+      args: [of.node, bound(path, STRING)],
+      binding: undefined,
+    }),
   JSONExtract: <V, T extends string, U extends string = never>(
     of: E<string | null, T>,
     type: ColumnType<V>,

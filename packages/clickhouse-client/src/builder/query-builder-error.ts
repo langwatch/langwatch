@@ -39,6 +39,7 @@ export type QueryBuilderViolation =
   | { kind: "empty-id-list" }
   | { kind: "set-reads-a-column"; column: string }
   | { kind: "scalar-not-one-value"; selected: number }
+  | { kind: "set-arity"; expected: number; selected: number }
   | { kind: "bad-union-order" }
   | { kind: "refused-setting"; setting: string }
   | { kind: "settings-in-union" }
@@ -128,6 +129,8 @@ function describe(violation: QueryBuilderViolation): string {
       return `"${violation.setting}" cannot be set by a read: SQL_ and pinned settings are the scope's, and a value is a finite number or a plain word.`;
     case "scalar-not-one-value":
       return `A scalar subquery selects one value; this one selects ${violation.selected}.`;
+    case "set-arity":
+      return `A set subquery selects one column per element tested, ${violation.expected}; this one selects ${violation.selected}.`;
     case "empty-id-list":
       return "An id-bound read names at least one id; an empty list reads nothing, so skip the read.";
     case "set-reads-a-column":

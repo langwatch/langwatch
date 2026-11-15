@@ -111,7 +111,7 @@ type Tenancy =
   | { kind: "windows" }
   | { kind: "braided"; held: HeldTrace | undefined };
 type Join = {
-  kind: "INNER" | "LEFT";
+  kind: "INNER" | "LEFT" | "FULL OUTER";
   table: ClickHouseTableFacts;
   on: ExpressionNode;
   latestVersion: boolean;
@@ -317,7 +317,8 @@ const rowCount = (value: number): number => {
 };
 
 const PINNED_KEYS = new Set(Object.keys(PINNED_SETTINGS).map((key) => key.toLowerCase()));
-const SETTING_WORD = /^[A-Za-z0-9_]+$/;
+/** A plain word, `:` allowed for a `log_comment` such as `analytics:timeseries:trace_summaries`. */
+const SETTING_WORD = /^[A-Za-z0-9_:]+$/;
 
 /** A setting a read may name: a plain key outside `SQL_*` and the pinned set, a plain value. */
 function checkedSetting({ key, value }: { key: string; value: number | string }): void {
@@ -349,7 +350,7 @@ type JoinOptions = { latestVersion?: boolean };
 /** `inElection: false`: the condition filters the elected rows only, as main's page cursors do. */
 type WhereOptions = { inElection?: boolean };
 
-/** A read's own clause operations: the condition operations and a scalar subquery. */
+/** A read's own clause operations: the condition operations, a scalar and a set subquery. */
 export type ReadOps<
   Scope extends TenantScope,
   Tables extends string,
@@ -361,6 +362,16 @@ export type ReadOps<
       sub: ClickHouseReadStart<Scope, Ctes>,
     ) => ClickHouseRead<Scope, SubTables, SubRow, Ctes>,
   ) => Expression<SubRow[keyof SubRow], never>;
+  /**
+   * `left IN (SELECT …)` under this read's scope: the inner read names a tenant table, so its
+   * text carries the predicate, and selects one column per element of a tuple `left`.
+   */
+  within: <V, T extends Tables, SubRow extends Record<string, unknown>, SubTables extends string>(
+    left: Expression<V, T>,
+    build: (
+      sub: ClickHouseReadStart<Scope, Ctes>,
+    ) => ClickHouseRead<Scope, SubTables, SubRow, Ctes>,
+  ) => Condition;
 };
 
 export class ClickHouseRead<
@@ -383,11 +394,20 @@ export class ClickHouseRead<
     return new ClickHouseRead({ ...this.#state, ...patch });
   }
 
-  /** The operations a clause is written with; a scalar reads its own table under this scope. */
+  /** The operations a clause is written with; a subquery reads its own table under this scope. */
   #ops(): ReadOps<Scope, Tables, Ctes> {
     const scope = this.#state.scope as Scope;
-    const scalar: ReadOps<Scope, Tables, Ctes>["scalar"] = (build) => {
+    const subquery = <SubRow extends Record<string, unknown>, SubTables extends string>(
+      build: (
+        sub: ClickHouseReadStart<Scope, Ctes>,
+      ) => ClickHouseRead<Scope, SubTables, SubRow, Ctes>,
+    ): ReadState => {
       const read = build(new ClickHouseReadStart<Scope, Ctes>(scope)).#state;
+      if (read.scope !== scope) throw new QueryBuilderError({ kind: "foreign-scope" });
+      return read;
+    };
+    const scalar: ReadOps<Scope, Tables, Ctes>["scalar"] = (build) => {
+      const read = subquery(build);
       const [only, ...rest] = read.select;
       if (only === undefined || rest.length > 0) {
         throw new QueryBuilderError({ kind: "scalar-not-one-value", selected: read.select.length });
@@ -396,7 +416,21 @@ export class ClickHouseRead<
         `(${renderStatement({ state: read, context, nested: true, keys: undefined })})`;
       return expression({ kind: "scalar", render }, only.binding);
     };
-    return { ...conditionOpsFor<Tables, Ctes>(), scalar };
+    const within: ReadOps<Scope, Tables, Ctes>["within"] = (left, build) => {
+      const read = subquery(build);
+      const arity =
+        left.node.kind === "call" && left.node.name === "tuple" ? left.node.args.length : 1;
+      if (read.select.length !== arity) {
+        throw new QueryBuilderError({
+          kind: "set-arity",
+          expected: arity,
+          selected: read.select.length,
+        });
+      }
+      const render = (context: RenderContext) => `(${scopedSubquery({ read, context })})`;
+      return expression<boolean>({ kind: "in", left: left.node, set: { kind: "scalar", render } });
+    };
+    return { ...conditionOpsFor<Tables, Ctes>(), scalar, within };
   }
 
   /** The selection, or a function of the clause operations for `countIf`, `if` and the like. */
@@ -471,6 +505,27 @@ export class ClickHouseRead<
     options: JoinOptions = {},
   ): ClickHouseRead<Scope, Tables | Name, Row, Ctes> {
     return this.#join({ kind: "LEFT", table: table.$table, options, on: on(conditionOpsFor()) });
+  }
+
+  /**
+   * `FULL OUTER JOIN`: both sides keep a tenant column, matched first, so every row it emits comes
+   * from a scoped side; a side of bound rows, or a derived read dropping its tenant, is refused.
+   */
+  fullJoin<Name extends string, Columns extends ColumnsSpec>(
+    table: ClickHouseTable<Name, Columns, "tenant" | "derived">,
+    on: (ops: ConditionOps<Tables | Name, Ctes>) => Condition<Tables | Name>,
+    options: JoinOptions = {},
+  ): ClickHouseRead<Scope, Tables | Name, Row, Ctes> {
+    for (const side of [this.#state.table, table.$table]) {
+      if (side.tenantColumn === "")
+        throw new QueryBuilderError({ kind: "unjoinable", table: side.name });
+    }
+    return this.#join({
+      kind: "FULL OUTER",
+      table: table.$table,
+      options,
+      on: on(conditionOpsFor()),
+    });
   }
 
   #join<NextTables extends string>({
@@ -1034,6 +1089,21 @@ function selectionOf({
     });
   }
   return ordered;
+}
+
+/**
+ * A set subquery's text, refused unless it names a tenant table (or, all tenants, an allow-listed
+ * system table): bound rows alone would admit any tenant's keys. Shares the statement's parameters.
+ */
+function scopedSubquery({ read, context }: { read: ReadState; context: RenderContext }): string {
+  const inner: RenderContext = { ...context, tenantColumns: new Set(), systemTables: new Set() };
+  const text = renderStatement({ state: read, context: inner, nested: true, keys: undefined });
+  const named = read.scope.kind === "allTenants" ? inner.systemTables.size : 0;
+  if (inner.tenantColumns.size + named === 0)
+    throw new QueryBuilderError({ kind: "no-tenant-table" });
+  for (const each of inner.tenantColumns) context.tenantColumns.add(each);
+  for (const each of inner.systemTables) context.systemTables.add(each);
+  return text;
 }
 
 /** Whether a derived table's text reads a tenant table anywhere: a source, a CTE or a scalar. */

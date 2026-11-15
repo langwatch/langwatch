@@ -61,6 +61,7 @@ export {
   type Conditions,
   type Direction,
   type Expression,
+  type JsonObject,
 } from "./expression.ts";
 export { fn } from "./functions.ts";
 export { QueryBuilderError, type QueryBuilderViolation } from "./query-builder-error.ts";
