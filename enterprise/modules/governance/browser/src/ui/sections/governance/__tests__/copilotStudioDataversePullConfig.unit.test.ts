@@ -15,10 +15,12 @@
 import { copilotStudioDataversePullConfigSchema } from "@langwatch/enterprise-governance-contract";
 import { describe, expect, it } from "vitest";
 
-import { fieldControl, PARSER_FIELDS, reconcileParserValues } from "../parser-fields.ts";
-import { buildCopilotStudioDataversePullConfig } from "../pull-config-builders.ts";
-import { type ComposerState } from "../source-composer-state.ts";
-import { buildParserConfig, seedComposerParserConfig } from "../source-submission.ts";
+import { buildCopilotStudioDataversePullConfig } from "../inventory/copilot-studio-pull-config.ts";
+import { PARSER_FIELDS } from "../inventory/parser-field-catalog.ts";
+import { fieldControl } from "../inventory/parser-field-controls.ts";
+import { reconcileParserValues } from "../inventory/parser-fields.ts";
+import { type ComposerState } from "../inventory/source-composer-state.ts";
+import { buildParserConfig, seedComposerParserConfig } from "../inventory/source-submission.ts";
 
 const SUBSCRIPTION_ID = "00000000-0000-0000-0000-000000000000";
 

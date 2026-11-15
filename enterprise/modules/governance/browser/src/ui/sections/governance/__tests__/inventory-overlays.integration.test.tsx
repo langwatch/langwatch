@@ -12,10 +12,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { fakeGovernanceHost, renderWithGovernanceHost } from "../../../../testing.tsx";
 import type { Source } from "../ingestion-source-forms.ts";
-import { SourceComposerDrawer } from "../source-composer-drawer.tsx";
-import { type ComposerState } from "../source-composer-state.ts";
-import { SourceEditDrawer } from "../source-edit-drawer.tsx";
-import { SecretModal } from "../source-secret-modal.tsx";
+import { SourceComposerDrawer } from "../inventory/source-composer-drawer.tsx";
+import { type ComposerState } from "../inventory/source-composer-state.ts";
+import { SourceEditDrawer } from "../inventory/source-edit-drawer.tsx";
+import { SecretModal } from "../inventory/source-secret-modal.tsx";
 
 vi.mock("../../../../behavior/governance-api.ts", () => {
   const api = {

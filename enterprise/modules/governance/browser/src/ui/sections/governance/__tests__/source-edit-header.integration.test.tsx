@@ -29,7 +29,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { fakeGovernanceHost, renderWithGovernanceHost } from "../../../../testing.tsx";
 import type { Source } from "../ingestion-source-forms.ts";
-import { SourceEditDrawer } from "../source-edit-drawer.tsx";
+import { SourceEditDrawer } from "../inventory/source-edit-drawer.tsx";
 
 function sourceRow(overrides: Partial<Source>): Source {
   return {

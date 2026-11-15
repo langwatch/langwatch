@@ -5,10 +5,10 @@ import { HandledErrorAlert } from "@langwatch/error-views";
 import { Plug } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { IngestionSourcesTable } from "../../../features/ingestion-sources/ingestion-sources-table.tsx";
-import { GovernanceEmptyState } from "../../../ui/elements/governance-empty-state.tsx";
-import { PermissionRequiredNotice } from "../../../ui/elements/permission-required-notice.tsx";
-import type { Source } from "./ingestion-source-forms.ts";
+import { IngestionSourcesTable } from "../../../../features/ingestion-sources/ingestion-sources-table.tsx";
+import { GovernanceEmptyState } from "../../../../ui/elements/governance-empty-state.tsx";
+import { PermissionRequiredNotice } from "../../../../ui/elements/permission-required-notice.tsx";
+import type { Source } from "../ingestion-source-forms.ts";
 
 /**
  * The source list: what the viewer may read, what went wrong when it could

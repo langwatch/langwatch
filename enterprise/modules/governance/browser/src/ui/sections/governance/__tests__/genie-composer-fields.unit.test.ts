@@ -16,9 +16,9 @@
 import { describe, expect, it } from "vitest";
 
 import { recordingGovernanceToaster } from "../../../../testing.tsx";
-import { PARSER_FIELDS } from "../parser-fields.ts";
-import { type ComposerState } from "../source-composer-state.ts";
-import { buildCreateInput } from "../source-submission.ts";
+import { PARSER_FIELDS } from "../inventory/parser-field-catalog.ts";
+import { type ComposerState } from "../inventory/source-composer-state.ts";
+import { buildCreateInput } from "../inventory/source-submission.ts";
 
 const genieFields = PARSER_FIELDS.databricks_genie;
 const keysInOrder = genieFields.map((f) => f.key);

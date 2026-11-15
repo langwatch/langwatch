@@ -13,14 +13,14 @@ import { recordingGovernanceToaster } from "../../../../testing.tsx";
 import {
   buildCopilotStudioDataversePullConfig,
   normalizeEnvironmentUrl,
-} from "../pull-config-builders.ts";
-import { type ComposerState } from "../source-composer-state.ts";
-import { editSourceNotes, lockedParserKeys } from "../source-edit-drawer.tsx";
+} from "../inventory/copilot-studio-pull-config.ts";
+import { type ComposerState } from "../inventory/source-composer-state.ts";
+import { editSourceNotes, lockedParserKeys } from "../inventory/source-edit-rules.ts";
 import {
   buildEditSubmission,
   isEditablePullSource,
   seedComposerParserConfig,
-} from "../source-submission.ts";
+} from "../inventory/source-submission.ts";
 
 const ENVIRONMENT = "https://org12345.crm.dynamics.com";
 const AGENT = "aaaaaaaa-0000-4000-8000-000000000001";

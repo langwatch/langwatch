@@ -1,16 +1,17 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { GovernanceToaster } from "../../../behavior/governance-feedback.ts";
+import type { GovernanceToaster } from "../../../../behavior/governance-feedback.ts";
 import {
   routesConversations,
   type SourceType,
-} from "../../../features/ingestion-sources/model/ingestion-source-catalog.ts";
+} from "../../../../features/ingestion-sources/model/ingestion-source-catalog.ts";
 import {
   PULL_ADAPTER_FOR_SOURCE,
   PULL_SCHEDULE_DEFAULTS,
   recommendedPullSchedule,
-} from "../../../features/ingestion-sources/model/pull-cadence.ts";
-import { isSecretFieldKey, PARSER_FIELDS } from "./parser-fields.ts";
+} from "../../../../features/ingestion-sources/model/pull-cadence.ts";
+import { PARSER_FIELDS } from "./parser-field-catalog.ts";
+import { isSecretFieldKey } from "./parser-fields.ts";
 import { resolvePullConfig } from "./pull-config-builders.ts";
 import type { ComposerState } from "./source-composer-state.ts";
 

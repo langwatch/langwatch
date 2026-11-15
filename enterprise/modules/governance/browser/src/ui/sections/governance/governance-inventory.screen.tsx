@@ -30,22 +30,18 @@ import { SampleDataBanner, SampleDataToggle } from "../../../ui/elements/sample-
 import GovernanceLayout from "../../../ui/sections/governance-layout.tsx";
 import { withGovernanceSection } from "../../../ui/sections/governance-section-gate.tsx";
 import type { Source } from "./ingestion-source-forms.ts";
-import { IngestionSourceList } from "./ingestion-source-list.tsx";
-import { SourceComposerDrawer } from "./source-composer-drawer.tsx";
-import { SecretModal } from "./source-secret-modal.tsx";
+import { IngestionSourceList } from "./inventory/ingestion-source-list.tsx";
+import { SourceComposerDrawer } from "./inventory/source-composer-drawer.tsx";
+import { SecretModal } from "./inventory/source-secret-modal.tsx";
 import {
   type InventoryTab,
   useIngestionSourcesPage,
   useInventoryTab,
-} from "./use-inventory-page.ts";
+} from "./inventory/use-inventory-page.ts";
 
 /**
- * Admin CRUD for IngestionSources - the per-platform fleet config that
- * powers the Activity Monitor pillar. One source per platform fleet
- * Wires to
- * api.ingestionSources.* per Sergey's slice 4.
- *
- * Spec: specs/ai-gateway/governance/ingestion-sources.feature
+ * The Inventory page: header actions, summary strip, the Catalog, Environments and
+ * Sources tabs, and the overlays. State and writes live in use-inventory-page.ts.
  */
 
 function InventoryHeader() {

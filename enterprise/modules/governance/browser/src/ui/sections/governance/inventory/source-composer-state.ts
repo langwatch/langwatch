@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { SourceType } from "../../../features/ingestion-sources/model/ingestion-source-catalog.ts";
+import type { SourceType } from "../../../../features/ingestion-sources/model/ingestion-source-catalog.ts";
 
 export interface ComposerState {
   sourceType: SourceType;

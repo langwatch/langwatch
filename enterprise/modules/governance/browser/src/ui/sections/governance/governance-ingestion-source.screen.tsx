@@ -53,7 +53,7 @@ import { PermissionRequiredNotice } from "../../../ui/elements/permission-requir
 import GovernanceLayout from "../../../ui/sections/governance-layout.tsx";
 import { withGovernanceSection } from "../../../ui/sections/governance-section-gate.tsx";
 import { useDestinationContext } from "./ingestion-source-forms.ts";
-import { SourceEditDrawer } from "./source-edit-drawer.tsx";
+import { SourceEditDrawer } from "./inventory/source-edit-drawer.tsx";
 
 /**
  * Per-source detail page - health metrics + a cursor-walked table of every

@@ -9,16 +9,16 @@ import {
   isOttlEnabledSourceType,
   routesConversations,
   SOURCE_TYPE_OPTIONS,
-} from "../../../features/ingestion-sources/model/ingestion-source-catalog.ts";
+} from "../../../../features/ingestion-sources/model/ingestion-source-catalog.ts";
 import {
   composerCadenceError,
   recommendedPullSchedule,
-} from "../../../features/ingestion-sources/model/pull-cadence.ts";
-import { PullCadenceField } from "../../../features/ingestion-sources/ui/elements/pull-cadence-field.tsx";
-import { SourceTypeIconGlyph } from "../../../features/ingestion-sources/ui/elements/source-type-icon-glyph.tsx";
-import { TraceDestinationField } from "../../../features/ingestion-sources/ui/elements/trace-destination-field.tsx";
-import { EnterpriseOttlEditor as OttlEditor } from "../../../features/ottl/ui/sections/ottl-editor.connected.tsx";
-import type { DestinationContext } from "./ingestion-source-forms.ts";
+} from "../../../../features/ingestion-sources/model/pull-cadence.ts";
+import { PullCadenceField } from "../../../../features/ingestion-sources/ui/elements/pull-cadence-field.tsx";
+import { SourceTypeIconGlyph } from "../../../../features/ingestion-sources/ui/elements/source-type-icon-glyph.tsx";
+import { TraceDestinationField } from "../../../../features/ingestion-sources/ui/elements/trace-destination-field.tsx";
+import { EnterpriseOttlEditor as OttlEditor } from "../../../../features/ottl/ui/sections/ottl-editor.connected.tsx";
+import type { DestinationContext } from "../ingestion-source-forms.ts";
 import { ParserConfigFields } from "./parser-config-fields.tsx";
 import type { ComposerState } from "./source-composer-state.ts";
 

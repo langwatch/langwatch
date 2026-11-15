@@ -24,7 +24,7 @@ import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vite
 
 import { fakeGovernanceHost, renderWithGovernanceHost } from "../../../../testing.tsx";
 import type { Source } from "../ingestion-source-forms.ts";
-import { SourceEditDrawer } from "../source-edit-drawer.tsx";
+import { SourceEditDrawer } from "../inventory/source-edit-drawer.tsx";
 
 function sourceRow(overrides: Partial<Source>): Source {
   return {
