@@ -468,6 +468,7 @@ function buildPageSharedParams({
   traceIds,
   effectiveQuery,
   scrollStart,
+  occurredFloor,
 }: {
   projectId: string;
   startDate: number | undefined;
@@ -476,6 +477,7 @@ function buildPageSharedParams({
   traceIds: string[] | undefined;
   effectiveQuery: string | undefined;
   scrollStart: number | undefined;
+  occurredFloor: number | undefined;
 }) {
   return {
     tenantId: projectId,
@@ -493,6 +495,8 @@ function buildPageSharedParams({
     // cursor-scoped binding would leave {scrollStart} unbound there.
     // Only present when the SQL references it.
     ...(scrollStart !== undefined ? { scrollStart } : {}),
+    // Only present when the SQL references it (updated axis with a floor).
+    ...(occurredFloor !== undefined ? { occurredFloor } : {}),
   };
 }
 
@@ -529,6 +533,7 @@ function buildPageStatements({
   extraFilters,
   searchFilter,
   traceIdFilter,
+  occurredAtFloorMs,
 }: {
   projectId: string;
   startDate: number | undefined;
@@ -543,6 +548,8 @@ function buildPageStatements({
   extraFilters: string;
   searchFilter: string;
   traceIdFilter: string;
+  /** Updated axis only; see `TraceSummaryListOptions.occurredAtFloorMs`. */
+  occurredAtFloorMs?: number | undefined;
 }) {
   // occurred (default): windows + seeks on the immutable OccurredAt (prunes partitions).
   // updated (CDC): restricts ts to each trace's latest version (global max UpdatedAt) first,
@@ -555,14 +562,18 @@ function buildPageStatements({
 
   const occurredWindow =
     " AND ts.OccurredAt >= fromUnixTimestamp64Milli({startDate:UInt64}) AND ts.OccurredAt <= fromUnixTimestamp64Milli({endDate:UInt64})";
+  // OccurredAt is the frozen storage anchor and the partition key, so a floor on it lets the
+  // updated axis skip old weekly partitions, in the page and in the latest-version subquery.
+  const occurredFloor = occurredFloorFor({ isUpdatedAxis, occurredAtFloorMs });
   const updatedWindow =
-    " AND ts.UpdatedAt >= fromUnixTimestamp64Milli({startDate:UInt64}) AND ts.UpdatedAt <= fromUnixTimestamp64Milli({endDate:UInt64})";
+    " AND ts.UpdatedAt >= fromUnixTimestamp64Milli({startDate:UInt64}) AND ts.UpdatedAt <= fromUnixTimestamp64Milli({endDate:UInt64})" +
+    (occurredFloor === undefined ? "" : OCCURRED_FLOOR_OUTER);
   // Collapses ts to each trace's latest version so the updated-axis window/filters/cursor
   // evaluate on the latest row, bounded by scrollStart when a scroll is in play — otherwise
   // a trace bumped past the cursor mid-scroll would silently drop out of every remaining
   // page. Capped inside the dedup, not on the outer rows, since version resolution itself
   // must stay stable for the scroll's duration.
-  const latestVersionOnly = buildLatestVersionOnly(scrollStart);
+  const latestVersionOnly = buildLatestVersionOnly(scrollStart, occurredFloor !== undefined);
 
   const { occurredCursor, updatedCursor } = buildCursorSeeks({ cursor, cmp });
 
@@ -574,6 +585,7 @@ function buildPageStatements({
     traceIds,
     effectiveQuery,
     scrollStart,
+    occurredFloor,
   });
 
   const cursorParams = {
@@ -688,12 +700,30 @@ function buildPageQueries({
  * play. Only the updated axis uses it, so versions before the window's start can never be the
  * latest of a trace the window keeps; bounding them lets the UpdatedAt index skip old granules.
  */
-function buildLatestVersionOnly(scrollStart: number | undefined): string {
+function buildLatestVersionOnly(scrollStart: number | undefined, withOccurredFloor = false): string {
   const scrollSnapshotBound =
     scrollStart !== undefined
       ? " AND UpdatedAt <= fromUnixTimestamp64Milli({scrollStart:UInt64})"
       : "";
-  return ` AND (ts.TenantId, ts.TraceId, ts.UpdatedAt) IN (SELECT TenantId, TraceId, max(UpdatedAt) FROM trace_summaries WHERE TenantId = {tenantId:String} AND UpdatedAt >= fromUnixTimestamp64Milli({startDate:UInt64})${scrollSnapshotBound} GROUP BY TenantId, TraceId)`;
+  // OccurredAt never changes between a trace's versions, so bounding it here drops no version
+  // of a trace the outer floor keeps.
+  const occurredFloorBound = withOccurredFloor ? OCCURRED_FLOOR_INNER : "";
+  return ` AND (ts.TenantId, ts.TraceId, ts.UpdatedAt) IN (SELECT TenantId, TraceId, max(UpdatedAt) FROM trace_summaries WHERE TenantId = {tenantId:String} AND UpdatedAt >= fromUnixTimestamp64Milli({startDate:UInt64})${scrollSnapshotBound}${occurredFloorBound} GROUP BY TenantId, TraceId)`;
+}
+const OCCURRED_FLOOR_OUTER = " AND ts.OccurredAt >= fromUnixTimestamp64Milli({occurredFloor:UInt64})";
+const OCCURRED_FLOOR_INNER = " AND OccurredAt >= fromUnixTimestamp64Milli({occurredFloor:UInt64})";
+/** The floor as a ClickHouse UInt64, or undefined when there is none or the axis is not updated. */
+function occurredFloorFor({
+  isUpdatedAxis,
+  occurredAtFloorMs,
+}: {
+  isUpdatedAxis: boolean;
+  occurredAtFloorMs: number | undefined;
+}): number | undefined {
+  if (!isUpdatedAxis || occurredAtFloorMs === undefined || !Number.isFinite(occurredAtFloorMs)) {
+    return undefined;
+  }
+  return Math.max(0, Math.floor(occurredAtFloorMs));
 }
 
 /** Stored-span rows as the joined read selects them. */
@@ -1541,6 +1571,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
             extraFilters,
             searchFilter: "",
             traceIdFilter,
+            occurredAtFloorMs: options.occurredAtFloorMs,
           });
         const idRows = traceIdRowsSchema.parse(
           await (
@@ -1566,6 +1597,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
                 fetchOutput: false,
                 dateColumn,
                 scrollStart,
+                occurredAtFloorMs: options.occurredAtFloorMs,
               });
         const summaries = rows.map((row) => this.rowToTraceSummaryData(row));
         const last = summaries.at(-1);
@@ -2084,6 +2116,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     fetchOutput = true,
     dateColumn = "OccurredAt",
     scrollStart,
+    occurredAtFloorMs,
   }: {
     clickHouseClient: TraceClickHouseClient;
     projectId: string;
@@ -2103,6 +2136,8 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
      * version than the page was selected on.
      */
     scrollStart?: number;
+    /** Updated axis only: the same floor the id query applied, so this read prunes partitions too. */
+    occurredAtFloorMs?: number | undefined;
   }): Promise<TraceSummaryRow[]> {
     // dateColumn is interpolated into SQL and reachable from paths that are only
     // TypeScript-narrowed — assert here so a non-enum value can never reach the query string.
@@ -2117,12 +2152,17 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     // already filtered by the id-query's HAVING, so no date window is applied
     // here (windowing would re-introduce the in-window-max staleness). Occurred
     // axis windows the partition column in both the outer scan and the dedup.
+    const occurredFloor = occurredFloorFor({ isUpdatedAxis, occurredAtFloorMs });
     const outerWindow = isUpdatedAxis
-      ? ""
+      ? occurredFloor === undefined
+        ? ""
+        : OCCURRED_FLOOR_OUTER
       : `AND ts.${dateColumn} >= fromUnixTimestamp64Milli({startDate:UInt64})
             AND ts.${dateColumn} <= fromUnixTimestamp64Milli({endDate:UInt64})`;
     const dedupWindow = isUpdatedAxis
-      ? ""
+      ? occurredFloor === undefined
+        ? ""
+        : OCCURRED_FLOOR_INNER
       : `AND ${dateColumn} >= fromUnixTimestamp64Milli({startDate:UInt64})
                 AND ${dateColumn} <= fromUnixTimestamp64Milli({endDate:UInt64})`;
     // Same snapshot bound the id-query applied, so both stages resolve the same
@@ -2187,6 +2227,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
           endDate,
           pageTraceIds: ids,
           ...(dedupScrollBound !== "" ? { scrollStart } : {}),
+          ...(occurredFloor !== undefined ? { occurredFloor } : {}),
         },
         format: "JSONEachRow",
       });

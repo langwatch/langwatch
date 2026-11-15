@@ -61,6 +61,14 @@ export interface TraceSummaryListOptions {
   dateField?: TraceDateField;
   scrollId?: string | null;
   filterWhere?: { sql: string; params: Record<string, unknown> };
+  /**
+   * Updated axis only: a lower bound (epoch ms) on each trace's `OccurredAt`, the frozen storage
+   * anchor the table is partitioned by. Without one, an updated-axis read has nothing to prune
+   * weekly partitions on and walks the whole history, cold storage included. A trace updated in
+   * the window whose anchor is older than this is not returned, so a caller picks a bound beyond
+   * which it accepts that. Ignored on the occurred axis, whose window already bounds `OccurredAt`.
+   */
+  occurredAtFloorMs?: number;
 }
 
 /** One keyset page of latest trace summaries; `updatedThrough` as on the list read. */

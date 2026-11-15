@@ -9,9 +9,12 @@ import type {
   GovernanceOcsfEventWriter,
 } from "../../repositories/governance.repositories.ts";
 import {
+  GOVERNANCE_TRACE_FACTS_OCCURRED_LOOKBACK_MS,
   type GovernanceTraceSummary,
   GovernanceTraceFactsService,
 } from "../governance-trace-facts.service.ts";
+
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 const summary: GovernanceTraceSummary = {
   traceId: "trace-1",
@@ -257,6 +260,24 @@ describe("GovernanceTraceFactsService", () => {
       expect(ocsf.rows.size).toBe(3);
     });
 
+    /** @scenario "The governance trace facts pass bounds its read by when traces first occurred" */
+    it("bounds every page of every tenant by a week before the window's start", async () => {
+      const { traces, service } = setup({
+        "tenant-a": [
+          { summaries: [summary], scrollId: "next" },
+          { summaries: [{ ...summary, traceId: "trace-2" }] },
+        ],
+        "tenant-b": [{ summaries: [summary] }],
+      });
+
+      await service.pull({ fromMs: 10 * WEEK_MS, toMs: 10 * WEEK_MS + 60_000 });
+
+      const floors = traces.listTraceSummaries.mock.calls.map(
+        ([input]) => input.options?.occurredAtFloorMs,
+      );
+      expect(floors).toEqual([9 * WEEK_MS, 9 * WEEK_MS, 9 * WEEK_MS]);
+      expect(GOVERNANCE_TRACE_FACTS_OCCURRED_LOOKBACK_MS).toBe(WEEK_MS);
+    });
     /** @scenario "A governance trace summary read that fails is re-driven without duplicate rows" */
     it("fails the pass when the read fails, and the re-driven window leaves one row of each", async () => {
       const { kpis, ocsf, traces, service } = setup({
