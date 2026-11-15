@@ -391,7 +391,19 @@ function addDescriptorNames(constants: Map<string, string>, source: ts.SourceFil
 type ConstantScope = {
   resolver: WorkspaceModuleResolver;
   scopes: Map<string, ReadonlyMap<string, string>>;
-  cut: { count: number };
+  /** A depth-cut result per (remaining depth, file); a cycle-cut one is never kept. */
+  bounded: Map<string, Bounded>;
+  resolved: Map<string, string | undefined>;
+  cut: { cycles: number; depth: number };
+  /** The files each walk in progress reached without a full cached result. */
+  visiting: Set<string>[];
+};
+
+/** Reused only while the walk would repeat: none of `visited` on the trail or fully cached. */
+type Bounded = {
+  constants: ReadonlyMap<string, string>;
+  visited: ReadonlySet<string>;
+  checkedAt: number;
 };
 
 const MAX_IMPORT_DEPTH = 8;
@@ -451,6 +463,63 @@ function addReExports(constants: Map<string, string>, statement: ts.Statement, t
   }
 }
 
+/** The resolver per (file, specifier) once: the walk below re-reaches the same imports. */
+function resolveOnce({
+  scope,
+  specifier,
+  file,
+}: {
+  scope: ConstantScope;
+  specifier: string;
+  file: string;
+}): string | undefined {
+  const key = `${file}\0${specifier}`;
+  if (scope.resolved.has(key)) return scope.resolved.get(key);
+
+  const target = scope.resolver.resolve({ specifier, file });
+  scope.resolved.set(key, target);
+
+  return target;
+}
+
+/** A file already on the trail, or past the depth limit, is cut and counted. */
+function isCut({
+  scope,
+  file,
+  trail,
+}: {
+  scope: ConstantScope;
+  file: string;
+  trail: readonly string[];
+}): boolean {
+  if (trail.includes(file)) scope.cut.cycles += 1;
+  else if (trail.length >= MAX_IMPORT_DEPTH) scope.cut.depth += 1;
+  else return false;
+
+  return true;
+}
+
+/** A kept depth-cut result, unless the trail cuts a file it reached or one is now fully cached. */
+function reusable({
+  scope,
+  key,
+  trail,
+}: {
+  scope: ConstantScope;
+  key: string;
+  trail: readonly string[];
+}): Bounded | undefined {
+  const entry = scope.bounded.get(key);
+  if (!entry || trail.some((file) => entry.visited.has(file))) return void 0;
+
+  if (entry.checkedAt !== scope.scopes.size) {
+    for (const reached of entry.visited) if (scope.scopes.has(reached)) return void 0;
+    entry.checkedAt = scope.scopes.size;
+  }
+
+  return entry;
+}
+
 /**
  * Every table-name constant a file can name: its own, those it imports by name
  * and those it re-exports. The reader stays the importing file, so a constant
@@ -468,17 +537,29 @@ function constantsOf({
   const known = scope.scopes.get(file);
   if (known) return known;
 
-  if (trail.includes(file) || trail.length >= MAX_IMPORT_DEPTH) {
-    scope.cut.count += 1;
+  const parent = scope.visiting.at(-1);
+  if (isCut({ scope, file, trail })) {
+    parent?.add(file);
 
     return new Map();
   }
 
-  const cutBefore = scope.cut.count;
+  const key = `${MAX_IMPORT_DEPTH - trail.length}\0${file}`;
+  const bounded = reusable({ scope, key, trail });
+  if (bounded) {
+    scope.cut.depth += 1;
+    for (const reached of bounded.visited) parent?.add(reached);
+
+    return bounded.constants;
+  }
+
+  const { cycles, depth } = scope.cut;
+  const visited = new Set([file]);
+  scope.visiting.push(visited);
   const source = sourceFile({ file });
   const constants = literalConstants(source);
   const through: Through = (specifier) => {
-    const target = scope.resolver.resolve({ specifier, file });
+    const target = resolveOnce({ scope, specifier, file });
 
     return target ? constantsOf({ file: target, scope, trail: [...trail, file] }) : new Map();
   };
@@ -489,8 +570,13 @@ function constantsOf({
   }
 
   addDescriptorNames(constants, source);
+  scope.visiting.pop();
+  for (const reached of visited) parent?.add(reached);
 
-  if (scope.cut.count === cutBefore) scope.scopes.set(file, constants);
+  if (scope.cut.cycles !== cycles) return constants;
+
+  if (scope.cut.depth === depth) scope.scopes.set(file, constants);
+  else scope.bounded.set(key, { constants, visited, checkedAt: scope.scopes.size });
 
   return constants;
 }
@@ -704,8 +790,9 @@ function readFile({
 
   const source = sourceFile({ file });
   const local = literalConstants(source);
+  let imported: ReadonlyMap<string, string> | undefined;
   const constant = (name: string): string | undefined =>
-    local.get(name) ?? constantsOf({ file, scope }).get(name);
+    local.get(name) ?? (imported ??= constantsOf({ file, scope })).get(name);
   let collected: Map<string, Set<string>> | undefined;
   const aliases = () => (collected ??= descriptorAliases(source, constant));
   const reader: Reader = { source, module, tables, constant, aliases, found };
@@ -737,7 +824,10 @@ export function collectAccess(
   const scope: ConstantScope = {
     resolver: workspaceModuleResolver({ root }),
     scopes: new Map(),
-    cut: { count: 0 },
+    bounded: new Map(),
+    resolved: new Map(),
+    cut: { cycles: 0, depth: 0 },
+    visiting: [],
   };
 
   for (const scan of scanRoots(root, catalogue)) {
