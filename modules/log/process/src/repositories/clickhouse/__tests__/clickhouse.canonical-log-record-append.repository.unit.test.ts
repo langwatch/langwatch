@@ -8,6 +8,7 @@ import {
 
 function createRepository(resolveClient: () => Promise<LogClickHouseClient>) {
   return ClickHouseCanonicalLogRecordAppendRepository.create({
+    clickhouse: { read: async () => ({ rows: [] }) },
     resolveClient,
     defaultRetentionDays: 30,
   });
@@ -136,5 +137,21 @@ describe("ClickHouseCanonicalLogRecordAppendRepository", () => {
     expect(insert).toHaveBeenCalledTimes(2);
     expect(insert.mock.calls[0]![0].values).toHaveLength(2);
     expect(insert.mock.calls[1]![0].values).toHaveLength(2);
+  });
+});
+
+describe("ClickHouseCanonicalLogRecordAppendRepository.storedBytesRead", () => {
+  it("sums its one tenant's stored bytes under the meter's thread and time caps", () => {
+    const statement = ClickHouseCanonicalLogRecordAppendRepository.storedBytesRead({
+      tenantId: "project_1",
+    });
+
+    expect(statement.identity).toBe("reader");
+    expect(statement.kind).toBe("tenant");
+    expect(statement.tenantId).toBe("project_1");
+    expect(statement.settings.SQL_langwatch_tenant_ids).toBe("project_1");
+    expect(statement.sql).toContain("FROM log_records");
+    expect(statement.sql).toContain("sum(_size_bytes)");
+    expect(statement.sql).toContain("SETTINGS max_threads = 2, max_execution_time = 45");
   });
 });

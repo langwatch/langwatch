@@ -212,39 +212,6 @@ Feature: Externalize event byte content to stored_objects
     And the gating goes through the "localFilesystemIsActive" helper (localFilesystem.enabled AND NOT dataplane.enabled)
 
   @unit
-  Scenario: Cross-tenant owner lookup fans out to every ClickHouse instance
-    Given the shared ClickHouse instance and one private/BYOC ClickHouse instance
-    When a private-CH tenant owns a stored object and /api/files/:id is requested by id only
-    Then resolveStoredObjectOwner finds the row in the private instance
-    And the route does not 404 even though the shared client has no match
-
-  @unit
-  Scenario: Cross-tenant owner lookup isolates failures across instances
-    # A single BYOC ClickHouse outage must NOT propagate to a healthy
-    # shared lookup — otherwise one customer's degraded CH instance can
-    # globally break /api/files/:id for every other tenant. Each instance
-    # is awaited under Promise.allSettled and the first healthy hit wins
-    # regardless of any sibling rejection.
-    Given the shared ClickHouse instance returns a hit for a stored-object id
-    And one private/BYOC ClickHouse instance is degraded and its query rejects
-    When resolveStoredObjectOwner is invoked
-    Then the healthy shared hit is returned
-    And the rejection from the degraded instance does not fail the lookup
-
-  @unit
-  Scenario: Cross-tenant owner lookup signals transient unavailability when no hit and any instance failed
-    # When no instance returned a hit but at least one rejected, the
-    # lookup cannot prove "not_found" — the object may live on the
-    # degraded instance. The route relies on a typed thrown error
-    # (StoredObjectOwnerLookupUnavailableError) to map this state to a
-    # 502 instead of falsely 404'ing the caller.
-    Given every configured ClickHouse instance returns no hit OR rejects with an error
-    And at least one instance rejects
-    When resolveStoredObjectOwner is invoked
-    Then it throws StoredObjectOwnerLookupUnavailableError
-    And the error carries the list of failed instance targets so the route can log them
-
-  @unit
   Scenario: headById returns a tri-state distinguishing not_found, missing, and available
     Given a project with one stored object row whose storage_uri points at storage
     When the renderer probes a stored-object id whose row does not exist
@@ -794,9 +761,6 @@ Feature: Externalize event byte content to stored_objects
   #                                                                          -> Scenario: GET /api/files/:id authenticates via API key header when no session cookie is present
   # AC28 "404 not_found is distinct from 404 missing"                        -> Scenario: GET /api/files/:id returns 404 with status not_found when no row exists for the id
   # AC29 "Cross-tenant id->project resolve runs before auth gate"            -> Scenario: GET /api/files/:id resolves the owning project from the row id before pinning the key to it
-  #                                                                          -> Scenario: Cross-tenant owner lookup fans out to every ClickHouse instance
-  #                                                                          -> Scenario: Cross-tenant owner lookup isolates failures across instances
-  #                                                                          -> Scenario: Cross-tenant owner lookup signals transient unavailability when no hit and any instance failed
   # AC30 "BYOC: per-project private bucket beats global S3_BUCKET_NAME"      -> Scenario: For a project with a per-project private dataplane bucket, mintStorageUri uses the project bucket, not the global one
   #                                                                          -> Scenario: For a project without per-project storage configured, mintStorageUri falls back to the global S3_BUCKET_NAME
   # AC31 "Persisted storage_uri is authoritative for reads"                  -> Scenario: storage_uri persisted on the stored_objects row is the authoritative bucket address for reads

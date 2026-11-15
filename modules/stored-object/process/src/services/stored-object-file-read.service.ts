@@ -13,7 +13,6 @@ import {
   StoredObjectBytesMissingError,
   StoredObjectFilesRateLimitedError,
   storedObjectIdSchema,
-  StoredObjectOwnerLookupUnavailableError,
   storedObjectProjectIdSchema,
   type StoredObjectFileViewPermission,
 } from "@langwatch/stored-object-contract";
@@ -109,7 +108,7 @@ export class StoredObjectFileReadService {
   }
 
   private async countCaller(caller: StoredObjectFileCaller): Promise<void> {
-    // Keyed on the caller, so id probes are throttled before the cross-tenant lookup. The
+    // Keyed on the caller, so id probes are throttled before the owner is resolved. The
     // door sets one of the two; refuse rather than fall back to a shared bucket.
     const callerKey = caller.apiKeyProjectId ?? caller.userId;
     if (!callerKey) throw new Error("rate-limit key unresolved");
@@ -127,7 +126,7 @@ export class StoredObjectFileReadService {
 
   /**
    * The scoped URL names its owner. The id-only URL asks the key's own project's rows first
-   * (uploads live only in Postgres), then the legacy cross-tenant index.
+   * (uploads live only in Postgres), then the owner resolver, which finds none.
    */
   private async ownerOf(input: StoredObjectFileReadInput): Promise<string> {
     if (input.claimedProjectId) return input.claimedProjectId;
@@ -135,15 +134,7 @@ export class StoredObjectFileReadService {
     const own = input.caller.apiKeyProjectId;
     if (own && (await this.gate.isRecorded({ projectId: own, id: input.id }))) return own;
 
-    try {
-      return (await this.gate.resolveOwner({ id: input.id })).projectId;
-    } catch (err) {
-      // A degraded instance must not read as a deleted object.
-      if (err instanceof StoredObjectOwnerLookupUnavailableError) {
-        throw new StorageUnavailableError();
-      }
-      throw err;
-    }
+    return (await this.gate.resolveOwner({ id: input.id })).projectId;
   }
 
   /** A storage failure other than a miss is an outage, not a deletion. */

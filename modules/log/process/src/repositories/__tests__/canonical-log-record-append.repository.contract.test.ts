@@ -105,6 +105,7 @@ describe("given the canonical-log ClickHouse repository over a recording client"
   contractCases(() => {
     let rows = 0;
     const repository = ClickHouseCanonicalLogRecordAppendRepository.create({
+      clickhouse: { read: async () => ({ rows: [] }) },
       defaultRetentionDays: 30,
       resolveClient: async () => ({
         insert: async ({ table, values }) => {
@@ -114,5 +115,18 @@ describe("given the canonical-log ClickHouse repository over a recording client"
       }),
     });
     return { repository, held: () => rows };
+  });
+});
+
+describe("given the canonical-log memory repository asked for stored bytes", () => {
+  it("grows with each held record and counts no other tenant's", async () => {
+    const repository = MemoryCanonicalLogRecordAppendRepository.create();
+    const before = await repository.getStoredBytes({ tenantId: "project_test" });
+
+    await repository.ensureLogRecords(["a", "b"].map((id) => record(id.repeat(64))));
+
+    expect(before).toBe(0);
+    expect(await repository.getStoredBytes({ tenantId: "project_test" })).toBeGreaterThan(0);
+    expect(await repository.getStoredBytes({ tenantId: "project_other" })).toBe(0);
   });
 });

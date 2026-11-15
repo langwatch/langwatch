@@ -171,7 +171,7 @@ export interface StoredObjectApi {
   }): Promise<StoredObjectSignedContent>;
   /** Throws `StoredObjectNotFoundError` when the project holds no such row. */
   readById(input: { projectId: string; id: string }): Promise<StoredObjectFileRead>;
-  /** Throws `StoredObjectNotFoundError` when no instance holds the id. */
+  /** Throws `StoredObjectNotFoundError`: an id-only link stays unresolvable. */
   resolveOwner(input: { id: string }): Promise<{ projectId: string }>;
   /** Where this project's objects are written, for the checkup. */
   getStorageDestination(input: {

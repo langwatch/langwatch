@@ -103,3 +103,12 @@ export type LogPreparation = {
   rejectedLogRecords: number;
   errors: string[];
 };
+
+const logStoredBytesInputSchemaDefinition = z.object({ projectId: z.string().min(1) }).strict();
+export interface LogStoredBytesInputSchema extends Named<
+  typeof logStoredBytesInputSchemaDefinition
+> {}
+/** One project's question to the storage meter (ADR-202 Decided 20). */
+export const logStoredBytesInputSchema: LogStoredBytesInputSchema =
+  logStoredBytesInputSchemaDefinition;
+export type LogStoredBytesInput = z.infer<typeof logStoredBytesInputSchema>;

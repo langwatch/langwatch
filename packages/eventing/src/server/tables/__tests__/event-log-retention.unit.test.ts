@@ -34,6 +34,7 @@ function retentionOver({ holdsIdIndex = false }: { holdsIdIndex?: boolean } = {}
   const retention = EventLogRetention.create({
     client: {
       command: async (statement) => void statements.push(statement),
+      read: async () => ({ rows: [] }),
       query: async (question) => {
         questions.push(question);
         return { rows: holdsIdIndex ? [{ name: "event_log_id_index" }] : [] };
@@ -354,6 +355,44 @@ describe("EventLogRetention", () => {
         }),
       ).rejects.toThrow(ValidationError);
       expect(statements).toEqual([]);
+    });
+  });
+
+  describe("when the storage meter asks for a tenant's stored bytes", () => {
+    /** @scenario "The event log's stored-bytes read is scoped to one tenant under the meter's settings" */
+    it("sums only that tenant's event-log bytes under the settings it was given", () => {
+      const statement = EventLogRetention.storedBytesRead({
+        tenantId: "project-1",
+        settings: { max_threads: 2, max_execution_time: 45 },
+      });
+
+      expect(statement.identity).toBe("reader");
+      expect(statement.kind).toBe("tenant");
+      expect(statement.tenantId).toBe("project-1");
+      expect(statement.settings.SQL_langwatch_tenant_ids).toBe("project-1");
+      expect(statement.sql).toContain("FROM event_log");
+      expect(statement.sql).toContain("sum(_size_bytes)");
+      expect(statement.sql).toContain("SETTINGS max_threads = 2, max_execution_time = 45");
+    });
+
+    it("answers the summed bytes the member returns, read as a declared full scan", async () => {
+      const sent: unknown[] = [];
+      const retention = EventLogRetention.create({
+        client: {
+          command: async () => undefined,
+          query: async () => ({ rows: [] }),
+          read: async (request) => {
+            sent.push({ table: request.table, declaresFullScan: request.declaresFullScan });
+            return { rows: [{ bytes: "1234" }] } as never;
+          },
+        },
+        classification,
+      });
+
+      await expect(
+        retention.getStoredBytes({ tenantId: "project-1", settings: { max_threads: 2 } }),
+      ).resolves.toBe(1234);
+      expect(sent).toEqual([{ table: "event_log", declaresFullScan: true }]);
     });
   });
 });

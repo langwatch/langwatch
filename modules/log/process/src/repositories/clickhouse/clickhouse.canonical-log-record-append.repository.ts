@@ -1,11 +1,19 @@
 import type { ClickHouseSettings, DataFormat } from "@clickhouse/client";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import {
+  clickhouseRead,
+  fn,
+  type ReaderReadStatement,
+  tenantScope,
+} from "@langwatch/clickhouse-client/builder";
+import { STORAGE_METER_READ_SETTINGS } from "@langwatch/data-retention-contract/retention-tables";
 import { EventUtils, SecurityError } from "@langwatch/eventing";
 import type { CanonicalLogRecord } from "@langwatch/log-contract";
 import { createLogger } from "@langwatch/observability";
 import { Temporal, toDate } from "@langwatch/time";
 
 import { CanonicalLogRecordAppendRepository } from "../canonical-log-record-append.repository.ts";
+import { logRecords } from "./clickhouse.log-records.table.ts";
 
 /**
  * A DateTime64(3) column value. The ClickHouse client serialises a `Date`;
@@ -196,6 +204,7 @@ function toUsageEstimateRow(record: CanonicalLogRecord): {
 export class ClickHouseCanonicalLogRecordAppendRepository extends CanonicalLogRecordAppendRepository {
   private constructor(
     private readonly resolveClient: LogClickHouseClientResolver,
+    private readonly clickhouse: Pick<ClickHouseQueryClient, "read">,
     private readonly defaultRetentionDays: number,
   ) {
     super();
@@ -208,12 +217,37 @@ export class ClickHouseCanonicalLogRecordAppendRepository extends CanonicalLogRe
 
   static create(options: {
     resolveClient: LogClickHouseClientResolver;
+    clickhouse: Pick<ClickHouseQueryClient, "read">;
     defaultRetentionDays: number;
   }): ClickHouseCanonicalLogRecordAppendRepository {
     return new ClickHouseCanonicalLogRecordAppendRepository(
       options.resolveClient,
+      options.clickhouse,
       options.defaultRetentionDays,
     );
+  }
+
+  /** One tenant's `_size_bytes` in `log_records`, every stored row counted, as the meter counts. */
+  async getStoredBytes({ tenantId }: { tenantId: string }): Promise<number> {
+    const { rows } = await this.clickhouse.read({
+      statement: ClickHouseCanonicalLogRecordAppendRepository.storedBytesRead({ tenantId }),
+      table: logRecords.$table.name,
+      declaresFullScan: true,
+    });
+    return Number(rows[0]?.bytes ?? 0);
+  }
+
+  /** The tenant's summed `_size_bytes`, under the meter's thread and time caps. */
+  static storedBytesRead({
+    tenantId,
+  }: {
+    tenantId: string;
+  }): ReaderReadStatement<{ bytes: number | string }> {
+    return clickhouseRead({ scope: tenantScope.single({ tenantId }) })
+      .from(logRecords)
+      .select({ bytes: fn.sum(logRecords._size_bytes) })
+      .settings(STORAGE_METER_READ_SETTINGS)
+      .build();
   }
 
   async ensureLogRecord(

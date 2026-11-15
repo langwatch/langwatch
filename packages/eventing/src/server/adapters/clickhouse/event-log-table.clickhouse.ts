@@ -23,5 +23,6 @@ export const eventLog = defineClickHouseTable({
     ProcessingTraceparent: column.string(),
     EventOccurredAt: column.uint64(),
     _retention_days: column.uint16(),
+    _size_bytes: column.uint32(),
   },
 });

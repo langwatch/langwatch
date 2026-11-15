@@ -8,10 +8,7 @@ import { Readable } from "node:stream";
 import { ProjectMissingCredentialsError } from "@langwatch/api";
 import { createRestRuntime } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
-import {
-  StoredObjectNotFoundError,
-  StoredObjectOwnerLookupUnavailableError,
-} from "@langwatch/stored-object-contract";
+import { StoredObjectNotFoundError } from "@langwatch/stored-object-contract";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import type { ErrorHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
@@ -144,22 +141,6 @@ describe("given the /api/files family", () => {
       const api = mount({
         read: async () => {
           throw new Error("connection reset by peer");
-        },
-      });
-
-      const response = await api.fetch(`/api/files/${OBJECT_ID}`);
-
-      expect(response.status).toBe(502);
-      await expect(response.json()).resolves.toEqual({ error: "storage_unavailable" });
-    });
-  });
-
-  describe("when the cross-tenant lookup cannot prove the object is gone", () => {
-    /** @scenario "GET /api/files/:id returns 502 with a friendly message on transient storage failure" */
-    it("answers 502 rather than a 404 that would read as a deletion", async () => {
-      const api = mount({
-        owner: async () => {
-          throw new StoredObjectOwnerLookupUnavailableError(["org_byoc_down"]);
         },
       });
 

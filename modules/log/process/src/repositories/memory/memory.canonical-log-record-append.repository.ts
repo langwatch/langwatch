@@ -29,4 +29,13 @@ export class MemoryCanonicalLogRecordAppendRepository extends CanonicalLogRecord
   async ensureLogRecords(records: CanonicalLogRecord[]): Promise<void> {
     for (const record of records) await this.ensureLogRecord(record);
   }
+
+  /** The tenant's held records' JSON byte length, standing in for `_size_bytes`. */
+  async getStoredBytes({ tenantId }: { tenantId: string }): Promise<number> {
+    let total = 0;
+    for (const record of this.#records.values()) {
+      if (record.tenantId === tenantId) total += Buffer.byteLength(JSON.stringify(record));
+    }
+    return total;
+  }
 }

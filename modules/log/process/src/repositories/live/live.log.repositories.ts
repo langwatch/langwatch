@@ -12,6 +12,7 @@ export class LiveLogRepositories {
     return {
       logRecords: ClickHouseCanonicalLogRecordAppendRepository.create({
         resolveClient: ClickHouseCanonicalLogRecordAppendRepository.resolverOver(clickhouse),
+        clickhouse,
         defaultRetentionDays: LOG_DEFAULT_RETENTION_DAYS,
       }),
     };

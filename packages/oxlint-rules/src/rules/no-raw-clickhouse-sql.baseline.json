@@ -11,7 +11,6 @@
     "modules/analytics/process/src/repositories/clickhouse/clickhouse.rollup-timeseries-query.mapper.ts": 1,
     "modules/analytics/process/src/repositories/clickhouse/clickhouse.slim-timeseries-query.mapper.ts": 1,
     "modules/data-retention/process/src/repositories/clickhouse/clickhouse.storage-meter.repository.ts": 2,
-    "modules/stored-object/process/src/repositories/clickhouse/clickhouse.stored-object-owner.repository.ts": 2,
     "modules/trace/process/src/features/facet/repositories/clickhouse/clickhouse.trace-facet-evaluator.repository.ts": 1,
     "modules/trace/process/src/features/facet/repositories/clickhouse/clickhouse.trace-facet-event-attribute-keys.repository.ts": 1,
     "modules/trace/process/src/features/facet/repositories/clickhouse/clickhouse.trace-facet-events.repository.ts": 1,

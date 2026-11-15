@@ -12,6 +12,7 @@ describe("CanonicalLogRecordStore", () => {
     const repository = {
       ensureLogRecord,
       ensureLogRecords,
+      getStoredBytes: async () => 0,
     } satisfies CanonicalLogRecordAppendRepository;
     const records = [
       { recordId: "a".repeat(64) },

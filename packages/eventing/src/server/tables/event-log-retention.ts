@@ -1,11 +1,19 @@
 import {
+  type ClickHouseQueryClient,
   ID_INDEX_KEPT_FOREVER_DAYS,
   ID_INDEX_RETENTION_RAISE,
   idIndexRetentionDays,
   idIndexRetentionRaises,
 } from "@langwatch/clickhouse-client";
+import {
+  clickhouseRead,
+  fn,
+  type ReaderReadStatement,
+  tenantScope,
+} from "@langwatch/clickhouse-client/builder";
 
 import { ConfigurationError, ValidationError } from "../../services/errorHandling.ts";
+import { eventLog } from "../adapters/clickhouse/event-log-table.clickhouse.ts";
 import { EVENT_TABLES } from "./event-table-declarations.ts";
 
 const EVENT_LOG_TABLE = EVENT_TABLES[0].table;
@@ -13,8 +21,8 @@ const EVENT_LOG_ID_INDEX_TABLE = EVENT_TABLES[1].table;
 const MUTATION_CATEGORY_MARKER_PREFIX = "langwatch:event-log-retention-category:";
 const MAX_RETENTION_DAYS = 65_535;
 
-/** The one statement the operation runs, in the routed ClickHouse member's own vocabulary. */
-export interface EventLogRetentionClient {
+/** The statements the operation runs, in the routed ClickHouse member's own vocabulary. */
+export interface EventLogRetentionClient extends Pick<ClickHouseQueryClient, "read"> {
   command(request: {
     tenantId: string;
     organizationId?: string;
@@ -73,6 +81,37 @@ export class EventLogRetention {
     private readonly client: EventLogRetentionClient,
     private readonly classification: EventLogRetentionClassification,
   ) {}
+
+  /** One tenant's `_size_bytes` in `event_log`, every stored row counted, for the storage meter. */
+  async getStoredBytes({
+    tenantId,
+    settings,
+  }: {
+    tenantId: string;
+    settings: Readonly<Record<string, number | string>>;
+  }): Promise<number> {
+    const { rows } = await this.client.read({
+      statement: EventLogRetention.storedBytesRead({ tenantId, settings }),
+      table: EVENT_LOG_TABLE,
+      declaresFullScan: true,
+    });
+    return Number(rows[0]?.bytes ?? 0);
+  }
+
+  /** The tenant's summed `_size_bytes`, under the caller's meter settings. */
+  static storedBytesRead({
+    tenantId,
+    settings,
+  }: {
+    tenantId: string;
+    settings: Readonly<Record<string, number | string>>;
+  }): ReaderReadStatement<{ bytes: number | string }> {
+    return clickhouseRead({ scope: tenantScope.single({ tenantId }) })
+      .from(eventLog)
+      .select({ bytes: fn.sum(eventLog._size_bytes) })
+      .settings(settings)
+      .build();
+  }
 
   /**
    * Rewrites the retention of the tenant's rows in `category`, and raises (never lowers) its id

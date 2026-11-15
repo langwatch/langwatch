@@ -287,11 +287,7 @@ export class StoredObjectModule implements StoredObjectApi, StoredObjectFileApi 
     return this.#storage.readById(input);
   }
 
-  /**
-   * Which project owns an object, for a URL that does not say. A transient
-   * outage on one instance raises rather than answering "no owner": a degraded
-   * instance must not read as a deleted object.
-   */
+  /** Which project owns an object, for a URL that does not say; none is ever found. */
   resolveOwner(input: { id: string }): Promise<{ projectId: string }> {
     return this.#owners.getOwner(input);
   }

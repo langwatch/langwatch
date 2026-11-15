@@ -13,6 +13,7 @@ import {
   type LogOtlpDoorResult,
   type LogPreparation,
   type LogServerConfig,
+  type LogStoredBytesInput,
 } from "@langwatch/log-contract";
 import type { OtlpDoorRequest } from "@langwatch/otlp";
 import { type OtlpIngestCredential } from "@langwatch/otlp/door";
@@ -20,6 +21,7 @@ import type { FeatureSetup } from "@langwatch/process";
 import { TraceApi } from "@langwatch/trace-contract";
 
 import { LogProcessingAdapter, type LogProcessingPipeline } from "../eventing/log.pipeline.ts";
+import type { CanonicalLogRecordAppendRepository } from "../repositories/canonical-log-record-append.repository.ts";
 import type { LogRepositories } from "../repositories/log.repositories.ts";
 import { CanonicalLogService } from "../services/canonical-log.service.ts";
 import { LogRequestCollectionService } from "../services/log-request-collection.service.ts";
@@ -47,6 +49,7 @@ export class LogModule implements LogApiContract {
   readonly #pipeline: LogProcessingPipeline;
   readonly #receiver: OtlpLogReceiverService;
   readonly #collection: LogRequestCollectionService;
+  readonly #logRecords: CanonicalLogRecordAppendRepository;
   #commands: EventingCommands<LogProcessingPipeline> | undefined;
 
   private constructor(parts: {
@@ -54,11 +57,13 @@ export class LogModule implements LogApiContract {
     pipeline: LogProcessingPipeline;
     receiver: OtlpLogReceiverService;
     collection: LogRequestCollectionService;
+    logRecords: CanonicalLogRecordAppendRepository;
   }) {
     this.#service = parts.service;
     this.#pipeline = parts.pipeline;
     this.#receiver = parts.receiver;
     this.#collection = parts.collection;
+    this.#logRecords = parts.logRecords;
   }
 
   static create({ dependencies, repositories, config }: LogSetup): LogModule {
@@ -85,6 +90,7 @@ export class LogModule implements LogApiContract {
       pipeline,
       receiver: OtlpLogReceiverService.create({ traces: dependencies.traces, collection }),
       collection,
+      logRecords: repository,
     });
     return app;
   }
@@ -119,6 +125,11 @@ export class LogModule implements LogApiContract {
   }
 
   /** The pipeline this module registers, built once by {@link create}. */
+  /** Log's stored bytes for one project, for data-retention's storage meter. */
+  getStoredBytes(input: LogStoredBytesInput): Promise<number> {
+    return this.#logRecords.getStoredBytes({ tenantId: input.projectId });
+  }
+
   eventingPipeline(): LogProcessingPipeline {
     return this.#pipeline;
   }

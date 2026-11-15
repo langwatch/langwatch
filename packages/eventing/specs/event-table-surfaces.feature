@@ -61,6 +61,21 @@ Feature: Eventing's own surfaces over its tables
       Then a marked rewrite answers its category
       And an unmarked rewrite, or a rewrite of another table, answers none
 
+  # ADR-202 Decided 22: eventing reports event_log's stored bytes to the storage meter.
+  Rule: The event log's stored bytes are eventing's read
+
+    @unit
+    Scenario: The event log's stored-bytes read is scoped to one tenant under the meter's settings
+      When the storage meter asks for a tenant's event-log stored bytes
+      Then one built read sums `_size_bytes` over the event log for that tenant alone
+      And it carries the settings the meter passed
+
+    @integration
+    Scenario: The event log's stored bytes count only this tenant's rows
+      Given events stored for this tenant and for other tenants
+      When the storage meter asks for this tenant's event-log stored bytes
+      Then the answer equals the sum of `_size_bytes` over this tenant's rows alone
+
   Rule: Eventing declares its tables' LWQL entries as plain data
 
     @unit

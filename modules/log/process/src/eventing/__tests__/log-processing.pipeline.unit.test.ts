@@ -10,7 +10,6 @@ import { LogProcessingAdapter } from "../log.pipeline.ts";
 function client(overrides: Partial<LogClickHouseClient> = {}): LogClickHouseClient {
   return {
     insert: async () => undefined,
-    query: async () => ({ json: async () => [] }),
     ...overrides,
   };
 }
@@ -71,6 +70,7 @@ describe("ClickHouseLogProcessingAdapter", () => {
     it("builds the log-processing pipeline from that client alone", () => {
       const pipeline = LogProcessingAdapter.create({
         repository: ClickHouseCanonicalLogRecordAppendRepository.create({
+          clickhouse: { read: async () => ({ rows: [] }) },
           resolveClient: async () => client(),
           defaultRetentionDays: 49,
         }),
@@ -91,6 +91,7 @@ describe("ClickHouseLogProcessingAdapter", () => {
       const resolveClient = vi.fn(async () => client({ insert }));
 
       await ClickHouseCanonicalLogRecordAppendRepository.create({
+        clickhouse: { read: async () => ({ rows: [] }) },
         resolveClient,
         defaultRetentionDays: 49,
       }).ensureLogRecord(sample());

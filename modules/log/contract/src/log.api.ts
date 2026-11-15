@@ -2,7 +2,12 @@ import { moduleApi } from "@langwatch/module";
 import type { OtlpDoorRefusal, OtlpDoorRequest } from "@langwatch/otlp";
 import type { OtlpIngestCredential } from "@langwatch/otlp/door";
 
-import type { LogPiiRedactionLevel, LogPreparation, CanonicalLogRecord } from "./log-record.ts";
+import type {
+  CanonicalLogRecord,
+  LogPiiRedactionLevel,
+  LogPreparation,
+  LogStoredBytesInput,
+} from "./log-record.ts";
 
 /**
  * An OTLP log request's outcome. `unavailable` means nothing was durably accepted, so the sender
@@ -46,6 +51,8 @@ export interface LogApi {
   collectOtlpLogs(input: LogCollectionInput): Promise<LogRequestCollectionResult>;
   /** Sends prepared records onto the `log_processing` pipeline for durable storage. */
   recordCanonicalLogRecords(records: readonly CanonicalLogRecord[]): Promise<void>;
+  /** The sum of `_size_bytes` over log's own records for one project; a store failure throws. */
+  getStoredBytes(input: LogStoredBytesInput): Promise<number>;
 }
 
 export const LogApi = moduleApi<LogApi>()("log");

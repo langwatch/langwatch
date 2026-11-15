@@ -17,6 +17,7 @@ import { startTestClickHouseEndpoints } from "@langwatch/clickhouse-client/testi
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { REPLAY_ALL_TENANTS } from "../../../../replay/replayEventSource.ts";
+import { EventLogRetention } from "../../../tables/event-log-retention.ts";
 import {
   aggregateDiscoveryRead,
   aggregateHistoryRead,
@@ -670,4 +671,49 @@ describe("replay's built reads on ClickHouse 26.8", () => {
       expect(main).toHaveLength(bounds === undefined ? 8 : 6);
     },
   );
+});
+
+describe("the storage meter's event-log read on ClickHouse 26.8", () => {
+  /** @scenario "The event log's stored bytes count only this tenant's rows" */
+  it("sums this tenant's `_size_bytes` as main's raw read does, without the other tenants'", async () => {
+    const retention = EventLogRetention.create({
+      client: {
+        command: async () => undefined,
+        query: async () => ({ rows: [] }),
+        read: (input) => {
+          readerSent = undefined;
+          return clickhouse.read(input).finally(() => {
+            builtSent = readerSent;
+          });
+        },
+      },
+      classification: {
+        categories: [],
+        classByAggregateType: {},
+        indefiniteClass: "indefinite",
+        indefiniteEventTypePrefixes: [],
+        indefiniteEventTypes: [],
+      },
+    });
+    const rawBytes = async (tenantId: string) =>
+      Number(
+        (
+          await mainRows<{ bytes: string }>({
+            sql: "SELECT sum(_size_bytes) AS bytes FROM event_log WHERE TenantId = {tenantId:String}",
+            params: { tenantId },
+            tenantId,
+          })
+        )[0]?.bytes ?? 0,
+      );
+
+    const bytes = await retention.getStoredBytes({
+      tenantId: A,
+      settings: { max_threads: 2, max_execution_time: 45 },
+    });
+
+    expectSentAs(A);
+    expect(bytes).toBeGreaterThan(0);
+    expect(bytes).toBe(await rawBytes(A));
+    expect(await rawBytes(B)).toBeGreaterThan(0);
+  });
 });

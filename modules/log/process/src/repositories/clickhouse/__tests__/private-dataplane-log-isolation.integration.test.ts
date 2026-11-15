@@ -85,6 +85,7 @@ function routedMember({ sharedUrl, privateUrl }: { sharedUrl: string; privateUrl
   });
   const logs = ClickHouseCanonicalLogRecordAppendRepository.create({
     resolveClient: ClickHouseCanonicalLogRecordAppendRepository.resolverOver(clickhouse),
+    clickhouse,
     defaultRetentionDays: 30,
   });
   return { connection, clickhouse, logs };

@@ -41,6 +41,7 @@ export class MemoryRetroactiveRetentionRepository implements RetroactiveRetentio
       query: async ({ params }) => ({
         rows: this.idIndexTenants.has(String(params?.table)) ? [{ name: params?.table }] : [],
       }),
+      read: async () => ({ rows: [] }) as never,
     },
     classification: EVENT_LOG_RETENTION_CLASSIFICATION,
   });
