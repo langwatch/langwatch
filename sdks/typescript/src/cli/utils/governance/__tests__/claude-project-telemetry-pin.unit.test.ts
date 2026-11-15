@@ -101,6 +101,52 @@ describe("ensureClaudeProjectTelemetryPin", () => {
       });
     });
 
+    describe("and git tracks a pin file an older run wrote a key into", () => {
+      /** @scenario "a key an older run left in a tracked pin file is taken out" */
+      it("removes the langwatch env and keeps the user's own settings", () => {
+        git("init", "-q");
+        installAppEnv(
+          claudeProjectSettingsTarget(temp.cwd),
+          buildOtelEnvBlock("claude", STALE_ENDPOINT, STALE_TOKEN),
+        );
+        const withUserKey = JSON.parse(fs.readFileSync(pinPath(), "utf8"));
+        fs.writeFileSync(pinPath(), JSON.stringify({ ...withUserKey, model: "opus" }));
+        git("add", "-f", ".claude/settings.local.json");
+
+        const result = ensureClaudeProjectTelemetryPin({
+          vars: currentClaudeVars(),
+          cwd: temp.cwd,
+        });
+
+        const after = fs.readFileSync(pinPath(), "utf8");
+        expect(result.action).toBe("tracked");
+        expect(after).not.toContain(STALE_TOKEN);
+        expect(after).not.toContain(CURRENT_TOKEN);
+        expect(JSON.parse(after).model).toBe("opus");
+      });
+    });
+
+    describe("and git does not answer in time", () => {
+      /** @scenario "no key is written when git cannot say whether it tracks the pin file" */
+      it("writes nothing and reports the pin as unverified", () => {
+        const bin = fs.mkdtempSync(path.join(temp.cwd, "slow-git-"));
+        fs.writeFileSync(path.join(bin, "git"), "#!/bin/sh\nsleep 5\n", { mode: 0o755 });
+        const prevPath = process.env.PATH;
+        process.env.PATH = `${bin}${path.delimiter}${prevPath}`;
+        try {
+          const result = ensureClaudeProjectTelemetryPin({
+            vars: currentClaudeVars(),
+            cwd: temp.cwd,
+          });
+
+          expect(result.action).toBe("unverified");
+          expect(fs.existsSync(pinPath())).toBe(false);
+        } finally {
+          process.env.PATH = prevPath;
+        }
+      });
+    });
+
     describe("and git tracks the pin file", () => {
       /** @scenario "no key is written into a pin file git tracks" */
       it("writes no key into it and reports it as tracked", () => {

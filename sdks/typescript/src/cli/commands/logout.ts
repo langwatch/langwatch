@@ -23,19 +23,17 @@ const revokeAndClearSession = async (): Promise<void> => {
     clearConfig();
     return;
   }
-  if (cfg.refresh_token || cfg.access_token) {
-    try {
-      // Send every token held so each is invalidated now, not at its expiry.
-      // A `login --token` session has only an access token; it is revoked too.
-      await serverRevokeLogout(
-        { baseUrl: cfg.control_plane_url },
-        cfg.refresh_token,
-        cfg.access_token,
-      );
-    } catch (err) {
-      const msg = err instanceof DeviceFlowError ? err.message : String(err);
-      console.error(chalk.yellow(`warning: server-side revoke failed: ${msg}`));
-    }
+  try {
+    // Send every token held so each is invalidated now, not at its expiry.
+    // A `login --token` session has only an access token; it is revoked too.
+    await serverRevokeLogout(
+      { baseUrl: cfg.control_plane_url },
+      cfg.refresh_token,
+      cfg.access_token,
+    );
+  } catch (err) {
+    const msg = err instanceof DeviceFlowError ? err.message : String(err);
+    console.error(chalk.yellow(`warning: server-side revoke failed: ${msg}`));
   }
   clearConfig();
 };

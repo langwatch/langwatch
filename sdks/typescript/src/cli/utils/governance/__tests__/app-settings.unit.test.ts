@@ -86,16 +86,19 @@ describe("installAppEnv", () => {
     });
 
     /** @scenario "A tool's settings file carrying the ingest key is owner-only" */
-    it("writes the file readable by its owner only, even one that existed world-readable", () => {
-      const target = appSettingsTargetFor("claude")!;
-      fs.mkdirSync(path.dirname(target.path), { recursive: true });
-      fs.writeFileSync(target.path, "{}\n");
-      fs.chmodSync(target.path, 0o644);
+    it.skipIf(process.platform === "win32")(
+      "writes the file readable by its owner only, even one that existed world-readable",
+      () => {
+        const target = appSettingsTargetFor("claude")!;
+        fs.mkdirSync(path.dirname(target.path), { recursive: true });
+        fs.writeFileSync(target.path, "{}\n");
+        fs.chmodSync(target.path, 0o644);
 
-      installAppEnv(target, otelVars);
+        installAppEnv(target, otelVars);
 
-      expect(fs.statSync(target.path).mode & 0o777).toBe(0o600);
-    });
+        expect(fs.statSync(target.path).mode & 0o777).toBe(0o600);
+      },
+    );
 
     it("creates the ~/.claude directory when missing", () => {
       const target = appSettingsTargetFor("claude")!;

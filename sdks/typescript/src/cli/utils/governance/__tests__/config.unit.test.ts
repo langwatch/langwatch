@@ -336,14 +336,17 @@ describe("configWriteProblem", () => {
 
   describe("when the config folder is missing", () => {
     /** @scenario "The check writes and removes a probe beside the config" */
-    it("creates it owner-only and leaves no probe behind", () => {
-      const dir = path.join(root, "missing");
-      process.env.LANGWATCH_CLI_CONFIG = path.join(dir, "config.json");
+    it.skipIf(process.platform === "win32")(
+      "creates it owner-only and leaves no probe behind",
+      () => {
+        const dir = path.join(root, "missing");
+        process.env.LANGWATCH_CLI_CONFIG = path.join(dir, "config.json");
 
-      expect(configWriteProblem()).toBeUndefined();
-      expect(fs.statSync(dir).mode & 0o777).toBe(0o700);
-      expect(fs.readdirSync(dir)).toEqual([]);
-    });
+        expect(configWriteProblem()).toBeUndefined();
+        expect(fs.statSync(dir).mode & 0o777).toBe(0o700);
+        expect(fs.readdirSync(dir)).toEqual([]);
+      },
+    );
   });
 
   describe("when a file sits where the config folder belongs", () => {

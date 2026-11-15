@@ -4,11 +4,11 @@
  * race between two sessions re-reads config and retries with the winner's pair.
  */
 
-import type { GovernanceConfig } from "./config";
-import type { configWriteProblem } from "./config";
 import {
   assertConfigWritable,
+  type configWriteProblem,
   displayConfigPath,
+  type GovernanceConfig,
   loadConfig,
   saveConfig,
 } from "./config";

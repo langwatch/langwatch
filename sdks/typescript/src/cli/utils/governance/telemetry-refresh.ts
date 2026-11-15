@@ -28,6 +28,7 @@ import {
   claudeProjectSettingsTarget,
   installAppEnv,
   removeAppEnvVars,
+  type AppSettingsTarget,
 } from "./app-settings";
 import { readClaudePluginState } from "./claude-plugin";
 import {
@@ -37,7 +38,12 @@ import {
   mintIngestionKey,
 } from "./cli-api";
 import { assertCodexAgentGuidance } from "./codex-agents-md";
-import { assertConfigWritable, isIsolatedConfig, type GovernanceConfig } from "./config";
+import {
+  assertConfigWritable,
+  ConfigNotWritableError,
+  isIsolatedConfig,
+  type GovernanceConfig,
+} from "./config";
 import { buildOtelEnvBlock, SOURCE_TYPE_BY_TOOL, telemetryEnvVarNames } from "./otel-env-block";
 import { resolvePlatformToolPolicy } from "./platform-tool-policy";
 import { runningCodeRestartNotice } from "./running-code";
@@ -304,7 +310,13 @@ export function refreshCodexOtelBlockTo({
   return `codex [otel] block (${displayCodexConfigPath()})`;
 }
 
-export type ClaudeProjectPinAction = "created" | "updated" | "unchanged" | "skipped" | "tracked";
+export type ClaudeProjectPinAction =
+  | "created"
+  | "updated"
+  | "unchanged"
+  | "skipped"
+  | "tracked"
+  | "unverified";
 
 export interface ClaudeProjectPinResult {
   action: ClaudeProjectPinAction;
@@ -313,9 +325,9 @@ export interface ClaudeProjectPinResult {
 }
 
 /**
- * Write (or re-sync) telemetry env into `.claude/settings.local.json`, which Claude Code applies
- * above user-level settings so a wrapped run always emits to the login that spawned it.
- * `skipped`: the file carries OTLP wiring the user owns. `tracked`: git tracks the file, so no key.
+ * Write (or re-sync) the run's telemetry env into `.claude/settings.local.json`, which Claude Code
+ * applies above user settings. `skipped`: OTLP wiring the user owns. `tracked`: git tracks the
+ * file, so no key goes in and an old one of ours comes out. `unverified`: git did not answer.
  */
 export function ensureClaudeProjectTelemetryPin({
   vars,
@@ -326,7 +338,13 @@ export function ensureClaudeProjectTelemetryPin({
 }): ClaudeProjectPinResult {
   const target = claudeProjectSettingsTarget(cwd);
   const base = { path: target.path, displayPath: target.displayPath };
-  if (gitTracksClaudeLocalSettings(cwd)) return { action: "tracked", ...base };
+  const tracking = claudeLocalSettingsTracking(cwd);
+  if (tracking === "unknown") return { action: "unverified", ...base };
+  if (tracking === "tracked") {
+    // A key left by an older run would still outrank this run's env: take ours out.
+    stripLangwatchPinEnv(target);
+    return { action: "tracked", ...base };
+  }
   // Every run, not only on create: a pin written before the exclude existed, or
   // into a file the user made, would otherwise stay one `git add .` from history.
   excludeClaudeLocalSettingsFromGit(cwd);
@@ -376,18 +394,26 @@ function removeSettingsFileIfEmpty(filePath: string): void {
 
 const CLAUDE_LOCAL_SETTINGS = ".claude/settings.local.json";
 
-/** Git's exit status for `args` run in `cwd`; null when git is missing or hangs. */
-function gitStatus(cwd: string, args: string[]): number | null {
-  try {
-    return spawnSync("git", args, { cwd, stdio: "ignore", timeout: 2000 }).status;
-  } catch {
-    return null;
-  }
+/** Git's exit status for `args` run in `cwd`: "missing" without git, null when it hangs. */
+function gitStatus(cwd: string, args: string[]): number | null | "missing" {
+  const run = spawnSync("git", args, { cwd, stdio: "ignore", timeout: 2000 });
+  if ((run.error as NodeJS.ErrnoException | undefined)?.code === "ENOENT") return "missing";
+  return run.status;
 }
 
-/** True when git already tracks the pin file: writing a key there puts it in the next commit. */
-function gitTracksClaudeLocalSettings(cwd: string): boolean {
-  return gitStatus(cwd, ["ls-files", "--error-unmatch", "--", CLAUDE_LOCAL_SETTINGS]) === 0;
+/** Whether git tracks the pin file; a key written into a tracked one lands in the next commit. */
+function claudeLocalSettingsTracking(cwd: string): "tracked" | "untracked" | "unknown" {
+  const status = gitStatus(cwd, ["ls-files", "--error-unmatch", "--", CLAUDE_LOCAL_SETTINGS]);
+  if (status === 0) return "tracked";
+  return status === null ? "unknown" : "untracked";
+}
+
+/** Removes the langwatch telemetry env from the pin file, keeping the file and the rest of it. */
+function stripLangwatchPinEnv(target: AppSettingsTarget): void {
+  const keys = telemetryEnvVarNames("claude");
+  if (!appEnvHasAnyVar(target, keys)) return;
+  if (!otelWiringLooksLangwatchAuthored(appEnvValues(target))) return;
+  removeAppEnvVars(target, keys);
 }
 
 /**
@@ -568,6 +594,23 @@ function rewriteToolWiring({
   }
 }
 
+/**
+ * One tool's login refresh; a failure skips that tool, never the login or the other tools.
+ * A config that cannot be saved is said out loud, since the tool keeps its old wiring.
+ */
+async function refreshToolForLoginBestEffort(
+  args: Parameters<typeof refreshToolForLogin>[0],
+): Promise<boolean> {
+  try {
+    return await refreshToolForLogin(args);
+  } catch (error) {
+    if (error instanceof ConfigNotWritableError) {
+      args.warnings.push(`${args.tool} telemetry was not refreshed: ${error.message}`);
+    }
+    return false;
+  }
+}
+
 /** Refreshes one tool's stale wiring for the new login; true when it minted a key. */
 async function refreshToolForLogin({
   cfg,
@@ -705,23 +748,17 @@ export async function refreshTelemetryWiringForLogin(
   const keptForLoopback: string[] = [];
 
   for (const [tool, sourceType] of Object.entries(SOURCE_TYPE_BY_TOOL)) {
-    try {
-      const minted = await refreshToolForLogin({
-        cfg,
-        tool,
-        sourceType,
-        expectedEndpoint,
-        loopbackLogin,
-        keptForLoopback,
-        labels,
-        warnings,
-      });
-      if (minted) mintedAny = true;
-    } catch {
-      // Best-effort per tool: one failed mint must not block the login
-      // or the other tools' refreshes.
-      void 0;
-    }
+    const minted = await refreshToolForLoginBestEffort({
+      cfg,
+      tool,
+      sourceType,
+      expectedEndpoint,
+      loopbackLogin,
+      keptForLoopback,
+      labels,
+      warnings,
+    });
+    if (minted) mintedAny = true;
   }
 
   resyncCodexGatewayBlock({ cfg, loopbackLogin, keptForLoopback, labels });

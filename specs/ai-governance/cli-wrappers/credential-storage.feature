@@ -48,6 +48,27 @@ Feature: The CLI never asks for a credential it cannot keep, and keeps it privat
       And no ingest key is issued on the server
 
     @unit
+    Scenario: A device login does not start when the config cannot be saved
+      Given ~/.langwatch/config.json cannot be written
+      When the user runs `langwatch login --device`
+      Then the command fails saying the config cannot be saved
+      And no device code is requested from the server
+
+    @unit
+    Scenario: A project login does not fork the session when the config cannot be saved
+      Given ~/.langwatch/config.json cannot be written
+      When the user runs `langwatch login --project <slug>`
+      Then the command fails saying the config cannot be saved
+      And the device session is not sent to the server
+
+    @unit
+    Scenario: A login that cannot refresh a tool's key says so
+      Given claude's telemetry wiring points at a previous instance
+      And ~/.langwatch/config.json cannot be written
+      When the user logs in to the new instance
+      Then the login warns that claude's telemetry was not refreshed and why
+
+    @unit
     Scenario: The check writes and removes a probe beside the config
       Given the folder holding ~/.langwatch/config.json is missing
       When the CLI checks that it can save the config

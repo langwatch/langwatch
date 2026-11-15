@@ -12,7 +12,7 @@ import type { Ora } from "ora";
 
 import { normalizeEndpoint } from "../../../internal/endpoint";
 import { rememberProjectName } from "../identityNotice";
-import { SECRET_FILE_MODE } from "../secret-file";
+import { writeSecretFile } from "../secret-file";
 import { createSpinner } from "../spinner";
 import {
   type BudgetOverviewResponse,
@@ -527,7 +527,7 @@ interface EnvWriteResult {
 function writeApiKeyToEnv(apiKey: string): EnvWriteResult {
   const envPath = path.join(process.cwd(), ".env");
   if (!fs.existsSync(envPath)) {
-    fs.writeFileSync(envPath, `LANGWATCH_API_KEY=${apiKey}\n`, { mode: SECRET_FILE_MODE });
+    writeSecretFile(envPath, `LANGWATCH_API_KEY=${apiKey}\n`);
     return { created: true, updated: false, path: envPath };
   }
   const content = fs.readFileSync(envPath, "utf-8");

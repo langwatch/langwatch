@@ -107,6 +107,20 @@ Feature: The latest login wins over stale persisted telemetry wiring
       Then the ingest key is not written into that file
       And a warning says git tracks it and how to stop tracking it
 
+    @unit
+    Scenario: a key an older run left in a tracked pin file is taken out
+      Given git tracks .claude/settings.local.json
+      And it carries a langwatch telemetry env from a previous login
+      When the user runs `langwatch claude`
+      Then the langwatch telemetry env is removed from that file
+      And the user's own settings in it are kept
+
+    @unit
+    Scenario: no key is written when git cannot say whether it tracks the pin file
+      Given git does not answer in time
+      When the user runs `langwatch claude`
+      Then the ingest key is not written into .claude/settings.local.json
+
     Scenario: the pin is refreshed when a different login runs next
       Given .claude/settings.local.json carries a pin from a previous login
       When the user runs `langwatch claude` under a new login

@@ -477,6 +477,11 @@ function reportModeResult(modeResult: WrapperModeResult): void {
         `git tracks that file, so the ingest key would land in your next commit. ` +
         `Run \`git rm --cached .claude/settings.local.json\` to keep it local.\n`,
     );
+  } else if (pin?.action === "unverified") {
+    process.stderr.write(
+      `${lwTag()} did not pin claude telemetry in .claude/settings.local.json this run: ` +
+        `git did not say in time whether it tracks that file.\n`,
+    );
   } else if (pin?.action === "skipped") {
     process.stderr.write(
       `${lwTag()} left the OTLP env in .claude/settings.local.json alone, ` +

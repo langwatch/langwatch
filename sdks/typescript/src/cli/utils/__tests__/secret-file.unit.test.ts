@@ -1,5 +1,4 @@
 import * as fs from "node:fs";
-import type * as nodeFs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 
@@ -7,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const chmod = vi.hoisted(() => ({ refuse: false }));
 vi.mock("node:fs", async (importOriginal) => {
-  const real = await importOriginal<typeof nodeFs>();
+  const real = await importOriginal<typeof fs>();
   const chmodSync: typeof real.chmodSync = (...args) => {
     if (chmod.refuse) throw new Error("EPERM: operation not permitted");
     return real.chmodSync(...args);
@@ -28,7 +27,7 @@ afterEach(() => {
 
 describe("writeSecretFile", () => {
   describe("when the file is new", () => {
-    it("creates it readable by its owner only", () => {
+    it.skipIf(process.platform === "win32")("creates it readable by its owner only", () => {
       const file = path.join(dir, "settings.json");
       writeSecretFile(file, "token");
 
@@ -38,16 +37,19 @@ describe("writeSecretFile", () => {
   });
 
   describe("when the file exists readable by everyone", () => {
-    it("narrows it to its owner and replaces the content", () => {
-      const file = path.join(dir, ".zshrc");
-      fs.writeFileSync(file, "old", { mode: 0o644 });
-      fs.chmodSync(file, 0o644);
+    it.skipIf(process.platform === "win32")(
+      "narrows it to its owner and replaces the content",
+      () => {
+        const file = path.join(dir, ".zshrc");
+        fs.writeFileSync(file, "old", { mode: 0o644 });
+        fs.chmodSync(file, 0o644);
 
-      writeSecretFile(file, "new");
+        writeSecretFile(file, "new");
 
-      expect(fs.statSync(file).mode & 0o777).toBe(0o600);
-      expect(fs.readFileSync(file, "utf8")).toBe("new");
-    });
+        expect(fs.statSync(file).mode & 0o777).toBe(0o600);
+        expect(fs.readFileSync(file, "utf8")).toBe("new");
+      },
+    );
   });
 
   describe("when the file system refuses to change the mode", () => {
