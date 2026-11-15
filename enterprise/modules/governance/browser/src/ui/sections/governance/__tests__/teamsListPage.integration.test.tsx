@@ -10,6 +10,7 @@
  */
 import "@testing-library/jest-dom/vitest";
 import { cleanup, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const harness = vi.hoisted(() => ({
@@ -19,13 +20,14 @@ const harness = vi.hoisted(() => ({
     isLoading: false,
     error: null as unknown,
   },
+  refetch: vi.fn(),
 }));
 
 vi.mock("../../../../behavior/governance-api.ts", async (importOriginal) => ({
   ...(await importOriginal<typeof governanceApiModule>()),
   api: {
     activityMonitor: {
-      spendByTeam: { useQuery: () => ({ ...harness.teams, refetch: vi.fn() }) },
+      spendByTeam: { useQuery: () => ({ ...harness.teams, refetch: harness.refetch }) },
     },
   },
 }));
@@ -52,6 +54,7 @@ const renderPage = () =>
 
 beforeEach(() => {
   harness.teams = { data: undefined, isPending: false, isLoading: false, error: null };
+  harness.refetch.mockReset();
 });
 
 afterEach(() => cleanup());
@@ -72,6 +75,20 @@ describe("the all-teams page reading team activity", () => {
       expect(screen.queryByText("Team activity could not be read.")).toBeNull();
       expect(screen.queryByText("No team activity this window.")).toBeNull();
       expect(screen.queryByText(/teams? shown/)).toBeNull();
+    });
+
+    /** @scenario "A failed team activity read shows only the failure" */
+    it("reads the team activity again when Try again is pressed", async () => {
+      harness.teams = {
+        data: undefined,
+        isPending: false,
+        isLoading: false,
+        error: new Error("read failed"),
+      };
+      renderPage();
+
+      await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+      expect(harness.refetch).toHaveBeenCalledTimes(1);
     });
   });
 

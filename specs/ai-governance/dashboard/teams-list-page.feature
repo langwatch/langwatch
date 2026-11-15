@@ -16,6 +16,7 @@ Feature: All teams: what the team activity panel says about its read
     When the member opens the all-teams page
     Then the page shows an alert saying the team activity could not be loaded
     And no empty state, no table and no team count is shown
+    And pressing Try again on the alert reads the team activity again
 
   @integration
   Scenario: A failed refresh keeps the teams already shown beside the alert

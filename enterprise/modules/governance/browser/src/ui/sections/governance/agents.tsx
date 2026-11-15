@@ -164,7 +164,8 @@ function useAgentsScreen() {
     rows: sample.active ? SAMPLE_AGENT_ROWS : (agents.data ?? []),
     // Suppress loading/error under sample mode. Use `!orgId` not `!!orgId` to avoid false
     // "no agents registered" before org resolves.
-    isLoading: !sample.active && (!orgId || agents.isLoading),
+    // `isPending`: a read paused offline has no answer yet either.
+    isLoading: !sample.active && (!orgId || agents.isPending),
     error: sample.active ? null : agents.error,
     retry: () => void agents.refetch(),
   };

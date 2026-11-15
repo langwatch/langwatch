@@ -158,6 +158,7 @@ Feature: The AI Governance Agents page
     When a governance viewer opens the Agents page
     Then the page shows an alert saying the agents could not be loaded
     And the pane shows no empty state and no register action of its own
+    And pressing Try again on the alert reads the agents again
     # The header keeps its Register agent. What a failed read must not do is
     # also say "no agents registered yet": that is a claim the read never made.
 

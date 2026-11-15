@@ -36,6 +36,8 @@ vi.mock("@langwatch/browser-host/drawer", async () => ({
   useDrawer: () => ({ openDrawer: vi.fn(), closeDrawer: harness.closeDrawer, goBack: vi.fn() }),
 }));
 
+// Strict by name: the drawer may read only the procedures configured here, so
+// an accidental new dependency fails the suite instead of answering empty.
 vi.mock("../../../../behavior/governance-api.ts", () => {
   const mutation = () => ({
     mutate: vi.fn(),
@@ -45,24 +47,35 @@ vi.mock("../../../../behavior/governance-api.ts", () => {
     data: undefined,
     error: null,
   });
+  const idle = () => ({ data: undefined, isPending: false, isLoading: false, error: null });
+  const queries: Record<string, (input: unknown, options?: { enabled?: boolean }) => unknown> = {
+    "ingestionSources.list": (_input, options) => {
+      harness.listEnabled.push(options?.enabled ?? true);
+      return { ...harness.list, refetch: harness.refetch };
+    },
+    // The edit form's OTTL editor asks for its starter statements on render.
+    "ingestionSources.ottlStarter": idle,
+  };
+  const mutations = new Set(["ingestionSources.update", "ingestionSources.validateOttl"]);
   const node = (path: string[]): unknown =>
     new Proxy(() => undefined, {
       get(_target, property) {
         if (typeof property !== "string") return undefined;
+        const name = path.join(".");
         if (property === "useQuery") {
-          if (path.join(".") === "ingestionSources.list") {
-            return (_input: unknown, options?: { enabled?: boolean }) => {
-              harness.listEnabled.push(options?.enabled ?? true);
-              return { ...harness.list, refetch: harness.refetch };
-            };
-          }
-          return () => ({ data: undefined, isLoading: false, error: null });
+          const query = queries[name];
+          if (!query) throw new Error(`unconfigured query ${name}`);
+          return query;
         }
-        if (property === "useMutation") return mutation;
-        if (property === "useUtils") return () => node([]);
+        if (property === "useMutation") {
+          if (!mutations.has(name)) throw new Error(`unconfigured mutation ${name}`);
+          return mutation;
+        }
+        if (property === "useUtils") return () => utils;
         return node([...path, property]);
       },
     });
+  const utils = { ingestionSources: { list: { invalidate: vi.fn() } } };
   const api = node([]);
   return { api, governanceApi: api };
 });
