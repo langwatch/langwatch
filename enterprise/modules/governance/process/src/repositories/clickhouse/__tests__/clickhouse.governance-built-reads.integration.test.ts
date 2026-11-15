@@ -7,12 +7,14 @@
  * replayed row answers is decided by the built read's election, so a mock cannot prove it.
  */
 import type { ClickHouseClient } from "@clickhouse/client";
-import { vendorQueryClient } from "@langwatch/clickhouse-client/testing";
 import { Temporal } from "@langwatch/time";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { startMigratedClickHouse } from "../../../__tests__/migrated-clickhouse.harness.ts";
+import {
+  type MigratedClickHouseAsReader,
+  startMigratedClickHouseAsReader,
+} from "../../../__tests__/migrated-clickhouse.harness.ts";
 import { OCSF_ACTIVITY, OCSF_SEVERITY } from "../../../rules/ocsf-codes.rules.ts";
 import type { GovernanceOcsfEvent } from "../../governance.repositories.ts";
 import { ClickHouseAnomalySpendRepository } from "../clickhouse.anomaly-spend.repository.ts";
@@ -29,6 +31,7 @@ const run = nanoid(8);
 const pause = () => new Promise((resolve) => setTimeout(resolve, 15));
 
 let client: ClickHouseClient;
+let migrated: MigratedClickHouseAsReader;
 let ocsfEvents: ClickHouseOcsfEventsRepository;
 let anomalySpend: ClickHouseAnomalySpendRepository;
 
@@ -64,9 +67,10 @@ function ocsfEvent({
 
 describe.skipIf(!enabled)("governance's built reads against a real ClickHouse", () => {
   beforeAll(async () => {
-    client = await startMigratedClickHouse({ suite: "governance-built-reads" });
-    // The process's client over the suite's connection: built reads carry the tenant setting.
-    const resolve = memberClickHouseResolver(vendorQueryClient({ vendor: client, indexes: [] }));
+    migrated = await startMigratedClickHouseAsReader({ suite: "governance-built-reads" });
+    client = migrated.client;
+    // As the worker holds it: built reads go as the app reader, inserts as the system.
+    const resolve = memberClickHouseResolver(migrated.queryClient);
     ocsfEvents = ClickHouseOcsfEventsRepository.create(resolve);
     anomalySpend = ClickHouseAnomalySpendRepository.create(resolve);
     await client.command({ query: "SYSTEM STOP MERGES governance_ocsf_events" });
@@ -77,7 +81,7 @@ describe.skipIf(!enabled)("governance's built reads against a real ClickHouse", 
     if (!client) return;
     await client.command({ query: "SYSTEM START MERGES governance_ocsf_events" });
     await client.command({ query: "SYSTEM START MERGES governance_kpis" });
-    await client.close();
+    await migrated.close();
   }, 60_000);
 
   describe("given three events, one of them replayed with a later version", () => {

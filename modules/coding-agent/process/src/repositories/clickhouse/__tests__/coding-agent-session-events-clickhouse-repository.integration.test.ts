@@ -6,26 +6,21 @@
 import { randomUUID } from "node:crypto";
 
 import type { ClickHouseClient } from "@clickhouse/client";
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
-import { vendorQueryClient } from "@langwatch/clickhouse-client/testing";
 import type { CodingAgentSessionEventRecord } from "@langwatch/coding-agent-contract";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { CODING_AGENT_ID_INDEXES } from "../clickhouse.coding-agent-id-indexes.database.ts";
 import { CodingAgentSessionEventsClickHouseRepository } from "../clickhouse.coding-agent-session-event.repository.ts";
 import {
-  createTestClickHouseClient,
+  type CodingAgentClickHouseAsReader,
+  startCodingAgentClickHouseAsReader,
   testClickHouseUrl,
 } from "./support/clickhouse-endpoint.support.ts";
 
 const clickHouseUrl = testClickHouseUrl();
 
 let ch: ClickHouseClient;
+let migrated: CodingAgentClickHouseAsReader;
 let repository: CodingAgentSessionEventsClickHouseRepository;
-
-function queryClient(client: ClickHouseClient): ClickHouseQueryClient {
-  return vendorQueryClient({ vendor: client, indexes: CODING_AGENT_ID_INDEXES });
-}
 
 const tag = randomUUID();
 const tenantId = `${tag}-project`;
@@ -88,12 +83,13 @@ function eventRecord(
 
 beforeAll(async () => {
   if (!clickHouseUrl) return;
-  ch = createTestClickHouseClient(clickHouseUrl);
+  migrated = await startCodingAgentClickHouseAsReader({ suite: "coding-agent-session-events" });
+  ch = migrated.ch;
   repository = CodingAgentSessionEventsClickHouseRepository.create({
-    clickhouse: queryClient(ch),
+    clickhouse: migrated.queryClient,
     defaultTraceRetentionDays: 30,
   });
-}, 120_000);
+}, 240_000);
 
 afterAll(async () => {
   if (ch) {

@@ -16,7 +16,8 @@ import { TestClock } from "../../../__tests__/fixtures/coding-agent.fixture.ts";
 import { NoopCodingAgentReadMetricsService } from "../../../__tests__/support/coding-agent-read-metrics-noop.service.ts";
 import { CodingAgentSessionClickHouseRepository } from "../clickhouse.coding-agent-session.repository.ts";
 import {
-  createTestClickHouseClient,
+  type CodingAgentClickHouseAsReader,
+  startCodingAgentClickHouseAsReader,
   testClickHouseUrl,
 } from "./support/clickhouse-endpoint.support.ts";
 
@@ -28,9 +29,11 @@ const never = `${tag}-never`;
 const now = Date.now();
 
 let ch: ClickHouseClient;
+let migrated: CodingAgentClickHouseAsReader;
 let repository: CodingAgentSessionClickHouseRepository;
 
-function queryClient(client: ClickHouseClient): ClickHouseQueryClient {
+/** Reads only, as the app reader: the system side refuses every insert and command. */
+function queryClient(client: ClickHouseClient, readerDriver: QueryDriver): ClickHouseQueryClient {
   const driver: QueryDriver = {
     async execute(request) {
       const result = await client.query({
@@ -44,7 +47,7 @@ function queryClient(client: ClickHouseClient): ClickHouseQueryClient {
     insert: () => Promise.reject(new Error("the usage count never inserts")),
     command: () => Promise.reject(new Error("the usage count never commands")),
   };
-  return new ClickHouseQueryClient({ tenantGuard: new TenantGuard(), driver });
+  return new ClickHouseQueryClient({ tenantGuard: new TenantGuard(), driver, readerDriver });
 }
 
 const clock = (ms: number): string => new Date(ms).toISOString().replace("T", " ").replace("Z", "");
@@ -89,9 +92,10 @@ describe.skipIf(!clickHouseUrl)(
     const oldMs = now - 40 * DAY_MS;
 
     beforeAll(async () => {
-      ch = createTestClickHouseClient(clickHouseUrl as URL);
+      migrated = await startCodingAgentClickHouseAsReader({ suite: "coding-agent-usage-count" });
+      ch = migrated.ch;
       repository = CodingAgentSessionClickHouseRepository.create({
-        clickhouse: queryClient(ch),
+        clickhouse: queryClient(ch, migrated.readerDriver),
         defaultTraceRetentionDays: 30,
         metrics: NoopCodingAgentReadMetricsService.create(),
         clock: new TestClock(now),
@@ -99,7 +103,7 @@ describe.skipIf(!clickHouseUrl)(
       await foldSession({ sessionId: `${tag}-recent`, startedAtMs: recentMs, version: 1 });
       await foldSession({ sessionId: `${tag}-recent`, startedAtMs: recentMs, version: 2 });
       await foldSession({ sessionId: `${tag}-old`, startedAtMs: oldMs, version: 1 });
-    }, 120_000);
+    }, 240_000);
 
     afterAll(async () => {
       if (!ch) return;
@@ -107,7 +111,7 @@ describe.skipIf(!clickHouseUrl)(
         query: "ALTER TABLE coding_agent_sessions DELETE WHERE TenantId = {install:String}",
         query_params: { install },
       });
-      await ch.close();
+      await migrated.close();
     });
 
     describe("given a coding agent session folded twice and a session from forty days ago", () => {

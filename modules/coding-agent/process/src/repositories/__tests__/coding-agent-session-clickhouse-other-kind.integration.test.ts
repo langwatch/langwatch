@@ -6,17 +6,15 @@ import { randomUUID } from "node:crypto";
 
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
-import {
-  readyIdIndexedClientDouble,
-  vendorQueryClient,
-} from "@langwatch/clickhouse-client/testing";
+import { readyIdIndexedClientDouble } from "@langwatch/clickhouse-client/testing";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { session } from "../../__tests__/fixtures/coding-agent.fixture.ts";
 import { NoopCodingAgentReadMetricsService } from "../../__tests__/support/coding-agent-read-metrics-noop.service.ts";
 import type { CodingAgentClock } from "../../services/coding-agent-clock.service.ts";
 import {
-  createTestClickHouseClient,
+  type CodingAgentClickHouseAsReader,
+  startCodingAgentClickHouseAsReader,
   testClickHouseUrl,
 } from "../clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
 import { CODING_AGENT_ID_INDEXES } from "../clickhouse/clickhouse.coding-agent-id-indexes.database.ts";
@@ -39,6 +37,7 @@ class FixedClock implements CodingAgentClock {
 }
 
 let ch: ClickHouseClient;
+let migrated: CodingAgentClickHouseAsReader;
 let sessions: CodingAgentSessionClickHouseRepository;
 /** The same repository while the id index's fill has not finished. */
 let unready: CodingAgentSessionClickHouseRepository;
@@ -53,8 +52,9 @@ const repositoryOver = (clickhouse: ClickHouseQueryClient) =>
 
 beforeAll(async () => {
   if (clickHouseUrl === null) return;
-  ch = createTestClickHouseClient(clickHouseUrl);
-  const vendor = vendorQueryClient({ vendor: ch, indexes: CODING_AGENT_ID_INDEXES });
+  migrated = await startCodingAgentClickHouseAsReader({ suite: "coding-agent-other-kind" });
+  ch = migrated.ch;
+  const vendor = migrated.queryClient;
   sessions = repositoryOver(
     await readyIdIndexedClientDouble({
       indexes: CODING_AGENT_ID_INDEXES,
@@ -65,7 +65,7 @@ beforeAll(async () => {
     }),
   );
   unready = repositoryOver(vendor);
-});
+}, 240_000);
 
 afterAll(async () => {
   if (clickHouseUrl === null) return;
@@ -75,7 +75,7 @@ afterAll(async () => {
       query_params: { tenants },
     });
   }
-  await ch.close();
+  await migrated.close();
 });
 
 const store = (tenantId: string, sessionId: string, auxiliary: boolean) =>

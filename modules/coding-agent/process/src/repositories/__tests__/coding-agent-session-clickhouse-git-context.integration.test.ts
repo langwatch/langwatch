@@ -6,18 +6,16 @@
 import { randomUUID } from "node:crypto";
 
 import type { ClickHouseClient } from "@clickhouse/client";
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
-import { vendorQueryClient } from "@langwatch/clickhouse-client/testing";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { session } from "../../__tests__/fixtures/coding-agent.fixture.ts";
 import { NoopCodingAgentReadMetricsService } from "../../__tests__/support/coding-agent-read-metrics-noop.service.ts";
 import type { CodingAgentClock } from "../../services/coding-agent-clock.service.ts";
 import {
-  createTestClickHouseClient,
+  type CodingAgentClickHouseAsReader,
+  startCodingAgentClickHouseAsReader,
   testClickHouseUrl,
 } from "../clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
-import { CODING_AGENT_ID_INDEXES } from "../clickhouse/clickhouse.coding-agent-id-indexes.database.ts";
 import { CodingAgentSessionClickHouseRepository } from "../clickhouse/clickhouse.coding-agent-session.repository.ts";
 import { CodingAgentTraceSessionClickHouseRepository } from "../clickhouse/clickhouse.coding-agent-trace-session.repository.ts";
 import { SessionMetricSeriesClickHouseRepository } from "../clickhouse/clickhouse.session-metric-series.repository.ts";
@@ -35,32 +33,30 @@ const tenantId = `${tag}-project`;
 const baseMs = Date.now();
 
 let ch: ClickHouseClient;
+let migrated: CodingAgentClickHouseAsReader;
 let sessions: CodingAgentSessionClickHouseRepository;
 let traceSessions: CodingAgentTraceSessionClickHouseRepository;
 let metricSeries: SessionMetricSeriesClickHouseRepository;
 
-function queryClient(client: ClickHouseClient): ClickHouseQueryClient {
-  return vendorQueryClient({ vendor: client, indexes: CODING_AGENT_ID_INDEXES });
-}
-
-beforeAll(() => {
+beforeAll(async () => {
   if (clickHouseUrl === null) return;
-  ch = createTestClickHouseClient(clickHouseUrl);
+  migrated = await startCodingAgentClickHouseAsReader({ suite: "coding-agent-git-context" });
+  ch = migrated.ch;
   sessions = CodingAgentSessionClickHouseRepository.create({
-    clickhouse: queryClient(ch),
+    clickhouse: migrated.queryClient,
     defaultTraceRetentionDays: 30,
     metrics: NoopCodingAgentReadMetricsService.create(),
     clock: new FixedClock(),
   });
   traceSessions = CodingAgentTraceSessionClickHouseRepository.create({
-    clickhouse: queryClient(ch),
+    clickhouse: migrated.queryClient,
     defaultTraceRetentionDays: 30,
   });
   metricSeries = SessionMetricSeriesClickHouseRepository.create({
-    clickhouse: queryClient(ch),
+    clickhouse: migrated.queryClient,
     defaultTraceRetentionDays: 30,
   });
-});
+}, 240_000);
 
 afterAll(async () => {
   if (clickHouseUrl === null) return;
@@ -72,7 +68,7 @@ afterAll(async () => {
     query: "ALTER TABLE session_metric_series DELETE WHERE TenantId = {tenantId:String}",
     query_params: { tenantId },
   });
-  await ch.close();
+  await migrated.close();
 });
 
 describe.skipIf(clickHouseUrl === null)("coding_agent_sessions git context round-trip", () => {

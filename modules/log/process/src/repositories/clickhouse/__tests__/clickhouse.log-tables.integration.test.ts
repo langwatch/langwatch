@@ -7,13 +7,16 @@
 import { randomUUID } from "node:crypto";
 
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
-import { ClickHouseQueryClient, type QueryDriver, TenantGuard } from "@langwatch/clickhouse-client";
 import type { ClickHouseTableFacts } from "@langwatch/clickhouse-client/builder";
 import {
   migrateTestClickHouseOnce,
   startTestClickHouseEndpoints,
 } from "@langwatch/clickhouse-client/testing";
 import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
+import {
+  provisionTestAppReader,
+  type TestAppReader,
+} from "@langwatch/test-harness/clickhouse-app-reader";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { ClickHouseCanonicalLogRecordAppendRepository } from "../clickhouse.canonical-log-record-append.repository.ts";
@@ -34,12 +37,15 @@ const bindingOf = (type: string): string =>
     .replace(/^FixedString\(\d+\)$/, "String");
 
 let ch: ClickHouseClient | undefined;
+let appReader: TestAppReader | undefined;
 
 beforeAll(async () => {
+  // The reader's names are server-wide, so this suite reads on its own container (ADR-202).
+  const { LANGWATCH_TEST_CLICKHOUSE_URL: _native, ...containerOnly } = process.env;
   const [endpoint] = await startTestClickHouseEndpoints({
     suite: "log-tables",
     names: ["schema"],
-    environment: process.env,
+    environment: containerOnly,
   });
   if (!endpoint) throw new Error("No ClickHouse endpoint was provisioned for log's descriptors");
   await migrateTestClickHouseOnce({
@@ -58,9 +64,11 @@ beforeAll(async () => {
     },
   });
   ch = createClient({ url: endpoint.url });
-}, 120_000);
+  appReader = await provisionTestAppReader({ endpoint, environment: process.env });
+}, 180_000);
 
 afterAll(async () => {
+  await appReader?.close();
   await ch?.close();
 });
 
@@ -95,28 +103,6 @@ describe("log's descriptors against the migrated schema", () => {
 });
 
 const METERED_TABLES = ["log_records"] as const;
-
-/** The routed member over the migrated test server, as the process hands it to the module. */
-function queryClientOver(client: ClickHouseClient): ClickHouseQueryClient {
-  const driver: QueryDriver = {
-    async execute(request) {
-      const result = await client.query({
-        query: request.sql,
-        format: "JSONEachRow",
-        ...(request.params === undefined ? {} : { query_params: request.params }),
-        ...(request.settings === undefined ? {} : { clickhouse_settings: request.settings }),
-      });
-      return { rows: await result.json() };
-    },
-    async insert(request) {
-      await client.insert({ table: request.table, values: request.rows, format: "JSONEachRow" });
-    },
-    async command(request) {
-      await client.command({ query: request.sql });
-    },
-  };
-  return new ClickHouseQueryClient({ tenantGuard: new TenantGuard(), driver });
-}
 
 /** Main's meter read: the raw `_size_bytes` sum over one tenant's rows in each metered table. */
 async function rawStoredBytes(tenantId: string): Promise<number> {
@@ -164,7 +150,7 @@ describe("log's stored bytes against the migrated schema", () => {
 
   /** @scenario "Log's stored bytes count only this project's rows" */
   it("sums this project's `_size_bytes` as main's raw read does, without the other tenant's", async () => {
-    const clickhouse = queryClientOver(ch!);
+    const clickhouse = appReader!.reader;
     const bytes = await ClickHouseCanonicalLogRecordAppendRepository.create({
       resolveClient: ClickHouseCanonicalLogRecordAppendRepository.resolverOver(clickhouse),
       clickhouse,

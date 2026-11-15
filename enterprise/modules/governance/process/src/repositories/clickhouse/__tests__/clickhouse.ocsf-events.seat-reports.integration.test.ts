@@ -9,12 +9,14 @@
  * Spec: specs/governance/governance-cost-screen.feature
  */
 import type { ClickHouseClient } from "@clickhouse/client";
-import { vendorQueryClient } from "@langwatch/clickhouse-client/testing";
 import { Temporal } from "@langwatch/time";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { startMigratedClickHouse } from "../../../__tests__/migrated-clickhouse.harness.ts";
+import {
+  type MigratedClickHouseAsReader,
+  startMigratedClickHouseAsReader,
+} from "../../../__tests__/migrated-clickhouse.harness.ts";
 import { OCSF_ACTIVITY, OCSF_SEVERITY } from "../../../rules/ocsf-codes.rules.ts";
 import type { GovernanceOcsfEvent } from "../../governance.repositories.ts";
 import { memberClickHouseResolver } from "../clickhouse.governance-clickhouse.repositories.ts";
@@ -32,6 +34,7 @@ const SOURCE_ID = `is-${run}`;
 const SKU = "AGENT_SEAT_USL";
 
 let client: ClickHouseClient;
+let migrated: MigratedClickHouseAsReader;
 let repository: ClickHouseOcsfEventsRepository;
 
 function seatReport({
@@ -92,10 +95,11 @@ describe.skipIf(!enabled)("the seat read against a real ClickHouse", () => {
   const tenants = { pool: `gov-pool-${run}`, twice: `gov-twice-${run}` };
 
   beforeAll(async () => {
-    client = await startMigratedClickHouse({ suite: "governance-seat-reports" });
-    // The process's client over the suite's connection: built reads carry the tenant setting.
+    migrated = await startMigratedClickHouseAsReader({ suite: "governance-seat-reports" });
+    client = migrated.client;
+    // As the worker holds it: built reads go as the app reader, inserts as the system.
     repository = ClickHouseOcsfEventsRepository.create(
-      memberClickHouseResolver(vendorQueryClient({ vendor: client, indexes: [] })),
+      memberClickHouseResolver(migrated.queryClient),
     );
     await client.command({ query: "SYSTEM STOP MERGES governance_ocsf_events" });
   }, 180_000);
@@ -103,7 +107,7 @@ describe.skipIf(!enabled)("the seat read against a real ClickHouse", () => {
   afterAll(async () => {
     if (!client) return;
     await client.command({ query: "SYSTEM START MERGES governance_ocsf_events" });
-    await client.close();
+    await migrated.close();
   }, 60_000);
 
   describe("given a licence pool recorded on an earlier day and again on a later day", () => {

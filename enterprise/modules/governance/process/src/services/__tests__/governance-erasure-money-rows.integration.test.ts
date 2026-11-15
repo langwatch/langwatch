@@ -14,7 +14,7 @@ import { ClickHouseQueryClient, type QueryDriver, TenantGuard } from "@langwatch
 import {
   migrateTestClickHouseOnce,
   startTestClickHouseEndpoints,
-  vendorQueryClient,
+  vendorQueryDriver,
 } from "@langwatch/clickhouse-client/testing";
 import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
 import {
@@ -26,6 +26,7 @@ import { Temporal } from "@langwatch/time";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { appReaderOver } from "../../__tests__/migrated-clickhouse.harness.ts";
 import { observed } from "../../eventing/__tests__/governance-cost-rollup.fixtures.ts";
 import { GovernanceCostChargeMapProjection } from "../../eventing/governance-cost-charge.projection.ts";
 import { GovernanceCostRollupFoldProjection } from "../../eventing/governance-cost-rollup.projection.ts";
@@ -48,11 +49,13 @@ const SECOND_DAY_MS = Date.UTC(2026, 7, 21, 10);
 const ERASED_AT = Temporal.Instant.from("2026-09-02T00:00:00Z");
 
 let clickhouse: ClickHouseClient;
+let appReader: Awaited<ReturnType<typeof appReaderOver>>;
 let rollup: ClickHouseGovernanceCostRollupRepository;
 let charges: ClickHouseGovernanceCostChargeRepository;
 let rollupErasure: ClickHouseRollupErasureRepository;
 
-function queryClient(raw: ClickHouseClient): ClickHouseQueryClient {
+/** The system side refuses inserts; tenant reads go as the app reader. */
+function queryClient(raw: ClickHouseClient, readerDriver: QueryDriver): ClickHouseQueryClient {
   const driver: QueryDriver = {
     async execute(request) {
       const result = await raw.query({
@@ -71,7 +74,7 @@ function queryClient(raw: ClickHouseClient): ClickHouseQueryClient {
       });
     },
   };
-  return new ClickHouseQueryClient({ tenantGuard: new TenantGuard(), driver });
+  return new ClickHouseQueryClient({ tenantGuard: new TenantGuard(), driver, readerDriver });
 }
 
 /** One organization's governance area, holding an observed spend per day for two spenders. */
@@ -242,10 +245,12 @@ describe.skipIf(
   ),
 )("erasing a person's money rows over a real ClickHouse", () => {
   beforeAll(async () => {
+    // The reader's names are server-wide, so this suite reads on its own container (ADR-202).
+    const { LANGWATCH_TEST_CLICKHOUSE_URL: _native, ...containerOnly } = process.env;
     const [endpoint] = await startTestClickHouseEndpoints({
       suite: "governance-erasure-money",
       names: ["money"],
-      environment: process.env,
+      environment: containerOnly,
     });
     if (!endpoint) throw new Error("No ClickHouse endpoint was provisioned for the erasure suite");
     await migrateTestClickHouseOnce({
@@ -272,16 +277,23 @@ describe.skipIf(
       },
     });
     clickhouse = createClient({ url: endpoint.url });
+    appReader = await appReaderOver({
+      endpoint,
+      system: vendorQueryDriver({ vendor: clickhouse }),
+    });
     rollup = ClickHouseGovernanceCostRollupRepository.create(
-      memberClickHouseResolver(vendorQueryClient({ vendor: clickhouse, indexes: [] })),
+      memberClickHouseResolver(appReader.queryClient),
     );
     charges = ClickHouseGovernanceCostChargeRepository.create(
-      memberClickHouseResolver(vendorQueryClient({ vendor: clickhouse, indexes: [] })),
+      memberClickHouseResolver(appReader.queryClient),
     );
-    rollupErasure = ClickHouseRollupErasureRepository.create(queryClient(clickhouse));
+    rollupErasure = ClickHouseRollupErasureRepository.create(
+      queryClient(clickhouse, appReader.readerDriver),
+    );
   }, 600_000);
 
   afterAll(async () => {
+    await appReader?.close();
     await clickhouse?.close();
   });
 

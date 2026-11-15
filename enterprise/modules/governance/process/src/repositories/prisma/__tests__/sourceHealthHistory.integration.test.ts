@@ -9,18 +9,20 @@ import { createClient, type ClickHouseClient } from "@clickhouse/client";
 import {
   migrateTestClickHouseOnce,
   startTestClickHouseEndpoints,
-  vendorQueryClient,
+  vendorQueryDriver,
 } from "@langwatch/clickhouse-client/testing";
 import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { appReaderOver } from "../../../__tests__/migrated-clickhouse.harness.ts";
 import { createActivityMonitorTestService } from "../../../__tests__/testing.ts";
 import { memberClickHouseResolver } from "../../clickhouse/clickhouse.governance-clickhouse.repositories.ts";
 
 const DAY_MS = 86_400_000;
 
 let clickhouse: ClickHouseClient;
+let appReader: Awaited<ReturnType<typeof appReaderOver>>;
 
 /** ISO with its zone, so the server's own time zone cannot shift the row. */
 function timestamp(ms: number): string {
@@ -59,10 +61,12 @@ function rowFor({
 
 describe("source health during a historical provider import", () => {
   beforeAll(async () => {
+    // The reader's names are server-wide, so this suite reads on its own container (ADR-202).
+    const { LANGWATCH_TEST_CLICKHOUSE_URL: _native, ...containerOnly } = process.env;
     const [endpoint] = await startTestClickHouseEndpoints({
       suite: "governance-source-health",
       names: ["health"],
-      environment: process.env,
+      environment: containerOnly,
     });
     if (!endpoint) throw new Error("No ClickHouse endpoint was provisioned for the health suite");
     await migrateTestClickHouseOnce({
@@ -92,9 +96,14 @@ describe("source health during a historical provider import", () => {
       url: endpoint.url,
       clickhouse_settings: { date_time_input_format: "best_effort" },
     });
+    appReader = await appReaderOver({
+      endpoint,
+      system: vendorQueryDriver({ vendor: clickhouse }),
+    });
   }, 600_000);
 
   afterAll(async () => {
+    await appReader?.close();
     await clickhouse?.close();
   });
 
@@ -124,9 +133,7 @@ describe("source health during a historical provider import", () => {
       });
       const repository = createActivityMonitorTestService({
         prisma: prismaDouble({ project: { findFirst: async () => ({ id: tenantId }) } }),
-        clickhouse: memberClickHouseResolver(
-          vendorQueryClient({ vendor: clickhouse, indexes: [] }),
-        ),
+        clickhouse: memberClickHouseResolver(appReader.queryClient),
         traces: {
           getAttributedTraceRecency: async () => ({ counts: [0, 0, 0], lastOccurredAtMs: 0 }),
         },

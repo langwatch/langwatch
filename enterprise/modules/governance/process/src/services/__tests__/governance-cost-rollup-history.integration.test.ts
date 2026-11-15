@@ -12,7 +12,7 @@ import { createClient, type ClickHouseClient } from "@clickhouse/client";
 import {
   migrateTestClickHouseOnce,
   startTestClickHouseEndpoints,
-  vendorQueryClient,
+  vendorQueryDriver,
 } from "@langwatch/clickhouse-client/testing";
 import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
 import {
@@ -26,6 +26,7 @@ import { type Instant, Temporal } from "@langwatch/time";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { appReaderOver } from "../../__tests__/migrated-clickhouse.harness.ts";
 import { GovernanceCostRollupFoldProjection } from "../../eventing/governance-cost-rollup.projection.ts";
 import { GovernanceCostRollupStore } from "../../eventing/governance-cost-rollup.store.ts";
 import { PulledUsagePricingService } from "../../features/ingestion-pull/services/pulled-usage-pricing.service.ts";
@@ -44,6 +45,7 @@ const RESTATED_READ = Temporal.Instant.from("2026-01-17T09:00:00.000Z");
 const NANO = 1_000_000_000;
 
 let clickhouse: ClickHouseClient;
+let appReader: Awaited<ReturnType<typeof appReaderOver>>;
 let repository: ClickHouseGovernanceCostRollupRepository;
 
 const records = PulledUsageRecordService.create(
@@ -163,10 +165,12 @@ describe.skipIf(
   ),
 )("the cost summary over a real ClickHouse", () => {
   beforeAll(async () => {
+    // The reader's names are server-wide, so this suite reads on its own container (ADR-202).
+    const { LANGWATCH_TEST_CLICKHOUSE_URL: _native, ...containerOnly } = process.env;
     const [endpoint] = await startTestClickHouseEndpoints({
       suite: "governance-cost-history",
       names: ["history"],
-      environment: process.env,
+      environment: containerOnly,
     });
     if (!endpoint) throw new Error("No ClickHouse endpoint was provisioned for the history suite");
     await migrateTestClickHouseOnce({
@@ -193,8 +197,12 @@ describe.skipIf(
       },
     });
     clickhouse = createClient({ url: endpoint.url });
+    appReader = await appReaderOver({
+      endpoint,
+      system: vendorQueryDriver({ vendor: clickhouse }),
+    });
     repository = ClickHouseGovernanceCostRollupRepository.create(
-      memberClickHouseResolver(vendorQueryClient({ vendor: clickhouse, indexes: [] })),
+      memberClickHouseResolver(appReader.queryClient),
     );
     await clickhouse.command({ query: "SYSTEM STOP MERGES governance_cost_rollup_1d" });
   }, 600_000);
@@ -202,6 +210,7 @@ describe.skipIf(
   afterAll(async () => {
     if (!clickhouse) return;
     await clickhouse.command({ query: "SYSTEM START MERGES governance_cost_rollup_1d" });
+    await appReader?.close();
     await clickhouse.close();
   });
 
