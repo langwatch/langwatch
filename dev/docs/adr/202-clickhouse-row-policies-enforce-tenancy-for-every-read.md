@@ -168,6 +168,11 @@ Migration path: about 139 non-test TypeScript files under ClickHouse repository 
 19. Analytics' dashboard reads move onto the shared builder in this PR; there is no second, analytics-only renderer.
 20. The storage meter asks each owning module for its own stored bytes through that module's `*Api`; data-retention reads no other module's table.
 21. LangWatchQL views are reads: the table-ownership policy counts each view's source table as read by analytics.
+22. The eventing framework reports `event_log`'s stored bytes to the storage meter; `stored_log_records` no longer counts in the figure.
+23. The legacy stored-object owner lookup is deleted with its four scenarios; id-only links stay unresolvable.
+24. Gateway keeps every version of a spend row in one month and turns id-index pruning back on under `FINAL`, in this PR.
+25. Other modules hand `TraceApi` a filter as written, never compiled text; trace compiles it inside each read, and `translateTraceFilter` only validates.
+26. Analytics narrows filter options with its own filter translator on the builder; `TraceApi.translateLegacyFilters` goes.
 
 ## Open questions for Alex
 
