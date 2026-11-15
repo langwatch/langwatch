@@ -339,11 +339,10 @@ export function ensureClaudeProjectTelemetryPin({
   const target = claudeProjectSettingsTarget(cwd);
   const base = { path: target.path, displayPath: target.displayPath };
   const tracking = claudeLocalSettingsTracking(cwd);
-  if (tracking === "unknown") return { action: "unverified", ...base };
-  if (tracking === "tracked") {
-    // A key left by an older run would still outrank this run's env: take ours out.
+  if (tracking !== "untracked") {
+    // No key goes in; one an older run left would still outrank this run's env, so it comes out.
     stripLangwatchPinEnv(target);
-    return { action: "tracked", ...base };
+    return { action: tracking === "tracked" ? "tracked" : "unverified", ...base };
   }
   // Every run, not only on create: a pin written before the exclude existed, or
   // into a file the user made, would otherwise stay one `git add .` from history.
@@ -401,11 +400,16 @@ function gitStatus(cwd: string, args: string[]): number | null | "missing" {
   return run.status;
 }
 
-/** Whether git tracks the pin file; a key written into a tracked one lands in the next commit. */
+/**
+ * Whether git tracks the pin file; a key written into a tracked one lands in the next commit.
+ * Only a confirmed answer, no git or no repository counts as untracked; other errors are unknown.
+ */
 function claudeLocalSettingsTracking(cwd: string): "tracked" | "untracked" | "unknown" {
   const status = gitStatus(cwd, ["ls-files", "--error-unmatch", "--", CLAUDE_LOCAL_SETTINGS]);
   if (status === 0) return "tracked";
-  return status === null ? "unknown" : "untracked";
+  if (status === 1 || status === "missing") return "untracked";
+  if (status === null) return "unknown";
+  return gitStatus(cwd, ["rev-parse", "--git-dir"]) === 128 ? "untracked" : "unknown";
 }
 
 /** Removes the langwatch telemetry env from the pin file, keeping the file and the rest of it. */

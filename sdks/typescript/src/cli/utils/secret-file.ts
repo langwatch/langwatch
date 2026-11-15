@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
 
 /** Owner read and write only: what any file holding a key or token is written as. */
-export const SECRET_FILE_MODE = 0o600;
+const SECRET_FILE_MODE = 0o600;
 
 /**
  * Write a file holding a key or token, owner-only. `mode` applies only on create, so an existing

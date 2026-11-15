@@ -121,6 +121,15 @@ Feature: The latest login wins over stale persisted telemetry wiring
       When the user runs `langwatch claude`
       Then the ingest key is not written into .claude/settings.local.json
 
+    @unit
+    Scenario: a git error is not taken as an untracked pin file
+      Given git tracks .claude/settings.local.json
+      And it carries a langwatch telemetry env from a previous login
+      And git fails reading its index
+      When the user runs `langwatch claude`
+      Then the ingest key is not written into that file
+      And the previous login's langwatch telemetry env is removed from it
+
     Scenario: the pin is refreshed when a different login runs next
       Given .claude/settings.local.json carries a pin from a previous login
       When the user runs `langwatch claude` under a new login

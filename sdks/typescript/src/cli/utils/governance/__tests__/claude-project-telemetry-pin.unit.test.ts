@@ -147,6 +147,29 @@ describe("ensureClaudeProjectTelemetryPin", () => {
       });
     });
 
+    describe("and git fails reading its index", () => {
+      /** @scenario "a git error is not taken as an untracked pin file" */
+      it("writes no key and takes out the previous login's env", () => {
+        git("init", "-q");
+        installAppEnv(
+          claudeProjectSettingsTarget(temp.cwd),
+          buildOtelEnvBlock("claude", STALE_ENDPOINT, STALE_TOKEN),
+        );
+        git("add", "-f", ".claude/settings.local.json");
+        fs.writeFileSync(path.join(temp.cwd, ".git", "index"), "not an index");
+
+        const result = ensureClaudeProjectTelemetryPin({
+          vars: currentClaudeVars(),
+          cwd: temp.cwd,
+        });
+
+        const after = fs.readFileSync(pinPath(), "utf8");
+        expect(result.action).toBe("unverified");
+        expect(after).not.toContain(CURRENT_TOKEN);
+        expect(after).not.toContain(STALE_TOKEN);
+      });
+    });
+
     describe("and git tracks the pin file", () => {
       /** @scenario "no key is written into a pin file git tracks" */
       it("writes no key into it and reports it as tracked", () => {
