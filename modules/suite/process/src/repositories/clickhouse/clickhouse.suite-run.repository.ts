@@ -5,6 +5,7 @@ import {
   type ReaderReadStatement,
   tenantScope,
 } from "@langwatch/clickhouse-client/builder";
+import { STORAGE_METER_READ_SETTINGS } from "@langwatch/data-retention-contract/retention-tables";
 import {
   classifyClickHouseError,
   createTenantId,
@@ -136,6 +137,16 @@ export class ClickHouseSuiteRunRepository implements ProjectionStore<
       declaresFullScan: true,
     });
     return rows.map((row) => ClickHouseSuiteRunRepository.mapRowToState(row));
+  }
+
+  /** One tenant's `_size_bytes` in `suite_runs`, every stored row counted, as the meter counts. */
+  async getStoredBytes({ tenantId }: { tenantId: string }): Promise<number> {
+    const { rows } = await this.options.clickhouse.read({
+      statement: ClickHouseSuiteRunRepository.storedBytesRead({ tenantId }),
+      table: TABLE_NAME,
+      declaresFullScan: true,
+    });
+    return Number(rows[0]?.bytes ?? 0);
   }
 
   async storeProjection(
@@ -302,6 +313,19 @@ export class ClickHouseSuiteRunRepository implements ProjectionStore<
       .where(({ oneOf }) => oneOf(suiteRuns.Status, [...OPEN_SUITE_RUN_STATUSES]))
       .orderBy(suiteRuns.BatchRunId, "ASC")
       .limitBy(1, suiteRuns.BatchRunId)
+      .build();
+  }
+
+  /** The tenant's summed `_size_bytes`, under the meter's thread and time caps. */
+  static storedBytesRead({
+    tenantId,
+  }: {
+    tenantId: string;
+  }): ReaderReadStatement<{ bytes: number | string }> {
+    return clickhouseRead({ scope: tenantScope.single({ tenantId }) })
+      .from(suiteRuns)
+      .select({ bytes: fn.sum(suiteRuns._size_bytes) })
+      .settings(STORAGE_METER_READ_SETTINGS)
       .build();
   }
 

@@ -27,11 +27,14 @@ import type {
   SuiteRunResult,
   SuiteRunPlanInput,
   SuiteRunPlanResult,
+  SuiteStoredBytesInput,
   UpdateSuiteCommand,
 } from "./index.ts";
 
 /** Callable capability exposed by the composed Suite application. */
 export interface SuiteApi {
+  /** The sum of `_size_bytes` over suite's own tables for one project; a store failure throws. */
+  getStoredBytes(input: SuiteStoredBytesInput): Promise<number>;
   listByIds(input: { projectId: string; ids: readonly string[] }): Promise<Suite[]>;
   list(input: { projectId: string; includeArchived?: boolean }): Promise<Suite[]>;
   /** The project's run plans with their own evaluators and a link into the interface it reads. */

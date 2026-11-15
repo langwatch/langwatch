@@ -249,3 +249,14 @@ export function generateBatchRunId(): string {
 export function generateScenarioRunId(): string {
   return generate("scenariorun").toString();
 }
+
+const scenarioStoredBytesInputSchemaDefinition = z
+  .object({ projectId: z.string().min(1) })
+  .strict();
+export interface ScenarioStoredBytesInputSchema extends Named<
+  typeof scenarioStoredBytesInputSchemaDefinition
+> {}
+/** One project's question to the storage meter (ADR-202 Decided 20). */
+export const scenarioStoredBytesInputSchema: ScenarioStoredBytesInputSchema =
+  scenarioStoredBytesInputSchemaDefinition;
+export type ScenarioStoredBytesInput = z.infer<typeof scenarioStoredBytesInputSchema>;

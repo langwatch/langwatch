@@ -27,6 +27,12 @@ export class MemorySuiteRunProcessingRepository implements SuiteRunProcessingRep
     const held = await this.runs.findForTenant(tenantId);
     return held.map((projection) => projection.data).filter((run) => isOpenSuiteRun(run));
   }
+
+  /** The JSON byte length of the tenant's held runs, standing in for `_size_bytes`. */
+  async getStoredBytes({ tenantId }: { tenantId: string }): Promise<number> {
+    const held = await this.runs.findForTenant(tenantId);
+    return held.reduce((total, run) => total + Buffer.byteLength(JSON.stringify(run)), 0);
+  }
 }
 
 export class MemorySuiteRepositories {

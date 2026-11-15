@@ -88,3 +88,14 @@ export interface EvaluationOutcomesQuerySchema extends Named<
 export const evaluationOutcomesQuerySchema: EvaluationOutcomesQuerySchema =
   evaluationOutcomesQuerySchemaDefinition;
 export type EvaluationOutcomesQuery = z.infer<typeof evaluationOutcomesQuerySchema>;
+
+const evaluationStoredBytesInputSchemaDefinition = z
+  .object({ projectId: z.string().min(1) })
+  .strict();
+export interface EvaluationStoredBytesInputSchema extends Named<
+  typeof evaluationStoredBytesInputSchemaDefinition
+> {}
+/** One project's question to the storage meter (ADR-202 Decided 20). */
+export const evaluationStoredBytesInputSchema: EvaluationStoredBytesInputSchema =
+  evaluationStoredBytesInputSchemaDefinition;
+export type EvaluationStoredBytesInput = z.infer<typeof evaluationStoredBytesInputSchema>;

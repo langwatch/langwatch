@@ -62,6 +62,7 @@ import {
   type SuiteRunInput,
   type SuiteRunPlanInput,
   type SuiteRunPlanResult,
+  type SuiteStoredBytesInput,
   type UpdateSuiteCommand,
   OrganizationNotFoundForProjectError,
 } from "@langwatch/suite-contract";
@@ -71,6 +72,7 @@ import {
   buildSuiteRunProcessingPipeline,
   type SuiteRunProcessingPipeline,
 } from "../eventing/suite-run-processing.pipeline.ts";
+import type { SuiteRunProcessingRepository } from "../repositories/suite-run-processing.repository.ts";
 import type { SuiteRepositories } from "../repositories/suite.repositories.ts";
 import { suitePlatformUrl } from "../rules/suite-platform-url.rules.ts";
 import { AgentOwnerNamesService } from "../services/agent-owner-names.service.ts";
@@ -178,6 +180,7 @@ export class SuiteModule implements SuiteApi {
       ...dependencies,
       suites,
       runItems,
+      runProcessing: repositories.runProcessing,
       runPlans: SuiteModule.buildRunPlans({
         repositories,
         dependencies,
@@ -280,6 +283,7 @@ export class SuiteModule implements SuiteApi {
       ...setup.dependencies,
       suites,
       runItems,
+      runProcessing: setup.repositories.runProcessing,
       runPlans: SuiteModule.buildRunPlans({
         repositories: setup.repositories,
         dependencies: setup.dependencies,
@@ -294,6 +298,7 @@ export class SuiteModule implements SuiteApi {
   readonly #pipeline: SuiteRunProcessingPipeline | undefined;
   readonly #runItems: SuiteRunItemCommandsService;
   readonly #runPlans: RunPlanReadService;
+  readonly #runProcessing: Pick<SuiteRunProcessingRepository, "getStoredBytes">;
   readonly #connectedTargets: ConnectedTargetService;
 
   private constructor(
@@ -301,11 +306,13 @@ export class SuiteModule implements SuiteApi {
       suites: SuiteService;
       runItems: SuiteRunItemCommandsService;
       runPlans: RunPlanReadService;
+      runProcessing: Pick<SuiteRunProcessingRepository, "getStoredBytes">;
       publicBaseUrl: string | undefined;
       pipeline?: SuiteRunProcessingPipeline;
     },
   ) {
-    const { publicBaseUrl, pipeline, runItems, runPlans, ...rest } = dependencies;
+    const { publicBaseUrl, pipeline, runItems, runPlans, runProcessing, ...rest } = dependencies;
+    this.#runProcessing = runProcessing;
     this.#publicBaseUrl = publicBaseUrl;
     this.#pipeline = pipeline;
     this.#runItems = runItems;
@@ -371,6 +378,11 @@ export class SuiteModule implements SuiteApi {
   }
 
   // -- reads -----------------------------------------------------------------
+
+  /** The suite's stored bytes for one project, for data-retention's storage meter. */
+  getStoredBytes(input: SuiteStoredBytesInput): Promise<number> {
+    return this.#runProcessing.getStoredBytes({ tenantId: input.projectId });
+  }
 
   /** The project's run plans. */
   list(input: { projectId: string; includeArchived?: boolean }): Promise<Suite[]> {

@@ -310,3 +310,12 @@ export function extractSuiteId(setId: string): string | null {
   if (!isSuiteSetId(setId)) return null;
   return setId.slice(INTERNAL_SET_PREFIX.length, -SUITE_SET_SUFFIX.length);
 }
+
+const suiteStoredBytesInputSchemaDefinition = z.object({ projectId: z.string().min(1) }).strict();
+export interface SuiteStoredBytesInputSchema extends Named<
+  typeof suiteStoredBytesInputSchemaDefinition
+> {}
+/** One project's question to the storage meter (ADR-202 Decided 20). */
+export const suiteStoredBytesInputSchema: SuiteStoredBytesInputSchema =
+  suiteStoredBytesInputSchemaDefinition;
+export type SuiteStoredBytesInput = z.infer<typeof suiteStoredBytesInputSchema>;

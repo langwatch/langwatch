@@ -5,7 +5,10 @@
  * exists on the migrated schema with the type it is declared as, so a descriptor cannot drift
  * from goose.
  */
+import { randomUUID } from "node:crypto";
+
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
+import { ClickHouseQueryClient, type QueryDriver, TenantGuard } from "@langwatch/clickhouse-client";
 import type { ClickHouseTableFacts } from "@langwatch/clickhouse-client/builder";
 import {
   migrateTestClickHouseOnce,
@@ -14,6 +17,7 @@ import {
 import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { ClickHouseSuiteRunRepository } from "../clickhouse.suite-run.repository.ts";
 import { suiteRuns } from "../clickhouse.suite-runs.table.ts";
 
 const DESCRIPTORS: readonly { readonly $table: ClickHouseTableFacts }[] = [suiteRuns];
@@ -89,4 +93,87 @@ describe("suite's descriptors against the migrated schema", () => {
       );
     },
   );
+});
+
+const METERED_TABLES = ["suite_runs"] as const;
+
+/** The routed member over the migrated test server, as the process hands it to the module. */
+function queryClientOver(client: ClickHouseClient): ClickHouseQueryClient {
+  const driver: QueryDriver = {
+    async execute(request) {
+      const result = await client.query({
+        query: request.sql,
+        format: "JSONEachRow",
+        ...(request.params === undefined ? {} : { query_params: request.params }),
+        ...(request.settings === undefined ? {} : { clickhouse_settings: request.settings }),
+      });
+      return { rows: await result.json() };
+    },
+    async insert(request) {
+      await client.insert({ table: request.table, values: request.rows, format: "JSONEachRow" });
+    },
+    async command(request) {
+      await client.command({ query: request.sql });
+    },
+  };
+  return new ClickHouseQueryClient({ tenantGuard: new TenantGuard(), driver });
+}
+
+/** Main's meter read: the raw `_size_bytes` sum over one tenant's rows in each metered table. */
+async function rawStoredBytes(tenantId: string): Promise<number> {
+  let total = 0;
+  for (const table of METERED_TABLES) {
+    const result = await ch!.query({
+      query: `SELECT sum(_size_bytes) AS total FROM ${table} WHERE TenantId = {tenantId:String}`,
+      query_params: { tenantId },
+      format: "JSONEachRow",
+    });
+    const [row] = (await result.json()) as { total: string }[];
+    total += Number(row?.total ?? 0);
+  }
+  return total;
+}
+
+describe("suite's stored bytes against the migrated schema", () => {
+  const tag = randomUUID();
+  const ours = `${tag}-ours`;
+  const theirs = `${tag}-theirs`;
+
+  beforeAll(async () => {
+    const run = (tenantId: string, batchRunId: string) => ({
+      TenantId: tenantId,
+      ProjectionId: `${tenantId}-${batchRunId}`,
+      SuiteRunId: batchRunId,
+      BatchRunId: batchRunId,
+      ScenarioSetId: "__internal__suite_1__suite",
+      SuiteId: "suite_1",
+      Status: "IN_PROGRESS",
+    });
+    await ch!.insert({
+      table: "suite_runs",
+      values: [run(ours, "batch_1"), run(ours, "batch_2"), run(theirs, "batch_1")],
+      format: "JSONEachRow",
+    });
+  });
+
+  afterAll(async () => {
+    for (const table of METERED_TABLES) {
+      await ch?.command({
+        query: `ALTER TABLE ${table} DELETE WHERE TenantId IN ({tenants:Array(String)})`,
+        query_params: { tenants: [ours, theirs] },
+      });
+    }
+  });
+
+  /** @scenario "Suite's stored bytes count only this project's rows" */
+  it("sums this project's `_size_bytes` as main's raw read does, without the other tenant's", async () => {
+    const bytes = await ClickHouseSuiteRunRepository.create({
+      clickhouse: queryClientOver(ch!),
+      defaultRetentionDays: () => 30,
+    }).getStoredBytes({ tenantId: ours });
+
+    expect(bytes).toBeGreaterThan(0);
+    expect(bytes).toBe(await rawStoredBytes(ours));
+    expect(await rawStoredBytes(theirs)).toBeGreaterThan(0);
+  });
 });

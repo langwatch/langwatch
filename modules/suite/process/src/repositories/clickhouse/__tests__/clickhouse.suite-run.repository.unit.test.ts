@@ -223,5 +223,16 @@ describe("ClickHouseSuiteRunRepository", () => {
       expect(statement.sql).toContain("LIMIT 1 BY");
       expect(Object.values(statement.params)).toContainEqual([...OPEN_SUITE_RUN_STATUSES]);
     });
+
+    it("sums its one tenant's stored bytes under the meter's thread and time caps", () => {
+      const statement = ClickHouseSuiteRunRepository.storedBytesRead({ tenantId: "project_1" });
+
+      expect(statement.identity).toBe("reader");
+      expect(statement.kind).toBe("tenant");
+      expect(statement.tenantId).toBe("project_1");
+      expect(statement.settings.SQL_langwatch_tenant_ids).toBe("project_1");
+      expect(statement.sql).toContain("sum(_size_bytes)");
+      expect(statement.sql).toContain("SETTINGS max_threads = 2, max_execution_time = 45");
+    });
   });
 });

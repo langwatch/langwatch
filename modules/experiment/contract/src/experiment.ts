@@ -103,3 +103,14 @@ export const findOrCreateWorkflowExperimentInputSchema: FindOrCreateWorkflowExpe
 export type FindOrCreateWorkflowExperimentInput = z.infer<
   typeof findOrCreateWorkflowExperimentInputSchema
 >;
+
+const experimentStoredBytesInputSchemaDefinition = z
+  .object({ projectId: z.string().min(1) })
+  .strict();
+export interface ExperimentStoredBytesInputSchema extends Named<
+  typeof experimentStoredBytesInputSchemaDefinition
+> {}
+/** One project's question to the storage meter (ADR-202 Decided 20). */
+export const experimentStoredBytesInputSchema: ExperimentStoredBytesInputSchema =
+  experimentStoredBytesInputSchemaDefinition;
+export type ExperimentStoredBytesInput = z.infer<typeof experimentStoredBytesInputSchema>;
