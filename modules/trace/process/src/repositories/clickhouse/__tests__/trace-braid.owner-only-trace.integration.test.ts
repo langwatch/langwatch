@@ -10,7 +10,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { braidedProof } from "../../../__tests__/support/authorization-proofs.fixture.ts";
 import { TraceSummaryService } from "../../../features/read/services/trace-summary-read.service.ts";
-import { traceQueryTranslation } from "../../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
+import { traceFilterCompileFor } from "../../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
 import { TraceListClickHouseRepository } from "../trace-list.repository.ts";
 import { ClickHouseTraceSpanRepository } from "../trace-span.repository.ts";
 import { TraceSummaryClickHouseRepository } from "../trace-summary.repository.ts";
@@ -114,7 +114,7 @@ beforeAll(async () => {
   if (!clickHouseConfigured) return;
   ch = await startMigratedTraceClickHouse();
   const clickhouse = authorizedClickHouseFor(ch);
-  list = TraceListClickHouseRepository.create({ clickhouse });
+  list = TraceListClickHouseRepository.create({ clickhouse, reader: traceQueryClientFor(ch) });
   spans = ClickHouseTraceSpanRepository.create({ clickhouse: traceQueryClientFor(ch) });
   summaries = TraceSummaryService.create({
     repository: TraceSummaryClickHouseRepository.create({
@@ -163,23 +163,21 @@ async function listed({
   authorization: Authorization;
   queryText?: string;
 }) {
-  const filterWhere =
-    queryText === undefined
-      ? undefined
-      : (traceQueryTranslation.translateFilter({ queryText, timeRange: WINDOW }) ?? undefined);
+  const compileFilter =
+    queryText === undefined ? undefined : traceFilterCompileFor({ queryText, timeRange: WINDOW });
   const page = await list.listAll({
     authorization,
     timeRange: WINDOW,
     sort: { column: "OccurredAt", direction: "desc" },
     limit: 100,
     offset: 0,
-    filterWhere,
+    ...(compileFilter ? { compileFilter } : {}),
   });
   const count = await list.findCount({
     authorization,
     timeRange: WINDOW,
     since: WINDOW.from,
-    filterWhere,
+    ...(compileFilter ? { compileFilter } : {}),
   });
   return { traceIds: page.rows.map((row) => row.traceId), count };
 }

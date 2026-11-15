@@ -1,4 +1,3 @@
-import type { Authorization } from "@langwatch/authorization";
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
@@ -117,19 +116,6 @@ export interface TraceListFilter {
   hideExplorerOrigins?: boolean;
 }
 
-export interface TraceListQuery {
-  /** The proof the read is fenced by; the reader applies its tenant set. */
-  authorization: Authorization;
-  timeRange: { from: number; to: number; live?: boolean };
-  sort: TraceListSort;
-  limit: number;
-  /** Cursor takes precedence. Offset remains only for page-one/legacy callers. */
-  cursor?: TraceListCursor;
-  offset?: number;
-  /** Raw WHERE clause fragments + params from filter translator (plugged in later) */
-  filterWhere?: { sql: string; params: Record<string, unknown> };
-}
-
 /**
  * One page as the REPOSITORY answers it: the stored summary rows and the total. Distinct from
  * `TraceListPage` in `trace-list-view`, which is the page the LIST VIEW publishes — rows mapped
@@ -209,141 +195,6 @@ export interface BatchedFacetResult {
   categoricals: Record<string, CategoricalFacetResult>;
   ranges: Record<string, { min: number; max: number }>;
 }
-
-export interface TraceListRead {
-  listAll(query: TraceListQuery): Promise<TraceListRepositoryPage>;
-
-  findCount(params: {
-    authorization: Authorization;
-    timeRange: { from: number; to: number; live?: boolean };
-    since: number;
-    filterWhere?: { sql: string; params: Record<string, unknown> };
-  }): Promise<number>;
-
-  /**
-   * The traces matching the filter, newest first and capped, each named by tenant and trace id:
-   * two aggregate members may hold the same id (ADR-177). Deduped the IN-tuple way.
-   */
-  findTraceRefs(params: {
-    authorization: Authorization;
-    timeRange: { from: number; to: number; live?: boolean };
-    filterWhere?: { sql: string; params: Record<string, unknown> };
-    limit: number;
-  }): Promise<TraceRef[]>;
-
-  findDistinctValues(params: {
-    authorization: Authorization;
-    column: string;
-    prefix: string;
-    limit: number;
-  }): Promise<string[]>;
-
-  /**
-   * `filterWhere` on the facet reads below is the active trace filter, which
-   * every read scopes to its own table and applies after the version dedup.
-   * Absent for the unfiltered discover read.
-   */
-  findCategoricalFacet(params: {
-    authorization: Authorization;
-    timeRange: { from: number; to: number; live?: boolean };
-    table: FacetTableName;
-    timeColumn: string;
-    facetExpression: string;
-    limit: number;
-    offset: number;
-    prefix?: string;
-    filterWhere?: { sql: string; params: Record<string, unknown> };
-  }): Promise<CategoricalFacetResult>;
-
-  findCategoricalFacetRaw(params: {
-    authorization: Authorization;
-    query: TraceListFacetQuery;
-  }): Promise<CategoricalFacetResult>;
-
-  findRangeStatsForTable(params: {
-    authorization: Authorization;
-    timeRange: { from: number; to: number; live?: boolean };
-    table: FacetTableName;
-    timeColumn: string;
-    column: string;
-    filterWhere?: { sql: string; params: Record<string, unknown> };
-  }): Promise<{ min: number; max: number }>;
-
-  /**
-   * Distinct integer values + counts for a discrete range facet (one declared `isDiscrete:
-   * true` on its `RangeFacetDef`), ascending, capped at `limit`.
-   */
-  findDiscreteValues(params: {
-    authorization: Authorization;
-    timeRange: { from: number; to: number; live?: boolean };
-    table: FacetTableName;
-    timeColumn: string;
-    column: string;
-    limit: number;
-    filterWhere?: { sql: string; params: Record<string, unknown> };
-  }): Promise<DiscreteFacetResult>;
-
-  /**
-   * Compute multiple categorical and range facets over the same table scan.
-   * Categoricals share a single arrayJoin pass; ranges share a single agg pass.
-   * Used by `discover` to collapse ~25 parallel queries into ~2 per table.
-   */
-  findBatchedFacets(params: {
-    authorization: Authorization;
-    timeRange: { from: number; to: number; live?: boolean };
-    table: FacetTableName;
-    timeColumn: string;
-    categoricalSpecs: { key: string; expression: string }[];
-    rangeSpecs: { key: string; expression: string }[];
-    topN: number;
-    filterWhere?: { sql: string; params: Record<string, unknown> };
-  }): Promise<BatchedFacetResult>;
-
-  /**
-   * Distinct values for a single dynamic Attributes key, sampled for speed.
-   * Caller must validate `attributeKey` against an injection-safe whitelist —
-   * the repo trusts it.
-   */
-  findAttributeValues(params: {
-    authorization: Authorization;
-    timeRange: { from: number; to: number; live?: boolean };
-    attributeKey: string;
-    prefix?: string;
-    limit: number;
-    offset: number;
-  }): Promise<CategoricalFacetResult>;
-
-  /**
-   * Distinct values for a single event-attribute key, read from
-   * `stored_spans.Events.Attributes` — the store the `event.attribute.` filter actually
-   * queries.
-   */
-  findEventAttributeValues(params: {
-    authorization: Authorization;
-    timeRange: { from: number; to: number; live?: boolean };
-    attributeKey: string;
-    prefix?: string;
-    limit: number;
-    offset: number;
-  }): Promise<CategoricalFacetResult>;
-
-  /**
-   * Distinct values for a single span-attribute key, read from
-   * `stored_spans.SpanAttributes`. Same sampling strategy and
-   * injection-safety contract as {@link findAttributeValues}.
-   */
-  findSpanAttributeValues(params: {
-    authorization: Authorization;
-    timeRange: { from: number; to: number; live?: boolean };
-    attributeKey: string;
-    prefix?: string;
-    limit: number;
-    offset: number;
-  }): Promise<CategoricalFacetResult>;
-}
-
-/** Compatibility name for composition adapters; callers depend on the port. */
-export type TraceListRepository = TraceListRead;
 
 /**
  * Position-based reads are limited by depth (ClickHouse charges for skipped rows),

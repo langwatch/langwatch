@@ -3,12 +3,14 @@
  * out of a regular project's list and counts, and show in the owner's personal one.
  * @see specs/traces-v2/origin-badge-filter.feature
  */
+import { clickhouseRead, tenantScope } from "@langwatch/clickhouse-client/builder";
 import type { Project, ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { LANGY_TRACE_ORIGIN } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { ownProof } from "../../__tests__/support/authorization-proofs.fixture.ts";
+import { traceSummaries } from "../../repositories/clickhouse/clickhouse.trace-summaries.table.ts";
 import { HIDDEN_ORIGINS_PARAM } from "../../rules/trace-filter-hidden-origins.rules.ts";
 import type { TracesListReader } from "../trace.app.ts";
 import { createTraceAppHarness } from "./support/trace-app.harness.ts";
@@ -43,7 +45,15 @@ async function hiddenOriginsOf(harnessed: ReturnType<typeof harness>) {
     filter: { query: "", tenantId: PROJECT_ID, hideExplorerOrigins: true },
   });
   const [call] = harnessed.getList.mock.calls;
-  return call?.[0].filterWhere?.params[HIDDEN_ORIGINS_PARAM];
+  const scope = tenantScope.single({ tenantId: PROJECT_ID });
+  const compiled = call?.[0].compileFilter?.({ scope });
+  if (compiled?.kind !== "compiled") return undefined;
+  const { params } = clickhouseRead({ scope })
+    .from(traceSummaries)
+    .select({ TraceId: traceSummaries.TraceId })
+    .where(compiled.where)
+    .build();
+  return Object.values(params).find(Array.isArray);
 }
 
 async function statusFacetFilter(harnessed: ReturnType<typeof harness>) {

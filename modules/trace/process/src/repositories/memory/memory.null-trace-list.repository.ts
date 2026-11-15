@@ -2,10 +2,11 @@ import type {
   CategoricalFacetResult,
   DiscreteFacetResult,
   TraceListRepositoryPage,
-  TraceListRepository,
   BatchedFacetResult,
   TraceRef,
 } from "@langwatch/trace-contract";
+
+import type { TraceListRepository } from "../trace-list.repository.ts";
 
 export class MemoryNullTraceListRepository implements TraceListRepository {
   private constructor() {}

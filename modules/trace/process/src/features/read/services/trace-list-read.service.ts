@@ -14,7 +14,6 @@ import type {
   TraceListCursor,
   TraceListItem,
   TraceListPage,
-  TraceListRead,
   TraceRef,
   Protections,
 } from "@langwatch/trace-contract";
@@ -22,6 +21,7 @@ import type {
 import type { FacetCatalog } from "#features/facet/rules/trace-facet-registry.rules";
 
 import type { TraceEvaluationRunsReadRepository } from "../../../repositories/trace-evaluation-runs.repository.ts";
+import type { TraceListQuery, TraceListRead } from "../../../repositories/trace-list.repository.ts";
 import {
   facetCountWindowKey,
   type DiscoverParams,
@@ -47,7 +47,7 @@ interface ListParams {
   pageSize: number;
   /** A cursor minted before it carried its tenant reads as the proof's own project. */
   cursor?: Omit<TraceListCursor, "tenantId"> & { tenantId?: string };
-  filterWhere?: { sql: string; params: Record<string, unknown> };
+  compileFilter?: TraceListQuery["compileFilter"];
   /**
    * Visibility gate: list items older than this cutoff get their
    * input/output previews teaser-redacted. Omitted/null = ungated.
@@ -73,13 +73,13 @@ interface NewCountParams {
   authorization: Authorization;
   timeRange: { from: number; to: number };
   since: number;
-  filterWhere?: { sql: string; params: Record<string, unknown> };
+  compileFilter?: TraceListQuery["compileFilter"];
 }
 
 interface TraceIdsParams {
   authorization: Authorization;
   timeRange: { from: number; to: number };
-  filterWhere?: { sql: string; params: Record<string, unknown> };
+  compileFilter?: TraceListQuery["compileFilter"];
   limit: number;
 }
 
@@ -227,7 +227,7 @@ export class TraceListService {
           }
         : undefined,
       offset,
-      filterWhere: params.filterWhere,
+      compileFilter: params.compileFilter,
     });
 
     const hasMore = result.rows.length > params.pageSize;
@@ -292,7 +292,7 @@ export class TraceListService {
       authorization: params.authorization,
       timeRange: params.timeRange,
       since: params.since,
-      filterWhere: params.filterWhere,
+      compileFilter: params.compileFilter,
     });
   }
 
@@ -305,7 +305,7 @@ export class TraceListService {
     return this.repository.findTraceRefs({
       authorization: params.authorization,
       timeRange: params.timeRange,
-      ...(params.filterWhere ? { filterWhere: params.filterWhere } : {}),
+      ...(params.compileFilter ? { compileFilter: params.compileFilter } : {}),
       limit: params.limit,
     });
   }

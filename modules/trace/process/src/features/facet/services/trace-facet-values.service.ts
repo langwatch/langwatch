@@ -12,12 +12,12 @@ import type {
   CategoricalFacetResult,
   FacetValuesResult,
   Protections,
-  TraceListRead,
 } from "@langwatch/trace-contract";
 import { TraceAttributeValuesWithheldError } from "@langwatch/trace-contract";
 
 import type { FacetCatalog } from "#features/facet/rules/trace-facet-registry.rules";
 
+import type { TraceListRead } from "../../../repositories/trace-list.repository.ts";
 import { createAttributeRedactor } from "../../../rules/trace-attribute-redaction.rules.ts";
 import {
   facetValuesCacheKey,

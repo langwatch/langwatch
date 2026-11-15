@@ -10,7 +10,6 @@ import {
   type BatchedFacetResult,
   explorerHiddenOrigins,
   LANGY_TRACE_ORIGIN,
-  type TraceListRead,
 } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -19,6 +18,7 @@ import {
   ownProof,
 } from "../../../../__tests__/support/authorization-proofs.fixture.ts";
 import { MemoryTraceEvaluationRunsRepository } from "../../../../repositories/memory/memory.trace-evaluation-runs.repository.ts";
+import type { TraceListRead } from "../../../../repositories/trace-list.repository.ts";
 import {
   explorerOriginExclusion,
   HIDDEN_ORIGINS_PARAM,

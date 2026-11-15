@@ -149,10 +149,18 @@ describe("given a filter on a side table", () => {
     });
 
     /** @scenario "A side-table filter reads its table under the filtered read's own scope" */
-    it("excludes with NOT over the subquery when negated", () => {
-      expect(builtSql("NOT evaluator:ev1").sql).toContain(
-        "NOT (tuple(TenantId, TraceId) IN (SELECT DISTINCT TenantId, TraceId FROM evaluation_runs WHERE TenantId = {tenantId:String}",
+    it("excludes with NOT IN when negated, leaving the subquery's tenant predicate unnegated", () => {
+      const { sql } = builtSql("NOT evaluator:ev1");
+
+      expect(sql).toContain(
+        "tuple(TenantId, TraceId) NOT IN (SELECT DISTINCT TenantId, TraceId FROM evaluation_runs WHERE TenantId = {tenantId:String}",
       );
+      expect(sql).not.toContain("NOT (tuple(");
+    });
+
+    /** @scenario "A side-table filter reads its table under the filtered read's own scope" */
+    it("negates a free-text span match as NOT IN beside the summary's own NOT", () => {
+      expect(builtSql("NOT hello").sql).toContain("tuple(TenantId, TraceId) NOT IN (SELECT");
     });
 
     /** @scenario "A side-table filter reads its table under the filtered read's own scope" */

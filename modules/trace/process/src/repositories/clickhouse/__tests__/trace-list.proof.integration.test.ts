@@ -13,9 +13,15 @@ import {
   aggregateProof,
   ownProof,
 } from "../../../__tests__/support/authorization-proofs.fixture.ts";
-import { traceQueryTranslation } from "../../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
+import {
+  traceFilterCompileFor,
+  traceQueryTranslation,
+} from "../../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
 import { TraceListClickHouseRepository } from "../trace-list.repository.ts";
-import { authorizedClickHouseFor } from "./support/authorized-clickhouse.support.ts";
+import {
+  authorizedClickHouseFor,
+  traceQueryClientFor,
+} from "./support/authorized-clickhouse.support.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
@@ -231,6 +237,7 @@ beforeAll(async () => {
   takeClock();
   repo = TraceListClickHouseRepository.create({
     clickhouse: authorizedClickHouseFor(ch),
+    reader: traceQueryClientFor(ch),
   });
 
   await insert([
@@ -436,6 +443,10 @@ describe.skipIf(!clickHouseConfigured)("TraceListClickHouseRepository through th
             queryText: "span.attribute.marker:only-in-a",
             timeRange: WINDOW,
           }) ?? undefined;
+        const compileFilter = traceFilterCompileFor({
+          queryText: "span.attribute.marker:only-in-a",
+          timeRange: WINDOW,
+        });
 
         const page = await repo.listAll({
           authorization,
@@ -443,7 +454,7 @@ describe.skipIf(!clickHouseConfigured)("TraceListClickHouseRepository through th
           sort: { column: "OccurredAt", direction: "desc" },
           limit: 10,
           offset: 0,
-          filterWhere,
+          compileFilter,
         });
         expect(page.rows.map(rowKey)).toEqual([`${TWIN_A}:${TWIN_TRACE_ID}`]);
 
@@ -451,7 +462,7 @@ describe.skipIf(!clickHouseConfigured)("TraceListClickHouseRepository through th
           authorization,
           timeRange: WINDOW,
           since: WINDOW.from,
-          filterWhere,
+          compileFilter,
         });
         expect(count).toBe(1);
 
@@ -494,12 +505,7 @@ describe.skipIf(!clickHouseConfigured)("TraceListClickHouseRepository through th
             sort: { column: "OccurredAt", direction: "desc" },
             limit: 10,
             offset: 0,
-            filterWhere:
-              traceQueryTranslation.translateFilter({
-                queryText,
-                timeRange: WINDOW,
-                evalRuns,
-              }) ?? undefined,
+            compileFilter: traceFilterCompileFor({ queryText, timeRange: WINDOW, evalRuns }),
           });
           return page.rows.length;
         };

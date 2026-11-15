@@ -1,16 +1,16 @@
-/**
- * @vitest-environment node
- * @unit
- * ADR-177 block B: the proof travels as a named parameter, never ambient. Each call sits behind
- * `@ts-expect-error`, so typecheck fails the moment one compiles; the bodies are never run.
- */
-import type { TraceListRead } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import type { TraceListService } from "../../features/read/services/trace-list-read.service.ts";
 import type { SpanStorageService } from "../../features/read/services/trace-span-storage-read.service.ts";
 import type { TraceSummaryService } from "../../features/read/services/trace-summary-read.service.ts";
 import type { TraceEvaluationRunsReadRepository } from "../../repositories/trace-evaluation-runs.repository.ts";
+/**
+ * @vitest-environment node
+ * @unit
+ * ADR-177 block B: the proof travels as a named parameter, never ambient. Each call sits behind
+ * `@ts-expect-error`, so typecheck fails the moment one compiles; the bodies are never run.
+ */
+import type { TraceListRead } from "../../repositories/trace-list.repository.ts";
 
 declare const list: TraceListService;
 declare const listRepository: TraceListRead;

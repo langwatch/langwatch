@@ -1,5 +1,3 @@
-import type { TraceListRepository } from "@langwatch/trace-contract";
-
 import type { TraceBraidReadsRepository } from "../features/braid/repositories/trace-braid-reads.repository.ts";
 import type { TraceEditOverlayRepository } from "../features/edit-overlay/repositories/trace-edit-overlay.repository.ts";
 import type { TraceExportSlotRepository } from "../features/export/repositories/trace-export-slot.repository.ts";
@@ -28,6 +26,7 @@ import type { TraceExistenceRepository } from "./trace-existence.repository.ts";
 import type { TraceFullRecordRowsRepository } from "./trace-full-record-rows.repository.ts";
 import type { TraceIndexMaterialisationRepository } from "./trace-index-materialisation.repository.ts";
 import type { TraceInstantEvalRunsReadRepository } from "./trace-instant-eval-runs.repository.ts";
+import type { TraceListRepository } from "./trace-list.repository.ts";
 import type { TraceModelSpendRepository } from "./trace-model-spend.repository.ts";
 import type { TracePayloadReaderRepository } from "./trace-payload-reader.repository.ts";
 import type { TraceProjectedReadRepository } from "./trace-projected-read.repository.ts";

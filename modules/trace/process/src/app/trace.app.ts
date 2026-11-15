@@ -327,6 +327,12 @@ import {
   utf8Preview,
 } from "../features/projection/rules/trace-projection-lean.rules.ts";
 import {
+  conversationTraceFilter,
+  findHiddenOriginFilters,
+  type TraceFilterCompile,
+  traceFilterCompileOf,
+} from "../features/query/repositories/clickhouse/clickhouse.trace-filter-condition.mapper.ts";
+import {
   TraceQueryFieldValuesRepository,
   type TraceQueryFieldValuesInput,
   type TraceQueryFieldValuesResult,
@@ -525,7 +531,7 @@ type TraceListReadParams = {
   page?: number;
   pageSize: number;
   cursor?: { sortValue: number; traceId: string };
-  filterWhere?: { sql: string; params: Record<string, unknown> };
+  compileFilter?: TraceFilterCompile;
   visibilityCutoffMs?: number | null;
 };
 
@@ -533,13 +539,15 @@ type TraceNewCountParams = {
   authorization: Authorization;
   timeRange: { from: number; to: number };
   since: number;
-  filterWhere?: { sql: string; params: Record<string, unknown> };
+  compileFilter?: TraceFilterCompile;
 };
 
 /** A list read as callers ask it: the filter as written, compiled inside (ADR-202 Decided 25). */
-type TraceListReadInput = Omit<TraceListReadParams, "filterWhere"> & { filter?: TraceListFilter };
+type TraceListReadInput = Omit<TraceListReadParams, "compileFilter"> & { filter?: TraceListFilter };
 
-type TraceNewCountInput = Omit<TraceNewCountParams, "filterWhere"> & { filter?: TraceListFilter };
+type TraceNewCountInput = Omit<TraceNewCountParams, "compileFilter"> & {
+  filter?: TraceListFilter;
+};
 
 type TraceSuggestionsParams = {
   authorization: Authorization;
@@ -575,7 +583,7 @@ export type TracesListReader = Readonly<{
   getTraceRefs(params: {
     authorization: Authorization;
     timeRange: { from: number; to: number };
-    filterWhere?: { sql: string; params: Record<string, unknown> };
+    compileFilter?: TraceFilterCompile;
     limit: number;
   }): Promise<readonly TraceRef[]>;
   getSuggestions(params: TraceSuggestionsParams): Promise<string[]>;
@@ -1384,6 +1392,7 @@ export class TraceModule implements TraceApi, CollectorApp {
 
   /** The trace query compiler and its in-memory mirror, over the ClickHouse facet registry. */
   static #composeQuery(): {
+    fields: TraceQueryFieldsService;
     translation: TraceQueryTranslationService;
     evaluation: TraceQueryEvaluationService;
   } {
@@ -1392,7 +1401,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     });
     const translation = TraceQueryTranslationService.create({ fields });
     const evaluation = TraceQueryEvaluationService.create({ fields, translation });
-    return { translation, evaluation };
+    return { fields, translation, evaluation };
   }
 
   /** The trace-tree read over this process's ClickHouse and query-value boundaries. */
@@ -1523,11 +1532,13 @@ export class TraceModule implements TraceApi, CollectorApp {
   #transcriptRead: TraceTranscriptReadService;
   #exportProgress: TraceExportProgressService;
   #tenantUpdates: TraceTenantUpdateStreamService;
+  #queryFields: TraceQueryFieldsService;
   #queryTranslation: TraceQueryTranslationService;
   #queryEvaluation: TraceQueryEvaluationService;
   private constructor(dependencies: TraceAppDependencies) {
     this.#dependencies = dependencies;
     const query = TraceModule.#composeQuery();
+    this.#queryFields = query.fields;
     this.#queryTranslation = query.translation;
     this.#queryEvaluation = query.evaluation;
     this.#transcriptRead = TraceTranscriptReadService.create();
@@ -1963,10 +1974,6 @@ export class TraceModule implements TraceApi, CollectorApp {
     // partition pruning effective.
     const now = nowInstant().epochMilliseconds;
     const timeRange = { from: now - 365 * 24 * 60 * 60 * 1000, to: now };
-    const filterWhere = {
-      sql: "Attributes['gen_ai.conversation.id'] = {threadConversationId:String}",
-      params: { threadConversationId: input.conversationId },
-    };
     const page = traceListPageSchema.parse(
       await this.#dependencies.traces.list.getList({
         authorization,
@@ -1974,7 +1981,7 @@ export class TraceModule implements TraceApi, CollectorApp {
         sort: { columnId: "time", direction: "asc" },
         page: 1,
         pageSize: 200,
-        filterWhere,
+        compileFilter: conversationTraceFilter({ conversationId: input.conversationId }),
         visibilityCutoffMs: protections.visibilityCutoffMs,
       }),
     );
@@ -2817,17 +2824,24 @@ export class TraceModule implements TraceApi, CollectorApp {
       queryText: input.query,
       timeRange: input.timeRange,
       ...(input.evalRuns ? { evalRuns: input.evalRuns } : {}),
-      ...(input.protections
-        ? {
-            searchContent: canSearchCapturedContent(input.protections),
-            isHiddenAttribute: hiddenAttributeKeyMatcher({
-              protections: input.protections,
-              contentPrivacy: traceReadMapperPorts.contentPrivacy,
-              derivedPrefixes: traceDerivedAttrPrefixes,
-            }),
-          }
-        : {}),
+      ...TraceModule.#filterProtections(input.protections),
     });
+  }
+
+  /** What a protected viewer's filter may not read: captured I/O and the hidden attributes. */
+  static #filterProtections(protections: Protections | undefined): {
+    searchContent?: boolean;
+    isHiddenAttribute?: (key: string) => boolean;
+  } {
+    if (!protections) return {};
+    return {
+      searchContent: canSearchCapturedContent(protections),
+      isHiddenAttribute: hiddenAttributeKeyMatcher({
+        protections,
+        contentPrivacy: traceReadMapperPorts.contentPrivacy,
+        derivedPrefixes: traceDerivedAttrPrefixes,
+      }),
+    };
   }
 
   translateLegacyFilters(input: {
@@ -2895,19 +2909,29 @@ export class TraceModule implements TraceApi, CollectorApp {
     const refs = await this.#dependencies.traces.list.getTraceRefs({
       authorization: input.authorization,
       timeRange: input.window,
-      filterWhere: await this.#compileExplorerTraceFilter({
-        query: input.filter,
-        tenantId: input.projectId,
+      compileFilter: await this.#compileListFilter({
+        filter: await this.#explorerFilterOfProof(input),
         timeRange: input.window,
-        protections: await this.#protectionsOfProof({
-          projectId: input.projectId,
-          authorization: input.authorization,
-        }),
       }),
       limit: input.limit,
     });
 
     return refs.map((ref) => ref.traceId);
+  }
+
+  /** A filter the proof's holder wrote in the Explorer, read through their protections. */
+  async #explorerFilterOfProof(input: {
+    projectId: string;
+    authorization: Authorization;
+    filter: string;
+  }): Promise<TraceListFilter> {
+    const protections = await this.#protectionsOfProof(input);
+    return {
+      query: input.filter,
+      tenantId: input.projectId,
+      hideExplorerOrigins: true,
+      ...(protections ? { protections } : {}),
+    };
   }
 
   /** The protections of whoever holds the proof; a system or internal read is unprotected. */
@@ -2949,31 +2973,37 @@ export class TraceModule implements TraceApi, CollectorApp {
 
   /** One page of the trace grid, its filter compiled as written. */
   async readTraceList({ filter, ...params }: TraceListReadInput): Promise<TraceListPage> {
-    const filterWhere = await this.#compileListFilter({ filter, timeRange: params.timeRange });
+    const compileFilter = await this.#compileListFilter({ filter, timeRange: params.timeRange });
     return this.#dependencies.traces.list.getList({
       ...params,
-      ...(filterWhere ? { filterWhere } : {}),
+      ...(compileFilter ? { compileFilter } : {}),
     });
   }
 
-  /** A list filter as written: the Explorer's (hidden origins out) or the query alone. */
+  /**
+   * A list filter as written, compiled inside each read for its scope (Decided 25): the
+   * Explorer's (hidden origins out unless the query names one) or the query alone.
+   */
   async #compileListFilter({
     filter,
     timeRange,
   }: {
     filter: TraceListFilter | undefined;
     timeRange: { from: number; to: number };
-  }): Promise<TraceFilterWhere | undefined> {
+  }): Promise<TraceFilterCompile | undefined> {
     if (!filter) return undefined;
-    const input = {
-      query: filter.query,
-      tenantId: filter.tenantId,
+    const hiddenOrigins =
+      filter.hideExplorerOrigins === true
+        ? await this.#explorerHiddenOrigins({ projectId: filter.tenantId, query: filter.query })
+        : [];
+    return traceFilterCompileOf({
+      queryText: filter.query,
       timeRange,
+      fields: this.#queryFields,
+      terms: findHiddenOriginFilters({ hiddenOrigins }),
       ...(filter.evalRuns ? { evalRuns: filter.evalRuns } : {}),
-      ...(filter.protections ? { protections: filter.protections } : {}),
-    };
-    if (filter.hideExplorerOrigins === true) return this.#compileExplorerTraceFilter(input);
-    return this.#translateTraceFilter(input) ?? undefined;
+      ...TraceModule.#filterProtections(filter.protections),
+    });
   }
 
   /** One Sessions lens page through the viewer's protections; coding-agent fills `codingAgent`. */
@@ -3064,10 +3094,10 @@ export class TraceModule implements TraceApi, CollectorApp {
 
   /** How many traces have arrived since the grid last painted, under the filter as written. */
   async readNewCount({ filter, ...params }: TraceNewCountInput): Promise<number> {
-    const filterWhere = await this.#compileListFilter({ filter, timeRange: params.timeRange });
+    const compileFilter = await this.#compileListFilter({ filter, timeRange: params.timeRange });
     return this.#dependencies.traces.list.getNewCount({
       ...params,
-      ...(filterWhere ? { filterWhere } : {}),
+      ...(compileFilter ? { compileFilter } : {}),
     });
   }
 

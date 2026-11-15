@@ -12,7 +12,6 @@ import type {
   DynamicKeysFacetDescriptor,
   FacetDescriptor,
   RangeFacetDescriptor,
-  TraceListRead,
 } from "@langwatch/trace-contract";
 
 import type {
@@ -22,6 +21,7 @@ import type {
   RangeFacetDef,
 } from "#features/facet/rules/trace-facet-registry.rules";
 
+import type { TraceListRead } from "../../../repositories/trace-list.repository.ts";
 import type { TraceFilterWhere } from "../../../rules/trace-filter-hidden-origins.rules.ts";
 import type { DiscoverParams } from "../../../rules/trace-list-cache-key.rules.ts";
 import type { TraceTopicNamingService } from "../../topic/services/trace-topic-naming.service.ts";

@@ -20,6 +20,7 @@ function makeRepo() {
   return {
     repo: TraceListClickHouseRepository.create({
       clickhouse: new AuthorizedClickHouse({ resolveClient: async () => client }),
+      reader: client,
     }),
     requests,
   };

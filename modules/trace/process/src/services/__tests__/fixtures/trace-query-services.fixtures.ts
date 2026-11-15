@@ -1,4 +1,11 @@
+import type { ResolvedInstantEvalRun } from "@langwatch/trace-contract";
+
 import { ClickHouseTraceFacetRegistryRepository } from "../../../features/facet/repositories/clickhouse/clickhouse.trace-facet-registry.repository.ts";
+import {
+  findHiddenOriginFilters,
+  type TraceFilterCompile,
+  traceFilterCompileOf,
+} from "../../../features/query/repositories/clickhouse/clickhouse.trace-filter-condition.mapper.ts";
 import { TraceQueryEvaluationService } from "../../../features/query/services/trace-query-evaluation.service.ts";
 import { TraceQueryFieldsService } from "../../../features/query/services/trace-query-fields.service.ts";
 import { TraceQueryTranslationService } from "../../../features/query/services/trace-query-translation.service.ts";
@@ -16,3 +23,25 @@ export const traceQueryEvaluation = TraceQueryEvaluationService.create({
   fields: traceQueryFields,
   translation: traceQueryTranslation,
 });
+
+/** A query as the list reads take it: compiled inside each read for its scope, `hiddenOrigins` out
+ * of it. */
+export function traceFilterCompileFor({
+  queryText,
+  timeRange,
+  evalRuns,
+  hiddenOrigins = [],
+}: {
+  queryText: string;
+  timeRange: { from: number; to: number };
+  evalRuns?: readonly ResolvedInstantEvalRun[];
+  hiddenOrigins?: readonly string[];
+}): TraceFilterCompile {
+  return traceFilterCompileOf({
+    queryText,
+    timeRange,
+    fields: traceQueryFields,
+    terms: findHiddenOriginFilters({ hiddenOrigins }),
+    ...(evalRuns ? { evalRuns } : {}),
+  });
+}

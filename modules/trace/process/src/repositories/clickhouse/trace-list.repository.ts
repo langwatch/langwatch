@@ -1,18 +1,32 @@
 import type { Authorization } from "@langwatch/authorization";
 import {
   type AuthorizedClickHouse,
+  type ClickHouseQueryClient,
   type TenantScopedReader,
   type TenantScopeTimeColumn,
   tenantScope,
 } from "@langwatch/clickhouse-client";
+import {
+  type ClickHouseReadStart,
+  clickhouseRead,
+  type Condition,
+  cond,
+  type Expression,
+  fn,
+  param,
+  type ReaderScope,
+  tenantScope as builtTenantScope,
+} from "@langwatch/clickhouse-client/builder";
 import { nowInstant } from "@langwatch/time";
 import {
   isStorageAnchoredVersion,
+  RESERVED_CACHE_CREATION_TOKENS,
+  RESERVED_CACHE_READ_TOKENS,
+  type TraceListCursor,
   type TraceListFacetQuery,
   type TraceListRepositoryPage,
-  type TraceListQuery,
-  type TraceListRepository,
   type TraceListRow,
+  type TraceListSortColumn,
   type TraceRef,
   type BatchedFacetResult,
   type CategoricalFacetResult,
@@ -24,8 +38,14 @@ import {
 import { z } from "zod";
 
 import { scopeTraceFilterToTable } from "../../features/facet/repositories/clickhouse/clickhouse.trace-facet-scope.mapper.ts";
+import type {
+  TraceFilterCompilation,
+  TraceFilterCompile,
+  TraceFilterCondition,
+} from "../../features/query/repositories/clickhouse/clickhouse.trace-filter-condition.mapper.ts";
 import type { TraceFilterWhere } from "../../rules/trace-filter-hidden-origins.rules.ts";
-import { TRACE_SUMMARY_TOTAL_TOKENS_SQL } from "../../rules/trace-token-total.rules.ts";
+import type { TraceListQuery, TraceListRepository } from "../trace-list.repository.ts";
+import { traceSummaries } from "./clickhouse.trace-summaries.table.ts";
 import { chBoolean, chNumber, chString } from "./stored-span-row.mapper.ts";
 
 const TABLE_NAME = "trace_summaries" as const;
@@ -126,7 +146,7 @@ const listSummaryRowSchema = z.looseObject({
   SubTopicId: chString.nullable(),
   AnnotationIds: z.array(chString),
   SizeBytes: chNumber.optional(),
-  LastEventOccurredAt: chNumber,
+  LastEventOccurredAtMs: chNumber,
 });
 
 const listSummaryRowsSchema = z.array(listSummaryRowSchema);
@@ -138,37 +158,210 @@ function isLiveUpperBound(timeRange: { to: number; live?: boolean }): boolean {
   return timeRange.live === true;
 }
 
+const ts = traceSummaries;
+const attribute = (key: string) => fn.mapGet(ts.Attributes, key);
+const numericSort = (of: Expression<number | null, "trace_summaries">) =>
+  fn.toFloat64(fn.ifNull(of, 0));
+
+/** `TRACE_SUMMARY_TOTAL_TOKENS_SQL` built: input, output and both cache buckets. */
+const TOTAL_TOKENS = fn.plus(
+  fn.plus(
+    fn.plus(fn.ifNull(ts.TotalPromptTokenCount, 0), fn.ifNull(ts.TotalCompletionTokenCount, 0)),
+    fn.toUInt64OrZero(attribute(RESERVED_CACHE_READ_TOKENS)),
+  ),
+  fn.toUInt64OrZero(attribute(RESERVED_CACHE_CREATION_TOKENS)),
+);
+
 /**
- * `baseSql` is the tenant marker (expanded into the proof's fence) and the window; `sql` adds
- * the user's filter. The latest-version dedup must use `baseSql` alone, or a re-annotated
- * trace answers to both annotation buckets: filter after the dedup, never inside it.
+ * Every list sort as one finite number, which ORDER BY, the keyset comparison and the
+ * service-side cursor all use: `OccurredAt` in epoch ms, a missing metric as 0.
  */
-function buildWhereClause({
+const SORT_EXPRESSIONS: Record<TraceListSortColumn, Expression<number, "trace_summaries">> = {
+  OccurredAt: fn.toFloat64(fn.toUnixTimestamp64Milli(ts.OccurredAt)),
+  TotalDurationMs: numericSort(ts.TotalDurationMs),
+  TotalCost: numericSort(ts.TotalCost),
+  SpanCount: numericSort(ts.SpanCount),
+  TotalTokens: numericSort(TOTAL_TOKENS),
+  TimeToFirstTokenMs: numericSort(ts.TimeToFirstTokenMs),
+  TotalPromptTokenCount: numericSort(ts.TotalPromptTokenCount),
+  TotalCompletionTokenCount: numericSort(ts.TotalCompletionTokenCount),
+  _size_bytes: numericSort(ts._size_bytes),
+};
+
+/** The page's columns; only the fixed `Attributes` keys the list mapper reads are projected. */
+const LIST_SELECTION = {
+  TraceId: ts.TraceId,
+  TenantId: ts.TenantId,
+  AttrSpanName: attribute("langwatch.span.name"),
+  AttrServiceName: attribute("service.name"),
+  AttrConversationId: attribute("gen_ai.conversation.id"),
+  AttrUserId: attribute("langwatch.user_id"),
+  AttrOrigin: attribute("langwatch.origin"),
+  AttrNonBillable: attribute("langwatch.cost.non_billable"),
+  AttrCacheReadTokens: attribute(RESERVED_CACHE_READ_TOKENS),
+  AttrInputMediaRefs: attribute("langwatch.reserved.media_refs.input"),
+  AttrOutputMediaRefs: attribute("langwatch.reserved.media_refs.output"),
+  AttrCacheCreationTokens: attribute(RESERVED_CACHE_CREATION_TOKENS),
+  AttrReasoningTokens: attribute("langwatch.reserved.reasoning_tokens"),
+  AttrContextSizeTokens: attribute("langwatch.reserved.context_size_tokens"),
+  AttrLabels: attribute("langwatch.labels"),
+  OccurredAtMs: fn.toUnixTimestamp64Milli(ts.OccurredAt),
+  Version: ts.Version,
+  EarliestSpanStartMs: ts.EarliestSpanStartMs,
+  CreatedAtMs: fn.toUnixTimestamp64Milli(ts.CreatedAt),
+  UpdatedAtMs: fn.toUnixTimestamp64Milli(ts.UpdatedAt),
+  ComputedIOSchemaVersion: ts.ComputedIOSchemaVersion,
+  ComputedInput: ts.ComputedInput,
+  ComputedOutput: ts.ComputedOutput,
+  TimeToFirstTokenMs: ts.TimeToFirstTokenMs,
+  TimeToLastTokenMs: ts.TimeToLastTokenMs,
+  TotalDurationMs: ts.TotalDurationMs,
+  TokensPerSecond: ts.TokensPerSecond,
+  SpanCount: ts.SpanCount,
+  ContainsErrorStatus: ts.ContainsErrorStatus,
+  ContainsOKStatus: ts.ContainsOKStatus,
+  ErrorMessage: ts.ErrorMessage,
+  Models: ts.Models,
+  TotalCost: ts.TotalCost,
+  NonBilledCost: ts.NonBilledCost,
+  TokensEstimated: ts.TokensEstimated,
+  TotalPromptTokenCount: ts.TotalPromptTokenCount,
+  TotalCompletionTokenCount: ts.TotalCompletionTokenCount,
+  OutputFromRootSpan: ts.OutputFromRootSpan,
+  OutputSpanEndTimeMs: ts.OutputSpanEndTimeMs,
+  BlockedByGuardrail: ts.BlockedByGuardrail,
+  TraceName: ts.TraceName,
+  RootSpanType: ts.RootSpanType,
+  ContainsAi: ts.ContainsAi,
+  ContainsPrompt: ts.ContainsPrompt,
+  SelectedPromptId: ts.SelectedPromptId,
+  SelectedPromptSpanId: ts.SelectedPromptSpanId,
+  LastUsedPromptId: ts.LastUsedPromptId,
+  LastUsedPromptVersionNumber: ts.LastUsedPromptVersionNumber,
+  LastUsedPromptVersionId: ts.LastUsedPromptVersionId,
+  LastUsedPromptSpanId: ts.LastUsedPromptSpanId,
+  TopicId: ts.TopicId,
+  SubTopicId: ts.SubTopicId,
+  AnnotationIds: ts.AnnotationIds,
+  SizeBytes: ts._size_bytes,
+  LastEventOccurredAtMs: fn.toUnixTimestamp64Milli(ts.LastEventOccurredAt),
+};
+
+/** The window a list read covers on `OccurredAt`; a live range leaves the upper bound open. */
+function occurredWithin(timeRange: {
+  from: number;
+  to: number;
+  live?: boolean;
+}): Condition<"trace_summaries"> {
+  const from = cond.gte(ts.OccurredAt, timeRange.from);
+  return isLiveUpperBound(timeRange) ? from : cond.and(from, cond.lte(ts.OccurredAt, timeRange.to));
+}
+
+/** The compiled filter as one term; an empty filter narrows nothing. */
+function filterTerm(filter: TraceFilterCompilation): TraceFilterCondition {
+  return filter.kind === "compiled" ? filter.where : () => cond.always();
+}
+
+/**
+ * The proof's windows and the time range decide the latest-version election; the filter
+ * applies after it, or a re-annotated trace answers to both annotation buckets.
+ */
+function electedSummaries<S extends ReaderScope>({
+  start,
   timeRange,
-  filterWhere,
+  filter,
 }: {
+  start: ClickHouseReadStart<S>;
   timeRange: { from: number; to: number; live?: boolean };
-  filterWhere?: { sql: string; params: Record<string, unknown> };
-}): { sql: string; baseSql: string; params: Record<string, unknown> } {
-  const parts = [
-    tenantScope("OccurredAt"),
-    "OccurredAt >= fromUnixTimestamp64Milli({timeFrom:Int64})",
-  ];
-  const params: Record<string, unknown> = { timeFrom: timeRange.from };
+  filter: TraceFilterCompilation;
+}) {
+  return start
+    .from(ts)
+    .withinWindows()
+    .where(() => occurredWithin(timeRange))
+    .where(filterTerm(filter), { inElection: false });
+}
 
-  if (!isLiveUpperBound(timeRange)) {
-    parts.push("OccurredAt <= fromUnixTimestamp64Milli({timeTo:Int64})");
-    params.timeTo = timeRange.to;
-  }
+/** A list read's proof scope, and its filter compiled for that scope. */
+function listScopeOf({
+  authorization,
+  compileFilter,
+}: {
+  authorization: Authorization;
+  compileFilter?: TraceFilterCompile;
+}) {
+  const scope = builtTenantScope.fromProof({ authorization, reads: "traces" });
+  const filter: TraceFilterCompilation = compileFilter?.({ scope }) ?? { kind: "empty" };
+  return { scope, filter };
+}
 
-  const baseSql = parts.join(" AND ");
+/** Rows past the cursor; (tenant, trace id) breaks ties, since two members may share an id. */
+function pastCursor({
+  sort,
+  ascending,
+  cursor,
+}: {
+  sort: Expression<number, "trace_summaries">;
+  ascending: boolean;
+  cursor: TraceListCursor;
+}): Condition<"trace_summaries"> {
+  const beyond = ascending ? cond.gt(sort, cursor.sortValue) : cond.lt(sort, cursor.sortValue);
+  return cond.or(
+    beyond,
+    cond.and(
+      cond.eq(sort, cursor.sortValue),
+      cond.gt(
+        fn.tuple(ts.TenantId, ts.TraceId),
+        fn.tuple(param.string(cursor.tenantId), param.string(cursor.traceId)),
+      ),
+    ),
+  );
+}
 
-  if (filterWhere) {
-    parts.push(filterWhere.sql);
-    Object.assign(params, filterWhere.params);
-  }
+/**
+ * One page in two stages: the inner read picks the page's (tenant, trace, version) keys from the
+ * light columns, the outer reads the payload for those rows alone. Many traces share a sort value,
+ * so (TenantId, TraceId) completes the order and adjacent pages neither repeat nor skip a row.
+ */
+function listPageStatement(query: TraceListQuery) {
+  const { scope, filter } = listScopeOf(query);
+  const sort = SORT_EXPRESSIONS[query.sort.column];
+  const ascending = query.sort.direction === "asc";
+  const direction = ascending ? "ASC" : "DESC";
+  return electedSummaries({ start: clickhouseRead({ scope }), timeRange: query.timeRange, filter })
+    .select(LIST_SELECTION)
+    .where(({ within }) =>
+      within(fn.tuple(ts.TenantId, ts.TraceId, ts.UpdatedAt), (sub) => {
+        const keys = electedSummaries({ start: sub, timeRange: query.timeRange, filter })
+          .select({ TenantId: ts.TenantId, TraceId: ts.TraceId, UpdatedAt: ts.UpdatedAt })
+          .latestVersion();
+        const { cursor } = query;
+        const paged =
+          cursor === undefined
+            ? keys
+            : keys.where(() => pastCursor({ sort, ascending, cursor }), { inElection: false });
+        return paged
+          .orderBy(sort, direction)
+          .orderBy(ts.TenantId, "ASC")
+          .orderBy(ts.TraceId, "ASC")
+          .limit(query.limit)
+          .offset(query.offset ?? 0);
+      }),
+    )
+    .orderBy(sort, direction)
+    .orderBy(ts.TenantId, "ASC")
+    .orderBy(ts.TraceId, "ASC")
+    .limit(query.limit)
+    .build();
+}
 
-  return { sql: parts.join(" AND "), baseSql, params };
+/** The window's latest traces under the filter, counted. */
+function listCountStatement(query: TraceListQuery) {
+  const { scope, filter } = listScopeOf(query);
+  return electedSummaries({ start: clickhouseRead({ scope }), timeRange: query.timeRange, filter })
+    .select({ totalHits: fn.count() })
+    .latestVersion()
+    .build();
 }
 
 /** Seconds a sidebar facet read may run before ClickHouse stops it. */
@@ -232,229 +425,40 @@ function facetFilterFragment(
 }
 
 export class TraceListClickHouseRepository implements TraceListRepository {
-  private constructor(private readonly clickhouse: AuthorizedClickHouse) {}
+  private readonly clickhouse: AuthorizedClickHouse;
+  private readonly reader: Pick<ClickHouseQueryClient, "read">;
 
-  static create({
-    clickhouse,
-  }: {
+  private constructor(deps: {
     clickhouse: AuthorizedClickHouse;
+    reader: Pick<ClickHouseQueryClient, "read">;
+  }) {
+    this.clickhouse = deps.clickhouse;
+    this.reader = deps.reader;
+  }
+
+  static create(deps: {
+    clickhouse: AuthorizedClickHouse;
+    reader: Pick<ClickHouseQueryClient, "read">;
   }): TraceListClickHouseRepository {
-    return new TraceListClickHouseRepository(clickhouse);
+    return new TraceListClickHouseRepository(deps);
   }
 
   async listAll(query: TraceListQuery): Promise<TraceListRepositoryPage> {
-    const {
-      sql: whereClause,
-      baseSql: baseWhereClause,
-      params,
-    } = buildWhereClause({
-      timeRange: query.timeRange,
-      filterWhere: query.filterWhere,
-    });
-
-    const rawSortExpression =
-      query.sort.column === "TotalTokens" ? TRACE_SUMMARY_TOTAL_TOKENS_SQL : query.sort.column;
-    // Every supported list sort is numeric (OccurredAt is normalized to epoch
-    // milliseconds). Coalescing nullable metrics makes the keyset comparison
-    // use exactly the same value as ORDER BY and as the service-side cursor.
-    const sortExpression =
-      query.sort.column === "OccurredAt"
-        ? "toFloat64(toUnixTimestamp64Milli(OccurredAt))"
-        : `toFloat64(coalesce(${rawSortExpression}, 0))`;
-    const sortDir = query.sort.direction === "asc" ? "ASC" : "DESC";
-    const cursorComparison = query.sort.direction === "asc" ? ">" : "<";
-    // The tie-break is the (tenant, trace id) pair: an aggregate project
-    // reads several tenants and two of them may hold the same trace id, so
-    // the id alone would skip or repeat a row across pages (ADR-177).
-    const cursorClause = query.cursor
-      ? `AND (
-              ${sortExpression} ${cursorComparison} {cursorSortValue:Float64}
-              OR (
-                ${sortExpression} = {cursorSortValue:Float64}
-                AND (TenantId, TraceId) > ({cursorTenantId:String}, {cursorTraceId:String})
-              )
-            )`
-      : "";
-
-    const client = this.clickhouse.as(query.authorization, { reads: "traces" });
-
-    // Latest-version dedup, shared by the page's inner stage and the count,
-    // decided on base predicates alone. A whole-window aggregate, so state
-    // it once per read — the outer stage below reuses this result.
-    const dedupFilter = `(TenantId, TraceId, UpdatedAt) IN (
-          SELECT TenantId, TraceId, max(UpdatedAt)
-          FROM ${TABLE_NAME}
-          WHERE ${baseWhereClause}
-          GROUP BY TenantId, TraceId
-        )`;
-
-    // Two-stage: page light columns first, then read heavy payloads for page only.
-    const [result, countResult] = await Promise.all([
-      client.query({
-        query: `
-        SELECT
-          TraceId,
-          TenantId,
-          AttrSpanName,
-          AttrServiceName,
-          AttrConversationId,
-          AttrUserId,
-          AttrOrigin,
-          AttrNonBillable,
-          AttrCacheReadTokens,
-          AttrInputMediaRefs,
-          AttrOutputMediaRefs,
-          AttrCacheCreationTokens,
-          AttrReasoningTokens,
-          AttrContextSizeTokens,
-          AttrLabels,
-          toUnixTimestamp64Milli(OccurredAt) AS OccurredAtMs,
-          Version,
-          EarliestSpanStartMs,
-          toUnixTimestamp64Milli(CreatedAt) AS CreatedAtMs,
-          toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAtMs,
-          ComputedIOSchemaVersion,
-          ComputedInput,
-          ComputedOutput,
-          TimeToFirstTokenMs,
-          TimeToLastTokenMs,
-          TotalDurationMs,
-          TokensPerSecond,
-          SpanCount,
-          ContainsErrorStatus,
-          ContainsOKStatus,
-          ErrorMessage,
-          Models,
-          TotalCost,
-          NonBilledCost,
-          TokensEstimated,
-          TotalPromptTokenCount,
-          TotalCompletionTokenCount,
-          OutputFromRootSpan,
-          OutputSpanEndTimeMs,
-          BlockedByGuardrail,
-          TraceName,
-          RootSpanType,
-          ContainsAi,
-          ContainsPrompt,
-          SelectedPromptId,
-          SelectedPromptSpanId,
-          LastUsedPromptId,
-          LastUsedPromptVersionNumber,
-          LastUsedPromptVersionId,
-          LastUsedPromptSpanId,
-          TopicId,
-          SubTopicId,
-          AnnotationIds,
-          SizeBytes,
-          toUnixTimestamp64Milli(LastEventOccurredAt) AS LastEventOccurredAt
-        FROM (
-          SELECT
-            TraceId,
-            TenantId,
-            Attributes['langwatch.span.name'] AS AttrSpanName,
-            Attributes['service.name'] AS AttrServiceName,
-            Attributes['gen_ai.conversation.id'] AS AttrConversationId,
-            Attributes['langwatch.user_id'] AS AttrUserId,
-            Attributes['langwatch.origin'] AS AttrOrigin,
-            Attributes['langwatch.cost.non_billable'] AS AttrNonBillable,
-            Attributes['langwatch.reserved.cache_read_tokens'] AS AttrCacheReadTokens,
-            Attributes['langwatch.reserved.media_refs.input'] AS AttrInputMediaRefs,
-            Attributes['langwatch.reserved.media_refs.output'] AS AttrOutputMediaRefs,
-            Attributes['langwatch.reserved.cache_creation_tokens'] AS AttrCacheCreationTokens,
-            Attributes['langwatch.reserved.reasoning_tokens'] AS AttrReasoningTokens,
-            Attributes['langwatch.reserved.context_size_tokens'] AS AttrContextSizeTokens,
-            Attributes['langwatch.labels'] AS AttrLabels,
-            OccurredAt,
-            Version,
-            EarliestSpanStartMs,
-            CreatedAt,
-            UpdatedAt,
-            ComputedIOSchemaVersion,
-            ComputedInput,
-            ComputedOutput,
-            TimeToFirstTokenMs,
-            TimeToLastTokenMs,
-            TotalDurationMs,
-            TokensPerSecond,
-            SpanCount,
-            ContainsErrorStatus,
-            ContainsOKStatus,
-            ErrorMessage,
-            Models,
-            TotalCost,
-            NonBilledCost,
-            TokensEstimated,
-            TotalPromptTokenCount,
-            TotalCompletionTokenCount,
-            OutputFromRootSpan,
-            OutputSpanEndTimeMs,
-            BlockedByGuardrail,
-            TraceName,
-            RootSpanType,
-            ContainsAi,
-            ContainsPrompt,
-            SelectedPromptId,
-            SelectedPromptSpanId,
-            LastUsedPromptId,
-            LastUsedPromptVersionNumber,
-            LastUsedPromptVersionId,
-            LastUsedPromptSpanId,
-            TopicId,
-            SubTopicId,
-            AnnotationIds,
-            _size_bytes AS SizeBytes,
-            LastEventOccurredAt
-          FROM ${TABLE_NAME}
-          WHERE ${whereClause}
-            AND (TenantId, TraceId, UpdatedAt) IN (
-              SELECT TenantId, TraceId, UpdatedAt
-              FROM ${TABLE_NAME}
-              WHERE ${whereClause}
-                AND ${dedupFilter}
-                ${cursorClause}
-              -- Offset pagination needs a total order. Many traces legitimately
-              -- share timestamps, costs, token counts, and durations; without
-              -- a unique tie-breaker ClickHouse may return tied rows in a
-              -- different order on adjacent requests, causing duplicates and
-              -- omissions between pages. The tenant comes before the trace id
-              -- because the id is only unique within a tenant.
-              ORDER BY ${sortExpression} ${sortDir}, TenantId ASC, TraceId ASC
-              LIMIT {limit:UInt32}
-              OFFSET {offset:UInt32}
-            )
-          ORDER BY ${sortExpression} ${sortDir}, TenantId ASC, TraceId ASC
-          LIMIT {limit:UInt32}
-        )
-      `,
-        query_params: {
-          ...params,
-          limit: query.limit,
-          offset: query.offset ?? 0,
-          ...(query.cursor
-            ? {
-                cursorSortValue: query.cursor.sortValue,
-                cursorTenantId: query.cursor.tenantId,
-                cursorTraceId: query.cursor.traceId,
-              }
-            : {}),
-        },
-        format: "JSONEachRow",
+    const [page, count] = await Promise.all([
+      this.reader.read({
+        // ID_BOUND_SKIP: one page of the window's traces, bounded by OccurredAt.
+        statement: listPageStatement(query),
+        table: ts.$table.name,
       }),
-      client.query({
-        query: `
-        SELECT count() AS totalHits
-        FROM ${TABLE_NAME}
-        WHERE ${whereClause}
-          AND ${dedupFilter}
-      `,
-        query_params: { ...params },
-        format: "JSONEachRow",
+      this.reader.read({
+        // ID_BOUND_SKIP: the window's trace count, bounded by OccurredAt.
+        statement: listCountStatement(query),
+        table: ts.$table.name,
       }),
     ]);
 
-    const rows = listSummaryRowsSchema.parse(await result.json());
-    const countRows = totalHitsRowsSchema.parse(await countResult.json());
+    const rows = listSummaryRowsSchema.parse(page.rows);
+    const countRows = totalHitsRowsSchema.parse(count.rows);
     const totalHits = countRows.length > 0 ? Number(countRows[0]!.totalHits) : 0;
 
     return {
@@ -467,90 +471,56 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     authorization: Authorization;
     timeRange: { from: number; to: number };
     since: number;
-    filterWhere?: { sql: string; params: Record<string, unknown> };
+    compileFilter?: TraceFilterCompile;
   }): Promise<number> {
-    // Live "new traces since `since`" poll. Outer count wants OccurredAt >
-    // since, but filterWhere may carry a span-level filter scanning
-    // stored_spans over [from, to]: raising the lower bound to since (minus a
-    // buffer) prunes that subquery; a matching span's StartTime >= OccurredAt > since.
+    // Live "new traces since `since`" poll. A span-level filter scans stored_spans over the
+    // window: raising its lower bound to since (minus a buffer) prunes that subquery, since a
+    // matching span's StartTime >= OccurredAt > since.
     const effectiveFrom = Math.max(params.timeRange.from, params.since - SINCE_WINDOW_BUFFER_MS);
-    const {
-      sql: whereClause,
-      baseSql: baseWhereClause,
-      params: queryParams,
-    } = buildWhereClause({
+    const { scope, filter } = listScopeOf(params);
+    const statement = electedSummaries({
+      start: clickhouseRead({ scope }),
       timeRange: { ...params.timeRange, from: effectiveFrom },
-      filterWhere: params.filterWhere,
-    });
+      filter,
+    })
+      .where(() => cond.gt(ts.OccurredAt, params.since))
+      .select({ cnt: fn.count() })
+      .latestVersion()
+      .build();
 
-    const client = this.clickhouse.as(params.authorization, {
-      reads: "traces",
-    });
-    const result = await client.query({
-      query: `
-        SELECT count() AS cnt
-        FROM ${TABLE_NAME}
-        WHERE ${whereClause}
-          AND OccurredAt > fromUnixTimestamp64Milli({since:Int64})
-          AND (TenantId, TraceId, UpdatedAt) IN (
-            SELECT TenantId, TraceId, max(UpdatedAt)
-            FROM ${TABLE_NAME}
-            WHERE ${baseWhereClause}
-              AND OccurredAt > fromUnixTimestamp64Milli({since:Int64})
-            GROUP BY TenantId, TraceId
-          )
-      `,
-      query_params: { ...queryParams, since: params.since },
-      format: "JSONEachRow",
-    });
-
-    const rows = countRowsSchema.parse(await result.json());
+    // ID_BOUND_SKIP: the window's new-trace count, bounded by OccurredAt.
+    const result = await this.reader.read({ statement, table: ts.$table.name });
+    const rows = countRowsSchema.parse(result.rows);
     return Number(rows[0]?.cnt ?? 0);
   }
 
   async findTraceRefs(params: {
     authorization: Authorization;
     timeRange: { from: number; to: number; live?: boolean };
-    filterWhere?: { sql: string; params: Record<string, unknown> };
+    compileFilter?: TraceFilterCompile;
     limit: number;
   }): Promise<TraceRef[]> {
-    const {
-      sql: whereClause,
-      baseSql: baseWhereClause,
-      params: queryParams,
-    } = buildWhereClause({
+    const { scope, filter } = listScopeOf(params);
+    // Two unmerged versions can tie on max(UpdatedAt), so LIMIT 1 BY keeps one per trace. It
+    // reads only the two key columns, so none of LIMIT BY's heavy-column cost applies.
+    const statement = electedSummaries({
+      start: clickhouseRead({ scope }),
       timeRange: params.timeRange,
-      filterWhere: params.filterWhere,
-    });
+      filter,
+    })
+      .select({ TenantId: ts.TenantId, TraceId: ts.TraceId })
+      .latestVersion()
+      .orderBy(ts.OccurredAt, "DESC")
+      .orderBy(ts.TenantId, "ASC")
+      .orderBy(ts.TraceId, "ASC")
+      .limitBy(1, ts.TenantId, ts.TraceId)
+      .limit(params.limit)
+      .build();
 
-    const client = this.clickhouse.as(params.authorization, {
-      reads: "traces",
-    });
-    // Two unmerged versions can tie on max(UpdatedAt), so the dedup tuple
-    // can pass a trace twice; LIMIT 1 BY keeps one per trace. It reads only
-    // the two key columns, so none of the heavy-column cost LIMIT BY carries
-    // on a wide select applies here.
-    const result = await client.query({
-      query: `
-        SELECT TenantId, TraceId
-        FROM ${TABLE_NAME}
-        WHERE ${whereClause}
-          AND (TenantId, TraceId, UpdatedAt) IN (
-            SELECT TenantId, TraceId, max(UpdatedAt)
-            FROM ${TABLE_NAME}
-            WHERE ${baseWhereClause}
-            GROUP BY TenantId, TraceId
-          )
-        ORDER BY OccurredAt DESC, TenantId, TraceId
-        LIMIT 1 BY TenantId, TraceId
-        LIMIT {limit:UInt32}
-      `,
-      query_params: { ...queryParams, limit: params.limit },
-      format: "JSONEachRow",
-    });
-
+    // ID_BOUND_SKIP: the filter's newest traces, bounded by OccurredAt and the limit.
+    const result = await this.reader.read({ statement, table: ts.$table.name });
     return traceRefRowsSchema
-      .parse(await result.json())
+      .parse(result.rows)
       .map((row) => ({ tenantId: row.TenantId, traceId: row.TraceId }));
   }
 
@@ -1248,7 +1218,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
         : Number(row.OccurredAtMs),
       createdAt: Number(row.CreatedAtMs),
       updatedAt: Number(row.UpdatedAtMs),
-      LastEventOccurredAt: Number(row.LastEventOccurredAt ?? 0),
+      LastEventOccurredAt: Number(row.LastEventOccurredAtMs ?? 0),
     };
   }
 

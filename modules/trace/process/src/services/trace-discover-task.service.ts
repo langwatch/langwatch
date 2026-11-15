@@ -4,7 +4,6 @@ import type {
   BatchedFacetResult,
   DiscreteFacetResult,
   FacetDescriptor,
-  TraceListRead,
 } from "@langwatch/trace-contract";
 
 import type {
@@ -16,6 +15,7 @@ import type {
 } from "#features/facet/rules/trace-facet-registry.rules";
 
 import type { TraceFacetDescriptorService } from "../features/facet/services/trace-facet-descriptor.service.ts";
+import type { TraceListRead } from "../repositories/trace-list.repository.ts";
 import type { TraceFilterWhere } from "../rules/trace-filter-hidden-origins.rules.ts";
 import type { DiscoverParams } from "../rules/trace-list-cache-key.rules.ts";
 

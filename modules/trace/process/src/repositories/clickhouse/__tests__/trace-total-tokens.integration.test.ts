@@ -11,7 +11,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { ownProof } from "../../../__tests__/support/authorization-proofs.fixture.ts";
 import { mapToTraceListItem } from "../../../features/read/rules/trace-list-row.rules.ts";
-import { traceQueryTranslation } from "../../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
+import { traceFilterCompileFor } from "../../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
 import { SessionGroupsClickHouseRepository } from "../session-groups.repository.ts";
 import { TraceListClickHouseRepository } from "../trace-list.repository.ts";
 import {
@@ -92,7 +92,10 @@ describe.skipIf(!clickHouseConfigured)("a trace's total tokens on ClickHouse rea
 
   beforeAll(async () => {
     ch = await startMigratedTraceClickHouse();
-    list = TraceListClickHouseRepository.create({ clickhouse: authorizedClickHouseFor(ch) });
+    list = TraceListClickHouseRepository.create({
+      clickhouse: authorizedClickHouseFor(ch),
+      reader: traceQueryClientFor(ch),
+    });
     groups = SessionGroupsClickHouseRepository.create({
       clickhouse: authorizedClickHouseFor(ch),
       reader: traceQueryClientFor(ch),
@@ -162,13 +165,9 @@ describe.skipIf(!clickHouseConfigured)("a trace's total tokens on ClickHouse rea
 
   /** @scenario "Filtering and sorting by tokens use the total with the cache" */
   it("filters by the total with the cache", async () => {
-    const filterWhere = traceQueryTranslation.translateFilter({
-      queryText: "tokens:>10000",
-      timeRange,
-    });
-    if (!filterWhere) throw new Error("the token filter compiled to nothing");
+    const compileFilter = traceFilterCompileFor({ queryText: "tokens:>10000", timeRange });
 
-    const page = await listTraces({ filterWhere });
+    const page = await listTraces({ compileFilter });
 
     expect(page.rows.map((row) => row.traceId)).toEqual(["cached-trace"]);
   });

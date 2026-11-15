@@ -42,3 +42,16 @@ Feature: Trace filters compile to built conditions
     When each filter kind is read through the built conditions and through main's text
     Then both return the same traces for the read's tenant
     And no row of the other tenant admits a trace
+
+  @integration
+  Scenario: The trace list keeps main's rows under an own and an aggregate proof
+    Given another tenant shares the trace ids of a member's traces
+    When the list is read under the member's own proof or an aggregate's tenant set
+    Then each filter kind lists the rows main lists, and none of the other tenant's
+
+  @integration
+  Scenario: The trace list no longer matches by a side row outside a share's window
+    Given a member shares its traces into an aggregate from a time onwards
+    And one of the member's traces was evaluated before that time
+    When the aggregate's list is filtered by that evaluator
+    Then the trace is not listed, though the member's own list still lists it

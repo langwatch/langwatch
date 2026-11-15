@@ -6,13 +6,14 @@
  */
 import type { Project, ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { Protections, ResolvedInstantEvalRun, TraceListRead } from "@langwatch/trace-contract";
+import type { Protections, ResolvedInstantEvalRun } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { ownProof } from "../../__tests__/support/authorization-proofs.fixture.ts";
 import { CLICKHOUSE_FACET_CATALOG } from "../../features/facet/repositories/clickhouse/clickhouse.trace-facet-registry.mapper.ts";
 import { TraceListService } from "../../features/read/services/trace-list-read.service.ts";
 import { MemoryTraceEvaluationRunsRepository } from "../../repositories/memory/memory.trace-evaluation-runs.repository.ts";
+import type { TraceListRead } from "../../repositories/trace-list.repository.ts";
 import { createTraceAppHarness } from "./support/trace-app.harness.ts";
 
 const PROJECT_ID = "project-1";

@@ -88,6 +88,27 @@ export interface CompiledTraceFilter {
   readsSpans: boolean;
 }
 
+/** A read's trace filter, compiled for the scope that read runs under (ADR-202 Decided 25). */
+export type TraceFilterCompile = (input: { scope: ReaderScope }) => TraceFilterCompilation;
+
+/** `compilation` with `terms` ANDed on; empty when neither carries a term. */
+export function andTraceFilterTerms({
+  compilation,
+  terms,
+}: {
+  compilation: TraceFilterCompilation;
+  terms: readonly TraceFilterCondition[];
+}): TraceFilterCompilation {
+  const all = compilation.kind === "compiled" ? [compilation.where, ...terms] : [...terms];
+  const [first, ...rest] = all;
+  if (first === undefined) return { kind: "empty" };
+  return {
+    kind: "compiled",
+    where: rest.length === 0 ? first : (ops) => ops.and(...all.map((term) => term(ops))),
+    readsSpans: compilation.kind === "compiled" && compilation.readsSpans,
+  };
+}
+
 interface Compilation {
   ctx: TranslationContext;
   /** A proof-fenced read: every side subquery reads its shared windows (Decided 27). */
@@ -105,8 +126,24 @@ const constant =
   () =>
     condition;
 
+/**
+ * `NOT term`. A side-table term negates as `NOT IN`: `NOT (… IN (SELECT …))` would negate the
+ * subquery's tenant predicate, which the reader refuses.
+ */
+function negatedTerm(term: TraceFilterCondition): TraceFilterCondition {
+  return (ops) => {
+    let membership: Condition | undefined;
+    const within: typeof ops.within = (left, build, options) => {
+      membership = ops.within(left, build, { negated: options?.negated !== true });
+      return membership;
+    };
+    const condition = term({ ...ops, within });
+    return membership !== undefined && condition === membership ? condition : ops.not(condition);
+  };
+}
+
 const polarised = (term: TraceFilterCondition, negated: boolean): TraceFilterCondition =>
-  negated ? (ops) => ops.not(term(ops)) : term;
+  negated ? negatedTerm(term) : term;
 
 const nothing = (negated: boolean) => constant(negated ? cond.always() : cond.never());
 
@@ -663,7 +700,7 @@ function freeText(tag: TagToken, negated: boolean, c: Compilation): TraceFilterC
     : name;
   const named = spansWith(c, fn.ilike(spans.SpanName, pattern));
   return negated
-    ? (ops) => ops.and(ops.not(own), ops.not(named(ops)))
+    ? (ops) => ops.and(ops.not(own), negatedTerm(named)(ops))
     : (ops) => ops.or(own, named(ops));
 }
 
@@ -710,7 +747,7 @@ function evaluationScope(scope: EvaluationScope, c: Compilation): TraceFilterCon
     latestEvaluationRunsWith({ c, evaluatorId, inner });
   const keptRuns = runsOf(kept);
   const excludedRuns = excluded.map((condition) => runsOf([condition]));
-  return (ops) => ops.and(keptRuns(ops), ...excludedRuns.map((term) => ops.not(term(ops))));
+  return (ops) => ops.and(keptRuns(ops), ...excludedRuns.map((term) => negatedTerm(term)(ops)));
 }
 
 function isEvaluationFacet(
@@ -781,6 +818,35 @@ export function translateFilterConditions({
   });
   if (where.kind === "empty") return where;
   return { kind: "compiled", where: where.compiled, readsSpans: c.readsSpans };
+}
+
+/** A query compiled inside each read for that read's scope (Decided 25), `terms` ANDed on. */
+export function traceFilterCompileOf({
+  terms = [],
+  ...options
+}: {
+  queryText: string;
+  timeRange: { from: number; to: number };
+  evalRuns?: readonly ResolvedInstantEvalRun[];
+  searchContent?: boolean;
+  isHiddenAttribute?: (key: string) => boolean;
+  fields: TraceQueryFieldsService;
+  terms?: readonly TraceFilterCondition[];
+}): TraceFilterCompile {
+  return ({ scope }) =>
+    andTraceFilterTerms({ compilation: compileTraceFilterCondition({ ...options, scope }), terms });
+}
+
+/** The traces of one conversation, as the conversation-context read selects them. */
+export function conversationTraceFilter({
+  conversationId,
+}: {
+  conversationId: string;
+}): TraceFilterCompile {
+  const where = constant(
+    cond.eq(TRACE_SUMMARY_CATEGORICAL_EXPRESSIONS.conversation, conversationId),
+  );
+  return () => ({ kind: "compiled", where, readsSpans: false });
 }
 
 /** The Explorer's hidden origins left out, as `findHiddenOriginConditions` writes it. */

@@ -21,17 +21,22 @@ import {
   FACET_REGISTRY,
 } from "../../../features/facet/repositories/clickhouse/clickhouse.trace-facet-registry.mapper.ts";
 import { createFacetFilterResolver } from "../../../features/facet/rules/trace-facet-filter.rules.ts";
+import type { TraceFilterCompile } from "../../../features/query/repositories/clickhouse/clickhouse.trace-filter-condition.mapper.ts";
 import { TraceListService } from "../../../features/read/services/trace-list-read.service.ts";
 import {
-  andFilterConditions,
   explorerOriginExclusion,
-  findHiddenOriginConditions,
   type TraceFilterWhere,
 } from "../../../rules/trace-filter-hidden-origins.rules.ts";
-import { traceQueryTranslation } from "../../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
+import {
+  traceFilterCompileFor,
+  traceQueryTranslation,
+} from "../../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
 import { MemoryTraceEvaluationRunsRepository } from "../../memory/memory.trace-evaluation-runs.repository.ts";
 import { TraceListClickHouseRepository } from "../trace-list.repository.ts";
-import { authorizedClickHouseFor } from "./support/authorized-clickhouse.support.ts";
+import {
+  authorizedClickHouseFor,
+  traceQueryClientFor,
+} from "./support/authorized-clickhouse.support.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
@@ -112,22 +117,29 @@ function compiled({
   return filter;
 }
 
-/** The Explorer's filter: the query's own conditions and the origins it hides. */
-function explorerFilter({ query }: { query: string }): TraceFilterWhere {
-  return andFilterConditions([
-    ...(query ? [compiled({ queryText: query })] : []),
-    ...findHiddenOriginConditions({ hiddenOrigins: explorerHiddenOrigins(query) }),
-  ]);
+/** The Explorer's filter as the list reads take it, compiled inside each read. */
+function explorerCompile({ query }: { query: string }): TraceFilterCompile {
+  return traceFilterCompileFor({
+    queryText: query,
+    timeRange,
+    hiddenOrigins: explorerHiddenOrigins(query),
+  });
 }
 
-function listWith({ tenantId, filterWhere }: { tenantId: string; filterWhere: TraceFilterWhere }) {
+function listWith({
+  tenantId,
+  compileFilter,
+}: {
+  tenantId: string;
+  compileFilter: TraceFilterCompile;
+}) {
   return repo.listAll({
     authorization: ownProof({ projectId: tenantId }),
     timeRange,
     sort: { column: "OccurredAt", direction: "desc" },
     limit: 50,
     offset: 0,
-    filterWhere,
+    compileFilter,
   });
 }
 
@@ -158,7 +170,10 @@ async function categoricalCounts({
 beforeAll(async () => {
   if (!clickHouseConfigured) return;
   ch = await startMigratedTraceClickHouse();
-  repo = TraceListClickHouseRepository.create({ clickhouse: authorizedClickHouseFor(ch) });
+  repo = TraceListClickHouseRepository.create({
+    clickhouse: authorizedClickHouseFor(ch),
+    reader: traceQueryClientFor(ch),
+  });
 }, 120_000);
 
 describe.skipIf(!clickHouseConfigured)("the Explorer's hidden origins on the trace list", () => {
@@ -191,7 +206,7 @@ describe.skipIf(!clickHouseConfigured)("the Explorer's hidden origins on the tra
     it("lists only the customer trace with the default hidden origins", async () => {
       const page = await listWith({
         tenantId,
-        filterWhere: explorerFilter({ query: "" }),
+        compileFilter: explorerCompile({ query: "" }),
       });
 
       expect(page.rows.map((row) => row.traceId)).toEqual([customerTraceId]);
@@ -202,7 +217,7 @@ describe.skipIf(!clickHouseConfigured)("the Explorer's hidden origins on the tra
     it("lists only Langy's turn once the query asks for that origin", async () => {
       const page = await listWith({
         tenantId,
-        filterWhere: explorerFilter({ query: "origin:langy" }),
+        compileFilter: explorerCompile({ query: "origin:langy" }),
       });
 
       expect(page.rows.map((row) => row.traceId)).toEqual([langyTraceId]);
@@ -213,7 +228,7 @@ describe.skipIf(!clickHouseConfigured)("the Explorer's hidden origins on the tra
     it("keeps a filter of its own and still hides the turn", async () => {
       const page = await listWith({
         tenantId,
-        filterWhere: explorerFilter({ query: "status:ok" }),
+        compileFilter: explorerCompile({ query: "status:ok" }),
       });
 
       expect(page.rows.map((row) => row.traceId)).toEqual([customerTraceId]);
@@ -225,7 +240,7 @@ describe.skipIf(!clickHouseConfigured)("the Explorer's hidden origins on the tra
         authorization: ownProof({ projectId: tenantId }),
         timeRange,
         since: base - 1,
-        filterWhere: explorerFilter({ query: "" }),
+        compileFilter: explorerCompile({ query: "" }),
       });
 
       expect(count).toBe(1);
@@ -263,6 +278,8 @@ describe.skipIf(!clickHouseConfigured)("an eval chip on the trace list", () => {
 
   const chipFilter = ({ query, run }: { query: string; run: string }) =>
     compiled({ queryText: query, evalRuns: [runOf(run)] });
+  const chipCompile = ({ query, run }: { query: string; run: string }) =>
+    traceFilterCompileFor({ queryText: query, timeRange, evalRuns: [runOf(run)] });
 
   function judgment({
     tenant,
@@ -339,7 +356,10 @@ describe.skipIf(!clickHouseConfigured)("an eval chip on the trace list", () => {
   describe("given a run of the project with judgements on three traces", () => {
     it("lists the two passed traces, and the sidebar counts the same two", async () => {
       const filterWhere = chipFilter({ query: `eval:"${question}"`, run: runId });
-      const page = await listWith({ tenantId, filterWhere });
+      const page = await listWith({
+        tenantId,
+        compileFilter: chipCompile({ query: `eval:"${question}"`, run: runId }),
+      });
 
       expect(page.totalHits).toBe(2);
       expect(page.rows.map((row) => row.traceId).toSorted()).toEqual([passedA, passedB]);
@@ -351,7 +371,7 @@ describe.skipIf(!clickHouseConfigured)("an eval chip on the trace list", () => {
     it("keeps the other chips in force beside the eval chip", async () => {
       const page = await listWith({
         tenantId,
-        filterWhere: chipFilter({ query: `service:worker AND eval:"${question}"`, run: runId }),
+        compileFilter: chipCompile({ query: `service:worker AND eval:"${question}"`, run: runId }),
       });
 
       expect(page.totalHits).toBe(0);
@@ -362,7 +382,7 @@ describe.skipIf(!clickHouseConfigured)("an eval chip on the trace list", () => {
     it("lists no traces", async () => {
       const page = await listWith({
         tenantId,
-        filterWhere: chipFilter({ query: `eval:"${question}"`, run: foreignRunId }),
+        compileFilter: chipCompile({ query: `eval:"${question}"`, run: foreignRunId }),
       });
 
       expect(page.totalHits).toBe(0);
@@ -444,7 +464,7 @@ describe.skipIf(!clickHouseConfigured)("the sidebar's counts against the table",
 
       const page = await listWith({
         tenantId,
-        filterWhere: explorerFilter({ query: "status:error AND service:api" }),
+        compileFilter: explorerCompile({ query: "status:error AND service:api" }),
       });
 
       expect(page.totalHits).toBe(apiCount);
@@ -458,7 +478,7 @@ describe.skipIf(!clickHouseConfigured)("the sidebar's counts against the table",
       expect(everything.get("status")).toEqual({ error: 3, ok: 1 });
 
       const query = "service:nobody";
-      const page = await listWith({ tenantId, filterWhere: explorerFilter({ query }) });
+      const page = await listWith({ tenantId, compileFilter: explorerCompile({ query }) });
       expect(page.totalHits).toBe(0);
 
       const counts = await sidebarCounts({ tenantId, query });

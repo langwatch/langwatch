@@ -5,13 +5,14 @@
  */
 import type { Authorization } from "@langwatch/authorization";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { BatchedFacetResult, TraceListRead } from "@langwatch/trace-contract";
+import type { BatchedFacetResult } from "@langwatch/trace-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ownProof } from "../../__tests__/support/authorization-proofs.fixture.ts";
 import { CLICKHOUSE_FACET_CATALOG } from "../../features/facet/repositories/clickhouse/clickhouse.trace-facet-registry.mapper.ts";
 import { TraceListService } from "../../features/read/services/trace-list-read.service.ts";
 import { MemoryTraceEvaluationRunsRepository } from "../../repositories/memory/memory.trace-evaluation-runs.repository.ts";
+import type { TraceListRead } from "../../repositories/trace-list.repository.ts";
 
 const HOUR = 3_600_000;
 const MINUTE = 60_000;

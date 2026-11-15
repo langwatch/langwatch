@@ -177,7 +177,10 @@ function composeApp(): TraceModule {
         evaluationRuns,
       }),
       list: TraceListService.create({
-        repository: TraceListClickHouseRepository.create({ clickhouse }),
+        repository: TraceListClickHouseRepository.create({
+          clickhouse,
+          reader: traceQueryClientFor(ch),
+        }),
         evaluationRuns,
         topicNames: MemoryTraceTopicNamesRepository.create(),
         facets: CLICKHOUSE_FACET_CATALOG,

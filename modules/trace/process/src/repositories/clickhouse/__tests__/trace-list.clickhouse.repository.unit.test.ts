@@ -1,12 +1,18 @@
+// The statements the list reads build: a page in two stages (keys, then payload) and the count,
+// each under one full-window version dedup; the companion integration suites prove the rows.
 import { AuthorizedClickHouse } from "@langwatch/clickhouse-client";
-import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
-// Unit tests for SQL `listAll` emits. List pages in two stages: inner picks
-// page traces (keys only), outer reads payload. Dedup is full-window aggregate.
-// Assertions on emitted SQL; companion integration test proves semantics
-import type { TraceListQuery } from "@langwatch/trace-contract";
+import { cond } from "@langwatch/clickhouse-client/builder";
+import {
+  idIndexedClientDouble,
+  type ScriptedStatements,
+} from "@langwatch/clickhouse-client/testing";
 import { describe, expect, it, vi } from "vitest";
 
 import { ownProof } from "../../../__tests__/support/authorization-proofs.fixture.ts";
+import type { TraceFilterCompile } from "../../../features/query/repositories/clickhouse/clickhouse.trace-filter-condition.mapper.ts";
+import type { TraceListQuery } from "../../trace-list.repository.ts";
+import { TRACE_ID_INDEXES } from "../clickhouse.trace-id-indexes.database.ts";
+import { traceSummaries } from "../clickhouse.trace-summaries.table.ts";
 import { TraceListClickHouseRepository } from "../trace-list.repository.ts";
 
 /** The full-window version dedup, identified by its GROUP BY. */
@@ -21,16 +27,21 @@ function occurrences({ haystack, needle }: { haystack: string; needle: string })
 
 function makeRepo() {
   const queries: string[] = [];
-  const client = clickHouseQueryClientDouble({
-    query: vi.fn(async ({ sql }: { sql: string }) => {
-      queries.push(sql);
-      return { rows: [] };
-    }),
+  const client = idIndexedClientDouble({
+    indexes: TRACE_ID_INDEXES,
+    driver: {
+      execute: vi.fn<ScriptedStatements["execute"]>(async (request) => {
+        queries.push(request.sql);
+        return { rows: [] };
+      }),
+    },
   });
   return {
     repo: TraceListClickHouseRepository.create({
       clickhouse: new AuthorizedClickHouse({ resolveClient: async () => client }),
+      reader: client,
     }),
+    client,
     queries,
   };
 }
@@ -50,7 +61,48 @@ function baseQuery(overrides: Partial<TraceListQuery> = {}): TraceListQuery {
 const isPageQuery = (sql: string) => sql.includes("ComputedInput");
 const isCountQuery = (sql: string) => sql.includes("totalHits");
 
-const USER_FILTER = "AnnotationIds != []";
+/** A user filter on a column no stage of the list read otherwise names. */
+const USER_FILTER = "SatisfactionScore";
+const userFilter: TraceFilterCompile = () => ({
+  kind: "compiled",
+  where: () => cond.gt(traceSummaries.SatisfactionScore, 0.5),
+  readsSpans: false,
+});
+
+describe("TraceListClickHouseRepository built reads (unit)", () => {
+  describe("when the page, the count, the new-trace count and the trace refs are read", () => {
+    it("sends each as a tenant statement fenced by the proof with the tenant setting", async () => {
+      const { repo, client } = makeRepo();
+      const read = vi.spyOn(client, "read");
+      const authorization = ownProof({ projectId: "tenant-1" });
+
+      await repo.listAll(baseQuery({ compileFilter: userFilter }));
+      await repo.findCount({
+        authorization,
+        timeRange: { from: 1_000, to: 2_000 },
+        since: 1_500,
+        compileFilter: userFilter,
+      });
+      await repo.findTraceRefs({
+        authorization,
+        timeRange: { from: 1_000, to: 2_000 },
+        compileFilter: userFilter,
+        limit: 10,
+      });
+
+      expect(read).toHaveBeenCalledTimes(4);
+      for (const [{ statement }] of read.mock.calls) {
+        expect(statement).toMatchObject({
+          identity: "reader",
+          kind: "tenant",
+          tenantId: "tenant-1",
+        });
+        expect(statement.settings).toMatchObject({ SQL_langwatch_tenant_ids: "tenant-1" });
+        expect(statement.sql).not.toContain("{{tenantScope");
+      }
+    });
+  });
+});
 
 describe("TraceListClickHouseRepository.listAll (unit)", () => {
   describe("when the caller asks for a page of traces", () => {
@@ -102,8 +154,8 @@ describe("TraceListClickHouseRepository.listAll (unit)", () => {
       );
 
       const pageQuery = queries.find(isPageQuery)!;
-      expect(pageQuery).toContain(
-        "(TenantId, TraceId) > ({cursorTenantId:String}, {cursorTraceId:String})",
+      expect(pageQuery).toMatch(
+        /tuple\(TenantId, TraceId\) > tuple\(\{v\d+:String\}, \{v\d+:String\}\)/,
       );
       expect(pageQuery).not.toMatch(/AND TraceId > \{cursorTraceId/);
       expect(
@@ -121,7 +173,7 @@ describe("TraceListClickHouseRepository.listAll (unit)", () => {
 
       await repo.listAll(
         baseQuery({
-          filterWhere: { sql: USER_FILTER, params: { unused: 1 } },
+          compileFilter: userFilter,
         }),
       );
 
@@ -143,7 +195,7 @@ describe("TraceListClickHouseRepository.listAll (unit)", () => {
 
       await repo.listAll(
         baseQuery({
-          filterWhere: { sql: USER_FILTER, params: { unused: 1 } },
+          compileFilter: userFilter,
         }),
       );
 

@@ -13,7 +13,6 @@ import type {
   DiscoverResult,
   DiscreteFacetResult,
   FacetDescriptor,
-  TraceListRead,
 } from "@langwatch/trace-contract";
 
 import type {
@@ -26,6 +25,7 @@ import { isExpressionCategorical } from "../features/facet/rules/trace-facet-cla
 import type { FacetFilterResolver } from "../features/facet/rules/trace-facet-filter.rules.ts";
 import { TraceFacetDescriptorService } from "../features/facet/services/trace-facet-descriptor.service.ts";
 import type { TraceTopicNamingService } from "../features/topic/services/trace-topic-naming.service.ts";
+import type { TraceListRead } from "../repositories/trace-list.repository.ts";
 import type { TraceFilterWhere } from "../rules/trace-filter-hidden-origins.rules.ts";
 import {
   discoverCacheKey,
