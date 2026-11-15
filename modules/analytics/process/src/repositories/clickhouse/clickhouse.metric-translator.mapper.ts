@@ -344,7 +344,8 @@ export function buildMetricAlias({
   key?: string;
   subkey?: string;
 }): string {
-  const parts = [index.toString(), sanitizeAliasPart(metric), aggregation];
+  // An identifier may not start with a digit (ADR-202 Decided 26): the index is prefixed.
+  const parts = [`m${index}`, sanitizeAliasPart(metric), aggregation];
   if (key) parts.push(sanitizeAliasPart(key));
   if (subkey) parts.push(sanitizeAliasPart(subkey));
   return parts.join("__");

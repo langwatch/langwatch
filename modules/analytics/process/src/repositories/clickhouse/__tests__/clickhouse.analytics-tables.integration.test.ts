@@ -8,16 +8,20 @@ import type { ClickHouseTableFacts } from "@langwatch/clickhouse-client/builder"
 import { describe, expect, it } from "vitest";
 
 import { startMigratedClickHouse } from "../../../__tests__/migrated-clickhouse.harness.ts";
+import { evaluationAnalyticsRollup } from "../clickhouse.evaluation-analytics-rollup.table.ts";
 import { evaluationAnalytics } from "../clickhouse.evaluation-analytics.table.ts";
 import { evaluationRuns } from "../clickhouse.evaluation-runs.table.ts";
 import { storedSpans } from "../clickhouse.stored-spans.table.ts";
+import { traceAnalyticsRollup } from "../clickhouse.trace-analytics-rollup.table.ts";
 import { traceAnalytics } from "../clickhouse.trace-analytics.table.ts";
 import { traceSummaries } from "../clickhouse.trace-summaries.table.ts";
 
 const DESCRIPTORS: readonly { readonly $table: ClickHouseTableFacts }[] = [
   evaluationAnalytics,
+  evaluationAnalyticsRollup,
   // Declared shares (clickhouse-table-ownership.ts): only the columns analytics reads.
   traceAnalytics,
+  traceAnalyticsRollup,
   traceSummaries,
   storedSpans,
   evaluationRuns,

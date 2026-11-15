@@ -43,7 +43,7 @@ describe("buildTimeseriesQuery() date-bucketed pipeline final select", () => {
       const { sql } = buildTimeseriesQuery(hourlyInput([threadsPerUser]));
 
       expect(finalSelectOf(sql)).toBe(
-        "SELECT * FROM cte_0__metadata_thread_id__cardinality WHERE period IS NOT NULL ORDER BY period, date\n  ",
+        "SELECT * FROM cte_m0__metadata_thread_id__cardinality WHERE period IS NOT NULL ORDER BY period, date\n  ",
       );
     });
   });
@@ -54,10 +54,10 @@ describe("buildTimeseriesQuery() date-bucketed pipeline final select", () => {
       const finalSelect = finalSelectOf(sql);
 
       expect(finalSelect).toContain(
-        "SELECT cte_0__metadata_thread_id__cardinality.period, cte_0__metadata_thread_id__cardinality.date, cte_0__metadata_thread_id__cardinality.`0__metadata_thread_id__cardinality`",
+        "SELECT cte_m0__metadata_thread_id__cardinality.period, cte_m0__metadata_thread_id__cardinality.date, cte_m0__metadata_thread_id__cardinality.m0__metadata_thread_id__cardinality",
       );
       expect(finalSelect).toContain(
-        "FULL OUTER JOIN cte_1__metadata_trace_id__cardinality ON cte_0__metadata_thread_id__cardinality.period = cte_1__metadata_trace_id__cardinality.period AND cte_0__metadata_thread_id__cardinality.date = cte_1__metadata_trace_id__cardinality.date",
+        "FULL OUTER JOIN cte_m1__metadata_trace_id__cardinality ON cte_m0__metadata_thread_id__cardinality.period = cte_m1__metadata_trace_id__cardinality.period AND cte_m0__metadata_thread_id__cardinality.date = cte_m1__metadata_trace_id__cardinality.date",
       );
     });
   });
@@ -69,10 +69,10 @@ describe("buildTimeseriesQuery() date-bucketed pipeline final select", () => {
 
       expect(sql).toContain("simple_metrics AS (");
       expect(finalSelect).toContain(
-        "SELECT simple_metrics.period, simple_metrics.date, simple_metrics.`0__metadata_trace_id__cardinality`",
+        "SELECT simple_metrics.period, simple_metrics.date, simple_metrics.m0__metadata_trace_id__cardinality",
       );
       expect(finalSelect).toContain(
-        "FULL OUTER JOIN cte_1__metadata_thread_id__cardinality ON simple_metrics.period = cte_1__metadata_thread_id__cardinality.period",
+        "FULL OUTER JOIN cte_m1__metadata_thread_id__cardinality ON simple_metrics.period = cte_m1__metadata_thread_id__cardinality.period",
       );
       expect(finalSelect).toContain("WHERE simple_metrics.period IS NOT NULL");
     });

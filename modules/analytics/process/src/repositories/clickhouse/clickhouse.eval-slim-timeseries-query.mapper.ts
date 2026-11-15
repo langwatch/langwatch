@@ -4,24 +4,45 @@
  * `tenantScope` marker and dedups with `latestVersionSubquery`.
  */
 
-import type { AnalyticsAggregation, BuiltAnalyticsQuery } from "@langwatch/analytics-contract";
-import { tenantScope, tenantSet } from "@langwatch/clickhouse-client";
+import {
+  clickhouseRead,
+  column,
+  type Condition,
+  cond,
+  type Expression,
+  fn,
+  param,
+  type ReaderReadStatement,
+} from "@langwatch/clickhouse-client/builder";
 
 import type { TimeseriesQueryInput } from "./clickhouse.aggregation-builder.mapper.ts";
-import { latestVersionSubquery } from "./clickhouse.latest-version-dedup.mapper.ts";
+import { evaluationAnalytics as ea } from "./clickhouse.evaluation-analytics.table.ts";
 import { buildMetricAlias } from "./clickhouse.metric-translator.mapper.ts";
 import {
-  dateTrunc,
+  dateBucket,
   type EvalMetricKey,
+  groupKeyOf,
   hasFilterValues,
+  inEitherPeriod,
   isEvalMetricKey,
-  isPercentile,
-  percentileFor,
-  referencedAliasColumns,
+  type Measure,
+  periodOf,
+  slimAggregate,
+  type TimeseriesRead,
 } from "./clickhouse.timeseries-query-shared.mapper.ts";
 
-const SLIM_TABLE = "evaluation_analytics" as const;
-const ea = "ea";
+/** The columns a deduped evaluation may carry; a read carries only those its series name. */
+const CARRIED = ["OccurredAt", "Status", "Score", "Passed", "EvaluatorType", "Label"] as const;
+type Carried = (typeof CARRIED)[number];
+
+/** The carried tuple, indexed by position. */
+type CarriedRow = readonly unknown[] & { readonly [position: `${number}`]: unknown };
+
+/** One evaluation's newest value of a carried column, and its id (the dedup key). */
+type LatestEvaluation<T extends string> = {
+  carried: (name: Carried) => Measure<T>;
+  evaluationId: Measure<T>;
+};
 
 /** Group-by keys the eval slim builder serves. */
 type EvalSlimGroupByKey =
@@ -33,19 +54,23 @@ type EvalSlimGroupByKey =
 /** Eval-slim eligible metric keys (must match SLIM_ELIGIBLE_EVAL_METRIC_KEYS). */
 
 /**
- * Maps an eval metric to its slim column. `Passed` is `Nullable(Bool)`; we
- * coerce with `toUInt8` so `avg` reads as a pass rate. Verdict metrics null
- * themselves on incomplete runs so a stray verdict can't shift the chart (#6833).
+ * An eval metric's slim column. `Passed` is `Nullable(Bool)`, coerced with `toUInt8` so `avg`
+ * reads as a pass rate. Verdict metrics null themselves on incomplete runs (#6833).
  */
-function evalSlimColumnFor(metric: EvalMetricKey): string {
+function evalSlimColumnFor<T extends string>(
+  metric: EvalMetricKey,
+  { carried, evaluationId }: LatestEvaluation<T>,
+): Measure<T> {
+  const processed = cond.eq(carried("Status"), param.string("processed"));
   switch (metric) {
     case "evaluations.evaluation_score":
-      return `if(${ea}.Status = 'processed', ${ea}.Score, NULL)`;
+      return fn.if(processed, carried("Score"), fn.nullAs(column.nullable(column.float64())));
     case "evaluations.evaluation_pass_rate":
-      // Treat true as 1, false as 0; null stays null (excluded from avg).
-      return `toUInt8(if(${ea}.Status = 'processed', ${ea}.Passed, NULL))`;
+      return fn.toUInt8(
+        fn.if(processed, carried("Passed"), fn.nullAs(column.nullable(column.bool()))),
+      );
     case "evaluations.evaluation_runs":
-      return `${ea}.EvaluationId`;
+      return evaluationId;
     default: {
       const _exhaustive: never = metric;
       throw new Error(
@@ -67,25 +92,36 @@ function isEvalSlimGroupByKey(groupBy: string): groupBy is EvalSlimGroupByKey {
   }
 }
 
-function buildEvalSlimGroupByExpression(groupBy?: string): string | null {
-  if (!groupBy) return null;
+function buildEvalSlimGroupByExpression<T extends string>(
+  groupBy: string | undefined,
+  { carried }: LatestEvaluation<T>,
+): Measure<T> | undefined {
+  if (!groupBy) return undefined;
   if (!isEvalSlimGroupByKey(groupBy)) {
     throw new Error(`Eval slim builder cannot group by "${groupBy}".`);
   }
+  const unknown = param.string("unknown");
+  const notProcessed = cond.ne(carried("Status"), param.string("processed"));
   switch (groupBy) {
-    case "evaluations.evaluator_type":
-      return `if(${ea}.EvaluatorType = '', 'unknown', ${ea}.EvaluatorType)`;
-    case "evaluations.evaluation_passed":
-      // Nullable(Bool) → display string for group_key. Status-gated like the
-      // metric columns: a historical errored row carrying a stray verdict
-      // must bucket as 'unknown', not 'failed' — the legacy per-evaluator
-      // path gates the same way (aggregation-builder.ts, #6833).
-      return `if(${ea}.Status != 'processed' OR ${ea}.Passed IS NULL, 'unknown', if(${ea}.Passed, 'passed', 'failed'))`;
+    case "evaluations.evaluator_type": {
+      const type = carried("EvaluatorType");
+      return fn.if(cond.eq(type, param.string("")), unknown, type);
+    }
+    case "evaluations.evaluation_passed": {
+      // Status-gated like the metric columns: a historical errored row carrying a stray verdict
+      // buckets as 'unknown', not 'failed', as the legacy per-evaluator path does (#6833).
+      const passed = carried("Passed");
+      return fn.if(
+        cond.or(notProcessed, cond.isNull(passed)),
+        unknown,
+        fn.if(passed as Condition<T>, param.string("passed"), param.string("failed")),
+      );
+    }
     case "evaluations.evaluation_label":
-      // Same status gate — an errored run's label is not a verdict (#6833).
-      return `if(${ea}.Status != 'processed', 'unknown', coalesce(${ea}.Label, 'unknown'))`;
+      // Same status gate: an errored run's label is not a verdict (#6833).
+      return fn.if(notProcessed, unknown, fn.coalesce(carried("Label"), unknown));
     case "evaluations.evaluation_status":
-      return `${ea}.Status`;
+      return carried("Status");
     default: {
       const _exhaustive: never = groupBy;
       throw new Error(`Unhandled eval slim group-by: ${String(_exhaustive)}`);
@@ -93,117 +129,35 @@ function buildEvalSlimGroupByExpression(groupBy?: string): string | null {
   }
 }
 
-// isPercentile + percentileFor moved to _shared.
-
-/**
- * Eval slim aggregation expression. Percentiles use `quantileTDigest`, like
- * the trace slim builder: the read spans the whole range, and an exact
- * quantile keeps every value of the group in memory.
- */
-function evalSlimAggExpression(agg: AnalyticsAggregation, column: string): string {
-  if (isPercentile(agg)) {
-    return `quantileTDigest(${percentileFor(agg)})(${column})`;
-  }
-  switch (agg) {
-    case "sum":
-      return `coalesce(sum(${column}), 0)`;
-    case "avg":
-      return `avg(${column})`;
-    case "min":
-      return `min(${column})`;
-    case "max":
-      return `max(${column})`;
-    case "cardinality":
-    case "terms":
-      return `uniq(${column})`;
-    default:
-      throw new Error(`Unhandled eval slim aggregation: ${String(agg)}`);
-  }
-}
-
-/**
- * Deduped FROM-clause for the eval slim table (`ReplacingMergeTree(UpdatedAt)`): the latest
- * version of each evaluation in range via {@link latestVersionSubquery}, carrying only the
- * columns the outer query reads.
- */
-function dedupedSlim({
-  alias,
-  dateClause,
-  expressions,
-}: {
-  alias: string;
-  dateClause: string;
-  expressions: readonly string[];
-}): string {
-  const keyColumns = ["TenantId", "EvaluationId"];
-  const columns = referencedAliasColumns({ alias, expressions, keyColumns });
-  return latestVersionSubquery({
-    table: SLIM_TABLE,
-    alias,
-    keyColumns,
-    columns: columns.map((name) => ({ name })),
-    where: `${tenantScope("OccurredAt")} ${dateClause}`,
-  });
-}
-
-const SLIM_DATE_FILTER_BOTH_PERIODS = `AND ((OccurredAt >= {currentStart:DateTime64(3)} AND OccurredAt < {currentEnd:DateTime64(3)}) OR (OccurredAt >= {previousStart:DateTime64(3)} AND OccurredAt < {previousEnd:DateTime64(3)}))`;
-
 /**
  * The eval slim serves no filter fields (its Attributes hold only the
  * evaluation events' metadata), so `pickAnalyticsTable` routes every filtered
  * query to `evaluation_runs`. A filter reaching here is a routing bug.
  */
-function buildEvalSlimFilterClauses(filters: TimeseriesQueryInput["filters"]): {
-  whereClause: string;
-  params: Record<string, unknown>;
-} {
+function refuseEvalSlimFilters(filters: TimeseriesQueryInput["filters"]): void {
   for (const [field, rawValue] of Object.entries(filters ?? {})) {
     if (!hasFilterValues(rawValue)) continue;
     throw new Error(
       `Eval slim builder cannot serve filter "${field}". The router should have routed this to evaluation_runs.`,
     );
   }
-  return { whereClause: "", params: {} };
 }
 
-/**
- * Builds a slim query for `evaluation_analytics`, UNKEYED series only —
- * it hoists `EvaluatorType`, not `EvaluatorId`, so keyed series route to
- * `evaluation_runs` instead.
- */
-export function buildEvalSlimTimeseriesQuery(input: TimeseriesQueryInput): BuiltAnalyticsQuery {
-  const timeZone = input.timeZone ?? "UTC";
-
-  const selectExprs: string[] = [];
-  selectExprs.push(
-    `CASE
-      WHEN ${ea}.LatestOccurredAt >= {currentStart:DateTime64(3)} AND ${ea}.LatestOccurredAt < {currentEnd:DateTime64(3)} THEN 'current'
-      WHEN ${ea}.LatestOccurredAt >= {previousStart:DateTime64(3)} AND ${ea}.LatestOccurredAt < {previousEnd:DateTime64(3)} THEN 'previous'
-    END AS period`,
-  );
-  if (typeof input.timeScale === "number") {
-    selectExprs.push(`${dateTrunc(`${ea}.LatestOccurredAt`, input.timeScale, timeZone)} AS date`);
-  }
-
-  const groupByColumn = buildEvalSlimGroupByExpression(input.groupBy);
-  if (groupByColumn) {
-    selectExprs.push(
-      `if(${groupByColumn} IS NULL, 'unknown', toString(${groupByColumn})) AS group_key`,
-    );
-  }
-
-  for (let i = 0; i < input.series.length; i++) {
-    const s = input.series[i]!;
+/** The series and the group key over one evaluation's newest version. */
+function evalSlimShape<T extends string>(
+  input: TimeseriesQueryInput,
+  latest: LatestEvaluation<T>,
+): { metrics: Record<string, Measure<T>>; groupKey: Measure<T> | undefined } {
+  const grouping = buildEvalSlimGroupByExpression(input.groupBy, latest);
+  const metrics: Record<string, Measure<T>> = {};
+  input.series.forEach((s, i) => {
     if (!isEvalMetricKey(s.metric)) {
       throw new Error(
         `Eval slim builder cannot serve metric "${s.metric}". The router should have routed this to evaluation_runs.`,
       );
     }
-    // `evaluation_analytics` hoists `EvaluatorType`, not `EvaluatorId`, so a
-    // per-evaluator predicate cannot be expressed against this table. The
-    // router keeps keyed series on `evaluation_runs`; this throw is the
-    // backstop for a routing regression, which would otherwise return numbers
-    // blended across every evaluator in the project.
+    // `evaluation_analytics` hoists `EvaluatorType`, not `EvaluatorId`: a per-evaluator series
+    // would blend every evaluator, so the router keeps keyed series on `evaluation_runs`.
     if (s.key !== undefined || s.subkey !== undefined) {
       throw new Error(
         `Eval slim builder cannot filter by evaluator key "${String(s.key)}" — evaluation_analytics has no EvaluatorId column. The router should have routed this to evaluation_runs.`,
@@ -216,50 +170,83 @@ export function buildEvalSlimTimeseriesQuery(input: TimeseriesQueryInput): Built
       key: s.key,
       subkey: s.subkey,
     });
-    const expr = evalSlimAggExpression(s.aggregation, evalSlimColumnFor(s.metric));
-    selectExprs.push(`${expr} AS ${alias}`);
-  }
+    metrics[alias] = slimAggregate({
+      aggregation: s.aggregation,
+      of: evalSlimColumnFor(s.metric, latest),
+      table: "eval slim",
+    });
+  });
+  return { metrics, groupKey: grouping ? groupKeyOf(grouping) : undefined };
+}
 
-  const groupByExprs: string[] = ["period"];
-  if (typeof input.timeScale === "number") groupByExprs.push("date");
-  if (groupByColumn) groupByExprs.push("group_key");
-
-  const { whereClause: filterWhere, params: filterParams } = buildEvalSlimFilterClauses(
-    input.filters,
-  );
-
-  const havingClause = groupByColumn ? `HAVING group_key != ''` : "";
-
-  // The windowed fence sits inside dedupedSlim; the outer read takes the tenant set alone, since
-  // its time leaves the dedup as LatestOccurredAt (ADR-201 §3). Every OR nests below the fence.
-  const sql = `
-    SELECT
-      ${selectExprs.join(",\n      ")}
-    FROM ${dedupedSlim({
-      alias: ea,
-      dateClause: SLIM_DATE_FILTER_BOTH_PERIODS,
-      expressions: selectExprs,
-    })}
-    WHERE ${tenantSet()}
-      AND (
-        (${ea}.LatestOccurredAt >= {currentStart:DateTime64(3)} AND ${ea}.LatestOccurredAt < {currentEnd:DateTime64(3)})
-        OR
-        (${ea}.LatestOccurredAt >= {previousStart:DateTime64(3)} AND ${ea}.LatestOccurredAt < {previousEnd:DateTime64(3)})
-      )
-      ${filterWhere}
-    GROUP BY ${groupByExprs.join(", ")}
-    ${havingClause}
-    ORDER BY period${typeof input.timeScale === "number" ? ", date" : ""}
-  `;
-
-  return {
-    sql,
-    params: {
-      currentStart: input.startDate,
-      currentEnd: input.endDate,
-      previousStart: input.previousPeriodStartDate,
-      previousEnd: input.startDate,
-      ...filterParams,
+/**
+ * The slim read of `evaluation_analytics`, UNKEYED series only. Each evaluation's newest version
+ * in range is collapsed with a spillable `argMax` of a tuple (a NULL survives it) under the
+ * proof's windows on `OccurredAt` (clickhouse-queries.md, "Whole-range aggregates").
+ */
+export function evalSlimTimeseriesRead({
+  scope,
+  input,
+  settings,
+}: TimeseriesRead): ReaderReadStatement {
+  refuseEvalSlimFilters(input.filters);
+  const used = new Set<Carried>(["OccurredAt"]);
+  evalSlimShape(input, {
+    carried: (name) => {
+      used.add(name);
+      return ea[name];
     },
+    evaluationId: ea.EvaluationId,
+  });
+  const carried = CARRIED.filter((name) => used.has(name));
+
+  const versions = clickhouseRead({ scope })
+    .from(ea)
+    .withinWindows()
+    .select({
+      TenantId: ea.TenantId,
+      EvaluationId: ea.EvaluationId,
+      __version: ea.UpdatedAt,
+      __latest_row: fn.tuple(...carried.map((name) => ea[name])),
+    })
+    .where(() => inEitherPeriod(ea.OccurredAt, input))
+    .as("versions");
+  const latest = clickhouseRead({ scope })
+    .from(versions)
+    .select({
+      TenantId: versions.TenantId,
+      EvaluationId: versions.EvaluationId,
+      __latest: fn.argMax(versions.__latest_row, versions.__version),
+    })
+    .groupBy(versions.TenantId, versions.EvaluationId)
+    .as("ea");
+  const row = latest.__latest as Expression<CarriedRow, "ea">;
+  const newest: LatestEvaluation<"ea"> = {
+    carried: (name) => fn.tupleElement(row, `${carried.indexOf(name)}`),
+    evaluationId: latest.EvaluationId,
   };
+  const { metrics, groupKey } = evalSlimShape(input, newest);
+  const occurredAt = newest.carried("OccurredAt");
+  const period = periodOf(occurredAt, input);
+  const date =
+    typeof input.timeScale === "number"
+      ? dateBucket(occurredAt, input.timeScale, input.timeZone ?? "UTC")
+      : undefined;
+
+  const selection: Record<string, Measure<"ea">> = { period };
+  if (date) selection.date = date;
+  if (groupKey) selection.group_key = groupKey;
+  Object.assign(selection, metrics);
+
+  const keys = [period, ...(date ? [date] : []), ...(groupKey ? [groupKey] : [])];
+  const grouped = clickhouseRead({ scope })
+    .from(latest)
+    .select(selection)
+    .where(() => inEitherPeriod(occurredAt, input))
+    .groupBy(...keys);
+  const kept = groupKey ? grouped.having(({ ne }) => ne(groupKey, param.string(""))) : grouped;
+  const ordered = kept.orderBy("period");
+  return (date ? ordered.orderBy("date") : ordered)
+    .settings({ ...settings, log_comment: "analytics:timeseries:evaluation_analytics" })
+    .build() as ReaderReadStatement;
 }

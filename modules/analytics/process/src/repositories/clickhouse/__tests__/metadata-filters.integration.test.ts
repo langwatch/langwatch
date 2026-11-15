@@ -5,19 +5,24 @@
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
+import { tenantScope } from "@langwatch/clickhouse-client/builder";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
   deleteMigratedTenantRows,
   startMigratedClickHouse,
 } from "../../../__tests__/migrated-clickhouse.harness.ts";
+import { analyticsProof } from "../../__tests__/analytics-proof.fixture.ts";
 import {
   buildTimeseriesQuery,
   type TimeseriesQueryInput,
 } from "../clickhouse.aggregation-builder.mapper.ts";
 import { resetParamCounter } from "../clickhouse.filter-translator.mapper.ts";
-import { buildSlimTimeseriesQuery } from "../clickhouse.slim-timeseries-query.mapper.ts";
-import { ownProjectReaderOver } from "./support/clickhouse-query-client.support.ts";
+import { slimTimeseriesRead } from "../clickhouse.slim-timeseries-query.mapper.ts";
+import {
+  clickHouseQueryClientOver,
+  ownProjectReaderOver,
+} from "./support/clickhouse-query-client.support.ts";
 
 const TENANT_ID = "test-analytics-metadata-filters-919";
 const T0 = Math.floor((Date.now() - 60 * 60 * 1000) / 60_000) * 60_000;
@@ -41,7 +46,7 @@ const TRACES = [
 const SERIES = {
   metric: "metadata.trace_id",
   aggregation: "cardinality" as const,
-  alias: "0__metadata_trace_id__cardinality",
+  alias: "m0__metadata_trace_id__cardinality",
 };
 
 const traceId = (trace: (typeof TRACES)[number]) => `${TENANT_ID}-${trace.id}`;
@@ -90,10 +95,30 @@ function traceAnalyticsRow(trace: (typeof TRACES)[number]) {
 
 type Filters = TimeseriesQueryInput["filters"];
 
-/** Each graph table with its builder; both read through the proof as the repository sends them. */
+type Rows = Record<string, number | string>[];
+
+/** Each graph table with its read; both read through the proof as the repository sends them. */
 const BUILDERS = [
-  ["trace_summaries", buildTimeseriesQuery],
-  ["trace_analytics", buildSlimTimeseriesQuery],
+  [
+    "trace_summaries",
+    async (ch: ClickHouseClient, input: TimeseriesQueryInput): Promise<Rows> => {
+      const { sql, params } = buildTimeseriesQuery(input);
+      const statement = { query: sql, query_params: params, format: "JSONEachRow" } as const;
+      const reader = ownProjectReaderOver({ client: ch, projectId: TENANT_ID });
+      return (await (await reader.query(statement)).json()) as Rows;
+    },
+  ],
+  [
+    "trace_analytics",
+    async (ch: ClickHouseClient, input: TimeseriesQueryInput): Promise<Rows> => {
+      const scope = tenantScope.fromProof({
+        authorization: analyticsProof({ projectId: TENANT_ID }),
+        reads: "analytics",
+      });
+      const statement = slimTimeseriesRead({ scope, input, settings: {} });
+      return (await clickHouseQueryClientOver(ch).read({ statement })).rows as Rows;
+    },
+  ],
 ] as const;
 
 describe("analytics metadata filters", () => {
@@ -130,16 +155,11 @@ describe("analytics metadata filters", () => {
     /** Traces the series counts in the current period under `filters`. */
     const countWith = async (filters: Filters): Promise<number> => {
       resetParamCounter();
-      const { sql, params } = build({
+      const rows = await build(ch, {
         ...WINDOW,
         series: [SERIES],
         filters,
       });
-      const statement = { query: sql, query_params: params, format: "JSONEachRow" } as const;
-      const result = await ownProjectReaderOver({ client: ch, projectId: TENANT_ID }).query(
-        statement,
-      );
-      const rows = (await result.json()) as Record<string, number | string>[];
       return rows
         .filter((row) => row.period === "current")
         .reduce((sum, row) => sum + Number(row[SERIES.alias] ?? 0), 0);

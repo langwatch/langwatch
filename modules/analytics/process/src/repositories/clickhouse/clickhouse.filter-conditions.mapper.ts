@@ -58,7 +58,7 @@ const anyOf = <T extends string>([first, ...rest]: Condition<T>[]): Condition<T>
   first ? cond.or(first, ...rest) : cond.never();
 
 /** Custom metadata sits under three stored keys; trace-custom-metadata-conditions.ts names them. */
-const storedMetadataKeys = (key: string): [string, string, string] => {
+export const storedMetadataKeys = (key: string): [string, string, string] => {
   const rawKey = key.replaceAll("·", ".");
   return [`metadata.${rawKey}`, `langwatch.metadata.${rawKey}`, rawKey];
 };

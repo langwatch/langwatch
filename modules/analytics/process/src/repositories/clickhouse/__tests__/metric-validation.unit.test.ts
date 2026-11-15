@@ -63,7 +63,7 @@ describe("analytics timeseries metric validation", () => {
         );
 
         expect(built.sql).toContain("sum(ts.TotalCost)");
-        expect(built.sql).toContain("0__performance_total_cost__sum");
+        expect(built.sql).toContain("m0__performance_total_cost__sum");
       });
 
       /** @scenario "A known metric compiles to its ClickHouse expression" */

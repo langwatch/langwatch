@@ -186,8 +186,8 @@ describe("aggregation-builder", () => {
 
       // Both metrics must still be emitted by any valid fix.
       expect(result.sql).toContain("Passed");
-      expect(result.sql).toContain("0__performance_total_cost__sum");
-      expect(result.sql).toContain("1__evaluations_evaluation_pass_rate__avg");
+      expect(result.sql).toContain("m0__performance_total_cost__sum");
+      expect(result.sql).toContain("m1__evaluations_evaluation_pass_rate__avg");
     });
 
     // The query windows on trace OccurredAt, but evaluation_runs partitions on ScheduledAt
@@ -257,8 +257,8 @@ describe("aggregation-builder", () => {
       expect(result.sql).toMatch(/GROUP BY\s+trace_id\b/);
 
       // Both aliases still present
-      expect(result.sql).toContain("0__performance_total_cost__sum");
-      expect(result.sql).toContain("1__evaluations_evaluation_pass_rate__avg");
+      expect(result.sql).toContain("m0__performance_total_cost__sum");
+      expect(result.sql).toContain("m1__evaluations_evaluation_pass_rate__avg");
     });
 
     // @regression issue #3088: When metadata.user_id (cardinality, which uses
@@ -288,8 +288,8 @@ describe("aggregation-builder", () => {
       expect(result.sql).not.toMatch(/\bany\s*\(\s*(sum|avg|min|max|count|uniq)\s*\(/);
 
       // Both metric aliases still emitted
-      expect(result.sql).toContain("0__metadata_user_id__cardinality");
-      expect(result.sql).toContain("1__evaluations_evaluation_pass_rate__avg");
+      expect(result.sql).toContain("m0__metadata_user_id__cardinality");
+      expect(result.sql).toContain("m1__evaluations_evaluation_pass_rate__avg");
     });
 
     // @regression issue #3088: When trace-level metrics (sum TotalCost) are combined with
@@ -327,11 +327,11 @@ describe("aggregation-builder", () => {
       // per-trace column, not an avgIf conditional aggregation.
       expect(result.sql).toMatch(/_per_trace/);
       expect(result.sql).toMatch(
-        /\bavg\s*\(\s*`?1__evaluations_evaluation_pass_rate__avg__my_evaluator__per_trace`?\s*\)/,
+        /\bavg\s*\(\s*`?m1__evaluations_evaluation_pass_rate__avg__my_evaluator__per_trace`?\s*\)/,
       );
 
       // The eval metric alias must still be emitted
-      expect(result.sql).toContain("1__evaluations_evaluation_pass_rate__avg");
+      expect(result.sql).toContain("m1__evaluations_evaluation_pass_rate__avg");
     });
 
     // Trace-level columns referenced as `ts.<Column>` in metric-translator are only in scope
@@ -485,7 +485,7 @@ describe("aggregation-builder", () => {
       expect(result.sql).toContain("deduped_traces");
 
       // The metric alias must be present in the outer SELECT (not silently dropped)
-      expect(result.sql).toContain("0__metadata_trace_id__cardinality");
+      expect(result.sql).toContain("m0__metadata_trace_id__cardinality");
 
       // The metric should be converted to uniqExact(trace_id) via transformMetricForDedup
       expect(result.sql).toContain("uniqExact(trace_id)");
@@ -657,8 +657,8 @@ describe("aggregation-builder", () => {
 
       // Uses CTEs for pipeline metrics with cte_ prefix to avoid starting with digit
       expect(result.sql).toContain("WITH");
-      expect(result.sql).toContain("cte_0__metadata_thread_id__cardinality_current AS");
-      expect(result.sql).toContain("cte_0__metadata_thread_id__cardinality_previous AS");
+      expect(result.sql).toContain("cte_m0__metadata_thread_id__cardinality_current AS");
+      expect(result.sql).toContain("cte_m0__metadata_thread_id__cardinality_previous AS");
       expect(result.sql).toContain("UNION ALL");
       expect(result.sql).toContain("'current' AS period");
       expect(result.sql).toContain("'previous' AS period");
@@ -718,8 +718,8 @@ describe("aggregation-builder", () => {
       expect(result.sql).toContain("'previous' AS period");
 
       // Column aliases starting with digits are quoted with backticks
-      expect(result.sql).toContain("`0__metadata_trace_id__cardinality`");
-      expect(result.sql).toContain("`1__performance_total_cost__sum`");
+      expect(result.sql).toContain("m0__metadata_trace_id__cardinality");
+      expect(result.sql).toContain("m1__performance_total_cost__sum");
     });
 
     describe("when traceIds are provided", () => {
@@ -857,7 +857,7 @@ describe("aggregation-builder", () => {
         expect(result.sql).toMatch(
           /uniqIf\(ts\.TraceId, \(\(\(ts\.TenantId, ts\.TraceId\) IN \(\s*SELECT TenantId, TraceId FROM stored_spans/,
         );
-        expect(result.sql).toContain("uniq(ts.TraceId) AS 1__");
+        expect(result.sql).toContain("uniq(ts.TraceId) AS m1__");
         expect(Object.keys(result.params)).toContain("spanTypes_0");
       });
 
@@ -913,7 +913,7 @@ describe("aggregation-builder", () => {
           });
 
           expect(result.sql).toContain("if(countIf((ts.ContainsErrorStatus = 1)) > 0, min");
-          expect(result.sql).toContain(", NULL) AS 0__");
+          expect(result.sql).toContain(", NULL) AS m0__");
         });
 
         it("leaves an additive aggregation unguarded, because zero is the truth there", () => {
@@ -922,7 +922,7 @@ describe("aggregation-builder", () => {
             series: [errorSeries({ values: ["true"] })],
           });
 
-          expect(result.sql).not.toContain("NULL) AS 0__");
+          expect(result.sql).not.toContain("NULL) AS m0__");
         });
       });
 
@@ -973,7 +973,7 @@ describe("aggregation-builder", () => {
           // column, so the unguarded ratio would report a real-looking 0%
           // for a bucket the filter excluded.
           expect(result.sql).toContain("if(countIf((ts.ContainsErrorStatus = 1)) > 0, if(min");
-          expect(result.sql).toContain(", NULL) AS 0__");
+          expect(result.sql).toContain(", NULL) AS m0__");
         });
 
         /** @scenario "A percentage on a per-entity average is refused rather than answered wrongly" */
@@ -1482,9 +1482,9 @@ describe("aggregation-builder", () => {
       const result = buildTimeseriesQuery(input);
 
       // All three metric aliases must be present
-      expect(result.sql).toContain("0__performance_total_cost__sum");
-      expect(result.sql).toContain("1__evaluations_evaluation_pass_rate__avg");
-      expect(result.sql).toContain("2__metadata_thread_id__cardinality");
+      expect(result.sql).toContain("m0__performance_total_cost__sum");
+      expect(result.sql).toContain("m1__evaluations_evaluation_pass_rate__avg");
+      expect(result.sql).toContain("m2__metadata_thread_id__cardinality");
     });
 
     // @regression: buildDateBucketedPipelineQuery previously only received pipeline
@@ -1512,8 +1512,8 @@ describe("aggregation-builder", () => {
       const result = buildTimeseriesQuery(input);
 
       // Both metric aliases must be present
-      expect(result.sql).toContain("0__performance_total_cost__sum");
-      expect(result.sql).toContain("1__metadata_thread_id__cardinality");
+      expect(result.sql).toContain("m0__performance_total_cost__sum");
+      expect(result.sql).toContain("m1__metadata_thread_id__cardinality");
 
       // Simple metrics should be in a simple_metrics CTE
       expect(result.sql).toContain("simple_metrics");
@@ -1540,8 +1540,8 @@ describe("aggregation-builder", () => {
       // Should NOT throw — count-like metrics must be handled explicitly
       const result = buildTimeseriesQuery(input);
 
-      expect(result.sql).toContain("0__metadata_trace_id__cardinality");
-      expect(result.sql).toContain("1__evaluations_evaluation_pass_rate__avg");
+      expect(result.sql).toContain("m0__metadata_trace_id__cardinality");
+      expect(result.sql).toContain("m1__evaluations_evaluation_pass_rate__avg");
       // The per-trace CTE should exist
       expect(result.sql).toMatch(/WITH\s+per_trace_metrics/);
     });

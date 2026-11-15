@@ -13,7 +13,11 @@ import {
   type ClickHouseQueryClient,
   tenantScopeKey,
 } from "@langwatch/clickhouse-client";
-import { type ReaderReadStatement, tenantScope } from "@langwatch/clickhouse-client/builder";
+import {
+  type ProofScope,
+  type ReaderReadStatement,
+  tenantScope,
+} from "@langwatch/clickhouse-client/builder";
 import { createLogger } from "@langwatch/observability";
 import { toDate } from "@langwatch/time";
 import { z } from "zod";
@@ -32,16 +36,17 @@ import {
   type TimeseriesQueryInput,
 } from "./clickhouse.aggregation-builder.mapper.ts";
 import { pickAnalyticsTable } from "./clickhouse.analytics-route-table.mapper.ts";
-import { buildEvalRollupTimeseriesQuery } from "./clickhouse.eval-rollup-timeseries-query.mapper.ts";
-import { buildEvalSlimTimeseriesQuery } from "./clickhouse.eval-slim-timeseries-query.mapper.ts";
+import { evalRollupTimeseriesRead } from "./clickhouse.eval-rollup-timeseries-query.mapper.ts";
+import { evalSlimTimeseriesRead } from "./clickhouse.eval-slim-timeseries-query.mapper.ts";
 import {
   feedbacksPageRead,
   feedbacksRead,
   topDocumentsRead,
 } from "./clickhouse.feedback-document-reads.mapper.ts";
 import { translatingQueryFailures } from "./clickhouse.query-error-translation.mapper.ts";
-import { buildRollupTimeseriesQuery } from "./clickhouse.rollup-timeseries-query.mapper.ts";
-import { buildSlimTimeseriesQuery } from "./clickhouse.slim-timeseries-query.mapper.ts";
+import { rollupTimeseriesRead } from "./clickhouse.rollup-timeseries-query.mapper.ts";
+import { slimTimeseriesRead } from "./clickhouse.slim-timeseries-query.mapper.ts";
+import type { TimeseriesRead } from "./clickhouse.timeseries-query-shared.mapper.ts";
 import { parseTimeseriesRows } from "./clickhouse.timeseries-row-parser.mapper.ts";
 
 /** A series asked under one project and a proof minted for another; nothing is read. */
@@ -53,35 +58,14 @@ class AnalyticsProofProjectMismatchError extends Error {
   }
 }
 
-type TimeseriesBuilder = (input: TimeseriesQueryInput) => {
-  sql: string;
-  params: Record<string, unknown>;
-};
-
-/**
- * The builder for a table. Every builder writes the proof's markers and is read through the
- * fenced reader (ADR-177); `evaluation_runs` is joined beside trace_summaries, never its own
- * FROM, so both legacy tables share one builder.
- */
-const builderFor = (table: AnalyticsTable): TimeseriesBuilder => {
-  switch (table) {
-    case "trace_analytics_rollup":
-      return buildRollupTimeseriesQuery;
-    case "trace_analytics":
-      return buildSlimTimeseriesQuery;
-    case "evaluation_analytics_rollup":
-      return buildEvalRollupTimeseriesQuery;
-    case "evaluation_analytics":
-      return buildEvalSlimTimeseriesQuery;
-    case "trace_summaries":
-    case "evaluation_runs":
-      return buildTimeseriesQuery;
-    default: {
-      const exhaustive: never = table;
-      throw new Error(`Unknown Analytics table ${String(exhaustive)}`);
-    }
-  }
-};
+/** The tables read on the typed builder (ADR-202); trace_summaries and evaluation_runs are text. */
+const BUILT_READS: Partial<Record<AnalyticsTable, (read: TimeseriesRead) => ReaderReadStatement>> =
+  {
+    trace_analytics_rollup: rollupTimeseriesRead,
+    trace_analytics: slimTimeseriesRead,
+    evaluation_analytics_rollup: evalRollupTimeseriesRead,
+    evaluation_analytics: evalSlimTimeseriesRead,
+  };
 
 /** What an analytics statement is sent through: the fenced reader. */
 type TimeseriesStatementClient = {
@@ -131,12 +115,7 @@ export class ClickHouseAnalyticsRepository extends AnalyticsRepository {
     if (!projectId.trim()) {
       throw new Error("Analytics timeseries projectId is required");
     }
-    const build = builderFor(query.table);
-    const client = this.statementClient({
-      authorization: query.authorization,
-      projectId,
-      reads: "analytics",
-    });
+    const builtRead = BUILT_READS[query.table];
 
     const builderInput: TimeseriesQueryInput = {
       projectId,
@@ -153,25 +132,21 @@ export class ClickHouseAnalyticsRepository extends AnalyticsRepository {
       negateFilters: query.input.negateFilters,
       excludeOrigins: query.input.excludeOrigins,
     };
-    const built = build(builderInput);
+    const limits: Record<string, string> =
+      query.maxResultRows === undefined
+        ? {}
+        : { max_result_rows: String(query.maxResultRows), result_overflow_mode: "throw" };
 
     try {
-      const response = await client.query({
-        query: built.sql,
-        query_params: built.params,
-        format: "JSONEachRow",
-        clickhouse_settings: {
-          ...ANALYTICS_CLICKHOUSE_SETTINGS,
-          log_comment: `analytics:timeseries:${query.table}`,
-          ...(query.maxResultRows === undefined
-            ? {}
-            : {
-                max_result_rows: String(query.maxResultRows),
-                result_overflow_mode: "throw",
-              }),
-        },
-      });
-      const rows = await response.json();
+      const rows = builtRead
+        ? await this.sent(
+            builtRead({
+              scope: this.proofScope({ authorization: query.authorization, projectId }),
+              input: builderInput,
+              settings: { ...ANALYTICS_CLICKHOUSE_SETTINGS, ...limits },
+            }),
+          )
+        : await this.legacyRows({ query, builderInput, limits });
       const result = parseTimeseriesRows({
         rows: Array.isArray(rows) ? rows : [],
         series: query.input.series,
@@ -283,6 +258,50 @@ export class ClickHouseAnalyticsRepository extends AnalyticsRepository {
       );
       throw error;
     }
+  }
+
+  /** The trace_summaries / evaluation_runs text read, through the fenced reader. */
+  private async legacyRows({
+    query,
+    builderInput,
+    limits,
+  }: {
+    query: AnalyticsTimeseriesQuery;
+    builderInput: TimeseriesQueryInput;
+    limits: Record<string, string>;
+  }): Promise<unknown> {
+    const client = this.statementClient({
+      authorization: query.authorization,
+      projectId: builderInput.projectId,
+      reads: "analytics",
+    });
+    const built = buildTimeseriesQuery(builderInput);
+    const response = await client.query({
+      query: built.sql,
+      query_params: built.params,
+      format: "JSONEachRow",
+      clickhouse_settings: {
+        ...ANALYTICS_CLICKHOUSE_SETTINGS,
+        log_comment: `analytics:timeseries:${query.table}`,
+        ...limits,
+      },
+    });
+    return response.json();
+  }
+
+  /** An analytics proof scope; the proof must be for the input's project. */
+  private proofScope({
+    authorization,
+    projectId,
+  }: {
+    authorization: Authorization;
+    projectId: string;
+  }): ProofScope {
+    const scope = tenantScope.fromProof({ authorization, reads: "analytics" });
+    if (!scope.fence.own.includes(projectId)) {
+      throw new AnalyticsProofProjectMismatchError(projectId);
+    }
+    return scope;
   }
 
   /**

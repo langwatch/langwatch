@@ -18,10 +18,10 @@ import {
 import { analyticsProof } from "../../__tests__/analytics-proof.fixture.ts";
 import { buildTimeseriesQuery } from "../clickhouse.aggregation-builder.mapper.ts";
 import { pickAnalyticsTable } from "../clickhouse.analytics-route-table.mapper.ts";
-import { buildEvalSlimTimeseriesQuery } from "../clickhouse.eval-slim-timeseries-query.mapper.ts";
+import { evalSlimTimeseriesRead } from "../clickhouse.eval-slim-timeseries-query.mapper.ts";
 import { topDocumentsRead } from "../clickhouse.feedback-document-reads.mapper.ts";
 import { resetParamCounter } from "../clickhouse.filter-translator.mapper.ts";
-import { buildSlimTimeseriesQuery } from "../clickhouse.slim-timeseries-query.mapper.ts";
+import { slimTimeseriesRead } from "../clickhouse.slim-timeseries-query.mapper.ts";
 import { ownProjectReaderOver } from "./support/clickhouse-query-client.support.ts";
 
 const TENANT_ID = `acme-dashboard-memory-${nanoid(8)}`;
@@ -117,11 +117,26 @@ function buildPanelQuery(input: AnalyticsTimeseriesInput) {
     timeScale: input.timeScale ?? DAY_MS / 60_000,
   };
   resetParamCounter();
+  // A built read carries its own tenant predicate and setting; the cap is the caller's.
+  const read = {
+    scope: tenantScope.fromProof({
+      authorization: analyticsProof({ projectId: input.projectId }),
+      reads: "analytics",
+    }),
+    input: builderInput,
+    settings: {},
+  };
+  const built = (statement: ReturnType<typeof slimTimeseriesRead>) => ({
+    table,
+    sql: statement.sql,
+    params: statement.params,
+    settings: statement.settings,
+  });
   switch (table) {
     case "trace_analytics":
-      return { table, fenced: true, ...buildSlimTimeseriesQuery(builderInput) };
+      return built(slimTimeseriesRead(read));
     case "evaluation_analytics":
-      return { table, fenced: true, ...buildEvalSlimTimeseriesQuery(builderInput) };
+      return built(evalSlimTimeseriesRead(read));
     case "trace_summaries":
     case "evaluation_runs":
       return { table, fenced: true, ...buildTimeseriesQuery(builderInput) };

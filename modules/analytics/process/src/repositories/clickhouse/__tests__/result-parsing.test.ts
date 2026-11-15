@@ -38,7 +38,7 @@ describe("result-parsing", () => {
       const result = buildTimeseriesQuery(input);
 
       // Verify alias format
-      expect(parsingAlias).toBe("0__performance_total_cost__avg");
+      expect(parsingAlias).toBe("m0__performance_total_cost__avg");
 
       // The SQL should contain the alias (possibly quoted with backticks)
       const aliasInSql =
@@ -76,9 +76,9 @@ describe("result-parsing", () => {
 
       // Check each alias is present
       const expectedAliases = [
-        "0__metadata_trace_id__cardinality",
-        "1__performance_total_cost__avg",
-        "2__performance_completion_time__p90",
+        "m0__metadata_trace_id__cardinality",
+        "m1__performance_total_cost__avg",
+        "m2__performance_completion_time__p90",
       ];
 
       for (const alias of expectedAliases) {
@@ -125,10 +125,10 @@ describe("result-parsing", () => {
 
       // Check that each expected alias is in the SQL
       const expectedAliases = [
-        "0__metadata_thread_id__cardinality",
-        "1__metadata_thread_id__cardinality",
-        "2__threads_average_duration_per_thread__avg",
-        "3__metadata_trace_id__cardinality",
+        "m0__metadata_thread_id__cardinality",
+        "m1__metadata_thread_id__cardinality",
+        "m2__threads_average_duration_per_thread__avg",
+        "m3__metadata_trace_id__cardinality",
       ];
 
       for (const alias of expectedAliases) {
@@ -177,10 +177,10 @@ describe("result-parsing", () => {
 
       // Check that each expected alias is in the SQL
       const expectedAliases = [
-        "0__performance_total_tokens__avg",
-        "1__performance_total_cost__avg",
-        "2__performance_first_token__p90",
-        "3__performance_completion_time__p90",
+        "m0__performance_total_tokens__avg",
+        "m1__performance_total_cost__avg",
+        "m2__performance_first_token__p90",
+        "m3__performance_completion_time__p90",
       ];
 
       for (const alias of expectedAliases) {
@@ -204,17 +204,17 @@ describe("result-parsing", () => {
       const simulatedChResponse = [
         {
           period: "current",
-          "0__metadata_thread_id__cardinality": 150,
-          "1__metadata_thread_id__cardinality": 3.5,
-          "2__threads_average_duration_per_thread__avg": 8280000, // ~2.3 hours in ms
-          "3__metadata_trace_id__cardinality": 25.5,
+          m0__metadata_thread_id__cardinality: 150,
+          m1__metadata_thread_id__cardinality: 3.5,
+          m2__threads_average_duration_per_thread__avg: 8280000, // ~2.3 hours in ms
+          m3__metadata_trace_id__cardinality: 25.5,
         },
         {
           period: "previous",
-          "0__metadata_thread_id__cardinality": 120,
-          "1__metadata_thread_id__cardinality": 3.2,
-          "2__threads_average_duration_per_thread__avg": 7200000, // 2 hours in ms
-          "3__metadata_trace_id__cardinality": 22.0,
+          m0__metadata_thread_id__cardinality: 120,
+          m1__metadata_thread_id__cardinality: 3.2,
+          m2__threads_average_duration_per_thread__avg: 7200000, // 2 hours in ms
+          m3__metadata_trace_id__cardinality: 22.0,
         },
       ];
 
@@ -268,15 +268,15 @@ describe("result-parsing", () => {
       }
 
       // Verify all values were correctly parsed
-      expect(results.current!["0__metadata_thread_id__cardinality"]).toBe(150);
-      expect(results.current!["1__metadata_thread_id__cardinality"]).toBe(3.5);
-      expect(results.current!["2__threads_average_duration_per_thread__avg"]).toBe(8280000);
-      expect(results.current!["3__metadata_trace_id__cardinality"]).toBe(25.5);
+      expect(results.current!["m0__metadata_thread_id__cardinality"]).toBe(150);
+      expect(results.current!["m1__metadata_thread_id__cardinality"]).toBe(3.5);
+      expect(results.current!["m2__threads_average_duration_per_thread__avg"]).toBe(8280000);
+      expect(results.current!["m3__metadata_trace_id__cardinality"]).toBe(25.5);
 
-      expect(results.previous!["0__metadata_thread_id__cardinality"]).toBe(120);
-      expect(results.previous!["1__metadata_thread_id__cardinality"]).toBe(3.2);
-      expect(results.previous!["2__threads_average_duration_per_thread__avg"]).toBe(7200000);
-      expect(results.previous!["3__metadata_trace_id__cardinality"]).toBe(22.0);
+      expect(results.previous!["m0__metadata_thread_id__cardinality"]).toBe(120);
+      expect(results.previous!["m1__metadata_thread_id__cardinality"]).toBe(3.2);
+      expect(results.previous!["m2__threads_average_duration_per_thread__avg"]).toBe(7200000);
+      expect(results.previous!["m3__metadata_trace_id__cardinality"]).toBe(22.0);
     });
   });
 
@@ -287,22 +287,22 @@ describe("result-parsing", () => {
         {
           period: "current",
           group_key: "cat_a",
-          "0__metadata_trace_id__cardinality": 150,
+          m0__metadata_trace_id__cardinality: 150,
         },
         {
           period: "current",
           group_key: "cat_b",
-          "0__metadata_trace_id__cardinality": 160,
+          m0__metadata_trace_id__cardinality: 160,
         },
         {
           period: "previous",
           group_key: "cat_a",
-          "0__metadata_trace_id__cardinality": 100,
+          m0__metadata_trace_id__cardinality: 100,
         },
         {
           period: "previous",
           group_key: "cat_b",
-          "0__metadata_trace_id__cardinality": 110,
+          m0__metadata_trace_id__cardinality: 110,
         },
       ];
 
@@ -351,11 +351,11 @@ describe("result-parsing", () => {
       const simulatedRows = [
         {
           period: "current",
-          "0__metadata_trace_id__cardinality": 310,
+          m0__metadata_trace_id__cardinality: 310,
         },
         {
           period: "previous",
-          "0__metadata_trace_id__cardinality": 210,
+          m0__metadata_trace_id__cardinality: 210,
         },
       ];
 
@@ -386,12 +386,12 @@ describe("result-parsing", () => {
         {
           period: "current",
           group_key: "group_x",
-          "0__metadata_thread_id__cardinality": 3.5,
+          m0__metadata_thread_id__cardinality: 3.5,
         },
         {
           period: "current",
           group_key: "group_y",
-          "0__metadata_thread_id__cardinality": 7.2,
+          m0__metadata_thread_id__cardinality: 7.2,
         },
       ];
 
@@ -421,12 +421,12 @@ describe("result-parsing", () => {
         {
           period: "current",
           group_key: "",
-          "0__metadata_trace_id__cardinality": 42,
+          m0__metadata_trace_id__cardinality: 42,
         },
         {
           period: "current",
           group_key: "known_label",
-          "0__metadata_trace_id__cardinality": 88,
+          m0__metadata_trace_id__cardinality: 88,
         },
       ];
 

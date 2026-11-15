@@ -12,7 +12,6 @@ import {
   translateMetric,
   translatePipelineAggregation,
 } from "../clickhouse.metric-translator.mapper.ts";
-import { buildSlimTimeseriesQuery } from "../clickhouse.slim-timeseries-query.mapper.ts";
 
 const THREAD_KEY = memberScopedTraceAttribute("gen_ai.conversation.id");
 const USER_KEY = memberScopedTraceAttribute("langwatch.user_id");
@@ -50,7 +49,7 @@ describe("translateMetric()", () => {
       });
 
       expect(selectExpression).toBe(
-        `uniqIf(${key}, ${key} != '') AS 0__${metric.replace(".", "_")}__cardinality`,
+        `uniqIf(${key}, ${key} != '') AS m0__${metric.replace(".", "_")}__cardinality`,
       );
     });
   });
@@ -118,22 +117,5 @@ describe("buildTimeseriesQuery()", () => {
       expect(sql).toContain(`any(${THREAD_KEY})`);
       expect(sql).not.toContain(`uniqIf(${THREAD_KEY}`);
     });
-  });
-});
-
-describe("buildSlimTimeseriesQuery()", () => {
-  it("counts each slim thread and user by its member", () => {
-    const { sql } = buildSlimTimeseriesQuery({
-      ...baseInput,
-      series: [
-        { metric: "metadata.thread_id", aggregation: "cardinality" },
-        { metric: "metadata.user_id", aggregation: "cardinality" },
-      ],
-    } as never);
-
-    expect(sql).toContain(
-      "uniq(if(ta.ConversationId = '', '', concat(ta.TenantId, '/', ta.ConversationId)))",
-    );
-    expect(sql).toContain("uniq(if(ta.UserId = '', '', concat(ta.TenantId, '/', ta.UserId)))");
   });
 });

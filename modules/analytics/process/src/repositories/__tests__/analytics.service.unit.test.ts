@@ -374,7 +374,7 @@ describe("AnalyticsService", () => {
                 {
                   period: "current",
                   date: "2026-01-01",
-                  "0__performance_total_cost__sum": "2.5",
+                  m0__performance_total_cost__sum: "2.5",
                 },
               ],
             };
@@ -387,9 +387,8 @@ describe("AnalyticsService", () => {
       currentPeriod: [{ date: "2026-01-01", "0/performance.total_cost/sum": 2.5 }],
     });
     expect(calls).toHaveLength(1);
-    expect(calls[0]?.clickhouse_settings).toMatchObject({
-      max_bytes_before_external_group_by: 500_000_000,
-    });
+    // A built read carries its settings in the statement's SETTINGS clause (ADR-202).
+    expect(calls[0]?.query).toContain("max_bytes_before_external_group_by = 500000000");
   });
 
   /** @scenario "Feedback reads preserve their existing result shape" */

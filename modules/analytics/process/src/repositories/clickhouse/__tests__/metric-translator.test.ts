@@ -37,7 +37,7 @@ describe("metric-translator", () => {
     it("builds basic alias with index, metric, and aggregation", () => {
       expect(
         buildMetricAlias({ index: 0, metric: "performance.total_cost", aggregation: "sum" }),
-      ).toBe("0__performance_total_cost__sum");
+      ).toBe("m0__performance_total_cost__sum");
     });
 
     it("includes key in alias when provided", () => {
@@ -48,7 +48,7 @@ describe("metric-translator", () => {
           aggregation: "avg",
           key: "eval-123",
         }),
-      ).toBe("1__evaluations_evaluation_score__avg__eval_123");
+      ).toBe("m1__evaluations_evaluation_score__avg__eval_123");
     });
 
     it("includes both key and subkey in alias", () => {
@@ -60,13 +60,13 @@ describe("metric-translator", () => {
           key: "thumbs_up",
           subkey: "vote",
         }),
-      ).toBe("2__events_event_score__avg__thumbs_up__vote");
+      ).toBe("m2__events_event_score__avg__thumbs_up__vote");
     });
 
     it("sanitizes special characters in key and subkey", () => {
       expect(
         buildMetricAlias({ index: 0, metric: "test", aggregation: "avg", key: "key-with-dashes" }),
-      ).toBe("0__test__avg__key_with_dashes");
+      ).toBe("m0__test__avg__key_with_dashes");
     });
   });
 

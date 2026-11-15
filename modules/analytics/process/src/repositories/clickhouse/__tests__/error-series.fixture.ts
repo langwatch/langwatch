@@ -52,7 +52,7 @@ export const ERROR_TRACES_MIN_DURATION_MS = Math.min(
 export const traceCount = (index: number): AnalyticsSeries & { alias: string } => ({
   metric: "metadata.trace_id",
   aggregation: "cardinality",
-  alias: `${index}__metadata_trace_id__cardinality`,
+  alias: `m${index}__metadata_trace_id__cardinality`,
 });
 
 /** Traces the evaluation-run fixtures cover, and the score each one carries. */

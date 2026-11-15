@@ -6,7 +6,7 @@ import {
 } from "@langwatch/analytics-contract";
 
 const aliasFor = (index: number, series: AnalyticsSeries): string => {
-  const parts = [String(index), series.metric.replace(/\./g, "_"), series.aggregation];
+  const parts = [`m${index}`, series.metric.replace(/\./g, "_"), series.aggregation];
   if (series.key) parts.push(series.key.replace(/[^a-zA-Z0-9]/g, "_"));
   if (series.subkey) parts.push(series.subkey.replace(/[^a-zA-Z0-9]/g, "_"));
   return parts.join("__");

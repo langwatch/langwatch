@@ -4,20 +4,30 @@
  * so none of legacy's JOINs, dedup or fan-out apply. Unsupported shapes throw as routing bugs.
  */
 
-import type { AnalyticsAggregation, BuiltAnalyticsQuery } from "@langwatch/analytics-contract";
-import { tenantScope } from "@langwatch/clickhouse-client";
+import type { AnalyticsAggregation } from "@langwatch/analytics-contract";
+import {
+  clickhouseRead,
+  fn,
+  param,
+  type ReaderReadStatement,
+} from "@langwatch/clickhouse-client/builder";
 
-import type { TimeseriesQueryInput } from "./clickhouse.aggregation-builder.mapper.ts";
 import {
   isRollupAvgMetricKey,
   isRollupRollableTraceMetricKey,
   type TraceRollupMetricKey,
 } from "./clickhouse.analytics-route-table.mapper.ts";
 import { buildMetricAlias } from "./clickhouse.metric-translator.mapper.ts";
-import { dateTrunc } from "./clickhouse.timeseries-query-shared.mapper.ts";
+import {
+  dateBucket,
+  inEitherPeriod,
+  type Measure,
+  periodOf,
+  type TimeseriesRead,
+} from "./clickhouse.timeseries-query-shared.mapper.ts";
 
-const ROLLUP_TABLE = "trace_analytics_rollup" as const;
-const ra = "ra";
+type Rollup = Measure<"trace_analytics_rollup">;
+import { traceAnalyticsRollup as ra } from "./clickhouse.trace-analytics-rollup.table.ts";
 
 /**
  * Aggregations the rollup can serve, mirroring the router's eligibility (route-table.ts): `sum`
@@ -31,31 +41,34 @@ type RollupAggregation = Extract<AnalyticsAggregation, "sum" | "avg">;
  * `TraceRollupMetricKey` so the compiler enforces the complete switch; the caller validates via
  * `isRollupRollableTraceMetricKey` before dispatching.
  */
-function rollupColumnFor(metric: TraceRollupMetricKey): string {
+function rollupColumnFor(metric: TraceRollupMetricKey): Rollup {
   switch (metric) {
     case "performance.total_cost":
-      return `${ra}.CostSum`;
+      return ra.CostSum;
     case "performance.cost_non_billed":
-      return `${ra}.NonBilledCostSum`;
+      return ra.NonBilledCostSum;
     case "performance.cost_billed":
       // Billed = total - non-billed (rollup carries both sums).
-      return `(${ra}.CostSum - ${ra}.NonBilledCostSum)`;
+      return fn.minus(ra.CostSum, ra.NonBilledCostSum);
     case "performance.completion_time":
-      return `${ra}.DurationSum`;
+      return ra.DurationSum;
     case "performance.prompt_tokens":
-      return `${ra}.PromptTokensSum`;
+      return ra.PromptTokensSum;
     case "performance.completion_tokens":
-      return `${ra}.CompletionTokensSum`;
+      return ra.CompletionTokensSum;
     case "performance.cache_read_tokens":
-      return `${ra}.CacheReadTokensSum`;
+      return ra.CacheReadTokensSum;
     case "performance.cache_write_tokens":
-      return `${ra}.CacheWriteTokensSum`;
+      return ra.CacheWriteTokensSum;
     case "performance.reasoning_tokens":
-      return `${ra}.ReasoningTokensSum`;
+      return ra.ReasoningTokensSum;
     // Total tokens count the cache reads and writes: input is the fresh remainder.
     case "performance.total_tokens":
     case "performance.total_processed_tokens":
-      return `(${ra}.PromptTokensSum + ${ra}.CompletionTokensSum + ${ra}.CacheReadTokensSum + ${ra}.CacheWriteTokensSum)`;
+      return fn.plus(
+        fn.plus(ra.PromptTokensSum, ra.CompletionTokensSum),
+        fn.plus(ra.CacheReadTokensSum, ra.CacheWriteTokensSum),
+      );
     default: {
       // Exhaustiveness: `metric` should narrow to `never` here. If a new
       // entry is added to TraceRollupMetricKey, this assignment fails
@@ -95,19 +108,19 @@ function rollupAggExpression({
   metric,
 }: {
   agg: RollupAggregation;
-  column: string;
+  column: Rollup;
   metric: TraceRollupMetricKey;
-}): string {
+}): Rollup {
   switch (agg) {
     case "sum":
-      return `coalesce(sum(${column}), 0)`;
+      return fn.coalesce(fn.sum(column), param.float64(0));
     case "avg": {
       if (!isRollupAvgMetricKey(metric)) {
         throw new Error(
           `Rollup builder cannot serve avg(${metric}) — only non-nullable legacy columns divide correctly by TraceCount. The router should have routed this to slim.`,
         );
       }
-      return `sum(${column}) / nullIf(sum(${ra}.TraceCount), 0)`;
+      return fn.divide(fn.sum(column), fn.nullIf(fn.sum(ra.TraceCount), 0));
     }
     default: {
       const _exhaustive: never = agg;
@@ -119,29 +132,25 @@ function rollupAggExpression({
 }
 
 /**
- * Builds a rollup query for `trace_analytics_rollup`: CASE-based period, optional date bucket,
- * one aggregate per series, ungrouped only.
+ * The rollup read of `trace_analytics_rollup`: the period, an optional date bucket and one
+ * aggregate per series, ungrouped only, over the proof's windows on `BucketStart`.
  * @see assertRollupUngrouped
  */
-export function buildRollupTimeseriesQuery(input: TimeseriesQueryInput): BuiltAnalyticsQuery {
-  const timeZone = input.timeZone ?? "UTC";
-
-  const selectExprs: string[] = [];
-  selectExprs.push(
-    `CASE
-      WHEN ${ra}.BucketStart >= {currentStart:DateTime64(3)} AND ${ra}.BucketStart < {currentEnd:DateTime64(3)} THEN 'current'
-      WHEN ${ra}.BucketStart >= {previousStart:DateTime64(3)} AND ${ra}.BucketStart < {previousEnd:DateTime64(3)} THEN 'previous'
-    END AS period`,
-  );
-
-  if (typeof input.timeScale === "number") {
-    selectExprs.push(`${dateTrunc(`${ra}.BucketStart`, input.timeScale, timeZone)} AS date`);
-  }
-
+export function rollupTimeseriesRead({
+  scope,
+  input,
+  settings,
+}: TimeseriesRead): ReaderReadStatement {
   assertRollupUngrouped(input.groupBy);
+  const bucketed = typeof input.timeScale === "number";
+  const period = periodOf(ra.BucketStart, input);
+  const date = bucketed
+    ? dateBucket(ra.BucketStart, input.timeScale as number, input.timeZone ?? "UTC")
+    : undefined;
 
-  for (let i = 0; i < input.series.length; i++) {
-    const s = input.series[i]!;
+  const selection: Record<string, Rollup> = { period };
+  if (date) selection.date = date;
+  input.series.forEach((s, i) => {
     if (!isRollupRollableTraceMetricKey(s.metric)) {
       throw new Error(
         `Rollup builder cannot serve metric "${s.metric}". The router should have routed this to slim or trace_summaries.`,
@@ -159,40 +168,23 @@ export function buildRollupTimeseriesQuery(input: TimeseriesQueryInput): BuiltAn
       key: s.key,
       subkey: s.subkey,
     });
-    const expr = rollupAggExpression({
+    selection[alias] = rollupAggExpression({
       agg: s.aggregation,
       column: rollupColumnFor(s.metric),
       metric: s.metric,
     });
-    selectExprs.push(`${expr} AS ${alias}`);
-  }
+  });
 
-  const groupByExprs: string[] = ["period"];
-  if (typeof input.timeScale === "number") groupByExprs.push("date");
-
-  // Time-range predicate on the partition column BucketStart enables
-  // partition pruning across both the current and previous periods.
-  const sql = `
-    SELECT
-      ${selectExprs.join(",\n      ")}
-    FROM ${ROLLUP_TABLE} ${ra}
-    WHERE ${tenantScope("BucketStart")}
-      AND (
-        (${ra}.BucketStart >= {currentStart:DateTime64(3)} AND ${ra}.BucketStart < {currentEnd:DateTime64(3)})
-        OR
-        (${ra}.BucketStart >= {previousStart:DateTime64(3)} AND ${ra}.BucketStart < {previousEnd:DateTime64(3)})
-      )
-    GROUP BY ${groupByExprs.join(", ")}
-    ORDER BY period${typeof input.timeScale === "number" ? ", date" : ""}
-  `;
-
-  return {
-    sql,
-    params: {
-      currentStart: input.startDate,
-      currentEnd: input.endDate,
-      previousStart: input.previousPeriodStartDate,
-      previousEnd: input.startDate,
-    },
-  };
+  const keys = date ? [period, date] : [period];
+  // The period range on the partition column BucketStart prunes both periods' partitions.
+  const read = clickhouseRead({ scope })
+    .from(ra)
+    .withinWindows()
+    .select(selection)
+    .where(() => inEitherPeriod(ra.BucketStart, input))
+    .groupBy(...keys)
+    .orderBy("period");
+  return (date ? read.orderBy("date") : read)
+    .settings({ ...settings, log_comment: "analytics:timeseries:trace_analytics_rollup" })
+    .build() as ReaderReadStatement;
 }

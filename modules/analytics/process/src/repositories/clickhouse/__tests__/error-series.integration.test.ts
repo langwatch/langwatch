@@ -249,7 +249,7 @@ describe("per-series filters and percentage mode", () => {
         // `evaluation_runs` (buildJoinClause), dropping unevaluated traces first, so
         // reading short of the window's trace count is the join working.
         expect(numberAt(rows[0], unfiltered.alias)).toBe(EVALUATED.length);
-        expect(numberAt(rows[0], "0__evaluations_evaluation_score__avg")).toBeCloseTo(
+        expect(numberAt(rows[0], "m0__evaluations_evaluation_score__avg")).toBeCloseTo(
           averageScore,
           6,
         );
@@ -261,7 +261,7 @@ describe("per-series filters and percentage mode", () => {
     describe("when the window holds traces but the filter matches none", () => {
       /** @scenario "A filtered average or extremum reports no value when nothing matched" */
       it("reports no value rather than a duration of zero", async () => {
-        const alias = "0__performance_completion_time__min";
+        const alias = "m0__performance_completion_time__min";
         const rows = await runCurrent({
           ...WINDOW,
           series: [
@@ -280,7 +280,7 @@ describe("per-series filters and percentage mode", () => {
 
     describe("when the filter does match traces", () => {
       it("still reports the real measurement", async () => {
-        const alias = "0__performance_completion_time__min";
+        const alias = "m0__performance_completion_time__min";
         const rows = await runCurrent({
           ...WINDOW,
           series: [

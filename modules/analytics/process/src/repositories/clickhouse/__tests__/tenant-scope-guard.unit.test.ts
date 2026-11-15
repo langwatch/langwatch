@@ -10,11 +10,7 @@ import { describe, expect, it } from "vitest";
 
 import { analyticsProof } from "../../__tests__/analytics-proof.fixture.ts";
 import { buildTimeseriesQuery } from "../clickhouse.aggregation-builder.mapper.ts";
-import { pickAnalyticsTable } from "../clickhouse.analytics-route-table.mapper.ts";
-import { buildEvalRollupTimeseriesQuery } from "../clickhouse.eval-rollup-timeseries-query.mapper.ts";
-import { buildEvalSlimTimeseriesQuery } from "../clickhouse.eval-slim-timeseries-query.mapper.ts";
 import { resetParamCounter } from "../clickhouse.filter-translator.mapper.ts";
-import { buildSlimTimeseriesQuery } from "../clickhouse.slim-timeseries-query.mapper.ts";
 
 const dates = {
   startDate: new Date("2026-06-15T00:00:00.000Z"),
@@ -179,53 +175,6 @@ describe("tenant scope guard vs the timeseries builders", () => {
     });
   });
 
-  it("passes buildSlimTimeseriesQuery with no filters", () => {
-    const { sql, params } = buildSlimTimeseriesQuery({
-      projectId: "tenant-a",
-      ...dates,
-      series: [{ metric: "performance.total_cost", aggregation: "sum" }],
-      timeScale: 60,
-    });
-
-    expect(fencedViolations({ sql, params })).toEqual([null, null]);
-  });
-
-  it("passes buildSlimTimeseriesQuery when a filter clause carries its own OR", () => {
-    const { sql, params } = buildSlimTimeseriesQuery({
-      projectId: "tenant-a",
-      ...dates,
-      series: [{ metric: "performance.total_cost", aggregation: "sum" }],
-      timeScale: 60,
-      filters: { "metadata.key": ["a", "b"] },
-    });
-
-    expect(sql).toContain(" OR ");
-    expect(fencedViolations({ sql, params })).toEqual([null, null]);
-  });
-
-  it("passes buildEvalSlimTimeseriesQuery with no filters", () => {
-    const { sql, params } = buildEvalSlimTimeseriesQuery({
-      projectId: "tenant-a",
-      ...dates,
-      series: [{ metric: "evaluations.evaluation_score", aggregation: "avg" } as AnalyticsSeries],
-      timeScale: 60,
-    });
-
-    expect(fencedViolations({ sql, params })).toEqual([null, null]);
-  });
-
-  it("refuses a filter on the eval slim, which the router sends to evaluation_runs", () => {
-    expect(() =>
-      buildEvalSlimTimeseriesQuery({
-        projectId: "tenant-a",
-        ...dates,
-        series: [{ metric: "evaluations.evaluation_score", aggregation: "avg" } as AnalyticsSeries],
-        timeScale: 60,
-        filters: { "metadata.key": ["a", "b"] },
-      }),
-    ).toThrow(/Eval slim builder cannot serve filter "metadata.key"/);
-  });
-
   describe.each([
     [
       "LLM calls grouped by model",
@@ -255,30 +204,5 @@ describe("tenant scope guard vs the timeseries builders", () => {
         expect(fencedViolations({ sql, params })).toEqual([null, null]);
       },
     );
-  });
-
-  // WEB-985: the eval slim builder is still refused; flip to `it` once fixed (routed to fix-hi).
-  it("passes the overview's evaluation summary on the table it routes to (WEB-985)", () => {
-    const input = {
-      projectId: "tenant-a",
-      ...dates,
-      series: [
-        { metric: "evaluations.evaluation_runs", aggregation: "cardinality" },
-      ] as AnalyticsSeries[],
-      groupBy: "evaluations.evaluation_passed",
-      timeScale: "full" as const,
-      timeZone: "Europe/Amsterdam",
-    };
-    const table = pickAnalyticsTable(input);
-    const routed = {
-      evaluation_analytics_rollup: buildEvalRollupTimeseriesQuery,
-      evaluation_analytics: buildEvalSlimTimeseriesQuery,
-    }[table as string];
-    resetParamCounter();
-    const built = (routed ?? buildTimeseriesQuery)(
-      input as Parameters<typeof buildTimeseriesQuery>[0],
-    );
-
-    expect(fencedViolations(built)).toEqual([null, null]);
   });
 });

@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import { buildTimeseriesQuery } from "../clickhouse.aggregation-builder.mapper.ts";
-import { buildRollupTimeseriesQuery } from "../clickhouse.rollup-timeseries-query.mapper.ts";
 
 const input = {
   projectId: "tenant-1",
@@ -23,14 +22,6 @@ describe("Analytics timeseries query compatibility", () => {
     expect(query.sql).not.toContain("{tenantId:String}");
     expect(query.sql).toContain("{currentStart:DateTime64(3)}");
     expect(query.sql).toContain("{previousStart:DateTime64(3)}");
-    expect(query.params).not.toHaveProperty("tenantId");
-  });
-
-  it("keeps the routed timezone in the ClickHouse bucket expression", () => {
-    const query = buildRollupTimeseriesQuery(input);
-
-    expect(query.sql).toContain("Europe/Amsterdam");
-    expect(query.sql).toContain("{{tenantScope:BucketStart}}");
     expect(query.params).not.toHaveProperty("tenantId");
   });
 });

@@ -4,10 +4,6 @@
     "modules/analytics/process/src/repositories/clickhouse/clickhouse.aggregation-builder.mapper.ts": 7,
     "modules/analytics/process/src/repositories/clickhouse/clickhouse.analytics-session.repository.ts": 1,
     "modules/analytics/process/src/repositories/clickhouse/clickhouse.analytics.repository.ts": 2,
-    "modules/analytics/process/src/repositories/clickhouse/clickhouse.eval-rollup-timeseries-query.mapper.ts": 1,
-    "modules/analytics/process/src/repositories/clickhouse/clickhouse.eval-slim-timeseries-query.mapper.ts": 1,
-    "modules/analytics/process/src/repositories/clickhouse/clickhouse.rollup-timeseries-query.mapper.ts": 1,
-    "modules/analytics/process/src/repositories/clickhouse/clickhouse.slim-timeseries-query.mapper.ts": 1,
     "modules/data-retention/process/src/repositories/clickhouse/clickhouse.storage-meter.repository.ts": 2,
     "modules/trace/process/src/features/facet/repositories/clickhouse/clickhouse.trace-facet-evaluator.repository.ts": 1,
     "modules/trace/process/src/features/facet/repositories/clickhouse/clickhouse.trace-facet-event-attribute-keys.repository.ts": 1,
@@ -21,6 +17,6 @@
     "modules/trace/process/src/features/query/rules/trace-query-subquery.rules.ts": 1,
     "modules/trace/process/src/repositories/clickhouse/clickhouse.trace-member-client.repository.ts": 1,
     "modules/trace/process/src/repositories/clickhouse/session-groups.repository.ts": 5,
-    "modules/trace/process/src/repositories/clickhouse/trace-list.repository.ts": 18
+    "modules/trace/process/src/repositories/clickhouse/trace-list.repository.ts": 13
   }
 }

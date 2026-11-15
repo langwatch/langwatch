@@ -1,13 +1,30 @@
-import type { AnalyticsFilterValue } from "@langwatch/analytics-contract";
-import { customMetadataValueCondition } from "@langwatch/trace-contract";
+import type { AnalyticsAggregation } from "@langwatch/analytics-contract";
+import {
+  type Condition,
+  cond,
+  type Expression,
+  fn,
+  param,
+  type ProofScope,
+} from "@langwatch/clickhouse-client/builder";
 
-import { latestVersionColumnOf } from "./clickhouse.latest-version-dedup.mapper.ts";
+import type { TimeseriesQueryInput } from "./clickhouse.aggregation-builder.mapper.ts";
 
 /**
- * Internal helpers shared by the slim + rollup timeseries SQL builders
- * (ADR-034 Phase 3). Centralising the `toStartOf…` bucket function keeps
- * boundaries identical across both tables and the legacy builder.
+ * Helpers shared by the slim and rollup timeseries reads (ADR-034 Phase 3, ADR-202): the period,
+ * the date bucket and the slim aggregates, as builder expressions, so every table buckets alike.
  */
+
+/** A timeseries read: the proof it runs under, the dashboard's query and the statement settings. */
+export type TimeseriesRead = {
+  scope: ProofScope;
+  input: TimeseriesQueryInput;
+  settings: Readonly<Record<string, number | string>>;
+};
+
+/** A value read out of a deduped row or a bucket; its type is the column's. */
+// oxlint-disable-next-line typescript/no-explicit-any -- a carried column's type is the caller's
+export type Measure<Tables extends string = string> = Expression<any, Tables>;
 
 const MINUTES_PER_HOUR = 60;
 const MINUTES_PER_DAY = 24 * MINUTES_PER_HOUR;
@@ -23,30 +40,98 @@ function validateTimeZone(tz: string): string {
   }
 }
 
-/**
- * Build a ClickHouse date-bucket function over a given column for a given
- * timeScale (in minutes) and timezone. Mirrors the legacy builder's logic
- * exactly so the bucket boundaries match the trace_summaries path.
- */
-export function dateTrunc(column: string, timeScaleMinutes: number, timeZone: string): string {
-  const tz = validateTimeZone(timeZone);
-  if (timeScaleMinutes <= 1) {
-    return `toStartOfMinute(${column}, '${tz}')`;
-  }
+/** `[start, end)` of one period, in epoch ms. */
+const within = <T extends string>(at: Measure<T>, start: Date, end: Date): Condition<T> =>
+  cond.and(cond.gte(at, param.epochMs(start.getTime())), cond.lt(at, param.epochMs(end.getTime())));
 
+const currentPeriod = <T extends string>(at: Measure<T>, input: TimeseriesQueryInput) =>
+  within(at, input.startDate, input.endDate);
+const previousPeriod = <T extends string>(at: Measure<T>, input: TimeseriesQueryInput) =>
+  within(at, input.previousPeriodStartDate, input.startDate);
+
+/** The row lies in the current or the previous period: the partition-pruning range. */
+export function inEitherPeriod<T extends string>(
+  at: Measure<T>,
+  input: TimeseriesQueryInput,
+): Condition<T> {
+  return cond.or(currentPeriod(at, input), previousPeriod(at, input));
+}
+
+/** `'current'` or `'previous'`; a read keeps only rows {@link inEitherPeriod}. */
+export function periodOf<T extends string>(
+  at: Measure<T>,
+  input: TimeseriesQueryInput,
+): Measure<T> {
+  return fn.multiIf(
+    [[currentPeriod(at, input), param.string("current")]],
+    param.string("previous"),
+  );
+}
+
+/**
+ * The date bucket of `at` for a timeScale in minutes, in the dashboard's zone (UTC when the zone
+ * is not one). Mirrors the legacy builder so bucket boundaries match trace_summaries.
+ */
+export function dateBucket<T extends string>(
+  at: Measure<T>,
+  timeScaleMinutes: number,
+  timeZone: string,
+): Measure<T> {
+  const zone = { timeZone: validateTimeZone(timeZone) };
+  if (timeScaleMinutes <= 1) return fn.toStartOfMinute(at, zone);
   if (timeScaleMinutes < MINUTES_PER_DAY) {
     if (timeScaleMinutes % MINUTES_PER_HOUR === 0) {
-      const hours = timeScaleMinutes / MINUTES_PER_HOUR;
-      return `toStartOfInterval(${column}, INTERVAL ${hours} HOUR, '${tz}')`;
+      return fn.toStartOfInterval(at, { hours: timeScaleMinutes / MINUTES_PER_HOUR }, zone);
     }
-    return `toStartOfInterval(${column}, INTERVAL ${timeScaleMinutes} MINUTE, '${tz}')`;
+    return fn.toStartOfInterval(at, { minutes: timeScaleMinutes }, zone);
   }
-
   const days = Math.floor(timeScaleMinutes / MINUTES_PER_DAY);
-  if (days === 1) return `toStartOfDay(${column}, '${tz}')`;
-  if (days <= DAYS_PER_WEEK) return `toStartOfInterval(${column}, INTERVAL ${days} DAY, '${tz}')`;
-  if (days <= DAYS_PER_MONTH) return `toStartOfWeek(${column}, 1, '${tz}')`;
-  return `toStartOfMonth(${column}, '${tz}')`;
+  if (days === 1) return fn.toStartOfDay(at, zone);
+  if (days <= DAYS_PER_WEEK) return fn.toStartOfInterval(at, { days }, zone);
+  if (days <= DAYS_PER_MONTH) return fn.toStartOfWeek(at, { mode: 1, ...zone });
+  return fn.toStartOfMonth(at, zone);
+}
+
+/**
+ * A slim aggregate. Percentiles use `quantileTDigest`, the legacy builder's estimator for
+ * `performance.*` metrics: bounded memory per group, where `quantileExact` keeps every value.
+ */
+export function slimAggregate<T extends string>({
+  aggregation,
+  of,
+  table,
+}: {
+  aggregation: AnalyticsAggregation;
+  of: Measure<T>;
+  table: string;
+}): Measure<T> {
+  if (isPercentile(aggregation)) return fn.quantileTDigest(percentileFor(aggregation), of);
+  switch (aggregation) {
+    case "sum":
+      return fn.coalesce(fn.sum(of), param.float64(0));
+    case "avg":
+      return fn.avg(of);
+    case "min":
+      return fn.min(of);
+    case "max":
+      return fn.max(of);
+    case "cardinality":
+    case "terms":
+      return fn.uniq(of);
+    default:
+      throw new Error(`Unhandled ${table} aggregation: ${String(aggregation)}`);
+  }
+}
+
+/** `cond.and` and `cond.or` over a list, which may hold a single term. */
+export const allOf = <T extends string>([first, ...rest]: Condition<T>[]): Condition<T> =>
+  first ? cond.and(first, ...rest) : cond.always();
+export const anyOf = <T extends string>([first, ...rest]: Condition<T>[]): Condition<T> =>
+  first ? cond.or(first, ...rest) : cond.never();
+
+/** `group_key`: NULL reads as `'unknown'`, anything else as its text. */
+export function groupKeyOf<T extends string>(of: Measure<T>): Measure<T> {
+  return fn.if(cond.isNull(of), param.string("unknown"), fn.toString(of));
 }
 
 export function hasFilterValues(
@@ -125,59 +210,4 @@ export type EvalMetricKey = (typeof EVAL_METRIC_KEYS)[number];
 
 export function isEvalMetricKey(metric: string): metric is EvalMetricKey {
   return (EVAL_METRIC_KEYS as readonly string[]).includes(metric);
-}
-
-export function appendMetadataValueFilterClauses({
-  alias,
-  rawValue,
-  clauses,
-  params,
-  next,
-}: {
-  /** Alias of the row carrying `Attributes`. */
-  alias: string;
-  rawValue: AnalyticsFilterValue;
-  clauses: string[];
-  params: Record<string, unknown>;
-  next: (prefix: string) => string;
-}): void {
-  // Values with no key match nothing, as on trace_summaries.
-  if (Array.isArray(rawValue)) {
-    clauses.push("1=0");
-    return;
-  }
-  if (typeof rawValue !== "object") return;
-
-  for (const [metaKey, vals] of Object.entries(rawValue)) {
-    if (!Array.isArray(vals) || vals.length === 0) continue;
-    const condition = customMetadataValueCondition({
-      values: vals,
-      paramId: next("metaValue"),
-      key: metaKey,
-      alias,
-    });
-    clauses.push(condition.sql);
-    Object.assign(params, condition.params);
-  }
-}
-
-/** The columns of a deduped slim read: `OccurredAt` plus the column each `<alias>.<key>` names. */
-export function referencedAliasColumns({
-  alias,
-  expressions,
-  keyColumns,
-}: {
-  alias: string;
-  expressions: readonly string[];
-  keyColumns: readonly string[];
-}): string[] {
-  const columns = new Set<string>(["OccurredAt"]);
-  const pattern = new RegExp(`\\b${alias}\\.([A-Za-z_][A-Za-z0-9_]*)`, "g");
-  for (const expression of expressions) {
-    for (const match of expression.matchAll(pattern)) {
-      if (match[1]) columns.add(latestVersionColumnOf(match[1]));
-    }
-  }
-  for (const key of keyColumns) columns.delete(key);
-  return Array.from(columns);
 }
