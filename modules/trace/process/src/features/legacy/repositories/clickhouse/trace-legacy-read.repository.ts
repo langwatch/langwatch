@@ -45,6 +45,8 @@ import { isStorageAnchoredVersion } from "@langwatch/trace-contract";
 import { getLangWatchTracer } from "langwatch";
 import { z } from "zod";
 
+import { evaluationRuns } from "../../../../repositories/clickhouse/clickhouse.evaluation-runs.table.ts";
+import { storedSpans } from "../../../../repositories/clickhouse/clickhouse.stored-spans.table.ts";
 import type { TraceClickHouseClient } from "../../../../repositories/clickhouse/clickhouse.trace-member-client.repository.ts";
 import { traceSummaries } from "../../../../repositories/clickhouse/clickhouse.trace-summaries.table.ts";
 import {
@@ -57,10 +59,7 @@ import {
 } from "../../../../repositories/clickhouse/stored-span-row.mapper.ts";
 import type { TraceAnnotationScoresReadRepository } from "../../../../repositories/trace-annotation-scores.repository.ts";
 import type { TraceAnnotationsReadRepository } from "../../../../repositories/trace-annotations.repository.ts";
-import {
-  type ClickHouseEvaluationRunRow,
-  EVALUATION_RUN_COLUMNS_WITH_INPUTS,
-} from "../../../../rules/trace-evaluation-mapping.rules.ts";
+import { type ClickHouseEvaluationRunRow } from "../../../../rules/trace-evaluation-mapping.rules.ts";
 import { mapEventAttrsToEvent } from "../../../../rules/trace-event-attribute-mapping.rules.ts";
 import { type EventSpanRow } from "../../../../rules/trace-event-attribute-mapping.rules.ts";
 import { translateLegacyFilters } from "../../rules/trace-legacy-filter-conditions.rules.ts";
@@ -90,18 +89,24 @@ const occurredAtRangeRowsSchema = z.array(
   z.looseObject({ fromMs: chNumber.nullable(), toMs: chNumber.nullable() }),
 );
 const promptStudioSpanRowsSchema: z.ZodType<PromptStudioSpanRow[]> = z.array(
-  z.looseObject({
-    SpanId: chString,
-    TraceId: chString,
-    ParentSpanId: chString.nullable(),
-    SpanName: chString,
-    SpanAttributes: attributeMapSchema,
-    StartTime: chNumber,
-    EndTime: chNumber,
-    DurationMs: chNumber,
-    StatusCode: chNumber.nullable(),
-    StatusMessage: chString.nullable(),
-  }),
+  z
+    .looseObject({
+      SpanId: chString,
+      TraceId: chString,
+      ParentSpanId: chString.nullable(),
+      SpanName: chString,
+      SpanAttributes: attributeMapSchema,
+      StartTimeMs: chNumber,
+      EndTimeMs: chNumber,
+      DurationMs: chNumber,
+      StatusCode: chNumber.nullable(),
+      StatusMessage: chString.nullable(),
+    })
+    .transform(({ StartTimeMs, EndTimeMs, ...row }) => ({
+      ...row,
+      StartTime: StartTimeMs,
+      EndTime: EndTimeMs,
+    })),
 );
 const eventSpanRowsSchema: z.ZodType<EventSpanRow[]> = z.array(
   z.looseObject({
@@ -897,6 +902,161 @@ function distinctAttributeStatement<const Alias extends string>({
     .build();
 }
 
+/** Every stored span version of the trace holding `spanId`, as main read them (no election). */
+function promptStudioSpansStatement({ projectId, spanId }: { projectId: string; spanId: string }) {
+  return clickhouseRead({ scope: builtTenantScope.single({ tenantId: projectId }) })
+    .from(storedSpans)
+    .select({
+      SpanId: storedSpans.SpanId,
+      TraceId: storedSpans.TraceId,
+      ParentSpanId: storedSpans.ParentSpanId,
+      SpanName: storedSpans.SpanName,
+      SpanAttributes: storedSpans.SpanAttributes,
+      StartTimeMs: fn.toUnixTimestamp64Milli(storedSpans.StartTime),
+      EndTimeMs: fn.toUnixTimestamp64Milli(storedSpans.EndTime),
+      DurationMs: storedSpans.DurationMs,
+      StatusCode: storedSpans.StatusCode,
+      StatusMessage: storedSpans.StatusMessage,
+    })
+    .where(({ eq, scalar }) =>
+      eq(
+        storedSpans.TraceId,
+        scalar((sub) =>
+          sub
+            .from(storedSpans)
+            .select({ TraceId: storedSpans.TraceId })
+            .where(({ eq: same }) => same(storedSpans.SpanId, spanId))
+            .limit(1),
+        ),
+      ),
+    )
+    .limit(1000)
+    .build();
+}
+
+/**
+ * The OccurredAt span of the asked traces under the proof, epoch sentinels excluded; no row when
+ * none matches. An id the index has never seen reads every partition (`onMiss: "unbounded"`).
+ */
+function occurredAtRangeStatement({
+  authorization,
+  traceIds,
+}: {
+  authorization: Authorization;
+  traceIds: readonly string[];
+}) {
+  return clickhouseRead({
+    scope: builtTenantScope.fromProof({ authorization, reads: "traces" }),
+  })
+    .from(traceSummaries)
+    .withinWindows()
+    .select({
+      fromMs: fn.toUnixTimestamp64Milli(fn.min(traceSummaries.OccurredAt)),
+      toMs: fn.toUnixTimestamp64Milli(fn.max(traceSummaries.OccurredAt)),
+    })
+    .where(({ and, gt, idBound }) =>
+      and(idBound(traceSummaries.TraceId, [...traceIds]), gt(traceSummaries.OccurredAt, 0)),
+    )
+    .having(({ gt }) => gt(fn.count(), 0))
+    .build();
+}
+
+/** Each evaluation's latest version on the asked traces, under the proof, `Inputs` included. */
+function evaluationRowsStatement({
+  authorization,
+  traceIds,
+}: {
+  authorization: Authorization;
+  traceIds: readonly string[];
+}) {
+  return clickhouseRead({
+    scope: builtTenantScope.fromProof({ authorization, reads: "traces" }),
+  })
+    .from(evaluationRuns)
+    .withinWindows()
+    .select({
+      ProjectionId: evaluationRuns.ProjectionId,
+      TenantId: evaluationRuns.TenantId,
+      EvaluationId: evaluationRuns.EvaluationId,
+      Version: evaluationRuns.Version,
+      EvaluatorId: evaluationRuns.EvaluatorId,
+      EvaluatorType: evaluationRuns.EvaluatorType,
+      EvaluatorName: evaluationRuns.EvaluatorName,
+      TraceId: evaluationRuns.TraceId,
+      IsGuardrail: evaluationRuns.IsGuardrail,
+      Status: evaluationRuns.Status,
+      Score: evaluationRuns.Score,
+      Passed: evaluationRuns.Passed,
+      Label: evaluationRuns.Label,
+      Details: evaluationRuns.Details,
+      Error: evaluationRuns.Error,
+      ScheduledAt: evaluationRuns.ScheduledAt,
+      StartedAt: evaluationRuns.StartedAt,
+      CompletedAt: evaluationRuns.CompletedAt,
+      LastProcessedEventId: evaluationRuns.LastProcessedEventId,
+      UpdatedAt: evaluationRuns.UpdatedAt,
+      Inputs: evaluationRuns.Inputs,
+    })
+    .where(({ oneOf }) => oneOf(evaluationRuns.TraceId, [...traceIds]))
+    .latestVersion({ repeat: [evaluationRuns.TraceId] })
+    .build();
+}
+
+type FieldWindow = { projectId: string; startDate: number; endDate: number };
+
+/** The distinct non-empty span names started in the window. */
+function spanNamesStatement({ projectId, startDate, endDate }: FieldWindow) {
+  return clickhouseRead({ scope: builtTenantScope.single({ tenantId: projectId }) })
+    .from(storedSpans)
+    .select({ SpanName: storedSpans.SpanName })
+    .distinct()
+    .where(({ and, gte, lte, ne }) =>
+      and(
+        gte(storedSpans.StartTime, startDate),
+        lte(storedSpans.StartTime, endDate),
+        ne(storedSpans.SpanName, ""),
+      ),
+    )
+    .orderBy(storedSpans.SpanName, "ASC")
+    .limit(DISTINCT_FIELD_NAMES_LIMIT)
+    .build();
+}
+
+/** The distinct attribute keys of the summaries created in the window; keys only, no values. */
+function metadataKeysStatement({ projectId, startDate, endDate }: FieldWindow) {
+  return clickhouseRead({ scope: builtTenantScope.single({ tenantId: projectId }) })
+    .from(traceSummaries)
+    .select({ key: fn.arrayJoin(fn.mapKeys(traceSummaries.Attributes)) })
+    .distinct()
+    .where(({ and, gte, lte }) =>
+      and(gte(traceSummaries.CreatedAt, startDate), lte(traceSummaries.CreatedAt, endDate)),
+    )
+    .orderBy("key", "ASC")
+    .limit(DISTINCT_FIELD_NAMES_LIMIT)
+    .build();
+}
+
+/** Each evaluator scheduled in the window, by id, with its most recent name. */
+function evaluatorNamesStatement({ projectId, startDate, endDate }: FieldWindow) {
+  return clickhouseRead({ scope: builtTenantScope.single({ tenantId: projectId }) })
+    .from(evaluationRuns)
+    .select({
+      id: evaluationRuns.EvaluatorId,
+      name: fn.argMax(evaluationRuns.EvaluatorName, evaluationRuns.ScheduledAt),
+    })
+    .where(({ and, gte, lte, ne }) =>
+      and(
+        gte(evaluationRuns.ScheduledAt, startDate),
+        lte(evaluationRuns.ScheduledAt, endDate),
+        ne(evaluationRuns.EvaluatorId, ""),
+      ),
+    )
+    .groupBy(evaluationRuns.EvaluatorId)
+    .orderBy("name", "ASC")
+    .limit(DISTINCT_FIELD_NAMES_LIMIT)
+    .build();
+}
+
 export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadRepository {
   private readonly logger = createLogger("langwatch:traces:clickhouse-service");
   private readonly tracer = getLangWatchTracer("langwatch.traces.clickhouse-service");
@@ -1009,6 +1169,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
         try {
           // Fetch trace summaries with spans using JOIN
           const tracesWithSpans = await this.fetchTracesWithSpansJoined({
+            authorization,
             reader,
             projectId,
             traceIds,
@@ -1382,11 +1543,13 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
 
   /** The page's evaluations, and the child collections its projection asked for. */
   private async readPageCollections({
+    authorization,
     reader,
     projectId,
     summaries,
     projection,
   }: {
+    authorization: Authorization;
     reader: TenantScopedReader;
     projectId: string;
     summaries: TraceSummaryData[];
@@ -1394,7 +1557,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
   }): Promise<Pick<TraceLegacyPage, "evaluations" | "events" | "annotations">> {
     if (summaries.length === 0) return { evaluations: [] };
     const traceIds = summaries.map((summary) => summary.traceId);
-    const evaluations = await this.fetchEvaluationRows({ reader, traceIds });
+    const evaluations = await this.fetchEvaluationRows({ authorization, projectId, traceIds });
     // Scoped to this page, never table-wide.
     const events = projection?.needsEvents
       ? await this.findEventsForProjection({ reader, projectId, summaries })
@@ -1407,12 +1570,14 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
 
   /** The page's spans, read only where the caller wants spans or full IO. */
   private async readRequestedSpans({
+    authorization,
     reader,
     summaries,
     projectId,
     wanted,
     retentionDays,
   }: {
+    authorization: Authorization;
     reader: TenantScopedReader;
     summaries: TraceSummaryData[];
     projectId: string;
@@ -1427,6 +1592,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
         ? { from: Math.min(...startedAts), to: Math.max(...startedAts) }
         : undefined;
     return this.fetchTracesWithSpansJoined({
+      authorization,
       reader,
       projectId,
       traceIds: summaries.map((s) => s.traceId),
@@ -1536,6 +1702,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
             scrollStart,
           });
           const spans = await this.readRequestedSpans({
+            authorization: ownRead,
             reader,
             summaries,
             projectId: input.projectId,
@@ -1555,6 +1722,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
             scrollStart,
           });
           const { evaluations, events, annotations } = await this.readPageCollections({
+            authorization: ownRead,
             reader,
             projectId: input.projectId,
             summaries,
@@ -1796,42 +1964,16 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
       "TraceLegacyReadClickHouseRepository.findSpanForPromptStudio",
       { attributes: { "tenant.id": projectId, "span.id": spanId } },
       async () => {
-        const clickHouseClient = await this.resolveClient(projectId);
+        const reader = this.builtReader(projectId);
 
         try {
-          // Fetch ALL spans in the trace in a single query so we can
-          // both extract LLM data and walk ancestors for prompt reference.
-          const queryResult = await clickHouseClient.query({
-            query: `
-              SELECT
-                SpanId,
-                TraceId,
-                ParentSpanId,
-                SpanName,
-                SpanAttributes,
-                toUnixTimestamp64Milli(StartTime) AS StartTime,
-                toUnixTimestamp64Milli(EndTime) AS EndTime,
-                DurationMs,
-                StatusCode,
-                StatusMessage
-              FROM stored_spans
-              WHERE TenantId = {tenantId:String}
-                AND TraceId = (
-                  SELECT TraceId FROM stored_spans
-                  WHERE TenantId = {tenantId:String}
-                    AND SpanId = {spanId:String}
-                  LIMIT 1
-                )
-              LIMIT 1000
-            `,
-            query_params: {
-              tenantId: projectId,
-              spanId,
-            },
-            format: "JSONEachRow",
+          // Every span of the trace in one read: the LLM data and the ancestors' prompt reference.
+          const queryResult = await reader.read({
+            statement: promptStudioSpansStatement({ projectId, spanId }),
+            table: storedSpans.$table.name,
           });
 
-          const rows = promptStudioSpanRowsSchema.parse(await queryResult.json());
+          const rows = promptStudioSpanRowsSchema.parse(queryResult.rows);
           return derivePromptStudioSpan({ rows, spanId }) ?? null;
         } catch (error) {
           if (HandledError.isHandled(error)) throw error;
@@ -1863,88 +2005,30 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
       "TraceLegacyReadClickHouseRepository.getDistinctFieldNames",
       { attributes: { "tenant.id": projectId } },
       async () => {
-        const clickHouseClient = await this.resolveClient(projectId);
+        const reader = this.builtReader(projectId);
+        const window = { projectId, startDate, endDate };
 
         try {
-          // Get distinct span names from stored_spans
-          const spanResult = await clickHouseClient.query({
-            query: `
-              SELECT DISTINCT SpanName
-              FROM stored_spans
-              WHERE TenantId = {tenantId:String}
-                AND StartTime >= fromUnixTimestamp64Milli({startDate:UInt64})
-                AND StartTime <= fromUnixTimestamp64Milli({endDate:UInt64})
-                AND SpanName != ''
-              ORDER BY SpanName ASC
-              LIMIT ${DISTINCT_FIELD_NAMES_LIMIT}
-            `,
-            query_params: {
-              tenantId: projectId,
-              startDate,
-              endDate,
-            },
-            format: "JSONEachRow",
+          const spanResult = await reader.read({
+            statement: spanNamesStatement(window),
+            table: storedSpans.$table.name,
           });
+          const spanRows = spanNameRowsSchema.parse(spanResult.rows);
+          const spanNames = spanRows.map((row) => ({ key: row.SpanName, label: row.SpanName }));
 
-          const spanRows = spanNameRowsSchema.parse(await spanResult.json());
-
-          const spanNames = spanRows.map((row) => ({
-            key: row.SpanName,
-            label: row.SpanName,
-          }));
-
-          // Get distinct metadata keys from trace_summaries Attributes
-          const metaResult = await clickHouseClient.query({
-            query: `
-              SELECT DISTINCT arrayJoin(mapKeys(Attributes)) AS key
-              FROM trace_summaries
-              WHERE TenantId = {tenantId:String}
-                AND CreatedAt >= fromUnixTimestamp64Milli({startDate:UInt64})
-                AND CreatedAt <= fromUnixTimestamp64Milli({endDate:UInt64})
-              ORDER BY key ASC
-              LIMIT ${DISTINCT_FIELD_NAMES_LIMIT}
-            `,
-            query_params: {
-              tenantId: projectId,
-              startDate,
-              endDate,
-            },
-            format: "JSONEachRow",
+          const metaResult = await reader.read({
+            statement: metadataKeysStatement(window),
+            table: traceSummaries.$table.name,
           });
+          const metaRows = metadataKeyRowsSchema.parse(metaResult.rows);
+          const metadataKeys = metaRows.map((row) => ({ key: row.key, label: row.key }));
 
-          const metaRows = metadataKeyRowsSchema.parse(await metaResult.json());
-
-          const metadataKeys = metaRows.map((row) => ({
-            key: row.key,
-            label: row.key,
-          }));
-
-          // Get distinct evaluator names from evaluation_runs. Dedupe by
-          // evaluator id (an evaluator can be renamed over time) and keep the
-          // most recent name. The dropdown maps the id and shows the name.
-          const evalResult = await clickHouseClient.query({
-            query: `
-              SELECT
-                EvaluatorId AS id,
-                argMax(EvaluatorName, ScheduledAt) AS name
-              FROM evaluation_runs
-              WHERE TenantId = {tenantId:String}
-                AND ScheduledAt >= fromUnixTimestamp64Milli({startDate:UInt64})
-                AND ScheduledAt <= fromUnixTimestamp64Milli({endDate:UInt64})
-                AND EvaluatorId != ''
-              GROUP BY EvaluatorId
-              ORDER BY name ASC
-              LIMIT ${DISTINCT_FIELD_NAMES_LIMIT}
-            `,
-            query_params: {
-              tenantId: projectId,
-              startDate,
-              endDate,
-            },
-            format: "JSONEachRow",
+          // Deduped by evaluator id (a renamed evaluator keeps its id), latest name kept.
+          const evalResult = await reader.read({
+            statement: evaluatorNamesStatement(window),
+            table: evaluationRuns.$table.name,
           });
-
-          const evalRows = evaluatorNameRowsSchema.parse(await evalResult.json());
+          const evalRows = evaluatorNameRowsSchema.parse(evalResult.rows);
 
           const evaluationNames = evalRows.map((row) => ({
             key: row.id,
@@ -2431,36 +2515,24 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
    * Same OOM-resilient pattern as fetchTraceSummaryRows.
    */
   private async fetchEvaluationRows({
-    reader,
+    authorization,
+    projectId,
     traceIds,
   }: {
-    reader: TenantScopedReader;
+    authorization: Authorization;
+    projectId: string;
     traceIds: string[];
   }): Promise<ClickHouseEvaluationRunRow[]> {
+    const reader = this.builtReader(projectId);
     const runQuery = async (ids: string[]) => {
       // ID_BOUND_SKIP: evaluation's index, registered by evaluation; moves there with trace-review.
-      const result = await reader.query({
-        query: `
-          SELECT ${EVALUATION_RUN_COLUMNS_WITH_INPUTS}
-          FROM evaluation_runs
-          WHERE ${tenantScope("ScheduledAt")}
-            AND TraceId IN ({traceIds:Array(String)})
-            AND (TenantId, EvaluationId, UpdatedAt) IN (
-              SELECT TenantId, EvaluationId, max(UpdatedAt)
-              FROM evaluation_runs
-              WHERE ${tenantScope("ScheduledAt")}
-                AND TraceId IN ({traceIds:Array(String)})
-              GROUP BY TenantId, EvaluationId
-            )
-        `,
-        query_params: {
-          traceIds: ids,
-        },
-        format: "JSONEachRow",
+      const result = await reader.read({
+        statement: evaluationRowsStatement({ authorization, traceIds: ids }),
+        table: evaluationRuns.$table.name,
         // As on main: a trace's evaluations by id, kept unbounded so none is dropped.
-        SKIP_COLD_SCAN_CHECK: true,
+        declaresFullScan: true,
       });
-      return evaluationRunRowsSchema.parse(await result.json());
+      return evaluationRunRowsSchema.parse(result.rows);
     };
 
     try {
@@ -2545,34 +2617,25 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
    * @internal
    */
   private async resolveOccurredAtRange({
-    reader,
+    authorization,
+    projectId,
     traceIds,
   }: {
-    reader: TenantScopedReader;
+    authorization: Authorization;
+    projectId: string;
     traceIds: string[];
   }): Promise<OccurredAtRange | undefined> {
     if (traceIds.length === 0) {
       return undefined;
     }
-    const result = await reader.query({
-      query: `
-        SELECT
-          toUnixTimestamp64Milli(min(OccurredAt)) AS fromMs,
-          toUnixTimestamp64Milli(max(OccurredAt)) AS toMs
-        FROM trace_summaries
-        WHERE ${tenantScope("OccurredAt")}
-          AND TraceId IN ({traceIds:Array(String)})
-          AND OccurredAt > fromUnixTimestamp64Milli(0)
-          {{idBound:trace_summaries.TraceId:traceIds}}
-        HAVING count() > 0
-      `,
-      query_params: { traceIds },
-      format: "JSONEachRow",
+    const result = await this.builtReader(projectId).read({
+      statement: occurredAtRangeStatement({ authorization, traceIds }),
+      table: traceSummaries.$table.name,
       // A trace the index has never seen is resolved over every partition, as before the index.
       // No match answers no row (`HAVING`), so emptiness, the fallback and the miss count hold.
       idBound: { onMiss: "unbounded" },
     });
-    const rows = occurredAtRangeRowsSchema.parse(await result.json());
+    const rows = occurredAtRangeRowsSchema.parse(result.rows);
     const row = rows[0];
     if (!row || !(Number(row.fromMs) > 0) || !(Number(row.toMs) > 0)) {
       return undefined;
@@ -2586,12 +2649,14 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
    * @internal
    */
   private async fetchTracesWithSpansJoined({
+    authorization,
     reader,
     projectId,
     traceIds,
     occurredAt,
     retentionDays,
   }: {
+    authorization: Authorization;
     reader: TenantScopedReader;
     projectId: string;
     traceIds: string[];
@@ -2606,7 +2671,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
       async (_span) => {
         const resolved = occurredAt
           ? { range: occurredAt, unfiled: false }
-          : await this.resolveOccurredAtOrNone({ reader, projectId, traceIds });
+          : await this.resolveOccurredAtOrNone({ authorization, projectId, traceIds });
         const batchRead = {
           reader,
           projectId,
@@ -2628,11 +2693,11 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
   }
 
   private async resolveOccurredAtOrNone({
-    reader,
+    authorization,
     projectId,
     traceIds,
   }: {
-    reader: TenantScopedReader;
+    authorization: Authorization;
     projectId: string;
     traceIds: string[];
   }): Promise<{ range: OccurredAtRange | undefined; unfiled: boolean }> {
@@ -2641,10 +2706,12 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     // cannot prune partitions, so resolve the OccurredAt span from a cheap sort-key seek first.
     // A resolve that answers no filed summary leaves only epoch sentinel rows to find (ADR-087):
     // `unfiled` bounds the summary read to that one partition instead of every partition.
-    const resolved = this.resolveOccurredAtRange({ reader, traceIds }).then((range) => ({
-      range,
-      unfiled: range === undefined,
-    }));
+    const resolved = this.resolveOccurredAtRange({ authorization, projectId, traceIds }).then(
+      (range) => ({
+        range,
+        unfiled: range === undefined,
+      }),
+    );
     return resolved.catch((error) => {
       // Fail open: the resolve is a pure optimization, so a transient
       // failure must not break a read that previously succeeded. Fall

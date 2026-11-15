@@ -225,7 +225,11 @@ describe("given the light resolve that bounds a hint-less batch read", () => {
       String(args.query).includes("AS fromMs"),
     );
     expect(resolveCall).toBeDefined();
-    expect(String(resolveCall![0].query)).toContain("OccurredAt > fromUnixTimestamp64Milli(0)");
+    const sentinel = /OccurredAt > fromUnixTimestamp64Milli\(\{(\w+):\w+\}\)/.exec(
+      String(resolveCall![0].query),
+    );
+    expect(sentinel).not.toBeNull();
+    expect(Number(resolveCall![0].query_params?.[sentinel![1]!])).toBe(0);
   });
 });
 

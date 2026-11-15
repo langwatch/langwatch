@@ -2,7 +2,11 @@
  * @vitest-environment node
  * Spec: modules/trace/specs/trace-legacy-filtered-search.feature
  */
-import { AuthorizedClickHouse, type QueryRequest } from "@langwatch/clickhouse-client";
+import {
+  AuthorizedClickHouse,
+  type ClickHouseQueryClient,
+  type QueryRequest,
+} from "@langwatch/clickhouse-client";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { describe, expect, it } from "vitest";
@@ -12,7 +16,9 @@ import { TraceCanonicalisationService } from "#features/derivation/services/trac
 import { ownProof } from "../../../../../__tests__/support/authorization-proofs.fixture.ts";
 import { traceSummaryRow } from "../../../../../repositories/clickhouse/__tests__/support/trace-summary-row.support.ts";
 import type { TraceClickHouseClient } from "../../../../../repositories/clickhouse/clickhouse.trace-member-client.repository.ts";
-import { mappedLegacyRead } from "./support/legacy-trace-mapping.support.ts";
+import { builtOver, mappedLegacyRead } from "./support/legacy-trace-mapping.support.ts";
+
+type ReadRequest = Parameters<ClickHouseQueryClient["read"]>[0];
 
 const PROTECTIONS = { canSeeCosts: true, canSeeCapturedInput: true, canSeeCapturedOutput: true };
 
@@ -27,32 +33,36 @@ function rowsFor(sql: string): unknown[] {
 }
 
 function compose() {
-  const requests: QueryRequest[] = [];
   const member = createApiFixture<TraceClickHouseClient>({
     query: async ({ query }: { query: string }) => ({ json: async () => rowsFor(query) }),
   });
   const clickhouse = new AuthorizedClickHouse({
     resolveClient: async () =>
       clickHouseQueryClientDouble({
-        query: async (request: QueryRequest) => {
-          requests.push(request);
-          return { rows: rowsFor(request.sql) };
-        },
+        query: async (request: QueryRequest) => ({ rows: rowsFor(request.sql) }),
       }),
   });
+  const built: ReadRequest[] = [];
+  const builtReader = builtOver(async () => member);
   const repository = mappedLegacyRead({
     clickhouse,
     resolveClickHouseClient: async () => member,
+    reader: clickHouseQueryClientDouble({
+      read: async (request) => {
+        built.push(request);
+        return builtReader.read(request);
+      },
+    }),
     traceCanonicalisation: TraceCanonicalisationService.create(),
   });
-  return { repository, requests };
+  return { repository, built };
 }
 
 describe("TraceLegacyReadClickHouseRepository page evaluations", () => {
   describe("given a page of traces", () => {
     /** @scenario "A page's evaluations are read by trace id as on main, a declared full scan" */
     it("reads the page's evaluations unbounded by time, declared a full scan", async () => {
-      const { repository, requests } = compose();
+      const { repository, built } = compose();
 
       await repository.listAllTracesForProject(
         {
@@ -65,11 +75,10 @@ describe("TraceLegacyReadClickHouseRepository page evaluations", () => {
         PROTECTIONS,
         { ownRead: ownProof({ projectId: "project-1" }) },
       );
-      const evaluationRead = requests.find((request) =>
-        request.sql.includes("FROM evaluation_runs"),
-      );
-      expect(evaluationRead?.SKIP_COLD_SCAN_CHECK).toBe(true);
-      expect(evaluationRead?.sql).not.toMatch(/ScheduledAt\s*>=/);
+      const evaluationRead = built.find((request) => request.table === "evaluation_runs");
+      expect(evaluationRead?.declaresFullScan).toBe(true);
+      expect(evaluationRead?.statement).toMatchObject({ kind: "tenant", tenantIds: ["project-1"] });
+      expect(evaluationRead?.statement.sql).not.toMatch(/ScheduledAt\s*>=/);
     });
   });
 });

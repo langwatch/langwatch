@@ -11,8 +11,10 @@ export const evaluationRuns = defineClickHouseTable({
   versionColumn: "UpdatedAt",
   sortKey: ["TenantId", "EvaluationId"],
   columns: {
+    ProjectionId: column.string(),
     TenantId: column.string(),
     EvaluationId: column.string(),
+    Version: column.string(),
     EvaluatorId: column.string(),
     EvaluatorType: column.lowCardinalityString(),
     EvaluatorName: column.nullable(column.string()),
@@ -37,6 +39,7 @@ export const evaluationRuns = defineClickHouseTable({
     LastAttemptAt: column.nullable(column.dateTime64({ precision: 3 })),
     LastAttemptError: column.nullable(column.string()),
     NextAttemptAt: column.nullable(column.dateTime64({ precision: 3 })),
+    LastProcessedEventId: column.string(),
     LastEventOccurredAt: column.dateTime64({ precision: 3 }),
   },
 });

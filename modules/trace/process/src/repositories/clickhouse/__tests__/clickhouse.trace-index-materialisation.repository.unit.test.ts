@@ -55,4 +55,29 @@ describe("ClickHouseTraceIndexMaterialisationRepository", () => {
       );
     });
   });
+
+  describe("when the parts lacking the analytics metadata columns are counted", () => {
+    it("counts over a derived system.parts_columns read with the column list bound once", async () => {
+      const reads: ReadRequest[] = [];
+      const repository = ClickHouseTraceIndexMaterialisationRepository.create(
+        clickHouseQueryClientDouble({
+          async read(request: ReadRequest) {
+            reads.push(request);
+            return { rows: [{ parts: 2 }] };
+          },
+        }),
+      );
+
+      const parts = await repository.countPartsMissingAnalyticsMetadataColumns();
+
+      expect(parts).toBe(2);
+      expect(reads[0]?.table).toBe("system.parts_columns");
+      expect(reads[0]?.statement).toMatchObject({ kind: "allTenants", identity: "system" });
+      expect(reads[0]?.statement.sql).toMatch(
+        /FROM \(SELECT name AS PartName FROM system\.parts_columns/,
+      );
+      const lists = Object.values(reads[0]?.statement.params ?? {}).filter(Array.isArray);
+      expect(lists).toEqual([[...ANALYTICS_METADATA_COLUMNS]]);
+    });
+  });
 });

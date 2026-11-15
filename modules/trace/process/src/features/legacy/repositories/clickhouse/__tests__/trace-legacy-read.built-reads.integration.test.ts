@@ -1,6 +1,7 @@
 /**
  * The legacy reads that take no filter, built (ADR-202) and run on a migrated 26.8 server as the
- * reader with the tenant setting: the thread lookups, topic counts, customers and labels.
+ * reader with the tenant setting: the thread lookups, topic counts, customers and labels, the
+ * prompt studio span and field discovery, each compared with main's text where it had one.
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
@@ -16,6 +17,7 @@ import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
 } from "../../../../../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
+import { derivePromptStudioSpan } from "../../../rules/trace-legacy-prompt-studio-span.rules.ts";
 import { TraceLegacyReadClickHouseRepository } from "../trace-legacy-read.repository.ts";
 
 const clickHouseConfigured = testClickHouseConfigured();
@@ -47,6 +49,71 @@ function summary({
     CreatedAt: new Date(createdAt),
     UpdatedAt: new Date(now),
     TopicId: topicId,
+  };
+}
+
+function span({
+  tenant = tenantId,
+  traceId,
+  spanId,
+  parentSpanId = null,
+  name,
+  attributes,
+}: {
+  tenant?: string;
+  traceId: string;
+  spanId: string;
+  parentSpanId?: string | null;
+  name: string;
+  attributes: Record<string, string>;
+}) {
+  return {
+    ProjectionId: `proj-${nanoid()}`,
+    TenantId: tenant,
+    TraceId: traceId,
+    SpanId: spanId,
+    ParentSpanId: parentSpanId,
+    Sampled: 1,
+    StartTime: new Date(now),
+    EndTime: new Date(now + 5),
+    DurationMs: 5,
+    SpanName: name,
+    SpanKind: 1,
+    ServiceName: "test-service",
+    SpanAttributes: attributes,
+    StatusCode: 1,
+    ScopeName: "test",
+    CreatedAt: new Date(now),
+    UpdatedAt: new Date(now),
+  };
+}
+
+function evaluationRun({
+  tenant = tenantId,
+  evaluatorId,
+  name,
+  scheduledAt,
+}: {
+  tenant?: string;
+  evaluatorId: string;
+  name: string;
+  scheduledAt: number;
+}) {
+  return {
+    ProjectionId: `proj-${nanoid()}`,
+    TenantId: tenant,
+    EvaluationId: `eval-${nanoid()}`,
+    Version: "v1",
+    EvaluatorId: evaluatorId,
+    EvaluatorType: "custom/test",
+    EvaluatorName: name,
+    TraceId: "trace-p",
+    IsGuardrail: 0,
+    Status: "processed",
+    ScheduledAt: new Date(scheduledAt),
+    CreatedAt: new Date(now),
+    UpdatedAt: new Date(now),
+    LastEventOccurredAt: new Date(now),
   };
 }
 
@@ -90,14 +157,59 @@ beforeAll(async () => {
     format: "JSONEachRow",
     clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
   });
+  await ch.insert({
+    table: "stored_spans",
+    values: [
+      span({
+        traceId: "trace-p",
+        spanId: "span-root",
+        name: "agent",
+        attributes: { "langwatch.prompt.handle": "greeter" },
+      }),
+      span({
+        traceId: "trace-p",
+        spanId: "span-llm",
+        parentSpanId: "span-root",
+        name: "chat",
+        attributes: { "langwatch.span.type": "llm", "gen_ai.request.model": "gpt-5" },
+      }),
+      span({
+        tenant: otherTenantId,
+        traceId: "trace-p-other",
+        spanId: "span-llm",
+        name: "other-chat",
+        attributes: { "langwatch.span.type": "llm" },
+      }),
+    ],
+    format: "JSONEachRow",
+    clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
+  });
+  await ch.insert({
+    table: "evaluation_runs",
+    values: [
+      evaluationRun({ evaluatorId: "evaluator-1", name: "Old name", scheduledAt: now - 2_000 }),
+      evaluationRun({ evaluatorId: "evaluator-1", name: "Faithfulness", scheduledAt: now - 1_000 }),
+      evaluationRun({ evaluatorId: "evaluator-2", name: "Accuracy", scheduledAt: now }),
+      evaluationRun({
+        tenant: otherTenantId,
+        evaluatorId: "evaluator-x",
+        name: "Elsewhere",
+        scheduledAt: now,
+      }),
+    ],
+    format: "JSONEachRow",
+    clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
+  });
 }, 120_000);
 
 afterAll(async () => {
   if (!ch) return;
-  await ch.exec({
-    query: "ALTER TABLE trace_summaries DELETE WHERE TenantId IN ({a:String}, {b:String})",
-    query_params: { a: tenantId, b: otherTenantId },
-  });
+  for (const table of ["trace_summaries", "stored_spans", "evaluation_runs"]) {
+    await ch.exec({
+      query: `ALTER TABLE ${table} DELETE WHERE TenantId IN ({a:String}, {b:String})`,
+      query_params: { a: tenantId, b: otherTenantId },
+    });
+  }
 });
 
 const window = { projectId: tenantId, filters: {}, startDate: now - 60_000, endDate: now + 60_000 };
@@ -139,7 +251,88 @@ describe.skipIf(!clickHouseConfigured)("legacy built reads on live ClickHouse", 
       expect(labels).toEqual(["red"]);
     });
   });
+
+  describe("when the prompt studio span is read by span id", () => {
+    it("derives what main's text derived, from the project's own trace only", async () => {
+      const built = await repository.findSpanForPromptStudio({
+        projectId: tenantId,
+        spanId: "span-llm",
+        protections: { canSeeCosts: true },
+      });
+
+      expect(built).not.toBeNull();
+      expect(built).toEqual(await promptStudioOverMain("span-llm"));
+    });
+  });
+
+  describe("when the project's field names are discovered", () => {
+    it("lists span names, metadata keys and evaluators as main's text did", async () => {
+      const fields = await repository.findDistinctFieldNames(
+        tenantId,
+        window.startDate,
+        window.endDate,
+      );
+
+      expect(fields).toEqual(await fieldNamesOverMain());
+      expect(fields.spanNames.map((each) => each.key)).toEqual(["agent", "chat"]);
+      expect(fields.evaluationNames).toEqual([
+        { key: "evaluator-2", label: "Accuracy" },
+        { key: "evaluator-1", label: "Faithfulness" },
+      ]);
+    });
+  });
 });
+
+/** Main's prompt studio text, run as main ran it, through the same derivation. */
+async function promptStudioOverMain(spanId: string) {
+  const result = await ch.query({
+    query: `SELECT SpanId, TraceId, ParentSpanId, SpanName, SpanAttributes,
+        toUnixTimestamp64Milli(StartTime) AS StartTime, toUnixTimestamp64Milli(EndTime) AS EndTime,
+        DurationMs, StatusCode, StatusMessage
+      FROM stored_spans
+      WHERE TenantId = {tenantId:String}
+        AND TraceId = (SELECT TraceId FROM stored_spans
+          WHERE TenantId = {tenantId:String} AND SpanId = {spanId:String} LIMIT 1)
+      LIMIT 1000`,
+    query_params: { tenantId, spanId },
+    format: "JSONEachRow",
+  });
+  const rows = (await result.json<Record<string, unknown>>()).map((row) => ({
+    ...row,
+    StartTime: Number(row.StartTime),
+    EndTime: Number(row.EndTime),
+    DurationMs: Number(row.DurationMs),
+  }));
+  return derivePromptStudioSpan({ rows: rows as never, spanId }) ?? null;
+}
+
+/** Main's three field discovery texts, mapped as main mapped them. */
+async function fieldNamesOverMain() {
+  const params = { tenantId, startDate: window.startDate, endDate: window.endDate };
+  const run = async <Row>(query: string) =>
+    (await ch.query({ query, query_params: params, format: "JSONEachRow" })).json<Row>();
+  const spans = await run<{ SpanName: string }>(`SELECT DISTINCT SpanName FROM stored_spans
+    WHERE TenantId = {tenantId:String}
+      AND StartTime >= fromUnixTimestamp64Milli({startDate:UInt64})
+      AND StartTime <= fromUnixTimestamp64Milli({endDate:UInt64})
+      AND SpanName != '' ORDER BY SpanName ASC LIMIT 10000`);
+  const keys = await run<{ key: string }>(`SELECT DISTINCT arrayJoin(mapKeys(Attributes)) AS key
+    FROM trace_summaries WHERE TenantId = {tenantId:String}
+      AND CreatedAt >= fromUnixTimestamp64Milli({startDate:UInt64})
+      AND CreatedAt <= fromUnixTimestamp64Milli({endDate:UInt64})
+    ORDER BY key ASC LIMIT 10000`);
+  const evaluators = await run<{ id: string; name: string | null }>(`SELECT EvaluatorId AS id,
+      argMax(EvaluatorName, ScheduledAt) AS name
+    FROM evaluation_runs WHERE TenantId = {tenantId:String}
+      AND ScheduledAt >= fromUnixTimestamp64Milli({startDate:UInt64})
+      AND ScheduledAt <= fromUnixTimestamp64Milli({endDate:UInt64})
+      AND EvaluatorId != '' GROUP BY EvaluatorId ORDER BY name ASC LIMIT 10000`);
+  return {
+    spanNames: spans.map((row) => ({ key: row.SpanName, label: row.SpanName })),
+    metadataKeys: keys.map((row) => ({ key: row.key, label: row.key })),
+    evaluationNames: evaluators.map((row) => ({ key: row.id, label: row.name ?? row.id })),
+  };
+}
 
 /** Main's topic count text, for parity: the same rows aggregated the same way. */
 async function repositoryOverMain() {

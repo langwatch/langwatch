@@ -14,7 +14,6 @@ import {
   clickhouseRead,
   cond,
   fn,
-  param,
   tenantScope as builtTenantScope,
 } from "@langwatch/clickhouse-client/builder";
 import { z } from "zod";
@@ -96,9 +95,6 @@ const spanTotalsRowsSchema = z.array(
 const ATTRIBUTE_KEY_SAMPLE_ROWS = 50_000;
 const MAX_TEST_TRACE_SPANS = 10_000;
 
-/** A constant false, for a braid set with no braid in it. */
-const noBraid = () => cond.eq(param.uint16(0), param.uint16(1));
-
 /** A braid's own window on `StartTime`; an open end bounds nothing. */
 function braidWindow(braid: BraidWindowRead) {
   const from = cond.gte(storedSpans.StartTime, braid.fromMs);
@@ -141,7 +137,7 @@ function unsignedOf({
 
 /** Whether any braid shows a span: each its own window and condition, never merged. */
 function anyBraid(braids: readonly BraidWindowRead[]) {
-  if (braids.length === 0) return noBraid();
+  if (braids.length === 0) return cond.never();
   return braids.map(braidPick).reduce((shown, pick) => cond.or(shown, pick));
 }
 
@@ -243,7 +239,7 @@ function ownerSpansInTracesStatement({
   const liveShown = anyBraid(live);
   const shown = cond.or(liveShown, braidPick(draft));
   const split = verifiedPartsOf(draft.compiledWhere);
-  const unsigned = split.kind === "signed" ? unsignedOf({ draft, split, liveShown }) : noBraid();
+  const unsigned = split.kind === "signed" ? unsignedOf({ draft, split, liveShown }) : cond.never();
   const perSpan = clickhouseRead({ scope })
     .from(storedSpans)
     .withinWindows()

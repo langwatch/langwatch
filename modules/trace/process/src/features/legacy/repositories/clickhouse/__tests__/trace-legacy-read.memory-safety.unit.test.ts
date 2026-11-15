@@ -6,14 +6,17 @@ import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
-import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 import { TraceLegacyReadClickHouseRepository } from "../trace-legacy-read.repository.ts";
 
 type ReadRequest = Parameters<ClickHouseQueryClient["read"]>[0];
 
-/** The SQL findTopicCounts sends, built and recorded rather than read off the source. */
-async function topicCountsSql(): Promise<string> {
+/** A repository whose built reads are recorded and answered with no rows. */
+function recordingRepository(): {
+  repository: TraceLegacyReadClickHouseRepository;
+  reads: ReadRequest[];
+} {
   const reads: ReadRequest[] = [];
   const repository = TraceLegacyReadClickHouseRepository.create({
     reader: {
@@ -23,6 +26,12 @@ async function topicCountsSql(): Promise<string> {
       },
     },
   });
+  return { repository, reads };
+}
+
+/** The SQL findTopicCounts sends, built and recorded rather than read off the source. */
+async function topicCountsSql(): Promise<string> {
+  const { repository, reads } = recordingRepository();
   await repository.findTopicCounts({
     projectId: "project-1",
     filters: {},
@@ -30,6 +39,13 @@ async function topicCountsSql(): Promise<string> {
     endDate: 2,
   });
   return reads.map((request) => request.statement.sql).join("\n");
+}
+
+/** The three statements findDistinctFieldNames sends: span names, metadata keys, evaluators. */
+async function fieldDiscoverySql(): Promise<string[]> {
+  const { repository, reads } = recordingRepository();
+  await repository.findDistinctFieldNames("project-1", 1, 2);
+  return reads.map((request) => request.statement.sql);
 }
 
 /**
@@ -50,22 +66,16 @@ describe("memory-safety", () => {
   // Scenario 2: Topic and field-discovery queries access only specific attributes
   // -------------------------------------------------------------------------
   describe("given a topic or field-discovery query", () => {
-    /**
-     * Read the actual production source of clickhouse-trace.service.ts and
-     * extract the method bodies for findTopicCounts and findDistinctFieldNames.
-     * This way, if the SQL changes the test checks the ACTUAL code.
-     */
-    const traceServicePath = traceReadSourcePath();
-    const traceServiceSource = fs.readFileSync(traceServicePath, "utf-8");
-
+    /** The statements the shipped reads build, recorded, so a changed query is what is checked. */
     let topicCountsStatement = "";
     beforeAll(async () => {
       topicCountsStatement = await topicCountsSql();
     });
 
-    const getDistinctFieldNamesBody = traceServiceSource.match(
-      /async findDistinctFieldNames[\s\S]*?(?=\n {2}async |\n {2}\/\*\*|\n {2}private )/,
-    );
+    let fieldDiscoveryStatements: string[] = [];
+    beforeAll(async () => {
+      fieldDiscoveryStatements = await fieldDiscoverySql();
+    });
 
     describe("when the topic counting query SQL is inspected", () => {
       /** @scenario Topic and field-discovery queries access only specific attributes */
@@ -83,14 +93,16 @@ describe("memory-safety", () => {
     describe("when the field discovery query SQL is inspected", () => {
       /** @scenario "Topic and field-discovery queries access only specific attributes" */
       it("does not select the full SpanAttributes Map column", () => {
-        expect(getDistinctFieldNamesBody).not.toBeNull();
-        expect(getDistinctFieldNamesBody![0]).not.toContain("SpanAttributes");
+        expect(fieldDiscoveryStatements).toHaveLength(3);
+        for (const sql of fieldDiscoveryStatements) expect(sql).not.toContain("SpanAttributes");
       });
 
       it("uses mapKeys() for Attributes access (extracts keys only, not values)", () => {
-        expect(getDistinctFieldNamesBody).not.toBeNull();
+        const metadataKeys = fieldDiscoveryStatements[1] ?? "";
+        expect(metadataKeys).toContain("FROM trace_summaries");
         // mapKeys extracts only the key names, avoiding reading all Map values
-        expect(getDistinctFieldNamesBody![0]).toContain("mapKeys(Attributes)");
+        expect(metadataKeys).toContain("mapKeys(Attributes)");
+        expect(metadataKeys.replace(/mapKeys\(Attributes\)/g, "")).not.toMatch(/\bAttributes\b/);
       });
     });
   });
@@ -111,41 +123,25 @@ describe("memory-safety", () => {
   // Scenario 4: Field discovery query includes a LIMIT clause
   // -------------------------------------------------------------------------
   describe("given the field discovery query's LIMIT clause", () => {
-    const traceServicePath = traceReadSourcePath();
-    const traceServiceSource = fs.readFileSync(traceServicePath, "utf-8");
-
-    const getDistinctFieldNamesBody = traceServiceSource.match(
-      /async findDistinctFieldNames[\s\S]*?(?=\n {2}async |\n {2}\/\*\*|\n {2}private )/,
-    );
-
     describe("when the field discovery query SQL is inspected", () => {
-      // A bounded LIMIT is either a literal number or a named numeric constant
-      // interpolated into the query (e.g. `LIMIT ${DISTINCT_FIELD_NAMES_LIMIT}`).
-      // Both keep the query bounded, which is what memory-safety requires.
-      const BOUNDED_LIMIT = /\bLIMIT\s+(?:\d+|\$\{[A-Z0-9_]+\})/g;
-      let limitMatches: RegExpMatchArray;
-
-      beforeEach(() => {
-        if (!getDistinctFieldNamesBody) {
-          throw new Error("findDistinctFieldNames source was not found");
-        }
-        const matches = getDistinctFieldNamesBody[0].match(BOUNDED_LIMIT);
-        if (!matches) {
-          throw new Error("findDistinctFieldNames has no bounded LIMIT");
-        }
-        limitMatches = matches;
+      let statements: string[] = [];
+      beforeAll(async () => {
+        statements = await fieldDiscoverySql();
       });
 
       /** @scenario Field discovery query includes a LIMIT clause */
       it("span names query includes a LIMIT clause followed by a number", () => {
-        // The body contains two queries (span names + metadata keys).
-        // Verify at least two LIMIT occurrences so both are covered.
-        expect(limitMatches.length).toBeGreaterThanOrEqual(1);
+        expect(statements[0]).toContain("FROM stored_spans");
+        expect(statements[0]).toMatch(/\bLIMIT\s+\d+/);
       });
 
       it("metadata keys query includes a LIMIT clause followed by a number", () => {
-        // Both the span-names and metadata-keys queries must have LIMIT.
-        expect(limitMatches.length).toBeGreaterThanOrEqual(2);
+        expect(statements[1]).toMatch(/\bLIMIT\s+\d+/);
+      });
+
+      it("evaluator names query includes a LIMIT clause followed by a number", () => {
+        expect(statements[2]).toContain("FROM evaluation_runs");
+        expect(statements[2]).toMatch(/\bLIMIT\s+\d+/);
       });
     });
   });

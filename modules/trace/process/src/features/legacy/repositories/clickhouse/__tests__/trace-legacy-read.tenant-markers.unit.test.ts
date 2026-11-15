@@ -12,6 +12,7 @@ import { TraceCanonicalisationService } from "#features/derivation/services/trac
 import { ownProof } from "../../../../../__tests__/support/authorization-proofs.fixture.ts";
 import { traceSummaryRow } from "../../../../../repositories/clickhouse/__tests__/support/trace-summary-row.support.ts";
 import type { TraceClickHouseClient } from "../../../../../repositories/clickhouse/clickhouse.trace-member-client.repository.ts";
+import { TraceLegacyReadClickHouseRepository } from "../trace-legacy-read.repository.ts";
 import { builtOver, mappedLegacyRead } from "./support/legacy-trace-mapping.support.ts";
 
 type ReadRequest = Parameters<ClickHouseQueryClient["read"]>[0];
@@ -99,8 +100,17 @@ describe("TraceLegacyReadClickHouseRepository tenant markers", () => {
       });
 
       // The thread lookups are built reads under the proof's scope (ADR-202).
-      expect(built).toHaveLength(2);
+      const lookups = built.filter((request) =>
+        request.statement.sql.includes("SELECT DISTINCT TraceId"),
+      );
+      expect(lookups).toHaveLength(2);
       for (const request of built) {
+        expect(request.statement).toMatchObject({
+          kind: "tenant",
+          tenantIds: [PROJECT_ID],
+        });
+      }
+      for (const request of lookups) {
         expect(request.table).toBe("trace_summaries");
         expect(request.statement).toMatchObject({
           kind: "tenant",
@@ -111,9 +121,47 @@ describe("TraceLegacyReadClickHouseRepository tenant markers", () => {
         expect(request.statement.sql).toContain("SELECT DISTINCT TraceId");
         expect(request.statement.sql).toContain("ORDER BY CreatedAt ASC");
       }
-      expect(built[0]?.statement.sql).toMatch(/Attributes\[\{v\d+:String\}\] = /);
-      expect(built[1]?.statement.sql).toMatch(/Attributes\[\{v\d+:String\}\] IN /);
+      expect(lookups[0]?.statement.sql).toMatch(/Attributes\[\{v\d+:String\}\] = /);
+      expect(lookups[1]?.statement.sql).toMatch(/Attributes\[\{v\d+:String\}\] IN /);
       expectFencedTo(statements(), PROJECT_ID);
+    });
+  });
+
+  describe("when the prompt studio span and the field names are read", () => {
+    it("builds each read on the project's single-tenant scope", async () => {
+      const built: ReadRequest[] = [];
+      const repository = TraceLegacyReadClickHouseRepository.create({
+        reader: {
+          read: async (request) => {
+            built.push(request);
+            return { rows: [] };
+          },
+        },
+      });
+
+      await repository.findSpanForPromptStudio({
+        projectId: PROJECT_ID,
+        spanId: "span-1",
+        protections: PROTECTIONS,
+      });
+      await repository.findDistinctFieldNames(PROJECT_ID, 1, 2);
+
+      expect(built.map((request) => request.table)).toEqual([
+        "stored_spans",
+        "stored_spans",
+        "trace_summaries",
+        "evaluation_runs",
+      ]);
+      for (const request of built) {
+        expect(request.statement).toMatchObject({
+          kind: "tenant",
+          identity: "reader",
+          settings: { SQL_langwatch_tenant_ids: PROJECT_ID },
+        });
+        expect(request.statement).toHaveProperty("tenantIds", undefined);
+      }
+      // The span-id subquery carries its own tenant predicate, as main's did.
+      expect(built[0]?.statement.sql.match(/TenantId = /g)).toHaveLength(2);
     });
   });
 

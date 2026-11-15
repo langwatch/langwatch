@@ -42,37 +42,6 @@ export interface ClickHouseEvaluationRunRow {
   UpdatedAt: string;
 }
 
-/**
- * evaluation_runs columns backing {@link ClickHouseEvaluationRunRow}, minus the heavy `Inputs`
- * payload — keep in sync with the interface above. Listing them avoids `SELECT *`, which on the
- * deduped read path also pulls every stale version's columns before the IN-tuple discards them.
- */
-const EVALUATION_RUN_COLUMNS_LIGHT = [
-  "ProjectionId",
-  "TenantId",
-  "EvaluationId",
-  "Version",
-  "EvaluatorId",
-  "EvaluatorType",
-  "EvaluatorName",
-  "TraceId",
-  "IsGuardrail",
-  "Status",
-  "Score",
-  "Passed",
-  "Label",
-  "Details",
-  "Error",
-  "ScheduledAt",
-  "StartedAt",
-  "CompletedAt",
-  "LastProcessedEventId",
-  "UpdatedAt",
-].join(", ");
-
-/** Light columns plus the heavy `Inputs` payload. */
-export const EVALUATION_RUN_COLUMNS_WITH_INPUTS = `${EVALUATION_RUN_COLUMNS_LIGHT}, Inputs`;
-
 /** Appends "Z" to a timestamp string only when it lacks a timezone indicator. */
 function appendUtcSuffix(ts: string): string {
   return /[Zz]$|[+-]\d{2}:?\d{2}$/.test(ts) ? ts : ts + "Z";

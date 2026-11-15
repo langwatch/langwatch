@@ -24,7 +24,7 @@ const protections: Protections = { canSeeCosts: true };
 
 /** ClickHouse's `min`/`max` with no GROUP BY over no rows: one row of zeroes, unless HAVING. */
 function aggregateOverNoRows({ sql }: { sql: string }): unknown[] {
-  return sql.includes("HAVING count() > 0") ? [] : [{ fromMs: "0", toMs: "0" }];
+  return /HAVING count\(\) > /.test(sql) ? [] : [{ fromMs: "0", toMs: "0" }];
 }
 
 let outcomes: { table: string; outcome: WindowedReadOutcome }[];
@@ -51,6 +51,7 @@ describe("TraceLegacyReadClickHouseRepository's OccurredAt resolver", () => {
       });
       const read = mappedLegacyRead({
         clickhouse: new AuthorizedClickHouse({ resolveClient: async () => client }),
+        reader: client,
         traceCanonicalisation: TraceCanonicalisationService.create(),
       });
 

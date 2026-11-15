@@ -4,7 +4,9 @@ import {
   cond,
   type Condition,
   fn,
+  param,
   systemMutations,
+  systemPartsColumns,
   tenantScope,
 } from "@langwatch/clickhouse-client/builder";
 import { z } from "zod";
@@ -66,6 +68,35 @@ function mutationsStatement({
 }
 
 /** Reads and starts the trace module's materialisations on the shared ClickHouse target. */
+/** The active trace_analytics parts that lack at least one analytics metadata column. */
+function partsMissingMetadataColumnsStatement() {
+  const read = clickhouseRead({
+    scope: tenantScope.allTenants({
+      reason: "a part's stored columns belong to the shared table, which no tenant owns",
+    }),
+  });
+  const wanted = param.strings([...ANALYTICS_METADATA_COLUMNS]);
+  const lacking = read
+    .from(systemPartsColumns)
+    .select({ PartName: systemPartsColumns.name })
+    .where(({ and, eq }) =>
+      and(
+        eq(systemPartsColumns.database, fn.currentDatabase()),
+        eq(systemPartsColumns.table, "trace_analytics"),
+        eq(systemPartsColumns.active, 1),
+      ),
+    )
+    .groupBy(systemPartsColumns.name)
+    .having(({ lt }) =>
+      lt(fn.countIf(fn.has(wanted, systemPartsColumns.column)), fn.length(wanted)),
+    )
+    .as("lacking");
+  return read
+    .from(lacking)
+    .select({ parts: fn.toUInt32(fn.count()) })
+    .build();
+}
+
 export class ClickHouseTraceIndexMaterialisationRepository extends TraceIndexMaterialisationRepository {
   readonly #clickhouse: ClickHouseQueryClient;
 
@@ -100,25 +131,9 @@ export class ClickHouseTraceIndexMaterialisationRepository extends TraceIndexMat
   }
 
   async countPartsMissingAnalyticsMetadataColumns(): Promise<number> {
-    const { rows } = await this.#clickhouse.query<unknown>({
-      tenantId: "",
+    const { rows } = await this.#clickhouse.read({
+      statement: partsMissingMetadataColumnsStatement(),
       table: "system.parts_columns",
-      kind: "read",
-      sql: `
-        SELECT toUInt32(count()) AS parts
-        FROM (
-          SELECT name
-          FROM system.parts_columns
-          WHERE database = currentDatabase()
-            AND table = 'trace_analytics'
-            AND active
-          GROUP BY name
-          HAVING countIf(has({columns:Array(String)}, column)) < length({columns:Array(String)})
-        )
-      `,
-      params: { columns: [...ANALYTICS_METADATA_COLUMNS] },
-      // A part's stored columns belong to the shared table, which no tenant owns.
-      SKIP_TENANT_CHECK: true,
     });
     return partCountSchema.parse(rows)[0]?.parts ?? 0;
   }
