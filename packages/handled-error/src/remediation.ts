@@ -101,6 +101,13 @@ const registry = {
     ],
     docsPath: "/platform/data-retention",
   },
+  span_content_withheld: {
+    tips: [
+      "A privacy rule hides part of this span's content (input, output, system instructions or tool calls) from you; ask a project admin for access",
+      "On a plan with a visibility window, spans older than the window can't be opened in the playground; upgrade the plan or open a newer span",
+    ],
+    docsPath: "/platform/data-privacy",
+  },
   span_not_found: {
     tips: ["Check the span id; spans are deleted with their trace after the retention window"],
     docsPath: "/platform/data-retention",
