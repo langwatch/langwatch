@@ -10,25 +10,7 @@ import { GovernanceEmptyState } from "../../../../ui/elements/governance-empty-s
 import { PermissionRequiredNotice } from "../../../../ui/elements/permission-required-notice.tsx";
 import type { Source } from "../ingestion-source-forms.ts";
 
-/**
- * The source list: what the viewer may read, what went wrong when it could
- * not be read, the connectors header with its add control, the table, and
- * the note naming the grant that unlocks the writes.
- */
-export function IngestionSourceList({
-  isSample = false,
-  canRead,
-  canManage,
-  isLoading,
-  error,
-  sources,
-  rotatingId,
-  archivingId,
-  onEdit,
-  onRotate,
-  onArchive,
-  createAction,
-}: {
+type IngestionSourceListProps = {
   isSample?: boolean;
   canRead: boolean;
   canManage: boolean;
@@ -48,7 +30,50 @@ export function IngestionSourceList({
    * header — that one was a differently-worded outline button and is gone.
    */
   createAction?: ReactNode;
+};
+
+/** What the list says when the viewer may read it and no source exists yet. */
+function NoSourcesConnected({
+  canManage,
+  createAction,
+}: {
+  canManage: boolean;
+  createAction?: ReactNode;
 }) {
+  return (
+    <GovernanceEmptyState
+      testId="ingestion-sources-empty"
+      icon={Plug}
+      headline="No sources connected yet"
+      description={
+        canManage
+          ? "A source is where this organization's AI usage is read from. Connect one and its events start arriving here."
+          : "A source is where this organization's AI usage is read from. Once someone connects one, its events arrive here."
+      }
+      action={createAction}
+    />
+  );
+}
+
+/**
+ * The source list: what the viewer may read, what went wrong when it could
+ * not be read, the connectors header with its add control, the table, and
+ * the note naming the grant that unlocks the writes.
+ */
+export function IngestionSourceList({
+  isSample = false,
+  canRead,
+  canManage,
+  isLoading,
+  error,
+  sources,
+  rotatingId,
+  archivingId,
+  onEdit,
+  onRotate,
+  onArchive,
+  createAction,
+}: IngestionSourceListProps) {
   // Only claim "none connected" when we actually know: on a load failure the
   // alert below says what went wrong instead, and an empty table read off an
   // empty `?? []` would tell an admin their entire ingest fleet is gone when
@@ -81,17 +106,7 @@ export function IngestionSourceList({
           goes stale the moment the button is renamed, and nothing checks
           prose. Same component, so one label, one weight, one flow. */}
       {canRead && knowsFleet && sources.length === 0 && (
-        <GovernanceEmptyState
-          testId="ingestion-sources-empty"
-          icon={Plug}
-          headline="No sources connected yet"
-          description={
-            canManage
-              ? "A source is where this organization's AI usage is read from. Connect one and its events start arriving here."
-              : "A source is where this organization's AI usage is read from. Once someone connects one, its events arrive here."
-          }
-          action={createAction}
-        />
+        <NoSourcesConnected canManage={canManage} createAction={createAction} />
       )}
 
       {canRead && knowsFleet && sources.length > 0 && (

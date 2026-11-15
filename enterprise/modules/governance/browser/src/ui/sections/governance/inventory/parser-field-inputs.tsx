@@ -115,7 +115,7 @@ function ParserSwitchInput({
     offValue: control.offValue,
   });
 
-  // Same reasoning as the select branch below: a switch has no readOnly
+  // Same reasoning as `ParserSelectInput` above: a switch has no readOnly
   // either, and `disabled` would drop it out of the tab order where a keyboard
   // or screen-reader user could not read what it holds. So a locked toggle is
   // shown as its own state in a readOnly input instead — in the words of the
@@ -151,26 +151,7 @@ function ParserSwitchInput({
   );
 }
 
-/**
- * The input itself, chosen by control kind.
- *
- * Split from `ParserConfigField` so the label, the required marker and the hint
- * are decided in one place and the control in another — the two were growing a
- * shared ternary chain, which is how a field ends up rendering one control and
- * labelling another.
- */
-export function ParserFieldInput({
-  ariaLabel,
-  control,
-  fieldKey,
-  isInvalid,
-  isMultiline,
-  isSecret,
-  placeholder,
-  readOnly,
-  value,
-  onChange,
-}: {
+type ParserFieldInputProps = {
   /**
    * The field's label.
    *
@@ -192,24 +173,95 @@ export function ParserFieldInput({
   readOnly: boolean;
   value: string;
   onChange: (next: string) => void;
-}) {
-  const invalidStyles = invalidInputStyles(isInvalid);
+};
 
-  if (isMultiline) {
-    return (
-      <Textarea
-        size="sm"
-        rows={6}
-        aria-label={ariaLabel}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        fontFamily="mono"
-        readOnly={readOnly}
-        {...invalidStyles}
-      />
-    );
-  }
+/** A multi-line value, in monospace. */
+function ParserTextareaInput({
+  ariaLabel,
+  isInvalid,
+  placeholder,
+  readOnly,
+  value,
+  onChange,
+}: ParserFieldInputProps) {
+  return (
+    <Textarea
+      size="sm"
+      rows={6}
+      aria-label={ariaLabel}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      fontFamily="mono"
+      readOnly={readOnly}
+      {...invalidInputStyles(isInvalid)}
+    />
+  );
+}
+
+/** A calendar day, shown as the date part of whatever is held. */
+function ParserDateInput({
+  ariaLabel,
+  isInvalid,
+  readOnly,
+  value,
+  onChange,
+}: ParserFieldInputProps) {
+  return (
+    <Input
+      size="sm"
+      type="date"
+      aria-label={ariaLabel}
+      // Display-only truncation — see `dateInputValue`. The held value stays
+      // whatever was stored until the admin picks a different day.
+      value={dateInputValue(value)}
+      onChange={(e) => onChange(e.target.value)}
+      readOnly={readOnly}
+      {...invalidInputStyles(isInvalid)}
+    />
+  );
+}
+
+/** A single-line value, masked when it is a secret. */
+function ParserTextInput({
+  ariaLabel,
+  isInvalid,
+  isSecret,
+  placeholder,
+  readOnly,
+  value,
+  onChange,
+}: ParserFieldInputProps) {
+  return (
+    <Input
+      size="sm"
+      type={isSecret ? "password" : "text"}
+      aria-label={ariaLabel}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      // readOnly, never disabled: a locked field is shown precisely so the
+      // admin can read what it holds, and `disabled` drops it out of the tab
+      // order where a keyboard or screen-reader user cannot reach it. The
+      // textarea and date inputs are read-only the same way.
+      readOnly={readOnly}
+      {...invalidInputStyles(isInvalid)}
+    />
+  );
+}
+
+/**
+ * The input itself, chosen by control kind.
+ *
+ * Split from `ParserConfigField` so the label, the required marker and the hint
+ * are decided in one place and the control in another — the two were growing a
+ * shared ternary chain, which is how a field ends up rendering one control and
+ * labelling another.
+ */
+export function ParserFieldInput(props: ParserFieldInputProps) {
+  const { ariaLabel, control, fieldKey, isInvalid, isMultiline, readOnly, value, onChange } = props;
+
+  if (isMultiline) return <ParserTextareaInput {...props} />;
 
   if (control.kind === "select") {
     return (
@@ -237,36 +289,7 @@ export function ParserFieldInput({
     );
   }
 
-  if (control.kind === "date") {
-    return (
-      <Input
-        size="sm"
-        type="date"
-        aria-label={ariaLabel}
-        // Display-only truncation — see `dateInputValue`. The held value stays
-        // whatever was stored until the admin picks a different day.
-        value={dateInputValue(value)}
-        onChange={(e) => onChange(e.target.value)}
-        readOnly={readOnly}
-        {...invalidStyles}
-      />
-    );
-  }
+  if (control.kind === "date") return <ParserDateInput {...props} />;
 
-  return (
-    <Input
-      size="sm"
-      type={isSecret ? "password" : "text"}
-      aria-label={ariaLabel}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder={placeholder}
-      // readOnly, never disabled: a locked field is shown precisely so the
-      // admin can read what it holds, and `disabled` drops it out of the tab
-      // order where a keyboard or screen-reader user cannot reach it. The
-      // Textarea branch above says the same thing.
-      readOnly={readOnly}
-      {...invalidStyles}
-    />
-  );
+  return <ParserTextInput {...props} />;
 }

@@ -34,8 +34,8 @@ function ParserConfigField({
     field,
     mode,
   });
-  // `fieldControl` builds a fresh options array every call, and a select below
-  // hands it straight to `DashboardSelect`, whose collection is keyed on that
+  // `fieldControl` builds a fresh options array every call, and a select in
+  // `parser-field-inputs.tsx` hands it straight to `DashboardSelect`, whose collection is keyed on that
   // array's identity — so an unmemoized call resets highlight and scroll under
   // an open dropdown. It still rebuilds when `values` change, which is correct:
   // these options are a function of the form's other answers.
@@ -84,15 +84,7 @@ function ParserConfigField({
   );
 }
 
-export function ParserConfigFields({
-  sourceType,
-  values,
-  onChange,
-  mode = "create",
-  readOnlyKeys,
-  invalidKeys,
-  advancedExtras,
-}: {
+type ParserConfigFieldsProps = {
   sourceType: SourceType;
   values: Record<string, string>;
   onChange: (next: Record<string, string>) => void;
@@ -126,7 +118,52 @@ export function ParserConfigFields({
    * silently discard the admin's choice on every collapse.
    */
   advancedExtras?: ReactNode;
+};
+
+/** The fields outside the Advanced group, each run of one group under its heading. */
+function PrimaryParserFields({
+  fields,
+  values,
+  onChange,
+  mode,
+  isReadOnly,
+  isInvalid,
+}: {
+  fields: FieldDef[];
+  values: Record<string, string>;
+  onChange: (next: Record<string, string>) => void;
+  mode: ParserConfigMode;
+  isReadOnly: (key: string) => boolean;
+  isInvalid: (key: string) => boolean;
 }) {
+  return fields.map((f, i) => (
+    <Fragment key={f.key}>
+      {f.group && f.group !== fields[i - 1]?.group && (
+        <Text fontSize="xs" fontWeight="semibold" color="fg.muted" pt={i > 0 ? 2 : 0}>
+          {f.group}
+        </Text>
+      )}
+      <ParserConfigField
+        field={f}
+        values={values}
+        onChange={onChange}
+        mode={mode}
+        readOnly={isReadOnly(f.key)}
+        isInvalid={isInvalid(f.key)}
+      />
+    </Fragment>
+  ));
+}
+
+export function ParserConfigFields({
+  sourceType,
+  values,
+  onChange,
+  mode = "create",
+  readOnlyKeys,
+  invalidKeys,
+  advancedExtras,
+}: ParserConfigFieldsProps) {
   // A held value can stop being offered without the admin touching its field —
   // switching the Anthropic report to `cost` retires every bucket width. Left
   // in place it would reject the save for a field the form no longer shows a
@@ -160,23 +197,14 @@ export function ParserConfigFields({
           Configuration
         </Text>
       )}
-      {primaryFields.map((f, i) => (
-        <Fragment key={f.key}>
-          {f.group && f.group !== primaryFields[i - 1]?.group && (
-            <Text fontSize="xs" fontWeight="semibold" color="fg.muted" pt={i > 0 ? 2 : 0}>
-              {f.group}
-            </Text>
-          )}
-          <ParserConfigField
-            field={f}
-            values={values}
-            onChange={onChange}
-            mode={mode}
-            readOnly={isReadOnly(f.key)}
-            isInvalid={isInvalid(f.key)}
-          />
-        </Fragment>
-      ))}
+      <PrimaryParserFields
+        fields={primaryFields}
+        values={values}
+        onChange={onChange}
+        mode={mode}
+        isReadOnly={isReadOnly}
+        isInvalid={isInvalid}
+      />
       {(advancedFields.length > 0 || advancedExtras) && (
         <AdvancedSettingsGroup openWhen={hasInvalidAdvancedField}>
           {advancedFields.map((f) => (

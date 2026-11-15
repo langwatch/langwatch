@@ -379,6 +379,29 @@ export interface EditSubmission {
 }
 
 /**
+ * The pull config an edited pull source would run on, or null when a field is
+ * one the adapter cannot parse. Reuses the create path's dispatcher, and with
+ * it the toast that names which field is wrong — a second builder here is how
+ * the two forms would drift into disagreeing about what a valid bucket width is.
+ */
+function rebuildEditedPullConfig({
+  toaster,
+  ...draft
+}: Omit<ComposerState, "traceProjectId"> & {
+  toaster: GovernanceToaster;
+}): Record<string, unknown> | null {
+  const resolved = resolvePullConfig(
+    // The destination is not part of the adapter's pull config — it only
+    // decides where routed conversations land afterwards. Null here so
+    // this literal satisfies ComposerState without implying otherwise.
+    { ...draft, traceProjectId: null },
+    toaster,
+    { shouldRequireCredentials: false },
+  );
+  return resolved?.pullConfig || null;
+}
+
+/**
  * The edit form's submission, assembled from the form state and the row it
  * opened on. `null` means the form is not in a saveable state and the caller
  * does nothing: either the name is empty, or a pull field is one the adapter
@@ -420,29 +443,18 @@ export function buildEditSubmission({
 
   let rebuiltPullConfig: Record<string, unknown> | null = null;
   if (isPullMode) {
-    // Reuses the create path's dispatcher, and with it the toast that names
-    // which field is wrong — a second builder here is how the two forms would
-    // drift into disagreeing about what a valid bucket width is.
-    const resolved = resolvePullConfig(
-      {
-        sourceType,
-        name: trimmedName,
-        description: description.trim(),
-        parserConfig,
-        ottlStatements,
-        pullSchedule,
-        // The destination is not part of the adapter's pull config — it only
-        // decides where routed conversations land afterwards. Null here so
-        // this literal satisfies ComposerState without implying otherwise.
-        traceProjectId: null,
-      },
+    rebuiltPullConfig = rebuildEditedPullConfig({
+      sourceType,
+      name: trimmedName,
+      description: description.trim(),
+      parserConfig,
+      ottlStatements,
+      pullSchedule,
       toaster,
-      { shouldRequireCredentials: false },
-    );
+    });
     // Refusing here names the field before a round trip; the server runs the
     // adapter's schema on save as well.
-    if (!resolved?.pullConfig) return null;
-    rebuiltPullConfig = resolved.pullConfig;
+    if (!rebuiltPullConfig) return null;
   }
 
   return {

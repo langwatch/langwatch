@@ -13,8 +13,8 @@ export interface FieldDef {
    * masked as the admin types it AND kept out of the plaintext
    * `parserConfig` JSONB (it belongs only inside the encrypted
    * `credentials` subtree). This is the single declaration both of those
-   * decisions are driven from - see `isSecretFieldKey` below for why
-   * that matters.
+   * decisions are driven from - see `isSecretFieldKey` in
+   * `parser-fields.ts` for why that matters.
    */
   secret?: boolean;
   /**

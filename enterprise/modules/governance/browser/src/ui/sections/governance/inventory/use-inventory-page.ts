@@ -28,7 +28,7 @@ import { useSourceComposer } from "./use-source-composer.ts";
  * What the Catalog and Environments panes need, and nothing the source
  * composer does.
  *
- * Its own hook because it is a different concern from the source CRUD below:
+ * Its own hook because it is a different concern from the source CRUD (`useSourceComposer`):
  * this is how the page is being READ — which layout, which samples, which
  * environments the reader typed in — while the other is what is being written.
  * Keeping them apart also keeps either one small enough to follow.

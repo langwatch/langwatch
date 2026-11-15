@@ -206,6 +206,23 @@ function TestCurlPanel({ curl }: { curl: string }) {
   );
 }
 
+/** Which source the secret belongs to: its name and its type. */
+function SourceSummaryPanel({ details }: { details: SecretDetails }) {
+  return (
+    <VStack align="stretch" gap={1}>
+      <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+        Source name
+      </Text>
+      <Text fontSize="sm" fontWeight="medium">
+        {details.sourceName}{" "}
+        <Badge size="sm" variant="surface" marginLeft={2}>
+          {SOURCE_TYPE_LABEL[details.sourceType]}
+        </Badge>
+      </Text>
+    </VStack>
+  );
+}
+
 export function SecretModal({
   details,
   onClose,
@@ -255,17 +272,7 @@ export function SecretModal({
           This is the only time we&apos;ll show this secret. Save it somewhere safe and paste it
           into the upstream platform&apos;s admin console. We store only its hash.
         </Text>
-        <VStack align="stretch" gap={1}>
-          <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-            Source name
-          </Text>
-          <Text fontSize="sm" fontWeight="medium">
-            {details.sourceName}{" "}
-            <Badge size="sm" variant="surface" marginLeft={2}>
-              {SOURCE_TYPE_LABEL[details.sourceType]}
-            </Badge>
-          </Text>
-        </VStack>
+        <SourceSummaryPanel details={details} />
         <IngestSecretPanel secret={details.secret} copied={copied} onCopy={copy} />
         {usesPushUrl && <OtlpEndpointPanel otlpUrl={otlpUrl} onCopy={copy} />}
         {usesWebhookUrl && <WebhookEndpointPanel webhookUrl={webhookUrl} onCopy={copy} />}

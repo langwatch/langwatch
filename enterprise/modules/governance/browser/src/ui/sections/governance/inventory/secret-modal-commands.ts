@@ -53,12 +53,65 @@ export function buildClaudeCodeEnvBlock({
   ].join("\n");
 }
 
+/** One test span in OTLP JSON, stamped now so it lands in the 24h health window. */
+function buildTestOtlpBody({ details }: { details: SecretDetails }): string {
+  return JSON.stringify({
+    resource_spans: [
+      {
+        resource: {
+          attributes: [
+            {
+              key: "service.name",
+              value: { stringValue: details.sourceName },
+            },
+          ],
+        },
+        scope_spans: [
+          {
+            spans: [
+              {
+                name: "chat.completion",
+                startTimeUnixNano: `${nowInstant().epochMilliseconds}000000`,
+                attributes: [
+                  {
+                    key: "gen_ai.usage.input_tokens",
+                    value: { intValue: 120 },
+                  },
+                  {
+                    key: "gen_ai.usage.output_tokens",
+                    value: { intValue: 480 },
+                  },
+                  {
+                    key: "gen_ai.usage.cost_usd",
+                    value: { doubleValue: 0.025 },
+                  },
+                  {
+                    key: "user.email",
+                    value: { stringValue: "you@your.org" },
+                  },
+                  {
+                    key: "gen_ai.request.model",
+                    value: { stringValue: "claude-sonnet-4" },
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  });
+}
+
+/** POSIX single quoting: JSON escaping leaves an apostrophe in a name as is. */
+function shellSingleQuoted(value: string): string {
+  return `'${value.replaceAll("'", `'\\''`)}'`;
+}
+
 /**
  * A copy-paste curl that exercises the full happy path: the body parses, the
  * attribute parser sees the canonical gen_ai.* + user.email keys, and the KPI
- * strip moves on the first event. The timestamp is fresh at modal open so the
- * test event lands inside the 24h health window even if the admin waits a
- * little before pasting. Null for source types with no push endpoint.
+ * strip moves on the first event. Null for source types with no push endpoint.
  */
 export function buildTestCurl({
   details,
@@ -74,57 +127,11 @@ export function buildTestCurl({
   usesWebhookUrl: boolean;
 }): string | null {
   if (usesPushUrl) {
-    const otlpBody = JSON.stringify({
-      resource_spans: [
-        {
-          resource: {
-            attributes: [
-              {
-                key: "service.name",
-                value: { stringValue: details.sourceName },
-              },
-            ],
-          },
-          scope_spans: [
-            {
-              spans: [
-                {
-                  name: "chat.completion",
-                  startTimeUnixNano: `${nowInstant().epochMilliseconds}000000`,
-                  attributes: [
-                    {
-                      key: "gen_ai.usage.input_tokens",
-                      value: { intValue: 120 },
-                    },
-                    {
-                      key: "gen_ai.usage.output_tokens",
-                      value: { intValue: 480 },
-                    },
-                    {
-                      key: "gen_ai.usage.cost_usd",
-                      value: { doubleValue: 0.025 },
-                    },
-                    {
-                      key: "user.email",
-                      value: { stringValue: "you@your.org" },
-                    },
-                    {
-                      key: "gen_ai.request.model",
-                      value: { stringValue: "claude-sonnet-4" },
-                    },
-                  ],
-                },
-              ],
-            },
-          ],
-        },
-      ],
-    });
     return [
       `curl -X POST '${otlpUrl}' \\`,
       `  -H 'Authorization: Bearer ${details.secret}' \\`,
       `  -H 'Content-Type: application/json' \\`,
-      `  -d '${otlpBody}'`,
+      `  -d ${shellSingleQuoted(buildTestOtlpBody({ details }))}`,
     ].join("\n");
   }
   if (usesWebhookUrl) {

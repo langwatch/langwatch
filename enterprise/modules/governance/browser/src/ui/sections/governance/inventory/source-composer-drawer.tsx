@@ -108,18 +108,7 @@ function ComposerDestinationHint({
   );
 }
 
-export function SourceComposerDrawer({
-  isOpen,
-  organizationId,
-  destinationCtx,
-  composer,
-  setComposer,
-  invalidFieldKeys,
-  isPending,
-  refusal,
-  onSubmit,
-  onClose,
-}: {
+type SourceComposerDrawerProps = {
   isOpen: boolean;
   organizationId: string;
   destinationCtx: DestinationContext;
@@ -132,23 +121,74 @@ export function SourceComposerDrawer({
   refusal?: unknown;
   onSubmit: () => void;
   onClose: () => void;
-}) {
-  const meta = SOURCE_TYPE_OPTIONS.find((o) => o.value === composer.sourceType);
-  const advancedExtras = composerAdvancedExtras({
-    composer,
-    setComposer,
-    destinationCtx,
-  });
-  // The type was picked from the Add source menu, which is where the plan
-  // gate lives (see gatedSourceTypeOptions) — the composer is committed to
-  // it. Changing type means closing and picking again, exactly like the
-  // model-provider drawer.
-  const createBlockedReason = composer.name.trim()
+};
+
+/** The display name and description, the two fields every new source asks for. */
+function ComposerIdentityFields({
+  composer,
+  setComposer,
+}: Pick<SourceComposerDrawerProps, "composer" | "setComposer">) {
+  return (
+    <>
+      <VStack align="stretch" gap={1}>
+        <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+          Display name
+        </Text>
+        <Input
+          size="sm"
+          value={composer.name}
+          onChange={(e) => setComposer({ ...composer, name: e.target.value })}
+          placeholder="Display name for this source"
+        />
+      </VStack>
+      <VStack align="stretch" gap={1}>
+        <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+          Description (optional)
+        </Text>
+        <Textarea
+          size="sm"
+          rows={2}
+          value={composer.description}
+          onChange={(e) => setComposer({ ...composer, description: e.target.value })}
+          // Asks in the same shape as the display name directly above
+          // it. The old prompt asked for two particular facts and used a
+          // word ("fleet") that appears nowhere else an admin can see.
+          placeholder="Description for this source"
+        />
+      </VStack>
+    </>
+  );
+}
+
+/** Why Create is off, in words, or undefined when the draft may be submitted. */
+function composerCreateBlockedReason(composer: ComposerState): string | undefined {
+  return composer.name.trim()
     ? (composerCadenceError({
         sourceType: composer.sourceType,
         pullSchedule: composer.pullSchedule,
       }) ?? undefined)
     : "Give the source a display name";
+}
+
+export function SourceComposerDrawer({
+  isOpen,
+  organizationId,
+  destinationCtx,
+  composer,
+  setComposer,
+  invalidFieldKeys,
+  isPending,
+  refusal,
+  onSubmit,
+  onClose,
+}: SourceComposerDrawerProps) {
+  const meta = SOURCE_TYPE_OPTIONS.find((o) => o.value === composer.sourceType);
+  const advancedExtras = composerAdvancedExtras({ composer, setComposer, destinationCtx });
+  // The type was picked from the Add source menu, which is where the plan
+  // gate lives (see gatedSourceTypeOptions) — the composer is committed to
+  // it. Changing type means closing and picking again, exactly like the
+  // model-provider drawer.
+  const createBlockedReason = composerCreateBlockedReason(composer);
   return (
     <Drawer
       open={isOpen}
@@ -171,32 +211,7 @@ export function SourceComposerDrawer({
       }}
     >
       <VStack align="stretch" gap={3}>
-        <VStack align="stretch" gap={1}>
-          <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-            Display name
-          </Text>
-          <Input
-            size="sm"
-            value={composer.name}
-            onChange={(e) => setComposer({ ...composer, name: e.target.value })}
-            placeholder="Display name for this source"
-          />
-        </VStack>
-        <VStack align="stretch" gap={1}>
-          <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-            Description (optional)
-          </Text>
-          <Textarea
-            size="sm"
-            rows={2}
-            value={composer.description}
-            onChange={(e) => setComposer({ ...composer, description: e.target.value })}
-            // Asks in the same shape as the display name directly above
-            // it. The old prompt asked for two particular facts and used a
-            // word ("fleet") that appears nowhere else an admin can see.
-            placeholder="Description for this source"
-          />
-        </VStack>
+        <ComposerIdentityFields composer={composer} setComposer={setComposer} />
 
         <ParserConfigFields
           sourceType={composer.sourceType}

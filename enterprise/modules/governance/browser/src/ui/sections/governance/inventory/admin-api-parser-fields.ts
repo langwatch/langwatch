@@ -48,7 +48,7 @@ export const CLAUDE_COMPLIANCE_FIELDS: FieldDef[] = [
 export const ANTHROPIC_ADMIN_FIELDS: FieldDef[] = [
   {
     // `credentials*` prefix routes this into the encrypted `credentials`
-    // subtree — same rule as the Genie token below.
+    // subtree — same rule as the Genie token in `parser-field-catalog.ts`.
     key: "credentialsToken",
     label: "Admin API key",
     placeholder: "sk-ant-admin-...",

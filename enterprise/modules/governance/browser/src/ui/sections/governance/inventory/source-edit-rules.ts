@@ -122,18 +122,6 @@ function isEnvironmentLocked({
 }
 
 /**
- * Edit a previously-created IngestionSource: name, description, OTTL, and —
- * for a pull source the form knows how to rebuild — the adapter configuration
- * and cadence the poller actually runs on.
- *
- * Shared by the source list and the source detail page, so the two cannot
- * drift into offering different edits of the same row.
- *
- * Source type is immutable after create (changing it would invalidate the
- * upstream's running configuration); admins who need to change it archive +
- * recreate.
- */
-/**
  * Whether Save should refuse the click.
  *
  * The same two conditions the create drawer gates on, so the two cannot

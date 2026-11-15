@@ -33,7 +33,7 @@ function seedSourceEditForm(source: Source) {
  *
  * Split out from the drawer because seeding is the half with the reasoning in
  * it — which fields the row can answer, and which the DTO deliberately cannot
- * — while the drawer below is chrome. Keeping them in one function meant every
+ * — while `SourceEditDrawer` (`source-edit-drawer.tsx`) is chrome. Keeping them in one function meant every
  * read of the markup scrolled past the seeding rules first.
  */
 export function useSourceEditForm(source: Source | null) {

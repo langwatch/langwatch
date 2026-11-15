@@ -108,21 +108,7 @@ function PullConfigEditFields({
   );
 }
 
-/**
- * The fields an edit drawer shows, in order. Split from the drawer because the
- * drawer above is a shell — open state, submit gate, footer — while this is the
- * part that decides what an admin can actually change about a source, and which
- * of those fields the source's type even offers.
- */
-export function SourceEditBody({
-  form,
-  source,
-  sourceType,
-  hasPulled,
-  organizationId,
-  destinationCtx,
-  refusal,
-}: {
+type SourceEditBodyProps = {
   form: ReturnType<typeof useSourceEditForm>;
   source: Source;
   sourceType: SourceType | undefined;
@@ -130,19 +116,20 @@ export function SourceEditBody({
   organizationId: string;
   destinationCtx: DestinationContext;
   refusal?: unknown;
-}) {
-  // Derived here rather than passed in: `isEditablePullSource` is a type guard,
-  // and narrowing `sourceType` is what lets the pull fields below take it as a
-  // `SourceType` instead of re-asserting one.
-  const isPullMode = isEditablePullSource(sourceType);
-  // The row menu offers Rotate secret only for these (needsIngestSecret).
-  const hasRotatableSecret = !!sourceType && needsIngestSecret({ sourceType });
+};
+
+/** The trace destination picker, or null for a type that routes no conversations. */
+function editDestinationField({
+  form,
+  source,
+  destinationCtx,
+}: Pick<SourceEditBodyProps, "form" | "source" | "destinationCtx">): ReactNode {
   // Read here rather than left to the field's own early return, because the
   // Advanced group has to know whether it holds anything before it offers
   // itself — a disclosure that opens onto an empty box is worse than none.
   const offersDestination = routesConversations(source.sourceType as SourceType);
 
-  const destinationField = offersDestination ? (
+  return offersDestination ? (
     <TraceDestinationField
       sourceType={source.sourceType as SourceType}
       // Both props describe `value`, so both have to move together. An
@@ -160,6 +147,29 @@ export function SourceEditBody({
       {...destinationCtx}
     />
   ) : null;
+}
+
+/**
+ * The fields an edit drawer shows, in order. Split from the drawer because
+ * `SourceEditDrawer` (`source-edit-drawer.tsx`) is a shell — open state, submit
+ * gate, footer — while this decides what an admin can change about a source.
+ */
+export function SourceEditBody({
+  form,
+  source,
+  sourceType,
+  hasPulled,
+  organizationId,
+  destinationCtx,
+  refusal,
+}: SourceEditBodyProps) {
+  // Derived here rather than passed in: `isEditablePullSource` is a type guard,
+  // and narrowing `sourceType` is what lets the pull fields below take it as a
+  // `SourceType` instead of re-asserting one.
+  const isPullMode = isEditablePullSource(sourceType);
+  // The row menu offers Rotate secret only for these (needsIngestSecret).
+  const hasRotatableSecret = !!sourceType && needsIngestSecret({ sourceType });
+  const destinationField = editDestinationField({ form, source, destinationCtx });
 
   return (
     <VStack align="stretch" gap={3}>
