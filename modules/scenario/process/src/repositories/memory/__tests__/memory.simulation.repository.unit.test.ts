@@ -615,6 +615,18 @@ describe("MemorySimulationRepository", () => {
     });
   });
 
+  describe("when the storage meter asks for stored bytes (getStoredBytes)", () => {
+    it("counts the project's held runs and none of another project's", async () => {
+      const { simulations } = await given([
+        runState({ ScenarioRunId: "run-1" }),
+        inProject({ projectId: OTHER_PROJECT, state: runState({ ScenarioRunId: "run-2" }) }),
+      ]);
+
+      expect(await simulations.getStoredBytes({ projectId: PROJECT })).toBeGreaterThan(0);
+      expect(await simulations.getStoredBytes({ projectId: "project-empty" })).toBe(0);
+    });
+  });
+
   describe("when a run awaits its evaluators (PENDING_EVALUATION)", () => {
     /** @scenario "A run with attached evaluators reads as pending until they are recorded" */
     it("reads as pending with the judge's verdict and counts as running, not settled", async () => {

@@ -17,7 +17,9 @@ import {
   param,
   tenantScope as builtScope,
   type ProofScope,
+  type ReaderReadStatement,
 } from "@langwatch/clickhouse-client/builder";
+import { STORAGE_METER_READ_SETTINGS } from "@langwatch/data-retention-contract/retention-tables";
 import {
   evaluationOutcomeSchema,
   evaluationRunDataSchema,
@@ -231,6 +233,30 @@ export class EvaluationRunClickHouseReadRepository {
     });
     this.floors.set(retention, floor);
     return floor;
+  }
+
+  /** One tenant's `_size_bytes` in `evaluation_runs`, every stored row counted. */
+  async getStoredBytes({ tenantId }: { tenantId: string }): Promise<number> {
+    const client = await this.options.resolveQueryClient(tenantId);
+    const { rows } = await client.read({
+      statement: EvaluationRunClickHouseReadRepository.storedBytesRead({ tenantId }),
+      table: TABLE_NAME,
+      declaresFullScan: true,
+    });
+    return Number(rows[0]?.bytes ?? 0);
+  }
+
+  /** The tenant's summed `_size_bytes`, under the meter's thread and time caps. */
+  static storedBytesRead({
+    tenantId,
+  }: {
+    tenantId: string;
+  }): ReaderReadStatement<{ bytes: number | string }> {
+    return clickhouseRead({ scope: builtScope.single({ tenantId }) })
+      .from(evaluationRuns)
+      .select({ bytes: fn.sum(evaluationRuns._size_bytes) })
+      .settings(STORAGE_METER_READ_SETTINGS)
+      .build();
   }
 
   async getByEvaluationId(input: EvaluationRunFloorLookup): Promise<EvaluationRunData> {

@@ -1,3 +1,5 @@
+import { Buffer } from "node:buffer";
+
 import { type Authorization, projectIdsReadBy } from "@langwatch/authorization";
 import {
   EvaluationNotFoundError,
@@ -127,6 +129,14 @@ export class MemoryEvaluationRunRepository extends EvaluationRunRepository {
       tenantId,
       inputs: this.#runs.get(`${tenantId}\u0000${input.evaluationId}`)?.inputs ?? null,
     };
+  }
+
+  /** The JSON byte length of the tenant's held runs, standing in for `_size_bytes`. */
+  async getStoredBytes({ tenantId }: { tenantId: string }): Promise<number> {
+    return this.#tenantRuns(tenantId).reduce(
+      (total, run) => total + Buffer.byteLength(JSON.stringify(run)),
+      0,
+    );
   }
 
   #tenantRuns(tenantId: string): EvaluationRunData[] {

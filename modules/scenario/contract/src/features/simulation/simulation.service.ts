@@ -168,6 +168,8 @@ export abstract class SimulationService {
   abstract countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<number>;
   /** Lifetime runs across one organization's projects, in one read: they share one route. */
   abstract countOrganizationRuns(input: { projectIds: readonly string[] }): Promise<number>;
+  /** One project's `_size_bytes` in `simulation_runs`, every stored row version counted. */
+  abstract getStoredBytes(input: { projectId: string }): Promise<number>;
   abstract listRunsForExport(
     input: SimulationExportRunsInput,
   ): Promise<{ runs: SimulationExportRun[]; nextCursor?: string; hasMore: boolean }>;

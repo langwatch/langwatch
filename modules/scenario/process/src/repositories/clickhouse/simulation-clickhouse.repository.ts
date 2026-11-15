@@ -14,6 +14,7 @@ import {
   type ReaderReadStatement,
   tenantScope,
 } from "@langwatch/clickhouse-client/builder";
+import { STORAGE_METER_READ_SETTINGS } from "@langwatch/data-retention-contract/retention-tables";
 import {
   AGENT_TEST_SET_SUFFIX,
   RUN_ACTOR_LABELS,
@@ -1095,6 +1096,17 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     return totals.reduce((sum, total) => sum + total, 0);
   }
 
+  /** One project's `_size_bytes` in `simulation_runs`, every stored row counted. */
+  async getStoredBytes({ projectId }: { projectId: string }): Promise<number> {
+    const client = await this.getClient(projectId);
+    const { rows } = await client.read({
+      statement: SimulationClickHouseRepository.storedBytesRead({ projectId }),
+      table: simulationRuns.$table.name,
+      declaresFullScan: true,
+    });
+    return Number(rows[0]?.bytes ?? 0);
+  }
+
   /** One read over the organization's projects, which the caller holds. */
   async countOrganizationRuns({ projectIds }: { projectIds: readonly string[] }): Promise<number> {
     const tenantIds = [...new Set(projectIds)];
@@ -1542,6 +1554,19 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     since?: number;
   }): ReaderReadStatement<RunCountRow> {
     return usageCountReadOf(input);
+  }
+
+  /** The project's summed `_size_bytes`, under the meter's thread and time caps. */
+  static storedBytesRead({
+    projectId,
+  }: {
+    projectId: string;
+  }): ReaderReadStatement<{ bytes: number | string }> {
+    return clickhouseRead({ scope: tenantScope.single({ tenantId: projectId }) })
+      .from(simulationRuns)
+      .select({ bytes: fn.sum(simulationRuns._size_bytes) })
+      .settings(STORAGE_METER_READ_SETTINGS)
+      .build();
   }
 
   /** How many live runs the export's filters hold. */

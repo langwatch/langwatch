@@ -39,6 +39,7 @@ import type {
   EvaluationOutcomesQuery,
   EvaluationRunLookup,
   EvaluationRunsByTraceQuery,
+  EvaluationStoredBytesInput,
 } from "./evaluation.queries.ts";
 import type {
   EvaluationOutcomePage,
@@ -71,6 +72,8 @@ export interface EvaluationApi {
   findRunsByTraceId(input: EvaluationRunsByTraceQuery): Promise<EvaluationRunData[]>;
   /** A page of one project's finished evaluations on a trace, oldest first; for backfills. */
   listEvaluationOutcomes(input: EvaluationOutcomesQuery): Promise<EvaluationOutcomePage>;
+  /** One project's summed `_size_bytes` over evaluation's own table; a store failure throws. */
+  getStoredBytes(input: EvaluationStoredBytesInput): Promise<number>;
   /** Read through the proof; null when none are stored or the viewer may not read content. */
   findInputs(
     input: EvaluationInputsQuery & { authorization: Authorization; userId: string | null },

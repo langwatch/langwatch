@@ -72,6 +72,7 @@ import type {
   ExperimentType,
   FindOrCreateWorkflowExperimentInput,
   SaveExperimentInput,
+  ExperimentStoredBytesInput,
 } from "./experiment.ts";
 import type { SavedWorkbenchRead } from "./workbench/actions/saved-workbench-read.ts";
 
@@ -177,6 +178,8 @@ export interface ExperimentApi {
   archive(input: ExperimentLookup): Promise<{ success: true }>;
   listRuns(input: ExperimentRunListInput): Promise<Record<string, ExperimentRun[]>>;
   getRunAggregates(input: ExperimentRunListInput): Promise<Record<string, ExperimentRunAggregate>>;
+  /** One project's summed `_size_bytes` over experiment's own tables; a store failure throws. */
+  getStoredBytes(input: ExperimentStoredBytesInput): Promise<number>;
   getRunsPage(input: ExperimentRunPageInput): Promise<{ runs: ExperimentRun[]; totalHits: number }>;
   /** A polling read: absent rows and disabled ClickHouse both read as null. */
   findRun(input: ExperimentRunLookup): Promise<ExperimentRunWithItems | null>;

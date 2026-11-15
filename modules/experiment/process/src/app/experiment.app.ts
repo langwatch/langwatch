@@ -43,6 +43,7 @@ import {
   type ExperimentRun,
   type ExperimentRunAggregate,
   type ExperimentRunListInput,
+  type ExperimentStoredBytesInput,
   type ExperimentRunLookup,
   type ExperimentRunPageInput,
   type ExperimentRunSlugPageInput,
@@ -488,6 +489,10 @@ export class ExperimentModule implements ExperimentApi {
   /** The runs of each named experiment, keyed by experiment id, with their aggregate. */
   getRunAggregates(input: ExperimentRunListInput): Promise<Record<string, ExperimentRunAggregate>> {
     return this.#dependencies.experiments.getRunAggregates(input);
+  }
+
+  getStoredBytes(input: ExperimentStoredBytesInput): Promise<number> {
+    return this.#dependencies.experiments.getStoredBytes(input);
   }
 
   /** One page of an experiment's runs, addressed by id. */

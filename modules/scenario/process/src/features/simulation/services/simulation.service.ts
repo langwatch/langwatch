@@ -154,6 +154,10 @@ export class SimulationService extends SimulationServiceContract {
     return this.repository.countOrganizationRuns(input);
   }
 
+  getStoredBytes(input: { projectId: string }): Promise<number> {
+    return this.repository.getStoredBytes(input);
+  }
+
   listRunsForExport(
     input: SimulationExportRunsInput,
   ): Promise<{ runs: SimulationExportRun[]; nextCursor?: string; hasMore: boolean }> {

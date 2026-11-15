@@ -11,6 +11,7 @@ import {
   evaluationRunDataSchema,
   evaluationRunLookupSchema,
   evaluationRunsByTraceQuerySchema,
+  evaluationStoredBytesInputSchema,
   evaluationExecutionResultSchema,
   executeEvaluationCommandSchema,
   upsertEvaluationRunCommandSchema,
@@ -24,6 +25,7 @@ import {
   type EvaluationInputsQuery,
   type EvaluationOutcomePage,
   type EvaluationOutcomesQuery,
+  type EvaluationStoredBytesInput,
 } from "@langwatch/evaluation-contract";
 import { canReadCapturedContent, type TraceApi } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
@@ -135,6 +137,12 @@ export class EvaluationService {
       }),
       traceId,
     });
+  }
+
+  /** Evaluation's stored bytes for one project (ADR-202 Decided 20). */
+  getStoredBytes(input: EvaluationStoredBytesInput): Promise<number> {
+    const { projectId } = evaluationStoredBytesInputSchema.parse(input);
+    return this.options.repository.getStoredBytes({ tenantId: projectId });
   }
 
   /** A page of finished runs on a trace; a full page names where the next resumes. */

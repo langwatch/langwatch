@@ -40,5 +40,6 @@ export const experimentRunItems = defineClickHouseTable({
     CarriedOver: column.uint8(),
     CreatedAt: moment(),
     OccurredAt: moment(),
+    _size_bytes: column.uint32(),
   },
 });

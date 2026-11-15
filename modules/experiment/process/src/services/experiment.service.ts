@@ -9,6 +9,7 @@ import {
   experimentPageInputSchema,
   experimentSlugLookupSchema,
   experimentRunListInputSchema,
+  experimentStoredBytesInputSchema,
   experimentRunLookupSchema,
   experimentRunPageInputSchema,
   experimentRunSlugPageInputSchema,
@@ -31,6 +32,7 @@ import {
   type ExperimentRun,
   type ExperimentRunAggregate,
   type ExperimentRunListInput,
+  type ExperimentStoredBytesInput,
   type ExperimentRunLookup,
   type ExperimentRunPageInput,
   type ExperimentRunSlugPageInput,
@@ -458,6 +460,11 @@ export class ExperimentService {
   ): Promise<Record<string, ExperimentRunAggregate>> => {
     return this.options.runRepository.findAggregates(experimentRunListInputSchema.parse(input));
   };
+
+  /** Experiment's stored bytes for one project (ADR-202 Decided 20). */
+  getStoredBytes(input: ExperimentStoredBytesInput): Promise<number> {
+    return this.options.runRepository.getStoredBytes(experimentStoredBytesInputSchema.parse(input));
+  }
 
   getRunsPage(
     input: ExperimentRunPageInput,

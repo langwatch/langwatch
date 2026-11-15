@@ -5,6 +5,8 @@
  * exists on the migrated schema with the type it is declared as, so a descriptor cannot drift
  * from goose.
  */
+import { randomUUID } from "node:crypto";
+
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import type { ClickHouseTableFacts } from "@langwatch/clickhouse-client/builder";
 import {
@@ -17,6 +19,10 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { simulationRunMetricsRollup } from "../clickhouse.simulation-run-metrics-rollup.table.ts";
 import { simulationRunMetrics } from "../clickhouse.simulation-run-metrics.table.ts";
 import { simulationRuns } from "../clickhouse.simulation-runs.table.ts";
+import {
+  simulationRepositoryOver,
+  simulationRunRow,
+} from "./simulation-clickhouse-rows.fixture.ts";
 
 const DESCRIPTORS: readonly { readonly $table: ClickHouseTableFacts }[] = [
   simulationRuns,
@@ -99,4 +105,49 @@ describe("scenario's descriptors against the migrated schema", () => {
       );
     },
   );
+});
+
+/** Main's meter read: the raw `_size_bytes` sum over one tenant's rows in `simulation_runs`. */
+async function rawStoredBytes(tenantId: string): Promise<number> {
+  const result = await ch!.query({
+    query:
+      "SELECT sum(_size_bytes) AS total FROM simulation_runs WHERE TenantId = {tenantId:String}",
+    query_params: { tenantId },
+    format: "JSONEachRow",
+  });
+  const [row] = (await result.json()) as { total: string }[];
+  return Number(row?.total ?? 0);
+}
+
+describe("scenario's stored bytes against the migrated schema", () => {
+  const tag = randomUUID();
+  const ours = `${tag}-ours`;
+  const theirs = `${tag}-theirs`;
+
+  beforeAll(async () => {
+    const run = (tenantId: string, batchRunId: string) =>
+      simulationRunRow({ tenantId, scenarioSetId: "set_1", batchRunId, metadata: null });
+    await ch!.insert({
+      table: "simulation_runs",
+      values: [run(ours, "batch_1"), run(ours, "batch_2"), run(theirs, "batch_1")],
+      format: "JSONEachRow",
+      clickhouse_settings: { date_time_input_format: "best_effort" },
+    });
+  });
+
+  afterAll(async () => {
+    await ch?.command({
+      query: "ALTER TABLE simulation_runs DELETE WHERE TenantId IN ({tenants:Array(String)})",
+      query_params: { tenants: [ours, theirs] },
+    });
+  });
+
+  /** @scenario "Scenario's stored bytes count only this project's rows" */
+  it("sums this project's `_size_bytes` as main's raw read does, without the other tenant's", async () => {
+    const bytes = await simulationRepositoryOver(ch!).getStoredBytes({ projectId: ours });
+
+    expect(bytes).toBeGreaterThan(0);
+    expect(bytes).toBe(await rawStoredBytes(ours));
+    expect(await rawStoredBytes(theirs)).toBeGreaterThan(0);
+  });
 });

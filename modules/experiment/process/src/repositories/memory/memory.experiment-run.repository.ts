@@ -46,4 +46,9 @@ export class MemoryExperimentRunRepository extends ExperimentRunRepository {
   ): Promise<Record<string, ExperimentRunWorkflowVersion>> {
     return this.workflowVersions.findByIds({ projectId, versionIds });
   }
+
+  /** This tier holds no run rows, so it stores no bytes. */
+  getStoredBytes(): Promise<number> {
+    return Promise.resolve(0);
+  }
 }

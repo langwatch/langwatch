@@ -95,4 +95,8 @@ export class ClickHouseEvaluationRepository extends EvaluationRunRepository {
   }): Promise<EvaluationInputsRead | null> {
     return this.reader.findInputs(input);
   }
+
+  getStoredBytes(input: { tenantId: string }): Promise<number> {
+    return this.reader.getStoredBytes(input);
+  }
 }

@@ -71,6 +71,9 @@ class FakeRepository extends EvaluationRunRepository {
   async findOutcomesSince(): Promise<EvaluationOutcome[]> {
     return [];
   }
+  async getStoredBytes(): Promise<number> {
+    return 0;
+  }
 }
 
 /** Mints the own-only proof the `*Api` run reads are fenced by, as the authz module would. */

@@ -643,6 +643,8 @@ export class EvaluationModule implements EvaluationApiContract {
   findInputs: EvaluationApiContract["findInputs"] = (input) => this.#service.findInputs(input);
   listEvaluationOutcomes: EvaluationApiContract["listEvaluationOutcomes"] = (input) =>
     this.#service.listEvaluationOutcomes(input);
+  getStoredBytes: EvaluationApiContract["getStoredBytes"] = (input) =>
+    this.#service.getStoredBytes(input);
   getMonitorPerformance: EvaluationApiContract["getMonitorPerformance"] = (input) =>
     this.#service.getMonitorPerformance(input);
   findMonitorPerformance: EvaluationApiContract["findMonitorPerformance"] = (input) =>

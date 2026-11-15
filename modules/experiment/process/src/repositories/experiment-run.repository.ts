@@ -23,4 +23,6 @@ export abstract class ExperimentRunRepository {
     projectId: string,
     versionIds: string[],
   ): Promise<Record<string, ExperimentRunWorkflowVersion>>;
+  /** One project's `_size_bytes` over experiment's tables; a store failure throws. */
+  abstract getStoredBytes(input: { projectId: string }): Promise<number>;
 }

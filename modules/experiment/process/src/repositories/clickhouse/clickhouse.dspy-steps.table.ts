@@ -32,5 +32,6 @@ export const dspySteps = defineClickHouseTable({
     CreatedAt: moment(),
     InsertedAt: moment(),
     UpdatedAt: moment(),
+    _size_bytes: column.uint32(),
   },
 });

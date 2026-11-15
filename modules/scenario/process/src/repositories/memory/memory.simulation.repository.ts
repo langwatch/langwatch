@@ -919,6 +919,13 @@ export class MemorySimulationRepository extends SimulationRepository {
     return this.runsOf([...new Set(projectIds)]).filter(isVisible).length;
   }
 
+  /** The JSON byte length of the project's held runs, standing in for `_size_bytes`. */
+  async getStoredBytes({ projectId }: { projectId: string }): Promise<number> {
+    return this.runs
+      .findForTenants({ tenantIds: [projectId] })
+      .reduce((total, run) => total + Buffer.byteLength(JSON.stringify(run)), 0);
+  }
+
   async listRunsForExport({
     limit,
     cursor,

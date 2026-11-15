@@ -310,6 +310,9 @@ class MemoryExperimentRunRepository extends ExperimentRunRepository {
   async findWorkflowVersions() {
     return {};
   }
+  async getStoredBytes() {
+    return 0;
+  }
 }
 
 class MemoryExperimentExecution extends ExperimentExecution {

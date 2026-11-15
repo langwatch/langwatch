@@ -35,6 +35,7 @@ import {
   runRowOf,
   runsOfExperimentsRead,
   runsPageRead,
+  storedBytesRead,
   WARN_OLD_RUN_AGE_MS,
 } from "./clickhouse.experiment-run.mapper.ts";
 
@@ -347,6 +348,16 @@ export class ClickHouseExperimentRunRepository extends ExperimentRunRepository {
         }
       },
     );
+  }
+
+  /** One project's `_size_bytes` over experiment's tables, as the storage meter counts. */
+  async getStoredBytes({ projectId }: { projectId: string }): Promise<number> {
+    const client = await this.requireClient(projectId);
+    const { rows } = await client.read({
+      statement: storedBytesRead({ projectId }),
+      declaresFullScan: true,
+    });
+    return Number(rows[0]?.bytes ?? 0);
   }
 
   private async requireClient(projectId: string): Promise<ExperimentClickHouseClient> {

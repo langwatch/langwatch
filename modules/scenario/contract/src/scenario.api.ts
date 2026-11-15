@@ -86,6 +86,7 @@ import type {
   ScenarioTestSuiteUpdateInput,
   ScenarioRunConfig,
   ScenarioLookup,
+  ScenarioStoredBytesInput,
 } from "./scenario.ts";
 import type {
   ScenarioDuplicateInput,
@@ -448,6 +449,8 @@ export interface ScenarioApi {
   }): Promise<SimulationBatchSummary | null>;
   /** The usage report's figures (ADR-156, section 10). */
   countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<ScenarioUsageCount>;
+  /** The sum of `_size_bytes` over scenario's own table for one project; a store failure throws. */
+  getStoredBytes(input: ScenarioStoredBytesInput): Promise<number>;
 }
 
 export const ScenarioApi = moduleApi<ScenarioApi>()("scenario");

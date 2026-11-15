@@ -44,6 +44,8 @@ export abstract class EvaluationRunRepository {
     after: EvaluationOutcomeCursor | null;
     limit: number;
   }): Promise<EvaluationOutcome[]>;
+  /** One project's `_size_bytes` in `evaluation_runs`, every stored row version counted. */
+  abstract getStoredBytes(input: { tenantId: string }): Promise<number>;
   /** The newest inputs in the first project the proof reads that holds the run. */
   abstract findInputs(input: {
     authorization: Authorization;

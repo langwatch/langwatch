@@ -114,6 +114,7 @@ import {
   type SimulationRunRestResponse,
   type SimulationScenarioSetRunsInput,
   type ScenarioUsageCount,
+  type ScenarioStoredBytesInput,
   type SimulationService as SimulationServiceContract,
   type SimulationSetData,
   withActor,
@@ -1232,6 +1233,11 @@ export class ScenarioModule implements ScenarioApi {
     since?: number;
   }): Promise<ScenarioUsageCount> {
     return { runs: await this.#dependencies.simulations.countUsage(input) };
+  }
+
+  /** Scenario's stored bytes for one project (ADR-202 Decided 20). */
+  getStoredBytes({ projectId }: ScenarioStoredBytesInput): Promise<number> {
+    return this.#dependencies.simulations.getStoredBytes({ projectId });
   }
 }
 

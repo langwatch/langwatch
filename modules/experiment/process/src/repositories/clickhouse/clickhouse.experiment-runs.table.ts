@@ -42,5 +42,6 @@ export const experimentRuns = defineClickHouseTable({
     ExpectedTargetResults: column.nullable(column.uint32()),
     ExpectedEvaluatorResults: column.nullable(column.uint32()),
     Concurrency: column.nullable(column.uint16()),
+    _size_bytes: column.uint32(),
   },
 });

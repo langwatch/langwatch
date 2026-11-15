@@ -13,9 +13,11 @@ import {
   type ReaderReadStatement,
   tenantScope,
 } from "@langwatch/clickhouse-client/builder";
+import { STORAGE_METER_READ_SETTINGS } from "@langwatch/data-retention-contract/retention-tables";
 import { toEpochMs } from "@langwatch/time";
 
 import { OCCURRED_AT_BUFFER_MS } from "../../rules/experiment-run-occurred-at.rules.ts";
+import { dspySteps } from "./clickhouse.dspy-steps.table.ts";
 import { experimentRunItems as items } from "./clickhouse.experiment-run-items.table.ts";
 import { experimentRuns as runs } from "./clickhouse.experiment-runs.table.ts";
 
@@ -224,6 +226,26 @@ export function runCountRead({
     .from(runs)
     .select({ totalHits: fn.uniqExact(runs.RunId) })
     .where(({ idBound }) => idBound(runs.ExperimentId, experimentId))
+    .build();
+}
+
+/** One project's `_size_bytes` over experiment's three tables, every stored row counted. */
+export function storedBytesRead({
+  projectId,
+}: {
+  projectId: string;
+}): ReaderReadStatement<{ bytes: number | string }> {
+  const scope = tenantScope.single({ tenantId: projectId });
+  const parts = clickhouseRead({ scope })
+    .from(runs)
+    .select({ bytes: fn.sum(runs._size_bytes) })
+    .unionAll((arm) => arm.from(items).select({ bytes: fn.sum(items._size_bytes) }))
+    .unionAll((arm) => arm.from(dspySteps).select({ bytes: fn.sum(dspySteps._size_bytes) }))
+    .as("parts");
+  return clickhouseRead({ scope })
+    .from(parts)
+    .select({ bytes: fn.sum(parts.bytes) })
+    .settings(STORAGE_METER_READ_SETTINGS)
     .build();
 }
 

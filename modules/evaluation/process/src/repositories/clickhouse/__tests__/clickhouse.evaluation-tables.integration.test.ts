@@ -2,12 +2,16 @@
  * ADR-202, "Tables are typed descriptors": every column evaluation's descriptors declare exists on
  * the migrated schema with the type it is declared as, so a descriptor cannot drift from goose.
  */
+import { randomUUID } from "node:crypto";
+
 import type { ClickHouseTableFacts } from "@langwatch/clickhouse-client/builder";
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { startMigratedClickHouse } from "../../../__tests__/support/monitor-performance.fixtures.ts";
 import { evaluationRuns } from "../clickhouse.evaluation-runs.table.ts";
 import { traceSummaries } from "../clickhouse.trace-summaries.table.ts";
+import { EvaluationRunClickHouseReadRepository } from "../evaluation-run-read.repository.ts";
+import { queryClientResolverFor } from "./support/authorized-clickhouse.support.ts";
 
 const DESCRIPTORS: readonly { readonly $table: ClickHouseTableFacts }[] = [
   evaluationRuns,
@@ -54,4 +58,62 @@ describe("evaluation's descriptors against the migrated schema", () => {
     },
     180_000,
   );
+});
+
+/** Main's meter read: the raw `_size_bytes` sum over one tenant's rows in `evaluation_runs`. */
+async function rawStoredBytes(tenantId: string): Promise<number> {
+  const client = await startMigratedClickHouse();
+  const result = await client.query({
+    query:
+      "SELECT sum(_size_bytes) AS total FROM evaluation_runs WHERE TenantId = {tenantId:String}",
+    query_params: { tenantId },
+    format: "JSONEachRow",
+  });
+  const [row] = (await result.json()) as { total: string }[];
+  return Number(row?.total ?? 0);
+}
+
+describe("evaluation's stored bytes against the migrated schema", () => {
+  const tag = randomUUID();
+  const ours = `${tag}-ours`;
+  const theirs = `${tag}-theirs`;
+
+  beforeAll(async () => {
+    const run = (tenantId: string, evaluationId: string) => ({
+      ProjectionId: `${tenantId}-${evaluationId}`,
+      TenantId: tenantId,
+      EvaluationId: evaluationId,
+      Version: "v1",
+      EvaluatorId: "evaluator_1",
+      EvaluatorType: "native",
+      TraceId: "trace_1",
+      Status: "processed",
+    });
+    const client = await startMigratedClickHouse();
+    await client.insert({
+      table: "evaluation_runs",
+      values: [run(ours, "evaluation_1"), run(ours, "evaluation_2"), run(theirs, "evaluation_1")],
+      format: "JSONEachRow",
+    });
+  }, 180_000);
+
+  afterAll(async () => {
+    const client = await startMigratedClickHouse();
+    await client.command({
+      query: "ALTER TABLE evaluation_runs DELETE WHERE TenantId IN ({tenants:Array(String)})",
+      query_params: { tenants: [ours, theirs] },
+    });
+  });
+
+  /** @scenario "Evaluation's stored bytes count only this project's rows" */
+  it("sums this project's `_size_bytes` as main's raw read does, without the other tenant's", async () => {
+    const client = await startMigratedClickHouse();
+    const bytes = await EvaluationRunClickHouseReadRepository.create({
+      resolveQueryClient: queryClientResolverFor(client),
+    }).getStoredBytes({ tenantId: ours });
+
+    expect(bytes).toBeGreaterThan(0);
+    expect(bytes).toBe(await rawStoredBytes(ours));
+    expect(await rawStoredBytes(theirs)).toBeGreaterThan(0);
+  });
 });
