@@ -1,10 +1,9 @@
 /** @vitest-environment node */
 
 /**
- * A replay batch's event read on a ClickHouse with less memory than the batch: the whole-batch
- * read fails, so the source reads slices and applies each event once. One aggregate over that
- * memory alone fails its bulk read and is read in pages instead.
- * Spec: specs/upgrade/projection-replay-step.feature
+ * On a ClickHouse with less memory than the batch, its whole read fails and is read in slices,
+ * each event applied once; one aggregate over it alone is read in pages. Spec:
+ * specs/upgrade/projection-replay-step.feature
  */
 import { randomUUID } from "node:crypto";
 

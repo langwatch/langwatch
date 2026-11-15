@@ -42,10 +42,9 @@ const BASE_MS = 1_760_000_000_000;
 
 /** ClickHouse's refusal for one statement over its own memory limit, as the client raises it. */
 const queryMemoryLimitError = () =>
-  Object.assign(
-    new Error("Query memory limit exceeded: would use 4.76 GiB, maximum: 4.66 GiB"),
-    { code: "241" },
-  );
+  Object.assign(new Error("Query memory limit exceeded: would use 4.76 GiB, maximum: 4.66 GiB"), {
+    code: "241",
+  });
 
 /** A small trace's spans as the event log hands them to replay: parsed payloads, leaned. */
 function traceEvents(): ReplayEvent[] {

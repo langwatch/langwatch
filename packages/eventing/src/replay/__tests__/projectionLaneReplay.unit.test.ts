@@ -1,4 +1,5 @@
 /** Spec: specs/upgrade/projection-replay-step.feature. */
+import type * as Observability from "@langwatch/observability";
 import { memoryRedisDouble, memoryRedisStore } from "@langwatch/test-harness/client-doubles/redis";
 import { describe, expect, it, vi } from "vitest";
 
@@ -37,7 +38,7 @@ import type {
 /** What the lane replay logs to the worker's log; every other logger stays real. */
 const laneLog = vi.hoisted(() => [] as { fields: Record<string, unknown>; message: string }[]);
 vi.mock("@langwatch/observability", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@langwatch/observability")>();
+  const actual = await importOriginal<typeof Observability>();
   const record = (fields: Record<string, unknown>, message: string) =>
     void laneLog.push({ fields, message });
   return {
