@@ -23,7 +23,6 @@ const governanceIngestReceiptSchemaDefinition = z.object({
   hint: z.string().optional(),
   logRecords: z.number().optional(),
   costEvents: z.number().optional(),
-  ledgerRows: z.number().optional(),
   metrics: z.number().optional(),
   acceptedDataPoints: z.number().optional(),
   partialSuccess: z

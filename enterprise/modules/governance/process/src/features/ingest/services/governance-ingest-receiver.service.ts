@@ -3,14 +3,15 @@
  * What a push-mode IngestionSource payload becomes: origin metadata stamped
  * receiver-authoritatively, the existing trace / log / metric pipelines handed
  * the batch under the organization's hidden governance project, and the cost
- * events inside a log batch priced into the spend ledger.
+ * events inside a log batch recorded as the facts the spend ledger debits.
  */
 import {
   IngestionReceiverUnavailableError,
   type GovernanceIngestionSource,
   type GovernanceOttlGateway,
+  type RecordIngestedCostCommand,
 } from "@langwatch/enterprise-governance-contract";
-import { type GatewayApi } from "@langwatch/gateway-contract";
+import type { LogRequestCollectionResult } from "@langwatch/log-contract";
 import { createLogger } from "@langwatch/observability";
 import { applyOtlpReceiverPolicy, parseOtlpLogs, parseOtlpTraces } from "@langwatch/otlp";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -51,7 +52,7 @@ export type GovernanceIngestLogCollectionChannel = (input: {
   tenantId: string;
   organizationId: string;
   logRequest: IExportLogsServiceRequest;
-}) => Promise<unknown>;
+}) => Promise<LogRequestCollectionResult>;
 
 /** The metric pipeline `/v1/metrics` hands data points to. */
 export type GovernanceIngestMetricCollectionChannel = (input: {
@@ -69,15 +70,12 @@ export type GovernanceIngestMetricCollectionChannel = (input: {
 >;
 
 /**
- * The spend ledger and change feed an extracted cost event lands in, or none.
- * All three travel together because one write without the others is worse than
- * none: a debit row nobody evicts a cache for is spend the gateway keeps
- * routing against a stale balance.
+ * Where an extracted cost event is recorded: governance's `recordIngestedCost` command.
+ * Gateway's budget ledger peer-subscribes to the fact and debits it in the worker.
  */
-export type GovernanceIngestSpend = Pick<
-  GatewayApi,
-  "resolveApplicableBudgets" | "insertSpendDebit" | "appendBudgetChange"
->;
+export type GovernanceIngestCostRecorder = Readonly<{
+  record(commands: readonly RecordIngestedCostCommand[]): Promise<void>;
+}>;
 
 /**
  * The principal resolution a priced cost event performs, stated as the one
@@ -117,7 +115,6 @@ type GovernanceIngestLogReceipt = Readonly<{
   bytes: number;
   logRecords: number;
   costEvents: number;
-  ledgerRows: number;
   hint?: string | undefined;
 }>;
 
@@ -152,8 +149,8 @@ export type GovernanceIngestReceiverMembers = Readonly<{
   logCollection: GovernanceIngestLogCollectionChannel;
   /** The metric pipeline. */
   metricCollection: GovernanceIngestMetricCollectionChannel;
-  /** The spend ledger a cost event is priced into. */
-  spend: GovernanceIngestSpend;
+  /** Where each cost event is recorded for the spend ledger to debit. */
+  costs: GovernanceIngestCostRecorder;
   /**
    * The typed client the principal resolution reads. A cost event names a
    * person by EMAIL, and a non-member resolves to no principal while the spend
@@ -289,7 +286,7 @@ export class GovernanceIngestReceiverService implements GovernanceIngestReceiver
 
     try {
       if (bodyBytes > 0) {
-        await logCollection({
+        const collected = await logCollection({
           tenantId: await this.landing.governanceTenantOf(source),
           organizationId: source.organizationId,
           logRequest: buildWebhookLogRequest({
@@ -298,7 +295,7 @@ export class GovernanceIngestReceiverService implements GovernanceIngestReceiver
             nowNanos: String(BigInt(nowInstant().epochMilliseconds) * 1_000_000n),
           }),
         });
-        handoffOk = true;
+        handoffOk = collected.outcome === "collected";
       }
     } catch (err) {
       logger.warn(
@@ -333,7 +330,7 @@ export class GovernanceIngestReceiverService implements GovernanceIngestReceiver
 
     let bodyBytes = 0;
     let logRecordCount = 0;
-    const landed = { costEvents: 0, ledgerRows: 0 };
+    const landed = { costEvents: 0 };
     let parseHint: string | undefined;
 
     try {
@@ -353,6 +350,8 @@ export class GovernanceIngestReceiverService implements GovernanceIngestReceiver
         }
       }
     } catch (err) {
+      // Nothing durable took the batch: the exporter resends and every record dedupes.
+      if (err instanceof IngestionReceiverUnavailableError) throw err;
       parseHint = String(err);
       logger.warn(
         { sourceId: source.id, err: String(err) },
@@ -368,7 +367,6 @@ export class GovernanceIngestReceiverService implements GovernanceIngestReceiver
         bytes: bodyBytes,
         logRecords: logRecordCount,
         costEvents: landed.costEvents,
-        ledgerRows: landed.ledgerRows,
       },
       "otel logs ingest landed",
     );
@@ -378,7 +376,6 @@ export class GovernanceIngestReceiverService implements GovernanceIngestReceiver
       bytes: bodyBytes,
       logRecords: logRecordCount,
       costEvents: landed.costEvents,
-      ledgerRows: landed.ledgerRows,
       hint: parseHint,
     };
   }
@@ -388,9 +385,9 @@ export class GovernanceIngestReceiverService implements GovernanceIngestReceiver
   }
 
   /**
-   * A non-empty log batch stamped, handed to the log pipeline, and its cost
-   * events priced. `landed` is tallied as it goes, so a pricing failure still
-   * reports the cost events it extracted.
+   * A non-empty log batch stamped, handed to the log pipeline, and its cost events recorded.
+   * Either handoff failing is a 503, never an ack: both dedupe on resend (the records by
+   * content hash, the costs by source and request id), so a retry loses and doubles nothing.
    */
   private async landParsedLogs({
     batch,
@@ -401,7 +398,7 @@ export class GovernanceIngestReceiverService implements GovernanceIngestReceiver
     batch: GovernanceIngestBatch;
     body: ArrayBuffer;
     request: IExportLogsServiceRequest;
-    landed: { costEvents: number; ledgerRows: number };
+    landed: { costEvents: number };
   }): Promise<void> {
     const { source } = batch;
     const tenantId = await this.landing.governanceTenantOf(source);
@@ -409,17 +406,18 @@ export class GovernanceIngestReceiverService implements GovernanceIngestReceiver
     stampLogOriginAttrs(request, source);
     applyOtlpReceiverPolicy({ request, signal: "logs", apiKeyId: null });
 
-    try {
-      await this.members.logCollection({
-        tenantId,
-        organizationId: source.organizationId,
-        logRequest: request,
-      });
-    } catch (handoffErr) {
+    const collected = await this.members
+      .logCollection({ tenantId, organizationId: source.organizationId, logRequest: request })
+      .catch((handoffErr: unknown) => ({
+        outcome: "unavailable" as const,
+        errorMessage: String(handoffErr),
+      }));
+    if (collected.outcome === "unavailable") {
       logger.warn(
-        { sourceId: source.id, err: String(handoffErr) },
-        "log pipeline handoff failed (cost extraction continues)",
+        { sourceId: source.id, err: collected.errorMessage },
+        "log pipeline handoff failed; answering 503 so the exporter resends",
       );
+      throw new IngestionReceiverUnavailableError();
     }
 
     const events = await this.costs.extractCostEvents({
@@ -431,13 +429,15 @@ export class GovernanceIngestReceiverService implements GovernanceIngestReceiver
 
     landed.costEvents = events.length;
 
-    if (events.length > 0) {
-      landed.ledgerRows += await this.costs.priceCostEvents({
-        events,
-        source,
-        spend: this.members.spend,
-        governanceProjectId: tenantId,
-      });
+    if (events.length === 0) return;
+    try {
+      await this.costs.recordCostEvents({ events, source, governanceProjectId: tenantId });
+    } catch (recordErr) {
+      logger.warn(
+        { sourceId: source.id, costEvents: events.length, err: String(recordErr) },
+        "cost event record failed; answering 503 so the exporter resends",
+      );
+      throw new IngestionReceiverUnavailableError();
     }
   }
 }

@@ -3,21 +3,22 @@
  * What a push-mode IngestionSource payload becomes: origin metadata stamped
  * receiver-authoritatively, the existing trace / log / metric pipelines handed
  * the batch under the organization's hidden governance project, and the cost
- * events inside a log batch priced into the spend ledger.
+ * events inside a log batch recorded as the facts the spend ledger debits.
  */
-import type {
-  CanonicalCostEvent,
-  GovernanceIngestionSource,
+import {
+  ingestedCostRecordedEventDataSchema,
+  type CanonicalCostEvent,
+  type GovernanceIngestionSource,
+  type IngestedCostRecordedEventData,
+  type RecordIngestedCostCommand,
 } from "@langwatch/enterprise-governance-contract";
 import { usdToNanoUsd } from "@langwatch/gateway-contract";
 import { createLogger } from "@langwatch/observability";
 import { parseOtlpLogs } from "@langwatch/otlp";
+import { nowInstant } from "@langwatch/time";
 import type { IExportLogsServiceRequest } from "@opentelemetry/otlp-transformer";
 
-import type {
-  GovernanceIngestReceiverMembers,
-  GovernanceIngestSpend,
-} from "./governance-ingest-receiver.service.ts";
+import type { GovernanceIngestReceiverMembers } from "./governance-ingest-receiver.service.ts";
 
 const logger = createLogger("langwatch:ingest");
 
@@ -26,12 +27,12 @@ export class GovernanceIngestCostService {
   private constructor(
     private readonly members: Pick<
       GovernanceIngestReceiverMembers,
-      "costEvents" | "ottl" | "directory"
+      "costEvents" | "ottl" | "directory" | "costs"
     >,
   ) {}
 
   static create(
-    members: Pick<GovernanceIngestReceiverMembers, "costEvents" | "ottl" | "directory">,
+    members: Pick<GovernanceIngestReceiverMembers, "costEvents" | "ottl" | "directory" | "costs">,
   ): GovernanceIngestCostService {
     return new GovernanceIngestCostService(members);
   }
@@ -116,105 +117,98 @@ export class GovernanceIngestCostService {
   }
 
   /**
-   * One debit row per (event, applicable budget). Every failure here is
-   * per-event and logged rather than fatal: the batch was already
-   * acknowledged, and losing the rest of it because one event named an unknown
-   * user would turn a partial attribution gap into total data loss.
+   * Each cost event priced and attributed into the fact gateway's ledger debits, recorded
+   * through governance's command and never written to the ledger in the request. A failed
+   * record rejects: the receiver answers 503 and the resend dedupes on source and request id.
    */
-  async priceCostEvents(input: {
+  async recordCostEvents(input: {
     events: readonly CanonicalCostEvent[];
     source: GovernanceIngestionSource;
-    spend: GovernanceIngestSpend;
     governanceProjectId: string;
-  }): Promise<number> {
-    const { events, source, spend, governanceProjectId } = input;
-    let ledgerRowsWritten = 0;
+  }): Promise<void> {
+    const { events, source, governanceProjectId } = input;
+    const observedAtMs = nowInstant().epochMilliseconds;
+    const commands: RecordIngestedCostCommand[] = [];
 
     for (const event of events) {
-      try {
-        ledgerRowsWritten += await this.debitEvent({ event, source, spend, governanceProjectId });
-      } catch (eventErr) {
-        logger.warn(
-          { sourceId: source.id, requestId: event.requestId, err: String(eventErr) },
-          "ingestion-source event ledger-write failed (continuing batch)",
-        );
-      }
+      const data = await this.recordedFact({ event, source, observedAtMs });
+      if (data)
+        commands.push({ tenantId: governanceProjectId, occurredAt: data.occurredAtMs, data });
     }
 
-    return ledgerRowsWritten;
+    if (commands.length > 0) await this.members.costs.record(commands);
   }
 
-  /** The debit rows for one event, against every budget it applies to; the count written. */
-  private async debitEvent({
+  /**
+   * One event's fact, or null for a cost the ledger cannot hold exactly: not a decimal amount,
+   * or past a safe integer. Skipped with a log, since a resend carries the same value.
+   */
+  private async recordedFact({
     event,
     source,
-    spend,
-    governanceProjectId,
+    observedAtMs,
   }: {
     event: CanonicalCostEvent;
     source: GovernanceIngestionSource;
-    spend: GovernanceIngestSpend;
-    governanceProjectId: string;
-  }): Promise<number> {
-    const principalUserId = await this.findPrincipal({ event, source });
-
-    // Sentinel team and virtual-key ids for ingestion-source rows: the
-    // applicable-scopes signature requires non-null strings, and a sentinel
-    // that cannot be a real id naturally excludes the narrow TEAM budgets
-    // while organization, project and principal budgets still match.
-    const sentinelVK = `_ingestion_:${source.id}`;
-    // Attributed-user templates bucket spend per END user and an ingestion
-    // source carries none, so a row here could only name the bare anchor.
-    const budgets = (
-      await spend.resolveApplicableBudgets({
-        organizationId: source.organizationId,
-        teamId: source.teamId ?? `_ingestion_:${source.id}`,
-        projectId: governanceProjectId,
-        virtualKeyId: sentinelVK,
-        principalUserId,
-      })
-    )
-      .map(({ budget }) => budget)
-      .filter((budget) => budget.scopeType !== "ATTRIBUTED_USER");
-
-    if (budgets.length === 0) return 0;
-
+    observedAtMs: number;
+  }): Promise<IngestedCostRecordedEventData | null> {
     // The reported cost is a decimal string, so it is pinned to an integer
     // once, here, and every total downstream adds those integers.
-    const nano = usdToNanoUsd(event.costUsd);
-    const nanoNum = Number(nano);
+    let nano: bigint;
+    try {
+      nano = usdToNanoUsd(event.costUsd);
+    } catch (error) {
+      logger.error(
+        { costUsd: event.costUsd, requestId: event.requestId, error },
+        "budget: cost is not a decimal amount, skipping the cost fact",
+      );
+      return null;
+    }
+    const amountNanoUsd = Number(nano);
 
-    if (!Number.isSafeInteger(nanoNum)) {
+    if (!Number.isSafeInteger(amountNanoUsd)) {
       logger.error(
         { costUsd: event.costUsd, nanoUsd: nano.toString(), requestId: event.requestId },
-        "budget: amountNanoUsd exceeds Number.MAX_SAFE_INTEGER, skipping debit row to avoid silent rounding",
+        "budget: amountNanoUsd exceeds Number.MAX_SAFE_INTEGER, skipping the cost fact to avoid silent rounding",
       );
-      return 0;
+      return null;
     }
 
-    const rows = budgets.map((budget) => ({
-      tenantId: governanceProjectId,
-      budgetId: budget.id,
-      scope: budget.scopeType,
-      scopeId: budget.scopeId,
-      window: budget.window,
-      virtualKeyId: sentinelVK,
-      gatewayRequestId: event.requestId,
-      amountNanoUsd: nanoNum,
-      tokensInput: event.inputTokens,
-      tokensOutput: event.outputTokens,
-      tokensCacheRead: event.cacheReadTokens,
-      tokensCacheWrite: event.cacheCreationTokens,
+    const fact = ingestedCostRecordedEventDataSchema.safeParse({
+      ingestionSourceId: source.id,
+      sourceType: source.sourceType,
+      organizationId: source.organizationId,
+      teamId: source.teamId ?? null,
+      requestId: event.requestId,
       model: event.model,
-      durationMs: 0,
-      status: "SUCCESS" as const,
-      occurredAt: event.occurredAt,
-    }));
+      tokensInput: tokenCount(event.inputTokens),
+      tokensOutput: tokenCount(event.outputTokens),
+      tokensCacheRead: tokenCount(event.cacheReadTokens),
+      tokensCacheWrite: tokenCount(event.cacheCreationTokens),
+      amountNanoUsd,
+      principalUserId: await this.findPrincipal({ event, source }),
+      occurredAtMs: this.occurredAtMs({ event, observedAtMs }),
+      observedAtMs,
+    });
+    if (fact.success) return fact.data;
 
-    await spend.insertSpendDebit(rows);
-    await this.announceDebit({ event, source, spend, governanceProjectId, budgets });
+    logger.error(
+      { requestId: event.requestId, issues: fact.error.issues },
+      "budget: cost fact does not fit the recorded event, skipping it",
+    );
+    return null;
+  }
 
-    return rows.length;
+  /** A record stamped at or before the epoch counts at receive time, as an absent stamp does. */
+  private occurredAtMs({
+    event,
+    observedAtMs,
+  }: {
+    event: CanonicalCostEvent;
+    observedAtMs: number;
+  }): number {
+    const occurredAtMs = event.occurredAt.epochMilliseconds;
+    return occurredAtMs > 0 ? occurredAtMs : observedAtMs;
   }
 
   /**
@@ -229,65 +223,31 @@ export class GovernanceIngestCostService {
     event: CanonicalCostEvent;
     source: GovernanceIngestionSource;
   }): Promise<string | null> {
-    let principalUserId: string | null = null;
+    if (!event.userEmail) return null;
 
-    if (event.userEmail) {
-      principalUserId = await this.members.directory.findMemberIdByEmail({
-        email: event.userEmail,
-        organizationId: source.organizationId,
-      });
+    const principalUserId = await this.members.directory.findMemberIdByEmail({
+      email: event.userEmail,
+      organizationId: source.organizationId,
+    });
 
-      if (!principalUserId) {
-        logger.info(
-          {
-            sourceId: source.id,
-            userEmail: event.userEmail,
-            anthropicAccountId: event.raw["user.account_id"],
-            requestId: event.requestId,
-          },
-          "ingestion-source event from non-member email — falling back to org/team/project scope only",
-        );
-      }
+    if (!principalUserId) {
+      logger.info(
+        {
+          sourceId: source.id,
+          userEmail: event.userEmail,
+          anthropicAccountId: event.raw["user.account_id"],
+          requestId: event.requestId,
+        },
+        "ingestion-source event from non-member email — falling back to org/team/project scope only",
+      );
     }
 
     return principalUserId;
   }
+}
 
-  private async announceDebit({
-    event,
-    source,
-    spend,
-    governanceProjectId,
-    budgets,
-  }: {
-    event: CanonicalCostEvent;
-    source: GovernanceIngestionSource;
-    spend: GovernanceIngestSpend;
-    governanceProjectId: string;
-    budgets: readonly { id: string }[];
-  }): Promise<void> {
-    // A change event so the gateway's subscriber evicts its cache and the
-    // next request re-resolves against the fresh spend. Its failure is
-    // logged rather than raised: the row has already landed, and the cache
-    // is corrected by the next change anyway.
-    try {
-      await spend.appendBudgetChange({
-        organizationId: source.organizationId,
-        projectId: governanceProjectId,
-        payload: {
-          source: "ingestion_source",
-          sourceId: source.id,
-          requestId: event.requestId,
-          userEmail: event.userEmail,
-          budgetIds: budgets.map((budget) => budget.id),
-          amountUsd: event.costUsd,
-        },
-      });
-    } catch (changeErr) {
-      logger.warn(
-        { sourceId: source.id, requestId: event.requestId, err: String(changeErr) },
-        "BUDGET_UPDATED emit failed (ledger row already landed)",
-      );
-    }
-  }
+/** A token count as the fact holds it: a whole, non-negative number; anything else counts as none. */
+function tokenCount(value: number): number {
+  const whole = Math.floor(value);
+  return Number.isSafeInteger(whole) && whole > 0 ? whole : 0;
 }

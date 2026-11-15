@@ -1,4 +1,8 @@
 import {
+  type IngestedCostRecordedEventData,
+  ingestedCostKey,
+} from "@langwatch/enterprise-governance-contract";
+import {
   budgetAppliesToProvider,
   type GatewayBudgetDebitRow,
   type GatewayBudgetLedgerStatus,
@@ -18,9 +22,9 @@ import type { GatewayBudgetCrossingService } from "../../budget/services/gateway
 const logger = createLogger("langwatch:gateway:spend-debits");
 
 /**
- * The sole writer of gateway budget debits: one ledger row per budget a
- * request's outcome applies to, then its crossings, then a BUDGET_UPDATED so
- * the data plane stops enforcing against the spend its cached bundle was built with.
+ * The sole writer of gateway budget debits, for the gateway's own requests and for the costs a
+ * governance push source recorded: one ledger row per budget the spend applies to, then its
+ * crossings, then a BUDGET_UPDATED so the data plane stops enforcing against a stale bundle.
  */
 type GatewaySpendDebitCollaborators = Readonly<{
   budgets: Pick<GatewayService, "resolveApplicableBudgets">;
@@ -48,30 +52,101 @@ export class GatewaySpendDebitService {
       endUserId: payload.end_user_id || null,
     });
     const budgets = applicable.filter(({ budget }) => budgetAppliesToProvider(budget, providerKey));
+    await this.debit({
+      projectId: payload.project_id,
+      organizationId: payload.organization_id,
+      requestId: payload.gateway_request_id,
+      budgets,
+      rows: () => this.debitRows(payload, budgets, providerKey),
+      announcement: (budgetIds) => ({
+        gatewayRequestId: payload.gateway_request_id,
+        virtualKeyId: payload.virtual_key_id,
+        budgetIds,
+      }),
+    });
+  }
+
+  /**
+   * A governance push source's recorded cost, debited in the worker rather than in its request.
+   * The sentinel key and team cannot be real ids, so TEAM budgets drop out while organization,
+   * project and principal budgets match; attributed-user templates need an end user it lacks.
+   */
+  async writeIngestedCost({
+    tenantId,
+    fact,
+  }: {
+    tenantId: string;
+    fact: IngestedCostRecordedEventData;
+  }): Promise<void> {
+    const sentinel = `_ingestion_:${fact.ingestionSourceId}`;
+    const applicable = await this.collaborators.budgets.resolveApplicableBudgets({
+      organizationId: fact.organizationId,
+      teamId: fact.teamId ?? sentinel,
+      projectId: tenantId,
+      virtualKeyId: sentinel,
+      principalUserId: fact.principalUserId,
+    });
+    // A push cost names no provider, so a provider-restricted budget does not cover it.
+    const budgets = applicable.filter(
+      ({ budget }) =>
+        budget.scopeType !== "ATTRIBUTED_USER" && budgetAppliesToProvider(budget, null),
+    );
+    await this.debit({
+      projectId: tenantId,
+      organizationId: fact.organizationId,
+      requestId: ingestedCostKey(fact),
+      budgets,
+      rows: () => this.ingestedRows({ tenantId, fact, budgets, sentinel }),
+      announcement: (budgetIds) => ({
+        source: "ingestion_source",
+        sourceId: fact.ingestionSourceId,
+        requestId: fact.requestId,
+        budgetIds,
+        amountNanoUsd: fact.amountNanoUsd,
+      }),
+    });
+  }
+
+  /** Rows, then crossings, both rethrown for the caller's retry; then the best-effort notice. */
+  private async debit({
+    projectId,
+    organizationId,
+    requestId,
+    budgets,
+    rows,
+    announcement,
+  }: {
+    projectId: string;
+    organizationId: string;
+    requestId: string;
+    budgets: GatewayResolvedBudget[];
+    rows: () => GatewayBudgetDebitRow[];
+    announcement: (budgetIds: string[]) => Record<string, unknown>;
+  }): Promise<void> {
     if (budgets.length === 0) return;
 
     try {
-      await this.collaborators.spend.insertDebitsForBudgets(
-        this.debitRows(payload, budgets, providerKey),
-      );
+      await this.collaborators.spend.insertDebitsForBudgets(rows());
     } catch (error) {
       logger.error(
-        { projectId: payload.project_id, gatewayRequestId: payload.gateway_request_id, error },
+        { projectId, gatewayRequestId: requestId, error },
         "failed to write gateway budget debits",
       );
-      // Rethrown for the outbox retry: a lost debit under-enforces the cap.
+      // Rethrown for the outbox or subscriber retry: a lost debit under-enforces the cap.
       throw error;
     }
 
-    // Throws for the outbox retry too: the insert skips a budget the request
+    // Throws for the retry too: the insert skips a budget the request
     // already debited, so a re-drive writes nothing twice.
-    await this.collaborators.crossings.detect({
-      tenantId: payload.project_id,
-      organizationId: payload.organization_id,
-      budgets,
-    });
+    await this.collaborators.crossings.detect({ tenantId: projectId, organizationId, budgets });
 
-    await this.announce(payload, budgets);
+    await this.announce({
+      projectId,
+      organizationId,
+      requestId,
+      budgets,
+      payload: announcement(budgets.map(({ budget }) => budget.id)),
+    });
   }
 
   /**
@@ -79,38 +154,67 @@ export class GatewaySpendDebitService {
    * until the bundle TTL, never correctness. A blocking budget is never held
    * back by the dedupe window, so enforcement never waits on it.
    */
-  private async announce(
-    payload: WriteGatewayDebitsPayload,
-    budgets: GatewayResolvedBudget[],
-  ): Promise<void> {
+  private async announce({
+    projectId,
+    organizationId,
+    requestId,
+    budgets,
+    payload,
+  }: {
+    projectId: string;
+    organizationId: string;
+    requestId: string;
+    budgets: GatewayResolvedBudget[];
+    payload: Record<string, unknown>;
+  }): Promise<void> {
     try {
       const blocks = budgets.some(({ budget }) => budget.onBreach === "BLOCK");
-      if (
-        !blocks &&
-        !(await this.collaborators.dedupe.shouldEmit({ projectId: payload.project_id }))
-      )
-        return;
+      if (!blocks && !(await this.collaborators.dedupe.shouldEmit({ projectId }))) return;
       await this.collaborators.changes.append({
-        organizationId: payload.organization_id,
-        projectId: payload.project_id,
+        organizationId,
+        projectId,
         kind: "BUDGET_UPDATED",
-        payload: {
-          gatewayRequestId: payload.gateway_request_id,
-          virtualKeyId: payload.virtual_key_id,
-          budgetIds: budgets.map(({ budget }) => budget.id),
-        },
+        payload,
       });
     } catch (error) {
       logger.warn(
-        {
-          projectId: payload.project_id,
-          virtualKeyId: payload.virtual_key_id,
-          gatewayRequestId: payload.gateway_request_id,
-          error,
-        },
+        { projectId, gatewayRequestId: requestId, error },
         "failed to emit BUDGET_UPDATED change event after debiting",
       );
     }
+  }
+
+  private ingestedRows({
+    tenantId,
+    fact,
+    budgets,
+    sentinel,
+  }: {
+    tenantId: string;
+    fact: IngestedCostRecordedEventData;
+    budgets: GatewayResolvedBudget[];
+    sentinel: string;
+  }): GatewayBudgetDebitRow[] {
+    return budgets.map(({ budget, bucketScopeId }) => ({
+      tenantId,
+      budgetId: budget.id,
+      scope: budget.scopeType,
+      scopeId: bucketScopeId,
+      window: budget.window,
+      virtualKeyId: sentinel,
+      providerKey: null,
+      // Two sources may each report the same request id; the ledger key keeps them apart.
+      gatewayRequestId: ingestedCostKey(fact),
+      amountNanoUsd: fact.amountNanoUsd,
+      tokensInput: fact.tokensInput,
+      tokensOutput: fact.tokensOutput,
+      tokensCacheRead: fact.tokensCacheRead,
+      tokensCacheWrite: fact.tokensCacheWrite,
+      model: fact.model,
+      durationMs: 0,
+      status: "SUCCESS",
+      occurredAt: Temporal.Instant.fromEpochMilliseconds(fact.occurredAtMs),
+    }));
   }
 
   private ledgerStatus(payload: WriteGatewayDebitsPayload): GatewayBudgetLedgerStatus {

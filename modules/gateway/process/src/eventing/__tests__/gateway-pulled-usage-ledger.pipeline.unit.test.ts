@@ -65,7 +65,7 @@ function pricedFact(): PulledUsagePricedEventData {
 
 function harness() {
   const spend = MemoryGatewayBudgetSpendRepository.create();
-  const ledger = GatewayBudgetLedgerService.create({ spend, changes: { append: vi.fn() } });
+  const ledger = GatewayBudgetLedgerService.create({ spend });
   const eventing = new EventSourcing({
     eventStore: EventStoreMemory.createForTesting(),
     processStore: InMemoryProcessStore.createForTesting(),

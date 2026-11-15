@@ -88,10 +88,8 @@ import {
   type CreateGatewayGuardrailInput,
   type GatewayApplicableBudget,
   type GatewayAgentCacheWriteInput,
-  type GatewayBudgetChangeInput,
   type GatewayBudgetCheckInput,
   type GatewayBudgetCheckResult,
-  type GatewayBudgetDebitRow,
   type GatewayBudgetResolutionTarget,
   type GatewayElevenLabsApiCredential,
   type GatewayTwilioCredential,
@@ -175,6 +173,10 @@ import {
   buildGatewayGovernanceEventsPipeline,
   type GatewayGovernanceEventsDefinition,
 } from "../eventing/gateway-governance-events.pipeline.ts";
+import {
+  buildGatewayIngestedCostLedgerPipeline,
+  type GatewayIngestedCostLedgerPipeline,
+} from "../eventing/gateway-ingested-cost-ledger.pipeline.ts";
 import {
   buildGatewayInstantEvalJudgeSpendPipeline,
   type GatewayInstantEvalJudgeSpendPipeline,
@@ -1465,6 +1467,11 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     });
   }
 
+  /** gateway_ingested_cost_ledger: the sole debit writer debits governance's push-source costs. */
+  ingestedCostLedgerPipeline(): GatewayIngestedCostLedgerPipeline {
+    return buildGatewayIngestedCostLedgerPipeline({ debits: this.#spendPipeline?.debits });
+  }
+
   /** gateway_instant_eval_judge_spend: the ledger row for each judge call (ADR-174 dec. 13). */
   instantEvalJudgeSpendPipeline(): GatewayInstantEvalJudgeSpendPipeline {
     return buildGatewayInstantEvalJudgeSpendPipeline({
@@ -2572,18 +2579,9 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     return this.#dependencies.budgetDecisions.checkBudget(input);
   }
 
-  insertSpendDebit(rows: readonly GatewayBudgetDebitRow[]): Promise<void> {
-    return this.#budgetLedgerService.insertDebit(rows);
-  }
-
-  appendBudgetChange(input: GatewayBudgetChangeInput): Promise<void> {
-    return this.#budgetLedgerService.appendBudgetChange(input);
-  }
-
   get #budgetLedgerService(): GatewayBudgetLedgerService {
     return (this.#budgetLedger ??= GatewayBudgetLedgerService.create({
       spend: this.#dependencies.budgetSpend,
-      changes: this.#dependencies.changeEvents,
     }));
   }
 

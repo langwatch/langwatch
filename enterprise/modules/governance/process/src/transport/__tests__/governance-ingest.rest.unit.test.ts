@@ -7,8 +7,9 @@ import {
 import type {
   GovernanceIngestionSource,
   GovernanceRestApi,
+  RecordIngestedCostCommand,
 } from "@langwatch/enterprise-governance-contract";
-import type { GatewayApi } from "@langwatch/gateway-contract";
+import { ingestedCostRecordedEventDataSchema } from "@langwatch/enterprise-governance-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { resolveRequestBound } from "@langwatch/plans";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -28,6 +29,7 @@ import { GovernanceIngestAccessService } from "../../features/ingest/services/go
 import { GovernanceIngestPrincipalService } from "../../features/ingest/services/governance-ingest-principal.service.ts";
 import {
   GovernanceIngestReceiverService,
+  type GovernanceIngestCostRecorder,
   type GovernanceIngestLogCollectionChannel,
   type GovernanceIngestMetricCollectionChannel,
   type GovernanceIngestTraceCollection,
@@ -73,6 +75,7 @@ type World = {
   traceCollection?: GovernanceIngestTraceCollection;
   logCollection?: GovernanceIngestLogCollectionChannel;
   metricCollection?: GovernanceIngestMetricCollectionChannel;
+  costs?: GovernanceIngestCostRecorder;
 };
 
 function mountIngest(world: World = {}) {
@@ -85,7 +88,16 @@ function mountIngest(world: World = {}) {
   const traceCollectionMock = vi.fn<GovernanceIngestTraceCollection>().mockResolvedValue({
     rejectedSpans: 0,
   });
-  const logCollectionMock = vi.fn<GovernanceIngestLogCollectionChannel>().mockResolvedValue(void 0);
+  const logCollectionMock = vi
+    .fn<GovernanceIngestLogCollectionChannel>()
+    .mockResolvedValue({ outcome: "collected", acceptedLogRecords: 1, rejectedLogRecords: 0 });
+  const recorded: RecordIngestedCostCommand[] = [];
+  const costs: GovernanceIngestCostRecorder = world.costs ?? {
+    record: async (commands) => {
+      for (const { data } of commands) ingestedCostRecordedEventDataSchema.parse(data);
+      recorded.push(...commands);
+    },
+  };
   const metricCollectionMock = vi.fn<GovernanceIngestMetricCollectionChannel>().mockResolvedValue({
     outcome: "collected",
     acceptedDataPoints: 0,
@@ -116,9 +128,12 @@ function mountIngest(world: World = {}) {
       traceCollection: world.traceCollection ?? traceCollectionMock,
       logCollection: world.logCollection ?? logCollectionMock,
       metricCollection: world.metricCollection ?? metricCollectionMock,
-      spend: createApiFixture<GatewayApi>(),
+      costs,
       directory: GovernanceIngestPrincipalService.create({
-        organizations: createApiFixture<OrganizationApi>(),
+        organizations: createApiFixture<OrganizationApi>({
+          findMembersIncludingDeactivated: async () =>
+            [{ id: "user_member", email: "member@example.com" }] as never,
+        }),
       }),
     }),
   });
@@ -151,6 +166,7 @@ function mountIngest(world: World = {}) {
     traceCollection: traceCollectionMock,
     logCollection: logCollectionMock,
     metricCollection: metricCollectionMock,
+    recorded,
     ingestionSourceRecordEventReceived: recordEventReceived,
     findIngestionSourceByIngestSecret: findByIngestSecret,
     post: (path: string, body: string, headers: Record<string, string> = {}) =>
@@ -175,6 +191,41 @@ const traceBody = JSON.stringify({
 const logBody = JSON.stringify({
   resourceLogs: [{ scopeLogs: [{ logRecords: [{ body: { stringValue: "one" } }] }] }],
 });
+
+const COSTED_SOURCE: GovernanceIngestionSource = {
+  ...SOURCE,
+  parserConfig: { ottlStatements: ['set(attributes["x"], "y")'] },
+};
+const COST_OCCURRED_AT_MS = Date.UTC(2026, 10, 14, 12);
+
+const attribute = (key: string, value: string) => ({ key, value: { stringValue: value } });
+const costRecord = ({
+  requestId = "req_1",
+  costUsd = "1.25",
+  timeUnixNano = String(BigInt(COST_OCCURRED_AT_MS) * 1_000_000n),
+  inputTokens = "100",
+  outputTokens = "50",
+}: {
+  requestId?: string;
+  costUsd?: string;
+  timeUnixNano?: string;
+  inputTokens?: string;
+  outputTokens?: string;
+} = {}) => ({
+  timeUnixNano,
+  body: { stringValue: "request" },
+  attributes: [
+    attribute("langwatch.request_id", requestId),
+    attribute("langwatch.cost.usd", costUsd),
+    attribute("langwatch.model", "claude-sonnet"),
+    attribute("langwatch.input_tokens", inputTokens),
+    attribute("langwatch.output_tokens", outputTokens),
+    attribute("langwatch.principal.email", "member@example.com"),
+  ],
+});
+const costedLogs = (...logRecords: ReturnType<typeof costRecord>[]) =>
+  JSON.stringify({ resourceLogs: [{ scopeLogs: [{ logRecords }] }] });
+const costedLogBody = costedLogs(costRecord());
 
 const metricBody = JSON.stringify({
   resourceMetrics: [
@@ -464,9 +515,138 @@ describe("the ingestion-source receivers", () => {
     });
   });
 
+  describe("when a log batch carrying costs arrives for a source with extraction rules", () => {
+    /** @scenario "A pushed cost event is recorded as a fact, not written in the request" */
+    it("records one fact per cost, keyed by source and request id, naming the member", async () => {
+      const api = mountIngest({ source: COSTED_SOURCE });
+
+      const response = await api.post(`/api/ingest/otel/${SOURCE_ID}/v1/logs`, costedLogBody);
+
+      expect(response.status).toBe(202);
+      await expect(response.json()).resolves.toMatchObject({ accepted: true, costEvents: 1 });
+      expect(api.recorded).toEqual([
+        {
+          tenantId: "gov_project",
+          occurredAt: COST_OCCURRED_AT_MS,
+          data: {
+            ingestionSourceId: SOURCE_ID,
+            sourceType: "otel_generic",
+            organizationId: ORGANIZATION_ID,
+            teamId: null,
+            requestId: "req_1",
+            model: "claude-sonnet",
+            tokensInput: 100,
+            tokensOutput: 50,
+            tokensCacheRead: 0,
+            tokensCacheWrite: 0,
+            amountNanoUsd: 1_250_000_000,
+            principalUserId: "user_member",
+            occurredAtMs: COST_OCCURRED_AT_MS,
+            observedAtMs: expect.any(Number),
+          },
+        },
+      ]);
+      expect(JSON.stringify(api.recorded)).not.toContain("member@example.com");
+    });
+  });
+
+  describe("when one cost in a batch is not a decimal amount", () => {
+    it("skips that cost and still records the batch's valid ones", async () => {
+      const api = mountIngest({ source: COSTED_SOURCE });
+
+      const response = await api.post(
+        `/api/ingest/otel/${SOURCE_ID}/v1/logs`,
+        costedLogs(costRecord({ requestId: "req_hex", costUsd: "0x10" }), costRecord()),
+      );
+
+      expect(response.status).toBe(202);
+      expect(api.recorded.map(({ data }) => data.requestId)).toEqual(["req_1"]);
+    });
+  });
+
+  describe("when a cost carries a negative or fractional token count", () => {
+    it("records the cost with whole, non-negative counts instead of refusing the batch", async () => {
+      const api = mountIngest({ source: COSTED_SOURCE });
+
+      const response = await api.post(
+        `/api/ingest/otel/${SOURCE_ID}/v1/logs`,
+        costedLogs(costRecord({ inputTokens: "-5", outputTokens: "12.7" })),
+      );
+
+      expect(response.status).toBe(202);
+      expect(api.recorded.map(({ data }) => [data.tokensInput, data.tokensOutput])).toEqual([
+        [0, 12],
+      ]);
+    });
+  });
+
+  describe("when a cost's record is stamped at the epoch", () => {
+    it("records it at receive time, where a budget period counts it", async () => {
+      const api = mountIngest({ source: COSTED_SOURCE });
+
+      const response = await api.post(
+        `/api/ingest/otel/${SOURCE_ID}/v1/logs`,
+        costedLogs(costRecord({ timeUnixNano: "0" })),
+      );
+
+      expect(response.status).toBe(202);
+      expect(api.recorded).toHaveLength(1);
+      const [fact] = api.recorded;
+      if (!fact) throw new Error("expected one recorded cost fact");
+      expect(fact.data.occurredAtMs).toBe(fact.data.observedAtMs);
+      expect(fact.occurredAt).toBe(fact.data.observedAtMs);
+    });
+  });
+
+  describe("when recording a batch's costs fails", () => {
+    /** @scenario "A cost that cannot be recorded is answered as retryable" */
+    it("answers a retryable 503 and records no source event, so the resend counts once", async () => {
+      const api = mountIngest({
+        source: COSTED_SOURCE,
+        costs: { record: async () => Promise.reject(new Error("queue down")) },
+      });
+
+      const response = await api.post(`/api/ingest/otel/${SOURCE_ID}/v1/logs`, costedLogBody);
+
+      expect(response.status).toBe(503);
+      await expect(response.json()).resolves.toMatchObject({ retryable: true });
+      expect(api.ingestionSourceRecordEventReceived).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the log pipeline cannot take the batch", () => {
+    /** @scenario "A log batch the pipeline cannot take is answered as retryable" */
+    it.each([
+      [
+        "reports itself unavailable",
+        vi
+          .fn<GovernanceIngestLogCollectionChannel>()
+          .mockResolvedValue({ outcome: "unavailable", errorMessage: "queue down" }),
+      ],
+      [
+        "throws",
+        vi.fn<GovernanceIngestLogCollectionChannel>().mockRejectedValue(new Error("queue down")),
+      ],
+    ])(
+      "answers a retryable 503 and records no cost when the pipeline %s",
+      async (_how, logCollection) => {
+        const api = mountIngest({ source: COSTED_SOURCE, logCollection });
+
+        const response = await api.post(`/api/ingest/otel/${SOURCE_ID}/v1/logs`, costedLogBody);
+
+        expect(response.status).toBe(503);
+        await expect(response.json()).resolves.toMatchObject({ retryable: true });
+        expect(api.recorded).toEqual([]);
+        expect(api.ingestionSourceRecordEventReceived).not.toHaveBeenCalled();
+      },
+    );
+  });
+
   describe("when a webhook envelope arrives for a source that serves it", () => {
     it("hands ONE log record to the log pipeline and acknowledges the envelope", async () => {
-      const logCollection = vi.fn().mockResolvedValue(void 0);
+      const logCollection = vi
+        .fn()
+        .mockResolvedValue({ outcome: "collected", acceptedLogRecords: 1, rejectedLogRecords: 0 });
       const api = mountIngest({ source: { ...SOURCE, sourceType: "workato" }, logCollection });
 
       const response = await api.post(`/api/ingest/webhook/${SOURCE_ID}`, '{"event":"run"}');
@@ -499,7 +679,9 @@ describe("the ingestion-source receivers", () => {
   describe("when a body over the JSON wire cap reaches the webhook door", () => {
     /** @scenario "The governance webhook door refuses a body over the JSON wire cap before holding it" */
     it("refuses it as too large before the source is looked up", async () => {
-      const logCollection = vi.fn().mockResolvedValue(void 0);
+      const logCollection = vi
+        .fn()
+        .mockResolvedValue({ outcome: "collected", acceptedLogRecords: 1, rejectedLogRecords: 0 });
       const api = mountIngest({ source: { ...SOURCE, sourceType: "workato" }, logCollection });
 
       const response = await api.post(

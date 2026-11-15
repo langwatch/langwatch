@@ -20,6 +20,7 @@ import { ingestionPullReconcileEventing } from "./eventing/ingestion-pull-reconc
 import { ingestionPullEventing } from "./eventing/ingestion-pull.pipeline.ts";
 import { pulledUsageEventing } from "./eventing/pulled-usage.pipeline.ts";
 import { GOVERNANCE_SETTLING_WINDOW_DAYS } from "./features/cost/rules/governance-cost-summary.rules.ts";
+import { ingestedCostEventing } from "./features/ingest/eventing/ingested-cost.pipeline.ts";
 import { agentRegistryEventing } from "./features/registry/eventing/agent-registry.pipeline.ts";
 import { governanceRepositories } from "./repositories/governance-repositories.registry.ts";
 import { activityMonitorTrpcTransport } from "./transport/activity-monitor.trpc.ts";
@@ -132,6 +133,7 @@ export const governanceProcessModule: PublishedProcessModule<"governance", Gover
     .withEventing(ingestionPullReconcileEventing)
     .withEventing(governanceActivityMonitorEventing)
     .withEventing(codingAssistantBillingEventing)
+    .withEventing(ingestedCostEventing)
     .withEventing(agentRegistryEventing)
     // Background, after old writers are gone: an older image edits coding-assistant configs
     // without a fact and appends pulled usage without a charge (governance-deploy-steps.feature).

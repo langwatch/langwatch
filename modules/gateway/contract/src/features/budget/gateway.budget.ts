@@ -113,13 +113,6 @@ export type GatewayBudgetDebitRow = {
   occurredAt: Instant;
 };
 
-/** A spend landed outside the gateway pipeline, announced so the data plane re-reads budgets. */
-export type GatewayBudgetChangeInput = Readonly<{
-  organizationId: string;
-  projectId: string;
-  payload: Record<string, unknown>;
-}>;
-
 /** Decimal values stay portable without leaking a database client type. */
 export type GatewayMoney = {
   toString(): string;
