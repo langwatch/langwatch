@@ -19,7 +19,6 @@ import {
   type StoredObjectReadUrl,
   type StoredObjectReadUrlInput,
   type StoredObjectMetadata,
-  type StoredObjectOwnerResolver,
   type StoredObjectReference,
   type StoredObjectServerConfig,
   type StoredObjectsConfirmUploadInput,
@@ -53,7 +52,6 @@ import {
   StoredObjectFileReadService,
   type StoredObjectFileAllowance,
 } from "../services/stored-object-file-read.service.ts";
-import { StoredObjectOwnerUnresolvedService } from "../services/stored-object-owner-unresolved.service.ts";
 import { StoredObjectUploadSignerService } from "../services/stored-object-upload-signer.service.ts";
 import { StoredObjectService } from "../services/stored-object.service.ts";
 import { StoredObjectsTelemetryService } from "../services/stored-objects-telemetry.service.ts";
@@ -76,8 +74,6 @@ export type StoredObjectInfrastructure = Readonly<{
   uploadExpiryMs: number;
   /** The legacy ClickHouse index, read when no Postgres row answers (ADR-158 §5). */
   files: StoredObjectFileReader;
-  /** Which project owns an object, when the URL does not say. */
-  owners: StoredObjectOwnerResolver;
 }>;
 
 type StoredObjectDependencies = Readonly<{
@@ -120,7 +116,6 @@ export class StoredObjectModule implements StoredObjectApi, StoredObjectFileApi 
           registry: (projectId) => repositories.legacyStorage.forProject(projectId),
           telemetry: StoredObjectsTelemetryService.create(),
         }),
-        owners: StoredObjectOwnerUnresolvedService.create(),
       },
       repositories,
       permissions: setup.dependencies.authz,
@@ -152,7 +147,6 @@ export class StoredObjectModule implements StoredObjectApi, StoredObjectFileApi 
         maximumUploadBytes: parts.maximumUploadBytes,
         uploadExpiryMs: parts.uploadExpiryMs,
       }),
-      owners: parts.owners,
       permissions: setup.permissions,
       rateLimits: repositories.rateLimits,
       images: ImageProxyService.create({ images: setup.images }),
@@ -160,7 +154,6 @@ export class StoredObjectModule implements StoredObjectApi, StoredObjectFileApi 
   }
 
   readonly #storage: StoredObjectService;
-  readonly #owners: StoredObjectOwnerResolver;
   readonly #permissions: AuthzApi;
   readonly #rateLimits: StoredObjectRateLimitRepository;
   readonly #images: ImageProxyService;
@@ -168,13 +161,11 @@ export class StoredObjectModule implements StoredObjectApi, StoredObjectFileApi 
 
   private constructor(parts: {
     storage: StoredObjectService;
-    owners: StoredObjectOwnerResolver;
     permissions: AuthzApi;
     rateLimits: StoredObjectRateLimitRepository;
     images: ImageProxyService;
   }) {
     this.#storage = parts.storage;
-    this.#owners = parts.owners;
     this.#permissions = parts.permissions;
     this.#rateLimits = parts.rateLimits;
     this.#images = parts.images;
@@ -182,7 +173,6 @@ export class StoredObjectModule implements StoredObjectApi, StoredObjectFileApi 
       countRead: (input) => this.countRead(input),
       assertProjectPermission: (input) => this.assertProjectPermission(input),
       isRecorded: (input) => this.#storage.isRecorded(input),
-      resolveOwner: (input) => this.resolveOwner(input),
       readById: (input) => this.readById(input),
     });
   }
@@ -285,11 +275,6 @@ export class StoredObjectModule implements StoredObjectApi, StoredObjectFileApi 
     input: Readonly<{ projectId: string; id: string }>,
   ): Promise<StoredObjectFileStreamRead> {
     return this.#storage.readById(input);
-  }
-
-  /** Which project owns an object, for a URL that does not say; none is ever found. */
-  resolveOwner(input: { id: string }): Promise<{ projectId: string }> {
-    return this.#owners.getOwner(input);
   }
 
   storeFromBytes(

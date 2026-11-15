@@ -24,4 +24,13 @@ export class LangyAnalyticsEventMemoryRepository extends LangyAnalyticsEventRepo
   async insertBatch(records: LangyAnalyticsEventRecord[]): Promise<void> {
     this.store.analyticsEvents.push(...records);
   }
+
+  /** The tenant's held rows' JSON byte length, standing in for `_size_bytes`. */
+  async getStoredBytes({ tenantId }: { tenantId: string }): Promise<number> {
+    let total = 0;
+    for (const record of this.store.analyticsEvents) {
+      if (record.tenantId === tenantId) total += Buffer.byteLength(JSON.stringify(record));
+    }
+    return total;
+  }
 }

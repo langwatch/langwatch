@@ -14,7 +14,15 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Callable capability exposed by the composed Suite application.
 
-Peers call these through the token, declared at `../contract/src/suite.api.ts:34`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/suite.api.ts:35`; nothing else in this package is public.
+
+#### `getStoredBytes`
+
+The sum of `_size_bytes` over suite's own tables for one project; a store failure throws.
+
+```typescript
+getStoredBytes(input: SuiteStoredBytesInput): Promise<number>;
+```
 
 #### `listByIds`
 

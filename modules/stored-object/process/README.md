@@ -118,14 +118,6 @@ Throws `StoredObjectNotFoundError` when the project holds no such row.
 readById(input: { projectId: string; id: string }): Promise<StoredObjectFileRead>;
 ```
 
-#### `resolveOwner`
-
-Throws `StoredObjectNotFoundError` when no instance holds the id.
-
-```typescript
-resolveOwner(input: { id: string }): Promise<{ projectId: string }>;
-```
-
 #### `getStorageDestination`
 
 Where this project's objects are written, for the checkup.

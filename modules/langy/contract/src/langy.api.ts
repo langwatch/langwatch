@@ -78,7 +78,12 @@ import type {
   langyConversationUpdateFrameSchema,
 } from "./langy.dtos.ts";
 import type { LangyStreamEntry } from "./langy.stream-entry.ts";
-import type { LangyCredentialSession, LangyEgressAllowlist, LangyStopTurnInput } from "./langy.ts";
+import type {
+  LangyCredentialSession,
+  LangyEgressAllowlist,
+  LangyStopTurnInput,
+  LangyStoredBytesInput,
+} from "./langy.ts";
 
 /**
  * What the install-wide usage report counts here (ADR-156, section 10): turns
@@ -505,6 +510,8 @@ export interface LangyApi {
   setEgressState(
     input: LangyPanelCall<typeof langyEgressSetInputSchema>,
   ): Promise<z.infer<typeof langyEgressStateSchema>>;
+  /** Summed `_size_bytes` over langy's analytics rows for one project; a store failure throws. */
+  getStoredBytes(input: LangyStoredBytesInput): Promise<number>;
 }
 
 export const LangyApi = moduleApi<LangyApi>()("langy");

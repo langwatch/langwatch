@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The portable, callable Langy capability shared by process transports.
 
-Peers call these through the token, declared at `../contract/src/langy.api.ts:299`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/langy.api.ts:304`; nothing else in this package is public.
 
 #### `ingestInternalTurnResult`
 
@@ -548,6 +548,14 @@ getEgressState(input: LangyPanelCall<typeof langyEgressGetInputSchema>): Promise
 
 ```typescript
 setEgressState(input: LangyPanelCall<typeof langyEgressSetInputSchema>): Promise<z.infer<typeof langyEgressStateSchema>>;
+```
+
+#### `getStoredBytes`
+
+Summed `_size_bytes` over langy's analytics rows for one project; a store failure throws.
+
+```typescript
+getStoredBytes(input: LangyStoredBytesInput): Promise<number>;
 ```
 
 ## REST transport

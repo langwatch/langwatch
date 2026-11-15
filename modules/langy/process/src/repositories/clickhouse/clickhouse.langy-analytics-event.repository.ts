@@ -1,3 +1,11 @@
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import {
+  clickhouseRead,
+  fn,
+  type ReaderReadStatement,
+  tenantScope,
+} from "@langwatch/clickhouse-client/builder";
+import { STORAGE_METER_READ_SETTINGS } from "@langwatch/data-retention-contract/retention-tables";
 import { EventUtils } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { Temporal, toDate } from "@langwatch/time";
@@ -6,6 +14,7 @@ import {
   LangyAnalyticsEventRepository,
   type LangyAnalyticsEventRecord,
 } from "../langy-analytics-event.repository.ts";
+import { langyAnalyticsEvents } from "./clickhouse.langy-analytics-events.table.ts";
 
 /**
  * The `DateTime64(3)` columns. The ClickHouse client serialises a `Date`; an
@@ -31,8 +40,8 @@ type LangyAnalyticsClickHouseClientResolver = (
   tenantId: string,
 ) => Promise<LangyAnalyticsClickHouseWriteClient>;
 
-/** The process's routing ClickHouse member, as far as this sink writes through it. */
-export interface LangyAnalyticsClickHouseMember {
+/** The process's routing ClickHouse member, as far as this sink writes and meters through it. */
+export interface LangyAnalyticsClickHouseMember extends Pick<ClickHouseQueryClient, "read"> {
   insert(request: {
     tenantId: string;
     table: string;
@@ -111,29 +120,58 @@ function validateBatch(records: LangyAnalyticsEventRecord[]): ValidatedBatch {
 export class LangyAnalyticsEventClickHouseRepository extends LangyAnalyticsEventRepository {
   static create(
     resolveClient: LangyAnalyticsClickHouseClientResolver,
+    clickhouse: Pick<ClickHouseQueryClient, "read">,
   ): LangyAnalyticsEventClickHouseRepository {
-    return new LangyAnalyticsEventClickHouseRepository(resolveClient);
+    return new LangyAnalyticsEventClickHouseRepository(resolveClient, clickhouse);
   }
 
   /** The sink over the process's own ClickHouse member, every write naming its tenant. */
   static overMember(
     clickhouse: LangyAnalyticsClickHouseMember,
   ): LangyAnalyticsEventClickHouseRepository {
-    return new LangyAnalyticsEventClickHouseRepository((tenantId) =>
-      Promise.resolve({
-        insert: ({ table, values, clickhouse_settings }) =>
-          clickhouse.insert({
-            tenantId,
-            table,
-            rows: values,
-            ...(clickhouse_settings === undefined ? {} : { settings: clickhouse_settings }),
-          }),
-      }),
+    return new LangyAnalyticsEventClickHouseRepository(
+      (tenantId) =>
+        Promise.resolve({
+          insert: ({ table, values, clickhouse_settings }) =>
+            clickhouse.insert({
+              tenantId,
+              table,
+              rows: values,
+              ...(clickhouse_settings === undefined ? {} : { settings: clickhouse_settings }),
+            }),
+        }),
+      clickhouse,
     );
   }
 
-  constructor(private readonly resolveClient: LangyAnalyticsClickHouseClientResolver) {
+  constructor(
+    private readonly resolveClient: LangyAnalyticsClickHouseClientResolver,
+    private readonly clickhouse: Pick<ClickHouseQueryClient, "read">,
+  ) {
     super();
+  }
+
+  /** One tenant's `_size_bytes` in `langy_analytics_events`, every stored row counted. */
+  async getStoredBytes({ tenantId }: { tenantId: string }): Promise<number> {
+    const { rows } = await this.clickhouse.read({
+      statement: LangyAnalyticsEventClickHouseRepository.storedBytesRead({ tenantId }),
+      table: langyAnalyticsEvents.$table.name,
+      declaresFullScan: true,
+    });
+    return Number(rows[0]?.bytes ?? 0);
+  }
+
+  /** The tenant's summed `_size_bytes`, under the meter's thread and time caps. */
+  static storedBytesRead({
+    tenantId,
+  }: {
+    tenantId: string;
+  }): ReaderReadStatement<{ bytes: number | string }> {
+    return clickhouseRead({ scope: tenantScope.single({ tenantId }) })
+      .from(langyAnalyticsEvents)
+      .select({ bytes: fn.sum(langyAnalyticsEvents._size_bytes) })
+      .settings(STORAGE_METER_READ_SETTINGS)
+      .build();
   }
 
   async insert(record: LangyAnalyticsEventRecord, retentionDays: number): Promise<void> {

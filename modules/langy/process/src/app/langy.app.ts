@@ -712,6 +712,13 @@ export class LangyModule implements LangyApiContract {
     );
   }
 
+  /** Langy's stored bytes for one project, for data-retention's storage meter. */
+  getStoredBytes(input: langyContractModule.LangyStoredBytesInput): Promise<number> {
+    return this.dependencies.repositories.analyticsEvents.getStoredBytes({
+      tenantId: input.projectId,
+    });
+  }
+
   getRestCaller(
     input: langyContractModule.LangyRestCallerInput,
   ): Promise<langyContractModule.LangyRestCaller> {

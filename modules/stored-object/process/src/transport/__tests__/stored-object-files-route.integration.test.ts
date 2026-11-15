@@ -109,11 +109,7 @@ describe("given the /api/files family", () => {
   describe("when no row exists for the id", () => {
     /** @scenario "GET /api/files/:id returns 404 with status not_found when no row exists for the id" */
     it("answers 404 with a not-found status, distinct from a missing blob", async () => {
-      const api = mount({
-        owner: async () => {
-          throw new StoredObjectNotFoundError();
-        },
-      });
+      const api = mount({ isRecorded: async () => false });
 
       const response = await api.fetch(`/api/files/${OBJECT_ID}`);
 
@@ -152,22 +148,25 @@ describe("given the /api/files family", () => {
   });
 
   describe("when the key belongs to a different project than the owner", () => {
-    /** @scenario "GET /api/files/:id enforces project ownership through the shared permission check" */
-    /** @scenario "GET /api/files/:id resolves the owning project from the row id before pinning the key to it" */
     /** @scenario "A key reading stored bytes is pinned to the project it authenticated as" */
-    it("resolves the owner from the row, refuses the foreign key, and reads nothing", async () => {
+    /** @scenario "An id-only URL the key's own project does not record answers not found" */
+    it("answers 404 for the id-only URL, resolves no other owner, and reads nothing", async () => {
       const read = vi.fn(async () => availableRead());
-      const owner = vi.fn(async () => ({ projectId: OWNER_PROJECT }));
-      const api = mount({ read, owner });
+      const isRecorded = vi.fn<StoredObjectFileGate["isRecorded"]>(
+        async ({ projectId }) => projectId === OWNER_PROJECT,
+      );
+      const api = mount({ read, isRecorded });
 
       const response = await api.fetch(`/api/files/${OBJECT_ID}`, keyFor("project-other"));
 
-      expect(response.status).toBe(403);
-      expect(owner).toHaveBeenCalled();
+      expect(response.status).toBe(404);
+      await expect(response.json()).resolves.toEqual({ error: "stored_object_not_found" });
+      expect(isRecorded).toHaveBeenCalledWith({ projectId: "project-other", id: OBJECT_ID });
       expect(read).not.toHaveBeenCalled();
     });
 
-    it("refuses the foreign key on the project-scoped URL too", async () => {
+    /** @scenario "GET /api/files/:id enforces project ownership through the shared permission check" */
+    it("refuses the foreign key on the project-scoped URL", async () => {
       const read = vi.fn(async () => availableRead());
       const api = mount({ read });
 
@@ -182,37 +181,33 @@ describe("given the /api/files family", () => {
   });
 
   describe("when the id-only URL names an upload only the key's own project records", () => {
-    it("reads it from the key's project without the cross-tenant lookup", async () => {
+    it("reads it from the key's project", async () => {
       const read = vi.fn(async () => availableRead());
-      const owner = vi.fn(async () => {
-        throw new StoredObjectNotFoundError();
-      });
       const isRecorded = vi.fn(async () => true);
-      const api = mount({ read, owner, isRecorded });
+      const api = mount({ read, isRecorded });
 
       const response = await api.fetch(`/api/files/${OBJECT_ID}`, keyFor(OWNER_PROJECT));
 
       expect(response.status).toBe(200);
       expect(isRecorded).toHaveBeenCalledWith({ projectId: OWNER_PROJECT, id: OBJECT_ID });
-      expect(owner).not.toHaveBeenCalled();
       expect(read).toHaveBeenCalledWith({ projectId: OWNER_PROJECT, id: OBJECT_ID });
     });
   });
 
   describe("when the caller has exhausted the per-caller rate limit", () => {
     /** @scenario "GET /api/files/:id throttles by caller identity before any cross-tenant lookup" */
-    it("answers 429 keyed on the caller, before the cross-tenant owner lookup runs", async () => {
-      const owner = vi.fn(async () => ({ projectId: OWNER_PROJECT }));
+    it("answers 429 keyed on the caller, before any owner lookup runs", async () => {
+      const isRecorded = vi.fn(async () => true);
       const rateLimit = vi.fn<StoredObjectFileGate["countRead"]>(async () => ({
         allowed: false,
         resetAt: 1_000,
       }));
-      const api = mount({ owner, rateLimit });
+      const api = mount({ isRecorded, rateLimit });
 
       const response = await api.fetch(`/api/files/${OBJECT_ID}`);
 
       expect(response.status).toBe(429);
-      expect(owner).not.toHaveBeenCalled();
+      expect(isRecorded).not.toHaveBeenCalled();
       expect(rateLimit.mock.calls[0]![0].key).toBe(`files-route:caller:${OWNER_PROJECT}`);
     });
   });
@@ -275,14 +270,14 @@ describe("given the /api/files family", () => {
   describe("when the URL names the project that owns the object", () => {
     // The same scenario the membership case above binds; a second annotation
     // would bind nothing it does not already cover.
-    it("takes the owner from the path and never runs the cross-tenant lookup", async () => {
-      const owner = vi.fn(async () => ({ projectId: OWNER_PROJECT }));
-      const api = mount({ read: async () => availableRead(), owner });
+    it("takes the owner from the path and never asks which project records the id", async () => {
+      const isRecorded = vi.fn(async () => true);
+      const api = mount({ read: async () => availableRead(), isRecorded });
 
       const response = await api.fetch(`/api/files/${OWNER_PROJECT}/${OBJECT_ID}`);
 
       expect(response.status).toBe(200);
-      expect(owner).not.toHaveBeenCalled();
+      expect(isRecorded).not.toHaveBeenCalled();
     });
   });
 });
@@ -299,7 +294,6 @@ function keyFor(projectId: string): Record<string, string> {
 /** The family over one process's byte reads, counter and gate, behind a project-key door. */
 function mount(options: {
   read?: () => Promise<StoredObjectFileStreamRead>;
-  owner?: () => Promise<{ projectId: string }>;
   isRecorded?: StoredObjectFileGate["isRecorded"];
   assertProjectPermission?: StoredObjectFileGate["assertProjectPermission"];
   rateLimit?: StoredObjectFileGate["countRead"];
@@ -307,8 +301,7 @@ function mount(options: {
   const files = StoredObjectFileReadService.create({
     countRead: options.rateLimit ?? (async () => ({ allowed: true, resetAt: 0 })),
     assertProjectPermission: options.assertProjectPermission ?? (async () => undefined),
-    isRecorded: options.isRecorded ?? (async () => false),
-    resolveOwner: options.owner ?? (async () => ({ projectId: OWNER_PROJECT })),
+    isRecorded: options.isRecorded ?? (async ({ projectId }) => projectId === OWNER_PROJECT),
     readById: options.read ?? (async () => availableRead()),
   });
   const api: StoredObjectFileApi = { readFile: (input) => files.read(input) };

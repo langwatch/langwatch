@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`ExperimentApi`)
 
-Peers call these through the token, declared at `../contract/src/experiment.api.ts:143`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/experiment.api.ts:144`; nothing else in this package is public.
 
 #### `getById`
 
@@ -146,6 +146,14 @@ listRuns(input: ExperimentRunListInput): Promise<Record<string, ExperimentRun[]>
 
 ```typescript
 getRunAggregates(input: ExperimentRunListInput): Promise<Record<string, ExperimentRunAggregate>>;
+```
+
+#### `getStoredBytes`
+
+One project's summed `_size_bytes` over experiment's own tables; a store failure throws.
+
+```typescript
+getStoredBytes(input: ExperimentStoredBytesInput): Promise<number>;
 ```
 
 #### `getRunsPage`

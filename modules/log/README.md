@@ -11,15 +11,15 @@ Logs: receiving OTLP logs, canonicalising and recording them, and reading a trac
 | Classification | core (`modules/catalogue.json`)                                                      |
 | Subjects       | log, log-ingestion                                                                   |
 | Halves         | [contract](contract) · [process](process/README.md)                                  |
-| Api token      | `LogApi` = `moduleApi<LogApi>()("log")`, `contract/src/log.api.ts:51` (4 operations) |
+| Api token      | `LogApi` = `moduleApi<LogApi>()("log")`, `contract/src/log.api.ts:58` (5 operations) |
 | Installed by   | api, worker, tasks (process)                                                         |
 
 ## What log owns
 
 | Kind                      | Name                                       | Declared at                                                                                    |
 | ------------------------- | ------------------------------------------ | ---------------------------------------------------------------------------------------------- |
-| ClickHouse table (writes) | `log_records`                              | `process/src/repositories/clickhouse/clickhouse.canonical-log-record-append.repository.ts:251` |
-| ClickHouse table (writes) | `log_usage_estimates`                      | `process/src/repositories/clickhouse/clickhouse.canonical-log-record-append.repository.ts:257` |
+| ClickHouse table (writes) | `log_records`                              | `process/src/repositories/clickhouse/clickhouse.canonical-log-record-append.repository.ts:271` |
+| ClickHouse table (writes) | `log_usage_estimates`                      | `process/src/repositories/clickhouse/clickhouse.canonical-log-record-append.repository.ts:277` |
 | Stores required           | clickhouse                                 | `process/src/repositories/live/live.log.repositories.ts:9`                                     |
 | Config                    | `processingShards` (LOG_PROCESSING_SHARDS) | `contract/src/log.config.ts:9`                                                                 |
 

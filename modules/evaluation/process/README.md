@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The complete callable Evaluation capability shared by process peers.
 
-Peers call these through the token, declared at `../contract/src/evaluation.api.ts:54`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/evaluation.api.ts:55`; nothing else in this package is public.
 
 #### `listEvaluators`
 
@@ -90,6 +90,14 @@ A page of one project's finished evaluations on a trace, oldest first; for backf
 
 ```typescript
 listEvaluationOutcomes(input: EvaluationOutcomesQuery): Promise<EvaluationOutcomePage>;
+```
+
+#### `getStoredBytes`
+
+One project's summed `_size_bytes` over evaluation's own table; a store failure throws.
+
+```typescript
+getStoredBytes(input: EvaluationStoredBytesInput): Promise<number>;
 ```
 
 #### `findInputs`

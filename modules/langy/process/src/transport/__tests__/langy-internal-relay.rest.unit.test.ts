@@ -57,6 +57,7 @@ function quietPresence(): PresenceApi {
     upgradeReadHints: async function* () {},
     getTenantEmitter: () => new EventEmitter(),
     cleanupTenantEmitter: () => void 0,
+    operatorReadHints: async function* () {},
   };
 }
 

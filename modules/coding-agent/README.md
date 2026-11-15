@@ -18,10 +18,10 @@ Coding-agent observability: sessions built from coding-agent traces, their trans
 
 | Kind                      | Name                                                                            | Declared at                                                                                   |
 | ------------------------- | ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| ClickHouse table (writes) | `coding_agent_session_events`                                                   | `process/src/repositories/clickhouse/clickhouse.coding-agent-session-event.repository.ts:210` |
+| ClickHouse table (writes) | `coding_agent_session_events`                                                   | `process/src/repositories/clickhouse/clickhouse.coding-agent-session-event.repository.ts:251` |
 | ClickHouse table (writes) | `coding_agent_sessions`                                                         | `process/src/repositories/clickhouse/clickhouse.coding-agent-session.repository.ts:595`       |
-| ClickHouse table (writes) | `coding_agent_trace_sessions`                                                   | `process/src/repositories/clickhouse/clickhouse.coding-agent-trace-session.repository.ts:80`  |
-| ClickHouse table (writes) | `session_metric_series`                                                         | `process/src/repositories/clickhouse/clickhouse.session-metric-series.repository.ts:93`       |
+| ClickHouse table (writes) | `coding_agent_trace_sessions`                                                   | `process/src/repositories/clickhouse/clickhouse.coding-agent-trace-session.repository.ts:71`  |
+| ClickHouse table (writes) | `session_metric_series`                                                         | `process/src/repositories/clickhouse/clickhouse.session-metric-series.repository.ts:95`       |
 | Stores required           | clickhouse                                                                      | `process/src/repositories/clickhouse/clickhouse.coding-agent.repositories.ts:26`              |
 | Stores required           | clickhouse, redis                                                               | `process/src/repositories/live/live.coding-agent.repositories.ts:12`                          |
 | Secrets                   | `repositoryKey` (CREDENTIALS_SECRET), `repositoryKeyFallback` (NEXTAUTH_SECRET) | `process/src/app/coding-agent.app.ts:156`                                                     |

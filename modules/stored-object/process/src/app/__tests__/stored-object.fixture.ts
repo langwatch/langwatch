@@ -4,7 +4,6 @@ import { memoryObjectStorage } from "@langwatch/process-stores";
 import {
   StoredObjectNotFoundError,
   type StoredObjectDeliveryCapability,
-  type StoredObjectOwnerResolver,
   type StoredObjectStorageDestination,
 } from "@langwatch/stored-object-contract";
 /**
@@ -147,17 +146,6 @@ export class MemoryStoredObjectFiles implements StoredObjectFileReader {
   }
 }
 
-export function createStoredObjectTestOwners(
-  projectId: string | null = null,
-): StoredObjectOwnerResolver {
-  return {
-    getOwner: async () => {
-      if (!projectId) throw new StoredObjectNotFoundError();
-      return { projectId };
-    },
-  } as StoredObjectOwnerResolver;
-}
-
 export function createStoredObjectTestInfrastructure(
   overrides: Partial<StoredObjectInfrastructure> = {},
 ): StoredObjectInfrastructure {
@@ -168,7 +156,6 @@ export function createStoredObjectTestInfrastructure(
     maximumUploadBytes: 1024,
     uploadExpiryMs: 300_000,
     files: new MemoryStoredObjectFiles(),
-    owners: createStoredObjectTestOwners(),
     ...overrides,
   };
 }

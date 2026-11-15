@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Who else is looking at this project, where they are, and where their cursor is.
 
-Peers call these through the token, declared at `../contract/src/presence.api.ts:36`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/presence.api.ts:41`; nothing else in this package is public.
 
 #### `isEnabledForProject`
 
@@ -98,6 +98,14 @@ The upgrade runner's platform-scoped hints, for the Ops Upgrades pages, until th
 upgradeReadHints(input: UpgradeReadHintsWatchInput): AsyncIterable<ReadHint>;
 ```
 
+#### `operatorReadHints`
+
+The operator's own user-scope hints, for an Ops tab with no organisation, until the abort.
+
+```typescript
+operatorReadHints(input: OperatorReadHintsWatchInput): AsyncIterable<ReadHint>;
+```
+
 ## REST transport
 
 None: this module declares no REST family.
@@ -118,6 +126,7 @@ Contract `../contract/src/presence.trpc.ts:26`, router `src/transport/presence.t
 | `presence.onOrganizationReadHints` | subscription | Permission `organization:view` | `organizationReadHintsInputSchema` | `readHintSchema`             |
 | `presence.onProjectReadHints`      | subscription | Permission `project:view`      | `projectReadHintsInputSchema`      | `readHintSchema`             |
 | `presence.onUpgradeReadHints`      | subscription | Platform permission `ops:view` | inline                             | `readHintSchema`             |
+| `presence.onOperatorReadHints`     | subscription | Platform permission `ops:view` | inline                             | `readHintSchema`             |
 
 ```typescript
 // presence.update
@@ -184,6 +193,11 @@ type Output = z.infer<typeof readHintSchema>; // ../contract/src/read-hints.ts:1
 
 // presence.onUpgradeReadHints
 // Input: inline, ../contract/src/presence.trpc.ts:64
+type Input = unknown;
+type Output = z.infer<typeof readHintSchema>; // ../contract/src/read-hints.ts:15
+
+// presence.onOperatorReadHints
+// Input: inline, ../contract/src/presence.trpc.ts:69
 type Input = unknown;
 type Output = z.infer<typeof readHintSchema>; // ../contract/src/read-hints.ts:15
 ```

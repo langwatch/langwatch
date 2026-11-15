@@ -75,12 +75,3 @@ export const storedObjectsInternalRpc = {
     permission: "project:view",
   },
 } as const satisfies Record<string, StoredObjectsInternalRpcProcedure<ZodTypeAny, ZodTypeAny>>;
-
-/**
- * Server capability for resolving a historical id-only file URL to its owner.
- * It is deliberately separate from ordinary project-scoped Stored Object I/O.
- */
-export abstract class StoredObjectOwnerResolver {
-  /** Throws `StoredObjectNotFoundError`: id-only links stay unresolvable (ADR-202 Decided 23). */
-  abstract getOwner(input: { id: string }): Promise<{ projectId: string }>;
-}

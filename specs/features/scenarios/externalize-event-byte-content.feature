@@ -493,15 +493,6 @@ Feature: Externalize event byte content to stored_objects
     And the response body is {"status":"not_found"}
     And the project membership check is never run
 
-  @integration
-  Scenario: GET /api/files/:id resolves the owning project from the row id before pinning the key to it
-    Given a stored_objects row with id F exists for project A
-    And the caller presents an API key for project B
-    When the caller GETs /api/files/F
-    Then the response is 403
-    And the bytes are not streamed
-    And the row's project_id is not leaked in the error body
-
   # ---------------------------------------------------------------
   # Storage URI / BYOC (AC30, AC31)
   # ---------------------------------------------------------------
@@ -760,7 +751,6 @@ Feature: Externalize event byte content to stored_objects
   # AC27 "Key-only auth on /api/files/:id (Alex, 2026-09-30)"               -> Scenario: GET /api/files/:id refuses a session cookie, since REST authenticates with API keys only
   #                                                                          -> Scenario: GET /api/files/:id authenticates via API key header when no session cookie is present
   # AC28 "404 not_found is distinct from 404 missing"                        -> Scenario: GET /api/files/:id returns 404 with status not_found when no row exists for the id
-  # AC29 "Cross-tenant id->project resolve runs before auth gate"            -> Scenario: GET /api/files/:id resolves the owning project from the row id before pinning the key to it
   # AC30 "BYOC: per-project private bucket beats global S3_BUCKET_NAME"      -> Scenario: For a project with a per-project private dataplane bucket, mintStorageUri uses the project bucket, not the global one
   #                                                                          -> Scenario: For a project without per-project storage configured, mintStorageUri falls back to the global S3_BUCKET_NAME
   # AC31 "Persisted storage_uri is authoritative for reads"                  -> Scenario: storage_uri persisted on the stored_objects row is the authoritative bucket address for reads

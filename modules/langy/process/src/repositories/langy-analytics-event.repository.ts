@@ -15,4 +15,7 @@ export abstract class LangyAnalyticsEventRepository {
 
   /** A whole fold's rows in one round trip. An empty batch writes nothing. */
   abstract insertBatch(records: LangyAnalyticsEventRecord[], retentionDays: number): Promise<void>;
+
+  /** One tenant's stored bytes over its analytics rows, every stored row version counted. */
+  abstract getStoredBytes(input: { tenantId: string }): Promise<number>;
 }

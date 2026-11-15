@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The portable canonical log capability shared by process features.
 
-Peers call these through the token, declared at `../contract/src/log.api.ts:32`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/log.api.ts:37`; nothing else in this package is public.
 
 #### `prepareCanonicalLogRecords`
 
@@ -44,6 +44,14 @@ Sends prepared records onto the `log_processing` pipeline for durable storage.
 
 ```typescript
 recordCanonicalLogRecords(records: readonly CanonicalLogRecord[]): Promise<void>;
+```
+
+#### `getStoredBytes`
+
+The sum of `_size_bytes` over log's own records for one project; a store failure throws.
+
+```typescript
+getStoredBytes(input: LogStoredBytesInput): Promise<number>;
 ```
 
 ## REST transport

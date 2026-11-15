@@ -12,6 +12,7 @@ import {
   StorageUnavailableError,
   StoredObjectBytesMissingError,
   StoredObjectFilesRateLimitedError,
+  StoredObjectNotFoundError,
   storedObjectIdSchema,
   storedObjectProjectIdSchema,
   type StoredObjectFileViewPermission,
@@ -49,8 +50,6 @@ export interface StoredObjectFileGate {
   }): Promise<void>;
   /** Whether the project holds a Postgres row for the object, in any status. */
   isRecorded(input: { projectId: string; id: string }): Promise<boolean>;
-  /** Which project owns an object, for a URL that does not say. Throws when none does. */
-  resolveOwner(input: { id: string }): Promise<{ projectId: string }>;
   /** One object's row and, when the bytes are there, a stream of them. Throws when absent. */
   readById(input: { projectId: string; id: string }): Promise<StoredObjectFileStreamRead>;
 }
@@ -125,8 +124,8 @@ export class StoredObjectFileReadService {
   }
 
   /**
-   * The scoped URL names its owner. The id-only URL asks the key's own project's rows first
-   * (uploads live only in Postgres), then the owner resolver, which finds none.
+   * The scoped URL names its owner. The id-only URL is answered only from the key's own
+   * project's rows; any other id-only link stays unresolvable (ADR-202 Decided 23).
    */
   private async ownerOf(input: StoredObjectFileReadInput): Promise<string> {
     if (input.claimedProjectId) return input.claimedProjectId;
@@ -134,7 +133,7 @@ export class StoredObjectFileReadService {
     const own = input.caller.apiKeyProjectId;
     if (own && (await this.gate.isRecorded({ projectId: own, id: input.id }))) return own;
 
-    return (await this.gate.resolveOwner({ id: input.id })).projectId;
+    throw new StoredObjectNotFoundError();
   }
 
   /** A storage failure other than a miss is an outage, not a deletion. */

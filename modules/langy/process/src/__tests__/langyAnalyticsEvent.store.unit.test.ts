@@ -24,6 +24,7 @@ const record: LangyAnalyticsEventProjectionRecord = {
 class FakeLangyAnalyticsEventSink extends LangyAnalyticsEventRepository {
   readonly insert = vi.fn().mockResolvedValue(undefined);
   readonly insertBatch = vi.fn().mockResolvedValue(undefined);
+  readonly getStoredBytes = vi.fn().mockResolvedValue(0);
 }
 
 describe("LangyAnalyticsEventAppendStore", () => {

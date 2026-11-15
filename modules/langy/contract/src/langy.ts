@@ -237,3 +237,12 @@ export class LangyCredentialResolutionError extends HandledError {
     this.name = "LangyCredentialResolutionError";
   }
 }
+
+const langyStoredBytesInputSchemaDefinition = z.object({ projectId: z.string().min(1) }).strict();
+export interface LangyStoredBytesInputSchema extends Named<
+  typeof langyStoredBytesInputSchemaDefinition
+> {}
+/** One project's question to the storage meter (ADR-202 Decided 20). */
+export const langyStoredBytesInputSchema: LangyStoredBytesInputSchema =
+  langyStoredBytesInputSchemaDefinition;
+export type LangyStoredBytesInput = z.infer<typeof langyStoredBytesInputSchema>;

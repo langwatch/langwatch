@@ -169,16 +169,10 @@ feature-specific authorization remains with the feature resolving the object.
 
 #### Legacy id-only delivery owner resolution
 
-The historical `GET` and `HEAD /api/files/:id` transport has no project scope,
-so process composition also creates one server-only `StoredObjectOwnerResolver`.
-This is a distinct trust boundary from the ordinary project-scoped service: it
-may fan out to every configured ClickHouse instance only to identify the owner,
-then the transport authorizes that project before reading bytes. The resolver's
-private adapter preserves the current parallel fan-out, first healthy hit,
-per-target failure collection and degraded-without-hit error. The transport
-maps that concrete error to its existing `502` response; it never treats a
-partially unavailable fan-out as object absence. Project-scoped URLs do not
-invoke this resolver.
+Superseded by ADR-202 Decided 23. The historical `GET` and `HEAD /api/files/:id`
+transport has no project scope. It answers only from the presenting key's own
+project's rows; any other id-only link answers not found. No owner resolver is
+composed and nothing fans out across ClickHouse instances.
 
 ### Contracts and validation
 
