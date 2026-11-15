@@ -13966,7 +13966,8 @@
               "description": "Admin/platform-authored OTTL statements.",
               "unit": null,
               "gates": [
-                "output"
+                "output",
+                "aiTools:manage"
               ],
               "available": true
             },

@@ -310,7 +310,11 @@ export interface GovernanceRestApi {
   aiToolReorder(input: ReorderAiToolEntriesInput): Promise<void>;
   templateListForUser(input: { organizationId: string }): Promise<IngestionTemplate[]>;
   templateListForOrgAdmin(input: { organizationId: string }): Promise<IngestionTemplate[]>;
-  templateGetByIdForOrg(input: { id: string; organizationId: string }): Promise<IngestionTemplate>;
+  /** The member shape, at `aiTools:view`: `ottlRules` is empty, as in `templateListForUser`. */
+  templateGetByIdForMember(input: {
+    id: string;
+    organizationId: string;
+  }): Promise<IngestionTemplate>;
   templateCreateOrg(input: CreateIngestionTemplateInput): Promise<IngestionTemplate>;
   templateUpdateOttlRules(input: UpdateIngestionTemplateOttlInput): Promise<IngestionTemplate>;
   templateArchiveOrg(input: ArchiveIngestionTemplateInput): Promise<void>;

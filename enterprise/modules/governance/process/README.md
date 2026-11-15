@@ -356,10 +356,12 @@ templateListForUser(input: { organizationId: string }): Promise<IngestionTemplat
 templateListForOrgAdmin(input: { organizationId: string }): Promise<IngestionTemplate[]>;
 ```
 
-#### `templateGetByIdForOrg`
+#### `templateGetByIdForMember`
+
+The member shape, at `aiTools:view`: `ottlRules` is empty, as in `templateListForUser`.
 
 ```typescript
-templateGetByIdForOrg(input: { id: string; organizationId: string }): Promise<IngestionTemplate>;
+templateGetByIdForMember(input: { id: string; organizationId: string; }): Promise<IngestionTemplate>;
 ```
 
 #### `templateCreateOrg`
