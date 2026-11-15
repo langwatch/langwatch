@@ -20,7 +20,12 @@ import { fakeGovernanceHost, renderWithGovernanceHost } from "../../../../testin
 import type { Source } from "../ingestion-source-forms.ts";
 
 const harness = vi.hoisted(() => ({
-  list: { data: undefined as unknown, isLoading: false, error: null as unknown },
+  list: {
+    data: undefined as unknown,
+    isPending: false,
+    isLoading: false,
+    error: null as unknown,
+  },
   listEnabled: [] as boolean[],
   refetch: vi.fn(),
   closeDrawer: vi.fn(),
@@ -97,14 +102,15 @@ function sourceRow(overrides: Partial<Source> = {}): Source {
 function renderDrawer({
   permissions = MANAGER,
   sourceId = "src_known",
-}: { permissions?: readonly string[]; sourceId?: string } = {}) {
+  sessionSettled = true,
+}: { permissions?: readonly string[]; sourceId?: string; sessionSettled?: boolean } = {}) {
   return renderWithGovernanceHost(<RoutedSourceEditDrawer sourceId={sourceId} />, {
-    host: fakeGovernanceHost({ permissions }),
+    host: fakeGovernanceHost({ permissions, sessionSettled }),
   });
 }
 
 beforeEach(() => {
-  harness.list = { data: [sourceRow()], isLoading: false, error: null };
+  harness.list = { data: [sourceRow()], isPending: false, isLoading: false, error: null };
   harness.listEnabled = [];
 });
 
@@ -117,20 +123,31 @@ describe("the source edit drawer opened by address", () => {
   describe("given a reader who may read sources but not manage them", () => {
     /** @scenario "A reader without the manage grant is told why instead of shown the edit form" */
     it("names the missing grant in an open drawer and offers no save", () => {
-      harness.list = { data: [sourceRow()], isLoading: false, error: null };
       renderDrawer({ permissions: READER });
 
       expect(screen.getByRole("dialog")).toBeInTheDocument();
       expect(screen.getByText(/ingestionSources:manage/)).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Save changes" })).toBeNull();
       expect(screen.queryByDisplayValue("Known source")).toBeNull();
+      // The list is a manager's read here; a reader's drawer never asks for it.
+      expect(harness.listEnabled.every((enabled) => !enabled)).toBe(true);
+    });
+  });
+
+  describe("given a manager whose session has not settled yet", () => {
+    /** @scenario "The edit drawer says it is loading while the source is read" */
+    it("shows the loading state, not a missing-grant notice", () => {
+      renderDrawer({ sessionSettled: false });
+
+      expect(within(screen.getByRole("dialog")).getByText("Loading the source")).toBeVisible();
+      expect(screen.queryByText(/ingestionSources:manage/)).toBeNull();
     });
   });
 
   describe("given the source list has not answered yet", () => {
     /** @scenario "The edit drawer says it is loading while the source is read" */
     it("opens the drawer in its loading state rather than rendering nothing", () => {
-      harness.list = { data: undefined, isLoading: true, error: null };
+      harness.list = { data: undefined, isPending: true, isLoading: true, error: null };
       renderDrawer();
 
       const drawer = screen.getByRole("dialog");
@@ -159,7 +176,12 @@ describe("the source edit drawer opened by address", () => {
   describe("given the source list read fails", () => {
     /** @scenario "A failed source read in the edit drawer shows the failure and a retry" */
     it("shows the failure with a way to try again, and no form", async () => {
-      harness.list = { data: undefined, isLoading: false, error: new Error("read failed") };
+      harness.list = {
+        data: undefined,
+        isPending: false,
+        isLoading: false,
+        error: new Error("read failed"),
+      };
       renderDrawer();
 
       expect(screen.getByRole("alert")).toHaveTextContent("Couldn't load this source");

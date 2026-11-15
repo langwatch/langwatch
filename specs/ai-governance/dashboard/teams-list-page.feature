@@ -26,6 +26,13 @@ Feature: All teams: what the team activity panel says about its read
     And the teams already read stay listed under it
 
   @integration
+  Scenario: A read still in flight claims neither teams nor an empty window
+    Given the team activity read has not answered yet
+    When the member opens the all-teams page
+    Then the panel shows that it is loading
+    And it says nothing about the window and shows no team count
+
+  @integration
   Scenario: A window with no team activity says so
     Given the team activity read answers with no teams
     When the member opens the all-teams page

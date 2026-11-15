@@ -130,7 +130,9 @@ function TeamSpendPanel({
   );
 
   const teams = teamsQuery.data ?? [];
-  const isLoading = teamsQuery.isLoading;
+  // `isPending`: until the organization resolves the query is disabled, which
+  // is not loading, yet it has no answer to call an empty window.
+  const isLoading = !orgId || teamsQuery.isPending;
   const isEmpty = !isLoading && teams.length === 0;
   const hasRows = !isLoading && teams.length > 0;
   const alert = teamsQuery.error ? (
@@ -174,9 +176,11 @@ function TeamSpendPanel({
           </ListTable>
         )}
       </Card>
-      <Text fontSize="xs" color="fg.muted">
-        {teams.length} team{teams.length === 1 ? "" : "s"} shown.
-      </Text>
+      {!isLoading && (
+        <Text fontSize="xs" color="fg.muted">
+          {teams.length} team{teams.length === 1 ? "" : "s"} shown.
+        </Text>
+      )}
     </>
   );
 }

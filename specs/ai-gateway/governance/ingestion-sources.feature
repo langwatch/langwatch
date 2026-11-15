@@ -214,13 +214,14 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
       When the reader opens the edit address of a source
       Then the drawer opens and names the "ingestionSources:manage" grant
       And no edit field and no Save changes action is offered
+      And the source list is not read for the drawer
 
     @integration
     Scenario: The edit drawer says it is loading while the source is read
-      Given the organization's source list has not answered yet
+      Given the admin's session or the organization's source list has not answered yet
       When the admin opens the edit address of a source
       Then the drawer opens in its loading state
-      And no Save changes action is offered yet
+      And no Save changes action and no missing-grant notice is shown yet
 
     @integration
     Scenario: An edit address naming an unknown source says so and can be closed

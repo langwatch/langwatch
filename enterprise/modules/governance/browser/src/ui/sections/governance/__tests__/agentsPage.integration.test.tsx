@@ -174,7 +174,8 @@ describe("the Agents page reading the organization's agents", () => {
       renderPage();
 
       expect(screen.getByRole("alert")).toHaveTextContent("Couldn't load agents");
-      expect(screen.queryByTestId("agents-empty")).toBeNull();
+      expect(document.querySelector('[data-testid^="agents-empty"]')).toBeNull();
+      expect(document.querySelector('[data-testid="agents-no-match"]')).toBeNull();
       expect(screen.queryByText("No agents registered yet")).toBeNull();
       // The header's own Register agent stays; the pane must not add a second.
       expect(screen.getAllByRole("button", { name: /Register agent/ })).toHaveLength(1);

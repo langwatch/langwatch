@@ -11,6 +11,7 @@ import type { ReactNode } from "react";
 import { api } from "../../../behavior/governance-api.ts";
 import { useGovernanceToaster, useShowErrorToast } from "../../../behavior/governance-feedback.ts";
 import { useGovernanceScope } from "../../../behavior/governance-session.ts";
+import { useGovernanceHost } from "../../../model/governance-host.ts";
 import { PermissionRequiredNotice } from "../../elements/permission-required-notice.tsx";
 import { SourceEditDrawer } from "./governance-inventory.screen.tsx";
 import { useDestinationContext } from "./ingestion-source-forms.ts";
@@ -24,8 +25,12 @@ import { useDestinationContext } from "./ingestion-source-forms.ts";
 export function RoutedSourceEditDrawer({ sourceId }: { sourceId?: string }) {
   const { closeDrawer } = useDrawer();
   const { organization, hasAnyPermission } = useGovernanceScope();
+  // Mounted at the app root, not behind the section gate: until the session
+  // settles every grant reads false, so a manager would see "not allowed".
+  const isSettled = useGovernanceHost().isSettled();
   const organizationId = organization?.id ?? "";
   const canManage = hasAnyPermission("ingestionSources:manage");
+  const canRead = hasAnyPermission("ingestionSources:view");
   const destinationCtx = useDestinationContext(organization);
   const toaster = useGovernanceToaster();
   const showErrorToast = useShowErrorToast();
@@ -44,20 +49,24 @@ export function RoutedSourceEditDrawer({ sourceId }: { sourceId?: string }) {
     onError: (e) => showErrorToast({ error: e, fallbackTitle: "Couldn't update the source" }),
   });
 
-  if (!canManage) {
+  if (isSettled && !canManage) {
     return (
       <SourceUnavailableDrawer onClose={closeDrawer}>
         <PermissionRequiredNotice
           permission="ingestionSources:manage"
-          detail="Editing a source needs this grant. You can still read it from the source list."
+          detail={
+            canRead
+              ? "Editing a source needs this grant. You can still read it from the source list."
+              : "Editing a source needs this grant."
+          }
         />
       </SourceUnavailableDrawer>
     );
   }
 
-  // Before the organization resolves the read is disabled and not loading,
-  // which would otherwise read as "no such source".
-  if (!organizationId || sourcesQuery.isLoading) {
+  // `isPending`, not `isLoading`: a read not yet running (no organization, or
+  // paused offline) has no answer either, and must not read as "no such source".
+  if (!isSettled || !organizationId || sourcesQuery.isPending) {
     return (
       <SourceUnavailableDrawer onClose={closeDrawer}>
         <SkeletonRows rows={6} label="Loading the source" />
