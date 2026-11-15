@@ -1,48 +1,192 @@
 import type { FilterField } from "@langwatch/analytics-contract";
+import {
+  clickhouseRead,
+  type Condition,
+  cond,
+  type Expression,
+  fn,
+  param,
+  type ReaderReadStatement,
+} from "@langwatch/clickhouse-client/builder";
 import { evaluationRunDataSchema } from "@langwatch/evaluation-contract";
 
+import { evaluationRuns } from "./clickhouse.evaluation-runs.table.ts";
 import {
   ATTRIBUTE_KEYS,
-  buildEvaluationRunsConditions,
-  buildQueryFilter,
-  buildScopeConditions,
-  buildStoredSpansConditions,
-  buildTraceScopeJoin,
-  buildTraceSummariesConditions,
   extractStandardResults,
+  PICKER_LIMIT,
+  pickerEvaluations,
+  pickerSpans,
+  pickerSummaries,
+  startsLike,
 } from "./clickhouse.filter-query-helpers.mapper.ts";
-import type { ClickHouseFilterDefinition } from "./clickhouse.filter-shapes.mapper.ts";
+import type {
+  ClickHouseFilterDefinition,
+  FilterOptionsReadInput,
+} from "./clickhouse.filter-shapes.mapper.ts";
+import { storedSpans } from "./clickhouse.stored-spans.table.ts";
+import { traceSummaries } from "./clickhouse.trace-summaries.table.ts";
 
 /** Label values that represent pass/fail status rather than classification labels. */
 const STATUS_LABEL_VALUES = ["succeeded", "failed"] as const;
 
+const ts = traceSummaries;
+const ss = storedSpans;
+const runs = evaluationRuns;
+
+type SummaryValue = Expression<string | null, "trace_summaries">;
+
 /**
- * Factory for evaluator_id ClickHouse filter definitions.
- * All 5 variants share the same query template, differing only in an additional WHERE clause.
+ * A trace_summaries picker offering one expression's distinct values, by count's field and label,
+ * with the prefix search on the value; `nonEmpty` leaves out the empty value.
  */
-function buildEvaluatorIdClickHouseFilter(additionalWhere: string): ClickHouseFilterDefinition {
+function summaryValuePicker({
+  value,
+  nonEmpty = true,
+  needsKey = false,
+}: {
+  value: (input: FilterOptionsReadInput) => SummaryValue;
+  nonEmpty?: boolean;
+  needsKey?: boolean;
+}): ClickHouseFilterDefinition {
   return {
-    tableName: "evaluation_runs",
-    buildQuery: (params) => {
-      const scopeJoin = buildTraceScopeJoin(params);
-      return `
-        SELECT
-          EvaluatorId as field,
-          if(EvaluatorName != '', concat('[', EvaluatorType, '] ', EvaluatorName), concat('[', EvaluatorType, '] ', EvaluatorId)) as label,
-          count() as count
-        FROM evaluation_runs
-        WHERE ${buildEvaluationRunsConditions(params)}
-          ${additionalWhere}
-          ${params.query ? `AND lower(ifNull(EvaluatorName, '')) LIKE lower(concat({query:String}, '%'))` : ""}
-          ${scopeJoin}
-        GROUP BY EvaluatorId, EvaluatorType, EvaluatorName
-        ORDER BY label ASC
-        LIMIT 10000
-      `;
+    tableName: "trace_summaries",
+    buildQuery: (input) => {
+      if (needsKey && !input.key) return null;
+      const of = value(input);
+      const read = pickerSummaries(input).select({ field: of, label: of, count: fn.count() });
+      const kept = nonEmpty ? read.where(({ ne }) => ne(of, "")) : read;
+      const searched = input.query ? kept.where(() => startsLike(of, input.query ?? "")) : kept;
+      return searched
+        .groupBy(of)
+        .orderBy("field", "ASC")
+        .limit(PICKER_LIMIT)
+        .build() as ReaderReadStatement;
     },
     extractResults: extractStandardResults,
   };
 }
+
+/**
+ * A trace_summaries picker over the values of a JSON array attribute, each element unquoted. The
+ * empty and `null` tests read the raw element, as main's did on 26.8 (filter-options proof).
+ */
+function summaryJsonArrayPicker(attribute: string): ClickHouseFilterDefinition {
+  return {
+    tableName: "trace_summaries",
+    buildQuery: (input) => {
+      const raw = fn.mapGet(ts.Attributes, attribute);
+      const elements = pickerSummaries(input)
+        .select({ element: fn.arrayJoin(fn.JSONExtractArrayRaw(raw)) })
+        .where(({ and, ne }) => and(ne(raw, ""), ne(raw, "[]")))
+        .as("elements");
+      const unquoted = fn.trimBoth(elements.element, '"');
+      const read = clickhouseRead({ scope: input.scope })
+        .from(elements)
+        .select({ field: unquoted, label: unquoted, count: fn.count() })
+        .where(({ and, ne }) => and(ne(elements.element, ""), ne(elements.element, "null")));
+      const searched = input.query
+        ? read.where(() => startsLike(unquoted, input.query ?? ""))
+        : read;
+      return searched
+        .groupBy(elements.element)
+        .orderBy(elements.element, "ASC")
+        .limit(PICKER_LIMIT)
+        .build() as ReaderReadStatement;
+    },
+    extractResults: extractStandardResults,
+  };
+}
+
+/** A stored_spans picker offering one span attribute's distinct non-empty values. */
+function spanAttributePicker(attribute: string): ClickHouseFilterDefinition {
+  return {
+    tableName: "stored_spans",
+    buildQuery: (input) => {
+      const of = fn.mapGet(ss.SpanAttributes, attribute);
+      const read = pickerSpans(input)
+        .select({ field: of, label: of, count: fn.count() })
+        .where(({ ne }) => ne(of, ""));
+      const searched = input.query ? read.where(() => startsLike(of, input.query ?? "")) : read;
+      return searched
+        .groupBy(of)
+        .orderBy("field", "ASC")
+        .limit(PICKER_LIMIT)
+        .build() as ReaderReadStatement;
+    },
+    extractResults: extractStandardResults,
+  };
+}
+
+/** The span attribute keys under `prefix` on one event type's spans, the prefix removed. */
+function eventAttributeKeyPicker(prefix: string): ClickHouseFilterDefinition {
+  return {
+    tableName: "stored_spans",
+    buildQuery: (input) => {
+      if (!input.key) return null;
+      const eventType = input.key;
+      const keys = pickerSpans(input)
+        .select({
+          full_key: fn.arrayJoin(
+            fn.arrayFilter((key) => fn.startsWith(key, prefix), fn.mapKeys(ss.SpanAttributes)),
+          ),
+        })
+        .where(({ eq }) => eq(fn.mapGet(ss.SpanAttributes, "event.type"), eventType))
+        .as("event_keys");
+      const field = fn.replaceOne(keys.full_key, prefix, "");
+      const read = clickhouseRead({ scope: input.scope })
+        .from(keys)
+        .select({ full_key: keys.full_key, field, label: field, count: fn.count() })
+        .groupBy(keys.full_key)
+        .having(({ ne }) => ne(field, ""));
+      const searched = input.query ? read.having(() => startsLike(field, input.query ?? "")) : read;
+      return searched.orderBy("field", "ASC").limit(PICKER_LIMIT).build() as ReaderReadStatement;
+    },
+    extractResults: extractStandardResults,
+  };
+}
+
+/**
+ * Factory for evaluator_id ClickHouse filter definitions.
+ * All 5 variants share the same read, differing only in an additional condition.
+ */
+function buildEvaluatorIdClickHouseFilter(
+  additionalWhere?: () => Condition<"evaluation_runs">,
+): ClickHouseFilterDefinition {
+  return {
+    tableName: "evaluation_runs",
+    buildQuery: (input) => {
+      const label = fn.if(
+        cond.ne(runs.EvaluatorName, ""),
+        fn.concat("[", runs.EvaluatorType, "] ", runs.EvaluatorName),
+        fn.concat("[", runs.EvaluatorType, "] ", runs.EvaluatorId),
+      );
+      const read = pickerEvaluations(input).select({
+        field: runs.EvaluatorId,
+        label,
+        count: fn.count(),
+      });
+      const narrowed = additionalWhere ? read.where(additionalWhere) : read;
+      const searched = input.query
+        ? narrowed.where(() => startsLike(fn.ifNull(runs.EvaluatorName, ""), input.query ?? ""))
+        : narrowed;
+      return searched
+        .groupBy(runs.EvaluatorId, runs.EvaluatorType, runs.EvaluatorName)
+        .orderBy("label", "ASC")
+        .limit(PICKER_LIMIT)
+        .build() as ReaderReadStatement;
+    },
+    extractResults: extractStandardResults,
+  };
+}
+
+/** A classification label: present, not empty, and not a pass/fail status. */
+const isClassificationLabel = () =>
+  cond.and(
+    cond.isNotNull(runs.Label),
+    cond.ne(runs.Label, ""),
+    cond.not(cond.oneOf(runs.Label, STATUS_LABEL_VALUES)),
+  );
 
 /**
  * ClickHouse filter definitions for each filter field.
@@ -51,333 +195,108 @@ function buildEvaluatorIdClickHouseFilter(additionalWhere: string): ClickHouseFi
  */
 export const clickHouseFilters: Record<FilterField, ClickHouseFilterDefinition | null> = {
   // Topics filters
-  "topics.topics": {
-    tableName: "trace_summaries",
-    buildQuery: (params) => {
-      const { sql: scopeSql } = buildScopeConditions(params);
-      return `
-        SELECT
-          TopicId as field,
-          TopicId as label,
-          count() as count
-        FROM trace_summaries ts
-        WHERE ${buildTraceSummariesConditions(params)}
-          AND ts.TopicId IS NOT NULL
-          AND ts.TopicId != ''
-          ${buildQueryFilter("ts.TopicId", params)}
-          ${scopeSql}
-        GROUP BY TopicId
-        ORDER BY TopicId ASC
-        LIMIT 10000
-      `;
-    },
-    extractResults: extractStandardResults,
-  },
-
-  "topics.subtopics": {
-    tableName: "trace_summaries",
-    buildQuery: (params) => {
-      const { sql: scopeSql } = buildScopeConditions(params);
-      return `
-        SELECT
-          SubTopicId as field,
-          SubTopicId as label,
-          count() as count
-        FROM trace_summaries ts
-        WHERE ${buildTraceSummariesConditions(params)}
-          AND ts.SubTopicId IS NOT NULL
-          AND ts.SubTopicId != ''
-          ${buildQueryFilter("ts.SubTopicId", params)}
-          ${scopeSql}
-        GROUP BY SubTopicId
-        ORDER BY SubTopicId ASC
-        LIMIT 10000
-      `;
-    },
-    extractResults: extractStandardResults,
-  },
+  "topics.topics": summaryValuePicker({ value: () => ts.TopicId }),
+  "topics.subtopics": summaryValuePicker({ value: () => ts.SubTopicId }),
 
   // Metadata filters
-  "metadata.user_id": {
-    tableName: "trace_summaries",
-    buildQuery: (params) => {
-      const { sql: scopeSql } = buildScopeConditions(params);
-      return `
-        SELECT
-          ts.${ATTRIBUTE_KEYS.user_id} as field,
-          ts.${ATTRIBUTE_KEYS.user_id} as label,
-          count() as count
-        FROM trace_summaries ts
-        WHERE ${buildTraceSummariesConditions(params)}
-          AND ts.${ATTRIBUTE_KEYS.user_id} != ''
-          ${buildQueryFilter(`ts.${ATTRIBUTE_KEYS.user_id}`, params)}
-          ${scopeSql}
-        GROUP BY field
-        ORDER BY field ASC
-        LIMIT 10000
-      `;
-    },
-    extractResults: extractStandardResults,
-  },
+  "metadata.user_id": summaryValuePicker({
+    value: () => fn.mapGet(ts.Attributes, ATTRIBUTE_KEYS.user_id),
+  }),
+  "metadata.thread_id": summaryValuePicker({
+    value: () => fn.mapGet(ts.Attributes, ATTRIBUTE_KEYS.thread_id),
+  }),
+  "metadata.customer_id": summaryValuePicker({
+    value: () => fn.mapGet(ts.Attributes, ATTRIBUTE_KEYS.customer_id),
+  }),
 
-  "metadata.thread_id": {
-    tableName: "trace_summaries",
-    buildQuery: (params) => {
-      const { sql: scopeSql } = buildScopeConditions(params);
-      return `
-        SELECT
-          ts.${ATTRIBUTE_KEYS.thread_id} as field,
-          ts.${ATTRIBUTE_KEYS.thread_id} as label,
-          count() as count
-        FROM trace_summaries ts
-        WHERE ${buildTraceSummariesConditions(params)}
-          AND ts.${ATTRIBUTE_KEYS.thread_id} != ''
-          ${buildQueryFilter(`ts.${ATTRIBUTE_KEYS.thread_id}`, params)}
-          ${scopeSql}
-        GROUP BY field
-        ORDER BY field ASC
-        LIMIT 10000
-      `;
-    },
-    extractResults: extractStandardResults,
-  },
-
-  "metadata.customer_id": {
-    tableName: "trace_summaries",
-    buildQuery: (params) => {
-      const { sql: scopeSql } = buildScopeConditions(params);
-      return `
-        SELECT
-          ts.${ATTRIBUTE_KEYS.customer_id} as field,
-          ts.${ATTRIBUTE_KEYS.customer_id} as label,
-          count() as count
-        FROM trace_summaries ts
-        WHERE ${buildTraceSummariesConditions(params)}
-          AND ts.${ATTRIBUTE_KEYS.customer_id} != ''
-          ${buildQueryFilter(`ts.${ATTRIBUTE_KEYS.customer_id}`, params)}
-          ${scopeSql}
-        GROUP BY field
-        ORDER BY field ASC
-        LIMIT 10000
-      `;
-    },
-    extractResults: extractStandardResults,
-  },
-
-  "metadata.labels": {
-    tableName: "trace_summaries",
-    buildQuery: (params) => {
-      const { sql: scopeSql } = buildScopeConditions(params);
-      return `
-        SELECT
-          trim(BOTH '"' FROM label) as field,
-          trim(BOTH '"' FROM label) as label,
-          count() as count
-        FROM (
-          SELECT arrayJoin(JSONExtractArrayRaw(ts.Attributes['langwatch.labels'])) as label
-          FROM trace_summaries ts
-          WHERE ${buildTraceSummariesConditions(params)}
-            AND ts.Attributes['langwatch.labels'] != ''
-            AND ts.Attributes['langwatch.labels'] != '[]'
-            ${scopeSql}
-        )
-        WHERE label != '' AND label != 'null'
-          ${params.query ? `AND lower(trim(BOTH '"' FROM label)) LIKE lower(concat({query:String}, '%'))` : ""}
-        GROUP BY label
-        ORDER BY label ASC
-        LIMIT 10000
-      `;
-    },
-    extractResults: extractStandardResults,
-  },
+  "metadata.labels": summaryJsonArrayPicker("langwatch.labels"),
 
   "metadata.key": {
     tableName: "trace_summaries",
-    buildQuery: (params) => {
-      const { sql: scopeSql } = buildScopeConditions(params);
-      return `
-        SELECT
-          replaceAll(key, '.', '·') as field,
-          key as label,
-          count() as count
-        FROM (
-          SELECT arrayJoin(mapKeys(ts.Attributes)) as key
-          FROM trace_summaries ts
-          WHERE ${buildTraceSummariesConditions(params)}
-            ${scopeSql}
-        )
-        WHERE NOT startsWith(key, 'langwatch.')
-          AND NOT startsWith(key, 'gen_ai.')
-          ${buildQueryFilter("key", params)}
-        GROUP BY key
-        ORDER BY key ASC
-        LIMIT 10000
-      `;
+    buildQuery: (input) => {
+      const keys = pickerSummaries(input)
+        .select({ key: fn.arrayJoin(fn.mapKeys(ts.Attributes)) })
+        .as("attribute_keys");
+      const read = clickhouseRead({ scope: input.scope })
+        .from(keys)
+        .select({
+          field: fn.replaceAll(keys.key, ".", "·"),
+          label: keys.key,
+          count: fn.count(),
+        })
+        .where(({ and, not }) =>
+          and(not(fn.startsWith(keys.key, "langwatch.")), not(fn.startsWith(keys.key, "gen_ai."))),
+        );
+      const searched = input.query
+        ? read.where(() => startsLike(keys.key, input.query ?? ""))
+        : read;
+      return searched
+        .groupBy(keys.key)
+        .orderBy(keys.key, "ASC")
+        .limit(PICKER_LIMIT)
+        .build() as ReaderReadStatement;
     },
     extractResults: extractStandardResults,
   },
 
-  "metadata.value": {
-    tableName: "trace_summaries",
-    buildQuery: (params) => {
-      if (!params.key) {
-        return null;
-      }
-      const { sql: scopeSql } = buildScopeConditions(params);
-      // Note: The key parameter is passed via query_params as {key:String}
-      // We convert the dot-encoded key back in the service layer before passing it
-      return `
-        SELECT
-          ts.Attributes[{key:String}] as field,
-          ts.Attributes[{key:String}] as label,
-          count() as count
-        FROM trace_summaries ts
-        WHERE ${buildTraceSummariesConditions(params)}
-          AND ts.Attributes[{key:String}] != ''
-          ${params.query ? `AND lower(ts.Attributes[{key:String}]) LIKE lower(concat({query:String}, '%'))` : ""}
-          ${scopeSql}
-        GROUP BY field
-        ORDER BY field ASC
-        LIMIT 10000
-      `;
-    },
-    extractResults: extractStandardResults,
-  },
+  "metadata.value": summaryValuePicker({
+    needsKey: true,
+    value: (input) => fn.mapGet(ts.Attributes, input.key ?? ""),
+  }),
 
-  "metadata.prompt_ids": {
-    tableName: "trace_summaries",
-    buildQuery: (params) => {
-      const { sql: scopeSql } = buildScopeConditions(params);
-      return `
-        SELECT
-          trim(BOTH '"' FROM prompt_id) as field,
-          trim(BOTH '"' FROM prompt_id) as label,
-          count() as count
-        FROM (
-          SELECT arrayJoin(JSONExtractArrayRaw(ts.Attributes['langwatch.prompt_ids'])) as prompt_id
-          FROM trace_summaries ts
-          WHERE ${buildTraceSummariesConditions(params)}
-            AND ts.Attributes['langwatch.prompt_ids'] != ''
-            AND ts.Attributes['langwatch.prompt_ids'] != '[]'
-            ${scopeSql}
-        )
-        WHERE prompt_id != '' AND prompt_id != 'null'
-          ${params.query ? `AND lower(trim(BOTH '"' FROM prompt_id)) LIKE lower(concat({query:String}, '%'))` : ""}
-        GROUP BY prompt_id
-        ORDER BY prompt_id ASC
-        LIMIT 10000
-      `;
-    },
-    extractResults: extractStandardResults,
-  },
+  "metadata.prompt_ids": summaryJsonArrayPicker("langwatch.prompt_ids"),
 
   // Trace filters
-  "traces.origin": {
-    tableName: "trace_summaries",
-    buildQuery: (params) => {
-      const { sql: scopeSql } = buildScopeConditions(params);
-      return `
-        SELECT
-          if(ifNull(ts.Attributes['langwatch.origin'], '') = '', 'application', ts.Attributes['langwatch.origin']) as field,
-          if(ifNull(ts.Attributes['langwatch.origin'], '') = '', 'application', ts.Attributes['langwatch.origin']) as label,
-          count() as count
-        FROM trace_summaries ts
-        WHERE ${buildTraceSummariesConditions(params)}
-          ${buildQueryFilter("if(ifNull(ts.Attributes['langwatch.origin'], '') = '', 'application', ts.Attributes['langwatch.origin'])", params)}
-          ${scopeSql}
-        GROUP BY field
-        ORDER BY field ASC
-        LIMIT 10000
-      `;
+  "traces.origin": summaryValuePicker({
+    nonEmpty: false,
+    value: () => {
+      const origin = fn.mapGet(ts.Attributes, "langwatch.origin");
+      return fn.if(cond.ne(origin, ""), origin, "application");
     },
-    extractResults: extractStandardResults,
-  },
+  }),
 
   "traces.error": {
     tableName: "trace_summaries",
-    buildQuery: (params) => {
-      const { sql: scopeSql } = buildScopeConditions(params);
-      return `
-        SELECT
-          if(ts.ContainsErrorStatus, 'true', 'false') as field,
-          if(ts.ContainsErrorStatus, 'Traces with error', 'Traces without error') as label,
-          count() as count
-        FROM trace_summaries ts
-        WHERE ${buildTraceSummariesConditions(params)}
-          ${scopeSql}
-        GROUP BY ts.ContainsErrorStatus
-        ORDER BY field ASC
-      `;
-    },
+    buildQuery: (input) =>
+      pickerSummaries(input)
+        .select({
+          field: fn.if(cond.eq(ts.ContainsErrorStatus, true), param.string("true"), "false"),
+          label: fn.if(
+            cond.eq(ts.ContainsErrorStatus, true),
+            param.string("Traces with error"),
+            "Traces without error",
+          ),
+          count: fn.count(),
+        })
+        .groupBy(ts.ContainsErrorStatus)
+        .orderBy("field", "ASC")
+        .build() as ReaderReadStatement,
     extractResults: extractStandardResults,
   },
 
-  "traces.name": {
-    tableName: "trace_summaries",
-    buildQuery: (params) => {
-      const { sql: scopeSql } = buildScopeConditions(params);
-      return `
-        SELECT
-          ts.TraceName as field,
-          ts.TraceName as label,
-          count() as count
-        FROM trace_summaries ts
-        WHERE ${buildTraceSummariesConditions(params)}
-          AND ts.TraceName != ''
-          ${buildQueryFilter("ts.TraceName", params)}
-          ${scopeSql}
-        GROUP BY ts.TraceName
-        ORDER BY ts.TraceName ASC
-        LIMIT 10000
-      `;
-    },
-    extractResults: extractStandardResults,
-  },
+  "traces.name": summaryValuePicker({ value: () => ts.TraceName }),
 
   // Span filters
-  "spans.type": {
-    tableName: "stored_spans",
-    buildQuery: (params) => {
-      const scopeJoin = buildTraceScopeJoin(params);
-      return `
-        SELECT
-          SpanAttributes['langwatch.span.type'] as field,
-          SpanAttributes['langwatch.span.type'] as label,
-          count() as count
-        FROM stored_spans
-        WHERE ${buildStoredSpansConditions(params)}
-          AND SpanAttributes['langwatch.span.type'] != ''
-          ${buildQueryFilter("SpanAttributes['langwatch.span.type']", params)}
-          ${scopeJoin}
-        GROUP BY field
-        ORDER BY field ASC
-        LIMIT 10000
-      `;
-    },
-    extractResults: extractStandardResults,
-  },
+  "spans.type": spanAttributePicker("langwatch.span.type"),
 
   "spans.model": {
     tableName: "trace_summaries",
-    buildQuery: (params) => {
-      const { sql: scopeSql } = buildScopeConditions(params);
-      return `
-        SELECT
-          model as field,
-          model as label,
-          count() as count
-        FROM (
-          SELECT arrayJoin(ts.Models) as model
-          FROM trace_summaries ts
-          WHERE ${buildTraceSummariesConditions(params)}
-            ${scopeSql}
-        )
-        WHERE model != ''
-          ${buildQueryFilter("model", params)}
-        GROUP BY model
-        ORDER BY model ASC
-        LIMIT 10000
-      `;
+    buildQuery: (input) => {
+      const models = pickerSummaries(input)
+        .select({ model: fn.arrayJoin(ts.Models) })
+        .as("models");
+      const read = clickhouseRead({ scope: input.scope })
+        .from(models)
+        .select({ field: models.model, label: models.model, count: fn.count() })
+        .where(({ ne }) => ne(models.model, ""));
+      const searched = input.query
+        ? read.where(() => startsLike(models.model, input.query ?? ""))
+        : read;
+      return searched
+        .groupBy(models.model)
+        .orderBy(models.model, "ASC")
+        .limit(PICKER_LIMIT)
+        .build() as ReaderReadStatement;
     },
     extractResults: extractStandardResults,
   },
@@ -385,80 +304,72 @@ export const clickHouseFilters: Record<FilterField, ClickHouseFilterDefinition |
   // Annotation filters
   "annotations.hasAnnotation": {
     tableName: "trace_summaries",
-    buildQuery: (params) => {
-      const { sql: scopeSql } = buildScopeConditions(params);
-      return `
-        SELECT
-          if(ts.HasAnnotation = true, 'true', 'false') as field,
-          if(ts.HasAnnotation = true, 'Has Annotation', 'No Annotation') as label,
-          count() as count
-        FROM trace_summaries ts
-        WHERE ${buildTraceSummariesConditions(params)}
-          ${scopeSql}
-        GROUP BY ts.HasAnnotation
-        ORDER BY field DESC
-      `;
-    },
+    buildQuery: (input) =>
+      pickerSummaries(input)
+        .select({
+          field: fn.if(cond.eq(ts.HasAnnotation, true), param.string("true"), "false"),
+          label: fn.if(
+            cond.eq(ts.HasAnnotation, true),
+            param.string("Has Annotation"),
+            "No Annotation",
+          ),
+          count: fn.count(),
+        })
+        .groupBy(ts.HasAnnotation)
+        .orderBy("field", "DESC")
+        .build() as ReaderReadStatement,
     extractResults: extractStandardResults,
   },
 
-  // Evaluation filters - using evaluation_runs table
-  // Note: evaluation_runs filters require a join with trace_summaries for scope conditions
-  // For now, we'll add scope via a subquery when scopeFilters are present
-  "evaluations.evaluator_id": buildEvaluatorIdClickHouseFilter(""),
+  // Evaluation filters - using evaluation_runs table, held to the traces the other filters pick
+  "evaluations.evaluator_id": buildEvaluatorIdClickHouseFilter(),
 
-  "evaluations.evaluator_id.guardrails_only":
-    buildEvaluatorIdClickHouseFilter("AND IsGuardrail = 1"),
-
-  "evaluations.evaluator_id.has_passed": buildEvaluatorIdClickHouseFilter("AND Passed IS NOT NULL"),
-
-  "evaluations.evaluator_id.has_score": buildEvaluatorIdClickHouseFilter("AND Score IS NOT NULL"),
-
-  "evaluations.evaluator_id.has_label": buildEvaluatorIdClickHouseFilter(
-    `AND Label IS NOT NULL AND Label != '' AND Label NOT IN ('${STATUS_LABEL_VALUES.join("', '")}')`,
+  "evaluations.evaluator_id.guardrails_only": buildEvaluatorIdClickHouseFilter(() =>
+    cond.eq(runs.IsGuardrail, 1),
   ),
+
+  "evaluations.evaluator_id.has_passed": buildEvaluatorIdClickHouseFilter(() =>
+    cond.isNotNull(runs.Passed),
+  ),
+
+  "evaluations.evaluator_id.has_score": buildEvaluatorIdClickHouseFilter(() =>
+    cond.isNotNull(runs.Score),
+  ),
+
+  "evaluations.evaluator_id.has_label": buildEvaluatorIdClickHouseFilter(isClassificationLabel),
 
   "evaluations.passed": {
     tableName: "evaluation_runs",
-    buildQuery: (params) => {
-      if (!params.key) {
-        return null;
-      }
-      const scopeJoin = buildTraceScopeJoin(params);
-      return `
-        SELECT
-          if(Passed = 1, 'true', 'false') as field,
-          if(Passed = 1, 'Passed', 'Failed') as label,
-          count() as count
-        FROM evaluation_runs
-        WHERE ${buildEvaluationRunsConditions(params)}
-          AND EvaluatorId = {key:String}
-          AND Passed IS NOT NULL
-          ${scopeJoin}
-        GROUP BY Passed
-        ORDER BY field DESC
-      `;
+    buildQuery: (input) => {
+      if (!input.key) return null;
+      const evaluatorId = input.key;
+      return pickerEvaluations(input)
+        .select({
+          field: fn.if(cond.eq(runs.Passed, 1), param.string("true"), "false"),
+          label: fn.if(cond.eq(runs.Passed, 1), param.string("Passed"), "Failed"),
+          count: fn.count(),
+        })
+        .where(({ and, eq, isNotNull }) =>
+          and(eq(runs.EvaluatorId, evaluatorId), isNotNull(runs.Passed)),
+        )
+        .groupBy(runs.Passed)
+        .orderBy("field", "DESC")
+        .build() as ReaderReadStatement;
     },
     extractResults: extractStandardResults,
   },
 
   "evaluations.score": {
     tableName: "evaluation_runs",
-    buildQuery: (params) => {
-      if (!params.key) {
-        return null;
-      }
-      const scopeJoin = buildTraceScopeJoin(params);
-      return `
-        SELECT
-          min(Score) as min_score,
-          max(Score) as max_score
-        FROM evaluation_runs
-        WHERE ${buildEvaluationRunsConditions(params)}
-          AND EvaluatorId = {key:String}
-          AND Score IS NOT NULL
-          ${scopeJoin}
-      `;
+    buildQuery: (input) => {
+      if (!input.key) return null;
+      const evaluatorId = input.key;
+      return pickerEvaluations(input)
+        .select({ min_score: fn.min(runs.Score), max_score: fn.max(runs.Score) })
+        .where(({ and, eq, isNotNull }) =>
+          and(eq(runs.EvaluatorId, evaluatorId), isNotNull(runs.Score)),
+        )
+        .build() as ReaderReadStatement;
     },
     extractResults: (rows: unknown[]) => {
       const row = (rows as { min_score: number | null; max_score: number | null }[])[0];
@@ -474,25 +385,18 @@ export const clickHouseFilters: Record<FilterField, ClickHouseFilterDefinition |
 
   "evaluations.state": {
     tableName: "evaluation_runs",
-    buildQuery: (params) => {
-      if (!params.key) {
-        return null;
-      }
-      const scopeJoin = buildTraceScopeJoin(params);
-      return `
-        SELECT
-          Status as field,
-          Status as label,
-          count() as count
-        FROM evaluation_runs
-        WHERE ${buildEvaluationRunsConditions(params)}
-          AND EvaluatorId = {key:String}
-          AND Status NOT IN ('${STATUS_LABEL_VALUES.join("', '")}')
-          ${scopeJoin}
-        GROUP BY Status
-        ORDER BY Status ASC
-        LIMIT 10000
-      `;
+    buildQuery: (input) => {
+      if (!input.key) return null;
+      const evaluatorId = input.key;
+      return pickerEvaluations(input)
+        .select({ field: runs.Status, label: runs.Status, count: fn.count() })
+        .where(({ and, eq, not, oneOf }) =>
+          and(eq(runs.EvaluatorId, evaluatorId), not(oneOf(runs.Status, STATUS_LABEL_VALUES))),
+        )
+        .groupBy(runs.Status)
+        .orderBy(runs.Status, "ASC")
+        .limit(PICKER_LIMIT)
+        .build() as ReaderReadStatement;
     },
     // The option list is the canonical EvaluationStatus enum, not distinct
     // Status values in ClickHouse (#4805) — a stored-only value produced an
@@ -512,101 +416,44 @@ export const clickHouseFilters: Record<FilterField, ClickHouseFilterDefinition |
 
   "evaluations.label": {
     tableName: "evaluation_runs",
-    buildQuery: (params) => {
-      if (!params.key) {
-        return null;
-      }
-      const scopeJoin = buildTraceScopeJoin(params);
-      return `
-        SELECT
-          Label as field,
-          Label as label,
-          count() as count
-        FROM evaluation_runs
-        WHERE ${buildEvaluationRunsConditions(params)}
-          AND EvaluatorId = {key:String}
-          AND Label IS NOT NULL
-          AND Label != ''
-          AND Label NOT IN ('${STATUS_LABEL_VALUES.join("', '")}')
-          ${params.query ? `AND lower(Label) LIKE lower(concat({query:String}, '%'))` : ""}
-          ${scopeJoin}
-        GROUP BY Label
-        ORDER BY Label ASC
-        LIMIT 10000
-      `;
+    buildQuery: (input) => {
+      if (!input.key) return null;
+      const evaluatorId = input.key;
+      const read = pickerEvaluations(input)
+        .select({ field: runs.Label, label: runs.Label, count: fn.count() })
+        .where(({ and, eq }) => and(eq(runs.EvaluatorId, evaluatorId), isClassificationLabel()));
+      const searched = input.query
+        ? read.where(() => startsLike(runs.Label, input.query ?? ""))
+        : read;
+      return searched
+        .groupBy(runs.Label)
+        .orderBy(runs.Label, "ASC")
+        .limit(PICKER_LIMIT)
+        .build() as ReaderReadStatement;
     },
     extractResults: extractStandardResults,
   },
 
   // Event filters - using stored_spans table with span attributes
-  // Note: stored_spans filters require a join with trace_summaries for scope conditions
-  "events.event_type": {
-    tableName: "stored_spans",
-    buildQuery: (params) => {
-      const scopeJoin = buildTraceScopeJoin(params);
-      return `
-        SELECT
-          SpanAttributes['event.type'] as field,
-          SpanAttributes['event.type'] as label,
-          count() as count
-        FROM stored_spans
-        WHERE ${buildStoredSpansConditions(params)}
-          AND SpanAttributes['event.type'] != ''
-          ${params.query ? `AND lower(SpanAttributes['event.type']) LIKE lower(concat({query:String}, '%'))` : ""}
-          ${scopeJoin}
-        GROUP BY field
-        ORDER BY field ASC
-        LIMIT 10000
-      `;
-    },
-    extractResults: extractStandardResults,
-  },
+  "events.event_type": spanAttributePicker("event.type"),
 
-  "events.metrics.key": {
-    tableName: "stored_spans",
-    buildQuery: (params) => {
-      if (!params.key) {
-        return null;
-      }
-      const scopeJoin = buildTraceScopeJoin(params);
-      return `
-        SELECT
-          arrayJoin(arrayFilter(k -> startsWith(k, 'event.metrics.'), mapKeys(SpanAttributes))) as full_key,
-          replaceOne(full_key, 'event.metrics.', '') as field,
-          replaceOne(full_key, 'event.metrics.', '') as label,
-          count() as count
-        FROM stored_spans
-        WHERE ${buildStoredSpansConditions(params)}
-          AND SpanAttributes['event.type'] = {key:String}
-          ${scopeJoin}
-        GROUP BY full_key
-        HAVING field != ''
-          ${params.query ? `AND lower(field) LIKE lower(concat({query:String}, '%'))` : ""}
-        ORDER BY field ASC
-        LIMIT 10000
-      `;
-    },
-    extractResults: extractStandardResults,
-  },
+  "events.metrics.key": eventAttributeKeyPicker("event.metrics."),
 
   "events.metrics.value": {
     tableName: "stored_spans",
-    buildQuery: (params) => {
-      if (!params.key || !params.subkey) {
-        return null;
-      }
-      const scopeJoin = buildTraceScopeJoin(params);
-      // Note: subkey is passed via query_params, we construct the full attribute key there
-      return `
-        SELECT
-          min(toFloat64OrNull(SpanAttributes[concat('event.metrics.', {subkey:String})])) as min_value,
-          max(toFloat64OrNull(SpanAttributes[concat('event.metrics.', {subkey:String})])) as max_value
-        FROM stored_spans
-        WHERE ${buildStoredSpansConditions(params)}
-          AND SpanAttributes['event.type'] = {key:String}
-          AND SpanAttributes[concat('event.metrics.', {subkey:String})] != ''
-          ${scopeJoin}
-      `;
+    buildQuery: (input) => {
+      if (!input.key || !input.subkey) return null;
+      const eventType = input.key;
+      const metric = fn.mapGet(ss.SpanAttributes, `event.metrics.${input.subkey}`);
+      return pickerSpans(input)
+        .select({
+          min_value: fn.min(fn.toFloat64OrNull(metric)),
+          max_value: fn.max(fn.toFloat64OrNull(metric)),
+        })
+        .where(({ and, eq, ne }) =>
+          and(eq(fn.mapGet(ss.SpanAttributes, "event.type"), eventType), ne(metric, "")),
+        )
+        .build() as ReaderReadStatement;
     },
     extractResults: (rows: unknown[]) => {
       const row = (rows as { min_value: number | null; max_value: number | null }[])[0];
@@ -620,30 +467,5 @@ export const clickHouseFilters: Record<FilterField, ClickHouseFilterDefinition |
     },
   },
 
-  "events.event_details.key": {
-    tableName: "stored_spans",
-    buildQuery: (params) => {
-      if (!params.key) {
-        return null;
-      }
-      const scopeJoin = buildTraceScopeJoin(params);
-      return `
-        SELECT
-          arrayJoin(arrayFilter(k -> startsWith(k, 'event.details.'), mapKeys(SpanAttributes))) as full_key,
-          replaceOne(full_key, 'event.details.', '') as field,
-          replaceOne(full_key, 'event.details.', '') as label,
-          count() as count
-        FROM stored_spans
-        WHERE ${buildStoredSpansConditions(params)}
-          AND SpanAttributes['event.type'] = {key:String}
-          ${scopeJoin}
-        GROUP BY full_key
-        HAVING field != ''
-          ${params.query ? `AND lower(field) LIKE lower(concat({query:String}, '%'))` : ""}
-        ORDER BY field ASC
-        LIMIT 10000
-      `;
-    },
-    extractResults: extractStandardResults,
-  },
+  "events.event_details.key": eventAttributeKeyPicker("event.details."),
 };

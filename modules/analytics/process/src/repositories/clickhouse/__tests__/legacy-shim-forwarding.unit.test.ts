@@ -19,8 +19,6 @@ vi.mock("../clickhouse.aggregation-builder.mapper.ts", () => ({
     sql: "SELECT 1 FROM trace_summaries WHERE {{tenantScope:OccurredAt}}",
     params: {},
   }),
-  buildFeedbacksQuery: vi.fn(),
-  buildTopDocumentsQuery: vi.fn(),
 }));
 
 const buildTimeseriesQueryMock = vi.mocked(buildTimeseriesQuery);

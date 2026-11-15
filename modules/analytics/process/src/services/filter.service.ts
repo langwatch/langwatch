@@ -18,7 +18,7 @@ type GetFilterOptionsInput = {
   subkey?: string;
   startDate: number;
   endDate: number;
-  scope?: FindFilterOptionsInput["scope"];
+  filters?: FindFilterOptionsInput["filters"];
   authorization: Authorization;
 };
 
@@ -83,7 +83,7 @@ export class FilterService {
             subkey: input.subkey,
             startDate: input.startDate,
             endDate: input.endDate,
-            ...(input.scope ? { scope: input.scope } : {}),
+            ...(input.filters ? { filters: input.filters } : {}),
             // A proof spanning members holds each evaluation to its trace's window.
             readsMembers: projectIdsReadBy(input.authorization, "analytics:view").length > 1,
           });

@@ -1,5 +1,6 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import type { ReaderReadStatement } from "@langwatch/clickhouse-client/builder";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
@@ -8,12 +9,12 @@ import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 /**
  * @vitest-environment node
- * A filter picker's other selections narrow its options through Trace's grammar.
- * Spec: modules/trace/specs/trace-legacy-filtered-search.feature
+ * A filter picker's other selections narrow its options through analytics' own grammar.
+ * Spec: modules/analytics/specs/filter-options-narrowing.feature
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { analyticsProof } from "../../repositories/__tests__/analytics-proof.fixture.ts";
 import { FilterOptionsClickHouseRepository } from "../../repositories/clickhouse/clickhouse.filter-options.repository.ts";
@@ -22,15 +23,10 @@ import { AnalyticsModule } from "../analytics.app.ts";
 import { analyticsTestSecrets } from "./analytics-secrets.fixture.ts";
 
 async function appOver() {
-  const translateLegacyFilters = vi.fn<TraceApi["translateLegacyFilters"]>(() => ({
-    conditions: ["ts.ContainsErrorStatus = true"],
-    params: { f0_values: ["otlp2"] },
-    hasUnsupportedFilters: false,
-  }));
-  const statements: { sql: string; params: Record<string, unknown> | undefined }[] = [];
+  const statements: ReaderReadStatement[] = [];
   const clickhouse = createApiFixture<ClickHouseQueryClient>({
-    query: async (request) => {
-      statements.push({ sql: request.sql, params: request.params });
+    read: async ({ statement }) => {
+      statements.push(statement as ReaderReadStatement);
       return { rows: [] };
     },
   });
@@ -41,7 +37,7 @@ async function appOver() {
       dataPrivacy: createApiFixture<DataPrivacyApi>(),
       projects: createApiFixture<ProjectApi>(),
       plans: createApiFixture<EntitlementApi>(),
-      traces: createApiFixture<TraceApi>({ translateLegacyFilters }),
+      traces: createApiFixture<TraceApi>(),
       retention: createApiFixture<DataRetentionApi>(),
     },
     channels: { judge: createApiFixture<InstantEvalApi>() },
@@ -67,34 +63,13 @@ async function appOver() {
     resources: { own: () => void 0, ownService: () => void 0 },
     secrets: analyticsTestSecrets(),
   });
-  return { app, translateLegacyFilters, statements };
+  return { app, statements };
 }
 
 describe("AnalyticsModule.filterOptions", () => {
   describe("given a picker for one field with other filters selected", () => {
-    /** @scenario "Analytics' filter picker is scoped through Trace's translation" */
-    it("asks Trace to translate the other filters, leaving out the field being picked", async () => {
-      const { app, translateLegacyFilters } = await appOver();
-
-      await app.filterOptions(
-        {
-          projectId: "project-1",
-          field: "metadata.user_id",
-          startDate: 1,
-          endDate: 2,
-          filters: { "metadata.user_id": ["u-1"], "traces.error": ["true"] },
-        },
-        { authorization: analyticsProof({ projectId: "project-1" }) },
-      );
-
-      expect(translateLegacyFilters).toHaveBeenCalledWith({
-        filters: { "traces.error": ["true"] },
-        fenced: true,
-      });
-    });
-
-    /** @scenario "Analytics' filter picker is scoped through Trace's translation" */
-    it("scopes the options query by Trace's conditions and their bound parameters", async () => {
+    /** @scenario "A filter picker is narrowed by the other filters, never its own" */
+    it("narrows the read by the other filters through analytics' own grammar", async () => {
       const { app, statements } = await appOver();
 
       await app.filterOptions(
@@ -103,13 +78,34 @@ describe("AnalyticsModule.filterOptions", () => {
           field: "metadata.user_id",
           startDate: 1,
           endDate: 2,
-          filters: { "traces.error": ["true"] },
+          filters: { "metadata.user_id": ["u-1"], "traces.name": ["checkout"] },
         },
         { authorization: analyticsProof({ projectId: "project-1" }) },
       );
 
-      expect(statements.at(0)?.sql).toContain("ts.ContainsErrorStatus = true");
-      expect(statements.at(0)?.params).toMatchObject({ scope_f0_values: ["otlp2"] });
+      const [statement] = statements;
+      expect(statement?.identity).toBe("reader");
+      expect(statement?.settings).toMatchObject({ SQL_langwatch_tenant_ids: "project-1" });
+      expect(statement?.sql).toContain("TraceName");
+      expect(JSON.stringify(statement?.params)).toContain("checkout");
+    });
+
+    /** @scenario "A filter picker is narrowed by the other filters, never its own" */
+    it("leaves out the field's own selection", async () => {
+      const { app, statements } = await appOver();
+
+      await app.filterOptions(
+        {
+          projectId: "project-1",
+          field: "metadata.user_id",
+          startDate: 1,
+          endDate: 2,
+          filters: { "metadata.user_id": ["u-1"] },
+        },
+        { authorization: analyticsProof({ projectId: "project-1" }) },
+      );
+
+      expect(JSON.stringify(statements.at(0)?.params)).not.toContain("u-1");
     });
   });
 });

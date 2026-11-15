@@ -50,6 +50,8 @@ import {
   type LangWatchQLValidationResult,
   type LangWatchQLReadableProject,
   type AnalyticsEvaluationUpsertInput,
+  type AnalyticsFilterValue,
+  type FilterField,
 } from "@langwatch/analytics-contract";
 import { DEFAULT_LWQL_RESOURCE_LIMITS } from "@langwatch/analytics-contract/langwatch-ql-limits";
 import { type Authorization, type RestCredentialPrincipal } from "@langwatch/authorization";
@@ -167,6 +169,9 @@ const TENANT_ANALYTICS_WAIT_TIMEOUT_MS = 45_000;
 /** The label the tenant gate's gauges, wait histogram and shed counter carry. */
 const TENANT_ANALYTICS_METRICS_INSTANCE = "tenant-analytics";
 
+/** Filters by field, as the transport's shared filters schema parsed them. */
+type AnalyticsPickerFilters = Partial<Record<FilterField, AnalyticsFilterValue>>;
+
 /**
  * The filter-value read this feature makes on the host's filter registry — declared
  * as the one method it calls, since which fields exist and what a stored filter means
@@ -182,7 +187,8 @@ type AnalyticsFilterOptionsLookup = Readonly<{
       subkey?: string;
       startDate: number;
       endDate: number;
-      scope?: { conditions: string[]; params: Record<string, unknown> };
+      /** The other filters the picker is narrowed by, in analytics' own grammar. */
+      filters?: AnalyticsPickerFilters;
       authorization: Authorization;
     }>,
   ): Promise<AnalyticsFilterOption[]>;
@@ -198,7 +204,7 @@ type AnalyticsFilterOptionsRequest = Readonly<{
   key?: string | undefined;
   subkey?: string | undefined;
   /** Every filter currently applied, including the one being selected. */
-  filters?: Record<string, unknown> | undefined;
+  filters?: AnalyticsPickerFilters | undefined;
 }>;
 
 /** What the process composes this feature's application from. */
@@ -761,12 +767,6 @@ export class AnalyticsModule
     const scopeFilters = Object.fromEntries(
       Object.entries(request.filters ?? {}).filter(([name]) => name !== request.field),
     );
-    // Trace owns the filter grammar because it owns the tables the scope reads. The picker
-    // reads through the proof's fence, so the scope names no tenant of its own.
-    const scope = this.#dependencies.traces.translateLegacyFilters({
-      filters: scopeFilters,
-      fenced: true,
-    });
 
     return this.#dependencies.filterOptions.getFilterOptions({
       projectId: request.projectId,
@@ -776,7 +776,8 @@ export class AnalyticsModule
       ...(request.subkey === undefined ? {} : { subkey: request.subkey }),
       startDate: request.startDate,
       endDate: request.endDate,
-      scope,
+      // Narrowed by analytics' own filter grammar, read through the proof (ADR-202 Decided 26).
+      filters: scopeFilters,
       authorization,
     });
   }

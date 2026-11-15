@@ -1,13 +1,11 @@
 {
   "record": "ADR-202 §3, langwatch/no-raw-clickhouse-sql: raw ClickHouse sites per module file still to port. Shrink-only: regenerate with `pnpm --filter @langwatch/oxlint-rules baseline:no-raw-clickhouse-sql` in the change that removes a site; never hand-edit.",
   "findings": {
-    "modules/analytics/process/src/repositories/clickhouse/clickhouse.aggregation-builder.mapper.ts": 10,
+    "modules/analytics/process/src/repositories/clickhouse/clickhouse.aggregation-builder.mapper.ts": 7,
     "modules/analytics/process/src/repositories/clickhouse/clickhouse.analytics-session.repository.ts": 1,
     "modules/analytics/process/src/repositories/clickhouse/clickhouse.analytics.repository.ts": 2,
     "modules/analytics/process/src/repositories/clickhouse/clickhouse.eval-rollup-timeseries-query.mapper.ts": 1,
     "modules/analytics/process/src/repositories/clickhouse/clickhouse.eval-slim-timeseries-query.mapper.ts": 1,
-    "modules/analytics/process/src/repositories/clickhouse/clickhouse.filter-options.repository.ts": 1,
-    "modules/analytics/process/src/repositories/clickhouse/clickhouse.filter-query-helpers.mapper.ts": 2,
     "modules/analytics/process/src/repositories/clickhouse/clickhouse.rollup-timeseries-query.mapper.ts": 1,
     "modules/analytics/process/src/repositories/clickhouse/clickhouse.slim-timeseries-query.mapper.ts": 1,
     "modules/data-retention/process/src/repositories/clickhouse/clickhouse.storage-meter.repository.ts": 2,

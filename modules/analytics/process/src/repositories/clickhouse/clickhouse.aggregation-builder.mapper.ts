@@ -3,7 +3,6 @@
  */
 
 import {
-  type AnalyticsFeedbackPosition,
   type FilterField,
   isZeroWhenAbsentSeries,
   SeriesPercentageUnsupportedError,
@@ -22,7 +21,6 @@ import {
   JOINED_SPAN_ATTRIBUTES,
   narrowMapColumnProjection,
   narrowSpanAttributesColumns,
-  spanAttributesNarrowProjection,
   TRACE_ANALYTICS_COLUMNS,
   TRACE_IDENTITY_COLUMNS,
   tableAliases,
@@ -98,7 +96,6 @@ function deriveRequiredColumns(
 const DATE_FILTER_BOTH_PERIODS = `AND ((OccurredAt >= {currentStart:DateTime64(3)} AND OccurredAt < {currentEnd:DateTime64(3)}) OR (OccurredAt >= {previousStart:DateTime64(3)} AND OccurredAt < {previousEnd:DateTime64(3)}))`;
 const DATE_FILTER_CURRENT = `AND OccurredAt >= {currentStart:DateTime64(3)} AND OccurredAt < {currentEnd:DateTime64(3)}`;
 const DATE_FILTER_PREVIOUS = `AND OccurredAt >= {previousStart:DateTime64(3)} AND OccurredAt < {previousEnd:DateTime64(3)}`;
-const DATE_FILTER_START_END = `AND OccurredAt >= {startDate:DateTime64(3)} AND OccurredAt < {endDate:DateTime64(3)}`;
 
 /**
  * StartTime partition-pruning bounds for stored_spans facet subqueries (see
@@ -108,9 +105,6 @@ const DATE_FILTER_START_END = `AND OccurredAt >= {startDate:DateTime64(3)} AND O
 const SPAN_TIME_FILTER_BOTH_PERIODS =
   "AND StartTime >= {previousStart:DateTime64(3)} - INTERVAL 2 DAY " +
   "AND StartTime < {currentEnd:DateTime64(3)} + INTERVAL 2 DAY";
-const SPAN_TIME_FILTER_START_END =
-  "AND StartTime >= {startDate:DateTime64(3)} - INTERVAL 2 DAY " +
-  "AND StartTime < {endDate:DateTime64(3)} + INTERVAL 2 DAY";
 
 // Partition-pruning bounds for the evaluation_runs JOIN subquery (OccurredAt doesn't prune
 // there since it partitions on ScheduledAt/UpdatedAt). Lower bounds only, on both columns —
@@ -3180,269 +3174,6 @@ function rewriteMetricForDedup(selectExpression: string, alias: string): string 
 
   // Default: return as-is (may need extension for other metric types)
   return selectExpression;
-}
-
-/** The span attribute RAG spans record their retrieved documents in. */
-const RAG_CONTEXTS_ATTRIBUTE = "langwatch.rag.contexts";
-
-/**
- * Build a query for top used documents (RAG analytics)
- */
-export function buildTopDocumentsQuery({
-  startDate,
-  endDate,
-  filters,
-}: {
-  startDate: Date;
-  endDate: Date;
-  filters?: Partial<
-    Record<
-      FilterField,
-      string[] | Record<string, string[]> | Record<string, Record<string, string[]>>
-    >
-  >;
-}): BuiltQuery {
-  const ts = tableAliases.trace_summaries;
-  const ss = tableAliases.stored_spans;
-
-  // Translate filters
-  const filterTranslation = translateAllFilters(filters ?? {}, {
-    spanTimePredicate: SPAN_TIME_FILTER_START_END,
-  });
-  const filterWhere =
-    filterTranslation.whereClause !== "1=1" ? `AND ${filterTranslation.whereClause}` : "";
-
-  // Build the top-RAG-documents query. Documents live in SpanAttributes['langwatch.rag.contexts']
-  // as JSON, joined in entirely via the stored_spans ARRAY JOIN; the fixed part only needs
-  // trace_summaries identity/date columns (JOIN keys, OccurredAt filter). So the deduped subquery
-  // reads just identity columns plus whatever filters reference, avoiding materializing the heavy
-  // Attributes map for every deduped trace.
-  const traceColumns = Array.from(
-    new Set([...TRACE_IDENTITY_COLUMNS, ...extractReferencedTraceColumns([filterWhere])]),
-  );
-
-  // The JOIN's right side is hashed into memory, so it carries only what the
-  // ARRAY JOIN reads: the rag.contexts value, as a one-key map read the same
-  // `ss.JoinedSpanAttributes[...]` way as the whole map, and only for the spans that
-  // have one. Selecting the whole SpanAttributes map buffered every span's
-  // attributes in range (inputs, outputs, prompts) on the join side.
-  const spanJoin = buildJoinClause({
-    table: "stored_spans",
-    requiredColumns: new Set([spanAttributesNarrowProjection([RAG_CONTEXTS_ATTRIBUTE])]),
-    spanTimeFilter: `${SPAN_TIME_FILTER_START_END} AND SpanAttributes['${RAG_CONTEXTS_ATTRIBUTE}'] != ''`,
-  });
-
-  // One statement: the top documents and the distinct-document total come
-  // from the same grouping (`count() OVER ()` counts the groups before the
-  // LIMIT), so the scan and the join run once instead of once per figure.
-  const sql = `
-    WITH document_refs AS (
-      SELECT
-        ${ts}.TraceId,
-        toString(context.document_id) AS document_id,
-        toString(context.content) AS content
-      FROM ${dedupedTraceSummaries({ alias: ts, columns: traceColumns, dateFilter: DATE_FILTER_START_END })}
-      ${spanJoin}
-      ARRAY JOIN JSONExtract(${ss}.${JOINED_SPAN_ATTRIBUTES}['${RAG_CONTEXTS_ATTRIBUTE}'], 'Array(JSON)') AS context
-      WHERE ${ts}.LatestOccurredAt >= {startDate:DateTime64(3)}
-        AND ${ts}.LatestOccurredAt < {endDate:DateTime64(3)}
-        ${filterWhere}
-    )
-    SELECT
-      document_id AS documentId,
-      count() AS count,
-      any(TraceId) AS trace_id,
-      any(content) AS content,
-      count() OVER () AS total
-    FROM document_refs
-    WHERE document_id != ''
-    GROUP BY document_id
-    ORDER BY count DESC
-    LIMIT 10
-  `;
-
-  return {
-    sql,
-    params: {
-      startDate,
-      endDate,
-      ...filterTranslation.params,
-    },
-  };
-}
-
-type FeedbackQueryFilters = Partial<
-  Record<
-    FilterField,
-    string[] | Record<string, string[]> | Record<string, Record<string, string[]>>
-  >
->;
-
-/**
- * The part of a feedbacks read both the capped list and the paged list share: the window, the
- * translated filters, and the fenced, pruned trace and span sources the events come from.
- */
-function feedbackQueryParts({
-  startDate,
-  endDate,
-  filters,
-}: {
-  startDate: Date;
-  endDate: Date;
-  filters?: FeedbackQueryFilters;
-}): { fromClause: string; filterWhere: string; params: BuiltQuery["params"] } {
-  const ts = tableAliases.trace_summaries;
-
-  // Translate filters
-  const filterTranslation = translateAllFilters(filters ?? {}, {
-    spanTimePredicate: SPAN_TIME_FILTER_START_END,
-  });
-  const filterWhere =
-    filterTranslation.whereClause !== "1=1" ? `AND ${filterTranslation.whereClause}` : "";
-
-  // Build query to get feedback events Events are stored in stored_spans as
-  // parallel arrays. As with the documents query, the fixed part uses only
-  // trace_summaries identity/date columns, so the deduped subquery reads just
-  // the identity columns plus whatever the user filters reference rather than
-  // the full analytics set, skipping the heavy Attributes map.
-  const traceColumns = Array.from(
-    new Set([...TRACE_IDENTITY_COLUMNS, ...extractReferencedTraceColumns([filterWhere])]),
-  );
-
-  // Prune the stored_spans JOIN to identity columns plus the Events.* arrays
-  // the feedback ARRAY JOIN reads, and push the StartTime window into the
-  // subquery, instead of joining the full analytics column set (#2551 / #2605).
-  const spanJoin = buildJoinClause({
-    table: "stored_spans",
-    requiredColumns: new Set(['"Events.Timestamp"', '"Events.Name"', '"Events.Attributes"']),
-    spanTimeFilter: SPAN_TIME_FILTER_START_END,
-  });
-
-  return {
-    fromClause: `${dedupedTraceSummaries({ alias: ts, columns: traceColumns, dateFilter: DATE_FILTER_START_END })}
-    ${spanJoin}`,
-    filterWhere,
-    params: {
-      startDate,
-      endDate,
-      ...filterTranslation.params,
-    },
-  };
-}
-
-/**
- * Build a query for feedbacks
- */
-export function buildFeedbacksQuery({
-  startDate,
-  endDate,
-  filters,
-}: {
-  startDate: Date;
-  endDate: Date;
-  filters?: FeedbackQueryFilters;
-}): BuiltQuery {
-  const ts = tableAliases.trace_summaries;
-  const ss = tableAliases.stored_spans;
-  const { fromClause, filterWhere, params } = feedbackQueryParts({
-    startDate,
-    endDate,
-    filters,
-  });
-
-  const sql = `
-    SELECT
-      ${ts}.TraceId AS trace_id,
-      ${ss}.SpanId AS event_id,
-      toUnixTimestamp64Milli(event_timestamp) AS started_at,
-      event_name AS event_type,
-      event_attrs AS attributes
-    FROM ${fromClause}
-    ARRAY JOIN
-      ${ss}."Events.Timestamp" AS event_timestamp,
-      ${ss}."Events.Name" AS event_name,
-      ${ss}."Events.Attributes" AS event_attrs
-    WHERE ${ts}.LatestOccurredAt >= {startDate:DateTime64(3)}
-      AND ${ts}.LatestOccurredAt < {endDate:DateTime64(3)}
-      AND event_name = 'thumbs_up_down'
-      AND mapContains(event_attrs, 'event.metrics.vote')
-      ${filterWhere}
-    ORDER BY event_timestamp DESC
-    LIMIT 100
-  `;
-
-  return { sql, params };
-}
-
-/**
- * One page of the feedbacks {@link buildFeedbacksQuery} lists, newest first, in a total order
- * (timestamp, trace, span, position in the span's event arrays) so equal timestamps neither
- * repeat nor vanish across pages. It asks for one row more than `limit` to know another follows.
- */
-export function buildFeedbacksPageQuery({
-  startDate,
-  endDate,
-  filters,
-  after,
-  limit,
-}: {
-  startDate: Date;
-  endDate: Date;
-  filters?: FeedbackQueryFilters;
-  after?: AnalyticsFeedbackPosition;
-  limit: number;
-}): BuiltQuery {
-  const ts = tableAliases.trace_summaries;
-  const ss = tableAliases.stored_spans;
-  const { fromClause, filterWhere, params } = feedbackQueryParts({
-    startDate,
-    endDate,
-    filters,
-  });
-
-  const afterWhere = after
-    ? `AND (toUnixTimestamp64Milli(event_timestamp), ${ts}.TraceId, ${ss}.SpanId, event_index) < ({afterStartedAt:Int64}, {afterTraceId:String}, {afterSpanId:String}, {afterEventIndex:UInt32})`
-    : "";
-
-  const sql = `
-    SELECT
-      ${ts}.TraceId AS trace_id,
-      ${ss}.SpanId AS event_id,
-      toUnixTimestamp64Milli(event_timestamp) AS started_at,
-      event_index,
-      event_name AS event_type,
-      event_attrs AS attributes
-    FROM ${fromClause}
-    ARRAY JOIN
-      ${ss}."Events.Timestamp" AS event_timestamp,
-      arrayEnumerate(${ss}."Events.Timestamp") AS event_index,
-      ${ss}."Events.Name" AS event_name,
-      ${ss}."Events.Attributes" AS event_attrs
-    WHERE ${ts}.LatestOccurredAt >= {startDate:DateTime64(3)}
-      AND ${ts}.LatestOccurredAt < {endDate:DateTime64(3)}
-      AND event_name = 'thumbs_up_down'
-      AND mapContains(event_attrs, 'event.metrics.vote')
-      ${filterWhere}
-      ${afterWhere}
-    ORDER BY event_timestamp DESC, ${ts}.TraceId DESC, ${ss}.SpanId DESC, event_index DESC
-    LIMIT {pageLimit:UInt32}
-  `;
-
-  return {
-    sql,
-    params: {
-      ...params,
-      pageLimit: limit + 1,
-      ...(after
-        ? {
-            afterStartedAt: after.startedAt,
-            afterTraceId: after.traceId,
-            afterSpanId: after.spanId,
-            afterEventIndex: after.eventIndex,
-          }
-        : {}),
-    },
-  };
 }
 
 // Exported for test coverage — do not use outside tests.

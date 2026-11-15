@@ -16,6 +16,7 @@ const columns = {
   SubTopicId: column.nullable(column.string()),
   HasAnnotation: column.nullable(column.bool()),
   TraceName: column.string(),
+  Models: column.array(column.string()),
 };
 
 /** The columns, so a read may alias the table and still hand it to the filter translator. */

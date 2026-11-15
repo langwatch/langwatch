@@ -1,10 +1,7 @@
-import type { FilterOption } from "../filter-options.repository.ts";
+import type { ProofScope, ReaderReadStatement } from "@langwatch/clickhouse-client/builder";
 
-/** Trace's translation of the other filters a picker is narrowed by. */
-type FilterOptionsScope = {
-  conditions: string[];
-  params: Record<string, unknown>;
-};
+import type { FilterOption } from "../filter-options.repository.ts";
+import type { AnalyticsFilterInput } from "./clickhouse.filter-conditions.mapper.ts";
 
 export type ClickHouseFilterQueryParams = {
   query?: string;
@@ -12,14 +9,17 @@ export type ClickHouseFilterQueryParams = {
   subkey?: string;
   startDate: number;
   endDate: number;
-  /** Conditions over `trace_summaries ts` scoping results to a subset of traces, from Trace. */
-  scope?: FilterOptionsScope;
+  /** The other filters the picker is narrowed by, in analytics' own grammar (ADR-202 D26). */
+  filters?: AnalyticsFilterInput;
   /**
    * The proof reads an aggregate's members, so an evaluation is offered only when its trace is
    * inside the member's window, not when it ran (ADR-177 v4.15).
    */
   readsMembers?: boolean;
 };
+
+/** A picker's parameters and the route proof's scope its read is built under. */
+export type FilterOptionsReadInput = ClickHouseFilterQueryParams & { scope: ProofScope };
 
 /**
  * ClickHouse tables that support filter queries.
@@ -32,11 +32,11 @@ export type ClickHouseFilterDefinition = {
    */
   tableName: ClickHouseFilterTable | null;
   /**
-   * Build the SQL query for this filter. Returns null when the filter cannot
-   * be queried yet (e.g. a required key/subkey is missing) — callers resolve
-   * that to an empty option list without hitting ClickHouse.
+   * Build the read for this filter. Returns null when the filter cannot be queried yet (e.g. a
+   * required key/subkey is missing) — callers resolve that to an empty option list without
+   * hitting ClickHouse.
    */
-  buildQuery: (params: ClickHouseFilterQueryParams) => string | null;
+  buildQuery: (input: FilterOptionsReadInput) => ReaderReadStatement | null;
   /**
    * Extract filter options from the query result rows.
    */

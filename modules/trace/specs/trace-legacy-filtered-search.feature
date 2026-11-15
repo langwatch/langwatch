@@ -23,12 +23,6 @@ Feature: A filtered legacy trace search narrows by Trace's own filter grammar
     Then the read fails rather than listing the whole project
 
   @unit
-  Scenario: Analytics' filter picker is scoped through Trace's translation
-    Given a filter picker asked for one field with other filters selected
-    When analytics looks up the picker's options
-    Then it asks Trace to translate the other filters and scopes the lookup by the answer
-
-  @unit
   Scenario: A trace search by free text over the API answers its matches
     Given a legacy trace search whose body carries a free-text query
     When the trace list is read

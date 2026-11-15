@@ -10,7 +10,6 @@ import { randomUUID } from "node:crypto";
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { FilterField } from "@langwatch/analytics-contract";
 import type { Authorization } from "@langwatch/authorization";
-import { tenantSet } from "@langwatch/clickhouse-client";
 import { Temporal } from "@langwatch/time";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -28,12 +27,14 @@ const AGGREGATE = `test-agg-filters-${RUN}`;
 const WHOLE_HISTORY_MEMBER = `test-agg-filters-a-${RUN}`;
 const LATE_MEMBER = `test-agg-filters-b-${RUN}`;
 const FOREIGN = `test-agg-filters-foreign-${RUN}`;
+const CLOSED_MEMBER = `test-agg-filters-c-${RUN}`;
 const SEEDED_TABLES = ["trace_summaries", "stored_spans", "evaluation_runs"] as const;
 const EVALUATOR = `${RUN}-check`;
 
 const DAY = "2026-06-15";
 const at = (time: string) => Temporal.Instant.from(`${DAY}T${time}Z`);
 const LATE_MEMBER_FROM = at("10:00:00");
+const CLOSED_MEMBER_UNTIL = at("12:00:00");
 
 /** A trace id two members both carry, as ids from different projects can collide. */
 const SHARED_TRACE_ID = `trace-${RUN}-shared`;
@@ -62,6 +63,7 @@ const TRACES: {
   },
   { tenantId: WHOLE_HISTORY_MEMBER, time: "11:30:00", name: "a-shared", traceId: SHARED_TRACE_ID },
   { tenantId: LATE_MEMBER, time: "11:30:00", name: "b-shared", traceId: SHARED_TRACE_ID },
+  { tenantId: CLOSED_MEMBER, time: "11:50:00", name: "c-closed", evaluatedAt: "12:10:00" },
 ];
 const IN_WINDOWS = ["a-early", "a-late", "a-shared", "b-in-grant", "b-shared"];
 
@@ -173,17 +175,24 @@ const aggregateProof = () =>
     ],
   });
 
+/** A member shared until noon: its 11:50 trace is in the window, its 12:10 evaluation is not. */
+const closedShareProof = () =>
+  analyticsProof({
+    projectId: AGGREGATE,
+    shared: [{ projectId: CLOSED_MEMBER, from: 0, until: CLOSED_MEMBER_UNTIL.epochMilliseconds }],
+  });
+
 /** What a picker offers; `readsMembers` is what FilterService sets for an aggregate's proof. */
 async function offered({
   field,
   authorization = aggregateProof(),
   readsMembers = true,
-  scope,
+  filters,
 }: {
   field: FilterField;
   authorization?: Authorization;
   readsMembers?: boolean;
-  scope?: FindFilterOptionsInput["scope"];
+  filters?: FindFilterOptionsInput["filters"];
 }): Promise<string[]> {
   const options = await repository.findOptions({
     field,
@@ -191,7 +200,7 @@ async function offered({
     readsMembers,
     startDate: at("06:00:00").epochMilliseconds,
     endDate: at("14:00:00").epochMilliseconds,
-    ...(scope ? { scope } : {}),
+    ...(filters ? { filters } : {}),
   });
   return options.map((option) => option.label).toSorted();
 }
@@ -213,7 +222,7 @@ beforeAll(async () => {
 }, 300_000);
 
 afterAll(async () => {
-  for (const tenantId of [AGGREGATE, WHOLE_HISTORY_MEMBER, LATE_MEMBER, FOREIGN]) {
+  for (const tenantId of [AGGREGATE, WHOLE_HISTORY_MEMBER, LATE_MEMBER, FOREIGN, CLOSED_MEMBER]) {
     await deleteMigratedTenantRows({ client, tenantId, tables: SEEDED_TABLES });
   }
 });
@@ -238,21 +247,11 @@ describe("filter pickers read under an aggregate's proof", () => {
     });
 
     it("narrows by another filter's side-table subquery without crossing members", async () => {
-      // The shape Trace's grammar writes for `evaluations.evaluator_id` in fenced mode.
-      const scope = {
-        conditions: [
-          `EXISTS (
-            SELECT 1 FROM evaluation_runs es
-            WHERE ${tenantSet()} AND es.TenantId = ts.TenantId
-              AND es.TraceId IS NOT NULL
-              AND assumeNotNull(es.TraceId) = ts.TraceId
-              AND es.EvaluatorId IN ({f0_values:Array(String)})
-          )`,
-        ],
-        params: { f0_values: [`${EVALUATOR}-a-late`, `${EVALUATOR}-foreign`] },
+      const filters = {
+        "evaluations.evaluator_id": [`${EVALUATOR}-a-late`, `${EVALUATOR}-foreign`],
       };
 
-      expect(await offered({ field: "metadata.user_id", scope })).toEqual(["a-late"]);
+      expect(await offered({ field: "metadata.user_id", filters })).toEqual(["a-late"]);
     });
 
     /** @scenario "The aggregate's filter pickers offer member values inside their windows" */
@@ -263,20 +262,39 @@ describe("filter pickers read under an aggregate's proof", () => {
     });
   });
 
-  describe("given two members carrying the same trace id, and a scope picking one member's", () => {
-    const scope = {
-      conditions: ["ts.Attributes['langwatch.user_id'] = {user:String}"],
-      params: { user: "a-shared" },
-    };
+  describe("given two members carrying the same trace id, and a filter picking one member's", () => {
+    const filters = { "metadata.user_id": ["a-shared"] };
 
     it("offers that member's evaluators alone", async () => {
-      expect(await offered({ field: "evaluations.evaluator_id", scope })).toEqual([
+      expect(await offered({ field: "evaluations.evaluator_id", filters })).toEqual([
         "[langevals/exact_match] a-shared",
       ]);
     });
 
     it("offers that member's span values alone", async () => {
-      expect(await offered({ field: "spans.type", scope })).toEqual(["a-shared"]);
+      expect(await offered({ field: "spans.type", filters })).toEqual(["a-shared"]);
+    });
+  });
+
+  describe("given a member shared until noon, with a trace before noon evaluated after it", () => {
+    it("offers the trace when no other filter narrows the picker", async () => {
+      const labels = await offered({
+        field: "metadata.user_id",
+        authorization: closedShareProof(),
+      });
+
+      expect(labels).toEqual(["c-closed"]);
+    });
+
+    /** @scenario "An aggregate's picker holds a side-table filter inside the member's share window" */
+    it("drops the trace when narrowed by its evaluator, whose run fell after the share closed", async () => {
+      const labels = await offered({
+        field: "metadata.user_id",
+        authorization: closedShareProof(),
+        filters: { "evaluations.evaluator_id": [`${EVALUATOR}-c-closed`] },
+      });
+
+      expect(labels).toEqual([]);
     });
   });
 

@@ -1,5 +1,6 @@
 import type { FilterField } from "@langwatch/analytics-contract";
-import { AuthorizedClickHouse, type ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import { tenantScope } from "@langwatch/clickhouse-client/builder";
 import { createLogger } from "@langwatch/observability";
 
 import {
@@ -8,57 +9,46 @@ import {
   type FindFilterOptionsInput,
 } from "../filter-options.repository.ts";
 import { clickHouseFilters } from "./clickhouse.filter-definitions.mapper.ts";
-import { buildScopeConditions } from "./clickhouse.filter-query-helpers.mapper.ts";
 import type { SupportedClickHouseFilterDefinition } from "./clickhouse.filter-shapes.mapper.ts";
 import { translatingQueryFailures } from "./clickhouse.query-error-translation.mapper.ts";
 
 const logger = createLogger("langwatch:filters:repository");
 
+/** The UI writes a dot in a key or subkey as a middle dot to keep it out of its path syntax. */
+const undotted = (value: string | undefined) => value?.replaceAll("·", ".");
+
 /**
- * Reads the distinct values a filter can offer, through the route's proof (ADR-177): every
- * definition writes the fence marker, so the reader picks the tenants and refuses a statement
- * that names one by hand.
+ * Reads the distinct values a filter can offer, built under the route's proof (ADR-202): the
+ * reader picks the tenants from the proof's fence, and its windows bound every table read.
  */
 export class FilterOptionsClickHouseRepository extends FilterOptionsRepository {
-  private constructor(private readonly authorized: AuthorizedClickHouse) {
+  private constructor(private readonly clickhouse: Pick<ClickHouseQueryClient, "read">) {
     super();
   }
 
-  static create(options: { clickhouse: ClickHouseQueryClient }): FilterOptionsClickHouseRepository {
-    return new FilterOptionsClickHouseRepository(
-      new AuthorizedClickHouse({ resolveClient: () => Promise.resolve(options.clickhouse) }),
-    );
+  static create(options: {
+    clickhouse: Pick<ClickHouseQueryClient, "read">;
+  }): FilterOptionsClickHouseRepository {
+    return new FilterOptionsClickHouseRepository(options.clickhouse);
   }
 
   async findOptions(input: FindFilterOptionsInput): Promise<FilterOption[]> {
     const definition = this.definitionFor(input.field);
     if (!definition) return [];
 
-    const sql = definition.buildQuery(input);
+    const { key, subkey, authorization, ...params } = input;
+    const statement = definition.buildQuery({
+      ...params,
+      ...(key === undefined ? {} : { key: undotted(key) }),
+      ...(subkey === undefined ? {} : { subkey: undotted(subkey) }),
+      scope: tenantScope.fromProof({ authorization, reads: "analytics" }),
+    });
     // A definition that needs a key or subkey returns null while one is
     // missing: there is nothing to ask for yet, not an empty answer to cache.
-    if (sql === null) return [];
+    if (statement === null) return [];
 
-    const reader = this.authorized.as(input.authorization, { reads: "analytics" });
-    const { params: scopeParams } = buildScopeConditions(input);
-
-    // The UI encodes dots in keys and subkeys as middle dots to keep them out
-    // of its path syntax; they go back before the query is parameterised.
-    const result = await translatingQueryFailures(() =>
-      reader.query({
-        query: sql,
-        query_params: {
-          query: input.query ?? "",
-          key: input.key?.replaceAll("·", ".") ?? "",
-          subkey: input.subkey?.replaceAll("·", ".") ?? "",
-          startDate: input.startDate,
-          endDate: input.endDate,
-          ...scopeParams,
-        },
-      }),
-    );
-
-    return definition.extractResults(await result.json());
+    const { rows } = await translatingQueryFailures(() => this.clickhouse.read({ statement }));
+    return definition.extractResults(rows);
   }
 
   private definitionFor(field: FilterField): SupportedClickHouseFilterDefinition | null {

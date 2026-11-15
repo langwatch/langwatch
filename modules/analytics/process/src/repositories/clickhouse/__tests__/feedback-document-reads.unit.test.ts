@@ -74,6 +74,32 @@ describe("ClickHouseAnalyticsRepository top documents and feedbacks", () => {
     });
   });
 
+  describe("given a feedbacks page asked after a cursor", () => {
+    /** @scenario The paged query orders by a persisted identity and resumes strictly after the cursor */
+    it("orders by time, trace, span and event position descending, one row past the page", async () => {
+      const { statements, repository } = repositoryOver();
+      const after = {
+        startedAt: 1_700_000_100_000,
+        traceId: "trace-cursor",
+        spanId: "span-cursor",
+        eventIndex: 3,
+      };
+
+      await repository.findFeedbackEventsPage({ ...input(), after, limit: 2 });
+
+      const sql = statements[0]?.sql ?? "";
+      const order = sql.slice(sql.lastIndexOf("ORDER BY"));
+      expect(order.match(/\bDESC\b/g)).toHaveLength(4);
+      expect(order).toMatch(/LIMIT 3\b/);
+      expect(sql).not.toContain("trace-cursor");
+      expect(sql).not.toContain("span-cursor");
+      expect(sql).not.toContain("project-1");
+      expect(Object.values(statements[0]?.params ?? {})).toEqual(
+        expect.arrayContaining(["trace-cursor", "span-cursor"]),
+      );
+    });
+  });
+
   describe("given a proof minted for another project", () => {
     it("refuses before reading anything", async () => {
       const { statements, repository } = repositoryOver();

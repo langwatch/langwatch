@@ -7,6 +7,7 @@
 
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { AnalyticsTimeseriesInput } from "@langwatch/analytics-contract";
+import { tenantScope } from "@langwatch/clickhouse-client/builder";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -14,12 +15,11 @@ import {
   deleteMigratedTenantRows,
   startMigratedClickHouse,
 } from "../../../__tests__/migrated-clickhouse.harness.ts";
-import {
-  buildTimeseriesQuery,
-  buildTopDocumentsQuery,
-} from "../clickhouse.aggregation-builder.mapper.ts";
+import { analyticsProof } from "../../__tests__/analytics-proof.fixture.ts";
+import { buildTimeseriesQuery } from "../clickhouse.aggregation-builder.mapper.ts";
 import { pickAnalyticsTable } from "../clickhouse.analytics-route-table.mapper.ts";
 import { buildEvalSlimTimeseriesQuery } from "../clickhouse.eval-slim-timeseries-query.mapper.ts";
+import { topDocumentsRead } from "../clickhouse.feedback-document-reads.mapper.ts";
 import { resetParamCounter } from "../clickhouse.filter-translator.mapper.ts";
 import { buildSlimTimeseriesQuery } from "../clickhouse.slim-timeseries-query.mapper.ts";
 import { ownProjectReaderOver } from "./support/clickhouse-query-client.support.ts";
@@ -448,13 +448,18 @@ describe("dashboard panels under a memory cap", () => {
   describe("when the documents panel ranks RAG documents", () => {
     /** @scenario The documents panel reads only the RAG contexts attribute */
     it("answers within the cap with the exact distinct document total", async () => {
-      resetParamCounter();
-      const query = buildTopDocumentsQuery({ startDate: start, endDate: end, filters: {} });
+      const authorization = analyticsProof({ projectId: TENANT_ID, permission: "cost:view" });
+      const statement = topDocumentsRead({
+        scope: tenantScope.fromProof({ authorization, reads: "cost" }),
+        window: { startMs: start.getTime(), endMs: end.getTime() },
+        filters: {},
+      });
+      // The built read carries its tenant predicate and setting, so it runs as sent.
       const rows = await runCapped<{
         documentId: string;
         count: string;
         total: string;
-      }>(ch, { ...query, fenced: true });
+      }>(ch, { sql: statement.sql, params: statement.params, settings: statement.settings });
       expect(rows).toHaveLength(10);
       expect(Number(rows[0]?.total)).toBe(RAG_DOCUMENT_COUNT);
       expect(Number(rows[0]?.count)).toBeGreaterThan(0);
