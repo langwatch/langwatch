@@ -2,7 +2,8 @@
 
 /**
  * A replay batch's event read on a real ClickHouse whose memory is smaller than the batch: one read
- * of the whole batch fails, the replay source reads it in slices and applies every event once.
+ * of the whole batch fails, the replay source reads it in slices and applies every event once. One
+ * aggregate over that memory alone fails its bulk read and is read in pages instead.
  * Spec: specs/upgrade/projection-replay-step.feature
  */
 import { randomUUID } from "node:crypto";
@@ -16,7 +17,9 @@ import {
 import { startTestClickHouseEndpoints } from "@langwatch/clickhouse-client/testing";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { pageAggregateEvents } from "../../../../replay/replayEngine.ts";
 import type { CutoffInfo, ReplayEvent } from "../../../../replay/replayEventSource.ts";
+import { isQueryMemoryLimitExceeded } from "../../../../services/errorHandling.ts";
 import { EventingClickHouseReplayEventSource } from "../replay-event-source.clickhouse.ts";
 
 const EVENT_TYPE = "lw.test.span_received";
@@ -32,6 +35,12 @@ const aggregateIds = Array.from(
   { length: AGGREGATES },
   (_, index) => `trace-${String(index).padStart(3, "0")}`,
 );
+
+/** One tenant holding a lone aggregate over the server's memory, and one a tenth its size. */
+const pagedTenantId = `${randomUUID()}-replay-paged-aggregate`;
+const LONE_AGGREGATES = { "trace-large": 1_500, "trace-small": 150 } as const;
+/** Page caps scaled to the test server's memory, as AGGREGATE_PAGE is to production's. */
+const TEST_PAGE = { maxEvents: 1_000, maxPayloadBytes: 3 * 1024 * 1024 };
 
 let capped: ClickHouseQueryClient;
 let uncapped: ClickHouseQueryClient;
@@ -101,6 +110,60 @@ function expectedOrder(): string[] {
   );
 }
 
+/** A source over the capped server, reading with its default budget. */
+function cappedSource(): EventingClickHouseReplayEventSource {
+  return new EventingClickHouseReplayEventSource({ clickhouse: capped, lean: (event) => event });
+}
+
+/** A lone aggregate's events through its bulk read, in the order applied. */
+async function bulkRead(aggregateId: keyof typeof LONE_AGGREGATES): Promise<string[]> {
+  const applied: string[] = [];
+  await cappedSource().streamEventsForAggregates({
+    tenantId: pagedTenantId,
+    aggregateIds: [aggregateId],
+    eventTypes: [EVENT_TYPE],
+    cutoffs: new Map<string, CutoffInfo>(),
+    onEvent: (event: ReplayEvent) => {
+      applied.push(event.id);
+    },
+  });
+  return applied;
+}
+
+/** A lone aggregate's events through its pages, in the order applied, and each page's size. */
+async function pagedRead(aggregateId: keyof typeof LONE_AGGREGATES) {
+  const source = cappedSource();
+  const load = source.loadAggregateEvents.bind(source);
+  const pages: { events: number; payloadBytes: number }[] = [];
+  source.loadAggregateEvents = async (input) => {
+    const events = await load(input);
+    const payloadBytes = events.reduce((sum, event) => sum + JSON.stringify(event.data).length, 0);
+    pages.push({ events: events.length, payloadBytes });
+    return events;
+  };
+  const last = LONE_AGGREGATES[aggregateId] - 1;
+  const applied: string[] = [];
+  await pageAggregateEvents({
+    eventSource: source,
+    signal: undefined,
+    log: { write: () => undefined },
+    page: TEST_PAGE,
+    tenantId: pagedTenantId,
+    aggregateIds: [aggregateId],
+    eventTypes: [EVENT_TYPE],
+    cutoffs: new Map([
+      [
+        `${pagedTenantId}:trace:${aggregateId}`,
+        { timestamp: 1_700_000_000_000 + last, eventId: `event-${last}` },
+      ],
+    ]),
+    onEvent: (event) => {
+      applied.push(event.id);
+    },
+  });
+  return { applied, pages };
+}
+
 /** Every event the source applies for the batch, as `aggregate:event number`. */
 async function replayBatch(source: EventingClickHouseReplayEventSource): Promise<string[]> {
   const applied: string[] = [];
@@ -163,15 +226,37 @@ beforeAll(async () => {
       events: AGGREGATES * EVENTS_PER_AGGREGATE,
     },
   });
+  for (const [aggregateId, events] of Object.entries(LONE_AGGREGATES)) {
+    await setup.command({
+      tenantId: pagedTenantId,
+      sql:
+        "INSERT INTO event_log (TenantId, IdempotencyKey, AggregateType, AggregateId, EventId, " +
+        "EventType, EventVersion, EventTimestamp, EventPayload, EventOccurredAt) " +
+        "SELECT {tenantId:String}, concat('event-', toString(number)), 'trace', " +
+        "{aggregateId:String}, concat('event-', toString(number)), {eventType:String}, " +
+        "'2026-11-14', 1700000000000 + number, " +
+        "concat('{\"blob\":\"', hex(randomString({payloadBytes:UInt32})), '\"}'), " +
+        "1700000000000 FROM numbers({events:UInt32})",
+      params: {
+        tenantId: pagedTenantId,
+        aggregateId,
+        eventType: EVENT_TYPE,
+        payloadBytes: PAYLOAD_RANDOM_BYTES,
+        events,
+      },
+    });
+  }
 }, 120_000);
 
 afterAll(async () => {
   if (uncapped === undefined) return;
-  await uncapped.command({
-    tenantId,
-    sql: "ALTER TABLE event_log DELETE WHERE TenantId = {tenantId:String}",
-    params: { tenantId },
-  });
+  for (const each of [tenantId, pagedTenantId]) {
+    await uncapped.command({
+      tenantId: each,
+      sql: "ALTER TABLE event_log DELETE WHERE TenantId = {tenantId:String}",
+      params: { tenantId: each },
+    });
+  }
 });
 
 describe("a replay batch's event read", () => {
@@ -214,5 +299,42 @@ describe("a replay batch's event read", () => {
 
       expect(await replayBatch(source)).toEqual(expectedOrder());
     });
+  });
+});
+
+describe("a lone aggregate's event read", () => {
+  describe("given one aggregate whose payloads outgrow the server's memory for one read", () => {
+    /** @scenario "A lone aggregate over the server's memory fails its bulk read and completes in pages" */
+    it("fails its bulk read as one statement over the per-query memory limit", async () => {
+      const failure: unknown = await bulkRead("trace-large").catch((error: unknown) => error);
+
+      expect(isQueryMemoryLimitExceeded(failure)).toBe(true);
+    });
+
+    /** @scenario "A lone aggregate over the server's memory fails its bulk read and completes in pages" */
+    it("reads it in pages within the caps and applies every event once, in order", async () => {
+      const { applied, pages } = await pagedRead("trace-large");
+
+      expect(applied).toEqual(
+        Array.from({ length: LONE_AGGREGATES["trace-large"] }, (_, n) => `event-${n}`),
+      );
+      for (const page of pages) {
+        expect(page.events).toBeLessThanOrEqual(TEST_PAGE.maxEvents);
+        expect(page.payloadBytes).toBeLessThanOrEqual(TEST_PAGE.maxPayloadBytes);
+      }
+    }, 120_000);
+  });
+
+  describe("given an aggregate a tenth that size, small enough for its bulk read", () => {
+    /** @scenario "A paged aggregate's pages stay within the page caps at any size" */
+    it("reads it in pages within the same caps, applying what its bulk read applies", async () => {
+      const { applied, pages } = await pagedRead("trace-small");
+
+      expect(applied).toEqual(await bulkRead("trace-small"));
+      for (const page of pages) {
+        expect(page.events).toBeLessThanOrEqual(TEST_PAGE.maxEvents);
+        expect(page.payloadBytes).toBeLessThanOrEqual(TEST_PAGE.maxPayloadBytes);
+      }
+    }, 120_000);
   });
 });

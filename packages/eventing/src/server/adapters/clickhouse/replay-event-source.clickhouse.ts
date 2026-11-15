@@ -619,21 +619,7 @@ function isRowBeyondCutoff(row: ClickHouseEventRow, cutoff: CutoffInfo | undefin
   return eventTimestamp === cutoff.timestamp && row.EventId > cutoff.eventId;
 }
 
-/**
- * Load events for a batch of aggregates up to a max cutoff, with cursor-based pagination.
- */
-export async function batchLoadAggregateEvents({
-  client,
-  tenantId,
-  aggregateIds,
-  eventTypes,
-  maxCutoff,
-  cursor,
-  batchSize,
-  occurredAtBounds,
-  lean,
-}: {
-  client: EventingClickHouseReplayClient;
+interface EventPage {
   tenantId: string;
   aggregateIds: string[];
   eventTypes: readonly string[];
@@ -641,14 +627,21 @@ export async function batchLoadAggregateEvents({
   cursor?: CutoffInfo;
   batchSize: number;
   occurredAtBounds?: OccurredAtBounds;
-  lean: ReplayEventLean;
-}): Promise<ReplayEvent[]> {
-  const pruning = occurredAtPredicate(occurredAtBounds);
+}
 
-  const query = `
-    SELECT EventId, EventTimestamp, EventOccurredAt, EventType, EventPayload,
-           EventVersion, TenantId, AggregateType, AggregateId, ProcessingTraceparent,
-           IdempotencyKey
+/** From `FROM` to `LIMIT`: a page of events after `cursor` up to `maxCutoff`, in event order. */
+function eventPageWhere({
+  tenantId,
+  aggregateIds,
+  eventTypes,
+  maxCutoff,
+  cursor,
+  batchSize,
+  occurredAtBounds,
+}: EventPage): { sql: string; params: Record<string, unknown> } {
+  const pruning = occurredAtPredicate(occurredAtBounds);
+  return {
+    sql: `
     FROM event_log
     WHERE TenantId = {tenantId:String}
       AND EventType IN ({eventTypes:Array(String)})
@@ -674,11 +667,7 @@ export async function batchLoadAggregateEvents({
       ${pruning.sql}
     ORDER BY EventTimestamp ASC, EventId ASC
     LIMIT {batchSize:UInt32}
-  `;
-
-  const { rows } = await client.query<ClickHouseEventRow>({
-    tenantId,
-    sql: query,
+  `,
     params: {
       tenantId,
       eventTypes: [...eventTypes],
@@ -694,6 +683,85 @@ export async function batchLoadAggregateEvents({
       batchSize,
       ...pruning.params,
     },
+  };
+}
+
+/** How many leading rows fit `maxPayloadBytes`: at least one, so a row over it alone is read. */
+export function rowsWithinPayload({
+  payloadBytes,
+  maxPayloadBytes,
+}: {
+  payloadBytes: readonly number[];
+  maxPayloadBytes: number;
+}): number {
+  let held = 0;
+  for (const [index, bytes] of payloadBytes.entries()) {
+    held += bytes;
+    if (held > maxPayloadBytes) return Math.max(index, 1);
+  }
+  return payloadBytes.length;
+}
+
+/**
+ * The last position of a page whose payloads stay within `maxPayloadBytes`, from the rows'
+ * positions and payload sizes alone, so this read sorts no payload. Undefined: the page is empty.
+ */
+async function payloadBoundedEnd({
+  client,
+  page,
+  maxPayloadBytes,
+}: {
+  client: EventingClickHouseReplayClient;
+  page: EventPage;
+  maxPayloadBytes: number;
+}): Promise<CutoffInfo | undefined> {
+  const where = eventPageWhere(page);
+  const { rows } = await client.query<{
+    EventTimestamp: string | number;
+    EventId: string;
+    payloadBytes: string | number;
+  }>({
+    tenantId: page.tenantId,
+    sql: `SELECT EventTimestamp, EventId, length(EventPayload) AS payloadBytes ${where.sql}`,
+    params: where.params,
+  });
+  const fit = rowsWithinPayload({
+    payloadBytes: rows.map((row) => Number(row.payloadBytes)),
+    maxPayloadBytes,
+  });
+  const end = rows[fit - 1];
+  return end && { timestamp: Number(end.EventTimestamp), eventId: end.EventId };
+}
+
+/**
+ * Load events for a batch of aggregates up to a max cutoff, with cursor-based pagination. With
+ * `maxPayloadBytes`, a first read of positions and sizes ends the page where its payloads fit.
+ */
+export async function batchLoadAggregateEvents({
+  client,
+  maxPayloadBytes,
+  lean,
+  ...page
+}: EventPage & {
+  client: EventingClickHouseReplayClient;
+  maxPayloadBytes?: number;
+  lean: ReplayEventLean;
+}): Promise<ReplayEvent[]> {
+  const maxCutoff =
+    maxPayloadBytes === undefined
+      ? page.maxCutoff
+      : await payloadBoundedEnd({ client, page, maxPayloadBytes });
+  if (!maxCutoff) return [];
+
+  const where = eventPageWhere({ ...page, maxCutoff });
+  const { rows } = await client.query<ClickHouseEventRow>({
+    tenantId: page.tenantId,
+    sql: `
+    SELECT EventId, EventTimestamp, EventOccurredAt, EventType, EventPayload,
+           EventVersion, TenantId, AggregateType, AggregateId, ProcessingTraceparent,
+           IdempotencyKey
+    ${where.sql}`,
+    params: where.params,
   });
 
   return rows.map((row) => rowToEvent(row, lean));
@@ -780,6 +848,7 @@ export class EventingClickHouseReplayEventSource implements ReplayEventSource {
     maxCutoff: CutoffInfo;
     cursor?: CutoffInfo;
     batchSize: number;
+    maxPayloadBytes?: number;
     occurredAtBounds?: OccurredAtBounds;
   }): Promise<ReplayEvent[]> {
     return batchLoadAggregateEvents({ client: this.clickhouse, lean: this.lean, ...input });

@@ -13,6 +13,11 @@ import {
   unionReplayTenants,
 } from "../projectionLaneReplay.ts";
 import { CUTOFF_KEY_PREFIX, REPLAY_CURSOR_SKEW_MARGIN_MS } from "../replayConstants.ts";
+import {
+  AGGREGATE_PAGE,
+  MAX_UNFINISHED_PAGED_ATTEMPTS,
+  pageAggregateEvents,
+} from "../replayEngine.ts";
 import type {
   CutoffInfo,
   DiscoveredAggregateWithEventTypes,
@@ -23,7 +28,11 @@ import type {
 import { aggregateKey } from "../replayMarkers.ts";
 import type { ReplayProjections } from "../replayProjections.ts";
 import { ReplayService } from "../replayService.ts";
-import type { RegisteredFoldProjection, RegisteredMapProjection } from "../types.ts";
+import type {
+  RegisteredFoldProjection,
+  RegisteredMapProjection,
+  ReplayPagingLedger,
+} from "../types.ts";
 
 const PAUSED_SET_KEY = "{event-sourcing/jobs}:gq:paused-jobs";
 const LANE = "directoryMembers";
@@ -369,6 +378,40 @@ function seedHeavyTenantBesideLight(log: SeededLog): void {
     ),
   );
 }
+
+/** One aggregate's `count` events alone in the log, so every batch holds it alone. */
+function seedLoneAggregate(log: SeededLog, count = 2): void {
+  log.events.length = 0;
+  log.events.push(
+    ...Array.from({ length: count }, (_, i) =>
+      seededEvent({ n: 1 + i, aggregateId: "directory-a" }),
+    ),
+  );
+}
+
+/** The events each paged read returned, as a count per page. */
+function recordPages(log: SeededLog): { pages: number[] } {
+  const load = log.loadAggregateEvents.bind(log);
+  const pages: number[] = [];
+  log.loadAggregateEvents = async (input) => {
+    const events = await load(input);
+    pages.push(events.length);
+    return events;
+  };
+  return { pages };
+}
+
+/** The step's report as the paging ledger: kept across runs, as the upgrade ledger keeps it. */
+function keptPaging(): ReplayPagingLedger & { unfinished: Map<string, number> } {
+  const unfinished = new Map<string, number>();
+  return {
+    unfinished,
+    started: async ({ key }) => void unfinished.set(key, (unfinished.get(key) ?? 0) + 1),
+    finished: ({ key }) => void unfinished.set(key, 0),
+  };
+}
+
+const KEY_A = "tenant-1:directory:directory-a";
 
 /** ClickHouse's refusal for one statement over its own memory limit, as the client raises it. */
 const queryMemoryLimitError = () =>
@@ -739,22 +782,186 @@ describe("projectionLaneReplayer", () => {
       expect(writes.count).toBe(clean.writes.count);
     });
 
-    /** @scenario "A single aggregate still over the query memory limit fails the lane by name" */
-    it("fails the lane with the original error, naming the aggregate but not its tenant", async () => {
-      const { log, replayer } = setUp();
+    /** @scenario "A lone aggregate over the query memory limit is replayed in pages" */
+    it("pages each lone aggregate still over the limit and folds it as a clean replay does", async () => {
+      const clean = setUp();
+      await clean.replayer.replayLane({ lane: LANE, since: FROM_START, dryRun: false });
+      const { log, readModel, replayer } = setUp();
       const { streamed } = failStreamsAbove({ log, maxAggregates: 0 });
+      const { pages } = recordPages(log);
 
+      const result = await replayer.replayLane({ lane: LANE, since: FROM_START, dryRun: false });
+
+      expect(streamed).toEqual([2, 1, 1]);
+      expect(pages).toEqual([2, 0, 1, 0]);
+      expect(Object.fromEntries(readModel)).toEqual(Object.fromEntries(clean.readModel));
+      expect(result).toMatchObject({ aggregatesReplayed: 2, totalEvents: 3 });
+    });
+
+    /** @scenario "A lone aggregate over the query memory limit is replayed in pages" */
+    it("fails on the bulk stream before any fold write, then writes the paged fold once", async () => {
+      const { log, readModel, writes, replayer } = setUp();
+      seedLoneAggregate(log);
+      const writesWhenStreamThrew: number[] = [];
+      log.streamEventsForAggregates = async () => {
+        writesWhenStreamThrew.push(writes.count);
+        throw queryMemoryLimitError();
+      };
+      const { pages } = recordPages(log);
+
+      await replayer.replayLane({ lane: LANE, since: FROM_START, dryRun: false });
+
+      expect(writesWhenStreamThrew).toEqual([0]);
+      expect(pages).toEqual([2, 0]);
+      expect(writes.count).toBe(1);
+      expect(Object.fromEntries(readModel)).toEqual({ "directory-a": 2 });
+    });
+
+    /** @scenario "A paged aggregate's pages stay within the page caps at any size" */
+    it.each([
+      { events: AGGREGATE_PAGE.maxEvents + AGGREGATE_PAGE.maxEvents / 2 },
+      { events: (AGGREGATE_PAGE.maxEvents + AGGREGATE_PAGE.maxEvents / 2) * 10 },
+    ])("pages a lone aggregate of $events events within the page caps", async ({ events }) => {
+      const { log, readModel, replayer } = setUp();
+      seedLoneAggregate(log, events);
+      failStreamsAbove({ log, maxAggregates: 0 });
+      const { pages } = recordPages(log);
+
+      await replayer.replayLane({ lane: LANE, since: FROM_START, dryRun: false });
+
+      expect(Math.max(...pages)).toBeLessThanOrEqual(AGGREGATE_PAGE.maxEvents);
+      expect(pages.reduce((sum, page) => sum + page, 0)).toBe(events);
+      expect(readModel.get("directory-a")).toBe(events);
+    });
+
+    /** @scenario "An aggregate whose paged replay was cut three times fails the lane by name" */
+    it("fails the lane by the aggregate's name once its paged replay was cut three times", async () => {
+      const { log, replayer } = setUp();
+      seedLoneAggregate(log);
+      const { streamed } = failStreamsAbove({ log, maxAggregates: 0 });
+      const paging = keptPaging();
+      const load = log.loadAggregateEvents.bind(log);
+      let deadline = new AbortController();
+      log.loadAggregateEvents = async (input) => {
+        deadline.abort(new Error("the run passed its 15-minute deadline"));
+        return load(input);
+      };
+
+      for (let cut = 1; cut <= MAX_UNFINISHED_PAGED_ATTEMPTS; cut++) {
+        deadline = new AbortController();
+        await expect(
+          replayer.replayLane({
+            lane: LANE,
+            since: FROM_START,
+            dryRun: false,
+            signal: deadline.signal,
+            paging,
+          }),
+        ).rejects.toThrow("the run passed its 15-minute deadline");
+        expect(paging.unfinished.get(KEY_A)).toBe(cut);
+      }
       const failure: unknown = await replayer
-        .replayLane({ lane: LANE, since: FROM_START, dryRun: false })
+        .replayLane({ lane: LANE, since: FROM_START, dryRun: false, paging })
         .catch((error: unknown) => error);
 
-      expect(streamed).toEqual([2, 1]);
+      expect(streamed).toEqual([1]);
       expect(failure).toBeInstanceOf(Error);
       const message = failure instanceof Error ? failure.message : "";
       expect(message).toContain(`Replaying "${LANE}" failed in 1 batch(es): `);
-      expect(message).toContain(queryMemoryLimitError().message);
+      expect(message).toContain(`cut ${MAX_UNFINISHED_PAGED_ATTEMPTS} times`);
       expect(message).toContain("directory directory-a");
       expect(message).not.toContain("tenant-1");
+    });
+
+    /** @scenario "An aggregate paged before is paged at once on the next run" */
+    it("pages an aggregate the ledger lists without reading it in a failing bulk batch", async () => {
+      const clean = setUp();
+      await clean.replayer.replayLane({ lane: LANE, since: FROM_START, dryRun: false });
+      const { log, readModel, replayer } = setUp();
+      const { streamed } = failStreamsAbove({ log, maxAggregates: 1 });
+      const { pages } = recordPages(log);
+      const paging = keptPaging();
+      paging.unfinished.set(KEY_A, 0);
+
+      await replayer.replayLane({ lane: LANE, since: FROM_START, dryRun: false, paging });
+
+      expect(streamed).toEqual([1]);
+      expect(pages).toEqual([2, 0]);
+      expect(paging.unfinished.get(KEY_A)).toBe(0);
+      expect(Object.fromEntries(readModel)).toEqual(Object.fromEntries(clean.readModel));
+    });
+
+    /** @scenario "A lone aggregate over the query memory limit is replayed in pages" */
+    it("counts the paged attempt before its first page and clears the count once it finishes", async () => {
+      const { log, replayer } = setUp();
+      seedLoneAggregate(log);
+      failStreamsAbove({ log, maxAggregates: 0 });
+      const paging = keptPaging();
+      const load = log.loadAggregateEvents.bind(log);
+      const countAtPage: (number | undefined)[] = [];
+      log.loadAggregateEvents = async (input) => {
+        countAtPage.push(paging.unfinished.get(KEY_A));
+        return load(input);
+      };
+
+      await replayer.replayLane({ lane: LANE, since: FROM_START, dryRun: false, paging });
+
+      expect(countAtPage).toEqual([1, 1]);
+      expect(paging.unfinished.get(KEY_A)).toBe(0);
+    });
+  });
+
+  describe("given an aggregate read in pages", () => {
+    /** @scenario "A paged aggregate applies only events at or before its cutoff" */
+    it("applies each aggregate's events only up to its own cutoff", async () => {
+      const { log } = setUp();
+      const applied: string[] = [];
+
+      await pageAggregateEvents({
+        eventSource: log,
+        signal: undefined,
+        log: { write: () => undefined },
+        tenantId: "tenant-1",
+        aggregateIds: ["directory-a", "directory-b"],
+        eventTypes: ["directory.member_added"],
+        cutoffs: new Map([
+          [KEY_A, { timestamp: BASE_MS + 1, eventId: "event-1" }],
+          ["tenant-1:directory:directory-b", { timestamp: BASE_MS + 3, eventId: "event-3" }],
+        ]),
+        onEvent: (event) => void applied.push(event.id),
+      });
+
+      expect(applied).toEqual(["event-1", "event-3"]);
+    });
+
+    /** @scenario "A paged aggregate logs each page's size and time, numbers only" */
+    it("logs each page's number, events, time and running total, and no id", async () => {
+      const { log } = setUp();
+      const events = AGGREGATE_PAGE.maxEvents * 2 + AGGREGATE_PAGE.maxEvents / 2;
+      seedLoneAggregate(log, events);
+      const entries: Record<string, unknown>[] = [];
+
+      await pageAggregateEvents({
+        eventSource: log,
+        signal: undefined,
+        log: { write: (entry) => void entries.push(entry) },
+        tenantId: "tenant-1",
+        aggregateIds: ["directory-a"],
+        eventTypes: ["directory.member_added"],
+        cutoffs: new Map([[KEY_A, { timestamp: BASE_MS + events, eventId: `event-${events}` }]]),
+        onEvent: () => undefined,
+      });
+
+      expect(entries).toMatchObject([
+        { page: 1, events: AGGREGATE_PAGE.maxEvents, totalEvents: AGGREGATE_PAGE.maxEvents },
+        { page: 2, events: AGGREGATE_PAGE.maxEvents, totalEvents: AGGREGATE_PAGE.maxEvents * 2 },
+        { page: 3, events: AGGREGATE_PAGE.maxEvents / 2, totalEvents: events },
+      ]);
+      for (const { step, ...numbers } of entries) {
+        expect(step).toBe("page-aggregate");
+        expect(Object.values(numbers).every((value) => typeof value === "number")).toBe(true);
+      }
+      expect(JSON.stringify(entries)).not.toMatch(/tenant-1|directory-a/);
     });
   });
 
@@ -774,6 +981,24 @@ describe("projectionLaneReplayer", () => {
 
       expect(streamed).toEqual([2]);
       expect(readModel.size).toBe(0);
+    });
+
+    /** @scenario "A lone aggregate failing for any other reason is not paged" */
+    it("fails the lane on a lone aggregate's other failure without reading a page", async () => {
+      const { log, replayer } = setUp();
+      seedLoneAggregate(log);
+      failStreamsAbove({
+        log,
+        maxAggregates: 0,
+        failure: () => new Error("the log's connection dropped"),
+      });
+      const { pages } = recordPages(log);
+
+      await expect(
+        replayer.replayLane({ lane: LANE, since: FROM_START, dryRun: false }),
+      ).rejects.toThrow(`Replaying "${LANE}" failed in 1 batch(es): the log's connection dropped`);
+
+      expect(pages).toEqual([]);
     });
 
     /** @scenario "A batch failing for any other reason fails the lane without splitting" */
@@ -831,6 +1056,23 @@ describe("projectionLaneReplayer", () => {
       );
 
       expect(streamed).toEqual([2]);
+      expect(mapRows).toHaveLength(MAP_DRAIN_ROWS);
+    });
+
+    /** @scenario "A lone map aggregate over the query memory limit after writing rows is not paged" */
+    it("fails the lane without reading a page once a lone aggregate's drain wrote rows", async () => {
+      const { log, mapRows, replayer } = setUp();
+      seedLoneAggregate(log, MAP_DRAIN_ROWS + 10);
+      failStreamsAbove({ log, maxAggregates: 0, eventsFirst: MAP_DRAIN_ROWS });
+      const { pages } = recordPages(log);
+
+      await expect(
+        replayer.replayLane({ lane: MAP_LANE, since: FROM_START, dryRun: false }),
+      ).rejects.toThrow(
+        `Replaying "${MAP_LANE}" failed in 1 batch(es): ${queryMemoryLimitError().message}`,
+      );
+
+      expect(pages).toEqual([]);
       expect(mapRows).toHaveLength(MAP_DRAIN_ROWS);
     });
 

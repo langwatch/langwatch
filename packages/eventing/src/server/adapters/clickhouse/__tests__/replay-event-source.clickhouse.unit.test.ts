@@ -9,7 +9,11 @@ import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doub
 import { describe, expect, it, vi } from "vitest";
 
 import type { ReplayEvent } from "../../../../replay/replayEventSource.ts";
-import { sliceByBudget, streamSliceOrHalves } from "../replay-event-source.clickhouse.ts";
+import {
+  rowsWithinPayload,
+  sliceByBudget,
+  streamSliceOrHalves,
+} from "../replay-event-source.clickhouse.ts";
 
 const row = (eventId: string, timestamp: number): ClickHouseEventRow => ({
   TenantId: "project_a",
@@ -118,6 +122,46 @@ describe("EventingClickHouseReplayEventSource", () => {
     });
   });
 
+  describe("when a page of an aggregate's events is capped by payload bytes", () => {
+    const page = {
+      tenantId: "project_a",
+      aggregateIds: ["trace_1"],
+      eventTypes: ["lw.span.received"],
+      maxCutoff: { timestamp: 9, eventId: "event_9" },
+      batchSize: 1_000,
+      maxPayloadBytes: 1_000,
+    };
+
+    /** @scenario "A page ends before its payloads pass the byte cap" */
+    it("reads its events up to the last one whose payload fits, sorting no payload to size them", async () => {
+      const { client, source } = member();
+      client.query
+        .mockResolvedValueOnce({
+          rows: [
+            { EventTimestamp: "1", EventId: "event_1", payloadBytes: "600" },
+            { EventTimestamp: "2", EventId: "event_2", payloadBytes: "600" },
+          ],
+        })
+        .mockResolvedValueOnce({ rows: [row("event_1", 1)] });
+
+      const events = await source.loadAggregateEvents(page);
+
+      expect(events.map((event) => event.id)).toEqual(["event_1"]);
+      const [sizes, read] = client.query.mock.calls.map(([request]) => request);
+      expect(sizes.sql).not.toContain("EventPayload,");
+      expect(read.params).toMatchObject({ maxCutoffTimestamp: 1, maxCutoffEventId: "event_1" });
+    });
+
+    /** @scenario "A page ends before its payloads pass the byte cap" */
+    it("reads nothing more once no event is left", async () => {
+      const { client, source } = member();
+
+      await expect(source.loadAggregateEvents(page)).resolves.toEqual([]);
+
+      expect(client.query).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("when a rebuilt table is optimized", () => {
     /** @scenario "A rebuilt table is optimized on each touched tenant's own server" */
     it("names the tenant, so a private data plane's table is the one optimized", async () => {
@@ -164,6 +208,24 @@ describe("sliceByBudget", () => {
       const slices = sliceByBudget({ aggregateIds: ["a", "unsized", "b"], sizes, budget });
 
       expect(slices).toEqual([["a", "unsized", "b"]]);
+    });
+  });
+});
+
+describe("rowsWithinPayload", () => {
+  describe("when a page's payloads pass the cap", () => {
+    it("ends the page before the row that passes it", () => {
+      expect(rowsWithinPayload({ payloadBytes: [400, 400, 400], maxPayloadBytes: 1_000 })).toBe(2);
+    });
+
+    it("reads a first row over the cap alone", () => {
+      expect(rowsWithinPayload({ payloadBytes: [5_000, 10], maxPayloadBytes: 1_000 })).toBe(1);
+    });
+  });
+
+  describe("when a page's payloads fit the cap", () => {
+    it("reads every row", () => {
+      expect(rowsWithinPayload({ payloadBytes: [400, 600], maxPayloadBytes: 1_000 })).toBe(2);
     });
   });
 });
