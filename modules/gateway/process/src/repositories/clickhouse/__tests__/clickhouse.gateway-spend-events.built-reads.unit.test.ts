@@ -50,6 +50,41 @@ describe("ClickHouseGatewaySpendEventsRepository built reads", () => {
       expect(statements()[0]?.sql).toContain("LIMIT 1");
       expect(sent[0]?.idBound).toEqual({ fallback: "unbounded" });
     });
+
+    /** @scenario A lookup by request id prunes partitions before FINAL */
+    it("prunes partitions before FINAL", async () => {
+      const { repository, statements } = repositoryOver();
+
+      await repository.findForFold({ tenantId: "project-1", gatewayRequestId: "req-1" });
+
+      expect(statements()[0]?.sql).toContain("FROM gateway_spend FINAL");
+      expect(statements()[0]?.sql).toContain("SETTINGS defer_partition_pruning_after_final = 0");
+    });
+  });
+
+  describe("when a request is found by id across projects", () => {
+    /** @scenario A lookup by request id prunes partitions before FINAL */
+    it("bounds each project's read by the index and prunes partitions before FINAL", async () => {
+      const { repository, sent, statements } = repositoryOver();
+
+      await repository.findSpendEventAcrossTenants({
+        tenantIds: ["project-1", "project-2"],
+        gatewayRequestId: "req-1",
+        statuses: ["confirmed"],
+      });
+
+      expect(statements()).toHaveLength(2);
+      expectProjectRead(statements()[1], "project-2");
+      for (const statement of statements()) {
+        expect(statement.sql).toContain("FROM gateway_spend FINAL");
+        expect(statement.sql).toContain("{{idBound:gateway_spend.GatewayRequestId:v0}}");
+        expect(statement.sql).toContain("SETTINGS defer_partition_pruning_after_final = 0");
+      }
+      expect(sent.map((each) => each.idBound)).toEqual([
+        { fallback: "unbounded" },
+        { fallback: "unbounded" },
+      ]);
+    });
   });
 
   describe("when the ledger UI pages one project with every filter and a cursor", () => {

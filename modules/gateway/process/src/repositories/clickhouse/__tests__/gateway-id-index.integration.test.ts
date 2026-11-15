@@ -21,10 +21,33 @@ import {
   startTestClickHouseEndpoints,
 } from "@langwatch/clickhouse-client/testing";
 import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
+import {
+  createTenantId,
+  type Event,
+  EventUtils,
+  type FoldProjectionStore,
+} from "@langwatch/eventing";
+import {
+  GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
+  GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
+} from "@langwatch/gateway-contract";
+import {
+  GATEWAY_SPEND_AGGREGATE_TYPE,
+  GATEWAY_SPEND_EVENT_VERSION_LATEST,
+  type GatewaySpendAdmittedEvent,
+  type GatewaySpendConfirmedEvent,
+} from "@langwatch/gateway-process";
 import { nowInstant, Temporal, toDate } from "@langwatch/time";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { GATEWAY_SPEND_PROJECTION_VERSION_LATEST } from "../../../rules/gateway-spend-projection.rules.ts";
+import {
+  GatewaySpendFoldProjection,
+  type GatewaySpendState,
+} from "../../../eventing/gateway-spend.projection.ts";
+import {
+  EMPTY_SPEND_USAGE,
+  GATEWAY_SPEND_PROJECTION_VERSION_LATEST,
+} from "../../../rules/gateway-spend-projection.rules.ts";
 import { GatewayBudgetClickHouseRepository } from "../clickhouse.gateway-budget.repository.ts";
 import { GATEWAY_ID_INDEXES } from "../clickhouse.gateway-id-indexes.database.ts";
 import { ClickHouseGatewaySession } from "../clickhouse.gateway-session.store.ts";
@@ -36,6 +59,18 @@ const eightWeeksAgoMs = nowInstant().epochMilliseconds - 56 * DAY_MS;
 // cannot rule that part out by key and an unbounded read must open it.
 const decoyAgesInDays = [100, 200];
 const decoyIds = ["!decoy", "~decoy"];
+// Admitted 100 ms before a month starts and confirmed 500 ms after; the confirmation folds first.
+const RACED = "req-raced";
+const racedMonthStart = Temporal.Instant.fromEpochMilliseconds(eightWeeksAgoMs)
+  .toZonedDateTimeISO("UTC")
+  .with({ day: 1 })
+  .startOfDay();
+const racedRequestAtMs = racedMonthStart.epochMilliseconds - 100;
+const racedOutcomeAtMs = racedMonthStart.epochMilliseconds + 500;
+const racedPartition = (() => {
+  const month = Temporal.Instant.fromEpochMilliseconds(racedRequestAtMs).toZonedDateTimeISO("UTC");
+  return `${month.year}${String(month.month).padStart(2, "0")}`;
+})();
 
 let ch: ClickHouseClient;
 let statements: QueryRequest[] = [];
@@ -116,6 +151,105 @@ function spendRow({ id, occurredAtMs }: { id: string; occurredAtMs: number }) {
   };
 }
 
+function racedEvent<E extends Event>(type: E["type"], data: E["data"], occurredAt: number): E {
+  return EventUtils.createEvent<E>({
+    aggregateType: GATEWAY_SPEND_AGGREGATE_TYPE,
+    aggregateId: RACED,
+    tenantId: createTenantId(tenantId),
+    type,
+    version: GATEWAY_SPEND_EVENT_VERSION_LATEST,
+    data,
+    occurredAt,
+    idempotencyKey: `${tenantId}:${RACED}:${type}`,
+  });
+}
+
+/**
+ * The fold's two versions of the raced request, each committed in its own batch through the
+ * store's writer: the confirmation (naming its admission instant) first, the admission after.
+ */
+async function foldRacedRequest(): Promise<void> {
+  const attribution = {
+    organization_id: "org-1",
+    virtual_key_id: "vk-1",
+    principal_user_id: "",
+    end_user_id: "",
+    trace_id: "",
+    request_type: "chat",
+    labels: [],
+    metadata: "",
+  };
+  const confirmation = racedEvent<GatewaySpendConfirmedEvent>(
+    GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
+    {
+      ...attribution,
+      gateway_request_id: RACED,
+      occurred_at: racedOutcomeAtMs,
+      tenantId,
+      model: "openai/gpt-5",
+      model_provider_id: "mp-1",
+      usage: { ...EMPTY_SPEND_USAGE, input_tokens: 10, output_tokens: 5 },
+      cost_nano_usd: 2_000,
+      rate_version: "catalog@test",
+      duration_ms: 600,
+      admitted_at: racedRequestAtMs,
+      team_id: "",
+    },
+    racedOutcomeAtMs,
+  );
+  const admission = racedEvent<GatewaySpendAdmittedEvent>(
+    GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
+    {
+      ...attribution,
+      outcome_carries_attribution: true,
+      gateway_request_id: RACED,
+      occurred_at: racedRequestAtMs,
+      tenantId,
+      model: "openai/gpt-5",
+      model_provider_id: "mp-1",
+      team_id: "",
+      pod_id: "pod-1",
+      pod_seq: 1,
+    },
+    racedRequestAtMs,
+  );
+  const projection = new GatewaySpendFoldProjection({
+    store: {} as FoldProjectionStore<GatewaySpendState>,
+  });
+  const fresh = projection.handleGatewaySpendConfirmed(confirmation, {
+    status: "",
+    organizationId: "",
+    virtualKeyId: "",
+    principalUserId: "",
+    endUserId: "",
+    model: "",
+    providerKey: "",
+    traceId: "",
+    requestType: "",
+    labels: [],
+    metadataJson: "",
+    podId: "",
+    podSeq: 0,
+    usage: null,
+    rateVersion: "",
+    costNanoUsd: 0,
+    errorType: "",
+    httpStatus: 0,
+    needsReconciliation: false,
+    settleReason: "",
+    occurredAtMs: 0,
+    durationMs: 0,
+    createdAt: racedOutcomeAtMs,
+    updatedAt: racedOutcomeAtMs,
+    LastEventOccurredAt: racedOutcomeAtMs,
+  });
+  await spend.upsertFromFold([{ tenantId, gatewayRequestId: RACED, state: fresh }]);
+  const late = projection.handleGatewaySpendAdmitted(admission, fresh);
+  await spend.upsertFromFold([
+    { tenantId, gatewayRequestId: RACED, state: { ...late, updatedAt: racedOutcomeAtMs + 1_000 } },
+  ]);
+}
+
 beforeAll(async () => {
   const [endpoint] = await startTestClickHouseEndpoints({
     suite: "gateway-id-index",
@@ -186,6 +320,7 @@ beforeAll(async () => {
       }),
     },
   ]);
+  await foldRacedRequest();
 }, 180_000);
 
 beforeEach(() => {
@@ -286,6 +421,34 @@ describe("gateway lookups by request id with the id index", () => {
           !request.sql.includes("_id_index"),
       );
       expect(probe?.params).toHaveProperty("idBound_fromMs");
+    });
+  });
+
+  describe("given a request whose confirmation folded before its admission across a month", () => {
+    /** @scenario A request folded out of order across a month boundary is found in one partition */
+    it("keeps every version in the request's month and reads the same row with fewer parts", async () => {
+      const placement = await queryRows(
+        `SELECT toString(uniqExact(_partition_id)) AS partitions, any(_partition_id) AS partition
+         FROM gateway_spend WHERE TenantId = {tenantId:String} AND GatewayRequestId = {id:String}`,
+        { tenantId, id: RACED },
+      );
+      expect(placement).toEqual([{ partitions: "1", partition: racedPartition }]);
+
+      const bounded = await spend.findForFold({ tenantId, gatewayRequestId: RACED });
+      const boundedRead = sourceReadOf("gateway_spend");
+      statements = [];
+      const unbounded = await unboundedSpend.findForFold({ tenantId, gatewayRequestId: RACED });
+
+      expect(bounded).toEqual(unbounded);
+      expect(bounded).toMatchObject({
+        status: "confirmed",
+        organizationId: "org-1",
+        costNanoUsd: 2_000,
+        occurredAtMs: racedRequestAtMs,
+      });
+      expect(await partsReached(boundedRead)).toBeLessThan(
+        await partsReached(sourceReadOf("gateway_spend")),
+      );
     });
   });
 });

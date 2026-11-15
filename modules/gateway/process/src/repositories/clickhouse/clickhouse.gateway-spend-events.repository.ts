@@ -241,6 +241,12 @@ const meteredWindow = ({ tenantIds, fromDay, toDay }: GatewaySpendWindow) => ({
 });
 
 const METERED_SETTINGS = { max_execution_time: METERED_READ_MAX_EXECUTION_SECONDS };
+/**
+ * A lookup the id index bounds prunes partitions before FINAL (26.3+ defers it): the fold fixes
+ * OccurredAt once, so a request's versions share one month, and the index's range spans every
+ * version already written (ADR-202 Decided 24).
+ */
+const PRUNE_BEFORE_FINAL = { defer_partition_pruning_after_final: 0 };
 
 export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRepository {
   static create(resolveClient: GatewayClickHouseResolver): ClickHouseGatewaySpendEventsRepository {
@@ -352,6 +358,7 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
       })
       .where(({ idBound }) => idBound(spend.GatewayRequestId, gatewayRequestId))
       .limit(1)
+      .settings(PRUNE_BEFORE_FINAL)
       .build();
     const { rows: raw } = await client.read({ statement, idBound: { fallback: "unbounded" } });
     const r = raw[0];
@@ -535,7 +542,8 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
             read
               .where(({ idBound }) => idBound(spend.GatewayRequestId, input.gatewayRequestId))
               .where(({ oneOf }) => oneOf(spend.Status, input.statuses))
-              .limit(1),
+              .limit(1)
+              .settings(PRUNE_BEFORE_FINAL),
           idBound: { fallback: "unbounded" },
         }),
       ),

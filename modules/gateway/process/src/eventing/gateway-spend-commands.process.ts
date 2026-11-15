@@ -63,7 +63,7 @@ const boundedMetadataJson = z
 /** Request time, unix ms, bounded to the plausible clock range so a
  *  seconds- or microseconds-scale timestamp fails at the ingest boundary
  *  instead of landing in the wrong partition. */
-const occurredAtMs = z
+export const occurredAtMs = z
   .number()
   .int()
   .min(

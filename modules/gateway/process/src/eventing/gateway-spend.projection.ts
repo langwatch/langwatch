@@ -6,6 +6,7 @@ import {
 import type { SpendUsage } from "@langwatch/gateway-contract";
 
 import { GATEWAY_SPEND_PROJECTION_VERSION_LATEST } from "../rules/gateway-spend-projection.rules.ts";
+import { occurredAtMs as plausibleInstantMs } from "./gateway-spend-commands.process.ts";
 import {
   type GatewaySpendAdmittedEvent,
   type GatewaySpendConfirmedEvent,
@@ -54,7 +55,7 @@ export interface GatewaySpendState {
   httpStatus: number;
   needsReconciliation: boolean;
   settleReason: string;
-  /** Request time (admission), unix ms. Period placement anchors here. */
+  /** Request time (admission), unix ms. Period placement anchors here; set once, never moved. */
   occurredAtMs: number;
   durationMs: number;
   createdAt: number;
@@ -121,6 +122,25 @@ function attributionFromAdmission(state: GatewaySpendState, d: AttributionWire):
     labels: d.labels?.length ? d.labels : (state.labels ?? []),
     metadataJson: d.metadata || state.metadataJson,
   };
+}
+
+/**
+ * The request time, fixed by the first event folded: the table is partitioned by its month and
+ * versions replace each other only inside one partition (ADR-202 Decided 24). An outcome folded
+ * first names its admission instant when it carries a plausible one, else its own time.
+ */
+function requestTimeOf({
+  state,
+  occurredAt,
+  admittedAt = 0,
+}: {
+  state: GatewaySpendState;
+  occurredAt: number;
+  admittedAt?: number;
+}): number {
+  if (state.occurredAtMs !== 0) return state.occurredAtMs;
+  const admitted = admittedAt <= occurredAt && plausibleInstantMs.validate(admittedAt);
+  return admitted ? admittedAt : occurredAt;
 }
 
 export class GatewaySpendFoldProjection
@@ -213,7 +233,7 @@ export class GatewaySpendFoldProjection
         outcomeResolved && state.providerKey !== "" ? state.providerKey : d.model_provider_id,
       podId: d.pod_id,
       podSeq: d.pod_seq,
-      occurredAtMs: d.occurred_at,
+      occurredAtMs: requestTimeOf({ state, occurredAt: d.occurred_at }),
     };
   }
 
@@ -239,7 +259,7 @@ export class GatewaySpendFoldProjection
       // A confirmation resolving a settled request clears the unknown.
       needsReconciliation: false,
       settleReason: "",
-      occurredAtMs: state.occurredAtMs || d.occurred_at,
+      occurredAtMs: requestTimeOf({ state, occurredAt: d.occurred_at, admittedAt: d.admitted_at }),
     };
   }
 
@@ -267,7 +287,7 @@ export class GatewaySpendFoldProjection
       durationMs: d.duration_ms,
       needsReconciliation: false,
       settleReason: "",
-      occurredAtMs: state.occurredAtMs || d.occurred_at,
+      occurredAtMs: requestTimeOf({ state, occurredAt: d.occurred_at, admittedAt: d.admitted_at }),
     };
   }
 
@@ -286,7 +306,11 @@ export class GatewaySpendFoldProjection
       status: "settled",
       needsReconciliation: true,
       settleReason: event.data.reason,
-      occurredAtMs: state.occurredAtMs || event.data.occurred_at,
+      occurredAtMs: requestTimeOf({
+        state,
+        occurredAt: event.data.occurred_at,
+        admittedAt: event.data.admitted_at,
+      }),
     };
   }
 }

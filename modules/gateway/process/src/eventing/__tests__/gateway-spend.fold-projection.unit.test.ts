@@ -396,3 +396,63 @@ describe("gatewaySpend fold", () => {
     expect(projection.handleGatewaySpendAdmitted(admitted(), early).organizationId).toBe("org_1");
   });
 });
+
+describe("gatewaySpend fold request time", () => {
+  /** The confirmation with its own instant and the admission instant it names. */
+  const confirmedAt = ({ occurredAt, admittedAt }: { occurredAt: number; admittedAt: number }) =>
+    makeEvent<GatewaySpendConfirmedEvent>(
+      GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
+      { ...confirmed().data, occurred_at: occurredAt, admitted_at: admittedAt },
+      occurredAt,
+    );
+  const NEXT_MONTH = Date.UTC(2026, 7, 1, 0, 0, 0, 500);
+
+  /** @scenario An outcome folded before its admission is placed at the admission instant it carries */
+  it("places both versions at the admission instant the early outcome names", () => {
+    const early = projection.handleGatewaySpendConfirmed(
+      confirmedAt({ occurredAt: T0 + 3800, admittedAt: T0 }),
+      initial(),
+    );
+    expect(early.occurredAtMs).toBe(T0);
+
+    expect(projection.handleGatewaySpendAdmitted(admitted(), early).occurredAtMs).toBe(T0);
+  });
+
+  /** @scenario A late admission never moves a record's request time */
+  it("keeps the first version's time when a late admission names an earlier month", () => {
+    const early = projection.handleGatewaySpendConfirmed(
+      confirmedAt({ occurredAt: NEXT_MONTH, admittedAt: 0 }),
+      initial(),
+    );
+    expect(early.occurredAtMs).toBe(NEXT_MONTH);
+
+    const afterAdmit = projection.handleGatewaySpendAdmitted(admitted(), early);
+    expect(afterAdmit.occurredAtMs).toBe(NEXT_MONTH);
+    expect(afterAdmit.organizationId).toBe("org_1");
+  });
+
+  /** @scenario A late admission never moves a record's request time */
+  it("keeps the admission's time through every later outcome and settlement", () => {
+    const admittedState = projection.handleGatewaySpendAdmitted(admitted(), initial());
+    const later = { occurredAt: NEXT_MONTH, admittedAt: NEXT_MONTH };
+
+    expect(
+      projection.handleGatewaySpendConfirmed(confirmedAt(later), admittedState).occurredAtMs,
+    ).toBe(T0);
+    expect(projection.handleGatewaySpendSettled(settled(), admittedState).occurredAtMs).toBe(T0);
+    expect(projection.handleGatewaySpendFailed(failed(), admittedState).occurredAtMs).toBe(T0);
+  });
+
+  /** @scenario An implausible admission instant never places a record */
+  it.each([
+    { name: "a seconds-scale instant", admittedAt: Math.floor(T0 / 1000) },
+    { name: "an instant after the outcome", admittedAt: T0 + 60_000 },
+  ])("places the record at the outcome's own time for $name", ({ admittedAt }) => {
+    const early = projection.handleGatewaySpendConfirmed(
+      confirmedAt({ occurredAt: T0 + 3800, admittedAt }),
+      initial(),
+    );
+
+    expect(early.occurredAtMs).toBe(T0 + 3800);
+  });
+});
