@@ -712,10 +712,9 @@ function positionGroups(rows: readonly SizedRow[]): { end: number; bytes: number
 }
 
 /**
- * How many leading rows a page reads within `maxPayloadBytes`. It ends only between positions, so
- * rows tied at one position (copies a merge has not yet collapsed) are read together; a first
- * position over the cap is its own page. `truncated`: the sizing read stopped at its LIMIT, so its
- * last position may hold rows it never saw and is left whole to the next page.
+ * Leading rows of a page within `maxPayloadBytes`, ended only between positions so tied copies
+ * stay together; a first position over the cap is its own page. `truncated`: the LIMIT cut the
+ * read, so its last position, which may hold unseen rows, waits for the next page.
  */
 export function rowsWithinPayload({
   rows,
