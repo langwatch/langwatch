@@ -162,6 +162,13 @@ Migration path: about 139 non-test TypeScript files under ClickHouse repository 
 16. The three materialised views fed by the writer's tables (`gateway_budget_scope_totals_mv`, `gateway_budget_ledger_events_id_index_mv`, `dspy_steps_id_index_mv`) run as `SQL SECURITY DEFINER`, set by a migration, so an insert-only writer fills them; without it 26.8 refuses the push with 497 after storing the source row. An insert depends on the definer user existing (Alex, 2026-11-14). Proven on 26.8: migrations 00132 and 00133 set `DEFINER = CURRENT_USER`, the user the upgrade runs as on each target; ClickHouse refuses to drop that user (630); a renamed definer, or one without grants, fails the insert (192 or 497) and stores nothing. A guard test fails any later view over a writer table without `SQL SECURITY DEFINER`.
 17. An organisation's usage totals are summed over its current projects, archived included; usage under a project that moved out or was deleted unpurged no longer counts for the old organisation (Alex, 2026-11-14).
 
+## Decided (Alex, 2026-11-15)
+
+18. The trace filter compiler returns builder conditions, not SQL text, so trace-list, facet, session-groups and legacy's filtered reads are built; no compiled-filter node admits its text.
+19. Analytics' dashboard reads move onto the shared builder in this PR; there is no second, analytics-only renderer.
+20. The storage meter asks each owning module for its own stored bytes through that module's `*Api`; data-retention reads no other module's table.
+21. LangWatchQL views are reads: the table-ownership policy counts each view's source table as read by analytics.
+
 ## Open questions for Alex
 
 1. Whether the reader's names (`langwatch_app_reader`, its profile and policies) become configurable per install. They are fixed today, so two installs sharing one server would replace each other's reader and grants. That fails closed, not open, but it rules out sharing a server until decided.
