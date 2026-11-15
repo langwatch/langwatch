@@ -132,9 +132,22 @@ export const isGrowthInstantEvalPriceProvisioned = ({
 }): boolean => Boolean(prices.GROWTH_INSTANT_EVAL_USD);
 
 /**
+ * The PII redaction price on a Growth subscription, when the mode has one.
+ * Dollars only, since its meter counts dollars (ADR-201), and absent until
+ * provisioned, so a checkout never fails over it.
+ */
+export const pickGrowthPiiRedactionPriceId = ({
+  currency,
+  prices,
+}: {
+  currency: Currency;
+  prices: StripePriceMap;
+}): string | undefined => (currency === "USD" ? prices.GROWTH_PII_REDACTION_USD : undefined);
+
+/**
  * Stripe checkout line items for a Growth subscription: a seat item (quantity
- * = coreMembers), a metered events item, and where provisioned a metered
- * Instant Evals one. Neither metered item carries a quantity.
+ * = coreMembers), a metered events item, and where provisioned the metered
+ * Instant Evals and PII redaction ones. No metered item carries a quantity.
  */
 export const createCheckoutLineItems = ({
   coreMembers,
@@ -151,6 +164,7 @@ export const createCheckoutLineItems = ({
     throw new InvalidSeatCountError(coreMembers);
   }
   const instantEvalPriceId = pickGrowthInstantEvalPriceId({ currency, prices });
+  const piiRedactionPriceId = pickGrowthPiiRedactionPriceId({ currency, prices });
 
   return [
     {
@@ -161,6 +175,7 @@ export const createCheckoutLineItems = ({
       price: resolveGrowthEventsPriceId({ currency, interval, prices }),
     },
     ...(instantEvalPriceId ? [{ price: instantEvalPriceId }] : []),
+    ...(piiRedactionPriceId ? [{ price: piiRedactionPriceId }] : []),
   ];
 };
 

@@ -135,6 +135,7 @@ export interface LicensingApi {
     id: string;
     maxMembers?: number;
     maxMembersLite?: number;
+    maxMembersDeveloper?: number;
     maxMessagesPerMonth?: number;
     /** ISO 8601. The instant the new term ends. */
     expiresAt: string;

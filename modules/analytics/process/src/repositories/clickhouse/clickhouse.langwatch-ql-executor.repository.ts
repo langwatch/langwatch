@@ -19,6 +19,7 @@ import {
 import { nowInstant } from "@langwatch/time";
 
 import { lwqlAppFunctionNames } from "../../features/app-functions/rules/langwatch-ql-app-function-catalog.rules.ts";
+import { bindLangWatchQLInstantParameters } from "../../rules/langwatch-ql-instant-parameters.rules.ts";
 import {
   withoutTenantCapability,
   withTenantCapability,
@@ -44,10 +45,9 @@ import {
   toError,
 } from "./clickhouse.query-error-translation.mapper.ts";
 
-/**
- * How long the driver waits on a LangWatchQL query, in milliseconds.
- */
-const LWQL_REQUEST_TIMEOUT_MS = (DEFAULT_LWQL_RESOURCE_LIMITS.maxExecutionTimeSeconds + 5) * 1000;
+/** How long the driver waits on a LangWatchQL query, in milliseconds: the cap, plus slack. */
+export const LWQL_REQUEST_TIMEOUT_MS =
+  (DEFAULT_LWQL_RESOURCE_LIMITS.maxExecutionTimeSeconds + 5) * 1000;
 
 /**
  * Sockets this process may hold open against the LangWatchQL endpoint at once.
@@ -195,7 +195,9 @@ export class ClickHouseLangWatchQLExecutorRepository extends LangWatchQLExecutor
         // the `FORMAT` it reads the response in.
         query: statement,
         format: "JSON",
-        query_params: parameters as Record<string, unknown> | undefined,
+        query_params: parameters
+          ? { ...bindLangWatchQLInstantParameters({ sql: statement, parameters }) }
+          : undefined,
       });
       const response = await resultSet.json<Record<string, unknown>>();
       const rows = response.data;

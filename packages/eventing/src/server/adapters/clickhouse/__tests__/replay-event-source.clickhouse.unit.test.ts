@@ -5,7 +5,11 @@ import {
   type EventingClickHouseReplayClient,
   getAggregateOccurredAtBounds,
 } from "@langwatch/eventing/server";
+import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { describe, expect, it, vi } from "vitest";
+
+import type { ReplayEvent } from "../../../../replay/replayEventSource.ts";
+import { sliceByBudget, streamSliceOrHalves } from "../replay-event-source.clickhouse.ts";
 
 const row = (eventId: string, timestamp: number): ClickHouseEventRow => ({
   TenantId: "project_a",
@@ -59,7 +63,10 @@ describe("EventingClickHouseReplayEventSource", () => {
       expect(client.stream).toHaveBeenCalledWith(
         expect.objectContaining({ tenantId: "project_a" }),
       );
-      expect(client.query).not.toHaveBeenCalled();
+      // Only the batch's sizes are read whole; its events arrive streamed.
+      const wholeReads = client.query.mock.calls.map(([request]) => String(request.sql));
+      expect(wholeReads).toHaveLength(1);
+      expect(wholeReads[0]).toContain("sum(length(EventPayload))");
     });
   });
 
@@ -121,6 +128,104 @@ describe("EventingClickHouseReplayEventSource", () => {
       expect(client.command).toHaveBeenCalledWith(
         expect.objectContaining({ tenantId: "project_a", params: { table: "stored_spans" } }),
       );
+    });
+  });
+});
+
+describe("sliceByBudget", () => {
+  const budget = { maxEvents: 10, maxPayloadBytes: 1_000 };
+  const sizes = new Map([
+    ["a", { events: 4, payloadBytes: 100 }],
+    ["b", { events: 4, payloadBytes: 100 }],
+    ["c", { events: 4, payloadBytes: 100 }],
+    ["huge", { events: 50, payloadBytes: 5_000 }],
+    ["heavy", { events: 1, payloadBytes: 950 }],
+    ["d", { events: 1, payloadBytes: 200 }],
+  ]);
+
+  describe("when the batch's aggregates outgrow the budget together", () => {
+    it("cuts them in order into slices within it, by events and by payload bytes", () => {
+      const slices = sliceByBudget({ aggregateIds: ["a", "b", "c", "heavy", "d"], sizes, budget });
+
+      expect(slices).toEqual([["a", "b"], ["c"], ["heavy"], ["d"]]);
+    });
+  });
+
+  describe("when one aggregate alone is over the budget", () => {
+    it("reads it in a slice of its own, never split", () => {
+      const slices = sliceByBudget({ aggregateIds: ["a", "huge", "b"], sizes, budget });
+
+      expect(slices).toEqual([["a"], ["huge"], ["b"]]);
+    });
+  });
+
+  describe("when an aggregate has no sized row", () => {
+    it("reads it with the slice it falls in", () => {
+      const slices = sliceByBudget({ aggregateIds: ["a", "unsized", "b"], sizes, budget });
+
+      expect(slices).toEqual([["a", "unsized", "b"]]);
+    });
+  });
+});
+
+describe("streamSliceOrHalves", () => {
+  const memoryLimit = () =>
+    Object.assign(new Error("Memory limit (total) exceeded: would use 3.3 GiB"), { code: "241" });
+
+  function slice(
+    stream: (request: { params?: Record<string, unknown> }) => AsyncGenerator<ClickHouseEventRow[]>,
+  ) {
+    const applied: string[] = [];
+    const client = clickHouseQueryClientDouble({
+      stream: async function* (request) {
+        yield* stream(request);
+      },
+    });
+    const read = {
+      client,
+      tenantId: "project_a",
+      aggregateIds: ["trace_1", "trace_2"],
+      eventTypes: ["lw.span.received"],
+      cutoffs: new Map(),
+      lean: (event: ReplayEvent) => event,
+      onEvent: (event: ReplayEvent) => {
+        applied.push(event.id);
+      },
+    };
+    return { read, applied };
+  }
+
+  describe("when the read hits a memory limit before it handed an event on", () => {
+    /** @scenario "A slice over the server's memory before it applied an event is read as halves" */
+    it("reads the slice again as two halves", async () => {
+      const reads: string[][] = [];
+      const { read, applied } = slice(async function* (request) {
+        const ids = (request.params?.aggregateIds ?? []) as string[];
+        reads.push(ids);
+        if (ids.length > 1) throw memoryLimit();
+        yield [row(`event_${ids[0]}`, 1)];
+      });
+
+      await expect(streamSliceOrHalves(read)).resolves.toBe(2);
+
+      expect(reads).toEqual([["trace_1", "trace_2"], ["trace_1"], ["trace_2"]]);
+      expect(applied).toEqual(["event_trace_1", "event_trace_2"]);
+    });
+  });
+
+  describe("when the read hits a memory limit after it handed an event on", () => {
+    /** @scenario "A slice over the server's memory after it applied an event fails without halving" */
+    it("fails with that error and reads no half", async () => {
+      const stream = vi.fn(async function* (): AsyncGenerator<ClickHouseEventRow[]> {
+        yield [row("event_1", 1)];
+        throw memoryLimit();
+      });
+      const { read, applied } = slice(stream);
+
+      await expect(streamSliceOrHalves(read)).rejects.toMatchObject({ code: "241" });
+
+      expect(stream).toHaveBeenCalledTimes(1);
+      expect(applied).toEqual(["event_1"]);
     });
   });
 });

@@ -17,18 +17,15 @@ function built(id: string) {
 
 const UNIT_WIDGETS = ["att-share", "att-table", "att-change", "cost-by-segment"];
 
-/** The view each unit-grouped query reads: those needing a prompt version stay on `traces`. */
-const UNIT_QUERY_VIEWS: Record<string, Record<string, "traces" | "trace_metrics">> = {
-  "att-share": { units: "trace_metrics", totals: "trace_metrics" },
-  "att-table": { units: "trace_metrics", passRates: "trace_metrics" },
-  "att-change": { units: "traces" },
-  "cost-by-segment": { units: "trace_metrics", totals: "trace_metrics" },
+/** The unit-grouped queries: every one picks its unit from `trace_metrics`' typed columns. */
+const UNIT_QUERIES: Record<string, string[]> = {
+  "att-share": ["units", "totals"],
+  "att-table": ["units", "passRates"],
+  "att-change": ["units"],
+  "cost-by-segment": ["units", "totals"],
 };
 
-const UNIT_EXPRESSION = {
-  traces: "JSONExtractString(Attributes['langwatch.labels'], 1)",
-  trace_metrics: "unit_key = 'langwatch.labels', Labels[1]",
-} as const;
+const UNIT_EXPRESSION = "unit_key = 'langwatch.labels', Labels[1]";
 
 describe("given the By customer widgets", () => {
   /** @scenario "AC80 By customer: the board groups by the first key the traces carry" */
@@ -46,15 +43,14 @@ describe("given the By customer widgets", () => {
     for (const id of UNIT_WIDGETS) {
       const { sql } = built(id);
       const grouped = Object.entries(sql).filter(([, text]) => text.includes("AS unit_key"));
-      const views = UNIT_QUERY_VIEWS[id] ?? {};
-      expect(grouped.map(([name]) => name).toSorted(), id).toEqual(Object.keys(views).toSorted());
+      expect(grouped.map(([name]) => name).toSorted(), id).toEqual(
+        (UNIT_QUERIES[id] ?? []).toSorted(),
+      );
       for (const [name, text] of grouped) {
-        const view = views[name];
-        if (!view) throw new Error(`${id}/${name} has no expected view`);
         expect(text, `${id}/${name}`).toContain("multiIf(");
-        expect(text, `${id}/${name}`).toMatch(new RegExp(`\\bFROM ${view}\\b`));
-        expect(text, `${id}/${name}`).toContain(UNIT_EXPRESSION[view]);
-        expect(/\bFROM traces\b/.test(text), `${id}/${name}`).toBe(view === "traces");
+        expect(text, `${id}/${name}`).toMatch(/\bFROM trace_metrics\b/);
+        expect(text, `${id}/${name}`).toContain(UNIT_EXPRESSION);
+        expect(text, `${id}/${name}`).not.toContain("Attributes[");
       }
     }
   });
@@ -88,8 +84,13 @@ describe("given the By customer widgets", () => {
   /** @scenario "AC82 By customer: one row per customer with pass rate, the period before and AI cost" */
   it("reads verdicts at the judged answer's time and flags a drop beyond chance", () => {
     const { code, sql } = built("att-table");
-    expect(sql.passRates).toContain("countIf(t.at < {dashboard_context_period_start:DateTime})");
-    expect(sql.passRates).toContain("e.IsGuardrail = false");
+    expect(sql.passRates).toContain(
+      "sumIf(t.judged, t.at < {dashboard_context_period_start:DateTime})",
+    );
+    expect(sql.passRates).toContain("IsGuardrail = false");
+    // Each verdict carries its trace's time and unit columns: one read, no join to the traces.
+    expect(sql.passRates).toContain("FROM trace_evaluation_metrics");
+    expect(sql.passRates).toContain("min(TraceOccurredAt) AS at");
     expect(code).toContain("const MIN_JUDGED = 30;");
     expect(code).toContain("drop >= 0.02 && spread > 0 && drop / spread >= 1.96");
     for (const header of ["Pass rate", "Before", "AI cost"]) {
@@ -103,6 +104,12 @@ describe("given the By customer widgets", () => {
     expect(sql.change).toContain("arrayReverseSort(groupArray(tuple(first_seen, version)))");
     expect(sql.change).toContain("length(versions) > 1");
     expect(sql.units).toContain("GROUP BY unit, version");
+    // The metadata version wins; the managed one is a plain traces column, never the map.
+    expect(sql.units).toContain("coalesce(nullIf(t.version, ''), t.managed, '')");
+    expect(sql.units).toContain("FROM trace_evaluation_metrics");
+    expect(sql.change).toContain("MetadataPromptVersion != ''");
+    expect(sql.change).toContain("LastUsedPromptVersionId != ''");
+    for (const text of [sql.units, sql.change]) expect(text).not.toContain("Attributes[");
     expect(code).toContain('row.version === last.version ? "after"');
     expect(code).toContain("No new prompt version started in this period.");
   });
@@ -120,9 +127,7 @@ describe("given the Call quality widgets", () => {
   it("sums each reply's stage spans and compares the halves of the period", () => {
     const { code, sql } = built("voice-turn-latency");
     expect(sql.summary).toContain("HAVING countIf(SpanName IN ('stt', 'tts')) > 0");
-    expect(sql.summary).toContain(
-      "sumIf(DurationMs, SpanAttributes['langwatch.span.type'] = 'llm')",
-    );
+    expect(sql.summary).toContain("sumIf(DurationMs, SpanType = 'llm')");
     expect(sql.summary).toContain("speaking_second_p95");
     expect(code).toContain('label="Reply time, slowest 5%"');
     expect(code).toContain('label="Grew most, second half"');
@@ -131,7 +136,7 @@ describe("given the Call quality widgets", () => {
   /** @scenario "AC86 Call quality: calls not ended and repeated sentences" */
   it("counts calls ending on an error and calls the repeat check failed, per 1,000", () => {
     const { code, sql } = built("voice-call-health");
-    expect(sql.summary).toContain("argMax(ContainsErrorStatus, OccurredAt) AS not_ended");
+    expect(sql.summary).toContain("argMax(ContainsErrorStatus, at) AS not_ended");
     expect(sql.summary).toContain(`EvaluatorName = '${REPEAT_CHECK}'`);
     expect(sql.summary).toContain("AS repeat_checks");
     expect(code).toContain('"Add the " + REPEAT_CHECK');
@@ -142,7 +147,9 @@ describe("given the Field accuracy widgets", () => {
   /** @scenario "AC87 Field accuracy: accuracy per field and document type" */
   it("splits the field check's wrong list per field and document type", () => {
     const { code, sql } = built("ext-field-accuracy");
-    expect(sql.wrong).toContain(`e.EvaluatorName = '${FIELD_CHECK}'`);
+    expect(sql.wrong).toContain(`EvaluatorName = '${FIELD_CHECK}'`);
+    expect(sql.wrong).toContain("FROM trace_metrics");
+    expect(sql.wrong).not.toContain("Attributes[");
     expect(sql.wrong).toContain("arrayJoin(splitByString(', '");
     expect(code).toContain("const FLOOR = 0.9;");
     expect(code).toContain("const MIN_CHECKED = 30;");

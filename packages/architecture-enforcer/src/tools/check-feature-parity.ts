@@ -281,12 +281,15 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   // The docs deploy's redirect store and its job (specs/ci/docs-deploy.feature).
   "tools/docsdeploy",
   "tools/chartheap",
+  "tools/charts3region",
   // How the package-suites weights are measured from main's job logs
   // (specs/ci/package-suites-weights.feature).
   "tools/suiteweights",
   // The gateway-matrix seed: which providers it seeds from which credentials,
   // and that Bedrock stays keyless (specs/ci/gateway-matrix-seed.feature).
   "tools/matrixseed",
+  // Its command writes the bootstrapped step output the later steps gate on.
+  "cmd/matrixseed",
   // The CLI half of the same tool: the verdict-to-exit-code step is the part
   // CI gates on, so the "check fails" / "check passes" scenarios bind here.
   "cmd/linkcheck",

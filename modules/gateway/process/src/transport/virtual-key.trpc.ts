@@ -94,7 +94,7 @@ export const virtualKeyTrpcTransport: TrpcRouterDeclaration<GatewayApi, typeof v
     )
 
     .procedure("create")
-    .mintsCredential("virtualKeys:create")
+    .mintsCredential()
     .withMiddlewareContext(gatewaySessionContext)
     .serviceAuthorized({
       reason: `${RESOLVER_AUTHORIZED}; manage on every requested scope, and every scope anchored to this organization, both before the key is minted`,
@@ -174,7 +174,7 @@ export const virtualKeyTrpcTransport: TrpcRouterDeclaration<GatewayApi, typeof v
     })
 
     .procedure("rotate")
-    .mintsCredential("virtualKeys:rotate")
+    .mintsCredential()
     .withMiddlewareContext(gatewaySessionContext)
     .serviceAuthorized({
       reason: `${RESOLVER_AUTHORIZED}; rotate on one of the key's existing scopes`,

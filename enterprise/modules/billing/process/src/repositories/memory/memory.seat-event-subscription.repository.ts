@@ -91,6 +91,7 @@ export class MemorySeatEventSubscriptionRepository extends SeatEventSubscription
       endDate: null,
       maxMembers: input.maxMembers,
       maxMembersLite: null,
+      maxMembersDeveloper: null,
       maxMessagesPerMonth: null,
       lastPaymentFailedDate: null,
       seatsKept: null,

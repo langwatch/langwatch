@@ -362,7 +362,7 @@ async function writtenRows(events: NormalizedPullEvent[]): Promise<GovernanceOcs
         traceSharingEnabled: false,
       }),
     },
-    sink: { insertEvent: async (row) => void rows.push(row) },
+    sink: { insertEvents: async (batch) => void rows.push(...batch) },
     usageEntitlement: { isEnabled: async () => false },
     usageRecords: PulledUsageRecordService.create(
       PulledUsagePricingService.create({ rate: () => ({ costNanoUsd: 0, rateVersion: "test" }) }),

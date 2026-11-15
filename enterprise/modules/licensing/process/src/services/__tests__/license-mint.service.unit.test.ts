@@ -9,6 +9,7 @@ import {
 } from "@langwatch/enterprise-license-signing";
 import { OrganizationNotFoundError } from "@langwatch/organization-contract";
 import type { OrganizationProvisioningSummary } from "@langwatch/organization-contract";
+import { MAX_STATED_SEATS } from "@langwatch/plans";
 import { nowInstant, Temporal, type Instant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
@@ -138,6 +139,44 @@ describe("LicenseMintService", () => {
       expect((await licenseRows.getOrganizationLicense("org-acme")).licenseKey).toBe(
         organizations.licenses.get("org-acme")?.licenseKey,
       );
+    });
+  });
+
+  describe("given the script states Developer seats", () => {
+    /** @scenario The mint script states Developer seats */
+    it("signs them into the license and records them on the registry row", async () => {
+      const { mint, repository, organizations } = harness({ goneBeforeWrite: false });
+
+      await mint.applyToOrganization({
+        organizationId: "org-acme",
+        planType: "ENTERPRISE",
+        maxMembersDeveloper: 2,
+      });
+
+      const licenseKey = organizations.licenses.get("org-acme")?.licenseKey ?? "";
+      const signed = NodeLicenseCryptographyService.create().parseLicenseKey(licenseKey);
+      expect(signed?.data.plan.maxMembersDeveloper).toBe(2);
+      expect((await registryRows(repository))[0]?.maxMembersDeveloper).toBe(2);
+    });
+  });
+
+  describe("given the script states more Developer seats than the seat column holds", () => {
+    it("refuses before signing anything", async () => {
+      const { mint, repository, organizations } = harness({ goneBeforeWrite: false });
+
+      const refusal = await mint
+        .applyToOrganization({
+          organizationId: "org-acme",
+          planType: "ENTERPRISE",
+          maxMembersDeveloper: MAX_STATED_SEATS + 1,
+        })
+        .catch((error: unknown) => error);
+
+      expect(refusal).toMatchObject({
+        issues: [expect.objectContaining({ code: "too_big", maximum: MAX_STATED_SEATS })],
+      });
+      expect(await registryRows(repository)).toEqual([]);
+      expect(organizations.licenses.size).toBe(0);
     });
   });
 

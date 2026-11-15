@@ -429,9 +429,6 @@ function BillingEventsPage() {
 
       <PageLayout.Container>
         <VStack gap={6} width="full" align="stretch">
-          <Text color="fg.muted">
-            Every billable request the gateway recorded for this project, with its cost.
-          </Text>
           <HStack gap={4} flexWrap="wrap" justify="space-between">
             <FilterChips
               groupLabel="Time range"

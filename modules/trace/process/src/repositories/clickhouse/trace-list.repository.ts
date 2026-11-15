@@ -85,13 +85,13 @@ const listSummaryRowSchema = z.looseObject({
   AttrLabels: chString,
   AttrInputMediaRefs: chString,
   AttrOutputMediaRefs: chString,
-  OccurredAt: chNumber,
-  /** The row's projection stamp; see the OccurredAt decode in `toTraceListRow`. */
+  OccurredAtMs: chNumber,
+  /** The row's projection stamp; see the OccurredAtMs decode in `toTraceListRow`. */
   Version: chString.optional(),
   /** The span timing baseline column added by migration 00072 (ADR-087). */
   EarliestSpanStartMs: chNumber.optional(),
   CreatedAt: chNumber,
-  UpdatedAt: chNumber,
+  UpdatedAtMs: chNumber,
   ComputedIOSchemaVersion: chString,
   ComputedInput: chString.nullable(),
   ComputedOutput: chString.nullable(),
@@ -308,11 +308,11 @@ export class TraceListClickHouseRepository implements TraceListRepository {
           AttrReasoningTokens,
           AttrContextSizeTokens,
           AttrLabels,
-          toUnixTimestamp64Milli(OccurredAt) AS OccurredAt,
+          toUnixTimestamp64Milli(OccurredAt) AS OccurredAtMs,
           Version,
           EarliestSpanStartMs,
           toUnixTimestamp64Milli(CreatedAt) AS CreatedAt,
-          toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAt,
+          toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAtMs,
           ComputedIOSchemaVersion,
           ComputedInput,
           ComputedOutput,
@@ -1242,12 +1242,12 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       // `EarliestSpanStartMs` is the span timing baseline it used to double as.
       // A row at an older stamp predates the split and carries both in the one
       // column, which is why this is version-gated rather than a bare read.
-      storageAnchorMs: Number(row.OccurredAt),
+      storageAnchorMs: Number(row.OccurredAtMs),
       occurredAt: isStorageAnchoredVersion(row.Version)
         ? Number(row.EarliestSpanStartMs ?? 0)
-        : Number(row.OccurredAt),
+        : Number(row.OccurredAtMs),
       createdAt: Number(row.CreatedAt),
-      updatedAt: Number(row.UpdatedAt),
+      updatedAt: Number(row.UpdatedAtMs),
       LastEventOccurredAt: Number(row.LastEventOccurredAt ?? 0),
     };
   }

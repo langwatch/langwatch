@@ -823,6 +823,65 @@ const presentations = {
     title: "This page is out of date: reload to continue",
     describe: () => "LangWatch was updated while this page was open. Reload to pick up the update.",
   },
+  braid_across_organizations: {
+    title: "These projects are in different organisations",
+    describe: () =>
+      "A braid joins two projects of the same organisation. Pick a project from this one.",
+  },
+  braid_aggregate_project: {
+    title: "Aggregate projects cannot be braided",
+    describe: () =>
+      "An aggregate project already reads its member projects. Braid the member projects instead.",
+  },
+  braid_already_exists: {
+    title: "This braid already exists",
+    describe: () =>
+      "A live braid between these projects already has this condition, data window and end date.",
+  },
+  braid_changed: {
+    title: "This braid changed in the meantime",
+    describe: () =>
+      "Someone changed or removed this braid since you opened it. Reload the list and try again.",
+  },
+  braid_condition_limit_reached: {
+    title: "This project receives too many braid conditions",
+    describe: (error) =>
+      `A project can receive braids with at most ${num(error, "limit", 50)} different conditions. Reuse a condition an existing braid already has, or remove a braid first.`,
+  },
+  braid_condition_syntax: {
+    title: "The condition is not complete",
+    describe: (error) =>
+      str(error, "fix", "") || "Check the condition for an unclosed quote, bracket or parenthesis.",
+  },
+  braid_condition_too_large: {
+    title: "The condition is too large",
+    describe: (error) =>
+      str(error, "fix", "") || "Shorten the condition, or use fewer comparisons or less nesting.",
+  },
+  braid_condition_unsupported: {
+    title: "The condition uses something braids do not support",
+    describe: (error) =>
+      str(error, "fix", "") ||
+      "Braid conditions support equality on attributes and the span name, joined with and.",
+  },
+  braid_governance_project: {
+    title: "The governance project cannot be braided",
+    describe: () => "The organisation's governance project never shares its spans with a braid.",
+  },
+  braid_into_itself: {
+    title: "A project cannot be braided into itself",
+    describe: () => "Pick a different project to braid into.",
+  },
+  braid_not_on_project: {
+    title: "This braid is not on this project",
+    describe: () =>
+      "A braid can only be removed from the project its spans come from or the project that shows them.",
+  },
+  braids_not_enabled: {
+    title: "Braids aren't switched on here",
+    describe: () =>
+      "This organisation can't manage braids yet. Braids it already has keep showing their spans.",
+  },
   broadcaster_not_active: {
     title: "Live updates disconnected",
     describe: () => "Refresh the page to reconnect.",
@@ -891,6 +950,13 @@ const presentations = {
     // configured wrong. The engine's statusText stays in the server log.
     title: "The workflow couldn't run",
     describe: () => "We've been notified. Try running it again in a moment.",
+  },
+  workflow_result_too_large: {
+    // fault: customer. The run finished but returned more than one synchronous
+    // answer can carry (6 MB), so the workflow's own output is what to shrink.
+    title: "The workflow's result is too large",
+    describe: () =>
+      "Make the workflow return less data, for example fewer rows or shorter text, and run it again.",
   },
 
   // ---- agent dev tunnel ----
@@ -1456,6 +1522,11 @@ const presentations = {
     describe: () =>
       "The documentation site that opened this page is not registered with this LangWatch installation. Paste an API key into the playground instead.",
   },
+  docs_playground_sessions_disabled: {
+    title: "Your organisation turned this off",
+    describe: () =>
+      "Your organisation does not let the documentation playground use your account. Paste an API key into the playground instead.",
+  },
   api_key_scope_violation: {
     title: "You don't have access for this",
     describe: () =>
@@ -1642,6 +1713,13 @@ const presentations = {
     describe: () =>
       "No default model is set yet. Open Settings, then Default Models, and pick one for your organization.",
   },
+  model_execution_unavailable: {
+    // A codex model reached a process with no gateway road to run it; no retry
+    // changes that, so the copy points at picking a model from another provider.
+    title: "This model can't run this feature yet",
+    describe: () =>
+      "Codex models can't run this feature on this deployment yet. Pick a model from another provider for it in Default Models.",
+  },
   model_restricted_for_execution: {
     // The same licence as `model_restricted_for_feature`, hit at the other
     // end: a codex model arriving at a surface it cannot run on, which is
@@ -1665,6 +1743,15 @@ const presentations = {
     title: "This model provider is turned off",
     describe: () =>
       "Turn it back on in your project's model settings, or pick a different provider.",
+  },
+  model_provider_unavailable: {
+    // A model named outright (not picked by the cascade) whose provider row is
+    // missing or switched off; `meta.reason` says which, so the copy names the fix.
+    title: "This model's provider isn't available",
+    describe: (error) =>
+      strEq(error, "reason", "disabled")
+        ? "Its provider is turned off. Turn it back on in Settings, then Model Providers, or pick a different model."
+        : "Its provider isn't set up for this project. Add it in Settings, then Model Providers, or pick a different model.",
   },
   model_provider_scope_forbidden: {
     // Deliberate refusal, not a mistake to correct: the provider is managed
@@ -2484,6 +2571,11 @@ const presentations = {
     title: "LangWatch is set up for a different web address than the one you are using",
     describe: () => "Check the address and try again.",
   },
+  authz_epoch_bump_failed: {
+    title: "Saved, but not yet applied everywhere",
+    describe: () =>
+      "The access change was saved, but not every server has picked it up yet. Try again to finish it; otherwise it applies on its own within a few minutes.",
+  },
   authz_ledger_unavailable: {
     title: "Access changes are paused",
     describe: () =>
@@ -2755,6 +2847,11 @@ const presentations = {
   cannot_impersonate_deactivated_user: {
     title: "This account is deactivated",
     describe: () => "Its sessions were revoked on purpose. Reactivate the account first.",
+  },
+  user_platform_operator_email_locked: {
+    title: "An operator's email address can't change",
+    describe: () =>
+      "Revoke their platform operator role on the Operators page first, then change the address.",
   },
   user_to_impersonate_not_found: {
     title: "User not found",
@@ -3688,6 +3785,10 @@ const presentations = {
   },
 
   // ---- governance ----
+  agent_registry_entry_not_found: {
+    title: "Agent not found in the registry",
+    describe: () => "No agent in this organisation's registry has that id.",
+  },
   anomaly_rule_not_found: {
     title: "Anomaly rule not found",
     describe: () => "It may have been deleted. Reload to see the current list.",
@@ -3805,6 +3906,12 @@ const presentations = {
     describe: () =>
       "Leave impersonation first. How this account signs in can only be changed by its owner.",
   },
+  impersonation_cannot_mint_credential: {
+    // No permission unlocks this, so the copy must not name one to ask for.
+    title: "Not available while impersonating",
+    describe: () =>
+      "Leave impersonation first. Only the member can create or rotate their own keys.",
+  },
   ingestion_key_not_found: {
     title: "Ingestion key not found",
     describe: () =>
@@ -3842,6 +3949,11 @@ const presentations = {
   ingestion_source_cap_reached: {
     title: "You've hit the limit for ingestion sources",
     describe: () => "Archive one you no longer use, or upgrade your plan to raise the limit.",
+  },
+  ingestion_source_disabled: {
+    title: "This ingestion source is disabled",
+    describe: () =>
+      "An admin turned this source off, so it takes no new events. Set it back to active to resume.",
   },
   ingestion_source_unauthorized: {
     title: "That ingestion source secret wasn't recognized",

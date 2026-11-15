@@ -1,6 +1,7 @@
 /** Settings navigation as data; model not hook, gates belong to host; shell menu, not page menu */
 
 import type { Hosting } from "@langwatch/browser-host/deployment";
+import type { FeatureName } from "@langwatch/design-system/feature-mark";
 import {
   Activity,
   Anvil,
@@ -33,6 +34,7 @@ import {
   UserRound,
   Workflow,
   Vault,
+  Waypoints,
   UserStar,
   UsersRound,
   ShieldUser,
@@ -60,13 +62,13 @@ export interface SettingsMenuItem {
    */
   alsoActiveAt?: string[];
   icon: LucideIcon;
+  /** A branded feature: the sidebar draws its mark in place of `icon`, as its pages do. */
+  feature?: FeatureName;
   /**
    * An Enterprise entry offered to a plan that lacks it: the sidebar shows a lock and "Included
    * in Enterprise", and the page opens on its upsell.
    */
   isLocked?: boolean;
-  /** An Enterprise entry on a plan that includes it: the sidebar marks it with the "ENT" chip. */
-  isEnterprise?: boolean;
 }
 
 /** Settings entry active check by path prefix; uses pathname, not router pattern */
@@ -151,6 +153,8 @@ export interface SettingsMenuGates {
   isLiteMember: boolean;
   hasOpsAccess: boolean;
   isPlatformAdmin: boolean;
+  /** `release_braids` answered on; false while it is still loading, so no entry flickers. */
+  braidsEnabled: boolean;
 }
 
 export type EnterprisePlanGate = "included" | "locked" | "pending";
@@ -177,9 +181,7 @@ function enterpriseEntry({
   enterprisePlan: EnterprisePlanGate;
 }): SettingsMenuItem[] {
   if (enterprisePlan === "pending") return [];
-  return [
-    enterprisePlan === "locked" ? { ...item, isLocked: true } : { ...item, isEnterprise: true },
-  ];
+  return [enterprisePlan === "locked" ? { ...item, isLocked: true } : item];
 }
 
 /**
@@ -349,7 +351,11 @@ function dataControlsGroup({ hasPermission }: SettingsMenuGates): SettingsMenuGr
   };
 }
 
-function projectGroup({ isLiteMember }: SettingsMenuGates): SettingsMenuGroup {
+function projectGroup({
+  isLiteMember,
+  enterprisePlan,
+  braidsEnabled,
+}: SettingsMenuGates): SettingsMenuGroup {
   return {
     id: "settings-project",
     label: "Project",
@@ -370,6 +376,19 @@ function projectGroup({ isLiteMember }: SettingsMenuGates): SettingsMenuGroup {
           ]
         : []),
       { label: "Integrations", href: "/settings/integrations", icon: Blocks },
+      ...(!isLiteMember && braidsEnabled
+        ? enterpriseEntry({
+            item: {
+              label: "Braids",
+              href: "/settings/braids",
+              // The one Braids entry: the organization's braids page lights it too.
+              alsoActiveAt: ["/settings/organization-braids"],
+              icon: Waypoints,
+              feature: "braids",
+            },
+            enterprisePlan,
+          })
+        : []),
     ],
   };
 }

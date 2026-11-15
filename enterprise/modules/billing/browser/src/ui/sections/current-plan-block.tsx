@@ -7,9 +7,9 @@ import { Link } from "@langwatch/browser-host/link";
 import { Banner } from "@langwatch/design-system/banner";
 import { Card } from "@langwatch/design-system/card";
 import { MeterBar } from "@langwatch/design-system/meter-bar";
-import { Box, Button, HStack, SimpleGrid, Text, VStack } from "@langwatch/design-system/primitives";
+import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { SettingList, SettingRow, StatusChip } from "@langwatch/design-system/settings-card";
-import { Check, Info } from "lucide-react";
+import { Info } from "lucide-react";
 
 import {
   type FixedSeats,
@@ -17,6 +17,7 @@ import {
   type PlanEventUsage,
   type PlanPrice,
 } from "../../model/subscription-page-state.ts";
+import { PlanFeatureList } from "../elements/plan-feature-list.tsx";
 
 const METER_FILL: Record<PlanEventUsage["status"], string> = {
   ok: "blue.solid",
@@ -258,23 +259,11 @@ export function CurrentPlanBlock({
           <FixedSeatsLine fixedSeats={fixedSeats} contactUrl={fixedSeatsContactUrl} />
         )}
         {features && (
-          <SimpleGrid
+          <PlanFeatureList
+            features={features}
             data-testid="current-plan-features-grid"
-            templateColumns={{ base: "1fr", md: "1fr 1.4fr 1fr" }}
-            rowGap={2}
-            columnGap={3}
-          >
-            {features.map((feature) => (
-              <HStack key={feature} gap={2} alignItems="start" data-testid="current-plan-feature">
-                <Box color="green.solid" flexShrink={0} paddingTop={1}>
-                  <Check size={12} />
-                </Box>
-                <Text textStyle="bodySm" color="fg.muted">
-                  {feature}
-                </Text>
-              </HStack>
-            ))}
-          </SimpleGrid>
+            itemTestId="current-plan-feature"
+          />
         )}
         {deprecatedNotice && (
           <Banner status="info" data-testid="tiered-deprecated-notice">

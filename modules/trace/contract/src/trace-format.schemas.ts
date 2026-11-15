@@ -519,6 +519,9 @@ export const langWatchSpanSchema: LangWatchSpanSchema = langWatchSpanSchemaDefin
 
 export type Span = z.infer<typeof langWatchSpanSchema>;
 
+/** A span as the trace view reads it: `ownerProjectId` set only on a braided owner's span. */
+export type OwnedSpan = Span & { ownerProjectId?: string };
+
 const spanInputOutputValidatorSchema = spanInputOutputSchema.and(
   z.object({
     value: z.any(),

@@ -17,6 +17,7 @@ import type {
   SourceCredentialContext,
 } from "../../ingestion-source/services/source-credential-access.service.ts";
 import { COPILOT_STUDIO_DATAVERSE_ADAPTER_ID } from "../../microsoft/rules/dataverse-environment-service.rules.ts";
+import type { AgentRegistryService } from "../../registry/services/agent-registry.service.ts";
 import {
   type AgentListing,
   type AgentListingRefusal,
@@ -42,6 +43,8 @@ interface AgentDiscoveryDependencies {
   signIn: ProviderSignInChannel;
   genieSpaces: GenieSpacesChannel;
   copilotBots: CopilotBotsChannel;
+  /** The agent registry, reconciled after a listing so new or renamed agents are announced. */
+  registry?: Pick<AgentRegistryService, "reconcileOrganization">;
   logger: Logger;
 }
 
@@ -115,7 +118,21 @@ export class AgentDiscoveryService {
         seenAt: now,
       });
     }
+    await this.reconcileRegistry({ organizationId });
     return { outcome: "listed", recorded: listing.items.length };
+  }
+
+  /** A registry that fails to reconcile does not fail the listing; the next trigger retries it. */
+  private async reconcileRegistry({ organizationId }: { organizationId: string }): Promise<void> {
+    if (!this.deps.registry) return;
+    try {
+      await this.deps.registry.reconcileOrganization({ organizationId });
+    } catch (error) {
+      this.deps.logger.warn(
+        { organizationId, error },
+        "agent registry reconcile after a listing failed; the next trigger retries it",
+      );
+    }
   }
 
   /** A source type with no agent list refuses rather than failing, so one source cannot break a sweep. */

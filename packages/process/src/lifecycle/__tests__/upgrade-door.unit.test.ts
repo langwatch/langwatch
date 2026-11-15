@@ -62,11 +62,11 @@ async function bootThread({ onProxied }: { onProxied: () => void }): Promise<Liv
   return thread;
 }
 
-const urlOf = ({ port }: AddressInfo, path: string): string => `http://127.0.0.1:${port}${path}`;
+const urlOf = ({ port }: AddressInfo, path: string): string => `http://localhost:${port}${path}`;
 
 function askWebSocket(thread: LivenessThread): Promise<string> {
   return new Promise<string>((resolve, reject) => {
-    const socket = net.connect({ host: "127.0.0.1", port: thread.address.port }, () =>
+    const socket = net.connect({ host: "localhost", port: thread.address.port }, () =>
       socket.write(
         "GET /api/stream HTTP/1.1\r\nHost: localhost\r\nConnection: Upgrade\r\n" +
           "Upgrade: websocket\r\nSec-WebSocket-Version: 13\r\n" +

@@ -6,8 +6,8 @@ Feature: Private Dataplane S3 Routing
 
   Credentials come from environment variables as a JSON config. The env var
   format is: DATAPLANE_S3__<label>__<orgId>=<jsonConfig>
-  where JSON contains: endpoint, bucket, and either roleArn or both
-  accessKeyId and secretAccessKey. A roleArn is assumed through the process's
+  where JSON contains: endpoint, bucket, an optional region, and either roleArn
+  or both accessKeyId and secretAccessKey. A roleArn is assumed through the process's
   web-identity token and wins when keys are also present.
 
   Background:
@@ -24,6 +24,14 @@ Feature: Private Dataplane S3 Routing
     When the stores parse the DATAPLANE_S3__ family at boot
     Then org "org123" maps to an S3 account with that endpoint, bucket and credentials
     And the label "acme" is ignored by the routing logic
+
+  @unit
+  Scenario: A private S3 config may name its own region
+    Given env var "DATAPLANE_S3__acme__org123" is set to JSON with endpoint, bucket, keys and region "eu-north1"
+    And the shared S3_REGION is "eu-west-1"
+    When the stores parse the DATAPLANE_S3__ family at boot
+    Then org "org123" maps to an S3 account in region "eu-north1"
+    And a private config without a region keeps the shared S3_REGION
 
   @unit
   Scenario: A private S3 config naming a role is read through the web identity

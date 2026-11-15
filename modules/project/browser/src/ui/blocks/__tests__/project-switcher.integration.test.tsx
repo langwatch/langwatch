@@ -76,6 +76,12 @@ describe("given the secrets page with a project in scope", () => {
 
       expect(screen.getByRole("button", { name: /Web/ })).toBeInTheDocument();
     });
+
+    it("names its trigger as the project switch, current project included", () => {
+      renderSwitcher({ projectId: "proj-web", pathname: "/settings/secrets" });
+
+      expect(screen.getByRole("button", { name: "Switch project: Web" })).toBeInTheDocument();
+    });
   });
 
   describe("when the reader opens it", () => {
@@ -100,6 +106,13 @@ describe("given the secrets page with a project in scope", () => {
       for (const name of ["Api", "Web", "Docs"]) {
         expect(screen.getAllByTitle(name).length).toBeGreaterThan(0);
       }
+    });
+
+    it("names each item by its project alone, without the avatar initial", async () => {
+      await screen.findByText("Acme - Platform");
+      const names = screen.getAllByRole("menuitem").map((item) => item.getAttribute("aria-label"));
+      expect(names).toEqual(["Api", "Web", "Docs"]);
+      expect(screen.getByRole("menuitem", { name: "Docs" })).toBeInTheDocument();
     });
 
     it("links each project to its home, told to return to the secrets page", async () => {

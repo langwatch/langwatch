@@ -7,13 +7,22 @@ import { createHash } from "node:crypto";
 
 import {
   AccessNotGrantedError,
+  AuthorizationExpiredError,
   type Authorization,
   type AuthorizationConditionType,
   type AuthorizationGrant,
+  BRAID_CONDITION_COMPILER_VERSION,
+  braidConditionDigest,
+  type BraidConditionTerm,
+  braidConditionTermsOf,
+  type CompiledWhere,
+  honouredSpanBraidGrants,
   type ProofBearingPermission,
   type SharedWindow,
   sharedWindowsReadBy,
+  SPAN_BRAID_PERMISSION,
   usableAuthorization,
+  VERIFIED_ATTRIBUTE_PREFIX,
 } from "@langwatch/authorization";
 import {
   TENANT_SCOPE_BUCKET_WIDTH_MS,
@@ -24,28 +33,62 @@ import { nowInstant } from "@langwatch/time";
 
 import type { ClickHouseQueryClient } from "./client.ts";
 import type { IdBoundOptions } from "./idBound.ts";
-import { StatementScopeError, TENANT_SCOPE_PARAM_PREFIX } from "./statementScopeError.ts";
+import { refuseOverBudget } from "./statementBudget.ts";
+import {
+  ID_BOUND_PARAM_PREFIX,
+  type LooseMarkerPlacement,
+  StatementScopeError,
+  TENANT_SCOPE_PARAM_PREFIX,
+  type UnfencedReadReason,
+} from "./statementScopeError.ts";
 
 /** Resolves the routed client a project's reads are sent through. */
 export type ClickHouseClientResolver = (tenantId: string) => Promise<ClickHouseQueryClient>;
 
+/** Whether a shared grant's window of one condition type opens a read; there is no default. */
+type WindowTreatment = "applies" | "excluded";
+
 /**
- * What a reader may be asked for: the proof-bearing permission each one needs, and the resource
- * a shared grant's window must apply to for that grant to open rows of it. All three read trace
- * rows, so all take a `trace` window; `cost` is the cost-gated analytics reads (ADR-177 v4.15).
+ * A reader's proof-bearing permission and its treatment of every condition type's window, so a
+ * new resource or condition type does not compile until someone chooses. Only `spans` takes
+ * `span` windows, those of grants carrying `spans:braided`; a guard test holds both (ADR-201 §3).
  */
-const READ_RESOURCES = {
-  traces: { permission: "traces:view", condition: "trace" },
-  analytics: { permission: "analytics:view", condition: "trace" },
-  cost: { permission: "cost:view", condition: "trace" },
+export const READ_RESOURCES = {
+  traces: {
+    permission: "traces:view",
+    windows: { trace: "applies", span: "excluded", log: "excluded" },
+  },
+  analytics: {
+    permission: "analytics:view",
+    windows: { trace: "applies", span: "excluded", log: "excluded" },
+  },
+  cost: {
+    permission: "cost:view",
+    windows: { trace: "applies", span: "excluded", log: "excluded" },
+  },
+  spans: {
+    permission: "traces:view",
+    windows: { trace: "applies", span: "applies", log: "excluded" },
+  },
 } as const satisfies Record<
   string,
-  { permission: ProofBearingPermission; condition: AuthorizationConditionType }
+  {
+    permission: ProofBearingPermission;
+    windows: { readonly [Type in AuthorizationConditionType]: WindowTreatment };
+  }
 >;
 export type ReadResource = keyof typeof READ_RESOURCES;
 
 const MARKER = /\{\{tenantScope:([A-Za-z_][A-Za-z0-9_]*)\}\}/g;
 const SET_MARKER = /\{\{tenantSet\}\}/g;
+const CONDITIONS_MARKER =
+  /\{\{tenantScopeWithConditions:([A-Za-z_][A-Za-z0-9_]*)(?::(traceId|sinceMs)=([A-Za-z_][A-Za-z0-9_]*))?\}\}/g;
+const LATEST_VERSION_MARKER = /\{\{tenantScopeForLatestVersion:([A-Za-z_][A-Za-z0-9_]*)\}\}/g;
+/** A fence marker that windows its select: the latest-version election must sit in its WHERE. */
+const WINDOWED_MARKER = /\{\{tenantScope(?:WithConditions)?:[^}]*\}\}/g;
+/** The one shape a latest-version marker may follow; its select names keys and versions only. */
+const ELECTION_HEAD =
+  /\(\s*TenantId\s*,\s*TraceId\s*,\s*SpanId\s*,\s*UpdatedAt\s*\)\s+IN\s*\(\s*SELECT\s+TenantId\s*,\s*TraceId\s*,\s*SpanId\s*,\s*max\(\s*UpdatedAt\s*\)\s+FROM\s+stored_spans\s+WHERE\s+$/i;
 
 /**
  * A tenant predicate written by hand (`TenantId =`, `IN`, comparisons); a projection, a dedup
@@ -69,13 +112,30 @@ export function tenantScopeKey({
   const fence = fenceFor({ authorization, reads });
   const own = fence.own.toSorted().join(",");
   if (fence.shared.length === 0) return own;
-  const windows = fence.shared
-    .map((window) => `${window.projectId}@${window.from}-${window.until ?? ""}`)
+  const windows = fence.shared.map(windowKey).toSorted().join("|");
+  const digest = createHash("sha256").update(windows).digest("hex");
+  const key = `${own}+${fence.shared.length}:${digest}`;
+  if (fence.braids === undefined) return key;
+  const clauses = fence.braids.clauses
+    .map((clause) => `${clause.digest}=${clause.windows.map(windowKey).toSorted().join(",")}`)
     .toSorted()
     .join("|");
-  const digest = createHash("sha256").update(windows).digest("hex");
-  return `${own}+${fence.shared.length}:${digest}`;
+  const braids = createHash("sha256").update(clauses).digest("hex");
+  return `${key}~${fence.braids.clauses.length}:${braids}`;
 }
+
+const windowKey = (window: SharedWindow): string =>
+  `${window.projectId}@${window.from}-${window.until ?? ""}`;
+
+/**
+ * One bracketed clause of the conditions marker: a trace window read beside braids, or owners
+ * and their windows under one braid's compiled predicate ("every span" stated). An owner sits
+ * once per clause; a second disjoint window under one predicate goes in a clause of its own.
+ */
+type BraidClause = { digest: string; windows: readonly SharedWindow[] } & (
+  | { kind: "traceWindow" }
+  | { kind: "braid"; compiledWhere: CompiledWhere }
+);
 
 type TenantFence = {
   /**
@@ -83,7 +143,10 @@ type TenantFence = {
    * of its shared projects, where the fence is that project's window alone.
    */
   own: readonly string[];
+  /** Windows the tenant marker binds; a braid owner's spans all its braids' windows. */
   shared: readonly SharedWindow[];
+  /** Set only on a span read whose proof carries braids; `reader` binds `Verified()`. */
+  braids?: { reader: string; clauses: readonly BraidClause[] };
 };
 
 /** The value an open window's `until` is bound as. */
@@ -120,10 +183,38 @@ export function fenceExpression({
     };
   }
 
-  const ids = slot("ids", "Array(String)");
-  // The default is never read: `TenantId IN ids` gates every lookup.
+  const windowed = windowsOf({ column, windows: fence.shared, name: (part) => part });
+  const params: Record<string, unknown> = {
+    [fenceParam("all")]: tenantsOf(fence),
+    ...windowed.params,
+  };
+  let picks = `(${windowed.sql})`;
+  if (fence.own.length > 0) {
+    params[fenceParam("own")] = [...fence.own];
+    picks = `(${ownClause} OR ${picks})`;
+  }
+  return {
+    sql: `(TenantId IN (${slot("all", "Array(String)")}) AND ${picks})`,
+    params,
+  };
+}
+
+/**
+ * Windows looked up from three parallel arrays named by `name`, unbracketed so a braid clause can
+ * append its predicate. The `transform` default is never read: `TenantId IN ids` gates it.
+ */
+function windowsOf({
+  column,
+  windows,
+  name,
+}: {
+  column: TenantScopeTimeColumn;
+  windows: readonly SharedWindow[];
+  name: (part: "ids" | "from" | "until") => string;
+}): { sql: string; params: Record<string, unknown> } {
+  const ids = slot(name("ids"), "Array(String)");
   const edgeOf = (edge: "from" | "until") =>
-    `transform(TenantId, ${ids}, ${slot(edge, "Array(Int64)")}, toInt64(0))`;
+    `transform(TenantId, ${ids}, ${slot(name(edge), "Array(Int64)")}, toInt64(0))`;
   const width = TENANT_SCOPE_BUCKET_WIDTH_MS[column];
   // A bucket starting at or after `from` lies wholly after it; one ending by `until` lies
   // wholly before it.
@@ -131,28 +222,179 @@ export function fenceExpression({
     width === undefined
       ? `${column} < fromUnixTimestamp64Milli(${edgeOf("until")})`
       : `${column} <= fromUnixTimestamp64Milli(${edgeOf("until")} - ${width})`;
-  const windowed =
-    `(TenantId IN (${ids})` +
-    ` AND ${column} >= fromUnixTimestamp64Milli(${edgeOf("from")})` +
-    ` AND (${edgeOf("until")} = ${OPEN_UNTIL}` +
-    ` OR ${closedUntil}))`;
+  return {
+    sql:
+      `TenantId IN (${ids})` +
+      ` AND ${column} >= fromUnixTimestamp64Milli(${edgeOf("from")})` +
+      ` AND (${edgeOf("until")} = ${OPEN_UNTIL}` +
+      ` OR ${closedUntil})`,
+    params: {
+      [fenceParam(name("ids"))]: windows.map((window) => window.projectId),
+      [fenceParam(name("from"))]: windows.map((window) => window.from),
+      [fenceParam(name("until"))]: windows.map((window) =>
+        window.until === null ? OPEN_UNTIL : Math.max(window.until, 1),
+      ),
+    },
+  };
+}
+
+/** The statement parameter a conditions marker names to narrow its held-trace semi-join. */
+type HeldTraceParam = { kind: "traceId" | "sinceMs"; param: string };
+
+/**
+ * The conditions marker (ADR-201 §3): own projects outright, OR one clause per distinct predicate
+ * holding its owners' windows AND the predicate, the braid clauses only in traces an own project
+ * holds. Each predicate binds its keys and literals once, as two arrays its layers share.
+ */
+export function conditionsExpression({
+  fence,
+  column,
+  held,
+}: {
+  fence: TenantFence;
+  column: TenantScopeTimeColumn;
+  held?: HeldTraceParam | undefined;
+}): { sql: string; params: Record<string, unknown> } {
+  const { braids } = fence;
+  if (braids === undefined) return fenceExpression({ fence, column });
   const params: Record<string, unknown> = {
     [fenceParam("all")]: tenantsOf(fence),
-    [fenceParam("ids")]: fence.shared.map((window) => window.projectId),
-    [fenceParam("from")]: fence.shared.map((window) => window.from),
-    [fenceParam("until")]: fence.shared.map((window) =>
-      window.until === null ? OPEN_UNTIL : Math.max(window.until, 1),
-    ),
+    [fenceParam("own")]: [...fence.own],
   };
-  let picks = windowed;
-  if (fence.own.length > 0) {
-    params[fenceParam("own")] = [...fence.own];
-    picks = `(${ownClause} OR ${windowed})`;
+  const picks: string[] = [];
+  if (fence.own.length > 0) picks.push(`TenantId IN (${slot("own", "Array(String)")})`);
+  const braided: string[] = [];
+  const predicates = new Map<string, number>();
+  braids.clauses.forEach((clause, index) => {
+    const name = (part: string) => `c${index}_${part}`;
+    const windowed = windowsOf({ column, windows: clause.windows, name });
+    Object.assign(params, windowed.params);
+    if (clause.kind === "traceWindow") {
+      picks.push(`(${windowed.sql})`);
+      return;
+    }
+    const predicateIndex = predicates.get(clause.digest) ?? predicates.size;
+    predicates.set(clause.digest, predicateIndex);
+    const predicate = predicateOf({
+      compiledWhere: clause.compiledWhere,
+      param: (part) => fenceParam(`p${predicateIndex}_${part}`),
+      readerSlot: slot("reader", "String"),
+    });
+    Object.assign(params, predicate.params);
+    if (predicate.verifies) params[fenceParam("reader")] = braids.reader;
+    braided.push(`(${windowed.sql} AND (${predicate.sql}))`);
+  });
+  if (braided.length > 0) {
+    params[fenceParam("heldFrom")] = Math.min(
+      ...braids.clauses
+        .filter((clause) => clause.kind === "braid")
+        .flatMap((clause) => clause.windows.map((window) => window.from)),
+    );
+    picks.push(`(${heldTraceOf(held)} AND (${braided.join(" OR ")}))`);
   }
   return {
-    sql: `(TenantId IN (${slot("all", "Array(String)")}) AND ${picks})`,
+    sql: `(TenantId IN (${slot("all", "Array(String)")}) AND (${picks.join(" OR ")}))`,
     params,
   };
+}
+
+/**
+ * The traces an own project holds: one semi-join on `stored_spans` from the earliest braid
+ * window's start, narrowed by the read's trace id or its own lower bound so it reads no wider than
+ * the outer read (ADR-201 §3). The fence binds the tenants; a statement names only its bound.
+ */
+function heldTraceOf(held: HeldTraceParam | undefined): string {
+  let narrowed = "";
+  if (held?.kind === "traceId") narrowed = ` AND TraceId = {${held.param}:String}`;
+  if (held?.kind === "sinceMs") {
+    narrowed = ` AND StartTime >= fromUnixTimestamp64Milli({${held.param}:Int64})`;
+  }
+  return (
+    `TraceId IN (SELECT TraceId FROM stored_spans WHERE TenantId IN (${slot("own", "Array(String)")})` +
+    ` AND StartTime >= fromUnixTimestamp64Milli(${slot("heldFrom", "Int64")})${narrowed})`
+  );
+}
+
+/**
+ * A compiled condition rendered for a statement of a module's own, the braid preview's
+ * (ADR-201 §7): the fence's conjunction, every key and literal bound under `prefix`, and
+ * `Verified()` against `reader`. The prefix may not be the fence's own.
+ */
+export function braidConditionExpression({
+  compiledWhere,
+  reader,
+  prefix,
+}: {
+  compiledWhere: CompiledWhere;
+  reader: string;
+  prefix: string;
+}): { sql: string; params: Record<string, unknown> } {
+  if (!/^[A-Za-z][A-Za-z0-9]*$/.test(prefix) || prefix.startsWith(TENANT_SCOPE_PARAM_PREFIX)) {
+    throw new StatementScopeError({ kind: "reserved-param", param: prefix });
+  }
+  const predicate = predicateOf({
+    compiledWhere,
+    param: (part) => `${prefix}_${part}`,
+    readerSlot: `{${prefix}_reader:String}`,
+  });
+  const params = predicate.verifies
+    ? { ...predicate.params, [`${prefix}_reader`]: reader }
+    : predicate.params;
+  return { sql: `(${predicate.sql})`, params };
+}
+
+/**
+ * A compiled condition as one conjunction over the span's columns. Keys bind as one array and
+ * values as another, each term reading its element, so a condition costs two parameters however
+ * many terms it has: ClickHouse refuses a request past `http_max_fields` (ADR-201 §3).
+ */
+function predicateOf({
+  compiledWhere,
+  param,
+  readerSlot,
+}: {
+  compiledWhere: CompiledWhere;
+  param: (part: "k" | "v") => string;
+  readerSlot: string;
+}): { sql: string; params: Record<string, unknown>; verifies: boolean } {
+  if (compiledWhere.version !== BRAID_CONDITION_COMPILER_VERSION) {
+    throw new StatementScopeError({
+      kind: "unsupported-condition-version",
+      version: compiledWhere.version,
+    });
+  }
+  const bound = { k: [] as string[], v: [] as string[] };
+  let verifies = false;
+  const bind = (part: "k" | "v", value: string): string => {
+    bound[part].push(value);
+    return `{${param(part)}:Array(String)}[${bound[part].length}]`;
+  };
+  const termSql = (term: BraidConditionTerm): string => {
+    switch (term.kind) {
+      case "attributeEquals": {
+        const map = term.on === "span" ? "SpanAttributes" : "ResourceAttributes";
+        return `${map}[${bind("k", term.key)}] = ${bind("v", term.value)}`;
+      }
+      case "nameEquals":
+        return `SpanName = ${bind("v", term.value)}`;
+      case "attributePresent":
+        return `mapContains(SpanAttributes, ${bind("k", term.key)})`;
+      case "verified": {
+        verifies = true;
+        // The signed entry must be present too: a mark on a row without its entry never matches.
+        const entry = `mapContains(SpanAttributes, ${bind("k", term.key)})`;
+        return `${entry} AND SpanAttributes[${bind("k", `${VERIFIED_ATTRIBUTE_PREFIX}${term.key}`)}] = ${readerSlot}`;
+      }
+    }
+  };
+  const terms = braidConditionTermsOf(compiledWhere.tree);
+  // "Every span" is the empty conjunction, which is true.
+  const sql = terms.length === 0 ? "1" : terms.map(termSql).join(" AND ");
+  const params: Record<string, unknown> = {};
+  for (const part of ["k", "v"] as const) {
+    if (bound[part].length > 0) params[param(part)] = bound[part];
+  }
+  return { sql, params, verifies };
 }
 
 /** The set-only form: every tenant in the fence, no window. */
@@ -178,16 +420,24 @@ export function fenceFor({
   authorization: Authorization;
   reads: ReadResource;
 }): TenantFence {
-  const { permission, condition } = READ_RESOURCES[reads];
+  const { permission, windows } = READ_RESOURCES[reads];
+  const applies = (type: AuthorizationConditionType): boolean => windows[type] === "applies";
+  // A braid carries `spans:braided` alone, so no resource reading `permission` picks one up.
+  const braids = (grant: AuthorizationGrant) => grant.permissions.includes(SPAN_BRAID_PERMISSION);
   const carries = (grant: AuthorizationGrant) => grant.permissions.includes(permission);
   const own = authorization.grants
     .filter((grant) => grant.kind === "own" && grant.projectId !== undefined)
     .filter(carries)
     .map((grant) => grant.projectId as string);
   if (own.length === 0) throw new AccessNotGrantedError(permission);
-  const shared = sharedWindowsReadBy({ authorization, permission, condition });
+  const shared = applies("trace")
+    ? sharedWindowsReadBy({ authorization, permission, condition: "trace" })
+    : [];
+  // A braid reaches the fence only on a proof the plan check honoured (ADR-201 §9).
+  const braided = applies("span") ? honouredSpanBraidGrants(authorization).filter(braids) : [];
+  const [reader = ""] = own;
   const narrowedTo = authorization.narrowedTo;
-  if (narrowedTo === undefined) return { own, shared };
+  if (narrowedTo === undefined) return withBraids({ fence: { own, shared }, braided, reader });
   const narrowed = {
     own: own.filter((projectId) => projectId === narrowedTo),
     shared: shared.filter((window) => window.projectId === narrowedTo),
@@ -195,7 +445,100 @@ export function fenceFor({
   if (narrowed.own.length === 0 && narrowed.shared.length === 0) {
     throw new AccessNotGrantedError(permission);
   }
-  return narrowed;
+  // Braids read into the own project's traces, so only narrowing to it keeps them (ADR-201 §5).
+  return withBraids({ fence: narrowed, braided: narrowed.own.length > 0 ? braided : [], reader });
+}
+
+const windowOf = (grant: AuthorizationGrant): SharedWindow => ({
+  projectId: grant.projectId as string,
+  from: grant.condition?.from ?? 0,
+  until: grant.condition?.until ?? null,
+});
+
+/**
+ * Adds a span read's braids: the tenant marker binds each owner's widest window (the conditions
+ * marker re-applies the exact ones), and the conditions marker groups windows by predicate. A
+ * proof with no braids returns the fence unchanged, so every other read renders as before.
+ */
+function withBraids({
+  fence,
+  braided,
+  reader,
+}: {
+  fence: TenantFence;
+  braided: readonly AuthorizationGrant[];
+  reader: string;
+}): TenantFence {
+  if (braided.length === 0) return fence;
+  const byPredicate = new Map<string, BraidClause>();
+  const add = (clause: BraidClause, window: SharedWindow) => {
+    const held = byPredicate.get(clause.digest) ?? clause;
+    byPredicate.set(clause.digest, { ...held, windows: [...held.windows, window] });
+  };
+  for (const grant of braided) {
+    const compiledWhere = compiledWhereOf(grant);
+    const digest = braidConditionDigest(compiledWhere);
+    add({ kind: "braid", compiledWhere, digest, windows: [] }, windowOf(grant));
+  }
+  // A trace window read beside braids is a clause of its own, with no predicate.
+  for (const window of fence.shared) add({ kind: "traceWindow", digest: "", windows: [] }, window);
+  const clauses = [...byPredicate.values()].flatMap(layeredByOwner);
+  const widest = mergedByOwner(braided.map(windowOf)).map(hullOf);
+  return { ...fence, shared: [...fence.shared, ...widest], braids: { reader, clauses } };
+}
+
+/**
+ * A braid's compiled form, refused when absent or from another compiler version: "every span" is
+ * stated, never implied by a missing form, so the fence fails closed (ADR-201 §3).
+ */
+function compiledWhereOf(grant: AuthorizationGrant): CompiledWhere {
+  const compiledWhere = grant.condition?.compiledWhere;
+  if (compiledWhere === undefined) {
+    throw new StatementScopeError({ kind: "uncompiled-braid-condition" });
+  }
+  if (compiledWhere.version !== BRAID_CONDITION_COMPILER_VERSION) {
+    throw new StatementScopeError({
+      kind: "unsupported-condition-version",
+      version: compiledWhere.version,
+    });
+  }
+  return compiledWhere;
+}
+
+/** Each owner's windows, overlapping ones merged, earliest first. */
+function mergedByOwner(windows: readonly SharedWindow[]): SharedWindow[][] {
+  const owners = new Map<string, SharedWindow[]>();
+  for (const window of windows.toSorted((left, right) => left.from - right.from)) {
+    const merged = owners.get(window.projectId) ?? [];
+    const last = merged.at(-1);
+    if (last !== undefined && (last.until === null || window.from <= last.until)) {
+      const until =
+        last.until === null || window.until === null ? null : Math.max(last.until, window.until);
+      merged[merged.length - 1] = { ...last, until };
+    } else {
+      merged.push(window);
+    }
+    owners.set(window.projectId, merged);
+  }
+  return [...owners.values()];
+}
+
+/** The one window spanning every window of one owner. */
+function hullOf(windows: readonly SharedWindow[]): SharedWindow {
+  const [first] = windows;
+  if (first === undefined) throw new Error("an owner holds at least one window");
+  const last = windows.at(-1) ?? first;
+  return { projectId: first.projectId, from: first.from, until: last.until };
+}
+
+/** One clause per layer: layer n holds each owner's nth disjoint window under the predicate. */
+function layeredByOwner(clause: BraidClause): BraidClause[] {
+  const owners = mergedByOwner(clause.windows);
+  const layers = Math.max(...owners.map((windows) => windows.length));
+  return Array.from({ length: layers }, (_, layer) => ({
+    ...clause,
+    windows: owners.flatMap((windows) => windows[layer] ?? []),
+  }));
 }
 
 /**
@@ -237,6 +580,16 @@ export function singleTenantOf({
   return tenants.length === 1 ? tenants[0] : undefined;
 }
 
+/**
+ * Settings sent with every statement, which neither its text nor its caller may change: a column
+ * wins over an alias of its name, and a statement's WITH reaches every select (ADR-201 §3).
+ */
+export const PINNED_SETTINGS = {
+  prefer_column_name_to_alias: 1,
+  enable_global_with_statement: 1,
+} as const;
+const PINNED_SETTING = new RegExp(`\\b(?:${Object.keys(PINNED_SETTINGS).join("|")})\\b`, "i");
+
 /** What a repository hands the reader: main's statement shape, rows always as JSONEachRow. */
 type ScopedQueryParams = {
   query: string;
@@ -275,6 +628,10 @@ export class TenantScopedReader {
       client: () => Promise<ClickHouseQueryClient>;
       fence: TenantFence;
       tenantId: string;
+      /** The proof's expiry, checked before every statement and again before its rows leave, and
+       *  sent as the statement's time limit: a held reader outlives no proof. */
+      expiresAt?: number;
+      now?: () => number;
     },
   ) {}
 
@@ -284,24 +641,55 @@ export class TenantScopedReader {
   }
 
   async query<Row = unknown>(params: ScopedQueryParams): Promise<{ json(): Promise<Row[]> }> {
+    this.#refuseExpired();
     const expanded = expandStatement({
       query: params.query,
       queryParams: params.query_params ?? {},
       fence: this.deps.fence,
     });
     const client = await this.resolvedClient();
+    const settings = {
+      ...this.#settingsWithinProof(params.clickhouse_settings),
+      ...PINNED_SETTINGS,
+    };
     // The client expands an `{{idBound}}` marker, reading the index under this fence's tenants.
     const result = await client.query<Row>({
       tenantId: this.deps.tenantId,
       tenantIds: tenantsOf(this.deps.fence),
       sql: expanded.query,
       params: expanded.queryParams,
-      ...(params.clickhouse_settings ? { settings: params.clickhouse_settings } : {}),
+      settings,
       ...(params.SKIP_COLD_SCAN_CHECK === true ? { SKIP_COLD_SCAN_CHECK: true } : {}),
       ...(params.idBound === undefined ? {} : { idBound: params.idBound }),
       ...(params.retryOnTimeout === false ? { retryOnTimeout: false } : {}),
     });
+    // A slow statement or a retry may outlast the proof: its rows are refused, never released.
+    this.#refuseExpired();
     return { json: async () => result.rows };
+  }
+
+  #now(): number {
+    return this.deps.now?.() ?? nowInstant().epochMilliseconds;
+  }
+
+  #refuseExpired(): void {
+    const { expiresAt } = this.deps;
+    if (expiresAt !== undefined && expiresAt <= this.#now()) {
+      throw new AuthorizationExpiredError(expiresAt);
+    }
+  }
+
+  /** The caller's settings with `max_execution_time` cut to the proof's remaining whole seconds,
+   *  at least one, since ClickHouse reads zero as no limit. */
+  #settingsWithinProof(
+    settings: Record<string, string | number> | undefined,
+  ): Record<string, string | number> | undefined {
+    const { expiresAt } = this.deps;
+    if (expiresAt === undefined) return settings;
+    const remaining = Math.max(1, Math.ceil((expiresAt - this.#now()) / 1000));
+    const asked = Number(settings?.max_execution_time ?? 0);
+    const limit = Number.isFinite(asked) && asked > 0 ? Math.min(asked, remaining) : remaining;
+    return { ...settings, max_execution_time: limit };
   }
 
   private async resolvedClient(): Promise<ClickHouseQueryClient> {
@@ -330,7 +718,11 @@ function refuseTenantInText({
       throw new StatementScopeError({ kind: "reserved-param", param });
     }
   }
-  const bare = text.replace(MARKER, " ").replace(SET_MARKER, " ");
+  const bare = text
+    .replace(MARKER, " ")
+    .replace(SET_MARKER, " ")
+    .replace(CONDITIONS_MARKER, " ")
+    .replace(LATEST_VERSION_MARKER, " ");
   if (HAND_WRITTEN_TENANT_PREDICATE.test(bare)) {
     throw new StatementScopeError({ kind: "hand-written-tenant-predicate" });
   }
@@ -350,17 +742,811 @@ export function expandStatement({
   fence: TenantFence;
 }): { query: string; queryParams: Record<string, unknown> } {
   refuseTenantInText({ text: query, queryParams });
+  refuseUnconditionedMarkers({ text: query, fence });
+  refuseLooseTenantMarkers({ text: query, fragment: false });
   const expanded = replaceMarkers({ text: query, queryParams, fence });
   if (expanded.windowed === 0) {
     throw new StatementScopeError({ kind: "missing-marker" });
   }
+  refuseUnfencedReads({ text: query });
+  refuseUnappliedBraids({ fence, expanded });
+  refuseOverBudget({ statement: expanded.text, params: expanded.queryParams });
   return { query: expanded.text, queryParams: expanded.queryParams };
 }
 
 /**
+ * Fails closed: a fence carrying braids applies their conditions only through the conditions
+ * marker, so a statement or fragment the fence reaches without one is refused (ADR-201 §3).
+ */
+function refuseUnappliedBraids({
+  fence,
+  expanded,
+}: {
+  fence: TenantFence;
+  expanded: { markers: number; conditioned: number };
+}): void {
+  if (fence.braids !== undefined && expanded.markers > 0 && expanded.conditioned === 0) {
+    throw new StatementScopeError({ kind: "missing-condition-marker" });
+  }
+}
+
+/**
+ * Owner rows leave only through the conditions marker (ADR-201 §3): under braids a plain marker
+ * is refused, and a latest-version marker is accepted only as the election AND-ed into the WHERE
+ * of a select a windowed marker fences, so its keys filter that select and are never read.
+ */
+function refuseUnconditionedMarkers({ text, fence }: { text: string; fence: TenantFence }): void {
+  // A SETTINGS clause would override the time limit the proof's expiry sets on the request.
+  if (fence.braids !== undefined && /\bSETTINGS\b/i.test(text)) {
+    throw new StatementScopeError({ kind: "settings-under-braids" });
+  }
+  if (
+    fence.braids !== undefined &&
+    (text.search(MARKER) !== -1 || text.search(SET_MARKER) !== -1)
+  ) {
+    throw new StatementScopeError({ kind: "plain-marker-under-braids" });
+  }
+  for (const election of text.matchAll(LATEST_VERSION_MARKER)) {
+    const before = text.slice(0, election.index);
+    const head = ELECTION_HEAD.exec(before);
+    const outer = head === null ? "" : before.slice(0, head.index);
+    const fenced = [...outer.matchAll(WINDOWED_MARKER)].at(-1);
+    const between = fenced === undefined ? undefined : outer.slice(fenced.index + fenced[0].length);
+    if (between === undefined || !isConjunctionLeadingIn({ text: between })) {
+      throw new StatementScopeError({ kind: "loose-latest-version-marker" });
+    }
+    if (!isElectionClosedAsAConjunct({ text, from: election.index + election[0].length })) {
+      throw new StatementScopeError({ kind: "loose-latest-version-marker" });
+    }
+  }
+}
+
+/** The words an election's own WHERE may use after its marker: keys, versions and their bounds. */
+const ELECTION_BODY_WORDS: ReadonlySet<string> = new Set([
+  "and",
+  "in",
+  "group",
+  "by",
+  "tenantid",
+  "traceid",
+  "spanid",
+  "starttime",
+  "updatedat",
+  "fromunixtimestamp64milli",
+  "tounixtimestamp64milli",
+]);
+const ELECTION_GROUP_BY = /\bGROUP\s+BY\s+TenantId\s*,\s*TraceId\s*,\s*SpanId\s*$/i;
+const WHERE_END = /\b(?:GROUP\s+BY|ORDER\s+BY|LIMIT|HAVING|SETTINGS)\b/i;
+const WORD = /[A-Za-z_]\w*/y;
+
+/**
+ * Allow-listed, after the marker: the election's own select AND-s key and version bounds and
+ * groups by the keys; after its close come AND-ed terms and the WHERE's end (a clause keyword, the
+ * enclosing select's close, the text's end). So nothing compares, negates or OR-s the election.
+ */
+function isElectionClosedAsAConjunct({ text, from }: { text: string; from: number }): boolean {
+  const body = flatScopeOf({ text, from });
+  if (body === undefined || body.end === text.length || !isKeysElection(body)) return false;
+  // A quoted or parameter-bound identifier reads as an operand, so it could hide a version bound.
+  if (/["`]|:\s*Identifier\s*\}/i.test(text.slice(from, body.end))) return false;
+  const after = flatScopeOf({ text, from: body.end + 1 });
+  if (after === undefined) return false;
+  const end = WHERE_END.exec(after.flat);
+  return isAndRun({ flat: end === null ? after.flat : after.flat.slice(0, end.index) });
+}
+
+/**
+ * The election's select after its marker: AND-ed key and version bounds, then the keys' group.
+ * A version is bounded from below only (`UpdatedAt >`), so the newest version is still elected.
+ */
+function isKeysElection({ flat, words }: { flat: string; words: readonly string[] }): boolean {
+  const unlisted = words.filter((word) => !ELECTION_BODY_WORDS.has(word.toLowerCase()));
+  const groupBy = ELECTION_GROUP_BY.exec(flat);
+  if (unlisted.length > 0 || groupBy === null) return false;
+  const versions = words.filter((word) => word.toLowerCase() === "updatedat").length;
+  if (versions !== (flat.match(/\bUpdatedAt\s*>/gi)?.length ?? 0)) return false;
+  return isAndRun({ flat: flat.slice(0, groupBy.index) });
+}
+
+/** ` AND term AND term ...` or nothing: a run of conjuncts, each an allow-listed term. */
+function isAndRun({ flat }: { flat: string }): boolean {
+  if (/\b(?:OR|NOT|XOR|BETWEEN)\b/i.test(flat)) return false;
+  const terms = flat.split(/\bAND\b/i);
+  if (terms.shift()?.trim() !== "") return false;
+  return terms.every((term) => CONJUNCT_TERM.test(term));
+}
+
+type Scan = { flat: string; words: string[]; depth: number; at: number };
+type Token = { as: string; next: number; word?: string };
+
+/**
+ * The text from `from` to its group's close (or the text's end): a nested group reads `§G`, a
+ * parameter or literal `§P`, a marker or line comment a space; `words` holds every word outside
+ * them, nested ones included. A block or hash comment, a `;` or an open literal refuses.
+ */
+function flatScopeOf({
+  text,
+  from,
+}: {
+  text: string;
+  from: number;
+}): { flat: string; words: string[]; end: number } | undefined {
+  const scan: Scan = { flat: "", words: [], depth: 0, at: from };
+  while (scan.at < text.length) {
+    const step = stepOf({ text, scan });
+    if (step === "refused") return undefined;
+    if (step === "closed") return { flat: scan.flat, words: scan.words, end: scan.at };
+  }
+  return scan.depth === 0 ? { flat: scan.flat, words: scan.words, end: text.length } : undefined;
+}
+
+/** One token of the scan; only the top level reaches the flat text. */
+function stepOf({ text, scan }: { text: string; scan: Scan }): "refused" | "closed" | "next" {
+  const skipped = skippedFrom({ text, at: scan.at });
+  const token = skipped ?? tokenAt({ text, at: scan.at });
+  if (token === "refused") return "refused";
+  if (token.as === ")" && scan.depth === 0) return "closed";
+  if (token.word !== undefined) scan.words.push(token.word);
+  if (token.as === ")") {
+    scan.depth -= 1;
+  } else if (token.as === "(") {
+    if (scan.depth === 0) scan.flat += " §G ";
+    scan.depth += 1;
+  } else if (scan.depth === 0) {
+    scan.flat += token.as;
+  }
+  scan.at = token.next;
+  return "next";
+}
+
+/** A word, or one character; a block or hash comment or a `;` refuses. */
+function tokenAt({ text, at }: { text: string; at: number }): Token | "refused" {
+  const char = text.charAt(at);
+  if ((char === "/" && text.charAt(at + 1) === "*") || char === "#" || char === ";") {
+    return "refused";
+  }
+  WORD.lastIndex = at;
+  const word = /\w/.test(text.charAt(at - 1)) ? null : WORD.exec(text);
+  if (word === null) return { as: char, next: at + 1 };
+  return { as: word[0], next: at + word[0].length, word: word[0] };
+}
+
+/** A literal, parameter, marker or line comment at `at`: what it reads as, and what follows. */
+function skippedFrom({ text, at }: { text: string; at: number }): Token | "refused" | undefined {
+  const char = text.charAt(at);
+  if (char === "'" || char === '"' || char === "`") {
+    const end = literalEndOf({ text, open: at });
+    return end === undefined ? "refused" : { as: " §P ", next: end + 1 };
+  }
+  if (char === "{") return braceSkipped({ text, at });
+  if (char === "-" && text.charAt(at + 1) === "-") {
+    const end = text.indexOf("\n", at);
+    return { as: " ", next: end === -1 ? text.length : end };
+  }
+  return undefined;
+}
+
+/** Where a quoted literal opened at `open` closes: a backslash escapes, a doubled quote is one. */
+function literalEndOf({ text, open }: { text: string; open: number }): number | undefined {
+  const quote = text.charAt(open);
+  for (let at = open + 1; at < text.length; at += 1) {
+    const char = text.charAt(at);
+    if (char === "\\") at += 1;
+    else if (char === quote && text.charAt(at + 1) === quote) at += 1;
+    else if (char === quote) return at;
+  }
+  return undefined;
+}
+
+/** A `{{marker}}` reads as a space, a `{param:Type}` as one operand; an unclosed one refuses. */
+function braceSkipped({ text, at }: { text: string; at: number }): Token | "refused" {
+  const marker = text.charAt(at + 1) === "{";
+  const end = text.indexOf(marker ? "}}" : "}", at);
+  if (end === -1) return "refused";
+  return { as: marker ? " " : " §P ", next: end + (marker ? 2 : 1) };
+}
+
+/** A term the election may be AND-ed after: an operand, or two compared; a group is one operand. */
+const CONJUNCT_OPERAND = String.raw`(?:[A-Za-z_][\w.]*\s*)?§G|[A-Za-z_][\w.]*|\d+(?:\.\d+)?|§P`;
+const CONJUNCT_TERM = new RegExp(
+  String.raw`^\s*(?:${CONJUNCT_OPERAND})\s*(?:(?:=|!=|<>|<=|>=|<|>|\bIN\b)\s*(?:${CONJUNCT_OPERAND})\s*)?$`,
+  "i",
+);
+
+/**
+ * Allow-listed: the text from the windowed marker to the election is ` AND term AND term ... AND`,
+ * so the election is a conjunct of that WHERE, never an OR arm, under a NOT, or inside a group.
+ * Markers, parameters and quoted text are one operand each; a comment or a subquery refuses.
+ */
+function isConjunctionLeadingIn({ text }: { text: string }): boolean {
+  if (/--|\/\*|#|;|\b(?:SELECT|FROM|UNION)\b/i.test(text)) return false;
+  let flat = text
+    .replace(/\{\{[^{}]*\}\}/g, " ")
+    .replace(/\{[^{}]*\}/g, " §P ")
+    .replace(/'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|`(?:[^`\\]|\\.)*`/g, " §P ");
+  if (/['"`{}]/.test(flat)) return false;
+  for (let previous = ""; previous !== flat;) {
+    previous = flat;
+    flat = flat.replace(/\([^()]*\)/g, " §G ");
+  }
+  if (/[()]/.test(flat) || /\b(?:OR|NOT|XOR)\b/i.test(flat)) return false;
+  const terms = flat.split(/\bAND\b/i);
+  const first = terms.shift();
+  const last = terms.pop();
+  if (first?.trim() !== "" || last?.trim() !== "") return false;
+  return terms.every((term) => CONJUNCT_TERM.test(term));
+}
+
+type TokenKind = "word" | "operand" | "marker" | "open" | "close" | "operator";
+type MarkerToken = { kind: TokenKind; text: string };
+
+/** Any `{{tenantScope…}}` or `{{tenantSet…}}` text; broader than the expanded ones, so stricter. */
+const TENANT_MARKER = /\{\{tenant(?:Scope|Set)[^{}]*\}\}/g;
+const IS_TENANT_MARKER = /^\{\{tenant(?:Scope|Set)/;
+
+/** Each lexeme the reader knows, tried in order at the cursor; anything else is unreadable. */
+const LEXEMES: readonly (readonly [TokenKind | "space", RegExp])[] = [
+  ["space", /\s+|--[^\n]*|#[ !][^\n]*/y],
+  ["operand", /'(?:[^'\\]|\\.|'')*'|"(?:[^"\\]|\\.|"")*"|`(?:[^`\\]|\\.|``)*`/y],
+  ["marker", /\{\{[^{}]*\}\}/y],
+  ["operand", /\{\s*[A-Za-z_]\w*\s*:[^{}]*\}/y],
+  ["word", /[A-Za-z_]\w*/y],
+  ["operand", /\d[\w.]*/y],
+  ["open", /[([]/y],
+  ["close", /[)\]]/y],
+  ["operator", /::|->|<=|>=|<>|!=|==|\|\||[-+*/%=<>,;:?.]/y],
+];
+
+/** Where a `/* … *\/` comment opened at `open` ends; ClickHouse nests them. -1 when unclosed. */
+function blockCommentEnd({ text, open }: { text: string; open: number }): number {
+  let depth = 0;
+  for (let at = open; at < text.length - 1; at += 1) {
+    const pair = text.slice(at, at + 2);
+    if (pair === "/*") depth += 1;
+    if (pair === "*/") depth -= 1;
+    if (pair === "/*" || pair === "*/") at += 1;
+    if (depth === 0) return at + 1;
+  }
+  return -1;
+}
+
+function tokensOf(text: string): MarkerToken[] | undefined {
+  const tokens: MarkerToken[] = [];
+  for (let at = 0; at < text.length;) {
+    if (text.startsWith("/*", at)) {
+      const end = blockCommentEnd({ text, open: at });
+      if (end === -1) return undefined;
+      at = end;
+      continue;
+    }
+    const lexed = LEXEMES.map(([kind, pattern]) => {
+      pattern.lastIndex = at;
+      return { kind, match: pattern.exec(text)?.[0] };
+    }).find((each) => each.match !== undefined && each.match !== "");
+    if (lexed?.match === undefined) return undefined;
+    if (lexed.kind !== "space") tokens.push({ kind: lexed.kind, text: lexed.match });
+    at += lexed.match.length;
+  }
+  return tokens;
+}
+
+/** A bracket: its open and close token, its parent, and whether it is a subquery or an index. */
+type Group = {
+  open: number;
+  close: number;
+  parent: number;
+  kind: "root" | "select" | "plain" | "index";
+};
+
+type Shape = { tokens: MarkerToken[]; groups: Group[]; groupOf: number[]; closeOf: number[] };
+
+const ROOT = 0;
+
+/** A bracket's kind: an index or array, a subquery, or a plain group of an expression. */
+function groupKindOf({
+  open,
+  first,
+}: {
+  open: MarkerToken;
+  first: MarkerToken | undefined;
+}): Group["kind"] {
+  if (open.text === "[") return "index";
+  const word = first?.text.toUpperCase();
+  return word === "SELECT" || word === "WITH" ? "select" : "plain";
+}
+
+/** Closes the innermost bracket at `index`; false when it does not pair with the one open. */
+function closeGroup({ shape, stack, index }: { shape: Shape; stack: number[]; index: number }) {
+  const current = stack.at(-1) ?? ROOT;
+  const group = shape.groups[current];
+  const pairs = group?.kind === "index" ? "]" : ")";
+  if (current === ROOT || group === undefined || shape.tokens[index]?.text !== pairs) return false;
+  group.close = index;
+  shape.closeOf[group.open] = index;
+  stack.pop();
+  return true;
+}
+
+function shapeOf(text: string): Shape | undefined {
+  const tokens = tokensOf(text);
+  if (tokens === undefined) return undefined;
+  const root: Group = { open: -1, close: tokens.length, parent: -1, kind: "root" };
+  const shape: Shape = { tokens, groups: [root], groupOf: [], closeOf: [] };
+  const stack = [ROOT];
+  for (const [index, token] of tokens.entries()) {
+    const current = stack.at(-1) ?? ROOT;
+    shape.groupOf[index] = current;
+    if (token.kind === "close" && !closeGroup({ shape, stack, index })) return undefined;
+    if (token.kind !== "open") continue;
+    const kind = groupKindOf({ open: token, first: tokens[index + 1] });
+    shape.groups.push({ open: index, close: -1, parent: current, kind });
+    stack.push(shape.groups.length - 1);
+  }
+  return stack.length === 1 ? shape : undefined;
+}
+
+/** The units of one level from `from` to `to`: a token, or a whole bracket as its open token. */
+function unitsOf({ shape, from, to }: { shape: Shape; from: number; to: number }): number[] {
+  const units: number[] = [];
+  for (let at = from; at < to; at = (shape.closeOf[at] ?? at) + 1) units.push(at);
+  return units;
+}
+
+/** Clause words that open a clause of a select; only WHERE and PREWHERE filter the rows read. */
+const CLAUSE_WORDS = new Set(
+  (
+    "SELECT FROM JOIN ON USING PREWHERE WHERE GROUP HAVING ORDER LIMIT OFFSET SETTINGS UNION" +
+    " INTERSECT EXCEPT WINDOW QUALIFY FORMAT"
+  ).split(" "),
+);
+const FILTERING_CLAUSES = new Set(["WHERE", "PREWHERE"]);
+
+/** Words that bind looser than AND or hide one (`CASE … END`), never at a marker's level. */
+const LOOSE_WORDS = new Set(["OR", "XOR", "CASE", "WHEN", "THEN", "ELSE", "END", "AS"]);
+/** Operators that bind tighter than AND; a comma, `?:`, `->` or `;` refuses. */
+const CONJUNCT_OPERATORS = new Set([
+  "=",
+  "==",
+  "!=",
+  "<>",
+  "<",
+  ">",
+  "<=",
+  ">=",
+  "+",
+  "-",
+  "*",
+  "/",
+  "%",
+  "||",
+  ".",
+  "::",
+]);
+
+const wordOf = (token: MarkerToken | undefined): string | undefined =>
+  token?.kind === "word" ? token.text.toUpperCase() : undefined;
+
+/** Whether `unit` is a whole term of the conjunction `units`, every other term binding tighter. */
+function isConjunct({ shape, units, unit }: { shape: Shape; units: number[]; unit: number }) {
+  const terms: number[][] = [[]];
+  let between = false;
+  for (const at of units) {
+    const token = shape.tokens[at];
+    const word = wordOf(token);
+    if (word === "AND" && !between) {
+      terms.push([]);
+      continue;
+    }
+    if (word !== undefined && LOOSE_WORDS.has(word)) return false;
+    if (token?.kind === "operator" && !CONJUNCT_OPERATORS.has(token.text)) return false;
+    // A BETWEEN's own AND joins its bounds, not two terms.
+    if (word === "BETWEEN" || word === "AND") between = word === "BETWEEN";
+    terms.at(-1)?.push(at);
+  }
+  return terms.some((term) => term.length === 1 && term[0] === unit);
+}
+
+/** The units of the filtering clause `unit` sits in at its select's level; undefined if none. */
+function filteringClauseOf({
+  shape,
+  group,
+  unit,
+  fragment,
+}: {
+  shape: Shape;
+  group: Group;
+  unit: number;
+  fragment: boolean;
+}): number[] | undefined {
+  const units = unitsOf({ shape, from: group.open + 1, to: group.close });
+  const position = units.indexOf(unit);
+  const opens = units
+    .slice(0, position)
+    .findLastIndex((at) => CLAUSE_WORDS.has(wordOf(shape.tokens[at]) ?? ""));
+  // A fragment is a WHERE's body: at its top level, text before any clause word is that body.
+  const bare = opens === -1 && fragment && group.kind === "root";
+  const clause = wordOf(shape.tokens[units[opens] ?? -1]) ?? "";
+  if (!bare && !FILTERING_CLAUSES.has(clause)) return undefined;
+  const ends = units.findIndex(
+    (at, index) => index > position && CLAUSE_WORDS.has(wordOf(shape.tokens[at]) ?? ""),
+  );
+  return units.slice(opens + 1, ends === -1 ? units.length : ends);
+}
+
+/** Climbs from the marker through plain brackets of AND-ed terms to its select's WHERE. */
+function placementOf({
+  shape,
+  marker,
+  fragment,
+}: {
+  shape: Shape;
+  marker: number;
+  fragment: boolean;
+}): LooseMarkerPlacement | "conjunct" {
+  let unit = marker;
+  for (;;) {
+    const group = shape.groups[shape.groupOf[unit] ?? ROOT];
+    if (group === undefined || group.kind === "index") return "not-a-conjunct";
+    if (group.kind === "plain") {
+      const units = unitsOf({ shape, from: group.open + 1, to: group.close });
+      if (!isConjunct({ shape, units, unit })) return "not-a-conjunct";
+      unit = group.open;
+      continue;
+    }
+    const clause = filteringClauseOf({ shape, group, unit, fragment });
+    if (clause === undefined) return "outside-where";
+    return isConjunct({ shape, units: clause, unit }) ? "conjunct" : "not-a-conjunct";
+  }
+}
+
+/**
+ * Refuses a tenant marker that is not a top-level AND conjunct of the WHERE (or PREWHERE) of its
+ * own select, read on the caller's text so the fence's own OR is never seen. Allow-listed: text
+ * this reader cannot follow with certainty is refused too.
+ */
+function refuseLooseTenantMarkers({ text, fragment }: { text: string; fragment: boolean }): void {
+  const written = text.match(TENANT_MARKER) ?? [];
+  const [first] = written;
+  if (first === undefined) return;
+  const shape = shapeOf(text);
+  const markers = shape === undefined ? [] : tenantMarkersOf(shape);
+  // A marker the lexer did not read as one sits in a comment or a literal.
+  if (shape === undefined || markers.length !== written.length) {
+    throw new StatementScopeError({
+      kind: "loose-tenant-marker",
+      marker: first,
+      placement: "unreadable",
+    });
+  }
+  for (const marker of markers) {
+    const placement = placementOf({ shape, marker, fragment });
+    if (placement === "conjunct") continue;
+    const name = shape.tokens[marker]?.text ?? first;
+    throw new StatementScopeError({ kind: "loose-tenant-marker", marker: name, placement });
+  }
+}
+
+/** The tenant markers among a shape's tokens, by index. */
+const tenantMarkersOf = (shape: Shape): number[] =>
+  shape.tokens.flatMap((token, index) =>
+    token.kind === "marker" && IS_TENANT_MARKER.test(token.text) ? [index] : [],
+  );
+
+/** One term of each kind a compiled condition holds, so a new kind does not compile until added. */
+const PROBE_TERMS = {
+  attributeEquals: [
+    { kind: "attributeEquals", on: "span", key: "k", value: "v" },
+    { kind: "attributeEquals", on: "resource", key: "k", value: "v" },
+  ],
+  nameEquals: [{ kind: "nameEquals", value: "v" }],
+  attributePresent: [{ kind: "attributePresent", key: "k" }],
+  verified: [{ kind: "verified", key: "k" }],
+} satisfies {
+  [Kind in BraidConditionTerm["kind"]]: readonly Extract<BraidConditionTerm, { kind: Kind }>[];
+};
+
+/**
+ * Every name the fence's expansion reads, lower-cased: each word a probe fence renders (every time
+ * column, held bound and condition term) that calls nothing and is no keyword, and the election's
+ * keys off its head. An alias may take none of them, or the fence would read the alias.
+ */
+function fenceReadNamesOf(): ReadonlySet<string> {
+  const window: SharedWindow = { projectId: "p", from: 1, until: 2 };
+  const compiledWhere: CompiledWhere = {
+    version: BRAID_CONDITION_COMPILER_VERSION,
+    tree: { kind: "and", terms: Object.values(PROBE_TERMS).flat() },
+  };
+  const fence: TenantFence = {
+    own: ["p"],
+    shared: [window],
+    braids: {
+      reader: "p",
+      clauses: [
+        { kind: "traceWindow", digest: "", windows: [window] },
+        { kind: "braid", digest: "d", windows: [window], compiledWhere },
+      ],
+    },
+  };
+  const bounds: (HeldTraceParam | undefined)[] = [
+    undefined,
+    { kind: "traceId", param: "t" },
+    { kind: "sinceMs", param: "s" },
+  ];
+  const rendered = TENANT_SCOPE_TIME_COLUMNS.flatMap((column) => [
+    fenceExpression({ fence, column }).sql,
+    ...bounds.map((held) => conditionsExpression({ fence, column, held }).sql),
+  ]);
+  const tokens = tokensOf([...rendered, setExpression(fence).sql].join(" "));
+  if (tokens === undefined) throw new Error("the fence renders text its own reader cannot read");
+  const read = tokens.filter(
+    (token, index) =>
+      token.kind === "word" && tokens[index + 1]?.text !== "(" && !/^[A-Z]+$/.test(token.text),
+  );
+  const keys = ELECTION_HEAD.source.match(/[A-Z][a-z]\w*/g) ?? [];
+  return new Set([...read.map((token) => token.text), ...keys].map((name) => name.toLowerCase()));
+}
+
+/** The names no alias may take; exported so a test holds them to the columns the fence reads. */
+export const FENCE_READ_NAMES = fenceReadNamesOf();
+
+/** Words a column may follow; a fence name after another word, a value or a bracket is an alias. */
+const LEADS_A_COLUMN = new Set(
+  (
+    "SELECT DISTINCT ALL WHERE PREWHERE HAVING AND OR XOR NOT BY ON USING WHEN THEN ELSE CASE IN" +
+    " IS LIKE ILIKE BETWEEN EXISTS ANY FROM JOIN WITH INTERVAL GLOBAL OVER PARTITION QUALIFY TO STEP"
+  ).split(" "),
+);
+
+/** A token read as an identifier: a word or a quoted name, and `?` for one a parameter binds. */
+function identifierOf(token: MarkerToken | undefined): string | undefined {
+  if (token?.kind === "word") return token.text;
+  if (token?.kind !== "operand") return undefined;
+  if (/^\{\s*\w+\s*:\s*Identifier\s*\}$/i.test(token.text)) return "?";
+  const quote = token.text.charAt(0);
+  if (quote !== '"' && quote !== "`") return undefined;
+  return token.text
+    .slice(1, -1)
+    .replaceAll(`\\${quote}`, quote)
+    .replaceAll(quote + quote, quote);
+}
+
+/** A name the fence reads, in any case; a name a parameter binds could be any of them. */
+const readByFence = (name: string | undefined): name is string =>
+  name === "?" || (name !== undefined && FENCE_READ_NAMES.has(name.toLowerCase()));
+
+/** Whether a name after `before` is an alias written with no AS. */
+function isImplicitAlias(before: MarkerToken | undefined): boolean {
+  if (before === undefined || before.kind === "operator" || before.kind === "open") return false;
+  const word = wordOf(before);
+  return word === undefined || !LEADS_A_COLUMN.has(word);
+}
+
+/**
+ * Refuses an alias taking a name the fence reads: `AS name` (quoted or bound too), a CTE or window
+ * `name AS (…)`, or a name after a value, a bracket or a non-keyword. Statement-wide, since an
+ * alias reaches a subquery whose table lacks the column whatever the settings (ADR-201 §3).
+ */
+function refuseShadowingAliases(tokens: readonly MarkerToken[]): void {
+  for (const [index, token] of tokens.entries()) {
+    const before = tokens[index - 1];
+    const after = tokens[index + 1];
+    const as = wordOf(token) === "AS";
+    const named = as ? identifierOf(after?.text === "(" ? before : after) : identifierOf(token);
+    if (readByFence(named) && (as || isImplicitAlias(before))) {
+      throw new StatementScopeError({ kind: "shadowing-alias", name: named });
+    }
+  }
+}
+
+/** Functions whose own grammar writes FROM in their brackets: `EXTRACT(DAY FROM t)`, `trim(…)`. */
+const FROM_TAKING_FUNCTIONS = new Set(["EXTRACT", "TRIM", "SUBSTRING", "OVERLAY"]);
+const SET_OPERATORS = new Set(["UNION", "INTERSECT", "EXCEPT"]);
+
+const unfenced = (reason: UnfencedReadReason) =>
+  new StatementScopeError({ kind: "unfenced-select", reason });
+
+/** A group's selects: its units split at UNION, INTERSECT and EXCEPT. */
+function armsOf({ shape, group }: { shape: Shape; group: Group }): number[][] {
+  const arms: number[][] = [[]];
+  for (const at of unitsOf({ shape, from: group.open + 1, to: group.close })) {
+    if (SET_OPERATORS.has(wordOf(shape.tokens[at]) ?? "")) arms.push([]);
+    else arms.at(-1)?.push(at);
+  }
+  return arms;
+}
+
+/** The select arm a conjunct marker fences, climbing plain brackets, as `group:arm`. */
+function fencedArmOf({ shape, marker }: { shape: Shape; marker: number }): string {
+  let unit = marker;
+  let index = shape.groupOf[unit] ?? ROOT;
+  for (let group = shape.groups[index]; group?.kind === "plain"; group = shape.groups[index]) {
+    unit = group.open;
+    index = shape.groupOf[unit] ?? ROOT;
+  }
+  const group = shape.groups[index];
+  const arms = group === undefined ? [] : armsOf({ shape, group });
+  return `${index}:${arms.findIndex((units) => units.includes(unit))}`;
+}
+
+/** Names the statement's own WITH gives a subquery, `name AS (SELECT …)`, before its SELECT. */
+function cteNamesOf(shape: Shape): ReadonlySet<string> {
+  const units = unitsOf({ shape, from: 0, to: shape.tokens.length });
+  const select = units.findIndex((at) => wordOf(shape.tokens[at]) === "SELECT");
+  const names = new Set<string>();
+  for (const [index, at] of units.slice(0, Math.max(select, 0)).entries()) {
+    const name = identifierOf(shape.tokens[at]);
+    const body = shape.groups.find((group) => group.open === units[index + 2]);
+    const as = wordOf(shape.tokens[units[index + 1] ?? -1]) === "AS";
+    if (name !== undefined && as && body?.kind === "select") names.add(name);
+  }
+  return names;
+}
+
+/** What a FROM or JOIN reads: a subquery or the statement's CTE, fenced on its own, or a table. */
+function sourceOf({
+  shape,
+  at,
+  ctes,
+}: {
+  shape: Shape;
+  at: number | undefined;
+  ctes: ReadonlySet<string>;
+}): "fenced" | "table" {
+  const token = at === undefined ? undefined : shape.tokens[at];
+  if (token?.kind === "open") {
+    if (shape.groups.find((group) => group.open === at)?.kind === "select") return "fenced";
+    throw unfenced("unreadable");
+  }
+  const name = identifierOf(token);
+  if (at === undefined || name === undefined) throw unfenced("unreadable");
+  const next = shape.tokens[at + 1]?.text;
+  if (next === "(") throw unfenced("table-function");
+  return ctes.has(name) && next !== "." ? "fenced" : "table";
+}
+
+/** Whether a select arm reads a table by name; a JOIN or comma to one or a second FROM refuses. */
+function readsTable({
+  shape,
+  arm,
+  ctes,
+}: {
+  shape: Shape;
+  arm: readonly number[];
+  ctes: ReadonlySet<string>;
+}): boolean {
+  const from = arm.findIndex((at) => wordOf(shape.tokens[at]) === "FROM");
+  if (from === -1) return false;
+  const reads = sourceOf({ shape, at: arm[from + 1], ctes }) === "table";
+  let joining = true;
+  for (let index = from + 1; index < arm.length; index += 1) {
+    const at = arm[index] ?? -1;
+    const word = wordOf(shape.tokens[at]);
+    if (word === "FROM") throw unfenced("unreadable");
+    if (word === "JOIN") {
+      joining = wordOf(shape.tokens[arm[index - 1] ?? -1]) !== "ARRAY";
+      if (joining && sourceOf({ shape, at: arm[index + 1], ctes }) === "table") {
+        throw unfenced("table-join");
+      }
+    } else if (word !== undefined && CLAUSE_WORDS.has(word)) {
+      joining = false;
+    } else if (joining && shape.tokens[at]?.text === ",") {
+      throw unfenced("table-join");
+    }
+  }
+  return reads;
+}
+
+/** The function forms of IN, whose last argument is the set; `in(x, t)` reads `t` as a table. */
+const SET_FUNCTIONS = new Set(
+  "IN NOTIN GLOBALIN GLOBALNOTIN NULLIN NOTNULLIN GLOBALNULLIN GLOBALNOTNULLIN".split(" "),
+);
+/** Functions that read a Join table or a dictionary by name, which no tenant marker fences. */
+const TABLE_READING_FUNCTION = /^(?:JOINGET\w*|DICT\w+)$/;
+
+/** Whether `tokens[from, to)` is a table's name alone, `t` or `db.t`, and not a CTE's. */
+function namesTable({
+  tokens,
+  from,
+  to,
+  ctes,
+}: {
+  tokens: readonly MarkerToken[];
+  from: number;
+  to: number;
+  ctes: ReadonlySet<string>;
+}): boolean {
+  const parts = tokens.slice(from, to);
+  if (parts.length % 2 === 0) return false;
+  const named = parts.every((token, at) =>
+    at % 2 === 0 ? identifierOf(token) !== undefined : token.text === ".",
+  );
+  return named && !(parts.length === 1 && ctes.has(identifierOf(parts[0]) ?? ""));
+}
+
+/** The bracket closing the one at `open`, and its last top-level comma; -1 when unbalanced. */
+function bracketAt({ tokens, open }: { tokens: readonly MarkerToken[]; open: number }) {
+  let depth = 0;
+  let comma = -1;
+  for (let at = open; at < tokens.length; at += 1) {
+    const text = tokens[at]?.text;
+    if (text === "(" || text === "[") depth += 1;
+    else if (text === ")" || text === "]") depth -= 1;
+    else if (text === "," && depth === 1) comma = at;
+    if (depth === 0) return { close: at, comma };
+  }
+  return { close: -1, comma };
+}
+
+type SetAt = { tokens: readonly MarkerToken[]; index: number; ctes: ReadonlySet<string> };
+
+/** Whether the bare `IN name` at `index` reads a table; `IN f(x)` is a function's value. */
+function bareSetIsTable({ tokens, index, ctes }: SetAt): boolean {
+  const name = identifierOf(tokens[index + 1]);
+  return name !== undefined && tokens[index + 2]?.text !== "(" && !ctes.has(name);
+}
+
+/** Whether the bracketed set at `index`, `IN (t)` or `in(x, t)`, is only a table's name. */
+function bracketedSetIsTable({ tokens, index, ctes }: SetAt): boolean {
+  // A subquery set is a select, which the coverage check fences on its own.
+  const head = wordOf(tokens[index + 2]);
+  if (head === "SELECT" || head === "WITH") return false;
+  const { close, comma } = bracketAt({ tokens, open: index + 1 });
+  if (close === -1) throw unfenced("unreadable");
+  if (namesTable({ tokens, from: index + 2, to: close, ctes })) return true;
+  return comma !== -1 && namesTable({ tokens, from: comma + 1, to: close, ctes });
+}
+
+/** `x IN t`, `x IN (t)` and `in(x, t)` read the whole table; so do joinGet and dictGet. */
+function refuseTablesInSets({
+  tokens,
+  ctes,
+}: {
+  tokens: readonly MarkerToken[];
+  ctes: ReadonlySet<string>;
+}): void {
+  for (const [index, token] of tokens.entries()) {
+    const word = wordOf(token) ?? "";
+    const opens = tokens[index + 1]?.text === "(";
+    if (opens && TABLE_READING_FUNCTION.test(word)) throw unfenced("table-function");
+    const set = { tokens, index, ctes };
+    const bare = word === "IN" && !opens && bareSetIsTable(set);
+    if (bare || (opens && SET_FUNCTIONS.has(word) && bracketedSetIsTable(set))) {
+      throw unfenced("table-in");
+    }
+  }
+}
+
+/**
+ * Every select reading a table carries a tenant marker as a top-level AND conjunct of its own
+ * WHERE, each UNION arm and subquery on its own (ADR-201 §3). A subquery or the statement's CTE
+ * holds rows already fenced; a join or comma to a table, a table function and `IN table` refuse.
+ */
+function refuseUnfencedReads({ text }: { text: string }): void {
+  const setting = PINNED_SETTING.exec(text);
+  if (setting !== null) {
+    throw new StatementScopeError({ kind: "pinned-setting", setting: setting[0] });
+  }
+  const shape = shapeOf(text);
+  if (shape === undefined) throw unfenced("unreadable");
+  refuseShadowingAliases(shape.tokens);
+  const ctes = cteNamesOf(shape);
+  refuseTablesInSets({ tokens: shape.tokens, ctes });
+  const fenced = new Set(tenantMarkersOf(shape).map((marker) => fencedArmOf({ shape, marker })));
+  for (const [index, group] of shape.groups.entries()) {
+    const fromTaking = FROM_TAKING_FUNCTIONS.has(wordOf(shape.tokens[group.open - 1]) ?? "");
+    if (group.kind === "index" || (group.kind === "plain" && fromTaking)) continue;
+    for (const [arm, units] of armsOf({ shape, group }).entries()) {
+      if (readsTable({ shape, arm: units, ctes }) && !fenced.has(`${index}:${arm}`)) {
+        throw unfenced("no-marker");
+      }
+    }
+  }
+}
+
+/**
  * Expand a WHERE fragment's markers on its own, for the one legacy statement that embeds the
- * compiled trace filter; a repository reads through `as()` instead. The tenant-predicate and
- * reserved-prefix checks still apply; only the windowed-marker check is left to the caller.
+ * compiled trace filter; a repository reads through `as()` instead. Every check but the
+ * windowed-marker one still applies, the fragment read as a WHERE's body.
  */
 export function expandFragment({
   fragment,
@@ -372,7 +1558,11 @@ export function expandFragment({
   fence: TenantFence;
 }): { sql: string; params: Record<string, unknown> } {
   refuseTenantInText({ text: fragment, queryParams });
+  refuseUnconditionedMarkers({ text: fragment, fence });
+  refuseLooseTenantMarkers({ text: fragment, fragment: true });
   const expanded = replaceMarkers({ text: fragment, queryParams, fence });
+  refuseUnfencedReads({ text: fragment });
+  refuseUnappliedBraids({ fence, expanded });
   return { sql: expanded.text, params: expanded.queryParams };
 }
 
@@ -384,26 +1574,75 @@ function replaceMarkers({
   text: string;
   queryParams: Record<string, unknown>;
   fence: TenantFence;
-}): { text: string; queryParams: Record<string, unknown>; windowed: number } {
+}): {
+  text: string;
+  queryParams: Record<string, unknown>;
+  windowed: number;
+  conditioned: number;
+  markers: number;
+} {
   let merged: Record<string, unknown> = { ...queryParams };
   let windowed = 0;
-  const replaced = text
-    .replace(MARKER, (_match, column: string) => {
+  let conditioned = 0;
+  let sets = 0;
+  let elections = 0;
+  const windowedBy =
+    (render: typeof conditionsExpression, counts: () => void) =>
+    (_match: string, column: string, ...groups: unknown[]) => {
       if (!isTimeColumn(column)) {
         throw new StatementScopeError({ kind: "unknown-time-column", column });
       }
-      windowed += 1;
-      const expression = fenceExpression({ fence, column });
+      // Only the conditions marker captures a bound; the others pass the offset here.
+      const [kind, param] = groups;
+      const held: HeldTraceParam | undefined =
+        (kind === "traceId" || kind === "sinceMs") && typeof param === "string"
+          ? { kind, param }
+          : undefined;
+      if (held !== undefined && reservesPrefix(held.param)) {
+        throw new StatementScopeError({ kind: "reserved-param", param: held.param });
+      }
+      counts();
+      const expression = render({ fence, column, held });
       merged = { ...merged, ...expression.params };
       return expression.sql;
-    })
+    };
+  const replaced = text
+    .replace(
+      MARKER,
+      windowedBy(fenceExpression, () => {
+        windowed += 1;
+      }),
+    )
+    .replace(
+      CONDITIONS_MARKER,
+      windowedBy(conditionsExpression, () => {
+        windowed += 1;
+        conditioned += 1;
+      }),
+    )
+    .replace(
+      LATEST_VERSION_MARKER,
+      windowedBy(fenceExpression, () => {
+        elections += 1;
+      }),
+    )
     .replace(SET_MARKER, () => {
+      sets += 1;
       const expression = setExpression(fence);
       merged = { ...merged, ...expression.params };
       return expression.sql;
     });
-  return { text: replaced, queryParams: merged, windowed };
+  return {
+    text: replaced,
+    queryParams: merged,
+    windowed,
+    conditioned,
+    markers: windowed + elections + sets,
+  };
 }
+
+const reservesPrefix = (param: string): boolean =>
+  param.startsWith(TENANT_SCOPE_PARAM_PREFIX) || param.startsWith(ID_BOUND_PARAM_PREFIX);
 
 function isTimeColumn(column: string): column is TenantScopeTimeColumn {
   return (TENANT_SCOPE_TIME_COLUMNS as readonly string[]).includes(column);
@@ -435,6 +1674,9 @@ export class AuthorizedClickHouse {
       client: () => this.deps.resolveClient(ownProjectId),
       fence,
       tenantId,
+      // Only a braid's read is cut at expiry: a long export on any other proof keeps its reader.
+      ...(fence.braids === undefined ? {} : { expiresAt: proof.expiresAt }),
+      now: () => this.deps.now?.() ?? nowInstant().epochMilliseconds,
     });
   }
 }

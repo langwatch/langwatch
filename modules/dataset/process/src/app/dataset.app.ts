@@ -95,6 +95,7 @@ import {
   type DatasetVersionsDefinition,
 } from "../eventing/dataset-versions.pipeline.ts";
 import type { DatasetRepositories } from "../repositories/dataset.repositories.ts";
+import { assertKnownColumns } from "../rules/dataset-columns.rules.ts";
 import { datasetPlatformUrl } from "../rules/dataset-platform-url.rules.ts";
 import { versionAuthorUserIds, withAuthorNames } from "../rules/dataset-version-author.rules.ts";
 import { DatasetAttachmentReferenceService } from "../services/dataset-attachment-reference.service.ts";
@@ -175,6 +176,11 @@ interface DatasetUpsertInput {
   columnTypes?: DatasetColumns;
   datasetRecords?: UpsertDatasetInput["datasetRecords"];
   columnRenames?: UpsertDatasetInput["columnRenames"];
+  /**
+   * Refuse `datasetRecords` as an append does: above the plan's batch bound, or naming a
+   * column `columnTypes` lacks.
+   */
+  enforceBatchBound?: boolean;
 }
 
 export class DatasetModule implements DatasetApi {
@@ -330,6 +336,16 @@ export class DatasetModule implements DatasetApi {
    * backs up to existing row, or refuse.
    */
   async upsertDataset(input: DatasetUpsertInput & EditedBy): Promise<Dataset> {
+    if (input.enforceBatchBound && input.datasetRecords?.length) {
+      await this.#requestBounds.assertBatchSize(input.projectId, input.datasetRecords.length);
+      if (input.columnTypes) {
+        assertKnownColumns({
+          datasetName: input.name ?? "",
+          columns: input.columnTypes.map((column) => column.name),
+          entries: input.datasetRecords,
+        });
+      }
+    }
     const target = input.datasetId ?? input.slugOrId;
     if (target === undefined) {
       const created = await this.#upsertDataset(input);
@@ -995,6 +1011,9 @@ export abstract class DatasetNormalizeQueue {
   abstract enqueueNormalize(input: { datasetId: string; projectId: string }): Promise<void>;
 }
 
+/** One row a new dataset is born with; without an id, the row gets a fresh one. */
+export type DatasetSeedRow = { id?: string | undefined; entry: Record<string, unknown> };
+
 /** Content-layout operations for s3_jsonl datasets. Keeps storage decisions
  * out of routes and process-globals out of service.
  */
@@ -1041,6 +1060,14 @@ export abstract class DatasetContent {
     dataset: Dataset;
     input: DeleteDatasetRecordsInput;
   }): Promise<{ count: number }>;
+  /** A new dataset born in object storage: chunks first, then its row (ADR-032 v13). */
+  abstract createDataset(input: {
+    projectId: string;
+    name: string;
+    slug: string;
+    columnTypes: Dataset["columnTypes"];
+    rows: AsyncIterable<DatasetSeedRow> | Iterable<DatasetSeedRow>;
+  }): Promise<Dataset>;
   abstract copyDataset(input: {
     source: Dataset;
     sourceProjectId: string;

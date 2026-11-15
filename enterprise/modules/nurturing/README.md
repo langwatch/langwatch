@@ -1,6 +1,6 @@
 # nurturing
 
-Product analytics and lifecycle messaging: every owner tells nurturing through a subscriber on its own pipeline, and nurturing alone talks to PostHog and Customer.io.
+Product analytics and lifecycle messaging: nurturing learns from the owners' events, keeps its own copies, and alone talks to PostHog and Customer.io.
 
 <!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
 
@@ -11,21 +11,29 @@ Product analytics and lifecycle messaging: every owner tells nurturing through a
 | Classification | enterprise (`modules/catalogue.json`)                                                                          |
 | Subjects       | nurturing, product-milestone                                                                                   |
 | Halves         | [contract](contract) · [process](process/README.md)                                                            |
-| Api token      | `NurturingApi` = `moduleApi<NurturingApi>()("nurturing")`, `contract/src/nurturing-types.ts:212` (1 operation) |
+| Api token      | `NurturingApi` = `moduleApi<NurturingApi>()("nurturing")`, `contract/src/nurturing-types.ts:259` (1 operation) |
 | Installed by   | api, worker, tasks (process)                                                                                   |
 
 ## What nurturing owns
 
-| Kind                           | Name                                                                                                                                          | Declared at                                                                           |
-| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| Postgres table                 | `NurturingOrganization`                                                                                                                       | `process/src/repositories/prisma/prisma.nurturing-milestones.repository.ts:34`        |
-| Postgres, accessed not claimed | `Organization`, `Project`, `Team`                                                                                                             | `process/src/repositories/prisma/prisma.nurturing-project-directory.repository.ts:12` |
-| Stores required                |                                                                                                                                               | `process/src/channels/http/http.customer-io.channel.ts:20`                            |
-| Stores required                |                                                                                                                                               | `process/src/channels/http/http.nurturing.channels.ts:13`                             |
-| Stores required                | prisma, redis                                                                                                                                 | `process/src/repositories/live/live.nurturing.repositories.ts:11`                     |
-| Stores required                | ≈ `ownedRepositories.requires`                                                                                                                | `process/src/repositories/prisma/prisma.nurturing.repositories.ts:16`                 |
-| Secrets                        | CUSTOMER_IO_API_KEY                                                                                                                           | `process/src/app/nurturing.app.ts:36`                                                 |
-| Config                         | `customerIoRegion` (CUSTOMER_IO_REGION), `customerIoBaseUrl` (CUSTOMER_IO_BASE_URL), `posthogKey` (POSTHOG_KEY), `posthogHost` (POSTHOG_HOST) | `contract/src/nurturing.config.ts:8`                                                  |
+| Kind                           | Name                                                                                                                                          | Declared at                                                                              |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Postgres table                 | `NurturingOrganization`                                                                                                                       | `process/src/repositories/prisma/prisma.nurturing-milestones.repository.ts:35`           |
+| Postgres table                 | `NurturingOrganizationCreated`                                                                                                                | `process/src/repositories/prisma/prisma.nurturing-organization-created.repository.ts:14` |
+| Postgres table                 | `NurturingOrganizationMember`                                                                                                                 | `process/src/repositories/prisma/prisma.nurturing-organization-member.repository.ts:20`  |
+| Postgres table                 | `NurturingPersonalProject`                                                                                                                    | `process/src/repositories/prisma/prisma.nurturing-personal-project.repository.ts:21`     |
+| Postgres table                 | `NurturingProject`                                                                                                                            | `process/src/repositories/prisma/prisma.nurturing-project-placement.repository.ts:12`    |
+| Postgres table                 | `NurturingProjectUsageView`                                                                                                                   | `process/src/repositories/prisma/prisma.nurturing-project-usage.repository.ts:32`        |
+| Postgres table                 | `NurturingProjectTraceDay`                                                                                                                    | `process/src/repositories/prisma/prisma.nurturing-trace-day.repository.ts:18`            |
+| Postgres table                 | `NurturingTracedProject`                                                                                                                      | `process/src/repositories/prisma/prisma.nurturing-traced-project.repository.ts:13`       |
+| Postgres table                 | `NurturingUncopiedProject`                                                                                                                    | `process/src/repositories/prisma/prisma.nurturing-uncopied-project.repository.ts:12`     |
+| Postgres, accessed not claimed | `Organization`, `Project`, `Team`                                                                                                             | `process/src/repositories/prisma/prisma.nurturing-project-directory.repository.ts:12`    |
+| Stores required                |                                                                                                                                               | `process/src/channels/http/http.customer-io.channel.ts:20`                               |
+| Stores required                |                                                                                                                                               | `process/src/channels/http/http.nurturing.channels.ts:13`                                |
+| Stores required                | prisma, redis                                                                                                                                 | `process/src/repositories/live/live.nurturing.repositories.ts:11`                        |
+| Stores required                | ≈ `ownedRepositories.requires`                                                                                                                | `process/src/repositories/prisma/prisma.nurturing.repositories.ts:36`                    |
+| Secrets                        | CUSTOMER_IO_API_KEY                                                                                                                           | `process/src/app/nurturing.app.ts:48`                                                    |
+| Config                         | `customerIoRegion` (CUSTOMER_IO_REGION), `customerIoBaseUrl` (CUSTOMER_IO_BASE_URL), `posthogKey` (POSTHOG_KEY), `posthogHost` (POSTHOG_HOST) | `contract/src/nurturing.config.ts:8`                                                     |
 
 Anything else nurturing needs belongs to another module and is reached through its `*Api`.
 

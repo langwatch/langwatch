@@ -289,5 +289,26 @@ export class TestAuthzApi implements AuthzApi {
   completeAdmission = unsupported<AuthzApi["completeAdmission"]>("completeAdmission");
   clearPendingAdmission = unsupported<AuthzApi["clearPendingAdmission"]>("clearPendingAdmission");
   hasProjectPermission = unsupported<AuthzApi["hasProjectPermission"]>("hasProjectPermission");
-  deriveGrantId = unsupported<AuthzApi["deriveGrantId"]>("deriveGrantId");
+  resolveGrantId = unsupported<AuthzApi["resolveGrantId"]>("resolveGrantId");
+  listBraids = unsupported<AuthzApi["listBraids"]>("listBraids");
+  listBraidsForScreen = unsupported<AuthzApi["listBraidsForScreen"]>("listBraidsForScreen");
+  getOrganizationPolicyForScreen = unsupported<AuthzApi["getOrganizationPolicyForScreen"]>(
+    "getOrganizationPolicyForScreen",
+  );
+  countProjectMembersHoldingForScreen = unsupported<
+    AuthzApi["countProjectMembersHoldingForScreen"]
+  >("countProjectMembersHoldingForScreen");
+  createBraid = unsupported<AuthzApi["createBraid"]>("createBraid");
+  changeBraid = unsupported<AuthzApi["changeBraid"]>("changeBraid");
+  removeBraid = unsupported<AuthzApi["removeBraid"]>("removeBraid");
+  recordBraidedSpansView =
+    unsupported<AuthzApi["recordBraidedSpansView"]>("recordBraidedSpansView");
+  getOrganizationPolicy = unsupported<AuthzApi["getOrganizationPolicy"]>("getOrganizationPolicy");
+  setBraidsPolicy = unsupported<AuthzApi["setBraidsPolicy"]>("setBraidsPolicy");
+  listOrganizationBraids =
+    unsupported<AuthzApi["listOrganizationBraids"]>("listOrganizationBraids");
+  countProjectMembersHolding = unsupported<AuthzApi["countProjectMembersHolding"]>(
+    "countProjectMembersHolding",
+  );
+  listBraidTargets = unsupported<AuthzApi["listBraidTargets"]>("listBraidTargets");
 }

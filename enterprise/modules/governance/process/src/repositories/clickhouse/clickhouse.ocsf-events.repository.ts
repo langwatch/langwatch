@@ -287,11 +287,11 @@ export class ClickHouseOcsfEventsRepository
   }
 
   /**
-   * SIEM forwarding pull — the read side of `governance_ocsf_events`,
-   * deduped to the latest version of each (TenantId, EventId) and ordered
-   * EventTime ASC for cursor pagination.
-   *
-   * Spec: specs/ai-gateway/governance/siem-export.feature
+   * SIEM forwarding pull: the latest version of each (TenantId, EventId), EventTime ASC.
+   * The plain `EventTime >=` prunes partitions (the tuple cursor alone prunes none) and
+   * implies nothing the tuple does not. The dedup set holds the page's keys only, and each
+   * key's EventTime prunes the payload read to the page's months.
+   * Spec: enterprise/modules/governance/specs/ocsf-event-pages.feature
    */
   async findAll(input: FindOcsfEventsInput): Promise<GovernanceOcsfExportRow[]> {
     const client = await this.resolveClient(input.tenantId);
@@ -318,13 +318,17 @@ export class ClickHouseOcsfEventsRepository
           RawOcsfJson
         FROM ${TABLE_NAME}
         WHERE TenantId = {tenantId:String}
+          AND EventTime >= fromUnixTimestamp64Milli({sinceMs:UInt64})
           AND (EventTime, EventId) > (fromUnixTimestamp64Milli({sinceMs:UInt64}), {sinceEventId:String})
-          AND (TenantId, EventId, LastUpdatedAt) IN (
-            SELECT TenantId, EventId, max(LastUpdatedAt)
+          AND (TenantId, EventId, LastUpdatedAt, EventTime) IN (
+            SELECT TenantId, EventId, max(LastUpdatedAt), argMax(EventTime, LastUpdatedAt) AS LatestTime
             FROM ${TABLE_NAME}
             WHERE TenantId = {tenantId:String}
+              AND EventTime >= fromUnixTimestamp64Milli({sinceMs:UInt64})
               AND (EventTime, EventId) > (fromUnixTimestamp64Milli({sinceMs:UInt64}), {sinceEventId:String})
             GROUP BY TenantId, EventId
+            ORDER BY LatestTime ASC, EventId ASC
+            LIMIT {limit:UInt32}
           )
         ORDER BY EventTime ASC, EventId ASC
         LIMIT {limit:UInt32}

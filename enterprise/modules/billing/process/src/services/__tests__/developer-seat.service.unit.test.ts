@@ -84,6 +84,7 @@ describe("DeveloperSeatService", () => {
       endDate: null,
       maxMembers: 3,
       maxMembersLite: null,
+      maxMembersDeveloper: null,
       maxMessagesPerMonth: null,
       lastPaymentFailedDate: null,
       seatsKept: null,

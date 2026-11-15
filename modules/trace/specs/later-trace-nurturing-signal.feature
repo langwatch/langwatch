@@ -24,3 +24,11 @@ Feature: A later trace tells nurturing, against the organization's admin
     When their received facts are recorded
     Then each fact is keyed by the project and its instant, so neither waits for the other
     And the fact still names its project
+
+  # Per-email usage (2026-11-10): nurturing throttles its trace-usage read per organization, so the
+  # fact names the admin's organization when the project resolves one.
+  @unit
+  Scenario: A later trace's fact names the admin's organization
+    Given a project whose organization admin resolves together with its organization
+    When another real trace is processed
+    Then trace_received carries the organization's id

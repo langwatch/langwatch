@@ -82,6 +82,13 @@ export class ObjectStorageStoredObjectBytesRepository extends StoredObjectBytesR
     }
   }
 
+  async exists(input: {
+    projectId: string;
+    address: StoredObjectStorageAddress;
+  }): Promise<boolean> {
+    return this.objects.exists(memberAddressOf(input.projectId, input.address));
+  }
+
   async getBytes(input: {
     projectId: string;
     address: StoredObjectStorageAddress;
