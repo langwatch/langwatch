@@ -41,6 +41,7 @@
     "@langwatch/api-key-contract": "workspace:*",
     "@langwatch/authorization": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/clickhouse-client": "workspace:*",
     "@langwatch/data-retention-contract": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/entitlement-contract": "workspace:*",
@@ -83,6 +84,8 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@clickhouse/client": "catalog:",
+    "@langwatch/clickhouse-migrations": "workspace:*",
     "@langwatch/feature-flag-process": "workspace:*",
     "@langwatch/plans": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
