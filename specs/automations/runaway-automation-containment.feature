@@ -131,6 +131,26 @@ Feature: Runaway automations are contained without punishing the customer
       When a match is dispatched after the UTC day rolls over
       Then the dispatch is allowed
 
+    # A match counts toward the UTC day its trace occurred, not the day it was
+    # processed (#8893). Replaying a backlog of N past days therefore gives
+    # each of those days its own allowance, up to N times the ceiling, which is
+    # the intended reading of "per day of traffic". A trace that settles after
+    # midnight counts toward the day it started. "Skipped today" on the
+    # automations list still reads today's counter only, so skips on replayed
+    # days do not show there.
+    @unit
+    Scenario: A replayed trace counts toward the day it occurred
+      Given a trace that occurred three days ago
+      When its confirmed match is dispatched today
+      Then the ceiling slot is counted on the day the trace occurred
+      And a breach on that slot is reported for that day
+
+    @unit
+    Scenario: A future-dated trace counts toward today
+      Given a trace whose time is later than now, because the sender's clock is ahead
+      When its confirmed match is dispatched
+      Then the ceiling slot is counted today, not on a later day
+
   Rule: At the ceiling the automation is throttled, not broken
 
     @unit
@@ -302,6 +322,23 @@ Feature: Runaway automations are contained without punishing the customer
       When the breach is handled
       Then the trigger is paused with a runaway-volume reason
       And the customer is emailed about the pause
+
+    # The share is measured over the same UTC day as the breached counter: the
+    # traces that occurred that day, not the last 24 hours (#8893).
+    @unit
+    Scenario: Replaying older days does not pause an automation whose share of each day is below the threshold
+      Given a replayed backlog breaches the ceiling on an earlier day
+      And its matches are a small share of that day's traces, though today is quiet
+      When the breach is handled
+      Then the share is measured against that day's traces
+      And the trigger stays active
+
+    @unit
+    Scenario: A replayed day that matches almost every trace of that day still pauses
+      Given a replayed backlog breaches the ceiling on an earlier day
+      And its matches cover almost all of that day's traces
+      When the breach is handled
+      Then the trigger is paused with a runaway-volume reason
 
     @integration
     Scenario: A grandfathered match-everything automation is paused on breach

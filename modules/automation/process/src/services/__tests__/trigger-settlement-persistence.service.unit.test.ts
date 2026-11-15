@@ -1,5 +1,5 @@
 import type { TriggerSummary } from "@langwatch/automation-contract";
-import { Temporal } from "@langwatch/time";
+import { Temporal, type Instant } from "@langwatch/time";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -31,6 +31,7 @@ function runtime(
     confirms?: boolean;
     capDecision?: { allowed: boolean; count: number; cap: number; skipped: number };
     breachThrows?: Error;
+    occurredAt?: number;
   } = {},
 ) {
   const consumePersistCapSlot = vi
@@ -56,7 +57,13 @@ function runtime(
     projects: {
       findById: vi.fn().mockResolvedValue({ id: "project-1", name: "Project", slug: "project" }),
     } as never,
-    traces: { findSummary: vi.fn().mockResolvedValue(fold) } as never,
+    traces: {
+      findSummary: vi
+        .fn()
+        .mockResolvedValue(
+          overrides.occurredAt === undefined ? fold : { ...fold, occurredAt: overrides.occurredAt },
+        ),
+    } as never,
     confirmation: { confirms: vi.fn().mockResolvedValue(overrides.confirms ?? true) } as never,
     persistActions: { dispatch } as never,
     clock: { now: () => Temporal.Instant.from("2026-01-01T00:00:00Z") } as never,
@@ -130,6 +137,48 @@ describe("given a settled match at persist dispatch", () => {
         expect.any(Error),
         expect.objectContaining({ phase: "persist-cap-breach" }),
       );
+    });
+  });
+});
+
+describe("given a confirmed match, the day its ceiling slot is counted on", () => {
+  const NOW = Temporal.Instant.from("2026-01-01T00:00:00Z");
+  const TODAY = Math.floor(NOW.epochMilliseconds / 86_400_000);
+  const dispatchOne = (service: TriggerSettlementPersistenceService) =>
+    service.dispatch({ projectId: "project-1", triggerId: "trigger-1", traceIds: ["trace-1"] });
+  const countedAt = (consume: ReturnType<typeof vi.fn>) =>
+    (consume.mock.calls[0]?.[0] as { now: Instant }).now.epochMilliseconds;
+
+  describe("when the trace occurred on an earlier day (a replayed backlog)", () => {
+    /** @scenario "A replayed trace counts toward the day it occurred" */
+    it("counts the slot at the trace's own time and reports a breach on that day", async () => {
+      const occurredAt = Temporal.Instant.from("2025-12-29T15:30:00Z").epochMilliseconds;
+      const { service, consumePersistCapSlot, handlePersistCapBreach } = runtime({
+        occurredAt,
+        capDecision: { allowed: false, count: 101, cap: 100, skipped: 1 },
+      });
+
+      await dispatchOne(service);
+
+      expect(countedAt(consumePersistCapSlot)).toBe(occurredAt);
+      expect(handlePersistCapBreach).toHaveBeenCalledWith(
+        expect.objectContaining({ day: TODAY - 3 }),
+      );
+    });
+  });
+
+  describe("when the trace is dated after now (an SDK clock ahead of ours)", () => {
+    /** @scenario "A future-dated trace counts toward today" */
+    it("counts the slot today, never in tomorrow's counter", async () => {
+      const { service, consumePersistCapSlot, handlePersistCapBreach } = runtime({
+        occurredAt: NOW.epochMilliseconds + 3 * 60 * 60 * 1_000,
+        capDecision: { allowed: false, count: 101, cap: 100, skipped: 1 },
+      });
+
+      await dispatchOne(service);
+
+      expect(countedAt(consumePersistCapSlot)).toBe(NOW.epochMilliseconds);
+      expect(handlePersistCapBreach).toHaveBeenCalledWith(expect.objectContaining({ day: TODAY }));
     });
   });
 });
