@@ -173,6 +173,7 @@ Migration path: about 139 non-test TypeScript files under ClickHouse repository 
 24. Gateway keeps every version of a spend row in one month and turns id-index pruning back on under `FINAL`, in this PR. Rows split across months before the fix stay as they are; no repair step.
 25. Other modules hand `TraceApi` a filter as written, never compiled text; trace compiles it inside each read, and `translateTraceFilter` only validates.
 26. Analytics narrows filter options with its own filter translator on the builder; `TraceApi.translateLegacyFilters` goes.
+27. Under a share, a filter's side-table check (evaluations, spans, scenario runs, Instant Eval judgments) reads only rows inside the share's windows, on each table's own time column; out-of-window rows never decide whether a trace matches. This is stricter than main for shared projects only.
 
 ## Open questions for Alex
 
