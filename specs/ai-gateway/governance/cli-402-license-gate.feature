@@ -99,5 +99,6 @@ Feature: CLI 402 license gate on /api/auth/cli/governance/*
   Scenario: CLI surfaces the upgrade URL in stderr on 402
     Given alice's CLI receives the 402 envelope from any governance endpoint
     When the CLI handles the GovernanceCliError
-    Then stderr contains the human-readable description "Ingestion sources require an Enterprise plan"
+    Then stderr contains the envelope's human-readable description
+      (for governance status, "Ingestion sources require an Enterprise plan")
     And stderr contains the upgrade URL on a separate line for click-targeting

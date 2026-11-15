@@ -16,7 +16,7 @@ export const governanceTrpcTransport: TrpcRouterDeclaration<
   .handle(async ({ app, input }) => {
     const lookup = await app.getActorWorkspace(input);
 
-    return lookup.disclosed ? lookup.workspace : null;
+    return lookup.status === "found" ? lookup.workspace : null;
   })
 
   .procedure("resolveHome")

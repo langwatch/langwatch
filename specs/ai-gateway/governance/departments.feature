@@ -114,7 +114,7 @@ Feature: Departments - org-chart spend attribution across people, teams, and pro
   Scenario: Archiving a department that is already archived is refused
     Given a department "Legacy" that the admin has archived
     When the admin archives "Legacy" again
-    Then the request is refused as department not found, as a rename of it is
+    Then the request is refused as department not found, as renaming it is
     And "Legacy" keeps the moment it was first archived
     # Archiving never closes the dated links nor clears the pointers (main's
     # rule): the rollup resolves an archived department to "Unassigned".

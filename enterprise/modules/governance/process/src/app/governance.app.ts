@@ -2333,14 +2333,14 @@ export class GovernanceModule implements GovernanceRestApi {
    * The personal workspace behind a CH-side `actor` token, for the bird's-eye
    * "View their workspace" link on `/governance/users/[id]`. Every miss (the
    * token names nobody, the person is not in this organization, or they have no
-   * personal workspace yet) answers one `disclosed: false`, so the shape of the
+   * personal workspace yet) answers one `undisclosed`, so the shape of the
    * answer never tells who else exists on the instance.
    */
   async getActorWorkspace(input: {
     organizationId: string;
     actor: string;
   }): Promise<GovernanceActorWorkspaceLookup> {
-    const undisclosed = { disclosed: false } as const;
+    const undisclosed = { status: "undisclosed" } as const;
     const user =
       (await this.dependencies.users.findById({ id: input.actor })) ??
       (input.actor.includes("@")
@@ -2366,7 +2366,7 @@ export class GovernanceModule implements GovernanceRestApi {
     if (!workspace) return undisclosed;
 
     return {
-      disclosed: true,
+      status: "found",
       workspace: {
         userId: user.id,
         // The admin reading the link needs a person, and any of the three

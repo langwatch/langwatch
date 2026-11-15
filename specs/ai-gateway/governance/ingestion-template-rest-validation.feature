@@ -12,13 +12,13 @@ Feature: The ingestion-template REST routes validate their bodies at the door
     Given a member who may manage AI tools, holding a project key bound to them
 
   @unit
-  Scenario: Creating an ingestion template with an empty source type is refused at the door
+  Scenario: An empty source type is refused at the door
     When they create an ingestion template with an empty `source_type`
     Then the response is 422 with code `validation_error`, naming `source_type`
     And no template is written
 
   @unit
-  Scenario: Cloning an ingestion template with an empty source template id is refused at the door
+  Scenario: An empty source template id is refused at the door
     When they clone an ingestion template with an empty `source_template_id`
     Then the response is 422 with code `validation_error`, naming `source_template_id`
     And no template is written

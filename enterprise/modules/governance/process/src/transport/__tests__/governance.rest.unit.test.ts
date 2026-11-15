@@ -413,8 +413,8 @@ describe("the governance REST family", () => {
       expect(body.code).toBe(new InvalidSourceTypeError().code);
     });
 
-    /** @scenario Creating an ingestion template with an empty source type is refused at the door */
-    it("refuses an empty source type as the door's validation_error and writes nothing", async () => {
+    /** @scenario An empty source type is refused at the door */
+    it("refuses an empty source type at the door and writes nothing", async () => {
       const { asUser } = await buildApi();
 
       const response = await asUser("/api/governance/ingestion-templates", {
@@ -600,8 +600,8 @@ describe("the governance REST family", () => {
       expect(body.ingestion_template.id).not.toBe(source.id);
     });
 
-    /** @scenario Cloning an ingestion template with an empty source template id is refused at the door */
-    it("refuses an empty source template id as the door's validation_error", async () => {
+    /** @scenario An empty source template id is refused at the door */
+    it("refuses an empty source template id at the door and writes nothing", async () => {
       const { asUser } = await buildApi();
 
       const response = await asUser("/api/governance/ingestion-templates/clone", {

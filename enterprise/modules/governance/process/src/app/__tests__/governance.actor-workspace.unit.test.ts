@@ -133,7 +133,7 @@ describe("GovernanceModule.getActorWorkspace", () => {
           actor: "ariana@acme.com",
         }),
       ).resolves.toEqual({
-        disclosed: true,
+        status: "found",
         workspace: {
           userId: "user-1",
           displayName: "Ariana",
@@ -180,7 +180,7 @@ describe("GovernanceModule.getActorWorkspace", () => {
           organizationId: ORGANIZATION_ID,
           actor: "stranger@example.com",
         }),
-      ).resolves.toEqual({ disclosed: false });
+      ).resolves.toEqual({ status: "undisclosed" });
       expect(isOrganizationMember).not.toHaveBeenCalled();
       expect(getPersonalWorkspace).not.toHaveBeenCalled();
     });
@@ -199,7 +199,7 @@ describe("GovernanceModule.getActorWorkspace", () => {
           organizationId: ORGANIZATION_ID,
           actor: "ben@other.com",
         }),
-      ).resolves.toEqual({ disclosed: false });
+      ).resolves.toEqual({ status: "undisclosed" });
       expect(getPersonalWorkspace).not.toHaveBeenCalled();
     });
   });
@@ -217,7 +217,7 @@ describe("GovernanceModule.getActorWorkspace", () => {
           organizationId: ORGANIZATION_ID,
           actor: "cara@acme.com",
         }),
-      ).resolves.toEqual({ disclosed: false });
+      ).resolves.toEqual({ status: "undisclosed" });
     });
   });
 });
