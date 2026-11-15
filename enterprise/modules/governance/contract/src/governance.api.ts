@@ -138,7 +138,7 @@ import type {
   PeopleScreenPerson,
   PeopleScreenSuggestion,
 } from "./governance-people.ts";
-import type { GovernanceActorWorkspace } from "./governance.responses.ts";
+import type { GovernanceActorWorkspaceLookup } from "./governance.responses.ts";
 import type { GovernanceSetupState } from "./governance.ts";
 import type { GovernanceOcsfExportInput, GovernanceOcsfExportPage } from "./ocsf-export.ts";
 import type { OrganizationSessionPolicyShape, SessionCeilingApplied } from "./session-policy.ts";
@@ -420,10 +420,10 @@ export interface GovernanceRestApi {
   governanceRecordWorkspaceView(
     input: RecordWorkspaceViewInput,
   ): Promise<RecordWorkspaceViewResult>;
-  findActorWorkspace(input: {
+  getActorWorkspace(input: {
     organizationId: string;
     actor: string;
-  }): Promise<GovernanceActorWorkspace | null>;
+  }): Promise<GovernanceActorWorkspaceLookup>;
   departmentList(input: { organizationId: string }): Promise<Department[]>;
   departmentAssignments(input: {
     organizationId: string;

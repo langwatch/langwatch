@@ -612,10 +612,10 @@ governanceQuarantineFillStats(input: QuarantineFillInput): Promise<QuarantineFil
 governanceRecordWorkspaceView(input: RecordWorkspaceViewInput): Promise<RecordWorkspaceViewResult>;
 ```
 
-#### `findActorWorkspace`
+#### `getActorWorkspace`
 
 ```typescript
-findActorWorkspace(input: { organizationId: string; actor: string; }): Promise<GovernanceActorWorkspace | null>;
+getActorWorkspace(input: { organizationId: string; actor: string; }): Promise<GovernanceActorWorkspaceLookup>;
 ```
 
 #### `departmentList`
@@ -965,7 +965,7 @@ interface Query {
 
 #### `GET /api/auth/cli/governance/ingest/sources/:sourceId/health` · `readCliIngestionSourceHealth`
 
-Permission `activityMonitor:view`. Entitlement `enterprise` (feature `INGESTION_SOURCES`). Declared at `src/transport/governance-cli.rest.ts:120`.
+Permission `activityMonitor:view`. Entitlement `enterprise` (feature `ACTIVITY_MONITOR`). Declared at `src/transport/governance-cli.rest.ts:122`.
 
 Answers at `/api/auth/cli/governance/ingest/sources/:sourceId/health`, `/api/v1/auth/cli/governance/ingest/sources/:sourceId/health`.
 
@@ -975,35 +975,35 @@ type Params = z.infer<typeof governanceCliSourceParamsSchema>; // ../contract/sr
 
 #### `GET /api/auth/cli/governance/status` · `readCliGovernanceStatus`
 
-Authenticated: the CLI bearer is one user's device session; every route answers for that user's own seat and the minting routes refuse an inactive seat. Entitlement `enterprise` (feature `INGESTION_SOURCES`). Declared at `src/transport/governance-cli.rest.ts:133`.
+Authenticated: the CLI bearer is one user's device session; every route answers for that user's own seat and the minting routes refuse an inactive seat. Entitlement `enterprise` (feature `INGESTION_SOURCES`). Declared at `src/transport/governance-cli.rest.ts:135`.
 
 Answers at `/api/auth/cli/governance/status`, `/api/v1/auth/cli/governance/status`.
 
 #### `GET /api/auth/cli/governance/ingestion-templates` · `listCliIngestionTemplates`
 
-Authenticated: the CLI bearer is one user's device session; every route answers for that user's own seat and the minting routes refuse an inactive seat. Declared at `src/transport/governance-cli.rest.ts:140`.
+Authenticated: the CLI bearer is one user's device session; every route answers for that user's own seat and the minting routes refuse an inactive seat. Declared at `src/transport/governance-cli.rest.ts:142`.
 
 Answers at `/api/auth/cli/governance/ingestion-templates`, `/api/v1/auth/cli/governance/ingestion-templates`.
 
 #### `POST /api/auth/cli/governance/ingestion-key` · `mintCliIngestionKey`
 
-Authenticated: the CLI bearer is one user's device session; every route answers for that user's own seat and the minting routes refuse an inactive seat. Declared at `src/transport/governance-cli.rest.ts:146`.
+Authenticated: the CLI bearer is one user's device session; every route answers for that user's own seat and the minting routes refuse an inactive seat. Declared at `src/transport/governance-cli.rest.ts:148`.
 
 Answers at `/api/auth/cli/governance/ingestion-key`, `/api/v1/auth/cli/governance/ingestion-key`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/governance-cli.rest.ts:149)
+// Rawbody: "text" (inline, src/transport/governance-cli.rest.ts:151)
 ```
 
 #### `GET /api/auth/cli/governance/ingestion-keys` · `listCliIngestionKeys`
 
-Authenticated: the CLI bearer is one user's device session; every route answers for that user's own seat and the minting routes refuse an inactive seat. Declared at `src/transport/governance-cli.rest.ts:155`.
+Authenticated: the CLI bearer is one user's device session; every route answers for that user's own seat and the minting routes refuse an inactive seat. Declared at `src/transport/governance-cli.rest.ts:157`.
 
 Answers at `/api/auth/cli/governance/ingestion-keys`, `/api/v1/auth/cli/governance/ingestion-keys`.
 
 #### `GET /api/auth/cli/governance/ingestion-keys/:lookup_id` · `readCliIngestionKeyState`
 
-Authenticated: the CLI bearer is one user's device session; every route answers for that user's own seat and the minting routes refuse an inactive seat. Declared at `src/transport/governance-cli.rest.ts:161`.
+Authenticated: the CLI bearer is one user's device session; every route answers for that user's own seat and the minting routes refuse an inactive seat. Declared at `src/transport/governance-cli.rest.ts:163`.
 
 Answers at `/api/auth/cli/governance/ingestion-keys/:lookup_id`, `/api/v1/auth/cli/governance/ingestion-keys/:lookup_id`.
 

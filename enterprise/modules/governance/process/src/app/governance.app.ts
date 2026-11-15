@@ -123,7 +123,7 @@ import {
   type CloneIngestionTemplateInput,
   type CreateIngestionTemplateInput,
   type UpdateIngestionTemplateOttlInput,
-  type GovernanceActorWorkspace,
+  type GovernanceActorWorkspaceLookup,
   type MePersonalCredential,
   type MeUsage,
   type PersonalUsageQueryInput,
@@ -2334,30 +2334,28 @@ export class GovernanceModule implements GovernanceRestApi {
 
   /**
    * The personal workspace behind a CH-side `actor` token, for the bird's-eye
-   * "View their workspace →" link on `/governance/users/[id]`.
-   *
-   * Three refusals collapse to one `null`: the token names nobody, the person
-   * it names is not in this organization, or they have no personal workspace
-   * yet. Keeping them indistinguishable is deliberate — a caller who may read
-   * the governance surface still learns nothing about who else exists on the
-   * instance from the shape of the answer.
+   * "View their workspace" link on `/governance/users/[id]`. Every miss (the
+   * token names nobody, the person is not in this organization, or they have no
+   * personal workspace yet) answers one `undisclosed`, so the shape of the
+   * answer never tells who else exists on the instance.
    */
-  async findActorWorkspace(input: {
+  async getActorWorkspace(input: {
     organizationId: string;
     actor: string;
-  }): Promise<GovernanceActorWorkspace | null> {
+  }): Promise<GovernanceActorWorkspaceLookup> {
+    const undisclosed = { status: "undisclosed" } as const;
     const user =
       (await this.dependencies.users.findById({ id: input.actor })) ??
       (input.actor.includes("@")
         ? await this.dependencies.users.findByEmail({ email: input.actor })
         : null);
-    if (!user) return null;
+    if (!user) return undisclosed;
 
     const member = await this.isOrganizationMember({
       organizationId: input.organizationId,
       userId: user.id,
     });
-    if (!member) return null;
+    if (!member) return undisclosed;
 
     const workspace = await this.dependencies.organizations
       .getPersonalWorkspace({
@@ -2368,16 +2366,19 @@ export class GovernanceModule implements GovernanceRestApi {
         if (TeamNotFoundError.is(error)) return null;
         throw error;
       });
-    if (!workspace) return null;
+    if (!workspace) return undisclosed;
 
     return {
-      userId: user.id,
-      // The admin reading the link needs a person, and any of the three
-      // columns identifies one; the id is the last resort rather than a blank.
-      displayName: user.name ?? user.email ?? user.id,
-      teamId: workspace.team.id,
-      projectId: workspace.project.id,
-      projectSlug: workspace.project.slug,
+      status: "found",
+      workspace: {
+        userId: user.id,
+        // The admin reading the link needs a person, and any of the three
+        // columns identifies one; the id is the last resort rather than a blank.
+        displayName: user.name ?? user.email ?? user.id,
+        teamId: workspace.team.id,
+        projectId: workspace.project.id,
+        projectSlug: workspace.project.slug,
+      },
     };
   }
 

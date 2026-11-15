@@ -75380,7 +75380,8 @@
                 "type": "object",
                 "properties": {
                   "source_type": {
-                    "type": "string"
+                    "type": "string",
+                    "minLength": 1
                   },
                   "display_name": {
                     "type": "string",
@@ -76374,7 +76375,8 @@
                 "type": "object",
                 "properties": {
                   "source_template_id": {
-                    "type": "string"
+                    "type": "string",
+                    "minLength": 1
                   }
                 },
                 "required": [
