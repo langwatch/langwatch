@@ -45,6 +45,8 @@ const READING_VERBS = new Set(["from", "join"]);
 /** The builder methods that take a table descriptor as the table they read (ADR-202). */
 const DESCRIPTOR_READS = new Set(["from", "innerJoin", "leftJoin"]);
 const DESCRIPTOR_NAME = ".$table.name";
+/** The key a LangWatchQL view (or its catalogue table) names the ClickHouse table it reads by. */
+const LWQL_VIEW_SOURCE = "sourceTable";
 
 export type Access = { module: string; table: string; file: string; line: number; write: boolean };
 type ScanRoot = { module: string; directory: string };
@@ -78,6 +80,8 @@ export type DeclaredOwnership = {
 };
 
 const LEGACY = "no writer on this release";
+/** A LangWatchQL view reads its source table (ADR-202, Decided 21). */
+const lwqlView = (view: string): string => `analytics' LangWatchQL view ${view} reads it`;
 const SUBQUERY =
   "a WHERE-clause subquery inside trace's one statement; an *Api call can only return an unbounded id list";
 
@@ -216,6 +220,174 @@ export const DECLARED_OWNERSHIP: DeclaredOwnership = {
       readers: ["trace"],
       reason:
         "trace dates the runs an Explorer eval chip claims from instant-eval's runs, not an InstantEvalApi call (R40; round 47, 2026-10-08)",
+    },
+    {
+      table: "span_analytics",
+      owner: "trace",
+      readers: ["analytics"],
+      reason: lwqlView("span_metrics"),
+    },
+    {
+      table: "simulation_runs",
+      owner: "scenario",
+      readers: ["analytics"],
+      reason: lwqlView("simulations"),
+    },
+    {
+      table: "simulation_run_metrics",
+      owner: "scenario",
+      readers: ["analytics"],
+      reason: lwqlView("simulation_trace_metrics"),
+    },
+    {
+      table: "simulation_run_metrics_rollup",
+      owner: "scenario",
+      readers: ["analytics"],
+      reason: lwqlView("simulation_metric_rollups"),
+    },
+    {
+      table: "suite_runs",
+      owner: "suite",
+      readers: ["analytics"],
+      reason: lwqlView("test_suite_runs"),
+    },
+    {
+      table: "instant_eval_judgments",
+      owner: "instant-eval",
+      readers: ["analytics"],
+      reason: lwqlView("judgments"),
+    },
+    {
+      table: "experiment_runs",
+      owner: "experiment",
+      readers: ["analytics"],
+      reason: lwqlView("experiment_run_results"),
+    },
+    {
+      table: "experiment_run_items",
+      owner: "experiment",
+      readers: ["analytics"],
+      reason: lwqlView("experiment_items"),
+    },
+    {
+      table: "dspy_steps",
+      owner: "experiment",
+      readers: ["analytics"],
+      reason: lwqlView("dspy_optimizer_steps"),
+    },
+    {
+      table: "coding_agent_sessions",
+      owner: "coding-agent",
+      readers: ["analytics"],
+      reason: lwqlView("coding_sessions"),
+    },
+    {
+      table: "coding_agent_session_events",
+      owner: "coding-agent",
+      readers: ["analytics"],
+      reason: lwqlView("coding_session_events"),
+    },
+    {
+      table: "coding_agent_trace_sessions",
+      owner: "coding-agent",
+      readers: ["analytics"],
+      reason: lwqlView("coding_trace_sessions"),
+    },
+    {
+      table: "session_metric_series",
+      owner: "coding-agent",
+      readers: ["analytics"],
+      reason: lwqlView("session_metrics"),
+    },
+    {
+      table: "gateway_spend",
+      owner: "gateway",
+      readers: ["analytics"],
+      reason: lwqlView("gateway_request_spend"),
+    },
+    {
+      table: "gateway_budget_ledger_events",
+      owner: "gateway",
+      readers: ["analytics"],
+      reason: lwqlView("gateway_budget_ledger"),
+    },
+    {
+      table: "gateway_budget_scope_totals",
+      owner: "gateway",
+      readers: ["analytics"],
+      reason: lwqlView("gateway_budget_totals"),
+    },
+    {
+      table: "billable_events",
+      owner: "entitlement",
+      readers: ["analytics"],
+      reason: lwqlView("billing_events"),
+    },
+    {
+      table: "governance_ocsf_events",
+      owner: "governance",
+      readers: ["analytics"],
+      reason: lwqlView("governance_security_events"),
+    },
+    {
+      table: "governance_kpis",
+      owner: "governance",
+      readers: ["analytics"],
+      reason: lwqlView("governance_hourly_kpis"),
+    },
+    {
+      table: "governance_cost_rollup_1d",
+      owner: "governance",
+      readers: ["analytics"],
+      reason: lwqlView("governance_daily_cost_rollup"),
+    },
+    {
+      table: "governance_cost_rollup_restatement_index",
+      owner: "governance",
+      readers: ["analytics"],
+      reason: lwqlView("governance_cost_restatements"),
+    },
+    {
+      table: "langy_analytics_events",
+      owner: "langy",
+      readers: ["analytics"],
+      reason: lwqlView("langy_usage_events"),
+    },
+    {
+      table: "log_records",
+      owner: "log",
+      readers: ["analytics"],
+      reason: lwqlView("logs"),
+    },
+    {
+      table: "log_usage_estimates",
+      owner: "log",
+      readers: ["analytics"],
+      reason: lwqlView("log_ingestion_usage"),
+    },
+    {
+      table: "metric_data_points",
+      owner: "metric",
+      readers: ["analytics"],
+      reason: lwqlView("metric_points"),
+    },
+    {
+      table: "metric_series",
+      owner: "metric",
+      readers: ["analytics"],
+      reason: lwqlView("metric_series_definitions"),
+    },
+    {
+      table: "metric_time_rollups",
+      owner: "metric",
+      readers: ["analytics"],
+      reason: lwqlView("metric_rollups"),
+    },
+    {
+      table: "metric_usage_estimates",
+      owner: "metric",
+      readers: ["analytics"],
+      reason: lwqlView("metric_ingestion_usage"),
     },
   ],
 };
@@ -746,6 +918,15 @@ function readTable(reader: Reader, property: ts.Node): string | undefined {
   return namedTable(reader, initializer);
 }
 
+/** A LangWatchQL view's `sourceTable: "<table>"` reads that table (ADR-202, Decided 21). */
+function viewSource(property: ts.Node): string | undefined {
+  if (!ts.isPropertyAssignment(property) || !ts.isIdentifier(property.name)) return void 0;
+
+  if (property.name.text !== LWQL_VIEW_SOURCE) return void 0;
+
+  return ts.isStringLiteralLike(property.initializer) ? property.initializer.text : void 0;
+}
+
 /** `${database}.${CONSTANT}`: the table is the declared constant after the database dot. */
 function qualifiedConstant(reader: Reader, template: ts.TemplateExpression): string | undefined {
   const spans = template.templateSpans;
@@ -804,7 +985,7 @@ function readFile({
 
     if (ts.isCallExpression(node)) readCall(reader, node);
 
-    const read = readTable(reader, node);
+    const read = readTable(reader, node) ?? viewSource(node);
     if (read) record({ reader, node, table: read, write: false });
 
     ts.forEachChild(node, visit);
