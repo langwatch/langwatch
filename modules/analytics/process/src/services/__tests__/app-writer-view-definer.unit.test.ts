@@ -7,9 +7,9 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { APP_WRITER_TABLES } from "@langwatch/clickhouse-migrations";
 import { describe, expect, it } from "vitest";
 
-import { APP_WRITER_TABLES } from "../langwatch-ql-access-model-definition.service.ts";
 import { CLICKHOUSE_MIGRATIONS_DIRECTORY } from "./support/clickhouse-migration-tables.ts";
 
 interface Migration {

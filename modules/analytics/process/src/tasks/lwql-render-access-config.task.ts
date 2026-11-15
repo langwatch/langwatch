@@ -8,7 +8,7 @@ import { createHash } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
-import { parseConnectionUrl } from "@langwatch/clickhouse-migrations";
+import { parseConnectionUrl, renderAppReaderUsersD } from "@langwatch/clickhouse-migrations";
 import { createLogger } from "@langwatch/observability";
 import { Task } from "@langwatch/task";
 
@@ -118,7 +118,7 @@ export function lwqlAccessConfigFilesFromSource(source: Record<string, string | 
     files: [
       {
         relativePath: LWQL_USERS_D_RELATIVE_PATH,
-        contents: accessModelDefinition.renderAppReaderUsersD({
+        contents: renderAppReaderUsersD({
           sourceDatabase: database,
           appReader,
           ...appWriterInputOf(reader),

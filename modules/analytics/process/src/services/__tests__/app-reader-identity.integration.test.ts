@@ -7,6 +7,11 @@
 import { createHash, randomBytes } from "node:crypto";
 
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
+import {
+  APP_READER_NAMES,
+  APP_READER_SETTINGS_PREFIX,
+  APP_READER_TENANT_TABLES,
+} from "@langwatch/clickhouse-migrations";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { PostgresNamedCollection } from "../../features/provisioning/services/langwatch-ql-postgres-mapping.service.ts";
@@ -14,11 +19,6 @@ import {
   type LangWatchQLClickHouseHarness,
   startLangWatchQLClickHouse,
 } from "../../langwatch-ql/__tests__/lwql-clickhouse-harness.ts";
-import {
-  APP_READER_NAMES,
-  APP_READER_SETTINGS_PREFIX,
-  APP_READER_TENANT_TABLES,
-} from "../../rules/app-reader-access.rules.ts";
 import { LangWatchQLAccessModelDefinitionService } from "../langwatch-ql-access-model-definition.service.ts";
 import type { LangWatchQLNames } from "../langwatch-ql-access-model.service.ts";
 

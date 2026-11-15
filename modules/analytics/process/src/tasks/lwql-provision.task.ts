@@ -6,7 +6,14 @@
 
 import { createHash } from "node:crypto";
 
-import { parseConnectionUrl } from "@langwatch/clickhouse-migrations";
+import {
+  APP_READER_ENFORCING_NAMES,
+  APP_READER_NAMES,
+  APP_WRITER_NAMES,
+  type AppWriterInput,
+  parseConnectionUrl,
+  renderAppReaderDdl,
+} from "@langwatch/clickhouse-migrations";
 import { createLogger } from "@langwatch/observability";
 import { clickhouseRoutesOf } from "@langwatch/process-stores";
 import { PROJECT_ID_PAGE_LIMIT, type ProjectApi } from "@langwatch/project-contract";
@@ -38,7 +45,6 @@ import type {
   SkippedProvisioningStatement,
 } from "../repositories/langwatch-ql-provisioning.repository.ts";
 import { PrismaLangWatchQLPostgresRepository } from "../repositories/prisma/prisma.langwatch-ql-postgres.repository.ts";
-import { APP_READER_NAMES } from "../rules/app-reader-access.rules.ts";
 import { collectionUnconfirmedError } from "../rules/langwatch-ql-collection-probe.rules.ts";
 import {
   clickHouseErrorCodeFields,
@@ -46,12 +52,6 @@ import {
   postgresErrorCodeFields,
   statementKind,
 } from "../rules/langwatch-ql-config-store.rules.ts";
-import {
-  APP_READER_ENFORCING_NAMES,
-  APP_WRITER_NAMES,
-  type AppWriterInput,
-  LangWatchQLAccessModelDefinitionService,
-} from "../services/langwatch-ql-access-model-definition.service.ts";
 import type { LangWatchQLNames } from "../services/langwatch-ql-access-model.service.ts";
 import { LangWatchQLSqlModeClusterGuardService } from "../services/langwatch-ql-sql-mode-cluster-guard.service.ts";
 
@@ -59,7 +59,6 @@ const lwqlProvisioning = LangWatchQLProductionProvisioningService.create();
 const clusterGuard = LangWatchQLSqlModeClusterGuardService.create();
 const selfProvisioning = LangWatchQLSelfProvisioningService.create();
 const collectionBinding = LangWatchQLCollectionBindingService.create();
-const accessModelDefinition = LangWatchQLAccessModelDefinitionService.create();
 
 /** One global key: the self-provision convergence is a singleton, not per tenant. */
 const LWQL_SELF_PROVISION_LOCK_KEY = "lwql:self-provision";
@@ -1064,7 +1063,7 @@ async function convergeAppReaderTarget({
     connectionUrl: target.adminUrl,
     clusterName: shared ? source.CLICKHOUSE_CLUSTER : undefined,
   });
-  const statements = accessModelDefinition.renderAppReaderDdl({
+  const statements = renderAppReaderDdl({
     sourceDatabase,
     appReader: appReaderInputOf(target),
     ...appWriterInputOf(target),

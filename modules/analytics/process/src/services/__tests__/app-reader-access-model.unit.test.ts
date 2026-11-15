@@ -1,9 +1,13 @@
+import {
+  APP_READER_NAMES,
+  APP_READER_TENANT_TABLES,
+  renderAppReaderUsersD,
+} from "@langwatch/clickhouse-migrations";
 /** The app reader inside the one access-model definition, through both emitters (ADR-202). */
 import { load } from "js-yaml";
 import { describe, expect, it } from "vitest";
 
 import type { PostgresNamedCollection } from "../../features/provisioning/services/langwatch-ql-postgres-mapping.service.ts";
-import { APP_READER_NAMES, APP_READER_TENANT_TABLES } from "../../rules/app-reader-access.rules.ts";
 import { LangWatchQLAccessModelDefinitionService } from "../langwatch-ql-access-model-definition.service.ts";
 import type { LangWatchQLNames } from "../langwatch-ql-access-model.service.ts";
 
@@ -303,7 +307,7 @@ describe("given the access-model definition built with the enforcing reader's cr
   /** @scenario "The DDL and users.d emitters render the same app reader" */
   it("renders the readers alone as users.d with the entries the full users.d gives them", () => {
     const alone = load(
-      accessModelDefinition.renderAppReaderUsersD({
+      renderAppReaderUsersD({
         sourceDatabase: NAMES.database,
         appReader: {
           passwordSha256Hex: READER_HASH,

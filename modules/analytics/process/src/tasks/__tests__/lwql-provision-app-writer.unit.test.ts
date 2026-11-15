@@ -5,15 +5,15 @@
  */
 import { createHash } from "node:crypto";
 
-import { describe, expect, it } from "vitest";
-
 import {
   APP_WRITER_NAMES,
-  LangWatchQLAccessModelDefinitionService,
-} from "../../services/langwatch-ql-access-model-definition.service.ts";
+  renderAppReaderDdl,
+  renderAppReaderUsersD,
+} from "@langwatch/clickhouse-migrations";
+import { describe, expect, it } from "vitest";
+
 import { appWriterInputOf, planAppReaderWalk } from "../lwql-provision.task.ts";
 
-const accessModelDefinition = LangWatchQLAccessModelDefinitionService.create();
 const sha256 = (value: string) => createHash("sha256").update(value).digest("hex");
 
 const SHARED_ADMIN = "http://default:admin@shared.invalid:8123/langwatch";
@@ -38,9 +38,9 @@ const WRITER_GRANTS = [
 describe("the writer in the access model", () => {
   /** @scenario "The writer holds INSERT on the three api tables and no SELECT grant" */
   it("grants INSERT on the three tables alone and hides its query log", () => {
-    const writerDdl = accessModelDefinition
-      .renderAppReaderDdl(INPUT)
-      .filter((statement) => statement.includes(APP_WRITER_NAMES.user));
+    const writerDdl = renderAppReaderDdl(INPUT).filter((statement) =>
+      statement.includes(APP_WRITER_NAMES.user),
+    );
 
     expect(writerDdl.filter((statement) => statement.startsWith("GRANT"))).toEqual(WRITER_GRANTS);
     expect(writerDdl.some((statement) => /GRANT SELECT/.test(statement))).toBe(false);
@@ -48,16 +48,14 @@ describe("the writer in the access model", () => {
       "CREATE ROW POLICY OR REPLACE user_query_log_app_writer_hidden ON system.user_query_log\n" +
         "  USING 0\n  TO langwatch_app_writer",
     );
-    expect(accessModelDefinition.renderAppReaderDdl({ ...INPUT, appWriter: undefined })).toEqual(
-      accessModelDefinition
-        .renderAppReaderDdl(INPUT)
-        .filter((statement) => !statement.includes(APP_WRITER_NAMES.user)),
+    expect(renderAppReaderDdl({ ...INPUT, appWriter: undefined })).toEqual(
+      renderAppReaderDdl(INPUT).filter((statement) => !statement.includes(APP_WRITER_NAMES.user)),
     );
   });
 
   /** @scenario "Both emitters render the same writer" */
   it("renders the same user, profile and grants as users.d", () => {
-    const usersD = accessModelDefinition.renderAppReaderUsersD(INPUT).replaceAll(`"`, "");
+    const usersD = renderAppReaderUsersD(INPUT).replaceAll(`"`, "");
 
     expect(usersD).toContain("langwatch_app_writer:");
     expect(usersD).toContain(`profile: ${APP_WRITER_NAMES.settingsProfile}`);

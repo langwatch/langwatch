@@ -1,7 +1,7 @@
 /**
- * ClickHouse schema migrations and storage maintenance, split from `@langwatch/clickhouse-client`
- * so querying processes do not carry the goose child process and SQL files. Imports the client,
- * never the reverse.
+ * ClickHouse schema migrations, storage maintenance and the app's access model (ADR-202), split
+ * from `@langwatch/clickhouse-client` so querying processes carry neither the goose child process
+ * and SQL files nor the identities' DDL. Imports the client, never the reverse.
  */
 export {
   ClickHouseMigrateTask,
@@ -41,3 +41,35 @@ export {
   TIERED_STORAGE_POLICY,
 } from "./ttl.reconciler.ts";
 export type { TableTTLEntry } from "./ttl.reconciler.ts";
+
+export {
+  renderIdentitiesUsersD,
+  renderIdentityDdl,
+  yamlDocument,
+} from "./access-model/access-identity.ts";
+export type {
+  AccessGrant,
+  AccessIdentity,
+  AccessProfileSetting,
+  AccessRowPolicy,
+  YamlValue,
+} from "./access-model/access-identity.ts";
+
+export {
+  APP_READER_ENFORCING_NAMES,
+  APP_READER_NAMES,
+  APP_READER_SETTINGS_PREFIX,
+  APP_READER_TENANT_TABLES,
+  APP_WRITER_NAMES,
+  APP_WRITER_TABLES,
+  appReaderEnforcingIdentity,
+  appReaderIdentity,
+  appWriterIdentity,
+  hiddenSystemTablePolicies,
+  renderAppReaderDdl,
+  renderAppReaderUsersD,
+} from "./access-model/app-access-model.ts";
+export type {
+  AppAccessModelInput,
+  AppWriterInput,
+} from "./access-model/app-access-model.ts";

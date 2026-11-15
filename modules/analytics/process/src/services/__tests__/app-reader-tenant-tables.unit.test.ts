@@ -1,8 +1,8 @@
+import { APP_READER_TENANT_TABLES } from "@langwatch/clickhouse-migrations";
 /** Guards the app reader's tenant-table list against the schema the migrations build (ADR-202). */
 import { describe, expect, it } from "vitest";
 
 import type { PostgresNamedCollection } from "../../features/provisioning/services/langwatch-ql-postgres-mapping.service.ts";
-import { APP_READER_TENANT_TABLES } from "../../rules/app-reader-access.rules.ts";
 import { LangWatchQLAccessModelDefinitionService } from "../langwatch-ql-access-model-definition.service.ts";
 import type { LangWatchQLNames } from "../langwatch-ql-access-model.service.ts";
 import { migratedTables } from "./support/clickhouse-migration-tables.ts";

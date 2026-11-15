@@ -18527,6 +18527,9 @@ importers:
       '@langwatch/clickhouse-client':
         specifier: workspace:*
         version: link:../clickhouse-client
+      '@langwatch/clickhouse-migrations':
+        specifier: workspace:*
+        version: link:../clickhouse-migrations
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../prisma-client

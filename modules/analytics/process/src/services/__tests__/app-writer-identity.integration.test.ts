@@ -7,24 +7,20 @@
 import { createHash, randomBytes } from "node:crypto";
 
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
+import {
+  APP_READER_NAMES,
+  APP_READER_SETTINGS_PREFIX,
+  APP_READER_TENANT_TABLES,
+  APP_WRITER_NAMES,
+  APP_WRITER_TABLES,
+  renderAppReaderDdl,
+} from "@langwatch/clickhouse-migrations";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
   type LangWatchQLClickHouseHarness,
   startLangWatchQLClickHouse,
 } from "../../langwatch-ql/__tests__/lwql-clickhouse-harness.ts";
-import {
-  APP_READER_NAMES,
-  APP_READER_SETTINGS_PREFIX,
-  APP_READER_TENANT_TABLES,
-} from "../../rules/app-reader-access.rules.ts";
-import {
-  APP_WRITER_NAMES,
-  APP_WRITER_TABLES,
-  LangWatchQLAccessModelDefinitionService,
-} from "../langwatch-ql-access-model-definition.service.ts";
-
-const accessModelDefinition = LangWatchQLAccessModelDefinitionService.create();
 
 const READER_LOGIN = "app-writer-identity-reader-login";
 const WRITER_LOGIN = "app-writer-identity-writer-login";
@@ -58,7 +54,7 @@ interface MaterializedView {
 
 /** The reader and the writer, as the upgrade renders them for a server LangWatchQL is off on. */
 function identitiesDdl({ sourceDatabase }: { sourceDatabase: string }): string[] {
-  return accessModelDefinition.renderAppReaderDdl({
+  return renderAppReaderDdl({
     sourceDatabase,
     appReader: { passwordSha256Hex: sha256(READER_LOGIN), enforce: true },
     appWriter: { passwordSha256Hex: sha256(WRITER_LOGIN) },
