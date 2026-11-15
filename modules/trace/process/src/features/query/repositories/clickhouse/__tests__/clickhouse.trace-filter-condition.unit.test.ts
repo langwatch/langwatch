@@ -202,5 +202,27 @@ describe("given a span filter compiled for a proof-fenced read", () => {
       );
       expect(windowed.params).toMatchObject({ tenantScope_from: [1_700_000_100_000] });
     });
+
+    /** @scenario "Every side-table filter under a share reads only within the share's windows" */
+    it.each([
+      ["evaluation_runs", "evaluator:ev1", "ScheduledAt"],
+      ["evaluation_runs", "evaluatorStatus:processed", "ScheduledAt"],
+      ["simulation_runs", "scenarioVerdict:success", "StartedAt"],
+      ["instant_eval_judgments", 'eval:"is it kind"', "CreatedAt"],
+    ] as const)("windows the %s subquery of %s on %s", (table, query, timeColumn) => {
+      const proof = tenantScope.fromProof({
+        authorization: aggregateProof({
+          projectId: "proj_a",
+          members: [{ projectId: "proj_b", from: 1_700_000_100_000 }],
+        }),
+        reads: "traces",
+      });
+      const sideRead = (sql: string) => sql.slice(sql.indexOf(`FROM ${table}`));
+
+      expect(sideRead(builtSql(query, proof).sql)).toContain(
+        `${timeColumn} >= fromUnixTimestamp64Milli(transform(TenantId, {tenantScope_ids:Array(String)}`,
+      );
+      expect(sideRead(builtSql(query).sql)).not.toContain("tenantScope_ids");
+    });
   });
 });

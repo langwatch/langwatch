@@ -26,9 +26,8 @@ describe("given a scheduled report with a trace query", () => {
     it("reads with the platform's own-only traces:view proof for the report's project", async () => {
       const authorizeInternal = vi.fn<AuthzApi["authorizeInternal"]>(async () => PROOF);
       const readTraceList = vi.fn<TraceApi["readTraceList"]>(async () => EMPTY_PAGE);
-      const translateTraceFilter = vi.fn<TraceApi["translateTraceFilter"]>(() => null);
       const service = ReportTraceListService.create({
-        traces: { readTraceList, translateTraceFilter },
+        traces: { readTraceList },
         authz: { authorizeInternal },
         baseHost: "https://app.example",
       });
@@ -51,8 +50,8 @@ describe("given a scheduled report with a trace query", () => {
       expect(readTraceList).toHaveBeenCalledWith(
         expect.objectContaining({ authorization: PROOF, pageSize: 5 }),
       );
-      expect(translateTraceFilter).toHaveBeenCalledWith(
-        expect.objectContaining({ tenantId: PROJECT_ID }),
+      expect(readTraceList).toHaveBeenCalledWith(
+        expect.objectContaining({ filter: { query: "status:error", tenantId: PROJECT_ID } }),
       );
     });
   });

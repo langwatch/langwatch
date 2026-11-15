@@ -73,6 +73,7 @@ import type {
   FacetValuesResult,
   TraceListPage,
 } from "./features/list/trace-list-view.ts";
+import type { TraceListFilter } from "./features/list/trace-list.queries.ts";
 import type { AiActionResult, AiQueryResult } from "./features/query/trace-ai-query.ts";
 import type { LangWatchQLTraceFilter } from "./features/query/trace-langwatch-ql-filter.ts";
 import type { TraceQueryEvaluationRun } from "./features/query/trace-query-evaluation.types.ts";
@@ -102,7 +103,7 @@ import type { CheckPreconditions } from "./trace-precondition.schemas.ts";
 import type {
   TraceCost,
   TraceLegacyListInput,
-  TraceSummaryListOptions,
+  TraceSummaryListRequestOptions,
   TraceSummaryListQuery,
   TraceSummaryPage,
   TracesForProjectResult,
@@ -268,9 +269,9 @@ export interface TraceApi extends TraceOtlpIngestApi {
       includeSpans?: boolean;
       resolveBlobs?: boolean;
       scrollId?: string | null;
-      /** The v1 REST search's compiled query-language filter, ANDed into the read. */
-      filterWhere?: { sql: string; params: Record<string, unknown> };
-      /** The proof `filterWhere`'s tenant markers expand into (ADR-177 block C). */
+      /** The v1 REST search's filter as written; trace compiles it into the read (Decided 25). */
+      filter?: TraceListFilter;
+      /** The proof the filter's side-table checks read under (ADR-177 block C). */
       authorization?: Authorization;
       /** Refuse above this plan bound instead of clamping to the list bound. */
       refuseAbove?: "tracesPageSizeMax" | "tracesDownloadPageSizeMax";
@@ -282,7 +283,7 @@ export interface TraceApi extends TraceOtlpIngestApi {
    */
   listTraceSummaries(input: {
     query: TraceSummaryListQuery;
-    options?: TraceSummaryListOptions;
+    options?: TraceSummaryListRequestOptions;
   }): Promise<TraceSummaryPage>;
   findTrace(input: {
     projectId: string;
@@ -774,19 +775,10 @@ export interface TraceApi extends TraceOtlpIngestApi {
   readTopicCounts(input: TraceLegacyListInput): Promise<unknown>;
   readCustomersAndLabels(input: TraceLegacyListInput): Promise<unknown>;
   /**
-   * The trace query language's free-text filter, compiled to a parameterized
-   * ClickHouse WHERE fragment. Null for an empty query; throws `FilterParseError`
-   * on invalid syntax.
+   * Checks a trace query language filter as written, compiling nothing out (ADR-202 Decided
+   * 25): throws `FilterParseError` on invalid syntax or an unknown field.
    */
-  translateTraceFilter(input: {
-    query: string;
-    tenantId: string;
-    timeRange: { from: number; to: number };
-    /** The Instant Eval runs registered for the query's `eval` chips. */
-    evalRuns?: readonly ResolvedInstantEvalRun[];
-    /** The viewer's; under any content protection free text skips captured I/O. */
-    protections?: Protections;
-  }): { sql: string; params: Record<string, unknown> } | null;
+  translateTraceFilter(input: { query: string }): void;
   /**
    * A legacy `filters` document compiled to parameterized ClickHouse conditions over
    * `trace_summaries ts`; Trace owns the grammar because it owns the tables. `fenced` writes
@@ -797,20 +789,6 @@ export interface TraceApi extends TraceOtlpIngestApi {
     window?: { startDate?: number; endDate?: number };
     fenced?: boolean;
   }): { conditions: string[]; params: Record<string, unknown>; hasUnsupportedFilters: boolean };
-  /**
-   * The Explorer's own filter: the query compiled, hidden origins left out
-   * unless the query (or `originNamed`) names one or the project is personal;
-   * `dateField` refuses a span/event clause on the `updated` axis.
-   */
-  compileExplorerTraceFilter(input: {
-    query: string;
-    tenantId: string;
-    timeRange: { from: number; to: number };
-    evalRuns?: readonly ResolvedInstantEvalRun[];
-    originNamed?: boolean;
-    dateField?: TraceDateField;
-    protections?: Protections;
-  }): Promise<{ sql: string; params: Record<string, unknown> }>;
   /**
    * The filter compiled against the LangWatchQL trace view, for a statement a
    * caller runs; throws `FilterParseError` on syntax the language cannot read.
@@ -847,7 +825,8 @@ export interface TraceApi extends TraceOtlpIngestApi {
     page?: number;
     pageSize: number;
     cursor?: { sortValue: number; traceId: string };
-    filterWhere?: { sql: string; params: Record<string, unknown> };
+    /** The filter as written; trace compiles it inside the read (ADR-202 Decided 25). */
+    filter?: TraceListFilter;
     visibilityCutoffMs?: number | null;
   }): Promise<TraceListPage>;
   /**

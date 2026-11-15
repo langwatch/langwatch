@@ -10,6 +10,7 @@ import type {
   TracesForProjectResult,
 } from "../../trace-read.contract.ts";
 import type { CompiledProjection } from "../ingest/trace-projection.types.ts";
+import type { TraceListFilter } from "../list/trace-list.queries.ts";
 
 export type TraceListTracesInput = {
   query: TraceLegacyListInput;
@@ -29,6 +30,13 @@ export type TraceListTracesInput = {
     authorization?: Authorization;
     /** Refuse above this plan bound instead of clamping to the list bound. */
     refuseAbove?: "tracesPageSizeMax" | "tracesDownloadPageSizeMax";
+  };
+};
+
+/** `TraceApi.listTraces` as callers ask it: the filter as written, which trace compiles. */
+export type TraceListTracesRequest = Omit<TraceListTracesInput, "options"> & {
+  options?: Omit<NonNullable<TraceListTracesInput["options"]>, "filterWhere"> & {
+    filter?: TraceListFilter;
   };
 };
 

@@ -114,8 +114,6 @@ import {
   type TraceAnnotationMarker,
   type TraceSuggestionTarget,
   type TraceSummaryData,
-  type TraceSummaryListOptions,
-  type TraceSummaryListQuery,
   type TraceSummaryPage,
   type TraceByIdInput,
   type TraceRecord,
@@ -185,7 +183,10 @@ import {
   traceConfig,
   TraceIdAmbiguousError,
   TraceNotFoundError,
-  type TraceListTracesInput,
+  type TraceListFilter,
+  type TraceListTracesRequest,
+  type TraceSummaryListQuery,
+  type TraceSummaryListRequestOptions,
   type TraceFindTraceInput,
   type TraceReadTracesWithSpansInput,
   type TraceReadTracesWithSpansPreviewInput,
@@ -396,6 +397,7 @@ import {
   andFilterConditions,
   explorerOriginExclusion,
   findHiddenOriginConditions,
+  type TraceFilterWhere,
 } from "../rules/trace-filter-hidden-origins.rules.ts";
 import { generateAsciiTree } from "../rules/trace-formatting.rules.ts";
 import { tracePath, tracePlatformUrl } from "../rules/trace-platform-url.rules.ts";
@@ -533,6 +535,11 @@ type TraceNewCountParams = {
   since: number;
   filterWhere?: { sql: string; params: Record<string, unknown> };
 };
+
+/** A list read as callers ask it: the filter as written, compiled inside (ADR-202 Decided 25). */
+type TraceListReadInput = Omit<TraceListReadParams, "filterWhere"> & { filter?: TraceListFilter };
+
+type TraceNewCountInput = Omit<TraceNewCountParams, "filterWhere"> & { filter?: TraceListFilter };
 
 type TraceSuggestionsParams = {
   authorization: Authorization;
@@ -1601,7 +1608,7 @@ export class TraceModule implements TraceApi, CollectorApp {
             exports: TraceExportService.create({
               traceService: dependencies.traces.read,
               compileFilter: ({ request, protections }) =>
-                this.compileExplorerTraceFilter({
+                this.#compileExplorerTraceFilter({
                   query: request.query ?? "",
                   tenantId: request.projectId,
                   timeRange: { from: request.startDate, to: request.endDate },
@@ -1822,15 +1829,29 @@ export class TraceModule implements TraceApi, CollectorApp {
     return this.#getTree().getEvaluationEvents(input);
   }
 
-  async listTraces(input: TraceListTracesInput): Promise<TracesForProjectResult> {
+  async listTraces(input: TraceListTracesRequest): Promise<TracesForProjectResult> {
     const pageSize = await this.#boundedPageSize({
       projectId: input.query.projectId,
       pageSize: input.query.pageSize,
       refuseAbove: input.options?.refuseAbove,
     });
+    const { filter, ...options } = input.options ?? {};
+    const filterWhere = filter
+      ? await this.#compileExplorerTraceFilter({
+          query: filter.query,
+          tenantId: filter.tenantId,
+          timeRange: { from: input.query.startDate, to: input.query.endDate },
+          originNamed: filter.hideExplorerOrigins !== true,
+          ...(options.dateField ? { dateField: options.dateField } : {}),
+          ...(filter.protections ? { protections: filter.protections } : {}),
+        })
+      : undefined;
 
     return this.#contentReader.listTraces({
       ...input,
+      ...(input.options
+        ? { options: { ...options, ...(filterWhere ? { filterWhere } : {}) } }
+        : {}),
       authorization: await this.#authorizeContentRead({
         projectId: input.query.projectId,
         route: "TraceApi.listTraces",
@@ -1859,16 +1880,29 @@ export class TraceModule implements TraceApi, CollectorApp {
   }
   async listTraceSummaries(input: {
     query: TraceSummaryListQuery;
-    options?: TraceSummaryListOptions;
+    options?: TraceSummaryListRequestOptions;
   }): Promise<TraceSummaryPage> {
     const pageSize =
       input.query.pageSize === undefined
         ? undefined
         : await this.#readBounds.clampPageSize(input.query.projectId, input.query.pageSize);
+    const { filter, ...options } = input.options ?? {};
+    const filterWhere = filter === undefined ? undefined : this.#compileLangWatchQLWhere(filter);
     return this.#contentReader.listTraceSummaries({
-      ...input,
       query: { ...input.query, ...(pageSize === undefined ? {} : { pageSize }) },
+      ...(input.options
+        ? { options: { ...options, ...(filterWhere ? { filterWhere } : {}) } }
+        : {}),
     });
+  }
+
+  /** A LangWatchQL filter as a WHERE fragment; one narrowing nothing is refused, not read whole. */
+  #compileLangWatchQLWhere(filter: string): TraceFilterWhere {
+    const compiled = compileLangWatchQLTraceFilter({ filter });
+    if (compiled.kind !== "compiled") {
+      throw new FilterParseError(`The trace filter cannot be read here: ${compiled.kind}`);
+    }
+    return { sql: compiled.sql, params: { ...compiled.parameters } };
   }
   async findTrace(input: TraceFindTraceInput): Promise<Trace | undefined> {
     return this.#contentReader.findTrace({
@@ -1934,7 +1968,7 @@ export class TraceModule implements TraceApi, CollectorApp {
       params: { threadConversationId: input.conversationId },
     };
     const page = traceListPageSchema.parse(
-      await this.readTraceList({
+      await this.#dependencies.traces.list.getList({
         authorization,
         timeRange,
         sort: { columnId: "time", direction: "asc" },
@@ -2766,10 +2800,14 @@ export class TraceModule implements TraceApi, CollectorApp {
     );
   }
 
+  /** The filter checked as written (Decided 25): throws `FilterParseError`, returns nothing. */
+  translateTraceFilter(input: { query: string }): void {
+    this.#translateTraceFilter({ query: input.query, timeRange: { from: 0, to: 0 } });
+  }
+
   /** The trace query language's free-text filter, compiled to a ClickHouse WHERE fragment. */
-  translateTraceFilter(input: {
+  #translateTraceFilter(input: {
     query: string;
-    tenantId: string;
     timeRange: { from: number; to: number };
     evalRuns?: readonly ResolvedInstantEvalRun[];
     /** The viewer's; under any content protection free text skips captured I/O. */
@@ -2810,7 +2848,7 @@ export class TraceModule implements TraceApi, CollectorApp {
    * unless the query (or `originNamed`) names one. `dateField` refuses a
    * span/event clause on the `updated` axis rather than dropping rows silently.
    */
-  async compileExplorerTraceFilter(input: {
+  async #compileExplorerTraceFilter(input: {
     query: string;
     tenantId: string;
     timeRange: { from: number; to: number };
@@ -2819,7 +2857,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     dateField?: TraceDateField;
     protections?: Protections;
   }): Promise<{ sql: string; params: Record<string, unknown> }> {
-    const compiled = this.translateTraceFilter(input);
+    const compiled = this.#translateTraceFilter(input);
 
     if (input.dateField === "updated" && compiled?.sql.includes("stored_spans")) {
       throw new FilterParseError(
@@ -2857,7 +2895,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     const refs = await this.#dependencies.traces.list.getTraceRefs({
       authorization: input.authorization,
       timeRange: input.window,
-      filterWhere: await this.compileExplorerTraceFilter({
+      filterWhere: await this.#compileExplorerTraceFilter({
         query: input.filter,
         tenantId: input.projectId,
         timeRange: input.window,
@@ -2909,9 +2947,33 @@ export class TraceModule implements TraceApi, CollectorApp {
   // The explorer's list, facet and session reads
   // -------------------------------------------------------------------------
 
-  /** One page of the trace grid. */
-  readTraceList(params: TraceListReadParams): Promise<TraceListPage> {
-    return this.#dependencies.traces.list.getList(params);
+  /** One page of the trace grid, its filter compiled as written. */
+  async readTraceList({ filter, ...params }: TraceListReadInput): Promise<TraceListPage> {
+    const filterWhere = await this.#compileListFilter({ filter, timeRange: params.timeRange });
+    return this.#dependencies.traces.list.getList({
+      ...params,
+      ...(filterWhere ? { filterWhere } : {}),
+    });
+  }
+
+  /** A list filter as written: the Explorer's (hidden origins out) or the query alone. */
+  async #compileListFilter({
+    filter,
+    timeRange,
+  }: {
+    filter: TraceListFilter | undefined;
+    timeRange: { from: number; to: number };
+  }): Promise<TraceFilterWhere | undefined> {
+    if (!filter) return undefined;
+    const input = {
+      query: filter.query,
+      tenantId: filter.tenantId,
+      timeRange,
+      ...(filter.evalRuns ? { evalRuns: filter.evalRuns } : {}),
+      ...(filter.protections ? { protections: filter.protections } : {}),
+    };
+    if (filter.hideExplorerOrigins === true) return this.#compileExplorerTraceFilter(input);
+    return this.#translateTraceFilter(input) ?? undefined;
   }
 
   /** One Sessions lens page through the viewer's protections; coding-agent fills `codingAgent`. */
@@ -2919,7 +2981,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     input: TraceSessionGroupsInput & { protections: Protections; authorization: Authorization },
   ): Promise<TracesSessionsPage> {
     const { protections } = input;
-    const filterWhere = await this.compileExplorerTraceFilter({
+    const filterWhere = await this.#compileExplorerTraceFilter({
       query: input.query ?? "",
       tenantId: input.projectId,
       timeRange: input.timeRange,
@@ -2970,9 +3032,8 @@ export class TraceModule implements TraceApi, CollectorApp {
     const filterFor = createFacetFilterResolver({
       queryText: input.query,
       compile: (text) =>
-        this.translateTraceFilter({
+        this.#translateTraceFilter({
           query: text,
-          tenantId: input.projectId,
           timeRange: input.timeRange,
           ...(input.evalRuns ? { evalRuns: input.evalRuns } : {}),
           ...(input.protections ? { protections: input.protections } : {}),
@@ -3001,9 +3062,13 @@ export class TraceModule implements TraceApi, CollectorApp {
     return { facets, pending: false };
   }
 
-  /** How many traces have arrived since the grid last painted. */
-  readNewCount(params: TraceNewCountParams): Promise<number> {
-    return this.#dependencies.traces.list.getNewCount(params);
+  /** How many traces have arrived since the grid last painted, under the filter as written. */
+  async readNewCount({ filter, ...params }: TraceNewCountInput): Promise<number> {
+    const filterWhere = await this.#compileListFilter({ filter, timeRange: params.timeRange });
+    return this.#dependencies.traces.list.getNewCount({
+      ...params,
+      ...(filterWhere ? { filterWhere } : {}),
+    });
   }
 
   /** The typeahead's values for one field. */

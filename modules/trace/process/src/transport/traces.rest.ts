@@ -252,15 +252,6 @@ async function searchTraces({
 
   const startEpoch = coerceToEpochOrThrow(startDate, "startDate");
   const endEpoch = coerceToEpochOrThrow(endDate, "endDate");
-  const filterWhere = await app.compileExplorerTraceFilter({
-    query: filter ?? "",
-    tenantId: scope.id,
-    timeRange: { from: startEpoch, to: endEpoch },
-    originNamed: namesOriginFilter(searchFields.filters),
-    dateField,
-    protections,
-  });
-
   const results = await app.listTraces({
     query: {
       ...searchFields,
@@ -275,7 +266,12 @@ async function searchTraces({
       includeSpans: includeSpans ?? false,
       scrollId: scrollId ?? undefined,
       dateField,
-      filterWhere,
+      filter: {
+        query: filter ?? "",
+        tenantId: scope.id,
+        protections,
+        hideExplorerOrigins: !namesOriginFilter(searchFields.filters),
+      },
       authorization,
       ...(projection ? { projection: projection.plan } : {}),
     },

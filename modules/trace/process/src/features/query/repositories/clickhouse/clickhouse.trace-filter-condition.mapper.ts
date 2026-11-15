@@ -90,7 +90,7 @@ export interface CompiledTraceFilter {
 
 interface Compilation {
   ctx: TranslationContext;
-  /** A proof-fenced read: span subqueries read its shared windows, as `{{tenantScope}}` did. */
+  /** A proof-fenced read: every side subquery reads its shared windows (Decided 27). */
   windowed: boolean;
   searchContent: boolean;
   isHiddenAttribute: (key: string) => boolean;
@@ -206,13 +206,7 @@ function numericCondition<T extends string>({
   }
 }
 
-type ReaderStart = ClickHouseReadStart<ReaderScope, Record<never, never>>;
-
-/**
- * `left IN (SELECT …)` under the filtered read's scope. `KindFor<S>` stays deferred for a generic
- * scope, so the inner start is typed as a reader's, as analytics' filter mapper does
- * (modules/analytics/process/src/repositories/clickhouse/clickhouse.filter-conditions.mapper.ts).
- */
+/** `left IN (SELECT …)` under the filtered read's scope. */
 function withinSide<
   S extends ReaderScope,
   C extends Record<string, unknown>,
@@ -221,20 +215,20 @@ function withinSide<
 >(
   ops: ReadOps<S, "trace_summaries", C>,
   left: Expression<unknown, "trace_summaries">,
-  build: (sub: ReaderStart) => ClickHouseRead<ReaderScope, SubTables, SubRow, Record<never, never>>,
+  build: (sub: ClickHouseReadStart<S, C>) => ClickHouseRead<S, SubTables, SubRow, C>,
 ): Condition {
-  return ops.within(
-    left,
-    (sub) =>
-      build(sub as unknown as ReaderStart) as unknown as ClickHouseRead<S, SubTables, SubRow, C>,
-  );
+  return ops.within(left, build);
+}
+
+/** Under a share a side read keeps to its windows on the table's own time column (Decided 27). */
+function keptToShare<R extends { withinWindows(): R }>(c: Compilation, read: R): R {
+  return c.windowed ? read.withinWindows() : read;
 }
 
 /** Traces with a span in the window passing `inner`; main's `boundedSubquery` on `stored_spans`. */
 function spansWith(c: Compilation, inner: Condition<"stored_spans">): TraceFilterCondition {
   c.readsSpans = true;
   const { from, to } = c.ctx.timeRange;
-  const windowed = c.windowed;
   return (ops) =>
     withinSide(ops, fn.tuple(ts.TenantId, ts.TraceId), (sub) => {
       const read = sub
@@ -244,7 +238,7 @@ function spansWith(c: Compilation, inner: Condition<"stored_spans">): TraceFilte
         .where(({ and, gte, lte }) =>
           and(gte(spans.StartTime, from), lte(spans.StartTime, to), inner),
         );
-      return windowed ? read.withinWindows() : read;
+      return keptToShare(c, read);
     });
 }
 
@@ -256,13 +250,16 @@ function evaluationRunsWith(
   const { from, to } = c.ctx.timeRange;
   return (ops) =>
     withinSide(ops, fn.tuple(ts.TenantId, ts.TraceId), (sub) =>
-      sub
-        .from(runs)
-        .distinct()
-        .select({ TenantId: runs.TenantId, TraceId: runs.TraceId })
-        .where(({ and, gte, lte }) =>
-          and(gte(runs.ScheduledAt, from), lte(runs.ScheduledAt, to), inner),
-        ),
+      keptToShare(
+        c,
+        sub
+          .from(runs)
+          .distinct()
+          .select({ TenantId: runs.TenantId, TraceId: runs.TraceId })
+          .where(({ and, gte, lte }) =>
+            and(gte(runs.ScheduledAt, from), lte(runs.ScheduledAt, to), inner),
+          ),
+      ),
     );
 }
 
@@ -294,7 +291,7 @@ function latestEvaluationRunsWith({
         inner.length === 0
           ? ofEvaluator
           : ofEvaluator.where(() => joined(inner, false), { inElection: false });
-      return passing.latestVersion();
+      return keptToShare(c, passing).latestVersion();
     });
 }
 
@@ -309,14 +306,16 @@ function scenarioRunsWith(
   const { from, to } = c.ctx.timeRange;
   return (ops) =>
     withinSide(ops, fn.tuple(ts.TenantId, fn.mapGet(ts.Attributes, "scenario.run_id")), (sub) =>
-      sub
-        .from(scenarios)
-        .select({ TenantId: scenarios.TenantId, ScenarioRunId: scenarios.ScenarioRunId })
-        .where(({ and, gte, lte }) =>
-          and(gte(scenarios.StartedAt, from), lte(scenarios.StartedAt, to)),
-        )
-        .where(() => inner, { inElection: false })
-        .latestVersion(),
+      keptToShare(
+        c,
+        sub
+          .from(scenarios)
+          .select({ TenantId: scenarios.TenantId, ScenarioRunId: scenarios.ScenarioRunId })
+          .where(({ and, gte, lte }) =>
+            and(gte(scenarios.StartedAt, from), lte(scenarios.StartedAt, to)),
+          )
+          .where(() => inner, { inElection: false }),
+      ).latestVersion(),
     );
 }
 
@@ -345,22 +344,28 @@ function judgedBy(c: Compilation, run: ResolvedInstantEvalRun): TraceFilterCondi
         ops,
         fn.tuple(ts.TenantId, fn.mapGet(ts.Attributes, "gen_ai.conversation.id")),
         (sub) =>
-          sub
-            .from(judgments)
-            .select({ TenantId: judgments.TenantId, MatchedThreadId: thread })
-            .where(() => judged)
-            .groupBy(...keys)
-            .having(() => cond.and(passed, cond.ne(thread, ""))),
+          keptToShare(
+            c,
+            sub
+              .from(judgments)
+              .select({ TenantId: judgments.TenantId, MatchedThreadId: thread })
+              .where(() => judged)
+              .groupBy(...keys)
+              .having(() => cond.and(passed, cond.ne(thread, ""))),
+          ),
       );
   }
   return (ops) =>
     withinSide(ops, fn.tuple(ts.TenantId, ts.TraceId), (sub) =>
-      sub
-        .from(judgments)
-        .select({ TenantId: judgments.TenantId, TraceId: judgments.TraceId })
-        .where(() => judged)
-        .groupBy(...keys)
-        .having(() => passed),
+      keptToShare(
+        c,
+        sub
+          .from(judgments)
+          .select({ TenantId: judgments.TenantId, TraceId: judgments.TraceId })
+          .where(() => judged)
+          .groupBy(...keys)
+          .having(() => passed),
+      ),
     );
 }
 

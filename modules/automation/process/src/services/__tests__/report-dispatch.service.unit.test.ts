@@ -480,7 +480,6 @@ describe("the composed trace-query report", () => {
         rootSpanType: null,
         evaluations: [],
       };
-      const filterWhere = { sql: "Status = {s:String}", params: { s: "error" } };
       const readTraceList = vi.fn<TraceApi["readTraceList"]>(async () => ({
         items: [item],
         totalHits: 1,
@@ -500,7 +499,6 @@ describe("the composed trace-query report", () => {
       });
       const traceList = ReportTraceListService.create({
         traces: createApiFixture<TraceApi>({
-          translateTraceFilter: () => filterWhere,
           readTraceList,
         }),
         authz: createApiFixture<AuthzApi>({ authorizeInternal: async () => proof }),
@@ -525,7 +523,7 @@ describe("the composed trace-query report", () => {
         page: 1,
         pageSize: 3,
         visibilityCutoffMs: null,
-        filterWhere,
+        filter: { query: "status:error", tenantId: PROJECT.id },
       });
       const [email] = mail.emails;
       expect(email?.html).toContain(`${BASE_HOST}/${PROJECT.slug}/traces/trace-a`);

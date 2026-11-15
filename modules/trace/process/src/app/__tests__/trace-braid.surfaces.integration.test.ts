@@ -271,7 +271,7 @@ async function answered(response: Response): Promise<string> {
   return body;
 }
 
-/** The explorer's list route: protections, the compiled query, then the list read. */
+/** The explorer's list route: protections, then the list read with the query as written. */
 async function explorerList(query: string) {
   const authorization = proof();
   const protections = await app.resolveViewerProtections({
@@ -279,18 +279,12 @@ async function explorerList(query: string) {
     userId: "sam",
     authorization,
   });
-  const filterWhere = await app.compileExplorerTraceFilter({
-    query,
-    tenantId: reader,
-    timeRange: WINDOW,
-    protections,
-  });
   return app.readTraceList({
     authorization,
     timeRange: WINDOW,
     sort: { columnId: "timestamp", direction: "desc" },
     pageSize: 50,
-    filterWhere,
+    filter: { query, tenantId: reader, protections, hideExplorerOrigins: true },
     visibilityCutoffMs: protections.visibilityCutoffMs,
   });
 }

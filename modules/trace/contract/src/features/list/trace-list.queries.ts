@@ -2,6 +2,9 @@ import type { Authorization } from "@langwatch/authorization";
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
+import type { Protections } from "../../trace-viewer-protections.contract.ts";
+import type { ResolvedInstantEvalRun } from "../evaluation/trace-instant-eval-chips.ts";
+
 /**
  * Projected fields required by the trace-list read and mapper. This is deliberately separate
  * from the ingest fold state: the list query owns a read-only projection of `trace_summaries`
@@ -97,6 +100,22 @@ export type TraceListRow = TraceListSummary & { tenantId: string };
 
 /** One trace, named by the tenant that holds it and its id. */
 export type TraceRef = { tenantId: string; traceId: string };
+
+/**
+ * A trace query language filter as written, which trace compiles inside the read that runs it
+ * (ADR-202 Decided 25). `hideExplorerOrigins` leaves the Explorer's hidden origins out unless
+ * the query names one, as the Explorer's own reads do.
+ */
+export interface TraceListFilter {
+  query: string;
+  /** The project the query was written in, whose kind decides the hidden origins. */
+  tenantId: string;
+  /** The Instant Eval runs registered for the query's `eval` chips. */
+  evalRuns?: readonly ResolvedInstantEvalRun[];
+  /** The viewer's; under any content protection free text skips captured I/O. */
+  protections?: Protections;
+  hideExplorerOrigins?: boolean;
+}
 
 export interface TraceListQuery {
   /** The proof the read is fenced by; the reader applies its tenant set. */

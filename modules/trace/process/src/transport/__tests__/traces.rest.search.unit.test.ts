@@ -16,6 +16,7 @@ import {
   FilterParseError,
   type Evaluation,
   type TraceApi,
+  type TraceListTracesInput,
   type TracesForProjectResult,
   type TraceWithGuardrail,
 } from "@langwatch/trace-contract";
@@ -37,9 +38,9 @@ vi.mock("#features/projection/rules/trace-projection-compile.rules", async (impo
 });
 
 /**
- * The real `TraceApi.compileExplorerTraceFilter` (`trace.app.ts`), rebuilt
- * here over the same production translator and rules so this door's filter
- * behavior is exercised for real — only `TraceApi` itself is a double.
+ * The Explorer compile `TraceModule.listTraces` runs on the filter as written (`trace.app.ts`),
+ * rebuilt over the same production translator and rules so this door's filter behaviour is
+ * exercised for real; only `TraceApi` itself is a double.
  */
 async function compileExplorerTraceFilter(input: {
   query: string;
@@ -130,9 +131,31 @@ const DEFAULT_PAGE: TracesForProjectResult = tracePage([TRACE_1, TRACE_2], {
   traceChecks: { "trace-1": [EVAL_1], "trace-2": [] },
 });
 
-function mount(overrides: Readonly<{ listTraces?: TraceApi["listTraces"] }> = {}) {
-  const listTraces: TraceApi["listTraces"] =
-    overrides.listTraces ?? vi.fn(async () => DEFAULT_PAGE);
+/** The content read `TraceModule.listTraces` hands the compiled filter to. */
+type ContentListTraces = (input: TraceListTracesInput) => Promise<TracesForProjectResult>;
+
+/** `TraceModule.listTraces`: the filter as written compiled, then the content read. */
+function listingAsWritten(listTraces: ContentListTraces): TraceApi["listTraces"] {
+  return async ({ options, ...input }) => {
+    const { filter, ...rest } = options ?? {};
+    const filterWhere = filter
+      ? await compileExplorerTraceFilter({
+          query: filter.query,
+          tenantId: filter.tenantId,
+          timeRange: { from: input.query.startDate, to: input.query.endDate },
+          originNamed: filter.hideExplorerOrigins !== true,
+          ...(rest.dateField ? { dateField: rest.dateField } : {}),
+        })
+      : undefined;
+    return listTraces({
+      ...input,
+      ...(options ? { options: { ...rest, ...(filterWhere ? { filterWhere } : {}) } } : {}),
+    });
+  };
+}
+
+function mount(overrides: Readonly<{ listTraces?: ContentListTraces }> = {}) {
+  const listTraces: ContentListTraces = overrides.listTraces ?? vi.fn(async () => DEFAULT_PAGE);
   const resolveApiKeyProtections: TraceApi["resolveApiKeyProtections"] = vi.fn(
     async () => PROTECTIONS,
   );
@@ -140,10 +163,9 @@ function mount(overrides: Readonly<{ listTraces?: TraceApi["listTraces"] }> = {}
     `https://app.langwatch.test/${projectSlug}${path}`;
 
   const stub = createApiFixture<TraceApi>({
-    listTraces,
+    listTraces: listingAsWritten(listTraces),
     resolveApiKeyProtections,
     platformUrl,
-    compileExplorerTraceFilter,
   });
 
   const runtime = createRestRuntime({
@@ -564,12 +586,12 @@ describe("POST /search", () => {
 });
 
 /**
- * `filter` compiles over the same `TraceApi.compileExplorerTraceFilter` path
- * `traces.discover` uses. Fold: error shapes are this tree's own codes
- * (`filter_parse_error`, `filter_field_unknown`), not upstream's `validation_error`.
+ * `filter` goes down as written and compiles over the Explorer path `traces.discover` uses.
+ * Fold: error shapes are this tree's own codes (`filter_parse_error`, `filter_field_unknown`),
+ * not upstream's `validation_error`.
  */
 describe("POST /search with a trace filter", () => {
-  const filterWhereOf = (listTraces: TraceApi["listTraces"]) =>
+  const filterWhereOf = (listTraces: ContentListTraces) =>
     vi.mocked(listTraces).mock.calls[0]?.[0]?.options?.filterWhere;
 
   describe("when the filter is well formed", () => {

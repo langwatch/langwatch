@@ -298,16 +298,6 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
         userId: actor.id,
         authorization,
       });
-      const filterWhere = await app.compileExplorerTraceFilter({
-        query: input.query ?? "",
-        tenantId: input.projectId,
-        timeRange: input.timeRange,
-        protections,
-        evalRuns: await app.findExplorerEvalRuns({
-          projectId: input.projectId,
-          evalRuns: input.evalRuns,
-        }),
-      });
       const page = traceListPageSchema.parse(
         await app.readTraceList({
           authorization,
@@ -316,7 +306,16 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
           page: input.page,
           pageSize: input.pageSize,
           cursor: input.cursor,
-          filterWhere,
+          filter: {
+            query: input.query ?? "",
+            tenantId: input.projectId,
+            protections,
+            evalRuns: await app.findExplorerEvalRuns({
+              projectId: input.projectId,
+              evalRuns: input.evalRuns,
+            }),
+            hideExplorerOrigins: true,
+          },
           visibilityCutoffMs: protections.visibilityCutoffMs,
         }),
       );
@@ -342,25 +341,24 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
     .procedure("newCount")
     .withPermission("traces:view")
     .handle(async ({ app, input, actor, authorization }) => {
-      const filterWhere = await app.compileExplorerTraceFilter({
-        query: input.query ?? "",
-        tenantId: input.projectId,
-        timeRange: input.timeRange,
-        protections: await app.resolveViewerProtections({
-          projectId: input.projectId,
-          userId: actor.id,
-          authorization,
-        }),
-        evalRuns: await app.findExplorerEvalRuns({
-          projectId: input.projectId,
-          evalRuns: input.evalRuns,
-        }),
-      });
       const count = await app.readNewCount({
         authorization,
         timeRange: input.timeRange,
         since: input.since,
-        filterWhere,
+        filter: {
+          query: input.query ?? "",
+          tenantId: input.projectId,
+          protections: await app.resolveViewerProtections({
+            projectId: input.projectId,
+            userId: actor.id,
+            authorization,
+          }),
+          evalRuns: await app.findExplorerEvalRuns({
+            projectId: input.projectId,
+            evalRuns: input.evalRuns,
+          }),
+          hideExplorerOrigins: true,
+        },
       });
 
       return { count };

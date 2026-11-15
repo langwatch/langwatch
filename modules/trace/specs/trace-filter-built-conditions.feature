@@ -23,6 +23,19 @@ Feature: Trace filters compile to built conditions
     When the filtered read is built
     Then the span subquery carries the proof's windows as the read does
 
+  @unit
+  Scenario: Every side-table filter under a share reads only within the share's windows
+    Given an evaluation, scenario run or Instant Eval filter compiled for a proof-fenced read
+    When the filtered read is built
+    Then the side subquery carries the share's windows on that table's own time column
+    And an out-of-window side row never decides whether a trace matches
+
+  @unit
+  Scenario: A summary read refuses a filter as written that narrows nothing
+    Given another module hands the summary read a LangWatchQL filter as written
+    When the filter compiles to no condition or one the view cannot answer
+    Then the read is refused with filter_parse_error and reads no trace
+
   @integration
   Scenario: Each filter kind keeps main's rows with another tenant sharing trace ids
     Given two tenants whose traces, spans, evaluations, scenario runs and judgements share ids

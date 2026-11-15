@@ -5,9 +5,9 @@ import type { AutomationTraceFilterCompiler } from "../app/automation.app.ts";
 import type { AutomationLogger } from "./automation.service.ts";
 
 /**
- * ADR-043's filter-query dry run, over trace's own translator as main's
- * readFilterQuery used it. The translator's account can name internal
- * columns, so it goes to the log and the author gets the handled error.
+ * ADR-043's filter-query dry run: trace checks the query as written (ADR-202 Decided 25). The
+ * refusal's account can name internal columns, so it goes to the log and the author gets the
+ * handled error.
  */
 export class AutomationTraceFilterCompilerService implements AutomationTraceFilterCompiler {
   static create(input: {
@@ -24,11 +24,7 @@ export class AutomationTraceFilterCompilerService implements AutomationTraceFilt
 
   assertCompiles({ query, projectId }: Readonly<{ query: string; projectId: string }>): void {
     try {
-      this.traces.translateTraceFilter({
-        query,
-        tenantId: projectId,
-        timeRange: { from: 0, to: 0 },
-      });
+      this.traces.translateTraceFilter({ query });
     } catch (error) {
       if (!(error instanceof FilterParseError)) throw error;
       this.logger.warn(

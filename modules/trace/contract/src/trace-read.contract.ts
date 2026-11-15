@@ -63,6 +63,14 @@ export interface TraceSummaryListOptions {
   filterWhere?: { sql: string; params: Record<string, unknown> };
 }
 
+/** The summary read's options: a LangWatchQL filter as written (Decided 25) */
+export interface TraceSummaryListRequestOptions extends Omit<
+  TraceSummaryListOptions,
+  "filterWhere"
+> {
+  filter?: string;
+}
+
 /** One keyset page of latest trace summaries; `updatedThrough` as on the list read. */
 export interface TraceSummaryPage {
   summaries: TraceSummaryData[];

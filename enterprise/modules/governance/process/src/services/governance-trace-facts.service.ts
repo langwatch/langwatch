@@ -49,14 +49,14 @@ type GovernanceTraceRows =
 export class GovernanceTraceFactsService {
   private readonly kpis: GovernanceKpiContributionWriter;
   private readonly ocsf: GovernanceOcsfEventWriter;
-  private readonly traces: Pick<TraceApi, "compileLangWatchQLTraceFilter" | "listTraceSummaries">;
+  private readonly traces: Pick<TraceApi, "listTraceSummaries">;
   private readonly projects: Pick<ProjectApi, "findInternalIds">;
   private readonly diagnostics: GovernanceDiagnosticsSink;
 
   private constructor(options: {
     kpis: GovernanceKpiContributionWriter;
     ocsf: GovernanceOcsfEventWriter;
-    traces: Pick<TraceApi, "compileLangWatchQLTraceFilter" | "listTraceSummaries">;
+    traces: Pick<TraceApi, "listTraceSummaries">;
     projects: Pick<ProjectApi, "findInternalIds">;
     diagnostics: GovernanceDiagnosticsSink;
   }) {
@@ -70,7 +70,7 @@ export class GovernanceTraceFactsService {
   static create(options: {
     kpis: GovernanceKpiContributionWriter;
     ocsf: GovernanceOcsfEventWriter;
-    traces: Pick<TraceApi, "compileLangWatchQLTraceFilter" | "listTraceSummaries">;
+    traces: Pick<TraceApi, "listTraceSummaries">;
     projects: Pick<ProjectApi, "findInternalIds">;
     diagnostics: GovernanceDiagnosticsSink;
   }): GovernanceTraceFactsService {
@@ -79,11 +79,6 @@ export class GovernanceTraceFactsService {
 
   /** Every governance tenant's governance-origin traces last updated in the window; a failed read or write throws. */
   async pull({ fromMs, toMs }: { fromMs: number; toMs: number }): Promise<{ written: number }> {
-    const filter = this.traces.compileLangWatchQLTraceFilter({ filter: GOVERNANCE_ORIGIN_FILTER });
-    if (filter.kind !== "compiled") {
-      throw new Error(`The governance-origin trace filter did not compile: ${filter.kind}`);
-    }
-    const filterWhere = { sql: filter.sql, params: { ...filter.parameters } };
     const tenants = await this.projects.findInternalIds({ kind: PROJECT_KIND.INTERNAL_GOVERNANCE });
     let written = 0;
     for (const tenantId of tenants) {
@@ -96,7 +91,11 @@ export class GovernanceTraceFactsService {
             endDate: toMs,
             pageSize: SUMMARY_PAGE_SIZE,
           },
-          options: { dateField: "updated", scrollId: scrollId ?? null, filterWhere },
+          options: {
+            dateField: "updated",
+            scrollId: scrollId ?? null,
+            filter: GOVERNANCE_ORIGIN_FILTER,
+          },
         });
         written += (await this.record({ tenantId, summaries: page.summaries })).written;
         scrollId = page.scrollId;

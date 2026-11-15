@@ -6,10 +6,10 @@ import type { ReportDispatchDeps } from "./report-dispatch.service.ts";
 
 type ReportTraceListInput = Parameters<ReportDispatchDeps["listReportTraces"]>[0];
 
-/** Main's `listReportTraces` (presets.ts): the author's query compiled onto the trace grid read. */
+/** Main's `listReportTraces` (presets.ts): the author's query as written, on the grid read. */
 export class ReportTraceListService {
   static create(input: {
-    traces: Pick<TraceApi, "readTraceList" | "translateTraceFilter">;
+    traces: Pick<TraceApi, "readTraceList">;
     authz: Pick<AuthzApi, "authorizeInternal">;
     baseHost: string;
   }): ReportTraceListService {
@@ -17,7 +17,7 @@ export class ReportTraceListService {
   }
 
   private constructor(
-    private readonly traces: Pick<TraceApi, "readTraceList" | "translateTraceFilter">,
+    private readonly traces: Pick<TraceApi, "readTraceList">,
     private readonly authz: Pick<AuthzApi, "authorizeInternal">,
     private readonly baseHost: string,
   ) {}
@@ -30,11 +30,6 @@ export class ReportTraceListService {
     to,
     limit,
   }: ReportTraceListInput): ReturnType<ReportDispatchDeps["listReportTraces"]> {
-    const filterWhere = this.traces.translateTraceFilter({
-      query,
-      tenantId: projectId,
-      timeRange: { from, to },
-    });
     // A scheduled report has no asker: the platform reads as itself (ruling TRACE-PROOF-REPORTS).
     const authorization = await this.authz.authorizeInternal({
       actor: { type: "internal", codePath: "automation.report-trace-list" },
@@ -49,7 +44,7 @@ export class ReportTraceListService {
       page: 1,
       pageSize: limit,
       visibilityCutoffMs: null,
-      ...(filterWhere ? { filterWhere } : {}),
+      filter: { query, tenantId: projectId },
     });
     const projectUrl = `${this.baseHost}/${projectSlug}`;
     return page.items.map((item) => toReportTraceRow({ item, projectUrl }));

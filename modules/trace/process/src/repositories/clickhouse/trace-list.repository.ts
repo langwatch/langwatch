@@ -90,7 +90,7 @@ const listSummaryRowSchema = z.looseObject({
   Version: chString.optional(),
   /** The span timing baseline column added by migration 00072 (ADR-087). */
   EarliestSpanStartMs: chNumber.optional(),
-  CreatedAt: chNumber,
+  CreatedAtMs: chNumber,
   UpdatedAtMs: chNumber,
   ComputedIOSchemaVersion: chString,
   ComputedInput: chString.nullable(),
@@ -311,7 +311,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
           toUnixTimestamp64Milli(OccurredAt) AS OccurredAtMs,
           Version,
           EarliestSpanStartMs,
-          toUnixTimestamp64Milli(CreatedAt) AS CreatedAt,
+          toUnixTimestamp64Milli(CreatedAt) AS CreatedAtMs,
           toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAtMs,
           ComputedIOSchemaVersion,
           ComputedInput,
@@ -1246,7 +1246,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       occurredAt: isStorageAnchoredVersion(row.Version)
         ? Number(row.EarliestSpanStartMs ?? 0)
         : Number(row.OccurredAtMs),
-      createdAt: Number(row.CreatedAt),
+      createdAt: Number(row.CreatedAtMs),
       updatedAt: Number(row.UpdatedAtMs),
       LastEventOccurredAt: Number(row.LastEventOccurredAt ?? 0),
     };

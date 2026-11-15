@@ -105,12 +105,7 @@ function traceReads(pages: SummaryPages) {
       })),
     };
   });
-  const compileLangWatchQLTraceFilter = vi.fn<TraceApi["compileLangWatchQLTraceFilter"]>(() => ({
-    kind: "compiled",
-    sql: "Attributes[{attrKey_0:String}] = {attrValue_1:String}",
-    parameters: { attrKey_0: "langwatch.origin.kind", attrValue_1: "ingestion_source" },
-  }));
-  return { listTraceSummaries, compileLangWatchQLTraceFilter };
+  return { listTraceSummaries };
 }
 
 function setup(pages: SummaryPages = {}) {
@@ -237,10 +232,6 @@ describe("GovernanceTraceFactsService", () => {
 
       await expect(service.pull({ fromMs: 1_000, toMs: 2_000 })).resolves.toEqual({ written: 3 });
 
-      expect(traces.compileLangWatchQLTraceFilter).toHaveBeenCalledOnce();
-      expect(traces.compileLangWatchQLTraceFilter).toHaveBeenCalledWith({
-        filter: "trace.attribute.langwatch.origin.kind:ingestion_source",
-      });
       expect(traces.listTraceSummaries.mock.calls.map(([input]) => input)).toEqual([
         expect.objectContaining({
           query: expect.objectContaining({
@@ -248,7 +239,11 @@ describe("GovernanceTraceFactsService", () => {
             startDate: 1_000,
             endDate: 2_000,
           }),
-          options: expect.objectContaining({ dateField: "updated", scrollId: null }),
+          options: expect.objectContaining({
+            dateField: "updated",
+            scrollId: null,
+            filter: "trace.attribute.langwatch.origin.kind:ingestion_source",
+          }),
         }),
         expect.objectContaining({ options: expect.objectContaining({ scrollId: "next" }) }),
         expect.objectContaining({ query: expect.objectContaining({ projectId: "tenant-b" }) }),
@@ -272,14 +267,6 @@ describe("GovernanceTraceFactsService", () => {
 
       expect(kpis.rows.size).toBe(1);
       expect(ocsf.rows.size).toBe(1);
-    });
-
-    it("refuses to pull when the origin filter does not compile, rather than reading every trace", async () => {
-      const { traces, service } = setup({ "tenant-a": [{ summaries: [summary] }] });
-      traces.compileLangWatchQLTraceFilter.mockReturnValueOnce({ kind: "empty" });
-
-      await expect(service.pull({ fromMs: 1_000, toMs: 2_000 })).rejects.toThrow(/did not compile/);
-      expect(traces.listTraceSummaries).not.toHaveBeenCalled();
     });
   });
 });

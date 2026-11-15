@@ -23,7 +23,6 @@ const RESOLVED: ResolvedInstantEvalRun = {
   writtenFrom: 900,
   writtenUntil: 2_100,
 };
-const COMPILED = { sql: "1 = 1", params: {} };
 const FILTERED_FACETS = {
   facets: [
     {
@@ -40,21 +39,22 @@ const FILTERED_FACETS = {
 
 function harness() {
   const findExplorerEvalRuns = vi.fn<TraceApi["findExplorerEvalRuns"]>(async () => [RESOLVED]);
-  const compileExplorerTraceFilter = vi.fn<TraceApi["compileExplorerTraceFilter"]>(
-    async () => COMPILED,
-  );
+  const readTraceList = vi.fn<TraceApi["readTraceList"]>(async () => ({
+    items: [],
+    totalHits: 0,
+    nextCursor: null,
+  }));
+  const readNewCount = vi.fn<TraceApi["readNewCount"]>(async () => 3);
   const readFilteredFacets = vi.fn<TraceApi["readFilteredFacets"]>(async () => FILTERED_FACETS);
   const readDiscoverForQuery = vi.fn<TraceApi["readDiscoverForQuery"]>(async () => FILTERED_FACETS);
   const app = createApiFixture<TraceApi>({
     findExplorerEvalRuns,
-    compileExplorerTraceFilter,
-    translateTraceFilter: () => COMPILED,
     readFilteredFacets,
     readDiscoverForQuery,
     resolveViewerProtections: async () => ({}),
     extractTraceFreeTextTerms: () => [],
-    readTraceList: async () => ({ items: [], totalHits: 0, evaluations: {}, nextCursor: null }),
-    readNewCount: async () => 3,
+    readTraceList,
+    readNewCount,
   });
 
   const trpc = initTRPC.context<TestContext>().create();
@@ -67,7 +67,8 @@ function harness() {
 
   return {
     caller: router.createCaller({ actor: { id: "reader-1" } }),
-    compileExplorerTraceFilter,
+    readTraceList,
+    readNewCount,
     findExplorerEvalRuns,
     readFilteredFacets,
     readDiscoverForQuery,
@@ -80,7 +81,7 @@ describe("given a read whose query carries an eval chip with a registered run", 
   describe("when the table reads a page", () => {
     /** @scenario "Every explorer read checks the runs its chips claim" */
     it("checks the claim against the project, then compiles with the dated run", async () => {
-      const { caller, compileExplorerTraceFilter, findExplorerEvalRuns } = harness();
+      const { caller, readTraceList, findExplorerEvalRuns } = harness();
 
       await caller.list({
         projectId: PROJECT_ID,
@@ -94,8 +95,10 @@ describe("given a read whose query carries an eval chip with a registered run", 
         projectId: PROJECT_ID,
         evalRuns: claim,
       });
-      expect(compileExplorerTraceFilter).toHaveBeenCalledWith(
-        expect.objectContaining({ evalRuns: [RESOLVED] }),
+      expect(readTraceList).toHaveBeenCalledWith(
+        expect.objectContaining({
+          filter: expect.objectContaining({ evalRuns: [RESOLVED], hideExplorerOrigins: true }),
+        }),
       );
     });
   });
@@ -120,7 +123,7 @@ describe("given a read whose query carries an eval chip with a registered run", 
 
   describe("when the table asks what has arrived since", () => {
     it("counts over the same runs", async () => {
-      const { caller, compileExplorerTraceFilter } = harness();
+      const { caller, readNewCount } = harness();
 
       await expect(
         caller.newCount({
@@ -131,8 +134,10 @@ describe("given a read whose query carries an eval chip with a registered run", 
           evalRuns: claim,
         }),
       ).resolves.toEqual({ count: 3 });
-      expect(compileExplorerTraceFilter).toHaveBeenCalledWith(
-        expect.objectContaining({ evalRuns: [RESOLVED] }),
+      expect(readNewCount).toHaveBeenCalledWith(
+        expect.objectContaining({
+          filter: expect.objectContaining({ evalRuns: [RESOLVED], hideExplorerOrigins: true }),
+        }),
       );
     });
   });
