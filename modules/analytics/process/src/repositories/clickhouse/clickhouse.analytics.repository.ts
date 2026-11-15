@@ -13,6 +13,7 @@ import {
   type ClickHouseQueryClient,
   tenantScopeKey,
 } from "@langwatch/clickhouse-client";
+import { type ReaderReadStatement, tenantScope } from "@langwatch/clickhouse-client/builder";
 import { createLogger } from "@langwatch/observability";
 import { toDate } from "@langwatch/time";
 import { z } from "zod";
@@ -27,15 +28,17 @@ import {
   type AnalyticsTimeseriesQuery,
 } from "../analytics.repository.ts";
 import {
-  buildFeedbacksPageQuery,
-  buildFeedbacksQuery,
   buildTimeseriesQuery,
-  buildTopDocumentsQuery,
   type TimeseriesQueryInput,
 } from "./clickhouse.aggregation-builder.mapper.ts";
 import { pickAnalyticsTable } from "./clickhouse.analytics-route-table.mapper.ts";
 import { buildEvalRollupTimeseriesQuery } from "./clickhouse.eval-rollup-timeseries-query.mapper.ts";
 import { buildEvalSlimTimeseriesQuery } from "./clickhouse.eval-slim-timeseries-query.mapper.ts";
+import {
+  feedbacksPageRead,
+  feedbacksRead,
+  topDocumentsRead,
+} from "./clickhouse.feedback-document-reads.mapper.ts";
 import { translatingQueryFailures } from "./clickhouse.query-error-translation.mapper.ts";
 import { buildRollupTimeseriesQuery } from "./clickhouse.rollup-timeseries-query.mapper.ts";
 import { buildSlimTimeseriesQuery } from "./clickhouse.slim-timeseries-query.mapper.ts";
@@ -106,12 +109,16 @@ export class ClickHouseAnalyticsRepository extends AnalyticsRepository {
   }): ClickHouseAnalyticsRepository {
     return new ClickHouseAnalyticsRepository(
       new AuthorizedClickHouse({ resolveClient: () => Promise.resolve(options.clickhouse) }),
+      options.clickhouse,
     );
   }
 
   private readonly logger = createLogger("langwatch:analytics:timeseries-repository");
 
-  private constructor(private readonly authorized: AuthorizedClickHouse) {
+  private constructor(
+    private readonly authorized: AuthorizedClickHouse,
+    private readonly clickhouse: Pick<ClickHouseQueryClient, "read">,
+  ) {
     super();
   }
 
@@ -187,20 +194,9 @@ export class ClickHouseAnalyticsRepository extends AnalyticsRepository {
   }
 
   async findTopDocuments(input: AnalyticsLegacyReadInput): Promise<AnalyticsTopDocumentsResult> {
-    const client = this.statementClient({ ...input, reads: "cost" });
-    const built = buildTopDocumentsQuery({
-      startDate: new Date(input.startDate),
-      endDate: new Date(input.endDate),
-      filters: input.filters,
-    });
+    const statement = topDocumentsRead(this.costRead(input));
     try {
-      const result = await client.query({
-        query: built.sql,
-        query_params: built.params,
-        format: "JSONEachRow",
-        clickhouse_settings: ANALYTICS_CLICKHOUSE_SETTINGS,
-      });
-      const topDocs = (await result.json()) as {
+      const topDocs = (await this.sent(statement)) as {
         documentId: string;
         count: string | number;
         trace_id: string;
@@ -231,20 +227,9 @@ export class ClickHouseAnalyticsRepository extends AnalyticsRepository {
   }
 
   async findFeedbackEvents(input: AnalyticsLegacyReadInput): Promise<AnalyticsFeedbacksResult> {
-    const client = this.statementClient({ ...input, reads: "cost" });
-    const built = buildFeedbacksQuery({
-      startDate: new Date(input.startDate),
-      endDate: new Date(input.endDate),
-      filters: input.filters,
-    });
+    const statement = feedbacksRead(this.costRead(input));
     try {
-      const result = await client.query({
-        query: built.sql,
-        query_params: built.params,
-        format: "JSONEachRow",
-        clickhouse_settings: ANALYTICS_CLICKHOUSE_SETTINGS,
-      });
-      const rows = (await result.json()) as {
+      const rows = (await this.sent(statement)) as {
         trace_id: string;
         event_id: string;
         started_at: string | number;
@@ -269,22 +254,13 @@ export class ClickHouseAnalyticsRepository extends AnalyticsRepository {
   async findFeedbackEventsPage(
     input: AnalyticsFeedbackPageReadInput,
   ): Promise<AnalyticsFeedbackPageRead> {
-    const client = this.statementClient({ ...input, reads: "cost" });
-    const built = buildFeedbacksPageQuery({
-      startDate: new Date(input.startDate),
-      endDate: new Date(input.endDate),
-      filters: input.filters,
-      after: input.after,
+    const statement = feedbacksPageRead({
+      ...this.costRead(input),
+      ...(input.after ? { after: input.after } : {}),
       limit: input.limit,
     });
     try {
-      const result = await client.query({
-        query: built.sql,
-        query_params: built.params,
-        format: "JSONEachRow",
-        clickhouse_settings: ANALYTICS_CLICKHOUSE_SETTINGS,
-      });
-      const fetched = feedbackPageRowsSchema.parse(await result.json());
+      const fetched = feedbackPageRowsSchema.parse(await this.sent(statement));
       return {
         rows: fetched.slice(0, input.limit).map((row) => ({
           event: toFeedbackEvent(row, input.projectId),
@@ -307,6 +283,28 @@ export class ClickHouseAnalyticsRepository extends AnalyticsRepository {
       );
       throw error;
     }
+  }
+
+  /**
+   * A cost read's scope, window and filters. The proof must be for the input's project, so a
+   * read cannot be asked under one project and run under another's.
+   */
+  private costRead(input: AnalyticsLegacyReadInput) {
+    const scope = tenantScope.fromProof({ authorization: input.authorization, reads: "cost" });
+    if (!scope.fence.own.includes(input.projectId)) {
+      throw new AnalyticsProofProjectMismatchError(input.projectId);
+    }
+    return {
+      scope,
+      window: { startMs: input.startDate, endMs: input.endDate },
+      filters: input.filters,
+    };
+  }
+
+  /** A built read's rows, its failures translated as the session translates them (ADR-045). */
+  private async sent(statement: ReaderReadStatement): Promise<unknown[]> {
+    const { rows } = await translatingQueryFailures(() => this.clickhouse.read({ statement }));
+    return rows;
   }
 
   /**

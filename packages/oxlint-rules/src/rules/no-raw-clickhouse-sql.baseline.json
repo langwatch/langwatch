@@ -3,7 +3,7 @@
   "findings": {
     "modules/analytics/process/src/repositories/clickhouse/clickhouse.aggregation-builder.mapper.ts": 10,
     "modules/analytics/process/src/repositories/clickhouse/clickhouse.analytics-session.repository.ts": 1,
-    "modules/analytics/process/src/repositories/clickhouse/clickhouse.analytics.repository.ts": 5,
+    "modules/analytics/process/src/repositories/clickhouse/clickhouse.analytics.repository.ts": 2,
     "modules/analytics/process/src/repositories/clickhouse/clickhouse.eval-rollup-timeseries-query.mapper.ts": 1,
     "modules/analytics/process/src/repositories/clickhouse/clickhouse.eval-slim-timeseries-query.mapper.ts": 1,
     "modules/analytics/process/src/repositories/clickhouse/clickhouse.filter-options.repository.ts": 1,

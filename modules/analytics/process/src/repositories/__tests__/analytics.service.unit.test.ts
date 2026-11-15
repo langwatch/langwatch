@@ -546,10 +546,11 @@ describe("AnalyticsService", () => {
       totalUniqueDocuments: 7,
     });
     expect(calls).toHaveLength(2);
+    // Built reads carry their settings in the statement's SETTINGS clause.
     for (const call of calls) {
-      expect(call.clickhouse_settings).toMatchObject({
-        max_bytes_before_external_group_by: 500_000_000,
-      });
+      expect(String(call.query)).toMatch(
+        /SETTINGS .*max_bytes_before_external_group_by = 500000000/s,
+      );
     }
   });
 
