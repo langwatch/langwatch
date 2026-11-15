@@ -6,6 +6,7 @@
 import {
   activeTraceContext,
   HandledError,
+  PROVIDER_UNSUPPORTED_PARAMETER_REASONS,
   type SerializedHandledError,
 } from "@langwatch/handled-error";
 
@@ -125,12 +126,13 @@ export class LangyWorkerStoppedError extends HandledError {
 export class LangyAgentErroredError extends HandledError {
   declare readonly code: "langy_agent_errored";
 
-  constructor(options: { reasons?: readonly Error[] } = {}) {
+  constructor(options: { reasons?: readonly Error[]; fault?: "provider" | "platform" } = {}) {
     super("langy_agent_errored", "agent reported the turn failed", {
       httpStatus: 502,
       // The agent answered deterministically — typically its LLM call was
-      // rejected by the provider or gateway.
-      fault: "provider",
+      // rejected by the provider or gateway. A provider refusing a setting the platform
+      // itself sent is the platform's fault (#9442).
+      fault: options.fault ?? "provider",
       ...remediation("langy_agent_errored"),
       reasons: options.reasons,
     });
@@ -272,7 +274,13 @@ export class LangyTurnErrors {
       }
 
       if (cause.code === "agent_error") {
-        return new LangyAgentErroredError({ reasons });
+        const refusedOurSetting = [...PROVIDER_UNSUPPORTED_PARAMETER_REASONS].some((reason) =>
+          LangyTurnErrors.domainErrorChainHas(cause, reason),
+        );
+        return new LangyAgentErroredError({
+          reasons,
+          ...(refusedOurSetting ? { fault: "platform" as const } : {}),
+        });
       }
     }
 
