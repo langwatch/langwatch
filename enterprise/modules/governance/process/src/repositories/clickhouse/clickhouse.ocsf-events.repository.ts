@@ -290,7 +290,8 @@ export class ClickHouseOcsfEventsRepository
    * SIEM forwarding pull: the latest version of each (TenantId, EventId), EventTime ASC.
    * The plain `EventTime >=` prunes partitions (the tuple cursor alone prunes none) and
    * implies nothing the tuple does not. The dedup set holds the page's keys only, and each
-   * key's EventTime prunes the payload read to the page's months. Spec: ocsf-event-pages.feature
+   * key's EventTime prunes the payload read to the page's months.
+   * Spec: enterprise/modules/governance/specs/ocsf-event-pages.feature
    */
   async findAll(input: FindOcsfEventsInput): Promise<GovernanceOcsfExportRow[]> {
     const client = await this.resolveClient(input.tenantId);

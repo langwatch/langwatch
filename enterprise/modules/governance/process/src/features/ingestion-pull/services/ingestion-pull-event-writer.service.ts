@@ -12,6 +12,7 @@ import type {
 import type { IngestionSourceRepository } from "../../../repositories/ingestion-source.repository.ts";
 import { azureBillSourceId } from "../../microsoft/rules/azure-bill-identity.rules.ts";
 import { mapToOcsfRow } from "../rules/ocsf-pull-event-mapping.rules.ts";
+import { earliestOf, latestOf } from "../rules/page-extremes.rules.ts";
 import type { IngestionPullDiagnosticsSink } from "./ingestion-pull-log.service.ts";
 import type {
   GovernanceProjectDirectory,
@@ -27,15 +28,6 @@ import type { PulledUsageRecordService } from "./pulled-usage-record.service.ts"
  */
 function lastCopyOfEachEvent(rows: GovernanceOcsfEventInput[]): GovernanceOcsfEventInput[] {
   return [...new Map(rows.map((row) => [row.eventId, row])).values()];
-}
-
-/** Loops, not `Math.min(...values)`: a spread of a large page throws a RangeError. */
-function earliest(values: number[]): number {
-  return values.reduce((low, value) => (value < low ? value : low), Infinity);
-}
-
-function latest(values: number[]): number {
-  return values.reduce((high, value) => (value > high ? value : high), -Infinity);
 }
 
 export type UnpricedWindowStore = Pick<
@@ -90,18 +82,7 @@ export class IngestionPullEventWriterService {
     });
     const recordCost = await this.usageEntitlement.isEnabled(input.source.organizationId);
     const observedAt = Temporal.Instant.fromEpochMilliseconds(this.now());
-    await this.sink.insertEvents(
-      lastCopyOfEachEvent(
-        input.events.map((event) =>
-          mapToOcsfRow({
-            event,
-            tenantId: project.id,
-            ingestionSourceId: input.source.id,
-            sourceType: input.source.sourceType,
-          }),
-        ),
-      ),
-    );
+    await this.writeAuditRows({ events: input.events, source: input.source, tenantId: project.id });
     for (const event of input.events) {
       if (!input.pulledUsage) {
         continue;
@@ -163,6 +144,27 @@ export class IngestionPullEventWriterService {
     return { droppedPeriodsMs, recordedPeriodsMs };
   }
 
+  /** The page's OCSF audit rows, in one `insertEvents` call (the sink chunks it). */
+  private async writeAuditRows({
+    events,
+    source,
+    tenantId,
+  }: {
+    events: NormalizedPullEvent[];
+    source: GovernanceIngestionSource;
+    tenantId: string;
+  }): Promise<void> {
+    const rows = events.map((event) =>
+      mapToOcsfRow({
+        event,
+        tenantId,
+        ingestionSourceId: source.id,
+        sourceType: source.sourceType,
+      }),
+    );
+    await this.sink.insertEvents(lastCopyOfEachEvent(rows));
+  }
+
   /**
    * ADR-088: a dropped price widens the source's unpriced window; a complete re-read
    * reaching back across its start clears it. A truncated one never does.
@@ -181,8 +183,8 @@ export class IngestionPullEventWriterService {
     if (droppedPeriodsMs.length === 0 && recordedPeriodsMs.length === 0) return;
     const window = await this.unpricedWindows.getUnpricedUsageWindow(source.id);
     if (droppedPeriodsMs.length > 0) {
-      const since = earliest(droppedPeriodsMs);
-      const through = latest(droppedPeriodsMs);
+      const since = earliestOf(droppedPeriodsMs);
+      const through = latestOf(droppedPeriodsMs);
       const widened = {
         since: Temporal.Instant.fromEpochMilliseconds(
           window.since ? Math.min(window.since.epochMilliseconds, since) : since,
@@ -207,7 +209,7 @@ export class IngestionPullEventWriterService {
 
     const gapStart = window.since;
     if (!gapStart || recordedPeriodsMs.length === 0) return;
-    if (earliest(recordedPeriodsMs) > gapStart.epochMilliseconds) return;
+    if (earliestOf(recordedPeriodsMs) > gapStart.epochMilliseconds) return;
     if (completeness === "truncated") {
       this.diagnostics.info(
         "a re-read reached back across the unpriced window but stopped short of its end; the window is kept",

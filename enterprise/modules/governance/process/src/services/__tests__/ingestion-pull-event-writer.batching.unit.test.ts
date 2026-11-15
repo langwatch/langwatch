@@ -13,14 +13,17 @@
 import type {
   GovernanceIngestionSource,
   NormalizedPullEvent,
-  PullResult,
 } from "@langwatch/enterprise-governance-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { clickHouseClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { describe, expect, it } from "vitest";
 
-import { pullReadThrough } from "../../features/ingestion-pull/rules/pull-read-through.rules.ts";
 import { IngestionPullEventWriterService } from "../../features/ingestion-pull/services/ingestion-pull-event-writer.service.ts";
 import { silentIngestionPullDiagnostics } from "../../features/ingestion-pull/services/ingestion-pull-log.service.ts";
+import type {
+  GovernanceProjectDirectory,
+  PulledUsageEntitlements,
+} from "../../features/ingestion-pull/services/ingestion-pull-worker.service.ts";
 import { PulledUsagePricingService } from "../../features/ingestion-pull/services/pulled-usage-pricing.service.ts";
 import { PulledUsageRecordService } from "../../features/ingestion-pull/services/pulled-usage-record.service.ts";
 import { ClickHouseOcsfEventsRepository } from "../../repositories/clickhouse/clickhouse.ocsf-events.repository.ts";
@@ -78,7 +81,7 @@ function writerOverClickHouse() {
     },
   });
   const writer = IngestionPullEventWriterService.create({
-    projects: {
+    projects: createApiFixture<GovernanceProjectDirectory>({
       ensureInternal: async () => ({
         id: "gov-proj-batch",
         name: "governance",
@@ -88,9 +91,9 @@ function writerOverClickHouse() {
         archivedAtMs: null,
         traceSharingEnabled: false,
       }),
-    },
+    }),
     sink: ClickHouseOcsfEventsRepository.create(async () => client),
-    usageEntitlement: { isEnabled: async () => false },
+    usageEntitlement: createApiFixture<PulledUsageEntitlements>({ isEnabled: async () => false }),
     usageRecords: PulledUsageRecordService.create(
       PulledUsagePricingService.create({ rate: () => ({ costNanoUsd: 0, rateVersion: "test" }) }),
     ),
@@ -162,19 +165,5 @@ describe("a pulled page too large to spread into Math.min", () => {
     });
 
     expect(widened).toEqual([{ since: START_MS, through: START_MS + PAGE - 1 }]);
-  });
-
-  /** @scenario "A pulled page too large to spread into Math.min still finds its unpriced window" */
-  it("reads through to the newest pulled event", { timeout: 60_000 }, () => {
-    const result: PullResult = {
-      events: Array.from({ length: PAGE }, (_, index) => pulledEvent(index)),
-      cursor: null,
-      errorCount: 0,
-    };
-
-    expect(pullReadThrough({ result, nowMs: 0 })).toEqual({
-      outcome: "read-through",
-      at: START_MS + (PAGE - 1) * 1_000,
-    });
   });
 });

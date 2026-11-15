@@ -28,7 +28,7 @@ Feature: governance_ocsf_events pages cost the page
       Given a pull run dropped the price of 200,000 events
       When the run records its unpriced window and how far it read
       Then the window spans the earliest to the latest dropped event
-      And the read-through is the newest event's time
+      And the newest of the page's times is found the same way, without a RangeError
 
   Rule: a SIEM export page costs the page, not the tenant's history
 
@@ -56,3 +56,10 @@ Feature: governance_ocsf_events pages cost the page
       Given a source holds six months of pulled OCSF events with their payloads
       When the activity drawer reads its newest page of pulled events
       Then ClickHouse reads less than half the payload bytes the source stores
+
+    @integration
+    Scenario: A rewritten pulled event appears once in the activity drawer, at its newest version
+      Given a pulled OCSF event was written twice, the second time with a new payload
+      When the activity drawer pages through the source's pulled events
+      Then the event appears on exactly one page
+      And it carries the second payload

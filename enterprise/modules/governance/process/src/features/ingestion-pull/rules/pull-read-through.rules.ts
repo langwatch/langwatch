@@ -3,6 +3,8 @@
 import type { PullResult } from "@langwatch/enterprise-governance-contract";
 import { Temporal } from "@langwatch/time";
 
+import { latestOf } from "./page-extremes.rules.ts";
+
 type PullReadThrough = { outcome: "read-through"; at: number } | { outcome: "read-nowhere" };
 
 /** A stamp with an offset, as epoch ms; none when it carries no offset or is malformed. */
@@ -46,11 +48,7 @@ export function pullReadThrough({
   const [stated] = result.readThroughAt === undefined ? [] : readableEpochMs(result.readThroughAt);
   if (stated !== undefined) return { outcome: "read-through", at: stated };
   const stamps = result.events.flatMap((event) => readableEpochMs(event.event_timestamp));
-  // A loop, not `Math.max(...stamps)`: a spread of a large page throws a RangeError.
-  if (stamps.length > 0) {
-    const newest = stamps.reduce((high, stamp) => (stamp > high ? stamp : high), -Infinity);
-    return { outcome: "read-through", at: newest };
-  }
+  if (stamps.length > 0) return { outcome: "read-through", at: latestOf(stamps) };
   if ((result.completeness ?? "complete") === "complete") {
     return { outcome: "read-through", at: nowMs };
   }
