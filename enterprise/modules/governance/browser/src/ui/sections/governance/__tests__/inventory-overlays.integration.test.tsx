@@ -11,13 +11,11 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { fakeGovernanceHost, renderWithGovernanceHost } from "../../../../testing.tsx";
-import {
-  type ComposerState,
-  SecretModal,
-  SourceComposerDrawer,
-  SourceEditDrawer,
-} from "../governance-inventory.screen.tsx";
 import type { Source } from "../ingestion-source-forms.ts";
+import { SourceComposerDrawer } from "../source-composer-drawer.tsx";
+import { type ComposerState } from "../source-composer-state.ts";
+import { SourceEditDrawer } from "../source-edit-drawer.tsx";
+import { SecretModal } from "../source-secret-modal.tsx";
 
 vi.mock("../../../../behavior/governance-api.ts", () => {
   const api = {

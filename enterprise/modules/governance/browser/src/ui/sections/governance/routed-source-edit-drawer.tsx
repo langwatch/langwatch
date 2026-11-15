@@ -13,8 +13,8 @@ import { useGovernanceToaster, useShowErrorToast } from "../../../behavior/gover
 import { useGovernanceScope } from "../../../behavior/governance-session.ts";
 import { useGovernanceHost } from "../../../model/governance-host.ts";
 import { PermissionRequiredNotice } from "../../elements/permission-required-notice.tsx";
-import { SourceEditDrawer } from "./governance-inventory.screen.tsx";
 import { useDestinationContext } from "./ingestion-source-forms.ts";
+import { SourceEditDrawer } from "./source-edit-drawer.tsx";
 
 /**
  * An address can open this drawer for anyone and at any moment: a shared link,

@@ -12,14 +12,15 @@ import { describe, expect, it } from "vitest";
 import { recordingGovernanceToaster } from "../../../../testing.tsx";
 import {
   buildCopilotStudioDataversePullConfig,
-  buildEditSubmission,
-  type ComposerState,
-  editSourceNotes,
-  isEditablePullSource,
-  lockedParserKeys,
   normalizeEnvironmentUrl,
+} from "../pull-config-builders.ts";
+import { type ComposerState } from "../source-composer-state.ts";
+import { editSourceNotes, lockedParserKeys } from "../source-edit-drawer.tsx";
+import {
+  buildEditSubmission,
+  isEditablePullSource,
   seedComposerParserConfig,
-} from "../governance-inventory.screen.tsx";
+} from "../source-submission.ts";
 
 const ENVIRONMENT = "https://org12345.crm.dynamics.com";
 const AGENT = "aaaaaaaa-0000-4000-8000-000000000001";

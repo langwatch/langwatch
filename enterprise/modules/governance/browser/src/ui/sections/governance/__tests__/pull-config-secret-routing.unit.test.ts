@@ -5,12 +5,12 @@
 import { describe, expect, it } from "vitest";
 
 import { SOURCE_TYPE_OPTIONS } from "../../../../features/ingestion-sources/model/ingestion-source-catalog.ts";
+import { PARSER_FIELDS } from "../parser-fields.ts";
 import {
   buildClaudeCompliancePullConfig,
-  PARSER_FIELDS,
   SOURCE_TYPES_WITH_PULL_CONFIG_BUILDER,
-  type ComposerState,
-} from "../governance-inventory.screen.tsx";
+} from "../pull-config-builders.ts";
+import { type ComposerState } from "../source-composer-state.ts";
 
 function composer(parserConfig: Record<string, string>): ComposerState {
   return {

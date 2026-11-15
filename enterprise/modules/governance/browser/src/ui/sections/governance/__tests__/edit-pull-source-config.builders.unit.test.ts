@@ -24,11 +24,8 @@ import { describe, expect, it } from "vitest";
 
 import { recommendedPullSchedule } from "../../../../features/ingestion-sources/model/pull-cadence.ts";
 import { recordingGovernanceToaster } from "../../../../testing.tsx";
-import {
-  buildAnthropicAdminPullConfig,
-  buildEditedParserConfig,
-  buildEditSubmission,
-} from "../governance-inventory.screen.tsx";
+import { buildAnthropicAdminPullConfig } from "../pull-config-builders.ts";
+import { buildEditedParserConfig, buildEditSubmission } from "../source-submission.ts";
 import { composer } from "./edit-pull-source-config.fixture.ts";
 
 describe("buildAnthropicAdminPullConfig on the edit path", () => {

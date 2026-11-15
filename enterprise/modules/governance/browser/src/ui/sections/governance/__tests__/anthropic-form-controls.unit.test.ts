@@ -31,19 +31,19 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   ANTHROPIC_BUCKET_WIDTHS,
-  buildAnthropicAdminPullConfig,
-  type ComposerState,
   dateInputValue,
   defaultParserValues,
   fieldControl,
   missingRequiredParserFieldKeys,
   PARSER_FIELDS,
   reconcileParserValues,
-  seedComposerParserConfig,
   switchFieldIsOn,
   switchReadOnlyLabel,
   visibleParserFields,
-} from "../governance-inventory.screen.tsx";
+} from "../parser-fields.ts";
+import { buildAnthropicAdminPullConfig } from "../pull-config-builders.ts";
+import { type ComposerState } from "../source-composer-state.ts";
+import { seedComposerParserConfig } from "../source-submission.ts";
 
 const fieldFor = (key: string) => {
   const field = PARSER_FIELDS.anthropic_admin.find((f) => f.key === key);

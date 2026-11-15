@@ -4,11 +4,8 @@
 
 import { describe, expect, it } from "vitest";
 
-import {
-  buildParserConfig,
-  isSecretFieldKey,
-  PARSER_FIELDS,
-} from "../governance-inventory.screen.tsx";
+import { isSecretFieldKey, PARSER_FIELDS } from "../parser-fields.ts";
+import { buildParserConfig } from "../source-submission.ts";
 
 // Every FieldDef declared `secret: true` across every source type, flattened
 // for iteration. This is the same shape `isSecretFieldKey` builds its
