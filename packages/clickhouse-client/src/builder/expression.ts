@@ -246,7 +246,13 @@ export type ExpressionNode =
       readonly left: ExpressionNode;
       readonly right: ExpressionNode;
     }
-  | { readonly kind: "in"; readonly left: ExpressionNode; readonly set: ExpressionNode }
+  | {
+      readonly kind: "in";
+      readonly left: ExpressionNode;
+      readonly set: ExpressionNode;
+      /** `left NOT IN (SELECT …)`: only a read's `within` sets it, on a scoped subquery. */
+      readonly negated?: boolean;
+    }
   | { readonly kind: "cte"; readonly name: string }
   | {
       readonly kind: "logic";
@@ -814,7 +820,9 @@ function inText({
   render: (inner: ExpressionNode) => string;
 }): string {
   // A subquery renders its own parentheses: `x IN ((SELECT …))` would read one tuple, not a set.
-  if (node.set.kind === "scalar") return `${render(node.left)} IN ${render(node.set)}`;
+  if (node.set.kind === "scalar") {
+    return `${render(node.left)} ${node.negated === true ? "NOT IN" : "IN"} ${render(node.set)}`;
+  }
   if (node.set.kind !== "cte") return `${render(node.left)} IN (${render(node.set)})`;
   if (!context.ctes.visible.has(node.set.name))
     throw new QueryBuilderError({ kind: "unknown-cte", name: node.set.name });

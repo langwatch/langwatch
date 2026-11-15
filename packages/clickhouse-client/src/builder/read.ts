@@ -155,11 +155,19 @@ type NoCtes = Record<never, never>;
  * The table kinds a scope reads: server metadata its system tables, all tenants also the system
  * identity's, every other scope tenant tables and rows.
  */
-type KindFor<Scope extends TenantScope> = Scope extends ServerMetadataScope
-  ? "system"
-  : Scope extends AllTenantsScope
-    ? "tenant" | "rows" | "systemIdentity"
-    : "tenant" | "rows";
+type KindFor<Scope extends TenantScope> = KindsByScope[Scope["kind"]];
+
+/**
+ * An indexed type, not a conditional: for a generic `S extends ReaderScope` it resolves to what
+ * every reader kind reads, so a scope-generic caller's `from` takes a tenant table uncast.
+ */
+type KindsByScope = {
+  proof: "tenant" | "rows";
+  single: "tenant" | "rows";
+  set: "tenant" | "rows";
+  allTenants: "tenant" | "rows" | "systemIdentity";
+  serverMetadata: "system";
+};
 
 /** A read used as a table: its selected keys, typed by the values they hold. */
 export type DerivedColumns<Row> = { readonly [Key in keyof Row & string]: ColumnType<Row[Key]> };
@@ -365,12 +373,14 @@ export type ReadOps<
   /**
    * `left IN (SELECT …)` under this read's scope: the inner read names a tenant table, so its
    * text carries the predicate, and selects one column per element of a tuple `left`.
+   * `negated` writes `NOT IN`, which leaves the inner predicate unnegated, as `cond.not` cannot.
    */
   within: <V, T extends Tables, SubRow extends Record<string, unknown>, SubTables extends string>(
     left: Expression<V, T>,
     build: (
       sub: ClickHouseReadStart<Scope, Ctes>,
     ) => ClickHouseRead<Scope, SubTables, SubRow, Ctes>,
+    options?: { negated?: boolean },
   ) => Condition;
 };
 
@@ -416,7 +426,7 @@ export class ClickHouseRead<
         `(${renderStatement({ state: read, context, nested: true, keys: undefined })})`;
       return expression({ kind: "scalar", render }, only.binding);
     };
-    const within: ReadOps<Scope, Tables, Ctes>["within"] = (left, build) => {
+    const within: ReadOps<Scope, Tables, Ctes>["within"] = (left, build, options) => {
       const read = subquery(build);
       const arity =
         left.node.kind === "call" && left.node.name === "tuple" ? left.node.args.length : 1;
@@ -428,7 +438,9 @@ export class ClickHouseRead<
         });
       }
       const render = (context: RenderContext) => `(${scopedSubquery({ read, context })})`;
-      return expression<boolean>({ kind: "in", left: left.node, set: { kind: "scalar", render } });
+      const set = { kind: "scalar", render } as const;
+      const negated = options?.negated === true;
+      return expression<boolean>({ kind: "in", left: left.node, set, negated });
     };
     return { ...conditionOpsFor<Tables, Ctes>(), scalar, within };
   }

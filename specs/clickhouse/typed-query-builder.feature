@@ -631,3 +631,24 @@ Feature: A typed ClickHouse read builder renders the tenant predicate and the te
     When the set subquery, the full join, the zoned buckets, the percentiles, the day offset, the token sum and the JSON paths are built and sent
     Then each returns the rows main's raw text returns, under the tenant's setting and under every tenant's
     And an unscoped subquery admits the other tenant's keys where the built set does not
+
+  @unit
+  Scenario: A scope-generic caller reads a tenant table without a cast
+    Given a filter compiler typed over any reader scope, as trace's is
+    When it starts a read or a set subquery from a tenant table
+    Then the table is accepted without a cast, as it is for a concrete reader scope
+    And a start whose scope may be server metadata still refuses a tenant table
+
+  @unit
+  Scenario: A negated set subquery writes NOT IN and keeps the inner predicate
+    Given main's negated filters, which write left NOT IN (SELECT …)
+    When the read tests membership with within, negated
+    Then it renders NOT IN, the inner read carrying its own tenant predicate unnegated, and the tenant guard accepts it where NOT (… IN (SELECT …)) is refused
+    And under a proof the inner read holds the share's windows on its own time column, an inner read naming no window treatment is refused, and what within refuses stays refused
+
+  @integration
+  Scenario: A negated set subquery keeps tenancy on 26.8
+    Given ClickHouse 26.8, the reader identity, and another tenant's spans on the same trace ids
+    When a negated set subquery is built and sent, single-tenant and under a proof with a share window
+    Then it returns only the tenant's own traces without a matching span, under the tenant's setting and under every tenant's
+    And a span outside the share's window does not decide whether a shared trace matches
