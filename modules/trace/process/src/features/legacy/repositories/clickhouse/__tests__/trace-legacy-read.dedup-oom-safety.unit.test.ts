@@ -7,8 +7,12 @@ import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { describe, expect, it } from "vitest";
 
+import { TraceCanonicalisationService } from "#features/derivation/services/trace-canonicalisation.service";
+
 import { ownProof } from "../../../../../__tests__/support/authorization-proofs.fixture.ts";
+import { traceSummaryRow } from "../../../../../repositories/clickhouse/__tests__/support/trace-summary-row.support.ts";
 import { SpanStorageClickHouseRepository } from "../../../../../repositories/clickhouse/span-storage.repository.ts";
+import { mappedLegacyRead } from "./support/legacy-trace-mapping.support.ts";
 
 /** Read source file once and extract a named method body. */
 function extractMethodBody(source: string, methodName: string): string {
@@ -94,35 +98,58 @@ describe("trace dedup OOM safety", () => {
   // clickhouse-trace.service.ts: fetchTracesWithSpansJoined
   // ---------------------------------------------------------------------------
   describe("fetchTracesWithSpansJoined()", () => {
-    const summaryReadBody = extractMethodBody(traceServiceSource, "readJoinedSummaryRows");
-    const spanReadBody = extractMethodBody(traceServiceSource, "readJoinedSpanRows");
-    const body =
-      extractMethodBody(traceServiceSource, "fetchTracesWithSpansJoined") +
-      extractMethodBody(traceServiceSource, "readJoinedTraceBatch") +
-      summaryReadBody +
-      spanReadBody;
+    /** The joined read's built summary and span statements, as the page read sends them. */
+    async function joinedSql(): Promise<{ summary: string; spans: string }> {
+      const statements: string[] = [];
+      const service = mappedLegacyRead({
+        reader: clickHouseQueryClientDouble({
+          async read(request: Parameters<ClickHouseQueryClient["read"]>[0]) {
+            statements.push(request.statement.sql);
+            const sql = request.statement.sql;
+            return { rows: sql.includes("AS ts_SpanCount") ? [traceSummaryRow({})] : [] };
+          },
+        }),
+        resolveClickHouseClient: () =>
+          Promise.reject(new Error("a built read never reaches the raw client")),
+        traceCanonicalisation: TraceCanonicalisationService.create(),
+      });
+      await service.findTracesWithSpans({
+        authorization: ownProof({ projectId: "project-1" }),
+        projectId: "project-1",
+        traceIds: ["trace-1"],
+        protections: { canSeeCosts: true, canSeeCapturedInput: true, canSeeCapturedOutput: true },
+        occurredAt: { from: 1_000_000, to: 2_000_000 },
+      });
+      const summary = statements.find((sql) => sql.includes("AS ts_SpanCount"));
+      const spans = statements.find((sql) => sql.includes("FROM stored_spans"));
+      if (summary === undefined || spans === undefined) {
+        throw new Error("fixture: the joined read sent no summary or no span statement");
+      }
+      return { summary, spans };
+    }
 
-    describe("when the trace summary query SQL is inspected", () => {
-      it("does not use LIMIT 1 BY for trace_summaries dedup", () => {
-        // The body may still contain LIMIT 200 BY TraceId for spans,
-        // but must not contain LIMIT 1 BY anywhere.
-        expect(body).not.toContain("LIMIT 1 BY");
+    describe("when the trace summary statement is inspected", () => {
+      it("does not use LIMIT 1 BY for trace_summaries dedup", async () => {
+        expect((await joinedSql()).summary).not.toContain("LIMIT 1 BY");
       });
 
-      it("uses max(UpdatedAt) GROUP BY for trace dedup", () => {
-        expect(summaryReadBody).toContain("max(UpdatedAt)");
-        expect(summaryReadBody).toMatch(/GROUP BY\s+TenantId,\s*TraceId/);
+      it("uses max(UpdatedAt) GROUP BY for trace dedup", async () => {
+        const { summary } = await joinedSql();
+        expect(summary).toContain("max(UpdatedAt)");
+        expect(summary).toMatch(/GROUP BY\s+TenantId,\s*TraceId\)/);
       });
     });
 
-    describe("when the stored_spans query SQL is inspected", () => {
-      it("does not use SELECT * from stored_spans", () => {
-        expect(body).not.toMatch(/SELECT\s+\*\s+FROM\s+stored_spans/i);
+    describe("when the stored_spans statement is inspected", () => {
+      it("does not use SELECT * from stored_spans", async () => {
+        expect((await joinedSql()).spans).not.toMatch(/SELECT\s+\*/i);
       });
 
-      it("uses max(UpdatedAt) GROUP BY for span dedup", () => {
-        expect(body).toContain("max(UpdatedAt)");
-        expect(spanReadBody).toMatch(/GROUP BY\s+TenantId,\s*TraceId,\s*SpanId/);
+      it("elects each span by an IN-tuple GROUP BY, never LIMIT 1 BY", async () => {
+        const { spans } = await joinedSql();
+        expect(spans).not.toContain("LIMIT 1 BY");
+        expect(spans).toMatch(/\(TenantId, TraceId, SpanId, StartTime\) IN/);
+        expect(spans).toMatch(/GROUP BY\s+TenantId,\s*TraceId,\s*SpanId/);
       });
     });
   });

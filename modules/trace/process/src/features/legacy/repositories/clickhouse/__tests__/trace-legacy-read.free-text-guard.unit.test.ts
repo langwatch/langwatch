@@ -183,7 +183,7 @@ describe("TraceLegacyReadClickHouseRepository free-text search", () => {
 
       expect(page.groups.flat().map((trace) => trace.trace_id)).toEqual(["trace-1"]);
       const statements = query.mock.calls.map(([statement]) => statement.query);
-      expect(statements.some((sql) => sql.includes("FROM stored_spans AS t"))).toBe(true);
+      expect(statements.some((sql) => sql.includes("FROM stored_spans WHERE"))).toBe(true);
       expect(statements.some((sql) => sql.includes("FROM evaluation_runs"))).toBe(true);
       expect(guardRefusals(query.mock.calls)).toEqual([]);
     });

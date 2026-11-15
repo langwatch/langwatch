@@ -110,7 +110,7 @@ function makeSpanRowWithEventRef(traceId: string, spanId: string) {
     ParentIsRemote: null,
     Sampled: true,
     StartTimeMs: Date.now(),
-    EndTime: Date.now() + 100,
+    EndTimeMs: Date.now() + 100,
     DurationMs: 100,
     SpanName: "llm-call",
     SpanKind: 1,

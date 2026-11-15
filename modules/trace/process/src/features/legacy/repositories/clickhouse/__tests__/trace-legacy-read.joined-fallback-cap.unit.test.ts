@@ -65,7 +65,7 @@ function spanRow({ traceId, spanIndex }: { traceId: string; spanIndex: number })
     ParentIsRemote: null,
     Sampled: 1,
     StartTimeMs: String(OCCURRED_AT),
-    EndTime: String(OCCURRED_AT + 1),
+    EndTimeMs: String(OCCURRED_AT + 1),
     DurationMs: "1",
     SpanName: "span",
     SpanKind: 1,
@@ -84,6 +84,14 @@ function spanRow({ traceId, spanIndex }: { traceId: string; spanIndex: number })
   };
 }
 
+/** A built read's query-level `SETTINGS` clause, as the server would apply it. */
+function settingsClauseOf(query: string): Record<string, string> {
+  const clause = /\bSETTINGS (.+)$/.exec(query)?.[1] ?? "";
+  return Object.fromEntries(
+    [...clause.matchAll(/(\w+) = '?([^',]+)'?/g)].map(([, key, value]) => [key!, value!]),
+  );
+}
+
 /** Refuses the first whole-list span read for memory (triggering the
  * fallback), then serves each batched retry. spanRowsServed records what
  * actually crossed the socket for heap assertions. */
@@ -95,25 +103,24 @@ function clickHouseThatOOMsThenBatches({ spansPerTrace }: { spansPerTrace: numbe
   mockClickHouseQuery.mockImplementation(
     async (args: {
       query: string;
-      query_params?: { traceIds?: string[] };
+      query_params?: Record<string, unknown>;
       clickhouse_settings?: Record<string, unknown>;
     }) => {
-      const ids = args.query_params?.traceIds ?? [];
+      // The built reads bind the trace ids under a generated name; the tenant list is the fence's.
+      const ids = (Object.entries(args.query_params ?? {}).find(
+        ([name, value]) => !name.startsWith("tenantScope") && Array.isArray(value),
+      )?.[1] ?? []) as string[];
       if (args.query.includes("FROM stored_spans")) {
         if (!refusedOnce) {
           refusedOnce = true;
           throw new Error("Code: 241. DB::Exception: MEMORY_LIMIT_EXCEEDED");
         }
-        spanReadSettings.push(args.clickhouse_settings ?? {});
+        const settings = { ...args.clickhouse_settings, ...settingsClauseOf(args.query) };
+        spanReadSettings.push(settings);
 
         const rowCount = ids.length * spansPerTrace;
-        const maxResultRows = Number(
-          args.clickhouse_settings?.max_result_rows ?? Number.POSITIVE_INFINITY,
-        );
-        if (
-          args.clickhouse_settings?.result_overflow_mode === "throw" &&
-          rowCount > maxResultRows
-        ) {
+        const maxResultRows = Number(settings.max_result_rows ?? Number.POSITIVE_INFINITY);
+        if (settings.result_overflow_mode === "throw" && rowCount > maxResultRows) {
           throw new Error(
             "Code: 396. DB::Exception: Limit for result exceeded: " + "TOO_MANY_ROWS_OR_BYTES",
           );
@@ -129,7 +136,7 @@ function clickHouseThatOOMsThenBatches({ spansPerTrace }: { spansPerTrace: numbe
             ),
         };
       }
-      if (args.query.includes("trace_summaries")) {
+      if (args.query.includes("AS ts_SpanCount")) {
         return { json: async () => ids.map(summaryRow) };
       }
       return { json: async () => [] };

@@ -112,11 +112,26 @@ function matchRows({
   summaries: ReturnType<typeof summaryRow>[];
 }) {
   if (query.includes("AS fromMs")) return [resolved];
-  if (query.includes("FROM trace_summaries AS t")) return summaries;
-  if (query.includes("FROM stored_spans AS t")) return [];
+  if (query.includes("FROM trace_summaries WHERE")) return summaries;
+  if (query.includes("FROM stored_spans WHERE")) return [];
   throw new Error(
     `fixture: fetchTracesWithSpansJoined issued a read this fixture does not know: ${query}`,
   );
+}
+
+/** The `[from, to]` bound a built read put on `column`, read back from its parameters. */
+function windowOf(
+  read: { query: string; query_params?: Record<string, unknown> },
+  column: string,
+): { fromMs: number; toMs: number } | undefined {
+  const bound = new RegExp(
+    `\\b${column} >= fromUnixTimestamp64Milli\\(\\{(\\w+):Int64\\}\\) AND ${column} <= fromUnixTimestamp64Milli\\(\\{(\\w+):Int64\\}\\)`,
+  ).exec(read.query);
+  if (!bound) return undefined;
+  return {
+    fromMs: Number(read.query_params?.[bound[1]!]),
+    toMs: Number(read.query_params?.[bound[2]!]),
+  };
 }
 
 /** Drives the read; a page with no summaries issues no span read at all. */
@@ -139,7 +154,7 @@ function findTraces(traceIds: string[]) {
 async function readTraces(traceIds: string[]) {
   await findTraces(traceIds);
   const spanCall = mockClickHouseQuery.mock.calls.find(([args]) =>
-    String(args.query).includes("FROM stored_spans AS t"),
+    String(args.query).includes("FROM stored_spans WHERE"),
   );
   if (!spanCall) {
     throw new Error(
@@ -163,11 +178,11 @@ describe("given a page of traces whose spans are read together", () => {
 
       const spanRead = await readTraces(["t1", "t2"]);
 
-      expect(spanRead.query).toContain("t.StartTime >=");
-      expect(spanRead.query).toContain("StartTime <=");
       const twoDaysMs = 2 * 24 * 60 * 60 * 1000;
-      expect(spanRead.query_params.fromMs).toBe(RECENT_MS - twoDaysMs);
-      expect(spanRead.query_params.toMs).toBe(RECENT_MS + twoDaysMs);
+      expect(windowOf(spanRead, "StartTime")).toEqual({
+        fromMs: RECENT_MS - twoDaysMs,
+        toMs: RECENT_MS + twoDaysMs,
+      });
     });
   });
 
@@ -183,15 +198,15 @@ describe("given a page of traces whose spans are read together", () => {
 
       const spanRead = await readTraces(["t1", "t2"]);
 
-      expect(spanRead.query).toContain("t.StartTime >=");
-      expect(spanRead.query).toContain("StartTime <=");
-      const fromMs = Number(spanRead.query_params.fromMs);
+      const window = windowOf(spanRead, "StartTime");
+      expect(window).toBeDefined();
+      const fromMs = window!.fromMs;
       const ninetyDaysMs = 90 * 24 * 60 * 60 * 1000;
       expect(fromMs).toBeGreaterThan(0);
       // The floor is `now - 90d`, and `now` is read when the query runs rather
       // than when this module loaded, so compare with a minute of slack.
       expect(Math.abs(NOW - ninetyDaysMs - fromMs)).toBeLessThan(60_000);
-      expect(Number(spanRead.query_params.toMs)).toBeGreaterThanOrEqual(NOW);
+      expect(window!.toMs).toBeGreaterThanOrEqual(NOW);
     });
   });
 
@@ -206,8 +221,10 @@ describe("given a page of traces whose spans are read together", () => {
       const spanRead = await readTraces(["t1", "t2"]);
 
       const twoDaysMs = 2 * 24 * 60 * 60 * 1000;
-      expect(spanRead.query_params.fromMs).toBe(RECENT_MS - twoDaysMs);
-      expect(spanRead.query_params.toMs).toBe(RECENT_MS + twoDaysMs);
+      expect(windowOf(spanRead, "StartTime")).toEqual({
+        fromMs: RECENT_MS - twoDaysMs,
+        toMs: RECENT_MS + twoDaysMs,
+      });
     });
   });
 });
@@ -236,7 +253,7 @@ describe("given the light resolve that bounds a hint-less batch read", () => {
 /** The summary read the service issued, located by its shape. */
 function summaryReadIssued() {
   const call = mockClickHouseQuery.mock.calls.find(([args]) =>
-    String(args.query).includes("FROM trace_summaries AS t"),
+    String(args.query).includes("AS ts_SpanCount"),
   );
   if (!call) {
     throw new Error("fixture: the service issued no trace_summaries read");
@@ -253,10 +270,7 @@ describe("given trace ids read by id alone", () => {
       await expect(findTraces(["missing-1"])).resolves.toBeDefined();
 
       const summaryRead = summaryReadIssued();
-      expect(summaryRead.query).toContain(
-        "t.OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})",
-      );
-      expect(summaryRead.query_params).toMatchObject({ fromMs: 0, toMs: 0 });
+      expect(windowOf(summaryRead, "OccurredAt")).toEqual({ fromMs: 0, toMs: 0 });
     });
   });
 
@@ -273,8 +287,7 @@ describe("given trace ids read by id alone", () => {
       await expect(findTraces(["t1"])).resolves.toBeDefined();
 
       const summaryRead = summaryReadIssued();
-      expect(summaryRead.query).not.toContain("t.OccurredAt >=");
-      expect(summaryRead.query_params).not.toHaveProperty("fromMs");
+      expect(summaryRead.query).not.toContain("OccurredAt >=");
     });
   });
 });

@@ -95,7 +95,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
     ParentIsRemote: null,
     Sampled: true,
     StartTimeMs: Date.now(),
-    EndTime: Date.now() + 100,
+    EndTimeMs: Date.now() + 100,
     DurationMs: 100,
     SpanName: "test-span",
     SpanKind: 1,
@@ -1047,7 +1047,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
         // call is the point; a cap merely present somewhere protects nothing.
         const spanQuery = mockClickHouseQuery.mock.calls[4]?.[0];
         expect(spanQuery.query).toContain("FROM stored_spans");
-        expect(spanQuery.clickhouse_settings).toHaveProperty("max_memory_usage");
+        expect(spanQuery.query).toMatch(/\bSETTINGS .*\bmax_memory_usage = /);
       });
     });
   });
@@ -1139,8 +1139,8 @@ describe("TraceLegacyReadClickHouseRepository", () => {
         // 3 = spans batch1, 4 = summary batch2, 5 = spans batch2
         const batch1Summary = mockClickHouseQuery.mock.calls[2]![0];
         const batch2Summary = mockClickHouseQuery.mock.calls[4]![0];
-        expect(batch1Summary.query_params.traceIds).toHaveLength(25);
-        expect(batch2Summary.query_params.traceIds).toHaveLength(5);
+        expect(boundIdsOf(batch1Summary)).toHaveLength(25);
+        expect(boundIdsOf(batch2Summary)).toHaveLength(5);
       });
 
       it("does not batch-retry non-OOM errors", async () => {
@@ -1202,8 +1202,10 @@ describe("TraceLegacyReadClickHouseRepository", () => {
         expect(
           summaryCall.query.match(/OccurredAt <= fromUnixTimestamp64Milli/g) ?? [],
         ).toHaveLength(2);
-        expect(summaryCall.query_params.fromMs).toBe(1_000_000 - TWO_DAYS_MS);
-        expect(summaryCall.query_params.toMs).toBe(2_000_000 + TWO_DAYS_MS);
+        expect(occurredWindowOf(summaryCall)).toEqual({
+          fromMs: 1_000_000 - TWO_DAYS_MS,
+          toMs: 2_000_000 + TWO_DAYS_MS,
+        });
       });
     });
 
@@ -1243,8 +1245,10 @@ describe("TraceLegacyReadClickHouseRepository", () => {
         expect(
           summaryCall.query.match(/OccurredAt >= fromUnixTimestamp64Milli/g) ?? [],
         ).toHaveLength(2);
-        expect(summaryCall.query_params.fromMs).toBe(1_000_000 - TWO_DAYS_MS);
-        expect(summaryCall.query_params.toMs).toBe(2_000_000 + TWO_DAYS_MS);
+        expect(occurredWindowOf(summaryCall)).toEqual({
+          fromMs: 1_000_000 - TWO_DAYS_MS,
+          toMs: 2_000_000 + TWO_DAYS_MS,
+        });
       });
 
       /** @scenario "Traces the resolve finds no filed summary for read only the epoch partition" */
@@ -1278,8 +1282,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
         expect(
           summaryCall.query.match(/OccurredAt >= fromUnixTimestamp64Milli/g) ?? [],
         ).toHaveLength(2);
-        expect(summaryCall.query_params.fromMs).toBe(0);
-        expect(summaryCall.query_params.toMs).toBe(0);
+        expect(occurredWindowOf(summaryCall)).toEqual({ fromMs: 0, toMs: 0 });
       });
 
       it("fails open to the unbounded read when the resolve query errors", async () => {
@@ -1310,11 +1313,33 @@ describe("TraceLegacyReadClickHouseRepository", () => {
         expect(traces).toHaveLength(1);
         const summaryCall = mockClickHouseQuery.mock.calls[1]![0];
         expect(summaryCall.query).not.toContain("OccurredAt >=");
-        expect(summaryCall.query_params.fromMs).toBeUndefined();
+        expect(occurredWindowOf(summaryCall)).toBeUndefined();
       });
     });
   });
 });
+
+type IssuedRead = { query: string; query_params?: Record<string, unknown> };
+
+/** The trace ids a built read bound, under its generated name (the tenant list is the fence's). */
+function boundIdsOf(read: IssuedRead): unknown[] | undefined {
+  return Object.entries(read.query_params ?? {}).find(
+    ([name, value]) => !name.startsWith("tenantScope") && Array.isArray(value),
+  )?.[1] as unknown[] | undefined;
+}
+
+/** The OccurredAt window a built summary read bound, read back from its parameters. */
+function occurredWindowOf(read: IssuedRead): { fromMs: number; toMs: number } | undefined {
+  const bound =
+    /OccurredAt >= fromUnixTimestamp64Milli\(\{(\w+):Int64\}\) AND OccurredAt <= fromUnixTimestamp64Milli\(\{(\w+):Int64\}\)/.exec(
+      read.query,
+    );
+  if (!bound) return undefined;
+  return {
+    fromMs: Number(read.query_params?.[bound[1]!]),
+    toMs: Number(read.query_params?.[bound[2]!]),
+  };
+}
 
 describe("isClickHouseMemoryLimitError", () => {
   // Two handled errors the resilient ClickHouse client raises, named here rather than imported

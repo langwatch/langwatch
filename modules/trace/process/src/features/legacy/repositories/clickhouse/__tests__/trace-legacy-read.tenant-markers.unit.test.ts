@@ -8,6 +8,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { TraceCanonicalisationService } from "#features/derivation/services/trace-canonicalisation.service";
+import { compileProjection } from "#features/projection/rules/trace-projection-compile.rules";
 
 import { ownProof } from "../../../../../__tests__/support/authorization-proofs.fixture.ts";
 import { traceSummaryRow } from "../../../../../repositories/clickhouse/__tests__/support/trace-summary-row.support.ts";
@@ -56,19 +57,32 @@ function harness() {
   return { read, statements, built, routedTo };
 }
 
-function expectFencedTo(statements: Statement[], projectId: string) {
-  expect(statements.length).toBeGreaterThan(0);
-  for (const statement of statements) {
-    expect(statement.query).not.toContain("{tenantId:String}");
-    expect(statement.query_params?.tenantId).toBeUndefined();
-    expect(statement.query_params?.tenantScope_own).toEqual([projectId]);
+/** Every read went out built under the proof's own project; no raw statement is left. */
+function expectBuiltFencedTo({
+  built,
+  statements,
+  projectId,
+}: {
+  built: ReadRequest[];
+  statements: Statement[];
+  projectId: string;
+}) {
+  expect(built.length).toBeGreaterThan(0);
+  for (const request of built) {
+    expect(request.statement).toMatchObject({
+      kind: "tenant",
+      tenantIds: [projectId],
+      settings: { SQL_langwatch_tenant_ids: projectId },
+    });
+    expect(request.statement.sql).not.toContain("{tenantId:String}");
   }
+  expect(statements).toEqual([]);
 }
 
 describe("TraceLegacyReadClickHouseRepository tenant markers", () => {
   describe("when traces are read by id", () => {
     it("fences every statement to the proof's own project", async () => {
-      const { read, statements, routedTo } = harness();
+      const { read, statements, built, routedTo } = harness();
 
       await read.findTracesWithSpans({
         authorization: ownProof({ projectId: PROJECT_ID }),
@@ -77,7 +91,7 @@ describe("TraceLegacyReadClickHouseRepository tenant markers", () => {
         protections: PROTECTIONS,
       });
 
-      expectFencedTo(statements(), PROJECT_ID);
+      expectBuiltFencedTo({ built, statements: statements(), projectId: PROJECT_ID });
       expect(new Set(routedTo)).toEqual(new Set([PROJECT_ID]));
     });
   });
@@ -123,7 +137,7 @@ describe("TraceLegacyReadClickHouseRepository tenant markers", () => {
       }
       expect(lookups[0]?.statement.sql).toMatch(/Attributes\[\{v\d+:String\}\] = /);
       expect(lookups[1]?.statement.sql).toMatch(/Attributes\[\{v\d+:String\}\] IN /);
-      expectFencedTo(statements(), PROJECT_ID);
+      expectBuiltFencedTo({ built, statements: statements(), projectId: PROJECT_ID });
     });
   });
 
@@ -165,9 +179,71 @@ describe("TraceLegacyReadClickHouseRepository tenant markers", () => {
     });
   });
 
+  describe("when a page's events are projected", () => {
+    it("builds the events read under the proof, electing on the event spans alone", async () => {
+      const query = vi.fn(async (statement: Statement) => ({
+        json: async (): Promise<unknown[]> => {
+          if (statement.query.includes("uniq(ts.TraceId)")) return [{ total: "1" }];
+          if (statement.query.includes("SELECT s.TraceId")) return [{ TraceId: "trace-1" }];
+          if (statement.query.includes("ts_SpanCount")) {
+            return [traceSummaryRow({ ts_OccurredAt: String(Date.now() - 60_000) })];
+          }
+          return [];
+        },
+      }));
+      const resolveClickHouseClient = async () =>
+        createApiFixture<TraceClickHouseClient>({ query });
+      const built: ReadRequest[] = [];
+      const builtReader = builtOver(resolveClickHouseClient);
+      const read = mappedLegacyRead({
+        resolveClickHouseClient,
+        reader: {
+          read: async (request) => {
+            built.push(request);
+            return builtReader.read(request);
+          },
+        },
+        traceCanonicalisation: TraceCanonicalisationService.create(),
+      });
+      const endDate = Date.now();
+
+      await read.listAllTracesForProject(
+        {
+          projectId: PROJECT_ID,
+          startDate: endDate - 86_400_000,
+          endDate,
+          pageSize: 10,
+          filters: {},
+        },
+        PROTECTIONS,
+        {
+          ownRead: ownProof({ projectId: PROJECT_ID }),
+          projection: compileProjection({
+            select: ["trace_id", "events.type"],
+            protections: PROTECTIONS,
+          }).plan,
+        },
+      );
+
+      const events = built.filter((request) => request.statement.sql.includes("mapFilter("));
+      expect(events).toHaveLength(1);
+      expect(events[0]?.table).toBe("stored_spans");
+      expect(events[0]?.statement).toMatchObject({
+        kind: "tenant",
+        tenantIds: [PROJECT_ID],
+        settings: { SQL_langwatch_tenant_ids: PROJECT_ID },
+      });
+      const sql = events[0]?.statement.sql ?? "";
+      // Main's election filtered on `event.type` too, in the outer read and its subquery.
+      expect(sql.match(/mapContains\(SpanAttributes, /g)).toHaveLength(2);
+      expect(sql).toMatch(/\(TenantId, TraceId, SpanId, UpdatedAt\) IN/);
+      expect(sql).toMatch(/LIMIT 1000 BY TraceId/);
+    });
+  });
+
   describe("when the proof names another project than the read", () => {
     it("reads only the proof's project", async () => {
-      const { read, statements } = harness();
+      const { read, statements, built } = harness();
 
       await read.findTracesWithSpans({
         authorization: ownProof({ projectId: "project-2" }),
@@ -176,7 +252,7 @@ describe("TraceLegacyReadClickHouseRepository tenant markers", () => {
         protections: PROTECTIONS,
       });
 
-      expectFencedTo(statements(), "project-2");
+      expectBuiltFencedTo({ built, statements: statements(), projectId: "project-2" });
     });
   });
 });

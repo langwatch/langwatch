@@ -9,8 +9,7 @@ import {
   queryWindowed,
   RetentionFloorService,
   type RetentionDaysProvider,
-  type TenantScopedReader,
-  tenantScope,
+  type WindowFragment,
 } from "@langwatch/clickhouse-client";
 import {
   clickhouseRead,
@@ -256,11 +255,6 @@ const EVENT_PARTITION_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
 /** Object keys that would corrupt the prototype chain if assigned. */
 const FORBIDDEN_SCORE_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 
-/**
- * Bounds the events stored_spans scan to the partitions the page's traces occurred in, clustered
- * into tight OR'd ranges so a page mixing old and recent traces doesn't scan every partition.
- */
-
 /** Adds the labels named by one `trace_summaries` row's `labels_json` value into `labelsSet`. */
 function addLabelsFromRow(labelsJson: string, labelsSet: Set<string>): void {
   try {
@@ -279,13 +273,12 @@ function addLabelsFromRow(labelsJson: string, labelsSet: Set<string>): void {
   }
 }
 
-function buildEventOccurrenceWindows(occurredAts: number[]): {
-  outer: string;
-  inner: string;
-  params: Record<string, number>;
-} {
-  if (occurredAts.length === 0) return { outer: "", inner: "", params: {} };
-
+/**
+ * Bounds the events stored_spans scan to the partitions the page's traces occurred in, clustered
+ * into tight ranges (OR'd by the read) so a page mixing old and recent traces doesn't scan every
+ * partition.
+ */
+function eventOccurrenceWindows(occurredAts: number[]): { from: number; to: number }[] {
   const sorted = [...occurredAts].toSorted((a, b) => a - b);
   // Merge points whose ±window ranges would overlap; split when farther apart.
   const clusterGap = 2 * EVENT_PARTITION_WINDOW_MS;
@@ -298,28 +291,10 @@ function buildEventOccurrenceWindows(occurredAts: number[]): {
       clusters.push({ from: ts, to: ts });
     }
   }
-
-  const params: Record<string, number> = {};
-  const outerParts: string[] = [];
-  const innerParts: string[] = [];
-  clusters.forEach((c, i) => {
-    const fromKey = `spanFrom${i}`;
-    const toKey = `spanTo${i}`;
-    params[fromKey] = c.from - EVENT_PARTITION_WINDOW_MS;
-    params[toKey] = c.to + EVENT_PARTITION_WINDOW_MS;
-    outerParts.push(
-      `(t.StartTime >= fromUnixTimestamp64Milli({${fromKey}:Int64}) AND t.StartTime <= fromUnixTimestamp64Milli({${toKey}:Int64}))`,
-    );
-    innerParts.push(
-      `(StartTime >= fromUnixTimestamp64Milli({${fromKey}:Int64}) AND StartTime <= fromUnixTimestamp64Milli({${toKey}:Int64}))`,
-    );
-  });
-
-  return {
-    outer: ` AND (${outerParts.join(" OR ")})`,
-    inner: ` AND (${innerParts.join(" OR ")})`,
-    params,
-  };
+  return clusters.map((c) => ({
+    from: c.from - EVENT_PARTITION_WINDOW_MS,
+    to: c.to + EVENT_PARTITION_WINDOW_MS,
+  }));
 }
 
 /**
@@ -711,32 +686,34 @@ function buildLatestVersionOnly(scrollStart: number | undefined): string {
 }
 
 /** Stored-span rows as the joined read selects them. */
-const joinedSpanRowSchema = z.looseObject({
-  SpanId: chString,
-  TraceId: chString,
-  TenantId: chString,
-  ParentSpanId: chString.nullable(),
-  ParentTraceId: chString.nullable(),
-  ParentIsRemote: chBoolean.nullable(),
-  Sampled: chBoolean,
-  StartTimeMs: chNumber,
-  EndTime: chNumber,
-  DurationMs: chNumber,
-  SpanName: chString,
-  SpanKind: chNumber,
-  ResourceAttributes: attributeMapSchema,
-  SpanAttributes: attributeMapSchema,
-  StatusCode: chNumber.nullable(),
-  StatusMessage: chString.nullable(),
-  ScopeName: chString.nullable(),
-  ScopeVersion: chString.nullable(),
-  Events_Timestamp: z.array(chNumber),
-  Events_Name: z.array(chString),
-  Events_Attributes: z.array(attributeMapSchema),
-  Links_TraceId: z.array(chString),
-  Links_SpanId: z.array(chString),
-  Links_Attributes: z.array(attributeMapSchema),
-});
+const joinedSpanRowSchema = z
+  .looseObject({
+    SpanId: chString,
+    TraceId: chString,
+    TenantId: chString,
+    ParentSpanId: chString.nullable(),
+    ParentTraceId: chString.nullable(),
+    ParentIsRemote: chBoolean.nullable(),
+    Sampled: chBoolean,
+    StartTimeMs: chNumber,
+    EndTimeMs: chNumber,
+    DurationMs: chNumber,
+    SpanName: chString,
+    SpanKind: chNumber,
+    ResourceAttributes: attributeMapSchema,
+    SpanAttributes: attributeMapSchema,
+    StatusCode: chNumber.nullable(),
+    StatusMessage: chString.nullable(),
+    ScopeName: chString.nullable(),
+    ScopeVersion: chString.nullable(),
+    Events_Timestamp: z.array(chNumber),
+    Events_Name: z.array(chString),
+    Events_Attributes: z.array(attributeMapSchema),
+    Links_TraceId: z.array(chString),
+    Links_SpanId: z.array(chString),
+    Links_Attributes: z.array(attributeMapSchema),
+  })
+  .transform(({ EndTimeMs, ...row }) => ({ ...row, EndTime: EndTimeMs }));
 
 type JoinedSpanRow = z.infer<typeof joinedSpanRowSchema>;
 
@@ -1002,6 +979,182 @@ function evaluationRowsStatement({
     .build();
 }
 
+/**
+ * The event spans (an `event.type` attribute) of the asked traces under the proof, in the
+ * occurrence windows, latest version each, at most `maxEvents` per trace, `event.*` entries only.
+ */
+function eventSpansStatement({
+  authorization,
+  traceIds,
+  windows,
+  maxEvents,
+}: {
+  authorization: Authorization;
+  traceIds: readonly string[];
+  windows: readonly { from: number; to: number }[];
+  maxEvents: number;
+}) {
+  return (
+    clickhouseRead({ scope: builtTenantScope.fromProof({ authorization, reads: "traces" }) })
+      .from(storedSpans)
+      .withinWindows()
+      .select({
+        TraceId: storedSpans.TraceId,
+        SpanId: storedSpans.SpanId,
+        StartTimeMs: fn.toUnixTimestamp64Milli(storedSpans.StartTime),
+        EndTimeMs: fn.toUnixTimestamp64Milli(storedSpans.EndTime),
+        EventAttrs: fn.mapFilter((key) => fn.startsWith(key, "event."), storedSpans.SpanAttributes),
+      })
+      .where(({ and, gte, lte, oneOf, or }) =>
+        and(
+          oneOf(storedSpans.TraceId, [...traceIds]),
+          or(
+            ...windows.map(({ from, to }) =>
+              and(gte(storedSpans.StartTime, from), lte(storedSpans.StartTime, to)),
+            ),
+          ),
+          fn.mapContains(storedSpans.SpanAttributes, "event.type"),
+        ),
+      )
+      // Main's election filtered on `event.type` too: repeating it keeps the same versions.
+      .latestVersion({ repeat: [storedSpans.SpanAttributes] })
+      .orderBy(storedSpans.TraceId, "ASC")
+      .orderBy(storedSpans.StartTime, "ASC")
+      .limitBy(maxEvents, storedSpans.TraceId)
+      .build()
+  );
+}
+
+/** The joined page read's summary columns, `ts_`-prefixed as its row schema reads them. */
+const JOINED_SUMMARY_SELECTION = {
+  ts_TraceId: traceSummaries.TraceId,
+  ts_SpanCount: traceSummaries.SpanCount,
+  ts_TotalDurationMs: traceSummaries.TotalDurationMs,
+  ts_ComputedIOSchemaVersion: traceSummaries.ComputedIOSchemaVersion,
+  ts_ComputedInput: traceSummaries.ComputedInput,
+  ts_ComputedOutput: traceSummaries.ComputedOutput,
+  ts_TimeToFirstTokenMs: traceSummaries.TimeToFirstTokenMs,
+  ts_TimeToLastTokenMs: traceSummaries.TimeToLastTokenMs,
+  ts_TokensPerSecond: traceSummaries.TokensPerSecond,
+  ts_ContainsErrorStatus: traceSummaries.ContainsErrorStatus,
+  ts_ContainsOKStatus: traceSummaries.ContainsOKStatus,
+  ts_ErrorMessage: traceSummaries.ErrorMessage,
+  ts_Models: traceSummaries.Models,
+  ts_TotalCost: traceSummaries.TotalCost,
+  ts_NonBilledCost: traceSummaries.NonBilledCost,
+  ts_TokensEstimated: traceSummaries.TokensEstimated,
+  ts_TotalPromptTokenCount: traceSummaries.TotalPromptTokenCount,
+  ts_TotalCompletionTokenCount: traceSummaries.TotalCompletionTokenCount,
+  ts_TopicId: traceSummaries.TopicId,
+  ts_SubTopicId: traceSummaries.SubTopicId,
+  ts_HasAnnotation: traceSummaries.HasAnnotation,
+  ts_AnnotationIds: traceSummaries.AnnotationIds,
+  ts_Attributes: traceSummaries.Attributes,
+  ts_TraceName: traceSummaries.TraceName,
+  ts_Version: traceSummaries.Version,
+  ts_EarliestSpanStartMs: traceSummaries.EarliestSpanStartMs,
+  ts_OccurredAt: fn.toUnixTimestamp64Milli(traceSummaries.OccurredAt),
+  ts_CreatedAt: fn.toUnixTimestamp64Milli(traceSummaries.CreatedAt),
+  ts_UpdatedAt: fn.toUnixTimestamp64Milli(traceSummaries.UpdatedAt),
+};
+
+/** The asked traces' latest summaries under the proof, inside `window` when one is given. */
+function joinedSummariesStatement({
+  authorization,
+  traceIds,
+  window,
+}: {
+  authorization: Authorization;
+  traceIds: readonly string[];
+  window: WindowFragment | null;
+}) {
+  const read = clickhouseRead({
+    scope: builtTenantScope.fromProof({ authorization, reads: "traces" }),
+  })
+    .from(traceSummaries)
+    .withinWindows()
+    .select(JOINED_SUMMARY_SELECTION)
+    .where(({ oneOf }) => oneOf(traceSummaries.TraceId, [...traceIds]));
+  const windowed =
+    window === null
+      ? read
+      : read.where(({ and, gte, lte }) =>
+          and(
+            gte(traceSummaries.OccurredAt, window.fromMs),
+            lte(traceSummaries.OccurredAt, window.toMs),
+          ),
+        );
+  return windowed.latestVersion().orderBy(traceSummaries.TraceId, "ASC").build();
+}
+
+/** The joined page read's span columns; `EndTimeMs` is read back as `EndTime` by its schema. */
+const JOINED_SPAN_SELECTION = {
+  SpanId: storedSpans.SpanId,
+  TraceId: storedSpans.TraceId,
+  TenantId: storedSpans.TenantId,
+  ParentSpanId: storedSpans.ParentSpanId,
+  ParentTraceId: storedSpans.ParentTraceId,
+  ParentIsRemote: storedSpans.ParentIsRemote,
+  Sampled: storedSpans.Sampled,
+  StartTimeMs: fn.toUnixTimestamp64Milli(storedSpans.StartTime),
+  EndTimeMs: fn.toUnixTimestamp64Milli(storedSpans.EndTime),
+  DurationMs: storedSpans.DurationMs,
+  SpanName: storedSpans.SpanName,
+  SpanKind: storedSpans.SpanKind,
+  ResourceAttributes: storedSpans.ResourceAttributes,
+  SpanAttributes: storedSpans.SpanAttributes,
+  StatusCode: storedSpans.StatusCode,
+  StatusMessage: storedSpans.StatusMessage,
+  ScopeName: storedSpans.ScopeName,
+  ScopeVersion: storedSpans.ScopeVersion,
+  Events_Timestamp: fn.arrayMap(
+    (at) => fn.toUnixTimestamp64Milli(at),
+    storedSpans["Events.Timestamp"],
+  ),
+  Events_Name: storedSpans["Events.Name"],
+  Events_Attributes: storedSpans["Events.Attributes"],
+  Links_TraceId: storedSpans["Links.TraceId"],
+  Links_SpanId: storedSpans["Links.SpanId"],
+  Links_Attributes: storedSpans["Links.Attributes"],
+};
+
+/** The asked traces' latest spans under the proof, in `window`, at most the per-trace cap each. */
+function joinedSpansStatement({
+  authorization,
+  traceIds,
+  window,
+  settings,
+}: {
+  authorization: Authorization;
+  traceIds: readonly string[];
+  window: WindowFragment | null;
+  settings: Record<string, string>;
+}) {
+  const read = clickhouseRead({
+    scope: builtTenantScope.fromProof({ authorization, reads: "traces" }),
+  })
+    .from(storedSpans)
+    .withinWindows()
+    .select(JOINED_SPAN_SELECTION)
+    .where(({ oneOf }) => oneOf(storedSpans.TraceId, [...traceIds]));
+  const windowed =
+    window === null
+      ? read
+      : read.where(({ and, gte, lte }) =>
+          and(gte(storedSpans.StartTime, window.fromMs), lte(storedSpans.StartTime, window.toMs)),
+        );
+  return (
+    windowed
+      // stored_spans replaces by StartTime (goose 00002): main elected max(StartTime) here.
+      .latestVersion({ version: storedSpans.StartTime })
+      .orderBy(storedSpans.TraceId, "ASC")
+      .orderBy(storedSpans.StartTime, "ASC")
+      .limitBy(MAX_SPANS_PER_TRACE, storedSpans.TraceId)
+      .settings(settings)
+      .build()
+  );
+}
+
 type FieldWindow = { projectId: string; startDate: number; endDate: number };
 
 /** The distinct non-empty span names started in the window. */
@@ -1155,7 +1308,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
       async () => {
         // Up front so a missing store or a refused proof surfaces by name,
         // not as the generic fetch failure from the try/catch below.
-        const reader = this.reader({ authorization, projectId });
+        this.reader({ authorization, projectId });
 
         if (traceIds.length === 0) {
           return [];
@@ -1170,7 +1323,6 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
           // Fetch trace summaries with spans using JOIN
           const tracesWithSpans = await this.fetchTracesWithSpansJoined({
             authorization,
-            reader,
             projectId,
             traceIds,
             occurredAt,
@@ -1544,13 +1696,11 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
   /** The page's evaluations, and the child collections its projection asked for. */
   private async readPageCollections({
     authorization,
-    reader,
     projectId,
     summaries,
     projection,
   }: {
     authorization: Authorization;
-    reader: TenantScopedReader;
     projectId: string;
     summaries: TraceSummaryData[];
     projection: GetAllTracesForProjectOptions["projection"];
@@ -1560,7 +1710,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     const evaluations = await this.fetchEvaluationRows({ authorization, projectId, traceIds });
     // Scoped to this page, never table-wide.
     const events = projection?.needsEvents
-      ? await this.findEventsForProjection({ reader, projectId, summaries })
+      ? await this.findEventsForProjection({ authorization, projectId, summaries })
       : undefined;
     const annotations = projection?.needsAnnotations
       ? await this.findAnnotationsForProjection({ projectId, traceIds })
@@ -1571,14 +1721,12 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
   /** The page's spans, read only where the caller wants spans or full IO. */
   private async readRequestedSpans({
     authorization,
-    reader,
     summaries,
     projectId,
     wanted,
     retentionDays,
   }: {
     authorization: Authorization;
-    reader: TenantScopedReader;
     summaries: TraceSummaryData[];
     projectId: string;
     wanted: boolean;
@@ -1593,7 +1741,6 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
         : undefined;
     return this.fetchTracesWithSpansJoined({
       authorization,
-      reader,
       projectId,
       traceIds: summaries.map((s) => s.traceId),
       occurredAt,
@@ -1617,7 +1764,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     return this.tracer.withActiveSpan(
       "TraceLegacyReadClickHouseRepository.getAllTracesForProject",
       async (_span) => {
-        const reader = this.reader({ authorization: ownRead, projectId: input.projectId });
+        this.reader({ authorization: ownRead, projectId: input.projectId });
 
         try {
           const pageSize = input.pageSize ?? 25;
@@ -1703,7 +1850,6 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
           });
           const spans = await this.readRequestedSpans({
             authorization: ownRead,
-            reader,
             summaries,
             projectId: input.projectId,
             wanted: options.includeSpans === true || options.resolveBlobs === true,
@@ -1723,7 +1869,6 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
           });
           const { evaluations, events, annotations } = await this.readPageCollections({
             authorization: ownRead,
-            reader,
             projectId: input.projectId,
             summaries,
             projection,
@@ -2375,11 +2520,11 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
    * Projection JOIN: attach events to a page of traces.
    */
   private async findEventsForProjection({
-    reader,
+    authorization,
     projectId,
     summaries,
   }: {
-    reader: TenantScopedReader;
+    authorization: Authorization;
     projectId: string;
     summaries: TraceSummaryData[];
   }): Promise<Map<string, Event[]>> {
@@ -2403,47 +2548,17 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     // put traces months apart on one page; a single min/max window would span
     // every weekly partition between them — so OR per-cluster windows instead,
     // each tight, with no single range crossing unrelated history.
-    const {
-      outer: spanTimeFilterOuter,
-      inner: spanTimeFilterInner,
-      params: spanTimeParams,
-    } = buildEventOccurrenceWindows(occurredAts);
-
-    const result = await reader.query({
-      // ID_BOUND_SKIP: bounded by the page's own trace occurrence windows.
-      query: `
-        SELECT
-          t.TraceId,
-          t.SpanId,
-          toUnixTimestamp64Milli(t.StartTime) AS StartTimeMs,
-          toUnixTimestamp64Milli(t.EndTime) AS EndTimeMs,
-          mapFilter((k, v) -> startsWith(k, 'event.'), t.SpanAttributes) AS EventAttrs
-        FROM stored_spans AS t
-        WHERE ${tenantScope("StartTime")}
-          AND t.TraceId IN ({traceIds:Array(String)})
-          ${spanTimeFilterOuter}
-          AND mapContains(t.SpanAttributes, 'event.type')
-          AND (t.TenantId, t.TraceId, t.SpanId, t.UpdatedAt) IN (
-            SELECT TenantId, TraceId, SpanId, max(UpdatedAt)
-            FROM stored_spans
-            WHERE ${tenantScope("StartTime")}
-              AND TraceId IN ({traceIds:Array(String)})
-              ${spanTimeFilterInner}
-              AND mapContains(SpanAttributes, 'event.type')
-            GROUP BY TenantId, TraceId, SpanId
-          )
-        ORDER BY t.TraceId, t.StartTime ASC
-        LIMIT {maxEvents:UInt32} BY t.TraceId
-      `,
-      query_params: {
+    const result = await this.builtReader(projectId).read({
+      statement: eventSpansStatement({
+        authorization,
         traceIds,
+        windows: eventOccurrenceWindows(occurredAts),
         maxEvents: MAX_EVENTS_PER_TRACE,
-        ...spanTimeParams,
-      },
-      format: "JSONEachRow",
+      }),
+      table: storedSpans.$table.name,
     });
 
-    const rows = eventSpanRowsSchema.parse(await result.json());
+    const rows = eventSpanRowsSchema.parse(result.rows);
     const byTrace = new Map<string, Event[]>();
     for (const row of rows) {
       const event = mapEventAttrsToEvent({ row, projectId });
@@ -2650,14 +2765,12 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
    */
   private async fetchTracesWithSpansJoined({
     authorization,
-    reader,
     projectId,
     traceIds,
     occurredAt,
     retentionDays,
   }: {
     authorization: Authorization;
-    reader: TenantScopedReader;
     projectId: string;
     traceIds: string[];
     occurredAt: OccurredAtRange | undefined;
@@ -2673,7 +2786,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
           ? { range: occurredAt, unfiled: false }
           : await this.resolveOccurredAtOrNone({ authorization, projectId, traceIds });
         const batchRead = {
-          reader,
+          authorization,
           projectId,
           effectiveOccurredAt: resolved.range,
           unfiled: resolved.unfiled,
@@ -2732,21 +2845,21 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
    * {@link MAX_SPANS_PER_JOINED_FALLBACK}.
    */
   private async readJoinedTracesInBatches({
-    reader,
+    authorization,
     projectId,
     effectiveOccurredAt,
     unfiled,
     retentionDays,
     traceIds,
   }: {
-    reader: TenantScopedReader;
+    authorization: Authorization;
     projectId: string;
     effectiveOccurredAt: OccurredAtRange | undefined;
     unfiled: boolean;
     retentionDays: RetentionDaysProvider | undefined;
     traceIds: string[];
   }): Promise<Map<string, TraceLegacyRow>> {
-    const batchRead = { reader, projectId, effectiveOccurredAt, unfiled, retentionDays };
+    const batchRead = { authorization, projectId, effectiveOccurredAt, unfiled, retentionDays };
 
     this.logger.warn(
       `Traces-with-spans join OOM for ${traceIds.length} traces, retrying in batches of ${TraceLegacyReadClickHouseRepository.SUMMARY_BATCH_SIZE}`,
@@ -2805,7 +2918,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
   }
 
   private async readJoinedTraceBatch({
-    reader,
+    authorization,
     projectId,
     effectiveOccurredAt,
     unfiled,
@@ -2813,7 +2926,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     batchTraceIds,
     maxSpanRows,
   }: {
-    reader: TenantScopedReader;
+    authorization: Authorization;
     projectId: string;
     effectiveOccurredAt: OccurredAtRange | undefined;
     /** No summary of these traces is filed after the epoch, per the resolve. */
@@ -2824,7 +2937,8 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     maxSpanRows?: number;
   }): Promise<Map<string, TraceLegacyRow>> {
     const { summaryRows, hasSummaryWindow } = await this.readJoinedSummaryRows({
-      reader,
+      authorization,
+      projectId,
       effectiveOccurredAt,
       unfiled,
       batchTraceIds,
@@ -2838,7 +2952,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     }
 
     const spanRows = await this.readJoinedSpanRows({
-      reader,
+      authorization,
       projectId,
       batchTraceIds,
       spanRange: deriveSpanRange({ summaryRows, hasSummaryWindow, effectiveOccurredAt }),
@@ -2886,12 +3000,14 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
   }
 
   private async readJoinedSummaryRows({
-    reader,
+    authorization,
+    projectId,
     effectiveOccurredAt,
     unfiled,
     batchTraceIds,
   }: {
-    reader: TenantScopedReader;
+    authorization: Authorization;
+    projectId: string;
     effectiveOccurredAt: OccurredAtRange | undefined;
     unfiled: boolean;
     batchTraceIds: string[];
@@ -2920,76 +3036,26 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
       fallback: "none",
       isEmpty: (rows) => rows.length === 0,
       run: async (window) => {
-        const summaryTimeFilterOuter = window ? window.sqlFor("t.OccurredAt") : "";
-        const summaryTimeFilterInner = window ? window.sqlFor("OccurredAt") : "";
-        const summaryResult = await reader.query({
-          // ID_BOUND_SKIP: bounded by the occurred range the index-bounded resolver found.
-          query: `
-        SELECT
-          TraceId AS ts_TraceId,
-          SpanCount AS ts_SpanCount,
-          TotalDurationMs AS ts_TotalDurationMs,
-          ComputedIOSchemaVersion AS ts_ComputedIOSchemaVersion,
-          ComputedInput AS ts_ComputedInput,
-          ComputedOutput AS ts_ComputedOutput,
-          TimeToFirstTokenMs AS ts_TimeToFirstTokenMs,
-          TimeToLastTokenMs AS ts_TimeToLastTokenMs,
-          TokensPerSecond AS ts_TokensPerSecond,
-          ContainsErrorStatus AS ts_ContainsErrorStatus,
-          ContainsOKStatus AS ts_ContainsOKStatus,
-          ErrorMessage AS ts_ErrorMessage,
-          Models AS ts_Models,
-          TotalCost AS ts_TotalCost,
-          NonBilledCost AS ts_NonBilledCost,
-          TokensEstimated AS ts_TokensEstimated,
-          TotalPromptTokenCount AS ts_TotalPromptTokenCount,
-          TotalCompletionTokenCount AS ts_TotalCompletionTokenCount,
-          TopicId AS ts_TopicId,
-          SubTopicId AS ts_SubTopicId,
-          HasAnnotation AS ts_HasAnnotation,
-          AnnotationIds AS ts_AnnotationIds,
-          Attributes AS ts_Attributes,
-          TraceName AS ts_TraceName,
-          Version AS ts_Version,
-          EarliestSpanStartMs AS ts_EarliestSpanStartMs,
-          toUnixTimestamp64Milli(OccurredAt) AS ts_OccurredAt,
-          toUnixTimestamp64Milli(CreatedAt) AS ts_CreatedAt,
-          toUnixTimestamp64Milli(UpdatedAt) AS ts_UpdatedAt
-        FROM trace_summaries AS t
-        WHERE ${tenantScope("OccurredAt")}
-          AND t.TraceId IN ({traceIds:Array(String)})
-          ${summaryTimeFilterOuter}
-          AND (t.TenantId, t.TraceId, t.UpdatedAt) IN (
-            SELECT TenantId, TraceId, max(UpdatedAt)
-            FROM trace_summaries
-            WHERE ${tenantScope("OccurredAt")}
-              AND TraceId IN ({traceIds:Array(String)})
-              ${summaryTimeFilterInner}
-            GROUP BY TenantId, TraceId
-          )
-        ORDER BY t.TraceId
-      `,
-          query_params: {
-            traceIds: batchTraceIds,
-            ...window?.params,
-          },
-          format: "JSONEachRow",
+        // ID_BOUND_SKIP: bounded by the occurred range the index-bounded resolver found.
+        const summaryResult = await this.builtReader(projectId).read({
+          statement: joinedSummariesStatement({ authorization, traceIds: batchTraceIds, window }),
+          table: traceSummaries.$table.name,
         });
-        return traceSummaryRowsSchema.parse(await summaryResult.json());
+        return traceSummaryRowsSchema.parse(summaryResult.rows);
       },
     });
     return { summaryRows, hasSummaryWindow };
   }
 
   private async readJoinedSpanRows({
-    reader,
+    authorization,
     projectId,
     batchTraceIds,
     spanRange,
     maxSpanRows,
     retentionDays,
   }: {
-    reader: TenantScopedReader;
+    authorization: Authorization;
     projectId: string;
     retentionDays: RetentionDaysProvider | undefined;
     batchTraceIds: string[];
@@ -3033,62 +3099,17 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
           },
       isEmpty: (rows) => rows.length === 0,
       run: async (window) => {
-        // Always present now: a hint yields the hinted fragment, and the
-        // hint-less path yields the retention floor's fragment. The null
-        // arm is kept only because the shared contract permits it.
-        const spanTimeFilterOuter = window ? window.sqlFor("t.StartTime") : "";
-        const spanTimeFilterInner = window ? window.sqlFor("StartTime") : "";
-        const spansResult = await reader.query({
-          // ID_BOUND_SKIP: bounded by the summaries' own occurred times read just above.
-          query: `
-        SELECT
-          SpanId,
-          TraceId,
-          TenantId,
-          ParentSpanId,
-          ParentTraceId,
-          ParentIsRemote,
-          Sampled,
-          toUnixTimestamp64Milli(StartTime) AS StartTimeMs,
-          toUnixTimestamp64Milli(EndTime) AS EndTime,
-          DurationMs,
-          SpanName,
-          SpanKind,
-          ResourceAttributes,
-          SpanAttributes,
-          StatusCode,
-          StatusMessage,
-          ScopeName,
-          ScopeVersion,
-          arrayMap(x -> toUnixTimestamp64Milli(x), \`Events.Timestamp\`) AS Events_Timestamp,
-          \`Events.Name\` AS Events_Name,
-          \`Events.Attributes\` AS Events_Attributes,
-          \`Links.TraceId\` AS Links_TraceId,
-          \`Links.SpanId\` AS Links_SpanId,
-          \`Links.Attributes\` AS Links_Attributes
-        FROM stored_spans AS t
-        WHERE ${tenantScope("StartTime")}
-          AND t.TraceId IN ({traceIds:Array(String)})
-          ${spanTimeFilterOuter}
-          AND (t.TenantId, t.TraceId, t.SpanId, t.StartTime) IN (
-            SELECT TenantId, TraceId, SpanId, max(StartTime)
-            FROM stored_spans
-            WHERE ${tenantScope("StartTime")}
-              AND TraceId IN ({traceIds:Array(String)})
-              ${spanTimeFilterInner}
-            GROUP BY TenantId, TraceId, SpanId
-          )
-        ORDER BY t.TraceId, t.StartTime ASC
-        LIMIT ${MAX_SPANS_PER_TRACE} BY t.TraceId
-      `,
-          query_params: {
+        // ID_BOUND_SKIP: bounded by the summaries' own occurred times read just above.
+        const spansResult = await this.builtReader(projectId).read({
+          statement: joinedSpansStatement({
+            authorization,
             traceIds: batchTraceIds,
-            ...window?.params,
-          },
-          clickhouse_settings: spanReadSettings,
-          format: "JSONEachRow",
+            window,
+            settings: spanReadSettings,
+          }),
+          table: storedSpans.$table.name,
         });
-        return joinedSpanRowsSchema.parse(await spansResult.json());
+        return joinedSpanRowsSchema.parse(spansResult.rows);
       },
     });
   }

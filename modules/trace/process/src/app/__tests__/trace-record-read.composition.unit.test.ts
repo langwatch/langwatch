@@ -24,7 +24,10 @@ import { ownProof } from "../../__tests__/support/authorization-proofs.fixture.t
 import { fakeTraceProcessingCommands } from "../../__tests__/support/trace-processing-commands.fake.ts";
 import { S3TraceLegacySpoolChannel } from "../../channels/s3/s3.trace-legacy-spool.channel.ts";
 import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
-import { fencedOver } from "../../features/legacy/repositories/clickhouse/__tests__/support/legacy-trace-mapping.support.ts";
+import {
+  builtOver,
+  fencedOver,
+} from "../../features/legacy/repositories/clickhouse/__tests__/support/legacy-trace-mapping.support.ts";
 import { TraceLegacyReadClickHouseRepository } from "../../features/legacy/repositories/clickhouse/trace-legacy-read.repository.ts";
 import { TraceBlobStoreService } from "../../features/media/services/trace-blob-store.service.ts";
 import { traceSummaryRow } from "../../repositories/clickhouse/__tests__/support/trace-summary-row.support.ts";
@@ -117,6 +120,7 @@ function compose({
       legacyRead: TraceLegacyReadClickHouseRepository.create({
         resolveClickHouseClient: resolve,
         clickhouse: fencedOver(resolve),
+        reader: builtOver(resolve),
       }),
     },
     resolveClickHouseClient: resolve,
