@@ -1,76 +1,45 @@
-// ClickHouse endpoint with real shipped migrations for experiment suites.
-// Schema from ClickHouseMigrateTask (production goose run), not a suite DDL.
-import { type ClickHouseClient, createClient } from "@clickhouse/client";
-import { DEFAULT_CLICKHOUSE_SETTINGS } from "@langwatch/clickhouse-client";
-import {
-  migrateTestClickHouseOnce,
-  startTestClickHouseEndpoints,
-} from "@langwatch/clickhouse-client/testing";
-import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
+// ClickHouse endpoint with real shipped migrations for experiment suites, in a container with the
+// app reader provisioned (ADR-202): suites read as the reader and seed as the system identity.
+import type { ClickHouseClient } from "@clickhouse/client";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 
-/** The one endpoint name every migrated-schema experiment suite asks for. */
-const MIGRATED_ENDPOINT_SUITE = "experiment-migrated";
+import {
+  EXPERIMENT_ID_INDEXES,
+  EXPERIMENT_SECOND_ID_INDEXES,
+} from "../repositories/clickhouse/clickhouse.experiment-id-indexes.database.ts";
+import { migratedAppReaderClickHouse } from "./support/app-reader-clickhouse.support.ts";
 
 export interface MigratedClickHouse {
-  /** Client bound to the migrated database. */
+  /** The system identity's client bound to the migrated database: seeds and cleanup. */
   client: ClickHouseClient;
+  /** The process's client with experiment's id indexes: reads as the app reader. */
+  reading: ClickHouseQueryClient;
   /** Connection URL with the migrated database in its path. */
   url: string;
   database: string;
 }
 
-let endpoint: MigratedClickHouse | undefined;
-
 /**
- * Starts (or reuses) the migrated endpoint and returns a client bound to it.
- * `CLICKHOUSE_CLUSTER` is unset for the migration: it switches every engine
- * to its `Replicated` form, which needs a Keeper no test server has.
+ * Starts (or reuses) the suite's own migrated endpoint with the reader provisioned. One endpoint
+ * per suite: the reader is one user per server and each file provisions its own password, so two
+ * files running at once on one server would replace each other's reader.
  */
-export async function startMigratedClickHouse(): Promise<MigratedClickHouse> {
-  if (endpoint) return endpoint;
-
-  const [provisioned] = await startTestClickHouseEndpoints({
-    suite: MIGRATED_ENDPOINT_SUITE,
-    names: ["schema"],
-    environment: process.env,
+export async function startMigratedClickHouse({
+  suite,
+}: {
+  suite: string;
+}): Promise<MigratedClickHouse> {
+  const opened = await migratedAppReaderClickHouse({
+    suite: `experiment-migrated-${suite}`,
+    indexes: [...EXPERIMENT_ID_INDEXES, ...EXPERIMENT_SECOND_ID_INDEXES],
   });
-  if (!provisioned) {
-    throw new Error("No ClickHouse endpoint was provisioned for the experiment schema suite");
-  }
-
-  await migrateTestClickHouseOnce({
-    url: provisioned.url,
-    migrate: async () => {
-      const previousCluster = process.env.CLICKHOUSE_CLUSTER;
-      delete process.env.CLICKHOUSE_CLUSTER;
-      try {
-        await ClickHouseMigrateTask.createFromConfig({
-          config: {
-            buildTime: false,
-            sharedUrl: provisioned.url,
-            privateEndpoints: [],
-          },
-        }).execute();
-      } finally {
-        if (previousCluster !== undefined) process.env.CLICKHOUSE_CLUSTER = previousCluster;
-      }
-    },
-  });
-
-  endpoint = {
-    client: createClient({
-      url: provisioned.url,
-      clickhouse_settings: {
-        ...DEFAULT_CLICKHOUSE_SETTINGS,
-        date_time_input_format: "best_effort",
-      },
-    }),
-    url: provisioned.url,
-    database: provisioned.database,
+  return {
+    client: opened.admin,
+    reading: opened.client,
+    url: opened.endpoint.url,
+    database: opened.endpoint.database,
   };
-  return endpoint;
 }
-
 /**
  * Deletes one tenant's rows from the migrated tables. Mutations rather than
  * a dropped database: the endpoint is shared, and suites key their rows on

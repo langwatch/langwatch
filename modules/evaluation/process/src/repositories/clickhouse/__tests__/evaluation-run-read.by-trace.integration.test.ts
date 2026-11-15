@@ -4,9 +4,8 @@
  * written and read back over real ClickHouse.
  * @see specs/automations/process-manager-dispatch.feature
  */
-import { type ClickHouseClient, createClient } from "@clickhouse/client";
+import type { ClickHouseClient } from "@clickhouse/client";
 import { narrowAuthorization } from "@langwatch/authorization";
-import { startTestClickHouseEndpoints } from "@langwatch/clickhouse-client/testing";
 import type { EvaluationRunData } from "@langwatch/evaluation-contract";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -14,9 +13,17 @@ import {
   aggregateProof,
   ownProof,
 } from "../../../__tests__/support/authorization-proofs.fixture.ts";
+import {
+  EVALUATION_ID_INDEXES,
+  EVALUATION_SECOND_ID_INDEXES,
+} from "../clickhouse.evaluation-id-indexes.database.ts";
 import { EvaluationRunClickHouseReadRepository } from "../evaluation-run-read.repository.ts";
 import { EvaluationRunClickHouseWriteRepository } from "../evaluation-run-write.repository.ts";
-import { queryClientResolverFor } from "./support/authorized-clickhouse.support.ts";
+import {
+  type AppReaderClickHouse,
+  appReaderClickHouseOver,
+  startAppReaderEndpoint,
+} from "./support/app-reader-clickhouse.support.ts";
 
 const TENANT = "tenant_by_trace";
 const TRACE_ID = "trace_by_trace_1";
@@ -77,20 +84,18 @@ function evaluationRun(overrides: Partial<EvaluationRunData>): EvaluationRunData
 }
 
 let client: ClickHouseClient;
+let clickHouse: AppReaderClickHouse;
 let reads: EvaluationRunClickHouseReadRepository;
 
 describe("given a trace whose evaluation runs are stored", () => {
   beforeAll(async () => {
-    const [endpoint] = await startTestClickHouseEndpoints({
-      suite: "evaluation-run-read-by-trace",
-      names: ["shared"],
-      environment: process.env,
+    const endpoint = await startAppReaderEndpoint({ suite: "evaluation-run-read-by-trace" });
+    clickHouse = await appReaderClickHouseOver({
+      endpoint,
+      indexes: [...EVALUATION_ID_INDEXES, ...EVALUATION_SECOND_ID_INDEXES],
     });
-    // The production member parses the write's ISO moments the same way.
-    client = createClient({
-      url: endpoint!.url,
-      clickhouse_settings: { date_time_input_format: "best_effort" },
-    });
+    // The system identity writes; it parses the write's ISO moments as the production member does.
+    client = clickHouse.admin;
     // The endpoint is reused across runs, so start from an empty table.
     await client.command({ query: "DROP TABLE IF EXISTS evaluation_runs SYNC" });
     await client.command({ query: CREATE_TABLE });
@@ -98,7 +103,7 @@ describe("given a trace whose evaluation runs are stored", () => {
     const resolveClient = async () => client as never;
     const writes = EvaluationRunClickHouseWriteRepository.create({ resolveClient });
     reads = EvaluationRunClickHouseReadRepository.create({
-      resolveQueryClient: queryClientResolverFor(client),
+      resolveQueryClient: async () => clickHouse.client,
     });
     const runs = [
       evaluationRun({}),
@@ -122,7 +127,7 @@ describe("given a trace whose evaluation runs are stored", () => {
   }, 120_000);
 
   afterAll(async () => {
-    await client?.close();
+    await clickHouse?.close();
   });
 
   describe("when the trace's runs are read by trace", () => {

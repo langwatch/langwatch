@@ -6,7 +6,6 @@ import { randomUUID } from "node:crypto";
  * The pipeline's three map projections over one point, against the migrated ClickHouse schema.
  */
 import type { ClickHouseClient } from "@clickhouse/client";
-import { vendorQueryClient } from "@langwatch/clickhouse-client/testing";
 import { createTenantId } from "@langwatch/eventing";
 import {
   METRIC_DATA_POINT_RECEIVED_EVENT_TYPE,
@@ -28,7 +27,7 @@ import {
   ClickHouseMetricDataPointAppendRepository,
   type MetricClickHouseClient,
 } from "../repositories/clickhouse/clickhouse.metric-data-point-append.repository.ts";
-import { startMigratedClickHouse } from "./migrated-clickhouse.harness.ts";
+import { type MigratedClickHouse, startMigratedClickHouse } from "./migrated-clickhouse.harness.ts";
 
 const tag = randomUUID();
 const tenantId = `${tag}-project`;
@@ -46,10 +45,10 @@ const TABLES = [
 let ch: ClickHouseClient;
 
 /** The narrow port the append repository takes, over the real client. */
-function metricClient(client: ClickHouseClient): MetricClickHouseClient {
+function metricClient({ client, reading }: MigratedClickHouse): MetricClickHouseClient {
   return {
     insert: async (params) => client.insert(params),
-    read: (input) => vendorQueryClient({ vendor: client, indexes: [] }).read(input),
+    read: (input) => reading.read(input),
   };
 }
 
@@ -64,8 +63,9 @@ async function rowsOf(table: (typeof TABLES)[number]): Promise<Record<string, un
 }
 
 beforeAll(async () => {
-  ch = (await startMigratedClickHouse()).client;
-  const port = metricClient(ch);
+  const migrated = await startMigratedClickHouse({ suite: "projections" });
+  ch = migrated.client;
+  const port = metricClient(migrated);
   const repository = ClickHouseMetricDataPointAppendRepository.create({
     resolveClient: async () => port,
     defaultRetentionDays: 30,

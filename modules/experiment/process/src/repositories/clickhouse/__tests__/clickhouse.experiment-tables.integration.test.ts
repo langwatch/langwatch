@@ -7,7 +7,6 @@
 import { randomUUID } from "node:crypto";
 
 import type { ClickHouseTableFacts } from "@langwatch/clickhouse-client/builder";
-import { vendorQueryClient } from "@langwatch/clickhouse-client/testing";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
@@ -16,10 +15,6 @@ import {
   startMigratedClickHouse,
 } from "../../../__tests__/migrated-clickhouse.harness.ts";
 import { dspySteps } from "../clickhouse.dspy-steps.table.ts";
-import {
-  EXPERIMENT_ID_INDEXES,
-  EXPERIMENT_SECOND_ID_INDEXES,
-} from "../clickhouse.experiment-id-indexes.database.ts";
 import { experimentRunItems } from "../clickhouse.experiment-run-items.table.ts";
 import { ClickHouseExperimentRunRepository } from "../clickhouse.experiment-run.repository.ts";
 import { experimentRuns } from "../clickhouse.experiment-runs.table.ts";
@@ -42,7 +37,7 @@ describe("experiment's descriptors against the migrated schema", () => {
   let migrated: MigratedClickHouse;
 
   beforeAll(async () => {
-    migrated = await startMigratedClickHouse();
+    migrated = await startMigratedClickHouse({ suite: "tables" });
   }, 240_000);
 
   it.each(DESCRIPTORS.map((table) => [table.$table.stored, table] as const))(
@@ -97,7 +92,7 @@ describe("experiment's stored bytes against the migrated schema", () => {
   }
 
   beforeAll(async () => {
-    migrated = await startMigratedClickHouse();
+    migrated = await startMigratedClickHouse({ suite: "tables" });
     for (const tenantId of [ours, theirs]) {
       for (const table of METERED_TABLES) {
         await migrated.client.insert({
@@ -129,12 +124,7 @@ describe("experiment's stored bytes against the migrated schema", () => {
   it("sums this project's `_size_bytes` over its three tables as main's raw read does", async () => {
     const bytes = await ClickHouseExperimentRunRepository.create({
       workflowVersions: { findByIds: async () => ({}) },
-      resolveClient: ClickHouseExperimentSession.resolverOver(
-        vendorQueryClient({
-          vendor: migrated.client,
-          indexes: [...EXPERIMENT_ID_INDEXES, ...EXPERIMENT_SECOND_ID_INDEXES],
-        }),
-      ),
+      resolveClient: ClickHouseExperimentSession.resolverOver(migrated.reading),
       telemetry: {
         trace: async <T>(_input: unknown, operation: () => Promise<T>) => operation(),
         warnOldRuns: () => {},

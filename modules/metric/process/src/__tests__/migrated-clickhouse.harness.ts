@@ -1,79 +1,36 @@
 /**
- * ClickHouse endpoint with shipped migrations for metric suites. Uses
- * {@link startTestClickHouseEndpoints} (native or container) and {@link ClickHouseMigrateTask}
- * (production goose run) to test real tables, not a transcription.
+ * ClickHouse endpoint with shipped migrations for metric suites, in a container with the app reader
+ * provisioned (ADR-202): suites read as the reader and seed as the system identity. One endpoint
+ * per suite: the reader is one user per server and each file provisions its own password.
  */
-import { type ClickHouseClient, createClient } from "@clickhouse/client";
-import { DEFAULT_CLICKHOUSE_SETTINGS } from "@langwatch/clickhouse-client";
-import {
-  migrateTestClickHouseOnce,
-  startTestClickHouseEndpoints,
-} from "@langwatch/clickhouse-client/testing";
-import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
+import type { ClickHouseClient } from "@clickhouse/client";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 
-/** The one endpoint name every migrated-schema metric suite asks for. */
-const MIGRATED_ENDPOINT_SUITE = "metric-migrated";
+import { migratedAppReaderClickHouse } from "./support/app-reader-clickhouse.support.ts";
 
 export interface MigratedClickHouse {
-  /** Client bound to the migrated database. */
+  /** The system identity's client bound to the migrated database: seeds and cleanup. */
   client: ClickHouseClient;
+  /** The process's client: reads as the app reader with the tenant setting. */
+  reading: ClickHouseQueryClient;
   /** Connection URL with the migrated database in its path. */
   url: string;
   database: string;
 }
 
-let endpoint: MigratedClickHouse | undefined;
-
-/**
- * Starts (or reuses) the migrated endpoint and returns a client bound to it.
- * `CLICKHOUSE_CLUSTER` is unset for the migration — it switches every engine
- * to `Replicated` form, which needs a Keeper no test server has.
- */
-export async function startMigratedClickHouse(): Promise<MigratedClickHouse> {
-  if (endpoint) return endpoint;
-
-  const [provisioned] = await startTestClickHouseEndpoints({
-    suite: MIGRATED_ENDPOINT_SUITE,
-    names: ["schema"],
-    environment: process.env,
-  });
-  if (!provisioned) throw new Error("No ClickHouse endpoint was provisioned for the metric suite");
-
-  await migrateTestClickHouseOnce({
-    url: provisioned.url,
-    migrate: async () => {
-      const previousCluster = process.env.CLICKHOUSE_CLUSTER;
-      delete process.env.CLICKHOUSE_CLUSTER;
-      try {
-        await ClickHouseMigrateTask.createFromConfig({
-          config: {
-            buildTime: false,
-            sharedUrl: provisioned.url,
-            privateEndpoints: [],
-          },
-        }).execute();
-      } finally {
-        if (previousCluster !== undefined) process.env.CLICKHOUSE_CLUSTER = previousCluster;
-      }
-    },
-  });
-
-  endpoint = {
-    client: createClient({
-      url: provisioned.url,
-      // The fold suites drive long sequential rebuilds against a shared
-      // server; the driver's 30s default aborts a statement that is merely
-      // queued behind another suite's.
-      request_timeout: 180_000,
-      clickhouse_settings: {
-        ...DEFAULT_CLICKHOUSE_SETTINGS,
-        date_time_input_format: "best_effort",
-      },
-    }),
-    url: provisioned.url,
-    database: provisioned.database,
+/** Starts (or reuses) the suite's own migrated endpoint with the reader provisioned. */
+export async function startMigratedClickHouse({
+  suite,
+}: {
+  suite: string;
+}): Promise<MigratedClickHouse> {
+  const opened = await migratedAppReaderClickHouse({ suite: `metric-migrated-${suite}` });
+  return {
+    client: opened.admin,
+    reading: opened.client,
+    url: opened.endpoint.url,
+    database: opened.endpoint.database,
   };
-  return endpoint;
 }
 
 /**

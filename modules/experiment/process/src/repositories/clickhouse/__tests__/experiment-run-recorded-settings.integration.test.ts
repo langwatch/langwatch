@@ -6,7 +6,6 @@
  * @vitest-environment node
  */
 import type { ClickHouseClient } from "@clickhouse/client";
-import { vendorQueryClient } from "@langwatch/clickhouse-client/testing";
 import { createTenantId, type FoldProjectionStore } from "@langwatch/eventing";
 import type { ExperimentRunPlan } from "@langwatch/experiment-contract";
 import { nanoid } from "nanoid";
@@ -30,10 +29,6 @@ import {
   ExperimentClickHouseRepository,
   type ExperimentEventingClickHouseClient,
 } from "../../experiment-clickhouse.repository.ts";
-import {
-  EXPERIMENT_ID_INDEXES,
-  EXPERIMENT_SECOND_ID_INDEXES,
-} from "../clickhouse.experiment-id-indexes.database.ts";
 import { ClickHouseExperimentRunStateRepository } from "../clickhouse.experiment-run-state.repository.ts";
 import { ClickHouseExperimentRunRepository } from "../clickhouse.experiment-run.repository.ts";
 import { ClickHouseExperimentSession } from "../clickhouse.experiment-session.store.ts";
@@ -124,7 +119,7 @@ async function storeStartedRun({
 }
 
 beforeAll(async () => {
-  ({ client } = await startMigratedClickHouse());
+  ({ client } = await startMigratedClickHouse({ suite: "recorded-settings" }));
   states = ClickHouseExperimentRunStateRepository.create({
     clickhouse: new SuiteClickHouse(),
     defaultRetentionDays: () => 90,
@@ -132,10 +127,7 @@ beforeAll(async () => {
   runs = ClickHouseExperimentRunRepository.create({
     workflowVersions: { findByIds: async () => ({}) },
     resolveClient: ClickHouseExperimentSession.resolverOver(
-      vendorQueryClient({
-        vendor: client,
-        indexes: [...EXPERIMENT_ID_INDEXES, ...EXPERIMENT_SECOND_ID_INDEXES],
-      }),
+      (await startMigratedClickHouse({ suite: "recorded-settings" })).reading,
     ),
     telemetry: {
       trace: async <T>(_input: unknown, operation: () => Promise<T>) => operation(),

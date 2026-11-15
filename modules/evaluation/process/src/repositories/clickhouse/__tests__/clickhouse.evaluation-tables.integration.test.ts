@@ -7,11 +7,22 @@ import { randomUUID } from "node:crypto";
 import type { ClickHouseTableFacts } from "@langwatch/clickhouse-client/builder";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { startMigratedClickHouse } from "../../../__tests__/support/monitor-performance.fixtures.ts";
+import {
+  EVALUATION_ID_INDEXES,
+  EVALUATION_SECOND_ID_INDEXES,
+} from "../clickhouse.evaluation-id-indexes.database.ts";
 import { evaluationRuns } from "../clickhouse.evaluation-runs.table.ts";
 import { traceSummaries } from "../clickhouse.trace-summaries.table.ts";
 import { EvaluationRunClickHouseReadRepository } from "../evaluation-run-read.repository.ts";
-import { queryClientResolverFor } from "./support/authorized-clickhouse.support.ts";
+import { migratedAppReaderClickHouse } from "./support/app-reader-clickhouse.support.ts";
+
+/** The migrated schema, its reads as the app reader and its seed rows as the system. */
+const openClickHouse = () =>
+  migratedAppReaderClickHouse({
+    suite: "evaluation-tables-reader",
+    indexes: [...EVALUATION_ID_INDEXES, ...EVALUATION_SECOND_ID_INDEXES],
+  });
+const startMigratedClickHouse = async () => (await openClickHouse()).admin;
 
 const DESCRIPTORS: readonly { readonly $table: ClickHouseTableFacts }[] = [
   evaluationRuns,
@@ -107,9 +118,8 @@ describe("evaluation's stored bytes against the migrated schema", () => {
 
   /** @scenario "Evaluation's stored bytes count only this project's rows" */
   it("sums this project's `_size_bytes` as main's raw read does, without the other tenant's", async () => {
-    const client = await startMigratedClickHouse();
     const bytes = await EvaluationRunClickHouseReadRepository.create({
-      resolveQueryClient: queryClientResolverFor(client),
+      resolveQueryClient: async () => (await openClickHouse()).client,
     }).getStoredBytes({ tenantId: ours });
 
     expect(bytes).toBeGreaterThan(0);

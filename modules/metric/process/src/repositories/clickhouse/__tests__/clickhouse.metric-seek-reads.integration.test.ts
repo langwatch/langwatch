@@ -8,7 +8,7 @@
 import { randomUUID } from "node:crypto";
 
 import type { ClickHouseClient } from "@clickhouse/client";
-import { vendorQueryClient } from "@langwatch/clickhouse-client/testing";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import {
   METRIC_ROLLUP_INTERVAL_MS,
   type CanonicalMetricDataPoint,
@@ -110,6 +110,7 @@ const rawFarPredecessor = (count: number) =>
   ).join("\n UNION ALL\n");
 
 let ch: ClickHouseClient;
+let reading: ClickHouseQueryClient;
 
 function seeded({ tenantId, offsetMs }: { tenantId: string; offsetMs: number }) {
   const at = (seriesId: string, timeUnixMs: number, pointId?: string): CanonicalMetricDataPoint =>
@@ -135,10 +136,8 @@ async function rawRows(query: string, params: Record<string, unknown>) {
   );
 }
 
-async function builtRows(
-  statement: Parameters<ReturnType<typeof vendorQueryClient>["read"]>[0]["statement"],
-) {
-  const { rows } = await vendorQueryClient({ vendor: ch, indexes: [] }).read({ statement });
+async function builtRows(statement: Parameters<ClickHouseQueryClient["read"]>[0]["statement"]) {
+  const { rows } = await reading.read({ statement });
   return sorted(rows.map((row) => seekMetricRowSchema.parse(row)));
 }
 
@@ -153,13 +152,13 @@ function sorted(rows: Parameters<typeof metricPointFromSeekRow>[0][]): MetricSeq
 }
 
 beforeAll(async () => {
-  ({ client: ch } = await startMigratedClickHouse());
+  ({ client: ch, reading } = await startMigratedClickHouse({ suite: "seek-reads" }));
   const repository = ClickHouseMetricDataPointAppendRepository.create({
     resolveClient: async () => ({
       insert: async (params) => {
         await ch.insert(params);
       },
-      read: (input) => vendorQueryClient({ vendor: ch, indexes: [] }).read(input),
+      read: (input) => reading.read(input),
     }),
     defaultRetentionDays: 30,
   });

@@ -5,7 +5,7 @@
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import { analyticsComparisonWindow } from "@langwatch/analytics-contract";
-import { ClickHouseQueryClient, type QueryDriver, TenantGuard } from "@langwatch/clickhouse-client";
+import type { QueryDriver } from "@langwatch/clickhouse-client";
 import { generate } from "@langwatch/ksuid";
 import { Temporal } from "@langwatch/time";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -14,15 +14,15 @@ import {
   buildSeedMatrix,
   deleteSeededTenantRows,
   seedMonitorPerformance,
-  startMigratedClickHouse,
 } from "../../../__tests__/support/monitor-performance.fixtures.ts";
 import { MonitorPerformanceService } from "../../../features/monitors/services/monitor-performance.service.ts";
 import { ClickHouseMonitorPerformanceRepository } from "../monitor-performance.repository.ts";
-
-const clickHouseUrl =
-  process.env.LANGWATCH_TEST_CLICKHOUSE_URL ??
-  process.env.TEST_CLICKHOUSE_URL ??
-  process.env.CI_CLICKHOUSE_URL;
+import {
+  type AppReaderClickHouse,
+  appReaderClickHouseOver,
+  migrateAppReaderEndpoint,
+  startAppReaderEndpoint,
+} from "./support/app-reader-clickhouse.support.ts";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const tenantId = `test-monitor-performance-${generate("test").toString()}`;
@@ -37,39 +37,19 @@ const previousStartMs = analyticsComparisonWindow({
 }).previousPeriodStart.epochMilliseconds;
 
 let clickHouse: ClickHouseClient;
+let appReader: AppReaderClickHouse;
 let service: MonitorPerformanceService;
 let queryCount = 0;
 
-/** The routed ClickHouse member over the migrated test server, counting its reads. */
-function countingQueryClient(client: ClickHouseClient): ClickHouseQueryClient {
-  const driver: QueryDriver = {
-    async execute(request) {
+/** The app reader's driver, counting the reads the process sends through it. */
+function countingReads(driver: QueryDriver): QueryDriver {
+  return {
+    ...driver,
+    execute(request) {
       queryCount++;
-      const result = await client.query({
-        query: request.sql,
-        format: "JSONEachRow",
-        ...(request.params === undefined ? {} : { query_params: request.params }),
-        ...(request.settings === undefined ? {} : { clickhouse_settings: request.settings }),
-      });
-      return { rows: await result.json() };
-    },
-    async insert(request) {
-      await client.insert({
-        table: request.table,
-        values: request.rows,
-        format: "JSONEachRow",
-        ...(request.settings === undefined ? {} : { clickhouse_settings: request.settings }),
-      });
-    },
-    async command(request) {
-      await client.command({
-        query: request.sql,
-        ...(request.params === undefined ? {} : { query_params: request.params }),
-        ...(request.settings === undefined ? {} : { clickhouse_settings: request.settings }),
-      });
+      return driver.execute(request);
     },
   };
-  return new ClickHouseQueryClient({ tenantGuard: new TenantGuard(), driver });
 }
 
 const readPerformance = (monitors: { id: string; isGuardrail: boolean }[]) =>
@@ -82,9 +62,14 @@ const readPerformance = (monitors: { id: string; isGuardrail: boolean }[]) =>
     timeZone: "UTC",
   });
 
-describe.skipIf(!clickHouseUrl)("online evaluation monitor performance", () => {
+describe("online evaluation monitor performance", () => {
   beforeAll(async () => {
-    clickHouse = await startMigratedClickHouse();
+    const endpoint = await startAppReaderEndpoint({
+      suite: "evaluation-monitor-performance-reader",
+    });
+    await migrateAppReaderEndpoint({ endpoint });
+    appReader = await appReaderClickHouseOver({ endpoint, wrapReaderDriver: countingReads });
+    clickHouse = appReader.admin;
     await seedMonitorPerformance({
       client: clickHouse,
       tenantId,
@@ -96,16 +81,16 @@ describe.skipIf(!clickHouseUrl)("online evaluation monitor performance", () => {
         previousStartMs,
       }),
     });
-    const routed = countingQueryClient(clickHouse);
     service = MonitorPerformanceService.create({
       repository: ClickHouseMonitorPerformanceRepository.create({
-        resolveQueryClient: async () => routed,
+        resolveQueryClient: async () => appReader.client,
       }),
     });
   }, 180_000);
 
   afterAll(async () => {
     await deleteSeededTenantRows({ client: clickHouse, tenantId });
+    await appReader?.close();
   });
 
   /** @scenario Performance for every monitor is read in one bounded query */

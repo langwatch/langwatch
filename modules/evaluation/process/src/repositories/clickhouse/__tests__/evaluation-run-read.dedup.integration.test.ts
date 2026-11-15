@@ -1,12 +1,19 @@
 /** @vitest-environment node */
 /** Spec: specs/evaluations/trace-evaluations-read.feature */
-import { type ClickHouseClient, createClient } from "@clickhouse/client";
-import { startTestClickHouseEndpoints } from "@langwatch/clickhouse-client/testing";
+import type { ClickHouseClient } from "@clickhouse/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { ownProof } from "../../../__tests__/support/authorization-proofs.fixture.ts";
+import {
+  EVALUATION_ID_INDEXES,
+  EVALUATION_SECOND_ID_INDEXES,
+} from "../clickhouse.evaluation-id-indexes.database.ts";
 import { EvaluationRunClickHouseReadRepository } from "../evaluation-run-read.repository.ts";
-import { queryClientResolverFor } from "./support/authorized-clickhouse.support.ts";
+import {
+  type AppReaderClickHouse,
+  appReaderClickHouseOver,
+  startAppReaderEndpoint,
+} from "./support/app-reader-clickhouse.support.ts";
 
 const TENANT = "tenant_dedup";
 const TRACE_ID = "trace_dedup_1";
@@ -68,15 +75,16 @@ function row(overrides: Record<string, unknown>): Record<string, unknown> {
 }
 
 let client: ClickHouseClient;
+let clickHouse: AppReaderClickHouse;
 
 describe("given an evaluation whose row was rewritten as it progressed", () => {
   beforeAll(async () => {
-    const [endpoint] = await startTestClickHouseEndpoints({
-      suite: "evaluation-run-read-dedup",
-      names: ["shared"],
-      environment: process.env,
+    const endpoint = await startAppReaderEndpoint({ suite: "evaluation-run-read-dedup" });
+    clickHouse = await appReaderClickHouseOver({
+      endpoint,
+      indexes: [...EVALUATION_ID_INDEXES, ...EVALUATION_SECOND_ID_INDEXES],
     });
-    client = createClient({ url: endpoint!.url });
+    client = clickHouse.admin;
     // The endpoint is reused across runs, so start from an empty table.
     await client.command({ query: "DROP TABLE IF EXISTS evaluation_runs SYNC" });
     await client.command({ query: CREATE_TABLE });
@@ -98,14 +106,14 @@ describe("given an evaluation whose row was rewritten as it progressed", () => {
   }, 120_000);
 
   afterAll(async () => {
-    await client?.close();
+    await clickHouse?.close();
   });
 
   describe("when the trace behind it is read", () => {
     /** @scenario "A rewritten evaluation is not hidden by the read's own column aliases" */
     it("returns it through the by-trace read as well", async () => {
       const repository = EvaluationRunClickHouseReadRepository.create({
-        resolveQueryClient: queryClientResolverFor(client),
+        resolveQueryClient: async () => clickHouse.client,
       });
 
       const result = await repository.findByTraceId({

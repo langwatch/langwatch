@@ -7,7 +7,6 @@ import { randomUUID } from "node:crypto";
  * multi-series handling; verifies data point landing and affected-bucket computation.
  */
 import type { ClickHouseClient } from "@clickhouse/client";
-import { vendorQueryClient } from "@langwatch/clickhouse-client/testing";
 import {
   METRIC_ROLLUP_INTERVAL_MS,
   type CanonicalMetricDataPoint,
@@ -19,19 +18,20 @@ import {
   ClickHouseMetricDataPointAppendRepository,
   type MetricClickHouseClient,
 } from "../repositories/clickhouse/clickhouse.metric-data-point-append.repository.ts";
-import { startMigratedClickHouse } from "./migrated-clickhouse.harness.ts";
+import { type MigratedClickHouse, startMigratedClickHouse } from "./migrated-clickhouse.harness.ts";
 
 let ch: ClickHouseClient;
+let migrated: MigratedClickHouse;
 let repo: ClickHouseMetricDataPointAppendRepository;
 
 /**
  * The narrow port the repository takes, over the real client: inserts go to the
  * driver, reads through the vendor reader with the tenant setting.
  */
-function metricClient(client: ClickHouseClient): MetricClickHouseClient {
+function metricClient({ client, reading }: MigratedClickHouse): MetricClickHouseClient {
   return {
     insert: async (params) => client.insert(params),
-    read: (input) => vendorQueryClient({ vendor: client, indexes: [] }).read(input),
+    read: (input) => reading.read(input),
   };
 }
 
@@ -123,8 +123,9 @@ async function readRollups(seriesId: string) {
 }
 
 beforeAll(async () => {
-  ch = (await startMigratedClickHouse()).client;
-  const port = metricClient(ch);
+  migrated = await startMigratedClickHouse({ suite: "fold" });
+  ch = migrated.client;
+  const port = metricClient(migrated);
   repo = ClickHouseMetricDataPointAppendRepository.create({
     resolveClient: async () => port,
     defaultRetentionDays: 30,
@@ -330,7 +331,7 @@ describe("given a cumulative series long enough to span several rollup buckets",
 
     beforeAll(async () => {
       reads = 0;
-      const delegate = metricClient(ch);
+      const delegate = metricClient(migrated);
       const counting: MetricClickHouseClient = {
         read: async (args) => {
           reads += 1;
