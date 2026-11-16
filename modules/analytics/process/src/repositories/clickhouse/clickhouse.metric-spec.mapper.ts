@@ -593,6 +593,22 @@ function arrayAggregate<T extends string>(
   }
 }
 
+const TRACE_ID_PROBE = param.string("trace-id");
+const OTHER_PROBE = param.string("other");
+const PROBE: MetricSource<string> = {
+  trace: (name) => (name === "TraceId" ? TRACE_ID_PROBE : OTHER_PROBE),
+  attribute: () => OTHER_PROBE,
+  span: () => OTHER_PROBE,
+  evaluation: () => OTHER_PROBE,
+};
+
+/** Whether a spec counts distinct traces on the trace row (main's isUniqOverTraceId). */
+export function countsTraces(spec: MetricSpec): boolean {
+  if (spec.form !== "scalar" || spec.outer || spec.condition || spec.joins.length > 0) return false;
+  if (spec.aggregate.fn !== "uniq") return false;
+  return spec.operand?.(PROBE) === TRACE_ID_PROBE;
+}
+
 /**
  * A spec's aggregate over `source`, with the series' own condition ANDed into the metric's.
  * A sum with no condition of the metric's own reads 0, never NULL, over no rows (main's coalesce).

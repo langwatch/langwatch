@@ -508,6 +508,18 @@ describe("the mixed trace and evaluation read", () => {
     expect(statement).toMatch(/coalesce\(sum\(v0\), 0\)/);
   });
 
+  it("counts traces exactly across the per-trace rows, never by the uniq estimate", () => {
+    const statement = inlined(
+      read(mixedEvalTimeseriesRead, {
+        series: [series("metadata.trace_id", "cardinality"), mix[1]!],
+        timeScale: 60,
+      }),
+    );
+
+    expect(statement).toMatch(/uniqExact\(v0\) AS m0__/);
+    expect(statement).not.toMatch(/\buniq\(/);
+  });
+
   it("serves trace metrics beside run metrics, and nothing else", () => {
     const serves = (input: Partial<Omit<TimeseriesQueryInput, keyof typeof dates>>) =>
       servesMixedEval({ ...dates, series: mix, timeScale: 60, ...input });
@@ -685,6 +697,22 @@ describe("the trace_summaries read grouped by a key a trace holds several of", (
     expect(sql).toContain(
       "join_algorithm = 'grace_hash', max_bytes_in_join = 200000000, max_threads = 4",
     );
+  });
+
+  it.each([
+    ["metadata.trace_id", "metadata.model"],
+    ["metadata.span_type", "metadata.span_type"],
+  ])("counts %s exactly under %s, never by the uniq estimate", (metric, groupBy) => {
+    const sql = inlined(
+      read(spanGroupedTimeseriesRead, {
+        series: [series(metric, "cardinality")],
+        groupBy,
+        timeScale: 60,
+      }),
+    );
+
+    expect(sql).toMatch(/uniqExact\(v0\) AS m0__/);
+    expect(sql).not.toMatch(/\buniq\(/);
   });
 
   it("keeps only the filtered labels when it filters and groups by labels", () => {
