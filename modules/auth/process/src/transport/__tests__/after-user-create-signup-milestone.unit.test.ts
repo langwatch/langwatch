@@ -19,7 +19,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
-const hooksLog = vi.hoisted(() => ({ lines: undefined as unknown as TestLogLines }));
+const hooksLog = vi.hoisted((): { lines?: TestLogLines } => ({}));
 
 // Only the hooks' own logger is replaced, so a failure it logs can be read; the name is spelled
 // inline because a `vi.mock` factory is hoisted above any const it might reference.
@@ -305,7 +305,7 @@ describe("afterUserCreate", () => {
           throw new Error("outbox unavailable");
         },
       });
-      hooksLog.lines.length = 0;
+      hooksLog.lines?.splice(0);
 
       await expect(
         afterUserCreate({
@@ -314,7 +314,7 @@ describe("afterUserCreate", () => {
         }),
       ).resolves.toBeUndefined();
 
-      expect(hooksLog.lines.findLine("error", "created fact")).toMatchObject({ userId: "user_5" });
+      expect(hooksLog.lines?.findLine("error", "created fact")).toMatchObject({ userId: "user_5" });
       expectSignUpOf(await onlySignUpFact(facts), "user_5");
     });
   });

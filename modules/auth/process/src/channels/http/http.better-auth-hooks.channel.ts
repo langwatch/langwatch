@@ -228,10 +228,9 @@ const joinSsoOrganization = async ({
 };
 
 /**
- * Better Auth writes a social or single sign-on account through its own adapter, past user's
- * mints, so the created fact that carries the address to Customer.io is asked for here. This hook
- * runs after the commit and a throw from it fails the sign-in, so a failure is logged by account
- * id instead: the account exists either way.
+ * Better Auth writes social and single sign-on accounts past user's mints, so the created fact
+ * that carries the address to Customer.io is asked for here. A throw here fails the sign-in after
+ * the commit, so a failure is logged by account id instead: the account exists either way.
  */
 async function recordAccountCreated({
   users,
@@ -251,10 +250,9 @@ async function recordAccountCreated({
 }
 
 /**
- * Called after a new user is created. Records the sign-up for nurturing and the
- * account's created fact, then auto-onboards the user into an SSO-matched
- * organization through the organization's seat-checked admission, which writes
- * the matching grant.
+ * Called after a new user is created. Records the sign-up for nurturing and the account's created
+ * fact, then auto-onboards the user into an SSO-matched organization through the organization's
+ * seat-checked admission, which writes the matching grant.
  */
 export const afterUserCreate = async ({
   user,
