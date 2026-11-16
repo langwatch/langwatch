@@ -19,6 +19,10 @@ import {
   mixedEvalTimeseriesRead,
   servesMixedEval,
 } from "../clickhouse.mixed-eval-timeseries-query.mapper.ts";
+import {
+  pipelineTimeseriesRead,
+  servesPipelines,
+} from "../clickhouse.pipeline-timeseries-query.mapper.ts";
 import { rollupTimeseriesRead } from "../clickhouse.rollup-timeseries-query.mapper.ts";
 import { slimTimeseriesRead } from "../clickhouse.slim-timeseries-query.mapper.ts";
 import {
@@ -696,6 +700,108 @@ describe("the trace_summaries read grouped by a key a trace holds several of", (
         ],
       }),
     ).toBe(false);
+  });
+});
+
+describe("the trace_summaries pipeline read", () => {
+  const perUser = {
+    ...series("performance.total_cost", "sum"),
+    pipeline: { field: "user_id", aggregation: "avg" },
+  } as AnalyticsSeries;
+  const perTrace = {
+    ...series("performance.total_cost", "sum"),
+    pipeline: { field: "trace_id", aggregation: "avg" },
+  } as AnalyticsSeries;
+  const threadsPerUser = {
+    ...series("threads.average_duration_per_thread", "avg"),
+    pipeline: { field: "user_id", aggregation: "max" },
+  } as AnalyticsSeries;
+
+  it.each([
+    ["own", 60],
+    ["aggregate", 60],
+    ["own", "full"],
+    ["aggregate", "full"],
+  ] as const)(
+    "is a reader statement whose tenants are the %s proof's at scale %s",
+    (proof, timeScale) => {
+      const statement = read(
+        pipelineTimeseriesRead,
+        { series: [series("performance.total_cost", "sum"), perUser, threadsPerUser], timeScale },
+        proof,
+      );
+      const tenants = proof === "own" ? ["tenant-a"] : ["tenant-a", "member-b"];
+
+      expect(statement.identity).toBe("reader");
+      expect(statement.kind).toBe("tenant");
+      expect(statement.tenantIds?.toSorted()).toEqual(tenants.toSorted());
+      expect(statement.settings.SQL_langwatch_tenant_ids.split(",").toSorted()).toEqual(
+        tenants.toSorted(),
+      );
+      expect(statement.sql).not.toMatch(/TenantId\s*=/);
+      expect(statement.sql).toContain(
+        "log_comment = 'analytics:timeseries:trace_summaries:pipelines'",
+      );
+    },
+  );
+
+  it("groups each per-entity step by the member, a trace id included", () => {
+    const sql = inlined(read(pipelineTimeseriesRead, { series: [perTrace], timeScale: 60 }));
+
+    expect(sql).toContain("TenantId, TraceId HAVING (TraceId != '')");
+    expect(sql).toMatch(/avg\(inner_value\)/);
+  });
+
+  it("stacks one arm per re-aggregated series and keeps the first source's buckets", () => {
+    const sql = inlined(
+      read(pipelineTimeseriesRead, {
+        series: [series("performance.total_cost", "sum"), perUser, threadsPerUser],
+        timeScale: 60,
+      }),
+    );
+
+    expect(sql.match(/UNION ALL/g)).toHaveLength(2);
+    expect(sql).toMatch(/HAVING max\(anchored\) > 0/);
+    expect(sql).not.toMatch(/JOIN/);
+  });
+
+  it("serves pipelines and thread durations on trace rows, and leaves the rest to their shapes", () => {
+    const serves = (input: Partial<Omit<TimeseriesQueryInput, keyof typeof dates>>) =>
+      servesPipelines({ ...dates, series: [perUser], timeScale: 60, ...input });
+
+    expect(serves({})).toBe(true);
+    expect(serves({ timeScale: "full" })).toBe(true);
+    expect(serves({ series: [series("threads.average_duration_per_thread", "avg")] })).toBe(true);
+    expect(serves({ groupBy: "metadata.user_id" })).toBe(true);
+    expect(serves({ groupBy: "metadata.user_id", timeScale: "full" })).toBe(false);
+    expect(serves({ groupBy: "metadata.labels" })).toBe(false);
+    expect(serves({ series: [series("performance.total_cost", "sum")] })).toBe(false);
+    expect(
+      serves({
+        series: [
+          {
+            ...series("evaluations.evaluation_score", "avg"),
+            key: "ev",
+            pipeline: { field: "user_id", aggregation: "avg" },
+          } as AnalyticsSeries,
+        ],
+      }),
+    ).toBe(false);
+  });
+
+  it("refuses a filtered per-entity series shown as a percentage", () => {
+    expect(() =>
+      read(pipelineTimeseriesRead, {
+        series: [
+          {
+            ...perUser,
+            filters: { "traces.error": ["false"] },
+            asPercent: true,
+          } as AnalyticsSeries,
+        ],
+        timeScale: 60,
+      }),
+    ).toThrow(expect.objectContaining({ code: "analytics_series_percentage_unsupported" }));
   });
 });
 

@@ -971,6 +971,65 @@ export const SPAN_GROUPED_SHAPES: Shape[] = [
   },
 ];
 
+/** Pipelines and thread durations: an inner metric per user, thread, customer or trace. */
+const PIPELINE_SERIES: AnalyticsSeries[] = [
+  mixed("performance.total_cost", "sum", { pipeline: { field: "user_id", aggregation: "avg" } }),
+  mixed("metadata.trace_id", "cardinality", {
+    pipeline: { field: "thread_id", aggregation: "max" },
+  }),
+  mixed("performance.completion_time", "avg", {
+    pipeline: { field: "customer_id", aggregation: "min" },
+  }),
+  mixed("performance.total_cost", "sum", { pipeline: { field: "trace_id", aggregation: "avg" } }),
+  mixed("performance.total_cost", "sum", {
+    pipeline: { field: "user_id", aggregation: "sum" },
+    filters: clean,
+  }),
+  mixed("threads.average_duration_per_thread", "avg"),
+  mixed("threads.average_duration_per_thread", "avg", {
+    pipeline: { field: "user_id", aggregation: "max" },
+  }),
+];
+const PIPELINE_WITH_SIMPLE: AnalyticsSeries[] = [
+  mixed("performance.total_cost", "sum"),
+  ...PIPELINE_SERIES,
+  mixed("metadata.trace_id", "cardinality", { filters: clean, asPercent: true }),
+];
+const pipelines = (
+  name: string,
+  series: AnalyticsSeries[],
+  timeScale: number | "full",
+  extra: Partial<Shape> = {},
+): Shape => ({ name: `pipelines ${name}`, table: "trace_summaries", series, timeScale, ...extra });
+
+/** Pipeline series: the both-periods summary CTEs and the date-bucketed pipeline. */
+export const PIPELINE_SHAPES: Shape[] = [
+  pipelines("with simple metrics, both periods", PIPELINE_WITH_SIMPLE, "full"),
+  pipelines("alone, both periods", PIPELINE_SERIES, "full"),
+  pipelines("filtered on spans.type, negated, both periods", PIPELINE_SERIES, "full", {
+    filters: { "spans.type": ["tool"] } as AnalyticsFilters,
+    negateFilters: true,
+  }),
+  pipelines("with simple metrics, hourly", PIPELINE_WITH_SIMPLE, 60),
+  pipelines("alone, daily in Amsterdam", PIPELINE_SERIES, 1440, {
+    timeZone: "Europe/Amsterdam",
+  }),
+  pipelines("one series, hourly", PIPELINE_SERIES.slice(0, 1), 60),
+  pipelines("by traces.trace_name, hourly", PIPELINE_WITH_SIMPLE, 60, {
+    groupBy: "traces.trace_name",
+  }),
+  pipelines("by metadata.user_id, hourly", PIPELINE_WITH_SIMPLE, 60, {
+    groupBy: "metadata.user_id",
+  }),
+  pipelines("alone by topics.topics, daily", PIPELINE_SERIES, 1440, {
+    groupBy: "topics.topics",
+  }),
+  pipelines("for three traces, excluding evaluation origins, hourly", PIPELINE_WITH_SIMPLE, 60, {
+    traceIds: [`trace-${RUN}-0`, `trace-${RUN}-1`, `trace-${RUN}-4`],
+    excludeOrigins: ["evaluation"],
+  }),
+];
+
 export const SHAPES: Shape[] = [
   {
     name: "rollup, full",

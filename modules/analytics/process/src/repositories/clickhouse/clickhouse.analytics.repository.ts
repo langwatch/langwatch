@@ -51,6 +51,10 @@ import {
   mixedEvalTimeseriesRead,
   servesMixedEval,
 } from "./clickhouse.mixed-eval-timeseries-query.mapper.ts";
+import {
+  pipelineTimeseriesRead,
+  servesPipelines,
+} from "./clickhouse.pipeline-timeseries-query.mapper.ts";
 import { translatingQueryFailures } from "./clickhouse.query-error-translation.mapper.ts";
 import { rollupTimeseriesRead } from "./clickhouse.rollup-timeseries-query.mapper.ts";
 import { slimTimeseriesRead } from "./clickhouse.slim-timeseries-query.mapper.ts";
@@ -101,6 +105,7 @@ function routeOf({
   if (servesMixedEval(input)) return built(mixedEvalTimeseriesRead);
   if (servesJoinedTraceSummaries(input)) return built(joinedTimeseriesRead);
   if (servesSpanGrouped(input)) return built(spanGroupedTimeseriesRead);
+  if (servesPipelines(input)) return built(pipelineTimeseriesRead);
   return { kind: "text" };
 }
 

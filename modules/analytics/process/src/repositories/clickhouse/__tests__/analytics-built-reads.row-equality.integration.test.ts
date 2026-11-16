@@ -34,6 +34,7 @@ import {
 import { FilterOptionsClickHouseRepository } from "../clickhouse.filter-options.repository.ts";
 import { servesJoinedTraceSummaries } from "../clickhouse.joined-timeseries-query.mapper.ts";
 import { servesMixedEval } from "../clickhouse.mixed-eval-timeseries-query.mapper.ts";
+import { servesPipelines } from "../clickhouse.pipeline-timeseries-query.mapper.ts";
 import { servesSpanGrouped } from "../clickhouse.span-grouped-timeseries-query.mapper.ts";
 import { servesStandardTraceSummaries } from "../clickhouse.trace-summaries-timeseries-query.mapper.ts";
 import { traceSummaries } from "../clickhouse.trace-summaries.table.ts";
@@ -58,6 +59,8 @@ const expected = JSON.parse(
   timeseries: Record<string, AnalyticsTimeseriesResult>;
   /** The mixed read under the aggregate: each member's trace once; see its describe. */
   mixedPerMember: Record<string, AnalyticsTimeseriesResult>;
+  /** Pipeline reads under the aggregate where a per-trace step counts each member's trace. */
+  pipelinePerMember: Record<string, AnalyticsTimeseriesResult>;
 };
 
 /** A read's answer with its suite's run id written as the literals write it. */
@@ -608,6 +611,77 @@ describe("timeseries reads built on the typed builder", () => {
     it.each(timeseries.SPAN_GROUPED_SHAPES)("$name is a built read", (shape) => {
       expect(
         servesSpanGrouped({
+          ...timeseriesInput(shape, timeseries.TENANT_A),
+          startDate: new Date(timeseries.START),
+          endDate: new Date(timeseries.END),
+          previousPeriodStartDate: new Date(timeseries.PREVIOUS_START),
+        }),
+      ).toBe(true);
+    });
+  });
+
+  /*
+   * Main's dated pipeline joined its CTEs and named the keys `simple_metrics.period`, so its parser
+   * read no bucket; these literals are main's SQL answers under the plain key names.
+   */
+  describe("given pipeline series", () => {
+    const [own, aggregate] = timeseries.PROOFS;
+
+    it.each(timeseries.PIPELINE_SHAPES)(
+      "$name answers main's buckets under one tenant's proof",
+      async (shape) => {
+        const want =
+          expected.timeseries[`${literal(own!.projectId, timeseries.RUN)}|${shape.name}`];
+        const got = await builtTimeseries({
+          shape,
+          projectId: own!.projectId,
+          proof: own!.proof(),
+        });
+
+        expect(want).toBeDefined();
+        expect(toTwelveDigits(got)).toEqual(toTwelveDigits(want));
+      },
+    );
+
+    /*
+     * Main grouped a per-trace pipeline by trace id alone, merging two members' traces sharing
+     * an id; the built read keeps each member's trace (ruling 1a). Elsewhere: main's buckets.
+     */
+    it.each(timeseries.PIPELINE_SHAPES)(
+      "$name counts each member's entities under an aggregate",
+      async (shape) => {
+        const key = `${literal(aggregate!.projectId, timeseries.RUN)}|${shape.name}`;
+        const want = expected.pipelinePerMember[key] ?? expected.timeseries[key];
+        const got = await builtTimeseries({
+          shape,
+          projectId: aggregate!.projectId,
+          proof: aggregate!.proof(),
+        });
+
+        expect(want).toBeDefined();
+        expect(toTwelveDigits(got)).toEqual(toTwelveDigits(want));
+      },
+    );
+
+    it("averages both members' traces 3, which share an id, as two traces", async () => {
+      const shape = timeseries.PIPELINE_SHAPES.find(
+        (each) => each.name === "pipelines alone, both periods",
+      )!;
+      const result = await builtTimeseries({
+        shape,
+        projectId: aggregate!.projectId,
+        proof: aggregate!.proof(),
+      });
+
+      // A's trace 3 costs 4, B's 400: two traces averaging 202, where main merged them into 404.
+      expect(result.previousPeriod[0]).toMatchObject({
+        "3/performance.total_cost/sum/trace_id/avg": 202,
+      });
+    });
+
+    it.each(timeseries.PIPELINE_SHAPES)("$name is a built read", (shape) => {
+      expect(
+        servesPipelines({
           ...timeseriesInput(shape, timeseries.TENANT_A),
           startDate: new Date(timeseries.START),
           endDate: new Date(timeseries.END),
