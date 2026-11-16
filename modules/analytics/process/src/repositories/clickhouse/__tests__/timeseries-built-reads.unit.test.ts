@@ -615,7 +615,7 @@ describe("the trace_summaries read joined to spans or runs", () => {
     expect(serves({ series: [cost], groupBy: "evaluations.evaluation_label" })).toBe(true);
     expect(serves({ timeScale: "full", groupBy: "metadata.user_id" })).toBe(true);
     expect(serves({ series: [cost] })).toBe(false);
-    expect(serves({ timeScale: "full" })).toBe(false);
+    expect(serves({ timeScale: "full" })).toBe(true);
     expect(serves({ series: [...runs, cost] })).toBe(false);
     expect(serves({ series: [...runs, ...spans] })).toBe(false);
     expect(serves({ groupBy: "metadata.labels" })).toBe(false);
@@ -834,7 +834,8 @@ describe("the trace_summaries pipeline read", () => {
     expect(serves({ timeScale: "full" })).toBe(true);
     expect(serves({ series: [series("threads.average_duration_per_thread", "avg")] })).toBe(true);
     expect(serves({ groupBy: "metadata.user_id" })).toBe(true);
-    expect(serves({ groupBy: "metadata.user_id", timeScale: "full" })).toBe(false);
+    // Main dropped a full-scale grouped pipeline; ruling 1a (Alex, 2026-11-16) computes it.
+    expect(serves({ groupBy: "metadata.user_id", timeScale: "full" })).toBe(true);
     expect(serves({ groupBy: "metadata.labels" })).toBe(false);
     expect(serves({ series: [series("performance.total_cost", "sum")] })).toBe(false);
     expect(

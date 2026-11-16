@@ -57,6 +57,11 @@ import {
 } from "./clickhouse.pipeline-timeseries-query.mapper.ts";
 import { translatingQueryFailures } from "./clickhouse.query-error-translation.mapper.ts";
 import { rollupTimeseriesRead } from "./clickhouse.rollup-timeseries-query.mapper.ts";
+import {
+  findPipelineParts,
+  renumberedRows,
+  type SeriesPart,
+} from "./clickhouse.series-parts.mapper.ts";
 import { slimTimeseriesRead } from "./clickhouse.slim-timeseries-query.mapper.ts";
 import {
   servesSpanGrouped,
@@ -88,10 +93,13 @@ const BUILT_READS: Partial<Record<AnalyticsTable, (read: TimeseriesRead) => Read
   };
 
 type TimeseriesReader = (read: TimeseriesRead) => ReaderReadStatement;
-/** How a query is read: a built read, or main's text while its shape is not ported yet. */
-type TimeseriesRoute = { kind: "built"; read: TimeseriesReader } | { kind: "text" };
+/** How a query is read: a built read, its series in built parts, or main's text. */
+type TimeseriesRoute =
+  | { kind: "built"; read: TimeseriesReader }
+  | { kind: "parts"; parts: (SeriesPart & { read: TimeseriesReader })[] }
+  | { kind: "text" };
 
-function routeOf({
+function wholeRouteOf({
   table,
   input,
 }: {
@@ -100,13 +108,37 @@ function routeOf({
 }): TimeseriesRoute {
   const built = (read: TimeseriesReader | undefined): TimeseriesRoute =>
     read ? { kind: "built", read } : { kind: "text" };
-  if (table !== "trace_summaries") return built(BUILT_READS[table]);
+  // Main's text read was the same for trace_summaries and evaluation_runs.
+  if (table !== "trace_summaries" && table !== "evaluation_runs") return built(BUILT_READS[table]);
   if (servesStandardTraceSummaries(input)) return built(traceSummariesTimeseriesRead);
   if (servesMixedEval(input)) return built(mixedEvalTimeseriesRead);
   if (servesJoinedTraceSummaries(input)) return built(joinedTimeseriesRead);
   if (servesSpanGrouped(input)) return built(spanGroupedTimeseriesRead);
   if (servesPipelines(input)) return built(pipelineTimeseriesRead);
   return { kind: "text" };
+}
+
+function routeOf({
+  table,
+  input,
+}: {
+  table: AnalyticsTable;
+  input: TimeseriesQueryInput;
+}): TimeseriesRoute {
+  const whole = wholeRouteOf({ table, input });
+  if (whole.kind !== "text") return whole;
+  const parts = findPipelineParts(input).map((part) => ({
+    ...part,
+    route: wholeRouteOf({ table, input: part.input }),
+  }));
+  if (parts.length === 0 || !parts.every((part) => part.route.kind === "built")) return whole;
+  return {
+    kind: "parts",
+    parts: parts.map(({ route, ...part }) => ({
+      ...part,
+      read: (route as { kind: "built"; read: TimeseriesReader }).read,
+    })),
+  };
 }
 
 /** What an analytics statement is sent through: the fenced reader. */
@@ -180,16 +212,27 @@ export class ClickHouseAnalyticsRepository extends AnalyticsRepository {
     const route = routeOf({ table: query.table, input: builderInput });
 
     try {
-      const rows =
-        route.kind === "built"
-          ? await this.sent(
-              route.read({
-                scope: this.proofScope({ authorization: query.authorization, projectId }),
-                input: builderInput,
-                settings: { ...ANALYTICS_CLICKHOUSE_SETTINGS, ...limits },
-              }),
-            )
-          : await this.legacyRows({ query, builderInput, limits });
+      const settings = { ...ANALYTICS_CLICKHOUSE_SETTINGS, ...limits };
+      const builtRows = (read: TimeseriesReader, input: TimeseriesQueryInput) =>
+        this.sent(
+          read({
+            scope: this.proofScope({ authorization: query.authorization, projectId }),
+            input,
+            settings,
+          }),
+        );
+      const partRows = async (parts: (SeriesPart & { read: TimeseriesReader })[]) =>
+        (
+          await Promise.all(
+            parts.map(async ({ read, input, indexes }) =>
+              renumberedRows(await builtRows(read, input), indexes),
+            ),
+          )
+        ).flat();
+      let rows: unknown;
+      if (route.kind === "built") rows = await builtRows(route.read, builderInput);
+      else if (route.kind === "parts") rows = await partRows(route.parts);
+      else rows = await this.legacyRows({ query, builderInput, limits });
       const result = parseTimeseriesRows({
         rows: Array.isArray(rows) ? rows : [],
         series: query.input.series,

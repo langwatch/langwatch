@@ -440,7 +440,7 @@ export const PROOFS: { name: string; projectId: string; proof: () => Authorizati
 
 export type Shape = {
   name: string;
-  table: TimeseriesTable | "trace_summaries";
+  table: TimeseriesTable | "trace_summaries" | "evaluation_runs";
   series: AnalyticsSeries[];
   groupBy?: string;
   filters?: AnalyticsFilters;
@@ -889,6 +889,31 @@ export const JOINED_SHAPES: Shape[] = [
     groupBy: "evaluations.evaluation_passed",
     timeScale: 60,
   },
+  {
+    name: "joined spans, every metric, both periods",
+    table: "trace_summaries",
+    series: JOINED_SPAN_SERIES,
+    timeScale: "full",
+  },
+  {
+    name: "joined spans with series filters, both periods",
+    table: "trace_summaries",
+    series: JOINED_FILTERED_SERIES,
+    timeScale: "full",
+  },
+  {
+    name: "joined runs, both periods",
+    table: "trace_summaries",
+    series: RUN_SERIES,
+    timeScale: "full",
+  },
+  {
+    name: "joined runs on the evaluation_runs table, filtered on traces.error, both periods",
+    table: "evaluation_runs",
+    series: RUN_SERIES,
+    filters: clean,
+    timeScale: "full",
+  },
 ];
 
 const SPAN_GROUPINGS = [
@@ -1001,6 +1026,53 @@ const pipelines = (
   timeScale: number | "full",
   extra: Partial<Shape> = {},
 ): Shape => ({ name: `pipelines ${name}`, table: "trace_summaries", series, timeScale, ...extra });
+
+/** Two of PIPELINE_SERIES' pipelines beside span metrics, or beside run metrics. */
+const besideSpans: AnalyticsSeries[] = [
+  PIPELINE_SERIES[0]!,
+  mixed("sentiment.thumbs_up_down", "sum"),
+  mixed("events.event_type", "cardinality"),
+  PIPELINE_SERIES[1]!,
+];
+const besideRuns: AnalyticsSeries[] = [
+  PIPELINE_SERIES[0]!,
+  mixed("evaluations.evaluation_score", "avg", { key: "ev" }),
+  mixed("evaluations.evaluation_runs", "cardinality"),
+  PIPELINE_SERIES[1]!,
+];
+
+/**
+ * Shapes main dropped or inflated, computed by Alex's rulings of 2026-11-16: 1a, a full-scale
+ * grouped pipeline is computed; 2a, a pipeline beside span or run metrics is read on its own.
+ */
+export const BY_RULING_SHAPES: (Shape & { ruling: string })[] = [
+  {
+    ...pipelines("by traces.trace_name, both periods", PIPELINE_WITH_SIMPLE, "full", {
+      groupBy: "traces.trace_name",
+    }),
+    ruling: "1a",
+  },
+  {
+    ...pipelines("alone by topics.topics, both periods", PIPELINE_SERIES, "full", {
+      groupBy: "topics.topics",
+    }),
+    ruling: "1a",
+  },
+  { ...pipelines("beside span metrics, hourly", besideSpans, 60), ruling: "2a" },
+  { ...pipelines("beside run metrics, hourly", besideRuns, 60), ruling: "2a" },
+  {
+    ...pipelines("beside run metrics by topics.topics, daily", besideRuns, 1440, {
+      groupBy: "topics.topics",
+    }),
+    ruling: "2a",
+  },
+  {
+    ...pipelines("beside span metrics by traces.trace_name, both periods", besideSpans, "full", {
+      groupBy: "traces.trace_name",
+    }),
+    ruling: "1a, 2a",
+  },
+];
 
 /** Pipeline series: the both-periods summary CTEs and the date-bucketed pipeline. */
 export const PIPELINE_SHAPES: Shape[] = [

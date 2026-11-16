@@ -87,11 +87,11 @@ function pipelineSpecOf(series: AnalyticsSeries, index: number): MetricSpec {
 
 /**
  * Whether the pipeline shape serves this query, as main routed it to its summary CTEs (full, no
- * grouping) or its date-bucketed pipeline (numeric): trace-row metrics, row filters, a pipeline.
+ * grouping) or its date-bucketed pipeline (numeric), and full-scale grouped pipelines main
+ * dropped (ruling 1a): trace-row metrics, row filters, a pipeline.
  */
 export function servesPipelines(input: TimeseriesQueryInput): boolean {
-  const numeric = typeof input.timeScale === "number";
-  if (!numeric && !(input.timeScale === "full" && !input.groupBy)) return false;
+  if (typeof input.timeScale !== "number" && input.timeScale !== "full") return false;
   if (input.groupBy && !GROUP_BYS[input.groupBy]) return false;
   let reaggregated = false;
   for (const [index, series] of input.series.entries()) {
@@ -118,18 +118,18 @@ function outerAggregate<T extends string>(
   }
 }
 
-/** Where one arm reads: a period and its buckets, or both periods bucketed by date. */
-type Bucketing = { kind: "period"; period: Period } | { kind: "dated"; scale: number };
+/** Where one arm reads: one period, or both by period, date (absent at full scale) and key. */
+type Bucketing = { kind: "period"; period: Period } | { kind: "dated"; scale: number | undefined };
 
 type Parts = { scope: ProofScope; input: TimeseriesQueryInput; bucketing: Bucketing };
 
 /** The bucket columns of a scan of the trace rows: period, date and group key. */
 function bucketsOf({ input, bucketing }: Parts): Row {
   if (bucketing.kind === "period") return {};
-  const buckets: Row = {
-    period: periodOf(ts.OccurredAt, input),
-    date: dateBucket(ts.OccurredAt, bucketing.scale, input.timeZone ?? "UTC"),
-  };
+  const buckets: Row = { period: periodOf(ts.OccurredAt, input) };
+  if (bucketing.scale !== undefined) {
+    buckets.date = dateBucket(ts.OccurredAt, bucketing.scale, input.timeZone ?? "UTC");
+  }
   const grouping = input.groupBy ? GROUP_BYS[input.groupBy] : undefined;
   if (grouping) buckets.group_key = groupKeyFor(grouping);
   return buckets;
@@ -410,12 +410,18 @@ function summaryRead({ scope, input, settings }: TimeseriesRead): ReaderReadStat
 /** The pipeline trace_summaries timeseries read; see {@link servesPipelines}. */
 export function pipelineTimeseriesRead(read: TimeseriesRead): ReaderReadStatement {
   const { scope, input, settings } = read;
-  if (typeof input.timeScale !== "number") return summaryRead(read);
-  const parts: Parts = { scope, input, bucketing: { kind: "dated", scale: input.timeScale } };
+  if (input.timeScale === "full" && !input.groupBy) return summaryRead(read);
+  // Ruling 1a (Alex, 2026-11-16): a full-scale grouped pipeline is computed; main dropped it.
+  const scale = typeof input.timeScale === "number" ? input.timeScale : undefined;
+  const parts: Parts = { scope, input, bucketing: { kind: "dated", scale } };
   const { arms, reaggregatedAliases } = armsOf(parts);
   const sources = stacked(scope, arms);
   const columns: Columns = sources;
-  const keys = ["period", "date", ...(input.groupBy ? ["group_key"] : [])];
+  const keys = [
+    "period",
+    ...(scale === undefined ? [] : ["date"]),
+    ...(input.groupBy ? ["group_key"] : []),
+  ];
   const selection: Row = Object.fromEntries(keys.map((key) => [key, columns[key]!]));
   const defaulted = arms.length > 1;
   for (const alias of aliasesOf(input)) {
@@ -425,13 +431,13 @@ export function pipelineTimeseriesRead(read: TimeseriesRead): ReaderReadStatemen
       defaulted && reaggregatedAliases.has(alias) ? fn.ifNull(value, param.uint32(0)) : value;
   }
   // Main kept the first source's buckets only (FULL JOIN, then `period IS NOT NULL`).
-  return clickhouseRead({ scope })
+  const ordered = clickhouseRead({ scope })
     .from(sources)
     .select(selection as never)
     .groupBy(...(keys.map((key) => columns[key]!) as never[]))
     .having(() => cond.gt(fn.max(columns.anchored!), 0) as never)
-    .orderBy("period" as never)
-    .orderBy("date" as never)
+    .orderBy("period" as never);
+  return (scale === undefined ? ordered : ordered.orderBy("date" as never))
     .settings({ ...settings, log_comment: LOG_COMMENT })
     .build() as ReaderReadStatement;
 }

@@ -66,6 +66,8 @@ const expected = JSON.parse(
    * member's trace (ruling 1a), so two members' traces sharing an id are two; main counted one.
    */
   traceCountPerMember: Record<string, AnalyticsTimeseriesResult>;
+  /** Shapes main dropped or inflated, answered by the ruling named (Alex, 2026-11-16). */
+  byRuling: Record<string, { ruling: string; answer: AnalyticsTimeseriesResult }>;
 };
 
 /** The expected answer: each member's trace counted apart where that differs from main's. */
@@ -701,6 +703,46 @@ describe("timeseries reads built on the typed builder", () => {
           previousPeriodStartDate: new Date(timeseries.PREVIOUS_START),
         }),
       ).toBe(true);
+    });
+  });
+
+  /*
+   * Main dropped a full-scale grouped pipeline (ruling 1a: computed) and a pipeline beside span or
+   * run metrics shared their join (ruling 2a: read on its own). Answers checked against each part
+   * read alone, which the suites above prove.
+   */
+  describe("given shapes main dropped or inflated", () => {
+    describe.each(timeseries.PROOFS)("given $name", ({ projectId, proof }) => {
+      it.each(timeseries.BY_RULING_SHAPES)("$name answers by ruling $ruling", async (shape) => {
+        const want = expected.byRuling[`${literal(projectId, timeseries.RUN)}|${shape.name}`];
+
+        expect(want?.ruling).toBe(shape.ruling);
+        expect(toTwelveDigits(await builtTimeseries({ shape, projectId, proof: proof() }))).toEqual(
+          toTwelveDigits(want?.answer),
+        );
+      });
+    });
+
+    it("reads a pipeline beside span metrics as it reads it alone", async () => {
+      const [own] = timeseries.PROOFS;
+      const read = (name: string) =>
+        builtTimeseries({
+          shape: [...timeseries.BY_RULING_SHAPES, ...timeseries.PIPELINE_SHAPES].find(
+            (shape) => shape.name === name,
+          )!,
+          projectId: own!.projectId,
+          proof: own!.proof(),
+        });
+      const values = (result: AnalyticsTimeseriesResult) =>
+        [...result.previousPeriod, ...result.currentPeriod].map((bucket) => [
+          bucket.date,
+          (bucket as Record<string, unknown>)["0/performance.total_cost/sum/user_id/avg"],
+        ]);
+
+      const beside = values(await read("pipelines beside span metrics, hourly"));
+      const alone = values(await read("pipelines one series, hourly"));
+
+      expect(beside.filter(([, value]) => value !== undefined)).toEqual(alone);
     });
   });
 

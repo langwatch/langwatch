@@ -4,10 +4,11 @@
  * or runs is aggregated N times, as main did.
  */
 
-import type { AnalyticsSeries } from "@langwatch/analytics-contract";
+import { isZeroWhenAbsentSeries, type AnalyticsSeries } from "@langwatch/analytics-contract";
 import {
   clickhouseRead,
   type ClickHouseRead,
+  type ClickHouseReadStart,
   type Condition,
   column,
   cond,
@@ -29,11 +30,13 @@ import { runsOf } from "./clickhouse.mixed-eval-timeseries-query.mapper.ts";
 import { storedSpans as ss } from "./clickhouse.stored-spans.table.ts";
 import {
   allOf,
+  currentPeriod,
   dateBucket,
   groupKeyOf,
   inEitherPeriod,
   type Measure,
   periodOf,
+  previousPeriod,
   type TimeseriesRead,
 } from "./clickhouse.timeseries-query-shared.mapper.ts";
 import {
@@ -130,8 +133,7 @@ function servesSeries(series: AnalyticsSeries, index: number): boolean {
 }
 
 function planOf(input: TimeseriesQueryInput): JoinPlan {
-  const numeric = typeof input.timeScale === "number";
-  if (!numeric && !(input.timeScale === "full" && input.groupBy)) return REFUSED;
+  if (typeof input.timeScale !== "number" && input.timeScale !== "full") return REFUSED;
   const runGrouped = input.groupBy !== undefined && RUN_GROUP_BYS[input.groupBy] !== undefined;
   if (input.groupBy && !runGrouped && !GROUP_BYS[input.groupBy]) return REFUSED;
   if (!input.series.every(servesSeries)) return REFUSED;
@@ -147,7 +149,8 @@ function planOf(input: TimeseriesQueryInput): JoinPlan {
 
 /**
  * Whether the joined shape serves this query, as main routed it to buildStandardTimeseriesQuery
- * with joins: a numeric scale, or full with a grouping; no pipeline; no span-row grouping.
+ * with joins (a numeric scale, or full with a grouping) or, full and ungrouped, to its both-periods
+ * summary; no pipeline; no span-row grouping.
  */
 export function servesJoinedTraceSummaries(input: TimeseriesQueryInput): boolean {
   return planOf(input).kind === "joined";
@@ -301,6 +304,78 @@ function finish<T extends string>(
     .build() as ReaderReadStatement;
 }
 
+/** One period's joined rows, as main's scalar CTE: one row even when the period is empty. */
+function periodArm({
+  start,
+  input,
+  period,
+  spans,
+  runs,
+}: {
+  start: ClickHouseReadStart<ProofScope>;
+  input: TimeseriesQueryInput;
+  period: "current" | "previous";
+  spans: Spans | undefined;
+  runs: Runs | undefined;
+}) {
+  const source = sourceOf({ spans, runs });
+  const { filters, restrictions } = filtersOf(input);
+  const base = start.from(ts).withinWindows();
+  const withSpans = spans
+    ? base.innerJoin(spans, ({ and, eq }) =>
+        and(eq(spans.TenantId, ts.TenantId), eq(spans.TraceId, ts.TraceId)),
+      )
+    : base;
+  const joined = runs
+    ? (withSpans as typeof base).innerJoin(runs, ({ and, eq }) =>
+        and(eq(runs.TenantId, ts.TenantId), eq(runs.TraceId, ts.TraceId)),
+      )
+    : withSpans;
+  return (joined as typeof base)
+    .select((ops) => {
+      const measures = Object.entries(seriesSelection({ input, source, ops })).map(
+        ([alias, measure], index): [string, Measure<Joined>] => [
+          alias,
+          isZeroWhenAbsentSeries(input.series[index]!)
+            ? fn.coalesce(measure, param.uint32(0))
+            : measure,
+        ],
+      );
+      return { period: param.string(period), ...Object.fromEntries(measures) } as Record<
+        string,
+        Measure<"trace_summaries">
+      >;
+    })
+    .where(() =>
+      period === "current"
+        ? currentPeriod(ts.OccurredAt, input)
+        : previousPeriod(ts.OccurredAt, input),
+    )
+    .where((ops) => allOf([filters(ops), ...restrictions]), { inElection: false })
+    .latestVersion();
+}
+
+/** Full scale, no grouping: each period's joined rows as one row, both periods stacked. */
+function summaryRead({ scope, input, settings }: TimeseriesRead, tables: ReadonlySet<string>) {
+  const spans = tables.has(SPANS) ? spansOf(scope, input) : undefined;
+  const runs = tables.has(EVALUATIONS) ? runsOf(scope, input) : undefined;
+  const periods = periodArm({
+    start: clickhouseRead({ scope }),
+    input,
+    period: "current",
+    spans,
+    runs,
+  })
+    .unionAll((start) => periodArm({ start, input, period: "previous", spans, runs }))
+    .as("periods");
+  const keys = ["period", ...input.series.map(seriesAlias)];
+  return clickhouseRead({ scope })
+    .from(periods)
+    .select(Object.fromEntries(keys.map((key) => [key, periods[key]!])))
+    .settings({ ...settings, log_comment: "analytics:timeseries:trace_summaries:joined" })
+    .build() as ReaderReadStatement;
+}
+
 /** The joined trace_summaries timeseries read; see {@link servesJoinedTraceSummaries}. */
 export function joinedTimeseriesRead({
   scope,
@@ -309,6 +384,9 @@ export function joinedTimeseriesRead({
 }: TimeseriesRead): ReaderReadStatement {
   const plan = planOf(input);
   const tables = plan.kind === "joined" ? plan.tables : new Set<string>();
+  if (input.timeScale === "full" && !input.groupBy) {
+    return summaryRead({ scope, input, settings }, tables);
+  }
   const spans = tables.has(SPANS) ? spansOf(scope, input) : undefined;
   const runs = tables.has(EVALUATIONS) ? runsOf(scope, input) : undefined;
 
