@@ -51,6 +51,7 @@ vi.mock("../../../behavior/model-provider-api.ts", () => {
         listAllForOrganizationForFrontend: { invalidate: vi.fn() },
         getResolvedDefault: { invalidate: vi.fn() },
         getDefaultModelsForProject: { invalidate: vi.fn() },
+        getModelOptionsForScopes: { invalidate: vi.fn() },
       },
     }),
   };

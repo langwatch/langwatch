@@ -3,6 +3,7 @@
  *
  * Regression tests for #3785: the submit-time guard fires a toast and aborts when
  * useAsDefaultProvider is true but a selected model belongs to a different provider.
+ * @see modules/model-provider/specs/default-models-scope-model-options.feature
  */
 
 import { act, renderHook } from "@testing-library/react";
@@ -24,6 +25,7 @@ const {
   mockSetRoleAssignmentMutateAsync,
   mockDefaultModelsInvalidate,
   mockListAllForOrgInvalidate,
+  mockScopeModelOptionsInvalidate,
 } = vi.hoisted(() => ({
   mockUpdateMutateAsync: vi.fn().mockResolvedValue({}),
   mockUpdateProjectDefaultModelsMutateAsync: vi.fn().mockResolvedValue({}),
@@ -32,6 +34,7 @@ const {
   mockSetRoleAssignmentMutateAsync: vi.fn().mockResolvedValue({ ok: true }),
   mockDefaultModelsInvalidate: vi.fn(),
   mockListAllForOrgInvalidate: vi.fn(),
+  mockScopeModelOptionsInvalidate: vi.fn(),
 }));
 
 const mockApi = {
@@ -52,6 +55,7 @@ const mockApi = {
       getDefaultModelsForProject: {
         invalidate: mockDefaultModelsInvalidate,
       },
+      getModelOptionsForScopes: { invalidate: mockScopeModelOptionsInvalidate },
     },
   }),
   modelProvider: {
@@ -312,6 +316,24 @@ describe("useProviderFormSubmit()", () => {
         });
 
         expect(mockListAllForOrgInvalidate).toHaveBeenCalled();
+      });
+
+      /** @scenario Saving a provider refreshes the models offered for the picked scopes */
+      it("invalidates the scope models read so an emptied picker offers the new deployment", async () => {
+        const snapshot = buildSnapshot({
+          useAsDefaultProvider: false,
+          projectDefaultModel: null,
+          projectTopicClusteringModel: null,
+          projectEmbeddingsModel: null,
+          scopes: [{ scopeType: "PROJECT", scopeId: "proj-1" }],
+        });
+        const { result } = renderSubmitHook({ snapshot });
+
+        await act(async () => {
+          await result.current.submit();
+        });
+
+        expect(mockScopeModelOptionsInvalidate).toHaveBeenCalled();
       });
     });
   });

@@ -38,6 +38,13 @@ Feature: Default models offer only what the picked scopes can run
     Then Anthropic is not named as holding no embedding model
 
   @unit
+  Scenario: The note names every empty provider and calls a non-Azure provider's entries models
+    Given two providers at the picked scopes list only what is added and have no chat model
+    When the note explains the empty chat picker
+    Then it names both providers in the plural
+    And a provider other than Azure is said to have no chat model rather than no deployment
+
+  @unit
   Scenario: Listing models for scopes of another organization is refused
     Given a picked scope belongs to another organization than the page's project
     When the models for the picked scopes are listed
@@ -72,6 +79,12 @@ Feature: Default models offer only what the picked scopes can run
     Given the note names an Azure OpenAI provider with no deployments
     When the user opens the provider from the note
     Then the Azure OpenAI provider drawer opens on that provider
+
+  @integration
+  Scenario: Saving a provider refreshes the models offered for the picked scopes
+    Given the drawer was offered no chat model for the picked scopes
+    When the user saves a provider after adding a deployment to it
+    Then the models offered for the picked scopes are read again
 
   @integration
   Scenario: Embeddings name an Azure provider with no embedding deployment

@@ -37,6 +37,7 @@ function invalidateModelProviderQueries(utils: ModelProviderUtils) {
     utils.modelProvider.listAllForOrganizationForFrontend.invalidate(),
     utils.modelProvider.getResolvedDefault.invalidate(),
     utils.modelProvider.getDefaultModelsForProject.invalidate(),
+    utils.modelProvider.getModelOptionsForScopes.invalidate(),
   ]);
 }
 

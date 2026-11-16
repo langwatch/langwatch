@@ -122,13 +122,11 @@ export class ModelProviderQueryService {
     provider?: string;
   }): Promise<Record<string, ModelProviderSummary>> {
     const { chain, saved, system } = await this.getProjectCandidates(input.projectId);
-    const stored = saved.filter((provider) => this.shouldKeep(provider, system));
-    const storedProviders = new Set(stored.map((provider) => provider.provider));
-    const providers = [
-      ...stored.map((provider) => this.toSummary({ provider, system })),
-      ...system.filter((provider) => !storedProviders.has(provider.provider)),
-    ];
-    const selected = this.selectProjectProviders(providers, chain, input.provider);
+    const selected = this.selectProjectProviders(
+      this.storedThenSystem({ saved, system }),
+      chain,
+      input.provider,
+    );
 
     return Object.fromEntries(selected.map((provider) => [provider.provider, provider]));
   }
@@ -202,21 +200,29 @@ export class ModelProviderQueryService {
   }
 
   /** The row a Default models scope runs on per provider key, environment-fed ones included. */
-  async findProvidersForScope({
+  private async findProvidersForScope({
     scope,
   }: {
     scope: ModelDefaultScope;
   }): Promise<ModelProviderSummary[]> {
     const { chain, saved, system } = await this.getScopeCandidates(scope);
+    return this.selectProjectProviders(this.storedThenSystem({ saved, system }), chain);
+  }
+
+  /** Kept stored rows, then each environment-fed provider no stored row already covers. */
+  private storedThenSystem({
+    saved,
+    system,
+  }: {
+    saved: ModelProvider[];
+    system: ModelProviderSummary[];
+  }): ModelProviderSummary[] {
     const stored = saved.filter((provider) => this.shouldKeep(provider, system));
     const storedProviders = new Set(stored.map((provider) => provider.provider));
-    return this.selectProjectProviders(
-      [
-        ...stored.map((provider) => this.toSummary({ provider, system })),
-        ...system.filter((provider) => !storedProviders.has(provider.provider)),
-      ],
-      chain,
-    );
+    return [
+      ...stored.map((provider) => this.toSummary({ provider, system })),
+      ...system.filter((provider) => !storedProviders.has(provider.provider)),
+    ];
   }
 
   /** A team sees itself and its organization; an organization sees itself. */
