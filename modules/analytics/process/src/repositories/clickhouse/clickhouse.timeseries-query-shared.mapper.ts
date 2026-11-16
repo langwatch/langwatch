@@ -44,10 +44,14 @@ function validateTimeZone(tz: string): string {
 const within = <T extends string>(at: Measure<T>, start: Date, end: Date): Condition<T> =>
   cond.and(cond.gte(at, param.epochMs(start.getTime())), cond.lt(at, param.epochMs(end.getTime())));
 
-const currentPeriod = <T extends string>(at: Measure<T>, input: TimeseriesQueryInput) =>
-  within(at, input.startDate, input.endDate);
-const previousPeriod = <T extends string>(at: Measure<T>, input: TimeseriesQueryInput) =>
-  within(at, input.previousPeriodStartDate, input.startDate);
+export const currentPeriod = <T extends string>(
+  at: Measure<T>,
+  input: TimeseriesQueryInput,
+): Condition<T> => within(at, input.startDate, input.endDate);
+export const previousPeriod = <T extends string>(
+  at: Measure<T>,
+  input: TimeseriesQueryInput,
+): Condition<T> => within(at, input.previousPeriodStartDate, input.startDate);
 
 /** The row lies in the current or the previous period: the partition-pruning range. */
 export function inEitherPeriod<T extends string>(

@@ -1,17 +1,19 @@
 /**
  * The standard `trace_summaries` timeseries read on the typed builder (ADR-202): trace-row metrics
- * over each trace's latest version, by date and a trace column. Joins, pipelines and the
- * both-periods summary stay on the text path.
+ * over each trace's latest version, by date and a trace column, or as the both-periods summary.
+ * Joins and pipelines stay on the text path.
  */
 
 import { isZeroWhenAbsentSeries, type AnalyticsSeries } from "@langwatch/analytics-contract";
 import {
   clickhouseRead,
+  type ClickHouseReadStart,
   column,
   type Condition,
   cond,
   fn,
   param,
+  type ProofScope,
   type ReaderReadStatement,
 } from "@langwatch/clickhouse-client/builder";
 
@@ -30,11 +32,13 @@ import {
 import { buildMetricAlias } from "./clickhouse.metric-translator.mapper.ts";
 import {
   allOf,
+  currentPeriod,
   dateBucket,
   groupKeyOf,
   inEitherPeriod,
   type Measure,
   periodOf,
+  previousPeriod,
   type TimeseriesRead,
 } from "./clickhouse.timeseries-query-shared.mapper.ts";
 import { traceSummaries as ts } from "./clickhouse.trace-summaries.table.ts";
@@ -102,10 +106,9 @@ function seriesConditions(series: AnalyticsSeries): Condition<Summaries>[] {
 
 /**
  * Whether the standard shape serves this query, as main's buildTimeseriesQuery routed it: no
- * summary-without-grouping, no pipeline, every metric and series filter on the trace row alone.
+ * pipeline, every metric and series filter on the trace row alone.
  */
 export function servesStandardTraceSummaries(input: TimeseriesQueryInput): boolean {
-  if (input.timeScale === "full" && !input.groupBy) return false;
   if (typeof input.timeScale !== "number" && input.timeScale !== "full") return false;
   if (input.groupBy && !GROUP_BYS[input.groupBy]) return false;
   return input.series.every((series, index) => {
@@ -167,32 +170,22 @@ function restrictionsOf(input: TimeseriesQueryInput): Condition<Summaries>[] {
   return restrictions;
 }
 
-/** The standard trace_summaries timeseries read; see {@link servesStandardTraceSummaries}. */
-export function traceSummariesTimeseriesRead({
-  scope,
-  input,
-  settings,
-}: TimeseriesRead): ReaderReadStatement {
-  const selection: Record<string, Measure<Summaries>> = { period: periodOf(ts.OccurredAt, input) };
-  const date =
-    typeof input.timeScale === "number"
-      ? dateBucket(ts.OccurredAt, input.timeScale, input.timeZone ?? "UTC")
-      : undefined;
-  if (date) selection.date = date;
-  const grouping = input.groupBy ? GROUP_BYS[input.groupBy] : undefined;
-  const groupKey = grouping ? groupKeyFor(grouping) : undefined;
-  if (groupKey) selection.group_key = groupKey;
-  input.series.forEach((series, index) => {
-    const alias = buildMetricAlias({
+/** Each series' alias and measure, in the order the dashboard asked them. */
+function seriesSelection(input: TimeseriesQueryInput): [string, Measure<Summaries>][] {
+  return input.series.map((series, index) => [
+    buildMetricAlias({
       index,
       metric: series.metric,
       aggregation: series.aggregation,
       key: series.key,
       subkey: series.subkey,
-    });
-    selection[alias] = seriesMeasure(series, index);
-  });
+    }),
+    seriesMeasure(series, index),
+  ]);
+}
 
+/** The dashboard's filters, under the negate toggle, and the restrictions outside it. */
+function filtersOf(input: TimeseriesQueryInput) {
   const restrictions = restrictionsOf(input);
   const filters = analyticsFilterCondition({
     filters: (input.filters ?? {}) as AnalyticsFilterInput,
@@ -203,7 +196,65 @@ export function traceSummariesTimeseriesRead({
     },
     negated: input.negateFilters === true,
   });
+  return { filters, restrictions };
+}
 
+/**
+ * The both-periods summary (full scale, no grouping), as main's scalar-subquery UNION: one
+ * aggregate row per period even when the period is empty, additive series coalesced to 0.
+ */
+function summaryRead({ scope, input, settings }: TimeseriesRead): ReaderReadStatement {
+  const measures = seriesSelection(input).map(([alias, measure], index): [string, Measure] => [
+    alias,
+    isZeroWhenAbsentSeries(input.series[index]!) ? fn.coalesce(measure, param.uint32(0)) : measure,
+  ]);
+  const { filters, restrictions } = filtersOf(input);
+  const selectionOf = (period: "current" | "previous"): Record<string, Measure<Summaries>> => ({
+    period: param.string(period),
+    ...Object.fromEntries(measures),
+  });
+  const arm = (start: ClickHouseReadStart<ProofScope>, period: "current" | "previous") =>
+    start
+      .from(ts)
+      .withinWindows()
+      .select(selectionOf(period))
+      .where(() =>
+        period === "current"
+          ? currentPeriod(ts.OccurredAt, input)
+          : previousPeriod(ts.OccurredAt, input),
+      )
+      .where((ops) => allOf([filters(ops), ...restrictions]), { inElection: false })
+      .latestVersion();
+  const periods = arm(clickhouseRead({ scope }), "current")
+    .unionAll((start) => arm(start, "previous"))
+    .as("periods");
+  const keys = ["period", ...measures.map(([alias]) => alias)];
+  return clickhouseRead({ scope })
+    .from(periods)
+    .select(Object.fromEntries(keys.map((key) => [key, periods[key]!])))
+    .settings({ ...settings, log_comment: "analytics:timeseries:trace_summaries" })
+    .build() as ReaderReadStatement;
+}
+
+/** The standard trace_summaries timeseries read; see {@link servesStandardTraceSummaries}. */
+export function traceSummariesTimeseriesRead({
+  scope,
+  input,
+  settings,
+}: TimeseriesRead): ReaderReadStatement {
+  if (input.timeScale === "full" && !input.groupBy) return summaryRead({ scope, input, settings });
+  const selection: Record<string, Measure<Summaries>> = { period: periodOf(ts.OccurredAt, input) };
+  const date =
+    typeof input.timeScale === "number"
+      ? dateBucket(ts.OccurredAt, input.timeScale, input.timeZone ?? "UTC")
+      : undefined;
+  if (date) selection.date = date;
+  const grouping = input.groupBy ? GROUP_BYS[input.groupBy] : undefined;
+  const groupKey = grouping ? groupKeyFor(grouping) : undefined;
+  if (groupKey) selection.group_key = groupKey;
+  for (const [alias, measure] of seriesSelection(input)) selection[alias] = measure;
+
+  const { filters, restrictions } = filtersOf(input);
   const keys = [selection.period!, ...(date ? [date] : []), ...(groupKey ? [groupKey] : [])];
   const grouped = clickhouseRead({ scope })
     .from(ts)

@@ -384,6 +384,43 @@ describe("the standard trace_summaries read", () => {
   });
 });
 
+describe("the both-periods trace_summaries summary", () => {
+  const input = { series: [series("performance.total_cost", "sum")], timeScale: "full" as const };
+
+  it.each(["own", "aggregate"] as const)(
+    "is a reader statement whose tenants are the %s proof's",
+    (proof) => {
+      const statement = read(traceSummariesTimeseriesRead, input, proof);
+      const tenants = proof === "own" ? ["tenant-a"] : ["tenant-a", "member-b"];
+
+      expect(statement.identity).toBe("reader");
+      expect(statement.kind).toBe("tenant");
+      expect(statement.tenantIds?.toSorted()).toEqual(tenants.toSorted());
+      expect(statement.settings.SQL_langwatch_tenant_ids.split(",").toSorted()).toEqual(
+        tenants.toSorted(),
+      );
+      expect(statement.sql).not.toMatch(/TenantId\s*=/);
+    },
+  );
+
+  it("reads one ungrouped row per period, each period electing its own latest versions", () => {
+    const statement = inlined(read(traceSummariesTimeseriesRead, input));
+
+    expect(statement).toContain("UNION ALL");
+    expect(statement).toContain("'current'");
+    expect(statement).toContain("'previous'");
+    expect(statement.match(/\(TenantId, TraceId, UpdatedAt\) IN \(/g)).toHaveLength(2);
+    expect(statement).not.toMatch(/GROUP BY period/);
+    expect(statement).toContain("log_comment = 'analytics:timeseries:trace_summaries'");
+  });
+
+  it("coalesces an additive series to zero over an empty period", () => {
+    const statement = inlined(read(traceSummariesTimeseriesRead, input));
+
+    expect(statement).toMatch(/coalesce\(.*sum\(TotalCost\).*, 0\)/);
+  });
+});
+
 describe("which queries the standard trace_summaries read serves", () => {
   const base: Pick<TimeseriesQueryInput, "series" | "timeScale"> = {
     series: [series("performance.total_cost", "sum")],
@@ -400,8 +437,13 @@ describe("which queries the standard trace_summaries read serves", () => {
     expect(serves({ traceIds: ["t"] })).toBe(true);
   });
 
-  it("leaves the both-periods summary, joins, pipelines and array groupings to their shapes", () => {
-    expect(serves({ timeScale: "full" })).toBe(false);
+  it("serves the both-periods summary of trace-row metrics", () => {
+    expect(serves({ timeScale: "full" })).toBe(true);
+    expect(serves({ timeScale: "full", groupBy: "metadata.user_id" })).toBe(true);
+  });
+
+  it("leaves joins, pipelines and array groupings to their shapes", () => {
+    expect(serves({ timeScale: "full", groupBy: "metadata.labels" })).toBe(false);
     expect(serves({ groupBy: "metadata.labels" })).toBe(false);
     expect(serves({ groupBy: "metadata.model" })).toBe(false);
     expect(serves({ series: [series("evaluations.evaluation_score", "avg")] })).toBe(false);

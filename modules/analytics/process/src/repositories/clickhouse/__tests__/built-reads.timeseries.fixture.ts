@@ -577,6 +577,33 @@ export const SUMMARY_SHAPES: Shape[] = [
     groupBy: "metadata.user_id",
     timeScale: "full",
   },
+  {
+    name: "summary, every metric, both periods",
+    table: "trace_summaries",
+    series: SUMMARY_SERIES,
+    timeScale: "full",
+  },
+  {
+    name: "summary with series filters, both periods",
+    table: "trace_summaries",
+    series: SUMMARY_FILTERED_SERIES,
+    timeScale: "full",
+  },
+  {
+    name: "summary filtered on spans.type, negated, both periods",
+    table: "trace_summaries",
+    series: SLIM_SHORT,
+    filters: { "spans.type": ["tool"] } as AnalyticsFilters,
+    negateFilters: true,
+    timeScale: "full",
+  },
+  {
+    name: "summary for two current traces, an empty previous period",
+    table: "trace_summaries",
+    series: SUMMARY_SERIES,
+    traceIds: [`trace-${RUN}-0`, `trace-${RUN}-4`],
+    timeScale: "full",
+  },
 ];
 
 export const SHAPES: Shape[] = [

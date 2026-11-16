@@ -1,17 +1,19 @@
 import { readFileSync } from "node:fs";
 
 /**
- * The analytics reads built on the typed builder answer literal rows on 26.8 (ADR-202): the filter
- * pickers, the filter conditions and their negation, and the four timeseries reads, each seeded for
- * two tenants that share ids, read under one tenant's proof and under an aggregate's.
+ * Analytics reads answer literal rows on 26.8 (ADR-202): pickers, filter conditions and timeseries
+ * for two tenants sharing ids, under one tenant's proof and an aggregate's; and each aggregate read
+ * inside its members' grant windows, never a project outside the proof (ADR-177).
+ * @see specs/governance/aggregate-project.feature
  * @integration
  * @vitest-environment node
  */
 import type { ClickHouseClient } from "@clickhouse/client";
-import type {
-  AnalyticsTable,
-  AnalyticsTimeseriesResult,
-  FilterField,
+import {
+  buildSeriesName,
+  type AnalyticsTable,
+  type AnalyticsTimeseriesResult,
+  type FilterField,
 } from "@langwatch/analytics-contract";
 import type { Authorization } from "@langwatch/authorization";
 import { clickhouseRead, tenantScope } from "@langwatch/clickhouse-client/builder";
@@ -22,7 +24,8 @@ import {
   deleteMigratedTenantRows,
   startMigratedClickHouse,
 } from "../../../__tests__/migrated-clickhouse.harness.ts";
-import type { FilterOption } from "../../filter-options.repository.ts";
+import { analyticsProof } from "../../__tests__/analytics-proof.fixture.ts";
+import type { FilterOption, FindFilterOptionsInput } from "../../filter-options.repository.ts";
 import { ClickHouseAnalyticsRepository } from "../clickhouse.analytics.repository.ts";
 import {
   type AnalyticsFilterInput,
@@ -31,6 +34,13 @@ import {
 import { FilterOptionsClickHouseRepository } from "../clickhouse.filter-options.repository.ts";
 import { servesStandardTraceSummaries } from "../clickhouse.trace-summaries-timeseries-query.mapper.ts";
 import { traceSummaries } from "../clickhouse.trace-summaries.table.ts";
+import * as costReads from "./built-reads.aggregate-cost-reads.fixture.ts";
+import * as evaluationWindow from "./built-reads.aggregate-evaluation-window.fixture.ts";
+import * as pickerWindows from "./built-reads.aggregate-filter-options.fixture.ts";
+import * as memberIds from "./built-reads.aggregate-member-scoped-ids.fixture.ts";
+import * as rollup from "./built-reads.aggregate-rollup.fixture.ts";
+import * as slim from "./built-reads.aggregate-slim.fixture.ts";
+import * as summaryWindows from "./built-reads.aggregate-trace-summaries.fixture.ts";
 import * as conditions from "./built-reads.filter-conditions.fixture.ts";
 import * as pickers from "./built-reads.filter-pickers.fixture.ts";
 import * as timeseries from "./built-reads.timeseries.fixture.ts";
@@ -50,6 +60,17 @@ const literal = <T>(value: T, run: string): T =>
   JSON.parse(JSON.stringify(value).replaceAll(run, "RUN")) as T;
 
 const SETTINGS = { async_insert: 0, wait_for_async_insert: 0 } as const;
+
+/** The aggregate-window cases: each seeds its own tenants and cleans them up. */
+const WINDOW_FIXTURES = [
+  slim,
+  rollup,
+  summaryWindows,
+  evaluationWindow,
+  memberIds,
+  costReads,
+  pickerWindows,
+];
 
 let client: ClickHouseClient;
 let options: FilterOptionsClickHouseRepository;
@@ -135,6 +156,9 @@ beforeAll(async () => {
       summaries.flatMap((row) => (row.run ? [row.run] : [])),
     );
   }
+  for (const fixture of WINDOW_FIXTURES) {
+    for (const { table, values } of fixture.seeds()) await insert(table, values);
+  }
 }, 300_000);
 
 afterAll(async () => {
@@ -150,6 +174,11 @@ afterAll(async () => {
       tenantId,
       tables: [...timeseries.TABLES, ...timeseries.SUMMARY_TABLES],
     });
+  }
+  for (const fixture of WINDOW_FIXTURES) {
+    for (const tenantId of fixture.TENANTS) {
+      await deleteMigratedTenantRows({ client, tenantId, tables: fixture.SEEDED_TABLES });
+    }
   }
 });
 
@@ -448,6 +477,486 @@ describe("timeseries reads built on the typed builder", () => {
           }),
         ),
       ).toBe(2 + 8 + 200);
+    });
+  });
+});
+
+/** The summed cost series over every bucket of the current period. */
+function totalCost(result: AnalyticsTimeseriesResult): number {
+  return result.currentPeriod.reduce(
+    (sum, bucket) => sum + Number(bucket["0/performance.total_cost/sum"] ?? 0),
+    0,
+  );
+}
+
+describe("slim trace analytics read under an aggregate's proof", () => {
+  describe("given a member shared for a closed window", () => {
+    /** @scenario "The aggregate's slim analytics counts members inside their windows" */
+    it("counts the member's traces inside the window and the aggregate's own, nothing else", async () => {
+      const proof = analyticsProof({
+        projectId: slim.AGGREGATE,
+        shared: [
+          {
+            projectId: slim.MEMBER,
+            from: slim.GRANT_FROM.epochMilliseconds,
+            until: slim.GRANT_UNTIL.epochMilliseconds,
+          },
+        ],
+      });
+
+      expect(totalCost(await analytics.runTimeseries(slim.costRead(proof)))).toBe(2 + 4 + 32);
+    });
+  });
+
+  describe("given a member whose grant is still open", () => {
+    it("counts every member trace from the window's start on", async () => {
+      const proof = analyticsProof({
+        projectId: slim.AGGREGATE,
+        shared: [{ projectId: slim.MEMBER, from: slim.GRANT_FROM.epochMilliseconds }],
+      });
+
+      expect(totalCost(await analytics.runTimeseries(slim.costRead(proof)))).toBe(2 + 4 + 8 + 32);
+    });
+  });
+
+  describe("given a plain project's proof", () => {
+    it("counts its own traces alone, as before", async () => {
+      const proof = analyticsProof({ projectId: slim.AGGREGATE });
+
+      expect(totalCost(await analytics.runTimeseries(slim.costRead(proof)))).toBe(32);
+    });
+  });
+});
+
+describe("trace analytics rollup read under an aggregate's proof", () => {
+  describe("given a member shared from part way through one minute to part way through another", () => {
+    /** @scenario "The aggregate's analytics rollup counts members inside their windows" */
+    it("counts the member's whole buckets inside the window and the aggregate's own, nothing else", async () => {
+      const proof = analyticsProof({
+        projectId: rollup.AGGREGATE,
+        shared: [
+          {
+            projectId: rollup.MEMBER,
+            from: rollup.GRANT_FROM.epochMilliseconds,
+            until: rollup.GRANT_UNTIL.epochMilliseconds,
+          },
+        ],
+      });
+
+      expect(totalCost(await analytics.runTimeseries(rollup.costRead(proof)))).toBe(4 + 8 + 64);
+    });
+  });
+
+  describe("given a member whose grant is still open", () => {
+    it("counts every member bucket from the window's start on", async () => {
+      const proof = analyticsProof({
+        projectId: rollup.AGGREGATE,
+        shared: [{ projectId: rollup.MEMBER, from: rollup.GRANT_FROM.epochMilliseconds }],
+      });
+
+      expect(totalCost(await analytics.runTimeseries(rollup.costRead(proof)))).toBe(
+        4 + 8 + 16 + 64,
+      );
+    });
+  });
+
+  describe("given a plain project's proof", () => {
+    it("counts its own buckets alone, as before", async () => {
+      const proof = analyticsProof({ projectId: rollup.AGGREGATE });
+
+      expect(totalCost(await analytics.runTimeseries(rollup.costRead(proof)))).toBe(64);
+    });
+  });
+});
+
+describe("legacy trace summaries read under an aggregate's proof", () => {
+  const { COST_SERIES, SCORE_SERIES, IN_WINDOWS, SHARED_ID_TOTAL } = summaryWindows;
+  const total = async (read: Parameters<typeof summaryWindows.seriesRead>[0]): Promise<number> =>
+    summaryWindows.seriesTotal(
+      await analytics.runTimeseries(summaryWindows.seriesRead(read)),
+      read.series,
+    );
+
+  describe("given two members each shared for their whole history", () => {
+    /** @scenario "Analytics aggregate across members" */
+    it("counts both members' traces and the aggregate's own, never a foreign one", async () => {
+      const authorization = analyticsProof({
+        projectId: summaryWindows.AGGREGATE,
+        shared: [
+          { projectId: summaryWindows.WHOLE_HISTORY_MEMBER, from: 0 },
+          { projectId: summaryWindows.LATE_MEMBER, from: 0 },
+        ],
+      });
+
+      expect(await total({ authorization, table: "trace_summaries", series: COST_SERIES })).toBe(
+        1 + 2 + 4 + 8 + 32 + SHARED_ID_TOTAL,
+      );
+    });
+  });
+
+  describe("given one member shared for its whole history and one from a later start", () => {
+    /** @scenario "The aggregate's trace summaries count members inside their windows" */
+    it("counts the first member's every trace, the second's from its start, never a foreign one", async () => {
+      expect(
+        await total({
+          authorization: summaryWindows.aggregateProof(),
+          table: "trace_summaries",
+          series: COST_SERIES,
+        }),
+      ).toBe(IN_WINDOWS + SHARED_ID_TOTAL);
+    });
+
+    it("keeps the windows when a filter reads the evaluation side table", async () => {
+      expect(
+        await total({
+          authorization: summaryWindows.aggregateProof(),
+          table: "trace_summaries",
+          series: COST_SERIES,
+          filters: { "evaluations.evaluator_id": [summaryWindows.EVALUATOR] },
+        }),
+      ).toBe(IN_WINDOWS);
+    });
+
+    it("keeps only the member whose own trace matches a side-table filter on a trace id both use", async () => {
+      expect(
+        await total({
+          authorization: summaryWindows.aggregateProof(),
+          table: "trace_summaries",
+          series: COST_SERIES,
+          filters: { "evaluations.evaluator_id": [summaryWindows.SHARED_ID_EVALUATOR] },
+        }),
+      ).toBe(64);
+    });
+
+    /** @scenario "The aggregate's evaluation chart counts members inside their windows" */
+    it("scores one check across the members inside their windows, never a foreign run", async () => {
+      expect(
+        await total({
+          authorization: summaryWindows.aggregateProof(),
+          table: "evaluation_runs",
+          series: SCORE_SERIES,
+        }),
+      ).toBe(IN_WINDOWS);
+    });
+  });
+
+  describe("given a plain project's proof", () => {
+    it("counts its own traces alone, as before", async () => {
+      expect(
+        await total({
+          authorization: analyticsProof({ projectId: summaryWindows.AGGREGATE }),
+          table: "trace_summaries",
+          series: COST_SERIES,
+        }),
+      ).toBe(32);
+    });
+
+    it("scores its own check alone, as before", async () => {
+      expect(
+        await total({
+          authorization: analyticsProof({ projectId: summaryWindows.AGGREGATE }),
+          table: "evaluation_runs",
+          series: SCORE_SERIES,
+        }),
+      ).toBe(32);
+    });
+  });
+});
+
+describe("evaluation runs read under an aggregate's proof", () => {
+  /** The evaluation runs a proof reads, through the table the series is routed to for it. */
+  async function countRuns({
+    authorization,
+    projectId,
+    readsMembers,
+  }: {
+    authorization: Authorization;
+    projectId: string;
+    readsMembers: boolean;
+  }): Promise<number> {
+    const input = evaluationWindow.inputFor(projectId);
+    const result = await analytics.runTimeseries({
+      table: analytics.tableFor(input, { readsMembers }),
+      authorization,
+      input,
+      startDate: evaluationWindow.START,
+      endDate: evaluationWindow.END,
+      previousPeriodStartDate: evaluationWindow.START,
+      adjustedTimeScale: "full",
+      maxResultRows: undefined,
+    });
+    const name = buildSeriesName(evaluationWindow.RUNS_SERIES, 0);
+    return result.currentPeriod.reduce((sum, bucket) => sum + Number(bucket[name] ?? 0), 0);
+  }
+
+  describe("given a member shared from a date, with a trace from before it evaluated after it", () => {
+    /** @scenario "The aggregate counts a member's evaluations by when their trace occurred" */
+    it("counts only the evaluation whose trace is inside the window", async () => {
+      const proof = analyticsProof({
+        projectId: evaluationWindow.AGGREGATE,
+        shared: [
+          {
+            projectId: evaluationWindow.MEMBER,
+            from: evaluationWindow.GRANT_FROM.epochMilliseconds,
+          },
+        ],
+      });
+
+      expect(
+        await countRuns({
+          authorization: proof,
+          projectId: evaluationWindow.AGGREGATE,
+          readsMembers: true,
+        }),
+      ).toBe(1);
+    });
+  });
+
+  describe("given the member's own proof", () => {
+    it("counts both of its evaluations, as before", async () => {
+      const proof = analyticsProof({ projectId: evaluationWindow.MEMBER });
+
+      expect(
+        await countRuns({
+          authorization: proof,
+          projectId: evaluationWindow.MEMBER,
+          readsMembers: false,
+        }),
+      ).toBe(2);
+    });
+  });
+});
+
+describe("thread and user metrics under an aggregate's proof", () => {
+  const { THREADS_COUNT, MESSAGES_PER_THREAD, THREAD_DURATION, USER_THREAD_DURATION, USERS_COUNT } =
+    memberIds;
+  const valuesOf = async (read: Parameters<typeof memberIds.seriesRead>[0]): Promise<number[]> =>
+    memberIds.values(await analytics.runTimeseries(memberIds.seriesRead(read)), read.series);
+
+  describe("given two members and an outsider on the same conversation and user id", () => {
+    describe("when the thread metrics card reads the group", () => {
+      it("counts each member's thread as its own, one message each, never the outsider's", async () => {
+        expect(
+          await valuesOf({
+            authorization: memberIds.groupProof(),
+            table: "trace_summaries",
+            series: [THREADS_COUNT, MESSAGES_PER_THREAD, THREAD_DURATION],
+          }),
+        ).toEqual([2, 1, 0]);
+      });
+    });
+
+    describe("when the users page reads the group", () => {
+      it("keeps one user per member, each with its own zero-length thread", async () => {
+        expect(
+          await valuesOf({
+            authorization: memberIds.groupProof(),
+            table: "trace_summaries",
+            series: [USERS_COUNT, USER_THREAD_DURATION],
+          }),
+        ).toEqual([2, 0]);
+      });
+    });
+
+    describe("when the slim table serves the counts", () => {
+      it("counts each member's thread and user as its own", async () => {
+        expect(
+          await valuesOf({
+            authorization: memberIds.groupProof(),
+            table: "trace_analytics",
+            series: [THREADS_COUNT, USERS_COUNT],
+          }),
+        ).toEqual([2, 2]);
+      });
+    });
+  });
+
+  describe("given a plain project's proof", () => {
+    it("reads its one thread of one message, as before", async () => {
+      expect(
+        await valuesOf({
+          projectId: memberIds.MEMBER_A,
+          authorization: analyticsProof({ projectId: memberIds.MEMBER_A }),
+          table: "trace_summaries",
+          series: [THREADS_COUNT, MESSAGES_PER_THREAD, THREAD_DURATION, USERS_COUNT],
+        }),
+      ).toEqual([1, 1, 0, 1]);
+    });
+
+    it("counts its one thread and user on the slim table, as before", async () => {
+      expect(
+        await valuesOf({
+          projectId: memberIds.MEMBER_A,
+          authorization: analyticsProof({ projectId: memberIds.MEMBER_A }),
+          table: "trace_analytics",
+          series: [THREADS_COUNT, USERS_COUNT],
+        }),
+      ).toEqual([1, 1]);
+    });
+  });
+});
+
+describe("cost-gated reads under an aggregate's proof", () => {
+  const { IN_WINDOWS } = costReads;
+
+  describe("given one member shared for its whole history and one from a later start", () => {
+    /** @scenario "The aggregate's top documents and feedbacks read members inside their windows" */
+    it("ranks documents cited by the members inside their windows, never a foreign one", async () => {
+      const result = await analytics.findTopDocuments(costReads.read());
+
+      expect(result.topDocuments.map((doc) => doc.documentId).toSorted()).toEqual(IN_WINDOWS);
+      expect(result.totalUniqueDocuments).toBe(IN_WINDOWS.length);
+    });
+
+    /** @scenario "The aggregate's top documents and feedbacks read members inside their windows" */
+    it("lists feedbacks on the members' traces inside their windows, never a foreign one", async () => {
+      const result = await analytics.findFeedbackEvents(costReads.read());
+
+      expect(result.events.map((event) => event.event_id).toSorted()).toEqual(IN_WINDOWS);
+    });
+
+    /** @scenario "The aggregate's top documents and feedbacks read members inside their windows" */
+    it("pages the same feedbacks", async () => {
+      const page = await analytics.findFeedbackEventsPage({
+        ...costReads.read(),
+        after: undefined,
+        limit: 10,
+      });
+
+      expect(page.rows.map((row) => row.event.event_id).toSorted()).toEqual(IN_WINDOWS);
+      expect(page.hasMore).toBe(false);
+    });
+  });
+
+  describe("given a proof minted for analytics view, not cost view", () => {
+    it("refuses the read before it runs", async () => {
+      const proof = analyticsProof({ projectId: costReads.AGGREGATE });
+
+      await expect(
+        analytics.findTopDocuments({ ...costReads.read(), authorization: proof }),
+      ).rejects.toMatchObject({ code: "access_not_granted" });
+    });
+  });
+
+  describe("given a plain project's proof", () => {
+    it("reads its own documents alone, as before", async () => {
+      const result = await analytics.findTopDocuments(
+        costReads.read(costReads.WHOLE_HISTORY_MEMBER),
+      );
+
+      expect(result.topDocuments.map((doc) => doc.documentId).toSorted()).toEqual([
+        "a-early",
+        "a-late",
+      ]);
+    });
+  });
+});
+
+describe("filter pickers read under an aggregate's proof", () => {
+  const { EVALUATOR, IN_WINDOWS } = pickerWindows;
+
+  /** What a picker offers; `readsMembers` is what FilterService sets for an aggregate's proof. */
+  async function offered({
+    field,
+    authorization = pickerWindows.aggregateProof(),
+    readsMembers = true,
+    filters,
+  }: {
+    field: FilterField;
+    authorization?: Authorization;
+    readsMembers?: boolean;
+    filters?: FindFilterOptionsInput["filters"];
+  }): Promise<string[]> {
+    const found = await options.findOptions({
+      field,
+      authorization,
+      readsMembers,
+      startDate: pickerWindows.START.epochMilliseconds,
+      endDate: pickerWindows.END.epochMilliseconds,
+      ...(filters ? { filters } : {}),
+    });
+    return found.map((option) => option.label).toSorted();
+  }
+
+  describe("given one member shared for its whole history and one from a later start", () => {
+    /** @scenario "The aggregate's filter pickers offer member values inside their windows" */
+    it("offers trace values from the members inside their windows, never a foreign one", async () => {
+      expect(await offered({ field: "metadata.user_id" })).toEqual(IN_WINDOWS);
+    });
+
+    /** @scenario "The aggregate's filter pickers offer member values inside their windows" */
+    it("offers span values from the members inside their windows, never a foreign one", async () => {
+      expect(await offered({ field: "spans.type" })).toEqual(IN_WINDOWS);
+    });
+
+    /** @scenario "The aggregate's filter pickers offer member values inside their windows" */
+    it("offers evaluators from the members inside their windows, never a foreign one", async () => {
+      expect(await offered({ field: "evaluations.evaluator_id" })).toEqual(
+        IN_WINDOWS.map((name) => `[langevals/exact_match] ${name}`),
+      );
+    });
+
+    it("narrows by another filter's side-table subquery without crossing members", async () => {
+      const filters = {
+        "evaluations.evaluator_id": [`${EVALUATOR}-a-late`, `${EVALUATOR}-foreign`],
+      };
+
+      expect(await offered({ field: "metadata.user_id", filters })).toEqual(["a-late"]);
+    });
+
+    /** @scenario "The aggregate's filter pickers offer member values inside their windows" */
+    it("offers no evaluator whose trace predates the member's grant, though it ran after", async () => {
+      expect(await offered({ field: "evaluations.evaluator_id" })).not.toContain(
+        "[langevals/exact_match] b-before-grant-evaluated-after",
+      );
+    });
+  });
+
+  describe("given two members carrying the same trace id, and a filter picking one member's", () => {
+    const filters = { "metadata.user_id": ["a-shared"] };
+
+    it("offers that member's evaluators alone", async () => {
+      expect(await offered({ field: "evaluations.evaluator_id", filters })).toEqual([
+        "[langevals/exact_match] a-shared",
+      ]);
+    });
+
+    it("offers that member's span values alone", async () => {
+      expect(await offered({ field: "spans.type", filters })).toEqual(["a-shared"]);
+    });
+  });
+
+  describe("given a member shared until noon, with a trace before noon evaluated after it", () => {
+    it("offers the trace when no other filter narrows the picker", async () => {
+      expect(
+        await offered({
+          field: "metadata.user_id",
+          authorization: pickerWindows.closedShareProof(),
+        }),
+      ).toEqual(["c-closed"]);
+    });
+
+    /** @scenario "An aggregate's picker holds a side-table filter inside the member's share window" */
+    it("drops the trace when narrowed by its evaluator, whose run fell after the share closed", async () => {
+      expect(
+        await offered({
+          field: "metadata.user_id",
+          authorization: pickerWindows.closedShareProof(),
+          filters: { "evaluations.evaluator_id": [`${EVALUATOR}-c-closed`] },
+        }),
+      ).toEqual([]);
+    });
+  });
+
+  describe("given a plain project's proof", () => {
+    it("offers its own values alone, as before", async () => {
+      expect(
+        await offered({
+          field: "metadata.user_id",
+          authorization: analyticsProof({ projectId: pickerWindows.WHOLE_HISTORY_MEMBER }),
+          readsMembers: false,
+        }),
+      ).toEqual(["a-early", "a-late", "a-shared"]);
     });
   });
 });
