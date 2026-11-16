@@ -3,6 +3,7 @@ import {
   type EvaluationCompletedEventData,
   type EvaluationReportedEventData,
 } from "@langwatch/evaluation-contract";
+import { GroupQueueError } from "@langwatch/group-queue";
 import { nowInstant } from "@langwatch/time";
 import type { RecordEvaluationOutcomeCommandData } from "@langwatch/trace-contract";
 
@@ -10,6 +11,8 @@ import type { TraceEvaluationRuns } from "../channels/trace-evaluation-runs.chan
 import {
   boundedOutcomeCommand,
   EVALUATED_TRACE_WAIT_MS,
+  evaluatedTraceRetryAfterMs,
+  namesStorableTrace,
 } from "../rules/trace-evaluation-analytics.rules.ts";
 import type { TraceAnchorService } from "./trace-anchor.service.ts";
 import type { TraceProcessingCommandsService } from "./trace-processing-commands.service.ts";
@@ -38,10 +41,18 @@ export class EvaluationRunNotYetReadableError extends Error {
   }
 }
 
-/** A trace an evaluation names that trace analytics has not stored yet; the delivery retries. */
-export class EvaluatedTraceNotYetStoredError extends Error {
-  constructor(traceId: string) {
-    super(`trace ${traceId} is not stored yet; its evaluation outcome is retried`);
+/**
+ * A trace an evaluation names that trace analytics has not stored yet. The delivery retries after
+ * the wait it names, which the queue keeps as a floor over its own backoff.
+ */
+export class EvaluatedTraceNotYetStoredError extends GroupQueueError {
+  constructor({ traceId, retryAfterMs }: { traceId: string; retryAfterMs: number }) {
+    super({
+      queueName: "trace",
+      operation: "recordEvaluationOutcome",
+      message: `trace ${traceId} is not stored yet; its evaluation outcome is retried`,
+      retryAfterMs,
+    });
     this.name = "EvaluatedTraceNotYetStoredError";
   }
 }
@@ -84,7 +95,7 @@ export class TraceEvaluationOutcomeService {
       evaluationId: data.evaluationId,
     });
     if (!run) throw new EvaluationRunNotYetReadableError(data.evaluationId);
-    if (!run.traceId) return;
+    if (!namesStorableTrace(run.traceId)) return;
     await this.recordFromEvent({
       context,
       traceId: run.traceId,
@@ -110,7 +121,8 @@ export class TraceEvaluationOutcomeService {
     >;
     context: EvaluationEventContext;
   }): Promise<void> {
-    if (!data.traceId) return;
+    // No trace is ever stored under a blank or all-zero id, so waiting an hour for one is waste.
+    if (!namesStorableTrace(data.traceId)) return;
     await this.recordFromEvent({
       context,
       traceId: data.traceId,
@@ -143,8 +155,12 @@ export class TraceEvaluationOutcomeService {
     const nowMs = this.now();
     if (occurredAt === undefined) {
       // Main joined at read time, so a late trace still matched: wait for it while it may come.
-      if (nowMs - context.createdAt <= EVALUATED_TRACE_WAIT_MS) {
-        throw new EvaluatedTraceNotYetStoredError(traceId);
+      const waitedMs = nowMs - context.createdAt;
+      if (waitedMs <= EVALUATED_TRACE_WAIT_MS) {
+        throw new EvaluatedTraceNotYetStoredError({
+          traceId,
+          retryAfterMs: evaluatedTraceRetryAfterMs(waitedMs),
+        });
       }
       this.deps.logger.warn(
         { tenantId: context.tenantId, traceId, evaluationId: outcome.evaluationId },

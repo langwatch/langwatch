@@ -26,6 +26,20 @@ Feature: Each evaluation's outcome is kept beside its trace's columns
     And the delivery fails so the queue retries it
 
   @unit
+  Scenario: An evaluation of a trace not stored yet looks again a minute later, then every quarter hour
+    Given an evaluation whose trace is not stored
+    When the trace subscriber handles it within the wait
+    Then the delivery names a minute's wait while the evaluation is under a minute old
+    And a quarter hour's wait after that
+    And the trace is looked for five times within the hour
+
+  @unit
+  Scenario: An evaluation naming no storable trace is not retried
+    Given an evaluation whose trace id is blank or all zeros
+    When the trace subscriber handles it
+    Then no outcome is recorded and the delivery completes at once
+
+  @unit
   Scenario: An evaluation of a trace still not stored after the wait records nothing
     Given an evaluation whose trace is not stored, appended over an hour ago
     When the trace subscriber handles it
