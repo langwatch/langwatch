@@ -8,6 +8,9 @@ from attrs import define as _attrs_define
 from ..models.get_api_governance_registry_events_response_200_data_item_agent_management import (
     GetApiGovernanceRegistryEventsResponse200DataItemAgentManagement,
 )
+from ..models.get_api_governance_registry_events_response_200_data_item_agent_posture import (
+    GetApiGovernanceRegistryEventsResponse200DataItemAgentPosture,
+)
 from ..models.get_api_governance_registry_events_response_200_data_item_agent_source import (
     GetApiGovernanceRegistryEventsResponse200DataItemAgentSource,
 )
@@ -18,6 +21,9 @@ from ..models.get_api_governance_registry_events_response_200_data_item_agent_st
 if TYPE_CHECKING:
     from ..models.get_api_governance_registry_events_response_200_data_item_agent_endpoints_item import (
         GetApiGovernanceRegistryEventsResponse200DataItemAgentEndpointsItem,
+    )
+    from ..models.get_api_governance_registry_events_response_200_data_item_agent_labels import (
+        GetApiGovernanceRegistryEventsResponse200DataItemAgentLabels,
     )
     from ..models.get_api_governance_registry_events_response_200_data_item_agent_model_type_0 import (
         GetApiGovernanceRegistryEventsResponse200DataItemAgentModelType0,
@@ -45,6 +51,11 @@ class GetApiGovernanceRegistryEventsResponse200DataItemAgent:
         description (None | str):
         status (GetApiGovernanceRegistryEventsResponse200DataItemAgentStatus):
         shadow (bool):
+        dormant (bool):
+        posture (GetApiGovernanceRegistryEventsResponse200DataItemAgentPosture):
+        platform (None | str):
+        labels (GetApiGovernanceRegistryEventsResponse200DataItemAgentLabels):
+        owner_label (None | str):
         version (int):
         source_version (None | str):
         project_id (None | str):
@@ -69,6 +80,11 @@ class GetApiGovernanceRegistryEventsResponse200DataItemAgent:
     description: None | str
     status: GetApiGovernanceRegistryEventsResponse200DataItemAgentStatus
     shadow: bool
+    dormant: bool
+    posture: GetApiGovernanceRegistryEventsResponse200DataItemAgentPosture
+    platform: None | str
+    labels: GetApiGovernanceRegistryEventsResponse200DataItemAgentLabels
+    owner_label: None | str
     version: int
     source_version: None | str
     project_id: None | str
@@ -108,6 +124,18 @@ class GetApiGovernanceRegistryEventsResponse200DataItemAgent:
         status = self.status.value
 
         shadow = self.shadow
+
+        dormant = self.dormant
+
+        posture = self.posture.value
+
+        platform: None | str
+        platform = self.platform
+
+        labels = self.labels.to_dict()
+
+        owner_label: None | str
+        owner_label = self.owner_label
 
         version = self.version
 
@@ -169,6 +197,11 @@ class GetApiGovernanceRegistryEventsResponse200DataItemAgent:
                 "description": description,
                 "status": status,
                 "shadow": shadow,
+                "dormant": dormant,
+                "posture": posture,
+                "platform": platform,
+                "labels": labels,
+                "owner_label": owner_label,
                 "version": version,
                 "source_version": source_version,
                 "project_id": project_id,
@@ -192,6 +225,9 @@ class GetApiGovernanceRegistryEventsResponse200DataItemAgent:
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         from ..models.get_api_governance_registry_events_response_200_data_item_agent_endpoints_item import (
             GetApiGovernanceRegistryEventsResponse200DataItemAgentEndpointsItem,
+        )
+        from ..models.get_api_governance_registry_events_response_200_data_item_agent_labels import (
+            GetApiGovernanceRegistryEventsResponse200DataItemAgentLabels,
         )
         from ..models.get_api_governance_registry_events_response_200_data_item_agent_model_type_0 import (
             GetApiGovernanceRegistryEventsResponse200DataItemAgentModelType0,
@@ -224,6 +260,26 @@ class GetApiGovernanceRegistryEventsResponse200DataItemAgent:
         status = GetApiGovernanceRegistryEventsResponse200DataItemAgentStatus(d.pop("status"))
 
         shadow = d.pop("shadow")
+
+        dormant = d.pop("dormant")
+
+        posture = GetApiGovernanceRegistryEventsResponse200DataItemAgentPosture(d.pop("posture"))
+
+        def _parse_platform(data: object) -> None | str:
+            if data is None:
+                return data
+            return cast(None | str, data)
+
+        platform = _parse_platform(d.pop("platform"))
+
+        labels = GetApiGovernanceRegistryEventsResponse200DataItemAgentLabels.from_dict(d.pop("labels"))
+
+        def _parse_owner_label(data: object) -> None | str:
+            if data is None:
+                return data
+            return cast(None | str, data)
+
+        owner_label = _parse_owner_label(d.pop("owner_label"))
 
         version = d.pop("version")
 
@@ -330,6 +386,11 @@ class GetApiGovernanceRegistryEventsResponse200DataItemAgent:
             description=description,
             status=status,
             shadow=shadow,
+            dormant=dormant,
+            posture=posture,
+            platform=platform,
+            labels=labels,
+            owner_label=owner_label,
             version=version,
             source_version=source_version,
             project_id=project_id,

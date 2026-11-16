@@ -112,16 +112,10 @@ export class AgentRegistrySourcesService {
 
     const nowMs = this.deps.now().epochMilliseconds;
     const since = nowMs - REGISTRY_TRAFFIC_WINDOW_MS;
-    const read = await Promise.all(
-      projectIds.map(async (projectId) => ({
-        projectId,
-        agents: await this.deps.traces.findAgentsSeen({
-          projectId,
-          sinceMs: nowMs - registryTrafficReadWindowMs(dormantAfterDays),
-          limit: REGISTRY_TRAFFIC_LIMIT_PER_PROJECT,
-        }),
-      })),
-    );
+    const read = await this.trafficOf({
+      projectIds,
+      sinceMs: nowMs - registryTrafficReadWindowMs(dormantAfterDays),
+    });
     const unsettled = new Set([
       ...incompleteProjects,
       ...read
@@ -151,6 +145,20 @@ export class AgentRegistrySourcesService {
           held.entry.project_id !== null &&
           incompleteProjects.has(held.entry.project_id)),
     };
+  }
+
+  /** The agents each project's traces named since `sinceMs`, capped per project. */
+  private trafficOf({ projectIds, sinceMs }: { projectIds: readonly string[]; sinceMs: number }) {
+    return Promise.all(
+      projectIds.map(async (projectId) => ({
+        projectId,
+        agents: await this.deps.traces.findAgentsSeen({
+          projectId,
+          sinceMs,
+          limit: REGISTRY_TRAFFIC_LIMIT_PER_PROJECT,
+        }),
+      })),
+    );
   }
 
   /**

@@ -77526,6 +77526,15 @@ openapi: "GET /api/v1/governance/registry/schema"
 
 ---
 
+# FILE: ./api-reference/governance-agent-registry/get-the-registry-settings.mdx
+
+---
+title: "Get the registry settings"
+openapi: "GET /api/v1/governance/registry/settings"
+---
+
+---
+
 # FILE: ./api-reference/governance-agent-registry/list-one-registry-agent-s-versions.mdx
 
 ---
@@ -77562,6 +77571,15 @@ Read every AI agent in your organization with its endpoints, model, instructions
 ---
 title: "Read the registry change feed"
 openapi: "GET /api/v1/governance/registry/events"
+---
+
+---
+
+# FILE: ./api-reference/governance-agent-registry/save-the-registry-settings.mdx
+
+---
+title: "Save the registry settings"
+openapi: "PUT /api/v1/governance/registry/settings"
 ---
 
 ---

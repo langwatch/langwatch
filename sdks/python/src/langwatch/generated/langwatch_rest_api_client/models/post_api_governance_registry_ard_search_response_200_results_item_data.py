@@ -8,6 +8,9 @@ from attrs import define as _attrs_define
 from ..models.post_api_governance_registry_ard_search_response_200_results_item_data_management import (
     PostApiGovernanceRegistryArdSearchResponse200ResultsItemDataManagement,
 )
+from ..models.post_api_governance_registry_ard_search_response_200_results_item_data_posture import (
+    PostApiGovernanceRegistryArdSearchResponse200ResultsItemDataPosture,
+)
 from ..models.post_api_governance_registry_ard_search_response_200_results_item_data_source import (
     PostApiGovernanceRegistryArdSearchResponse200ResultsItemDataSource,
 )
@@ -18,6 +21,9 @@ from ..models.post_api_governance_registry_ard_search_response_200_results_item_
 if TYPE_CHECKING:
     from ..models.post_api_governance_registry_ard_search_response_200_results_item_data_endpoints_item import (
         PostApiGovernanceRegistryArdSearchResponse200ResultsItemDataEndpointsItem,
+    )
+    from ..models.post_api_governance_registry_ard_search_response_200_results_item_data_labels import (
+        PostApiGovernanceRegistryArdSearchResponse200ResultsItemDataLabels,
     )
     from ..models.post_api_governance_registry_ard_search_response_200_results_item_data_model_type_0 import (
         PostApiGovernanceRegistryArdSearchResponse200ResultsItemDataModelType0,
@@ -45,6 +51,11 @@ class PostApiGovernanceRegistryArdSearchResponse200ResultsItemData:
         description (None | str):
         status (PostApiGovernanceRegistryArdSearchResponse200ResultsItemDataStatus):
         shadow (bool):
+        dormant (bool):
+        posture (PostApiGovernanceRegistryArdSearchResponse200ResultsItemDataPosture):
+        platform (None | str):
+        labels (PostApiGovernanceRegistryArdSearchResponse200ResultsItemDataLabels):
+        owner_label (None | str):
         version (int):
         source_version (None | str):
         project_id (None | str):
@@ -69,6 +80,11 @@ class PostApiGovernanceRegistryArdSearchResponse200ResultsItemData:
     description: None | str
     status: PostApiGovernanceRegistryArdSearchResponse200ResultsItemDataStatus
     shadow: bool
+    dormant: bool
+    posture: PostApiGovernanceRegistryArdSearchResponse200ResultsItemDataPosture
+    platform: None | str
+    labels: PostApiGovernanceRegistryArdSearchResponse200ResultsItemDataLabels
+    owner_label: None | str
     version: int
     source_version: None | str
     project_id: None | str
@@ -108,6 +124,18 @@ class PostApiGovernanceRegistryArdSearchResponse200ResultsItemData:
         status = self.status.value
 
         shadow = self.shadow
+
+        dormant = self.dormant
+
+        posture = self.posture.value
+
+        platform: None | str
+        platform = self.platform
+
+        labels = self.labels.to_dict()
+
+        owner_label: None | str
+        owner_label = self.owner_label
 
         version = self.version
 
@@ -169,6 +197,11 @@ class PostApiGovernanceRegistryArdSearchResponse200ResultsItemData:
                 "description": description,
                 "status": status,
                 "shadow": shadow,
+                "dormant": dormant,
+                "posture": posture,
+                "platform": platform,
+                "labels": labels,
+                "owner_label": owner_label,
                 "version": version,
                 "source_version": source_version,
                 "project_id": project_id,
@@ -192,6 +225,9 @@ class PostApiGovernanceRegistryArdSearchResponse200ResultsItemData:
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         from ..models.post_api_governance_registry_ard_search_response_200_results_item_data_endpoints_item import (
             PostApiGovernanceRegistryArdSearchResponse200ResultsItemDataEndpointsItem,
+        )
+        from ..models.post_api_governance_registry_ard_search_response_200_results_item_data_labels import (
+            PostApiGovernanceRegistryArdSearchResponse200ResultsItemDataLabels,
         )
         from ..models.post_api_governance_registry_ard_search_response_200_results_item_data_model_type_0 import (
             PostApiGovernanceRegistryArdSearchResponse200ResultsItemDataModelType0,
@@ -224,6 +260,26 @@ class PostApiGovernanceRegistryArdSearchResponse200ResultsItemData:
         status = PostApiGovernanceRegistryArdSearchResponse200ResultsItemDataStatus(d.pop("status"))
 
         shadow = d.pop("shadow")
+
+        dormant = d.pop("dormant")
+
+        posture = PostApiGovernanceRegistryArdSearchResponse200ResultsItemDataPosture(d.pop("posture"))
+
+        def _parse_platform(data: object) -> None | str:
+            if data is None:
+                return data
+            return cast(None | str, data)
+
+        platform = _parse_platform(d.pop("platform"))
+
+        labels = PostApiGovernanceRegistryArdSearchResponse200ResultsItemDataLabels.from_dict(d.pop("labels"))
+
+        def _parse_owner_label(data: object) -> None | str:
+            if data is None:
+                return data
+            return cast(None | str, data)
+
+        owner_label = _parse_owner_label(d.pop("owner_label"))
 
         version = d.pop("version")
 
@@ -332,6 +388,11 @@ class PostApiGovernanceRegistryArdSearchResponse200ResultsItemData:
             description=description,
             status=status,
             shadow=shadow,
+            dormant=dormant,
+            posture=posture,
+            platform=platform,
+            labels=labels,
+            owner_label=owner_label,
             version=version,
             source_version=source_version,
             project_id=project_id,
