@@ -82,26 +82,34 @@ Feature: A read bounded below on evaluation_metrics.OccurredAt deduplicates only
 
   @unit
   Scenario: A read bounded below on a latest-in-order view's floor column reads its floored twin
-    Given a statement that reads traces or trace_metrics bounded below on OccurredAt, or evaluations bounded below on ScheduledAt
+    Given a statement that reads trace_metrics bounded below on OccurredAt, or evaluations bounded below on ScheduledAt
     And a bound that takes the least of two query constants
     When the executor sends it
     Then it reads the view's floored twin from that bound
 
   @unit
-  Scenario: A floored twin of a latest-in-order view reads the source from its bound before LIMIT 1 BY
-    Given traces, trace_metrics and evaluations, which declare a floor column
-    When their floored twins are provisioned
-    Then each twin reads its source table from the bound before it keeps one version per key
-    And a latest-in-order view that declares no floor column, such as simulations, gets no twin
+  Scenario: A read bounded below on traces.OccurredAt keeps the whole-history dedup
+    Given a statement that reads traces bounded below on OccurredAt
+    And a newer version of a trace can carry an earlier OccurredAt than an older one
+    When the executor sends it
+    Then it reads traces as written, with no floored twin
 
   @unit
-  Scenario: Every trace read of the changes and capability-gap stock queries reads its floored twin
+  Scenario: A floored twin of a latest-in-order view reads the source from its bound before LIMIT 1 BY
+    Given trace_metrics and evaluations, which declare a floor column
+    When their floored twins are provisioned
+    Then each twin reads its source table from the bound before it keeps one version per key
+    And a latest-in-order view that declares no floor column, such as traces or simulations, gets no twin
+
+  @unit
+  Scenario: Every trace_metrics read of the changes and capability-gap stock queries reads its floored twin
     Given the stock queries for model and prompt changes and for capability gaps
     When the executor sends them
-    Then every read of traces and trace_metrics goes to its floored twin
+    Then every read of trace_metrics goes to its floored twin
+    And every read of traces is sent as written
 
   @unit
   Scenario: Every deduplicated view floors a bounded read or says why it cannot
     Given every catalog view whose dedup strategy, the shipped default included, is not none
-    Then each declares a floor column with a floored twin, or is listed with the reason it takes none
+    Then each declares a floor column and provisions exactly one floored twin, or is listed with the reason it takes none
     And the list names only deduplicated views that declare no floor column

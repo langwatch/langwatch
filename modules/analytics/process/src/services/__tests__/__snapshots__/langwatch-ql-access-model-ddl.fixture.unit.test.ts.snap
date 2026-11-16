@@ -553,7 +553,6 @@ exports[`the definition-driven access DDL > given fixed names, password hash and
   "GRANT SELECT ON langwatch.workflow_versions_pg TO langwatch_lwql",
   "GRANT SELECT ON langwatch.workflows_pg TO langwatch_lwql",
   "GRANT SELECT(\`TenantId\`, \`CorrelationTraceId\`, \`EventName\`, \`ProviderSessionId\`, \`AttributesJson\`, \`TimeUnixMs\`) ON langwatch.log_records TO langwatch_lwql",
-  "GRANT SELECT ON langwatch.traces__floor TO langwatch_lwql",
   "GRANT SELECT ON langwatch.evaluations__floor TO langwatch_lwql",
   "GRANT SELECT ON langwatch.trace_metrics__floor TO langwatch_lwql",
   "GRANT SELECT ON langwatch.evaluation_metrics__floor TO langwatch_lwql",

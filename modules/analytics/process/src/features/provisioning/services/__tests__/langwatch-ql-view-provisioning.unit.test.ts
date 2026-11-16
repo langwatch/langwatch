@@ -510,7 +510,6 @@ describe("given the views pinned to latest-in-order", () => {
 
   /** @scenario "A floored twin of a latest-in-order view reads the source from its bound before LIMIT 1 BY" */
   it.each([
-    ["traces", "trace_summaries", "OccurredAt"],
     ["trace_metrics", "trace_analytics", "OccurredAt"],
     ["evaluations", "evaluation_runs", "ScheduledAt"],
   ])("floors %s's read of %s on %s before it keeps one version", (name, table, column) => {
@@ -534,19 +533,22 @@ describe("given the views pinned to latest-in-order", () => {
   });
 
   /** @scenario "A floored twin of a latest-in-order view reads the source from its bound before LIMIT 1 BY" */
-  it("provisions no twin for a latest-in-order view that declares no floor column", () => {
-    const view = pickLwqlViewByName("simulations");
-    if (!view) throw new Error("simulations is not in the catalog");
+  it.each(["traces", "simulations"])(
+    "provisions no twin for %s, a latest-in-order view that declares no floor column",
+    (name) => {
+      const view = pickLwqlViewByName(name);
+      if (!view) throw new Error(`${name} is not in the catalog`);
 
-    expect(
-      viewStatements.flooredViewStatements({
-        names: NAMES,
-        sourceDatabase: SOURCE_DATABASE,
-        view,
-        dedup: SHIPPED_LWQL_DEDUP,
-      }),
-    ).toEqual([]);
-  });
+      expect(
+        viewStatements.flooredViewStatements({
+          names: NAMES,
+          sourceDatabase: SOURCE_DATABASE,
+          view,
+          dedup: SHIPPED_LWQL_DEDUP,
+        }),
+      ).toEqual([]);
+    },
+  );
 
   it("orders trace_metrics by its whole sort key and breaks a version tie on Version", () => {
     const sql = render("trace_metrics");

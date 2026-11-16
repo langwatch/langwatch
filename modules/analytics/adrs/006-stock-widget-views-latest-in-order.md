@@ -162,7 +162,7 @@ The stock evaluation widgets read `trace_evaluation_metrics` and `trace_evaluati
 retraction for every change. Those views take neither `FINAL` nor `LIMIT 1 BY` but the `settled`
 strategy: `GROUP BY` every column read, `HAVING sum(Sign) > 0` (ADR-007).
 
-## Amendment 2026-11-16: floored twins for traces, trace_metrics and evaluations
+## Amendment 2026-11-16: floored twins for trace_metrics and evaluations
 
 `LIMIT 1 BY` stops the caller's `WHERE` from reaching the table: a local `EXPLAIN indexes = 1`
 of the changes and capability-gap stock queries shows `MinMax Condition: true` on every
@@ -170,7 +170,8 @@ of the changes and capability-gap stock queries shows `MinMax Condition: true` o
 (87 production queries hit the 1 GB cap in seven days). ADR-005's floored twin now covers
 `latest-in-order`: the twin's subquery reads `WHERE <floor column> >= {lwql_floor}` before its
 `ORDER BY ... LIMIT 1 BY`, and the executor's rewrite is unchanged. The bound may also call
-`least` and `greatest`, which the sources lookup bound uses (ADR-003).
+`least` and `greatest`, which the sources lookup bound uses (ADR-003). `trace_summaries` reads keep
+`MinMax Condition: true`: `traces` takes no floor (below).
 
 A twin returns exactly the view's rows at or after the bound when no newer version of a row has
 an earlier floor column than an older one (ADR-005, decision 2). Per view:
@@ -178,14 +179,14 @@ an earlier floor column than an older one (ADR-005, decision 2). Per view:
 - **`trace_metrics`, `OccurredAt`: exact by construction.** `OccurredAt` is in the `LIMIT 1 BY`
   key, so the floor keeps or drops a key's versions together. A trace whose anchor moved keeps its
   two rows in both.
-- **`traces`, `OccurredAt`: holds while the anchor is frozen.** `trace_summaries.OccurredAt` is the
-  ADR-087 storage anchor: frozen on the first contribution (`anchorStorageTime` returns once
-  `storageAnchorMs > 0`), read back from the row and written as `storageAnchorMs ?? CreatedAt`.
-  It can fall only on paths ADR-005 already names as risks: a fold that misses its stored row
-  outside the ±7-day read window (`trustAbsentMiss`) or a replay re-anchors on the event it meets
-  first; and rows written before the ADR-087 stamp (2026-08-06), whose `OccurredAt` was the
-  minimum span start, keep an older, later version only where the two sit in different weekly
-  partitions.
+- **`traces`, `OccurredAt`: unsafe, not floored.** `trace_summaries.OccurredAt` is the ADR-087
+  storage anchor, frozen once `storageAnchorMs > 0`. But the trace-summary projection sets
+  `trustAbsentMiss: true` and starts each fold from `storageAnchorMs: 0`, so a fold that misses the
+  stored row (outside the ±7-day read window) starts fresh and `anchorStorageTime` freezes the
+  `OccurredAt` of the span it meets first, which can be earlier than the stored anchor. That newer
+  version sits before the floor while the older one sits after it: the twin would drop the newer
+  version and return the stale row, where the view returns none. `traces` keeps reading its whole
+  history until the anchor cannot fall.
 - **`evaluations`, `ScheduledAt`: holds while the scheduled event folds first.** Only
   `handleEvaluationScheduled` sets it; the row writes `scheduledAt ?? createdAt`, and `createdAt` is
   the fold's clock when it first folds the run. A run whose start or result folded before its
