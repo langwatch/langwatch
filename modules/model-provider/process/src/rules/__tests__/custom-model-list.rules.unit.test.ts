@@ -35,6 +35,66 @@ describe("toCanonicalCustomModelList", () => {
     });
   });
 
+  describe("given the per-model settings the custom-model form collects", () => {
+    /** @scenario "A saved custom model keeps its max tokens, parameters and inputs" */
+    it("keeps max tokens, supported parameters and multimodal inputs", () => {
+      expect(
+        toCanonicalCustomModelList(
+          [
+            {
+              modelId: "acme-chat",
+              displayName: "ACME Chat",
+              mode: "chat",
+              maxTokens: 8192,
+              supportedParameters: ["temperature", "max_tokens"],
+              multimodalInputs: ["image"],
+            },
+          ],
+          "chat",
+        ),
+      ).toEqual([
+        {
+          id: "acme-chat",
+          label: "ACME Chat",
+          type: "chat",
+          maxTokens: 8192,
+          supportedParameters: ["temperature", "max_tokens"],
+          multimodalInputs: ["image"],
+        },
+      ]);
+    });
+
+    it("keeps a cleared max tokens as null, so the save clears it", () => {
+      expect(
+        toCanonicalCustomModelList([{ modelId: "m", displayName: "M", maxTokens: null }], "chat"),
+      ).toEqual([{ id: "m", label: "M", type: "chat", maxTokens: null }]);
+    });
+
+    /** @scenario "A custom model list without settings stores none" */
+    it("adds no settings an entry did not carry", () => {
+      expect(toCanonicalCustomModelList(["m", { modelId: "n" }], "chat")).toEqual([
+        { id: "m", label: "m", type: "chat" },
+        { id: "n", label: "n", type: "chat" },
+      ]);
+    });
+
+    it("drops a setting of the wrong type rather than storing it", () => {
+      expect(
+        toCanonicalCustomModelList(
+          [
+            {
+              modelId: "m",
+              maxTokens: "lots",
+              supportedParameters: "temperature",
+              multimodalInputs: ["image", "video"],
+            },
+          ],
+          "chat",
+        ),
+      ).toEqual([{ id: "m", label: "m", type: "chat" }]);
+    });
+  });
+
   describe("given the two shapes mixed in one list", () => {
     it("reads both, because a customer may have written the list over time", () => {
       expect(toCanonicalCustomModelList(["a", { modelId: "b", displayName: "B" }], "chat")).toEqual(
