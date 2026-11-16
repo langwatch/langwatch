@@ -37,6 +37,7 @@ describe("given production source", () => {
 
       expect(found.map((entry) => entry.messageId)).toEqual(["mintNowMilliseconds"]);
       expect(found[0].message).toContain("nowEpochMs()");
+      expect(found[0].message).toContain("nowInstant()");
     });
   });
 
