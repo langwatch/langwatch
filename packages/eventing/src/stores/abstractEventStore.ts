@@ -2,6 +2,7 @@ import type { AggregateType } from "../domain/aggregateType.ts";
 import type { Event } from "../domain/types.ts";
 import { ValidationError } from "../services/errorHandling.ts";
 import { EventUtils } from "../utils/event.utils.ts";
+import type { EventLogPageCursor } from "./event-log-page-order.ts";
 import { readEventRecord } from "./eventReadSeat.ts";
 import type {
   EventStore as BaseEventStore,
@@ -359,7 +360,7 @@ export abstract class AbstractEventStore<
     context: EventStoreReadContext<EventType>;
     aggregateType: AggregateType;
     upToEvent: EventType;
-    after: { timestamp: number; eventId: string } | undefined;
+    after: EventLogPageCursor | undefined;
     limit: number;
   }): Promise<readonly EventType[]> {
     const { aggregateId, context, aggregateType } = request;
@@ -396,7 +397,7 @@ export abstract class AbstractEventStore<
       context: EventStoreReadContext<EventType>;
       aggregateType: AggregateType;
       upToEvent: EventType;
-      after: { timestamp: number; eventId: string } | undefined;
+      after: EventLogPageCursor | undefined;
       limit: number;
     },
   ): Promise<readonly EventType[]> {

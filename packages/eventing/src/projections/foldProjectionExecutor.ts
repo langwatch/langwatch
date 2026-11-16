@@ -9,6 +9,10 @@ import {
   incrementEsFoldRefoldTotal,
   observeEsFoldBlindReapplyEvents,
 } from "../metrics.ts";
+import {
+  type EventLogPageCursor,
+  eventLogPageCursorAfter,
+} from "../stores/event-log-page-order.ts";
 import { compareOrdinal } from "../utils/compareOrdinal.ts";
 import { appliedTokenOf } from "./appliedToken.ts";
 import { MAX_APPLIED_EVENT_IDS, mergeAppliedEventIds } from "./foldCache/foldCacheEntry.ts";
@@ -171,11 +175,18 @@ function applyUnseenEvents<State, E extends Event>({
   return { state: next, appliedCount };
 }
 
+/** An applied event's token and arrival, all the applied set's tail needs to keep of it. */
+type AppliedArrival = Pick<Event, "createdAt" | "id"> & { token: string };
+
 /** The running result of one paged rebuild pass (see `streamRebuild`). */
 interface RebuildPass<State> {
   state: State;
-  /** The newest applied tokens; only the last MAX_APPLIED_EVENT_IDS are stored. */
-  appliedTail: string[];
+  /**
+   * The newest applied events by arrival; only the last MAX_APPLIED_EVENT_IDS are stored. Pages
+   * come in key order, so the last folded are not the newest: a queued live job finds itself
+   * in the stored set only if the newest are kept.
+   */
+  appliedTail: AppliedArrival[];
   appliedCount: number;
   maxOccurredAt: number;
   seen: Set<string>;
@@ -193,11 +204,18 @@ function foldIntoRebuildPass<State, E extends Event>({
   event: E;
 }): void {
   pass.state = projection.apply(pass.state, event);
-  pass.appliedTail.push(appliedTokenOf(event));
+  pass.appliedTail.push({ createdAt: event.createdAt, id: event.id, token: appliedTokenOf(event) });
   pass.appliedCount++;
   if (pass.appliedTail.length > 2 * MAX_APPLIED_EVENT_IDS) {
-    pass.appliedTail = pass.appliedTail.slice(-MAX_APPLIED_EVENT_IDS);
+    pass.appliedTail = newestApplied(pass.appliedTail);
   }
+}
+
+/** The newest MAX_APPLIED_EVENT_IDS events by arrival, oldest first, as the applied set keeps them. */
+function newestApplied(applied: readonly AppliedArrival[]): AppliedArrival[] {
+  return applied
+    .toSorted((a, b) => a.createdAt - b.createdAt || compareOrdinal(a.id, b.id))
+    .slice(-MAX_APPLIED_EVENT_IDS);
 }
 
 /** Accounts one page against the pass's fences and folds its unseen consumed events. */
@@ -968,7 +986,10 @@ export class FoldProjectionExecutor {
       pass.state,
       withAppliedEventIds(
         context,
-        mergeAppliedEventIds({ previous: [], applied: pass.appliedTail }),
+        mergeAppliedEventIds({
+          previous: [],
+          applied: newestApplied(pass.appliedTail).map(({ token }) => token),
+        }),
       ),
     );
     logger.info(
@@ -1033,7 +1054,8 @@ export class FoldProjectionExecutor {
   }
 
   /**
-   * The aggregate's history up to `upToEvent`, one `refoldPageSize` page at a time.
+   * The aggregate's history up to `upToEvent`, one `refoldPageSize` page at a time, in page
+   * order (event_log's key order, not time order; see `EventLogPageCursor`).
    * The page bound is a safety net for a non-advancing cursor: 100k pages of the
    * default 1000 covers a 100M-event aggregate. Callers guard `eventLoaderUpToPaged`.
    */
@@ -1049,7 +1071,7 @@ export class FoldProjectionExecutor {
     reader: string;
   }): AsyncGenerator<readonly Event[]> {
     const MAX_PAGES = 100_000;
-    let after: { timestamp: number; eventId: string } | undefined;
+    let after: EventLogPageCursor | undefined;
     for (let pageCount = 1; pageCount <= MAX_PAGES; pageCount++) {
       const page = await projection.eventLoaderUpToPaged!({
         tenantId: context.tenantId,
@@ -1059,9 +1081,8 @@ export class FoldProjectionExecutor {
         limit: this.refoldPageSize,
       });
       if (page.length > 0) yield page;
-      const last = page.at(-1);
-      if (!last || page.length < this.refoldPageSize) return;
-      after = { timestamp: last.createdAt, eventId: last.id };
+      after = eventLogPageCursorAfter(page);
+      if (!after || page.length < this.refoldPageSize) return;
     }
     throw new Error(
       `${reader} exceeded ${MAX_PAGES} pages for aggregate ${context.aggregateId} — possible non-advancing cursor`,
@@ -1329,7 +1350,7 @@ export class FoldProjectionExecutor {
 
     // Stream the re-fold page-by-page when order-insensitive and a paginated loader is
     // wired, bounding memory for a huge aggregate (100k+ events). Gated on
-    // refoldOnOutOfOrder: false since paged results arrive in (timestamp, eventId) order.
+    // refoldOnOutOfOrder: false since paged results arrive in key order, not time order.
     if (projection.eventLoaderUpToPaged && projection.options?.refoldOnOutOfOrder === false) {
       return this.streamRefoldUpToDelivered({ projection, delivered, context, upToEvent });
     }

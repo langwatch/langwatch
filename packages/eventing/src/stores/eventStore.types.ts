@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { AggregateType } from "../domain/aggregateType.ts";
 import { type TenantId, TenantIdSchema } from "../domain/tenantId.ts";
 import type { Event } from "../domain/types.ts";
+import type { EventLogPageCursor } from "./event-log-page-order.ts";
 
 /**
  * Event store read context; tenantId is REQUIRED for tenant isolation.
@@ -124,13 +125,14 @@ export interface ReadOnlyEventStore<EventType extends Event = Event> {
   /**
    * Cursor-paginated variant of getEventsUpTo; enables paging large histories without
    * materializing all events. Optional: callers must check presence and fall back to getEventsUpTo.
+   * Pages come in key order, not time order (see EventLogPageCursor): for order-insensitive folds only.
    */
   getEventsUpToPaged?(request: {
     aggregateId: string;
     context: EventStoreReadContext<EventType>;
     aggregateType: AggregateType;
     upToEvent: EventType;
-    after: { timestamp: number; eventId: string } | undefined;
+    after: EventLogPageCursor | undefined;
     limit: number;
   }): Promise<readonly EventType[]>;
 

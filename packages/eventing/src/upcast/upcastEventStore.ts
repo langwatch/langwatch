@@ -1,4 +1,5 @@
 import type { Event } from "../domain/types.ts";
+import { compareEventLogPageOrder } from "../stores/event-log-page-order.ts";
 import type {
   EventStore,
   EventStoreEventReadInput,
@@ -82,7 +83,9 @@ class UpcastingEventStore<EventType extends Event> implements EventStore<EventTy
       const merged = await this.#merged(request.aggregateType, (aggregateType) =>
         paged({ ...request, aggregateType }),
       );
-      return merged.slice(0, request.limit);
+      // Each type's page is the first `limit` after the cursor in page order, so the merged
+      // page is the first `limit` of their union in that same order, not in log order.
+      return merged.toSorted(compareEventLogPageOrder).slice(0, request.limit);
     };
   }
 

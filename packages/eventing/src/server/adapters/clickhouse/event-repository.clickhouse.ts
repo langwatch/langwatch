@@ -1,6 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 
 import { ConfigurationError, EventNotFoundError } from "../../../services/errorHandling.ts";
+import type { EventLogPageCursor } from "../../../stores/event-log-page-order.ts";
 import type {
   EventOccurredAtWindow,
   EventRecord,
@@ -531,9 +532,10 @@ export class EventingClickHouseEventRepository implements EventRepository {
   }
 
   /**
-   * Cursor-paginated `getEventRecordsUpTo`. Same upper bound and order, plus a
-   * strict `after` cursor and `LIMIT`, so a re-fold of a huge aggregate streams
-   * history a page at a time instead of OOMing on every EventPayload blob at once.
+   * Cursor-paginated `getEventRecordsUpTo`: the same upper bound, in page order (see
+   * {@link EventLogPageCursor}) with a strict `after` cursor and `LIMIT`, so a re-fold of a
+   * huge aggregate streams history a page at a time instead of OOMing on every EventPayload
+   * blob at once.
    */
   async getEventRecordsUpToPaged(request: {
     tenantId: string;
@@ -541,7 +543,7 @@ export class EventingClickHouseEventRepository implements EventRepository {
     aggregateId: string;
     upToTimestamp: number;
     upToEventId: string;
-    after: { timestamp: number; eventId: string } | undefined;
+    after: EventLogPageCursor | undefined;
     limit: number;
     occurredAtFromMs?: number;
   }): Promise<EventRecord[]> {
@@ -583,7 +585,7 @@ export class EventingClickHouseEventRepository implements EventRepository {
     aggregateId: string;
     upToTimestamp: number;
     upToEventId: string;
-    after: { timestamp: number; eventId: string } | undefined;
+    after: EventLogPageCursor | undefined;
     limit: number;
     occurredAtFromMs?: number;
   }): {
@@ -601,17 +603,24 @@ export class EventingClickHouseEventRepository implements EventRepository {
       limit,
       occurredAtFromMs,
     } = request;
+    // event_log is ORDER BY (TenantId, AggregateType, AggregateId, IdempotencyKey) and the WHERE
+    // fixes the first three, so a page ordered by IdempotencyKey reads in sort-key order from the
+    // cursor's key and stops at LIMIT. Ordered by EventTimestamp, every page read the whole
+    // aggregate to sort it. The `>=` conjunct is the one the primary index seeks on; arrival
+    // and id only order copies of one key that are not merged yet, so none is skipped.
     const afterClause = after
-      ? `AND (
-            EventTimestamp > {afterTimestamp:UInt64}
+      ? `AND IdempotencyKey >= {afterKey:String}
+          AND (
+            IdempotencyKey > {afterKey:String}
+            OR EventTimestamp > {afterTimestamp:UInt64}
             OR (
               EventTimestamp = {afterTimestamp:UInt64}
               AND EventId > {afterEventId:String}
             )
           )`
       : "";
-    // The cursor and the upper bound are both on EventTimestamp, which is NOT
-    // the partition key — so neither prunes. Only EventOccurredAt does.
+    // The upper bound is on EventTimestamp, which is NOT the partition key, so it
+    // only filters. Only EventOccurredAt prunes partitions.
     const hasLowerBound = typeof occurredAtFromMs === "number" && occurredAtFromMs > 0;
     const occurredAtFilter = hasLowerBound
       ? "AND (EventOccurredAt = 0 OR EventOccurredAt >= {occurredAtFromMs:UInt64})"
@@ -633,7 +642,7 @@ export class EventingClickHouseEventRepository implements EventRepository {
             )
           )
           ${afterClause}
-        ORDER BY EventTimestamp ASC, EventId ASC
+        ORDER BY IdempotencyKey ASC, EventTimestamp ASC, EventId ASC
         LIMIT {limit:UInt32}
       `,
       query_params: {
@@ -643,7 +652,13 @@ export class EventingClickHouseEventRepository implements EventRepository {
         upToTimestamp,
         upToEventId,
         ...(hasLowerBound ? { occurredAtFromMs } : {}),
-        ...(after ? { afterTimestamp: after.timestamp, afterEventId: after.eventId } : {}),
+        ...(after
+          ? {
+              afterKey: after.idempotencyKey,
+              afterTimestamp: after.timestamp,
+              afterEventId: after.eventId,
+            }
+          : {}),
         limit,
       },
       declaresFullScan: !hasLowerBound,

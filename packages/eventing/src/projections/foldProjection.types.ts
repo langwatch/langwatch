@@ -1,6 +1,7 @@
 import type { ExhaustedOutcome } from "@langwatch/group-queue";
 
 import type { Event } from "../domain/types.ts";
+import type { EventLogPageCursor } from "../stores/event-log-page-order.ts";
 import type { ProjectionStoreContext } from "./projectionStoreContext.ts";
 
 // Stateful projection folding events into accumulated state via pure functions:
@@ -65,12 +66,13 @@ export interface FoldProjectionDefinition<State, E extends Event = Event> {
   }) => Promise<Event[]>;
 
   // Paginated variant of eventLoaderUpTo for streaming store-miss re-folds of
-  // huge aggregates; auto-wired when event store supports paginated reads.
+  // huge aggregates; auto-wired when event store supports paginated reads. Pages come in
+  // key order, not time order, so only an order-insensitive fold may use it.
   eventLoaderUpToPaged?: (context: {
     tenantId: string;
     aggregateId: string;
     upToEvent: Event;
-    after: { timestamp: number; eventId: string } | undefined;
+    after: EventLogPageCursor | undefined;
     limit: number;
   }) => Promise<Event[]>;
 }

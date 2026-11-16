@@ -1,3 +1,5 @@
+import type { EventLogPageCursor } from "../event-log-page-order.ts";
+
 /**
  * Event record format used by repositories for data storage.
  * This is the raw format stored in the database/memory.
@@ -78,7 +80,8 @@ export interface EventRepository {
 
   /**
    * Cursor-paginated variant; streams history page-by-page for large aggregates.
-   * Optional: callers detect absence and fall back to getEventRecordsUpTo.
+   * Optional: callers detect absence and fall back to getEventRecordsUpTo. Pages come in
+   * key order, not time order (see EventLogPageCursor).
    */
   getEventRecordsUpToPaged?: (request: {
     tenantId: string;
@@ -86,7 +89,7 @@ export interface EventRepository {
     aggregateId: string;
     upToTimestamp: number;
     upToEventId: string;
-    after: { timestamp: number; eventId: string } | undefined;
+    after: EventLogPageCursor | undefined;
     limit: number;
     /** Partition-pruning lower bound — see {@link EventRepository.getEventRecordsUpTo}. */
     occurredAtFromMs?: number;

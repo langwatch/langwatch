@@ -37,7 +37,7 @@ export function wireFoldEventLoaders<Stored extends Event>({
   // History up to AND including the delivered event in log order, so a store-miss re-fold
   // never pre-applies an event persisted but still queued (per-aggregate FIFO delivers it next).
   fold.eventLoaderUpTo ??= loadUpTo({ aggregateType, eventStore });
-  // One (timestamp, eventId)-ordered page; no occurredAt re-sort, as the streaming path
+  // One page in event_log's key order; no occurredAt re-sort, as the streaming path
   // serves order-insensitive folds only.
   const getEventsUpToPaged = eventStore.getEventsUpToPaged?.bind(eventStore);
   if (!fold.eventLoaderUpToPaged && getEventsUpToPaged) {
