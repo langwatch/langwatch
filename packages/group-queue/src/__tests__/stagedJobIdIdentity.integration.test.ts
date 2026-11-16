@@ -639,12 +639,14 @@ describe("GroupQueueProcessor — a staged job id is identity, not state (ADR-08
         const name = freshName();
         const groupId = `${TENANT}/redelivery-wait`;
         const seen: number[] = [];
+        // Full jitter can draw a wait shorter than this test watches; pin it near the rung's top.
+        const random = vi.spyOn(Math, "random").mockReturnValue(0.99);
         const { queue, payload } = await failOnceIntoALongBackoff({
           name,
           groupId,
           chainAt: 5,
           onDelivery: (d) => seen.push(d?.attempt ?? 0),
-        });
+        }).finally(() => random.mockRestore());
         const stagedJobId = expectedStagedId(payload);
         const backoffDeadline = Number(await readyScore(name, groupId));
         expect(backoffDeadline).toBeGreaterThan(Date.now());
