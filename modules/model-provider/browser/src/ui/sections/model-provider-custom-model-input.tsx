@@ -117,9 +117,18 @@ function CustomModelsTable({
 
 /**
  * A provider the catalogue lists nothing for (Azure lists only its deployments) offers no chat
- * model until one is added here; saving stays possible, the warning only says so.
+ * model until one is added here; saving stays possible, the warning only says so. Its embedding
+ * entries still work, so with some added only chat is said to be missing.
  */
-function NoChatModelWarning({ providerKey, onAdd }: { providerKey: string; onAdd: () => void }) {
+function NoChatModelWarning({
+  providerKey,
+  hasEmbeddings,
+  onAdd,
+}: {
+  providerKey: string;
+  hasEmbeddings: boolean;
+  onAdd: () => void;
+}) {
   const name = findModelProviderDefinition(providerKey)?.name ?? providerKey;
   const noun = providerKey === "azure" ? "deployment" : "model";
   return (
@@ -128,8 +137,11 @@ function NoChatModelWarning({ providerKey, onAdd }: { providerKey: string; onAdd
       data-testid="no-chat-deployment-warning"
       action={<BannerAction onClick={onAdd}>Add a chat {noun}</BannerAction>}
     >
-      {name} lists only the {noun}s you add. Until you add a chat {noun}, no model from it can be
-      picked as a default.
+      {hasEmbeddings
+        ? `${name} has embedding ${noun}s but no chat ${noun} yet. Add one to pick a chat ` +
+          `default from it.`
+        : `${name} lists only the ${noun}s you add. Until you add a chat ${noun}, no chat ` +
+          `default can be picked from it.`}
     </Banner>
   );
 }
@@ -227,6 +239,7 @@ export const CustomModelInputSection = ({
       {listsOnlyAddedModels({ provider: provider.provider }) && state.customModels.length === 0 && (
         <NoChatModelWarning
           providerKey={provider.provider}
+          hasEmbeddings={state.customEmbeddingsModels.length > 0}
           onAdd={() => setAddModelDialogOpen(true)}
         />
       )}

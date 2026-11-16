@@ -48,6 +48,11 @@ function runByEvery(lists: readonly string[][]): string[] {
   return first.filter((model) => others.every((list) => list.has(model)));
 }
 
+/** Every scope offers some model, yet none is offered by all: the scopes share nothing. */
+function sharesNoneOf(lists: readonly string[][]): boolean {
+  return lists.length > 1 && lists.every((list) => list.length > 0) && !runByEvery(lists).length;
+}
+
 function emptyProvidersOf({ rows, mode }: { rows: readonly ScopeProviderRow[]; mode: Mode }) {
   const named = new Map<string, EmptyScopeProvider>();
   for (const row of rows) {
@@ -121,17 +126,18 @@ export function scopeModelOptionsOf({
     })),
   );
 
+  const listsOf = (mode: Mode) =>
+    rowsByScope.map((scopeRows) => modelIdsForScope({ rows: scopeRows, mode }));
+  const chat = listsOf("chat");
+  const embedding = listsOf("embedding");
   return {
-    chat: runByEvery(
-      rowsByScope.map((scopeRows) => modelIdsForScope({ rows: scopeRows, mode: "chat" })),
-    ),
-    embedding: runByEvery(
-      rowsByScope.map((scopeRows) => modelIdsForScope({ rows: scopeRows, mode: "embedding" })),
-    ),
+    chat: runByEvery(chat),
+    embedding: runByEvery(embedding),
     displayNames,
     emptyProviders: {
       chat: emptyProvidersOf({ rows, mode: "chat" }),
       embedding: emptyProvidersOf({ rows, mode: "embedding" }),
     },
+    sharesNone: { chat: sharesNoneOf(chat), embedding: sharesNoneOf(embedding) },
   };
 }

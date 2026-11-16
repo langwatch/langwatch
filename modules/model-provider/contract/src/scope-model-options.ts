@@ -32,6 +32,8 @@ const scopeModelOptionsSchemaDefinition = z.object({
     chat: z.array(emptyScopeProviderSchema),
     embedding: z.array(emptyScopeProviderSchema),
   }),
+  /** Every picked scope offers a model of this kind, but no model is offered by all of them. */
+  sharesNone: z.object({ chat: z.boolean(), embedding: z.boolean() }),
 });
 export interface ScopeModelOptionsSchema extends Named<typeof scopeModelOptionsSchemaDefinition> {}
 export const scopeModelOptionsSchema: ScopeModelOptionsSchema = scopeModelOptionsSchemaDefinition;
@@ -42,6 +44,7 @@ export const NO_SCOPE_MODEL_OPTIONS: ScopeModelOptions = {
   embedding: [],
   displayNames: {},
   emptyProviders: { chat: [], embedding: [] },
+  sharesNone: { chat: false, embedding: false },
 };
 
 /** The catalogue's model ids for one provider and kind, as `<provider>/<model>`. */

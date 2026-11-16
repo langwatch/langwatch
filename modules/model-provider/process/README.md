@@ -669,7 +669,7 @@ type Output = {
 
 // modelProvider.getModelOptionsForScopes
 type Input = z.infer<typeof decisionModelsForScopesTrpcInputSchema>; // ../contract/src/model-provider.trpc-schemas.ts:324
-type Output = z.infer<typeof scopeModelOptionsSchema>; // ../contract/src/scope-model-options.ts:37
+type Output = z.infer<typeof scopeModelOptionsSchema>; // ../contract/src/scope-model-options.ts:39
 
 // modelProvider.listAllForOrganizationForFrontend
 // Input: modelProviderOrganizationTrpcInputSchema, ../contract/src/model-provider.trpc-schemas.ts:77

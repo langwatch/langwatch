@@ -19,6 +19,13 @@ Feature: Default models offer only what the picked scopes can run
     Then no OpenAI or Anthropic model is offered
 
   @unit
+  Scenario: Scopes that each offer chat models but share none are told apart from none
+    Given one picked project runs OpenAI and another runs only Anthropic
+    When the models for both projects are listed
+    Then the answer says the scopes share no chat model
+    And it does not say so for embeddings, which only one of them offers
+
+  @unit
   Scenario: An organization config is not offered a model only one project's provider lists
     Given a deployment is listed on a project's Azure OpenAI provider only
     When the models for the organization are listed
@@ -113,17 +120,47 @@ Feature: Default models offer only what the picked scopes can run
     Then the Embeddings row says no provider at these scopes offers an embedding model
 
   @integration
-  Scenario: A failed models read offers no models and no explanation
-    Given the scope models read fails
+  Scenario: A refused models read says a picked scope cannot be viewed
+    Given the scope models read is refused
     When the drawer opens
-    Then the Default picker lists no chat model
+    Then a note says "You can't view one of the picked scopes"
+    And it offers no retry
+    And the Default picker lists no chat model
     And no provider is named as empty
+
+  @integration
+  Scenario: A failed models read says so and offers to try again
+    Given the scope models read fails for a reason other than a refusal
+    When the drawer opens
+    Then a note says the models for the picked scopes could not be loaded
+    When the user tries again
+    Then the models are read again
+
+  @integration
+  Scenario: Scopes that share no chat model are told so
+    Given every picked scope offers chat models but they share none
+    When the drawer opens
+    Then a note says no chat model is offered by every picked scope
+    And it does not say that no provider offers one
+
+  @integration
+  Scenario: The note offers no Open button for a provider the user cannot open
+    Given the note names an Azure OpenAI provider the provider editor cannot look up
+    When the drawer opens
+    Then the note still names Azure OpenAI
+    And it offers no button to open it
 
   @integration
   Scenario: An Azure provider with no chat deployment warns before saving
     Given the Azure OpenAI provider form lists no chat deployment
-    Then the form warns that no model can be picked until a chat deployment is added
+    Then the form warns that no chat default can be picked until a chat deployment is added
     And saving stays possible
+
+  @integration
+  Scenario: An Azure provider with only embedding deployments warns that chat is missing
+    Given the Azure OpenAI provider form lists an embedding deployment but no chat deployment
+    Then the form warns that it has no chat deployment yet
+    And it does not say that no model from it can be picked
 
   @integration
   Scenario: An Azure provider with a chat deployment shows no warning

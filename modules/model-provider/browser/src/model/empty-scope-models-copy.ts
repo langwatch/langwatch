@@ -41,6 +41,21 @@ export function noProviderCopy({ kind }: { kind: Kind }): string {
   return "No provider at these scopes offers a chat model. Add a model provider to pick one here.";
 }
 
+/** Every picked scope offers models of this kind, but no one model is offered by all of them. */
+export function sharesNoneCopy({ kind }: { kind: Kind }): string {
+  return (
+    `No ${kind} model is offered by every picked scope. Each offers some, but a config runs ` +
+    `only a model all of its scopes offer: pick fewer scopes or give them a provider in common.`
+  );
+}
+
+/** The scopes' models read was refused: the reader may not view one of the picked scopes. */
+export const SCOPE_MODELS_REFUSED_COPY =
+  "You can't view one of the picked scopes, so its models can't be listed here.";
+
+/** The scopes' models read failed for any other reason; it can be tried again. */
+export const SCOPE_MODELS_FAILED_COPY = "Couldn't load the models for the picked scopes.";
+
 export function openProviderLabel({ provider }: { provider: EmptyScopeProvider }): string {
   return `Open ${provider.name}`;
 }

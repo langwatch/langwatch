@@ -61,6 +61,12 @@ vi.mock("../../../behavior/model-provider-api.ts", () => ({
       },
       listDecisionModelsForScopes: { useQuery: () => ({ data: [], isLoading: false }) },
       getModelOptionsForScopes: { useQuery: () => scopeAnswerFor(mockScopeProviderRows()) },
+      listAllForOrganizationForFrontend: {
+        useQuery: () => ({ data: [], isLoading: false, isSuccess: true }),
+      },
+      listAllForProjectForFrontend: {
+        useQuery: () => ({ data: [], isLoading: false, isSuccess: true }),
+      },
       saveDefaultModelsConfig: {
         useMutation: () => ({ mutateAsync: mockSave, isPending: false }),
       },

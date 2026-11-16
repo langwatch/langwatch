@@ -34,6 +34,7 @@ import { ChevronDown, ChevronRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { modelProviderApi } from "../../behavior/model-provider-api.ts";
+import { useAllModelProvidersList } from "../../behavior/use-all-model-providers-list.ts";
 import { useHostedDecisionModelOffered } from "../../behavior/use-hosted-decision-model.ts";
 import { useScopeModelOptions } from "../../behavior/use-scope-model-options.ts";
 import {
@@ -43,7 +44,11 @@ import {
 } from "../../model/decision-model-options.ts";
 import { MODEL_ROLE_LABEL } from "../../model/default-model-cascade.ts";
 import { useModelProviderHost } from "../../model/model-provider-host.ts";
-import { ChatModelsNotice, EmbeddingsModelsHint } from "../elements/empty-scope-models-notice.tsx";
+import {
+  EmbeddingsModelsHint,
+  type ProviderOpener,
+  ScopeModelsNotice,
+} from "../elements/empty-scope-models-notice.tsx";
 
 /** The snapshot as the browser holds one: its instants are ISO strings. */
 type Payload = WireOf<ModelDefaultSnapshot>;
@@ -336,11 +341,12 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
 
   const featuresByRole = groupFeaturesByRole(features);
 
-  const { options: scopeOptions, isAnswered: isScopeAnswered } = useScopeModelOptions({
-    projectId,
-    scopes,
-    enabled: open,
-  });
+  const {
+    options: scopeOptions,
+    read: scopeRead,
+    retry: retryScopeOptions,
+  } = useScopeModelOptions({ projectId, scopes, enabled: open });
+  const isScopeAnswered = scopeRead === "answered";
 
   // The server weighs the flag and the keys of the picked scopes, not the page's project, so
   // the column offers only models every picked scope would run. No scope picked: LangWatch only.
@@ -376,8 +382,7 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
 
   // Custom-model display names at the picked scopes, plus the decision models' labels.
   const displayNames = { ...scopeOptions.displayNames, ...DECISION_MODEL_DISPLAY_NAMES };
-  const openProvider = (provider: EmptyScopeProvider) =>
-    openProviderEditor({ host, projectId, organizationId, provider });
+  const openable = useProviderOpener({ host, projectId, organizationId });
   const pickerOptionFor = (modelValue: string): ModelPickerOption =>
     decisionOptions.find((option) => option.value === modelValue) ??
     modelPickerOption({ displayNames, modelValue });
@@ -460,12 +465,12 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
               {problems.models}
             </Text>
           )}
-          {isScopeAnswered && scopeOptions.chat.length === 0 && (
-            <ChatModelsNotice
-              emptyProviders={scopeOptions.emptyProviders.chat}
-              onOpenProvider={openProvider}
-            />
-          )}
+          <ScopeModelsNotice
+            read={scopeRead}
+            options={scopeOptions}
+            openable={openable}
+            onRetry={retryScopeOptions}
+          />
           {MODEL_ROLES.map((role) => (
             <RoleRow
               key={role}
@@ -482,15 +487,43 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
               pickerOptionFor={pickerOptionFor}
               pickerFor={(llmOptions) => rolePickerOptions({ role, decisionOptions, llmOptions })}
               emptyEmbeddings={
-                isScopeAnswered ? { providers: scopeOptions.emptyProviders.embedding } : undefined
+                isScopeAnswered
+                  ? {
+                      providers: scopeOptions.emptyProviders.embedding,
+                      sharesNone: scopeOptions.sharesNone.embedding,
+                    }
+                  : undefined
               }
-              onOpenProvider={openProvider}
+              openable={openable}
             />
           ))}
         </VStack>
       </VStack>
     </Drawer>
   );
+}
+
+/**
+ * Opens a named provider's editor. The editor looks a row up in the providers list, so only a
+ * listed row, or an environment-fed provider it adds as new, can be opened from here.
+ */
+function useProviderOpener({
+  host,
+  projectId,
+  organizationId,
+}: {
+  host: ReturnType<typeof useModelProviderHost>;
+  projectId: string | undefined;
+  organizationId: string | undefined;
+}): ProviderOpener {
+  const { providers: listed } = useAllModelProvidersList();
+  return {
+    find: (providers) =>
+      providers.find(
+        (provider) => provider.isSystem || listed.some((row) => row.id === provider.id),
+      ),
+    open: (provider) => openProviderEditor({ host, projectId, organizationId, provider }),
+  };
 }
 
 /** Opens the provider's editor in place of this drawer; an environment-fed one has no row yet. */
@@ -537,7 +570,7 @@ function RoleRow({
   pickerOptionFor,
   pickerFor,
   emptyEmbeddings,
-  onOpenProvider,
+  openable,
 }: {
   role: ModelRole;
   config: Record<string, string>;
@@ -557,8 +590,8 @@ function RoleRow({
   /** This row's picker options from its LLM entries. */
   pickerFor: (llmOptions: ModelPickerOption[]) => ModelPickerOption[];
   /** Set once the picked scopes answered: the providers that hold no embedding model yet. */
-  emptyEmbeddings?: { providers: readonly EmptyScopeProvider[] };
-  onOpenProvider: (provider: EmptyScopeProvider) => void;
+  emptyEmbeddings?: { providers: readonly EmptyScopeProvider[]; sharesNone: boolean };
+  openable: ProviderOpener;
 }) {
   // A pinned Evals Preview the column no longer offers reads as unset, as the table cell does.
   const stored = config[role] ?? "";
@@ -629,7 +662,8 @@ function RoleRow({
       {unsupportedAtScope && (
         <EmbeddingsModelsHint
           emptyProviders={emptyEmbeddings.providers}
-          onOpenProvider={onOpenProvider}
+          sharesNone={emptyEmbeddings.sharesNone}
+          openable={openable}
         />
       )}
       {canExpand && expanded && (

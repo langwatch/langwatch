@@ -47,7 +47,9 @@ vi.mock("../../../behavior/model-provider-api.ts", () => {
 import { FakeModelProviderHost, renderWithModelProviderHost } from "../../../testing.tsx";
 import { EditModelProviderForm } from "../model-provider-form.tsx";
 
-function azureRow(customModels: { modelId: string; displayName: string; mode: "chat" }[]) {
+type Deployment = { modelId: string; displayName: string; mode: "chat" | "embedding" };
+
+function azureRow(customModels: Deployment[], customEmbeddingsModels: Deployment[] = []) {
   return {
     id: "mp_azure",
     provider: "azure",
@@ -61,7 +63,7 @@ function azureRow(customModels: { modelId: string; displayName: string; mode: "c
     models: null,
     embeddingsModels: null,
     customModels,
-    customEmbeddingsModels: [],
+    customEmbeddingsModels,
     langySkipPermissionsModels: null,
     rateLimitRpm: null,
     rateLimitTpm: null,
@@ -95,6 +97,19 @@ describe("<EditModelProviderForm/> for Azure OpenAI", () => {
       const warning = await screen.findByTestId("no-chat-deployment-warning");
       expect(warning).toHaveTextContent("Azure OpenAI lists only the deployments you add");
       expect(screen.getByTestId("model-provider-save")).toBeEnabled();
+    });
+  });
+
+  describe("given the provider lists an embedding deployment but no chat deployment", () => {
+    /** @scenario "An Azure provider with only embedding deployments warns that chat is missing" */
+    it("says only a chat deployment is missing, not that nothing can be picked", async () => {
+      const embedding = { modelId: "embed", displayName: "embed", mode: "embedding" as const };
+      storedRows = [azureRow([], [embedding])];
+      renderAzureForm();
+
+      const warning = await screen.findByTestId("no-chat-deployment-warning");
+      expect(warning).toHaveTextContent("has embedding deployments but no chat deployment yet");
+      expect(warning).not.toHaveTextContent("no model from it can be picked");
     });
   });
 

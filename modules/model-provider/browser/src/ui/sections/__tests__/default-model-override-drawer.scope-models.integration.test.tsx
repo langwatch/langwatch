@@ -14,14 +14,21 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FakeModelProviderHost, renderWithModelProviderHost } from "../../../testing.tsx";
 import { DefaultModelOverrideDrawer } from "../default-model-override-drawer.tsx";
 
-type OptionsAnswer = { data?: ScopeModelOptions; isLoading: boolean; isError: boolean };
+type OptionsAnswer = {
+  data?: ScopeModelOptions;
+  isLoading: boolean;
+  isError: boolean;
+  error?: { data: { code: string } };
+};
 
 const asked: unknown[] = [];
+const refetch = vi.fn();
 let optionsAnswer: OptionsAnswer = {
   data: NO_SCOPE_MODEL_OPTIONS,
   isLoading: false,
   isError: false,
 };
+let listedProviders: { id: string; provider: string }[] = [];
 
 vi.mock("@langwatch/feature-flag-client", () => ({
   useFeatureFlag: () => ({ enabled: false, isLoading: false }),
@@ -83,8 +90,14 @@ vi.mock("../../../behavior/model-provider-api.ts", () => ({
       getModelOptionsForScopes: {
         useQuery: (input: unknown) => {
           asked.push(input);
-          return optionsAnswer;
+          return { ...optionsAnswer, refetch };
         },
+      },
+      listAllForOrganizationForFrontend: {
+        useQuery: () => ({ data: listedProviders, isLoading: false, isSuccess: true }),
+      },
+      listAllForProjectForFrontend: {
+        useQuery: () => ({ data: listedProviders, isLoading: false, isSuccess: true }),
       },
       saveDefaultModelsConfig: { useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }) },
     },
@@ -108,8 +121,7 @@ function answer(options: Partial<ScopeModelOptions>) {
   };
 }
 
-function renderDrawer() {
-  const host = new FakeModelProviderHost();
+function renderDrawer(host = new FakeModelProviderHost()) {
   renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />, host);
   return host;
 }
@@ -124,6 +136,8 @@ function defaultListbox() {
 describe("<DefaultModelOverrideDrawer/> scope models", () => {
   beforeEach(() => {
     asked.length = 0;
+    refetch.mockClear();
+    listedProviders = [{ id: "mp_azure", provider: "azure" }];
     answer({});
   });
   afterEach(() => cleanup());
@@ -219,18 +233,83 @@ describe("<DefaultModelOverrideDrawer/> scope models", () => {
     });
   });
 
-  describe("given the scope models read fails", () => {
+  describe("given the scope models read is refused", () => {
     beforeEach(() => {
-      optionsAnswer = { data: undefined, isLoading: false, isError: true };
+      optionsAnswer = {
+        data: undefined,
+        isLoading: false,
+        isError: true,
+        error: { data: { code: "FORBIDDEN" } },
+      };
     });
 
-    /** @scenario "A failed models read offers no models and no explanation" */
-    it("lists no chat model and names no provider", () => {
+    /** @scenario "A refused models read says a picked scope cannot be viewed" */
+    it("says one of the picked scopes cannot be viewed, offers no retry and names no provider", () => {
       renderDrawer();
 
+      const notice = screen.getByTestId("scope-models-read-notice");
+      expect(notice).toHaveTextContent("You can't view one of the picked scopes");
+      expect(within(notice).queryByRole("button", { name: "Try again" })).toBeNull();
       expect(within(defaultListbox()).queryAllByRole("option")).toHaveLength(0);
       expect(screen.queryByTestId("chat-models-empty-notice")).toBeNull();
       expect(screen.queryByTestId("role-row-embeddings-unsupported-hint")).toBeNull();
+    });
+  });
+
+  describe("given the scope models read fails for another reason", () => {
+    beforeEach(() => {
+      optionsAnswer = {
+        data: undefined,
+        isLoading: false,
+        isError: true,
+        error: { data: { code: "INTERNAL_SERVER_ERROR" } },
+      };
+    });
+
+    /** @scenario "A failed models read says so and offers to try again" */
+    it("says the models could not be loaded and reads them again on Try again", () => {
+      renderDrawer();
+
+      const notice = screen.getByTestId("scope-models-read-notice");
+      expect(notice).toHaveTextContent("Couldn't load the models for the picked scopes");
+      expect(screen.queryByTestId("chat-models-empty-notice")).toBeNull();
+      fireEvent.click(within(notice).getByRole("button", { name: "Try again" }));
+
+      expect(refetch).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("given every picked scope offers chat models but they share none", () => {
+    beforeEach(() =>
+      answer({
+        embedding: ["openai/text-embedding-3-small"],
+        sharesNone: { chat: true, embedding: false },
+      }),
+    );
+
+    /** @scenario "Scopes that share no chat model are told so" */
+    it("says the picked scopes share no chat model, not that no provider offers one", () => {
+      renderDrawer();
+
+      const notice = screen.getByTestId("chat-models-empty-notice");
+      expect(notice).toHaveTextContent("No chat model is offered by every picked scope");
+      expect(notice).not.toHaveTextContent("No provider at these scopes");
+    });
+  });
+
+  describe("given an Azure provider the provider editor cannot open", () => {
+    beforeEach(() => {
+      listedProviders = [];
+      answer({ emptyProviders: { chat: [EMPTY_AZURE], embedding: [EMPTY_AZURE] } });
+    });
+
+    /** @scenario "The note offers no Open button for a provider the user cannot open" */
+    it("still names it but offers no Open button", () => {
+      renderDrawer(new FakeModelProviderHost({ grants: new Set(["project:manage"]) }));
+
+      const notice = screen.getByTestId("chat-models-empty-notice");
+      expect(notice).toHaveTextContent("Azure OpenAI lists only the deployments you add");
+      expect(screen.queryByRole("button", { name: "Open Azure OpenAI" })).toBeNull();
     });
   });
 });

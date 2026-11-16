@@ -150,6 +150,15 @@ describe("ModelProviderQueryService.getModelOptionsForScopes", () => {
       expect(options.chat).toEqual([]);
       expect(options.embedding).toEqual([]);
     });
+
+    /** @scenario "Scopes that each offer chat models but share none are told apart from none" */
+    it("says they share no chat model, and not for embeddings only one of them offers", async () => {
+      const options = await queryFor({
+        saved: [OPENAI_ON_A, ANTHROPIC_ON_B],
+      }).getModelOptionsForScopes({ projectId: "proj_a", scopes: [PROJECT_A, PROJECT_B] });
+
+      expect(options.sharesNone).toEqual({ chat: true, embedding: false });
+    });
   });
 
   describe("given a deployment listed on one project's Azure provider only", () => {
@@ -190,6 +199,7 @@ describe("ModelProviderQueryService.getModelOptionsForScopes", () => {
       expect(options.chat).toEqual([]);
       expect(options.embedding).toEqual([]);
       expect(options.emptyProviders).toEqual({ chat: [named], embedding: [named] });
+      expect(options.sharesNone).toEqual({ chat: false, embedding: false });
     });
 
     it("names Azure for embeddings only once a chat deployment is listed", async () => {
@@ -279,6 +289,7 @@ describe("ModelProviderQueryService.getModelOptionsForScopes", () => {
         embedding: [],
         displayNames: {},
         emptyProviders: { chat: [], embedding: [] },
+        sharesNone: { chat: false, embedding: false },
       });
     });
   });

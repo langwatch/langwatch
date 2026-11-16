@@ -59,6 +59,12 @@ vi.mock("../../../behavior/model-provider-api.ts", () => ({
       getDefaultModelsForProject: { useQuery: () => mockGetDefaultModels() },
       getInheritedValuesForScopes: { useQuery: () => mockGetInheritedValues() },
       getModelOptionsForScopes: { useQuery: () => scopeAnswerFor(mockScopeProviderRows()) },
+      listAllForOrganizationForFrontend: {
+        useQuery: () => ({ data: [], isLoading: false, isSuccess: true }),
+      },
+      listAllForProjectForFrontend: {
+        useQuery: () => ({ data: [], isLoading: false, isSuccess: true }),
+      },
       listDecisionModelsForScopes: {
         useQuery: (input: unknown, options: unknown) => mockListDecisionModels(input, options),
       },
