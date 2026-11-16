@@ -87,6 +87,27 @@ describe("explainHandledError", () => {
       expect(description).toBe("Slack no longer accepts this webhook.");
     });
 
+    /** @scenario "The refusal names the Developer seats and the minimum" */
+    it("names Developer seats when a Developer seat change is refused", () => {
+      const { title, description } = explainHandledError(
+        shape({
+          code: "seat_quantity_below_in_use",
+          meta: { seat: "developer", requested: 1, minimum: 2 },
+        }),
+      );
+
+      expect(title).toBe("That's too few seats");
+      expect(description).toBe("Nothing changed. Choose at least 2 developer seats.");
+    });
+
+    it("keeps the full-seat wording when the refusal names no seat kind", () => {
+      const { description } = explainHandledError(
+        shape({ code: "seat_quantity_below_in_use", meta: { requested: 0, minimum: 1 } }),
+      );
+
+      expect(description).toBe("Nothing changed. Choose at least 1 seat.");
+    });
+
     /** @scenario "meta is read only where the client knows its shape" */
     it("falls back cleanly when the declared meta is absent", () => {
       const { title, description } = explainHandledError(

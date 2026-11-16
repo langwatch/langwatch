@@ -77,11 +77,17 @@ func (s *SQLStore) InFlight(ctx context.Context) ([]Backup, error) {
 	return s.ours(rows), nil
 }
 
+// noBackupLog reports whether err says the server has no backup_log copy yet:
+// UNKNOWN_TABLE for a named table, CANNOT_EXTRACT_TABLE_STRUCTURE for merge().
+func noBackupLog(err error) bool {
+	return chclient.IsCode(err, chclient.CodeUnknownTable) || chclient.IsCode(err, chclient.CodeCannotExtractTableStructure)
+}
+
 // A server that has never logged a backup has no backup_log yet; locally
 // that means no history. FlushLogs creates the table on every sidecar.
 func (s *SQLStore) Created(ctx context.Context, since time.Time) ([]Backup, error) {
 	rows, err := chclient.Rows[row](ctx, s.Client, s.Tables.CreatedSQL(s.Database, since))
-	if err != nil && !(s.Tables.Cluster == "" && chclient.IsCode(err, chclient.CodeUnknownTable)) {
+	if err != nil && !(s.Tables.Cluster == "" && noBackupLog(err)) {
 		return nil, fmt.Errorf("looking up completed backups: %w", err)
 	}
 	return s.ours(rows), nil
@@ -93,7 +99,7 @@ func (s *SQLStore) Summary(ctx context.Context, mode Mode) (int, time.Time, erro
 		Last    int64 `json:"last_end_ts"`
 	}](ctx, s.Client, s.Tables.SummarySQL(s.Database, mode))
 	if err != nil {
-		if s.Tables.Cluster == "" && chclient.IsCode(err, chclient.CodeUnknownTable) {
+		if s.Tables.Cluster == "" && noBackupLog(err) {
 			return 0, time.Time{}, nil
 		}
 		return 0, time.Time{}, fmt.Errorf("looking up %s backup history: %w", mode, err)
@@ -118,7 +124,7 @@ func (s *SQLStore) Status(ctx context.Context, id string) (Backup, bool, error) 
 	for _, query := range []string{s.Tables.StatusSQL(id), s.Tables.LoggedStatusSQL(id)} {
 		rows, err := chclient.Rows[row](ctx, s.Client, query)
 		if err != nil {
-			if chclient.IsCode(err, chclient.CodeUnknownTable) {
+			if noBackupLog(err) {
 				continue
 			}
 			return Backup{}, false, err
@@ -156,17 +162,28 @@ func (s *SQLStore) Replicas(ctx context.Context) (Replicas, error) {
 		return Replicas{Total: 1, Self: 0, Reachable: []int{0}}, nil
 	}
 	cluster, err := chclient.Rows[struct {
-		Self uint8  `json:"is_self"`
-		Host string `json:"host"`
+		Shard   uint32 `json:"shard_num"`
+		Replica uint32 `json:"replica_num"`
+		Self    uint8  `json:"is_self"`
+		Host    string `json:"host"`
 	}](ctx, s.Client, ReplicasSQL(s.Tables.Cluster))
 	if err != nil {
 		return Replicas{}, fmt.Errorf("reading cluster %s: %w", s.Tables.Cluster, err)
 	}
-	r := Replicas{Total: len(cluster), Self: -1}
-	for i, c := range cluster {
-		if c.Self == 1 && r.Self < 0 {
-			r.Self = i
+	// ClickHouse 26.8 can list each replica twice in system.clusters; a
+	// position is one (shard, replica), as clusterAllReplicas numbers them.
+	r := Replicas{Self: -1}
+	seen := map[[2]uint32]bool{}
+	for _, c := range cluster {
+		key := [2]uint32{c.Shard, c.Replica}
+		if seen[key] {
+			continue
 		}
+		seen[key] = true
+		if c.Self == 1 && r.Self < 0 {
+			r.Self = r.Total
+		}
+		r.Total++
 	}
 	if r.Total == 0 || r.Self < 0 {
 		return Replicas{}, fmt.Errorf("cluster %s does not list this server", s.Tables.Cluster)

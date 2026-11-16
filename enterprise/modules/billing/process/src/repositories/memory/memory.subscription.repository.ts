@@ -74,6 +74,7 @@ export class MemoryBillingSubscriptionRepository extends BillingSubscriptionRepo
       endDate: null,
       maxMembers: null,
       maxMembersLite: null,
+      maxMembersDeveloper: null,
       maxMessagesPerMonth: null,
       lastPaymentFailedDate: null,
       seatsKept: null,
@@ -146,6 +147,7 @@ export class MemoryBillingSubscriptionRepository extends BillingSubscriptionRepo
       endDate: nowInstant(),
       maxMembers: null,
       maxMembersLite: null,
+      maxMembersDeveloper: null,
       maxMessagesPerMonth: null,
     }));
   }
@@ -175,6 +177,8 @@ export class MemoryBillingSubscriptionRepository extends BillingSubscriptionRepo
   async updateQuantities(input: {
     id: string;
     maxMembers: number | null;
+    /** Undefined leaves the stored cap alone: only a seat-priced subscription states it. */
+    maxMembersDeveloper?: number;
     maxMessagesPerMonth: number | null;
   }): Promise<BillingSubscriptionWithOrganization> {
     const updated = this.update(input.id, (subscription) => ({
@@ -182,6 +186,7 @@ export class MemoryBillingSubscriptionRepository extends BillingSubscriptionRepo
       status: ACTIVE,
       lastPaymentFailedDate: null,
       maxMembers: input.maxMembers,
+      maxMembersDeveloper: input.maxMembersDeveloper ?? subscription.maxMembersDeveloper,
       maxMessagesPerMonth: input.maxMessagesPerMonth,
     }));
 

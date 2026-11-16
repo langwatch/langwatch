@@ -7,6 +7,7 @@ import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import { fromDate, toDate, type Instant } from "@langwatch/time";
 import {
   EmailAlreadyRegisteredError,
+  UserNotFoundError,
   userAccountInfoSchema,
   userFullProfileSchema,
   userProfileSchema,
@@ -304,6 +305,21 @@ export class PrismaUserRepository
     return row ? userProfileSchema.parse(row) : null;
   }
 
+  async searchProfiles({ query, limit }: { query: string; limit: number }): Promise<UserProfile[]> {
+    const rows = await this.prisma.user.findMany({
+      where: {
+        OR: (["id", "name", "email"] as const).map((field) => ({
+          [field]: { contains: literalSubstring(query), mode: "insensitive" as const },
+        })),
+      },
+      select: userProfileSelect,
+      orderBy: [{ email: "asc" }, { id: "asc" }],
+      take: limit,
+    });
+
+    return rows.map((row) => userProfileSchema.parse(row));
+  }
+
   async findByEmailAnyCase(email: string): Promise<UserProfile[]> {
     const rows = await this.prisma.user.findMany({
       where: { email: { equals: email, mode: "insensitive" } },
@@ -337,6 +353,14 @@ export class PrismaUserRepository
       if (isUniqueConstraintError(error)) throw new EmailAlreadyRegisteredError();
       throw error;
     }
+  }
+
+  async appendCreatedFact(id: string): Promise<void> {
+    await this.transaction(async (transaction) => {
+      const row = await transaction.user.findUnique({ where: { id }, select: { createdAt: true } });
+      if (!row) throw new UserNotFoundError(id);
+      await this.#appendMintFacts({ transaction, userId: id, createdAt: row.createdAt });
+    });
   }
 
   async createCredentialUser(input: CreateCredentialUserRow): Promise<CreatedCredentialUser> {
@@ -731,4 +755,9 @@ function domainCounts(emails: readonly string[]): Record<string, number> {
     if (domain) counts[domain] = (counts[domain] ?? 0) + 1;
   }
   return counts;
+}
+
+/** The query as a literal substring: LIKE reads `%`, `_` and `\\` as patterns otherwise. */
+function literalSubstring(query: string): string {
+  return query.replace(/[\\%_]/g, (character) => `\\${character}`);
 }

@@ -40,7 +40,11 @@ import {
   subscriptionPlanFlags,
   type SubscriptionPlanFlags,
 } from "../../model/subscription-page-state.ts";
-import { countFullMembers, formatPlanTypeLabel } from "../../model/subscription-types.ts";
+import {
+  countDevelopers,
+  countFullMembers,
+  formatPlanTypeLabel,
+} from "../../model/subscription-types.ts";
 import { UpgradePlanBlock } from "../../ui/blocks/upgrade-plan-block.tsx";
 import { UpgradeSeatsDialog } from "../../ui/blocks/upgrade-seats-dialog.tsx";
 import { SeatLimitCallout } from "../../ui/elements/seat-limit-callout.tsx";
@@ -107,6 +111,7 @@ function currentPlanFeaturesFor({
       planSeatsAndVolume({
         members: plan.maxMembers ?? 0,
         membersLite: plan.maxMembersLite ?? 0,
+        membersDeveloper: plan.maxMembersDeveloper ?? 0,
         messagesPerMonth: plan.maxMessagesPerMonth ?? 0,
       }),
     );
@@ -306,6 +311,10 @@ export function SubscriptionPage() {
     plannedFullMembers: 0,
     pageCount: existingCoreMembers + countFullMembers(pendingInvitesWithMemberType),
   });
+  // The Developer seat floor, as the server counts it once it answered; the page's own until then.
+  const developersInUse =
+    usage.data?.membersDeveloperCount ??
+    countDevelopers(users) + countDevelopers(pendingInvitesWithMemberType);
   const seatUsageM = plan?.maxMembers;
   const isOverPlanSeats = usage.data?.seatLimitInfo?.status === "exceeded";
 
@@ -452,7 +461,7 @@ export function SubscriptionPage() {
         currency={currency}
         onCurrencyChange={setSelectedCurrency}
       />
-      <VStack gap={6} width="full" align="stretch" paddingTop={4}>
+      <VStack gap={6} width="full" align="stretch">
         <Text color="fg.muted">
           Your plan, your usage, your seats and your invoices. Questions about billing?{" "}
           <Link href="mailto:sales@langwatch.ai" color="orange.fg">
@@ -533,6 +542,7 @@ export function SubscriptionPage() {
         isLoading={organizationWithMembers.isLoading}
         mode={drawerMode}
         inUse={seatUsageN}
+        developersInUse={developersInUse}
         held={heldSeats}
         price={seatPrice}
         onInvite={seatPurchase.invite}
@@ -576,7 +586,7 @@ function SubscriptionPagePlaceholder({
         currency={currency}
         onCurrencyChange={onCurrencyChange}
       />
-      <VStack gap={6} width="full" align="stretch" paddingTop={4}>
+      <VStack gap={6} width="full" align="stretch">
         {isLoading ? (
           <>
             <SkeletonText noOfLines={1} width="320px" />

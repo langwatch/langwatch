@@ -58,6 +58,7 @@ import {
   RecordPresenceSettingChangedCommand,
   RecordSignedUpCommand,
   RecordTraceSharingDisabledCommand,
+  RecordDocsPlaygroundSessionsDisabledCommand,
 } from "./organization-lifecycle.commands.ts";
 import {
   integrationMethodChosenEventSchema,
@@ -72,6 +73,7 @@ import {
   organizationPresenceSettingChangedEventSchema,
   organizationSignedUpEventSchema,
   organizationTraceSharingDisabledEventSchema,
+  organizationDocsPlaygroundSessionsDisabledEventSchema,
   personalWorkspaceProvisionedEventSchema,
   personalTeamCreatedEventSchema,
   personalWorkspaceArchivedEventSchema,
@@ -131,6 +133,7 @@ function lifecycleCommands() {
       personalWorkspaceFeaturesChangedEventSchema,
       organizationPresenceSettingChangedEventSchema,
       organizationTraceSharingDisabledEventSchema,
+      organizationDocsPlaygroundSessionsDisabledEventSchema,
       organizationMemberDisabledEventSchema,
       organizationMemberEnabledEventSchema,
       organizationMemberRemovedEventSchema,
@@ -151,6 +154,10 @@ function lifecycleCommands() {
     )
     .withCommand("recordPresenceSettingChanged", RecordPresenceSettingChangedCommand)
     .withCommand("recordTraceSharingDisabled", RecordTraceSharingDisabledCommand)
+    .withCommand(
+      "recordDocsPlaygroundSessionsDisabled",
+      RecordDocsPlaygroundSessionsDisabledCommand,
+    )
     .withCommand("recordMemberDisabled", RecordMemberDisabledCommand)
     .withCommand("recordMemberEnabled", RecordMemberEnabledCommand)
     .withCommand("recordMemberRemoved", RecordMemberRemovedCommand)

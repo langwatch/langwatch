@@ -22,10 +22,10 @@ Feature: Dashboards telemetry: product events and query telemetry
 
   @unit
   Scenario: Telemetry: making a board sends dashboards.created.dashboard with where it came from
-    Given a member makes a board blank, from a template, as a copy of a board, or as a copy of a From LangWatch board
+    Given a member makes a board blank, from a template, as a copy of a board, or as a copy of a From LangWatch board, or from one widget picked on a From LangWatch board
     When the board is made
-    Then "dashboards.created.dashboard" is sent with createdFrom "blank", "template", "duplicate" or "duplicate_curated"
-    And a board from a template also carries its templateId
+    Then "dashboards.created.dashboard" is sent with createdFrom "blank", "template", "duplicate", "duplicate_curated" or "widget_curated"
+    And a board from a template, or from a widget picked on a From LangWatch board, also carries its templateId
     And a board that fails to be made sends nothing
 
   @unit

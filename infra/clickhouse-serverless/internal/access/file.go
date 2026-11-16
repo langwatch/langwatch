@@ -60,6 +60,8 @@ type User struct {
 	Settings map[string]any `yaml:"settings"`
 	Quota    *Quota         `yaml:"quota"`
 	Grants   []string       `yaml:"grants"`
+	// Caps are this user's own maxima, rendered as constraints (see caps.go).
+	Caps map[string]Cap `yaml:"caps"`
 }
 
 // Login holds exactly one login kind.

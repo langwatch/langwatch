@@ -18,14 +18,24 @@ export const TEST_RUN_TELEMETRY = LangWatchQLRunTelemetryService.create({
   queryHashKey: new Uint8Array(32).fill(7),
 });
 
+/** A placement gate that admits every run, for a suite that measures what happens past it. */
+export const ADMIT_EVERY_PLACEMENT: LangWatchQLServiceDependencies["placement"] = {
+  admit: () => Promise.resolve(),
+};
+
 /**
  * The real LangWatchQL service, for a suite that measures a real refusal —
  * built here so a consuming test never names the private service class.
  */
 export function createLangWatchQLService(
-  dependencies: Omit<LangWatchQLServiceDependencies, "runTelemetry">,
+  dependencies: Omit<LangWatchQLServiceDependencies, "runTelemetry" | "placement"> &
+    Partial<Pick<LangWatchQLServiceDependencies, "placement">>,
 ): LangWatchQLService {
-  return LangWatchQLService.create({ runTelemetry: TEST_RUN_TELEMETRY, ...dependencies });
+  return LangWatchQLService.create({
+    runTelemetry: TEST_RUN_TELEMETRY,
+    placement: ADMIT_EVERY_PLACEMENT,
+    ...dependencies,
+  });
 }
 
 /**

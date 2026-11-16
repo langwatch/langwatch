@@ -176,9 +176,11 @@ export class IdentityBackfillService {
       });
     }
 
+    const stored = await this.reads.findIdentifierRows({ userId });
     const planned = this.plan.planIdentifiers({
       user: { ...settled, email, emailVerified: settled.emailVerified && !yields },
       accounts: yields ? [] : accounts,
+      storedIdentifierIds: new Set(stored.map((row) => row.id)),
     });
 
     await this.adoptPlanned({ userId, email, planned });

@@ -10,6 +10,7 @@ import { createHash } from "node:crypto";
 import type { LangWatchQLConnection } from "../../../repositories/langwatch-ql-executor.repository.ts";
 import type { LwqlPostgresViewFound } from "../../../repositories/langwatch-ql-postgres.repository.ts";
 import type { LwqlCollectionState } from "../../../repositories/langwatch-ql-provisioning.repository.ts";
+import { flooredViewName, flooredViewNames } from "../../../rules/lwql-dedup-floor.rules.ts";
 import { LWQL_VIEW_CATALOG } from "../../../rules/lwql-view-catalog.rules.ts";
 import { LangWatchQLAccessModelDefinitionService } from "../../../services/langwatch-ql-access-model-definition.service.ts";
 import {
@@ -255,9 +256,11 @@ export class LangWatchQLSelfProvisioningService {
       dedup: SHIPPED_LWQL_DEDUP,
     });
     if (mode === "rendered") return [...structural, ...engineTables, ...views];
+    // A config-defined collection belongs to its file: no statement may write it.
+    const configDefined = server.configDefined?.includes(definition.namedCollection.collection);
     return [
       ...structural,
-      ...accessModelDefinition.renderNamedCollectionDdl(definition),
+      ...(configDefined ? [] : accessModelDefinition.renderNamedCollectionDdl(definition)),
       ...engineTables,
       ...views,
       ...accessModelDefinition.renderDdl(definition),
@@ -308,6 +311,7 @@ export class LangWatchQLSelfProvisioningService {
     const views = LWQL_VIEW_CATALOG.filter(
       (view) =>
         drifted.has(view.name) ||
+        drifted.has(flooredViewName(view.name)) ||
         (catalogShapes.isPostgresResident(view) && replaced.has(view.sourceTable)),
     );
     const functions = includeAppFunctions
@@ -365,6 +369,7 @@ export class LangWatchQLSelfProvisioningService {
       names.keyMapTable,
       ...catalogShapes.postgresViews(LWQL_VIEW_CATALOG).map((view) => view.sourceTable),
       ...LWQL_VIEW_CATALOG.map((view) => view.name),
+      ...flooredViewNames(LWQL_VIEW_CATALOG),
     ];
   }
 

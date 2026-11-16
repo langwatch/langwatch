@@ -44,8 +44,17 @@ Feature: clickhouse-serverless takes chained native backups from CronJobs or its
   Scenario: The base is looked up in the persistent backup_log, on every replica
     Given BACKUP_CLUSTER names the cluster
     When an incremental looks up its base
-    Then it reads system.backup_log through clusterAllReplicas with skip_unavailable_shards
-    And without a cluster it reads this server's system.backup_log
+    Then it reads the backup log through clusterAllReplicas with skip_unavailable_shards
+    And without a cluster it reads this server's backup log
+
+  @unit
+  Scenario: The base is found in the backup_log copies an upgrade renamed
+    Given a ClickHouse upgrade renamed the old backup_log to backup_log_0 and started an empty backup_log
+    And the last full backup is logged only in backup_log_0
+    When the runner looks up a base, counts fulls, lists backups or reads a logged status
+    Then every lookup reads backup_log and each backup_log_N copy, locally and on every replica
+    And it finds the full, so the next incremental chains on it
+    And a server with no backup log at all still reads as no history
 
   @unit
   Scenario: An incremental only chains on a full from about the last day

@@ -108,12 +108,18 @@
     },
     "CONNECTED_HOSTED_USAGE_QUARTERLY": {
       "test": "price_1UHNqNIMsTw08cuduqNIf6LU"
+    },
+    "GROWTH_PII_REDACTION_USD": {
+      "test": "price_1Uat9tIMsTw08cudpWWrZG4a"
     }
   },
   "meters": {
     "BILLABLE_EVENTS": {
       "test": "mtr_test_61UBL0fe0hM4Csg7x41IMsTw08cudQaG",
       "live": "mtr_61UBLon1Ka5iWAcoH41IMsTw08cudD7o"
+    },
+    "PII_REDACTION_USD": {
+      "test": "mtr_test_61VkH7EXYKEdkxaxI41IMsTw08cudVay"
     }
   },
   "prices": {
@@ -1795,6 +1801,24 @@
       "nickname": "Connected hosted usage, quarterly",
       "lookupKey": "connected_hosted_usage_quarterly",
       "metadata": {}
+    },
+    "price_1Uat9tIMsTw08cudpWWrZG4a": {
+      "id": "price_1Uat9tIMsTw08cudpWWrZG4a",
+      "active": true,
+      "livemode": false,
+      "product": "prod_Vc7O05LokHhFyy",
+      "unitAmount": 100,
+      "currency": "usd",
+      "type": "recurring",
+      "recurring": {
+        "interval": "month",
+        "intervalCount": 1
+      },
+      "nickname": "Growth PII Redaction, 1.00 USD per USD redacted",
+      "lookupKey": "GROWTH_PII_REDACTION_USD",
+      "metadata": {
+        "langwatch_key": "GROWTH_PII_REDACTION_USD"
+      }
     }
   }
 }

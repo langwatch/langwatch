@@ -15,6 +15,7 @@ import type {
   PiiAnalysisMetricsOtelService,
   PiiRedactionModelFallbackReason,
 } from "./pii-analysis-metrics-otel.service.ts";
+import type { PiiRedactionSpendService } from "./pii-redaction-spend.service.ts";
 import type { PresidioRedactionService } from "./presidio-redaction.service.ts";
 import { ProjectLookupCacheService } from "./project-lookup-cache.service.ts";
 
@@ -66,6 +67,8 @@ type ModelClearInput = {
   /** The level of the tenant's resolved policy; absent when none was resolved. */
   resolvedPiiLevel?: PiiLevel | undefined;
   spareNamesAndPlaces?: readonly boolean[] | undefined;
+  /** The record's trace and span, when it has them; its spend request id is derived from it. */
+  recordKey?: string | undefined;
 };
 
 /**
@@ -78,6 +81,7 @@ export class PiiRedactionModelService {
     model: PresidioRedactionService;
     featureFlags: FeatureFlagApi;
     scopes: DataPrivacyProjectScopeService;
+    spend: PiiRedactionSpendService;
     metrics: Pick<PiiAnalysisMetricsOtelService, "modelFellBack">;
     log?: UsageLogger;
     now?: () => number;
@@ -100,6 +104,7 @@ export class PiiRedactionModelService {
   private readonly model: PresidioRedactionService;
   private readonly featureFlags: FeatureFlagApi;
   private readonly scopes: DataPrivacyProjectScopeService;
+  private readonly spend: PiiRedactionSpendService;
   private readonly metrics: Pick<PiiAnalysisMetricsOtelService, "modelFellBack">;
   private readonly log: UsageLogger;
   private readonly now: () => number;
@@ -108,6 +113,7 @@ export class PiiRedactionModelService {
     model: PresidioRedactionService;
     featureFlags: FeatureFlagApi;
     scopes: DataPrivacyProjectScopeService;
+    spend: PiiRedactionSpendService;
     metrics: Pick<PiiAnalysisMetricsOtelService, "modelFellBack">;
     log: UsageLogger;
     now: () => number;
@@ -115,6 +121,7 @@ export class PiiRedactionModelService {
     this.model = input.model;
     this.featureFlags = input.featureFlags;
     this.scopes = input.scopes;
+    this.spend = input.spend;
     this.metrics = input.metrics;
     this.log = input.log;
     this.now = input.now;
@@ -159,11 +166,16 @@ export class PiiRedactionModelService {
     const startedAt = performance.now();
     try {
       const { cleared, findings } = await this.model.clearCounting(input);
+      const durationMs = elapsedSince(startedAt);
       this.#settle({ admission, unavailable: false });
-      this.log.info(
-        { ...call, spansFound: findings, outcome: "ok", durationMs: elapsedSince(startedAt) },
-        USAGE_MESSAGE,
-      );
+      this.log.info({ ...call, spansFound: findings, outcome: "ok", durationMs }, USAGE_MESSAGE);
+      await this.spend.record({
+        organizationId,
+        projectId,
+        texts: input.texts,
+        recordKey: input.recordKey,
+        durationMs,
+      });
       return cleared;
     } catch (error) {
       const outcome = failureOutcomeOf(error);

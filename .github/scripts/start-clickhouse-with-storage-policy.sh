@@ -63,7 +63,7 @@ docker run -d \
   -e CLICKHOUSE_PASSWORD="${CLICKHOUSE_PASSWORD}" \
   -v /tmp/storage_policy.xml:/etc/clickhouse-server/config.d/storage_policy.xml:ro \
   -v "$PROFILE_PINS":/etc/clickhouse-server/users.d/zz-langwatch-profile-pins.yaml:ro \
-  clickhouse/clickhouse-server:26.8.34.13
+  clickhouse/clickhouse-server:26.8.36.3
 
 # ---------------------------------------------------------------------------
 # Step 3: Readiness loop — wait for ClickHouse HTTP interface to respond

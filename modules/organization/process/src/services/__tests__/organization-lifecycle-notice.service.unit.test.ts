@@ -29,6 +29,7 @@ function notices(
     recordPersonalWorkspaceProvisioned,
     recordPresenceSettingChanged: { ...idle, sendBatch: async () => undefined },
     recordTraceSharingDisabled: idle,
+    recordDocsPlaygroundSessionsDisabled: idle,
     recordMemberDisabled: idle,
     recordMemberEnabled: idle,
     recordMemberRemoved: idle,

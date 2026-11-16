@@ -174,11 +174,11 @@ These commands run in sidecar mode. Use `-c access` instead of `-c backup` when 
 # List available backups in CronJob mode (names, newest first)
 kubectl exec -n langwatch langwatch-clickhouse-0 -c clickhouse -- sh -c \
   'clickhouse-client --password "$(cat /mnt/secrets/password)" -q "
-    SELECT name, end_time FROM clusterAllReplicas(default, system.backup_log)
+    SELECT name, end_time FROM clusterAllReplicas(default, merge('\''system'\'', '\''^backup_log'\''))
     WHERE status = '\''BACKUP_CREATED'\'' ORDER BY end_time DESC"'
 ```
 
-The name to restore is the path after `Disk('backups', ...)`. Replace `default` with your `clusterName` if you changed it. With more than one replica and no `auth.clusterSecretEnabled`, the replicas refuse this query; read `system.backup_log` on each pod instead.
+The name to restore is the path after `Disk('backups', ...)`. Replace `default` with your `clusterName` if you changed it. With more than one replica and no `auth.clusterSecretEnabled`, the replicas refuse this query; read `merge('system', '^backup_log')` on each pod instead. The `merge` reads the `backup_log_0`, `backup_log_1`, ... copies a ClickHouse upgrade renames the older history to, as well as `system.backup_log` itself.
 
 <Warning>
   A restore adds the backup's rows to the tables in the target database; it does not replace what is

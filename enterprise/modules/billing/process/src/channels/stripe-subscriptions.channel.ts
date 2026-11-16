@@ -20,6 +20,9 @@ export abstract class StripeSubscriptionsChannel {
   /** Throws the provider's `resource_missing` refusal for a subscription it never held. */
   abstract getSubscription(input: { subscriptionId: string }): Promise<BillingSubscription>;
 
+  /** The customer's subscriptions in every status, with their lines. */
+  abstract listCustomerSubscriptions(input: { customerId: string }): Promise<BillingSubscription[]>;
+
   /** `timeoutMs` bounds each attempt of the request; absent uses the client's own timeout. */
   abstract updateSubscription(input: {
     subscriptionId: string;

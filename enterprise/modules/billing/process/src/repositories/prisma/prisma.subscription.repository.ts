@@ -12,7 +12,12 @@ import {
   type BillingSubscriptionWithOrganization,
 } from "../subscription.repository.ts";
 
-const NUMERIC_OVERRIDE_FIELDS = ["maxMembers", "maxMembersLite", "maxMessagesPerMonth"];
+const NUMERIC_OVERRIDE_FIELDS = [
+  "maxMembers",
+  "maxMembersLite",
+  "maxMembersDeveloper",
+  "maxMessagesPerMonth",
+];
 
 type SubscriptionRow = {
   id: string;
@@ -25,6 +30,7 @@ type SubscriptionRow = {
   endDate: Date | null;
   maxMembers: number | null;
   maxMembersLite: number | null;
+  maxMembersDeveloper: number | null;
   maxMessagesPerMonth: number | null;
   lastPaymentFailedDate: Date | null;
   seatsKept: number | null;
@@ -44,6 +50,7 @@ function subscriptionRecordOf(row: SubscriptionRow): BillingSubscriptionRecord {
     endDate: row.endDate ? fromDate(row.endDate) : null,
     maxMembers: row.maxMembers,
     maxMembersLite: row.maxMembersLite,
+    maxMembersDeveloper: row.maxMembersDeveloper,
     maxMessagesPerMonth: row.maxMessagesPerMonth,
     lastPaymentFailedDate: row.lastPaymentFailedDate ? fromDate(row.lastPaymentFailedDate) : null,
     seatsKept: row.seatsKept,
@@ -252,6 +259,8 @@ export class PrismaBillingSubscriptionRepository extends BillingSubscriptionRepo
   async updateQuantities(input: {
     id: string;
     maxMembers: number | null;
+    /** Undefined leaves the stored cap alone: only a seat-priced subscription states it. */
+    maxMembersDeveloper?: number;
     maxMessagesPerMonth: number | null;
   }): Promise<BillingSubscriptionWithOrganization> {
     const row = await this.prisma.subscription.update({
@@ -260,6 +269,9 @@ export class PrismaBillingSubscriptionRepository extends BillingSubscriptionRepo
         status: SubscriptionStatus.ACTIVE as PrismaSubscriptionStatus,
         lastPaymentFailedDate: null,
         maxMembers: input.maxMembers,
+        ...(input.maxMembersDeveloper === undefined
+          ? {}
+          : { maxMembersDeveloper: input.maxMembersDeveloper }),
         maxMessagesPerMonth: input.maxMessagesPerMonth,
       },
       include: { organization: true },
