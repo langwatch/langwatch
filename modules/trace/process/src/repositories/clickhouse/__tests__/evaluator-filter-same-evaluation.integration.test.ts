@@ -5,12 +5,10 @@
  * @see https://github.com/langwatch/tasks/issues/918
  */
 import type { ClickHouseClient } from "@clickhouse/client";
-import { tenantScope } from "@langwatch/clickhouse-client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { expandStatementForProject } from "../../../__tests__/support/authorization-proofs.fixture.ts";
-import { traceQueryTranslation } from "../../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
+import { builtTraceFilter } from "../../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
@@ -108,23 +106,15 @@ let ch: ClickHouseClient;
 
 /** The trace ids a compiled filter selects, sorted. */
 async function matching(filter: string, tenant = tenantId): Promise<string[]> {
-  const compiled = traceQueryTranslation.translateFilter({
-    queryText: filter,
-    timeRange: WINDOW,
-  });
+  const compiled = builtTraceFilter({ queryText: filter, timeRange: WINDOW, tenantId: tenant });
   if (!compiled) throw new Error(`compiled to nothing: ${filter}`);
-  const statement = expandStatementForProject({
-    query: `SELECT DISTINCT TraceId FROM trace_summaries ts WHERE ${tenantScope("OccurredAt")} AND ${compiled.sql}`,
-    queryParams: compiled.params,
-    projectId: tenant,
-  });
   const result = await ch.query({
-    query: statement.query,
-    query_params: statement.queryParams,
+    query: compiled.sql,
+    query_params: { ...compiled.bound, tenantId: tenant },
     format: "JSONEachRow",
   });
   const rows = await result.json<{ TraceId: string }>();
-  return rows.map((row) => row.TraceId).toSorted();
+  return [...new Set(rows.map((row) => row.TraceId))].toSorted();
 }
 
 beforeAll(async () => {

@@ -8,17 +8,12 @@ import {
   canSearchCapturedContent,
   hiddenAttributeKeyMatcher,
 } from "../../../../rules/trace-read-mappers.rules.ts";
-import { translateFilterAst, translateTraceTag } from "../trace-query.rules.ts";
+import { builtTraceFilter } from "../../../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
 
 const timeRange = { from: 0, to: 1 };
 
-function freeTextSql(searchContent: boolean): string | null {
-  return translateFilterAst({
-    queryText: "shipped",
-    ctx: { paramCounter: 0, nodeCount: 0, params: {}, timeRange },
-    translateTag: (tag, negated, ctx) =>
-      translateTraceTag({ tag, negated, ctx, fieldDefs: new Map(), searchContent }),
-  });
+function freeTextSql(searchContent: boolean): string | undefined {
+  return builtTraceFilter({ queryText: "shipped", timeRange, searchContent })?.sql;
 }
 
 describe("free-text search and the viewer's content visibility", () => {
@@ -75,24 +70,27 @@ describe("attribute filters and the viewer's content visibility", () => {
     derivedPrefixes: traceDerivedAttrPrefixes,
   });
 
-  function attributeSql(queryText: string): string | null {
-    return translateFilterAst({
-      queryText,
-      ctx: { paramCounter: 0, nodeCount: 0, params: {}, timeRange },
-      translateTag: (tag, negated, ctx) =>
-        translateTraceTag({ tag, negated, ctx, fieldDefs: new Map(), isHiddenAttribute }),
-    });
+  function attributeFilter(queryText: string) {
+    return builtTraceFilter({ queryText, timeRange, isHiddenAttribute });
   }
 
   describe("given a viewer the captured input is hidden from", () => {
     /** @scenario "An attribute filter on a value the viewer may not read matches nothing" */
     it("matches nothing on a captured-input attribute", () => {
-      expect(attributeSql('span.attribute.gen_ai.prompt:"shipped"')).toBe("0 = 1");
-      expect(attributeSql('trace.attribute.langwatch.gen_ai.input.text:"shipped"')).toBe("0 = 1");
+      for (const queryText of [
+        'span.attribute.gen_ai.prompt:"shipped"',
+        'trace.attribute.langwatch.gen_ai.input.text:"shipped"',
+      ]) {
+        const filter = attributeFilter(queryText);
+        expect(filter?.params).toEqual({ timeFrom: 0, timeTo: 1 });
+        expect(filter?.sql).not.toContain("SpanAttributes");
+        expect(filter?.sql).not.toContain("shipped");
+        expect(filter?.sql).not.toContain("gen_ai");
+      }
     });
 
     it("still filters on an attribute the viewer may read", () => {
-      expect(attributeSql('span.attribute.gen_ai.request.model:"gpt-5"')).toContain(
+      expect(attributeFilter('span.attribute.gen_ai.request.model:"gpt-5"')?.sql).toContain(
         "SpanAttributes",
       );
     });

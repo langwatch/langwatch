@@ -15,13 +15,6 @@ import {
 } from "@langwatch/trace-contract";
 
 import { META_FIELD_DEFS } from "./trace-query-meta-fields.rules.ts";
-import { instantEvalJudgmentsSubquery, wrapMembership } from "./trace-query-subquery.rules.ts";
-import {
-  extractStringValue,
-  nextParam,
-  validateValueLength,
-  wrap,
-} from "./trace-query-values.rules.ts";
 
 function normalise(question: string): string {
   return question.replace(/\s+/g, " ").trim();
@@ -47,33 +40,6 @@ export function findRuns({
   );
 }
 
-function compileRun({
-  ctx,
-  run,
-  negated,
-}: {
-  ctx: TranslationContext;
-  run: ResolvedInstantEvalRun;
-  negated: boolean;
-}): string {
-  const runParam = nextParam(ctx, "evalRun");
-  const fromParam = nextParam(ctx, "evalWrittenFrom");
-  const untilParam = nextParam(ctx, "evalWrittenUntil");
-  ctx.params[runParam] = run.runId;
-  ctx.params[fromParam] = run.writtenFrom;
-  ctx.params[untilParam] = run.writtenUntil;
-
-  return wrapMembership(
-    instantEvalJudgmentsSubquery({
-      by: run.target === "threads" ? "conversation" : "trace",
-      runParam,
-      fromParam,
-      untilParam,
-    }),
-    negated,
-  );
-}
-
 /**
  * One eval field. The bare spelling keeps the meaning it had before Instant
  * Evals when nothing resolves — `eval:<name>` was the evaluator-name lookup,
@@ -83,17 +49,6 @@ function fieldDef(fieldName: string): FieldDef {
   const forced = INSTANT_EVAL_TARGET_FIELDS[fieldName];
 
   return {
-    toClickHouse: (tag, negated, ctx) => {
-      const question = extractStringValue(tag);
-      validateValueLength(question);
-      const [run] = findRuns({ ctx, question, target: forced });
-      if (run) return compileRun({ ctx, run, negated });
-      // A forcing spelling can only mean an Instant Eval, so with no run it
-      // matches nothing; the bare field falls back to the evaluator lookup.
-      if (forced) return wrap("1 = 0", negated);
-
-      return META_FIELD_DEFS.eval.toClickHouse(tag, negated, ctx);
-    },
     evaluateInMemory: forced ? () => UNSUPPORTED : META_FIELD_DEFS.eval.evaluateInMemory,
     ...(forced ? {} : { needs: "evaluations" as const }),
   };

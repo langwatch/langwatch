@@ -1,27 +1,17 @@
 import {
-  FilterParseError,
   type TagToken,
   type FieldDef,
   type InMemoryTrace,
-  type TranslationContext,
   UNSUPPORTED,
   type Unsupported,
 } from "@langwatch/trace-contract";
 
 import {
-  boundedSubquery,
-  scenarioRunSubquery,
-  wrapMembership,
-} from "./trace-query-subquery.rules.ts";
-import {
   TRACE_ATTRIBUTE_PREFIX_LEGACY,
   extractStringValue,
   likeMatch,
-  nextParam,
   parseJsonStringArray,
   readAttribute,
-  validateValueLength,
-  wrap,
 } from "./trace-query-values.rules.ts";
 
 /**
@@ -71,9 +61,6 @@ export const SCENARIO_VERDICT_BY_LABEL: Record<string, string> = {
 // ---------------------------------------------------------------------------
 
 const TRACE_ID_DEF: FieldDef = {
-  // An arrow, not a bare reference: this const is evaluated at module load,
-  // before the class below is initialised.
-  toClickHouse: (tag, negated, ctx) => translateTraceId(tag, negated, ctx),
   evaluateInMemory: (tag, negated, trace) => {
     const value = extractStringValue(tag);
     const id = trace.summary.traceId;
@@ -87,12 +74,10 @@ const TRACE_ID_DEF: FieldDef = {
 // ---------------------------------------------------------------------------
 
 const HAS_DEF: FieldDef = {
-  toClickHouse: (tag, negated, ctx) => translateExistence(tag, negated, ctx),
   evaluateInMemory: (tag, negated, trace) => evaluateExistence(tag, negated, trace),
 };
 
 const NONE_DEF: FieldDef = {
-  toClickHouse: (tag, negated, ctx) => translateExistence(tag, !negated, ctx),
   evaluateInMemory: (tag, negated, trace) => evaluateExistence(tag, !negated, trace),
 };
 
@@ -102,16 +87,6 @@ const NONE_DEF: FieldDef = {
 
 const EVAL_DEF: FieldDef = {
   needs: "evaluations",
-  toClickHouse: (tag, negated, ctx) => {
-    const value = extractStringValue(tag);
-    validateValueLength(value);
-    const p = nextParam(ctx, "evaluatorName");
-    ctx.params[p] = value;
-    return wrapMembership(
-      boundedSubquery("evaluation_runs", "ScheduledAt", `EvaluatorName = {${p}:String}`),
-      negated,
-    );
-  },
   evaluateInMemory: (tag, negated, trace) => {
     if (trace.evaluations == null) return UNSUPPORTED;
     const value = extractStringValue(tag);
@@ -122,16 +97,6 @@ const EVAL_DEF: FieldDef = {
 
 const EVENT_DEF: FieldDef = {
   needs: "events",
-  toClickHouse: (tag, negated, ctx) => {
-    const value = extractStringValue(tag);
-    validateValueLength(value);
-    const p = nextParam(ctx, "eventName");
-    ctx.params[p] = value;
-    return wrapMembership(
-      boundedSubquery("stored_spans", "StartTime", `has(\`Events.Name\`, {${p}:String})`),
-      negated,
-    );
-  },
   evaluateInMemory: (tag, negated, trace) => {
     if (trace.events == null) return UNSUPPORTED;
     const value = extractStringValue(tag);
@@ -141,20 +106,8 @@ const EVENT_DEF: FieldDef = {
 };
 
 // Prompt IDs are hoisted onto trace_summaries as a JSON array string in
-// `Attributes['langwatch.prompt_ids']` — every prompt referenced anywhere in
-// the trace ends up there. The SQL parses it to Array(String) and checks
-// membership; in memory `parseJsonStringArray` does the same.
+// `Attributes['langwatch.prompt_ids']`; `parseJsonStringArray` reads it as the SQL does.
 const PROMPT_DEF: FieldDef = {
-  toClickHouse: (tag, negated, ctx) => {
-    const value = extractStringValue(tag);
-    validateValueLength(value);
-    const p = nextParam(ctx, "promptId");
-    ctx.params[p] = value;
-    return wrap(
-      `has(JSONExtract(Attributes['langwatch.prompt_ids'], 'Array(String)'), {${p}:String})`,
-      negated,
-    );
-  },
   evaluateInMemory: (tag, negated, trace) => {
     const value = extractStringValue(tag);
     const promptIds = parseJsonStringArray(trace.summary.attributes["langwatch.prompt_ids"]) ?? [];
@@ -163,26 +116,9 @@ const PROMPT_DEF: FieldDef = {
   },
 };
 
-// span-level id lookup translates to a cross-table subquery; deriving spans at
-// dispatch time is a later phase, so it can't be positively evaluated yet.
+// A span-level id lookup: deriving spans at dispatch time is a later phase, so it
+// can't be positively evaluated yet.
 const SPAN_ID_DEF: FieldDef = {
-  toClickHouse: (tag, negated, ctx) => {
-    const value = extractStringValue(tag);
-    validateValueLength(value);
-    const p = nextParam(ctx, "spanId");
-    if (value.includes("*")) {
-      ctx.params[p] = value.replace(/\*/g, "%");
-      return wrapMembership(
-        boundedSubquery("stored_spans", "StartTime", `SpanId LIKE {${p}:String}`),
-        negated,
-      );
-    }
-    ctx.params[p] = value;
-    return wrapMembership(
-      boundedSubquery("stored_spans", "StartTime", `SpanId = {${p}:String}`),
-      negated,
-    );
-  },
   evaluateInMemory: () => UNSUPPORTED,
 };
 
@@ -192,13 +128,6 @@ const SPAN_ID_DEF: FieldDef = {
 
 // Direct match on the hoisted attribute. No join.
 const SCENARIO_RUN_DEF: FieldDef = {
-  toClickHouse: (tag, negated, ctx) => {
-    const value = extractStringValue(tag);
-    validateValueLength(value);
-    const p = nextParam(ctx, "scenarioRunId");
-    ctx.params[p] = value;
-    return wrap(`Attributes['scenario.run_id'] = {${p}:String}`, negated);
-  },
   evaluateInMemory: (tag, negated, trace) => {
     const value = extractStringValue(tag);
     const matched = (trace.summary.attributes["scenario.run_id"] ?? "") === value;
@@ -209,36 +138,10 @@ const SCENARIO_RUN_DEF: FieldDef = {
 // scenario dimensions resolve through a `simulation_runs` subquery, a table the
 // in-memory trace doesn't carry — fail closed for now.
 const SCENARIO_VERDICT_DEF: FieldDef = {
-  toClickHouse: (tag, negated, ctx) => {
-    const raw = extractStringValue(tag);
-    validateValueLength(raw);
-    const mapped = SCENARIO_VERDICT_BY_LABEL[raw.toLowerCase()];
-    if (!mapped) {
-      throw new FilterParseError(
-        `Unknown scenario verdict "${raw}". Valid: success, failure, inconclusive`,
-      );
-    }
-    const p = nextParam(ctx, "scenarioVerdict");
-    ctx.params[p] = mapped;
-    return wrapMembership(scenarioRunSubquery(`Verdict = {${p}:String}`), negated);
-  },
   evaluateInMemory: () => UNSUPPORTED,
 };
 
 const SCENARIO_STATUS_DEF: FieldDef = {
-  toClickHouse: (tag, negated, ctx) => {
-    const raw = extractStringValue(tag);
-    validateValueLength(raw);
-    const mapped = SCENARIO_STATUS_BY_LABEL[raw.toLowerCase()];
-    if (!mapped) {
-      throw new FilterParseError(
-        `Unknown scenario status "${raw}". Valid: ${Object.keys(SCENARIO_STATUS_BY_LABEL).join(", ")}`,
-      );
-    }
-    const p = nextParam(ctx, "scenarioStatus");
-    ctx.params[p] = mapped;
-    return wrapMembership(scenarioRunSubquery(`Status = {${p}:String}`), negated);
-  },
   evaluateInMemory: () => UNSUPPORTED,
 };
 
@@ -261,102 +164,12 @@ export function traceAttributeKeyOf(
   return { kind: "other" };
 }
 
-function translateTraceId(tag: TagToken, negated: boolean, ctx: TranslationContext): string {
-  const value = extractStringValue(tag);
-  validateValueLength(value);
-  const p = nextParam(ctx, "traceId");
-  if (value.includes("*")) {
-    ctx.params[p] = value.replace(/\*/g, "%");
-    return wrap(`TraceId LIKE {${p}:String}`, negated);
-  }
-  ctx.params[p] = value;
-  return wrap(`TraceId = {${p}:String}`, negated);
-}
-
 /**
  * The event name user feedback lands under. A `thumbs_up_down` tracked event,
  * whether sent to `POST /api/events/track` or reconstructed from an SDK
  * `langwatch.event` span event, is stored as an event of this name.
  */
 export const FEEDBACK_TRACKED_EVENT_TYPE = "thumbs_up_down";
-
-function translateExistence(tag: TagToken, negated: boolean, ctx: TranslationContext): string {
-  const value = extractStringValue(tag);
-  validateValueLength(value);
-
-  // Dynamic per-attribute existence — accepts the legacy `attribute.<k>`
-  // form here. The `has:trace.attribute.<k>` namespaced form is handled
-  // alongside it so both surfaces work without a saved-query migration.
-  const traceAttr = traceAttributeKeyOf(value);
-  if (traceAttr.kind === "attribute") {
-    const traceAttrKey = traceAttr.key;
-    if (!traceAttrKey) {
-      throw new FilterParseError("attribute.<key> requires a key after the dot");
-    }
-    const p = nextParam(ctx, "attrKey");
-    ctx.params[p] = traceAttrKey;
-    return wrap(`Attributes[{${p}:String}] != ''`, negated);
-  }
-
-  switch (value) {
-    case "error":
-      return wrap("ContainsErrorStatus = 1", negated);
-
-    case "eval":
-      return wrapMembership(boundedSubquery("evaluation_runs", "ScheduledAt", "1 = 1"), negated);
-
-    case "feedback":
-      return wrapMembership(
-        boundedSubquery(
-          "stored_spans",
-          "StartTime",
-          `has(\`Events.Name\`, '${FEEDBACK_TRACKED_EVENT_TYPE}')`,
-        ),
-        negated,
-      );
-
-    case "annotation":
-      return wrap("length(AnnotationIds) > 0", negated);
-
-    case "conversation":
-      return wrap("Attributes['gen_ai.conversation.id'] != ''", negated);
-
-    case "user":
-      return wrap("Attributes['langwatch.user_id'] != ''", negated);
-
-    case "customer":
-      return wrap("Attributes['langwatch.customer_id'] != ''", negated);
-
-    case "topic":
-      return wrap("ifNull(TopicId, '') != ''", negated);
-
-    case "subtopic":
-      return wrap("ifNull(SubTopicId, '') != ''", negated);
-
-    case "label":
-      return wrap(
-        "Attributes['langwatch.labels'] != '' AND Attributes['langwatch.labels'] != '[]'",
-        negated,
-      );
-
-    case "model":
-      return wrap("length(Models) > 0", negated);
-
-    case "service":
-      return wrap("Attributes['service.name'] != ''", negated);
-
-    case "traceName":
-      return wrap("ifNull(TraceName, '') != ''", negated);
-
-    case "rootSpanType":
-      return wrap("ifNull(RootSpanType, '') != ''", negated);
-
-    default:
-      throw new FilterParseError(
-        `Unknown has/none value "${value}". Valid: ${HAS_VALUES.join(", ")}, attribute.<key>`,
-      );
-  }
-}
 
 /**
  * What each `has:`/`none:` value probes, keyed by the value. A Map, not an object, because
@@ -434,18 +247,8 @@ function evaluateExistence(
   return present === UNSUPPORTED ? UNSUPPORTED : polarise(present);
 }
 
-function scenarioColumnDef(column: string): FieldDef {
-  return {
-    toClickHouse: (tag, negated, ctx) => {
-      const value = extractStringValue(tag);
-      validateValueLength(value);
-      const p = nextParam(ctx, column);
-      ctx.params[p] = value;
-      return wrapMembership(scenarioRunSubquery(`${column} = {${p}:String}`), negated);
-    },
-    evaluateInMemory: () => UNSUPPORTED,
-  };
-}
+// Scenario dimensions live in `simulation_runs`, which the in-memory trace doesn't carry.
+const SCENARIO_COLUMN_DEF: FieldDef = { evaluateInMemory: () => UNSUPPORTED };
 
 /**
  * Which auxiliary collection a has/none filter reads, or null for trace summary.
@@ -466,9 +269,9 @@ export const META_FIELD_DEFS = {
   prompt: PROMPT_DEF,
   spanId: SPAN_ID_DEF,
   scenarioRun: SCENARIO_RUN_DEF,
-  scenario: scenarioColumnDef("ScenarioId"),
-  scenarioSet: scenarioColumnDef("ScenarioSetId"),
-  scenarioBatch: scenarioColumnDef("BatchRunId"),
+  scenario: SCENARIO_COLUMN_DEF,
+  scenarioSet: SCENARIO_COLUMN_DEF,
+  scenarioBatch: SCENARIO_COLUMN_DEF,
   scenarioVerdict: SCENARIO_VERDICT_DEF,
   scenarioStatus: SCENARIO_STATUS_DEF,
 } satisfies Record<string, FieldDef>;

@@ -21,9 +21,11 @@ import {
 import { collectQueryNeeds, evaluateTraceTag } from "../rules/trace-query-evaluation.rules.ts";
 import { normalizeQuery } from "../rules/trace-query.rules.ts";
 import type { TraceQueryFieldsService } from "./trace-query-fields.service.ts";
-import type { TraceQueryTranslationService } from "./trace-query-translation.service.ts";
 
 const logger = createLogger("langwatch:traces:filter-evaluate");
+
+/** The reads' compiler run over a query unapplied: refuses as they do, else says if it narrows. */
+export type TraceFilterCheck = (queryText: string) => "empty" | "compiled";
 
 interface WalkState {
   nodeCount: number;
@@ -34,42 +36,38 @@ interface WalkState {
 /** Evaluates saved queries against traces in memory, mirroring the CH compiler. */
 export class TraceQueryEvaluationService {
   readonly #fields: TraceQueryFieldsService;
-  readonly #translation: TraceQueryTranslationService;
+  readonly #check: TraceFilterCheck;
 
   static create({
     fields,
-    translation,
+    check,
   }: {
     fields: TraceQueryFieldsService;
-    translation: TraceQueryTranslationService;
+    check: TraceFilterCheck;
   }): TraceQueryEvaluationService {
-    return new TraceQueryEvaluationService(fields, translation);
+    return new TraceQueryEvaluationService(fields, check);
   }
 
-  private constructor(fields: TraceQueryFieldsService, translation: TraceQueryTranslationService) {
+  private constructor(fields: TraceQueryFieldsService, check: TraceFilterCheck) {
     this.#fields = fields;
-    this.#translation = translation;
+    this.#check = check;
   }
 
   /**
    * Evaluates a query against an in-memory trace, fail-closed on any error.
    */
   traceMatchesQuery(queryText: string, trace: InMemoryTrace): boolean {
-    // Reuse the compiler as the validation gate — it enforces the exact
-    // MAX_FILTER_NODE_COUNT / MAX_PARAM_COUNT caps, rejects invalid syntax, and throws
-    // FilterFieldUnknownError for unknown fields. Anything it rejects fails closed.
-    let compiled: { sql: string; params: Record<string, unknown> } | null;
+    // The reads' compiler is the validation gate: it enforces the node and parameter caps,
+    // rejects invalid syntax and unknown fields. Anything it rejects fails closed.
+    let compiled: "empty" | "compiled";
     try {
-      compiled = this.#translation.translateFilter({
-        queryText,
-        timeRange: { from: 0, to: 0 },
-      });
+      compiled = this.#check(queryText);
     } catch {
       return false;
     }
 
-    // `null` means no filter (empty / whitespace) — every trace matches.
-    if (compiled === null) {
+    // An empty (or whitespace) query is no filter: every trace matches.
+    if (compiled === "empty") {
       return true;
     }
 

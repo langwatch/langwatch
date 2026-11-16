@@ -3,7 +3,6 @@
  * @see specs/traces-v2/instant-eval-search.feature
  */
 
-import { tenantSet } from "@langwatch/clickhouse-client";
 import {
   parseTraceQuerySyntax,
   type ResolvedInstantEvalRun,
@@ -15,7 +14,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   traceQueryFields,
-  traceQueryTranslation,
+  builtTraceFilter,
 } from "../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
 
 const WINDOW = { from: 1_000, to: 2_000 };
@@ -30,7 +29,7 @@ const run = (overrides: Partial<ResolvedInstantEvalRun> = {}): ResolvedInstantEv
 });
 
 const compile = (queryText: string, evalRuns?: ResolvedInstantEvalRun[]) =>
-  traceQueryTranslation.translateFilter({
+  builtTraceFilter({
     queryText,
     timeRange: WINDOW,
     ...(evalRuns ? { evalRuns } : {}),
@@ -42,9 +41,10 @@ describe("given an eval chip with a registered run", () => {
     it("keeps traces whose latest verdict for the run passed, tenant marker first", () => {
       const result = compile('eval:"the user is annoyed"', [run()]);
       expect(result).not.toBeNull();
-      expect(result?.sql).toBe(
-        `((TenantId, TraceId) IN (SELECT TenantId, TraceId FROM instant_eval_judgments WHERE ${tenantSet()} AND RunId = {evalRun_0:String} AND CreatedAt >= fromUnixTimestamp64Milli({evalWrittenFrom_1:Int64}) AND CreatedAt <= fromUnixTimestamp64Milli({evalWrittenUntil_2:Int64}) GROUP BY TenantId, TraceId, SpanId, QuestionId HAVING argMax(Passed, UpdatedAt) = 1))`,
+      expect(result?.where).toBe(
+        "tuple(TenantId, TraceId) IN (SELECT TenantId, TraceId FROM instant_eval_judgments WHERE TenantId = {tenantId:String} AND (RunId = {v0:String} AND CreatedAt >= fromUnixTimestamp64Milli({v1:Int64}) AND CreatedAt <= fromUnixTimestamp64Milli({v2:Int64})) GROUP BY TenantId, TraceId, SpanId, QuestionId HAVING argMax(Passed, UpdatedAt) = {v3:UInt8})",
       );
+      expect(result?.bound).toMatchObject({ v0: "run-1", v1: 5_000, v2: 9_000 });
       expect(result?.params).toMatchObject({
         evalRun_0: "run-1",
         evalWrittenFrom_1: 5_000,
@@ -57,20 +57,22 @@ describe("given an eval chip with a registered run", () => {
       const result = compile('eval.conversation:"the user is annoyed"', [
         run({ target: "threads", runId: "run-2" }),
       ]);
-      expect(result?.sql).toContain(
-        `((TenantId, Attributes['gen_ai.conversation.id']) IN (SELECT TenantId, argMax(ThreadId, UpdatedAt) AS MatchedThreadId FROM instant_eval_judgments WHERE ${tenantSet()} AND RunId = {evalRun_0:String}`,
+      expect(result?.where).toMatch(
+        /^tuple\(TenantId, Attributes\[\{v0:String\}\]\) IN \(SELECT TenantId, argMax\(ThreadId, UpdatedAt\)/,
       );
-      expect(result?.sql).toContain(
-        "HAVING argMax(Passed, UpdatedAt) = 1 AND MatchedThreadId != ''",
+      expect(result?.where).toContain(
+        "FROM instant_eval_judgments WHERE TenantId = {tenantId:String}",
       );
+      expect(result?.bound).toMatchObject({ v0: "gen_ai.conversation.id" });
+      expect(Object.values(result?.bound ?? {})).toContain("run-2");
       expect(result?.params.evalRun_0).toBe("run-2");
     });
 
     /** @scenario "A negated eval chip keeps the traces the judge did not match" */
     it("negates the verdict subquery under NOT", () => {
       const result = compile('NOT eval:"the user is annoyed"', [run()]);
-      expect(result?.sql).toMatch(
-        /^\(\(TenantId, TraceId\) NOT IN \(SELECT TenantId, TraceId FROM instant_eval_judgments/,
+      expect(result?.where).toMatch(
+        /^tuple\(TenantId, TraceId\) NOT IN \(SELECT TenantId, TraceId FROM instant_eval_judgments/,
       );
     });
 
@@ -88,21 +90,22 @@ describe("given an eval chip and no run that fits it", () => {
       const result = compile('eval.llm:"the answer is wrong"', [
         run({ question: "the answer is wrong", target: "traces" }),
       ]);
-      expect(result?.sql).toBe("1 = 0");
+      expect(result?.where).toBe("0 = 1");
     });
   });
 
   describe("when no run is registered at all", () => {
     /** @scenario "An eval chip with no registered run matches nothing" */
     it("matches no rows for a forcing spelling", () => {
-      expect(compile('eval.trace:"the user is annoyed"')?.sql).toBe("1 = 0");
+      expect(compile('eval.trace:"the user is annoyed"')?.where).toBe("0 = 1");
     });
 
     /** @scenario "A bare eval chip with no registered run keeps its older meaning" */
     it("reads the bare field as an evaluator name", () => {
       const result = compile("eval:faithfulness");
       expect(result?.sql).toContain("FROM evaluation_runs");
-      expect(result?.sql).toContain("EvaluatorName = {evaluatorName_0:String}");
+      expect(result?.sql).toContain("EvaluatorName = {v2:String}");
+      expect(result?.bound.v2).toBe("faithfulness");
       expect(result?.params.evaluatorName_0).toBe("faithfulness");
     });
   });

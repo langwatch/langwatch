@@ -21,17 +21,16 @@ import {
 } from "../../../../facet/repositories/clickhouse/clickhouse.trace-facet-expressions.mapper.ts";
 import { ClickHouseTraceFacetRegistryRepository } from "../../../../facet/repositories/clickhouse/clickhouse.trace-facet-registry.repository.ts";
 import { TraceQueryFieldsService } from "../../../services/trace-query-fields.service.ts";
-import { TraceQueryTranslationService } from "../../../services/trace-query-translation.service.ts";
 import {
   type CompiledTraceFilter,
   compileTraceFilterCondition,
   translateFilterConditions,
 } from "../clickhouse.trace-filter-condition.mapper.ts";
 import { FILTER_KINDS, RUNS, timeRange } from "./trace-filter-kinds.fixture.ts";
+import { FILTER_KIND_PARAMS } from "./trace-filter-kinds.params.fixture.ts";
 
 const facetRegistry = ClickHouseTraceFacetRegistryRepository.create();
 const fields = TraceQueryFieldsService.create({ facetRegistry });
-const text = TraceQueryTranslationService.create({ fields });
 const single = tenantScope.single({ tenantId: "proj_a" });
 
 function freshContext(): TranslationContext {
@@ -77,31 +76,53 @@ function refusalOf(build: () => unknown): string {
 describe("given a trace filter of each kind", () => {
   describe("when it is compiled to conditions", () => {
     /** @scenario "Every filter kind compiles to conditions with the text compiler's parameters" */
-    it.each(FILTER_KINDS)("binds %s as the text compiler does", (_kind, queryText) => {
+    it.each(FILTER_KINDS)("binds %s as the text compiler did", (kind, queryText) => {
       const ctx = freshContext();
       const filter = translateFilterConditions({ queryText, ctx, scope: single, fields });
-      const sql = text.translateFilter({ queryText, timeRange, evalRuns: RUNS });
 
       expect(filter.kind).toBe("compiled");
-      expect(ctx.params).toEqual(sql?.params);
+      expect(ctx.params).toEqual(FILTER_KIND_PARAMS[kind]);
       expect(builtSql(queryText).sql).not.toContain("{{");
     });
 
     /** @scenario "Every filter kind compiles to conditions with the text compiler's parameters" */
     it.each([
-      ["an unknown field", "colour:red"],
-      ["an unknown has value", "has:weather"],
-      ["a bad scenario verdict", "scenarioVerdict:maybe"],
-      ["an attribute without a key", "trace.attribute.:v"],
-      ["a bad attribute key", "span.attribute.a b:v"],
-      ["a value past the length limit", `service:${"x".repeat(501)}`],
-      ["a non-numeric range value", "cost:>abc"],
-      ["too many conditions", Array.from({ length: 49 }, (_, i) => `user:u${i}`).join(" AND ")],
-      ["broken syntax", "status:(("],
-    ])("refuses %s as the text compiler does", (_case, queryText) => {
-      expect(refusalOf(() => compiled(queryText))).toBe(
-        refusalOf(() => text.translateFilter({ queryText, timeRange, evalRuns: RUNS })),
-      );
+      ["an unknown field", "colour:red", "FilterFieldUnknownError: Unknown field: @colour"],
+      [
+        "an unknown has value",
+        "has:weather",
+        'FilterParseError: Unknown has/none value "weather". Valid: error, eval, feedback, annotation, conversation, user, customer, topic, subtopic, label, model, service, traceName, rootSpanType, attribute.<key>',
+      ],
+      [
+        "a bad scenario verdict",
+        "scenarioVerdict:maybe",
+        'FilterParseError: Unknown scenario verdict "maybe". Valid: success, failure, inconclusive',
+      ],
+      [
+        "an attribute without a key",
+        "trace.attribute.:v",
+        "FilterParseError: trace.attribute.<key> requires a key after the dot",
+      ],
+      ["a bad attribute key", "span.attribute.a b:v", "FilterFieldUnknownError: Unknown field: @b"],
+      [
+        "a value past the length limit",
+        `service:${"x".repeat(501)}`,
+        "FilterParseError: Filter value too long (max 500 characters)",
+      ],
+      ["a non-numeric range value", "cost:>abc", "FilterParseError: Not a number: abc"],
+      [
+        "too many conditions",
+        Array.from({ length: 49 }, (_, i) => `user:u${i}`).join(" AND "),
+        "FilterTooComplexError: Too many separate terms. Put the sentence in quotes to search it as one phrase.",
+      ],
+      ["broken syntax", "status:((", "FilterParseError: Invalid filter syntax"],
+      [
+        "a prototype member",
+        "constructor:x",
+        "FilterFieldUnknownError: Unknown field: @constructor",
+      ],
+    ])("refuses %s as the text compiler did", (_case, queryText, refusal) => {
+      expect(refusalOf(() => compiled(queryText))).toBe(refusal);
     });
 
     /** @scenario "Every filter kind compiles to conditions with the text compiler's parameters" */

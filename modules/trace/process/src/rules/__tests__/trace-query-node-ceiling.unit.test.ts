@@ -10,10 +10,10 @@ import {
 } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { traceQueryTranslation } from "../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
+import { builtTraceFilter } from "../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
 
 const compile = (queryText: string) =>
-  traceQueryTranslation.translateFilter({
+  builtTraceFilter({
     queryText,
     timeRange: { from: 1_000, to: 2_000 },
   });
@@ -65,7 +65,9 @@ describe("given an evaluator bound to excluded verdicts", () => {
 describe("given the same sentence in quotes", () => {
   describe("when it is compiled for ClickHouse", () => {
     it("compiles as one phrase node", () => {
-      expect(compile(`"${ELEVEN_BARE_WORDS}"`)?.sql).toContain("ILIKE");
+      expect(compile(`"${ELEVEN_BARE_WORDS}"`)?.params).toMatchObject({
+        freeText_0: `%${ELEVEN_BARE_WORDS}%`,
+      });
     });
   });
 });

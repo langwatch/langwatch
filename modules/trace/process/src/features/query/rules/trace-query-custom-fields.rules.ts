@@ -1,33 +1,12 @@
 import { type FieldDef, UNSUPPORTED } from "@langwatch/trace-contract";
 
-import { boundedSubquery, wrapMembership } from "./trace-query-subquery.rules.ts";
-import {
-  extractStringValue,
-  likeMatch,
-  nextParam,
-  parseJsonStringArray,
-  validateValueLength,
-  wrap,
-} from "./trace-query-values.rules.ts";
+import { extractStringValue, likeMatch, parseJsonStringArray } from "./trace-query-values.rules.ts";
 
 /**
  * `model:<value>` — membership in the hoisted `Models` array, with `*`
  * wildcards. In memory the same array lives on the fold state.
  */
 export const MODEL_DEF: FieldDef = {
-  toClickHouse: (tag, negated, ctx) => {
-    const value = extractStringValue(tag);
-    validateValueLength(value);
-    const p = nextParam(ctx, "model");
-
-    if (value.includes("*")) {
-      ctx.params[p] = value.replace(/\*/g, "%");
-      return wrap(`arrayExists(m -> m LIKE {${p}:String}, Models)`, negated);
-    }
-
-    ctx.params[p] = value;
-    return wrap(`has(Models, {${p}:String})`, negated);
-  },
   evaluateInMemory: (tag, negated, trace) => {
     const value = extractStringValue(tag);
     const models = trace.summary.models;
@@ -39,21 +18,10 @@ export const MODEL_DEF: FieldDef = {
 };
 
 /**
- * `label:<value>` — membership in the JSON-encoded `langwatch.labels` array.
- * The SQL trims the raw quotes; `parseJsonStringArray` unquotes for the same
- * reason in memory.
+ * `label:<value>` — membership in the JSON-encoded `langwatch.labels` array,
+ * each element decoded by `parseJsonStringArray`.
  */
 export const LABEL_DEF: FieldDef = {
-  toClickHouse: (tag, negated, ctx) => {
-    const value = extractStringValue(tag);
-    validateValueLength(value);
-    const p = nextParam(ctx, "label");
-    ctx.params[p] = value;
-    return wrap(
-      `arrayExists(x -> trim(BOTH '"' FROM x) = {${p}:String}, JSONExtractArrayRaw(Attributes['langwatch.labels']))`,
-      negated,
-    );
-  },
   evaluateInMemory: (tag, negated, trace) => {
     const value = extractStringValue(tag);
     const labels = parseJsonStringArray(trace.summary.attributes["langwatch.labels"]) ?? [];
@@ -64,21 +32,10 @@ export const LABEL_DEF: FieldDef = {
 
 /**
  * `evaluator:<id>` — traces with an evaluation run for that evaluator id.
- * Answered by a cross-table subquery; in memory it needs the loaded evaluation
- * runs, else it fails closed.
+ * In memory it needs the loaded evaluation runs, else it fails closed.
  */
 export const EVALUATOR_DEF: FieldDef = {
   needs: "evaluations",
-  toClickHouse: (tag, negated, ctx) => {
-    const value = extractStringValue(tag);
-    validateValueLength(value);
-    const p = nextParam(ctx, "evaluatorId");
-    ctx.params[p] = value;
-    return wrapMembership(
-      boundedSubquery("evaluation_runs", "ScheduledAt", `EvaluatorId = {${p}:String}`),
-      negated,
-    );
-  },
   evaluateInMemory: (tag, negated, trace) => {
     if (trace.evaluations == null) return UNSUPPORTED;
     const value = extractStringValue(tag);

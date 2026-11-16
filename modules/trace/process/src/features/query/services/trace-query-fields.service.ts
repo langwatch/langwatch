@@ -20,16 +20,11 @@ import {
 } from "../rules/trace-query-fields.rules.ts";
 import { INSTANT_EVAL_FIELD_DEFS } from "../rules/trace-query-instant-eval-fields.rules.ts";
 import { META_FIELD_DEFS } from "../rules/trace-query-meta-fields.rules.ts";
-import {
-  categorical,
-  crossTableCategorical,
-  crossTableRange,
-  range,
-} from "../rules/trace-query-translators.rules.ts";
+import { categorical, range } from "../rules/trace-query-translators.rules.ts";
 
 /**
- * The filter fields, each pairing its SQL predicate with its in-memory
- * evaluation, single-sourced from the facet registry's expressions.
+ * The filter fields' in-memory evaluation, checked against the facet registry; the
+ * ClickHouse side is the built compiler's.
  */
 export class TraceQueryFieldsService {
   /**
@@ -167,7 +162,7 @@ export class TraceQueryFieldsService {
       throw new Error(`facet '${key}' is not a categorical facet`);
     }
     if (!def.read) throw new Error(`facet '${key}' has no in-memory read`);
-    return categorical(def.expression, def.read, def.key);
+    return categorical({ read: def.read });
   }
 
   /** Auto-derived `trace_summaries` range: numeric comparison + summary read. */
@@ -177,7 +172,7 @@ export class TraceQueryFieldsService {
       throw new Error(`facet '${key}' is not a range facet`);
     }
     if (!def.read) throw new Error(`facet '${key}' has no in-memory read`);
-    return range(def.expression, def.read, def.key);
+    return range({ read: def.read });
   }
 
   /** Cross-table categorical paired with per-collection in-memory read. */
@@ -186,14 +181,7 @@ export class TraceQueryFieldsService {
     if (def.kind !== "categorical") {
       throw new Error(`facet '${key}' is not a categorical facet`);
     }
-    return crossTableCategorical({
-      table: def.table,
-      timeColumn: this.getTimeColumn(def.table),
-      expression: def.expression,
-      read,
-      needs,
-      name: def.key,
-    });
+    return categorical({ read, needs });
   }
 
   #crossRangeFacet(key: string, needs: FieldNeeds, read: RangeRead): FieldDef {
@@ -201,13 +189,6 @@ export class TraceQueryFieldsService {
     if (def.kind !== "range") {
       throw new Error(`facet '${key}' is not a range facet`);
     }
-    return crossTableRange({
-      table: def.table,
-      timeColumn: this.getTimeColumn(def.table),
-      expression: def.expression,
-      read,
-      needs,
-      name: def.key,
-    });
+    return range({ read, needs });
   }
 }

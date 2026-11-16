@@ -72,12 +72,10 @@ export type CategoricalRead = (trace: InMemoryTrace) => string | string[] | null
 export type RangeRead = (trace: InMemoryTrace) => number | number[] | null | Unsupported;
 
 /**
- * Single filter field declaring BOTH sides (ClickHouse + in-memory predicate)
- * so they can't drift. Every known field maps to one via satisfies.
+ * One filter field's in-memory predicate (its ClickHouse side is the built compiler's
+ * `FIELD_CONDITIONS`). Every known field maps to one via satisfies.
  */
 export interface FieldDef {
-  /** Compiles the tag to a parameterised ClickHouse WHERE fragment. */
-  toClickHouse: FieldHandler;
   /** Evaluates the tag against an in-memory trace, or {@link UNSUPPORTED}. */
   evaluateInMemory: (
     tag: TagToken,

@@ -9,6 +9,7 @@ import {
 import { describe, expect, it } from "vitest";
 
 import { traceQueryFields } from "../../../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
+import { checkTraceFilter } from "../../repositories/clickhouse/clickhouse.trace-filter-condition.mapper.ts";
 
 const summary = {
   traceId: "trace-1",
@@ -93,9 +94,15 @@ describe("FIELD_DEFS", () => {
     );
   });
 
-  describe("when a field declares a ClickHouse compiler", () => {
-    it.each(traceQueryFields.knownFields)("[%s] exposes a callable toClickHouse", (field) => {
-      expect(typeof fieldDefs[field]!.toClickHouse).toBe("function");
+  describe("when the reads' compiler is asked for the field", () => {
+    it.each(traceQueryFields.knownFields)("[%s] knows it", (field) => {
+      let refusal: unknown;
+      try {
+        checkTraceFilter({ queryText: `${field}:x`, fields: traceQueryFields });
+      } catch (error) {
+        refusal = error;
+      }
+      expect((refusal as { code?: string } | undefined)?.code).not.toBe("filter_field_unknown");
     });
   });
 });

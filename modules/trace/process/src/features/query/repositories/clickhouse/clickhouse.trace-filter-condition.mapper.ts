@@ -787,24 +787,33 @@ export function compileTraceFilterCondition({
   scope: ReaderScope;
   fields: TraceQueryFieldsService;
 }): TraceFilterCompilation {
-  const ctx: TranslationContext = {
+  return translateFilterConditions({
+    queryText,
+    ctx: contextFor({ timeRange, ...(evalRuns ? { evalRuns } : {}) }),
+    ...options,
+  });
+}
+
+function contextFor({
+  timeRange,
+  evalRuns,
+}: {
+  timeRange: { from: number; to: number };
+  evalRuns?: readonly ResolvedInstantEvalRun[];
+}): TranslationContext {
+  return {
     paramCounter: 0,
     nodeCount: 0,
     params: { timeFrom: timeRange.from, timeTo: timeRange.to },
     timeRange,
     ...(evalRuns ? { evalRuns } : {}),
   };
-  return translateFilterConditions({ queryText, ctx, ...options });
 }
 
 /** The walk over a caller's context, whose `params` then hold what the text compiler binds. */
 export function translateFilterConditions({
-  queryText,
-  ctx,
-  searchContent = true,
-  isHiddenAttribute = () => false,
   scope,
-  fields,
+  ...options
 }: {
   queryText: string;
   ctx: TranslationContext;
@@ -813,9 +822,27 @@ export function translateFilterConditions({
   scope: ReaderScope;
   fields: TraceQueryFieldsService;
 }): TraceFilterCompilation {
+  return walkConditions({ ...options, windowed: scope.kind === "proof" });
+}
+
+function walkConditions({
+  queryText,
+  ctx,
+  windowed,
+  searchContent = true,
+  isHiddenAttribute = () => false,
+  fields,
+}: {
+  queryText: string;
+  ctx: TranslationContext;
+  windowed: boolean;
+  searchContent?: boolean;
+  isHiddenAttribute?: (key: string) => boolean;
+  fields: TraceQueryFieldsService;
+}): TraceFilterCompilation {
   const c: Compilation = {
     ctx,
-    windowed: scope.kind === "proof",
+    windowed,
     searchContent,
     isHiddenAttribute,
     fields,
@@ -830,6 +857,31 @@ export function translateFilterConditions({
   });
   if (where.kind === "empty") return where;
   return { kind: "compiled", where: where.compiled, readsSpans: c.readsSpans };
+}
+
+/**
+ * The filter checked as the reads compile it, refusing what they refuse (FilterParseError and
+ * kin) without running a read. No condition is applied, so no tenant is consulted.
+ */
+export function checkTraceFilter({
+  queryText,
+  timeRange = { from: 0, to: 0 },
+  evalRuns,
+  ...options
+}: {
+  queryText: string;
+  timeRange?: { from: number; to: number };
+  evalRuns?: readonly ResolvedInstantEvalRun[];
+  searchContent?: boolean;
+  isHiddenAttribute?: (key: string) => boolean;
+  fields: TraceQueryFieldsService;
+}): TraceFilterCompilation["kind"] {
+  return walkConditions({
+    queryText,
+    ctx: contextFor({ timeRange, ...(evalRuns ? { evalRuns } : {}) }),
+    windowed: false,
+    ...options,
+  }).kind;
 }
 
 /** A query compiled inside each read for that read's scope (Decided 25), `terms` ANDed on. */

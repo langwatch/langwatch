@@ -1,7 +1,5 @@
 import {
-  type FieldDef,
   type FieldHandler,
-  FilterFieldUnknownError,
   FilterParseError,
   FilterTooComplexError,
   MAX_FILTER_NODE_COUNT,
@@ -19,7 +17,6 @@ import {
   buildAndChain,
   type EvaluationScope,
 } from "./trace-query-evaluation-scope.rules.ts";
-import { boundedSubquery, wrapMembership } from "./trace-query-subquery.rules.ts";
 import {
   EVENT_ATTRIBUTE_PREFIX,
   EVENT_ATTRIBUTE_PREFIX_LEGACY,
@@ -28,10 +25,6 @@ import {
   TRACE_ATTRIBUTE_PREFIX,
   TRACE_ATTRIBUTE_PREFIX_LEGACY,
   extractStringValue,
-  nextParam,
-  validateAttributeKey,
-  validateValueLength,
-  wrap,
 } from "./trace-query-values.rules.ts";
 
 const MAX_PARAM_COUNT = 50;
@@ -42,10 +35,6 @@ const MAX_PARAM_COUNT = 50;
  * clothes, and the trace-level filter still applies every one of them.
  */
 const MAX_CONTENT_TERMS = 8;
-
-/**
- * Translates trace filters to ClickHouse SQL with value binding and free text.
- */
 
 /** Whether an OR joins any two branches of the query, at any depth. */
 function containsOrOperator(node: LiqeQuery): boolean {
@@ -223,69 +212,8 @@ function translateAndChain<T>({
   return others.reduce((acc, part) => logic.and(acc, part), first);
 }
 
-/** One tag of the `trace_summaries` dialect, its plain fields looked up in `fieldDefs`. */
-export function translateTraceTag({
-  tag,
-  negated,
-  ctx,
-  fieldDefs,
-  searchContent = true,
-  isHiddenAttribute = () => false,
-}: {
-  tag: TagToken;
-  negated: boolean;
-  ctx: TranslationContext;
-  fieldDefs: ReadonlyMap<string, FieldDef>;
-  /** False for a viewer under a content protection: free text then skips captured I/O. */
-  searchContent?: boolean;
-  /** Attribute keys whose values the viewer may not read. */
-  isHiddenAttribute?: (key: string) => boolean;
-}): string {
-  if (tag.field.type === "ImplicitField") {
-    return translateFreeText({ tag, negated, ctx, searchContent });
-  }
-
-  const fieldName = tag.field.name;
-
-  const attribute = attributeTargetOf(fieldName);
-  if (attribute.kind === "attribute") {
-    // A value the viewer may not read is never matched; negated, nothing is excluded by it.
-    if (isHiddenAttribute(attribute.key)) return negated ? "1 = 1" : "0 = 1";
-    return TEXT_ATTRIBUTE_TRANSLATORS[attribute.target]({
-      attrKey: attribute.key,
-      tag,
-      negated,
-      ctx,
-    });
-  }
-
-  // `.get()` — own keys only. A plain-object index would resolve a field named
-  // `constructor` / `toString` / `__proto__` off `Object.prototype`, sail past
-  // this guard, and persist a filter no reader can evaluate.
-  const def = fieldDefs.get(fieldName);
-
-  if (!def) {
-    throw new FilterFieldUnknownError(fieldName, [...fieldDefs.keys()]);
-  }
-
-  return def.toClickHouse(tag, negated, ctx);
-}
-
-type AttributeTranslator = (input: {
-  attrKey: string;
-  tag: TagToken;
-  negated: boolean;
-  ctx: TranslationContext;
-}) => string;
-
 /** Which table a namespaced attribute field reads its key on. */
 export type AttributeTarget = "trace" | "span" | "event";
-
-const TEXT_ATTRIBUTE_TRANSLATORS: Readonly<Record<AttributeTarget, AttributeTranslator>> = {
-  trace: (input) => translateTraceAttribute(input),
-  span: (input) => translateSpanAttribute(input),
-  event: (input) => translateEventAttribute(input),
-};
 
 /**
  * The attribute a namespaced field names. `trace.attribute.<k>` and `span.attribute.<k>` are
@@ -309,127 +237,6 @@ export function attributeTargetOf(
     }
   }
   return { kind: "field" };
-}
-
-function translateTraceAttribute({
-  attrKey,
-  tag,
-  negated,
-  ctx,
-}: {
-  attrKey: string;
-  tag: TagToken;
-  negated: boolean;
-  ctx: TranslationContext;
-}): string {
-  if (!attrKey) {
-    throw new FilterParseError("trace.attribute.<key> requires a key after the dot");
-  }
-  validateAttributeKey(attrKey);
-  const value = extractStringValue(tag);
-  validateValueLength(value);
-  const pKey = nextParam(ctx, "attrKey");
-  const pVal = nextParam(ctx, "attrValue");
-  ctx.params[pKey] = attrKey;
-  ctx.params[pVal] = value;
-  return wrap(`Attributes[{${pKey}:String}] = {${pVal}:String}`, negated);
-}
-
-/**
- * Matches span events with Attributes[<key>]=<value> via partition-pruned subquery.
- */
-function translateEventAttribute({
-  attrKey,
-  tag,
-  negated,
-  ctx,
-}: {
-  attrKey: string;
-  tag: TagToken;
-  negated: boolean;
-  ctx: TranslationContext;
-}): string {
-  if (!attrKey) {
-    throw new FilterParseError("event.attribute.<key> requires a key after the dot");
-  }
-  validateAttributeKey(attrKey);
-  const value = extractStringValue(tag);
-  validateValueLength(value);
-  const pKey = nextParam(ctx, "eventAttrKey");
-  const pVal = nextParam(ctx, "eventAttrValue");
-  ctx.params[pKey] = attrKey;
-  ctx.params[pVal] = value;
-  return wrapMembership(
-    boundedSubquery(
-      "stored_spans",
-      "StartTime",
-      `arrayExists(attrs -> attrs[{${pKey}:String}] = {${pVal}:String}, \`Events.Attributes\`)`,
-    ),
-    negated,
-  );
-}
-
-/**
- * Matches spans with SpanAttributes[<key>]=<value> via partition-pruned subquery.
- */
-function translateSpanAttribute({
-  attrKey,
-  tag,
-  negated,
-  ctx,
-}: {
-  attrKey: string;
-  tag: TagToken;
-  negated: boolean;
-  ctx: TranslationContext;
-}): string {
-  if (!attrKey) {
-    throw new FilterParseError("span.attribute.<key> requires a key after the dot");
-  }
-  validateAttributeKey(attrKey);
-  const value = extractStringValue(tag);
-  validateValueLength(value);
-  const pKey = nextParam(ctx, "spanAttrKey");
-  const pVal = nextParam(ctx, "spanAttrValue");
-  ctx.params[pKey] = attrKey;
-  ctx.params[pVal] = value;
-  return wrapMembership(
-    boundedSubquery(
-      "stored_spans",
-      "StartTime",
-      `SpanAttributes[{${pKey}:String}] = {${pVal}:String}`,
-    ),
-    negated,
-  );
-}
-
-function translateFreeText({
-  tag,
-  negated,
-  ctx,
-  searchContent,
-}: {
-  tag: TagToken;
-  negated: boolean;
-  ctx: TranslationContext;
-  searchContent: boolean;
-}): string {
-  const value = extractStringValue(tag);
-  validateValueLength(value);
-  const paramName = nextParam(ctx, "freeText");
-  ctx.params[paramName] = `%${value}%`;
-  const p = `{${paramName}:String}`;
-
-  // Span names are part of free text, not just captured I/O — often the
-  // only place a tool/agent identifier appears. TraceName covers the root
-  // span off trace_summaries; the subquery covers every other span via
-  // stored_spans.SpanName. Both branches evaluate to a definite true/false,
-  // never NULL (parity suite pins this), keeping three-valued logic unchanged.
-  const content = searchContent ? `ComputedInput ILIKE ${p} OR ComputedOutput ILIKE ${p} OR ` : "";
-  const own = `${content}ifNull(TraceName, '') ILIKE ${p}`;
-  const spans = boundedSubquery("stored_spans", "StartTime", `SpanName ILIKE ${p}`);
-  // Negated by De Morgan, so the span membership is a `NOT IN` the tenant guard admits.
-  return negated ? `(NOT (${own}) AND ${wrapMembership(spans, true)})` : `(${own} OR ${spans})`;
 }
 
 /**
@@ -528,7 +335,7 @@ export function walkFilterAst<T>({
   return { kind: "compiled", compiled };
 }
 
-/** {@link walkFilterAst} as SQL text, for LangWatchQL and the reads not yet built. */
+/** {@link walkFilterAst} as SQL text, for the LangWatchQL dialect a statement carries. */
 export function translateFilterAst({
   queryText,
   ctx,

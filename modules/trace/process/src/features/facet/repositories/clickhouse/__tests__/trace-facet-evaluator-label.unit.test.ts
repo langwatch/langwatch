@@ -1,13 +1,13 @@
 import { SEARCH_FIELDS } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { traceQueryTranslation } from "../../../../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
+import { builtTraceFilter } from "../../../../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
 import { FACET_REGISTRY } from "../clickhouse.trace-facet-registry.mapper.ts";
 
 const TIME_RANGE = { from: 1714435200000, to: 1715040000000 };
 
 const translate = (query: string) =>
-  traceQueryTranslation.translateFilter({
+  builtTraceFilter({
     queryText: query,
     timeRange: TIME_RANGE,
   });
@@ -39,7 +39,8 @@ describe("evaluatorLabel facet", () => {
       // Cross-table subquery against evaluation_runs (mirrors evaluatorVerdict).
       expect(result!.sql).toContain("evaluation_runs");
       expect(result!.sql).toContain("ScheduledAt >=");
-      expect(result!.sql).toMatch(/Label = \{[a-zA-Z]+_\d+:String\}/);
+      expect(result!.sql).toContain("Label = {v2:String}");
+      expect(result!.bound.v2).toBe("toxic");
       expect(Object.values(result!.params)).toContain("toxic");
     });
 
@@ -48,11 +49,11 @@ describe("evaluatorLabel facet", () => {
       const verdict = translate("evaluatorVerdict:pass");
       const normalise = (s: string) =>
         s
-          .replace(/\{[a-zA-Z]+_\d+:[A-Za-z0-9()]+\}/g, "{P}")
+          .replace(/\{v\d+:[A-Za-z0-9()]+\}/g, "{P}")
           // Collapse the differing column expression so the surrounding
           // subquery scaffolding can be compared directly.
-          .replace(/Label = \{P\}/, "{COL}")
-          .replace(/multiIf\([^)]*\)[^=]*= \{P\}/, "{COL}");
+          .replace(/AND Label = \{P\}\)\)$/, "AND {COL}))")
+          .replace(/AND multiIf\(.*\) = \{P\}\)\)$/, "AND {COL}))");
       expect(normalise(label!.sql)).toBe(normalise(verdict!.sql));
     });
   });

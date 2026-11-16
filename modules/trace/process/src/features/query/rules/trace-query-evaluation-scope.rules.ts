@@ -8,7 +8,6 @@ import {
   type LogicalExpressionToken,
   type TagToken,
   type TraceQueryEvaluationRun,
-  type TranslationContext,
   type UnaryOperatorToken,
   UNSUPPORTED,
   type Unsupported,
@@ -19,9 +18,7 @@ import type {
   RangeFacetDef,
 } from "../../facet/rules/trace-facet-registry.rules.ts";
 import type { TraceQueryFieldsService } from "../services/trace-query-fields.service.ts";
-import { latestEvaluationRunsSubquery, wrapMembership } from "./trace-query-subquery.rules.ts";
-import { translateNumericField, translateStringField } from "./trace-query-translators.rules.ts";
-import { extractStringValue, nextParam, validateValueLength } from "./trace-query-values.rules.ts";
+import { extractStringValue } from "./trace-query-values.rules.ts";
 
 /**
  * Binds an evaluator's result to that evaluator: within one AND chain naming
@@ -135,45 +132,8 @@ function fieldNameOf(tag: TagToken): string {
   return tag.field.type === "ImplicitField" ? "" : tag.field.name;
 }
 
-/** The bound group as `evaluation_runs` subqueries over X's latest rows. */
-export function translateEvaluationScope({
-  scope,
-  ctx,
-  fields,
-}: {
-  scope: EvaluationScope;
-  ctx: TranslationContext;
-  fields: TraceQueryFieldsService;
-}): string {
-  const evaluatorId = extractStringValue(scope.anchor);
-  validateValueLength(evaluatorId);
-  const p = nextParam(ctx, "evaluatorId");
-  ctx.params[p] = evaluatorId;
-
-  const runsOfX = (predicates: string[]): string =>
-    latestEvaluationRunsSubquery({
-      timeCol: fields.getTimeColumn("evaluation_runs"),
-      scopeWhere: `EvaluatorId = {${p}:String}`,
-      innerWhere: predicates.length > 0 ? predicates.join(" AND ") : "1 = 1",
-    });
-
-  const keptSql = keptGroups({ scope, fields }).map(({ conditions, anyOf }) => {
-    const joined = conditions
-      .map((condition) => conditionSql({ condition, ctx, fields }))
-      .join(anyOf ? " OR " : " AND ");
-    return conditions.length > 1 ? `(${joined})` : joined;
-  });
-  const excluded = scope.conditions.filter((c) => c.negated);
-  return [
-    runsOfX(keptSql),
-    ...excluded.map((c) =>
-      wrapMembership(runsOfX([conditionSql({ condition: c, ctx, fields })]), true),
-    ),
-  ].join(" AND ");
-}
-
 /**
- * The bound group in memory, mirroring `translateEvaluationScope`. Each
+ * The bound group in memory, mirroring the built compiler's `evaluationScope`. Each
  * condition reuses its field's own in-memory predicate over one evaluation, so
  * the two sides keep reading values the same way.
  */
@@ -235,20 +195,6 @@ export function keptGroups({
  * form: an excluded condition is applied by excluding the rows it matches. A
  * NULL column (no score, no label) matches no row either way.
  */
-function conditionSql({
-  condition: { tag, field },
-  ctx,
-  fields,
-}: {
-  condition: ScopedCondition;
-  ctx: TranslationContext;
-  fields: TraceQueryFieldsService;
-}): string {
-  const facet = scopedFacet({ field, fields });
-  const args = { columnExpr: facet.expression, tag, negated: false, ctx, name: facet.key };
-  return facet.kind === "range" ? translateNumericField(args) : translateStringField(args);
-}
-
 export function scopedFacet({
   field,
   fields,

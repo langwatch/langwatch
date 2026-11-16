@@ -329,6 +329,7 @@ import {
   findHiddenOriginFilters,
   precompiledTraceFilter,
   type TraceFilterCompile,
+  checkTraceFilter,
   traceFilterCompileOf,
 } from "../features/query/repositories/clickhouse/clickhouse.trace-filter-condition.mapper.ts";
 import {
@@ -345,7 +346,6 @@ import {
 } from "../features/query/services/trace-query-classification.service.ts";
 import { TraceQueryEvaluationService } from "../features/query/services/trace-query-evaluation.service.ts";
 import { TraceQueryFieldsService } from "../features/query/services/trace-query-fields.service.ts";
-import { TraceQueryTranslationService } from "../features/query/services/trace-query-translation.service.ts";
 import { TraceSearchRouterService } from "../features/query/services/trace-search-router.service.ts";
 import {
   TraceBraidDetailService,
@@ -1387,15 +1387,16 @@ export class TraceModule implements TraceApi, CollectorApp {
   /** The trace query compiler and its in-memory mirror, over the ClickHouse facet registry. */
   static #composeQuery(): {
     fields: TraceQueryFieldsService;
-    translation: TraceQueryTranslationService;
     evaluation: TraceQueryEvaluationService;
   } {
     const fields = TraceQueryFieldsService.create({
       facetRegistry: ClickHouseTraceFacetRegistryRepository.create(),
     });
-    const translation = TraceQueryTranslationService.create({ fields });
-    const evaluation = TraceQueryEvaluationService.create({ fields, translation });
-    return { fields, translation, evaluation };
+    const evaluation = TraceQueryEvaluationService.create({
+      fields,
+      check: (queryText) => checkTraceFilter({ queryText, fields }),
+    });
+    return { fields, evaluation };
   }
 
   /** The trace-tree read over this process's ClickHouse and query-value boundaries. */
@@ -1527,13 +1528,11 @@ export class TraceModule implements TraceApi, CollectorApp {
   #exportProgress: TraceExportProgressService;
   #tenantUpdates: TraceTenantUpdateStreamService;
   #queryFields: TraceQueryFieldsService;
-  #queryTranslation: TraceQueryTranslationService;
   #queryEvaluation: TraceQueryEvaluationService;
   private constructor(dependencies: TraceAppDependencies) {
     this.#dependencies = dependencies;
     const query = TraceModule.#composeQuery();
     this.#queryFields = query.fields;
-    this.#queryTranslation = query.translation;
     this.#queryEvaluation = query.evaluation;
     this.#transcriptRead = TraceTranscriptReadService.create();
     this.#tenantUpdates = TraceTenantUpdateStreamService.create({
@@ -2805,23 +2804,7 @@ export class TraceModule implements TraceApi, CollectorApp {
 
   /** The filter checked as written (Decided 25): throws `FilterParseError`, returns nothing. */
   translateTraceFilter(input: { query: string }): void {
-    this.#translateTraceFilter({ query: input.query, timeRange: { from: 0, to: 0 } });
-  }
-
-  /** The trace query language's free-text filter, compiled to a ClickHouse WHERE fragment. */
-  #translateTraceFilter(input: {
-    query: string;
-    timeRange: { from: number; to: number };
-    evalRuns?: readonly ResolvedInstantEvalRun[];
-    /** The viewer's; under any content protection free text skips captured I/O. */
-    protections?: Protections;
-  }): { sql: string; params: Record<string, unknown> } | null {
-    return this.#queryTranslation.translateFilter({
-      queryText: input.query,
-      timeRange: input.timeRange,
-      ...(input.evalRuns ? { evalRuns: input.evalRuns } : {}),
-      ...TraceModule.#filterProtections(input.protections),
-    });
+    checkTraceFilter({ queryText: input.query, fields: this.#queryFields });
   }
 
   /** What a protected viewer's filter may not read: captured I/O and the hidden attributes. */
@@ -3083,12 +3066,13 @@ export class TraceModule implements TraceApi, CollectorApp {
           queryText,
           // Validates the query (FilterParseError); an empty one narrows nothing.
           present:
-            this.#translateTraceFilter({
-              query: queryText,
+            checkTraceFilter({
+              queryText,
               timeRange: input.timeRange,
+              fields: this.#queryFields,
               ...(input.evalRuns ? { evalRuns: input.evalRuns } : {}),
-              ...(input.protections ? { protections: input.protections } : {}),
-            }) !== null,
+              ...TraceModule.#filterProtections(input.protections),
+            }) === "compiled",
           hidden: false,
         }),
       hide: (filter) =>

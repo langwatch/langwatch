@@ -12,7 +12,7 @@ import {
 } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { traceQueryTranslation } from "../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
+import { builtTraceFilter } from "../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
 
 const WINDOW = { from: 1_700_000_000_000, to: 1_700_086_400_000 };
 
@@ -30,7 +30,7 @@ describe("given the published trace filter examples", () => {
       "[%s] parses, passes the save-time check and compiles",
       (_id, text) => {
         expect(describeAstProblem(parseTraceQuerySyntax(text))).toBeNull();
-        const compiled = traceQueryTranslation.translateFilter({
+        const compiled = builtTraceFilter({
           queryText: text,
           timeRange: WINDOW,
         });
@@ -45,7 +45,7 @@ describe("given the published trace filter examples", () => {
     it("never emits a parameter the legacy builder also owns", () => {
       const legacyOwned = /^(f\d+_|spanWindowStart$|spanWindowEnd$)/;
       for (const example of TRACE_FILTER_EXAMPLES) {
-        const compiled = traceQueryTranslation.translateFilter({
+        const compiled = builtTraceFilter({
           queryText: example.text,
           timeRange: WINDOW,
         });

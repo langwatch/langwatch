@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   traceQueryEvaluation,
-  traceQueryTranslation,
+  builtTraceFilter,
 } from "../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
 
 function traceWithEvents(names: string[]): InMemoryTrace {
@@ -50,11 +50,12 @@ describe("has:feedback", () => {
 
   describe("when compiled to ClickHouse", () => {
     it("looks for the thumbs_up_down event name", () => {
-      const compiled = traceQueryTranslation.translateFilter({
+      const compiled = builtTraceFilter({
         queryText: "has:feedback",
         timeRange: { from: 0, to: 1 },
       });
-      expect(compiled?.sql).toContain("thumbs_up_down");
+      expect(compiled?.sql).toContain("has(`Events.Name`, {v2:String})");
+      expect(compiled?.bound.v2).toBe("thumbs_up_down");
     });
   });
 });

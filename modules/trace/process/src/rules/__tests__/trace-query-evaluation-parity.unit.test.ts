@@ -1,4 +1,4 @@
-import { tenantScope } from "@langwatch/clickhouse-client";
+import { clickhouseRead, tenantScope } from "@langwatch/clickhouse-client/builder";
 import {
   FilterFieldUnknownError,
   type DerivedTraceEvent,
@@ -9,14 +9,19 @@ import {
 } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
+import {
+  TRACE_SUMMARY_CATEGORICAL_EXPRESSIONS,
+  TRACE_SUMMARY_RANGE_EXPRESSIONS,
+} from "../../features/facet/repositories/clickhouse/clickhouse.trace-facet-expressions.mapper.ts";
 import type {
   ExpressionCategoricalDef,
   RangeFacetDef,
 } from "../../features/facet/rules/trace-facet-registry.rules.ts";
+import { traceSummaries } from "../../repositories/clickhouse/clickhouse.trace-summaries.table.ts";
 import {
   traceFacetRegistry as FACET_REGISTRY,
   traceQueryEvaluation,
-  traceQueryTranslation,
+  builtTraceFilter,
 } from "../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
 
 const evaluateQueryInMemory = (queryText: string, trace: InMemoryTrace) =>
@@ -698,11 +703,24 @@ describe("FieldDef SQL/read parity", () => {
       "[%s] compiles against its registry expression",
       (key, def) => {
         const literal = def.kind === "range" ? "1" : "x";
-        const compiled = traceQueryTranslation.translateFilter({
+        const compiled = builtTraceFilter({
           queryText: `${key}:${literal}`,
           timeRange: { from: 0, to: 1 },
         });
-        expect(compiled?.sql).toContain(def.expression);
+        const expression =
+          def.kind === "range"
+            ? TRACE_SUMMARY_RANGE_EXPRESSIONS[key as keyof typeof TRACE_SUMMARY_RANGE_EXPRESSIONS]
+            : TRACE_SUMMARY_CATEGORICAL_EXPRESSIONS[
+                key as keyof typeof TRACE_SUMMARY_CATEGORICAL_EXPRESSIONS
+              ];
+        const rendered = clickhouseRead({
+          scope: tenantScope.single({ tenantId: "project_fixture" }),
+        })
+          .from(traceSummaries)
+          .select({ facet: expression })
+          .build()
+          .sql.replace(/^SELECT (.*) AS facet FROM .*$/, "$1");
+        expect(compiled?.where.startsWith(rendered)).toBe(true);
       },
     );
   });
@@ -741,7 +759,7 @@ describe("given a filter field that collides with an Object.prototype member", (
   describe("when the save-time gate compiles it", () => {
     it.each(PROTOTYPE_FIELDS)("[%s] is rejected as an unknown field", (field) => {
       expect(() =>
-        traceQueryTranslation.translateFilter({
+        builtTraceFilter({
           queryText: `${field}:x`,
           timeRange: { from: 0, to: 1 },
         }),
@@ -844,12 +862,12 @@ describe("the in-memory free-text narrowing", () => {
 
     // The same filter compiled for ClickHouse does reach span names, which is
     // the asymmetry the spec records.
-    const compiled = traceQueryTranslation.translateFilter({
+    const compiled = builtTraceFilter({
       queryText: "codex",
       timeRange: { from: 0, to: 1 },
     });
     expect(compiled!.sql).toContain("FROM stored_spans");
-    expect(compiled!.sql).toContain("SpanName ILIKE");
+    expect(compiled!.sql).toContain("ilike(SpanName,");
 
     // Loading the spans closes the gap with no change to the evaluator.
     expect(
@@ -877,7 +895,7 @@ describe("the in-memory free-text narrowing", () => {
 
 describe("free text compiled to ClickHouse", () => {
   function compile(query: string) {
-    return traceQueryTranslation.translateFilter({
+    return builtTraceFilter({
       queryText: query,
       timeRange: { from: 1000, to: 2000 },
     });
@@ -888,27 +906,26 @@ describe("free text compiled to ClickHouse", () => {
     expect(compiled).not.toBeNull();
     const sql = compiled!.sql;
 
-    expect(sql).toContain("ComputedInput ILIKE");
-    expect(sql).toContain("ComputedOutput ILIKE");
-    expect(sql).toContain("ifNull(TraceName, '') ILIKE");
+    expect(sql).toContain("ilike(ComputedInput,");
+    expect(sql).toContain("ilike(ComputedOutput,");
+    expect(sql).toContain("ilike(ifNull(TraceName,");
     expect(sql).toContain("FROM stored_spans");
-    expect(sql).toContain("SpanName ILIKE");
-    // The span subquery crosses into another table, so its tenant marker is
+    expect(sql).toContain("ilike(SpanName,");
+    // The span subquery crosses into another table, so its tenant predicate is
     // the one whose regression leaks across tenants rather than just returning
-    // the wrong rows. Pin it here even though `boundedSubquery` owns it.
-    expect(sql).toContain(tenantScope("StartTime"));
+    // the wrong rows.
+    expect(sql).toContain("FROM stored_spans WHERE TenantId = {tenantId:String}");
     expect(compiled!.params).not.toHaveProperty("tenantId");
     expect(Object.values(compiled!.params)).toContain("%codex%");
   });
 
-  it("binds one parameter reused across every branch", () => {
+  it("binds one pattern, matched by every branch", () => {
     const compiled = compile("codex");
     const freeTextParams = Object.keys(compiled!.params).filter((k) => k.startsWith("freeText"));
     expect(freeTextParams).toHaveLength(1);
     // Four branches: input, output, trace name, span name.
-    const name = freeTextParams[0]!;
-    const occurrences = compiled!.sql.split(`{${name}:String}`).length - 1;
-    expect(occurrences).toBe(4);
+    const patterns = Object.values(compiled!.bound).filter((value) => value === "%codex%");
+    expect(patterns).toHaveLength(4);
   });
 
   it("bounds the span subquery to the query time window for partition pruning", () => {
@@ -921,11 +938,11 @@ describe("free text compiled to ClickHouse", () => {
   it("negates the whole clause, not just the IO columns", () => {
     const compiled = compile("NOT codex");
     const sql = compiled!.sql.trim();
-    expect(sql).toMatch(
-      /^\(NOT \(ComputedInput ILIKE .* OR ifNull\(TraceName, ''\) ILIKE [^)]*\) AND /,
+    expect(compiled!.where).toMatch(
+      /^\(NOT \(\(ilike\(ComputedInput, .* OR ilike\(ifNull\(TraceName, \{v\d+:String\}\), \{v\d+:String\}\)\)\) AND /,
     );
     expect(sql).toContain(
-      "(TenantId, TraceId) NOT IN (SELECT DISTINCT TenantId, TraceId FROM stored_spans",
+      "tuple(TenantId, TraceId) NOT IN (SELECT DISTINCT TenantId, TraceId FROM stored_spans",
     );
   });
 });

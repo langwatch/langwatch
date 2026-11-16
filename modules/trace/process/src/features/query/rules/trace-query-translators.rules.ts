@@ -12,7 +12,6 @@ import {
   type TranslationContext,
 } from "@langwatch/trace-contract";
 
-import { boundedSubquery, wrapMembership } from "./trace-query-subquery.rules.ts";
 import {
   extractNumericValue,
   extractStringValue,
@@ -21,29 +20,7 @@ import {
   wrap,
 } from "./trace-query-values.rules.ts";
 
-// ---------------------------------------------------------------------------
-// ClickHouse compilation (unchanged output — the byte-identical invariant)
-// ---------------------------------------------------------------------------
-
-const NUMERIC_OP_MAP: Record<string, string> = {
-  ":": "=",
-  ":>": ">",
-  ":<": "<",
-  ":>=": ">=",
-  ":<=": "<=",
-};
-
-// ---------------------------------------------------------------------------
-// In-memory evaluation (mirrors the SQL each compiler emits)
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
-// Field-def builders (both sides)
-// ---------------------------------------------------------------------------
-
-/**
- * Field translators for categorical/range filters on single-row and cross-table predicates.
- */
+/** The LangWatchQL dialect's text handlers, and the in-memory side of each filter field. */
 
 export function translateNumericField({
   columnExpr,
@@ -124,72 +101,6 @@ export function numericComparisonHandler(expression: string, name?: string): Fie
     translateNumericField({ columnExpr: expression, tag, negated, ctx, name });
 }
 
-function crossTableStringHandler({
-  table,
-  timeColumn,
-  expression,
-  name = "value",
-}: {
-  table: string;
-  timeColumn: string;
-  expression: string;
-  name?: string;
-}): FieldHandler {
-  return (tag, negated, ctx) => {
-    const value = extractStringValue(tag);
-    validateValueLength(value);
-    const p = nextParam(ctx, name);
-    ctx.params[p] = value;
-    return wrapMembership(
-      boundedSubquery(table, timeColumn, `${expression} = {${p}:String}`),
-      negated,
-    );
-  };
-}
-
-function crossTableNumericHandler({
-  table,
-  timeColumn,
-  expression,
-  name = "value",
-}: {
-  table: string;
-  timeColumn: string;
-  expression: string;
-  name?: string;
-}): FieldHandler {
-  return (tag, negated, ctx) => {
-    if (tag.expression.type === "RangeExpression") {
-      const min = tag.expression.range.min;
-      const max = tag.expression.range.max;
-      const pMin = nextParam(ctx, `${name}Min`);
-      const pMax = nextParam(ctx, `${name}Max`);
-      ctx.params[pMin] = min;
-      ctx.params[pMax] = max;
-      return wrapMembership(
-        boundedSubquery(
-          table,
-          timeColumn,
-          `${expression} >= {${pMin}:Float64} AND ${expression} <= {${pMax}:Float64}`,
-        ),
-        negated,
-      );
-    }
-    const operator = tag.operator.operator;
-    const num = extractNumericValue(tag);
-    const p = nextParam(ctx, name);
-    ctx.params[p] = num;
-    const cmp = NUMERIC_OP_MAP[operator];
-    if (!cmp) {
-      throw new FilterParseError(`Unsupported operator: ${operator}`);
-    }
-    return wrapMembership(
-      boundedSubquery(table, timeColumn, `${expression} ${cmp} {${p}:Float64}`),
-      negated,
-    );
-  };
-}
-
 /**
  * Numeric comparison mirroring {@link translateNumericField}: inclusive
  * `[min TO max]` ranges (ClickHouse always emits `>=`/`<=`, ignoring liqe's
@@ -260,68 +171,24 @@ function evaluateRange({
   return negated ? !matched : matched;
 }
 
-/** Direct string equality on a `trace_summaries` expression. */
-export function categorical(expression: string, read: CategoricalRead, name?: string): FieldDef {
-  return {
-    toClickHouse: stringEqualityHandler(expression, name),
-    evaluateInMemory: (tag, negated, trace) => evaluateCategorical({ read, tag, negated, trace }),
-  };
-}
-
-/** Numeric comparison on a `trace_summaries` expression. */
-export function range(expression: string, read: RangeRead, name?: string): FieldDef {
-  return {
-    toClickHouse: numericComparisonHandler(expression, name),
-    evaluateInMemory: (tag, negated, trace) => evaluateRange({ read, tag, negated, trace }),
-  };
-}
-
-/**
- * String equality answered by a partition-pruned subquery on another table
- * (`evaluation_runs` / `stored_spans`). `read` collects the candidate values
- * from the referenced collection (or {@link UNSUPPORTED} when it isn't loaded).
- */
-export function crossTableCategorical({
-  table,
-  timeColumn,
-  expression,
+/** A field compared as a string, against what `read` takes from the trace. */
+export function categorical({
   read,
   needs,
-  name = "value",
 }: {
-  table: string;
-  timeColumn: string;
-  expression: string;
   read: CategoricalRead;
-  needs: FieldNeeds;
-  name?: string;
+  needs?: FieldNeeds;
 }): FieldDef {
   return {
-    needs,
-    toClickHouse: crossTableStringHandler({ table, timeColumn, expression, name }),
+    ...(needs ? { needs } : {}),
     evaluateInMemory: (tag, negated, trace) => evaluateCategorical({ read, tag, negated, trace }),
   };
 }
 
-/** Numeric comparison answered by a partition-pruned cross-table subquery. */
-export function crossTableRange({
-  table,
-  timeColumn,
-  expression,
-  read,
-  needs,
-  name = "value",
-}: {
-  table: string;
-  timeColumn: string;
-  expression: string;
-  read: RangeRead;
-  needs: FieldNeeds;
-  name?: string;
-}): FieldDef {
+/** A field compared as a number, against what `read` takes from the trace. */
+export function range({ read, needs }: { read: RangeRead; needs?: FieldNeeds }): FieldDef {
   return {
-    needs,
-    toClickHouse: crossTableNumericHandler({ table, timeColumn, expression, name }),
+    ...(needs ? { needs } : {}),
     evaluateInMemory: (tag, negated, trace) => evaluateRange({ read, tag, negated, trace }),
   };
 }

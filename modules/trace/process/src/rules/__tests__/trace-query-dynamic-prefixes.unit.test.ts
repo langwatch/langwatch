@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { traceQueryTranslation } from "../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
+import { builtTraceFilter } from "../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
 
 const TIME_RANGE = { from: 1714435200000, to: 1715040000000 };
 
 function translate(query: string) {
-  return traceQueryTranslation.translateFilter({
+  return builtTraceFilter({
     queryText: query,
     timeRange: TIME_RANGE,
   });
