@@ -92,6 +92,26 @@ const SETTINGS_MEASURE = "1248px";
 const PAGE_GAP = "var(--chakra-spacing-6)";
 
 /**
+ * One plan banner at a time (specs/billing/over-plan-trace-withholding.feature): a failed
+ * payment's banner outranks the seat banner, and the plan page carries its own seat note.
+ */
+function showsSeatBanner({
+  usage,
+  onPlanPage,
+}: {
+  usage:
+    | {
+        activePlan?: { paymentFailed?: boolean; overPlan?: unknown };
+        seatLimitInfo?: { status: string };
+      }
+    | undefined;
+  onPlanPage: boolean;
+}): boolean {
+  if (!usage || onPlanPage || usage.activePlan?.paymentFailed === true) return false;
+  return usage.seatLimitInfo?.status === "exceeded" || !!usage.activePlan?.overPlan;
+}
+
+/**
  * Settings, gateway, instance and Cloud admin pages read in the settings column.
  * Ops tools other than instance and Cloud admin draw their own frame and get none here.
  */
@@ -270,13 +290,16 @@ export const ShellPageBody = ({
             }
           />
         )}
-        {/* The plan page carries its own seat note, with the actions this banner links to. */}
-        {usage.data?.seatLimitInfo?.status === "exceeded" &&
-          pathname !== planManagementHref(deployment.isSaaS) && (
+        {usage.data &&
+          showsSeatBanner({
+            usage: usage.data,
+            onPlanPage: pathname === planManagementHref(deployment.isSaaS),
+          }) && (
             <SeatLimitBanner
-              message={usage.data.seatLimitInfo.message}
+              message={usage.data.seatLimitInfo?.message ?? ""}
               isEnterprisePlan={usage.data.activePlan.type === "ENTERPRISE"}
               isSaaS={deployment.isSaaS}
+              isOverPlan={!!usage.data.activePlan.overPlan}
               planManagementHref={planManagementHref(deployment.isSaaS)}
             />
           )}

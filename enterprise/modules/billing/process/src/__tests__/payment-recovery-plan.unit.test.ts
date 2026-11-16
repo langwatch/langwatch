@@ -228,6 +228,7 @@ describe("Failed payment recovery and the plan", () => {
       const plan = await plans.getActivePlan("org_1");
 
       expect(plan.additionsHeldForPayment).toBe(true);
+      expect(plan.paymentFailed).toBe(true);
       expect(plan.maxMembers).toBe(12);
       expect(plan.maxMessagesPerMonth).toBe(2_000_000);
     });
@@ -248,7 +249,9 @@ describe("Failed payment recovery and the plan", () => {
 
       await recoveries.close({ subscriptionId: "sub_db_1", invoiceId: "in_1" });
 
-      expect((await plans.getActivePlan("org_1")).additionsHeldForPayment).toBeUndefined();
+      const plan = await plans.getActivePlan("org_1");
+      expect(plan.additionsHeldForPayment).toBeUndefined();
+      expect(plan.paymentFailed).toBeUndefined();
     });
 
     /** @scenario "After the pause, new members are checked against the Free plan's member limit" */
@@ -260,6 +263,7 @@ describe("Failed payment recovery and the plan", () => {
 
       expect(plan.maxMembers).toBe(getFreePlanLimits().maxMembers);
       expect(plan.additionsHeldForPayment).toBeUndefined();
+      expect(plan.paymentFailed).toBe(true);
     });
   });
 

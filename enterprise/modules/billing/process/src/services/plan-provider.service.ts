@@ -48,13 +48,13 @@ function customLimitsOf(subscription: ActiveSubscription): Partial<PlanInfo> {
 /** Before the pause, an unpaid invoice holds new members and seats on every non-Enterprise plan. */
 function recoveryHoldOf(
   subscription: ActiveSubscription,
-): Pick<PlanInfo, "additionsHeldForPayment"> {
+): Pick<PlanInfo, "additionsHeldForPayment" | "paymentFailed"> {
   const held = isPlanHeldForRecovery({
     startedAt: subscription.paymentRecoveryStartedAt,
     plan: subscription.plan,
     now: nowInstant(),
   });
-  return held ? { additionsHeldForPayment: true } : {};
+  return held ? { additionsHeldForPayment: true, paymentFailed: true } : {};
 }
 
 export class SaaSPlanProviderService extends BillingService {
@@ -111,7 +111,7 @@ export class SaaSPlanProviderService extends BillingService {
       })
     ) {
       const { visibilityDays: _freeWindow, ...freeLimits } = getFreePlanLimits();
-      return { ...freeLimits, overrideAddingLimitations };
+      return { ...freeLimits, paymentFailed: true, overrideAddingLimitations };
     }
 
     const subscriptionPlan = activeSubscription.plan as string | undefined;

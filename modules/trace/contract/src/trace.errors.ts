@@ -161,7 +161,7 @@ export class TraceWithheldOverPlanError extends HandledError {
   constructor(input: { traceId: string; members: number; maxMembers: number }) {
     super(
       "trace_withheld_over_plan",
-      "This trace was recorded while the organization is over its plan. It is saved and will show once the card is updated or the members fit the plan.",
+      "This trace was recorded while the organization is over its plan. It is saved and will show once the plan is upgraded or the members fit it.",
       {
         httpStatus: 403,
         meta: { traceId: input.traceId, members: input.members, maxMembers: input.maxMembers },

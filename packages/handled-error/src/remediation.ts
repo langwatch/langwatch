@@ -112,7 +112,7 @@ const registry = {
   },
   trace_withheld_over_plan: {
     tips: [
-      "Update the card on Settings > Subscription to show every held trace again",
+      "Upgrade the plan on Settings > Subscription to show every held trace again",
       "Or remove members on Settings > Members until they fit the plan",
     ],
   },

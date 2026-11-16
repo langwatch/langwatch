@@ -104,6 +104,13 @@ Feature: Traces withheld while an organization is over its plan
     Then the read fails with the code "trace_withheld_over_plan"
 
   @unit
+  Scenario: A shared link to a withheld trace reads as a missing link
+    Given an organization over its plan from a cutoff time
+    When an anonymous viewer opens a share link to a trace recorded after the cutoff
+    Then the read fails with the code "share_link_not_found"
+    And the answer carries none of the organization's member or plan counts
+
+  @unit
   Scenario: A trace recorded before the cutoff opens in full
     Given an organization over its plan from a cutoff time
     When a member opens a trace recorded before the cutoff
@@ -115,18 +122,20 @@ Feature: Traces withheld while an organization is over its plan
     When a member lists the project's traces
     Then no trace is withheld and the list says nothing is withheld
 
-  # The traces page
+  # One plan banner at a time: payment failed > over-plan withholding > seat overage
 
   @integration
-  Scenario: The traces page shows one line with the numbers and both actions
-    Given an organization over its plan with 5 members and 4 withheld traces
-    When a member opens the traces page
-    Then it shows "Your plan covers 2 members and you have 5. New traces are saved and will show once you update your card or remove 3 members."
-    And it offers "Update card" linking to the subscription page
+  Scenario: Only one plan banner shows at a time
+    Given an organization whose payment failed and that uses more seats than its plan includes
+    When a member opens any page
+    Then only the failed payment banner is shown
+    And the seat banner is not shown
+
+  @integration
+  Scenario: An over-plan organization sees one banner with the seat counts and both actions
+    Given an organization over its plan that uses 8 member seats and 5 Lite Member seats
+    When a member opens any page
+    Then one banner shows the seat counts and "New traces are saved and will show once you upgrade your plan or remove members."
+    And it offers "Compare plans" linking to the subscription page
     And it offers "Manage members" linking to the members page
-
-  @integration
-  Scenario: The traces page shows no line when nothing is withheld
-    Given an organization on the Free plan with no over-plan state
-    When a member opens the traces page
-    Then the over-plan line is not shown
+    And it does not ask to update the card

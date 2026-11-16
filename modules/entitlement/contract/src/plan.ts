@@ -38,6 +38,8 @@ const planSchemaDefinition = z.object({
   overPlan: overPlanSchema.nullable().optional(),
   /** True while a failed payment is unpaid and before the pause: no new members or seats. */
   additionsHeldForPayment: z.boolean().optional(),
+  /** True while a failed payment is unpaid, before or after the pause; its banner comes first. */
+  paymentFailed: z.boolean().optional(),
   trialDays: z.number().optional(),
   daysSinceCreation: z.number().optional(),
   overrideAddingLimitations: z.boolean().optional(),
