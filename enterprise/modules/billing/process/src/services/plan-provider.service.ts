@@ -62,27 +62,13 @@ export class SaaSPlanProviderService extends BillingService {
     // it can, and then which one answers decides the plan.
     const activeSubscription = await this.subscriptions.findActive(organizationId);
 
-    const customLimits: Partial<PlanInfo> = {};
-    for (const field of NUMERIC_OVERRIDE_FIELDS) {
-      if (activeSubscription?.[field] != null) {
-        customLimits[field] = activeSubscription[field]!;
-      }
-    }
-    // Seats lowered from the next cycle stay usable until the period paid for ends.
-    if (activeSubscription?.maxMembers != null) {
-      customLimits.maxMembers = effectiveMaxMembers({
-        ...activeSubscription,
-        maxMembers: activeSubscription.maxMembers,
-        now: nowInstant(),
-      });
-    }
-
     if (!activeSubscription) {
       return {
         ...getFreePlanLimits(),
         overrideAddingLimitations,
       };
     }
+    const customLimits = customLimitsOf(activeSubscription);
 
     // Unpaid past day 21: Free limits refuse new additions; nothing is removed, deleted or
     // hidden, so the Free visibility window does not apply to what is already stored.
@@ -124,4 +110,25 @@ export class SaaSPlanProviderService extends BillingService {
       overrideAddingLimitations,
     };
   }
+}
+
+type ActiveSubscription = NonNullable<
+  Awaited<ReturnType<BillingSubscriptionRepository["findActive"]>>
+>;
+
+/** The limits a subscription row overrides on its plan. */
+function customLimitsOf(subscription: ActiveSubscription): Partial<PlanInfo> {
+  const customLimits: Partial<PlanInfo> = {};
+  for (const field of NUMERIC_OVERRIDE_FIELDS) {
+    if (subscription[field] != null) customLimits[field] = subscription[field];
+  }
+  // Seats lowered from the next cycle stay usable until the period paid for ends.
+  if (subscription.maxMembers != null) {
+    customLimits.maxMembers = effectiveMaxMembers({
+      ...subscription,
+      maxMembers: subscription.maxMembers,
+      now: nowInstant(),
+    });
+  }
+  return customLimits;
 }
