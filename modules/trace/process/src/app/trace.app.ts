@@ -299,10 +299,6 @@ import type {
   TraceLegacyReadRepository,
 } from "../features/legacy/repositories/trace-legacy-read.repository.ts";
 import {
-  type GenerateFilterConditionsResult,
-  translateLegacyFilters,
-} from "../features/legacy/rules/trace-legacy-filter-conditions.rules.ts";
-import {
   derivePromptStudioSpan,
   promptStudioRowFromStoredSpan,
 } from "../features/legacy/rules/trace-legacy-prompt-studio-span.rules.ts";
@@ -327,8 +323,10 @@ import {
   utf8Preview,
 } from "../features/projection/rules/trace-projection-lean.rules.ts";
 import {
+  compileLangWatchQLTraceCondition,
   conversationTraceFilter,
   findHiddenOriginFilters,
+  precompiledTraceFilter,
   type TraceFilterCompile,
   traceFilterCompileOf,
 } from "../features/query/repositories/clickhouse/clickhouse.trace-filter-condition.mapper.ts";
@@ -403,7 +401,6 @@ import { mapTraceEvaluationsToLegacyEvaluations } from "../rules/trace-evaluatio
 import {
   andFilterConditions,
   findHiddenOriginConditions,
-  type TraceFilterWhere,
 } from "../rules/trace-filter-hidden-origins.rules.ts";
 import { generateAsciiTree } from "../rules/trace-formatting.rules.ts";
 import { tracePath, tracePlatformUrl } from "../rules/trace-platform-url.rules.ts";
@@ -1619,7 +1616,7 @@ export class TraceModule implements TraceApi, CollectorApp {
             exports: TraceExportService.create({
               traceService: dependencies.traces.read,
               compileFilter: ({ request, protections }) =>
-                this.#compileExplorerTraceFilter({
+                this.#compileExplorerListFilter({
                   query: request.query ?? "",
                   tenantId: request.projectId,
                   timeRange: { from: request.startDate, to: request.endDate },
@@ -1847,8 +1844,8 @@ export class TraceModule implements TraceApi, CollectorApp {
       refuseAbove: input.options?.refuseAbove,
     });
     const { filter, ...options } = input.options ?? {};
-    const filterWhere = filter
-      ? await this.#compileExplorerTraceFilter({
+    const compileFilter = filter
+      ? await this.#compileExplorerListFilter({
           query: filter.query,
           tenantId: filter.tenantId,
           timeRange: { from: input.query.startDate, to: input.query.endDate },
@@ -1861,7 +1858,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     return this.#contentReader.listTraces({
       ...input,
       ...(input.options
-        ? { options: { ...options, ...(filterWhere ? { filterWhere } : {}) } }
+        ? { options: { ...options, ...(compileFilter ? { compileFilter } : {}) } }
         : {}),
       authorization: await this.#authorizeContentRead({
         projectId: input.query.projectId,
@@ -1898,22 +1895,24 @@ export class TraceModule implements TraceApi, CollectorApp {
         ? undefined
         : await this.#readBounds.clampPageSize(input.query.projectId, input.query.pageSize);
     const { filter, ...options } = input.options ?? {};
-    const filterWhere = filter === undefined ? undefined : this.#compileLangWatchQLWhere(filter);
+    const compileFilter =
+      filter === undefined ? undefined : TraceModule.#compileLangWatchQLFilter(filter);
     return this.#contentReader.listTraceSummaries({
       query: { ...input.query, ...(pageSize === undefined ? {} : { pageSize }) },
       ...(input.options
-        ? { options: { ...options, ...(filterWhere ? { filterWhere } : {}) } }
+        ? { options: { ...options, ...(compileFilter ? { compileFilter } : {}) } }
         : {}),
     });
   }
 
-  /** A LangWatchQL filter as a WHERE fragment; one narrowing nothing is refused, not read whole. */
-  #compileLangWatchQLWhere(filter: string): TraceFilterWhere {
+  /** A LangWatchQL filter compiled inside the read; one narrowing nothing is refused, not read
+   * whole. */
+  static #compileLangWatchQLFilter(filter: string): TraceFilterCompile {
     const compiled = compileLangWatchQLTraceFilter({ filter });
     if (compiled.kind !== "compiled") {
       throw new FilterParseError(`The trace filter cannot be read here: ${compiled.kind}`);
     }
-    return { sql: compiled.sql, params: { ...compiled.parameters } };
+    return () => compileLangWatchQLTraceCondition({ filter });
   }
   async findTrace(input: TraceFindTraceInput): Promise<Trace | undefined> {
     return this.#contentReader.findTrace({
@@ -2844,14 +2843,6 @@ export class TraceModule implements TraceApi, CollectorApp {
     };
   }
 
-  translateLegacyFilters(input: {
-    filters: Readonly<Record<string, unknown>>;
-    window?: { startDate?: number; endDate?: number };
-    fenced?: boolean;
-  }): GenerateFilterConditionsResult {
-    return translateLegacyFilters(input);
-  }
-
   /** The filter compiled against the LangWatchQL trace view, for a statement a caller runs. */
   compileLangWatchQLTraceFilter(input: { filter: string }): LangWatchQLTraceFilter {
     return compileLangWatchQLTraceFilter(input);
@@ -2889,6 +2880,39 @@ export class TraceModule implements TraceApi, CollectorApp {
       ...(compiled ? [compiled] : []),
       ...findHiddenOriginConditions({ hiddenOrigins }),
     ]);
+  }
+
+  /**
+   * The Explorer's filter for the legacy list and export, compiled inside each read for its scope
+   * (Decided 25); checked here, so a span clause on the `updated` axis is refused before a read.
+   */
+  async #compileExplorerListFilter(input: {
+    query: string;
+    tenantId: string;
+    timeRange: { from: number; to: number };
+    originNamed?: boolean;
+    dateField?: TraceDateField;
+    protections?: Protections;
+  }): Promise<TraceFilterCompile> {
+    const hiddenOrigins = input.originNamed
+      ? []
+      : await this.#explorerHiddenOrigins({ projectId: input.tenantId, query: input.query });
+    const compile = traceFilterCompileOf({
+      queryText: input.query,
+      timeRange: input.timeRange,
+      fields: this.#queryFields,
+      terms: findHiddenOriginFilters({ hiddenOrigins }),
+      ...TraceModule.#filterProtections(input.protections),
+    });
+    const checked = precompiledTraceFilter({ compile, tenantId: input.tenantId });
+    if (input.dateField === "updated" && checked.kind === "compiled" && checked.readsSpans) {
+      throw new FilterParseError(
+        "A span, event or free-text clause matches spans by when they started, and dateField " +
+          '"updated" selects traces by when they were last modified — the two together would ' +
+          "drop traces silently. Filter on trace-level fields instead, or pull on the occurred axis.",
+      );
+    }
+    return compile;
   }
 
   /** Langy's turns are the owner's own traffic in a personal project, so it hides nothing. */

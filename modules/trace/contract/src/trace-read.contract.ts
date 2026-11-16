@@ -56,18 +56,14 @@ export type TraceSummaryListQuery = Pick<
   "projectId" | "startDate" | "endDate" | "pageSize"
 >;
 
-/** The list read's axis, keyset cursor and compiled filter, for a summaries-only read. */
+/** The list read's axis and keyset cursor, for a summaries-only read. */
 export interface TraceSummaryListOptions {
   dateField?: TraceDateField;
   scrollId?: string | null;
-  filterWhere?: { sql: string; params: Record<string, unknown> };
 }
 
 /** The summary read's options: a LangWatchQL filter as written (Decided 25) */
-export interface TraceSummaryListRequestOptions extends Omit<
-  TraceSummaryListOptions,
-  "filterWhere"
-> {
+export interface TraceSummaryListRequestOptions extends TraceSummaryListOptions {
   filter?: string;
 }
 

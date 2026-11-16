@@ -2,13 +2,11 @@
  * @vitest-environment node
  * Spec: modules/trace/specs/trace-legacy-filtered-search.feature
  */
-import { tenantScope } from "@langwatch/clickhouse-client";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { GetAllTracesForProjectInput } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { TraceCanonicalisationService } from "#features/derivation/services/trace-canonicalisation.service";
-import { boundedSubquery } from "#features/query/rules/trace-query-subquery.rules";
 
 import { ownProof } from "../../../../../__tests__/support/authorization-proofs.fixture.ts";
 import type { TraceClickHouseClient } from "../../../../../repositories/clickhouse/clickhouse.trace-member-client.repository.ts";
@@ -52,7 +50,9 @@ describe("TraceLegacyReadClickHouseRepository filtered list", () => {
         ownRead: OWN_READ,
       });
 
-      expect(query.mock.calls.at(0)?.at(0)?.query).toContain("ts.ContainsErrorStatus = true");
+      const first = query.mock.calls.at(0)?.at(0);
+      const bound = /ContainsErrorStatus = \{(\w+):Bool\}/.exec(first?.query ?? "");
+      expect(first?.query_params?.[bound![1]!]).toBe(true);
     });
   });
 
@@ -68,8 +68,9 @@ describe("TraceLegacyReadClickHouseRepository filtered list", () => {
       );
 
       const first = query.mock.calls.at(0)?.at(0);
-      expect(first?.query).not.toContain("'otlp2'");
-      expect(Object.values(first?.query_params ?? {})).toContainEqual(["otlp2"]);
+      expect(first?.query).not.toContain("otlp2");
+      // Bound JSON-quoted, as main's `concat('"', x, '"')` compared the raw array elements.
+      expect(Object.values(first?.query_params ?? {})).toContainEqual(['"otlp2"']);
     });
   });
 
@@ -87,39 +88,22 @@ describe("TraceLegacyReadClickHouseRepository filtered list", () => {
     });
   });
 
-  describe("given a compiled filter whose span clause carries a tenant marker", () => {
-    const filterWhere = {
-      sql: boundedSubquery("stored_spans", "StartTime", "SpanName = {spanName:String}"),
-      params: { timeFrom: 1000, timeTo: 5000, spanName: "llm" },
-    };
-
-    it("expands the marker into the proof's own project", async () => {
+  describe("given a span filter, which reads stored_spans", () => {
+    it("reads the span subquery under the own proof's project, as the page does", async () => {
       const { repository, query } = compose();
 
-      await repository.listAllTracesForProject(search({}), PROTECTIONS, {
-        filterWhere,
-        authorization: ownProof({ projectId: "project-1" }),
+      await repository.listAllTracesForProject(search({ "spans.type": ["llm"] }), PROTECTIONS, {
         ownRead: OWN_READ,
       });
 
-      const statements = query.mock.calls.map((call) => call[0]);
-      expect(statements.some((statement) => statement.query.includes("stored_spans"))).toBe(true);
-      for (const statement of statements) {
-        expect(statement.query).not.toContain(tenantScope("StartTime"));
-      }
-      expect(Object.values(statements[0]?.query_params ?? {})).toContainEqual(["project-1"]);
-    });
-
-    it("refuses the read without a proof", async () => {
-      const { repository, query } = compose();
-
-      await expect(
-        repository.listAllTracesForProject(search({}), PROTECTIONS, {
-          filterWhere,
-          ownRead: OWN_READ,
-        }),
-      ).rejects.toThrow(/needs the proof/);
-      expect(query).not.toHaveBeenCalled();
+      const [count] = query.mock.calls.map((call) => call[0]);
+      const subquery = count!.query.slice(count!.query.indexOf("FROM stored_spans"));
+      expect(subquery).toMatch(
+        /^FROM stored_spans WHERE \(TenantId IN \(\{(\w+):Array\(String\)\}\)\)/,
+      );
+      const tenantParam = /TenantId IN \(\{(\w+):Array\(String\)\}\)/.exec(subquery)![1]!;
+      expect(count!.query_params?.[tenantParam]).toEqual(["project-1"]);
+      expect(Object.values(count!.query_params ?? {})).toContainEqual(["llm"]);
     });
   });
 });

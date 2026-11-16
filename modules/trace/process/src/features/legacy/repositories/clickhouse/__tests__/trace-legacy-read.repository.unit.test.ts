@@ -40,6 +40,35 @@ vi.mock("~/server/filters/clickhouse", () => ({
   }),
 }));
 
+type SentStatement = { query: string; query_params: Record<string, unknown> };
+
+/** The statement the built read sent as the `index`th call. */
+const sent = (index: number) => mockClickHouseQuery.mock.calls[index]![0] as SentStatement;
+
+const SEARCHED_OPERANDS = {
+  ComputedInput: String.raw`lower\(ifNull\(ComputedInput, \{\w+:String\}\)\)`,
+  ComputedOutput: String.raw`lower\(ifNull\(ComputedOutput, \{\w+:String\}\)\)`,
+  TraceName: String.raw`lower\(ifNull\(TraceName, \{\w+:String\}\)\)`,
+  SpanName: String.raw`lower\(SpanName\)`,
+} as const;
+
+/** The pattern a statement binds for `like(<column>, ?)`, or undefined where it searches none. */
+function searchedPattern(
+  statement: SentStatement,
+  column: keyof typeof SEARCHED_OPERANDS,
+): unknown {
+  const match = new RegExp(String.raw`like\(${SEARCHED_OPERANDS[column]}, \{(\w+):String\}\)`).exec(
+    statement.query,
+  );
+  return match ? statement.query_params[match[1]!] : undefined;
+}
+
+/** The ids a statement binds for `TraceId IN (?)`, or undefined where it narrows by none. */
+function boundTraceIds(statement: SentStatement): unknown {
+  const match = /\bTraceId IN \(\{(\w+):Array\(String\)\}\)/.exec(statement.query);
+  return match ? statement.query_params[match[1]!] : undefined;
+}
+
 describe("TraceLegacyReadClickHouseRepository", () => {
   const traceCanonicalisation = TraceCanonicalisationService.create();
   const protections: Protections = {
@@ -180,15 +209,9 @@ describe("TraceLegacyReadClickHouseRepository", () => {
 
         expect(result).not.toBeNull();
 
-        // Verify the count query (1st call) contains the TraceId IN clause
-        const countCall = mockClickHouseQuery.mock.calls[0]!;
-        expect(countCall[0].query).toContain("ts.TraceId IN ({traceIds:Array(String)})");
-        expect(countCall[0].query_params.traceIds).toEqual(["trace-A", "trace-B"]);
-
-        // Verify the IDs query (2nd call) contains the TraceId IN clause
-        const dataCall = mockClickHouseQuery.mock.calls[1]!;
-        expect(dataCall[0].query).toContain("ts.TraceId IN ({traceIds:Array(String)})");
-        expect(dataCall[0].query_params.traceIds).toEqual(["trace-A", "trace-B"]);
+        // The count (1st call) and the id read (2nd call) both bind the asked ids.
+        expect(boundTraceIds(sent(0))).toEqual(["trace-A", "trace-B"]);
+        expect(boundTraceIds(sent(1))).toEqual(["trace-A", "trace-B"]);
       });
 
       it("returns only matching traces", async () => {
@@ -230,12 +253,9 @@ describe("TraceLegacyReadClickHouseRepository", () => {
 
         expect(result).not.toBeNull();
 
-        // Verify neither the count nor data query contains the TraceId IN clause
-        const countCall = mockClickHouseQuery.mock.calls[0]!;
-        expect(countCall[0].query).not.toContain("ts.TraceId IN ({traceIds:Array(String)})");
-
-        const dataCall = mockClickHouseQuery.mock.calls[1]!;
-        expect(dataCall[0].query).not.toContain("ts.TraceId IN ({traceIds:Array(String)})");
+        // Neither the count nor the id read narrows by ids.
+        expect(boundTraceIds(sent(0))).toBeUndefined();
+        expect(boundTraceIds(sent(1))).toBeUndefined();
       });
     });
 
@@ -276,13 +296,16 @@ describe("TraceLegacyReadClickHouseRepository", () => {
 
           expect(result).not.toBeNull();
 
-          // The data query (2nd call) includes the keyset cursor condition on deduped values
-          const dataCall = mockClickHouseQuery.mock.calls[1]!;
-          expect(dataCall[0].query).toContain(
-            "(toUnixTimestamp64Milli(ts.OccurredAt), ts.TraceId) <",
-          );
-          expect(dataCall[0].query_params.lastTimestamp).toBe(cursorTimestamp);
-          expect(dataCall[0].query_params.lastTraceId).toBe(cursorTraceId);
+          // The id read (2nd call) seeks past (time, TraceId) of the cursor, as main's tuple did.
+          const { query, query_params } = sent(1);
+          const seek =
+            /toUnixTimestamp64Milli\(OccurredAt\) < \{(\w+):Int64\} OR \(toUnixTimestamp64Milli\(OccurredAt\) = \{(\w+):Int64\} AND TraceId < \{(\w+):String\}\)/.exec(
+              query,
+            );
+          expect(seek).not.toBeNull();
+          expect(query_params[seek![1]!]).toBe(cursorTimestamp);
+          expect(query_params[seek![2]!]).toBe(cursorTimestamp);
+          expect(query_params[seek![3]!]).toBe(cursorTraceId);
         });
       });
 
@@ -308,13 +331,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           expect(result).not.toBeNull();
 
           // input.scrollId is ignored — only options.scrollId is read
-          const dataCall = mockClickHouseQuery.mock.calls[1]!;
-          expect(dataCall[0].query).not.toContain(
-            "(toUnixTimestamp64Milli(ts.OccurredAt), ts.TraceId) <",
-          );
-          expect(dataCall[0].query).not.toContain(
-            "(toUnixTimestamp64Milli(ts.OccurredAt), ts.TraceId) >",
-          );
+          expect(sent(1).query).not.toMatch(/TraceId [<>] \{/);
         });
       });
 
@@ -334,13 +351,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           expect(result).not.toBeNull();
 
           // The data query (2nd call) must NOT contain cursor condition
-          const dataCall = mockClickHouseQuery.mock.calls[1]!;
-          expect(dataCall[0].query).not.toContain(
-            "(toUnixTimestamp64Milli(ts.OccurredAt), ts.TraceId) <",
-          );
-          expect(dataCall[0].query).not.toContain(
-            "(toUnixTimestamp64Milli(ts.OccurredAt), ts.TraceId) >",
-          );
+          expect(sent(1).query).not.toMatch(/TraceId [<>] \{/);
         });
       });
 
@@ -361,13 +372,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           expect(result).not.toBeNull();
 
           // The data query (2nd call) must NOT contain cursor condition
-          const dataCall = mockClickHouseQuery.mock.calls[1]!;
-          expect(dataCall[0].query).not.toContain(
-            "(toUnixTimestamp64Milli(ts.OccurredAt), ts.TraceId) <",
-          );
-          expect(dataCall[0].query).not.toContain(
-            "(toUnixTimestamp64Milli(ts.OccurredAt), ts.TraceId) >",
-          );
+          expect(sent(1).query).not.toMatch(/TraceId [<>] \{/);
         });
       });
 
@@ -390,13 +395,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
 
           expect(result).not.toBeNull();
 
-          const dataCall = mockClickHouseQuery.mock.calls[1]!;
-          expect(dataCall[0].query).not.toContain(
-            "(toUnixTimestamp64Milli(ts.OccurredAt), ts.TraceId) <",
-          );
-          expect(dataCall[0].query).not.toContain(
-            "(toUnixTimestamp64Milli(ts.OccurredAt), ts.TraceId) >",
-          );
+          expect(sent(1).query).not.toMatch(/TraceId [<>] \{/);
         });
       });
 
@@ -418,13 +417,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
 
           expect(result).not.toBeNull();
 
-          const dataCall = mockClickHouseQuery.mock.calls[1]!;
-          expect(dataCall[0].query).not.toContain(
-            "(toUnixTimestamp64Milli(ts.OccurredAt), ts.TraceId) <",
-          );
-          expect(dataCall[0].query).not.toContain(
-            "(toUnixTimestamp64Milli(ts.OccurredAt), ts.TraceId) >",
-          );
+          expect(sent(1).query).not.toMatch(/TraceId [<>] \{/);
         });
       });
 
@@ -445,9 +438,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
             ownRead: OWN_READ,
           });
 
-          const dataCall = mockClickHouseQuery.mock.calls[1]!;
-          expect(dataCall[0].query).not.toContain("ts.TraceId) <");
-          expect(dataCall[0].query).not.toContain("ts.TraceId) >");
+          expect(sent(1).query).not.toMatch(/TraceId [<>] \{/);
         });
       });
     });
@@ -507,13 +498,8 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           { ownRead: OWN_READ },
         );
 
-        const countCall = mockClickHouseQuery.mock.calls[0]!;
-        expect(countCall[0].query).toContain(
-          "lower(ifNull(ts.ComputedInput, '')) LIKE {searchQuery:String}",
-        );
-        expect(countCall[0].query).toContain(
-          "lower(ifNull(ts.ComputedOutput, '')) LIKE {searchQuery:String}",
-        );
+        expect(searchedPattern(sent(0), "ComputedInput")).toBe("%hello world%");
+        expect(searchedPattern(sent(0), "ComputedOutput")).toBe("%hello world%");
       });
 
       it("includes LIKE clause in data query", async () => {
@@ -530,13 +516,8 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           { ownRead: OWN_READ },
         );
 
-        const dataCall = mockClickHouseQuery.mock.calls[1]!;
-        expect(dataCall[0].query).toContain(
-          "lower(ifNull(ts.ComputedInput, '')) LIKE {searchQuery:String}",
-        );
-        expect(dataCall[0].query).toContain(
-          "lower(ifNull(ts.ComputedOutput, '')) LIKE {searchQuery:String}",
-        );
+        expect(searchedPattern(sent(1), "ComputedInput")).toBe("%hello world%");
+        expect(searchedPattern(sent(1), "ComputedOutput")).toBe("%hello world%");
       });
 
       it("lowercases and wraps query param with wildcards", async () => {
@@ -553,8 +534,14 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           { ownRead: OWN_READ },
         );
 
-        const countCall = mockClickHouseQuery.mock.calls[0]!;
-        expect(countCall[0].query_params.searchQuery).toBe("%hello world%");
+        for (const column of [
+          "ComputedInput",
+          "ComputedOutput",
+          "TraceName",
+          "SpanName",
+        ] as const) {
+          expect(searchedPattern(sent(0), column)).toBe("%hello world%");
+        }
       });
 
       it("escapes wildcard characters in query", async () => {
@@ -574,8 +561,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           { ownRead: OWN_READ },
         );
 
-        const countCall = mockClickHouseQuery.mock.calls[0]!;
-        expect(countCall[0].query_params.searchQuery).toBe("%100\\% success\\_rate%");
+        expect(searchedPattern(sent(0), "ComputedInput")).toBe("%100\\% success\\_rate%");
       });
 
       // Issue #6356: a tool or agent identifier usually lives on the span
@@ -598,10 +584,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           { ownRead: OWN_READ },
         );
 
-        const call = mockClickHouseQuery.mock.calls[callIdx as number]!;
-        expect(call[0].query).toContain(
-          "lower(ifNull(ts.TraceName, '')) LIKE {searchQuery:String}",
-        );
+        expect(searchedPattern(sent(callIdx as number), "TraceName")).toBe("%codex%");
       });
 
       it.each([
@@ -621,13 +604,17 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           { ownRead: OWN_READ },
         );
 
-        const sql = mockClickHouseQuery.mock.calls[callIdx as number]![0].query;
-        expect(sql).toContain("FROM stored_spans sp");
-        expect(sql).toContain("lower(sp.SpanName) LIKE {searchQuery:String}");
-        // Correlated on the outer row and bounded, so it prunes partitions
-        // instead of cold-scanning every weekly partition.
-        expect(sql).toContain("sp.TraceId = ts.TraceId");
-        expect(sql).toContain("sp.StartTime >= fromUnixTimestamp64Milli({startDate:UInt64})");
+        const statement = sent(callIdx as number);
+        expect(searchedPattern(statement, "SpanName")).toBe("%codex%");
+        // Keyed on the outer row's (tenant, trace) and bounded to the window, so it prunes
+        // partitions instead of cold-scanning every weekly partition.
+        expect(statement.query).toContain(
+          "tuple(TenantId, TraceId) IN (SELECT TenantId, TraceId FROM stored_spans WHERE",
+        );
+        const start = /StartTime >= fromUnixTimestamp64Milli\(\{(\w+):Int64\}\)/.exec(
+          statement.query,
+        );
+        expect(statement.query_params[start![1]!]).toBe(baseInput.startDate);
       });
 
       it("ORs the name branches with the IO branches rather than replacing them", async () => {
@@ -644,25 +631,31 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           { ownRead: OWN_READ },
         );
 
-        const sql = mockClickHouseQuery.mock.calls[0]![0].query;
-        expect(sql).toContain("lower(ifNull(ts.ComputedInput, ''))");
-        expect(sql).toContain("lower(ifNull(ts.ComputedOutput, ''))");
-        expect(sql).toContain("lower(ifNull(ts.TraceName, ''))");
-        expect(sql).toContain("lower(sp.SpanName)");
+        const statement = sent(0);
+        const sql = statement.query;
+        for (const column of [
+          "ComputedInput",
+          "ComputedOutput",
+          "TraceName",
+          "SpanName",
+        ] as const) {
+          expect(searchedPattern(statement, column)).toBe("%codex%");
+        }
 
         // Presence alone would pass just as happily if the branches were
         // AND-joined, which is the actual regression to fear: an AND of four
         // substring tests matches nothing. Pin the join operator. The slice
         // stops at EXISTS so the span subquery's own internal ANDs (its tenant,
         // trace and time predicates) stay out of the assertion.
+        const spanBranch = "tuple(TenantId, TraceId) IN (SELECT";
         const columnBranches = sql.slice(
-          sql.indexOf("lower(ifNull(ts.ComputedInput, ''))"),
-          sql.indexOf("EXISTS ("),
+          sql.indexOf("like(lower(ifNull(ComputedInput"),
+          sql.indexOf(spanBranch),
         );
         expect(columnBranches).toContain(" OR ");
         expect(columnBranches).not.toContain(" AND ");
         // ...and the span branch is OR-ed onto them, not AND-ed.
-        expect(sql).toContain("OR EXISTS (");
+        expect(sql).toContain(`OR ${spanBranch}`);
       });
 
       // The 3-char floor exists because the ngrambf_v1 skip indexes are
@@ -681,9 +674,8 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           { ownRead: OWN_READ },
         );
 
-        const call = mockClickHouseQuery.mock.calls[0]!;
-        expect(call[0].query_params.searchQuery).toBeUndefined();
-        expect(call[0].query).not.toContain("lower(sp.SpanName)");
+        expect(sent(0).query).not.toContain("like(");
+        expect(sent(0).query).not.toContain("SpanName");
       });
 
       // The privacy-relevant asymmetry in this change: the two Computed*
@@ -704,11 +696,11 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           { ownRead: OWN_READ },
         );
 
-        const sql = mockClickHouseQuery.mock.calls[0]![0].query;
-        expect(sql).not.toContain("lower(ifNull(ts.ComputedOutput, ''))");
-        expect(sql).toContain("lower(ifNull(ts.ComputedInput, ''))");
-        expect(sql).toContain("lower(ifNull(ts.TraceName, ''))");
-        expect(sql).toContain("lower(sp.SpanName)");
+        const statement = sent(0);
+        expect(statement.query).not.toContain("ComputedOutput");
+        expect(searchedPattern(statement, "ComputedInput")).toBe("%codex%");
+        expect(searchedPattern(statement, "TraceName")).toBe("%codex%");
+        expect(searchedPattern(statement, "SpanName")).toBe("%codex%");
       });
     });
 
@@ -750,9 +742,8 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           { ownRead: OWN_READ },
         );
 
-        const countCall = mockClickHouseQuery.mock.calls[0]!;
-        expect(countCall[0].query).toContain("lower(ifNull(ts.ComputedOutput, '')) LIKE");
-        expect(countCall[0].query).not.toContain("ComputedInput");
+        expect(searchedPattern(sent(0), "ComputedOutput")).toBe("%hello%");
+        expect(sent(0).query).not.toContain("ComputedInput");
       });
 
       it("searches only input when output is hidden", async () => {
@@ -772,9 +763,8 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           { ownRead: OWN_READ },
         );
 
-        const countCall = mockClickHouseQuery.mock.calls[0]!;
-        expect(countCall[0].query).toContain("lower(ifNull(ts.ComputedInput, '')) LIKE");
-        expect(countCall[0].query).not.toContain("ComputedOutput");
+        expect(searchedPattern(sent(0), "ComputedInput")).toBe("%hello%");
+        expect(sent(0).query).not.toContain("ComputedOutput");
       });
     });
 
@@ -793,9 +783,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           { ownRead: OWN_READ },
         );
 
-        const countCall = mockClickHouseQuery.mock.calls[0]!;
-        expect(countCall[0].query).not.toContain("LIKE");
-        expect(countCall[0].query_params.searchQuery).toBeUndefined();
+        expect(sent(0).query).not.toContain("like(");
       });
     });
 
@@ -814,13 +802,8 @@ describe("TraceLegacyReadClickHouseRepository", () => {
 
         expect(result).not.toBeNull();
 
-        const countCall = mockClickHouseQuery.mock.calls[0]!;
-        expect(countCall[0].query).not.toContain("LIKE");
-        expect(countCall[0].query_params.searchQuery).toBeUndefined();
-
-        const dataCall = mockClickHouseQuery.mock.calls[1]!;
-        expect(dataCall[0].query).not.toContain("LIKE");
-        expect(dataCall[0].query_params.searchQuery).toBeUndefined();
+        expect(sent(0).query).not.toContain("like(");
+        expect(sent(1).query).not.toContain("like(");
       });
     });
 
@@ -923,10 +906,8 @@ describe("TraceLegacyReadClickHouseRepository", () => {
         expect(traces).toHaveLength(30);
 
         // Verify batch split: call 0=count, 1=IDs, 2=OOM, 3=batch1, 4=batch2
-        const batch1Params = mockClickHouseQuery.mock.calls[3]![0];
-        const batch2Params = mockClickHouseQuery.mock.calls[4]![0];
-        expect(batch1Params.query_params.pageTraceIds).toHaveLength(25);
-        expect(batch2Params.query_params.pageTraceIds).toHaveLength(5);
+        expect(boundTraceIds(sent(3))).toHaveLength(25);
+        expect(boundTraceIds(sent(4))).toHaveLength(5);
       });
 
       it("re-throws non-OOM errors from summary query", async () => {

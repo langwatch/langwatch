@@ -118,7 +118,6 @@ function compose({
     repositories: {
       ...MemoryTraceRepositories.create(),
       legacyRead: TraceLegacyReadClickHouseRepository.create({
-        resolveClickHouseClient: resolve,
         clickhouse: fencedOver(resolve),
         reader: builtOver(resolve),
       }),

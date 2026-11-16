@@ -107,7 +107,6 @@ export class PostgresTraceRepositories {
       annotations,
       annotationScores,
       legacyRead: TraceLegacyReadClickHouseRepository.create({
-        resolveClickHouseClient: traceClickHouse,
         clickhouse,
         reader: members.clickhouse,
         annotations: { rows: annotations, scores: annotationScores },

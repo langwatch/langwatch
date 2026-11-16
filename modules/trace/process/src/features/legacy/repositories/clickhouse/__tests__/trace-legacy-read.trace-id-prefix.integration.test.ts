@@ -79,7 +79,6 @@ describe.skipIf(!clickHouseConfigured)(
     beforeAll(async () => {
       ch = await startMigratedTraceClickHouse();
       service = TraceLegacyReadClickHouseRepository.create({
-        resolveClickHouseClient: async () => ch,
         reader: traceQueryClientFor(ch),
       });
     }, 60_000);

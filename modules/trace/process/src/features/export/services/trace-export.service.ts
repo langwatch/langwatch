@@ -14,11 +14,11 @@ import type {
 } from "@langwatch/trace-contract";
 
 import { enrichTracesWithEvaluations } from "../../../rules/trace-evaluation-mapping.rules.ts";
-import type { TraceFilterWhere } from "../../../rules/trace-filter-hidden-origins.rules.ts";
 // The PORT rather than the concrete legacy service: the export reads one
 // method, and typing it at the port lets a process hand over whatever it
 // composed its legacy read as.
 import type { TraceLegacyRead } from "../../../services/trace-viewer.service.ts";
+import type { TraceLegacyFilterOption } from "../../legacy/repositories/trace-legacy-read.repository.ts";
 import {
   CSV_NEWLINE,
   serializeTracesToFullCsv,
@@ -31,7 +31,7 @@ import {
 
 const BATCH_SIZE = 100;
 
-type ExportFilter = TraceFilterWhere | undefined;
+type ExportFilter = TraceLegacyFilterOption["compileFilter"];
 
 const logger = createLogger("langwatch:export");
 
@@ -87,7 +87,6 @@ export class TraceExportService {
   async getTotalCount({
     request,
     protections,
-    authorization,
   }: {
     request: ExportRequest;
     protections: Protections;
@@ -107,8 +106,7 @@ export class TraceExportService {
         downloadMode: false,
         includeSpans: false,
         scrollId: null,
-        filterWhere: await this.compileFilter({ request, protections }),
-        authorization,
+        compileFilter: await this.compileFilter({ request, protections }),
         ownRead: await this.authorizeOwnRead({ projectId: request.projectId }),
       },
     );
@@ -197,7 +195,6 @@ export class TraceExportService {
   private async fetchBatch({
     request,
     protections,
-    authorization,
     scrollId,
   }: {
     request: ExportRequest;
@@ -221,8 +218,7 @@ export class TraceExportService {
         includeSpans: request.mode === "full",
         resolveBlobs: true,
         scrollId: scrollId ?? null,
-        filterWhere: await this.compileFilter({ request, protections }),
-        authorization,
+        compileFilter: await this.compileFilter({ request, protections }),
         ownRead: await this.authorizeOwnRead({ projectId: request.projectId }),
       },
     );

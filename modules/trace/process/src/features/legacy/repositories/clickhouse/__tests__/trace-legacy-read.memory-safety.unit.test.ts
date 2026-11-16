@@ -151,13 +151,14 @@ describe("memory-safety", () => {
   // -------------------------------------------------------------------------
   describe("given query execution paths", () => {
     describe("when the trace service source is inspected", () => {
-      it("resolves every client through the injected per-tenant resolver", () => {
+      it("sends every read through the reader it was composed with", () => {
         const source = fs.readFileSync(traceReadSourcePath(), "utf-8");
 
-        // Every read must go through the resolver this repository was
-        // composed with, so memory-safety settings are injected on every
-        // query rather than remembered per call site. A bare client carries none.
-        expect(source).toContain("this.resolveClient(");
+        // Every read goes through the reader (or proof-fenced client) this repository was
+        // composed with, so memory-safety settings are injected on every query rather than
+        // remembered per call site. A bare client carries none.
+        expect(source).toContain("this.builtReader(");
+        expect(source).not.toMatch(/\bresolveClient\b/);
         expect(source).not.toMatch(/\bcreateClient\s*\(/);
       });
     });

@@ -7,7 +7,6 @@ import {
   type TraceLegacyListInput,
   type TracesForProjectResult,
   type TraceSummaryListQuery,
-  type TraceSummaryListOptions,
   type TraceSummaryPage,
   type Evaluation,
   type TraceLegacyFilterInput,
@@ -17,6 +16,10 @@ import {
   type PromptStudioSpanResult,
 } from "@langwatch/trace-contract";
 
+import type {
+  TraceLegacySummaryListOptions,
+  TraceLegacyFilterOption,
+} from "../features/legacy/repositories/trace-legacy-read.repository.ts";
 import type { TraceViewerProtectionService } from "./trace-viewer-protection.service.ts";
 
 /** The legacy trace read, as tRPC transports use it. Declared here to let
@@ -42,10 +45,8 @@ export interface TraceLegacyRead {
       includeSpans?: boolean;
       resolveBlobs?: boolean;
       scrollId?: string | null;
-      /** The v1 REST search's compiled query-language filter, ANDed into the read. */
-      filterWhere?: { sql: string; params: Record<string, unknown> };
-      /** The proof `filterWhere`'s tenant markers expand into (ADR-177 block C). */
-      authorization?: Authorization;
+      /** The v1 REST search's query-language filter, compiled inside the read. */
+      compileFilter?: TraceLegacyFilterOption["compileFilter"];
       /** The own-only proof the span, evaluation and event reads go through. */
       ownRead: Authorization;
     },
@@ -54,7 +55,7 @@ export interface TraceLegacyRead {
   /** The list read's keyset page as bare summaries, for a system reader. */
   listTraceSummaries(
     query: TraceSummaryListQuery,
-    options?: TraceSummaryListOptions,
+    options?: TraceLegacySummaryListOptions,
   ): Promise<TraceSummaryPage>;
 
   /**

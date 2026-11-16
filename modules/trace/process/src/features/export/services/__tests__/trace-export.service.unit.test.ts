@@ -1,9 +1,4 @@
-import type {
-  Protections,
-  TracesForProjectResult,
-  GetAllTracesForProjectOptions,
-  ExportRequest,
-} from "@langwatch/trace-contract";
+import type { Protections, TracesForProjectResult, ExportRequest } from "@langwatch/trace-contract";
 /** AC1 export wiring: proves TraceService is used and both modes resolve
  * blobs to prevent truncation data loss. */
 import { beforeEach, describe, expect, it } from "vitest";
@@ -11,7 +6,14 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { ownProof } from "../../../../__tests__/support/authorization-proofs.fixture.ts";
 import type { TraceLegacyReadService } from "../../../legacy/services/trace-legacy-read.service.ts";
 import { TraceExportService } from "../trace-export.service.ts";
-import { hiddenOriginsOnly, legacyReadAnswering } from "./support/trace-legacy-read.support.ts";
+import {
+  hiddenOriginsOnly,
+  legacyReadAnswering,
+  renderedFilter,
+} from "./support/trace-legacy-read.support.ts";
+
+/** The options the export hands the legacy read, its own-read proof included. */
+type SeenOptions = Parameters<TraceLegacyReadService["getAllTracesForProject"]>[2];
 
 const authorization = ownProof({ projectId: "proj-1" });
 const protections: Protections = {
@@ -37,16 +39,16 @@ function buildExportRequest(overrides?: Partial<ExportRequest>): ExportRequest {
  */
 function buildOptionsCapturingTraceService(): {
   traceService: TraceLegacyReadService;
-  optionsSeen: GetAllTracesForProjectOptions[];
+  optionsSeen: SeenOptions[];
 } {
-  const optionsSeen: GetAllTracesForProjectOptions[] = [];
+  const optionsSeen: SeenOptions[] = [];
   const traceService = legacyReadAnswering(
     async (
       _input: unknown,
       _protections: unknown,
-      options?: GetAllTracesForProjectOptions,
+      options: SeenOptions,
     ): Promise<TracesForProjectResult> => {
-      optionsSeen.push(options ?? {});
+      optionsSeen.push(options);
       // A complete-enough Trace so the real CSV/JSON serializers run.
       const trace = {
         trace_id: "t1",
@@ -82,7 +84,7 @@ async function drainExport(service: TraceExportService, request: ExportRequest) 
 describe("TraceExportService hides what the Explorer hides", () => {
   /** @scenario "Langy's own turns are left out of every Analytics read" */
   it("excludes the langy origin from the count and from every batch", async () => {
-    const seen: GetAllTracesForProjectOptions[] = [];
+    const seen: SeenOptions[] = [];
     const built = buildOptionsCapturingTraceService();
     const service = TraceExportService.create({
       authorizeOwnRead: async () => authorization,
@@ -96,9 +98,11 @@ describe("TraceExportService hides what the Explorer hides", () => {
 
     expect(seen).toHaveLength(2);
     for (const options of seen) {
-      expect(options.filterWhere?.params).toEqual({ hiddenOrigins: ["langy"] });
-      // The repository expands the filter's tenant markers from this proof.
-      expect(options.authorization).toBe(authorization);
+      const statement = renderedFilter({ compile: options.compileFilter, tenantId: "proj-1" });
+      expect(statement?.sql).toMatch(/NOT \(.* IN \(\{(\w+):Array\(String\)\}\)\)/);
+      expect(Object.values(statement?.params ?? {})).toContainEqual(["langy"]);
+      // The repository compiles the filter for the scope of this proof.
+      expect(options.ownRead).toBe(authorization);
     }
   });
 
@@ -109,11 +113,10 @@ describe("TraceExportService hides what the Explorer hides", () => {
       inputs.push(input);
       return { groups: [], totalHits: 0, traceChecks: {}, scrollId: undefined } as never;
     });
-    const filter = { sql: "x = {p:String}", params: { p: "1" } };
     const service = TraceExportService.create({
       authorizeOwnRead: async () => authorization,
       traceService,
-      compileFilter: () => filter,
+      compileFilter: hiddenOriginsOnly,
     });
 
     await service.getTotalCount({
@@ -135,7 +138,7 @@ describe("TraceExportService hides what the Explorer hides", () => {
 
     await drainExport(service, buildExportRequest({ query: "origin:langy" }));
 
-    expect(built.optionsSeen[0]?.filterWhere).toBeUndefined();
+    expect(built.optionsSeen[0]?.compileFilter).toBeUndefined();
   });
 });
 
@@ -179,7 +182,7 @@ describe("TraceExportService — #4991 AC1 full export resolution", () => {
   // truncated 64 KB preview for any offloaded trace — the bug this PR fixes.
   describe("given a SUMMARY export (reads trace-level input/output)", () => {
     describe("when exportTraces streams a batch", () => {
-      let optionsSeen: GetAllTracesForProjectOptions[];
+      let optionsSeen: SeenOptions[];
 
       beforeEach(async () => {
         const built = buildOptionsCapturingTraceService();

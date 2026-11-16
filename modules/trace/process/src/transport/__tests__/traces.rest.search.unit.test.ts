@@ -16,7 +16,6 @@ import {
   FilterParseError,
   type Evaluation,
   type TraceApi,
-  type TraceListTracesInput,
   type TracesForProjectResult,
   type TraceWithGuardrail,
 } from "@langwatch/trace-contract";
@@ -25,11 +24,12 @@ import { describe, expect, it, vi } from "vitest";
 import type * as projectionCompileRules from "#features/projection/rules/trace-projection-compile.rules";
 import { compileProjection } from "#features/projection/rules/trace-projection-compile.rules";
 import {
-  andFilterConditions,
-  findHiddenOriginConditions,
-} from "#rules/trace-filter-hidden-origins.rules";
+  precompiledTraceFilter,
+  type TraceFilterCompile,
+} from "#features/query/repositories/clickhouse/clickhouse.trace-filter-condition.mapper";
 
-import { traceQueryTranslation } from "../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
+import { renderedFilter } from "../../features/export/services/__tests__/support/trace-legacy-read.support.ts";
+import { traceFilterCompileFor } from "../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
 import { tracesRestCredential, tracesRest } from "../traces.rest.ts";
 
 vi.mock("#features/projection/rules/trace-projection-compile.rules", async (importOriginal) => {
@@ -42,32 +42,27 @@ vi.mock("#features/projection/rules/trace-projection-compile.rules", async (impo
  * rebuilt over the same production translator and rules so this door's filter behaviour is
  * exercised for real; only `TraceApi` itself is a double.
  */
-async function compileExplorerTraceFilter(input: {
+function compileExplorerTraceFilter(input: {
   query: string;
   tenantId: string;
   timeRange: { from: number; to: number };
   originNamed?: boolean;
   dateField?: "occurred" | "updated";
-}): Promise<{ sql: string; params: Record<string, unknown> }> {
-  const compiled = traceQueryTranslation.translateFilter({
+}): TraceFilterCompile {
+  const compile = traceFilterCompileFor({
     queryText: input.query,
     timeRange: input.timeRange,
+    hiddenOrigins: input.originNamed ? [] : explorerHiddenOrigins(input.query),
   });
-
-  if (input.dateField === "updated" && compiled?.sql.includes("stored_spans")) {
+  const checked = precompiledTraceFilter({ compile, tenantId: input.tenantId });
+  if (input.dateField === "updated" && checked.kind === "compiled" && checked.readsSpans) {
     throw new FilterParseError(
       "A span, event or free-text clause matches spans by when they started, and dateField " +
         '"updated" selects traces by when they were last modified — the two together would ' +
         "drop traces silently. Filter on trace-level fields instead, or pull on the occurred axis.",
     );
   }
-
-  const hiddenOrigins = input.originNamed ? [] : explorerHiddenOrigins(input.query);
-
-  return andFilterConditions([
-    ...(compiled ? [compiled] : []),
-    ...findHiddenOriginConditions({ hiddenOrigins }),
-  ]);
+  return compile;
 }
 
 const PROTECTIONS = { canSeeCapturedInput: true, canSeeCapturedOutput: true };
@@ -132,14 +127,21 @@ const DEFAULT_PAGE: TracesForProjectResult = tracePage([TRACE_1, TRACE_2], {
 });
 
 /** The content read `TraceModule.listTraces` hands the compiled filter to. */
-type ContentListTraces = (input: TraceListTracesInput) => Promise<TracesForProjectResult>;
+type ListTracesRequest = Parameters<TraceApi["listTraces"]>[0];
+type ContentListTraces = (
+  input: Omit<ListTracesRequest, "options"> & {
+    options?: Omit<NonNullable<ListTracesRequest["options"]>, "filter"> & {
+      compileFilter?: TraceFilterCompile;
+    };
+  },
+) => Promise<TracesForProjectResult>;
 
 /** `TraceModule.listTraces`: the filter as written compiled, then the content read. */
 function listingAsWritten(listTraces: ContentListTraces): TraceApi["listTraces"] {
   return async ({ options, ...input }) => {
     const { filter, ...rest } = options ?? {};
-    const filterWhere = filter
-      ? await compileExplorerTraceFilter({
+    const compileFilter = filter
+      ? compileExplorerTraceFilter({
           query: filter.query,
           tenantId: filter.tenantId,
           timeRange: { from: input.query.startDate, to: input.query.endDate },
@@ -149,7 +151,7 @@ function listingAsWritten(listTraces: ContentListTraces): TraceApi["listTraces"]
       : undefined;
     return listTraces({
       ...input,
-      ...(options ? { options: { ...rest, ...(filterWhere ? { filterWhere } : {}) } } : {}),
+      ...(options ? { options: { ...rest, ...(compileFilter ? { compileFilter } : {}) } } : {}),
     });
   };
 }
@@ -591,8 +593,23 @@ describe("POST /search", () => {
  * not upstream's `validation_error`.
  */
 describe("POST /search with a trace filter", () => {
+  /** The filter the content read was handed, rendered into the read it narrows. */
   const filterWhereOf = (listTraces: ContentListTraces) =>
-    vi.mocked(listTraces).mock.calls[0]?.[0]?.options?.filterWhere;
+    renderedFilter({
+      compile: vi.mocked(listTraces).mock.calls[0]?.[0]?.options?.compileFilter,
+      tenantId: "project-123",
+    });
+  const boundValues = (listTraces: ContentListTraces) =>
+    Object.values(filterWhereOf(listTraces)?.params ?? {});
+  /** The Explorer's hidden origins left out, and nothing of a filter's own. */
+  const HIDDEN_ORIGINS_ONLY = renderedFilter({
+    compile: traceFilterCompileFor({
+      queryText: "",
+      timeRange: { from: 1000, to: 5000 },
+      hiddenOrigins: ["langy"],
+    }),
+    tenantId: "project-123",
+  });
 
   describe("when the filter is well formed", () => {
     it("passes a compiled condition down, not the string", async () => {
@@ -600,15 +617,22 @@ describe("POST /search with a trace filter", () => {
       await send({ startDate: 1000, endDate: 5000, filter: "status:error" });
       const filterWhere = filterWhereOf(listTraces);
       expect(filterWhere?.sql).toContain("ContainsErrorStatus");
-      expect(filterWhere?.params).not.toHaveProperty("tenantId");
+      // The tenant is the read's scope: the filter binds only its own value, true.
+      expect(filterWhere?.sql).not.toContain("project-123");
+      expect(boundValues(listTraces).filter((value) => value === "project-123")).toHaveLength(1);
     });
 
     it("bounds the translation to the window the search asked for", async () => {
       const { send, listTraces } = mount();
-      await send({ startDate: 1000, endDate: 5000, filter: "status:error" });
+      // Free text reaches span names, the clause that reads spans in the window.
+      await send({ startDate: 1000, endDate: 5000, filter: "hello" });
       const filterWhere = filterWhereOf(listTraces);
-      expect(filterWhere?.params.timeFrom).toBe(1000);
-      expect(filterWhere?.params.timeTo).toBe(5000);
+      const window =
+        /StartTime >= fromUnixTimestamp64Milli\(\{(\w+):Int64\}\) AND StartTime <= fromUnixTimestamp64Milli\(\{(\w+):Int64\}\)/.exec(
+          filterWhere?.sql ?? "",
+        );
+      expect(filterWhere?.params[window![1]!]).toBe(1000);
+      expect(filterWhere?.params[window![2]!]).toBe(5000);
     });
 
     it("reads through the door's proof, fenced to the key's own project", async () => {
@@ -632,7 +656,7 @@ describe("POST /search with a trace filter", () => {
     it("sends no condition of the filter's own", async () => {
       const { send, listTraces } = mount();
       await send({ startDate: 1000, endDate: 5000 });
-      expect(Object.keys(filterWhereOf(listTraces)?.params ?? {})).toEqual(["hiddenOrigins"]);
+      expect(filterWhereOf(listTraces)).toEqual(HIDDEN_ORIGINS_ONLY);
     });
   });
 
@@ -641,7 +665,7 @@ describe("POST /search with a trace filter", () => {
     it("is the same request as no filter", async () => {
       const { send, listTraces } = mount();
       await send({ startDate: 1000, endDate: 5000, filter: "   " });
-      expect(Object.keys(filterWhereOf(listTraces)?.params ?? {})).toEqual(["hiddenOrigins"]);
+      expect(filterWhereOf(listTraces)).toEqual(HIDDEN_ORIGINS_ONLY);
     });
   });
 
@@ -652,9 +676,10 @@ describe("POST /search with a trace filter", () => {
         const { send, listTraces } = mount();
         await send({ startDate: 1000, endDate: 5000, filter: "status:error" });
         const filterWhere = filterWhereOf(listTraces);
-        expect(filterWhere?.params.hiddenOrigins).toEqual(["langy"]);
-        expect(filterWhere?.sql).toContain("ContainsErrorStatus");
-        expect(filterWhere?.sql).toContain("NOT IN ({hiddenOrigins:Array(String)})");
+        expect(boundValues(listTraces)).toContainEqual(["langy"]);
+        const sql = filterWhere?.sql ?? "";
+        expect(sql).toContain("ContainsErrorStatus");
+        expect(sql.indexOf("NOT (")).toBeGreaterThan(sql.indexOf("ContainsErrorStatus"));
       });
     });
 
@@ -663,18 +688,16 @@ describe("POST /search with a trace filter", () => {
       it("excludes no origin", async () => {
         const { send, listTraces } = mount();
         await send({ startDate: 1000, endDate: 5000, filter: "origin:langy" });
-        const filterWhere = filterWhereOf(listTraces);
-        expect(filterWhere?.params.hiddenOrigins).toBeUndefined();
-        expect(filterWhere?.sql).not.toContain("NOT IN ({hiddenOrigins");
+        expect(boundValues(listTraces)).not.toContainEqual(["langy"]);
+        expect(filterWhereOf(listTraces)?.sql).not.toContain("NOT (");
       });
     });
 
     describe("when the origin filter names an origin", () => {
       /**
        * @scenario "A trace search whose origin flag names an origin is left as asked"
-       * Fold: `compileExplorerTraceFilter` never returns `undefined` (unlike
-       * upstream) — with nothing left to filter on, it answers the no-op
-       * condition rather than omitting the field.
+       * With nothing left to filter on, the filter compiles to no condition, so the read
+       * narrows by nothing of the filter's own.
        */
       it("excludes no origin", async () => {
         const { send, listTraces } = mount();
@@ -683,7 +706,7 @@ describe("POST /search with a trace filter", () => {
           endDate: 5000,
           filters: { "traces.origin": ["evaluation"] },
         });
-        expect(filterWhereOf(listTraces)).toEqual({ sql: "1 = 1", params: {} });
+        expect(filterWhereOf(listTraces)).toBeUndefined();
       });
     });
   });

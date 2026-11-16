@@ -1,5 +1,3 @@
-import type { Authorization } from "@langwatch/authorization";
-
 import type { Span, Trace } from "../../trace-format.schemas.ts";
 import type { TraceDateField } from "../../trace-legacy-read.types.ts";
 import type {
@@ -24,10 +22,6 @@ export type TraceListTracesInput = {
     dateField?: TraceDateField;
     /** A compiled `select` projection, applied by the read rather than reshaped after it. */
     projection?: CompiledProjection["plan"];
-    /** The v1 REST search's compiled query-language filter, ANDed into the read. */
-    filterWhere?: { sql: string; params: Record<string, unknown> };
-    /** The proof `filterWhere`'s tenant markers expand into (ADR-177 block C). */
-    authorization?: Authorization;
     /** Refuse above this plan bound instead of clamping to the list bound. */
     refuseAbove?: "tracesPageSizeMax" | "tracesDownloadPageSizeMax";
   };
@@ -35,7 +29,7 @@ export type TraceListTracesInput = {
 
 /** `TraceApi.listTraces` as callers ask it: the filter as written, which trace compiles. */
 export type TraceListTracesRequest = Omit<TraceListTracesInput, "options"> & {
-  options?: Omit<NonNullable<TraceListTracesInput["options"]>, "filterWhere"> & {
+  options?: NonNullable<TraceListTracesInput["options"]> & {
     filter?: TraceListFilter;
   };
 };

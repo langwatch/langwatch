@@ -780,16 +780,6 @@ export interface TraceApi extends TraceOtlpIngestApi {
    */
   translateTraceFilter(input: { query: string }): void;
   /**
-   * A legacy `filters` document compiled to parameterized ClickHouse conditions over
-   * `trace_summaries ts`; Trace owns the grammar because it owns the tables. `fenced` writes
-   * side-table subqueries for a statement read through a proof's fence (ADR-177).
-   */
-  translateLegacyFilters(input: {
-    filters: Readonly<Record<string, unknown>>;
-    window?: { startDate?: number; endDate?: number };
-    fenced?: boolean;
-  }): { conditions: string[]; params: Record<string, unknown>; hasUnsupportedFilters: boolean };
-  /**
    * The filter compiled against the LangWatchQL trace view, for a statement a
    * caller runs; throws `FilterParseError` on syntax the language cannot read.
    */

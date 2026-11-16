@@ -2,30 +2,27 @@
  * @vitest-environment node
  * Spec: modules/trace/specs/trace-summaries-list.feature
  */
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { describe, expect, it, vi } from "vitest";
 
 import { traceSummaryRow } from "../../../../../repositories/clickhouse/__tests__/support/trace-summary-row.support.ts";
-import type { TraceClickHouseClient } from "../../../../../repositories/clickhouse/clickhouse.trace-member-client.repository.ts";
+import { compileLangWatchQLTraceCondition } from "../../../../query/repositories/clickhouse/clickhouse.trace-filter-condition.mapper.ts";
 import { TraceLegacyReadClickHouseRepository } from "../trace-legacy-read.repository.ts";
 
-const FILTER = {
-  sql: "Attributes[{attrKey_0:String}] = {attrValue_1:String}",
-  params: { attrKey_0: "langwatch.origin.kind", attrValue_1: "ingestion_source" },
-};
+type ReadRequest = Parameters<ClickHouseQueryClient["read"]>[0];
 
-type Statement = { query: string; query_params?: Record<string, unknown> };
+const ORIGIN_FILTER = "trace.attribute.langwatch.origin.kind:ingestion_source";
+const compileOrigin = () => compileLangWatchQLTraceCondition({ filter: ORIGIN_FILTER });
 
+/** The store over a reader that answers each built read in turn and records what it was sent. */
 function compose(answers: unknown[][]) {
-  const query = vi.fn(async (_input: Statement) => {
-    const rows = answers.shift() ?? [];
-    return { json: async (): Promise<unknown[]> => rows };
+  const read = vi.fn(async (_request: ReadRequest) => ({ rows: answers.shift() ?? [] }));
+  const repository = TraceLegacyReadClickHouseRepository.create({
+    reader: clickHouseQueryClientDouble({ read }),
   });
-  const client = createApiFixture<TraceClickHouseClient>({ query });
-  const repository = new TraceLegacyReadClickHouseRepository({
-    resolveClickHouseClient: async () => client,
-  });
-  return { repository, query };
+  const sent = () => read.mock.calls.map(([request]) => request.statement);
+  return { repository, read, sent };
 }
 
 const window = { projectId: "project-1", startDate: 1_000, endDate: Date.now(), pageSize: 1 };
@@ -33,7 +30,7 @@ const window = { projectId: "project-1", startDate: 1_000, endDate: Date.now(), 
 describe("TraceLegacyReadClickHouseRepository.findTraceSummaries", () => {
   /** @scenario "A summaries-only list reads bare summaries under the list's filter" */
   it("runs the filtered page statement, then the pruned summary read, and nothing else", async () => {
-    const { repository, query } = compose([
+    const { repository, read, sent } = compose([
       [{ TraceId: "trace-1" }],
       [
         traceSummaryRow({
@@ -48,16 +45,26 @@ describe("TraceLegacyReadClickHouseRepository.findTraceSummaries", () => {
 
     const page = await repository.findTraceSummaries(window, {
       dateField: "updated",
-      filterWhere: FILTER,
+      compileFilter: compileOrigin,
     });
 
-    expect(query).toHaveBeenCalledTimes(2);
-    const [pageStatement, summaryStatement] = query.mock.calls.map((call) => call[0]);
-    expect(pageStatement?.query).toContain(FILTER.sql);
-    expect(pageStatement?.query).not.toContain("count(");
-    expect(pageStatement?.query_params).toMatchObject(FILTER.params);
-    expect(summaryStatement?.query).not.toContain("ts.ComputedInput");
-    expect(summaryStatement?.query).not.toContain("ts.ComputedOutput");
+    expect(read).toHaveBeenCalledTimes(2);
+    const [pageStatement, summaryStatement] = sent();
+    // Both read the project alone on its single-tenant scope, as the reader.
+    for (const statement of [pageStatement, summaryStatement]) {
+      expect(statement).toMatchObject({
+        kind: "tenant",
+        identity: "reader",
+        settings: { SQL_langwatch_tenant_ids: "project-1" },
+      });
+    }
+    expect(pageStatement?.sql).not.toContain("ingestion_source");
+    expect(pageStatement?.sql).not.toContain("count(");
+    expect(Object.values(pageStatement?.params ?? {})).toEqual(
+      expect.arrayContaining(["langwatch.origin.kind", "ingestion_source"]),
+    );
+    expect(summaryStatement?.sql).not.toContain("ComputedInput");
+    expect(summaryStatement?.sql).not.toContain("ComputedOutput");
     expect(page.summaries).toEqual([
       expect.objectContaining({
         traceId: "trace-1",
@@ -82,23 +89,40 @@ describe("TraceLegacyReadClickHouseRepository.findTraceSummaries", () => {
       dateField: "updated",
       scrollId: page.scrollId ?? null,
     });
-    expect(next.query.mock.calls.at(0)?.at(0)?.query_params).toMatchObject({
-      lastTimestamp: 5000,
-      lastTraceId: "trace-1",
-    });
+    const [idStatement] = next.sent();
+    const seek =
+      /toUnixTimestamp64Milli\(UpdatedAt\) > \{(\w+):Int64\} OR \(toUnixTimestamp64Milli\(UpdatedAt\) = \{(\w+):Int64\} AND TraceId > \{(\w+):String\}\)/.exec(
+        idStatement?.sql ?? "",
+      );
+    expect(seek).not.toBeNull();
+    expect(idStatement?.params[seek![1]!]).toBe(5000);
+    expect(idStatement?.params[seek![3]!]).toBe("trace-1");
   });
 
   /** @scenario "A summaries-only list read that fails is refused, not answered empty" */
   it("fails the read when the store fails the page statement", async () => {
-    const query = vi.fn(async (_input: Statement) => {
-      throw new Error("clickhouse unavailable");
-    });
-    const repository = new TraceLegacyReadClickHouseRepository({
-      resolveClickHouseClient: async () => createApiFixture<TraceClickHouseClient>({ query }),
+    const repository = TraceLegacyReadClickHouseRepository.create({
+      reader: clickHouseQueryClientDouble({
+        read: async () => {
+          throw new Error("clickhouse unavailable");
+        },
+      }),
     });
 
     await expect(
-      repository.findTraceSummaries(window, { dateField: "updated", filterWhere: FILTER }),
+      repository.findTraceSummaries(window, { dateField: "updated", compileFilter: compileOrigin }),
     ).rejects.toThrow("clickhouse unavailable");
+  });
+
+  /** @scenario "A summary read refuses free text it cannot narrow by" */
+  it("refuses a free-text filter before it reads anything", async () => {
+    const { repository, read } = compose([]);
+
+    await expect(
+      repository.findTraceSummaries(window, {
+        compileFilter: () => compileLangWatchQLTraceCondition({ filter: "hello" }),
+      }),
+    ).rejects.toMatchObject({ code: "filter_value_refused" });
+    expect(read).not.toHaveBeenCalled();
   });
 });

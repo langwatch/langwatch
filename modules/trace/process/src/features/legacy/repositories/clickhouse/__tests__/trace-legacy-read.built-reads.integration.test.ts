@@ -122,7 +122,6 @@ beforeAll(async () => {
   if (!clickHouseConfigured) return;
   ch = await startMigratedTraceClickHouse();
   repository = TraceLegacyReadClickHouseRepository.create({
-    resolveClickHouseClient: async () => ch,
     clickhouse: authorizedClickHouseFor(ch),
     reader: traceQueryClientFor(ch),
   });

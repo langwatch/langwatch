@@ -36,6 +36,12 @@ Feature: Trace filters compile to built conditions
     When the filter compiles to no condition or one the view cannot answer
     Then the read is refused with filter_parse_error and reads no trace
 
+  @unit
+  Scenario: A summary read refuses free text it cannot narrow by
+    Given another module hands the summary read a LangWatchQL filter of free text
+    When the read compiles the filter for its scope
+    Then the read is refused with filter_value_refused and reads no trace
+
   @integration
   Scenario: Each filter kind keeps main's rows with another tenant sharing trace ids
     Given two tenants whose traces, spans, evaluations, scenario runs and judgements share ids

@@ -4,16 +4,19 @@ import {
   type AuthorizedClickHouse,
   type ClickHouseQueryClient,
   DEFAULT_PARTITION_WINDOW_MS,
-  expandFragment,
-  fenceFor,
   queryWindowed,
   RetentionFloorService,
   type RetentionDaysProvider,
   type WindowFragment,
 } from "@langwatch/clickhouse-client";
 import {
+  type ClickHouseRead,
   clickhouseRead,
+  cond,
+  type Condition,
+  type Expression,
   fn,
+  type ReaderScope,
   tenantScope as builtTenantScope,
 } from "@langwatch/clickhouse-client/builder";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "@langwatch/data-retention-contract";
@@ -36,7 +39,6 @@ import type {
   GetAllTracesForProjectInput,
   GetAllTracesForProjectOptions,
   TraceDateField,
-  TraceSummaryListOptions,
   TraceSummaryListQuery,
   TraceSummaryPage,
 } from "@langwatch/trace-contract";
@@ -46,7 +48,6 @@ import { z } from "zod";
 
 import { evaluationRuns } from "../../../../repositories/clickhouse/clickhouse.evaluation-runs.table.ts";
 import { storedSpans } from "../../../../repositories/clickhouse/clickhouse.stored-spans.table.ts";
-import type { TraceClickHouseClient } from "../../../../repositories/clickhouse/clickhouse.trace-member-client.repository.ts";
 import { traceSummaries } from "../../../../repositories/clickhouse/clickhouse.trace-summaries.table.ts";
 import {
   chBoolean,
@@ -61,7 +62,7 @@ import type { TraceAnnotationsReadRepository } from "../../../../repositories/tr
 import { type ClickHouseEvaluationRunRow } from "../../../../rules/trace-evaluation-mapping.rules.ts";
 import { mapEventAttrsToEvent } from "../../../../rules/trace-event-attribute-mapping.rules.ts";
 import { type EventSpanRow } from "../../../../rules/trace-event-attribute-mapping.rules.ts";
-import { translateLegacyFilters } from "../../rules/trace-legacy-filter-conditions.rules.ts";
+import type { TraceFilterCondition } from "../../../query/repositories/clickhouse/clickhouse.trace-filter-condition.mapper.ts";
 import {
   type PromptStudioSpanRow,
   derivePromptStudioSpan,
@@ -69,9 +70,12 @@ import {
 import { traceStartedAt } from "../../rules/trace-legacy-summary-mapping.rules.ts";
 import {
   TraceLegacyReadRepository,
+  type TraceLegacyListOptions,
   type TraceLegacyPage,
   type TraceLegacyRow,
+  type TraceLegacySummaryListOptions,
 } from "../trace-legacy-read.repository.ts";
+import { legacyTraceFilterTerms } from "./clickhouse.trace-legacy-filter-condition.mapper.ts";
 
 const attributeMapSchema = z.record(z.string(), z.unknown());
 const traceIdRowsSchema = z.array(z.looseObject({ TraceId: chString }));
@@ -312,8 +316,6 @@ class ClickHouseClientUnavailableError extends Error {
 
 /** The registry's store under the legacy trace read. */
 export type ClickHouseTraceLegacyReadOptions = {
-  /** The process's tenant-keyed connection; absent, every read refuses. */
-  resolveClickHouseClient?: ((tenantId: string) => Promise<TraceClickHouseClient>) | undefined;
   /** The proof-checked reader the fenced reads go through (ADR-177); absent, they refuse. */
   clickhouse?: AuthorizedClickHouse | undefined;
   /** The reader the built reads go through (ADR-202); absent, they refuse. */
@@ -326,41 +328,6 @@ export type ClickHouseTraceLegacyReadOptions = {
       }
     | undefined;
 };
-
-/** The compiled filter, its tenant markers expanded into the proof's fence (ADR-177 block C). */
-function fenceFilterWhere({
-  filterWhere,
-  authorization,
-}: {
-  filterWhere: GetAllTracesForProjectOptions["filterWhere"];
-  authorization: Authorization | undefined;
-}): GetAllTracesForProjectOptions["filterWhere"] {
-  if (!filterWhere) return undefined;
-  if (!authorization) {
-    throw new Error("A compiled trace filter needs the proof its tenant markers expand into");
-  }
-  return expandFragment({
-    fragment: filterWhere.sql,
-    queryParams: filterWhere.params,
-    fence: fenceFor({ authorization, reads: "traces" }),
-  });
-}
-
-function mergeFilterWhere({
-  conditions,
-  params,
-  filterWhere,
-}: {
-  conditions: string[];
-  params: Record<string, unknown>;
-  filterWhere: GetAllTracesForProjectOptions["filterWhere"];
-}): { filterConditions: string[]; filterParams: Record<string, unknown> } {
-  if (!filterWhere) return { filterConditions: conditions, filterParams: params };
-  return {
-    filterConditions: [...conditions, `(${filterWhere.sql})`],
-    filterParams: { ...params, ...filterWhere.params },
-  };
-}
 
 /**
  * Pinned once on the first page and carried by the cursor so every later page resolves the same
@@ -382,109 +349,6 @@ function resolveScrollWindow({
   return { scrollStart, effectiveEndDate: Math.min(endDate ?? scrollStart, scrollStart) };
 }
 
-function buildPageFilterClauses({
-  filterConditions,
-  traceIds,
-}: {
-  filterConditions: string[] | undefined;
-  traceIds: string[] | undefined;
-}): { extraFilters: string; traceIdFilter: string } {
-  const extraFilters =
-    filterConditions && filterConditions.length > 0 ? " AND " + filterConditions.join(" AND ") : "";
-
-  // Explicit trace ID filter — when callers provide specific trace IDs
-  const traceIdFilter =
-    traceIds && traceIds.length > 0 ? " AND ts.TraceId IN ({traceIds:Array(String)})" : "";
-  return { extraFilters, traceIdFilter };
-}
-
-function buildSearchFilter({
-  effectiveQuery,
-  protections,
-}: {
-  effectiveQuery: string | undefined;
-  protections: Protections;
-}): string {
-  if (!effectiveQuery) return "";
-  // Trace/span names are operation names, not captured content, so free text must reach
-  // them too — alongside, not instead of, the I/O columns. `searchQuery` is already
-  // lowercased and LIKE-escaped, so `lower(...)` on each side is the whole contract.
-  const searchableColumns = [
-    ...(protections.canSeeCapturedInput !== false ? ["lower(ifNull(ts.ComputedInput, ''))"] : []),
-    ...(protections.canSeeCapturedOutput !== false ? ["lower(ifNull(ts.ComputedOutput, ''))"] : []),
-    "lower(ifNull(ts.TraceName, ''))",
-  ];
-
-  // Non-root span names live in `stored_spans`, probed with the same
-  // correlated EXISTS shape the span filters in `filter-conditions.ts`
-  // use, bound to the tenant itself so the tenant guard sees its own read scoped.
-  // The StartTime bound keeps it partition-pruned, matching `buildSpanTimeBound`.
-  const spanNameSearch = `EXISTS (
-                    SELECT 1 FROM stored_spans sp
-                    WHERE sp.TenantId = {tenantId:String}
-                      AND sp.TraceId = ts.TraceId
-                      AND sp.StartTime >= fromUnixTimestamp64Milli({startDate:UInt64})
-                      AND sp.StartTime <= fromUnixTimestamp64Milli({endDate:UInt64})
-                      AND lower(sp.SpanName) LIKE {searchQuery:String}
-                  )`;
-
-  const alternatives = [
-    ...searchableColumns.map((col) => `${col} LIKE {searchQuery:String}`),
-    spanNameSearch,
-  ];
-  return ` AND (${alternatives.join(" OR ")})`;
-}
-
-function buildCursorSeeks({
-  cursor,
-  cmp,
-}: {
-  cursor: ClickHouseScrollCursor | null;
-  cmp: "<" | ">";
-}): { occurredCursor: string; updatedCursor: string } {
-  if (!cursor) return { occurredCursor: "", updatedCursor: "" };
-  return {
-    occurredCursor: ` AND (toUnixTimestamp64Milli(ts.OccurredAt), ts.TraceId) ${cmp} ({lastTimestamp:UInt64}, {lastTraceId:String})`,
-    updatedCursor: ` AND (toUnixTimestamp64Milli(ts.UpdatedAt), ts.TraceId) ${cmp} ({lastTimestamp:UInt64}, {lastTraceId:String})`,
-  };
-}
-
-function buildPageSharedParams({
-  projectId,
-  startDate,
-  endDate,
-  filterParams,
-  traceIds,
-  effectiveQuery,
-  scrollStart,
-}: {
-  projectId: string;
-  startDate: number | undefined;
-  endDate: number | undefined;
-  filterParams: Record<string, unknown> | undefined;
-  traceIds: string[] | undefined;
-  effectiveQuery: string | undefined;
-  scrollStart: number | undefined;
-}) {
-  return {
-    tenantId: projectId,
-    startDate: startDate ?? 0,
-    endDate: endDate ?? nowInstant().epochMilliseconds,
-    ...filterParams,
-    ...(traceIds && traceIds.length > 0 ? { traceIds } : {}),
-    ...(effectiveQuery
-      ? {
-          searchQuery: `%${effectiveQuery.replace(/[%_\\]/g, "\\$&").toLowerCase()}%`,
-        }
-      : {}),
-    // Shared rather than cursor-scoped: the count query embeds
-    // `latestVersionOnly` too and is bound with sharedParams alone, so a
-    // cursor-scoped binding would leave {scrollStart} unbound there.
-    // Only present when the SQL references it.
-    ...(scrollStart !== undefined ? { scrollStart } : {}),
-  };
-}
-
 /** What a failed list read logs: the project, and the error's message and stack. */
 function listFailureLogFields({ projectId, error }: { projectId: string; error: unknown }) {
   return {
@@ -503,186 +367,288 @@ function sortKeyOf({ last, dateField }: { last: TraceSummaryData; dateField: Tra
   return { timestamp, traceId: last.traceId };
 }
 
-/** The page's id and count statements over `trace_summaries`, shared by both list reads. */
-function buildPageStatements({
-  projectId,
-  startDate,
-  endDate,
-  filterParams,
-  traceIds,
-  effectiveQuery,
-  scrollStart,
-  cursor,
-  sortDirection,
+/** A bare summary's keyset position on the paged axis, as the summaries-only page seeks it. */
+function summarySortKey({
+  last,
   dateField,
-  extraFilters,
-  searchFilter,
-  traceIdFilter,
 }: {
-  projectId: string;
-  startDate: number | undefined;
-  endDate: number | undefined;
-  filterParams: Record<string, unknown> | undefined;
-  traceIds: string[] | undefined;
-  effectiveQuery: string | undefined;
-  scrollStart: number | undefined;
-  cursor: ClickHouseScrollCursor | null;
-  sortDirection: "asc" | "desc";
+  last: TraceSummaryData;
   dateField: TraceDateField;
-  extraFilters: string;
-  searchFilter: string;
-  traceIdFilter: string;
-}) {
-  // occurred (default): windows + seeks on the immutable OccurredAt (prunes partitions).
-  // updated (CDC): restricts ts to each trace's latest version (global max UpdatedAt) first,
-  // then applies window/filters/cursor to that row, so a stale version can never satisfy a
-  // filter the latest version doesn't, and adjacent CDC windows stay mutually exclusive.
-  const isUpdatedAxis = dateField === "updated";
-  const dateColumn: "UpdatedAt" | "OccurredAt" = isUpdatedAxis ? "UpdatedAt" : "OccurredAt";
-  const cmp = sortDirection === "desc" ? "<" : ">";
-  const orderDirection = sortDirection === "desc" ? "DESC" : "ASC";
-
-  const occurredWindow =
-    " AND ts.OccurredAt >= fromUnixTimestamp64Milli({startDate:UInt64}) AND ts.OccurredAt <= fromUnixTimestamp64Milli({endDate:UInt64})";
-  const updatedWindow =
-    " AND ts.UpdatedAt >= fromUnixTimestamp64Milli({startDate:UInt64}) AND ts.UpdatedAt <= fromUnixTimestamp64Milli({endDate:UInt64})";
-  // Collapses ts to each trace's latest version so the updated-axis window/filters/cursor
-  // evaluate on the latest row, bounded by scrollStart when a scroll is in play — otherwise
-  // a trace bumped past the cursor mid-scroll would silently drop out of every remaining
-  // page. Capped inside the dedup, not on the outer rows, since version resolution itself
-  // must stay stable for the scroll's duration.
-  const latestVersionOnly = buildLatestVersionOnly(scrollStart);
-
-  const { occurredCursor, updatedCursor } = buildCursorSeeks({ cursor, cmp });
-
-  const sharedParams = buildPageSharedParams({
-    projectId,
-    startDate,
-    endDate,
-    filterParams,
-    traceIds,
-    effectiveQuery,
-    scrollStart,
-  });
-
-  const cursorParams = {
-    lastTimestamp: cursor?.lastTimestamp ?? 0,
-    lastTraceId: cursor?.lastTraceId ?? "",
+}): {
+  timestamp: number;
+  traceId: string;
+} {
+  return {
+    timestamp: dateField === "updated" ? last.updatedAt : last.occurredAt,
+    traceId: last.traceId,
   };
-
-  // Step 1: Find page trace IDs + count in parallel.
-  // The ID query is lightweight (no heavy columns). occurred counts with
-  // HyperLogLog (~2% error, fine for display); updated counts traces whose
-  // global max(UpdatedAt) falls in the window (exact, via the aggregate).
-  const { countQuery, idQuery } = buildPageQueries({
-    isUpdatedAxis,
-    extraFilters,
-    latestVersionOnly,
-    occurredCursor,
-    occurredWindow,
-    orderDirection,
-    searchFilter,
-    traceIdFilter,
-    updatedCursor,
-    updatedWindow,
-  });
-
-  return { countQuery, idQuery, sharedParams, cursorParams, dateColumn, orderDirection };
 }
 
-function buildPageQueries({
-  isUpdatedAxis,
-  extraFilters,
-  latestVersionOnly,
-  occurredCursor,
-  occurredWindow,
-  orderDirection,
-  searchFilter,
-  traceIdFilter,
-  updatedCursor,
-  updatedWindow,
-}: {
-  isUpdatedAxis: boolean;
-  extraFilters: string;
-  latestVersionOnly: string;
-  occurredCursor: string;
-  occurredWindow: string;
-  orderDirection: string;
-  searchFilter: string;
-  traceIdFilter: string;
-  updatedCursor: string;
-  updatedWindow: string;
-}): { countQuery: string; idQuery: string } {
-  const countQuery = isUpdatedAxis
-    ? `
-              SELECT count() AS total
-              FROM (
-                SELECT ts.TraceId
-                FROM trace_summaries ts
-                WHERE ts.TenantId = {tenantId:String}
-                  ${latestVersionOnly}
-                  ${updatedWindow}
-                  ${extraFilters}
-                  ${traceIdFilter}
-                  ${searchFilter}
-                GROUP BY ts.TraceId
-              )
-            `
-    : `
-              SELECT uniq(ts.TraceId) as total
-              FROM trace_summaries ts
-              WHERE ts.TenantId = {tenantId:String}
-                ${occurredWindow}
-                ${extraFilters}
-                ${traceIdFilter}
-                ${searchFilter}
-            `;
-  const idQuery = isUpdatedAxis
-    ? `
-              SELECT ts.TraceId
-              FROM trace_summaries ts
-              WHERE ts.TenantId = {tenantId:String}
-                ${latestVersionOnly}
-                ${updatedWindow}
-                ${extraFilters}
-                ${traceIdFilter}
-                ${searchFilter}
-                ${updatedCursor}
-              GROUP BY ts.TraceId
-              ORDER BY max(toUnixTimestamp64Milli(ts.UpdatedAt)) ${orderDirection}, ts.TraceId ${orderDirection}
-              LIMIT {pageSize:UInt32}
-            `
-    : `
-              SELECT s.TraceId
-              FROM (
-                SELECT ts.TraceId AS TraceId,
-                       argMax(ts.OccurredAt, ts.UpdatedAt) AS _oa
-                FROM trace_summaries ts
-                WHERE ts.TenantId = {tenantId:String}
-                  ${occurredWindow}
-                  ${extraFilters}
-                  ${traceIdFilter}
-                  ${searchFilter}
-                  ${occurredCursor}
-                GROUP BY ts.TraceId
-              ) s
-              ORDER BY s._oa ${orderDirection}, s.TraceId ${orderDirection}
-              LIMIT {pageSize:UInt32}
-            `;
-  return { countQuery, idQuery };
+/** What narrows a list page: the window, the filter's terms, the asked ids and the search. */
+interface PageFilter<S extends ReaderScope> {
+  scope: S;
+  startDate: number;
+  endDate: number;
+  terms: readonly TraceFilterCondition[];
+  traceIds: readonly string[] | undefined;
+  /** Already lowercased and LIKE-escaped, `%`-wrapped. */
+  search: { pattern: string; protections: Protections } | undefined;
+  /** Updated-axis snapshot point; caps the version election. */
+  scrollStart: number | undefined;
+  dateField: TraceDateField;
+}
+
+type PageRead<S extends ReaderScope, Row extends Record<string, unknown>> = ClickHouseRead<
+  S,
+  "trace_summaries",
+  Row,
+  Record<never, never>
+>;
+
+/** The page's starting read: the proof's windows where it reads under one. */
+function pageStart<S extends ReaderScope>(scope: S) {
+  const read = clickhouseRead({ scope }).from(traceSummaries);
+  return scope.kind === "proof" ? read.withinWindows() : read;
 }
 
 /**
- * Collapses ts to each trace's latest version, capped at the scroll's snapshot when one is in
- * play. Only the updated axis uses it, so versions before the window's start can never be the
- * latest of a trace the window keeps; bounding them lets the UpdatedAt index skip old granules.
+ * Free text over the captured I/O the viewer may see and the trace name, or any span's name in
+ * the window: trace and span names are operation names, not captured content.
  */
-function buildLatestVersionOnly(scrollStart: number | undefined): string {
-  const scrollSnapshotBound =
-    scrollStart !== undefined
-      ? " AND UpdatedAt <= fromUnixTimestamp64Milli({scrollStart:UInt64})"
-      : "";
-  return ` AND (ts.TenantId, ts.TraceId, ts.UpdatedAt) IN (SELECT TenantId, TraceId, max(UpdatedAt) FROM trace_summaries WHERE TenantId = {tenantId:String} AND UpdatedAt >= fromUnixTimestamp64Milli({startDate:UInt64})${scrollSnapshotBound} GROUP BY TenantId, TraceId)`;
+function searchTerm<S extends ReaderScope>({
+  search,
+  startDate,
+  endDate,
+  windowed,
+}: {
+  search: NonNullable<PageFilter<S>["search"]>;
+  startDate: number;
+  endDate: number;
+  windowed: boolean;
+}): TraceFilterCondition {
+  const { pattern, protections } = search;
+  const lowered = (of: Expression<string | null, "trace_summaries">) =>
+    fn.like(fn.lower(fn.ifNull(of, "")), pattern);
+  const columns = [
+    ...(protections.canSeeCapturedInput !== false ? [lowered(traceSummaries.ComputedInput)] : []),
+    ...(protections.canSeeCapturedOutput !== false ? [lowered(traceSummaries.ComputedOutput)] : []),
+    lowered(traceSummaries.TraceName),
+  ];
+  return (ops) =>
+    ops.or(
+      ...columns,
+      ops.within(fn.tuple(traceSummaries.TenantId, traceSummaries.TraceId), (sub) => {
+        const spans = sub
+          .from(storedSpans)
+          .select({ TenantId: storedSpans.TenantId, TraceId: storedSpans.TraceId })
+          .where(({ and, gte, lte }) =>
+            and(
+              gte(storedSpans.StartTime, startDate),
+              lte(storedSpans.StartTime, endDate),
+              fn.like(fn.lower(storedSpans.SpanName), pattern),
+            ),
+          );
+        return windowed ? spans.withinWindows() : spans;
+      }),
+    );
+}
+
+/** The page's terms past the window: filter, asked ids and search; empty narrows nothing. */
+function pageTerms<S extends ReaderScope>(page: PageFilter<S>): TraceFilterCondition[] {
+  return [
+    ...page.terms,
+    ...(page.traceIds && page.traceIds.length > 0
+      ? [constantTerm(cond.oneOf(traceSummaries.TraceId, [...page.traceIds]))]
+      : []),
+    ...(page.search
+      ? [
+          searchTerm({
+            search: page.search,
+            startDate: page.startDate,
+            endDate: page.endDate,
+            windowed: page.scope.kind === "proof",
+          }),
+        ]
+      : []),
+  ];
+}
+
+function constantTerm(condition: Condition<"trace_summaries">): TraceFilterCondition {
+  return () => condition;
+}
+
+/** `(time, TraceId)` past the cursor in the page's direction, compared as main's tuple did. */
+function cursorSeek({
+  time,
+  cursor,
+  sortDirection,
+}: {
+  time: Expression<number, "trace_summaries">;
+  cursor: ClickHouseScrollCursor;
+  sortDirection: "asc" | "desc";
+}): Condition<"trace_summaries"> {
+  const past = sortDirection === "desc" ? cond.lt : cond.gt;
+  return cond.or(
+    past(time, cursor.lastTimestamp),
+    cond.and(cond.eq(time, cursor.lastTimestamp), past(traceSummaries.TraceId, cursor.lastTraceId)),
+  );
+}
+
+/**
+ * The page's rows. occurred: windowed on the immutable OccurredAt, every version. updated: each
+ * trace's latest version (capped at the scroll's snapshot) elected first, then the window, terms
+ * and cursor on that row, so a stale version never satisfies a filter the latest does not.
+ */
+function narrowedPage<S extends ReaderScope, Row extends Record<string, unknown>>({
+  read,
+  page,
+  cursor,
+  sortDirection,
+}: {
+  read: PageRead<S, Row>;
+  page: PageFilter<S>;
+  cursor: ClickHouseScrollCursor | null;
+  sortDirection: "asc" | "desc";
+}): PageRead<S, Row> {
+  const terms = pageTerms(page);
+  const filtered = (narrowed: PageRead<S, Row>, inElection: boolean) =>
+    terms.length === 0
+      ? narrowed
+      : narrowed.where((ops) => ops.and(...terms.map((term) => term(ops))), { inElection });
+  if (page.dateField !== "updated") {
+    const occurred = filtered(
+      read.where(({ and, gte, lte }) =>
+        and(
+          gte(traceSummaries.OccurredAt, page.startDate),
+          lte(traceSummaries.OccurredAt, page.endDate),
+        ),
+      ),
+      true,
+    );
+    return cursor
+      ? occurred.where(() =>
+          cursorSeek({
+            time: fn.toUnixTimestamp64Milli(traceSummaries.OccurredAt),
+            cursor,
+            sortDirection,
+          }),
+        )
+      : occurred;
+  }
+  const { scrollStart } = page;
+  const elected = read
+    .where(({ gte }) => gte(traceSummaries.UpdatedAt, page.startDate))
+    .where(() =>
+      scrollStart === undefined ? cond.always() : cond.lte(traceSummaries.UpdatedAt, scrollStart),
+    )
+    .latestVersion()
+    .where(({ lte }) => lte(traceSummaries.UpdatedAt, page.endDate), { inElection: false });
+  const updated = filtered(elected, false);
+  return cursor
+    ? updated.where(
+        () =>
+          cursorSeek({
+            time: fn.toUnixTimestamp64Milli(traceSummaries.UpdatedAt),
+            cursor,
+            sortDirection,
+          }),
+        { inElection: false },
+      )
+    : updated;
+}
+
+/** How many traces the page's filter matches: HyperLogLog on occurred, exact on updated. */
+function pageCountStatement<S extends ReaderScope>(page: PageFilter<S>) {
+  const total =
+    page.dateField === "updated"
+      ? fn.uniqExact(traceSummaries.TraceId)
+      : fn.uniq(traceSummaries.TraceId);
+  return narrowedPage({
+    read: pageStart(page.scope).select({ total }),
+    page,
+    cursor: null,
+    sortDirection: "desc",
+  }).build();
+}
+
+/** The page's trace ids, keyset-sorted on the paged axis, then by id. */
+function pageIdStatement<S extends ReaderScope>({
+  page,
+  cursor,
+  sortDirection,
+  pageSize,
+}: {
+  page: PageFilter<S>;
+  cursor: ClickHouseScrollCursor | null;
+  sortDirection: "asc" | "desc";
+  pageSize: number;
+}) {
+  const direction = sortDirection === "desc" ? "DESC" : "ASC";
+  const sortTime =
+    page.dateField === "updated"
+      ? fn.max(fn.toUnixTimestamp64Milli(traceSummaries.UpdatedAt))
+      : fn.argMax(traceSummaries.OccurredAt, traceSummaries.UpdatedAt);
+  return narrowedPage({
+    read: pageStart(page.scope).select({ TraceId: traceSummaries.TraceId, sortTime }),
+    page,
+    cursor,
+    sortDirection,
+  })
+    .groupBy(traceSummaries.TraceId)
+    .orderBy("sortTime", direction)
+    .orderBy(traceSummaries.TraceId, direction)
+    .limit(pageSize)
+    .build();
+}
+
+/**
+ * The page's traces' latest summaries. occurred: the window on OccurredAt in the rows and the
+ * election; updated: no window (the ids were chosen on the global latest), the snapshot cap only.
+ */
+function pageSummariesStatement<S extends ReaderScope>({
+  scope,
+  traceIds,
+  startDate,
+  endDate,
+  dateColumn,
+  scrollStart,
+  sortDirection,
+  fetchInput,
+  fetchOutput,
+}: {
+  scope: S;
+  traceIds: readonly string[];
+  startDate: number;
+  endDate: number;
+  dateColumn: "OccurredAt" | "UpdatedAt";
+  scrollStart: number | undefined;
+  sortDirection: "asc" | "desc";
+  fetchInput: boolean;
+  fetchOutput: boolean;
+}) {
+  const { ts_ComputedInput, ts_ComputedOutput, ...light } = JOINED_SUMMARY_SELECTION;
+  const direction = sortDirection === "desc" ? "DESC" : "ASC";
+  const read = pageStart(scope)
+    .select({
+      ...light,
+      ...(fetchInput ? { ts_ComputedInput } : {}),
+      ...(fetchOutput ? { ts_ComputedOutput } : {}),
+    })
+    .where(({ oneOf }) => oneOf(traceSummaries.TraceId, [...traceIds]));
+  const updatedCap = scrollStart;
+  const bounded =
+    dateColumn === "OccurredAt"
+      ? read.where(({ and, gte, lte }) =>
+          and(gte(traceSummaries.OccurredAt, startDate), lte(traceSummaries.OccurredAt, endDate)),
+        )
+      : read.where(({ lte }) =>
+          updatedCap === undefined ? cond.always() : lte(traceSummaries.UpdatedAt, updatedCap),
+        );
+  return bounded
+    .latestVersion()
+    .orderBy(traceSummaries[dateColumn], direction)
+    .orderBy(traceSummaries.TraceId, direction)
+    .build();
 }
 
 /** Stored-span rows as the joined read selects them. */
@@ -1215,14 +1181,12 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
   private readonly tracer = getLangWatchTracer("langwatch.traces.clickhouse-service");
 
   private readonly store: ClickHouseTraceLegacyReadOptions;
-  private readonly resolveClickHouseClient: ClickHouseTraceLegacyReadOptions["resolveClickHouseClient"];
   private readonly annotations: ClickHouseTraceLegacyReadOptions["annotations"];
 
   constructor(options: ClickHouseTraceLegacyReadOptions) {
     super();
-    const { resolveClickHouseClient, clickhouse, reader, annotations } = options;
-    this.store = { resolveClickHouseClient, clickhouse, reader, annotations };
-    this.resolveClickHouseClient = resolveClickHouseClient;
+    const { clickhouse, reader, annotations } = options;
+    this.store = { clickhouse, reader, annotations };
     this.annotations = annotations;
   }
 
@@ -1265,25 +1229,6 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
   private builtReader(projectId: string): Pick<ClickHouseQueryClient, "read"> {
     if (!this.store.reader) throw new ClickHouseClientUnavailableError(projectId);
     return this.store.reader;
-  }
-
-  /** Translates the caller's filter selection into a ClickHouse predicate. */
-  private translateFilters(
-    filters: Record<string, unknown>,
-    window: { startDate: number; endDate: number },
-  ): { conditions: string[]; params: Record<string, unknown>; hasUnsupportedFilters: boolean } {
-    if (Object.keys(filters).length === 0) {
-      return { conditions: [], params: {}, hasUnsupportedFilters: false };
-    }
-    return translateLegacyFilters({ filters, window });
-  }
-
-  private async resolveClient(projectId: string): Promise<TraceClickHouseClient> {
-    const resolve = this.resolveClickHouseClient;
-    if (!resolve) {
-      throw new ClickHouseClientUnavailableError(projectId);
-    }
-    return resolve(projectId);
   }
 
   /** @param occurredAt approximate time range bounding the partition scan. */
@@ -1757,7 +1702,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
   }: {
     input: GetAllTracesForProjectInput;
     protections: Protections;
-    options: GetAllTracesForProjectOptions;
+    options: TraceLegacyListOptions;
     retentionDays: RetentionDaysProvider | undefined;
     ownRead: Authorization;
   }): Promise<TraceLegacyPage> {
@@ -1793,32 +1738,23 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
             dateField,
           });
 
-          // Pass the dashboard time window so span/event filters bound their stored_spans
-          // EXISTS subqueries to the same window, pruning partitions instead of cold-scanning.
-          const {
-            conditions: legacyFilterConditions,
-            params: legacyFilterParams,
-            hasUnsupportedFilters,
-          } = this.translateFilters(input.filters ?? {}, {
-            startDate: input.startDate,
-            endDate: input.endDate,
+          // The page reads under the own-read proof; the legacy filter map's terms bound their
+          // stored_spans subqueries to the dashboard window, and the query-language filter is
+          // compiled for that scope (Decided 25), both ANDed into the read.
+          const scope = builtTenantScope.fromProof({ authorization: ownRead, reads: "traces" });
+          const legacy = legacyTraceFilterTerms({
+            filters: input.filters ?? {},
+            window: { startDate: input.startDate, endDate: input.endDate },
+            scope,
           });
-
-          if (hasUnsupportedFilters) {
+          if (legacy.hasUnsupportedFilters) {
             throw new Error("Filters contain unsupported fields for ClickHouse");
           }
-
-          // The v1 REST search door's compiled query-language filter (already
-          // parameterized by `TraceApi.compileExplorerTraceFilter`), ANDed
-          // alongside the legacy filter map's own conditions.
-          const { filterConditions, filterParams } = mergeFilterWhere({
-            conditions: legacyFilterConditions,
-            params: legacyFilterParams,
-            filterWhere: fenceFilterWhere({
-              filterWhere: options.filterWhere,
-              authorization: options.authorization,
-            }),
-          });
+          const compiled = options.compileFilter?.({ scope });
+          const terms = [
+            ...legacy.terms,
+            ...(compiled?.kind === "compiled" ? [compiled.where] : []),
+          ];
 
           // Pinned once on the first page and carried by the cursor so every later page
           // resolves the same versions. Only the updated axis needs it — OccurredAt is immutable.
@@ -1833,14 +1769,14 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
           // Build the query with keyset pagination
           const { summaries, totalHits } = await this.fetchTracesWithPagination({
             projectId: input.projectId,
+            scope,
             pageSize,
             sortDirection,
             cursor,
             protections,
             startDate: input.startDate,
             endDate: effectiveEndDate,
-            filterConditions,
-            filterParams,
+            terms,
             traceIds: input.traceIds,
             query: input.query,
             fetchInput,
@@ -1903,13 +1839,12 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
    */
   async findTraceSummaries(
     input: TraceSummaryListQuery,
-    options: TraceSummaryListOptions = {},
+    options: TraceLegacySummaryListOptions = {},
   ): Promise<TraceSummaryPage> {
     return this.tracer.withActiveSpan(
       "TraceLegacyReadClickHouseRepository.findTraceSummaries",
       { attributes: { "tenant.id": input.projectId } },
       async () => {
-        const clickHouseClient = await this.resolveClient(input.projectId);
         const pageSize = input.pageSize ?? 25;
         const sortDirection = "asc";
         const dateField: TraceDateField = options.dateField ?? "occurred";
@@ -1919,70 +1854,47 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
           pageSize,
           dateField,
         });
-        const { filterConditions, filterParams } = mergeFilterWhere({
-          conditions: [],
-          params: {},
-          filterWhere: options.filterWhere,
-        });
         const { scrollStart, effectiveEndDate } = resolveScrollWindow({
           dateField,
           cursor,
           endDate: input.endDate,
         });
-        const { extraFilters, traceIdFilter } = buildPageFilterClauses({
-          filterConditions,
+        const scope = builtTenantScope.single({ tenantId: input.projectId });
+        const compiled = options.compileFilter?.({ scope });
+        const page: PageFilter<typeof scope> = {
+          scope,
+          startDate: input.startDate ?? 0,
+          endDate: effectiveEndDate ?? nowInstant().epochMilliseconds,
+          terms: compiled?.kind === "compiled" ? [compiled.where] : [],
           traceIds: undefined,
+          search: undefined,
+          scrollStart,
+          dateField,
+        };
+        const idResult = await this.builtReader(input.projectId).read({
+          statement: pageIdStatement({ page, cursor, sortDirection, pageSize }),
+          table: traceSummaries.$table.name,
         });
-        const { idQuery, sharedParams, cursorParams, dateColumn, orderDirection } =
-          buildPageStatements({
-            projectId: input.projectId,
-            startDate: input.startDate,
-            endDate: effectiveEndDate,
-            filterParams,
-            traceIds: undefined,
-            effectiveQuery: undefined,
-            scrollStart,
-            cursor,
-            sortDirection,
-            dateField,
-            extraFilters,
-            searchFilter: "",
-            traceIdFilter,
-          });
-        const idRows = traceIdRowsSchema.parse(
-          await (
-            await clickHouseClient.query({
-              query: idQuery,
-              query_params: { ...sharedParams, ...cursorParams, pageSize },
-              format: "JSONEachRow",
-            })
-          ).json(),
-        );
-        const traceIds = idRows.map((row) => row.TraceId);
+        const traceIds = traceIdRowsSchema.parse(idResult.rows).map((row) => row.TraceId);
         const rows =
           traceIds.length === 0
             ? []
             : await this.fetchTraceSummaryRows({
-                clickHouseClient,
+                scope,
                 projectId: input.projectId,
-                startDate: input.startDate,
-                endDate: effectiveEndDate ?? nowInstant().epochMilliseconds,
+                startDate: page.startDate,
+                endDate: page.endDate,
                 traceIds,
-                orderDirection,
+                sortDirection,
                 fetchInput: false,
                 fetchOutput: false,
-                dateColumn,
+                dateColumn: dateField === "updated" ? "UpdatedAt" : "OccurredAt",
                 scrollStart,
               });
         const summaries = rows.map((row) => this.rowToTraceSummaryData(row));
         const last = summaries.at(-1);
         const scrollId = this.buildNextScrollId({
-          last: last
-            ? {
-                timestamp: dateField === "updated" ? last.updatedAt : last.occurredAt,
-                traceId: last.traceId,
-              }
-            : null,
+          last: last ? summarySortKey({ last, dateField }) : null,
           traceCount: summaries.length,
           pageSize,
           sortDirection,
@@ -2200,16 +2112,16 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
    * Fetch traces with keyset pagination.
    * @internal
    */
-  private async fetchTracesWithPagination({
+  private async fetchTracesWithPagination<S extends ReaderScope>({
     projectId,
+    scope,
     pageSize,
     sortDirection,
     cursor,
     protections,
     startDate,
     endDate,
-    filterConditions,
-    filterParams,
+    terms,
     traceIds,
     query,
     fetchInput = true,
@@ -2218,14 +2130,15 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     scrollStart,
   }: {
     projectId: string;
+    /** The scope the page reads, and its filter compiled, under. */
+    scope: S;
     pageSize: number;
     sortDirection: "asc" | "desc";
     cursor: ClickHouseScrollCursor | null;
     protections: Protections;
     startDate?: number;
     endDate?: number;
-    filterConditions?: string[];
-    filterParams?: Record<string, unknown>;
+    terms: readonly TraceFilterCondition[];
     traceIds?: string[];
     query?: string;
     /** Fetch the heavy ComputedInput column. False prunes it. */
@@ -2234,30 +2147,15 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     fetchOutput?: boolean;
     /** Time axis for the date window + keyset cursor. Default "occurred". */
     dateField?: TraceDateField;
-    /**
-     * Updated-axis snapshot point (epoch ms). Caps version resolution so every
-     * page of one scroll sees the same latest-versions. Undefined on the
-     * occurred axis, and on updated-axis cursors minted before it existed.
-     */
+    /** Updated-axis snapshot point (epoch ms): every page of one scroll sees the same versions. */
     scrollStart?: number;
   }): Promise<{ summaries: TraceSummaryData[]; totalHits: number }> {
     return this.tracer.withActiveSpan(
       "TraceLegacyReadClickHouseRepository.fetchTracesWithPagination",
-      {
-        attributes: { "tenant.id": projectId },
-      },
-      async (_span) => {
-        const clickHouseClient = await this.resolveClient(projectId);
-
-        // Additional filter conditions (already parameterized by the filter module)
-        const { extraFilters, traceIdFilter } = buildPageFilterClauses({
-          filterConditions,
-          traceIds,
-        });
-
+      { attributes: { "tenant.id": projectId } },
+      async () => {
         // lower(ifNull(...)) matches the ngrambf_v1 indexed expression.
         const effectiveQuery = query && query.length >= 3 ? query : undefined;
-
         // If the user can't see input/output, searching their content is not allowed
         if (
           effectiveQuery &&
@@ -2266,69 +2164,49 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
         ) {
           return { summaries: [], totalHits: 0 };
         }
-
-        const searchFilter = buildSearchFilter({ effectiveQuery, protections });
-        const { countQuery, idQuery, sharedParams, cursorParams, dateColumn, orderDirection } =
-          buildPageStatements({
-            projectId,
-            startDate,
-            endDate,
-            filterParams,
-            traceIds,
-            effectiveQuery,
-            scrollStart,
-            cursor,
-            sortDirection,
-            dateField,
-            extraFilters,
-            searchFilter,
-            traceIdFilter,
-          });
-        const [countResult, idsResult] = await Promise.all([
-          clickHouseClient.query({
-            query: countQuery,
-            query_params: sharedParams,
-            format: "JSONEachRow",
-          }),
-          clickHouseClient.query({
-            query: idQuery,
-            query_params: {
-              ...sharedParams,
-              ...cursorParams,
-              pageSize,
-            },
-            format: "JSONEachRow",
-          }),
-        ]);
-
-        const [countRows, idRows] = await Promise.all([
-          countResult.json().then((rows) => totalRowsSchema.parse(rows)),
-          idsResult.json().then((rows) => traceIdRowsSchema.parse(rows)),
-        ]);
-
-        const totalHits = parseInt(countRows[0]?.total ?? "0", 10);
-        const pageTraceIds = idRows.map((r) => r.TraceId);
-
-        if (pageTraceIds.length === 0) {
-          return { summaries: [], totalHits };
-        }
-
-        // Step 2: Fetch full data for just the page's trace IDs.
-        // The dedup subquery is scoped to pageTraceIds so it only reads
-        // N traces instead of the entire table.
-        const summaryRows = await this.fetchTraceSummaryRows({
-          clickHouseClient,
-          projectId,
+        const page: PageFilter<S> = {
+          scope,
           startDate: startDate ?? 0,
           endDate: endDate ?? nowInstant().epochMilliseconds,
+          terms,
+          traceIds,
+          search: effectiveQuery
+            ? {
+                pattern: `%${effectiveQuery.replace(/[%_\\]/g, "\\$&").toLowerCase()}%`,
+                protections,
+              }
+            : undefined,
+          scrollStart,
+          dateField,
+        };
+        const reader = this.builtReader(projectId);
+        const [countResult, idsResult] = await Promise.all([
+          reader.read({ statement: pageCountStatement(page), table: traceSummaries.$table.name }),
+          reader.read({
+            statement: pageIdStatement({ page, cursor, sortDirection, pageSize }),
+            table: traceSummaries.$table.name,
+          }),
+        ]);
+        const totalHits = Number.parseInt(
+          totalRowsSchema.parse(countResult.rows)[0]?.total ?? "0",
+          10,
+        );
+        const pageTraceIds = traceIdRowsSchema.parse(idsResult.rows).map((r) => r.TraceId);
+        if (pageTraceIds.length === 0) return { summaries: [], totalHits };
+
+        // Step 2: the page's own traces' full rows, the election scoped to those ids.
+        const summaryRows = await this.fetchTraceSummaryRows({
+          scope,
+          projectId,
+          startDate: page.startDate,
+          endDate: page.endDate,
           traceIds: pageTraceIds,
-          orderDirection,
+          sortDirection,
           fetchInput,
           fetchOutput,
-          dateColumn,
+          dateColumn: dateField === "updated" ? "UpdatedAt" : "OccurredAt",
           scrollStart,
         });
-
         return {
           summaries: summaryRows.map((row) => this.rowToTraceSummaryData(row)),
           totalHits,
@@ -2343,124 +2221,52 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
    * On ClickHouse MEMORY_LIMIT_EXCEEDED, retries in smaller batches so heavy
    * ComputedInput/ComputedOutput columns don't blow the per-query memory cap.
    */
-  private async fetchTraceSummaryRows({
-    clickHouseClient,
+  private async fetchTraceSummaryRows<S extends ReaderScope>({
+    scope,
     projectId,
     startDate,
     endDate,
     traceIds,
-    orderDirection,
+    sortDirection,
     fetchInput = true,
     fetchOutput = true,
     dateColumn = "OccurredAt",
     scrollStart,
   }: {
-    clickHouseClient: TraceClickHouseClient;
+    scope: S;
     projectId: string;
     startDate: number;
     endDate: number;
     traceIds: string[];
-    orderDirection: string;
-    /** Fetch the heavy Computed* columns independently. False reads '' instead —
-     * the row shape is unchanged but ClickHouse never materializes that column. */
+    sortDirection: "asc" | "desc";
+    /** Fetch the heavy Computed* columns independently. False reads '' for that column. */
     fetchInput?: boolean;
     fetchOutput?: boolean;
     /** Column the date window + ORDER BY run on (must match the page-ID query). */
     dateColumn?: "OccurredAt" | "UpdatedAt";
-    /**
-     * Updated-axis snapshot point (epoch ms) — must match the id-query's. This query
-     * re-resolves each trace's latest version, so an uncapped read could hand back a newer
-     * version than the page was selected on.
-     */
+    /** Updated-axis snapshot point (epoch ms), the id read's, so both elect the same version. */
     scrollStart?: number;
   }): Promise<TraceSummaryRow[]> {
-    // dateColumn is interpolated into SQL and reachable from paths that are only
-    // TypeScript-narrowed — assert here so a non-enum value can never reach the query string.
-    if (dateColumn !== "OccurredAt" && dateColumn !== "UpdatedAt") {
-      throw new Error(`Invalid dateColumn: ${String(dateColumn)}`);
-    }
-    const computedInputExpr = fetchInput ? "ts.ComputedInput" : "''";
-    const computedOutputExpr = fetchOutput ? "ts.ComputedOutput" : "''";
-    const isUpdatedAxis = dateColumn === "UpdatedAt";
-    const sortColumn = isUpdatedAxis ? "ts_UpdatedAt" : "ts_OccurredAt";
-    // Updated axis dedups on the GLOBAL max(UpdatedAt) — the page IDs were
-    // already filtered by the id-query's HAVING, so no date window is applied
-    // here (windowing would re-introduce the in-window-max staleness). Occurred
-    // axis windows the partition column in both the outer scan and the dedup.
-    const outerWindow = isUpdatedAxis
-      ? ""
-      : `AND ts.${dateColumn} >= fromUnixTimestamp64Milli({startDate:UInt64})
-            AND ts.${dateColumn} <= fromUnixTimestamp64Milli({endDate:UInt64})`;
-    const dedupWindow = isUpdatedAxis
-      ? ""
-      : `AND ${dateColumn} >= fromUnixTimestamp64Milli({startDate:UInt64})
-                AND ${dateColumn} <= fromUnixTimestamp64Milli({endDate:UInt64})`;
-    // Same snapshot bound the id-query applied, so both stages resolve the same
-    // version of every trace. Updated axis only; the occurred axis has no
-    // scrollStart and its SQL is unchanged.
-    const dedupScrollBound =
-      isUpdatedAxis && scrollStart !== undefined
-        ? " AND UpdatedAt <= fromUnixTimestamp64Milli({scrollStart:UInt64})"
-        : "";
     const runQuery = async (ids: string[]) => {
-      const result = await clickHouseClient.query({
-        // ID_BOUND_SKIP: a list page, bounded by the list's own date range.
-        query: `
-          SELECT
-            ts.TraceId AS ts_TraceId,
-            ts.SpanCount AS ts_SpanCount,
-            ts.TotalDurationMs AS ts_TotalDurationMs,
-            ts.ComputedIOSchemaVersion AS ts_ComputedIOSchemaVersion,
-            ts.TimeToFirstTokenMs AS ts_TimeToFirstTokenMs,
-            ts.TimeToLastTokenMs AS ts_TimeToLastTokenMs,
-            ts.TokensPerSecond AS ts_TokensPerSecond,
-            ts.ContainsErrorStatus AS ts_ContainsErrorStatus,
-            ts.ContainsOKStatus AS ts_ContainsOKStatus,
-            ts.ErrorMessage AS ts_ErrorMessage,
-            ts.Models AS ts_Models,
-            ts.TotalCost AS ts_TotalCost,
-            ts.NonBilledCost AS ts_NonBilledCost,
-            ts.TokensEstimated AS ts_TokensEstimated,
-            ts.TotalPromptTokenCount AS ts_TotalPromptTokenCount,
-            ts.TotalCompletionTokenCount AS ts_TotalCompletionTokenCount,
-            ts.TopicId AS ts_TopicId,
-            ts.SubTopicId AS ts_SubTopicId,
-            ts.HasAnnotation AS ts_HasAnnotation,
-            ts.AnnotationIds AS ts_AnnotationIds,
-            ${computedInputExpr} AS ts_ComputedInput,
-            ${computedOutputExpr} AS ts_ComputedOutput,
-            ts.Attributes AS ts_Attributes,
-            ts.TraceName AS ts_TraceName,
-            ts.Version AS ts_Version,
-            ts.EarliestSpanStartMs AS ts_EarliestSpanStartMs,
-            toUnixTimestamp64Milli(ts.OccurredAt) AS ts_OccurredAt,
-            toUnixTimestamp64Milli(ts.CreatedAt) AS ts_CreatedAt,
-            toUnixTimestamp64Milli(ts.UpdatedAt) AS ts_UpdatedAt
-          FROM trace_summaries ts
-          WHERE ts.TenantId = {tenantId:String}
-            ${outerWindow}
-            AND ts.TraceId IN ({pageTraceIds:Array(String)})
-            AND (ts.TenantId, ts.TraceId, ts.UpdatedAt) IN (
-              SELECT TenantId, TraceId, max(UpdatedAt)
-              FROM trace_summaries
-              WHERE TenantId = {tenantId:String}
-                ${dedupWindow}
-                ${dedupScrollBound}
-                AND TraceId IN ({pageTraceIds:Array(String)})
-              GROUP BY TenantId, TraceId
-            )
-          ORDER BY ts.${dateColumn} ${orderDirection}, ts.TraceId ${orderDirection}
-        `,
-        query_params: {
-          tenantId: projectId,
+      const result = await this.builtReader(projectId).read({
+        statement: pageSummariesStatement({
+          scope,
+          traceIds: ids,
           startDate,
           endDate,
-          pageTraceIds: ids,
-          ...(dedupScrollBound !== "" ? { scrollStart } : {}),
-        },
-        format: "JSONEachRow",
+          dateColumn,
+          scrollStart,
+          sortDirection,
+          fetchInput,
+          fetchOutput,
+        }),
+        table: traceSummaries.$table.name,
       });
-      return traceSummaryRowsSchema.parse(await result.json());
+      return traceSummaryRowsSchema.parse(result.rows).map((row) => ({
+        ...row,
+        ts_ComputedInput: fetchInput ? row.ts_ComputedInput : "",
+        ts_ComputedOutput: fetchOutput ? row.ts_ComputedOutput : "",
+      }));
     };
 
     try {
@@ -2469,11 +2275,10 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
       if (!TraceLegacyReadClickHouseRepository.isClickHouseMemoryLimitError(error)) {
         throw error;
       }
-
       return this.fetchTraceSummaryRowsInBatches({
         traceIds,
-        orderDirection,
-        sortColumn,
+        orderDirection: sortDirection === "desc" ? "DESC" : "ASC",
+        sortColumn: dateColumn === "UpdatedAt" ? "ts_UpdatedAt" : "ts_OccurredAt",
         runQuery,
       });
     }

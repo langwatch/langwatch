@@ -20,6 +20,15 @@ import type {
 
 import type { ClickHouseEvaluationRunRow } from "../../../rules/trace-evaluation-mapping.rules.ts";
 import type { ResolvedTraceSpans } from "../../../services/trace-offload-resolution.service.ts";
+import type { TraceFilterCompile } from "../../query/repositories/clickhouse/clickhouse.trace-filter-condition.mapper.ts";
+
+/** A list read's query-language filter, compiled inside the read for its scope (Decided 25). */
+export interface TraceLegacyFilterOption {
+  compileFilter?: TraceFilterCompile | undefined;
+}
+
+export type TraceLegacyListOptions = GetAllTracesForProjectOptions & TraceLegacyFilterOption;
+export type TraceLegacySummaryListOptions = TraceSummaryListOptions & TraceLegacyFilterOption;
 
 /**
  * Resolves offloaded blob refs for a single trace's normalized spans (ADR-021 decision B:
@@ -81,7 +90,7 @@ export abstract class TraceLegacyReadRepository {
     params: TraceLegacySpanFloor & {
       input: GetAllTracesForProjectInput;
       protections: Protections;
-      options: GetAllTracesForProjectOptions;
+      options: TraceLegacyListOptions;
       /** The own-only proof the span, evaluation and event reads go through. */
       ownRead: Authorization;
     },
@@ -89,7 +98,7 @@ export abstract class TraceLegacyReadRepository {
 
   abstract findTraceSummaries(
     query: TraceSummaryListQuery,
-    options?: TraceSummaryListOptions,
+    options?: TraceLegacySummaryListOptions,
   ): Promise<TraceSummaryPage>;
 
   abstract findCustomersAndLabels(

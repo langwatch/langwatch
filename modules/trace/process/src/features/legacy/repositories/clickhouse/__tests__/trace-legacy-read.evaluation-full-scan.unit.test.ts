@@ -24,8 +24,8 @@ const PROTECTIONS = { canSeeCosts: true, canSeeCapturedInput: true, canSeeCaptur
 
 /** A page of one trace: its count, its id and its summary; every other statement answers none. */
 function rowsFor(sql: string): unknown[] {
-  if (sql.includes("as total")) return [{ total: "1" }];
-  if (sql.includes("SELECT s.TraceId")) return [{ TraceId: "trace-1" }];
+  if (sql.startsWith("SELECT uniq(TraceId) AS total")) return [{ total: "1" }];
+  if (sql.includes("AS sortTime")) return [{ TraceId: "trace-1" }];
   if (sql.includes("ts_SpanCount")) {
     return [traceSummaryRow({ ts_OccurredAt: String(Date.now() - 60_000) })];
   }
@@ -46,7 +46,6 @@ function compose() {
   const builtReader = builtOver(async () => member);
   const repository = mappedLegacyRead({
     clickhouse,
-    resolveClickHouseClient: async () => member,
     reader: clickHouseQueryClientDouble({
       read: async (request) => {
         built.push(request);

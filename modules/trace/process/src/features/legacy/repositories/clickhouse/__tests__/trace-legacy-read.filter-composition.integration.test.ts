@@ -16,7 +16,7 @@ import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
 } from "../../../../../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
-import { traceQueryTranslation } from "../../../../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
+import { traceFilterCompileFor } from "../../../../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
 import { TraceCanonicalisationService } from "../../../../derivation/services/trace-canonicalisation.service.ts";
 import type { LegacyTraceMappingService } from "../../../services/legacy-trace-mapping.service.ts";
 import { mappedLegacyRead } from "./support/legacy-trace-mapping.support.ts";
@@ -82,16 +82,15 @@ async function search({
   queryText?: string;
   input?: Partial<GetAllTracesForProjectInput>;
 }): Promise<string[]> {
-  const filterWhere = queryText
-    ? traceQueryTranslation.translateFilter({
+  const compileFilter = queryText
+    ? traceFilterCompileFor({
         queryText,
         timeRange: { from: window.startDate, to: window.endDate },
       })
-    : null;
+    : undefined;
   const results = await repo.listAllTracesForProject(searchInput(input), openProtections, {
     downloadMode: true,
-    ...(filterWhere ? { filterWhere } : {}),
-    authorization: ownProof({ projectId: tenantId }),
+    ...(compileFilter ? { compileFilter } : {}),
     ownRead: ownProof({ projectId: tenantId }),
   });
   return results.groups

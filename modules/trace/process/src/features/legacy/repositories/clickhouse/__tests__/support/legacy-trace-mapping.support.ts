@@ -10,6 +10,23 @@ import {
 
 type MappingInputs = Omit<Parameters<typeof LegacyTraceMappingService.create>[0], "repository">;
 
+/** The store a test composes: a scripted member client stands in for both readers. */
+export type LegacyStoreInputs = ClickHouseTraceLegacyReadOptions & {
+  resolveClickHouseClient?: (tenantId: string) => Promise<TraceClickHouseClient>;
+};
+
+/** The ClickHouse store over a scripted member client, as the registry composes it. */
+export function legacyStoreOver({
+  resolveClickHouseClient,
+  ...store
+}: LegacyStoreInputs): TraceLegacyReadClickHouseRepository {
+  const clickhouse =
+    store.clickhouse ?? (resolveClickHouseClient ? fencedOver(resolveClickHouseClient) : undefined);
+  const reader =
+    store.reader ?? (resolveClickHouseClient ? builtOver(resolveClickHouseClient) : undefined);
+  return TraceLegacyReadClickHouseRepository.create({ ...store, clickhouse, reader });
+}
+
 /**
  * The proof-checked client over the same member client a test scripts, so the fenced reads
  * reach the test's `query` double with their markers expanded and the tenant they routed to.
@@ -64,15 +81,9 @@ export function mappedLegacyRead({
   resolveTraceSpansBatch,
   retentionDays,
   ...store
-}: MappingInputs & ClickHouseTraceLegacyReadOptions): LegacyTraceMappingService {
-  const clickhouse =
-    store.clickhouse ??
-    (store.resolveClickHouseClient ? fencedOver(store.resolveClickHouseClient) : undefined);
-  const reader =
-    store.reader ??
-    (store.resolveClickHouseClient ? builtOver(store.resolveClickHouseClient) : undefined);
+}: MappingInputs & LegacyStoreInputs): LegacyTraceMappingService {
   return LegacyTraceMappingService.create({
-    repository: TraceLegacyReadClickHouseRepository.create({ ...store, clickhouse, reader }),
+    repository: legacyStoreOver(store),
     traceCanonicalisation,
     resolveTraceSpans,
     resolveTraceSpansBatch,

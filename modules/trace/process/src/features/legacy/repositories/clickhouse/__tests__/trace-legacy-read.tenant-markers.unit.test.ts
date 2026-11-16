@@ -183,8 +183,8 @@ describe("TraceLegacyReadClickHouseRepository tenant markers", () => {
     it("builds the events read under the proof, electing on the event spans alone", async () => {
       const query = vi.fn(async (statement: Statement) => ({
         json: async (): Promise<unknown[]> => {
-          if (statement.query.includes("uniq(ts.TraceId)")) return [{ total: "1" }];
-          if (statement.query.includes("SELECT s.TraceId")) return [{ TraceId: "trace-1" }];
+          if (statement.query.startsWith("SELECT uniq(TraceId) AS total")) return [{ total: "1" }];
+          if (statement.query.includes(" AS sortTime ")) return [{ TraceId: "trace-1" }];
           if (statement.query.includes("ts_SpanCount")) {
             return [traceSummaryRow({ ts_OccurredAt: String(Date.now() - 60_000) })];
           }

@@ -12,8 +12,6 @@ import type {
   TracesForProjectResult,
   AggregationFiltersInput,
   GetAllTracesForProjectInput,
-  GetAllTracesForProjectOptions,
-  TraceSummaryListOptions,
   TraceSummaryListQuery,
   TraceSummaryPage,
 } from "@langwatch/trace-contract";
@@ -27,7 +25,11 @@ import { type TraceLogRecordReader } from "../../claude-code/rules/claude-code-l
 import type { TraceEditOverlayService } from "../../edit-overlay/services/trace-edit-overlay.service.ts";
 import type { TraceBlobStoreService } from "../../media/services/trace-blob-store.service.ts";
 import { TraceReadEnrichmentService } from "../../read/services/trace-read-enrichment.service.ts";
-import type { TraceLegacyReadRepository } from "../repositories/trace-legacy-read.repository.ts";
+import type {
+  TraceLegacyListOptions,
+  TraceLegacyReadRepository,
+  TraceLegacySummaryListOptions,
+} from "../repositories/trace-legacy-read.repository.ts";
 import type { LegacyTraceMappingService } from "./legacy-trace-mapping.service.ts";
 
 /**
@@ -311,7 +313,7 @@ export class TraceLegacyReadService {
     input: GetAllTracesForProjectInput,
     protections: Protections,
     /** `ownRead` is the own-only proof the span, evaluation and event reads go through. */
-    options: GetAllTracesForProjectOptions & { ownRead: Authorization },
+    options: TraceLegacyListOptions & { ownRead: Authorization },
   ): Promise<TracesForProjectResult> => {
     return this.tracer.withActiveSpan(
       "TraceService.getAllTracesForProject",
@@ -345,7 +347,7 @@ export class TraceLegacyReadService {
   /** The list read's keyset page as bare summaries: the store's read, no enrichment. */
   listTraceSummaries(
     query: TraceSummaryListQuery,
-    options?: TraceSummaryListOptions,
+    options?: TraceLegacySummaryListOptions,
   ): Promise<TraceSummaryPage> {
     return this.clickHouseService.findTraceSummaries(query, options);
   }

@@ -14,10 +14,12 @@ import {
   param,
   type ReaderScope,
   type ReadOps,
+  tenantScope,
 } from "@langwatch/clickhouse-client/builder";
 import {
   FilterFieldUnknownError,
   FilterParseError,
+  FilterValueRefusedError,
   INSTANT_EVAL_TARGET_FIELDS,
   type ResolvedInstantEvalRun,
   type TagToken,
@@ -53,6 +55,8 @@ import {
   extractNumericValue,
   extractStringValue,
   nextParam,
+  TRACE_ATTRIBUTE_PREFIX,
+  TRACE_ATTRIBUTE_PREFIX_LEGACY,
   validateAttributeKey,
   validateValueLength,
 } from "../../rules/trace-query-values.rules.ts";
@@ -155,7 +159,7 @@ const CONDITION_LOGIC: FilterLogic<TraceFilterCondition> = {
 };
 
 /** One parameter minted under `name`, as the text compiler mints it, so the tally matches. */
-function mint(c: Compilation, name: string, value: unknown): void {
+function mint(c: Pick<Compilation, "ctx">, name: string, value: unknown): void {
   c.ctx.params[nextParam(c.ctx, name)] = value;
 }
 
@@ -166,7 +170,15 @@ function stringOf(tag: TagToken): string {
   return value;
 }
 
-function bindString({ tag, c, name }: { tag: TagToken; c: Compilation; name: string }): string {
+function bindString({
+  tag,
+  c,
+  name,
+}: {
+  tag: TagToken;
+  c: Pick<Compilation, "ctx">;
+  name: string;
+}): string {
   const value = stringOf(tag);
   mint(c, name, value);
   return value;
@@ -196,7 +208,7 @@ function stringCondition<T extends string>({
 }: {
   expression: Expression<string | null, T>;
   tag: TagToken;
-  c: Compilation;
+  c: Pick<Compilation, "ctx">;
   name: string;
 }): Condition<T> {
   return cond.eq(expression, bindString({ tag, c, name }));
@@ -211,7 +223,7 @@ function numericCondition<T extends string>({
 }: {
   expression: Expression<number | null, T>;
   tag: TagToken;
-  c: Compilation;
+  c: Pick<Compilation, "ctx">;
   name: string;
 }): Condition<T> {
   if (tag.expression.type === "RangeExpression") {
@@ -861,4 +873,140 @@ export function findHiddenOriginFilters({
       cond.not(cond.oneOf(TRACE_SUMMARY_CATEGORICAL_EXPRESSIONS.origin, [...hiddenOrigins])),
     ),
   ];
+}
+
+/** LangWatchQL's string fields by their facet key (trace-query-langwatch-ql.rules.ts). */
+const LANGWATCH_QL_STRINGS = {
+  origin: "origin",
+  service: "service",
+  traceName: "traceName",
+  user: "user",
+  conversation: "conversation",
+  customer: "customer",
+  topic: "topic",
+  subtopic: "subtopic",
+  selectedPrompt: "selectedPrompt",
+  lastUsedPrompt: "lastUsedPrompt",
+  tokensEstimated: "tokensEstimated",
+} as const satisfies Record<string, keyof typeof TRACE_SUMMARY_CATEGORICAL_EXPRESSIONS>;
+
+const LANGWATCH_QL_NUMBERS = {
+  cost: "cost",
+  duration: "duration",
+  tokens: "tokens",
+  promptTokens: "promptTokens",
+  completionTokens: "completionTokens",
+  ttft: "ttft",
+  ttlt: "ttlt",
+  tokensPerSecond: "tokensPerSecond",
+  spans: "spans",
+  promptVersion: "promptVersion",
+} as const satisfies Record<string, keyof typeof TRACE_SUMMARY_RANGE_EXPRESSIONS>;
+
+const LANGWATCH_QL_ATTRIBUTE_PREFIXES = [TRACE_ATTRIBUTE_PREFIX, TRACE_ATTRIBUTE_PREFIX_LEGACY];
+
+/** One LangWatchQL term on the summary row, as trace-query-langwatch-ql.rules.ts compiles it. */
+function langWatchQLTerm(tag: TagToken, c: Pick<Compilation, "ctx">): SummaryCondition {
+  if (tag.field.type === "ImplicitField") {
+    throw new FilterValueRefusedError({
+      field: "text",
+      reason: "Free text cannot narrow a trace summary read; name a field instead.",
+    });
+  }
+  const name = tag.field.name;
+  const prefix = LANGWATCH_QL_ATTRIBUTE_PREFIXES.find((each) => name.startsWith(each));
+  if (prefix !== undefined) {
+    const key = name.slice(prefix.length);
+    if (!key) throw new FilterParseError(`${prefix}<key> requires a key after the dot`);
+    validateAttributeKey(key);
+    mint(c, "attrKey", key);
+    return cond.eq(fn.mapGet(ts.Attributes, key), bindString({ tag, c, name: "attrValue" }));
+  }
+  if (name === "traceId") return stringCondition({ expression: ts.TraceId, tag, c, name });
+  if (name === "scenarioRun") {
+    const expression = fn.mapGet(ts.Attributes, "scenario.run_id");
+    return stringCondition({ expression, tag, c, name: "scenarioRunId" });
+  }
+  if (name === "status") {
+    const value = extractStringValue(tag).toLowerCase();
+    if (value !== "error") {
+      throw new FilterValueRefusedError({
+        field: "status",
+        reason: `A shorthand filter can only ask for status:error. Ask for "${value}" with a statement instead.`,
+      });
+    }
+    return cond.eq(ts.ContainsErrorStatus, true);
+  }
+  if (name === "model") {
+    const value = bindString({ tag, c, name: "model" });
+    if (!value.includes("*")) return fn.has(ts.Models, value);
+    const pattern = value.replace(/[\\%_]/g, "\\$&").replace(/\*/g, "%");
+    return fn.arrayExists((model) => fn.like(model, pattern), ts.Models);
+  }
+  if (name === "label") {
+    const value = bindString({ tag, c, name: "label" });
+    return fn.arrayExists(
+      (raw) => cond.eq(fn.JSONExtractString(raw), value),
+      fn.JSONExtractArrayRaw(fn.mapGet(ts.Attributes, "langwatch.labels")),
+    );
+  }
+  if (Object.hasOwn(LANGWATCH_QL_STRINGS, name)) {
+    const key = LANGWATCH_QL_STRINGS[name as keyof typeof LANGWATCH_QL_STRINGS];
+    return stringCondition({
+      expression: TRACE_SUMMARY_CATEGORICAL_EXPRESSIONS[key],
+      tag,
+      c,
+      name,
+    });
+  }
+  if (Object.hasOwn(LANGWATCH_QL_NUMBERS, name)) {
+    const key = LANGWATCH_QL_NUMBERS[name as keyof typeof LANGWATCH_QL_NUMBERS];
+    return numericCondition({ expression: TRACE_SUMMARY_RANGE_EXPRESSIONS[key], tag, c, name });
+  }
+  throw new FilterFieldUnknownError(name, [
+    ...Object.keys(LANGWATCH_QL_STRINGS),
+    ...Object.keys(LANGWATCH_QL_NUMBERS),
+    "status",
+    "model",
+    "label",
+    "traceId",
+    "scenarioRun",
+  ]);
+}
+
+/**
+ * A LangWatchQL trace filter as conditions on `trace_summaries`, for the summary list read: the
+ * dialect's fields, none reading a side table, so the read's scope is not consulted.
+ */
+export function compileLangWatchQLTraceCondition({
+  filter,
+}: {
+  filter: string;
+}): TraceFilterCompilation {
+  const ctx: TranslationContext = {
+    paramCounter: 0,
+    nodeCount: 0,
+    params: {},
+    timeRange: { from: 0, to: 0 },
+  };
+  const c = { ctx };
+  const where = walkFilterAst({
+    queryText: filter,
+    ctx,
+    translateTag: (tag, negated) => polarised(constant(langWatchQLTerm(tag, c)), negated),
+    logic: CONDITION_LOGIC,
+  });
+  if (where.kind === "empty") return where;
+  return { kind: "compiled", where: where.compiled, readsSpans: false };
+}
+
+/** A filter compiled once outside any read, at the tenant's own scope, so it is refused early. */
+export function precompiledTraceFilter({
+  compile,
+  tenantId,
+}: {
+  compile: TraceFilterCompile;
+  tenantId: string;
+}): TraceFilterCompilation {
+  return compile({ scope: tenantScope.single({ tenantId }) });
 }

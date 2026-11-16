@@ -256,7 +256,8 @@ describe.skipIf(!clickHouseConfigured)("updated date-axis pagination (integratio
         {
           downloadMode: true,
           dateField: "updated",
-          ownRead: ownProof({ projectId: tenantId }),
+          // The page reads under this proof's project, so it is the drift tenant's own.
+          ownRead: ownProof({ projectId: filterTenant }),
         },
       );
 

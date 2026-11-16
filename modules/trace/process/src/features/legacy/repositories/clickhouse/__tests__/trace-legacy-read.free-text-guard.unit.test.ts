@@ -14,7 +14,7 @@ import { TraceCanonicalisationService } from "#features/derivation/services/trac
 import { ownProof } from "../../../../../__tests__/support/authorization-proofs.fixture.ts";
 import { traceSummaryRow } from "../../../../../repositories/clickhouse/__tests__/support/trace-summary-row.support.ts";
 import type { TraceClickHouseClient } from "../../../../../repositories/clickhouse/clickhouse.trace-member-client.repository.ts";
-import { traceQueryTranslation } from "../../../../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
+import { traceFilterCompileFor } from "../../../../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
 import { mappedLegacyRead } from "./support/legacy-trace-mapping.support.ts";
 
 const PROJECT_ID = "project-1";
@@ -55,32 +55,22 @@ describe("TraceLegacyReadClickHouseRepository free-text search", () => {
       });
       const endDate = Date.now();
       const startDate = endDate - 86_400_000;
-      const filterWhere = traceQueryTranslation.translateFilter({
+      const compileFilter = traceFilterCompileFor({
         queryText: "hello",
         timeRange: { from: startDate, to: endDate },
       });
-      expect(filterWhere).not.toBeNull();
 
       await repository.listAllTracesForProject(
         { projectId: PROJECT_ID, startDate, endDate, pageSize: 10, filters: {} },
         PROTECTIONS,
-        {
-          filterWhere: filterWhere ?? undefined,
-          authorization: ownProof({ projectId: PROJECT_ID }),
-          ownRead: OWN_READ,
-        },
+        { compileFilter, ownRead: OWN_READ },
       );
 
       expect(query).toHaveBeenCalled();
-      for (const [statement] of query.mock.calls) {
-        expect(
-          checkTenantScope({
-            sql: statement.query,
-            params: statement.query_params,
-            tenantId: PROJECT_ID,
-          }),
-        ).toBeNull();
-      }
+      expect(query.mock.calls.some(([statement]) => statement.query.includes("stored_spans"))).toBe(
+        true,
+      );
+      expect(guardRefusals(query.mock.calls)).toEqual([]);
     });
   });
 
@@ -108,7 +98,7 @@ describe("TraceLegacyReadClickHouseRepository free-text search", () => {
           filters: {},
         },
         PROTECTIONS,
-        { authorization: ownProof({ projectId: PROJECT_ID }), ownRead: OWN_READ },
+        { ownRead: OWN_READ },
       );
 
       expect(query).toHaveBeenCalled();
@@ -139,7 +129,7 @@ describe("TraceLegacyReadClickHouseRepository free-text search", () => {
           filters: { "spans.type": ["llm"], "evaluations.evaluator_id": ["evaluator-1"] },
         },
         PROTECTIONS,
-        { authorization: ownProof({ projectId: PROJECT_ID }), ownRead: OWN_READ },
+        { ownRead: OWN_READ },
       );
 
       expect(query).toHaveBeenCalled();
@@ -153,8 +143,9 @@ describe("TraceLegacyReadClickHouseRepository free-text search", () => {
       const query = vi.fn(
         async (input: { query: string; query_params?: Record<string, unknown> }) => ({
           json: async (): Promise<unknown[]> => {
-            if (input.query.includes("uniq(ts.TraceId)")) return [{ total: "1" }];
-            if (input.query.includes("SELECT s.TraceId")) return [{ TraceId: "trace-1" }];
+            if (input.query.startsWith("SELECT uniq(TraceId) AS total")) return [{ total: "1" }];
+            if (input.query.startsWith("SELECT TraceId, argMax(OccurredAt, UpdatedAt) AS sortTime"))
+              return [{ TraceId: "trace-1" }];
             if (input.query.includes("ts_SpanCount")) {
               return [traceSummaryRow({ ts_OccurredAt: String(Date.now() - 60_000) })];
             }
@@ -178,7 +169,7 @@ describe("TraceLegacyReadClickHouseRepository free-text search", () => {
           filters: {},
         },
         PROTECTIONS,
-        { includeSpans: true, authorization: OWN_READ, ownRead: OWN_READ },
+        { includeSpans: true, ownRead: OWN_READ },
       );
 
       expect(page.groups.flat().map((trace) => trace.trace_id)).toEqual(["trace-1"]);

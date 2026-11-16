@@ -14,20 +14,6 @@ import { traceSummaryRow } from "../../../../../repositories/clickhouse/__tests_
 import { SpanStorageClickHouseRepository } from "../../../../../repositories/clickhouse/span-storage.repository.ts";
 import { mappedLegacyRead } from "./support/legacy-trace-mapping.support.ts";
 
-/** Read source file once and extract a named method body. */
-function extractMethodBody(source: string, methodName: string): string {
-  const pattern = new RegExp(
-    `(?:async\\s+|private\\s+async\\s+|private\\s+)${methodName}[\\s\\S]*?(?=\\n {2}(?:async |private |/\\*\\*|\\}$))`,
-  );
-  const match = source.match(pattern);
-  if (!match) {
-    throw new Error(
-      `Could not extract method "${methodName}" from source. ` + `Pattern: ${pattern.source}`,
-    );
-  }
-  return match[0];
-}
-
 /** Read source file once and extract a named function body (top-level). */
 function extractFunctionBody(source: string, functionName: string): string {
   const pattern = new RegExp(
@@ -58,9 +44,6 @@ describe("trace dedup OOM safety", () => {
     return dir;
   }
 
-  const traceServicePath = path.resolve(__dirname, "..", "trace-legacy-read.repository.ts");
-  const traceServiceSource = fs.readFileSync(traceServicePath, "utf-8");
-
   const clusteringSamplePath = path.resolve(
     __dirname,
     "../../../../../repositories/clickhouse",
@@ -72,25 +55,73 @@ describe("trace dedup OOM safety", () => {
   // clickhouse-trace.service.ts: fetchTracesWithPagination + fetchTraceSummaryRows
   // ---------------------------------------------------------------------------
   describe("fetchTracesWithPagination()", () => {
-    const paginationBody = extractMethodBody(traceServiceSource, "fetchTracesWithPagination");
-    const pageQueriesBody = extractFunctionBody(traceServiceSource, "buildPageQueries");
-    const latestVersionBody = extractFunctionBody(traceServiceSource, "buildLatestVersionOnly");
-    const summaryBody = extractMethodBody(traceServiceSource, "fetchTraceSummaryRows");
-    const body = paginationBody + pageQueriesBody + latestVersionBody + summaryBody;
-
-    describe("when the pagination query SQL is inspected", () => {
-      it("does not use LIMIT 1 BY for deduplication", () => {
-        expect(body).not.toContain("LIMIT 1 BY");
+    /** The page read's built count, id and summary statements on one date axis. */
+    async function pageSql(dateField: "occurred" | "updated"): Promise<{
+      count: string;
+      ids: string;
+      summaries: string;
+    }> {
+      const statements: string[] = [];
+      const service = mappedLegacyRead({
+        resolveClickHouseClient: async () =>
+          ({ query: async () => ({ json: async () => [] }) }) as never,
+        reader: clickHouseQueryClientDouble({
+          async read(request: Parameters<ClickHouseQueryClient["read"]>[0]) {
+            const sql = request.statement.sql;
+            statements.push(sql);
+            if (sql.includes(" AS total ")) return { rows: [{ total: "1" }] };
+            if (sql.includes(" AS sortTime ")) return { rows: [{ TraceId: "trace-1" }] };
+            return { rows: sql.includes("AS ts_SpanCount") ? [traceSummaryRow({})] : [] };
+          },
+        }),
+        traceCanonicalisation: TraceCanonicalisationService.create(),
       });
+      await service
+        .listAllTracesForProject(
+          {
+            projectId: "project-1",
+            startDate: 1_000_000,
+            endDate: 2_000_000,
+            pageSize: 10,
+            filters: {},
+          },
+          { canSeeCosts: true, canSeeCapturedInput: true, canSeeCapturedOutput: true },
+          { ownRead: ownProof({ projectId: "project-1" }), dateField },
+        )
+        .catch(() => undefined);
+      const count = statements.find((sql) => sql.includes(" AS total "));
+      const ids = statements.find((sql) => sql.includes(" AS sortTime "));
+      const summaries = statements.find((sql) => sql.includes("AS ts_SpanCount"));
+      if (count === undefined || ids === undefined || summaries === undefined) {
+        throw new Error("fixture: the page read sent no count, id or summary statement");
+      }
+      return { count, ids, summaries };
+    }
 
-      it("uses max(UpdatedAt) GROUP BY for trace dedup", () => {
-        expect(body).toContain("max(UpdatedAt)");
-        expect(body).toMatch(/GROUP BY\s+TenantId,\s*TraceId/);
-      });
+    describe.each(["occurred", "updated"] as const)(
+      "when the %s-axis pagination statements are built",
+      (dateField) => {
+        it("does not use LIMIT 1 BY for deduplication", async () => {
+          const { count, ids, summaries } = await pageSql(dateField);
+          expect([count, ids, summaries].join("\n")).not.toContain("LIMIT 1 BY");
+        });
 
-      it("uses GROUP BY TraceId for page-selection subquery", () => {
-        expect(body).toMatch(/GROUP BY\s+ts\.TraceId/);
-      });
+        it("elects the summaries' latest version with max(UpdatedAt) GROUP BY", async () => {
+          const { summaries } = await pageSql(dateField);
+          expect(summaries).toContain("max(UpdatedAt)");
+          expect(summaries).toMatch(/GROUP BY\s+TenantId,\s*TraceId/);
+        });
+
+        it("groups the page-selection read by TraceId", async () => {
+          expect((await pageSql(dateField)).ids).toMatch(/GROUP BY\s+TraceId\b/);
+        });
+      },
+    );
+
+    it("elects each trace's latest version before the updated axis counts it", async () => {
+      const { count } = await pageSql("updated");
+      expect(count).toContain("max(UpdatedAt)");
+      expect(count).toMatch(/GROUP BY\s+TenantId,\s*TraceId/);
     });
   });
 

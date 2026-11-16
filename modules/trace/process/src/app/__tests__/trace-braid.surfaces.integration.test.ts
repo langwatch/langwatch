@@ -160,7 +160,6 @@ function composeApp(): TraceModule {
   const canonicalisation = TraceCanonicalisationService.create();
   const legacy = TraceLegacyReadClickHouseRepository.create({
     clickhouse,
-    resolveClickHouseClient: async () => ch,
     reader: traceQueryClientFor(ch),
   });
   const allowed = async () => true;

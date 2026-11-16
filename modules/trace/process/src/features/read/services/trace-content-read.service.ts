@@ -3,13 +3,16 @@ import type {
   Span,
   Trace,
   TraceLegacyListInput,
-  TraceSummaryListOptions,
   TraceSummaryListQuery,
   TraceSummaryPage,
   TracesForProjectResult,
 } from "@langwatch/trace-contract";
 
 import type { TraceLegacyRead } from "../../../services/trace-viewer.service.ts";
+import type {
+  TraceLegacySummaryListOptions,
+  TraceLegacyFilterOption,
+} from "../../legacy/repositories/trace-legacy-read.repository.ts";
 
 /** The content reads over the legacy read; every store read carries the caller's own-only proof. */
 export class TraceContentReadService {
@@ -29,6 +32,7 @@ export class TraceContentReadService {
       includeSpans?: boolean;
       resolveBlobs?: boolean;
       scrollId?: string | null;
+      compileFilter?: TraceLegacyFilterOption["compileFilter"];
     };
   }): Promise<TracesForProjectResult> {
     return this.read.getAllTracesForProject(input.query, input.protections, {
@@ -39,7 +43,7 @@ export class TraceContentReadService {
 
   listTraceSummaries(input: {
     query: TraceSummaryListQuery;
-    options?: TraceSummaryListOptions;
+    options?: TraceLegacySummaryListOptions;
   }): Promise<TraceSummaryPage> {
     return this.read.listTraceSummaries(input.query, input.options);
   }

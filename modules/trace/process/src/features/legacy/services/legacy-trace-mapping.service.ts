@@ -2,7 +2,6 @@ import type { Authorization } from "@langwatch/authorization";
 import type { RetentionDaysProvider } from "@langwatch/clickhouse-client";
 import type {
   GetAllTracesForProjectInput,
-  GetAllTracesForProjectOptions,
   ProjectableTrace,
   Protections,
   Trace,
@@ -34,6 +33,7 @@ import type {
   ResolveTraceSpansFn,
   TraceLegacyReadRepository,
   TraceLegacyRow,
+  TraceLegacyListOptions,
 } from "../repositories/trace-legacy-read.repository.ts";
 import { mapNormalizedSpansToSpans } from "../rules/trace-legacy-span-mapping.rules.ts";
 import { mapTraceSummaryToTrace } from "../rules/trace-legacy-summary-mapping.rules.ts";
@@ -165,7 +165,7 @@ export class LegacyTraceMappingService {
   async listAllTracesForProject(
     input: GetAllTracesForProjectInput,
     protections: Protections,
-    { ownRead, ...options }: GetAllTracesForProjectOptions & { ownRead: Authorization },
+    { ownRead, ...options }: TraceLegacyListOptions & { ownRead: Authorization },
   ): Promise<TracesForProjectResult> {
     const projectId = input.projectId;
     const { summaries, spans, evaluations, events, annotations, totalHits, scrollId, ...rest } =
