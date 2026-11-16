@@ -2699,6 +2699,7 @@ export interface LwqlPrismaRows {
     readonly decidedByUserId: "String?";
     readonly decidedByApiKeyId: "String?";
     readonly restoredByUserId: "String?";
+    readonly restoredByApiKeyId: "String?";
     readonly targets: "Json";
     readonly requestedAt: "DateTime";
     readonly decidedAt: "DateTime?";

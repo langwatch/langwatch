@@ -27850,6 +27850,15 @@
           "documentation": ""
         },
         {
+          "name": "restoredByApiKeyId",
+          "columnName": "restoredByApiKeyId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
           "name": "targets",
           "columnName": "targets",
           "type": "Json",
