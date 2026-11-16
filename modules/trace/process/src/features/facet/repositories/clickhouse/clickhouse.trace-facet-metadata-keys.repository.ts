@@ -1,12 +1,13 @@
+import { cond, fn } from "@langwatch/clickhouse-client/builder";
+
+import { traceSummaries } from "../../../../repositories/clickhouse/clickhouse.trace-summaries.table.ts";
 import type {
   DynamicKeysDef,
   FacetQuery,
   FacetQueryContext,
 } from "../../rules/trace-facet-registry.rules.ts";
-import {
-  ClickHouseTraceFacetQueryRepository,
-  KEY_DISCOVERY_SETTINGS,
-} from "./clickhouse.trace-facet-query.repository.ts";
+import { ClickHouseTraceFacetQueryRepository } from "./clickhouse.trace-facet-query.repository.ts";
+import { FACET_SOURCES, facetRows, facetScopeOf } from "./clickhouse.trace-facet-scope.mapper.ts";
 
 class ClickHouseTraceFacetMetadataKeysRepository {
   private constructor(private readonly facetQueries: ClickHouseTraceFacetQueryRepository) {}
@@ -21,38 +22,20 @@ class ClickHouseTraceFacetMetadataKeysRepository {
    * Discovers metadata attribute keys on the trace table.
    */
   buildMetadataKeysFacetQuery(ctx: FacetQueryContext): FacetQuery {
-    const where = this.facetQueries.buildTimeWhere("OccurredAt", ctx);
-    const prefixFilter = ctx.prefix ? "AND lower(key) ILIKE concat({prefix:String}, '%')" : "";
-
-    // Same I/O optimisation as `span-attribute-keys.ts`: stay entirely on the
-    // keys subcolumn so the values side of the Map never gets loaded. The
-    // empty-map short-circuit probes `Attributes.keys`, not `Attributes` —
-    // `length(Attributes)` would materialise the whole Map (keys and values)
-    // just to count entries, pulling the heavy values column into memory.
-    return {
-      sql: `
-        SELECT
-          key AS facet_value,
-          count() AS cnt,
-          count() OVER () AS total_distinct
-        FROM (
-          SELECT arrayJoin(Attributes.keys) AS key
-          FROM trace_summaries
-          WHERE ${where}
-            AND length(Attributes.keys) > 0
-        )
-        WHERE key != ''
-          ${prefixFilter}
-        GROUP BY key
-        ORDER BY cnt DESC
-        LIMIT {limit:UInt32} OFFSET {offset:UInt32}
-      `,
-      params: {
-        ...this.facetQueries.baseParams(ctx),
-        ...(ctx.prefix ? { prefix: ctx.prefix } : {}),
-      },
-      settings: KEY_DISCOVERY_SETTINGS,
-    };
+    const scope = facetScopeOf(ctx);
+    // `mapKeys` reads the keys subcolumn only, so the Map's values are never loaded.
+    const keys = fn.mapKeys(traceSummaries.Attributes);
+    const rows = facetRows({ source: FACET_SOURCES.trace_summaries, scan: ctx, scope })
+      .where(() => cond.gt(fn.length(keys), 0), { inElection: false })
+      .select({ key: fn.arrayJoin(keys) })
+      .as("keys");
+    return this.facetQueries.countedValues({
+      scope,
+      rows,
+      value: rows.key,
+      where: cond.ne(rows.key, ""),
+      ctx,
+    });
   }
 
   /**

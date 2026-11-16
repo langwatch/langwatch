@@ -178,7 +178,6 @@ function composeApp(): TraceModule {
       }),
       list: TraceListService.create({
         repository: TraceListClickHouseRepository.create({
-          clickhouse,
           reader: traceQueryClientFor(ch),
         }),
         evaluationRuns,

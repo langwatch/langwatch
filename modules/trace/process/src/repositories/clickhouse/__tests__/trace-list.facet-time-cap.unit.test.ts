@@ -2,29 +2,23 @@
 // server-side time cap, so one tenant's slow scan cannot hold the shared
 // statement slots that every other tenant's reads queue for.
 // @see specs/traces-v2/search.feature
-import { AuthorizedClickHouse, type QueryRequest, tenantScope } from "@langwatch/clickhouse-client";
+import type { QueryRequest } from "@langwatch/clickhouse-client";
 import {
   idIndexedClientDouble,
   type ScriptedStatements,
 } from "@langwatch/clickhouse-client/testing";
-import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { describe, expect, it, vi } from "vitest";
 
 import { ownProof } from "../../../__tests__/support/authorization-proofs.fixture.ts";
+import { EVENT_FACET } from "../../../features/facet/repositories/clickhouse/clickhouse.trace-facet-events.repository.ts";
+import { LABEL_FACET } from "../../../features/facet/repositories/clickhouse/clickhouse.trace-facet-label.repository.ts";
 import { TRACE_ID_INDEXES } from "../clickhouse.trace-id-indexes.database.ts";
 import { TraceListClickHouseRepository } from "../trace-list.repository.ts";
 
-/** Raw facet queries go through `clickhouse`; built facet reads through `reader`. */
+/** Every facet read reaches the driver through the reader as a built statement. */
 function makeRepo() {
-  const requests: QueryRequest[] = [];
   const statements: string[] = [];
   const builtRequests: QueryRequest[] = [];
-  const raw = clickHouseQueryClientDouble({
-    query: vi.fn(async (request: QueryRequest) => {
-      requests.push(request);
-      return { rows: [] };
-    }),
-  });
   const reader = idIndexedClientDouble({
     indexes: TRACE_ID_INDEXES,
     driver: {
@@ -35,15 +29,7 @@ function makeRepo() {
       }),
     },
   });
-  return {
-    repo: TraceListClickHouseRepository.create({
-      clickhouse: new AuthorizedClickHouse({ resolveClient: async () => raw }),
-      reader,
-    }),
-    requests,
-    statements,
-    builtRequests,
-  };
+  return { repo: TraceListClickHouseRepository.create({ reader }), statements, builtRequests };
 }
 
 const authorization = ownProof({ projectId: "tenant-1" });
@@ -65,8 +51,6 @@ function expectCapped(sql: string) {
   expect(memory).toBeGreaterThanOrEqual(2 * GiB);
   expect(memory).toBeLessThanOrEqual(4 * GiB);
 }
-
-const RAW_FACET_SQL = `SELECT '' AS facet_value, 0 AS cnt, 0 AS total_distinct FROM trace_summaries WHERE ${tenantScope("OccurredAt")}`;
 
 describe("the facet reads' time and memory cap", () => {
   describe("when the sidebar batches categorical and range facets over evaluation runs", () => {
@@ -103,54 +87,35 @@ describe("the facet reads' time and memory cap", () => {
     });
   });
 
-  describe("when a raw facet query brings its own guard", () => {
+  describe("when a queryBuilder facet brings its own memory guard", () => {
     /** @scenario "A capped facet read gives its shared slot back" */
-    it("keeps that guard's own memory ceiling and adds the time cap", async () => {
-      const { repo, requests } = makeRepo();
+    it("keeps the facet time and memory cap beside its spill threshold", async () => {
+      const { repo, statements } = makeRepo();
 
-      await repo.findCategoricalFacetRaw({
-        authorization,
-        query: { sql: RAW_FACET_SQL, params: {}, settings: { max_memory_usage: "1000000" } },
+      await repo.findQueryBuilderFacet({
+        table: "stored_spans",
+        query: EVENT_FACET.queryBuilder({ authorization, timeRange, limit: 50, offset: 0 }),
       });
 
-      expect(requests[0]?.settings?.max_memory_usage).toBe("1000000");
-      expect(Number(requests[0]?.settings?.max_execution_time)).toBeGreaterThan(0);
-    });
-  });
-
-  describe("when a raw facet query names settings of its own", () => {
-    /** @scenario "A facet read stopped at its time cap is not run again" */
-    it("never loosens the time cap", async () => {
-      const { repo, requests } = makeRepo();
-
-      await repo.findCategoricalFacetRaw({
-        authorization,
-        query: {
-          sql: RAW_FACET_SQL,
-          params: {},
-          settings: { max_execution_time: "600", timeout_overflow_mode: "break" },
-        },
-      });
-
-      expect(requests[0]?.settings).toMatchObject({
-        max_execution_time: "20",
-        timeout_overflow_mode: "throw",
-      });
+      expect(statements).toHaveLength(1);
+      expectCapped(statements[0]!);
+      expect(statements[0]).toContain("max_bytes_before_external_group_by = 536870912");
     });
   });
 
   describe("when a facet read hits its time cap", () => {
     /** @scenario "A facet read stopped at its time cap is not run again" */
-    it("asks the client not to run a raw facet statement again", async () => {
-      const { repo, requests } = makeRepo();
+    it("asks the client not to run a queryBuilder facet read again", async () => {
+      const { repo, builtRequests } = makeRepo();
 
-      await repo.findCategoricalFacetRaw({
-        authorization,
-        query: { sql: RAW_FACET_SQL, params: {} },
+      await repo.findQueryBuilderFacet({
+        table: "trace_summaries",
+        query: LABEL_FACET.queryBuilder({ authorization, timeRange, limit: 50, offset: 0 }),
       });
 
-      expect(requests).toHaveLength(1);
-      expect(requests[0]?.retryOnTimeout).toBe(false);
+      expect(builtRequests).toHaveLength(1);
+      expect(builtRequests[0]?.retryOnTimeout).toBe(false);
+      expect(builtRequests[0]?.sql).toContain("timeout_overflow_mode = 'throw'");
     });
 
     /** @scenario "A facet read stopped at its time cap is not run again" */

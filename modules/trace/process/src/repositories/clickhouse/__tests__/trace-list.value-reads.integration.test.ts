@@ -15,10 +15,7 @@ import {
 } from "../../../__tests__/support/authorization-proofs.fixture.ts";
 import type { TraceSuggestField } from "../../trace-list.repository.ts";
 import { TraceListClickHouseRepository } from "../trace-list.repository.ts";
-import {
-  authorizedClickHouseFor,
-  traceQueryClientFor,
-} from "./support/authorized-clickhouse.support.ts";
+import { traceQueryClientFor } from "./support/authorized-clickhouse.support.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
@@ -154,7 +151,6 @@ beforeAll(async () => {
   if (!clickHouseConfigured) return;
   ch = await startMigratedTraceClickHouse();
   repo = TraceListClickHouseRepository.create({
-    clickhouse: authorizedClickHouseFor(ch),
     reader: traceQueryClientFor(ch),
   });
   const insert = (table: string, values: Record<string, unknown>[]) =>

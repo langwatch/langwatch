@@ -15,10 +15,7 @@ import {
 } from "../../../__tests__/support/authorization-proofs.fixture.ts";
 import { traceFilterCompileFor } from "../../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
 import { TraceListClickHouseRepository } from "../trace-list.repository.ts";
-import {
-  authorizedClickHouseFor,
-  traceQueryClientFor,
-} from "./support/authorized-clickhouse.support.ts";
+import { traceQueryClientFor } from "./support/authorized-clickhouse.support.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
@@ -233,7 +230,6 @@ beforeAll(async () => {
   ch = await startMigratedTraceClickHouse();
   takeClock();
   repo = TraceListClickHouseRepository.create({
-    clickhouse: authorizedClickHouseFor(ch),
     reader: traceQueryClientFor(ch),
   });
 

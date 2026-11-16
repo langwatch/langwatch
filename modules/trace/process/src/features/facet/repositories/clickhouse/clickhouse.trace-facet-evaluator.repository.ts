@@ -1,9 +1,18 @@
+import { clickhouseRead, cond, fn, param } from "@langwatch/clickhouse-client/builder";
+
+import { evaluationRuns as runs } from "../../../../repositories/clickhouse/clickhouse.evaluation-runs.table.ts";
 import type {
   FacetQuery,
   FacetQueryContext,
   QueryBuilderCategoricalDef,
 } from "../../rules/trace-facet-registry.rules.ts";
 import { ClickHouseTraceFacetQueryRepository } from "./clickhouse.trace-facet-query.repository.ts";
+import {
+  FACET_SETTINGS,
+  FACET_SOURCES,
+  facetRows,
+  facetScopeOf,
+} from "./clickhouse.trace-facet-scope.mapper.ts";
 
 /**
  * Cap on distinct label values surfaced per evaluator in drilldown.
@@ -20,87 +29,77 @@ class ClickHouseTraceFacetEvaluatorRepository {
   }
 
   /**
-   * Discovers evaluators with label display and aggregated pass/fail/score stats.
+   * Discovers evaluators with label display and aggregated pass/fail/score stats. The label
+   * buckets' sumMap runs once per group, in the inner read; the outer read only reshapes it.
    */
   buildEvaluatorFacetQuery(ctx: FacetQueryContext): FacetQuery {
-    const where = this.facetQueries.buildTimeWhere("ScheduledAt", ctx);
-    const prefixFilter = ctx.prefix
-      ? "AND lower(ifNull(EvaluatorName, '')) ILIKE concat({prefix:String}, '%')"
-      : "";
-
-    // The label-buckets sumMap is hoisted into the inner aggregation so it
-    // runs once per group. The outer SELECT just reshapes the (keys, values)
-    // tuple — earlier code referenced `sumMap(...).1` and `sumMap(...).2`
-    // in the same SELECT, which evaluates the aggregate twice per group on
-    // a label-happy evaluator. Bounded CPU waste, fixed by the subquery.
-    return {
-      sql: `
-        SELECT
-          facet_value,
-          facet_label,
-          cnt,
-          passed_count,
-          failed_count,
-          errored_count,
-          score_min,
-          score_max,
-          has_score,
-          distinct_scores,
-          has_label,
-          -- Top-N distinct emitted-label values + counts for the drilldown's
-          -- clickable label-filter rows. arrayFilter drops the empty/null
-          -- bucket, arrayReverseSort ranks by count desc, arraySlice caps the
-          -- list so a label-happy evaluator can't balloon the discover
-          -- payload. The (value, count) tuples serialise as [[value, count],
-          -- …] JSON arrays the mapper reshapes.
-          arraySlice(
-            arrayReverseSort(
-              x -> x.2,
-              arrayFilter(
-                x -> x.1 != '',
-                arrayZip(label_buckets.1, label_buckets.2)
-              )
+    const scope = facetScopeOf(ctx);
+    const name = fn.ifNull(runs.EvaluatorName, "");
+    const evaluators = facetRows({ source: FACET_SOURCES.evaluation_runs, scan: ctx, scope })
+      .where(
+        () =>
+          cond.and(
+            cond.ne(fn.ifNull(runs.EvaluatorId, ""), ""),
+            this.facetQueries.prefixed(name, ctx.prefix),
+          ),
+        { inElection: false },
+      )
+      .select({
+        facet_value: runs.EvaluatorId,
+        facet_label: fn.if(cond.ne(name, ""), runs.EvaluatorName, runs.EvaluatorId),
+        cnt: fn.count(),
+        passed_count: fn.countIf(cond.eq(runs.Passed, 1)),
+        failed_count: fn.countIf(cond.eq(runs.Passed, 0)),
+        errored_count: fn.countIf(cond.eq(runs.Status, "error")),
+        score_min: fn.minIf(runs.Score, cond.isNotNull(runs.Score)),
+        score_max: fn.maxIf(runs.Score, cond.isNotNull(runs.Score)),
+        has_score: cond.gt(fn.countIf(cond.isNotNull(runs.Score)), 0),
+        // 0..2 exactly, 3 for more: the drilldown only asks whether a score is binary.
+        distinct_scores: fn.uniqUpTo(2, runs.Score),
+        has_label: cond.gt(
+          fn.countIf(cond.and(cond.isNotNull(runs.Label), cond.ne(runs.Label, ""))),
+          0,
+        ),
+        label_buckets: fn.sumMap(fn.array(fn.ifNull(runs.Label, "")), fn.array(param.uint64(1))),
+      })
+      .groupBy(runs.EvaluatorId, runs.EvaluatorName)
+      .as("evaluators");
+    return clickhouseRead({ scope })
+      .from(evaluators)
+      .select({
+        facet_value: evaluators.facet_value,
+        facet_label: evaluators.facet_label,
+        cnt: evaluators.cnt,
+        passed_count: evaluators.passed_count,
+        failed_count: evaluators.failed_count,
+        errored_count: evaluators.errored_count,
+        score_min: evaluators.score_min,
+        score_max: evaluators.score_max,
+        has_score: evaluators.has_score,
+        distinct_scores: evaluators.distinct_scores,
+        has_label: evaluators.has_label,
+        // The top emitted labels by count, the empty bucket dropped, for the drilldown's rows.
+        label_values: fn.arraySlice(
+          fn.arrayReverseSortBy(
+            (bucket) => fn.tupleElement(bucket, "1"),
+            fn.arrayFilter(
+              (bucket) => cond.ne(fn.toString(fn.tupleElement(bucket, "0")), ""),
+              fn.arrayZip(
+                fn.tupleElement(evaluators.label_buckets, "0"),
+                fn.tupleElement(evaluators.label_buckets, "1"),
+              ),
             ),
-            1, ${LABEL_VALUES_TOP_N}
-          ) AS label_values,
-          count() OVER () AS total_distinct
-        FROM (
-          SELECT
-            EvaluatorId AS facet_value,
-            if(ifNull(EvaluatorName, '') != '', EvaluatorName, EvaluatorId) AS facet_label,
-            count() AS cnt,
-            countIf(Passed = 1) AS passed_count,
-            countIf(Passed = 0) AS failed_count,
-            countIf(Status = 'error') AS errored_count,
-            minIf(Score, isNotNull(Score)) AS score_min,
-            maxIf(Score, isNotNull(Score)) AS score_max,
-            countIf(isNotNull(Score)) > 0 AS has_score,
-            -- Distinct non-null score values, capped at 3 (uniqUpTo(2) returns
-            -- 0..2 exactly and 3 for "more than 2"). The drilldown only branches
-            -- on distinct_scores == 2 to suppress a pointless score slider when
-            -- the score is a binary 0/1 that just mirrors the pass/fail verdict,
-            -- so counting beyond 3 distinct values wastes CPU/memory on
-            -- evaluators with many distinct scores.
-            uniqUpTo(2)(IF(isNotNull(Score), Score, NULL)) AS distinct_scores,
-            countIf(isNotNull(Label) AND Label != '') > 0 AS has_label,
-            -- sumMap aggregates Label → count in one pass and is referenced
-            -- twice in the outer SELECT (label_buckets.1 + .2). Hoisting it
-            -- here computes it once per group.
-            sumMap([ifNull(Label, '')], [toUInt64(1)]) AS label_buckets
-          FROM evaluation_runs
-          WHERE ${where}
-            AND ifNull(EvaluatorId, '') != ''
-            ${prefixFilter}
-          GROUP BY EvaluatorId, EvaluatorName
-        )
-        ORDER BY cnt DESC
-        LIMIT {limit:UInt32} OFFSET {offset:UInt32}
-      `,
-      params: {
-        ...this.facetQueries.baseParams(ctx),
-        ...(ctx.prefix ? { prefix: ctx.prefix } : {}),
-      },
-    };
+          ),
+          1,
+          LABEL_VALUES_TOP_N,
+        ),
+        total_distinct: fn.over(fn.count(), {}),
+      })
+      .orderBy("cnt", "DESC")
+      .limit(ctx.limit)
+      .offset(ctx.offset)
+      .settings(FACET_SETTINGS)
+      .build();
   }
 }
 

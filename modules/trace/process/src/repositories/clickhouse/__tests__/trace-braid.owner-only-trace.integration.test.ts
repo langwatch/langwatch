@@ -14,10 +14,7 @@ import { traceFilterCompileFor } from "../../../services/__tests__/fixtures/trac
 import { TraceListClickHouseRepository } from "../trace-list.repository.ts";
 import { ClickHouseTraceSpanRepository } from "../trace-span.repository.ts";
 import { TraceSummaryClickHouseRepository } from "../trace-summary.repository.ts";
-import {
-  authorizedClickHouseFor,
-  traceQueryClientFor,
-} from "./support/authorized-clickhouse.support.ts";
+import { traceQueryClientFor } from "./support/authorized-clickhouse.support.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
@@ -113,8 +110,7 @@ const settings = { async_insert: 0, wait_for_async_insert: 0 } as const;
 beforeAll(async () => {
   if (!clickHouseConfigured) return;
   ch = await startMigratedTraceClickHouse();
-  const clickhouse = authorizedClickHouseFor(ch);
-  list = TraceListClickHouseRepository.create({ clickhouse, reader: traceQueryClientFor(ch) });
+  list = TraceListClickHouseRepository.create({ reader: traceQueryClientFor(ch) });
   spans = ClickHouseTraceSpanRepository.create({ clickhouse: traceQueryClientFor(ch) });
   summaries = TraceSummaryService.create({
     repository: TraceSummaryClickHouseRepository.create({

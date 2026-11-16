@@ -1,7 +1,6 @@
 // The sidebar's facet reads as built statements: each fenced by the proof with the tenant setting,
 // the filter applied after the election on summaries and as a trace-pair subquery elsewhere; the
 // companion integration suite proves the counts.
-import { AuthorizedClickHouse } from "@langwatch/clickhouse-client";
 import {
   idIndexedClientDouble,
   type ScriptedStatements,
@@ -24,7 +23,6 @@ function makeRepo() {
     driver: { execute: vi.fn<ScriptedStatements["execute"]>(async () => ({ rows: [] })) },
   });
   const repo = TraceListClickHouseRepository.create({
-    clickhouse: new AuthorizedClickHouse({ resolveClient: async () => client }),
     reader: client,
   });
   return { repo, read: vi.spyOn(client, "read") };

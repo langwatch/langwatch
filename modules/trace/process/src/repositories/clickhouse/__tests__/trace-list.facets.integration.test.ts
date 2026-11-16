@@ -4,7 +4,6 @@
  * @see modules/trace/specs/trace-filter-built-conditions.feature
  */
 import type { Authorization } from "@langwatch/authorization";
-import { AuthorizedClickHouse } from "@langwatch/clickhouse-client";
 import {
   type MigratedAppReaderClickHouse,
   startMigratedAppReaderClickHouse,
@@ -840,7 +839,6 @@ beforeAll(async () => {
     insert: (table, values) => ch.admin.insert({ table, values, format: "JSONEachRow" }),
   });
   repo = TraceListClickHouseRepository.create({
-    clickhouse: new AuthorizedClickHouse({ resolveClient: async () => ch.reader }),
     reader: ch.reader,
   });
 }, 300_000);

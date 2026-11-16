@@ -37,7 +37,7 @@ function heldRepository({
     repository: createApiFixture<TraceListRead>({
       findBatchedFacets: async (params) => hold(params.timeRange, batch),
       findCategoricalFacet: async (params) => hold(params.timeRange, empty),
-      findCategoricalFacetRaw: async () => hold(undefined, empty),
+      findQueryBuilderFacet: async () => hold(undefined, empty),
       findRangeStatsForTable: async (params) => hold(params.timeRange, { min: 0, max: 0 }),
       findDiscreteValues: async (params) =>
         hold(params.timeRange, { values: [], distinctCount: 0 }),

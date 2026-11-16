@@ -66,7 +66,12 @@ interface TraceSpec {
   error: boolean;
   occurredAtMs: number;
   updatedAtMs?: number;
+  labels: string[];
+  metadata?: Record<string, string>;
 }
+
+/** One span event: its name and attributes (`event.metrics.*` keys feed the event facet). */
+type SpanEvent = [name: string, attributes: Record<string, string>];
 
 const summary = (trace: TraceSpec) => ({
   TenantId: trace.tenant,
@@ -81,10 +86,14 @@ const summary = (trace: TraceSpec) => ({
   TotalCost: trace.cost,
   SpanCount: trace.spans,
   ContainsErrorStatus: trace.error,
-  Attributes: { "service.name": trace.service },
+  Attributes: {
+    "service.name": trace.service,
+    "langwatch.labels": JSON.stringify(trace.labels),
+    ...trace.metadata,
+  },
 });
 
-const span = (trace: TraceSpec, type: string, kind: string) => ({
+const span = (trace: TraceSpec, type: string, kind: string, events: SpanEvent[] = []) => ({
   TenantId: trace.tenant,
   TraceId: trace.traceId,
   SpanId: `s_${trace.traceId}_${type}`,
@@ -92,6 +101,9 @@ const span = (trace: TraceSpec, type: string, kind: string) => ({
   EndTime: at(trace.occurredAtMs + 1_000),
   UpdatedAt: at(trace.occurredAtMs),
   SpanAttributes: { "langwatch.span.type": type, kind },
+  "Events.Timestamp": events.map(() => at(trace.occurredAtMs)),
+  "Events.Name": events.map(([name]) => name),
+  "Events.Attributes": events.map(([, attributes]) => attributes),
 });
 
 const evaluation = (
@@ -104,6 +116,7 @@ const evaluation = (
   Version: "1",
   EvaluatorId: "evaluator-1",
   EvaluatorType: "custom",
+  EvaluatorName: "Judge",
   TraceId: trace.traceId,
   IsGuardrail: 0,
   Status: run.status,
@@ -133,6 +146,8 @@ export async function seedFacetRows({
   const preShare = base - 60 * MINUTE;
   const traces = {
     t1: {
+      labels: ["prod", "beta"],
+      metadata: { "metadata.team": "red" },
       tenant: seed.member,
       traceId: "t1",
       service: "api-a",
@@ -144,6 +159,7 @@ export async function seedFacetRows({
       updatedAtMs: base + 1_000,
     },
     t1Stale: {
+      labels: ["stale"],
       tenant: seed.member,
       traceId: "t1",
       service: "api-stale",
@@ -154,6 +170,7 @@ export async function seedFacetRows({
       occurredAtMs: base,
     },
     t2: {
+      labels: ["prod"],
       tenant: seed.member,
       traceId: "t2",
       service: "api-b",
@@ -164,6 +181,7 @@ export async function seedFacetRows({
       occurredAtMs: base,
     },
     t0: {
+      labels: ["old"],
       tenant: seed.member,
       traceId: "t0",
       service: "api-old",
@@ -174,6 +192,8 @@ export async function seedFacetRows({
       occurredAtMs: preShare,
     },
     t3: {
+      labels: ["agg"],
+      metadata: { "metadata.team": "blue" },
       tenant: seed.aggregate,
       traceId: "t3",
       service: "api-agg",
@@ -184,6 +204,8 @@ export async function seedFacetRows({
       occurredAtMs: base,
     },
     o1: {
+      labels: ["other"],
+      metadata: { "metadata.secret": "x" },
       tenant: seed.other,
       traceId: "t1",
       service: "api-other",
@@ -194,6 +216,7 @@ export async function seedFacetRows({
       occurredAtMs: base,
     },
     o2: {
+      labels: ["prod", "private"],
       tenant: seed.other,
       traceId: "t2",
       service: "api-b",
@@ -206,11 +229,11 @@ export async function seedFacetRows({
   } satisfies Record<string, TraceSpec>;
   await insert("trace_summaries", Object.values(traces).map(summary));
   await insert("stored_spans", [
-    span(traces.t1, "llm", "keep"),
-    span(traces.t2, "tool", "drop"),
-    span(traces.t0, "chain", "keep"),
-    span(traces.t3, "agent", "keep"),
-    span(traces.o1, "rag", "keep"),
+    span(traces.t1, "llm", "keep", [["feedback", { "event.metrics.vote": "1", note: "x" }]]),
+    span(traces.t2, "tool", "drop", [["feedback", { "event.metrics.vote": "0" }]]),
+    span(traces.t0, "chain", "keep", [["retry", { attempt: "2" }]]),
+    span(traces.t3, "agent", "keep", [["feedback", { "event.metrics.vote": "1" }]]),
+    span(traces.o1, "rag", "keep", [["leak", { "event.metrics.leak": "9" }]]),
     span(traces.o2, "tool", "keep"),
   ]);
   await insert("evaluation_runs", [

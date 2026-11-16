@@ -65,7 +65,7 @@ function recordingRepository({
       calls.categorical.push(params);
       return { values: [], totalDistinct: 0 };
     }),
-    findCategoricalFacetRaw: vi.fn(async (params) => {
+    findQueryBuilderFacet: vi.fn(async (params) => {
       calls.raw.push(params);
       return { values: [], totalDistinct: 0 };
     }),

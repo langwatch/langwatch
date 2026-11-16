@@ -281,15 +281,13 @@ export class TraceFacetValuesService {
       });
     } else {
       const query = def.queryBuilder({
+        authorization: params.authorization,
         timeRange: params.timeRange,
         limit: params.limit,
         offset: params.offset,
-        prefix: params.prefix,
+        ...(params.prefix ? { prefix: params.prefix } : {}),
       });
-      result = await this.repository.findCategoricalFacetRaw({
-        authorization: params.authorization,
-        query,
-      });
+      result = await this.repository.findQueryBuilderFacet({ table: def.table, query });
     }
 
     if (def.key === "topic" || def.key === "subtopic") {

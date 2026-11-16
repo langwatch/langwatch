@@ -56,12 +56,6 @@ export interface TraceListSummary {
   redactedByVisibilityWindow?: boolean;
 }
 
-export interface TraceListFacetQuery {
-  sql: string;
-  params: Record<string, unknown>;
-  settings?: Record<string, string>;
-}
-
 export type TraceListSortColumn =
   | "OccurredAt"
   | "TotalDurationMs"

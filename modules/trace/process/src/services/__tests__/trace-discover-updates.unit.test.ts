@@ -18,7 +18,7 @@ function emptyRepository(): TraceListRead {
   return createApiFixture<TraceListRead>({
     findBatchedFacets: async () => ({ categoricals: {}, ranges: {} }),
     findCategoricalFacet: async () => ({ values: [], totalDistinct: 0 }),
-    findCategoricalFacetRaw: async () => ({ values: [], totalDistinct: 0 }),
+    findQueryBuilderFacet: async () => ({ values: [], totalDistinct: 0 }),
     findRangeStatsForTable: async () => ({ min: 0, max: 0 }),
     findDiscreteValues: async () => ({ values: [], distinctCount: 0 }),
   });

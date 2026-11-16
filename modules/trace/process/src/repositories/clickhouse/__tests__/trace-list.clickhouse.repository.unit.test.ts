@@ -1,6 +1,5 @@
 // The statements the list reads build: a page in two stages (keys, then payload) and the count,
 // each under one full-window version dedup; the companion integration suites prove the rows.
-import { AuthorizedClickHouse } from "@langwatch/clickhouse-client";
 import { cond } from "@langwatch/clickhouse-client/builder";
 import {
   idIndexedClientDouble,
@@ -38,7 +37,6 @@ function makeRepo() {
   });
   return {
     repo: TraceListClickHouseRepository.create({
-      clickhouse: new AuthorizedClickHouse({ resolveClient: async () => client }),
       reader: client,
     }),
     client,

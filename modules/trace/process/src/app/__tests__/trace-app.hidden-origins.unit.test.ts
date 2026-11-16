@@ -12,7 +12,6 @@ import { describe, expect, it, vi } from "vitest";
 import { ownProof } from "../../__tests__/support/authorization-proofs.fixture.ts";
 import type { TraceFilterCompile } from "../../features/query/repositories/clickhouse/clickhouse.trace-filter-condition.mapper.ts";
 import { traceSummaries } from "../../repositories/clickhouse/clickhouse.trace-summaries.table.ts";
-import { HIDDEN_ORIGINS_PARAM } from "../../rules/trace-filter-hidden-origins.rules.ts";
 import type { TracesListReader } from "../trace.app.ts";
 import { createTraceAppHarness } from "./support/trace-app.harness.ts";
 
@@ -81,7 +80,6 @@ describe("TraceModule hidden origins", () => {
 
       await expect(hiddenOriginsOf(harnessed)).resolves.toEqual([LANGY_TRACE_ORIGIN]);
       const facetFilter = await statusFacetFilter(harnessed);
-      expect(facetFilter?.where.params[HIDDEN_ORIGINS_PARAM]).toEqual([LANGY_TRACE_ORIGIN]);
       expect(hiddenOriginsIn(facetFilter?.compile)).toEqual([LANGY_TRACE_ORIGIN]);
       expect(harnessed.findById).toHaveBeenCalledWith(PROJECT_ID);
     });
@@ -102,7 +100,6 @@ describe("TraceModule hidden origins", () => {
 
       await expect(hiddenOriginsOf(harnessed)).resolves.toBeUndefined();
       const facetFilter = await statusFacetFilter(harnessed);
-      expect(facetFilter?.where.params[HIDDEN_ORIGINS_PARAM]).toBeUndefined();
       expect(hiddenOriginsIn(facetFilter?.compile)).toBeUndefined();
     });
   });

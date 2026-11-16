@@ -159,17 +159,13 @@ export class TraceFacetDescriptorService {
       });
     } else {
       const query = def.queryBuilder({
+        authorization: params.authorization,
         timeRange: params.timeRange,
         limit,
         offset: 0,
-        ...(filter
-          ? { filterWhere: filter.where, isLiveWindow: params.timeRange.live === true }
-          : {}),
+        ...(filter ? { compileFilter: filter.compile } : {}),
       });
-      result = await this.repository.findCategoricalFacetRaw({
-        authorization: params.authorization,
-        query,
-      });
+      result = await this.repository.findQueryBuilderFacet({ table: def.table, query });
     }
 
     if (def.key === "topic" || def.key === "subtopic") {
@@ -223,14 +219,12 @@ export class TraceFacetDescriptorService {
     limit: number;
   }): Promise<DynamicKeysFacetDescriptor> {
     const query = def.queryBuilder({
+      authorization: params.authorization,
       timeRange: params.timeRange,
       limit,
       offset: 0,
     });
-    const result = await this.repository.findCategoricalFacetRaw({
-      authorization: params.authorization,
-      query,
-    });
+    const result = await this.repository.findQueryBuilderFacet({ table: def.table, query });
 
     return {
       key: def.key,

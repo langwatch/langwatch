@@ -35,7 +35,7 @@ export class MemoryNullTraceListRepository implements TraceListRepository {
     return { values: [], totalDistinct: 0 };
   }
 
-  async findCategoricalFacetRaw(): Promise<CategoricalFacetResult> {
+  async findQueryBuilderFacet(): Promise<CategoricalFacetResult> {
     return { values: [], totalDistinct: 0 };
   }
 

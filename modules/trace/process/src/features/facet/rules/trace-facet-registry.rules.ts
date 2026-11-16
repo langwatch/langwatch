@@ -1,35 +1,20 @@
+import type { ClickHouseReadStatement } from "@langwatch/clickhouse-client/builder";
 import type { CategoricalRead, RangeRead } from "@langwatch/trace-contract";
 
-import type { TraceFilterWhere } from "../../../rules/trace-filter-hidden-origins.rules.ts";
+import type { FacetRowsScan } from "../repositories/clickhouse/clickhouse.trace-facet-scope.mapper.ts";
 
 export type FacetTable = "trace_summaries" | "evaluation_runs" | "stored_spans";
 type FacetGroup = "trace" | "evaluation" | "span" | "metadata" | "prompt";
 
-export interface FacetQueryContext {
-  timeRange: { from: number; to: number; live?: boolean };
+/** A queryBuilder facet's read: its proof, window and filter, its page and value prefix. */
+export type FacetQueryContext = FacetRowsScan & {
   limit: number;
   offset: number;
   prefix?: string;
-  /**
-   * The active trace filter; the facet store scopes it to its own table and
-   * AND-s it into the window predicate. Absent for the unfiltered discover
-   * read and for value lookups.
-   */
-  filterWhere?: TraceFilterWhere;
-  /** The window's `to` is rolling, so the scoped filter leaves it uncapped. */
-  isLiveWindow?: boolean;
-}
+};
 
-export interface FacetQuery {
-  sql: string;
-  params: Record<string, unknown>;
-  /**
-   * Optional per-query ClickHouse settings (e.g. a memory ceiling / external
-   * GROUP BY threshold for the unbounded key-discovery facets). Passed straight
-   * through as `clickhouse_settings` when the query runs.
-   */
-  settings?: Record<string, string>;
-}
+/** A queryBuilder facet's built read; its rows are the facet row the repository maps. */
+export type FacetQuery = ClickHouseReadStatement<Record<string, unknown>>;
 
 interface BaseFacetDef {
   key: string;

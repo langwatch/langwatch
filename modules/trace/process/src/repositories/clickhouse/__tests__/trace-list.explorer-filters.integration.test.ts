@@ -25,10 +25,7 @@ import {
 } from "../../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
 import { MemoryTraceEvaluationRunsRepository } from "../../memory/memory.trace-evaluation-runs.repository.ts";
 import { TraceListClickHouseRepository } from "../trace-list.repository.ts";
-import {
-  authorizedClickHouseFor,
-  traceQueryClientFor,
-} from "./support/authorized-clickhouse.support.ts";
+import { traceQueryClientFor } from "./support/authorized-clickhouse.support.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
@@ -140,7 +137,6 @@ beforeAll(async () => {
   if (!clickHouseConfigured) return;
   ch = await startMigratedTraceClickHouse();
   repo = TraceListClickHouseRepository.create({
-    clickhouse: authorizedClickHouseFor(ch),
     reader: traceQueryClientFor(ch),
   });
 }, 120_000);

@@ -14,10 +14,6 @@ import { TraceQueryEvaluationService } from "../../../features/query/services/tr
 import { TraceQueryFieldsService } from "../../../features/query/services/trace-query-fields.service.ts";
 import { TraceQueryTranslationService } from "../../../features/query/services/trace-query-translation.service.ts";
 import type { TraceFacetFilter } from "../../../repositories/trace-list.repository.ts";
-import {
-  explorerOriginExclusion,
-  type TraceFilterWhere,
-} from "../../../rules/trace-filter-hidden-origins.rules.ts";
 
 /** The trace query services over the ClickHouse facet registry, composed as `trace.app.ts` does. */
 const facetRegistry = ClickHouseTraceFacetRegistryRepository.create();
@@ -68,37 +64,37 @@ export function traceFacetFilterResolverFor({
   timeRange: { from: number; to: number };
   hiddenOrigins: readonly string[];
 }): FacetFilterResolver<TraceFacetFilter> {
-  const hideText = explorerOriginExclusion({ hiddenOrigins });
   const facetFilterOf = ({
     queryText,
-    where,
+    present,
     hidden,
   }: {
     queryText: string;
-    where: TraceFilterWhere | undefined;
+    present: boolean;
     hidden: boolean;
   }): TraceFacetFilter | undefined =>
-    where && {
-      queryText,
-      where,
-      compile: traceFilterCompileFor({
-        queryText,
-        timeRange,
-        hiddenOrigins: hidden ? hiddenOrigins : [],
-      }),
-    };
+    present
+      ? {
+          queryText,
+          compile: traceFilterCompileFor({
+            queryText,
+            timeRange,
+            hiddenOrigins: hidden ? hiddenOrigins : [],
+          }),
+        }
+      : undefined;
   return createFacetFilterResolver<TraceFacetFilter>({
     queryText: query,
     compile: (queryText) =>
       facetFilterOf({
         queryText,
-        where: traceQueryTranslation.translateFilter({ queryText, timeRange }) ?? undefined,
+        present: traceQueryTranslation.translateFilter({ queryText, timeRange }) !== null,
         hidden: false,
       }),
     hide: (filter) =>
       facetFilterOf({
         queryText: filter?.queryText ?? "",
-        where: hideText(filter?.where),
+        present: filter !== undefined || hiddenOrigins.length > 0,
         hidden: true,
       }),
   });

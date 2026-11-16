@@ -402,7 +402,6 @@ import { gateEvaluationContent } from "../rules/evaluation-content-gate.rules.ts
 import { mapTraceEvaluationsToLegacyEvaluations } from "../rules/trace-evaluation-mapping.rules.ts";
 import {
   andFilterConditions,
-  explorerOriginExclusion,
   findHiddenOriginConditions,
   type TraceFilterWhere,
 } from "../rules/trace-filter-hidden-origins.rules.ts";
@@ -3064,46 +3063,48 @@ export class TraceModule implements TraceApi, CollectorApp {
       projectId: input.projectId,
       query: input.query,
     });
-    const hideText = explorerOriginExclusion({ hiddenOrigins });
+    const hiddenTerms = findHiddenOriginFilters({ hiddenOrigins });
     const facetFilterOf = ({
       queryText,
-      where,
+      present,
       hidden,
     }: {
       queryText: string;
-      where: TraceFilterWhere | undefined;
+      present: boolean;
       hidden: boolean;
     }): TraceFacetFilter | undefined =>
-      where && {
-        queryText,
-        where,
-        compile: traceFilterCompileOf({
-          queryText,
-          timeRange: input.timeRange,
-          fields: this.#queryFields,
-          terms: hidden ? findHiddenOriginFilters({ hiddenOrigins }) : [],
-          ...(input.evalRuns ? { evalRuns: input.evalRuns } : {}),
-          ...TraceModule.#filterProtections(input.protections),
-        }),
-      };
+      present
+        ? {
+            queryText,
+            compile: traceFilterCompileOf({
+              queryText,
+              timeRange: input.timeRange,
+              fields: this.#queryFields,
+              terms: hidden ? hiddenTerms : [],
+              ...(input.evalRuns ? { evalRuns: input.evalRuns } : {}),
+              ...TraceModule.#filterProtections(input.protections),
+            }),
+          }
+        : undefined;
     const filterFor = createFacetFilterResolver<TraceFacetFilter>({
       queryText: input.query,
       compile: (queryText) =>
         facetFilterOf({
           queryText,
-          where:
+          // Validates the query (FilterParseError); an empty one narrows nothing.
+          present:
             this.#translateTraceFilter({
               query: queryText,
               timeRange: input.timeRange,
               ...(input.evalRuns ? { evalRuns: input.evalRuns } : {}),
               ...(input.protections ? { protections: input.protections } : {}),
-            }) ?? undefined,
+            }) !== null,
           hidden: false,
         }),
       hide: (filter) =>
         facetFilterOf({
           queryText: filter?.queryText ?? "",
-          where: hideText(filter?.where),
+          present: filter !== undefined || hiddenTerms.length > 0,
           hidden: true,
         }),
     });

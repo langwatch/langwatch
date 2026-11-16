@@ -75,3 +75,17 @@ Feature: Trace filters compile to built conditions
     Given a member shares its traces into an aggregate from a time onwards
     When the aggregate's list and its facets are read under the same span filter
     Then the facets count exactly the traces the list returns
+
+  @integration
+  Scenario: QueryBuilder facets keep main's answers under each scope
+    Given another tenant shares the trace ids of a member's summaries, spans and evaluation runs
+    When the sidebar reads the evaluator, label, event and attribute-key facets, with and without a value prefix
+    And each read is unfiltered or under a summary or a span filter
+    Then each answer equals main's under an own proof, a tenant set and a windowed share
+    And none counts the other tenant's rows, nor a summary's older version
+
+  @integration
+  Scenario: Under a windowed share the queryBuilder facets count the traces the list shows
+    Given a member shares its traces into an aggregate from a time onwards
+    When the aggregate's list and its trace attribute keys facet are read under the same span filter
+    Then the facet counts each key on exactly the traces the list returns

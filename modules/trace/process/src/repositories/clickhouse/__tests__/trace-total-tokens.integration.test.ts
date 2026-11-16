@@ -93,7 +93,6 @@ describe.skipIf(!clickHouseConfigured)("a trace's total tokens on ClickHouse rea
   beforeAll(async () => {
     ch = await startMigratedTraceClickHouse();
     list = TraceListClickHouseRepository.create({
-      clickhouse: authorizedClickHouseFor(ch),
       reader: traceQueryClientFor(ch),
     });
     groups = SessionGroupsClickHouseRepository.create({

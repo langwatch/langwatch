@@ -1,12 +1,9 @@
 import type { Authorization } from "@langwatch/authorization";
-import type { AuthorizedClickHouse, ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import {
-  type ClickHouseRead,
-  type ClickHouseReadStart,
   type ClickHouseReadStatement,
   type ClickHouseTable,
   clickhouseRead,
-  type ColumnsSpec,
   type Condition,
   cond,
   type DerivedColumns,
@@ -14,7 +11,6 @@ import {
   fn,
   param,
   type ProofScope,
-  type ReaderScope,
   tenantScope as builtTenantScope,
 } from "@langwatch/clickhouse-client/builder";
 import { nowInstant } from "@langwatch/time";
@@ -23,7 +19,6 @@ import {
   RESERVED_CACHE_CREATION_TOKENS,
   RESERVED_CACHE_READ_TOKENS,
   type TraceListCursor,
-  type TraceListFacetQuery,
   type TraceListRepositoryPage,
   type TraceListRow,
   type TraceListSortColumn,
@@ -37,24 +32,29 @@ import {
 } from "@langwatch/trace-contract";
 import { z } from "zod";
 
+import { TRACE_SUMMARY_CATEGORICAL_EXPRESSIONS } from "../../features/facet/repositories/clickhouse/clickhouse.trace-facet-expressions.mapper.ts";
 import {
-  FACET_CATEGORICAL_EXPRESSIONS,
-  FACET_RANGE_EXPRESSIONS,
-  TRACE_SUMMARY_CATEGORICAL_EXPRESSIONS,
-} from "../../features/facet/repositories/clickhouse/clickhouse.trace-facet-expressions.mapper.ts";
+  FACET_SETTINGS,
+  type FacetWindow,
+  facetExpressionOf,
+  facetRows,
+  facetScopeOf,
+  onFacetSource,
+  type FacetScan,
+} from "../../features/facet/repositories/clickhouse/clickhouse.trace-facet-scope.mapper.ts";
+import type { FacetQuery } from "../../features/facet/rules/trace-facet-registry.rules.ts";
 import type {
   TraceFilterCompilation,
   TraceFilterCompile,
-  TraceFilterCondition,
 } from "../../features/query/repositories/clickhouse/clickhouse.trace-filter-condition.mapper.ts";
 import type {
   TraceListQuery,
   TraceListRepository,
   TraceSuggestField,
 } from "../trace-list.repository.ts";
-import { evaluationRuns } from "./clickhouse.evaluation-runs.table.ts";
 import { storedSpans } from "./clickhouse.stored-spans.table.ts";
 import { traceSummaries } from "./clickhouse.trace-summaries.table.ts";
+import { electedSummaries } from "./clickhouse.trace-summary-election.mapper.ts";
 import { chBoolean, chNumber, chString } from "./stored-span-row.mapper.ts";
 
 const numeric = z.union([z.number(), z.string()]);
@@ -158,11 +158,6 @@ const listSummaryRowsSchema = z.array(listSummaryRowSchema);
 
 type ClickHouseSummaryRow = z.infer<typeof listSummaryRowSchema>;
 
-/** `live: true` (a relative preset) means `to` is rolling: skip the upper bound. */
-function isLiveUpperBound(timeRange: { to: number; live?: boolean }): boolean {
-  return timeRange.live === true;
-}
-
 const ts = traceSummaries;
 const attribute = (key: string) => fn.mapGet(ts.Attributes, key);
 const numericSort = (of: Expression<number | null, "trace_summaries">) =>
@@ -251,41 +246,6 @@ const LIST_SELECTION = {
   SizeBytes: ts._size_bytes,
   LastEventOccurredAtMs: fn.toUnixTimestamp64Milli(ts.LastEventOccurredAt),
 };
-
-/** The window a list read covers on `OccurredAt`; a live range leaves the upper bound open. */
-function occurredWithin(timeRange: {
-  from: number;
-  to: number;
-  live?: boolean;
-}): Condition<"trace_summaries"> {
-  const from = cond.gte(ts.OccurredAt, timeRange.from);
-  return isLiveUpperBound(timeRange) ? from : cond.and(from, cond.lte(ts.OccurredAt, timeRange.to));
-}
-
-/** The compiled filter as one term; an empty filter narrows nothing. */
-function filterTerm(filter: TraceFilterCompilation): TraceFilterCondition {
-  return filter.kind === "compiled" ? filter.where : () => cond.always();
-}
-
-/**
- * The proof's windows and the time range decide the latest-version election; the filter
- * applies after it, or a re-annotated trace answers to both annotation buckets.
- */
-function electedSummaries<S extends ReaderScope>({
-  start,
-  timeRange,
-  filter,
-}: {
-  start: ClickHouseReadStart<S>;
-  timeRange: { from: number; to: number; live?: boolean };
-  filter: TraceFilterCompilation;
-}) {
-  return start
-    .from(ts)
-    .withinWindows()
-    .where(() => occurredWithin(timeRange))
-    .where(filterTerm(filter), { inElection: false });
-}
 
 /** A list read's proof scope, and its filter compiled for that scope. */
 function listScopeOf({
@@ -553,176 +513,6 @@ function pickedValues(rows: unknown): CategoricalFacetResult {
   };
 }
 
-/** Seconds a sidebar facet read may run before ClickHouse stops it. */
-const FACET_READ_MAX_EXECUTION_SECONDS = 20;
-
-/**
- * Every sidebar facet read: stopped on the server at its time cap and not run again, under a
- * 2 GiB memory cap. The sidebar omits a stopped facet. specs/traces-v2/search.feature
- */
-const FACET_READ = {
-  clickhouse_settings: {
-    // ClickHouse settings are string-typed over the wire.
-    max_execution_time: String(FACET_READ_MAX_EXECUTION_SECONDS),
-    timeout_overflow_mode: "throw",
-    max_memory_usage: String(2 * 1024 * 1024 * 1024),
-  } as Record<string, string>,
-  retryOnTimeout: false,
-  format: "JSONEachRow",
-} as const;
-
-/** The facet time and memory cap as a SETTINGS clause on a built facet read. */
-const FACET_SETTINGS = {
-  max_execution_time: FACET_READ_MAX_EXECUTION_SECONDS,
-  timeout_overflow_mode: "throw",
-  max_memory_usage: 2 * 1024 * 1024 * 1024,
-} as const;
-
-type FacetWindow = { from: number; to: number; live?: boolean };
-
-/** One facet read's proof, window and filter; the filter is compiled for the read's own scope. */
-type FacetScan = {
-  authorization: Authorization;
-  timeRange: FacetWindow;
-  table: FacetTableName;
-  compileFilter?: TraceFilterCompile;
-};
-
-/**
- * A facet table's read: its descriptor, its window column, its facets' expressions, and how the
- * trace filter narrows its rows (on `trace_summaries` after the election; elsewhere by the
- * (tenant, trace) pairs whose latest summary in the window matches, ADR-139).
- */
-interface FacetSource<Name extends FacetTableName, Columns extends ColumnsSpec> {
-  table: ClickHouseTable<Name, Columns>;
-  time: Expression<unknown, Name>;
-  categorical: Readonly<Record<string, Expression<string | null, Name>>>;
-  range: Readonly<Record<string, Expression<number | null, Name>>>;
-  narrow: <Row extends Record<string, unknown>>(
-    read: ClickHouseRead<ProofScope, Name, Row, Record<never, never>>,
-    filter: { timeRange: FacetWindow; compiled: TraceFilterCompilation | undefined },
-  ) => ClickHouseRead<ProofScope, Name, Row, Record<never, never>>;
-}
-
-function facetSource<Name extends FacetTableName, Columns extends ColumnsSpec>(
-  source: FacetSource<Name, Columns>,
-): FacetSource<Name, Columns> {
-  return source;
-}
-
-/** The (tenant, trace) pairs whose latest summary in the window matches the filter. */
-function filteredTraceKeys<S extends ReaderScope>({
-  start,
-  timeRange,
-  filter,
-}: {
-  start: ClickHouseReadStart<S>;
-  timeRange: FacetWindow;
-  filter: TraceFilterCompilation;
-}) {
-  return electedSummaries({ start, timeRange, filter })
-    .select({ TenantId: ts.TenantId, TraceId: ts.TraceId })
-    .latestVersion();
-}
-
-const FACET_SOURCES = {
-  trace_summaries: facetSource({
-    table: ts,
-    time: ts.OccurredAt,
-    categorical: FACET_CATEGORICAL_EXPRESSIONS.trace_summaries,
-    range: FACET_RANGE_EXPRESSIONS.trace_summaries,
-    narrow: (read, { compiled }) =>
-      read.where(filterTerm(compiled ?? { kind: "empty" }), { inElection: false }).latestVersion(),
-  }),
-  evaluation_runs: facetSource({
-    table: evaluationRuns,
-    time: evaluationRuns.ScheduledAt,
-    categorical: FACET_CATEGORICAL_EXPRESSIONS.evaluation_runs,
-    range: FACET_RANGE_EXPRESSIONS.evaluation_runs,
-    narrow: (read, { timeRange, compiled }) =>
-      compiled === undefined
-        ? read
-        : read.where(({ within }) =>
-            within(fn.tuple(evaluationRuns.TenantId, evaluationRuns.TraceId), (sub) =>
-              filteredTraceKeys({ start: sub, timeRange, filter: compiled }),
-            ),
-          ),
-  }),
-  stored_spans: facetSource({
-    table: storedSpans,
-    time: storedSpans.StartTime,
-    categorical: FACET_CATEGORICAL_EXPRESSIONS.stored_spans,
-    range: FACET_RANGE_EXPRESSIONS.stored_spans,
-    narrow: (read, { timeRange, compiled }) =>
-      compiled === undefined
-        ? read
-        : read.where(({ within }) =>
-            within(fn.tuple(storedSpans.TenantId, storedSpans.TraceId), (sub) =>
-              filteredTraceKeys({ start: sub, timeRange, filter: compiled }),
-            ),
-          ),
-  }),
-};
-
-/** Runs `build` on the source of `table`, each typed by its own table. */
-function onFacetSource<R>(
-  table: FacetTableName,
-  build: <Name extends FacetTableName, Columns extends ColumnsSpec>(
-    source: FacetSource<Name, Columns>,
-  ) => R,
-): R {
-  switch (table) {
-    case "trace_summaries":
-      return build(FACET_SOURCES.trace_summaries);
-    case "evaluation_runs":
-      return build(FACET_SOURCES.evaluation_runs);
-    case "stored_spans":
-      return build(FACET_SOURCES.stored_spans);
-  }
-}
-
-/** A facet's expression on its table; a key the registry does not give one is a defect. */
-function facetExpressionOf<V>(
-  expressions: Readonly<Record<string, V>>,
-  table: FacetTableName,
-  key: string,
-): V {
-  const expression = expressions[key];
-  if (expression === undefined) throw new Error(`No facet expression for ${table}.${key}`);
-  return expression;
-}
-
-/** A facet read's proof scope; a derived read and the read over it share one. */
-function facetScopeOf(scan: FacetScan): ProofScope {
-  return builtTenantScope.fromProof({ authorization: scan.authorization, reads: "traces" });
-}
-
-/** The facet table's rows in the proof's windows and the time range, narrowed by the filter. */
-function facetRows<Name extends FacetTableName, Columns extends ColumnsSpec>({
-  source,
-  scan,
-  scope = facetScopeOf(scan),
-}: {
-  source: FacetSource<Name, Columns>;
-  scan: FacetScan;
-  scope?: ProofScope;
-}) {
-  const { time } = source;
-  const read = clickhouseRead({ scope })
-    .from(source.table)
-    .withinWindows()
-    .where(() => {
-      const from = cond.gte(time, scan.timeRange.from);
-      return isLiveUpperBound(scan.timeRange)
-        ? from
-        : cond.and(from, cond.lte(time, scan.timeRange.to));
-    });
-  return source.narrow(read, {
-    timeRange: scan.timeRange,
-    compiled: scan.compileFilter?.({ scope }),
-  });
-}
-
 /** One facet's values counted, most frequent first, with how many distinct values it holds. */
 function categoricalFacetStatement(
   scan: FacetScan & { facetKey: string; limit: number; offset: number; prefix?: string },
@@ -819,19 +609,13 @@ function batchedCategoricalStatement(
 }
 
 export class TraceListClickHouseRepository implements TraceListRepository {
-  private readonly clickhouse: AuthorizedClickHouse;
   private readonly reader: Pick<ClickHouseQueryClient, "read">;
 
-  private constructor(deps: {
-    clickhouse: AuthorizedClickHouse;
-    reader: Pick<ClickHouseQueryClient, "read">;
-  }) {
-    this.clickhouse = deps.clickhouse;
+  private constructor(deps: { reader: Pick<ClickHouseQueryClient, "read"> }) {
     this.reader = deps.reader;
   }
 
   static create(deps: {
-    clickhouse: AuthorizedClickHouse;
     reader: Pick<ClickHouseQueryClient, "read">;
   }): TraceListClickHouseRepository {
     return new TraceListClickHouseRepository(deps);
@@ -982,27 +766,11 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     return result.rows;
   }
 
-  async findCategoricalFacetRaw(params: {
-    authorization: Authorization;
-    query: TraceListFacetQuery;
+  async findQueryBuilderFacet(params: {
+    table: FacetTableName;
+    query: FacetQuery;
   }): Promise<CategoricalFacetResult> {
-    const client = this.clickhouse.as(params.authorization, {
-      reads: "traces",
-    });
-    const result = await client.query({
-      query: params.query.sql,
-      query_params: params.query.params,
-      ...FACET_READ,
-      // A facet's own memory ceiling overrides the shared one; never the time cap.
-      clickhouse_settings: {
-        ...FACET_READ.clickhouse_settings,
-        ...params.query.settings,
-        max_execution_time: String(FACET_READ_MAX_EXECUTION_SECONDS),
-        timeout_overflow_mode: "throw",
-      },
-    });
-
-    const rows = facetRowsSchema.parse(await result.json());
+    const rows = facetRowsSchema.parse(await this.readFacet(params.query, params.table));
     return TraceListClickHouseRepository.mapFacetRows(rows);
   }
 

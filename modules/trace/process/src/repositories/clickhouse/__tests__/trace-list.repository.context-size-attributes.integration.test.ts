@@ -9,10 +9,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { ownProof } from "../../../__tests__/support/authorization-proofs.fixture.ts";
 import { TraceListClickHouseRepository } from "../trace-list.repository.ts";
-import {
-  authorizedClickHouseFor,
-  traceQueryClientFor,
-} from "./support/authorized-clickhouse.support.ts";
+import { traceQueryClientFor } from "./support/authorized-clickhouse.support.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
@@ -84,7 +81,6 @@ describe.skipIf(!clickHouseConfigured)(
       if (!clickHouseConfigured) return;
       ch = await startMigratedTraceClickHouse();
       repo = TraceListClickHouseRepository.create({
-        clickhouse: authorizedClickHouseFor(ch),
         reader: traceQueryClientFor(ch),
       });
 

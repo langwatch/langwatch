@@ -1,12 +1,13 @@
+import { cond, fn } from "@langwatch/clickhouse-client/builder";
+
+import { storedSpans } from "../../../../repositories/clickhouse/clickhouse.stored-spans.table.ts";
 import type {
   DynamicKeysDef,
   FacetQuery,
   FacetQueryContext,
 } from "../../rules/trace-facet-registry.rules.ts";
-import {
-  ClickHouseTraceFacetQueryRepository,
-  KEY_DISCOVERY_SETTINGS,
-} from "./clickhouse.trace-facet-query.repository.ts";
+import { ClickHouseTraceFacetQueryRepository } from "./clickhouse.trace-facet-query.repository.ts";
+import { FACET_SOURCES, facetRows, facetScopeOf } from "./clickhouse.trace-facet-scope.mapper.ts";
 
 class ClickHouseTraceFacetSpanAttributeKeysRepository {
   private constructor(private readonly facetQueries: ClickHouseTraceFacetQueryRepository) {}
@@ -21,34 +22,22 @@ class ClickHouseTraceFacetSpanAttributeKeysRepository {
    * Discovers span attribute keys ordered by frequency, reading keys only.
    */
   buildSpanAttributeKeysFacetQuery(ctx: FacetQueryContext): FacetQuery {
-    const where = this.facetQueries.buildTimeWhere("StartTime", ctx);
-    const prefixFilter = ctx.prefix ? "AND lower(key) ILIKE concat({prefix:String}, '%')" : "";
-
-    return {
-      sql: `
-        SELECT
-          key AS facet_value,
-          count() AS cnt,
-          count() OVER () AS total_distinct
-        FROM (
-          SELECT arrayJoin(SpanAttributes.keys) AS key
-          FROM stored_spans
-          WHERE ${where}
-            AND length(SpanAttributes.keys) > 0
-        )
-        WHERE key != ''
-          AND NOT startsWith(key, 'langwatch.reserved.')
-          ${prefixFilter}
-        GROUP BY key
-        ORDER BY cnt DESC
-        LIMIT {limit:UInt32} OFFSET {offset:UInt32}
-      `,
-      params: {
-        ...this.facetQueries.baseParams(ctx),
-        ...(ctx.prefix ? { prefix: ctx.prefix } : {}),
-      },
-      settings: KEY_DISCOVERY_SETTINGS,
-    };
+    const scope = facetScopeOf(ctx);
+    const keys = fn.mapKeys(storedSpans.SpanAttributes);
+    const rows = facetRows({ source: FACET_SOURCES.stored_spans, scan: ctx, scope })
+      .where(() => cond.gt(fn.length(keys), 0), { inElection: false })
+      .select({ key: fn.arrayJoin(keys) })
+      .as("keys");
+    return this.facetQueries.countedValues({
+      scope,
+      rows,
+      value: rows.key,
+      where: cond.and(
+        cond.ne(rows.key, ""),
+        cond.not(fn.startsWith(rows.key, "langwatch.reserved.")),
+      ),
+      ctx,
+    });
   }
 }
 

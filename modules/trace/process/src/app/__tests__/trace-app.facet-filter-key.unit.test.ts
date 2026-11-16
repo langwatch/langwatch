@@ -37,7 +37,7 @@ function harness() {
       return { categoricals: {}, ranges: {} };
     }),
     findCategoricalFacet: vi.fn(async () => ({ values: [], totalDistinct: 0 })),
-    findCategoricalFacetRaw: vi.fn(async () => ({ values: [], totalDistinct: 0 })),
+    findQueryBuilderFacet: vi.fn(async () => ({ values: [], totalDistinct: 0 })),
     findRangeStatsForTable: vi.fn(async () => ({ min: 0, max: 0 })),
     findDiscreteValues: vi.fn(async () => ({ values: [], distinctCount: 0 })),
   });

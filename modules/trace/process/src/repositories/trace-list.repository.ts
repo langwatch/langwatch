@@ -5,26 +5,21 @@ import type {
   DiscreteFacetResult,
   FacetTableName,
   TraceListCursor,
-  TraceListFacetQuery,
   TraceListRepositoryPage,
   TraceListSort,
   TraceRef,
 } from "@langwatch/trace-contract";
 
+import type { FacetQuery } from "../features/facet/rules/trace-facet-registry.rules.ts";
 import type { TraceFilterCompile } from "../features/query/repositories/clickhouse/clickhouse.trace-filter-condition.mapper.ts";
-import type { TraceFilterWhere } from "../rules/trace-filter-hidden-origins.rules.ts";
 
 /** The search-bar fields whose stored values the list suggests. */
 export const TRACE_SUGGEST_FIELDS = ["model", "service", "user", "origin"] as const;
 export type TraceSuggestField = (typeof TRACE_SUGGEST_FIELDS)[number];
 
-/**
- * The filter one facet is counted under, from the query text it was compiled from: as text for
- * the queryBuilder facets' raw reads, and as a compile for the built facet reads.
- */
+/** The filter one facet is counted under: its query text, compiled inside each facet read. */
 export interface TraceFacetFilter {
   queryText: string;
-  where: TraceFilterWhere;
   compile: TraceFilterCompile;
 }
 
@@ -85,9 +80,10 @@ export interface TraceListRepository {
     compileFilter?: TraceFilterCompile;
   }): Promise<CategoricalFacetResult>;
 
-  findCategoricalFacetRaw(params: {
-    authorization: Authorization;
-    query: TraceListFacetQuery;
+  /** A queryBuilder facet's built read, counted by the facet's own statement. */
+  findQueryBuilderFacet(params: {
+    table: FacetTableName;
+    query: FacetQuery;
   }): Promise<CategoricalFacetResult>;
 
   findRangeStatsForTable(params: {

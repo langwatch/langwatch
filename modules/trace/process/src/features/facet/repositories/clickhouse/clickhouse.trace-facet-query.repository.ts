@@ -1,28 +1,29 @@
 /**
- * Shared SQL helpers for the per-file facet builders in this folder.
- * One source of truth — every facet builder consumes these.
+ * Shared pieces of the queryBuilder facets' built reads in this folder.
  */
+import {
+  type ClickHouseTable,
+  clickhouseRead,
+  type Condition,
+  cond,
+  type DerivedColumns,
+  type Expression,
+  fn,
+  type ProofScope,
+} from "@langwatch/clickhouse-client/builder";
 
-import { type TenantScopeTimeColumn, tenantScope } from "@langwatch/clickhouse-client";
-
-import type { FacetQueryContext } from "../../rules/trace-facet-registry.rules.ts";
-import { scopeTraceFilterToTable } from "./clickhouse.trace-facet-scope.mapper.ts";
-
-/** The facet table each builder's time column windows. */
-const FACET_TABLE_BY_TIME_COLUMN = {
-  OccurredAt: "trace_summaries",
-  StartTime: "stored_spans",
-  ScheduledAt: "evaluation_runs",
-} as const satisfies Partial<Record<TenantScopeTimeColumn, string>>;
+import type { FacetQuery, FacetQueryContext } from "../../rules/trace-facet-registry.rules.ts";
+import { FACET_SETTINGS } from "./clickhouse.trace-facet-scope.mapper.ts";
 
 /**
- * Per-query memory settings for high-cardinality key-discovery facets.
+ * The facet caps, with a spill threshold for the high-cardinality key-discovery reads, and the
+ * map functions read from their subcolumns (`mapKeys(m)` as `m.keys`), never the values side.
  */
-export const KEY_DISCOVERY_SETTINGS: Record<string, string> = {
-  // ClickHouse settings are string-typed over the wire.
-  max_bytes_before_external_group_by: String(512 * 1024 * 1024), // 512 MiB
-  max_memory_usage: String(2 * 1024 * 1024 * 1024), // 2 GiB
-};
+export const KEY_DISCOVERY_SETTINGS = {
+  ...FACET_SETTINGS,
+  max_bytes_before_external_group_by: 512 * 1024 * 1024,
+  optimize_functions_to_subcolumns: 1,
+} as const;
 
 export class ClickHouseTraceFacetQueryRepository {
   private constructor() {}
@@ -31,41 +32,42 @@ export class ClickHouseTraceFacetQueryRepository {
     return new ClickHouseTraceFacetQueryRepository();
   }
 
-  /**
-   * WHERE predicate: the tenant marker first (the authorized reader expands it
-   * into the proof's fence, ADR-177 block C), then the time window.
-   */
-  buildTimeWhere(
-    timeColumn: keyof typeof FACET_TABLE_BY_TIME_COLUMN,
-    ctx?: Pick<FacetQueryContext, "filterWhere" | "isLiveWindow">,
-  ): string {
-    const traceScope = ctx?.filterWhere
-      ? scopeTraceFilterToTable({
-          table: FACET_TABLE_BY_TIME_COLUMN[timeColumn],
-          filterWhere: ctx.filterWhere,
-          isLiveWindow: ctx.isLiveWindow === true,
-        })
-      : undefined;
-    return [
-      tenantScope(timeColumn),
-      `${timeColumn} >= fromUnixTimestamp64Milli({timeFrom:Int64})`,
-      `${timeColumn} <= fromUnixTimestamp64Milli({timeTo:Int64})`,
-      ...(traceScope ? [traceScope.sql] : []),
-    ].join(" AND ");
+  /** `value` in lower case starts with the prefix; no prefix matches every value. */
+  prefixed<T extends string>(
+    value: Expression<string | null, T>,
+    prefix: string | undefined,
+  ): Condition<T> {
+    return prefix ? fn.ilike(fn.lower(value), `${prefix}%`) : cond.always();
   }
 
   /**
-   * The bound-parameter tuple every facet query relies on. Helpers that need
-   * `prefix` add it on top, since not every builder supports key/value
-   * prefix-filtering.
+   * Each value of one column, counted, most frequent first, with how many distinct values pass
+   * `where` and the prefix.
    */
-  baseParams(ctx: FacetQueryContext): Record<string, unknown> {
-    return {
-      ...ctx.filterWhere?.params,
-      timeFrom: ctx.timeRange.from,
-      timeTo: ctx.timeRange.to,
-      limit: ctx.limit,
-      offset: ctx.offset,
-    };
+  countedValues<Name extends string, Columns extends Record<string, unknown>>({
+    scope,
+    rows,
+    value,
+    where,
+    ctx,
+    settings = KEY_DISCOVERY_SETTINGS,
+  }: {
+    scope: ProofScope;
+    rows: ClickHouseTable<Name, DerivedColumns<Columns>, "derived">;
+    value: Expression<string, Name>;
+    where: Condition<Name>;
+    ctx: FacetQueryContext;
+    settings?: Readonly<Record<string, number | string>>;
+  }): FacetQuery {
+    return clickhouseRead({ scope })
+      .from(rows)
+      .where(() => cond.and(where, this.prefixed(value, ctx.prefix)))
+      .select({ facet_value: value, cnt: fn.count(), total_distinct: fn.over(fn.count(), {}) })
+      .groupBy(value)
+      .orderBy("cnt", "DESC")
+      .limit(ctx.limit)
+      .offset(ctx.offset)
+      .settings(settings)
+      .build();
   }
 }
