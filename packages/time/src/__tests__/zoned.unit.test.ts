@@ -9,6 +9,7 @@ import { Temporal, nowEpochMs, toDate, toEpochMs, toZonedDateTime } from "../zon
 
 describe("nowEpochMs", () => {
   describe("given a caller that only wants the epoch millisecond count", () => {
+    /** @scenario "The clock reads the present moment as epoch milliseconds" */
     it("reads the system clock between two bounds", () => {
       const before = Date.now();
       const now = nowEpochMs();
