@@ -707,9 +707,9 @@ describe("timeseries reads built on the typed builder", () => {
   });
 
   /*
-   * Main dropped a full-scale grouped pipeline (ruling 1a: computed) and a pipeline beside span or
-   * run metrics shared their join (ruling 2a: read on its own). Answers checked against each part
-   * read alone, which the suites above prove.
+   * Rulings of 2026-11-16: 1a computes what main dropped; 2a and Risk 11.1's 1a read a pipeline or
+   * run metrics on their own; under a span grouping, 3a and 5a read only the spans or events behind
+   * each key and 4a computes run metrics per run. Each answer was checked by hand from the seeds.
    */
   describe("given shapes main dropped or inflated", () => {
     describe.each(timeseries.PROOFS)("given $name", ({ projectId, proof }) => {
@@ -743,6 +743,35 @@ describe("timeseries reads built on the typed builder", () => {
       const alone = values(await read("pipelines one series, hourly"));
 
       expect(beside.filter(([, value]) => value !== undefined)).toEqual(alone);
+    });
+
+    it("reads run metrics under a span grouping as it reads them alone", async () => {
+      const [own] = timeseries.PROOFS;
+      const scores = async (name: string, series: string) => {
+        const result = await builtTimeseries({
+          shape: timeseries.BY_RULING_SHAPES.find((shape) => shape.name === name)!,
+          projectId: own!.projectId,
+          proof: own!.proof(),
+        });
+        return [...result.previousPeriod, ...result.currentPeriod].map((bucket) => {
+          const keys = (bucket as Record<string, unknown>)["metadata.span_type"] as Record<
+            string,
+            Record<string, unknown>
+          >;
+          return [bucket.date, Object.entries(keys).map(([key, values]) => [key, values[series]])];
+        });
+      };
+
+      const beside = await scores(
+        "span and run metrics by metadata.span_type, hourly",
+        "8/evaluations.evaluation_score/avg/ev",
+      );
+      const alone = await scores(
+        "run metrics alone by metadata.span_type, hourly",
+        "0/evaluations.evaluation_score/avg/ev",
+      );
+
+      expect(beside).toEqual(alone);
     });
   });
 

@@ -3,7 +3,12 @@
  * the query's series; the row parser merges the parts' rows by period, date and group key.
  */
 
+import type { AnalyticsSeries } from "@langwatch/analytics-contract";
+
 import type { TimeseriesQueryInput } from "./clickhouse.aggregation-builder.mapper.ts";
+import { spanGroupedPartOf } from "./clickhouse.span-grouped-joined-timeseries-query.mapper.ts";
+import { isSpanGrouping } from "./clickhouse.span-grouped-timeseries-query.mapper.ts";
+import { specOf } from "./clickhouse.trace-summaries-timeseries-query.mapper.ts";
 
 /** One part: its own query, and the query's index for each of its series. */
 export type SeriesPart = { input: TimeseriesQueryInput; indexes: number[] };
@@ -23,6 +28,31 @@ export function findPipelineParts(input: TimeseriesQueryInput): SeriesPart[] {
   const rest = indexes.filter((index) => !input.series[index]!.pipeline);
   if (pipelines.length === 0 || rest.length === 0) return [];
   return [partOf(input, pipelines), partOf(input, rest)];
+}
+
+/** The query's series in one part per kind; empty when every series is of one kind. */
+function partsBy(
+  input: TimeseriesQueryInput,
+  kindOf: (series: AnalyticsSeries, index: number) => string,
+): SeriesPart[] {
+  const kinds = new Map<string, number[]>();
+  for (const [index, series] of input.series.entries()) {
+    const kind = kindOf(series, index);
+    kinds.set(kind, [...(kinds.get(kind) ?? []), index]);
+  }
+  return kinds.size < 2 ? [] : [...kinds.values()].map((indexes) => partOf(input, indexes));
+}
+
+/**
+ * Rulings 4a and 1a (Alex, 2026-11-16, Risk 11.1): run metrics are read per run on their own,
+ * under a span grouping or beside span metrics; under a span grouping, span metrics too.
+ */
+export function findRunParts(input: TimeseriesQueryInput): SeriesPart[] {
+  if (isSpanGrouping(input.groupBy)) return partsBy(input, spanGroupedPartOf);
+  return partsBy(input, (series, index) => {
+    if (series.pipeline) return "pipeline";
+    return specOf(series, index).joins.includes("evaluation_runs") ? "runs" : "rest";
+  });
 }
 
 const SERIES_KEY = /^m(\d+)__/;

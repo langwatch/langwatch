@@ -56,7 +56,7 @@ const firstPositive = (keys: string[]) =>
   );
 
 /** A span's model: response model, else request model, else 'unknown' (as the cost fold reads). */
-const modelOfSpan = fn.multiIf(
+export const modelOfSpan: Expression<string, "stored_spans"> = fn.multiIf(
   [
     [
       cond.ne(attribute("gen_ai.response.model"), param.string("")),

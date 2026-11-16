@@ -72,7 +72,7 @@ const NONE = () => fn.nullAs(column.nullable(column.float64()));
 const EMPTY = param.string("");
 
 /** A series' spec, its pipeline included. */
-function pipelineSpecOf(series: AnalyticsSeries, index: number): MetricSpec {
+export function pipelineSpecOf(series: AnalyticsSeries, index: number): MetricSpec {
   if (!series.pipeline) return specOf(series, index);
   return pipelineMetricSpecFor({
     metric: series.metric,

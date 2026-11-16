@@ -1,7 +1,7 @@
 /**
- * Pins the forwarding contract (builder -> CH client -> parser) for
- * `negateFilters` and `traceIds`, which the legacy shim used to silently
- * drop. See specs/analytics/negate-filters-and-trace-scope.feature.
+ * Pins the forwarding contract (input -> built statement -> reader) for `negateFilters`,
+ * `excludeOrigins` and `traceIds`, which the legacy shim used to silently drop.
+ * See specs/analytics/negate-filters-and-trace-scope.feature.
  */
 
 import type { AnalyticsTimeseriesInput } from "@langwatch/analytics-contract";
@@ -10,22 +10,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { analyticsProof } from "../../__tests__/analytics-proof.fixture.ts";
 import type { AnalyticsTimeseriesQuery } from "../../analytics.repository.ts";
-import { buildTimeseriesQuery } from "../clickhouse.aggregation-builder.mapper.ts";
 import { ClickHouseAnalyticsRepository } from "../clickhouse.analytics.repository.ts";
-
-vi.mock("../clickhouse.aggregation-builder.mapper.ts", () => ({
-  // Read through the proof's fence, so the statement carries the marker the reader expands.
-  buildTimeseriesQuery: vi.fn().mockReturnValue({
-    sql: "SELECT 1 FROM trace_summaries WHERE {{tenantScope:OccurredAt}}",
-    params: {},
-  }),
-}));
-
-const buildTimeseriesQueryMock = vi.mocked(buildTimeseriesQuery);
 
 const fakeClient = {
   query: vi.fn().mockResolvedValue({ json: async () => [] }),
+  read: vi.fn().mockResolvedValue({ rows: [] }),
 };
+
+/** Every statement the reader was sent for the last request, as text with its parameters. */
+const sentStatements = () => JSON.stringify(fakeClient.read.mock.calls.map(([call]) => call));
 
 function makeQuery(overrides: Partial<AnalyticsTimeseriesInput> = {}): AnalyticsTimeseriesQuery {
   const startDate = Temporal.Instant.from("2026-07-01T00:00:00.000Z");
@@ -48,7 +41,7 @@ function makeQuery(overrides: Partial<AnalyticsTimeseriesInput> = {}): Analytics
           key: "monitor_123",
         },
       ],
-      // A labels grouping stays on the text path (arrayJoin), which this suite covers.
+      // A run metric under a labels grouping: the span-grouped run read (ruling 4a).
       groupBy: "metadata.labels",
       timeScale: 1440,
       timeZone: "UTC",
@@ -63,17 +56,19 @@ describe("ClickHouseAnalyticsRepository", () => {
   });
 
   beforeEach(() => {
-    buildTimeseriesQueryMock.mockClear();
+    fakeClient.read.mockClear();
   });
 
   describe("when the request carries negateFilters", () => {
     /** @scenario Negating filters inverts the data selection */
     it("forwards negateFilters to the query builder", async () => {
+      await repository.runTimeseries(makeQuery());
+      const kept = sentStatements();
+      fakeClient.read.mockClear();
       await repository.runTimeseries(makeQuery({ negateFilters: true }));
 
-      expect(buildTimeseriesQueryMock).toHaveBeenCalledWith(
-        expect.objectContaining({ negateFilters: true }),
-      );
+      expect(sentStatements()).toContain("prod");
+      expect(sentStatements()).not.toEqual(kept);
     });
   });
 
@@ -82,9 +77,7 @@ describe("ClickHouseAnalyticsRepository", () => {
     it("forwards excludeOrigins to the query builder", async () => {
       await repository.runTimeseries(makeQuery({ excludeOrigins: ["langy"] }));
 
-      expect(buildTimeseriesQueryMock).toHaveBeenCalledWith(
-        expect.objectContaining({ excludeOrigins: ["langy"] }),
-      );
+      expect(sentStatements()).toContain("langy");
     });
   });
 
@@ -93,9 +86,8 @@ describe("ClickHouseAnalyticsRepository", () => {
     it("forwards traceIds to the query builder", async () => {
       await repository.runTimeseries(makeQuery({ traceIds: ["trace-1", "trace-2"] }));
 
-      expect(buildTimeseriesQueryMock).toHaveBeenCalledWith(
-        expect.objectContaining({ traceIds: ["trace-1", "trace-2"] }),
-      );
+      expect(sentStatements()).toContain("trace-1");
+      expect(sentStatements()).toContain("trace-2");
     });
   });
 
@@ -103,20 +95,16 @@ describe("ClickHouseAnalyticsRepository", () => {
     it("forwards the base query fields", async () => {
       await repository.runTimeseries(makeQuery());
 
-      expect(buildTimeseriesQueryMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          projectId: "project-1",
-          filters: { "metadata.labels": ["prod"] },
-          timeZone: "UTC",
-        }),
-      );
+      expect(fakeClient.read).toHaveBeenCalledTimes(1);
+      expect(sentStatements()).toContain("project-1");
+      expect(sentStatements()).toContain("prod");
     });
   });
 
   describe("when the proof was minted for another project", () => {
     /** @scenario "A series asked under another project's proof is refused" */
     it("refuses the read before building or sending anything", async () => {
-      fakeClient.query.mockClear();
+      fakeClient.read.mockClear();
 
       const refused = repository
         .runTimeseries({
@@ -126,8 +114,7 @@ describe("ClickHouseAnalyticsRepository", () => {
         .catch((error: unknown) => error);
 
       await expect(refused).resolves.toMatchObject({ code: "analytics_proof_project_mismatch" });
-      expect(buildTimeseriesQueryMock).not.toHaveBeenCalled();
-      expect(fakeClient.query).not.toHaveBeenCalled();
+      expect(fakeClient.read).not.toHaveBeenCalled();
     });
   });
 });

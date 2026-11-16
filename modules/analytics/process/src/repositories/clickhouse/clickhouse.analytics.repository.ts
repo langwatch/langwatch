@@ -59,10 +59,19 @@ import { translatingQueryFailures } from "./clickhouse.query-error-translation.m
 import { rollupTimeseriesRead } from "./clickhouse.rollup-timeseries-query.mapper.ts";
 import {
   findPipelineParts,
+  findRunParts,
   renumberedRows,
   type SeriesPart,
 } from "./clickhouse.series-parts.mapper.ts";
 import { slimTimeseriesRead } from "./clickhouse.slim-timeseries-query.mapper.ts";
+import {
+  servesSpanGroupedPipeline,
+  servesSpanGroupedRuns,
+  servesSpanGroupedSpans,
+  spanGroupedPipelineTimeseriesRead,
+  spanGroupedRunsTimeseriesRead,
+  spanGroupedSpansTimeseriesRead,
+} from "./clickhouse.span-grouped-joined-timeseries-query.mapper.ts";
 import {
   servesSpanGrouped,
   spanGroupedTimeseriesRead,
@@ -114,6 +123,9 @@ function wholeRouteOf({
   if (servesMixedEval(input)) return built(mixedEvalTimeseriesRead);
   if (servesJoinedTraceSummaries(input)) return built(joinedTimeseriesRead);
   if (servesSpanGrouped(input)) return built(spanGroupedTimeseriesRead);
+  if (servesSpanGroupedSpans(input)) return built(spanGroupedSpansTimeseriesRead);
+  if (servesSpanGroupedRuns(input)) return built(spanGroupedRunsTimeseriesRead);
+  if (servesSpanGroupedPipeline(input)) return built(spanGroupedPipelineTimeseriesRead);
   if (servesPipelines(input)) return built(pipelineTimeseriesRead);
   return { kind: "text" };
 }
@@ -127,18 +139,21 @@ function routeOf({
 }): TimeseriesRoute {
   const whole = wholeRouteOf({ table, input });
   if (whole.kind !== "text") return whole;
-  const parts = findPipelineParts(input).map((part) => ({
-    ...part,
-    route: wholeRouteOf({ table, input: part.input }),
-  }));
-  if (parts.length === 0 || !parts.every((part) => part.route.kind === "built")) return whole;
-  return {
-    kind: "parts",
-    parts: parts.map(({ route, ...part }) => ({
+  for (const split of [findPipelineParts, findRunParts]) {
+    const parts = split(input).map((part) => ({
       ...part,
-      read: (route as { kind: "built"; read: TimeseriesReader }).read,
-    })),
-  };
+      route: wholeRouteOf({ table, input: part.input }),
+    }));
+    if (parts.length === 0 || !parts.every((part) => part.route.kind === "built")) continue;
+    return {
+      kind: "parts",
+      parts: parts.map(({ route, ...part }) => ({
+        ...part,
+        read: (route as { kind: "built"; read: TimeseriesReader }).read,
+      })),
+    };
+  }
+  return whole;
 }
 
 /** What an analytics statement is sent through: the fenced reader. */

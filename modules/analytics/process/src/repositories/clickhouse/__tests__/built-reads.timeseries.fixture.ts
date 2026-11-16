@@ -1041,6 +1041,28 @@ const besideRuns: AnalyticsSeries[] = [
   PIPELINE_SERIES[1]!,
 ];
 
+/** Span, run and trace metrics together under a span grouping: one part each. */
+const UNDER_SPAN_GROUPING: AnalyticsSeries[] = [
+  graded("avg"),
+  graded("sum"),
+  mixed("sentiment.thumbs_up_down", "cardinality"),
+  mixed("sentiment.thumbs_up_down", "sum"),
+  mixed("sentiment.thumbs_up_down", "avg"),
+  mixed("events.event_type", "cardinality", { key: "thumbs_up_down" }),
+  mixed("events.event_type", "cardinality"),
+  mixed("spans.metrics.prompt_tokens", "sum"),
+  mixed("evaluations.evaluation_score", "avg", { key: "ev" }),
+  mixed("evaluations.evaluation_runs", "cardinality"),
+  mixed("performance.total_cost", "sum"),
+];
+/** Risk 11.1: run metrics beside span metrics, no span grouping. */
+const RUNS_BESIDE_SPANS: AnalyticsSeries[] = [
+  mixed("sentiment.thumbs_up_down", "sum"),
+  mixed("evaluations.evaluation_score", "avg", { key: "ev" }),
+  graded("max"),
+  mixed("evaluations.evaluation_runs", "cardinality"),
+];
+
 /**
  * Shapes main dropped or inflated, computed by Alex's rulings of 2026-11-16: 1a, a full-scale
  * grouped pipeline is computed; 2a, a pipeline beside span or run metrics is read on its own.
@@ -1071,6 +1093,64 @@ export const BY_RULING_SHAPES: (Shape & { ruling: string })[] = [
       groupBy: "traces.trace_name",
     }),
     ruling: "1a, 2a",
+  },
+  ...SPAN_GROUPINGS.map((groupBy) => ({
+    name: `span and run metrics by ${groupBy}, hourly`,
+    table: "trace_summaries" as const,
+    series: UNDER_SPAN_GROUPING,
+    groupBy,
+    timeScale: 60,
+    ruling: "3a, 4a, 5a",
+  })),
+  {
+    name: "span and run metrics by events.event_type, both periods",
+    table: "trace_summaries",
+    series: UNDER_SPAN_GROUPING,
+    groupBy: "events.event_type",
+    timeScale: "full",
+    ruling: "3a, 4a, 5a",
+  },
+  ...(
+    [
+      ["metadata.labels", 60],
+      ["metadata.span_type", "full"],
+      ["metadata.model", 60],
+      ["sentiment.thumbs_up_down", 1440],
+    ] as const
+  ).map(([groupBy, timeScale]) => ({
+    ...pipelines(`per entity by ${groupBy}, ${timeScale}`, PIPELINE_SERIES.slice(0, 5), timeScale, {
+      groupBy,
+    }),
+    ruling: "1a",
+  })),
+  {
+    ...pipelines("beside span metrics by events.event_type, hourly", besideSpans, 60, {
+      groupBy: "events.event_type",
+    }),
+    ruling: "1a, 3a, 5a",
+  },
+  {
+    name: "run metrics alone by metadata.span_type, hourly",
+    table: "trace_summaries",
+    series: RUN_SERIES,
+    groupBy: "metadata.span_type",
+    timeScale: 60,
+    ruling: "4a",
+  },
+  {
+    name: "run metrics beside span metrics, hourly",
+    table: "trace_summaries",
+    series: RUNS_BESIDE_SPANS,
+    timeScale: 60,
+    ruling: "Risk 11.1 1a",
+  },
+  {
+    name: "run metrics beside span metrics by topics.topics, both periods",
+    table: "trace_summaries",
+    series: RUNS_BESIDE_SPANS,
+    groupBy: "topics.topics",
+    timeScale: "full",
+    ruling: "Risk 11.1 1a",
   },
 ];
 
