@@ -346,6 +346,33 @@ describe("<SubscriptionPage/> while a payment recovery case is open", () => {
     });
   });
 
+  describe("when the paused organization has more members than Free includes", () => {
+    beforeEach(() => {
+      givenPausedOnFree();
+      mockGetUsage.mockReturnValue({
+        data: {
+          seatLimitInfo: {
+            status: "exceeded",
+            message: "Your organization uses 3 member seats and your plan includes 2 member seats.",
+          },
+          membersCount: 3,
+        },
+        isLoading: false,
+        refetch: vi.fn(),
+      });
+    });
+
+    /** @scenario "A paused organization over its seats is told to pay the invoice, not to add seats" */
+    it("says to pay the open invoice and offers no add-seats or upgrade action", async () => {
+      renderSubscriptionPage();
+
+      const note = await screen.findByTestId("seat-limit-callout");
+      expect(note).toHaveTextContent("Pay the open invoice to get your plan back.");
+      expect(within(note).queryByRole("button", { name: "Add seats" })).toBeNull();
+      expect(note).not.toHaveTextContent("Upgrade to the Growth plan");
+    });
+  });
+
   describe("when a Growth renewal failed and the plan is kept", () => {
     beforeEach(() => givenFailingGrowth());
 

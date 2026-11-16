@@ -545,3 +545,11 @@ Feature: Subscription Page Plan Management
       And I cannot manage the subscription
       When I view the subscription page
       Then the current plan card has no pay or upgrade action
+
+    @integration
+    Scenario: A paused organization over its seats is told to pay the invoice, not to add seats
+      Given my organization was moved to the Free plan on day 21 of an unpaid invoice
+      And it has more members than the Free plan includes
+      When I view the subscription page
+      Then the seat note says "Pay the open invoice to get your plan back."
+      And it offers no way to add seats or upgrade
