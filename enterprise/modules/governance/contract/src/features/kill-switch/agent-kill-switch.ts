@@ -1,0 +1,488 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+/**
+ * The agent kill switch: an agent's stop plan, the AWS connections a Bedrock target signs with,
+ * and one stop's lifecycle as events on its own aggregate.
+ * Spec: enterprise/modules/governance/specs/agent-kill-switch.feature
+ */
+import { defineTrpcContract, type Named } from "@langwatch/module";
+import { z } from "zod";
+
+import { governanceEventEnvelopeSchema } from "../../governance.ts";
+
+// ── Stop plan ──────────────────────────────────────────────────────────────
+
+export const AGENT_STOP_TARGET_KINDS = [
+  "databricks_serving_endpoint",
+  "bedrock_agent_alias",
+  "gateway_virtual_key",
+] as const;
+export type AgentStopTargetKind = (typeof AGENT_STOP_TARGET_KINDS)[number];
+
+const databricksServingEndpointTargetSchemaDefinition = z.object({
+  kind: z.literal("databricks_serving_endpoint"),
+  /** The Databricks governance source whose workspace and credentials the call uses. */
+  ingestionSourceId: z.string().min(1),
+  endpointName: z
+    .string()
+    .min(1)
+    .max(63)
+    .regex(/^[A-Za-z0-9_-]+$/, "a serving endpoint name is letters, digits, - and _"),
+});
+const bedrockAgentAliasTargetSchemaDefinition = z.object({
+  kind: z.literal("bedrock_agent_alias"),
+  awsConnectionId: z.string().min(1),
+  region: z.string().regex(/^[a-z]{2}(-[a-z]+)+-\d$/, "an AWS region such as eu-west-1"),
+  agentId: z.string().regex(/^[0-9a-zA-Z]{10}$/, "a Bedrock agent id is 10 characters"),
+  agentAliasId: z.string().regex(/^[0-9a-zA-Z]{10}$/, "a Bedrock alias id is 10 characters"),
+});
+const gatewayVirtualKeyTargetSchemaDefinition = z.object({
+  kind: z.literal("gateway_virtual_key"),
+  virtualKeyId: z.string().min(1),
+});
+
+const agentStopTargetSchemaDefinition = z.discriminatedUnion("kind", [
+  databricksServingEndpointTargetSchemaDefinition,
+  bedrockAgentAliasTargetSchemaDefinition,
+  gatewayVirtualKeyTargetSchemaDefinition,
+]);
+export interface AgentStopTargetSchema extends Named<typeof agentStopTargetSchemaDefinition> {}
+export const agentStopTargetSchema: AgentStopTargetSchema = agentStopTargetSchemaDefinition;
+export type AgentStopTarget = z.infer<typeof agentStopTargetSchema>;
+
+/** One plan row: a target with its stable id and a label people read. */
+const agentStopPlanTargetSchemaDefinition = z.object({
+  id: z.string(),
+  label: z.string(),
+  target: agentStopTargetSchema,
+});
+export interface AgentStopPlanTargetSchema extends Named<
+  typeof agentStopPlanTargetSchemaDefinition
+> {}
+export const agentStopPlanTargetSchema: AgentStopPlanTargetSchema =
+  agentStopPlanTargetSchemaDefinition;
+export type AgentStopPlanTarget = z.infer<typeof agentStopPlanTargetSchema>;
+
+export const AGENT_STOP_PLAN_TARGETS_MAX = 20;
+
+const agentStopPlanSchemaDefinition = z.object({
+  agentId: z.string(),
+  targets: agentStopPlanTargetSchema.array(),
+  updatedAt: z.string().nullable(),
+});
+export interface AgentStopPlanSchema extends Named<typeof agentStopPlanSchemaDefinition> {}
+export const agentStopPlanSchema: AgentStopPlanSchema = agentStopPlanSchemaDefinition;
+export type AgentStopPlan = z.infer<typeof agentStopPlanSchema>;
+
+const setAgentStopPlanInputSchemaDefinition = z.object({
+  targets: agentStopTargetSchema.array().max(AGENT_STOP_PLAN_TARGETS_MAX),
+});
+export interface SetAgentStopPlanInputSchema extends Named<
+  typeof setAgentStopPlanInputSchemaDefinition
+> {}
+export const setAgentStopPlanInputSchema: SetAgentStopPlanInputSchema =
+  setAgentStopPlanInputSchemaDefinition;
+
+// ── AWS connections ────────────────────────────────────────────────────────
+
+/** A static key pair, a role to assume, or both (the pair signs the AssumeRole call). */
+const awsConnectionInputSchemaDefinition = z
+  .object({
+    name: z.string().trim().min(1).max(80),
+    accessKeyId: z.string().trim().min(16).max(128).optional(),
+    secretAccessKey: z.string().trim().min(16).max(256).optional(),
+    roleArn: z
+      .string()
+      .regex(/^arn:aws[a-z-]*:iam::\d{12}:role\/.+$/, "an IAM role ARN")
+      .optional(),
+    externalId: z.string().min(2).max(1224).optional(),
+  })
+  .refine((input) => Boolean(input.accessKeyId) === Boolean(input.secretAccessKey), {
+    message: "an access key id and its secret come together",
+    path: ["secretAccessKey"],
+  })
+  .refine((input) => Boolean(input.accessKeyId) || Boolean(input.roleArn), {
+    message: "an access key pair or a role ARN is required",
+    path: ["roleArn"],
+  });
+export interface AwsConnectionInputSchema extends Named<
+  typeof awsConnectionInputSchemaDefinition
+> {}
+export const awsConnectionInputSchema: AwsConnectionInputSchema =
+  awsConnectionInputSchemaDefinition;
+export type AwsConnectionInput = z.infer<typeof awsConnectionInputSchema>;
+
+/** What a read answers: never the secret, only the access key id's last four characters. */
+const awsConnectionViewSchemaDefinition = z.object({
+  id: z.string(),
+  name: z.string(),
+  accessKeyIdLastFour: z.string().nullable(),
+  roleArn: z.string().nullable(),
+  hasExternalId: z.boolean(),
+  createdAt: z.string(),
+});
+export interface AwsConnectionViewSchema extends Named<typeof awsConnectionViewSchemaDefinition> {}
+export const awsConnectionViewSchema: AwsConnectionViewSchema = awsConnectionViewSchemaDefinition;
+export type AwsConnectionView = z.infer<typeof awsConnectionViewSchema>;
+
+// ── A stop ─────────────────────────────────────────────────────────────────
+
+export const AGENT_STOP_SEVERITIES = ["low", "medium", "high", "critical"] as const;
+export type AgentStopSeverity = (typeof AGENT_STOP_SEVERITIES)[number];
+
+/** `user`: a person in the UI or tRPC. `api_key`: a machine credential, a trace rule's webhook included. */
+export const AGENT_STOP_TRIGGERS = ["user", "api_key"] as const;
+export type AgentStopTrigger = (typeof AGENT_STOP_TRIGGERS)[number];
+
+export const AGENT_STOP_APPROVALS = ["immediate", "required"] as const;
+export type AgentStopApproval = (typeof AGENT_STOP_APPROVALS)[number];
+
+export const AGENT_STOP_STATUSES = [
+  "pending_approval",
+  "denied",
+  "stopping",
+  "quarantined",
+  "stop_failed",
+  "restoring",
+  "restored",
+  "restore_failed",
+] as const;
+export type AgentStopStatus = (typeof AGENT_STOP_STATUSES)[number];
+/** A stop in one of these blocks a new stop of the same agent. */
+export const AGENT_STOP_OPEN_STATUSES: readonly AgentStopStatus[] = [
+  "pending_approval",
+  "stopping",
+  "quarantined",
+  "stop_failed",
+  "restoring",
+  "restore_failed",
+];
+/** A stop in one of these may be restored. */
+export const AGENT_STOP_RESTORABLE_STATUSES: readonly AgentStopStatus[] = [
+  "quarantined",
+  "stop_failed",
+  "restore_failed",
+];
+
+export const AGENT_STOP_TARGET_STATES = [
+  "pending",
+  "applied",
+  "failed",
+  "reverting",
+  "reverted",
+  "revert_failed",
+] as const;
+export type AgentStopTargetState = (typeof AGENT_STOP_TARGET_STATES)[number];
+
+const agentStopTargetOutcomeSchemaDefinition = z.object({
+  id: z.string(),
+  label: z.string(),
+  target: agentStopTargetSchema,
+  state: z.enum(AGENT_STOP_TARGET_STATES),
+  /** A stable code (`http_403`, `ThrottlingException`, `virtual_key_not_found`), never provider prose. */
+  errorCode: z.string().nullable(),
+  appliedAt: z.string().nullable(),
+  revertedAt: z.string().nullable(),
+});
+export interface AgentStopTargetOutcomeSchema extends Named<
+  typeof agentStopTargetOutcomeSchemaDefinition
+> {}
+export const agentStopTargetOutcomeSchema: AgentStopTargetOutcomeSchema =
+  agentStopTargetOutcomeSchemaDefinition;
+export type AgentStopTargetOutcome = z.infer<typeof agentStopTargetOutcomeSchema>;
+
+const agentStopViewSchemaDefinition = z.object({
+  id: z.string(),
+  agentId: z.string(),
+  agentName: z.string(),
+  status: z.enum(AGENT_STOP_STATUSES),
+  severity: z.enum(AGENT_STOP_SEVERITIES),
+  approval: z.enum(AGENT_STOP_APPROVALS),
+  trigger: z.enum(AGENT_STOP_TRIGGERS),
+  reason: z.string(),
+  requestedBy: z.object({ userId: z.string().nullable(), apiKeyId: z.string().nullable() }),
+  decidedByUserId: z.string().nullable(),
+  restoredByUserId: z.string().nullable(),
+  targets: agentStopTargetOutcomeSchema.array(),
+  requestedAt: z.string(),
+  decidedAt: z.string().nullable(),
+  quarantinedAt: z.string().nullable(),
+  restoreRequestedAt: z.string().nullable(),
+  restoredAt: z.string().nullable(),
+});
+export interface AgentStopViewSchema extends Named<typeof agentStopViewSchemaDefinition> {}
+export const agentStopViewSchema: AgentStopViewSchema = agentStopViewSchemaDefinition;
+export type AgentStopView = z.infer<typeof agentStopViewSchema>;
+
+const requestAgentStopInputSchemaDefinition = z.object({
+  reason: z.string().trim().min(1).max(2000),
+  severity: z.enum(AGENT_STOP_SEVERITIES).default("high"),
+});
+export interface RequestAgentStopInputSchema extends Named<
+  typeof requestAgentStopInputSchemaDefinition
+> {}
+export const requestAgentStopInputSchema: RequestAgentStopInputSchema =
+  requestAgentStopInputSchemaDefinition;
+
+const decideAgentStopInputSchemaDefinition = z.object({
+  note: z.string().trim().max(2000).optional(),
+});
+export interface DecideAgentStopInputSchema extends Named<
+  typeof decideAgentStopInputSchemaDefinition
+> {}
+export const decideAgentStopInputSchema: DecideAgentStopInputSchema =
+  decideAgentStopInputSchemaDefinition;
+
+/** A restore takes no fields: it reverts what the stop applied. */
+const restoreAgentStopInputSchemaDefinition = z.object({});
+export interface RestoreAgentStopInputSchema extends Named<
+  typeof restoreAgentStopInputSchemaDefinition
+> {}
+export const restoreAgentStopInputSchema: RestoreAgentStopInputSchema =
+  restoreAgentStopInputSchemaDefinition;
+
+// ── REST (`/api/governance/agents/:agentId/stop*`, `/api/governance/agent-stops`) ──
+
+const agentStopAgentParamsSchemaDefinition = z.object({ agentId: z.string().min(1) });
+export interface AgentStopAgentParamsSchema extends Named<
+  typeof agentStopAgentParamsSchemaDefinition
+> {}
+export const agentStopAgentParamsSchema: AgentStopAgentParamsSchema =
+  agentStopAgentParamsSchemaDefinition;
+
+const agentStopParamsSchemaDefinition = z.object({ stopId: z.string().min(1) });
+export interface AgentStopParamsSchema extends Named<typeof agentStopParamsSchemaDefinition> {}
+export const agentStopParamsSchema: AgentStopParamsSchema = agentStopParamsSchemaDefinition;
+
+const agentStopListQuerySchemaDefinition = z.object({
+  status: z.enum(AGENT_STOP_STATUSES).optional(),
+});
+export interface AgentStopListQuerySchema extends Named<
+  typeof agentStopListQuerySchemaDefinition
+> {}
+export const agentStopListQuerySchema: AgentStopListQuerySchema =
+  agentStopListQuerySchemaDefinition;
+
+const agentStopPlanResponseSchemaDefinition = z.object({ data: agentStopPlanSchema });
+export interface AgentStopPlanResponseSchema extends Named<
+  typeof agentStopPlanResponseSchemaDefinition
+> {}
+export const agentStopPlanResponseSchema: AgentStopPlanResponseSchema =
+  agentStopPlanResponseSchemaDefinition;
+
+const agentStopResponseSchemaDefinition = z.object({ data: agentStopViewSchema });
+export interface AgentStopResponseSchema extends Named<typeof agentStopResponseSchemaDefinition> {}
+export const agentStopResponseSchema: AgentStopResponseSchema = agentStopResponseSchemaDefinition;
+
+const agentStopListResponseSchemaDefinition = z.object({ data: agentStopViewSchema.array() });
+export interface AgentStopListResponseSchema extends Named<
+  typeof agentStopListResponseSchemaDefinition
+> {}
+export const agentStopListResponseSchema: AgentStopListResponseSchema =
+  agentStopListResponseSchemaDefinition;
+
+// ── Events (aggregate `agent_stop`, one per stop) ──────────────────────────
+
+export const AGENT_STOP_AGGREGATE_TYPE = "agent_stop" as const;
+export const AGENT_STOP_EVENT_TYPES = {
+  REQUESTED: "lw.governance.agent_stop.requested",
+  APPROVED: "lw.governance.agent_stop.approved",
+  DENIED: "lw.governance.agent_stop.denied",
+  TARGET_APPLIED: "lw.governance.agent_stop.target_applied",
+  TARGET_FAILED: "lw.governance.agent_stop.target_failed",
+  RESTORE_REQUESTED: "lw.governance.agent_stop.restore_requested",
+  TARGET_REVERTED: "lw.governance.agent_stop.target_reverted",
+  TARGET_REVERT_FAILED: "lw.governance.agent_stop.target_revert_failed",
+} as const;
+export const AGENT_STOP_EVENT_VERSION = "2026-11-16" as const;
+export const AGENT_STOP_COMMAND_TYPES = {
+  REQUEST: "lw.governance.agent_stop.request",
+  APPROVE: "lw.governance.agent_stop.approve",
+  DENY: "lw.governance.agent_stop.deny",
+  RECORD_TARGET_APPLIED: "lw.governance.agent_stop.record_target_applied",
+  RECORD_TARGET_FAILED: "lw.governance.agent_stop.record_target_failed",
+  REQUEST_RESTORE: "lw.governance.agent_stop.request_restore",
+  RECORD_TARGET_REVERTED: "lw.governance.agent_stop.record_target_reverted",
+  RECORD_TARGET_REVERT_FAILED: "lw.governance.agent_stop.record_target_revert_failed",
+} as const;
+
+const stopRef = { stopId: z.string().min(1), organizationId: z.string().min(1) };
+
+const agentStopRequestedEventDataSchemaDefinition = z.object({
+  ...stopRef,
+  agentId: z.string().min(1),
+  agentName: z.string(),
+  severity: z.enum(AGENT_STOP_SEVERITIES),
+  approval: z.enum(AGENT_STOP_APPROVALS),
+  trigger: z.enum(AGENT_STOP_TRIGGERS),
+  reason: z.string(),
+  requestedByUserId: z.string().nullable(),
+  requestedByApiKeyId: z.string().nullable(),
+  /** The plan as it stood at request: a later plan edit never changes what this stop acts on. */
+  targets: agentStopPlanTargetSchema.array().min(1),
+});
+export interface AgentStopRequestedEventDataSchema extends Named<
+  typeof agentStopRequestedEventDataSchemaDefinition
+> {}
+export const agentStopRequestedEventDataSchema: AgentStopRequestedEventDataSchema =
+  agentStopRequestedEventDataSchemaDefinition;
+export type AgentStopRequestedEventData = z.infer<typeof agentStopRequestedEventDataSchema>;
+
+const agentStopDecidedEventDataSchemaDefinition = z.object({
+  ...stopRef,
+  decidedByUserId: z.string().nullable(),
+  decidedByApiKeyId: z.string().nullable(),
+  note: z.string().nullable(),
+});
+export interface AgentStopDecidedEventDataSchema extends Named<
+  typeof agentStopDecidedEventDataSchemaDefinition
+> {}
+export const agentStopDecidedEventDataSchema: AgentStopDecidedEventDataSchema =
+  agentStopDecidedEventDataSchemaDefinition;
+export type AgentStopDecidedEventData = z.infer<typeof agentStopDecidedEventDataSchema>;
+
+const agentStopTargetSettledEventDataSchemaDefinition = z.object({
+  ...stopRef,
+  targetId: z.string().min(1),
+  errorCode: z.string().nullable(),
+  /** On a revert outcome: the restore it answers, so a second restore records its own outcome. */
+  restoreRound: z.number().int().positive().optional(),
+});
+export interface AgentStopTargetSettledEventDataSchema extends Named<
+  typeof agentStopTargetSettledEventDataSchemaDefinition
+> {}
+export const agentStopTargetSettledEventDataSchema: AgentStopTargetSettledEventDataSchema =
+  agentStopTargetSettledEventDataSchemaDefinition;
+export type AgentStopTargetSettledEventData = z.infer<typeof agentStopTargetSettledEventDataSchema>;
+
+const agentStopRestoreRequestedEventDataSchemaDefinition = z.object({
+  ...stopRef,
+  requestedByUserId: z.string().nullable(),
+  requestedByApiKeyId: z.string().nullable(),
+  /** 1 for the stop's first restore, one more on each later one. */
+  restoreRound: z.number().int().positive(),
+});
+export interface AgentStopRestoreRequestedEventDataSchema extends Named<
+  typeof agentStopRestoreRequestedEventDataSchemaDefinition
+> {}
+export const agentStopRestoreRequestedEventDataSchema: AgentStopRestoreRequestedEventDataSchema =
+  agentStopRestoreRequestedEventDataSchemaDefinition;
+export type AgentStopRestoreRequestedEventData = z.infer<
+  typeof agentStopRestoreRequestedEventDataSchema
+>;
+
+const event = governanceEventEnvelopeSchema.safeExtend({
+  aggregateType: z.literal(AGENT_STOP_AGGREGATE_TYPE),
+  version: z.literal(AGENT_STOP_EVENT_VERSION),
+});
+export const agentStopRequestedEventSchema = event.safeExtend({
+  type: z.literal(AGENT_STOP_EVENT_TYPES.REQUESTED),
+  data: agentStopRequestedEventDataSchema,
+});
+export const agentStopApprovedEventSchema = event.safeExtend({
+  type: z.literal(AGENT_STOP_EVENT_TYPES.APPROVED),
+  data: agentStopDecidedEventDataSchema,
+});
+export const agentStopDeniedEventSchema = event.safeExtend({
+  type: z.literal(AGENT_STOP_EVENT_TYPES.DENIED),
+  data: agentStopDecidedEventDataSchema,
+});
+export const agentStopTargetAppliedEventSchema = event.safeExtend({
+  type: z.literal(AGENT_STOP_EVENT_TYPES.TARGET_APPLIED),
+  data: agentStopTargetSettledEventDataSchema,
+});
+export const agentStopTargetFailedEventSchema = event.safeExtend({
+  type: z.literal(AGENT_STOP_EVENT_TYPES.TARGET_FAILED),
+  data: agentStopTargetSettledEventDataSchema,
+});
+export const agentStopRestoreRequestedEventSchema = event.safeExtend({
+  type: z.literal(AGENT_STOP_EVENT_TYPES.RESTORE_REQUESTED),
+  data: agentStopRestoreRequestedEventDataSchema,
+});
+export const agentStopTargetRevertedEventSchema = event.safeExtend({
+  type: z.literal(AGENT_STOP_EVENT_TYPES.TARGET_REVERTED),
+  data: agentStopTargetSettledEventDataSchema,
+});
+export const agentStopTargetRevertFailedEventSchema = event.safeExtend({
+  type: z.literal(AGENT_STOP_EVENT_TYPES.TARGET_REVERT_FAILED),
+  data: agentStopTargetSettledEventDataSchema,
+});
+
+/** The webhook and audit names of a stop's milestones, pushed through the registry's feed. */
+export const AGENT_STOP_WEBHOOK_EVENT_TYPES = [
+  "governance.agent.stop_requested",
+  "governance.agent.quarantined",
+  "governance.agent.stop_failed",
+  "governance.agent.restored",
+  "governance.agent.restore_failed",
+] as const;
+export type AgentStopWebhookEventType = (typeof AGENT_STOP_WEBHOOK_EVENT_TYPES)[number];
+
+/** Who asked: a person (userId only), or an organisation API key (its id and its owner, if any). */
+export type AgentStopCaller = { userId: string | null; apiKeyId: string | null };
+
+// ── tRPC (the governance UI) ───────────────────────────────────────────────
+
+const organizationScope = { organizationId: z.string() };
+const agentScope = { ...organizationScope, agentId: z.string().min(1) };
+const stopScope = { ...organizationScope, stopId: z.string().min(1) };
+
+/** One Agents-page row's kill switch state, keyed by the row's registry entry. */
+const agentKillSwitchSummarySchemaDefinition = z.object({
+  agentId: z.string(),
+  /** The Agents-page row id this registry entry backs (`registered:<id>` or `discovered:<id>`). */
+  inventoryRowId: z.string().nullable(),
+  planTargetCount: z.number().int().nonnegative(),
+  openStop: agentStopViewSchema.nullable(),
+});
+export interface AgentKillSwitchSummarySchema extends Named<
+  typeof agentKillSwitchSummarySchemaDefinition
+> {}
+export const agentKillSwitchSummarySchema: AgentKillSwitchSummarySchema =
+  agentKillSwitchSummarySchemaDefinition;
+export type AgentKillSwitchSummary = z.infer<typeof agentKillSwitchSummarySchema>;
+
+export const governanceKillSwitchTrpc = defineTrpcContract("governanceKillSwitch")
+  .query("summaries")
+  .withInput(z.object(organizationScope))
+  .withOutput(agentKillSwitchSummarySchema.array())
+
+  .query("pendingApprovals")
+  .withInput(z.object(organizationScope))
+  .withOutput(agentStopViewSchema.array())
+
+  .query("plan")
+  .withInput(z.object(agentScope))
+  .withOutput(agentStopPlanSchema)
+
+  .mutation("setPlan")
+  .withInput(z.object({ ...agentScope, targets: setAgentStopPlanInputSchema.shape.targets }))
+  .withOutput(agentStopPlanSchema)
+
+  .query("awsConnections")
+  .withInput(z.object(organizationScope))
+  .withOutput(awsConnectionViewSchema.array())
+
+  .mutation("createAwsConnection")
+  .withInput(z.object({ ...organizationScope, connection: awsConnectionInputSchema }))
+  .withOutput(awsConnectionViewSchema)
+
+  .mutation("deleteAwsConnection")
+  .withInput(z.object({ ...organizationScope, connectionId: z.string().min(1) }))
+  .withOutput(z.object({ deleted: z.boolean() }))
+
+  .mutation("requestStop")
+  .withInput(z.object({ ...agentScope, reason: z.string().trim().min(1).max(2000) }))
+  .withOutput(agentStopViewSchema)
+
+  .mutation("approveStop")
+  .withInput(z.object({ ...stopScope, note: z.string().trim().max(2000).optional() }))
+  .withOutput(agentStopViewSchema)
+
+  .mutation("denyStop")
+  .withInput(z.object({ ...stopScope, note: z.string().trim().max(2000).optional() }))
+  .withOutput(agentStopViewSchema)
+
+  .mutation("restore")
+  .withInput(z.object(stopScope))
+  .withOutput(agentStopViewSchema)
+  .build();

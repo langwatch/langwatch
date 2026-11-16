@@ -1,0 +1,113 @@
+---
+title: Agent kill switch
+description: Stop an agent on the platform it runs on, with an approval when you want one, and restore it with one action.
+sidebarTitle: Kill switch
+keywords: kill switch, stop agent, quarantine, Databricks model serving, Amazon Bedrock agents, virtual key, governance, approval
+---
+
+When an agent misbehaves, the kill switch stops it where it runs. LangWatch stops the agent's Databricks model serving endpoint, sets its Amazon Bedrock agent alias to reject invocations, and disables the gateway virtual key its model calls use. The agent shows as **Quarantined** in the Agents inventory, every step is in the audit log, and your webhook endpoints get a `governance.agent.*` event. **Restore** undoes every action that was applied.
+
+The kill switch works on agents in the [agent registry](/governance/agent-registry) and is part of the Enterprise plan.
+
+## Stop plan
+
+Each agent has a stop plan: the targets a stop acts on. Set it on the Agents page (**Stop plan** in the agent's actions) or with `PUT /api/governance/agents/{agentId}/stop-plan`.
+
+| Target | What a stop does | What a restore does |
+|---|---|---|
+| Databricks model serving endpoint | `POST /api/2.0/serving-endpoints/{name}/config:stop` | `POST /api/2.0/serving-endpoints/{name}/config:start` |
+| Amazon Bedrock agent alias | `UpdateAgentAlias` with `aliasInvocationState: REJECT_INVOCATIONS` | `UpdateAgentAlias` with `aliasInvocationState: ACCEPT_INVOCATIONS` |
+| Gateway virtual key | Disables the key; requests answer `virtual_key_disabled` | Enables the key |
+
+A Databricks target uses the workspace and credentials of a Databricks [ingestion source](/ai-governance/ingestion-sources/index). A Bedrock target uses an AWS connection you add under **AWS connections** on the same screen: an access key pair, a role ARN to assume (with an external id), or both. The secret access key and the external id are stored encrypted and are never shown again.
+
+Databricks stops only endpoints that serve custom models and have no update in progress. A stopped endpoint answers `400` to queries.
+
+## Approval
+
+A stop is applied at once when:
+
+- a person with `governance:manage` presses **Stop** on the Agents page, or
+- a machine credential asks with `severity: "critical"`.
+
+Any other stop from a machine credential waits for an approval. It shows as an approval card on the Agents page and pushes `governance.agent.stop_requested` to your webhook endpoints, so your on-call tool can page someone. A person or key with `governance:manage` approves or denies it. The key that requested a stop cannot approve it.
+
+One agent has at most one open stop. A new request while one is pending, stopping or quarantined answers `409` with code `agent_stop_already_open`.
+
+## Status
+
+| Status | Meaning |
+|---|---|
+| `pending_approval` | Waiting for an approval |
+| `denied` | Denied; nothing was changed |
+| `stopping` | The worker is applying the targets |
+| `quarantined` | Every target was applied |
+| `stop_failed` | At least one target failed after its retries; the others were applied |
+| `restoring` | The worker is reverting the applied targets |
+| `restored` | Every applied target was reverted |
+| `restore_failed` | At least one target could not be reverted |
+
+Each target is retried with backoff before it is recorded as failed. A failed target carries an error code such as `http_403` or `AccessDeniedException`. Restore reverts only the targets that were applied, so a key that failed to disable is not enabled by a restore.
+
+## Endpoints
+
+Every route takes an organization API key in `Authorization: Bearer <key>`. Reads need `governance:view`; stops, decisions, restores and plan changes need `governance:manage`. Organization admins hold both.
+
+| Method and path | Does |
+|---|---|
+| `GET /api/governance/agents/{agentId}/stop-plan` | Reads the agent's stop plan |
+| `PUT /api/governance/agents/{agentId}/stop-plan` | Replaces the stop plan |
+| `POST /api/governance/agents/{agentId}/stop` | Requests a stop. Body: `{ "reason": "...", "severity": "low" \| "medium" \| "high" \| "critical" }`. Answers `202` with the stop |
+| `GET /api/governance/agents/{agentId}/stop` | The agent's latest stop |
+| `GET /api/governance/agent-stops` | Stops, filtered by `status` |
+| `POST /api/governance/agent-stops/{stopId}/approve` | Approves a pending stop |
+| `POST /api/governance/agent-stops/{stopId}/deny` | Denies a pending stop |
+| `POST /api/governance/agent-stops/{stopId}/restore` | Restores a quarantined agent |
+
+Each path also answers under `/api/v1/governance/...`. The routes are in the OpenAPI document under the tag **Governance / Kill Switch**.
+
+## Stop an agent from a trace rule
+
+A [trigger](/features/automations) can stop an agent. Add a **Webhook** action that posts to the stop route, put the API key in a secret header, and shape the body:
+
+```text
+URL      https://app.langwatch.ai/api/governance/agents/<agentId>/stop
+Header   Authorization: Bearer <organization API key with governance:manage>
+Body     {"reason": "Trace rule {{ trigger.name }} matched {{ match.trace.url }}", "severity": "critical"}
+```
+
+Use `critical` to stop at once, or `high` to page an approver first.
+
+## Audit log and webhooks
+
+The audit log records `governance.agent.stop_requested`, `governance.agent.stop_approved`, `governance.agent.stop_denied`, `governance.agent.quarantined`, `governance.agent.stop_failed`, `governance.agent.restore_requested`, `governance.agent.restored` and `governance.agent.restore_failed`, with the agent as the target.
+
+Webhook endpoints subscribed to `governance.agent.*` receive `governance.agent.stop_requested`, `governance.agent.quarantined`, `governance.agent.stop_failed`, `governance.agent.restored` and `governance.agent.restore_failed`. Each event carries the registry entry and a `stop` object with the status and every target's outcome. They are also in the registry's change feed.
+
+## Permissions on your platforms
+
+### Databricks
+
+The Databricks ingestion source's service principal needs **Can Manage** on each serving endpoint in a stop plan. Listing Genie spaces does not need it.
+
+### AWS
+
+The AWS connection needs this policy, scoped to the aliases in your stop plans:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": ["bedrock:GetAgentAlias", "bedrock:UpdateAgentAlias"],
+      "Resource": [
+        "arn:aws:bedrock:<region>:<account>:agent/<agentId>",
+        "arn:aws:bedrock:<region>:<account>:agent-alias/<agentId>/<aliasId>"
+      ]
+    }
+  ]
+}
+```
+
+With a role ARN, the role's trust policy must let the connection's principal call `sts:AssumeRole`, with the external id as a condition when you set one.

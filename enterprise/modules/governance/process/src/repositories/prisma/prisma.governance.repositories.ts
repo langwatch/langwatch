@@ -5,6 +5,8 @@ import type { Encryption } from "@langwatch/process-stores";
 
 import type { GovernanceRepositories } from "../governance.repositories.ts";
 import { PrismaAgentRegistryRepository } from "./prisma.agent-registry.repository.ts";
+import { PrismaAgentStopPlanRepository } from "./prisma.agent-stop-plan.repository.ts";
+import { PrismaAgentStopRepository } from "./prisma.agent-stop.repository.ts";
 import { PrismaAggregateReconcileLockRepository } from "./prisma.aggregate-reconcile-lock.repository.ts";
 import { PrismaAiToolCatalogRepository } from "./prisma.ai-tool-catalog.repository.ts";
 import { PrismaAnomalyRuleRepository } from "./prisma.anomaly-rule.repository.ts";
@@ -13,6 +15,7 @@ import { PrismaDepartmentRepository } from "./prisma.department.repository.ts";
 import { PrismaDiscoveredAgentRepository } from "./prisma.discovered-agent.repository.ts";
 import { PrismaDiscoveredPersonRepository } from "./prisma.discovered-person.repository.ts";
 import { PrismaErasedIdentifierSuppressionRepository } from "./prisma.erased-identifier-suppression.repository.ts";
+import { PrismaGovernanceAwsConnectionRepository } from "./prisma.governance-aws-connection.repository.ts";
 import { PrismaGovernanceSetupStateRepository } from "./prisma.governance-setup-state.repository.ts";
 import { PrismaGovernanceTenantHistoryRepository } from "./prisma.governance-tenant-history.repository.ts";
 import { PrismaIdentityMatchSuggestionRepository } from "./prisma.identity-match-suggestion.repository.ts";
@@ -47,6 +50,12 @@ export class PostgresGovernanceRepositories {
   > {
     return {
       agentRegistry: PrismaAgentRegistryRepository.create(prisma),
+      agentStopPlans: PrismaAgentStopPlanRepository.create(prisma),
+      agentStops: PrismaAgentStopRepository.create(prisma),
+      awsConnections: PrismaGovernanceAwsConnectionRepository.create({
+        database: prisma,
+        cipher: encryption,
+      }),
       aggregateReconcileLock: PrismaAggregateReconcileLockRepository.create(prisma),
       aiTools: PrismaAiToolCatalogRepository.create(prisma),
       anomalyRules: PrismaAnomalyRuleRepository.create(prisma),

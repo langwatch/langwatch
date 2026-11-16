@@ -5,6 +5,8 @@ import {
   type AgentRegistryEntry,
   type AgentRegistryEvent,
   type AgentRegistryStatus,
+  type AgentStopView,
+  type AgentStopWebhookEventType,
 } from "@langwatch/enterprise-governance-contract";
 import { Temporal, type Instant } from "@langwatch/time";
 
@@ -204,6 +206,56 @@ export class MemoryAgentRegistryRepository extends AgentRegistryRepository {
     for (const held of this.eventsOf(organizationId)) {
       if (ids.has(held.event.id)) held.deliveryRecordedAt = at;
     }
+  }
+
+  async appendStopEvent({
+    organizationId,
+    event,
+  }: {
+    organizationId: string;
+    event: {
+      id: string;
+      type: AgentStopWebhookEventType;
+      entryId: string;
+      occurredAt: Instant;
+      stop: AgentStopView;
+    };
+  }): Promise<AgentRegistryEvent> {
+    const held = this.eventsOf(organizationId).find((candidate) => candidate.event.id === event.id);
+    if (held) return structuredClone(held.event);
+    const entry = await this.getEntry({ organizationId, id: event.entryId });
+    this.sequence += 1n;
+    const appended: AgentRegistryEvent = {
+      ...registryEventOf({
+        organizationId,
+        sequence: this.sequence,
+        draft: {
+          id: event.id,
+          type: event.type,
+          entryId: event.entryId,
+          fromVersion: null,
+          toVersion: null,
+          tool: null,
+          agent: entry,
+          occurredAt: registryTimestamp(event.occurredAt),
+        },
+      }),
+      stop: structuredClone(event.stop),
+    };
+    this.events.push({ event: appended, deliveryRecordedAt: null });
+    return structuredClone(appended);
+  }
+
+  async findSourceKeys({
+    organizationId,
+    ids,
+  }: {
+    organizationId: string;
+    ids: readonly string[];
+  }): Promise<{ id: string; sourceKey: string }[]> {
+    return this.rows
+      .filter((row) => row.organizationId === organizationId && ids.includes(row.id))
+      .map((row) => ({ id: row.id, sourceKey: row.sourceKey }));
   }
 
   private entriesOf(organizationId: string): AgentRegistryEntry[] {

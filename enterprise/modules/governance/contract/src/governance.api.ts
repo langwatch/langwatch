@@ -107,6 +107,17 @@ import type {
   QuarantineFillInput,
   QuarantineFillStats,
 } from "./features/ingestion/quarantine-fill.ts";
+import type {
+  AgentKillSwitchSummary,
+  AgentStopCaller,
+  AgentStopPlan,
+  AgentStopSeverity,
+  AgentStopStatus,
+  AgentStopTarget,
+  AgentStopView,
+  AwsConnectionInput,
+  AwsConnectionView,
+} from "./features/kill-switch/agent-kill-switch.ts";
 import type { PersonaResolution } from "./features/personal/persona-home.ts";
 import type { GovernanceBudgetOverviewForUser } from "./features/personal/personal-budget-overview.ts";
 import type {
@@ -504,6 +515,59 @@ export interface GovernanceRestApi {
     organizationId: string;
     request: ArdSearchRequest;
   }): Promise<ArdSearchResponse>;
+
+  // The agent kill switch (specs/agent-kill-switch.feature).
+  findAgentKillSwitchSummaries(input: {
+    organizationId: string;
+  }): Promise<AgentKillSwitchSummary[]>;
+  findPendingAgentStops(input: { organizationId: string }): Promise<AgentStopView[]>;
+  /** Throws `agent_registry_entry_not_found` for an agent outside the organisation. */
+  getAgentStopPlan(input: { organizationId: string; agentId: string }): Promise<AgentStopPlan>;
+  /** Throws `agent_stop_target_invalid` for a target the organisation does not hold. */
+  setAgentStopPlan(input: {
+    organizationId: string;
+    agentId: string;
+    targets: readonly AgentStopTarget[];
+  }): Promise<AgentStopPlan>;
+  findAwsConnections(input: { organizationId: string }): Promise<AwsConnectionView[]>;
+  createAwsConnection(input: {
+    organizationId: string;
+    connection: AwsConnectionInput;
+  }): Promise<AwsConnectionView>;
+  deleteAwsConnection(input: {
+    organizationId: string;
+    connectionId: string;
+  }): Promise<{ deleted: boolean }>;
+  requestAgentStop(input: {
+    organizationId: string;
+    agentId: string;
+    reason: string;
+    severity: AgentStopSeverity;
+    caller: AgentStopCaller;
+  }): Promise<AgentStopView>;
+  approveAgentStop(input: {
+    organizationId: string;
+    stopId: string;
+    note?: string;
+    caller: AgentStopCaller;
+  }): Promise<AgentStopView>;
+  denyAgentStop(input: {
+    organizationId: string;
+    stopId: string;
+    note?: string;
+    caller: AgentStopCaller;
+  }): Promise<AgentStopView>;
+  restoreAgentStop(input: {
+    organizationId: string;
+    stopId: string;
+    caller: AgentStopCaller;
+  }): Promise<AgentStopView>;
+  /** The agent's latest stop; throws `agent_stop_not_found` when it was never stopped. */
+  getLatestAgentStop(input: { organizationId: string; agentId: string }): Promise<AgentStopView>;
+  findAgentStops(input: {
+    organizationId: string;
+    statuses?: readonly AgentStopStatus[];
+  }): Promise<AgentStopView[]>;
 }
 
 export const GovernanceRestApi = moduleApi<GovernanceRestApi>()("governance");

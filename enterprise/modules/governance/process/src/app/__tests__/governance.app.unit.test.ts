@@ -348,6 +348,8 @@ describe("GovernanceModule as the module a process installs", () => {
         "rest",
         "rest",
         "rest",
+        "rest",
+        "trpc",
         "trpc",
         "trpc",
         "trpc",

@@ -7,6 +7,8 @@
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
+import { agentStopViewSchema } from "../kill-switch/agent-kill-switch.ts";
+
 export const AGENT_REGISTRY_SOURCES = [
   "langwatch",
   "databricks",
@@ -105,6 +107,11 @@ export const AGENT_REGISTRY_EVENT_TYPES = [
   "governance.agent.removed",
   "governance.agent.tool_deprecated",
   "governance.agent.flagged_shadow",
+  "governance.agent.stop_requested",
+  "governance.agent.quarantined",
+  "governance.agent.stop_failed",
+  "governance.agent.restored",
+  "governance.agent.restore_failed",
 ] as const;
 export type AgentRegistryEventType = (typeof AGENT_REGISTRY_EVENT_TYPES)[number];
 
@@ -122,6 +129,8 @@ const agentRegistryEventSchemaDefinition = z.object({
   occurred_at: z.string(),
   /** The entry as it stood at `to_version`. */
   agent: agentRegistryEntrySchema,
+  /** On a kill switch milestone (`stop_requested`, `quarantined`, ...) only: the stop as it stands. */
+  stop: agentStopViewSchema.optional(),
 });
 export interface AgentRegistryEventSchema extends Named<
   typeof agentRegistryEventSchemaDefinition

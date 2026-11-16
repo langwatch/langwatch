@@ -1,0 +1,182 @@
+from __future__ import annotations
+
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Any, TypeVar, cast
+
+from attrs import define as _attrs_define
+
+from ..models.get_api_governance_agents_by_id_stop_response_200_data_targets_item_state import (
+    GetApiGovernanceAgentsByIdStopResponse200DataTargetsItemState,
+)
+
+if TYPE_CHECKING:
+    from ..models.get_api_governance_agents_by_id_stop_response_200_data_targets_item_target_type_0 import (
+        GetApiGovernanceAgentsByIdStopResponse200DataTargetsItemTargetType0,
+    )
+    from ..models.get_api_governance_agents_by_id_stop_response_200_data_targets_item_target_type_1 import (
+        GetApiGovernanceAgentsByIdStopResponse200DataTargetsItemTargetType1,
+    )
+    from ..models.get_api_governance_agents_by_id_stop_response_200_data_targets_item_target_type_2 import (
+        GetApiGovernanceAgentsByIdStopResponse200DataTargetsItemTargetType2,
+    )
+
+
+T = TypeVar("T", bound="GetApiGovernanceAgentsByIdStopResponse200DataTargetsItem")
+
+
+@_attrs_define
+class GetApiGovernanceAgentsByIdStopResponse200DataTargetsItem:
+    """
+    Attributes:
+        id (str):
+        label (str):
+        target (GetApiGovernanceAgentsByIdStopResponse200DataTargetsItemTargetType0 |
+            GetApiGovernanceAgentsByIdStopResponse200DataTargetsItemTargetType1 |
+            GetApiGovernanceAgentsByIdStopResponse200DataTargetsItemTargetType2):
+        state (GetApiGovernanceAgentsByIdStopResponse200DataTargetsItemState):
+        error_code (None | str):
+        applied_at (None | str):
+        reverted_at (None | str):
+    """
+
+    id: str
+    label: str
+    target: (
+        GetApiGovernanceAgentsByIdStopResponse200DataTargetsItemTargetType0
+        | GetApiGovernanceAgentsByIdStopResponse200DataTargetsItemTargetType1
+        | GetApiGovernanceAgentsByIdStopResponse200DataTargetsItemTargetType2
+    )
+    state: GetApiGovernanceAgentsByIdStopResponse200DataTargetsItemState
+    error_code: None | str
+    applied_at: None | str
+    reverted_at: None | str
+
+    def to_dict(self) -> dict[str, Any]:
+        from ..models.get_api_governance_agents_by_id_stop_response_200_data_targets_item_target_type_0 import (
+            GetApiGovernanceAgentsByIdStopResponse200DataTargetsItemTargetType0,
+        )
+        from ..models.get_api_governance_agents_by_id_stop_response_200_data_targets_item_target_type_1 import (
+            GetApiGovernanceAgentsByIdStopResponse200DataTargetsItemTargetType1,
+        )
+
+        id = self.id
+
+        label = self.label
+
+        target: dict[str, Any]
+        if isinstance(self.target, GetApiGovernanceAgentsByIdStopResponse200DataTargetsItemTargetType0):
+            target = self.target.to_dict()
+        elif isinstance(self.target, GetApiGovernanceAgentsByIdStopResponse200DataTargetsItemTargetType1):
+            target = self.target.to_dict()
+        else:
+            target = self.target.to_dict()
+
+        state = self.state.value
+
+        error_code: None | str
+        error_code = self.error_code
+
+        applied_at: None | str
+        applied_at = self.applied_at
+
+        reverted_at: None | str
+        reverted_at = self.reverted_at
+
+        field_dict: dict[str, Any] = {}
+
+        field_dict.update(
+            {
+                "id": id,
+                "label": label,
+                "target": target,
+                "state": state,
+                "errorCode": error_code,
+                "appliedAt": applied_at,
+                "revertedAt": reverted_at,
+            }
+        )
+
+        return field_dict
+
+    @classmethod
+    def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        from ..models.get_api_governance_agents_by_id_stop_response_200_data_targets_item_target_type_0 import (
+            GetApiGovernanceAgentsByIdStopResponse200DataTargetsItemTargetType0,
+        )
+        from ..models.get_api_governance_agents_by_id_stop_response_200_data_targets_item_target_type_1 import (
+            GetApiGovernanceAgentsByIdStopResponse200DataTargetsItemTargetType1,
+        )
+        from ..models.get_api_governance_agents_by_id_stop_response_200_data_targets_item_target_type_2 import (
+            GetApiGovernanceAgentsByIdStopResponse200DataTargetsItemTargetType2,
+        )
+
+        d = dict(src_dict)
+        id = d.pop("id")
+
+        label = d.pop("label")
+
+        def _parse_target(
+            data: object,
+        ) -> (
+            GetApiGovernanceAgentsByIdStopResponse200DataTargetsItemTargetType0
+            | GetApiGovernanceAgentsByIdStopResponse200DataTargetsItemTargetType1
+            | GetApiGovernanceAgentsByIdStopResponse200DataTargetsItemTargetType2
+        ):
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                target_type_0 = GetApiGovernanceAgentsByIdStopResponse200DataTargetsItemTargetType0.from_dict(data)
+
+                return target_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                target_type_1 = GetApiGovernanceAgentsByIdStopResponse200DataTargetsItemTargetType1.from_dict(data)
+
+                return target_type_1
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            if not isinstance(data, dict):
+                raise TypeError()
+            target_type_2 = GetApiGovernanceAgentsByIdStopResponse200DataTargetsItemTargetType2.from_dict(data)
+
+            return target_type_2
+
+        target = _parse_target(d.pop("target"))
+
+        state = GetApiGovernanceAgentsByIdStopResponse200DataTargetsItemState(d.pop("state"))
+
+        def _parse_error_code(data: object) -> None | str:
+            if data is None:
+                return data
+            return cast(None | str, data)
+
+        error_code = _parse_error_code(d.pop("errorCode"))
+
+        def _parse_applied_at(data: object) -> None | str:
+            if data is None:
+                return data
+            return cast(None | str, data)
+
+        applied_at = _parse_applied_at(d.pop("appliedAt"))
+
+        def _parse_reverted_at(data: object) -> None | str:
+            if data is None:
+                return data
+            return cast(None | str, data)
+
+        reverted_at = _parse_reverted_at(d.pop("revertedAt"))
+
+        get_api_governance_agents_by_id_stop_response_200_data_targets_item = cls(
+            id=id,
+            label=label,
+            target=target,
+            state=state,
+            error_code=error_code,
+            applied_at=applied_at,
+            reverted_at=reverted_at,
+        )
+
+        return get_api_governance_agents_by_id_stop_response_200_data_targets_item

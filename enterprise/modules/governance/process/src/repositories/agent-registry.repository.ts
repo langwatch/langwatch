@@ -4,6 +4,8 @@ import type {
   AgentRegistryEntry,
   AgentRegistryEvent,
   AgentRegistryStatus,
+  AgentStopView,
+  AgentStopWebhookEventType,
 } from "@langwatch/enterprise-governance-contract";
 import type { Instant } from "@langwatch/time";
 
@@ -66,4 +68,24 @@ export abstract class AgentRegistryRepository {
     eventIds: readonly string[];
     at: Instant;
   }): Promise<void>;
+  /**
+   * Appends one kill switch milestone for an entry, carrying the entry as it stands and the stop.
+   * An event id already in the feed answers the stored event, so a redelivery appends once.
+   * Throws `agent_registry_entry_not_found` when the organisation holds no such entry.
+   */
+  abstract appendStopEvent(input: {
+    organizationId: string;
+    event: {
+      id: string;
+      type: AgentStopWebhookEventType;
+      entryId: string;
+      occurredAt: Instant;
+      stop: AgentStopView;
+    };
+  }): Promise<AgentRegistryEvent>;
+  /** Each entry's source key, for the entries of the organisation among `ids`. */
+  abstract findSourceKeys(input: {
+    organizationId: string;
+    ids: readonly string[];
+  }): Promise<{ id: string; sourceKey: string }[]>;
 }

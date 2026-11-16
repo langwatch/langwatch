@@ -5,6 +5,8 @@ import type { Instant } from "@langwatch/time";
 
 import type { ActivityMonitorRepository } from "./activity-monitor.repository.ts";
 import type { AgentRegistryRepository } from "./agent-registry.repository.ts";
+import type { AgentStopPlanRepository } from "./agent-stop-plan.repository.ts";
+import type { AgentStopRepository } from "./agent-stop.repository.ts";
 import type { AggregateReconcileLockRepository } from "./aggregate-reconcile-lock.repository.ts";
 import type { AiToolCatalogRepository } from "./ai-tool-catalog.repository.ts";
 import type { AnomalyRuleRepository } from "./anomaly-rule.repository.ts";
@@ -17,6 +19,7 @@ import type { DepartmentRepository } from "./department.repository.ts";
 import type { DiscoveredAgentRepository } from "./discovered-agent.repository.ts";
 import type { DiscoveredPersonRepository } from "./discovered-person.repository.ts";
 import type { ErasedIdentifierSuppressionRepository } from "./erased-identifier-suppression.repository.ts";
+import type { GovernanceAwsConnectionRepository } from "./governance-aws-connection.repository.ts";
 import type { GovernanceCostChargeRepository } from "./governance-cost-charge.repository.ts";
 import type { GovernanceCostRollupRepository } from "./governance-cost-rollup.repository.ts";
 import type { GovernanceRateLimitRepository } from "./governance-rate-limit.repository.ts";
@@ -138,6 +141,10 @@ export interface GovernanceOcsfEventWriter {
 export interface GovernanceRepositories {
   readonly activityMonitor: ActivityMonitorRepository;
   readonly agentRegistry: AgentRegistryRepository;
+  /** The kill switch: each agent's stop plan, the AWS connections and the AgentStop projection. */
+  readonly agentStopPlans: AgentStopPlanRepository;
+  readonly agentStops: AgentStopRepository;
+  readonly awsConnections: GovernanceAwsConnectionRepository;
   readonly aggregateReconcileLock: AggregateReconcileLockRepository;
   readonly aiTools: AiToolCatalogRepository;
   readonly anomalyRules: AnomalyRuleRepository;

@@ -7,6 +7,9 @@ import {
   type AgentRegistryEntry,
   type AgentRegistryEvent,
   type AgentRegistryStatus,
+  type AgentStopView,
+  type AgentStopWebhookEventType,
+  agentStopViewSchema,
 } from "@langwatch/enterprise-governance-contract";
 import { skipTenantCheck } from "@langwatch/prisma-client";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
@@ -30,6 +33,7 @@ const REGISTRY_TRANSACTION_MAX_WAIT_MS = 10_000;
 const eventPayloadSchema = z.object({
   tool: z.string().nullable(),
   agent: agentRegistryEntrySchema,
+  stop: agentStopViewSchema.optional(),
 });
 
 type EventRow = {
@@ -46,7 +50,7 @@ type EventRow = {
 
 function eventOf(row: EventRow): AgentRegistryEvent {
   const payload = eventPayloadSchema.parse(row.payload);
-  return registryEventOf({
+  const event = registryEventOf({
     organizationId: row.organizationId,
     sequence: row.sequence,
     draft: {
@@ -60,6 +64,7 @@ function eventOf(row: EventRow): AgentRegistryEvent {
       occurredAt: row.occurredAt.toISOString(),
     },
   });
+  return payload.stop ? { ...event, stop: payload.stop } : event;
 }
 
 function entryOf(value: Prisma.JsonValue): AgentRegistryEntry {
@@ -322,6 +327,60 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`agent-registry:${organizationId
       take: limit,
     });
     return rows.map(eventOf);
+  }
+
+  async appendStopEvent({
+    organizationId,
+    event,
+  }: {
+    organizationId: string;
+    event: {
+      id: string;
+      type: AgentStopWebhookEventType;
+      entryId: string;
+      occurredAt: Instant;
+      stop: AgentStopView;
+    };
+  }): Promise<AgentRegistryEvent> {
+    return this.prisma.$transaction(async (transaction) => {
+      const held = await transaction.agentRegistryEvent.findFirst({
+        where: { organizationId, id: event.id },
+      });
+      if (held) return eventOf(held);
+      const entry = await transaction.agentRegistryEntry.findFirst({
+        where: { organizationId, id: event.entryId },
+        select: { entry: true },
+      });
+      if (!entry) throw new AgentRegistryEntryNotFoundError(event.entryId);
+      const row = await transaction.agentRegistryEvent.create({
+        data: {
+          id: event.id,
+          organizationId,
+          type: event.type,
+          entryId: event.entryId,
+          fromVersion: null,
+          toVersion: null,
+          payload: jsonOf({ tool: null, agent: entryOf(entry.entry), stop: event.stop }),
+          occurredAt: toDate(event.occurredAt),
+          deliveryRecordedAt: null,
+        },
+      });
+      return eventOf(row);
+    });
+  }
+
+  async findSourceKeys({
+    organizationId,
+    ids,
+  }: {
+    organizationId: string;
+    ids: readonly string[];
+  }): Promise<{ id: string; sourceKey: string }[]> {
+    if (ids.length === 0) return [];
+    return this.prisma.agentRegistryEntry.findMany({
+      where: { organizationId, id: { in: [...ids] } },
+      select: { id: true, sourceKey: true },
+    });
   }
 
   async markDeliveryRecorded({

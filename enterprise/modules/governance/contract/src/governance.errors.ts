@@ -361,3 +361,112 @@ export class IngestionReceiverUnavailableError extends HandledError {
     this.name = "IngestionReceiverUnavailableError";
   }
 }
+
+// ── Agent kill switch (specs/agent-kill-switch.feature) ─────────────────────
+
+/** A plan target names a source, AWS connection or virtual key the organisation does not hold. */
+export class AgentStopTargetInvalidError extends HandledError {
+  declare readonly code: "agent_stop_target_invalid";
+
+  constructor(meta: { position: number; kind: string; reason: string }) {
+    super("agent_stop_target_invalid", "A stop plan target is not valid for this organisation.", {
+      httpStatus: 422,
+      fault: "customer",
+      meta,
+      ...remediation("agent_stop_target_invalid"),
+    });
+    this.name = "AgentStopTargetInvalidError";
+  }
+}
+
+export class AgentStopPlanEmptyError extends HandledError {
+  declare readonly code: "agent_stop_plan_empty";
+
+  constructor(agentId: string) {
+    super("agent_stop_plan_empty", "The agent has no stop plan to apply.", {
+      httpStatus: 409,
+      fault: "customer",
+      meta: { agentId },
+      ...remediation("agent_stop_plan_empty"),
+    });
+    this.name = "AgentStopPlanEmptyError";
+  }
+}
+
+export class AgentStopAlreadyOpenError extends HandledError {
+  declare readonly code: "agent_stop_already_open";
+
+  constructor(meta: { agentId: string; stopId: string }) {
+    super("agent_stop_already_open", "The agent already has an open stop.", {
+      httpStatus: 409,
+      fault: "customer",
+      meta,
+      ...remediation("agent_stop_already_open"),
+    });
+    this.name = "AgentStopAlreadyOpenError";
+  }
+}
+
+export class AgentStopNotPendingError extends HandledError {
+  declare readonly code: "agent_stop_not_pending";
+
+  constructor(meta: { stopId: string; status: string }) {
+    super("agent_stop_not_pending", "The stop is no longer waiting for an approval.", {
+      httpStatus: 409,
+      fault: "customer",
+      meta,
+      ...remediation("agent_stop_not_pending"),
+    });
+    this.name = "AgentStopNotPendingError";
+  }
+}
+
+export class AgentStopSelfApprovalError extends HandledError {
+  declare readonly code: "agent_stop_self_approval";
+
+  constructor(stopId: string) {
+    super("agent_stop_self_approval", "The credential that requested a stop cannot approve it.", {
+      httpStatus: 409,
+      fault: "customer",
+      meta: { stopId },
+      ...remediation("agent_stop_self_approval"),
+    });
+    this.name = "AgentStopSelfApprovalError";
+  }
+}
+
+export class AgentStopNotRestorableError extends HandledError {
+  declare readonly code: "agent_stop_not_restorable";
+
+  constructor(meta: { stopId: string; status: string }) {
+    super("agent_stop_not_restorable", "The stop cannot be restored in its current status.", {
+      httpStatus: 409,
+      fault: "customer",
+      meta,
+      ...remediation("agent_stop_not_restorable"),
+    });
+    this.name = "AgentStopNotRestorableError";
+  }
+}
+
+export class AgentStopNotFoundError extends NotFoundError {
+  constructor(id: string) {
+    super(
+      "agent_stop_not_found",
+      { resource: "Agent stop", id },
+      remediation("agent_stop_not_found"),
+    );
+    this.name = "AgentStopNotFoundError";
+  }
+}
+
+export class GovernanceAwsConnectionNotFoundError extends NotFoundError {
+  constructor(id: string) {
+    super(
+      "governance_aws_connection_not_found",
+      { resource: "AWS connection", id },
+      remediation("governance_aws_connection_not_found"),
+    );
+    this.name = "GovernanceAwsConnectionNotFoundError";
+  }
+}

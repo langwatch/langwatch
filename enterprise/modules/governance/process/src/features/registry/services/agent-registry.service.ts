@@ -1,4 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import type {
+  AgentRegistryEvent,
+  AgentStopView,
+  AgentStopWebhookEventType,
+} from "@langwatch/enterprise-governance-contract";
 import { generate } from "@langwatch/ksuid";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
@@ -215,6 +220,43 @@ export class AgentRegistryService {
       eventIds: pending.map((event) => event.id),
       at: this.deps.now(),
     });
+  }
+
+  /**
+   * Appends a kill switch milestone to the entry's feed, then fans it out like any registry event.
+   * The event id is the caller's, so a redelivered announcement appends and pushes once.
+   */
+  async announceStop({
+    organizationId,
+    eventId,
+    milestone,
+    stop,
+  }: {
+    organizationId: string;
+    eventId: string;
+    milestone: AgentStopWebhookEventType;
+    stop: AgentStopView;
+  }): Promise<AgentRegistryEvent> {
+    const event = await this.deps.registry.appendStopEvent({
+      organizationId,
+      event: {
+        id: eventId,
+        type: milestone,
+        entryId: stop.agentId,
+        occurredAt: this.deps.now(),
+        stop,
+      },
+    });
+    await this.fanOutPending({ organizationId });
+    return event;
+  }
+
+  /** Each entry's source key, so a caller can name the Agents-page row the entry backs. */
+  findSourceKeys(input: {
+    organizationId: string;
+    ids: readonly string[];
+  }): Promise<{ id: string; sourceKey: string }[]> {
+    return this.deps.registry.findSourceKeys(input);
   }
 
   private async reconcileLogged({ organizationId }: { organizationId: string }): Promise<void> {

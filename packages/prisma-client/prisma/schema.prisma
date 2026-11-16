@@ -7416,6 +7416,73 @@ model AgentRegistryBaseline {
   baselinedAt    DateTime
 }
 
+/// One target of a registry agent's kill switch stop plan (enterprise/modules/governance/specs/
+/// agent-kill-switch.feature): a Databricks serving endpoint, a Bedrock agent alias or a gateway
+/// virtual key. A plan write replaces every row of the agent at once.
+model AgentStopPlanTarget {
+  id             String   @id
+  organizationId String
+  /// The AgentRegistryEntry the plan belongs to.
+  agentId        String
+  position       Int
+  label          String
+  target         Json
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now()) @updatedAt
+
+  @@index([organizationId, agentId])
+}
+
+/// An AWS credential a Bedrock kill switch target signs with: a static key pair, a role to assume,
+/// or both. The secret access key and the external id are stored sealed.
+model GovernanceAwsConnection {
+  id                       String   @id
+  organizationId           String
+  name                     String
+  accessKeyId              String?
+  encryptedSecretAccessKey String?
+  roleArn                  String?
+  encryptedExternalId      String?
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @default(now()) @updatedAt
+
+  @@index([organizationId])
+}
+
+/// The `agent_stop` aggregate's Postgres projection: one row per kill switch stop, its status and
+/// every target's outcome, folded from the stop's events.
+model AgentStop {
+  id                  String    @id
+  organizationId      String
+  agentId             String
+  agentName           String
+  status              String
+  severity            String
+  approval            String
+  trigger             String
+  reason              String
+  requestedByUserId   String?
+  requestedByApiKeyId String?
+  decidedByUserId     String?
+  decidedByApiKeyId   String?
+  restoredByUserId    String?
+  targets             Json
+  requestedAt         DateTime
+  decidedAt           DateTime?
+  quarantinedAt       DateTime?
+  restoreRequestedAt  DateTime?
+  restoredAt          DateTime?
+  lastAppliedEventId  String
+  lastAcceptedAt      BigInt
+  lastOccurredAt      BigInt
+  projectionVersion   String
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @default(now()) @updatedAt
+
+  @@index([organizationId, agentId])
+  @@index([organizationId, status])
+}
+
 /// The dated match table: "`user_abc123` on Anthropic is platform user #42,
 /// valid from March 3", closed when it stops being true.
 ///

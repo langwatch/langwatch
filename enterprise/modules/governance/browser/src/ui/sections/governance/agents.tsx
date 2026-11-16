@@ -20,6 +20,7 @@ import {
   AgentFilterBar,
   type AgentFilters,
   AgentFleetSummaryStrip,
+  type AgentRowExtras,
   type AgentsLayout,
   AgentsLayoutControl,
   AgentsList,
@@ -37,6 +38,12 @@ import {
   useAgentFilters,
 } from "../../../features/agents/index.ts";
 import { GovernanceSyncButton, governanceSyncStatus } from "../../../features/agents/sync/index.ts";
+import {
+  AgentKillSwitchMenu,
+  AgentStopStatusChip,
+  StopApprovalsCard,
+  useKillSwitchReads,
+} from "../../../features/kill-switch/index.ts";
 import { withGovernanceSection } from "../../../ui/sections/governance-section-gate.tsx";
 import {
   GovernanceEmptyState,
@@ -259,6 +266,7 @@ function AgentsPane({
   failed,
   noAgents,
   onClearFilters,
+  extras,
 }: {
   rows: readonly GovernanceAgentRow[];
   filters: AgentFilters;
@@ -279,6 +287,8 @@ function AgentsPane({
     testId: string;
   };
   onClearFilters: () => void;
+  /** The kill switch's status and actions per row; absent under sample mode. */
+  extras?: AgentRowExtras;
 }) {
   const visible = applyAgentFilters(rows, filters);
 
@@ -293,7 +303,7 @@ function AgentsPane({
   }
 
   if (visible.length > 0) {
-    return <AgentsList agents={visible} layout={layout} sample={sample} />;
+    return <AgentsList agents={visible} layout={layout} sample={sample} extras={extras} />;
   }
 
   // A failed read with nothing already on screen has no rows to stand behind
@@ -422,6 +432,29 @@ function AgentsPage() {
   });
   const { sample, rows, isLoading, error, retry } = useAgentsScreen();
   const { filters, setFilter, clearFilters } = useAgentFilters();
+  const organizationId = organization?.id ?? "";
+  // Sample rows are invented, so they carry no stop and offer no Stop.
+  const killSwitch = useKillSwitchReads({ organizationId, enabled: !sample.active });
+  const killSwitchExtras: AgentRowExtras | undefined =
+    sample.active || killSwitch.byRowId.size === 0
+      ? undefined
+      : (agent) => {
+          const summary = killSwitch.byRowId.get(agent.id);
+          if (!summary) return {};
+          return {
+            status: summary.openStop ? (
+              <AgentStopStatusChip status={summary.openStop.status} />
+            ) : null,
+            actions: (
+              <AgentKillSwitchMenu
+                organizationId={organizationId}
+                agentName={agent.name}
+                summary={summary}
+                canManage={canManage}
+              />
+            ),
+          };
+        };
   // Gated on the unfiltered set, never the visible one: a reader who filters
   // down to nothing must still have the chip that gets them back. The layout
   // switch takes the same gate, because there is nothing to lay out either
@@ -493,6 +526,13 @@ function AgentsPage() {
             the page's one claim about the whole screen; above the chips
             because the strip summarizes the fleet rather than whatever the
             chips have left of it. */}
+          {killSwitch.pendingApprovals.length > 0 && (
+            <StopApprovalsCard
+              organizationId={organizationId}
+              stops={killSwitch.pendingApprovals}
+              canManage={canManage}
+            />
+          )}
           {summary && <AgentFleetSummaryStrip summary={summary} />}
           {/* Out of the content and into the header. Controls that narrow what
             is below should not live inside the thing they narrow — the api
@@ -516,6 +556,7 @@ function AgentsPage() {
             failed={!!error}
             noAgents={noAgents}
             onClearFilters={clearFilters}
+            extras={killSwitchExtras}
           />
         </VStack>
       </PageLayout.Container>

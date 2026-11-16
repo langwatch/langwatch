@@ -1,0 +1,133 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
+import { randomBytes } from "node:crypto";
+
+import { GovernanceAwsConnectionNotFoundError } from "@langwatch/enterprise-governance-contract";
+import { aesEncryption, type Encryption } from "@langwatch/process-stores";
+import { nowInstant } from "@langwatch/time";
+
+import { stopTimestamp } from "../../features/kill-switch/rules/agent-stop.rules.ts";
+import {
+  type GovernanceAwsConnectionRecord,
+  GovernanceAwsConnectionRepository,
+  type GovernanceAwsCredentials,
+} from "../governance-aws-connection.repository.ts";
+
+/** The row as the store keeps it: the secret and the external id sealed, like the Prisma tier. */
+type MemoryAwsConnectionRow = {
+  id: string;
+  organizationId: string;
+  name: string;
+  accessKeyId: string | null;
+  encryptedSecretAccessKey: string | null;
+  roleArn: string | null;
+  encryptedExternalId: string | null;
+  createdAt: string;
+};
+
+function recordOf(row: MemoryAwsConnectionRow): GovernanceAwsConnectionRecord {
+  return {
+    id: row.id,
+    organizationId: row.organizationId,
+    name: row.name,
+    accessKeyId: row.accessKeyId,
+    roleArn: row.roleArn,
+    hasExternalId: row.encryptedExternalId !== null,
+    createdAt: row.createdAt,
+  };
+}
+
+export class MemoryGovernanceAwsConnectionRepository extends GovernanceAwsConnectionRepository {
+  private readonly rows: MemoryAwsConnectionRow[] = [];
+
+  private constructor(private readonly cipher: Encryption) {
+    super();
+  }
+
+  static create({
+    cipher = aesEncryption(randomBytes(32)),
+  }: { cipher?: Encryption } = {}): MemoryGovernanceAwsConnectionRepository {
+    return new MemoryGovernanceAwsConnectionRepository(cipher);
+  }
+
+  /** The rows as stored, sealed values included, for a test to read. */
+  storedRows(): MemoryAwsConnectionRow[] {
+    return structuredClone(this.rows);
+  }
+
+  async create(input: {
+    id: string;
+    organizationId: string;
+    name: string;
+    accessKeyId: string | null;
+    secretAccessKey: string | null;
+    roleArn: string | null;
+    externalId: string | null;
+  }): Promise<GovernanceAwsConnectionRecord> {
+    const row: MemoryAwsConnectionRow = {
+      id: input.id,
+      organizationId: input.organizationId,
+      name: input.name,
+      accessKeyId: input.accessKeyId,
+      encryptedSecretAccessKey:
+        input.secretAccessKey === null ? null : this.cipher.encrypt(input.secretAccessKey),
+      roleArn: input.roleArn,
+      encryptedExternalId: input.externalId === null ? null : this.cipher.encrypt(input.externalId),
+      createdAt: stopTimestamp(nowInstant().epochMilliseconds),
+    };
+    this.rows.push(row);
+    return recordOf(row);
+  }
+
+  async findAll({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<GovernanceAwsConnectionRecord[]> {
+    return this.rows.filter((row) => row.organizationId === organizationId).map(recordOf);
+  }
+
+  async findByIds({
+    organizationId,
+    ids,
+  }: {
+    organizationId: string;
+    ids: readonly string[];
+  }): Promise<GovernanceAwsConnectionRecord[]> {
+    return this.rows
+      .filter((row) => row.organizationId === organizationId && ids.includes(row.id))
+      .map(recordOf);
+  }
+
+  async getCredentials({
+    organizationId,
+    id,
+  }: {
+    organizationId: string;
+    id: string;
+  }): Promise<GovernanceAwsCredentials> {
+    const row = this.rows.find(
+      (candidate) => candidate.organizationId === organizationId && candidate.id === id,
+    );
+    if (!row) throw new GovernanceAwsConnectionNotFoundError(id);
+    return {
+      accessKeyId: row.accessKeyId,
+      secretAccessKey:
+        row.encryptedSecretAccessKey === null
+          ? null
+          : this.cipher.decrypt(row.encryptedSecretAccessKey),
+      roleArn: row.roleArn,
+      externalId:
+        row.encryptedExternalId === null ? null : this.cipher.decrypt(row.encryptedExternalId),
+    };
+  }
+
+  async delete({ organizationId, id }: { organizationId: string; id: string }): Promise<boolean> {
+    const index = this.rows.findIndex(
+      (row) => row.organizationId === organizationId && row.id === id,
+    );
+    if (index < 0) return false;
+    this.rows.splice(index, 1);
+    return true;
+  }
+}

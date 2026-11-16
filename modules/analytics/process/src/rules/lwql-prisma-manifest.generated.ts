@@ -2663,6 +2663,55 @@ export interface LwqlPrismaRows {
     readonly organizationId: "String";
     readonly baselinedAt: "DateTime";
   };
+  readonly AgentStopPlanTarget: {
+    readonly id: "String";
+    readonly organizationId: "String";
+    readonly agentId: "String";
+    readonly position: "Int";
+    readonly label: "String";
+    readonly target: "Json";
+    readonly createdAt: "DateTime";
+    readonly updatedAt: "DateTime";
+  };
+  readonly GovernanceAwsConnection: {
+    readonly id: "String";
+    readonly organizationId: "String";
+    readonly name: "String";
+    readonly accessKeyId: "String?";
+    readonly encryptedSecretAccessKey: "String?";
+    readonly roleArn: "String?";
+    readonly encryptedExternalId: "String?";
+    readonly createdAt: "DateTime";
+    readonly updatedAt: "DateTime";
+  };
+  readonly AgentStop: {
+    readonly id: "String";
+    readonly organizationId: "String";
+    readonly agentId: "String";
+    readonly agentName: "String";
+    readonly status: "String";
+    readonly severity: "String";
+    readonly approval: "String";
+    readonly trigger: "String";
+    readonly reason: "String";
+    readonly requestedByUserId: "String?";
+    readonly requestedByApiKeyId: "String?";
+    readonly decidedByUserId: "String?";
+    readonly decidedByApiKeyId: "String?";
+    readonly restoredByUserId: "String?";
+    readonly targets: "Json";
+    readonly requestedAt: "DateTime";
+    readonly decidedAt: "DateTime?";
+    readonly quarantinedAt: "DateTime?";
+    readonly restoreRequestedAt: "DateTime?";
+    readonly restoredAt: "DateTime?";
+    readonly lastAppliedEventId: "String";
+    readonly lastAcceptedAt: "BigInt";
+    readonly lastOccurredAt: "BigInt";
+    readonly projectionVersion: "String";
+    readonly createdAt: "DateTime";
+    readonly updatedAt: "DateTime";
+  };
   readonly IdentityMatch: {
     readonly id: "String";
     readonly organizationId: "String";

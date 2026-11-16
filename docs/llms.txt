@@ -580,6 +580,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 ## Agent Registry
 
 - [Agent registry](https://langwatch.ai/docs/governance/agent-registry.md): A machine-readable registry of every AI agent in your organization, served as REST, as an ARD v0.91 manifest, as a change feed and as signed webhooks.
+- [Agent kill switch](https://langwatch.ai/docs/governance/kill-switch.md): Stop an agent on the platform it runs on, with an approval when you want one, and restore it with one action.
 
 ## Privacy
 
@@ -1051,6 +1052,18 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Search the registry (ARD search)](https://langwatch.ai/docs/api-reference/governance-agent-registry/search-the-registry-ard-search.md)
 - [Get one registry agent](https://langwatch.ai/docs/api-reference/governance-agent-registry/get-one-registry-agent.md)
 - [List one registry agent's versions](https://langwatch.ai/docs/api-reference/governance-agent-registry/list-one-registry-agent-s-versions.md)
+
+## Agent Kill Switch
+
+- [Overview](https://langwatch.ai/docs/api-reference/governance-kill-switch/overview.md): Stop a registry agent on every platform it runs on: Databricks serving endpoints, Amazon Bedrock agent aliases and gateway virtual keys. Set each agent's stop plan, request a stop, approve or deny it, read every target's outcome and restore the agent. Needs an organization API key on an Enterprise plan.
+- [List the organisation's agent stops](https://langwatch.ai/docs/api-reference/governance-kill-switch/list-the-organisation-s-agent-stops.md)
+- [Get an agent's latest stop](https://langwatch.ai/docs/api-reference/governance-kill-switch/get-an-agent-s-latest-stop.md)
+- [Get an agent's stop plan](https://langwatch.ai/docs/api-reference/governance-kill-switch/get-an-agent-s-stop-plan.md)
+- [Replace an agent's stop plan](https://langwatch.ai/docs/api-reference/governance-kill-switch/replace-an-agent-s-stop-plan.md)
+- [Approve a pending stop](https://langwatch.ai/docs/api-reference/governance-kill-switch/approve-a-pending-stop.md)
+- [Deny a pending stop](https://langwatch.ai/docs/api-reference/governance-kill-switch/deny-a-pending-stop.md)
+- [Restore a stopped agent](https://langwatch.ai/docs/api-reference/governance-kill-switch/restore-a-stopped-agent.md)
+- [Stop an agent](https://langwatch.ai/docs/api-reference/governance-kill-switch/stop-an-agent.md)
 
 ## Coding Agents
 

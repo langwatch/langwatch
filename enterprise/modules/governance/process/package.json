@@ -28,6 +28,7 @@
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-bedrock-agent": "catalog:",
     "@aws-sdk/client-s3": "catalog:",
     "@langwatch/agent-contract": "workspace:*",
     "@langwatch/api": "workspace:*",

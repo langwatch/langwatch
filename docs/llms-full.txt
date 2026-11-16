@@ -77407,6 +77407,91 @@ openapi: "POST /api/v1/governance/registry/ard/search"
 
 ---
 
+# FILE: ./api-reference/governance-kill-switch/approve-a-pending-stop.mdx
+
+---
+title: "Approve a pending stop"
+openapi: "POST /api/v1/governance/agent-stops/{stopId}/approve"
+---
+
+---
+
+# FILE: ./api-reference/governance-kill-switch/deny-a-pending-stop.mdx
+
+---
+title: "Deny a pending stop"
+openapi: "POST /api/v1/governance/agent-stops/{stopId}/deny"
+---
+
+---
+
+# FILE: ./api-reference/governance-kill-switch/get-an-agent-s-latest-stop.mdx
+
+---
+title: "Get an agent's latest stop"
+openapi: "GET /api/v1/governance/agents/{agentId}/stop"
+---
+
+---
+
+# FILE: ./api-reference/governance-kill-switch/get-an-agent-s-stop-plan.mdx
+
+---
+title: "Get an agent's stop plan"
+openapi: "GET /api/v1/governance/agents/{agentId}/stop-plan"
+---
+
+---
+
+# FILE: ./api-reference/governance-kill-switch/list-the-organisation-s-agent-stops.mdx
+
+---
+title: "List the organisation's agent stops"
+openapi: "GET /api/v1/governance/agent-stops"
+---
+
+---
+
+# FILE: ./api-reference/governance-kill-switch/overview.mdx
+
+---
+title: "Overview"
+description: "Stop a registry agent on every platform it runs on: Databricks serving endpoints, Amazon Bedrock agent aliases and gateway virtual keys. Set each agent's stop plan, request a stop, approve or deny it, read every target's outcome and restore the agent. Needs an organization API key on an Enterprise plan."
+---
+
+## Intro
+
+Stop a registry agent on every platform it runs on: Databricks serving endpoints, Amazon Bedrock agent aliases and gateway virtual keys. Set each agent's stop plan, request a stop, approve or deny it, read every target's outcome and restore the agent. Needs an organization API key on an Enterprise plan.
+
+---
+
+# FILE: ./api-reference/governance-kill-switch/replace-an-agent-s-stop-plan.mdx
+
+---
+title: "Replace an agent's stop plan"
+openapi: "PUT /api/v1/governance/agents/{agentId}/stop-plan"
+---
+
+---
+
+# FILE: ./api-reference/governance-kill-switch/restore-a-stopped-agent.mdx
+
+---
+title: "Restore a stopped agent"
+openapi: "POST /api/v1/governance/agent-stops/{stopId}/restore"
+---
+
+---
+
+# FILE: ./api-reference/governance-kill-switch/stop-an-agent.mdx
+
+---
+title: "Stop an agent"
+openapi: "POST /api/v1/governance/agents/{agentId}/stop"
+---
+
+---
+
 # FILE: ./api-reference/grants/change-a-grant-s-role.mdx
 
 ---
