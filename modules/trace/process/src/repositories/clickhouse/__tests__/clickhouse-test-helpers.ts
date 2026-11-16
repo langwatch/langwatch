@@ -2,6 +2,18 @@ import type { WindowedReadMetrics, WindowedReadOutcome } from "@langwatch/clickh
 
 import type { TraceClickHouseWriteClient } from "../clickhouse.trace-member-client.repository.ts";
 
+/** A test double's statement entry point: SQL in, rows out. Production has no such member. */
+export interface ScriptedMember {
+  query(input: {
+    query: string;
+    query_params?: Record<string, unknown>;
+    format: "JSONEachRow";
+    clickhouse_settings?: Record<string, string>;
+  }): Promise<{ json(): Promise<unknown[]> }>;
+}
+
+type ScriptedWriteClient = TraceClickHouseWriteClient & ScriptedMember;
+
 export class TestWindowedReadMetrics implements WindowedReadMetrics {
   private readonly counts = new Map<string, number>();
 
@@ -15,7 +27,7 @@ export class TestWindowedReadMetrics implements WindowedReadMetrics {
   }
 }
 
-export function clientReturning(record: Record<string, unknown>): TraceClickHouseWriteClient {
+export function clientReturning(record: Record<string, unknown>): ScriptedWriteClient {
   return {
     async insert(): Promise<undefined> {
       return undefined;
@@ -27,7 +39,7 @@ export function clientReturning(record: Record<string, unknown>): TraceClickHous
 }
 
 export function orderingClient(rows: Record<string, unknown>[]): {
-  client: TraceClickHouseWriteClient;
+  client: ScriptedWriteClient;
   seen: { query: string; query_params?: Record<string, unknown> }[];
 } {
   const seen: { query: string; query_params?: Record<string, unknown> }[] = [];
@@ -65,7 +77,7 @@ export function orderingClient(rows: Record<string, unknown>[]): {
 }
 
 export function capturingInsertClient(): {
-  client: TraceClickHouseWriteClient;
+  client: ScriptedWriteClient;
   inserts: {
     clickhouse_settings?: Record<string, string | number>;
     values?: readonly Record<string, unknown>[];

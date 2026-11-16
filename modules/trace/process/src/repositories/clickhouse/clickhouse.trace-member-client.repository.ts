@@ -2,19 +2,10 @@ import {
   AuthorizedClickHouse,
   type ClickHouseColumns,
   type ClickHouseQueryClient,
-  type IdBoundOptions,
 } from "@langwatch/clickhouse-client";
 
-/** Minimal ClickHouse client primitive; rows arrive unknown and each caller parses its own. */
+/** Minimal ClickHouse client primitive: the column-aware select list and, for writers, insert. */
 export interface TraceClickHouseClient {
-  query(input: {
-    query: string;
-    query_params?: Record<string, unknown>;
-    format: "JSONEachRow";
-    clickhouse_settings?: Record<string, string>;
-    /** For a statement carrying `{{idBound}}`: a time the caller has, and today's fallback. */
-    idBound?: IdBoundOptions;
-  }): Promise<{ json(): Promise<unknown[]> }>;
   /** A select list naming only the columns this tenant's target has, the rest as defaults. */
   select?(input: Parameters<ClickHouseColumns["select"]>[0]): Promise<string>;
 }
@@ -72,23 +63,6 @@ export class MemberTraceClickHouseClientRepository implements TraceClickHouseWri
     private readonly clickhouse: ClickHouseQueryClient,
     private readonly tenantId: string,
   ) {}
-
-  async query(input: {
-    query: string;
-    query_params?: Record<string, unknown>;
-    format: "JSONEachRow";
-    clickhouse_settings?: Record<string, string>;
-    idBound?: IdBoundOptions;
-  }): Promise<{ json(): Promise<unknown[]> }> {
-    const result = await this.clickhouse.query<unknown>({
-      tenantId: this.tenantId,
-      sql: input.query,
-      params: input.query_params ?? {},
-      ...(input.clickhouse_settings ? { settings: input.clickhouse_settings } : {}),
-      ...(input.idBound ? { idBound: input.idBound } : {}),
-    });
-    return { json: async () => result.rows };
-  }
 
   select(input: Parameters<ClickHouseColumns["select"]>[0]): Promise<string> {
     return this.clickhouse.columns({ tenantId: this.tenantId }).select(input);

@@ -14,8 +14,8 @@ import { describe, expect, it } from "vitest";
 import { TraceCanonicalisationService } from "#features/derivation/services/trace-canonicalisation.service";
 
 import { ownProof } from "../../../../../__tests__/support/authorization-proofs.fixture.ts";
+import type { ScriptedMember } from "../../../../../repositories/clickhouse/__tests__/clickhouse-test-helpers.ts";
 import { traceSummaryRow } from "../../../../../repositories/clickhouse/__tests__/support/trace-summary-row.support.ts";
-import type { TraceClickHouseClient } from "../../../../../repositories/clickhouse/clickhouse.trace-member-client.repository.ts";
 import { builtOver, mappedLegacyRead } from "./support/legacy-trace-mapping.support.ts";
 
 type ReadRequest = Parameters<ClickHouseQueryClient["read"]>[0];
@@ -33,7 +33,7 @@ function rowsFor(sql: string): unknown[] {
 }
 
 function compose() {
-  const member = createApiFixture<TraceClickHouseClient>({
+  const member = createApiFixture<ScriptedMember>({
     query: async ({ query }: { query: string }) => ({ json: async () => rowsFor(query) }),
   });
   const clickhouse = new AuthorizedClickHouse({

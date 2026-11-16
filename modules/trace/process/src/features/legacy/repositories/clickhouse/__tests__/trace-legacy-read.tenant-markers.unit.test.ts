@@ -11,8 +11,8 @@ import { TraceCanonicalisationService } from "#features/derivation/services/trac
 import { compileProjection } from "#features/projection/rules/trace-projection-compile.rules";
 
 import { ownProof } from "../../../../../__tests__/support/authorization-proofs.fixture.ts";
+import type { ScriptedMember } from "../../../../../repositories/clickhouse/__tests__/clickhouse-test-helpers.ts";
 import { traceSummaryRow } from "../../../../../repositories/clickhouse/__tests__/support/trace-summary-row.support.ts";
-import type { TraceClickHouseClient } from "../../../../../repositories/clickhouse/clickhouse.trace-member-client.repository.ts";
 import { TraceLegacyReadClickHouseRepository } from "../trace-legacy-read.repository.ts";
 import { builtOver, mappedLegacyRead } from "./support/legacy-trace-mapping.support.ts";
 
@@ -36,7 +36,7 @@ function harness() {
   }));
   const resolveClickHouseClient = async (tenantId: string) => {
     routedTo.push(tenantId);
-    return createApiFixture<TraceClickHouseClient>({ query });
+    return createApiFixture<ScriptedMember>({ query });
   };
   const built: ReadRequest[] = [];
   const builtReader = builtOver(resolveClickHouseClient);
@@ -191,8 +191,7 @@ describe("TraceLegacyReadClickHouseRepository tenant markers", () => {
           return [];
         },
       }));
-      const resolveClickHouseClient = async () =>
-        createApiFixture<TraceClickHouseClient>({ query });
+      const resolveClickHouseClient = async () => createApiFixture<ScriptedMember>({ query });
       const built: ReadRequest[] = [];
       const builtReader = builtOver(resolveClickHouseClient);
       const read = mappedLegacyRead({

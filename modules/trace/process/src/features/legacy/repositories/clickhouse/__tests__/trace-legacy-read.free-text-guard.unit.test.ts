@@ -12,8 +12,8 @@ import { describe, expect, it, vi } from "vitest";
 import { TraceCanonicalisationService } from "#features/derivation/services/trace-canonicalisation.service";
 
 import { ownProof } from "../../../../../__tests__/support/authorization-proofs.fixture.ts";
+import type { ScriptedMember } from "../../../../../repositories/clickhouse/__tests__/clickhouse-test-helpers.ts";
 import { traceSummaryRow } from "../../../../../repositories/clickhouse/__tests__/support/trace-summary-row.support.ts";
-import type { TraceClickHouseClient } from "../../../../../repositories/clickhouse/clickhouse.trace-member-client.repository.ts";
 import { traceFilterCompileFor } from "../../../../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
 import { mappedLegacyRead } from "./support/legacy-trace-mapping.support.ts";
 
@@ -50,7 +50,7 @@ describe("TraceLegacyReadClickHouseRepository free-text search", () => {
         }),
       );
       const repository = mappedLegacyRead({
-        resolveClickHouseClient: async () => createApiFixture<TraceClickHouseClient>({ query }),
+        resolveClickHouseClient: async () => createApiFixture<ScriptedMember>({ query }),
         traceCanonicalisation: TraceCanonicalisationService.create(),
       });
       const endDate = Date.now();
@@ -83,7 +83,7 @@ describe("TraceLegacyReadClickHouseRepository free-text search", () => {
         }),
       );
       const repository = mappedLegacyRead({
-        resolveClickHouseClient: async () => createApiFixture<TraceClickHouseClient>({ query }),
+        resolveClickHouseClient: async () => createApiFixture<ScriptedMember>({ query }),
         traceCanonicalisation: TraceCanonicalisationService.create(),
       });
       const endDate = Date.now();
@@ -115,7 +115,7 @@ describe("TraceLegacyReadClickHouseRepository free-text search", () => {
         }),
       );
       const repository = mappedLegacyRead({
-        resolveClickHouseClient: async () => createApiFixture<TraceClickHouseClient>({ query }),
+        resolveClickHouseClient: async () => createApiFixture<ScriptedMember>({ query }),
         traceCanonicalisation: TraceCanonicalisationService.create(),
       });
       const endDate = Date.now();
@@ -154,7 +154,7 @@ describe("TraceLegacyReadClickHouseRepository free-text search", () => {
         }),
       );
       const repository = mappedLegacyRead({
-        resolveClickHouseClient: async () => createApiFixture<TraceClickHouseClient>({ query }),
+        resolveClickHouseClient: async () => createApiFixture<ScriptedMember>({ query }),
         traceCanonicalisation: TraceCanonicalisationService.create(),
       });
       const endDate = Date.now();

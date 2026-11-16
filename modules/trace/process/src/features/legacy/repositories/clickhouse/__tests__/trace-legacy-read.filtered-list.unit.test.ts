@@ -9,7 +9,7 @@ import { describe, expect, it, vi } from "vitest";
 import { TraceCanonicalisationService } from "#features/derivation/services/trace-canonicalisation.service";
 
 import { ownProof } from "../../../../../__tests__/support/authorization-proofs.fixture.ts";
-import type { TraceClickHouseClient } from "../../../../../repositories/clickhouse/clickhouse.trace-member-client.repository.ts";
+import type { ScriptedMember } from "../../../../../repositories/clickhouse/__tests__/clickhouse-test-helpers.ts";
 import { mappedLegacyRead } from "./support/legacy-trace-mapping.support.ts";
 
 const OWN_READ = ownProof({ projectId: "project-1" });
@@ -22,7 +22,7 @@ function compose() {
       json: async (): Promise<unknown[]> => [],
     }),
   );
-  const client = createApiFixture<TraceClickHouseClient>({ query });
+  const client = createApiFixture<ScriptedMember>({ query });
   const repository = mappedLegacyRead({
     resolveClickHouseClient: async () => client,
     traceCanonicalisation: TraceCanonicalisationService.create(),

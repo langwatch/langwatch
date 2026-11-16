@@ -30,11 +30,8 @@ import {
 } from "../../features/legacy/repositories/clickhouse/__tests__/support/legacy-trace-mapping.support.ts";
 import { TraceLegacyReadClickHouseRepository } from "../../features/legacy/repositories/clickhouse/trace-legacy-read.repository.ts";
 import { TraceBlobStoreService } from "../../features/media/services/trace-blob-store.service.ts";
+import type { ScriptedMember } from "../../repositories/clickhouse/__tests__/clickhouse-test-helpers.ts";
 import { traceSummaryRow } from "../../repositories/clickhouse/__tests__/support/trace-summary-row.support.ts";
-import type {
-  TraceClickHouseClient,
-  TraceClickHouseResolver,
-} from "../../repositories/clickhouse/clickhouse.trace-member-client.repository.ts";
 import { MemoryTraceSpanDedupRepository } from "../../repositories/memory/memory.trace-span-dedup.repository.ts";
 import { MemoryTraceRepositories } from "../../repositories/memory/memory.trace.repositories.ts";
 import { TraceModule } from "../trace.app.ts";
@@ -53,10 +50,12 @@ const readsProject = (params: Record<string, unknown>) =>
   params.tenantId === PROJECT ||
   (Array.isArray(params.tenantScope_own) && params.tenantScope_own.every((id) => id === PROJECT));
 
+type ScriptedResolver = (tenantId: string) => Promise<ScriptedMember>;
+
 /** A ClickHouse that holds one trace for PROJECT, started `ageDays` ago. */
 function clickHouseHolding({ ageDays, asked }: { ageDays: number; asked: Query[] }) {
   const startedAt = Date.now() - ageDays * DAY_MS;
-  const resolve: TraceClickHouseResolver = async (tenantId): Promise<TraceClickHouseClient> => ({
+  const resolve: ScriptedResolver = async (tenantId): Promise<ScriptedMember> => ({
     query: async ({ query, query_params = {} }) => {
       asked.push({ tenantId, query, params: query_params });
       const held = readsProject(query_params);
@@ -93,7 +92,7 @@ function compose({
   }),
   askedOrganizations = [],
 }: {
-  resolve: TraceClickHouseResolver;
+  resolve: ScriptedResolver;
   plans: EntitlementApi;
   dataPrivacy?: DataPrivacyApi;
   askedOrganizations?: string[];
@@ -122,7 +121,7 @@ function compose({
         reader: builtOver(resolve),
       }),
     },
-    resolveClickHouseClient: resolve,
+    resolveClickHouseClient: async () => ({}),
     storedObjects: createApiFixture<StoredObjectApi>(),
     canonicalisation: TraceCanonicalisationService.create(),
     blobStore: TraceBlobStoreService.create({

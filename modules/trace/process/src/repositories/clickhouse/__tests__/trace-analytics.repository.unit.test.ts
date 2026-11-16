@@ -20,12 +20,12 @@ import type { TraceAnalyticsRow } from "#eventing/trace-derived.projection";
 import { ownProof } from "../../../__tests__/support/authorization-proofs.fixture.ts";
 import { TRACE_ANALYTICS_MATERIALIZED_METADATA_COLUMNS } from "../../../rules/trace-widget-columns.rules.ts";
 import { TRACE_ID_INDEXES } from "../clickhouse.trace-id-indexes.database.ts";
-import type { TraceClickHouseWriteClient } from "../clickhouse.trace-member-client.repository.ts";
 import { TraceAnalyticsClickHouseRepository } from "../trace-metrics-analytics.repository.ts";
 import {
   capturingInsertClient,
   clientReturning,
   orderingClient,
+  type ScriptedMember,
   TestWindowedReadMetrics,
 } from "./clickhouse-test-helpers.ts";
 
@@ -38,7 +38,7 @@ const windowedReadMetrics = new TestWindowedReadMetrics();
 setWindowedReadMetrics(windowedReadMetrics);
 
 /** The built read path over a legacy-shaped double: rendered SQL in, `{ rows }` out. */
-function readsOver(client: TraceClickHouseWriteClient): Pick<ClickHouseQueryClient, "read"> {
+function readsOver(client: ScriptedMember): Pick<ClickHouseQueryClient, "read"> {
   return idIndexedClientDouble({
     indexes: TRACE_ID_INDEXES,
     driver: {

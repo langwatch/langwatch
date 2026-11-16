@@ -1,7 +1,7 @@
 import { AuthorizedClickHouse, type ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 
-import type { TraceClickHouseClient } from "../../../../../../repositories/clickhouse/clickhouse.trace-member-client.repository.ts";
+import type { ScriptedMember } from "../../../../../../repositories/clickhouse/__tests__/clickhouse-test-helpers.ts";
 import { LegacyTraceMappingService } from "../../../../services/legacy-trace-mapping.service.ts";
 import {
   TraceLegacyReadClickHouseRepository,
@@ -12,7 +12,7 @@ type MappingInputs = Omit<Parameters<typeof LegacyTraceMappingService.create>[0]
 
 /** The store a test composes: a scripted member client stands in for both readers. */
 export type LegacyStoreInputs = ClickHouseTraceLegacyReadOptions & {
-  resolveClickHouseClient?: (tenantId: string) => Promise<TraceClickHouseClient>;
+  resolveClickHouseClient?: (tenantId: string) => Promise<ScriptedMember>;
 };
 
 /** The ClickHouse store over a scripted member client, as the registry composes it. */
@@ -32,7 +32,7 @@ export function legacyStoreOver({
  * reach the test's `query` double with their markers expanded and the tenant they routed to.
  */
 export function fencedOver(
-  resolveClickHouseClient: (tenantId: string) => Promise<TraceClickHouseClient>,
+  resolveClickHouseClient: (tenantId: string) => Promise<ScriptedMember>,
 ): AuthorizedClickHouse {
   return new AuthorizedClickHouse({
     resolveClient: async (tenantId) => {
@@ -57,7 +57,7 @@ export function fencedOver(
  * so the built reads reach the test's `query` double as the fenced reads do.
  */
 export function builtOver(
-  resolveClickHouseClient: (tenantId: string) => Promise<TraceClickHouseClient>,
+  resolveClickHouseClient: (tenantId: string) => Promise<ScriptedMember>,
 ): Pick<ClickHouseQueryClient, "read"> {
   return clickHouseQueryClientDouble({
     read: async ({ statement }) => {
