@@ -109,6 +109,7 @@ describe("the ssoDomain auto-join on an unlicensed deployment", () => {
         emailVerified: true,
       },
       collaborators: {
+        users: { recordCreated: async () => undefined },
         linkProposals: createApiFixture<LinkProposals>(),
         organizations,
         federation,

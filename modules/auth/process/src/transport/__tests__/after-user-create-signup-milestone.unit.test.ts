@@ -2,7 +2,9 @@ import { SIGNED_UP_EVENT_TYPE } from "@langwatch/auth-contract";
 /**
  * Every new person is recorded once as auth's lw.auth.signed_up fact, before the SSO domain
  * auto-join looks at the email; nurturing derives PostHog signed_up from it (its pipeline test).
+ * The account Better Auth wrote also has user's created fact asked for, verified or not.
  * @see specs/analytics/posthog-product-milestones.feature
+ * @see modules/auth/specs/sign-up.feature
  */
 import { createTenantId } from "@langwatch/eventing";
 import type {
@@ -10,10 +12,27 @@ import type {
   SsoAuthenticationActivityApi,
   SsoMigrationCallbackApi,
 } from "@langwatch/identity-contract";
+import type * as observabilityModule from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
+
+const { hookErrors } = vi.hoisted(() => ({ hookErrors: vi.fn() }));
+
+// Only the hooks' own logger is replaced, so a failure it logs can be read; the name is spelled
+// inline because a `vi.mock` factory is hoisted above any const it might reference.
+vi.mock("@langwatch/observability", async () => {
+  const actual = await vi.importActual<typeof observabilityModule>("@langwatch/observability");
+  return {
+    ...actual,
+    createLogger: (name: string) =>
+      name === "langwatch:better-auth:hooks"
+        ? { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: hookErrors }
+        : actual.createLogger(name),
+  };
+});
 
 import { LoggedBetterAuthAnnouncements } from "../../app/auth.app.ts";
 import type { BetterAuthFederation } from "../../channels/better-auth.channel.ts";
@@ -131,17 +150,29 @@ function domainOrganizations(organization: SsoDomainOrganization | null): SsoDom
   });
 }
 
+/** user's created-fact door, noting each account it was asked to record. */
+function recordingUsers() {
+  const recorded: string[] = [];
+  const users: Pick<UserApi, "recordCreated"> = {
+    recordCreated: async ({ id }) => void recorded.push(id),
+  };
+  return { users, recorded };
+}
+
 describe("afterUserCreate", () => {
   function collaborators({
     announcements,
     admit = async () => undefined,
     organizations = domainOrganizations(null),
+    users = recordingUsers().users,
   }: {
     announcements: LoggedBetterAuthAnnouncements;
     admit?: SsoArrivalApi["admit"];
     organizations?: SsoDomainOrganizations;
+    users?: Pick<UserApi, "recordCreated">;
   }) {
     return {
+      users,
       organizations,
       federation: new StubFederation(true),
       invites: new StubInvites(),
@@ -233,6 +264,60 @@ describe("afterUserCreate", () => {
 
       expectSignUpOf(await onlySignUpFact(facts), "user_4");
       expect(createMembership).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given the account was created by a social sign-in", () => {
+    /** @scenario "A social sign-up records the new account's created fact" */
+    it("asks user to record the account's created fact once, under its id", async () => {
+      const { announcements } = composedAnnouncements();
+      const { users, recorded } = recordingUsers();
+
+      await afterUserCreate({
+        user: { id: "user_google", email: "u@gmail.com", name: "User", emailVerified: true },
+        collaborators: collaborators({ announcements, users }),
+      });
+
+      expect(recorded).toEqual(["user_google"]);
+    });
+
+    /** @scenario "An unverified social sign-up still records the new account's created fact" */
+    it("records it even when the address is not yet verified", async () => {
+      const { announcements } = composedAnnouncements();
+      const { users, recorded } = recordingUsers();
+
+      await afterUserCreate({
+        user: { id: "user_github", email: "u@users.dev", name: "User", emailVerified: false },
+        collaborators: collaborators({ announcements, users }),
+      });
+
+      expect(recorded).toEqual(["user_github"]);
+    });
+  });
+
+  describe("given recording the created fact fails", () => {
+    /** @scenario "A failure to record the new account does not block sign-in" */
+    it("lets the sign-in through and logs an error naming the account id", async () => {
+      const { announcements, facts } = composedAnnouncements();
+      const failing: Pick<UserApi, "recordCreated"> = {
+        recordCreated: async () => {
+          throw new Error("outbox unavailable");
+        },
+      };
+      hookErrors.mockClear();
+
+      await expect(
+        afterUserCreate({
+          user: { id: "user_5", email: "u@gmail.com", name: "User", emailVerified: true },
+          collaborators: collaborators({ announcements, users: failing }),
+        }),
+      ).resolves.toBeUndefined();
+
+      expect(hookErrors).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: "user_5" }),
+        expect.stringContaining("created fact"),
+      );
+      expectSignUpOf(await onlySignUpFact(facts), "user_5");
     });
   });
 });

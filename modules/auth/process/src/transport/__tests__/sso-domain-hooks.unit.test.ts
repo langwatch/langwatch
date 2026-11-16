@@ -12,6 +12,7 @@ import type {
 import type { OrganizationAdmission, OrganizationApi } from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nowInstant, toDate } from "@langwatch/time";
+import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import type {
@@ -124,17 +125,29 @@ function signupRepo(
   return { double: hooksRepo({}), mocks, organizations: organizationsOver(mocks) };
 }
 
+/** user's created-fact door, noting each account it was asked to record. */
+function recordingUsers() {
+  const recorded: string[] = [];
+  const users: Pick<UserApi, "recordCreated"> = {
+    recordCreated: async ({ id }) => void recorded.push(id),
+  };
+  return { users, recorded };
+}
+
 /** Everything a sign-up's auto-join reaches. */
 function signupCollaborators({
   organizations,
   announcements = new RecordingAnnouncements(),
   invites = new NoInvites(),
+  users = recordingUsers().users,
 }: {
   organizations: SsoDomainOrganizations;
   announcements?: RecordingAnnouncements;
   invites?: Pick<OrganizationApi, "applyPendingInvite">;
+  users?: Pick<UserApi, "recordCreated">;
 }): BetterAuthHookCollaborators {
   return {
+    users,
     linkProposals: createApiFixture<LinkProposals>(),
     organizations,
     federation: new LicensedFederation(),
@@ -312,6 +325,22 @@ describe("signing in through a domain-matched organization's identity provider",
   });
 
   describe("given a credential signup whose email nobody has verified", () => {
+    /** @scenario "A new single sign-on user records the new account's created fact" */
+    it.each([
+      { case: "auto-added to the domain-matched organization", organization: ACME },
+      { case: "not auto-added, no organization claiming the domain", organization: null },
+    ])("records the account's created fact once when $case", async ({ organization }) => {
+      const { organizations } = signupRepo(organization);
+      const { users, recorded } = recordingUsers();
+
+      await afterUserCreate({
+        user: NEW_ACME_USER,
+        collaborators: signupCollaborators({ organizations, users }),
+      });
+
+      expect(recorded).toEqual([NEW_ACME_USER.id]);
+    });
+
     /** @scenario Unverified signup with a matching ssoDomain does not auto-join the SSO org */
     it("creates no membership and no grant at the domain-matched organization", async () => {
       const { mocks, organizations } = signupRepo(ACME);
