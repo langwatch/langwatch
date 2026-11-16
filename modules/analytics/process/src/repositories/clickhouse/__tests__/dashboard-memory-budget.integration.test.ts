@@ -337,7 +337,7 @@ describe("dashboard panels under a memory cap", () => {
     if (expected.currentTraces < 400_000) {
       throw new Error(`seed produced ${expected.currentTraces} traces in the current window`);
     }
-  }, 240_000);
+  }, 480_000);
 
   afterAll(async () => {
     if (!ch) return;

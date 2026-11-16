@@ -14,6 +14,9 @@ import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
 /** The one endpoint name every migrated-schema analytics suite asks for. */
 const MIGRATED_ENDPOINT_SUITE = "analytics-migrated";
 
+/** Longest single statement a suite's hook may send; longer than any hook timeout here. */
+const SEED_STATEMENT_TIMEOUT_MS = 300_000;
+
 export interface MigratedClickHouse {
   /** Client bound to the migrated database. */
   client: ClickHouseClient;
@@ -61,6 +64,9 @@ export async function startMigratedClickHouse(): Promise<MigratedClickHouse> {
   endpoint = {
     client: createClient({
       url: provisioned.url,
+      // A million-row seed takes ~5s, but ~60s when the host starves the VM: the hook's own
+      // timeout, not the client's 30s default, bounds a statement.
+      request_timeout: SEED_STATEMENT_TIMEOUT_MS,
       clickhouse_settings: {
         ...DEFAULT_CLICKHOUSE_SETTINGS,
         date_time_input_format: "best_effort",
