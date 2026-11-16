@@ -1,6 +1,7 @@
 /** Pins every outcome of a claimed job as the ordered calls it makes; see ADR-090 and ADR-080. */
 
 import { nowInstant } from "@langwatch/time";
+import { SpanStatusCode } from "@opentelemetry/api";
 import { Redis as IORedis } from "ioredis";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -16,6 +17,11 @@ import {
 import { PayloadTooLargeError } from "../jobEnvelope.ts";
 import { type DrainedJob, GroupStagingScripts } from "../scripts.ts";
 import { TransientBlobStoreError } from "../tieredBlobStore.ts";
+import {
+  type ExportedSpan,
+  installInMemoryTracing,
+  uninstallInMemoryTracing,
+} from "./in-memory-tracing.ts";
 
 vi.mock("../dispatcher.ts", () => ({
   GroupQueueDispatcher: class {
@@ -65,6 +71,8 @@ type Scenario = {
   /** Another worker recovered the claim, so every fenced write answers false. */
   claimLost?: boolean;
   onExhausted?: GroupQueueRuntimeDefinition<TestPayload>["onExhausted"];
+  /** Sample no first attempt up front, so only a failure path builds the span. */
+  unsampled?: boolean;
 };
 
 const connections: IORedis[] = [];
@@ -157,6 +165,7 @@ function recordingProcessor(scenario: Scenario): {
         ...(scenario.retryAfterMs === undefined ? {} : { retryAfterMs: scenario.retryAfterMs }),
       }),
     },
+    ...(scenario.unsampled ? { spanSampling: { ratio: 0, random: () => 0 } } : {}),
   });
   return { processor, calls };
 }
@@ -542,6 +551,48 @@ describe("given a claimed job this worker has no handler for", () => {
         "No worker has run this job since it was first handed back; spending its attempts so it surfaces",
       );
     });
+  });
+});
+
+describe("given a first-attempt job whose span was not sampled", () => {
+  const exported: ExportedSpan[] = [];
+  const handedBack = async () => {
+    await runClaimed({
+      unsampled: true,
+      process: async () => {
+        throw new HandBackGroupQueueError("no handler registered in this worker");
+      },
+    });
+  };
+
+  afterEach(() => {
+    exported.length = 0;
+    uninstallInMemoryTracing();
+  });
+
+  /** @scenario "A handed-back job has a span carrying the hand-back, not an error" */
+  it("exports a span with the hand-back on every hand-back, without error status", async () => {
+    installInMemoryTracing({ exported });
+    await handedBack();
+    await handedBack();
+    expect(exported).toHaveLength(2);
+    for (const span of exported) {
+      expect(span.events).toEqual(["exception"]);
+      expect(span.status).toBeUndefined();
+    }
+  });
+
+  it("exports an error span for a failing job", async () => {
+    installInMemoryTracing({ exported });
+    await runClaimed({
+      unsampled: true,
+      retryable: false,
+      process: async () => {
+        throw new Error("handler failed");
+      },
+    });
+    expect(exported).toHaveLength(1);
+    expect(exported[0]?.status).toEqual({ code: SpanStatusCode.ERROR });
   });
 });
 

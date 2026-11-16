@@ -2136,6 +2136,17 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     const error = err instanceof Error ? err : new Error(String(err));
     const decision = this.failureDecision(err);
     const isRetryable = decision.retryable;
+    const handBack =
+      err instanceof HandBackGroupQueueError
+        ? handBackOutcome({
+            handedBackSince: job.handedBackSince,
+            now: nowInstant().epochMilliseconds,
+          })
+        : undefined;
+
+    // Before any write that can throw. A hand-back is no failure: an exception, no error status.
+    span.recordException(error);
+    if (handBack?.kind !== "hand-back") span.setStatus({ code: SpanStatusCode.ERROR });
 
     // The batch stores its fold state only once, at the very end, so a
     // failure means nothing was persisted for the drained siblings.
@@ -2149,13 +2160,9 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       });
     }
 
-    if (err instanceof HandBackGroupQueueError) {
-      const outcome = handBackOutcome({
-        handedBackSince: job.handedBackSince,
-        now: nowInstant().epochMilliseconds,
-      });
-      if (outcome.kind === "hand-back") {
-        await this.handBackClaimedJob({ job, error, since: outcome.since, stopHeartbeat });
+    if (handBack) {
+      if (handBack.kind === "hand-back") {
+        await this.handBackClaimedJob({ job, error, since: handBack.since, stopHeartbeat });
         return;
       }
       this.logger.error(
@@ -2164,7 +2171,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
           groupId,
           stagedJobId: job.stagedJobId,
           attempt,
-          handedBackSince: outcome.since,
+          handedBackSince: handBack.since,
           windowMs: HAND_BACK_CONFIG.windowMs,
           error,
         },
@@ -2173,8 +2180,6 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     }
     this.adaptiveSlots.jobFailed();
 
-    span.recordException(error);
-    span.setStatus({ code: SpanStatusCode.ERROR });
     const [quarantineError] = await this.quarantineErrors({ job, error, isRetryable });
     const budget = attemptBudgetOf({ decision, overloadAttempts: job.overloadAttempts });
     if (isRetryable && attempt < budget && !quarantineError) {

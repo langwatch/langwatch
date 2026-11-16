@@ -7,7 +7,8 @@ Feature: A claimed job keeps its consumer span for 1 in 10 successes and every f
   trace id, so every job in one trace agrees; a job without one draws from a random source the
   queue's options can replace. An unsampled job runs under a context that is not sampled, so the
   handler's own spans are dropped rather than exported as roots. When an unsampled job fails, its
-  span is created then, starting at the job's start, with the error recorded. The ratio is
+  span is created then, starting at the job's start, with the error recorded, in the trace its
+  earlier logs carry, under a sampled remote parent a ParentBased sampler keeps. The ratio is
   JOB_SPAN_SAMPLE_RATIO (0.1). Execution, retry, dead-letter and metrics are unchanged.
 
   @unit
@@ -47,3 +48,23 @@ Feature: A claimed job keeps its consumer span for 1 in 10 successes and every f
     Given a job the sampler leaves out
     When its handler starts spans of its own
     Then none of them is exported
+
+  @unit
+  Scenario: A failed job's span joins the logs written before the failure
+    Given a job the sampler leaves out
+    And its handler writes a log before it fails
+    When its span is exported
+    Then the span's trace id is the trace id on that log
+
+  @unit
+  Scenario: An error escaping the job is recorded on its span
+    Given a job the sampler leaves out
+    When an error escapes the queue's own failure handling
+    Then one span is exported with the exception and an error status
+    And the error is rethrown
+
+  @unit
+  Scenario: A handed-back job has a span carrying the hand-back, not an error
+    Given a first attempt the sampler leaves out
+    When its handler hands it back, once and again
+    Then each hand-back exports a span with the exception and no error status

@@ -1,25 +1,6 @@
 /** Which claimed jobs keep their consumer span. specs/job-span-sampling.feature */
-import { AsyncLocalStorage } from "node:async_hooks";
-import { randomBytes } from "node:crypto";
-
-import {
-  type Attributes,
-  type Context,
-  type ContextManager,
-  context as otelContext,
-  type Link,
-  ROOT_CONTEXT,
-  type Span,
-  type SpanContext,
-  SpanKind,
-  type SpanOptions,
-  type SpanStatus,
-  SpanStatusCode,
-  type TimeInput,
-  TraceFlags,
-  type Tracer,
-  trace,
-} from "@opentelemetry/api";
+import { getLogContext } from "@langwatch/observability/context";
+import { type Span, SpanKind, SpanStatusCode, TraceFlags, trace } from "@opentelemetry/api";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
@@ -28,87 +9,11 @@ import {
   isJobSpanSampled,
   withJobSpan,
 } from "../jobSpanSampling.ts";
-
-interface ExportedSpan {
-  name: string;
-  parent: SpanContext | undefined;
-  startTime: TimeInput | undefined;
-  attributes: Attributes;
-  links: Link[];
-  events: string[];
-  status: SpanStatus | undefined;
-}
-
-/** An async-local context manager, as the Node SDK installs. */
-class LocalContextManager implements ContextManager {
-  private readonly storage = new AsyncLocalStorage<Context>();
-  active(): Context {
-    return this.storage.getStore() ?? ROOT_CONTEXT;
-  }
-  with<A extends unknown[], F extends (...args: A) => ReturnType<F>>(
-    context: Context,
-    fn: F,
-    thisArg?: ThisParameterType<F>,
-    ...args: A
-  ): ReturnType<F> {
-    return this.storage.run(context, () => fn.apply(thisArg, args));
-  }
-  bind<T>(_context: Context, target: T): T {
-    return target;
-  }
-  enable(): this {
-    return this;
-  }
-  disable(): this {
-    this.storage.disable();
-    return this;
-  }
-}
-
-/** An in-memory tracer with the SDK's default ParentBased(AlwaysOn) sampling. */
-function inMemoryTracer(exported: ExportedSpan[]): Tracer {
-  const startSpan = (name: string, options: SpanOptions = {}, context?: Context): Span => {
-    const parent = trace.getSpanContext(context ?? otelContext.active());
-    const traceId = parent?.traceId ?? randomBytes(16).toString("hex");
-    const spanContext = { traceId, spanId: randomBytes(8).toString("hex") };
-    if (parent && (parent.traceFlags & TraceFlags.SAMPLED) === 0) {
-      return trace.wrapSpanContext({ ...spanContext, traceFlags: TraceFlags.NONE });
-    }
-    const record: ExportedSpan = {
-      name,
-      parent,
-      startTime: options.startTime,
-      attributes: { ...options.attributes },
-      links: [...(options.links ?? [])],
-      events: [],
-      status: undefined,
-    };
-    const span: Span = {
-      spanContext: () => ({ ...spanContext, traceFlags: TraceFlags.SAMPLED }),
-      setAttribute: (key, value) => ((record.attributes[key] = value), span),
-      setAttributes: (attributes) => (Object.assign(record.attributes, attributes), span),
-      addEvent: (event) => (record.events.push(event), span),
-      addLink: (link) => (record.links.push(link), span),
-      addLinks: (links) => (record.links.push(...links), span),
-      setStatus: (status) => ((record.status = status), span),
-      updateName: () => span,
-      end: () => void exported.push(record),
-      isRecording: () => true,
-      recordException: () => void record.events.push("exception"),
-    };
-    return span;
-  };
-  const startActiveSpan = (
-    name: string,
-    optionsOrFn: SpanOptions | ((span: Span) => unknown),
-    fn?: (span: Span) => unknown,
-  ) => {
-    const run = typeof optionsOrFn === "function" ? optionsOrFn : fn;
-    const span = startSpan(name, typeof optionsOrFn === "function" ? {} : optionsOrFn);
-    return otelContext.with(trace.setSpan(otelContext.active(), span), () => run?.(span));
-  };
-  return { startSpan, startActiveSpan } as Tracer;
-}
+import {
+  type ExportedSpan,
+  installInMemoryTracing,
+  uninstallInMemoryTracing,
+} from "./in-memory-tracing.ts";
 
 const TRACE = "4bf92f3577b34da6a3ce929d0e0e4736";
 const BASE = { "queue.name": "q", "queue.job_name": "j" };
@@ -124,13 +29,11 @@ describe("job span sampling", () => {
   beforeEach(() => {
     exported.length = 0;
     customCalls = 0;
-    otelContext.setGlobalContextManager(new LocalContextManager());
-    trace.setGlobalTracerProvider({ getTracer: () => inMemoryTracer(exported) });
+    installInMemoryTracing({ exported });
   });
 
   afterEach(() => {
-    trace.disable();
-    otelContext.disable();
+    uninstallInMemoryTracing();
   });
 
   function runJob(operation: (span: Span) => Promise<void>, sampled = false) {
@@ -174,7 +77,7 @@ describe("job span sampling", () => {
     });
     expect(exported).toHaveLength(1);
     const [failed] = exported;
-    expect(failed?.parent).toBeUndefined();
+    expect(failed?.parent?.isRemote).toBe(true);
     expect(failed?.startTime).toBeLessThanOrEqual(startedBefore);
     expect(failed?.status).toEqual({ code: SpanStatusCode.ERROR });
     expect(failed?.events).toEqual(["queue.group_batch_bisected", "exception"]);
@@ -244,5 +147,54 @@ describe("job span sampling", () => {
     }, true);
     expect(exported.map((span) => span.name)).toEqual(["child", "q/j"]);
     expect(exported[0]?.parent).toBeDefined();
+  });
+
+  /** @scenario "A failed job's span joins the logs written before the failure" */
+  it("exports the failure span in the trace the job's earlier logs carry", async () => {
+    let loggedTraceId: string | null = null;
+    let loggedAfter: string | null = null;
+    await runJob(async (span) => {
+      loggedTraceId = getLogContext().traceId;
+      span.recordException(new Error("boom"));
+      loggedAfter = getLogContext().traceId;
+    });
+    expect(exported).toHaveLength(1);
+    expect(loggedTraceId).toBe(exported[0]?.traceId);
+    expect(loggedAfter).toBe(exported[0]?.traceId);
+  });
+
+  it("keeps an unsampled job's failure span when the process samples no root", async () => {
+    uninstallInMemoryTracing();
+    installInMemoryTracing({ exported, rootSampled: false });
+    await runJob(async (span) => {
+      span.setStatus({ code: SpanStatusCode.ERROR });
+    });
+    expect(exported).toHaveLength(1);
+    expect(exported[0]?.parent).toMatchObject({ isRemote: true, traceFlags: TraceFlags.SAMPLED });
+  });
+
+  /** @scenario "An error escaping the job is recorded on its span" */
+  it("records an error that escapes the job on its span and rethrows it", async () => {
+    const boom = new Error("escaped");
+    await expect(runJob(async () => Promise.reject(boom))).rejects.toBe(boom);
+    expect(exported).toHaveLength(1);
+    expect(exported[0]?.events).toEqual(["exception"]);
+    expect(exported[0]?.status).toEqual({ code: SpanStatusCode.ERROR });
+  });
+
+  it("records an escaping error on a sampled job's span too", async () => {
+    await expect(runJob(async () => Promise.reject(new Error("x")), true)).rejects.toThrow("x");
+    expect(exported[0]?.status).toEqual({ code: SpanStatusCode.ERROR });
+  });
+
+  it("ignores an error recorded after the deferred span ended", async () => {
+    let held: Span | undefined;
+    await runJob(async (span) => {
+      held = span;
+    });
+    held?.recordException(new Error("late"));
+    held?.setStatus({ code: SpanStatusCode.ERROR });
+    expect(exported).toEqual([]);
+    expect(customCalls).toBe(0);
   });
 });

@@ -68,7 +68,8 @@ interface BufferedEvent {
 
 /**
  * An unsampled job's span: records nothing and parents no sampled child, until the job fails.
- * An error status or exception starts the real span at the job's start and replays the buffer.
+ * An error status or exception starts the real span at the job's start and replays the buffer,
+ * in the stand-in's trace so logs written before the failure join it. Ignored once ended.
  */
 class DeferredJobSpan implements Span {
   private readonly startTime = nowInstant().epochMilliseconds;
@@ -82,6 +83,7 @@ class DeferredJobSpan implements Span {
   private readonly events: BufferedEvent[] = [];
   private status: SpanStatus | undefined;
   private real: Span | undefined;
+  private ended = false;
   private name: string;
   private readonly kind: SpanKind;
   private readonly customAttributes: () => Attributes;
@@ -146,6 +148,7 @@ class DeferredJobSpan implements Span {
 
   setStatus(status: SpanStatus): this {
     if (status.code === SpanStatusCode.ERROR) this.materialise();
+    if (this.ended) return this;
     if (this.real) this.real.setStatus(status);
     else this.status = status;
     return this;
@@ -158,6 +161,8 @@ class DeferredJobSpan implements Span {
   }
 
   end(endTime?: TimeInput): void {
+    if (this.ended) return;
+    this.ended = true;
     this.real?.end(endTime);
   }
 
@@ -166,12 +171,18 @@ class DeferredJobSpan implements Span {
   }
 
   recordException(exception: Exception, time?: TimeInput): void {
-    this.materialise().recordException(exception, time);
+    this.materialise()?.recordException(exception, time);
   }
 
-  /** The real span, started at the job's start with everything buffered so far. */
-  private materialise(): Span {
-    if (this.real) return this.real;
+  /** The real span, started at the job's start under a sampled remote stand-in parent. */
+  private materialise(): Span | undefined {
+    if (this.real || this.ended) return this.real;
+    // ParentBased keeps a sampled remote parent's child whatever its root ratio.
+    const parent = trace.setSpanContext(ROOT_CONTEXT, {
+      ...this.unsampledContext,
+      traceFlags: TraceFlags.SAMPLED,
+      isRemote: true,
+    });
     const real = trace.getTracer("langwatch.group-queue").startSpan(
       this.name,
       {
@@ -180,7 +191,7 @@ class DeferredJobSpan implements Span {
         attributes: { ...this.attributes, ...this.customAttributes() },
         links: this.links,
       },
-      ROOT_CONTEXT,
+      parent,
     );
     for (const event of this.events) real.addEvent(event.name, event.attributes, event.time);
     if (this.status) real.setStatus(this.status);
@@ -196,6 +207,7 @@ function isTimeInput(value: Attributes | TimeInput | undefined): value is TimeIn
 /**
  * Runs a job under its consumer span. A sampled job gets a real span with its custom attributes;
  * an unsampled one runs under a deferred span whose context is not sampled, so its children drop.
+ * An error escaping the operation is recorded on the span before it is rethrown.
  */
 export async function withJobSpan<T>({
   name,
@@ -218,6 +230,9 @@ export async function withJobSpan<T>({
     return tracer.startActiveSpan(name, options, async (span) => {
       try {
         return await operation(span);
+      } catch (err) {
+        recordEscapedError({ span, err });
+        throw err;
       } finally {
         span.end();
       }
@@ -226,7 +241,15 @@ export async function withJobSpan<T>({
   const span = new DeferredJobSpan({ name, kind, attributes, customAttributes });
   try {
     return await otelContext.with(trace.setSpan(otelContext.active(), span), () => operation(span));
+  } catch (err) {
+    recordEscapedError({ span, err });
+    throw err;
   } finally {
     span.end();
   }
+}
+
+function recordEscapedError({ span, err }: { span: Span; err: unknown }): void {
+  span.recordException(err instanceof Error ? err : String(err));
+  span.setStatus({ code: SpanStatusCode.ERROR });
 }
