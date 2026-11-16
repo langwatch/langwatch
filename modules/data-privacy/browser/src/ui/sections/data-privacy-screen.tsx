@@ -9,6 +9,7 @@ import type {
   DataPrivacySnapshot,
 } from "@langwatch/data-privacy-contract";
 import { Card } from "@langwatch/design-system/card";
+import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Skeleton, SkeletonText, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
 import {
@@ -24,6 +25,7 @@ import {
 import { useMemo, useState } from "react";
 
 import { dataPrivacyApi } from "../../behavior/data-privacy-api.ts";
+import { usePiiRedactionModelOffer } from "../../behavior/use-pii-redaction-model-offer.ts";
 import {
   PRIVACY_RULE_NEW_VALUE,
   PRIVACY_RULE_QUERY_KEY,
@@ -36,11 +38,16 @@ import {
   canWritePrivacyRules,
   ruleMatchesScopeFilter,
 } from "../../model/data-privacy-rule-filter.ts";
+import {
+  type PiiRedactionModelOffer,
+  ruleSaveConfirmation,
+} from "../../model/pii-redaction-level-offer.ts";
 import { EffectiveSummary } from "../blocks/effective-summary.tsx";
 import { NoPrivacyRules } from "../blocks/no-privacy-rules.tsx";
 import { PrivacyRuleDrawer, type PrivacyScopeEntry } from "../blocks/privacy-rule-drawer.tsx";
 import { PrivacyRulesTable } from "../blocks/privacy-rules-table.tsx";
 import { RemoveRuleConfirmDialog } from "../blocks/remove-rule-confirm-dialog.tsx";
+import { OrganizationPiiLevelSection } from "./organization-pii-level-section.tsx";
 
 export default function DataPrivacyScreen() {
   const host = useDataPrivacyHost();
@@ -53,6 +60,7 @@ export default function DataPrivacyScreen() {
 
 function DataPrivacyPage({ host, projectId }: { host: DataPrivacyHostApi; projectId: string }) {
   const { teamId } = host.scope();
+  const piiRedactionModelOffer = usePiiRedactionModelOffer();
   const utils = dataPrivacyApi.useUtils();
   const snapshotQuery = dataPrivacyApi.dataPrivacy.getSnapshot.useQuery({ projectId });
 
@@ -152,6 +160,16 @@ function DataPrivacyPage({ host, projectId }: { host: DataPrivacyHostApi; projec
           scrubbed, at any scope, inherited down to projects.
         </Text>
 
+        {piiRedactionModelOffer?.kind === "model" && snapshot && (
+          <OrganizationPiiLevelSection
+            free={piiRedactionModelOffer.free}
+            host={host}
+            projectId={projectId}
+            snapshot={snapshot}
+            onSaved={() => void invalidate()}
+          />
+        )}
+
         {snapshot && snapshot.rules.length === 0 && (
           <NoPrivacyRules canWrite={canWrite} onAdd={openAdd} />
         )}
@@ -175,6 +193,7 @@ function DataPrivacyPage({ host, projectId }: { host: DataPrivacyHostApi; projec
             snapshot={snapshot}
             scopeFilter={scopeFilter}
             currentTeamId={teamId ?? null}
+            piiRedactionModelOffer={piiRedactionModelOffer}
           />
         )}
 
@@ -187,6 +206,7 @@ function DataPrivacyPage({ host, projectId }: { host: DataPrivacyHostApi; projec
             editingRule={privacyRuleForAddress(ruleAddress, snapshot.rules)}
             onClose={closeRuleDrawer}
             onSaved={() => void invalidate()}
+            piiRedactionModelOffer={piiRedactionModelOffer}
           />
         )}
       </VStack>
@@ -224,6 +244,7 @@ function PrivacyRuleDrawerMount({
   editingRule,
   onClose,
   onSaved,
+  piiRedactionModelOffer,
 }: {
   host: DataPrivacyHostApi;
   projectId: string;
@@ -232,6 +253,7 @@ function PrivacyRuleDrawerMount({
   editingRule: DataPrivacyRule | null;
   onClose: () => void;
   onSaved: () => void;
+  piiRedactionModelOffer: PiiRedactionModelOffer;
 }) {
   const { organizationId, teamId } = host.scope();
   const setForScope = dataPrivacyApi.dataPrivacy.setForScope.useMutation();
@@ -256,36 +278,71 @@ function PrivacyRuleDrawerMount({
       host.failed({ error, fallbackTitle: "Couldn't save the privacy rule" });
     }
   };
+  const [pending, setPending] = useState<{
+    scopes: PrivacyScopeEntry[];
+    config: DataPrivacyConfig;
+  } | null>(null);
+  const confirmation = pending
+    ? ruleSaveConfirmation({
+        offer: piiRedactionModelOffer,
+        before: editingRule?.config,
+        after: pending.config,
+      })
+    : null;
+  const saveOrAsk = (scopes: PrivacyScopeEntry[], config: DataPrivacyConfig) => {
+    const asks = ruleSaveConfirmation({
+      offer: piiRedactionModelOffer,
+      before: editingRule?.config,
+      after: config,
+    });
+    if (asks) setPending({ scopes, config });
+    else void save(scopes, config);
+  };
 
   return (
-    <PrivacyRuleDrawer
-      open={open}
-      editingRule={editingRule}
-      onClose={onClose}
-      available={available}
-      audienceOptions={snapshot.audienceOptions}
-      effectiveTeam={snapshot.effectiveTeam}
-      effectiveOrganization={snapshot.effectiveOrganization}
-      projectId={projectId}
-      isSaving={setForScope.isPending}
-      scopePicker={({ value, onChange }) => (
-        <ScopeChipPicker<ScopeChipPickerScopeType>
-          value={value}
-          onChange={onChange}
-          organizationId={available.organization?.id}
-          organizationName={available.organization?.name}
-          availableTeams={available.teams}
-          availableProjects={available.projects}
-          availableDepartments={available.departments}
-          allowedScopeTypes={["ORGANIZATION", "DEPARTMENT", "TEAM", "PROJECT"]}
-          personalScopes
-          currentOrganizationId={organizationId ?? null}
-          currentTeamId={teamId ?? null}
-          currentProjectId={projectId}
-        />
-      )}
-      onSave={save}
-    />
+    <>
+      <ConfirmDialog
+        open={confirmation !== null}
+        onClose={() => setPending(null)}
+        onConfirm={() => {
+          if (pending) void save(pending.scopes, pending.config);
+          setPending(null);
+        }}
+        title={confirmation?.title ?? ""}
+        description={confirmation?.description ?? ""}
+        confirmLabel={confirmation?.confirmLabel}
+        tone="default"
+      />
+      <PrivacyRuleDrawer
+        open={open}
+        editingRule={editingRule}
+        onClose={onClose}
+        available={available}
+        audienceOptions={snapshot.audienceOptions}
+        effectiveTeam={snapshot.effectiveTeam}
+        effectiveOrganization={snapshot.effectiveOrganization}
+        projectId={projectId}
+        isSaving={setForScope.isPending}
+        piiRedactionModelOffer={piiRedactionModelOffer}
+        scopePicker={({ value, onChange }) => (
+          <ScopeChipPicker<ScopeChipPickerScopeType>
+            value={value}
+            onChange={onChange}
+            organizationId={available.organization?.id}
+            organizationName={available.organization?.name}
+            availableTeams={available.teams}
+            availableProjects={available.projects}
+            availableDepartments={available.departments}
+            allowedScopeTypes={["ORGANIZATION", "DEPARTMENT", "TEAM", "PROJECT"]}
+            personalScopes
+            currentOrganizationId={organizationId ?? null}
+            currentTeamId={teamId ?? null}
+            currentProjectId={projectId}
+          />
+        )}
+        onSave={saveOrAsk}
+      />
+    </>
   );
 }
 
