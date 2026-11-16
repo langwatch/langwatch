@@ -3,26 +3,46 @@
 // statement slots that every other tenant's reads queue for.
 // @see specs/traces-v2/search.feature
 import { AuthorizedClickHouse, type QueryRequest, tenantScope } from "@langwatch/clickhouse-client";
+import {
+  idIndexedClientDouble,
+  type ScriptedStatements,
+} from "@langwatch/clickhouse-client/testing";
 import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { describe, expect, it, vi } from "vitest";
 
 import { ownProof } from "../../../__tests__/support/authorization-proofs.fixture.ts";
+import { TRACE_ID_INDEXES } from "../clickhouse.trace-id-indexes.database.ts";
 import { TraceListClickHouseRepository } from "../trace-list.repository.ts";
 
+/** Raw facet queries go through `clickhouse`; built facet reads through `reader`. */
 function makeRepo() {
   const requests: QueryRequest[] = [];
-  const client = clickHouseQueryClientDouble({
+  const statements: string[] = [];
+  const builtRequests: QueryRequest[] = [];
+  const raw = clickHouseQueryClientDouble({
     query: vi.fn(async (request: QueryRequest) => {
       requests.push(request);
       return { rows: [] };
     }),
   });
+  const reader = idIndexedClientDouble({
+    indexes: TRACE_ID_INDEXES,
+    driver: {
+      execute: vi.fn<ScriptedStatements["execute"]>(async (request) => {
+        statements.push(request.sql);
+        builtRequests.push(request);
+        return { rows: [] };
+      }),
+    },
+  });
   return {
     repo: TraceListClickHouseRepository.create({
-      clickhouse: new AuthorizedClickHouse({ resolveClient: async () => client }),
-      reader: client,
+      clickhouse: new AuthorizedClickHouse({ resolveClient: async () => raw }),
+      reader,
     }),
     requests,
+    statements,
+    builtRequests,
   };
 }
 
@@ -35,66 +55,51 @@ const GiB = 1024 * 1024 * 1024;
  * Short enough that a slow scan gives its slot back within the 20 s other
  * reads wait for one, small enough that one scan cannot fill a replica.
  */
-function expectCapped(settings: QueryRequest["settings"]) {
-  const seconds = Number(settings?.max_execution_time);
+function expectCapped(sql: string) {
+  const clause = (key: string) => new RegExp(`SETTINGS .*\\b${key} = '?(\\w+)`).exec(sql)?.[1];
+  const seconds = Number(clause("max_execution_time"));
   expect(seconds).toBeGreaterThan(0);
   expect(seconds).toBeLessThanOrEqual(30);
-  expect(settings?.timeout_overflow_mode).toBe("throw");
-  const memory = Number(settings?.max_memory_usage);
+  expect(clause("timeout_overflow_mode")).toBe("throw");
+  const memory = Number(clause("max_memory_usage"));
   expect(memory).toBeGreaterThanOrEqual(2 * GiB);
   expect(memory).toBeLessThanOrEqual(4 * GiB);
 }
 
+const RAW_FACET_SQL = `SELECT '' AS facet_value, 0 AS cnt, 0 AS total_distinct FROM trace_summaries WHERE ${tenantScope("OccurredAt")}`;
+
 describe("the facet reads' time and memory cap", () => {
-  describe("when the sidebar batches categorical and range facets over spans", () => {
+  describe("when the sidebar batches categorical and range facets over evaluation runs", () => {
     /** @scenario "A capped facet read gives its shared slot back" */
     it("caps both scans", async () => {
-      const { repo, requests } = makeRepo();
+      const { repo, statements } = makeRepo();
 
       await repo.findBatchedFacets({
         authorization,
         timeRange,
-        table: "stored_spans",
-        timeColumn: "StartTime",
-        categoricalSpecs: [
-          { key: "spanType", expression: "SpanAttributes['langwatch.span.type']" },
-        ],
-        rangeSpecs: [{ key: "duration", expression: "DurationMs" }],
+        table: "evaluation_runs",
+        categoricalKeys: ["evaluatorLabel"],
+        rangeKeys: ["evaluatorScore"],
         topN: 50,
       });
 
-      expect(requests).toHaveLength(2);
-      for (const request of requests) expectCapped(request.settings);
+      expect(statements).toHaveLength(2);
+      for (const sql of statements) expectCapped(sql);
     });
   });
 
   describe("when one facet's values are read on their own", () => {
     /** @scenario "A capped facet read gives its shared slot back" */
     it("caps the categorical, discrete and range-stat scans", async () => {
-      const { repo, requests } = makeRepo();
+      const { repo, statements } = makeRepo();
       const base = { authorization, timeRange, table: "trace_summaries" as const };
 
-      await repo.findCategoricalFacet({
-        ...base,
-        timeColumn: "OccurredAt",
-        facetExpression: "ServiceName",
-        limit: 50,
-        offset: 0,
-      });
-      await repo.findDiscreteValues({
-        ...base,
-        timeColumn: "OccurredAt",
-        column: "SpanCount",
-        limit: 50,
-      });
-      await repo.findRangeStatsForTable({
-        ...base,
-        timeColumn: "OccurredAt",
-        column: "TotalCost",
-      });
+      await repo.findCategoricalFacet({ ...base, facetKey: "service", limit: 50, offset: 0 });
+      await repo.findDiscreteValues({ ...base, facetKey: "spans", limit: 50 });
+      await repo.findRangeStatsForTable({ ...base, facetKey: "cost" });
 
-      expect(requests).toHaveLength(3);
-      for (const request of requests) expectCapped(request.settings);
+      expect(statements).toHaveLength(3);
+      for (const sql of statements) expectCapped(sql);
     });
   });
 
@@ -105,11 +110,7 @@ describe("the facet reads' time and memory cap", () => {
 
       await repo.findCategoricalFacetRaw({
         authorization,
-        query: {
-          sql: `SELECT '' AS facet_value, 0 AS cnt, 0 AS total_distinct FROM trace_summaries WHERE ${tenantScope("OccurredAt")}`,
-          params: {},
-          settings: { max_memory_usage: "1000000" },
-        },
+        query: { sql: RAW_FACET_SQL, params: {}, settings: { max_memory_usage: "1000000" } },
       });
 
       expect(requests[0]?.settings?.max_memory_usage).toBe("1000000");
@@ -125,7 +126,7 @@ describe("the facet reads' time and memory cap", () => {
       await repo.findCategoricalFacetRaw({
         authorization,
         query: {
-          sql: `SELECT '' AS facet_value, 0 AS cnt, 0 AS total_distinct FROM trace_summaries WHERE ${tenantScope("OccurredAt")}`,
+          sql: RAW_FACET_SQL,
           params: {},
           settings: { max_execution_time: "600", timeout_overflow_mode: "break" },
         },
@@ -140,30 +141,33 @@ describe("the facet reads' time and memory cap", () => {
 
   describe("when a facet read hits its time cap", () => {
     /** @scenario "A facet read stopped at its time cap is not run again" */
-    it("asks the client not to run the statement again", async () => {
+    it("asks the client not to run a raw facet statement again", async () => {
       const { repo, requests } = makeRepo();
 
-      await repo.findBatchedFacets({
-        authorization,
-        timeRange,
-        table: "stored_spans",
-        timeColumn: "StartTime",
-        categoricalSpecs: [
-          { key: "spanType", expression: "SpanAttributes['langwatch.span.type']" },
-        ],
-        rangeSpecs: [{ key: "duration", expression: "DurationMs" }],
-        topN: 50,
-      });
       await repo.findCategoricalFacetRaw({
         authorization,
-        query: {
-          sql: `SELECT '' AS facet_value, 0 AS cnt, 0 AS total_distinct FROM trace_summaries WHERE ${tenantScope("OccurredAt")}`,
-          params: {},
-        },
+        query: { sql: RAW_FACET_SQL, params: {} },
       });
 
-      expect(requests).toHaveLength(3);
-      for (const request of requests) expect(request.retryOnTimeout).toBe(false);
+      expect(requests).toHaveLength(1);
+      expect(requests[0]?.retryOnTimeout).toBe(false);
+    });
+
+    /** @scenario "A facet read stopped at its time cap is not run again" */
+    it("asks the client not to run a built facet read again", async () => {
+      const { repo, builtRequests } = makeRepo();
+
+      await repo.findCategoricalFacet({
+        authorization,
+        timeRange,
+        table: "trace_summaries",
+        facetKey: "service",
+        limit: 50,
+        offset: 0,
+      });
+
+      expect(builtRequests).toHaveLength(1);
+      expect(builtRequests[0]?.retryOnTimeout).toBe(false);
     });
   });
 });

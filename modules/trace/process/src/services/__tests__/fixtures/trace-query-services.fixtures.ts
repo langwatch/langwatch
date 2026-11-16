@@ -2,6 +2,10 @@ import type { ResolvedInstantEvalRun } from "@langwatch/trace-contract";
 
 import { ClickHouseTraceFacetRegistryRepository } from "../../../features/facet/repositories/clickhouse/clickhouse.trace-facet-registry.repository.ts";
 import {
+  createFacetFilterResolver,
+  type FacetFilterResolver,
+} from "../../../features/facet/rules/trace-facet-filter.rules.ts";
+import {
   findHiddenOriginFilters,
   type TraceFilterCompile,
   traceFilterCompileOf,
@@ -9,6 +13,11 @@ import {
 import { TraceQueryEvaluationService } from "../../../features/query/services/trace-query-evaluation.service.ts";
 import { TraceQueryFieldsService } from "../../../features/query/services/trace-query-fields.service.ts";
 import { TraceQueryTranslationService } from "../../../features/query/services/trace-query-translation.service.ts";
+import type { TraceFacetFilter } from "../../../repositories/trace-list.repository.ts";
+import {
+  explorerOriginExclusion,
+  type TraceFilterWhere,
+} from "../../../rules/trace-filter-hidden-origins.rules.ts";
 
 /** The trace query services over the ClickHouse facet registry, composed as `trace.app.ts` does. */
 const facetRegistry = ClickHouseTraceFacetRegistryRepository.create();
@@ -43,5 +52,54 @@ export function traceFilterCompileFor({
     fields: traceQueryFields,
     terms: findHiddenOriginFilters({ hiddenOrigins }),
     ...(evalRuns ? { evalRuns } : {}),
+  });
+}
+
+/**
+ * The sidebar's per-facet filters as `readFilteredFacets` composes them: as text for the raw
+ * facet reads and compiled for the built ones, the hidden origins out of all but origin's own.
+ */
+export function traceFacetFilterResolverFor({
+  query,
+  timeRange,
+  hiddenOrigins,
+}: {
+  query: string;
+  timeRange: { from: number; to: number };
+  hiddenOrigins: readonly string[];
+}): FacetFilterResolver<TraceFacetFilter> {
+  const hideText = explorerOriginExclusion({ hiddenOrigins });
+  const facetFilterOf = ({
+    queryText,
+    where,
+    hidden,
+  }: {
+    queryText: string;
+    where: TraceFilterWhere | undefined;
+    hidden: boolean;
+  }): TraceFacetFilter | undefined =>
+    where && {
+      queryText,
+      where,
+      compile: traceFilterCompileFor({
+        queryText,
+        timeRange,
+        hiddenOrigins: hidden ? hiddenOrigins : [],
+      }),
+    };
+  return createFacetFilterResolver<TraceFacetFilter>({
+    queryText: query,
+    compile: (queryText) =>
+      facetFilterOf({
+        queryText,
+        where: traceQueryTranslation.translateFilter({ queryText, timeRange }) ?? undefined,
+        hidden: false,
+      }),
+    hide: (filter) =>
+      facetFilterOf({
+        queryText: filter?.queryText ?? "",
+        where: hideText(filter?.where),
+        hidden: true,
+      }),
   });
 }

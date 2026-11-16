@@ -10,6 +10,7 @@ import { LANGY_TRACE_ORIGIN } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { ownProof } from "../../__tests__/support/authorization-proofs.fixture.ts";
+import type { TraceFilterCompile } from "../../features/query/repositories/clickhouse/clickhouse.trace-filter-condition.mapper.ts";
 import { traceSummaries } from "../../repositories/clickhouse/clickhouse.trace-summaries.table.ts";
 import { HIDDEN_ORIGINS_PARAM } from "../../rules/trace-filter-hidden-origins.rules.ts";
 import type { TracesListReader } from "../trace.app.ts";
@@ -45,8 +46,13 @@ async function hiddenOriginsOf(harnessed: ReturnType<typeof harness>) {
     filter: { query: "", tenantId: PROJECT_ID, hideExplorerOrigins: true },
   });
   const [call] = harnessed.getList.mock.calls;
+  return hiddenOriginsIn(call?.[0].compileFilter);
+}
+
+/** The array parameter a compiled filter binds: the origins it leaves out. */
+function hiddenOriginsIn(compile: TraceFilterCompile | undefined) {
   const scope = tenantScope.single({ tenantId: PROJECT_ID });
-  const compiled = call?.[0].compileFilter?.({ scope });
+  const compiled = compile?.({ scope });
   if (compiled?.kind !== "compiled") return undefined;
   const { params } = clickhouseRead({ scope })
     .from(traceSummaries)
@@ -74,9 +80,9 @@ describe("TraceModule hidden origins", () => {
       const harnessed = harness({ isPersonal: false });
 
       await expect(hiddenOriginsOf(harnessed)).resolves.toEqual([LANGY_TRACE_ORIGIN]);
-      expect((await statusFacetFilter(harnessed))?.params[HIDDEN_ORIGINS_PARAM]).toEqual([
-        LANGY_TRACE_ORIGIN,
-      ]);
+      const facetFilter = await statusFacetFilter(harnessed);
+      expect(facetFilter?.where.params[HIDDEN_ORIGINS_PARAM]).toEqual([LANGY_TRACE_ORIGIN]);
+      expect(hiddenOriginsIn(facetFilter?.compile)).toEqual([LANGY_TRACE_ORIGIN]);
       expect(harnessed.findById).toHaveBeenCalledWith(PROJECT_ID);
     });
   });
@@ -95,7 +101,9 @@ describe("TraceModule hidden origins", () => {
       const harnessed = harness({ isPersonal: true });
 
       await expect(hiddenOriginsOf(harnessed)).resolves.toBeUndefined();
-      expect((await statusFacetFilter(harnessed))?.params[HIDDEN_ORIGINS_PARAM]).toBeUndefined();
+      const facetFilter = await statusFacetFilter(harnessed);
+      expect(facetFilter?.where.params[HIDDEN_ORIGINS_PARAM]).toBeUndefined();
+      expect(hiddenOriginsIn(facetFilter?.compile)).toBeUndefined();
     });
   });
 });

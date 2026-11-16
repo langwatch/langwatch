@@ -177,6 +177,8 @@ type BuiltRead<Row> = {
   idBound?: IdBoundOptions | undefined;
   /** The read scans every partition on purpose; sent as `SKIP_COLD_SCAN_CHECK`. */
   declaresFullScan?: true | undefined;
+  /** A capped read that must not run again when it times out. */
+  retryOnTimeout?: false | undefined;
   signal?: QueryRequest["signal"];
 };
 
@@ -445,6 +447,7 @@ export class ClickHouseQueryClient {
     tenantId,
     idBound,
     declaresFullScan,
+    retryOnTimeout,
     signal,
   }: BuiltRead<Row>): {
     request: SentRequest;
@@ -458,6 +461,7 @@ export class ClickHouseQueryClient {
       signal,
       ...(idBound === undefined ? {} : { idBound }),
       ...(declaresFullScan === true ? { SKIP_COLD_SCAN_CHECK: true as const } : {}),
+      ...(retryOnTimeout === false ? { retryOnTimeout: false as const } : {}),
     };
     if (statement.kind === "metadata") {
       refuseMetadataOutsideAllowList({ sql: statement.sql });

@@ -16,20 +16,12 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { ownProof } from "../../../__tests__/support/authorization-proofs.fixture.ts";
-import {
-  CLICKHOUSE_FACET_CATALOG,
-  FACET_REGISTRY,
-} from "../../../features/facet/repositories/clickhouse/clickhouse.trace-facet-registry.mapper.ts";
-import { createFacetFilterResolver } from "../../../features/facet/rules/trace-facet-filter.rules.ts";
+import { CLICKHOUSE_FACET_CATALOG } from "../../../features/facet/repositories/clickhouse/clickhouse.trace-facet-registry.mapper.ts";
 import type { TraceFilterCompile } from "../../../features/query/repositories/clickhouse/clickhouse.trace-filter-condition.mapper.ts";
 import { TraceListService } from "../../../features/read/services/trace-list-read.service.ts";
 import {
-  explorerOriginExclusion,
-  type TraceFilterWhere,
-} from "../../../rules/trace-filter-hidden-origins.rules.ts";
-import {
+  traceFacetFilterResolverFor,
   traceFilterCompileFor,
-  traceQueryTranslation,
 } from "../../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
 import { MemoryTraceEvaluationRunsRepository } from "../../memory/memory.trace-evaluation-runs.repository.ts";
 import { TraceListClickHouseRepository } from "../trace-list.repository.ts";
@@ -95,28 +87,6 @@ async function insertTraces(rows: ReturnType<typeof traceRow>[]): Promise<void> 
   });
 }
 
-function facetExpression(key: string): string {
-  const facet = FACET_REGISTRY.find((entry) => entry.key === key);
-  if (!facet || !("expression" in facet)) throw new Error(`the ${key} facet carries no expression`);
-  return facet.expression;
-}
-
-function compiled({
-  queryText,
-  evalRuns,
-}: {
-  queryText: string;
-  evalRuns?: ResolvedInstantEvalRun[];
-}): TraceFilterWhere {
-  const filter = traceQueryTranslation.translateFilter({
-    queryText,
-    timeRange,
-    ...(evalRuns ? { evalRuns } : {}),
-  });
-  if (!filter) throw new Error(`"${queryText}" compiled to no filter`);
-  return filter;
-}
-
 /** The Explorer's filter as the list reads take it, compiled inside each read. */
 function explorerCompile({ query }: { query: string }): TraceFilterCompile {
   return traceFilterCompileFor({
@@ -146,21 +116,20 @@ function listWith({
 async function categoricalCounts({
   tenantId,
   key,
-  filterWhere,
+  compileFilter,
 }: {
   tenantId: string;
   key: string;
-  filterWhere?: TraceFilterWhere;
+  compileFilter?: TraceFilterCompile;
 }): Promise<Record<string, number>> {
   const batch = await repo.findBatchedFacets({
     authorization: ownProof({ projectId: tenantId }),
     timeRange,
     table: "trace_summaries",
-    timeColumn: "OccurredAt",
-    categoricalSpecs: [{ key, expression: facetExpression(key) }],
-    rangeSpecs: [],
+    categoricalKeys: [key],
+    rangeKeys: [],
     topN: 10,
-    ...(filterWhere ? { filterWhere } : {}),
+    ...(compileFilter ? { compileFilter } : {}),
   });
   return Object.fromEntries(
     (batch.categoricals[key]?.values ?? []).map((entry) => [entry.value, entry.count]),
@@ -276,8 +245,6 @@ describe.skipIf(!clickHouseConfigured)("an eval chip on the trace list", () => {
     writtenUntil: writtenAt + 60_000,
   });
 
-  const chipFilter = ({ query, run }: { query: string; run: string }) =>
-    compiled({ queryText: query, evalRuns: [runOf(run)] });
   const chipCompile = ({ query, run }: { query: string; run: string }) =>
     traceFilterCompileFor({ queryText: query, timeRange, evalRuns: [runOf(run)] });
 
@@ -355,15 +322,12 @@ describe.skipIf(!clickHouseConfigured)("an eval chip on the trace list", () => {
 
   describe("given a run of the project with judgements on three traces", () => {
     it("lists the two passed traces, and the sidebar counts the same two", async () => {
-      const filterWhere = chipFilter({ query: `eval:"${question}"`, run: runId });
-      const page = await listWith({
-        tenantId,
-        compileFilter: chipCompile({ query: `eval:"${question}"`, run: runId }),
-      });
+      const compileFilter = chipCompile({ query: `eval:"${question}"`, run: runId });
+      const page = await listWith({ tenantId, compileFilter });
 
       expect(page.totalHits).toBe(2);
       expect(page.rows.map((row) => row.traceId).toSorted()).toEqual([passedA, passedB]);
-      expect(await categoricalCounts({ tenantId, key: "service", filterWhere })).toEqual({
+      expect(await categoricalCounts({ tenantId, key: "service", compileFilter })).toEqual({
         api: 2,
       });
     });
@@ -409,11 +373,10 @@ async function sidebarCounts({
     authorization: ownProof({ projectId: tenantId }),
     timeRange,
     filterKey: query,
-    filterFor: createFacetFilterResolver({
-      queryText: query,
-      compile: (text) =>
-        traceQueryTranslation.translateFilter({ queryText: text, timeRange }) ?? undefined,
-      hide: explorerOriginExclusion({ hiddenOrigins: explorerHiddenOrigins(query) }),
+    filterFor: traceFacetFilterResolverFor({
+      query,
+      timeRange,
+      hiddenOrigins: explorerHiddenOrigins(query),
     }),
   });
   const counts = new Map<string, Record<string, number>>();

@@ -13,10 +13,7 @@ import {
   aggregateProof,
   ownProof,
 } from "../../../__tests__/support/authorization-proofs.fixture.ts";
-import {
-  traceFilterCompileFor,
-  traceQueryTranslation,
-} from "../../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
+import { traceFilterCompileFor } from "../../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
 import { TraceListClickHouseRepository } from "../trace-list.repository.ts";
 import {
   authorizedClickHouseFor,
@@ -341,12 +338,11 @@ describe.skipIf(!clickHouseConfigured)("TraceListClickHouseRepository through th
           authorization,
           timeRange: WINDOW,
           table: "trace_summaries",
-          timeColumn: "OccurredAt",
-          categoricalSpecs: [{ key: "name", expression: "TraceName" }],
-          rangeSpecs: [],
+          categoricalKeys: ["traceName"],
+          rangeKeys: [],
           topN: 50,
         });
-        const names = facets.categoricals.name?.values.map((v) => v.value);
+        const names = facets.categoricals.traceName?.values.map((v) => v.value);
         expect(names).toEqual(
           expect.arrayContaining([
             `name-of-${AGGREGATE}`,
@@ -438,11 +434,6 @@ describe.skipIf(!clickHouseConfigured)("TraceListClickHouseRepository through th
           startTimeMs: TODAY,
         });
         const authorization = twinProof();
-        const filterWhere =
-          traceQueryTranslation.translateFilter({
-            queryText: "span.attribute.marker:only-in-a",
-            timeRange: WINDOW,
-          }) ?? undefined;
         const compileFilter = traceFilterCompileFor({
           queryText: "span.attribute.marker:only-in-a",
           timeRange: WINDOW,
@@ -470,13 +461,14 @@ describe.skipIf(!clickHouseConfigured)("TraceListClickHouseRepository through th
           authorization,
           timeRange: WINDOW,
           table: "stored_spans",
-          timeColumn: "StartTime",
-          categoricalSpecs: [{ key: "span", expression: "SpanName" }],
-          rangeSpecs: [],
+          categoricalKeys: ["spanName"],
+          rangeKeys: [],
           topN: 50,
-          filterWhere,
+          compileFilter,
         });
-        expect(facets.categoricals.span?.values.map((v) => v.value)).toEqual([`span-of-${TWIN_A}`]);
+        expect(facets.categoricals.spanName?.values.map((v) => v.value)).toEqual([
+          `span-of-${TWIN_A}`,
+        ]);
       });
     });
 
@@ -591,12 +583,11 @@ describe.skipIf(!clickHouseConfigured)("TraceListClickHouseRepository through th
           authorization,
           timeRange: WINDOW,
           table: "trace_summaries",
-          timeColumn: "OccurredAt",
-          categoricalSpecs: [{ key: "name", expression: "TraceName" }],
-          rangeSpecs: [],
+          categoricalKeys: ["traceName"],
+          rangeKeys: [],
           topN: 50,
         });
-        expect(facets.categoricals.name?.values.map((v) => v.value).toSorted()).toEqual(
+        expect(facets.categoricals.traceName?.values.map((v) => v.value).toSorted()).toEqual(
           [
             `name-of-${wideMember(0)}`,
             `name-of-${wideMember(1)}`,

@@ -22,6 +22,7 @@ import type { FacetCatalog } from "#features/facet/rules/trace-facet-registry.ru
 import type { TraceEvaluationRunsReadRepository } from "../../../repositories/trace-evaluation-runs.repository.ts";
 import {
   TRACE_SUGGEST_FIELDS,
+  type TraceFacetFilter,
   type TraceListQuery,
   type TraceListRead,
 } from "../../../repositories/trace-list.repository.ts";
@@ -63,7 +64,7 @@ interface FacetParams {
   /** The exact window the list reads, never snapped. */
   timeRange: { from: number; to: number; live?: boolean };
   /** The predicate each facet is counted under. */
-  filterFor: FacetFilterResolver;
+  filterFor: FacetFilterResolver<TraceFacetFilter>;
   /**
    * Names everything `filterFor` was built from beyond the proof and window
    * (the query, the eval runs, the viewer's protections): two requests with

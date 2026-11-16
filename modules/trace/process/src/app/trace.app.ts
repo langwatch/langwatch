@@ -385,6 +385,7 @@ import type { TraceAttributedRollupRepository } from "../repositories/trace-attr
 import type { TraceEvaluationRunsReadRepository } from "../repositories/trace-evaluation-runs.repository.ts";
 import type { TraceExistenceRepository } from "../repositories/trace-existence.repository.ts";
 import type { TraceFullRecordRowsRepository } from "../repositories/trace-full-record-rows.repository.ts";
+import type { TraceFacetFilter } from "../repositories/trace-list.repository.ts";
 import type { TraceModelSpendRepository } from "../repositories/trace-model-spend.repository.ts";
 import type { TracePayloadReaderRepository } from "../repositories/trace-payload-reader.repository.ts";
 import type { TraceProjectedReadRepository } from "../repositories/trace-projected-read.repository.ts";
@@ -575,7 +576,7 @@ export type TracesListReader = Readonly<{
   getFacets(params: {
     authorization: Authorization;
     timeRange: { from: number; to: number; live?: boolean };
-    filterFor: FacetFilterResolver;
+    filterFor: FacetFilterResolver<TraceFacetFilter>;
     /** Names what `filterFor` was built from, so a repeat shares a running count. */
     filterKey: string;
   }): Promise<FacetDescriptor[]>;
@@ -3059,21 +3060,52 @@ export class TraceModule implements TraceApi, CollectorApp {
     authorization: Authorization;
     protections?: Protections;
   }): Promise<DiscoverResult> {
-    const filterFor = createFacetFilterResolver({
-      queryText: input.query,
-      compile: (text) =>
-        this.#translateTraceFilter({
-          query: text,
+    const hiddenOrigins = await this.#explorerHiddenOrigins({
+      projectId: input.projectId,
+      query: input.query,
+    });
+    const hideText = explorerOriginExclusion({ hiddenOrigins });
+    const facetFilterOf = ({
+      queryText,
+      where,
+      hidden,
+    }: {
+      queryText: string;
+      where: TraceFilterWhere | undefined;
+      hidden: boolean;
+    }): TraceFacetFilter | undefined =>
+      where && {
+        queryText,
+        where,
+        compile: traceFilterCompileOf({
+          queryText,
           timeRange: input.timeRange,
+          fields: this.#queryFields,
+          terms: hidden ? findHiddenOriginFilters({ hiddenOrigins }) : [],
           ...(input.evalRuns ? { evalRuns: input.evalRuns } : {}),
-          ...(input.protections ? { protections: input.protections } : {}),
-        }) ?? undefined,
-      hide: explorerOriginExclusion({
-        hiddenOrigins: await this.#explorerHiddenOrigins({
-          projectId: input.projectId,
-          query: input.query,
+          ...TraceModule.#filterProtections(input.protections),
         }),
-      }),
+      };
+    const filterFor = createFacetFilterResolver<TraceFacetFilter>({
+      queryText: input.query,
+      compile: (queryText) =>
+        facetFilterOf({
+          queryText,
+          where:
+            this.#translateTraceFilter({
+              query: queryText,
+              timeRange: input.timeRange,
+              ...(input.evalRuns ? { evalRuns: input.evalRuns } : {}),
+              ...(input.protections ? { protections: input.protections } : {}),
+            }) ?? undefined,
+          hidden: false,
+        }),
+      hide: (filter) =>
+        facetFilterOf({
+          queryText: filter?.queryText ?? "",
+          where: hideText(filter?.where),
+          hidden: true,
+        }),
     });
 
     const facets = await this.#dependencies.traces.list.getFacets({

@@ -8,11 +8,7 @@ import { ownProof } from "../../../__tests__/support/authorization-proofs.fixtur
  * @integration
  * Verifies that filters encounter stale trace versions before version dedup collapses them.
  */
-import { FACET_REGISTRY } from "../../../features/facet/repositories/clickhouse/clickhouse.trace-facet-registry.mapper.ts";
-import {
-  traceFilterCompileFor,
-  traceQueryTranslation,
-} from "../../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
+import { traceFilterCompileFor } from "../../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
 import { TraceListClickHouseRepository } from "../trace-list.repository.ts";
 import {
   authorizedClickHouseFor,
@@ -86,24 +82,6 @@ describe.skipIf(!clickHouseConfigured)(
     const versionTenant = `test-version-leak-${nanoid()}`;
     const versionedTraceId = "vl-annotated";
     const timeRange = { from: base - 60_000, to: base + 60_000 };
-
-    const annotationFacetExpression = (() => {
-      const def = FACET_REGISTRY.find((facet) => facet.key === "annotation");
-      if (!def || !("expression" in def)) {
-        throw new Error("the annotation facet no longer carries an expression");
-      }
-      return def.expression;
-    })();
-
-    /** The filter the sidebar compiles, so the test reads the production SQL. */
-    const filterFor = (queryText: string) => {
-      const compiled = traceQueryTranslation.translateFilter({
-        queryText,
-        timeRange,
-      });
-      if (!compiled) throw new Error(`"${queryText}" compiled to no filter`);
-      return compiled;
-    };
 
     const listWith = (queryText: string) =>
       repo.listAll({
@@ -183,8 +161,7 @@ describe.skipIf(!clickHouseConfigured)(
           authorization: ownProof({ projectId: versionTenant }),
           timeRange,
           table: "trace_summaries",
-          timeColumn: "OccurredAt",
-          facetExpression: annotationFacetExpression,
+          facetKey: "annotation",
           limit: 100,
           offset: 0,
         });
@@ -198,11 +175,10 @@ describe.skipIf(!clickHouseConfigured)(
           authorization: ownProof({ projectId: versionTenant }),
           timeRange,
           table: "trace_summaries",
-          timeColumn: "OccurredAt",
-          facetExpression: annotationFacetExpression,
+          facetKey: "annotation",
           limit: 100,
           offset: 0,
-          filterWhere: filterFor("annotation:unannotated"),
+          compileFilter: traceFilterCompileFor({ queryText: "annotation:unannotated", timeRange }),
         });
 
         expect(counts.values).toEqual([]);

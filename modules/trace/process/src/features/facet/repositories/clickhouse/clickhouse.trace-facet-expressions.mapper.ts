@@ -136,3 +136,33 @@ export const STORED_SPAN_EXPRESSIONS: Readonly<
     fn.if(cond.eq(spanStatusCode, 1), label("ok"), "unset"),
   ),
 };
+
+/** Each expression facet's categorical values by table, as the facet reads select them. */
+export const FACET_CATEGORICAL_EXPRESSIONS: {
+  readonly trace_summaries: Readonly<Record<string, Summary<string>>>;
+  readonly evaluation_runs: Readonly<Record<string, Expression<string | null, "evaluation_runs">>>;
+  readonly stored_spans: Readonly<Record<string, Expression<string | null, "stored_spans">>>;
+} = {
+  trace_summaries: {
+    ...TRACE_SUMMARY_CATEGORICAL_EXPRESSIONS,
+    model: fn.arrayJoin(ts.Models),
+    scenarioRun: attribute("scenario.run_id"),
+  },
+  evaluation_runs: {
+    evaluatorStatus: EVALUATION_RUN_EXPRESSIONS.evaluatorStatus,
+    evaluatorVerdict: EVALUATION_RUN_EXPRESSIONS.evaluatorVerdict,
+    evaluatorLabel: EVALUATION_RUN_EXPRESSIONS.evaluatorLabel,
+  },
+  stored_spans: STORED_SPAN_EXPRESSIONS,
+};
+
+/** Each range facet's value by table. */
+export const FACET_RANGE_EXPRESSIONS: {
+  readonly trace_summaries: Readonly<Record<string, Summary<number>>>;
+  readonly evaluation_runs: Readonly<Record<string, Expression<number | null, "evaluation_runs">>>;
+  readonly stored_spans: Readonly<Record<string, Expression<number | null, "stored_spans">>>;
+} = {
+  trace_summaries: TRACE_SUMMARY_RANGE_EXPRESSIONS,
+  evaluation_runs: { evaluatorScore: EVALUATION_RUN_EXPRESSIONS.evaluatorScore },
+  stored_spans: {},
+};

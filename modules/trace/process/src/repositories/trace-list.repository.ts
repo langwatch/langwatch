@@ -18,6 +18,16 @@ import type { TraceFilterWhere } from "../rules/trace-filter-hidden-origins.rule
 export const TRACE_SUGGEST_FIELDS = ["model", "service", "user", "origin"] as const;
 export type TraceSuggestField = (typeof TRACE_SUGGEST_FIELDS)[number];
 
+/**
+ * The filter one facet is counted under, from the query text it was compiled from: as text for
+ * the queryBuilder facets' raw reads, and as a compile for the built facet reads.
+ */
+export interface TraceFacetFilter {
+  queryText: string;
+  where: TraceFilterWhere;
+  compile: TraceFilterCompile;
+}
+
 export interface TraceListQuery {
   /** The proof the read is fenced by; the reader applies its tenant set. */
   authorization: Authorization;
@@ -60,20 +70,19 @@ export interface TraceListRepository {
   }): Promise<string[]>;
 
   /**
-   * `filterWhere` on the facet reads below is the active trace filter, which
-   * every read scopes to its own table and applies after the version dedup.
-   * Absent for the unfiltered discover read.
+   * A facet read names its facet by registry key. `compileFilter`, compiled for the read's scope,
+   * applies after the election on `trace_summaries` and as the (tenant, trace) pairs it selects
+   * elsewhere; absent for the unfiltered discover read.
    */
   findCategoricalFacet(params: {
     authorization: Authorization;
     timeRange: { from: number; to: number; live?: boolean };
     table: FacetTableName;
-    timeColumn: string;
-    facetExpression: string;
+    facetKey: string;
     limit: number;
     offset: number;
     prefix?: string;
-    filterWhere?: TraceFilterWhere;
+    compileFilter?: TraceFilterCompile;
   }): Promise<CategoricalFacetResult>;
 
   findCategoricalFacetRaw(params: {
@@ -85,9 +94,8 @@ export interface TraceListRepository {
     authorization: Authorization;
     timeRange: { from: number; to: number; live?: boolean };
     table: FacetTableName;
-    timeColumn: string;
-    column: string;
-    filterWhere?: TraceFilterWhere;
+    facetKey: string;
+    compileFilter?: TraceFilterCompile;
   }): Promise<{ min: number; max: number }>;
 
   /**
@@ -98,10 +106,9 @@ export interface TraceListRepository {
     authorization: Authorization;
     timeRange: { from: number; to: number; live?: boolean };
     table: FacetTableName;
-    timeColumn: string;
-    column: string;
+    facetKey: string;
     limit: number;
-    filterWhere?: TraceFilterWhere;
+    compileFilter?: TraceFilterCompile;
   }): Promise<DiscreteFacetResult>;
 
   /**
@@ -113,11 +120,10 @@ export interface TraceListRepository {
     authorization: Authorization;
     timeRange: { from: number; to: number; live?: boolean };
     table: FacetTableName;
-    timeColumn: string;
-    categoricalSpecs: { key: string; expression: string }[];
-    rangeSpecs: { key: string; expression: string }[];
+    categoricalKeys: readonly string[];
+    rangeKeys: readonly string[];
     topN: number;
-    filterWhere?: TraceFilterWhere;
+    compileFilter?: TraceFilterCompile;
   }): Promise<BatchedFacetResult>;
 
   /**

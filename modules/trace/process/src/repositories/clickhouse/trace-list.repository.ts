@@ -1,15 +1,12 @@
 import type { Authorization } from "@langwatch/authorization";
+import type { AuthorizedClickHouse, ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import {
-  type AuthorizedClickHouse,
-  type ClickHouseQueryClient,
-  type TenantScopedReader,
-  type TenantScopeTimeColumn,
-  tenantScope,
-} from "@langwatch/clickhouse-client";
-import {
+  type ClickHouseRead,
   type ClickHouseReadStart,
+  type ClickHouseReadStatement,
   type ClickHouseTable,
   clickhouseRead,
+  type ColumnsSpec,
   type Condition,
   cond,
   type DerivedColumns,
@@ -40,19 +37,22 @@ import {
 } from "@langwatch/trace-contract";
 import { z } from "zod";
 
-import { TRACE_SUMMARY_CATEGORICAL_EXPRESSIONS } from "../../features/facet/repositories/clickhouse/clickhouse.trace-facet-expressions.mapper.ts";
-import { scopeTraceFilterToTable } from "../../features/facet/repositories/clickhouse/clickhouse.trace-facet-scope.mapper.ts";
+import {
+  FACET_CATEGORICAL_EXPRESSIONS,
+  FACET_RANGE_EXPRESSIONS,
+  TRACE_SUMMARY_CATEGORICAL_EXPRESSIONS,
+} from "../../features/facet/repositories/clickhouse/clickhouse.trace-facet-expressions.mapper.ts";
 import type {
   TraceFilterCompilation,
   TraceFilterCompile,
   TraceFilterCondition,
 } from "../../features/query/repositories/clickhouse/clickhouse.trace-filter-condition.mapper.ts";
-import type { TraceFilterWhere } from "../../rules/trace-filter-hidden-origins.rules.ts";
 import type {
   TraceListQuery,
   TraceListRepository,
   TraceSuggestField,
 } from "../trace-list.repository.ts";
+import { evaluationRuns } from "./clickhouse.evaluation-runs.table.ts";
 import { storedSpans } from "./clickhouse.stored-spans.table.ts";
 import { traceSummaries } from "./clickhouse.trace-summaries.table.ts";
 import { chBoolean, chNumber, chString } from "./stored-span-row.mapper.ts";
@@ -72,8 +72,6 @@ const traceRefRowsSchema = z.array(z.looseObject({ TenantId: chString, TraceId: 
 const discreteValueRowsSchema = z.array(
   z.looseObject({ discrete_value: z.unknown(), cnt: numeric, total_distinct: numeric }),
 );
-
-const rangeRowsSchema = z.array(z.looseObject({ min_val: z.unknown(), max_val: z.unknown() }));
 
 const keyedFacetRowsSchema = z.array(
   z.looseObject({
@@ -573,46 +571,251 @@ const FACET_READ = {
   format: "JSONEachRow",
 } as const;
 
-function buildWhereClauseForTable({
+/** The facet time and memory cap as a SETTINGS clause on a built facet read. */
+const FACET_SETTINGS = {
+  max_execution_time: FACET_READ_MAX_EXECUTION_SECONDS,
+  timeout_overflow_mode: "throw",
+  max_memory_usage: 2 * 1024 * 1024 * 1024,
+} as const;
+
+type FacetWindow = { from: number; to: number; live?: boolean };
+
+/** One facet read's proof, window and filter; the filter is compiled for the read's own scope. */
+type FacetScan = {
+  authorization: Authorization;
+  timeRange: FacetWindow;
+  table: FacetTableName;
+  compileFilter?: TraceFilterCompile;
+};
+
+/**
+ * A facet table's read: its descriptor, its window column, its facets' expressions, and how the
+ * trace filter narrows its rows (on `trace_summaries` after the election; elsewhere by the
+ * (tenant, trace) pairs whose latest summary in the window matches, ADR-139).
+ */
+interface FacetSource<Name extends FacetTableName, Columns extends ColumnsSpec> {
+  table: ClickHouseTable<Name, Columns>;
+  time: Expression<unknown, Name>;
+  categorical: Readonly<Record<string, Expression<string | null, Name>>>;
+  range: Readonly<Record<string, Expression<number | null, Name>>>;
+  narrow: <Row extends Record<string, unknown>>(
+    read: ClickHouseRead<ProofScope, Name, Row, Record<never, never>>,
+    filter: { timeRange: FacetWindow; compiled: TraceFilterCompilation | undefined },
+  ) => ClickHouseRead<ProofScope, Name, Row, Record<never, never>>;
+}
+
+function facetSource<Name extends FacetTableName, Columns extends ColumnsSpec>(
+  source: FacetSource<Name, Columns>,
+): FacetSource<Name, Columns> {
+  return source;
+}
+
+/** The (tenant, trace) pairs whose latest summary in the window matches the filter. */
+function filteredTraceKeys<S extends ReaderScope>({
+  start,
   timeRange,
-  timeColumn,
+  filter,
 }: {
-  timeRange: { from: number; to: number; live?: boolean };
-  timeColumn: TenantScopeTimeColumn;
-}): { sql: string; params: Record<string, unknown> } {
-  const parts = [
-    tenantScope(timeColumn),
-    `${timeColumn} >= fromUnixTimestamp64Milli({timeFrom:Int64})`,
-  ];
-  const params: Record<string, unknown> = { timeFrom: timeRange.from };
+  start: ClickHouseReadStart<S>;
+  timeRange: FacetWindow;
+  filter: TraceFilterCompilation;
+}) {
+  return electedSummaries({ start, timeRange, filter })
+    .select({ TenantId: ts.TenantId, TraceId: ts.TraceId })
+    .latestVersion();
+}
 
-  if (!isLiveUpperBound(timeRange)) {
-    parts.push(`${timeColumn} <= fromUnixTimestamp64Milli({timeTo:Int64})`);
-    params.timeTo = timeRange.to;
+const FACET_SOURCES = {
+  trace_summaries: facetSource({
+    table: ts,
+    time: ts.OccurredAt,
+    categorical: FACET_CATEGORICAL_EXPRESSIONS.trace_summaries,
+    range: FACET_RANGE_EXPRESSIONS.trace_summaries,
+    narrow: (read, { compiled }) =>
+      read.where(filterTerm(compiled ?? { kind: "empty" }), { inElection: false }).latestVersion(),
+  }),
+  evaluation_runs: facetSource({
+    table: evaluationRuns,
+    time: evaluationRuns.ScheduledAt,
+    categorical: FACET_CATEGORICAL_EXPRESSIONS.evaluation_runs,
+    range: FACET_RANGE_EXPRESSIONS.evaluation_runs,
+    narrow: (read, { timeRange, compiled }) =>
+      compiled === undefined
+        ? read
+        : read.where(({ within }) =>
+            within(fn.tuple(evaluationRuns.TenantId, evaluationRuns.TraceId), (sub) =>
+              filteredTraceKeys({ start: sub, timeRange, filter: compiled }),
+            ),
+          ),
+  }),
+  stored_spans: facetSource({
+    table: storedSpans,
+    time: storedSpans.StartTime,
+    categorical: FACET_CATEGORICAL_EXPRESSIONS.stored_spans,
+    range: FACET_RANGE_EXPRESSIONS.stored_spans,
+    narrow: (read, { timeRange, compiled }) =>
+      compiled === undefined
+        ? read
+        : read.where(({ within }) =>
+            within(fn.tuple(storedSpans.TenantId, storedSpans.TraceId), (sub) =>
+              filteredTraceKeys({ start: sub, timeRange, filter: compiled }),
+            ),
+          ),
+  }),
+};
+
+/** Runs `build` on the source of `table`, each typed by its own table. */
+function onFacetSource<R>(
+  table: FacetTableName,
+  build: <Name extends FacetTableName, Columns extends ColumnsSpec>(
+    source: FacetSource<Name, Columns>,
+  ) => R,
+): R {
+  switch (table) {
+    case "trace_summaries":
+      return build(FACET_SOURCES.trace_summaries);
+    case "evaluation_runs":
+      return build(FACET_SOURCES.evaluation_runs);
+    case "stored_spans":
+      return build(FACET_SOURCES.stored_spans);
   }
+}
 
-  return { sql: parts.join(" AND "), params };
+/** A facet's expression on its table; a key the registry does not give one is a defect. */
+function facetExpressionOf<V>(
+  expressions: Readonly<Record<string, V>>,
+  table: FacetTableName,
+  key: string,
+): V {
+  const expression = expressions[key];
+  if (expression === undefined) throw new Error(`No facet expression for ${table}.${key}`);
+  return expression;
+}
+
+/** A facet read's proof scope; a derived read and the read over it share one. */
+function facetScopeOf(scan: FacetScan): ProofScope {
+  return builtTenantScope.fromProof({ authorization: scan.authorization, reads: "traces" });
+}
+
+/** The facet table's rows in the proof's windows and the time range, narrowed by the filter. */
+function facetRows<Name extends FacetTableName, Columns extends ColumnsSpec>({
+  source,
+  scan,
+  scope = facetScopeOf(scan),
+}: {
+  source: FacetSource<Name, Columns>;
+  scan: FacetScan;
+  scope?: ProofScope;
+}) {
+  const { time } = source;
+  const read = clickhouseRead({ scope })
+    .from(source.table)
+    .withinWindows()
+    .where(() => {
+      const from = cond.gte(time, scan.timeRange.from);
+      return isLiveUpperBound(scan.timeRange)
+        ? from
+        : cond.and(from, cond.lte(time, scan.timeRange.to));
+    });
+  return source.narrow(read, {
+    timeRange: scan.timeRange,
+    compiled: scan.compileFilter?.({ scope }),
+  });
+}
+
+/** One facet's values counted, most frequent first, with how many distinct values it holds. */
+function categoricalFacetStatement(
+  scan: FacetScan & { facetKey: string; limit: number; offset: number; prefix?: string },
+) {
+  return onFacetSource(scan.table, (source) => {
+    const value = facetExpressionOf(source.categorical, scan.table, scan.facetKey);
+    const present = cond.ne(value, "");
+    return facetRows({ source, scan })
+      .where(
+        () => (scan.prefix ? cond.and(present, fn.ilike(value, `${scan.prefix}%`)) : present),
+        {
+          inElection: false,
+        },
+      )
+      .select({ facet_value: value, cnt: fn.count(), total_distinct: fn.over(fn.count(), {}) })
+      .groupBy(value)
+      .orderBy("cnt", "DESC")
+      .limit(scan.limit)
+      .offset(scan.offset)
+      .settings(FACET_SETTINGS)
+      .build();
+  });
+}
+
+/** A discrete range facet's values in ascending order, each counted. */
+function discreteValuesStatement(scan: FacetScan & { facetKey: string; limit: number }) {
+  return onFacetSource(scan.table, (source) => {
+    const value = facetExpressionOf(source.range, scan.table, scan.facetKey);
+    return facetRows({ source, scan })
+      .where(() => cond.isNotNull(value), { inElection: false })
+      .select({ discrete_value: value, cnt: fn.count(), total_distinct: fn.over(fn.count(), {}) })
+      .groupBy(value)
+      .orderBy("discrete_value", "ASC")
+      .limit(scan.limit)
+      .settings(FACET_SETTINGS)
+      .build();
+  });
+}
+
+/** Each range facet's bounds in one pass, aliased by position. */
+function rangeBoundsStatement(scan: FacetScan & { facetKeys: readonly string[] }) {
+  return onFacetSource(scan.table, (source) => {
+    const bounds: Record<string, Expression<unknown, typeof source.table.$table.name>> = {};
+    scan.facetKeys.forEach((key, index) => {
+      const value = facetExpressionOf(source.range, scan.table, key);
+      bounds[`r_${index}_min`] = fn.min(value);
+      bounds[`r_${index}_max`] = fn.max(value);
+    });
+    return facetRows({ source, scan }).select(bounds).settings(FACET_SETTINGS).build();
+  });
 }
 
 /**
- * The active trace filter as an `AND` fragment for a facet read on `table`,
- * placed after the version dedup so it never decides which version is the
- * latest. Empty when there is no filter.
+ * Every categorical facet of one table in one scan: each row yields one (key, value) pair per
+ * facet, counted per pair, the top `topN` per key kept with the key's distinct-value count.
  */
-function facetFilterFragment(
-  table: FacetTableName,
-  filterWhere: TraceFilterWhere | undefined,
-  timeRange: { to: number; live?: boolean },
-): TraceFilterWhere {
-  if (!filterWhere) return { sql: "", params: {} };
-
-  const scoped = scopeTraceFilterToTable({
-    table,
-    filterWhere,
-    isLiveWindow: timeRange.live === true,
+function batchedCategoricalStatement(
+  scan: FacetScan & { facetKeys: readonly string[]; topN: number },
+) {
+  return onFacetSource(scan.table, (source) => {
+    const pair = fn.arrayJoin(
+      fn.array(
+        ...scan.facetKeys.map((key) =>
+          fn.tuple(
+            param.string(key),
+            fn.toString(facetExpressionOf(source.categorical, scan.table, key)),
+          ),
+        ),
+      ),
+    );
+    const scope = facetScopeOf(scan);
+    const pairs = facetRows({ source, scan, scope })
+      .select({
+        facet_key: fn.toString(fn.tupleElement(pair, "0")),
+        facet_value: fn.toString(fn.tupleElement(pair, "1")),
+      })
+      .as("pairs");
+    return clickhouseRead({ scope })
+      .from(pairs)
+      .where(() => cond.ne(fn.toString(pairs.facet_value), ""))
+      .select({
+        facet_key: pairs.facet_key,
+        facet_value: pairs.facet_value,
+        cnt: fn.count(),
+        total_distinct: fn.over(fn.count(), { partitionBy: [pairs.facet_key] }),
+      })
+      .groupBy(pairs.facet_key, pairs.facet_value)
+      .orderBy(pairs.facet_key, "ASC")
+      .orderBy("cnt", "DESC")
+      .limitBy(scan.topN, pairs.facet_key)
+      .settings(FACET_SETTINGS)
+      .build();
   });
-
-  return { sql: `AND ${scoped.sql}`, params: scoped.params };
 }
 
 export class TraceListClickHouseRepository implements TraceListRepository {
@@ -735,123 +938,29 @@ export class TraceListClickHouseRepository implements TraceListRepository {
 
   async findCategoricalFacet(params: {
     authorization: Authorization;
-    timeRange: { from: number; to: number; live?: boolean };
+    timeRange: FacetWindow;
     table: FacetTableName;
-    timeColumn: TenantScopeTimeColumn;
-    facetExpression: string;
+    facetKey: string;
     limit: number;
     offset: number;
     prefix?: string;
-    filterWhere?: TraceFilterWhere;
+    compileFilter?: TraceFilterCompile;
   }): Promise<CategoricalFacetResult> {
-    const { sql: whereClause, params: queryParams } = buildWhereClauseForTable({
-      timeRange: params.timeRange,
-      timeColumn: params.timeColumn,
-    });
-    const filter = facetFilterFragment(params.table, params.filterWhere, params.timeRange);
-
-    const prefixFilter = params.prefix
-      ? `AND ${params.facetExpression} ILIKE concat({prefix:String}, '%')`
-      : "";
-
-    // `trace_summaries` is a ReplacingMergeTree-style projection — the same
-    // logical trace can have multiple rows (different `UpdatedAt` versions)
-    // until the merge runs. Without dedup, facet counts double-count any
-    // re-projected trace. Other tables (evaluation_runs, stored_spans) keep
-    // their own row identity per evaluation/span, so we don't dedup there.
-    const needsDedup = params.table === "trace_summaries";
-    const dedupFilter = needsDedup
-      ? `AND (TenantId, TraceId, UpdatedAt) IN (
-            SELECT TenantId, TraceId, max(UpdatedAt)
-            FROM ${params.table}
-            WHERE ${whereClause}
-            GROUP BY TenantId, TraceId
-          )`
-      : "";
-
-    const client = this.clickhouse.as(params.authorization, {
-      reads: "traces",
-    });
-    const result = await client.query({
-      query: `
-        SELECT
-          ${params.facetExpression} AS facet_value,
-          count() AS cnt,
-          count() OVER () AS total_distinct
-        FROM ${params.table}
-        WHERE ${whereClause}
-          ${dedupFilter}
-          ${filter.sql}
-          AND ${params.facetExpression} != ''
-          ${prefixFilter}
-        GROUP BY facet_value
-        ORDER BY cnt DESC
-        LIMIT {limit:UInt32} OFFSET {offset:UInt32}
-      `,
-      query_params: {
-        ...filter.params,
-        ...queryParams,
-        limit: params.limit,
-        offset: params.offset,
-        ...(params.prefix ? { prefix: params.prefix } : {}),
-      },
-      ...FACET_READ,
-    });
-
-    const rows = facetRowsSchema.parse(await result.json());
-    return TraceListClickHouseRepository.mapFacetRows(rows);
+    const rows = await this.readFacet(categoricalFacetStatement(params), params.table);
+    return TraceListClickHouseRepository.mapFacetRows(facetRowsSchema.parse(rows));
   }
 
   async findDiscreteValues(params: {
     authorization: Authorization;
-    timeRange: { from: number; to: number; live?: boolean };
+    timeRange: FacetWindow;
     table: FacetTableName;
-    timeColumn: TenantScopeTimeColumn;
-    column: string;
+    facetKey: string;
     limit: number;
-    filterWhere?: TraceFilterWhere;
+    compileFilter?: TraceFilterCompile;
   }): Promise<DiscreteFacetResult> {
-    const { sql: whereClause, params: queryParams } = buildWhereClauseForTable({
-      timeRange: params.timeRange,
-      timeColumn: params.timeColumn,
-    });
-    const filter = facetFilterFragment(params.table, params.filterWhere, params.timeRange);
-
-    // Same ReplacingMergeTree dedup as findCategoricalFacet — only
-    // trace_summaries re-projects a logical trace across versions.
-    const needsDedup = params.table === "trace_summaries";
-    const dedupFilter = needsDedup
-      ? `AND (TenantId, TraceId, UpdatedAt) IN (
-            SELECT TenantId, TraceId, max(UpdatedAt)
-            FROM ${params.table}
-            WHERE ${whereClause}
-            GROUP BY TenantId, TraceId
-          )`
-      : "";
-
-    const client = this.clickhouse.as(params.authorization, {
-      reads: "traces",
-    });
-    const result = await client.query({
-      query: `
-        SELECT
-          ${params.column} AS discrete_value,
-          count() AS cnt,
-          count() OVER () AS total_distinct
-        FROM ${params.table}
-        WHERE ${whereClause}
-          ${dedupFilter}
-          ${filter.sql}
-          AND ${params.column} IS NOT NULL
-        GROUP BY discrete_value
-        ORDER BY discrete_value ASC
-        LIMIT {limit:UInt32}
-      `,
-      query_params: { ...filter.params, ...queryParams, limit: params.limit },
-      ...FACET_READ,
-    });
-
-    const rows = discreteValueRowsSchema.parse(await result.json());
+    const rows = discreteValueRowsSchema.parse(
+      await this.readFacet(discreteValuesStatement(params), params.table),
+    );
     return {
       values: rows.map((r) => ({
         value: Number(r.discrete_value),
@@ -861,6 +970,16 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       // so this is the true distinct count even when values are capped.
       distinctCount: Number(rows[0]?.total_distinct ?? 0),
     };
+  }
+
+  /** A facet read: its time cap stops it on the server (search.feature). */
+  private async readFacet<Row>(
+    statement: ClickHouseReadStatement<Row>,
+    table: FacetTableName,
+  ): Promise<Row[]> {
+    // ID_BOUND_SKIP: a facet's counts over the window, bounded by the table's time column.
+    const result = await this.reader.read({ statement, table, retryOnTimeout: false });
+    return result.rows;
   }
 
   async findCategoricalFacetRaw(params: {
@@ -889,254 +1008,69 @@ export class TraceListClickHouseRepository implements TraceListRepository {
 
   async findRangeStatsForTable(params: {
     authorization: Authorization;
-    timeRange: { from: number; to: number; live?: boolean };
+    timeRange: FacetWindow;
     table: FacetTableName;
-    timeColumn: TenantScopeTimeColumn;
-    column: string;
-    filterWhere?: TraceFilterWhere;
+    facetKey: string;
+    compileFilter?: TraceFilterCompile;
   }): Promise<{ min: number; max: number }> {
-    const { sql: whereClause, params: queryParams } = buildWhereClauseForTable({
-      timeRange: params.timeRange,
-      timeColumn: params.timeColumn,
-    });
-    const filter = facetFilterFragment(params.table, params.filterWhere, params.timeRange);
-
-    // Match the dedup behaviour of findCategoricalFacet/findBatchedFacets:
-    // trace_summaries is a ReplacingMergeTree projection, so without the
-    // IN-tuple dedup older versions of a trace widen the discovered
-    // min/max envelope until merges run. Other facet tables keep one row
-    // per logical entity (eval/span) and don't need it.
-    const needsDedup = params.table === "trace_summaries";
-    const dedupFilter = needsDedup
-      ? `AND (TenantId, TraceId, UpdatedAt) IN (
-            SELECT TenantId, TraceId, max(UpdatedAt)
-            FROM ${params.table}
-            WHERE ${whereClause}
-            GROUP BY TenantId, TraceId
-          )`
-      : "";
-
-    const client = this.clickhouse.as(params.authorization, {
-      reads: "traces",
-    });
-    const result = await client.query({
-      query: `
-        SELECT
-          min(${params.column}) AS min_val,
-          max(${params.column}) AS max_val
-        FROM ${params.table}
-        WHERE ${whereClause}
-          ${dedupFilter}
-          ${filter.sql}
-      `,
-      query_params: { ...filter.params, ...queryParams },
-      ...FACET_READ,
-    });
-
-    const rows = rangeRowsSchema.parse(await result.json());
-    const row = rows[0];
-    return { min: Number(row?.min_val ?? 0), max: Number(row?.max_val ?? 0) };
-  }
-
-  /**
-   * Tuple-typed arrayJoin packs every facet into a single row stream. Each (key, expression)
-   * pair becomes one (key, value) tuple per row.
-   */
-  private async fetchCategoricalFacets({
-    client,
-    specs,
-    table,
-    whereClause,
-    dedupFilter,
-    filterClause,
-    queryParams,
-    topN,
-  }: {
-    client: TenantScopedReader;
-    specs: { key: string; expression: string }[];
-    table: FacetTableName;
-    whereClause: string;
-    dedupFilter: string;
-    filterClause: string;
-    queryParams: Record<string, unknown>;
-    topN: number;
-  }): Promise<Record<string, CategoricalFacetResult>> {
-    const tupleArray = specs
-      .map((s) => `(${this.quoteIdentifier(s.key)}, toString(${s.expression}))`)
-      .join(", ");
-
-    const query = `
-              SELECT facet_key, facet_value, cnt, total_distinct FROM (
-                SELECT
-                  facet_key,
-                  facet_value,
-                  cnt,
-                  count() OVER (PARTITION BY facet_key) AS total_distinct
-                FROM (
-                  SELECT facet_key, facet_value, count() AS cnt FROM (
-                    SELECT
-                      arrayJoin([${tupleArray}]) AS kv,
-                      kv.1 AS facet_key,
-                      kv.2 AS facet_value
-                    FROM ${table}
-                    WHERE ${whereClause}
-                      ${dedupFilter}
-                      ${filterClause}
-                  )
-                  WHERE facet_value != ''
-                  GROUP BY facet_key, facet_value
-                )
-              )
-              ORDER BY facet_key, cnt DESC
-              LIMIT {topN:UInt32} BY facet_key
-            `;
-
-    const result = await client.query({
-      query,
-      query_params: { ...queryParams, topN },
-      ...FACET_READ,
-    });
-
-    const rows = keyedFacetRowsSchema.parse(await result.json());
-
-    const out: Record<string, CategoricalFacetResult> = {};
-    for (const spec of specs) {
-      out[spec.key] = { values: [], totalDistinct: 0 };
-    }
-    for (const row of rows) {
-      const bucket = out[row.facet_key];
-      if (!bucket) continue;
-      bucket.values.push({ value: row.facet_value, count: Number(row.cnt) });
-      bucket.totalDistinct = Number(row.total_distinct);
-    }
-
-    return out;
-  }
-
-  /**
-   * Indexed aliases, so arbitrary registry keys cannot collide with reserved SQL words or with
-   * each other after sanitisation.
-   */
-  private async fetchRangeFacets({
-    client,
-    specs,
-    table,
-    whereClause,
-    dedupFilter,
-    filterClause,
-    queryParams,
-  }: {
-    client: TenantScopedReader;
-    specs: { key: string; expression: string }[];
-    table: FacetTableName;
-    whereClause: string;
-    dedupFilter: string;
-    filterClause: string;
-    queryParams: Record<string, unknown>;
-  }): Promise<Record<string, { min: number; max: number }>> {
-    const aggClauses = specs
-      .flatMap((s, i) => [
-        `min(${s.expression}) AS r_${i}_min`,
-        `max(${s.expression}) AS r_${i}_max`,
-      ])
-      .join(", ");
-
-    const query = `
-              SELECT ${aggClauses}
-              FROM ${table}
-              WHERE ${whereClause}
-                ${dedupFilter}
-                ${filterClause}
-            `;
-
-    const result = await client.query({
-      query,
-      query_params: queryParams,
-      ...FACET_READ,
-    });
-
-    const rows = rangeFacetRowsSchema.parse(await result.json());
+    const rows = rangeFacetRowsSchema.parse(
+      await this.readFacet(
+        rangeBoundsStatement({ ...params, facetKeys: [params.facetKey] }),
+        params.table,
+      ),
+    );
     const row = rows[0] ?? {};
-    const out: Record<string, { min: number; max: number }> = {};
-    for (let i = 0; i < specs.length; i += 1) {
-      const spec = specs[i]!;
-      out[spec.key] = {
-        min: Number(row[`r_${i}_min`] ?? 0),
-        max: Number(row[`r_${i}_max`] ?? 0),
-      };
-    }
-
-    return out;
+    return { min: Number(row.r_0_min ?? 0), max: Number(row.r_0_max ?? 0) };
   }
 
+  /** Categoricals share one arrayJoin scan and ranges one aggregate scan, side by side. */
   async findBatchedFacets(params: {
     authorization: Authorization;
-    timeRange: { from: number; to: number; live?: boolean };
+    timeRange: FacetWindow;
     table: FacetTableName;
-    timeColumn: TenantScopeTimeColumn;
-    categoricalSpecs: { key: string; expression: string }[];
-    rangeSpecs: { key: string; expression: string }[];
+    categoricalKeys: readonly string[];
+    rangeKeys: readonly string[];
     topN: number;
-    filterWhere?: TraceFilterWhere;
+    compileFilter?: TraceFilterCompile;
   }): Promise<BatchedFacetResult> {
-    const { sql: whereClause, params: baseParams } = buildWhereClauseForTable({
-      timeRange: params.timeRange,
-      timeColumn: params.timeColumn,
-    });
-    const filter = facetFilterFragment(params.table, params.filterWhere, params.timeRange);
-    const queryParams = { ...filter.params, ...baseParams };
-
-    // `trace_summaries` is a ReplacingMergeTree-style projection — same trace
-    // can have multiple `UpdatedAt` versions until merge runs. The other facet
-    // tables (`evaluation_runs`, `stored_spans`) keep row identity per record.
-    const needsDedup = params.table === "trace_summaries";
-    const dedupFilter = needsDedup
-      ? `AND (TenantId, TraceId, UpdatedAt) IN (
-            SELECT TenantId, TraceId, max(UpdatedAt)
-            FROM ${params.table}
-            WHERE ${whereClause}
-            GROUP BY TenantId, TraceId
-          )`
-      : "";
-
-    const client = this.clickhouse.as(params.authorization, { reads: "traces" });
-    const shared = {
-      client,
-      table: params.table,
-      whereClause,
-      dedupFilter,
-      filterClause: filter.sql,
-      queryParams,
+    const categoricals = async () => {
+      const rows = keyedFacetRowsSchema.parse(
+        await this.readFacet(
+          batchedCategoricalStatement({ ...params, facetKeys: params.categoricalKeys }),
+          params.table,
+        ),
+      );
+      const out: Record<string, CategoricalFacetResult> = {};
+      for (const key of params.categoricalKeys) out[key] = { values: [], totalDistinct: 0 };
+      for (const row of rows) {
+        const bucket = out[row.facet_key];
+        if (!bucket) continue;
+        bucket.values.push({ value: row.facet_value, count: Number(row.cnt) });
+        bucket.totalDistinct = Number(row.total_distinct);
+      }
+      return out;
+    };
+    const ranges = async () => {
+      const rows = rangeFacetRowsSchema.parse(
+        await this.readFacet(
+          rangeBoundsStatement({ ...params, facetKeys: params.rangeKeys }),
+          params.table,
+        ),
+      );
+      const row = rows[0] ?? {};
+      return Object.fromEntries(
+        params.rangeKeys.map((key, i) => [
+          key,
+          { min: Number(row[`r_${i}_min`] ?? 0), max: Number(row[`r_${i}_max`] ?? 0) },
+        ]),
+      );
     };
 
-    const categoricalsPromise =
-      params.categoricalSpecs.length === 0
-        ? Promise.resolve({})
-        : this.fetchCategoricalFacets({
-            ...shared,
-            specs: params.categoricalSpecs,
-            topN: params.topN,
-          });
-
-    const rangesPromise =
-      params.rangeSpecs.length === 0
-        ? Promise.resolve({})
-        : this.fetchRangeFacets({ ...shared, specs: params.rangeSpecs });
-
-    const [categoricals, ranges] = await Promise.all([categoricalsPromise, rangesPromise]);
-
-    return { categoricals, ranges };
-  }
-
-  /**
-   * Quote a registry key for safe use as a ClickHouse string literal. The
-   * registry only ships ASCII identifiers, but we still defend in depth.
-   */
-  private quoteIdentifier(key: string): string {
-    if (!/^[a-zA-Z0-9_]+$/.test(key)) {
-      throw new Error(`Invalid facet key: ${key}`);
-    }
-    return `'${key}'`;
+    const [categoricalResult, rangeResult] = await Promise.all([
+      params.categoricalKeys.length === 0 ? {} : categoricals(),
+      params.rangeKeys.length === 0 ? {} : ranges(),
+    ]);
+    return { categoricals: categoricalResult, ranges: rangeResult };
   }
 
   async findAttributeValues(params: ValuePickerQuery): Promise<CategoricalFacetResult> {

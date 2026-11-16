@@ -15,14 +15,15 @@ import type {
 } from "@langwatch/trace-contract";
 
 import type {
-  FacetCatalog,
   ExpressionCategoricalDef,
   FacetDefinition,
   RangeFacetDef,
 } from "#features/facet/rules/trace-facet-registry.rules";
 
-import type { TraceListRead } from "../../../repositories/trace-list.repository.ts";
-import type { TraceFilterWhere } from "../../../rules/trace-filter-hidden-origins.rules.ts";
+import type {
+  TraceFacetFilter,
+  TraceListRead,
+} from "../../../repositories/trace-list.repository.ts";
 import type { DiscoverParams } from "../../../rules/trace-list-cache-key.rules.ts";
 import type { TraceTopicNamingService } from "../../topic/services/trace-topic-naming.service.ts";
 import { isExpressionCategorical } from "../rules/trace-facet-classification.rules.ts";
@@ -31,19 +32,16 @@ export class TraceFacetDescriptorService {
   private constructor(
     private readonly repository: TraceListRead,
     private readonly topicNaming: TraceTopicNamingService,
-    private readonly facets: FacetCatalog,
   ) {}
 
   static create({
     repository,
     topicNaming,
-    facets,
   }: {
     repository: TraceListRead;
     topicNaming: TraceTopicNamingService;
-    facets: FacetCatalog;
   }): TraceFacetDescriptorService {
-    return new TraceFacetDescriptorService(repository, topicNaming, facets);
+    return new TraceFacetDescriptorService(repository, topicNaming);
   }
 
   async buildDescriptor({
@@ -139,13 +137,13 @@ export class TraceFacetDescriptorService {
     def,
     params,
     limit,
-    filterWhere,
+    filter,
   }: {
     def: FacetDefinition & { kind: "categorical" };
     params: DiscoverParams;
     limit: number;
     /** The predicate this facet is counted under; absent on the discover read. */
-    filterWhere?: TraceFilterWhere;
+    filter?: TraceFacetFilter;
   }): Promise<CategoricalFacetDescriptor> {
     let result: CategoricalFacetResult;
 
@@ -154,18 +152,19 @@ export class TraceFacetDescriptorService {
         authorization: params.authorization,
         timeRange: params.timeRange,
         table: def.table,
-        timeColumn: this.facets.timeColumns[def.table],
-        facetExpression: def.expression,
+        facetKey: def.key,
         limit,
         offset: 0,
-        ...(filterWhere ? { filterWhere } : {}),
+        ...(filter ? { compileFilter: filter.compile } : {}),
       });
     } else {
       const query = def.queryBuilder({
         timeRange: params.timeRange,
         limit,
         offset: 0,
-        ...(filterWhere ? { filterWhere, isLiveWindow: params.timeRange.live === true } : {}),
+        ...(filter
+          ? { filterWhere: filter.where, isLiveWindow: params.timeRange.live === true }
+          : {}),
       });
       result = await this.repository.findCategoricalFacetRaw({
         authorization: params.authorization,
@@ -190,19 +189,18 @@ export class TraceFacetDescriptorService {
   async discoverRange({
     def,
     params,
-    filterWhere,
+    filter,
   }: {
     def: RangeFacetDef;
     params: DiscoverParams;
-    filterWhere?: TraceFilterWhere;
+    filter?: TraceFacetFilter;
   }): Promise<RangeFacetDescriptor> {
     const result = await this.repository.findRangeStatsForTable({
       authorization: params.authorization,
       timeRange: params.timeRange,
       table: def.table,
-      timeColumn: this.facets.timeColumns[def.table],
-      column: def.expression,
-      ...(filterWhere ? { filterWhere } : {}),
+      facetKey: def.key,
+      ...(filter ? { compileFilter: filter.compile } : {}),
     });
 
     return {

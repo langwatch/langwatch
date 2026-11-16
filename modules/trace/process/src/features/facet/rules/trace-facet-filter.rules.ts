@@ -6,36 +6,34 @@
 
 import { queryNamesFacet, queryWithoutFacet } from "@langwatch/trace-contract";
 
-import type { TraceFilterWhere } from "../../../rules/trace-filter-hidden-origins.rules.ts";
-
 /** The facet a resolver is asked about: its key and the table it counts. */
 interface FacetFilterSubject {
   key: string;
   table: string;
 }
 
-export type FacetFilterResolver = (facet: FacetFilterSubject) => TraceFilterWhere | undefined;
+export type FacetFilterResolver<Filter> = (facet: FacetFilterSubject) => Filter | undefined;
 
 /**
  * The per-facet predicate, compiled once per named facet field and once for
  * every facet the query does not name; facets sharing a compile share its
  * object. `hide` adds the origins the Explorer leaves out, which origin keeps.
  */
-export function createFacetFilterResolver({
+export function createFacetFilterResolver<Filter>({
   queryText,
   compile,
   hide,
 }: {
   queryText: string;
-  compile: (text: string) => TraceFilterWhere | undefined;
-  hide: (filter: TraceFilterWhere | undefined) => TraceFilterWhere | undefined;
-}): FacetFilterResolver {
+  compile: (text: string) => Filter | undefined;
+  hide: (filter: Filter | undefined) => Filter | undefined;
+}): FacetFilterResolver<Filter> {
   const whole = compile(queryText);
-  const byFacet = new Map<string, TraceFilterWhere | undefined>();
-  const hidden = new Map<TraceFilterWhere | undefined, TraceFilterWhere | undefined>();
+  const byFacet = new Map<string, Filter | undefined>();
+  const hidden = new Map<Filter | undefined, Filter | undefined>();
   const hasQuery = queryText.trim() !== "";
 
-  const own = (facetKey: string): TraceFilterWhere | undefined => {
+  const own = (facetKey: string): Filter | undefined => {
     if (!queryNamesFacet({ queryText, facetKey })) return whole;
     if (!byFacet.has(facetKey)) {
       byFacet.set(facetKey, compile(queryWithoutFacet({ queryText, facetKey })));

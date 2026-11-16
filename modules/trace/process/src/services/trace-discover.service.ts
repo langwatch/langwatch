@@ -25,8 +25,7 @@ import { isExpressionCategorical } from "../features/facet/rules/trace-facet-cla
 import type { FacetFilterResolver } from "../features/facet/rules/trace-facet-filter.rules.ts";
 import { TraceFacetDescriptorService } from "../features/facet/services/trace-facet-descriptor.service.ts";
 import type { TraceTopicNamingService } from "../features/topic/services/trace-topic-naming.service.ts";
-import type { TraceListRead } from "../repositories/trace-list.repository.ts";
-import type { TraceFilterWhere } from "../rules/trace-filter-hidden-origins.rules.ts";
+import type { TraceFacetFilter, TraceListRead } from "../repositories/trace-list.repository.ts";
 import {
   discoverCacheKey,
   discoverPassKey,
@@ -70,10 +69,10 @@ const DISCOVER_PASS_FAILURE_COOLDOWN_MS = 30_000;
 
 const discoverLogger = createLogger("langwatch:app-layer:traces:trace-list-discover");
 
-function facetFilters(filterFor: FacetFilterResolver): FacetFilters {
-  const byKey = new Map<string, TraceFilterWhere | undefined>();
-  const slotIds = new Map<TraceFilterWhere | undefined, number>();
-  const of = (def: FacetDefinition): TraceFilterWhere | undefined => {
+function facetFilters(filterFor: FacetFilterResolver<TraceFacetFilter>): FacetFilters {
+  const byKey = new Map<string, TraceFacetFilter | undefined>();
+  const slotIds = new Map<TraceFacetFilter | undefined, number>();
+  const of = (def: FacetDefinition): TraceFacetFilter | undefined => {
     if (!byKey.has(def.key)) {
       byKey.set(def.key, filterFor({ key: def.key, table: def.table }));
     }
@@ -114,7 +113,7 @@ function partitionFacetRegistry({
     const key = filters.slotKeyOf(def);
     const slot = batched.get(key) ?? {
       table: def.table,
-      filterWhere: filters.of(def),
+      filter: filters.of(def),
       categoricals: [],
       ranges: [],
     };
@@ -207,7 +206,7 @@ export class TraceDiscoverService {
   }): TraceDiscoverService {
     return new TraceDiscoverService({
       repository,
-      descriptors: TraceFacetDescriptorService.create({ repository, topicNaming, facets }),
+      descriptors: TraceFacetDescriptorService.create({ repository, topicNaming }),
       facets,
       updates,
     });
@@ -266,7 +265,7 @@ export class TraceDiscoverService {
     filterFor,
   }: {
     params: DiscoverParams;
-    filterFor: FacetFilterResolver;
+    filterFor: FacetFilterResolver<TraceFacetFilter>;
   }): Promise<FacetDescriptor[]> {
     return this.computeFacets({ params, filterFor, includeDynamicKeys: false });
   }
@@ -357,7 +356,7 @@ export class TraceDiscoverService {
     includeDynamicKeys,
   }: {
     params: DiscoverParams;
-    filterFor: FacetFilterResolver;
+    filterFor: FacetFilterResolver<TraceFacetFilter>;
     includeDynamicKeys: boolean;
   }): Promise<FacetDescriptor[]> {
     const filters = facetFilters(filterFor);

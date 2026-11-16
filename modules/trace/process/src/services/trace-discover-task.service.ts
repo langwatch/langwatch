@@ -15,8 +15,7 @@ import type {
 } from "#features/facet/rules/trace-facet-registry.rules";
 
 import type { TraceFacetDescriptorService } from "../features/facet/services/trace-facet-descriptor.service.ts";
-import type { TraceListRead } from "../repositories/trace-list.repository.ts";
-import type { TraceFilterWhere } from "../rules/trace-filter-hidden-origins.rules.ts";
+import type { TraceFacetFilter, TraceListRead } from "../repositories/trace-list.repository.ts";
 import type { DiscoverParams } from "../rules/trace-list-cache-key.rules.ts";
 
 /** Top values fetched per categorical facet during discovery. */
@@ -45,7 +44,7 @@ export interface DiscoverTask {
  */
 interface BatchSlot {
   table: FacetTable;
-  filterWhere: TraceFilterWhere | undefined;
+  filter: TraceFacetFilter | undefined;
   categoricals: ExpressionCategoricalDef[];
   ranges: RangeFacetDef[];
 }
@@ -59,7 +58,7 @@ export type Outcome =
 
 /** The predicate every facet is counted under, memoised per facet and per slot. */
 export interface FacetFilters {
-  of: (def: FacetDefinition) => TraceFilterWhere | undefined;
+  of: (def: FacetDefinition) => TraceFacetFilter | undefined;
   slotKeyOf: (def: FacetDefinition) => string;
 }
 
@@ -101,14 +100,10 @@ export class TraceDiscoverTaskService {
             authorization: params.authorization,
             timeRange: params.timeRange,
             table: slot.table,
-            timeColumn: this.facets.timeColumns[slot.table],
-            categoricalSpecs: slot.categoricals.map((d) => ({
-              key: d.key,
-              expression: d.expression,
-            })),
-            rangeSpecs: slot.ranges.map((d) => ({ key: d.key, expression: d.expression })),
+            categoricalKeys: slot.categoricals.map((d) => d.key),
+            rangeKeys: slot.ranges.map((d) => d.key),
             topN: DISCOVER_TOP_N,
-            ...(slot.filterWhere ? { filterWhere: slot.filterWhere } : {}),
+            ...(slot.filter ? { compileFilter: slot.filter.compile } : {}),
           })
           .then((result): Outcome => ({ kind: "batch", slotKey, result })),
     }));
@@ -128,7 +123,7 @@ export class TraceDiscoverTaskService {
       label: `standalone:${def.kind}:${def.key}`,
       statements: 1,
       run: async (): Promise<Outcome> => {
-        const filterWhere = filters.of(def);
+        const filter = filters.of(def);
         let descriptor: FacetDescriptor;
         switch (def.kind) {
           case "categorical":
@@ -136,14 +131,14 @@ export class TraceDiscoverTaskService {
               def,
               params,
               limit: DISCOVER_TOP_N,
-              ...(filterWhere ? { filterWhere } : {}),
+              ...(filter ? { filter } : {}),
             });
             break;
           case "range":
             descriptor = await this.descriptors.discoverRange({
               def,
               params,
-              ...(filterWhere ? { filterWhere } : {}),
+              ...(filter ? { filter } : {}),
             });
             break;
           case "dynamic_keys":
@@ -176,10 +171,9 @@ export class TraceDiscoverTaskService {
               authorization: params.authorization,
               timeRange: params.timeRange,
               table: def.table,
-              timeColumn: this.facets.timeColumns[def.table],
-              column: def.expression,
+              facetKey: def.key,
               limit: DISCRETE_VALUE_LIMIT,
-              ...(filters.of(def) ? { filterWhere: filters.of(def) } : {}),
+              ...(filters.of(def) ? { compileFilter: filters.of(def)?.compile } : {}),
             })
             .then((result): Outcome => ({ kind: "discrete", key: def.key, result })),
       }));

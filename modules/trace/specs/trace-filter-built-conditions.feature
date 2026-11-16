@@ -62,3 +62,16 @@ Feature: Trace filters compile to built conditions
     When the search bar suggests a field's values, or a picker samples a trace, span or event attribute's values
     Then each returns the values main's text returns under an own proof, a tenant set and a windowed share
     And none of the other tenant's values, nor any from before a windowed share
+
+  @integration
+  Scenario: Facet counts keep main's answers under each scope
+    Given another tenant shares the trace ids of a member's summaries, spans and evaluation runs
+    When the sidebar counts its facets on each table, unfiltered or under a summary or a span filter
+    Then each count, range and discrete value equals main's under an own proof, a tenant set and a windowed share
+    And none counts the other tenant's rows, nor a summary's older version
+
+  @integration
+  Scenario: Under a windowed share the facets count the traces the list shows
+    Given a member shares its traces into an aggregate from a time onwards
+    When the aggregate's list and its facets are read under the same span filter
+    Then the facets count exactly the traces the list returns
