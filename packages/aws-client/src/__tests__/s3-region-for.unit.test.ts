@@ -79,11 +79,9 @@ describe("s3RegionFor()", () => {
         now: () => now,
       });
 
-      await expect(resolve(region)).rejects.toThrow(
-        /region of S3 bucket "objects".*S3_REGION.*app\.dataplane\.providers\.awsS3\.region/s,
-      );
+      await expect(resolve(region)).rejects.toMatchObject({ code: "s3_region_not_found" });
       now += 1_000;
-      await expect(resolve(region)).rejects.toThrow(/S3_REGION/);
+      await expect(resolve(region)).rejects.toMatchObject({ code: "s3_region_not_found" });
       expect(askBucket).toHaveBeenCalledTimes(1);
 
       now += 60_000;
@@ -97,7 +95,7 @@ describe("s3RegionFor()", () => {
       });
       const region = s3RegionFor({ bucket: "objects", askBucket, configured: unset });
 
-      await expect(resolve(region)).rejects.toThrow(/S3_REGION/);
+      await expect(resolve(region)).rejects.toMatchObject({ code: "s3_region_not_found" });
     });
   });
 
@@ -107,7 +105,7 @@ describe("s3RegionFor()", () => {
       const askBucket = asking([{ kind: "missing" }]);
       const region = s3RegionFor({ bucket: "objects", askBucket, configured: unset });
 
-      await expect(resolve(region)).rejects.toThrow(/S3 bucket "objects" does not exist/);
+      await expect(resolve(region)).rejects.toMatchObject({ code: "s3_bucket_not_found" });
     });
   });
 });

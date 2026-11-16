@@ -35,6 +35,29 @@ export type S3BucketRegionAnswer =
   | { kind: "missing" }
   | { kind: "unknown" };
 
+/** AWS answered that the bucket does not exist. */
+export class S3BucketNotFoundError extends Error {
+  readonly code = "s3_bucket_not_found";
+
+  constructor(bucket: string) {
+    super(`S3 bucket "${bucket}" does not exist. Check S3_BUCKET_NAME.`);
+    this.name = "S3BucketNotFoundError";
+  }
+}
+
+/** No setting names the region and AWS could not be asked where the bucket lives. */
+export class S3RegionNotFoundError extends Error {
+  readonly code = "s3_region_not_found";
+
+  constructor(bucket: string) {
+    super(
+      `Could not find the AWS region of S3 bucket "${bucket}". Set S3_REGION ` +
+        "(Helm: app.dataplane.providers.awsS3.region) to the bucket's region.",
+    );
+    this.name = "S3RegionNotFoundError";
+  }
+}
+
 /** A failed lookup is answered from memory this long, so an outage is not a question per call. */
 const REGION_RETRY_AFTER_MS = 30_000;
 
@@ -71,11 +94,8 @@ export function s3RegionFor({
     const answer = await askBucket().catch((): S3BucketRegionAnswer => ({ kind: "unknown" }));
     if (answer.kind === "found") return answer.region;
     throw answer.kind === "missing"
-      ? new Error(`S3 bucket "${bucket}" does not exist. Check S3_BUCKET_NAME.`)
-      : new Error(
-          `Could not find the AWS region of S3 bucket "${bucket}". Set S3_REGION ` +
-            "(Helm: app.dataplane.providers.awsS3.region) to the bucket's region.",
-        );
+      ? new S3BucketNotFoundError(bucket)
+      : new S3RegionNotFoundError(bucket);
   };
 
   return async () => {
@@ -99,10 +119,16 @@ export function s3RegionFor({
   };
 }
 
-/** AWS_REGION or the profile's region, as the SDK reads them; undefined when neither names one. */
+/**
+ * AWS_REGION or the profile's region, as the SDK reads them; undefined when neither names one.
+ * Never the EC2 host's own region from instance metadata: the bucket may live elsewhere.
+ */
 async function configuredRegion(): Promise<string | undefined> {
   try {
-    const region = await loadConfig(NODE_REGION_CONFIG_OPTIONS, NODE_REGION_CONFIG_FILE_OPTIONS)();
+    const region = await loadConfig(
+      { ...NODE_REGION_CONFIG_OPTIONS, default: () => undefined },
+      NODE_REGION_CONFIG_FILE_OPTIONS,
+    )();
     return region?.trim() || undefined;
   } catch {
     return undefined;
