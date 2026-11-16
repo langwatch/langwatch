@@ -168,6 +168,7 @@ export const mockGetUsage = vi.fn(
       | {
           seatLimitInfo: MockSeatLimitInfo;
           membersCount: number;
+          membersDeveloperCount?: number;
           currentMonthMessagesCount?: number | null;
           messageLimitInfo?: MockMessageLimitInfo;
           usageUnit?: "traces" | "events";
