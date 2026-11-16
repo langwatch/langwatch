@@ -350,6 +350,26 @@ describe("given analytics' and the trace filter's shapes sent as a reader on Cli
     });
   });
 
+  describe("when array aggregates carry a condition over a seeded array column", () => {
+    /** @scenario "Analytics' and the trace filter's shapes return main's rows on 26.8" */
+    it("aggregates only the arrays of rows the condition holds for", async () => {
+      const built = clickhouseRead({ scope: single })
+        .from(spans)
+        .select(({ eq }) => ({
+          total: fn.sumArrayIf(spans.Durations, eq(spans.SpanName, "llm")),
+          mean: fn.avgArrayIf(spans.Durations, eq(spans.SpanName, "llm")),
+          low: fn.minArrayIf(spans.Durations, eq(spans.SpanName, "llm")),
+          high: fn.maxArrayIf(spans.Durations, eq(spans.SpanName, "llm")),
+          distinct: fn.uniqArrayIf(spans.Durations, eq(spans.SpanName, "llm")),
+          p90: fn.quantileExactArrayIf(0.9, spans.Durations, eq(spans.SpanName, "llm")),
+          p99: fn.quantileTDigestArrayIf(0.99, spans.Durations, eq(spans.SpanName, "llm")),
+          toolTotal: fn.sumArrayIf(spans.Durations, eq(spans.SpanName, "tool")),
+        }))
+        .build();
+      expect(await scopedRows({ built })).toEqual(["62|15.5|5|40|4|40|40|2"]);
+    });
+  });
+
   describe("when a JSON array attribute is joined to its elements and their paths read", () => {
     /** @scenario "Analytics' and the trace filter's shapes return main's rows on 26.8" */
     it("returns main's ARRAY JOIN of Array(JSON) rows, a number id read as text", async () => {

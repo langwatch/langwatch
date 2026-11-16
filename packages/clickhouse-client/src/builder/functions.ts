@@ -143,6 +143,15 @@ const overArray =
       args: [of.node],
       binding: binding ?? elementBinding(of) ?? FLOAT64,
     });
+/** `<name>If(array, condition)`: the array aggregate over the rows the condition holds for. */
+const overArrayIf =
+  (name: string, binding?: Binding) =>
+  <V extends Num, T extends string, U extends string>(of: Arr<V, T>, when: Condition<U>) =>
+    call<V extends null ? number | null : number, T | U>({
+      name,
+      args: [of.node, when.node],
+      binding: binding ?? elementBinding(of) ?? FLOAT64,
+    });
 const jsonRead =
   <V>(name: string, binding: Binding) =>
   <T extends string, U extends string = never>(
@@ -235,6 +244,16 @@ const quantileOverArray =
     call<number, T>({
       name,
       args: [of.node],
+      binding: FLOAT64,
+      parameters: [constant({ value: level, min: 0, max: 1 })],
+    });
+
+const quantileOverArrayIf =
+  (name: string) =>
+  <T extends string, U extends string>(level: number, of: Arr<Num, T>, when: Condition<U>) =>
+    call<number, T | U>({
+      name,
+      args: [of.node, when.node],
       binding: FLOAT64,
       parameters: [constant({ value: level, min: 0, max: 1 })],
     });
@@ -417,6 +436,12 @@ export const fn = {
   maxArray: overArray("maxArray"),
   uniqArray: <T extends string>(of: Arr<unknown, T>) =>
     call<number, T>({ name: "uniqArray", args: [of.node], binding: UINT64 }),
+  sumArrayIf: overArrayIf("sumArrayIf", FLOAT64),
+  avgArrayIf: overArrayIf("avgArrayIf", FLOAT64),
+  minArrayIf: overArrayIf("minArrayIf"),
+  maxArrayIf: overArrayIf("maxArrayIf"),
+  uniqArrayIf: <T extends string, U extends string>(of: Arr<unknown, T>, when: Condition<U>) =>
+    call<number, T | U>({ name: "uniqArrayIf", args: [of.node, when.node], binding: UINT64 }),
   /** `sumMap(keys, values)`: per key, the sum of its values, as a `(keys, sums)` tuple. */
   sumMap: <K, T extends string, U extends string>(keys: Arr<K, T>, values: Arr<Num, U>) =>
     call<readonly [readonly K[], readonly number[]], T | U>({
@@ -442,6 +467,9 @@ export const fn = {
   /** `quantileExactArray(level)(values)`: the level over every element of every row's array. */
   quantileExactArray: quantileOverArray("quantileExactArray"),
   quantileTDigestArray: quantileOverArray("quantileTDigestArray"),
+  /** `quantileExactArrayIf(level)(values, condition)`: the level over matching rows' arrays. */
+  quantileExactArrayIf: quantileOverArrayIf("quantileExactArrayIf"),
+  quantileTDigestArrayIf: quantileOverArrayIf("quantileTDigestArrayIf"),
 
   // Dates and times
   toUnixTimestamp64Milli: numeric("toUnixTimestamp64Milli", INT64),

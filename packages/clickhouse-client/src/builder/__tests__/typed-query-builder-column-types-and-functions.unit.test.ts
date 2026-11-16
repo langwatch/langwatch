@@ -433,6 +433,38 @@ describe("the typed read builder, for column types, aggregate states, lambdas an
 
   describe("when a read calls the catalogue functions", () => {
     /** @scenario "The census functions render with every value bound" */
+    it("renders the array aggregates with a condition, the array first and the condition second", () => {
+      const built = clickhouseRead({ scope: single })
+        .from(runs)
+        .select(({ eq }) => ({
+          total: fn.sumArrayIf(runs["Evaluations.Score"], eq(runs.TraceId, "t")),
+          mean: fn.avgArrayIf(runs["Evaluations.Score"], eq(runs.TraceId, "t")),
+          low: fn.minArrayIf(runs["Evaluations.Score"], eq(runs.TraceId, "t")),
+          high: fn.maxArrayIf(runs["Evaluations.Score"], eq(runs.TraceId, "t")),
+          ids: fn.uniqArrayIf(runs["Messages.Id"], eq(runs.TraceId, "t")),
+          p50: fn.quantileExactArrayIf(0.5, runs["Evaluations.Score"], eq(runs.TraceId, "t")),
+          p99: fn.quantileTDigestArrayIf(0.99, runs["Evaluations.Score"], eq(runs.TraceId, "t")),
+        }))
+        .build();
+
+      expect(built.sql).toContain(
+        "sumArrayIf(`Evaluations.Score`, TraceId = {v0:String}) AS total, avgArrayIf(`Evaluations.Score`, TraceId = {v1:String}) AS mean, minArrayIf(`Evaluations.Score`, TraceId = {v2:String}) AS low, maxArrayIf(`Evaluations.Score`, TraceId = {v3:String}) AS high, uniqArrayIf(`Messages.Id`, TraceId = {v4:String}) AS ids, quantileExactArrayIf(0.5)(`Evaluations.Score`, TraceId = {v5:String}) AS p50, quantileTDigestArrayIf(0.99)(`Evaluations.Score`, TraceId = {v6:String}) AS p99",
+      );
+    });
+
+    it("refuses a quantile level outside 0 to 1 on the array-if forms", () => {
+      expect(
+        refusalOf(() =>
+          clickhouseRead({ scope: single })
+            .from(runs)
+            .select(({ eq }) => ({
+              p: fn.quantileExactArrayIf(1.5, runs["Evaluations.Score"], eq(runs.TraceId, "t")),
+            })),
+        ).kind,
+      ).toBe("bad-constant");
+    });
+
+    /** @scenario "The census functions render with every value bound" */
     it("binds JSON paths, patterns, formats, units and time zones as values", () => {
       const built = clickhouseRead({ scope: single })
         .from(runs)
