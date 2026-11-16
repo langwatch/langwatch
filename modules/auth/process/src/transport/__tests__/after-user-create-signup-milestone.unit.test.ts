@@ -14,22 +14,25 @@ import type {
 } from "@langwatch/identity-contract";
 import type * as observabilityModule from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
-import { createTestLogger } from "@langwatch/test-harness";
+import { createTestLogger, type TestLogLines } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
-const { hookErrors } = vi.hoisted(() => ({ hookErrors: vi.fn() }));
+const hooksLog = vi.hoisted(() => ({ lines: undefined as unknown as TestLogLines }));
 
 // Only the hooks' own logger is replaced, so a failure it logs can be read; the name is spelled
 // inline because a `vi.mock` factory is hoisted above any const it might reference.
 vi.mock("@langwatch/observability", async () => {
   const actual = await vi.importActual<typeof observabilityModule>("@langwatch/observability");
+  const { createTestLogger: createHooksLogger } = await import("@langwatch/test-harness");
+  const { logger: hooksLogger, lines } = createHooksLogger();
+  hooksLog.lines = lines;
   return {
     ...actual,
     createLogger: (name: string) =>
       name === "langwatch:better-auth:hooks"
-        ? { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: hookErrors }
+        ? hooksLogger
         : actual.createLogger(name),
   };
 });
@@ -153,9 +156,9 @@ function domainOrganizations(organization: SsoDomainOrganization | null): SsoDom
 /** user's created-fact door, noting each account it was asked to record. */
 function recordingUsers() {
   const recorded: string[] = [];
-  const users: Pick<UserApi, "recordCreated"> = {
+  const users = createApiFixture<Pick<UserApi, "recordCreated">>({
     recordCreated: async ({ id }) => void recorded.push(id),
-  };
+  });
   return { users, recorded };
 }
 
@@ -299,12 +302,12 @@ describe("afterUserCreate", () => {
     /** @scenario "A failure to record the new account does not block sign-in" */
     it("lets the sign-in through and logs an error naming the account id", async () => {
       const { announcements, facts } = composedAnnouncements();
-      const failing: Pick<UserApi, "recordCreated"> = {
+      const failing = createApiFixture<Pick<UserApi, "recordCreated">>({
         recordCreated: async () => {
           throw new Error("outbox unavailable");
         },
-      };
-      hookErrors.mockClear();
+      });
+      hooksLog.lines.length = 0;
 
       await expect(
         afterUserCreate({
@@ -313,10 +316,7 @@ describe("afterUserCreate", () => {
         }),
       ).resolves.toBeUndefined();
 
-      expect(hookErrors).toHaveBeenCalledWith(
-        expect.objectContaining({ userId: "user_5" }),
-        expect.stringContaining("created fact"),
-      );
+      expect(hooksLog.lines.findLine("error", "created fact")).toMatchObject({ userId: "user_5" });
       expectSignUpOf(await onlySignUpFact(facts), "user_5");
     });
   });

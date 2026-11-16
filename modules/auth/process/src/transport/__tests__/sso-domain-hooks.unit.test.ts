@@ -128,9 +128,9 @@ function signupRepo(
 /** user's created-fact door, noting each account it was asked to record. */
 function recordingUsers() {
   const recorded: string[] = [];
-  const users: Pick<UserApi, "recordCreated"> = {
+  const users = createApiFixture<Pick<UserApi, "recordCreated">>({
     recordCreated: async ({ id }) => void recorded.push(id),
-  };
+  });
   return { users, recorded };
 }
 
