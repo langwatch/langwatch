@@ -28,3 +28,10 @@ Feature: Python uv workspace
     When the member pyprojects are read
     Then none of them declares exclude-newer or constraint-dependencies
     And the root pyproject carries the security constraint pins
+
+  @unit
+  Scenario: A member's release bumps its version in the root lock
+    # The root uv.lock records each member's version. A release PR that bumps
+    # pyproject.toml but not the lock is relocked by CI and fails (#9175).
+    When the release configuration is read
+    Then every member's release also updates its own entry in the root uv.lock
