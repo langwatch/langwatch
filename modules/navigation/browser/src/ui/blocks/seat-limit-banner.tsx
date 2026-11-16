@@ -43,7 +43,7 @@ export function SeatLimitBanner({
       <Banner
         status="warning"
         placement="top"
-        title={message}
+        title={message || "Your organization has more members than your plan includes"}
         data-testid="seat-limit-banner"
         action={
           <>
