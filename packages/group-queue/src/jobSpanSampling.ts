@@ -4,7 +4,7 @@
  */
 import { randomBytes } from "node:crypto";
 
-import { nowInstant } from "@langwatch/time";
+import { nowEpochMs } from "@langwatch/time";
 import {
   type Attributes,
   type AttributeValue,
@@ -72,7 +72,7 @@ interface BufferedEvent {
  * in the stand-in's trace so logs written before the failure join it. Ignored once ended.
  */
 class DeferredJobSpan implements Span {
-  private readonly startTime = nowInstant().epochMilliseconds;
+  private readonly startTime = nowEpochMs();
   private readonly unsampledContext: SpanContext = {
     traceId: randomBytes(16).toString("hex"),
     spanId: randomBytes(8).toString("hex"),
@@ -131,7 +131,7 @@ class DeferredJobSpan implements Span {
     this.events.push({
       name,
       attributes: timed ? undefined : attributesOrTime,
-      time: (timed ? attributesOrTime : time) ?? nowInstant().epochMilliseconds,
+      time: (timed ? attributesOrTime : time) ?? nowEpochMs(),
     });
     return this;
   }
