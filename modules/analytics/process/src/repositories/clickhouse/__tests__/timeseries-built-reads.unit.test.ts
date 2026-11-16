@@ -398,6 +398,39 @@ describe("the standard trace_summaries read", () => {
   it("sums cost as main did, zero over no rows", () => {
     expect(statement).toContain("coalesce(sum(TotalCost), 0)");
   });
+
+  describe("when a series is filtered on spans or runs", () => {
+    const filtered = (filters: Record<string, unknown>) =>
+      ({ ...series("performance.total_cost", "sum"), filters }) as AnalyticsSeries;
+    const input: Pick<TimeseriesQueryInput, "series" | "timeScale"> = {
+      series: [filtered({ "spans.type": ["tool"] }), filtered({ "evaluations.passed": ["true"] })],
+      timeScale: 60,
+    };
+
+    it("is a standard read", () => {
+      expect(servesStandardTraceSummaries({ ...dates, ...input })).toBe(true);
+    });
+
+    it("narrows each series' -If by its own member-and-trace subquery, in both periods' span window", () => {
+      const own = inlined(read(traceSummariesTimeseriesRead, input));
+
+      expect(own).toContain(
+        `sumIf(TotalCost, ((tuple(TenantId, TraceId) IN (SELECT TenantId, TraceId FROM stored_spans WHERE (TenantId IN (["tenant-a"])) AND (StartTime >= `,
+      );
+      expect(own).toContain(
+        `sumIf(TotalCost, ((tuple(TenantId, TraceId) IN (SELECT TenantId, TraceId FROM evaluation_runs WHERE (TenantId IN (["tenant-a"])) AND (Passed IN ([1])))))), 0)`,
+      );
+    });
+
+    it("reads each subquery under the aggregate's members", () => {
+      const statement = read(traceSummariesTimeseriesRead, input, "aggregate");
+
+      expect(statement.settings.SQL_langwatch_tenant_ids.split(",").toSorted()).toEqual([
+        "member-b",
+        "tenant-a",
+      ]);
+    });
+  });
 });
 
 describe("the both-periods trace_summaries summary", () => {
@@ -813,12 +846,22 @@ describe("which queries the standard trace_summaries read serves", () => {
   const serves = (input: Partial<Omit<TimeseriesQueryInput, keyof typeof dates>>) =>
     servesStandardTraceSummaries({ ...dates, ...base, ...input });
 
-  it("serves trace-row metrics bucketed by date, filtered, negated or trace-scoped", () => {
+  it("serves trace-row metrics bucketed by date, filtered (a series too), negated or trace-scoped", () => {
     expect(serves({})).toBe(true);
     expect(
       serves({ filters: { "evaluations.passed": { ev: ["true"] } }, negateFilters: true }),
     ).toBe(true);
     expect(serves({ traceIds: ["t"] })).toBe(true);
+    expect(
+      serves({
+        series: [
+          {
+            ...series("performance.total_cost", "sum"),
+            filters: { "spans.type": ["llm"] },
+          } as AnalyticsSeries,
+        ],
+      }),
+    ).toBe(true);
   });
 
   it("serves the both-periods summary of trace-row metrics", () => {
@@ -838,16 +881,6 @@ describe("which queries the standard trace_summaries read serves", () => {
           {
             ...series("performance.total_cost", "sum"),
             pipeline: { field: "user_id", aggregation: "avg" },
-          } as AnalyticsSeries,
-        ],
-      }),
-    ).toBe(false);
-    expect(
-      serves({
-        series: [
-          {
-            ...series("performance.total_cost", "sum"),
-            filters: { "spans.type": ["llm"] },
           } as AnalyticsSeries,
         ],
       }),

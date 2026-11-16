@@ -24,10 +24,6 @@ import {
 
 import type { TimeseriesQueryInput } from "./clickhouse.aggregation-builder.mapper.ts";
 import {
-  type AnalyticsFilterInput,
-  filterTranslations,
-} from "./clickhouse.filter-conditions.mapper.ts";
-import {
   type MetricSource,
   type MetricSpec,
   pipelineMetricSpecFor,
@@ -50,6 +46,8 @@ import {
   GROUP_BYS,
   groupKeyFor,
   seriesAlias,
+  hasSeriesFilter,
+  type SeriesOps,
   seriesConditions,
   specOf,
 } from "./clickhouse.trace-summaries-timeseries-query.mapper.ts";
@@ -99,8 +97,6 @@ export function servesPipelines(input: TimeseriesQueryInput): boolean {
   for (const [index, series] of input.series.entries()) {
     const spec = pipelineSpecOf(series, index);
     if (spec.joins.length > 0 || spec.form !== "scalar") return false;
-    const filters = (series.filters ?? {}) as AnalyticsFilterInput;
-    if (filterTranslations({ filters, ts }).some((each) => each.kind !== "row")) return false;
     if (spec.outer) reaggregated = true;
   }
   return reaggregated;
@@ -147,8 +143,9 @@ function traceScan({
   start = clickhouseRead({ scope: parts.scope }),
 }: {
   parts: Parts;
-  own: Condition<Summaries>[];
-  selection: Row;
+  /** The series whose own filter narrows the scan; none for the shared trace-row arm. */
+  own: AnalyticsSeries | undefined;
+  selection: Row | ((ops: SeriesOps<Summaries, Record<never, never>>) => Row);
   start?: ClickHouseReadStart<ProofScope>;
 }) {
   const { input, bucketing } = parts;
@@ -156,14 +153,28 @@ function traceScan({
   return start
     .from(ts)
     .withinWindows()
-    .select(selection as Record<string, Measure<Summaries>>)
+    .select(
+      (ops) =>
+        (typeof selection === "function" ? selection(ops) : selection) as Record<
+          string,
+          Measure<Summaries>
+        >,
+    )
     .where(() => {
       if (bucketing.kind === "dated") return inEitherPeriod(ts.OccurredAt, input);
       return bucketing.period === "current"
         ? currentPeriod(ts.OccurredAt, input)
         : previousPeriod(ts.OccurredAt, input);
     })
-    .where((ops) => allOf([filters(ops), ...restrictions, ...own]), { inElection: false })
+    .where(
+      (ops) =>
+        allOf([
+          filters(ops),
+          ...restrictions,
+          ...(own ? seriesConditions({ series: own, input, ops }) : []),
+        ]),
+      { inElection: false },
+    )
     .latestVersion();
 }
 
@@ -186,7 +197,7 @@ function threadDurations({
 }: {
   parts: Parts;
   spec: MetricSpec;
-  own: Condition<Summaries>[];
+  own: AnalyticsSeries;
   tag: string;
 }) {
   const outer = spec.outer as Extract<MetricSpec["outer"], { kind: "thread-duration" }>;
@@ -235,7 +246,7 @@ function threadDurations({
  */
 function reaggregated(parts: Parts, series: AnalyticsSeries, index: number): Reaggregated {
   const spec = pipelineSpecOf(series, index);
-  const own = seriesConditions(series);
+  const own = series;
   const tag = `${index}_${parts.bucketing.kind === "period" ? parts.bucketing.period : "dated"}`;
   if (spec.outer?.kind !== "per-entity") return threadDurations({ parts, spec, own, tag });
   const buckets = bucketsOf(parts);
@@ -290,24 +301,22 @@ function simpleArm(context: ArmContext, simple: number[]): Arm {
   const { parts, aliases, specs, keepsKey } = context;
   return (start) => {
     const buckets = bucketsOf(parts);
-    const measures = Object.fromEntries(
-      simple.map((index) => {
-        const series = parts.input.series[index]!;
-        const conditions = seriesConditions(series);
-        const measure = shapeSeries({
-          series,
-          when: conditions.length > 0 ? allOf(conditions) : undefined,
-          render: (when) => renderMetric({ spec: specs[index]!, source: SOURCE, when }),
-        });
-        return [aliases[index]!, measure];
-      }),
-    );
-    const selection = {
-      ...periodColumns(parts),
-      ...buckets,
-      ...valuesWith(context, measures, true),
+    const selection = (ops: SeriesOps<Summaries, Record<never, never>>): Row => {
+      const measures = Object.fromEntries(
+        simple.map((index) => {
+          const series = parts.input.series[index]!;
+          const conditions = seriesConditions({ series, input: parts.input, ops });
+          const measure = shapeSeries({
+            series,
+            when: conditions.length > 0 ? allOf(conditions) : undefined,
+            render: (when) => renderMetric({ spec: specs[index]!, source: SOURCE, when }),
+          });
+          return [aliases[index]!, measure];
+        }),
+      );
+      return { ...periodColumns(parts), ...buckets, ...valuesWith(context, measures, true) };
     };
-    const scan = traceScan({ parts, own: [], selection, start });
+    const scan = traceScan({ parts, own: undefined, selection, start });
     if (parts.bucketing.kind === "period") return scan;
     const grouped = scan.groupBy(...(Object.values(buckets) as Measure<Summaries>[]));
     return keepsKey
@@ -320,7 +329,7 @@ function simpleArm(context: ArmContext, simple: number[]): Arm {
 function reaggregatedArm(context: ArmContext, index: number, anchored: boolean): Arm {
   const { parts, aliases, keepsKey } = context;
   const series = parts.input.series[index]!;
-  if (series.asPercent && seriesConditions(series).length > 0) {
+  if (series.asPercent && hasSeriesFilter(series)) {
     throw new SeriesPercentageUnsupportedError();
   }
   return (start) => {

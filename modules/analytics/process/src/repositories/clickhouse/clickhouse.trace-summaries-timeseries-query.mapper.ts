@@ -22,6 +22,7 @@ import {
   type AnalyticsFilterInput,
   analyticsFilterCondition,
   filterTranslations,
+  type SpanWindow,
 } from "./clickhouse.filter-conditions.mapper.ts";
 import {
   type MetricSource,
@@ -91,23 +92,47 @@ export function specOf(series: AnalyticsSeries, index: number): MetricSpec {
   });
 }
 
-/** A series' own filters as row conditions (none when it has none); side tables refuse. */
-export function seriesConditions(series: AnalyticsSeries): Condition<Summaries>[] {
-  const translations = filterTranslations({
-    filters: (series.filters ?? {}) as AnalyticsFilterInput,
-    ts,
-  });
-  return translations.map((translation) => {
-    if (translation.kind !== "row") {
-      throw new Error("A series filter on a side table is not a standard trace_summaries read.");
-    }
-    return translation.condition as Condition<Summaries>;
-  });
+/** The span scan's bounds for a side-table filter: both periods, as main's subqueries pruned. */
+export function spanWindowOf(input: TimeseriesQueryInput): SpanWindow {
+  return { startMs: input.previousPeriodStartDate.getTime(), endMs: input.endDate.getTime() };
+}
+
+/** What a read's clause operations look like to a series filter: a side table is a subquery. */
+export type SeriesOps<Tables extends string, Ctes extends Record<string, unknown>> = ReadOps<
+  ProofScope,
+  Tables | Summaries,
+  Ctes
+>;
+
+/**
+ * A series' own filters as conditions (none when it has none). A side-table filter is main's
+ * `(TenantId, TraceId) IN (...)`, a subquery in the proof's windows, inside the series' `-If`.
+ */
+export function seriesConditions<Tables extends string, Ctes extends Record<string, unknown>>({
+  series,
+  input,
+  ops,
+}: {
+  series: AnalyticsSeries;
+  input: TimeseriesQueryInput;
+  ops: SeriesOps<Tables, Ctes>;
+}): Condition<Summaries>[] {
+  if (!hasSeriesFilter(series)) return [];
+  const filters = (series.filters ?? {}) as AnalyticsFilterInput;
+  const condition = analyticsFilterCondition({ filters, ts, spanWindow: spanWindowOf(input) });
+  // Every term reads the summaries alias or a subquery of its own.
+  return [condition(ops) as Condition<Summaries>];
+}
+
+/** Whether a series has a filter of its own (an entry the composer keeps empty does not count). */
+export function hasSeriesFilter(series: AnalyticsSeries): boolean {
+  const filters = (series.filters ?? {}) as AnalyticsFilterInput;
+  return filterTranslations({ filters, ts }).length > 0;
 }
 
 /**
  * Whether the standard shape serves this query, as main's buildTimeseriesQuery routed it: no
- * pipeline, every metric and series filter on the trace row alone.
+ * pipeline, every metric on the trace row alone.
  */
 export function servesStandardTraceSummaries(input: TimeseriesQueryInput): boolean {
   if (typeof input.timeScale !== "number" && input.timeScale !== "full") return false;
@@ -115,16 +140,24 @@ export function servesStandardTraceSummaries(input: TimeseriesQueryInput): boole
   return input.series.every((series, index) => {
     if (series.pipeline) return false;
     const spec = specOf(series, index);
-    if (spec.joins.length > 0 || spec.outer || spec.form !== "scalar") return false;
-    const filters = (series.filters ?? {}) as AnalyticsFilterInput;
-    return filterTranslations({ filters, ts }).every((translation) => translation.kind === "row");
+    return spec.joins.length === 0 && !spec.outer && spec.form === "scalar";
   });
 }
 
 /** A series' measure on the elected trace row, under its own filter and percentage mode. */
-function seriesMeasure(series: AnalyticsSeries, index: number): Measure<Summaries> {
+function seriesMeasure<Tables extends string, Ctes extends Record<string, unknown>>({
+  series,
+  index,
+  input,
+  ops,
+}: {
+  series: AnalyticsSeries;
+  index: number;
+  input: TimeseriesQueryInput;
+  ops: SeriesOps<Tables, Ctes>;
+}): Measure<Summaries> {
   const spec = specOf(series, index);
-  const conditions = seriesConditions(series);
+  const conditions = seriesConditions({ series, input, ops });
   return shapeSeries({
     series,
     when: conditions.length > 0 ? allOf(conditions) : undefined,
@@ -155,10 +188,13 @@ function restrictionsOf(input: TimeseriesQueryInput): Condition<Summaries>[] {
 }
 
 /** Each series' alias and measure, in the order the dashboard asked them. */
-function seriesSelection(input: TimeseriesQueryInput): [string, Measure<Summaries>][] {
+function seriesSelection<Tables extends string, Ctes extends Record<string, unknown>>(
+  input: TimeseriesQueryInput,
+  ops: SeriesOps<Tables, Ctes>,
+): [string, Measure<Summaries>][] {
   return input.series.map((series, index) => [
     seriesAlias(series, index),
-    seriesMeasure(series, index),
+    seriesMeasure({ series, index, input, ops }),
   ]);
 }
 
@@ -184,10 +220,7 @@ export function filtersOf(input: TimeseriesQueryInput): {
   const filters = analyticsFilterCondition({
     filters: (input.filters ?? {}) as AnalyticsFilterInput,
     ts,
-    spanWindow: {
-      startMs: input.previousPeriodStartDate.getTime(),
-      endMs: input.endDate.getTime(),
-    },
+    spanWindow: spanWindowOf(input),
     negated: input.negateFilters === true,
   });
   return { filters, restrictions };
@@ -198,15 +231,23 @@ export function filtersOf(input: TimeseriesQueryInput): {
  * aggregate row per period even when the period is empty, additive series coalesced to 0.
  */
 function summaryRead({ scope, input, settings }: TimeseriesRead): ReaderReadStatement {
-  const measures = seriesSelection(input).map(([alias, measure], index): [string, Measure] => [
-    alias,
-    isZeroWhenAbsentSeries(input.series[index]!) ? fn.coalesce(measure, param.uint32(0)) : measure,
-  ]);
+  const aliases = input.series.map(seriesAlias);
   const { filters, restrictions } = filtersOf(input);
-  const selectionOf = (period: "current" | "previous"): Record<string, Measure<Summaries>> => ({
-    period: param.string(period),
-    ...Object.fromEntries(measures),
-  });
+  const selectionOf =
+    (period: "current" | "previous") =>
+    <Ctes extends Record<string, unknown>>(
+      ops: SeriesOps<Summaries, Ctes>,
+    ): Record<string, Measure<Summaries>> => ({
+      period: param.string(period),
+      ...Object.fromEntries(
+        seriesSelection(input, ops).map(([alias, measure], index): [string, Measure<Summaries>] => [
+          alias,
+          isZeroWhenAbsentSeries(input.series[index]!)
+            ? fn.coalesce(measure, param.uint32(0))
+            : measure,
+        ]),
+      ),
+    });
   const arm = (start: ClickHouseReadStart<ProofScope>, period: "current" | "previous") =>
     start
       .from(ts)
@@ -222,7 +263,7 @@ function summaryRead({ scope, input, settings }: TimeseriesRead): ReaderReadStat
   const periods = arm(clickhouseRead({ scope }), "current")
     .unionAll((start) => arm(start, "previous"))
     .as("periods");
-  const keys = ["period", ...measures.map(([alias]) => alias)];
+  const keys = ["period", ...aliases];
   return clickhouseRead({ scope })
     .from(periods)
     .select(Object.fromEntries(keys.map((key) => [key, periods[key]!])))
@@ -246,14 +287,13 @@ export function traceSummariesTimeseriesRead({
   const grouping = input.groupBy ? GROUP_BYS[input.groupBy] : undefined;
   const groupKey = grouping ? groupKeyFor(grouping) : undefined;
   if (groupKey) selection.group_key = groupKey;
-  for (const [alias, measure] of seriesSelection(input)) selection[alias] = measure;
 
   const { filters, restrictions } = filtersOf(input);
   const keys = [selection.period!, ...(date ? [date] : []), ...(groupKey ? [groupKey] : [])];
   const grouped = clickhouseRead({ scope })
     .from(ts)
     .withinWindows()
-    .select(selection)
+    .select((ops) => ({ ...selection, ...Object.fromEntries(seriesSelection(input, ops)) }))
     .where(() => inEitherPeriod(ts.OccurredAt, input))
     .where((ops) => allOf([filters(ops), ...restrictions]), { inElection: false })
     .latestVersion()

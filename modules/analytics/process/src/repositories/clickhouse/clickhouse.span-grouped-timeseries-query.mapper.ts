@@ -17,10 +17,6 @@ import {
 } from "@langwatch/clickhouse-client/builder";
 
 import type { TimeseriesQueryInput } from "./clickhouse.aggregation-builder.mapper.ts";
-import {
-  type AnalyticsFilterInput,
-  filterTranslations,
-} from "./clickhouse.filter-conditions.mapper.ts";
 import { type JoinedSpans, spansOf } from "./clickhouse.joined-timeseries-query.mapper.ts";
 import type { MetricSource } from "./clickhouse.metric-spec.mapper.ts";
 import { carriedPerTrace, measuresOver } from "./clickhouse.mixed-eval-timeseries-query.mapper.ts";
@@ -143,7 +139,7 @@ const SPAN_GROUP_BYS: Record<string, SpanGrouping> = {
 /** Per trace already, so main read these pipelines as their inner metric. */
 const TRACE_ID_PIPELINES: ReadonlySet<string> = new Set(["sum", "avg", "min", "max"]);
 
-/** A series this shape reads: a trace-row metric, a row filter, no pipeline but a per-trace one. */
+/** A series this shape reads: a trace-row metric, no pipeline but a per-trace one. */
 function servesSeries(series: AnalyticsSeries, index: number): boolean {
   const { pipeline } = series;
   if (
@@ -153,9 +149,7 @@ function servesSeries(series: AnalyticsSeries, index: number): boolean {
     return false;
   }
   const spec = specOf(series, index);
-  if (spec.joins.length > 0 || spec.outer || spec.form !== "scalar") return false;
-  const filters = (series.filters ?? {}) as AnalyticsFilterInput;
-  return filterTranslations({ filters, ts }).every((each) => each.kind === "row");
+  return spec.joins.length === 0 && !spec.outer && spec.form === "scalar";
 }
 
 /**
@@ -208,7 +202,6 @@ function perTraceRead({
   }
   selection.group_key = groupKey;
   groupBy.push(groupKey);
-  Object.assign(selection, carriedPerTrace({ input, source }));
 
   const { filters, restrictions } = filtersOf(input);
   const base = clickhouseRead({ scope }).from(ts).withinWindows();
@@ -223,7 +216,13 @@ function perTraceRead({
       )
     : withSpans;
   return (withModels as typeof base)
-    .select(selection as Record<string, Measure<"trace_summaries">>)
+    .select(
+      (ops) =>
+        ({ ...selection, ...carriedPerTrace({ input, source, ops }) }) as Record<
+          string,
+          Measure<"trace_summaries">
+        >,
+    )
     .where(() => inEitherPeriod(ts.OccurredAt, input))
     .where((ops) => allOf([filters(ops), ...restrictions]), { inElection: false })
     .latestVersion()

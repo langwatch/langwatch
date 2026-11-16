@@ -1030,6 +1030,82 @@ export const PIPELINE_SHAPES: Shape[] = [
   }),
 ];
 
+const tool = { "spans.type": ["tool"] } as AnalyticsFilters;
+const failed = { "evaluations.passed": { ev: ["false"] } } as AnalyticsFilters;
+/** Series filtered on a side table: additive and not, as a count, and as a percentage. */
+const SIDE_FILTERED_SERIES: AnalyticsSeries[] = [
+  mixed("performance.total_cost", "sum", { filters: tool }),
+  mixed("performance.completion_time", "avg", { filters: failed }),
+  mixed("metadata.trace_id", "cardinality", { filters: tool, asPercent: true }),
+  mixed("performance.total_cost", "max", { filters: failed, asPercent: true }),
+  mixed("metadata.trace_id", "cardinality"),
+];
+const sideFiltered = (
+  name: string,
+  series: AnalyticsSeries[],
+  timeScale: number | "full",
+  extra: Partial<Shape> = {},
+): Shape => ({
+  name: `side-filtered ${name}`,
+  table: "trace_summaries",
+  series,
+  timeScale,
+  ...extra,
+});
+
+/** A series' own filter on spans or runs: main's `(TenantId, TraceId) IN (...)` in its `-If`. */
+export const SIDE_FILTER_SHAPES: Shape[] = [
+  sideFiltered("standard, hourly", SIDE_FILTERED_SERIES, 60),
+  sideFiltered("standard, both periods", SIDE_FILTERED_SERIES, "full"),
+  sideFiltered("standard by metadata.user_id, both periods", SIDE_FILTERED_SERIES, "full", {
+    groupBy: "metadata.user_id",
+  }),
+  sideFiltered("standard, filtered on evaluations.passed, negated", SIDE_FILTERED_SERIES, 60, {
+    filters: failed,
+    negateFilters: true,
+  }),
+  sideFiltered(
+    "joined spans, hourly",
+    [
+      graded("sum", { filters: tool }),
+      mixed("sentiment.thumbs_up_down", "sum", { filters: failed, asPercent: true }),
+      mixed("events.event_type", "cardinality", { filters: tool }),
+      mixed("performance.total_cost", "sum"),
+    ],
+    60,
+  ),
+  sideFiltered(
+    "mixed with runs, hourly",
+    [
+      mixed("performance.total_cost", "sum", { filters: tool }),
+      mixed("metadata.trace_id", "cardinality", { filters: failed, asPercent: true }),
+      mixed("evaluations.evaluation_score", "avg", { key: "ev", filters: tool }),
+      mixed("evaluations.evaluation_runs", "cardinality", { filters: tool, asPercent: true }),
+    ],
+    60,
+  ),
+  sideFiltered("span-grouped by metadata.span_type, hourly", SIDE_FILTERED_SERIES, 60, {
+    groupBy: "metadata.span_type",
+  }),
+  sideFiltered("span-grouped by metadata.model, both periods", SIDE_FILTERED_SERIES, "full", {
+    groupBy: "metadata.model",
+  }),
+  ...(["full", 60] as const).map((timeScale) =>
+    sideFiltered(
+      `pipelines, ${timeScale === "full" ? "both periods" : "hourly"}`,
+      [
+        mixed("performance.total_cost", "sum", {
+          pipeline: { field: "user_id", aggregation: "avg" },
+          filters: tool,
+        }),
+        mixed("threads.average_duration_per_thread", "avg", { filters: failed }),
+        mixed("performance.total_cost", "sum", { filters: failed }),
+      ],
+      timeScale,
+    ),
+  ),
+];
+
 export const SHAPES: Shape[] = [
   {
     name: "rollup, full",

@@ -19,10 +19,6 @@ import {
 
 import type { TimeseriesQueryInput } from "./clickhouse.aggregation-builder.mapper.ts";
 import {
-  type AnalyticsFilterInput,
-  filterTranslations,
-} from "./clickhouse.filter-conditions.mapper.ts";
-import {
   type MetricSource,
   type MetricSpec,
   renderMetric,
@@ -45,6 +41,7 @@ import {
   GROUP_BYS,
   groupKeyFor,
   seriesAlias,
+  type SeriesOps,
   seriesConditions,
   specOf,
 } from "./clickhouse.trace-summaries-timeseries-query.mapper.ts";
@@ -124,14 +121,12 @@ const isEvaluation = (spec: MetricSpec) => spec.joins.includes(EVALUATIONS);
 type JoinPlan = { kind: "refused" } | { kind: "joined"; tables: ReadonlySet<string> };
 const REFUSED: JoinPlan = { kind: "refused" };
 
-/** A series this shape reads: no pipeline, no outer grouping, a row filter, joins it knows. */
+/** A series this shape reads: no pipeline, no outer grouping, joins it knows. */
 function servesSeries(series: AnalyticsSeries, index: number): boolean {
   if (series.pipeline) return false;
   const spec = specOf(series, index);
   if (spec.outer) return false;
-  if (spec.joins.some((join) => join !== SPANS && join !== EVALUATIONS)) return false;
-  const filters = (series.filters ?? {}) as AnalyticsFilterInput;
-  return filterTranslations({ filters, ts }).every((each) => each.kind === "row");
+  return spec.joins.every((join) => join === SPANS || join === EVALUATIONS);
 }
 
 function planOf(input: TimeseriesQueryInput): JoinPlan {
@@ -234,11 +229,19 @@ function groupingOf(
   return { groupKey: groupKeyFor(grouping), keeps: grouping.handlesUnknown ? "all" : "non-empty" };
 }
 
-function seriesSelection(input: TimeseriesQueryInput, source: MetricSource<Joined>) {
+function seriesSelection<Tables extends string, Ctes extends Record<string, unknown>>({
+  input,
+  source,
+  ops,
+}: {
+  input: TimeseriesQueryInput;
+  source: MetricSource<Joined>;
+  ops: SeriesOps<Tables, Ctes>;
+}) {
   return Object.fromEntries(
     input.series.map((series, index): [string, Measure<Joined>] => {
       const spec = specOf(series, index);
-      const conditions = seriesConditions(series) as Condition<Joined>[];
+      const conditions = seriesConditions({ series, input, ops }) as Condition<Joined>[];
       return [
         seriesAlias(series, index),
         shapeSeries({
@@ -255,6 +258,7 @@ type Parts = {
   input: TimeseriesQueryInput;
   settings: TimeseriesRead["settings"];
   selection: Record<string, Measure>;
+  source: MetricSource<Joined>;
   keys: Measure[];
   groupKey: Measure | undefined;
   keeps: Keeps;
@@ -268,14 +272,20 @@ function finish<T extends string>(
     Record<never, never>,
     Record<never, never>
   >,
-  { input, settings, selection, keys, groupKey, keeps }: Parts,
+  { input, settings, selection, source, keys, groupKey, keeps }: Parts,
 ): ReaderReadStatement {
   type Read = T | "trace_summaries";
   // The parts read only the tables this read joined; the branch that built it chose them.
   const key = groupKey as Measure<Read> | undefined;
   const { filters, restrictions } = filtersOf(input);
   const grouped = read
-    .select(selection as Record<string, Measure<Read>>)
+    .select(
+      (ops) =>
+        ({ ...selection, ...seriesSelection({ input, source, ops }) }) as Record<
+          string,
+          Measure<Read>
+        >,
+    )
     .where(() => inEitherPeriod(ts.OccurredAt, input))
     .where((ops) => allOf([filters(ops), ...restrictions]), { inElection: false })
     .latestVersion()
@@ -310,9 +320,9 @@ export function joinedTimeseriesRead({
   if (date) selection.date = date;
   const { groupKey, keeps } = groupingOf(input, runs);
   if (groupKey) selection.group_key = groupKey;
-  Object.assign(selection, seriesSelection(input, sourceOf({ spans, runs })));
+  const source = sourceOf({ spans, runs });
   const keys = [selection.period!, ...(date ? [date] : []), ...(groupKey ? [groupKey] : [])];
-  const parts: Parts = { input, settings, selection, keys, groupKey, keeps };
+  const parts: Parts = { input, settings, selection, source, keys, groupKey, keeps };
 
   const base = clickhouseRead({ scope }).from(ts).withinWindows();
   if (spans && runs) {

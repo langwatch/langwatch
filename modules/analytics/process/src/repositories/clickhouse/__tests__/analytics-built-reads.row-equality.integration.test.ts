@@ -691,6 +691,65 @@ describe("timeseries reads built on the typed builder", () => {
     });
   });
 
+  /*
+   * A series filtered on spans or runs: main put `(TenantId, TraceId) IN (...)` in the series'
+   * `-If`; the built reads hold the same subquery under the proof's windows. Under the aggregate,
+   * the mixed read counts each member's trace (ruling 1a), as the mixed suite above does.
+   */
+  describe("given a series filtered on a side table", () => {
+    const [own, aggregate] = timeseries.PROOFS;
+
+    it.each(timeseries.SIDE_FILTER_SHAPES)(
+      "$name answers main's buckets under one tenant's proof",
+      async (shape) => {
+        const want =
+          expected.timeseries[`${literal(own!.projectId, timeseries.RUN)}|${shape.name}`];
+        const got = await builtTimeseries({
+          shape,
+          projectId: own!.projectId,
+          proof: own!.proof(),
+        });
+
+        expect(want).toBeDefined();
+        expect(toTwelveDigits(got)).toEqual(toTwelveDigits(want));
+      },
+    );
+
+    it.each(timeseries.SIDE_FILTER_SHAPES)(
+      "$name answers the expected buckets under an aggregate",
+      async (shape) => {
+        const key = `${literal(aggregate!.projectId, timeseries.RUN)}|${shape.name}`;
+        const want = expected.mixedPerMember[key] ?? expected.timeseries[key];
+        const got = await builtTimeseries({
+          shape,
+          projectId: aggregate!.projectId,
+          proof: aggregate!.proof(),
+        });
+
+        expect(want).toBeDefined();
+        expect(toTwelveDigits(got)).toEqual(toTwelveDigits(want));
+      },
+    );
+
+    it.each(timeseries.SIDE_FILTER_SHAPES)("$name is a built read", (shape) => {
+      const input = {
+        ...timeseriesInput(shape, timeseries.TENANT_A),
+        startDate: new Date(timeseries.START),
+        endDate: new Date(timeseries.END),
+        previousPeriodStartDate: new Date(timeseries.PREVIOUS_START),
+      };
+      const routes = [
+        servesStandardTraceSummaries,
+        servesMixedEval,
+        servesJoinedTraceSummaries,
+        servesSpanGrouped,
+        servesPipelines,
+      ];
+
+      expect(routes.some((serves) => serves(input))).toBe(true);
+    });
+  });
+
   describe("given the aggregate reads B inside its window", () => {
     it("counts B's cost where tenant A's own proof does not", async () => {
       const [own, aggregate] = timeseries.PROOFS;

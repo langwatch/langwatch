@@ -19,10 +19,6 @@ import {
 import type { TimeseriesQueryInput } from "./clickhouse.aggregation-builder.mapper.ts";
 import { evaluationRuns as er } from "./clickhouse.evaluation-runs.table.ts";
 import {
-  type AnalyticsFilterInput,
-  filterTranslations,
-} from "./clickhouse.filter-conditions.mapper.ts";
-import {
   type MetricAggregate,
   type MetricOperand,
   type MetricPredicate,
@@ -46,6 +42,7 @@ import {
   GROUP_BYS,
   groupKeyFor,
   seriesAlias,
+  type SeriesOps,
   seriesConditions,
   specOf,
 } from "./clickhouse.trace-summaries-timeseries-query.mapper.ts";
@@ -72,8 +69,6 @@ export function servesMixedEval(input: TimeseriesQueryInput): boolean {
     const spec = specOf(series, index);
     if (spec.outer || spec.form !== "scalar") return false;
     if (spec.joins.some((join) => join !== EVALUATIONS)) return false;
-    const filters = (series.filters ?? {}) as AnalyticsFilterInput;
-    if (filterTranslations({ filters, ts }).some((each) => each.kind !== "row")) return false;
     specs.push(spec);
   }
   return specs.some(isEvaluation) && !specs.every(isEvaluation);
@@ -110,12 +105,18 @@ export function runsOf(scope: ProofScope, input: TimeseriesQueryInput): JoinedRu
 type PerTraceKeys = { period: boolean; date: boolean; groupKey: boolean };
 
 /** Per trace: each run metric over its runs, each trace operand, condition and series filter. */
-export function carriedPerTrace<T extends string>({
+export function carriedPerTrace<
+  T extends string,
+  Tables extends string,
+  Ctes extends Record<string, unknown>,
+>({
   input,
   source,
+  ops,
 }: {
   input: TimeseriesQueryInput;
   source: MetricSource<T>;
+  ops: SeriesOps<Tables, Ctes>;
 }): Record<string, Measure<T>> {
   const carried: Record<string, Measure<T>> = {};
   for (const [index, series] of input.series.entries()) {
@@ -125,7 +126,7 @@ export function carriedPerTrace<T extends string>({
     if (isEvaluation(spec)) carried[`m${index}`] = renderMetric({ spec, source });
     else if (operand) carried[`v${index}`] = fn.any(operand);
     if (!isEvaluation(spec) && condition) carried[`c${index}`] = fn.any(condition);
-    const conditions = seriesConditions(series);
+    const conditions = seriesConditions({ series, input, ops });
     if (conditions.length > 0) carried[`f${index}`] = fn.any(allOf(conditions)) as Measure<T>;
   }
   return carried;
@@ -173,8 +174,6 @@ function perTraceRead({
   const grouping = input.groupBy ? GROUP_BYS[input.groupBy] : undefined;
   if (keys.groupKey && grouping) keep("group_key", groupKeyFor(grouping));
 
-  Object.assign(selection, carriedPerTrace({ input, source }));
-
   const { filters, restrictions } = filtersOf(input);
   return clickhouseRead({ scope })
     .from(ts)
@@ -182,7 +181,7 @@ function perTraceRead({
     .innerJoin(runs, ({ and, eq }) =>
       and(eq(runs.TenantId, ts.TenantId), eq(runs.TraceId, ts.TraceId)),
     )
-    .select(selection)
+    .select((ops) => ({ ...selection, ...carriedPerTrace({ input, source, ops }) }))
     .where(() => inPeriod)
     .where((ops) => allOf([filters(ops), ...restrictions]), { inElection: false })
     .latestVersion()
