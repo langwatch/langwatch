@@ -38,11 +38,11 @@ const SCALED_JOIN_BYTES = "30000000";
 
 /**
  * Model-grouped chart: its span-model join stacks three aggregations, and merging spilled parts
- * costs memory per part. At 100 MB spill (production: 500 MB) it peaks at 145-193 MiB across
+ * costs memory per part. At 100 MB spill (production: 500 MB) it peaks at 145-242 MiB across
  * runs against ~520 MiB unspilled, so this cap still fails a query that stops spilling.
  */
 const MODEL_GROUPED_SETTINGS = {
-  max_memory_usage: "250000000",
+  max_memory_usage: "300000000",
   max_bytes_before_external_group_by: "100000000",
 } as const;
 
