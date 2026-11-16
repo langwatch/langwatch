@@ -71,7 +71,7 @@ export class ModelProviderCommandService {
     this.assertValidSkipPermissionsPatterns(parsed.langySkipPermissionsModels);
     const existing = await this.getExistingProvider(parsed);
     const scopes = this.scopesForWrite(parsed, existing);
-    await this.authorizeWrite(parsed.actorId, existing?.scopes, scopes);
+    await this.authorizeWrite(parsed, existing?.scopes, scopes);
     const organizationId = await this.resolveOrganizationId(parsed, existing, scopes);
     const provider = await this.providerValue({
       parsed,
@@ -256,19 +256,7 @@ export class ModelProviderCommandService {
   }
 
   private async getExistingProvider(input: ModelProviderWriteInput): Promise<ModelProvider | null> {
-    const projectScopes = input.projectId
-      ? await this.options.scopes.getProjectScopes(input.projectId).catch((error: unknown) => {
-          if (HandledError.isHandled(error) && error.code === "project_not_found") return undefined;
-          throw error;
-        })
-      : undefined;
-    const existing = input.id
-      ? await this.options.repository.getById({
-          id: input.id,
-          organizationId: input.organizationId,
-          ...(projectScopes ? { projectScopes } : {}),
-        })
-      : null;
+    const existing = input.id ? await this.getProviderById({ ...input, id: input.id }) : null;
     // A row id names that row only for its own provider; never rewrite one provider into another.
     if (existing && existing.provider !== input.provider) throw new ModelProviderNotFoundError();
 
@@ -285,6 +273,53 @@ export class ModelProviderCommandService {
     return existing;
   }
 
+  private getProviderById(input: ModelProviderWriteInput & { id: string }): Promise<ModelProvider> {
+    return input.actorId
+      ? this.getOrganizationProvider(input)
+      : this.getProjectReachableProvider(input);
+  }
+
+  /**
+   * The settings list shows every provider of the organization, whichever project the page is
+   * on, so an attributed save finds the row by id within the organization, as delete does.
+   * `authorizeWrite` then asks write on the scopes the row already lives in.
+   */
+  private async getOrganizationProvider(
+    input: ModelProviderWriteInput & { id: string },
+  ): Promise<ModelProvider> {
+    const organizationId = await this.options.scopes
+      .getAnchorOrganizationId({ projectId: input.projectId, organizationId: input.organizationId })
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "project_not_found")
+          throw new ModelProviderNotFoundError();
+        throw error;
+      });
+    const existing = await this.options.repository.getById({ id: input.id, organizationId });
+    // A row attached nowhere has no scopes to authorize against, so it is no one's to save.
+    if (existing.scopes.length === 0) throw new ModelProviderNotFoundError();
+
+    return existing;
+  }
+
+  /** An unattributed write is authorized by its credential's project, so it reaches no further. */
+  private async getProjectReachableProvider(
+    input: ModelProviderWriteInput & { id: string },
+  ): Promise<ModelProvider> {
+    const projectScopes = input.projectId
+      ? await this.options.scopes.getProjectScopes(input.projectId).catch((error: unknown) => {
+          if (HandledError.isHandled(error) && error.code === "project_not_found") return undefined;
+          throw error;
+        })
+      : undefined;
+
+    return this.options.repository.getById({
+      id: input.id,
+      organizationId: input.organizationId,
+      ...(projectScopes ? { projectScopes } : {}),
+    });
+  }
+
+  /** A save naming no scopes never moves a stored row; the page project only seeds a new row. */
   private scopesForWrite(
     input: ModelProviderWriteInput,
     existing: ModelProvider | null,
@@ -293,29 +328,35 @@ export class ModelProviderCommandService {
       return input.scopes;
     }
 
-    if (input.projectId) {
-      return [{ scopeType: "PROJECT", scopeId: input.projectId }];
-    }
-
     if (existing) {
       return existing.scopes;
+    }
+
+    if (input.projectId) {
+      return [{ scopeType: "PROJECT", scopeId: input.projectId }];
     }
 
     throw new ModelProviderScopesRequiredError();
   }
 
+  /** The page project's default is written too when one is sent, so its scope is asked as well. */
   private async authorizeWrite(
-    actorId: string | undefined,
+    input: ModelProviderWriteInput,
     oldScopes: ModelDefaultScope[] | undefined,
     scopes: ModelDefaultScope[],
   ): Promise<void> {
-    if (!actorId) {
+    if (!input.actorId) {
       return;
     }
 
-    await this.options.writeAuthorization.assertCanWrite(actorId, [
+    const defaultScope: ModelDefaultScope[] =
+      input.defaultModel !== undefined && input.projectId
+        ? [{ scopeType: "PROJECT", scopeId: input.projectId }]
+        : [];
+    await this.options.writeAuthorization.assertCanWrite(input.actorId, [
       ...(oldScopes ?? []),
       ...scopes,
+      ...defaultScope,
     ]);
   }
 
