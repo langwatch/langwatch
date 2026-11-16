@@ -84,8 +84,9 @@ export class LangWatchQLViewDedupService {
 
     // The floor column never falls between versions, so every row at or after the bound has its
     // latest version there too (analytics ADR-005).
-    const { floorColumn } = view.dedup;
-    if (floor === undefined || floorColumn === undefined) {
+    const innerFloor = this.floorCondition({ view, floor });
+    const outerFloor = this.floorCondition({ view, floor, column: sourceColumn });
+    if (innerFloor === undefined || outerFloor === undefined) {
       return (
         `WHERE (${[...outerKeys, sourceColumn(versionColumn)].join(", ")}) IN (\n` +
         `    SELECT ${innerKeys.join(", ")}, max(${version})\n` +
@@ -96,16 +97,33 @@ export class LangWatchQLViewDedupService {
     }
     // The twin keeps only its window's versions, keyed by a 128-bit hash of the grain so the set
     // holds 16 bytes a row (analytics ADR-005).
-    const column = catalogShapes.physicalColumn(view, floorColumn);
     return (
       `WHERE (sipHash128(${outerKeys.join(", ")}), ${sourceColumn(versionColumn)}) IN (\n` +
       `    SELECT sipHash128(${innerKeys.join(", ")}) AS ${FLOOR_GRAIN_KEY}, max(${version})\n` +
       `    FROM ${relation}\n` +
-      `    WHERE ${sqlText.quotedColumn(column)} >= ${floor}\n` +
+      `    WHERE ${innerFloor}\n` +
       `    GROUP BY ${FLOOR_GRAIN_KEY}\n` +
       `  )\n` +
-      `  AND ${sourceColumn(column)} >= ${floor}`
+      `  AND ${outerFloor}`
     );
+  }
+
+  /**
+   * A floored twin's bound on the view's floor column, or undefined when the view reads every
+   * version. `column` renders the physical column: bare inside a subquery, qualified outside it.
+   */
+  private floorCondition({
+    view,
+    floor,
+    column = (name) => sqlText.quotedColumn(name),
+  }: {
+    view: LangWatchQLViewDefinition;
+    floor?: string;
+    column?: (name: string) => string;
+  }): string | undefined {
+    const { floorColumn } = view.dedup;
+    if (floor === undefined || floorColumn === undefined) return undefined;
+    return `${column(catalogShapes.physicalColumn(view, floorColumn))} >= ${floor}`;
   }
 
   /**
@@ -145,11 +163,8 @@ export class LangWatchQLViewDedupService {
     const newestFirst = [versionColumn, ...tieBreakColumns].map(
       (column) => `${sqlText.quotedColumn(column)} DESC`,
     );
-    const { floorColumn } = view.dedup;
-    const where =
-      floor === undefined || floorColumn === undefined
-        ? ""
-        : `  WHERE ${sqlText.quotedColumn(catalogShapes.physicalColumn(view, floorColumn))} >= ${floor}\n`;
+    const floorCondition = this.floorCondition({ view, floor });
+    const where = floorCondition === undefined ? "" : `  WHERE ${floorCondition}\n`;
     return (
       `(\n  SELECT ${columns.join(", ")}\n` +
       `  FROM ${relation}\n` +
@@ -176,12 +191,9 @@ export class LangWatchQLViewDedupService {
     floor?: string;
   }): string {
     const signColumn = this.settledSign(view);
-    const { floorColumn } = view.dedup;
     const columns = this.settledColumns(view).map((column) => sqlText.quotedColumn(column));
-    const where =
-      floor === undefined || floorColumn === undefined
-        ? ""
-        : `\n  WHERE ${sqlText.quotedColumn(catalogShapes.physicalColumn(view, floorColumn))} >= ${floor}`;
+    const floorCondition = this.floorCondition({ view, floor });
+    const where = floorCondition === undefined ? "" : `\n  WHERE ${floorCondition}`;
     return (
       `(\n  SELECT ${[...columns, sqlText.quotedColumn(signColumn)].join(", ")}\n` +
       `  FROM ${relation}${where}\n` +

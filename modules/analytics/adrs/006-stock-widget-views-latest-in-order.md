@@ -26,8 +26,9 @@ new MATERIALIZED column.
    table through a subquery
    `ORDER BY <full sort key, stableColumns>, <version> DESC, <tieBreakColumns> DESC LIMIT 1 BY <full sort key, stableColumns>`:
    whole rows, newest version first, one per key. The order matches the table's, so `optimize_read_in_order` merges the parts
-   as a stream with no hash state. A filter on a key column reaches the primary key and
-   partitions. An earlier form, `GROUP BY` the key with `argMax` per column under
+   as a stream with no hash state. A caller's filter on a key column does not reach the primary
+   key or the partitions through `LIMIT 1 BY`; only a floored twin's bound, read inside the
+   subquery, prunes (amended 2026-11-16). An earlier form, `GROUP BY` the key with `argMax` per column under
    `optimize_aggregation_in_order`, measured far worse (below) and was replaced; the profile pins
    no `optimize_aggregation_in_order`, so it stays the server default. Eight views pin the strategy:
    `trace_metrics`, `traces`, `evaluations`, `simulations`, `experiment_run_results`, `experiment_items`,
@@ -83,9 +84,10 @@ new MATERIALIZED column.
   an insert retried after it landed, or the replay of decision 6 reaching a span the live writer
   already wrote. A span re-sent with a different start time is two rows, where `FINAL` on
   `stored_spans` keeps one.
-- **Time pruning.** `trace_metrics` and `span_metrics` prune by time through a key column. The
-  other seven have no time column in their key, so a time filter applies after the dedup: their
-  cost grows with the project's history, not the period. Measured below (for the argMax form).
+- **Time pruning.** `span_metrics`, which takes no dedup, prunes by time through the caller's
+  filter. On the eight `latest-in-order` views a time filter applies after the dedup: their cost
+  grows with the project's history, not the period. `trace_metrics` and `evaluations` prune only
+  through their floored twins' bound (amended 2026-11-16). Measured below (for the argMax form).
 - **Rollout and rollback.** A row an old writer writes during the rollout, or after a rollback,
   holds '' in the three 00128 columns and has no `span_analytics` row until a replay reaches it.
   `span_metrics` is empty before its replay runs, and holds nothing older than the floor.
