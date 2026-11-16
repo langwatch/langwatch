@@ -277,6 +277,32 @@ describe("given a claimed job", () => {
     });
   });
 
+  describe("when a job staged with its staging time fails retryably", () => {
+    /** @scenario "a retried job keeps the time it was first staged" */
+    it("re-encodes the retry with the time it was first staged", async () => {
+      const stagedAtMs = 1_763_283_600_000;
+      const header = JSON.stringify({ v: 2, e: "j", a: stagedAtMs, m: { __attempt: 1 } });
+      const body = JSON.stringify({ id: "job-1", groupId: GROUP });
+      const { processor, calls } = recordingProcessor({
+        decode: async () => JSON.parse(body),
+        process: async () => {
+          throw new Error("handler failed");
+        },
+      });
+
+      await processor["processClaimedJob"]({
+        stagedJobId: "job-1",
+        groupId: GROUP,
+        jobDataJson: `GQ2|${Buffer.byteLength(header)}|${header}${body}`,
+        originalScore: 1000,
+        claimToken: "claim-1",
+      });
+
+      const encodes = calls.filter((call) => Array.isArray(call) && call[0] === "blob.encode");
+      expect(encodes).toEqual([["blob.encode", [expect.objectContaining({ stagedAtMs })]]]);
+    });
+  });
+
   it("drops a job whose value cannot be decoded", async () => {
     const calls = await runClaimed({
       decode: async () => {

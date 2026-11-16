@@ -64,6 +64,7 @@ import {
   readJobOverloadAttempts,
   readJobPayloadBytes,
   readJobRoutingMeta,
+  readJobStagedAt,
   withJobAttempt,
 } from "./jobEnvelope.ts";
 import { JobLatencyStats } from "./jobLatencyStats.ts";
@@ -827,7 +828,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     const stagedJobId = this.generateStagedJobId(payload);
     // Not `?? Date.now()`: a score function returning 0 or NaN (a payload with
     // no usable occurrence time) survives `??` and stages the job at the epoch.
-    const score = this.resolveScore(this.score?.(payload));
+    const nowMs = nowInstant().epochMilliseconds;
+    const score = this.resolveScore(this.score?.(payload), nowMs);
 
     const span = trace.getActiveSpan();
     if (span) {
@@ -837,6 +839,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     const jobDataJson = await this.blobLifecycle.encode({
       jobData: { ...(payload as Record<string, unknown>), __context: contextMetadata },
       groupId,
+      stagedAtMs: nowMs,
     });
     return {
       stagedJobId,
@@ -1124,6 +1127,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
           jobDataJson: await this.blobLifecycle.encode({
             jobData: payloadWithContext,
             groupId,
+            stagedAtMs: now,
           }),
           shouldExtend,
           shouldReplace,
@@ -2308,6 +2312,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
           ),
         },
         groupId,
+        stagedAtMs: readJobStagedAt(jobDataJson) ?? undefined,
       });
     } catch (encodeErr) {
       this.recordDrop({
@@ -2440,6 +2445,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
           ...overloadAttemptsField(job.overloadAttempts),
         },
         groupId,
+        stagedAtMs: readJobStagedAt(jobDataJson) ?? undefined,
       });
     } catch (encodeErr) {
       this.recordDrop({
@@ -2607,6 +2613,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     const freshValue = await this.blobLifecycle.encode({
       jobData: { ...payload, __context: contextMetadata },
       groupId,
+      stagedAtMs: readJobStagedAt(job.jobDataJson) ?? undefined,
     });
     const handlerError = lastError.cause instanceof Error ? lastError.cause : lastError;
     const refusedJobIds: string[] = [];
