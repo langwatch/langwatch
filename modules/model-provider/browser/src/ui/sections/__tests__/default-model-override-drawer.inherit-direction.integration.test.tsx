@@ -14,11 +14,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ModelProviderHostProvider } from "../../../model/model-provider-host.ts";
 import { FakeModelProviderHost } from "../../../testing.tsx";
 import { DefaultModelOverrideDrawer } from "../default-model-override-drawer.tsx";
+import { scopeAnswerFor } from "./scope-model-options.fixture.ts";
 
 const mockCloseDrawer = vi.fn();
 const mockGetDefaultModels = vi.fn();
 const mockGetInheritedValues = vi.fn();
-const mockListAllForProjectForFrontend = vi.fn();
+const mockScopeProviderRows = vi.fn();
 const mockSave = vi.fn();
 const mockInvalidate = vi.fn();
 
@@ -76,9 +77,7 @@ vi.mock("../../../behavior/model-provider-api.ts", () => ({
         useQuery: () => mockGetInheritedValues(),
       },
       listDecisionModelsForScopes: { useQuery: () => ({ data: [], isLoading: false }) },
-      listAllForProjectForFrontend: {
-        useQuery: () => mockListAllForProjectForFrontend(),
-      },
+      getModelOptionsForScopes: { useQuery: () => scopeAnswerFor(mockScopeProviderRows()) },
       saveDefaultModelsConfig: {
         useMutation: () => ({ mutateAsync: mockSave, isPending: false }),
       },
@@ -165,7 +164,7 @@ describe("<DefaultModelOverrideDrawer/> inherit direction and save integrity", (
       data: { inherited: {}, referenceScope: null },
       isLoading: false,
     });
-    mockListAllForProjectForFrontend.mockReturnValue({
+    mockScopeProviderRows.mockReturnValue({
       data: [
         {
           provider: "openai",

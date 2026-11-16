@@ -44,6 +44,7 @@ import type {
   TranslateOutput,
 } from "./model-provider.ts";
 import type { BuiltInModel } from "./model-selection.ts";
+import type { ScopeModelOptions } from "./scope-model-options.ts";
 
 export interface ModelProviderCaller {
   readonly id: string;
@@ -321,6 +322,14 @@ export interface ModelProviderApi {
     projectId: string;
     scopes: readonly ModelDefaultScope[];
   }): Promise<readonly BuiltInModel[]>;
+  /**
+   * The chat and embedding models a Default models config on these scopes may pick: only those
+   * every scope runs, plus the providers that hold none of a kind. Other organizations refused.
+   */
+  getModelOptionsForScopes(input: {
+    projectId: string;
+    scopes: readonly ModelDefaultScope[];
+  }): Promise<ScopeModelOptions>;
   findAlternateModel(input: {
     projectId: string;
     featureKey: string;

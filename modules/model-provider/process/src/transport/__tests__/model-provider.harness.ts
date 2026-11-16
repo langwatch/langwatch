@@ -227,5 +227,6 @@ function forwarded(app: ModelProviderModule): ModelProviderApi {
     resolveDecisionModel: (...args) => app.resolveDecisionModel(...args),
     listDecisionModelsForProject: (...args) => app.listDecisionModelsForProject(...args),
     listDecisionModelsForScopes: (...args) => app.listDecisionModelsForScopes(...args),
+    getModelOptionsForScopes: (...args) => app.getModelOptionsForScopes(...args),
   };
 }

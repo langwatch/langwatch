@@ -80,6 +80,12 @@ export const modelProviderTrpcTransport: TrpcRouterDeclaration<
     })),
   ])
 
+  .procedure("getModelOptionsForScopes")
+  .withPermission("project:view")
+  .handle(({ app, input }) =>
+    app.getModelOptionsForScopes({ projectId: input.projectId, scopes: input.scopes }),
+  )
+
   .procedure("listAllForOrganizationForFrontend")
   .withPermission("organization:view")
   .handle(async ({ app, input }) =>

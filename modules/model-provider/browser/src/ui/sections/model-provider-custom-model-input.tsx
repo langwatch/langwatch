@@ -1,14 +1,17 @@
+import { Banner, BannerAction } from "@langwatch/design-system/banner";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { Badge, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { SmallLabel } from "@langwatch/design-system/small-label";
-import type {
-  CustomModelEntry,
-  ModelProviderEditorValue as MaybeStoredModelProvider,
+import {
+  findModelProviderDefinition,
+  listsOnlyAddedModels,
+  type CustomModelEntry,
+  type ModelProviderEditorValue as MaybeStoredModelProvider,
 } from "@langwatch/model-provider-contract";
 import { Pencil, Plus, Trash2 } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useState } from "react";
 
 import type {
   UseModelProviderFormActions,
@@ -112,6 +115,25 @@ function CustomModelsTable({
   );
 }
 
+/**
+ * A provider the catalogue lists nothing for (Azure lists only its deployments) offers no chat
+ * model until one is added here; saving stays possible, the warning only says so.
+ */
+function NoChatModelWarning({ providerKey, onAdd }: { providerKey: string; onAdd: () => void }) {
+  const name = findModelProviderDefinition(providerKey)?.name ?? providerKey;
+  const noun = providerKey === "azure" ? "deployment" : "model";
+  return (
+    <Banner
+      status="warning"
+      data-testid="no-chat-deployment-warning"
+      action={<BannerAction onClick={onAdd}>Add a chat {noun}</BannerAction>}
+    >
+      {name} lists only the {noun}s you add. Until you add a chat {noun}, no model from it can be
+      picked as a default.
+    </Banner>
+  );
+}
+
 /** Chat and embeddings models share one table so a provider's model surface reads at a glance. */
 export const CustomModelInputSection = ({
   state,
@@ -133,60 +155,49 @@ export const CustomModelInputSection = ({
   const [registryModalOpen, setRegistryModalOpen] = useState(false);
   const [editingModel, setEditingModel] = useState<CustomModelEntry | undefined>();
 
-  const allCustomModels: CustomModelEntry[] = useMemo(
-    () => [...state.customModels, ...state.customEmbeddingsModels],
-    [state.customModels, state.customEmbeddingsModels],
-  );
+  const allCustomModels: CustomModelEntry[] = [
+    ...state.customModels,
+    ...state.customEmbeddingsModels,
+  ];
 
-  const handleDeleteModel = useCallback(
-    (entry: CustomModelEntry) => {
-      const remove =
-        entry.mode === "embedding"
-          ? actions.removeCustomEmbeddingsModel
-          : actions.removeCustomModel;
-      remove(entry.modelId);
-    },
-    [actions],
-  );
+  const handleDeleteModel = (entry: CustomModelEntry) => {
+    const remove =
+      entry.mode === "embedding" ? actions.removeCustomEmbeddingsModel : actions.removeCustomModel;
+    remove(entry.modelId);
+  };
 
-  const handleEditModel = useCallback((entry: CustomModelEntry) => {
+  const handleEditModel = (entry: CustomModelEntry) => {
     setEditingModel(entry);
     const openDialog =
       entry.mode === "embedding" ? setAddEmbeddingsDialogOpen : setAddModelDialogOpen;
     openDialog(true);
-  }, []);
+  };
 
-  const handleAddModel = useCallback(
-    (entry: CustomModelEntry) => {
-      if (editingModel) {
-        actions.removeCustomModel(editingModel.modelId);
-        setEditingModel(undefined);
-      }
-      actions.addCustomModel(entry);
-    },
-    [actions, editingModel],
-  );
+  const handleAddModel = (entry: CustomModelEntry) => {
+    if (editingModel) {
+      actions.removeCustomModel(editingModel.modelId);
+      setEditingModel(undefined);
+    }
+    actions.addCustomModel(entry);
+  };
 
-  const handleAddEmbeddingsModel = useCallback(
-    (entry: CustomModelEntry) => {
-      if (editingModel) {
-        actions.removeCustomEmbeddingsModel(editingModel.modelId);
-        setEditingModel(undefined);
-      }
-      actions.addCustomEmbeddingsModel(entry);
-    },
-    [actions, editingModel],
-  );
+  const handleAddEmbeddingsModel = (entry: CustomModelEntry) => {
+    if (editingModel) {
+      actions.removeCustomEmbeddingsModel(editingModel.modelId);
+      setEditingModel(undefined);
+    }
+    actions.addCustomEmbeddingsModel(entry);
+  };
 
-  const handleCloseModelDialog = useCallback(() => {
+  const handleCloseModelDialog = () => {
     setAddModelDialogOpen(false);
     setEditingModel(undefined);
-  }, []);
+  };
 
-  const handleCloseEmbeddingsDialog = useCallback(() => {
+  const handleCloseEmbeddingsDialog = () => {
     setAddEmbeddingsDialogOpen(false);
     setEditingModel(undefined);
-  }, []);
+  };
 
   const editingChatModel = editingModel?.mode === "chat" ? editingModel : undefined;
   const editingEmbeddingsModel = editingModel?.mode === "embedding" ? editingModel : undefined;
@@ -212,6 +223,13 @@ export const CustomModelInputSection = ({
           </Menu.Content>
         </Menu.Root>
       </HStack>
+
+      {listsOnlyAddedModels({ provider: provider.provider }) && state.customModels.length === 0 && (
+        <NoChatModelWarning
+          providerKey={provider.provider}
+          onAdd={() => setAddModelDialogOpen(true)}
+        />
+      )}
 
       <CustomModelsTable
         entries={allCustomModels}

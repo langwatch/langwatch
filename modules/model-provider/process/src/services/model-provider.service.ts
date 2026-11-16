@@ -41,6 +41,7 @@ import {
   type ModelProviderCustomKeys,
   type ModelProviderUsageCount,
   type BuiltInModel,
+  type ScopeModelOptions,
   type DecisionModelResolution,
 } from "@langwatch/model-provider-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
@@ -361,6 +362,13 @@ export class ModelProviderService {
     scopes: readonly ModelDefaultScope[];
   }): Promise<readonly BuiltInModel[]> {
     return this.decisionModels.listPickableForScopes(input);
+  }
+
+  getModelOptionsForScopes(input: {
+    projectId: string;
+    scopes: readonly ModelDefaultScope[];
+  }): Promise<ScopeModelOptions> {
+    return this.query.getModelOptionsForScopes(input);
   }
 
   findAlternateModel(input: {

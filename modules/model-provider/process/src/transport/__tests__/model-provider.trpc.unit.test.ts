@@ -5,7 +5,11 @@
  * @see specs/settings/model-provider-skip-permissions.feature
  */
 import { createTrpcRuntime } from "@langwatch/api/trpc";
-import { ModelNotConfiguredError, type ModelProviderApi } from "@langwatch/model-provider-contract";
+import {
+  ModelNotConfiguredError,
+  NO_SCOPE_MODEL_OPTIONS,
+  type ModelProviderApi,
+} from "@langwatch/model-provider-contract";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
@@ -95,6 +99,7 @@ describe("the modelProvider tRPC namespace", () => {
         "getAllForProjectForFrontend",
         "getDefaultModelsForProject",
         "getInheritedValuesForScopes",
+        "getModelOptionsForScopes",
         "getResolvedDefault",
         "isManagedProvider",
         "listAllForOrganizationForFrontend",
@@ -139,6 +144,38 @@ describe("the modelProvider tRPC namespace", () => {
 
         expect(providers.openai?.id).toBe("mp_openai");
       });
+    });
+  });
+
+  describe("given the scope models read", () => {
+    const SCOPES = [{ scopeType: "PROJECT" as const, scopeId: PROJECT_A }];
+
+    /** @scenario "The models read is declared with the project view permission" */
+    it("refuses a caller without project:view before the application is asked", async () => {
+      const getModelOptionsForScopes = vi.fn(async () => NO_SCOPE_MODEL_OPTIONS);
+      const { caller } = mount({
+        modelProviders: { getModelOptionsForScopes },
+        permits: (permission) => permission !== "project:view",
+      });
+
+      await expect(
+        caller.getModelOptionsForScopes({ projectId: PROJECT_A, scopes: SCOPES }),
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      expect(getModelOptionsForScopes).not.toHaveBeenCalled();
+    });
+
+    it("answers the application's options to a caller holding project:view", async () => {
+      const options = { ...NO_SCOPE_MODEL_OPTIONS, chat: ["openai/gpt-5"] };
+      const { caller } = mount({
+        modelProviders: { getModelOptionsForScopes: async () => options },
+      });
+
+      const answer = await caller.getModelOptionsForScopes({
+        projectId: PROJECT_A,
+        scopes: SCOPES,
+      });
+
+      expect(answer.chat).toEqual(["openai/gpt-5"]);
     });
   });
 
