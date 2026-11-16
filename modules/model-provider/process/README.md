@@ -244,10 +244,10 @@ listDecisionModelsForScopes(input: { projectId: string; scopes: readonly ModelDe
 
 #### `getModelOptionsForScopes`
 
-The chat and embedding models a Default models config on these scopes may pick: only those every scope runs, plus the providers that hold none of a kind. Other organizations refused.
+The chat and embedding models a Default models config on these scopes may pick: only those every scope runs, plus the providers that hold none of a kind. Other organizations, and any scope the caller may not view, are refused.
 
 ```typescript
-getModelOptionsForScopes(input: { projectId: string; scopes: readonly ModelDefaultScope[]; }): Promise<ScopeModelOptions>;
+getModelOptionsForScopes(input: { projectId: string; scopes: readonly ModelDefaultScope[] }, by: ModelProviderCaller): Promise<ScopeModelOptions>;
 ```
 
 #### `findAlternateModel`
@@ -599,7 +599,7 @@ type Output = z.infer<typeof costRuleMatchingSpansPreviewSchema>; // ../contract
 
 ### `modelProvider`
 
-Contract `../contract/src/model-provider.trpc.ts:45`, router `src/transport/model-provider.trpc.ts:46`.
+Contract `../contract/src/model-provider.trpc.ts:45`, router `src/transport/model-provider.trpc.ts:49`.
 
 | Procedure                                         | Kind     | Gate                                                                                                                                                                                                                                                                   | Input                                                  | Output                                    |
 | ------------------------------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ | ----------------------------------------- |
