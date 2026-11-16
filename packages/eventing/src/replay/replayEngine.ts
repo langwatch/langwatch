@@ -1,4 +1,4 @@
-import { nowInstant, toEpochMs } from "@langwatch/time";
+import { nowEpochMs, toEpochMs } from "@langwatch/time";
 
 import { isQueryMemoryLimitExceeded } from "../services/errorHandling.ts";
 import { pMapLimited } from "./pMapLimited.ts";
@@ -310,7 +310,7 @@ class FoldMapReplayRun {
   private readonly aggregateBatchSize: number;
   private readonly concurrency: number;
   private readonly runProjectionKind: ProjectionKind;
-  private readonly startTime = nowInstant().epochMilliseconds;
+  private readonly startTime = nowEpochMs();
   private readonly touchedTenants = new Set<string>();
 
   private aggregateProjectionMap: AggregateProjectionMap = new Map();
@@ -433,7 +433,7 @@ class FoldMapReplayRun {
       batchEventsProcessed: 0,
       aggregatesCompleted: this.aggregatesCompleted,
       totalEventsReplayed: this.totalEventsReplayed,
-      elapsedSec: (nowInstant().epochMilliseconds - this.startTime) / 1000,
+      elapsedSec: (nowEpochMs() - this.startTime) / 1000,
       skippedCount: this.skippedCount,
       batchErrors: this.totalBatchErrors,
       firstError: this.firstError,
@@ -450,7 +450,7 @@ class FoldMapReplayRun {
     batchNum: number;
     paged?: boolean;
   }): Promise<boolean> {
-    const batchStartTime = nowInstant().epochMilliseconds;
+    const batchStartTime = nowEpochMs();
     const progress = this.buildProgress({ batchKeys, batchNum });
     const emit: EmitFn = (phase, eventsProcessed) => {
       // A stop mid-batch takes the failure path: the batch's markers clear and the lane unpauses.
@@ -460,7 +460,7 @@ class FoldMapReplayRun {
         progress.batchEventsProcessed = eventsProcessed;
         progress.totalEventsReplayed = this.totalEventsReplayed + eventsProcessed;
       }
-      progress.elapsedSec = (nowInstant().epochMilliseconds - this.startTime) / 1000;
+      progress.elapsedSec = (nowEpochMs() - this.startTime) / 1000;
       this.callbacks?.onProgress?.({ ...progress });
     };
 
@@ -513,7 +513,7 @@ class FoldMapReplayRun {
       totalBatches: this.totalBatches,
       aggregatesInBatch: batchKeys.length,
       eventsInBatch: batchResult.eventsReplayed,
-      durationSec: (nowInstant().epochMilliseconds - batchStartTime) / 1000,
+      durationSec: (nowEpochMs() - batchStartTime) / 1000,
     });
     return true;
   }
@@ -633,7 +633,7 @@ class FoldMapReplayRun {
 
     progress.batchErrors = this.totalBatchErrors;
     progress.firstError = this.firstError;
-    progress.elapsedSec = (nowInstant().epochMilliseconds - this.startTime) / 1000;
+    progress.elapsedSec = (nowEpochMs() - this.startTime) / 1000;
     // Deliberately unguarded: a cancellation rethrow from this emit is how
     // ReplayCancelledError reaches the caller — the batch's markers are
     // already cleared above, so propagating is safe and required.
@@ -1112,7 +1112,7 @@ export async function pageAggregateEvents({
   let eventsApplied = 0;
   for (let pageNum = 1; ; pageNum++) {
     signal?.throwIfAborted();
-    const pageStart = nowInstant().epochMilliseconds;
+    const pageStart = nowEpochMs();
     const events = await eventSource.loadAggregateEvents({
       tenantId,
       aggregateIds,
@@ -1148,7 +1148,7 @@ export async function pageAggregateEvents({
       step: "page-aggregate",
       page: pageNum,
       events: events.length,
-      ms: nowInstant().epochMilliseconds - pageStart,
+      ms: nowEpochMs() - pageStart,
       totalEvents: eventsApplied,
     });
   }

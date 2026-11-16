@@ -142,3 +142,43 @@ Feature: GroupQueue ready-score integrity
       Given a just-unblocked group carrying the unblock sentinel score
       When queue metrics are collected
       Then the oldest-pending-age gauge reports 0
+
+  Rule: the age gauges measure how long a job has waited, not how old its event is
+
+    # a ready score is the event's own time, which can be up to a day in the
+    # past for a job staged a moment ago. each job records when it was staged
+    # in its envelope header, and a group counts as waiting only from the later
+    # of the two. a job staged before that time was recorded keeps the score.
+
+    @unit
+    Scenario: a fresh job for an old event reads as a short wait
+      Given a ready group scored ten hours ago whose head job was staged three seconds ago
+      When queue metrics are collected
+      Then the oldest-pending-age gauge reports three seconds
+      And so does the backlog gauge
+
+    @unit
+    Scenario: the gauge names the group that waited longest
+      Given a group with an old event staged two seconds ago
+      And a group whose job has waited a minute
+      When queue metrics are collected
+      Then the oldest-pending-age gauge reports a minute under the waiting group's job
+
+    @unit
+    Scenario: a deferred group's backlog counts from when its head job was staged
+      Given a group in retry backoff whose head job is for an event from ten hours ago
+      And that job was staged ninety seconds ago
+      When queue metrics are collected
+      Then the backlog gauge reports ninety seconds
+
+    @unit
+    Scenario: a retried job keeps the time it was first staged
+      Given a job staged with its staging time
+      When a retry rewrites its attempt
+      Then its staged time is unchanged
+
+    @unit
+    Scenario: a job re-staged into its blocked group keeps the time it was first staged
+      Given a job staged with its staging time
+      When it fails for good and blocks its group
+      Then the re-staged job keeps its staged time
