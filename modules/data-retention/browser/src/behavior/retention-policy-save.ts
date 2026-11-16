@@ -129,13 +129,10 @@ export async function countStoredPastRetention({
 }): Promise<{ rows: number; retentionDays: number | null } | null> {
   try {
     const answers = await Promise.all(scopes.map((scope) => count(scope)));
-    const traces = answers.flatMap((answer) =>
-      answer.categories.filter((each) => each.category === "traces"),
-    );
-    const days = new Set(traces.map((each) => each.retentionDays));
+    const days = new Set(answers.map((each) => each.retentionDays));
     const [only] = [...days];
     return {
-      rows: traces.reduce((sum, each) => sum + each.rows, 0),
+      rows: answers.reduce((sum, each) => sum + each.rows, 0),
       retentionDays: days.size === 1 && only !== undefined ? only : null,
     };
   } catch {

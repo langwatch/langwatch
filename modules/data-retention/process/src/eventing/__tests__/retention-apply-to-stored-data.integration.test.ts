@@ -142,8 +142,7 @@ describe.skipIf(!scratchClickHouseUrl)("a shorter period applied to stored data"
       userId: "user-1",
     });
 
-    expect(counted.categories.find((each) => each.category === "traces")).toEqual({
-      category: "traces",
+    expect(counted).toEqual({
       rows: 2,
       retentionDays: NEW_PERIOD,
     });

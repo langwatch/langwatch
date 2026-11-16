@@ -166,9 +166,7 @@ describe("given an organization with three projects and stored data", () => {
           userId: "user-1",
         });
 
-        expect(counted.projectCount).toBe(2);
-        expect(counted.categories.find((each) => each.category === "traces")).toEqual({
-          category: "traces",
+        expect(counted).toEqual({
           rows: 2,
           retentionDays: null,
         });

@@ -37,26 +37,14 @@ const {
   applyScope,
 } = vi.hoisted(() => ({
   storedPastRef: {
-    current: {
-      categories: [] as {
-        category: "traces" | "scenarios" | "experiments";
-        rows: number;
-        retentionDays: number | null;
-      }[],
-      projectCount: 1,
-    },
+    current: { rows: 0, retentionDays: null as number | null },
   },
-  fetchStoredPast: vi.fn(async (input: unknown) => {
-    void input;
-    return {
-      categories: [
-        { category: "traces" as const, rows: 1234, retentionDays: 91 },
-        { category: "scenarios" as const, rows: 0, retentionDays: 91 },
-        { category: "experiments" as const, rows: 0, retentionDays: 91 },
-      ],
-      projectCount: 2,
-    };
-  }),
+  fetchStoredPast: vi.fn(
+    async (input: unknown): Promise<{ rows: number; retentionDays: number | null }> => {
+      void input;
+      return { rows: 1234, retentionDays: 91 };
+    },
+  ),
   applyScope: vi.fn(async (input: unknown) => {
     void input;
   }),
@@ -235,7 +223,7 @@ function renderScreen(host: TestRetentionHost, { isSaaS }: { isSaaS?: boolean } 
 describe("given the retention policies page", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    storedPastRef.current = { categories: [], projectCount: 1 };
+    storedPastRef.current = { rows: 0, retentionDays: null };
     snapshotRef.current.canConfigureRetention = true;
     snapshotRef.current.effective = { traces: 49, scenarios: 49, experiments: 49 };
     snapshotRef.current.rules = [
@@ -436,7 +424,7 @@ describe("given the retention policies page", () => {
     });
 
     it("asks nothing when no stored data is past the new period", async () => {
-      fetchStoredPast.mockResolvedValueOnce({ categories: [], projectCount: 2 });
+      fetchStoredPast.mockResolvedValueOnce({ rows: 0, retentionDays: null });
       await saveTeamPolicy(new TestRetentionHost());
 
       await waitFor(() => expect(fetchStoredPast).toHaveBeenCalled());
@@ -459,8 +447,8 @@ describe("given the retention policies page", () => {
     /** @scenario "Not now leaves a note with an Apply button" */
     it("notes how many traces still use the old period and applies it after the prompt", async () => {
       storedPastRef.current = {
-        categories: [{ category: "traces", rows: 1234, retentionDays: 91 }],
-        projectCount: 2,
+        rows: 1234,
+        retentionDays: 91,
       };
       const user = userEvent.setup();
       renderScreen(new TestRetentionHost());

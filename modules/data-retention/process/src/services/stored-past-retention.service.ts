@@ -1,13 +1,9 @@
 /**
- * How many stored items each category keeps past the period its projects resolve to, summed over
- * the scope's projects the caller may read: what applying the period now would delete.
+ * How many stored traces are kept past the period their projects resolve to, summed over the
+ * scope's projects the caller may read: what applying the period now would delete.
  * Spec: modules/data-retention/specs/retention-apply-to-stored-data.feature
  */
-import {
-  retentionCategories,
-  type ScopeAssignment,
-  type StoredPastRetention,
-} from "@langwatch/data-retention-contract";
+import type { ScopeAssignment, StoredPastRetention } from "@langwatch/data-retention-contract";
 
 import type { DataRetentionDirectoryReader } from "../app/data-retention.app.ts";
 import type { RetroactiveRetentionRepository } from "../repositories/retroactive-retention.repository.ts";
@@ -41,47 +37,33 @@ export class StoredPastRetentionService {
     nowMs: number;
   }): Promise<StoredPastRetention> {
     const projectIds = await this.readableProjectIds({ projectId, scope, actor });
-    const categories = await this.countPastRetention({ projectIds, nowMs });
-    return { categories, projectCount: projectIds.length };
+    return this.countTracesPastRetention({ projectIds, nowMs });
   }
 
   /**
-   * One project at a time, its categories together, so a page load holds at most three reads.
-   * A category's `retentionDays` is null when the projects resolve to different periods.
+   * One project at a time, so a page load holds at most one read. `retentionDays` is null when
+   * the projects resolve to different traces periods.
    */
-  private async countPastRetention({
+  private async countTracesPastRetention({
     projectIds,
     nowMs,
   }: {
     projectIds: readonly string[];
     nowMs: number;
-  }): Promise<StoredPastRetention["categories"]> {
+  }): Promise<StoredPastRetention> {
     const resolved = await this.options.retention.getResolvedForProjects({ projectIds });
-    const rows = new Map(retentionCategories.map((category) => [category, 0]));
+    let rows = 0;
     for (const [projectId, retention] of resolved) {
-      const counts = await Promise.all(
-        retentionCategories.map((category) =>
-          this.options.retroactive.countPastRetention({
-            projectId,
-            category,
-            retentionDays: retention[category],
-            nowMs,
-          }),
-        ),
-      );
-      retentionCategories.forEach((category, index) => {
-        rows.set(category, (rows.get(category) ?? 0) + (counts[index] ?? 0));
+      rows += await this.options.retroactive.countPastRetention({
+        projectId,
+        category: "traces",
+        retentionDays: retention.traces,
+        nowMs,
       });
     }
-    return retentionCategories.map((category) => {
-      const days = new Set([...resolved.values()].map((retention) => retention[category]));
-      const [only] = days;
-      return {
-        category,
-        rows: rows.get(category) ?? 0,
-        retentionDays: days.size === 1 && only !== undefined ? only : null,
-      };
-    });
+    const days = new Set([...resolved.values()].map((retention) => retention.traces));
+    const [only] = days;
+    return { rows, retentionDays: days.size === 1 && only !== undefined ? only : null };
   }
 
   /** A personal project (no organization) is only ever its own scope, which the door approved. */

@@ -91,18 +91,12 @@ export const retentionStorageUsageSchema: RetentionStorageUsageSchema =
 export type RetentionStorageUsage = z.infer<typeof retentionStorageUsageSchema>;
 
 /**
- * Stored rows a scope's projects keep past their resolved retention, per category: what applying
- * the period to stored data would delete. `retentionDays` is null when the projects differ.
+ * Stored traces a scope's projects keep past their resolved traces retention: what applying the
+ * period to stored data would delete. `retentionDays` is null when the projects differ.
  */
 const storedPastRetentionSchemaDefinition = z.object({
-  categories: z.array(
-    z.object({
-      category: retentionCategorySchema,
-      rows: z.number().int().nonnegative(),
-      retentionDays: z.number().int().nonnegative().nullable(),
-    }),
-  ),
-  projectCount: z.number().int().nonnegative(),
+  rows: z.number().int().nonnegative(),
+  retentionDays: z.number().int().nonnegative().nullable(),
 });
 export interface StoredPastRetentionSchema extends Named<
   typeof storedPastRetentionSchemaDefinition
