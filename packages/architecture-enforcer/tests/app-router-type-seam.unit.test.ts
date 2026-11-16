@@ -18,7 +18,7 @@ const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", ".."
  * -192, -188, agent/evaluator versions; 1,570 `dataset-version.ts`; 1,576 seat requests; 1,578
  * `langy-call-stopped.ts`, Grok canonicaliser; 1,583 trace-limit cache, coalescer, entitlement
  * errors, client-fault telemetry; 1,585 seat peak; 1,589 braids' contracts; 1,592 agent registry
- * contract; 1,593 `use-docs-playground-policy.ts`; 1,594 http-mux's `metrics/http-server.ts`; 1,595 agent kill switch contract. */
+ * contract; 1,593 docs playground policy; 1,594 http-mux server metrics; 1,595 kill switch. */
 const CEILING = 1_595;
 
 /** Every browser file that declares a module's typed procedures through `createModuleApi`. */

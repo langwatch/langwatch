@@ -7059,6 +7059,18 @@ from .post_api_governance_agent_stops_by_id_approve_response_404_meta import (
 from .post_api_governance_agent_stops_by_id_approve_response_404_trace import (
     PostApiGovernanceAgentStopsByIdApproveResponse404Trace,
 )
+from .post_api_governance_agent_stops_by_id_approve_response_409 import (
+    PostApiGovernanceAgentStopsByIdApproveResponse409,
+)
+from .post_api_governance_agent_stops_by_id_approve_response_409_fault import (
+    PostApiGovernanceAgentStopsByIdApproveResponse409Fault,
+)
+from .post_api_governance_agent_stops_by_id_approve_response_409_meta import (
+    PostApiGovernanceAgentStopsByIdApproveResponse409Meta,
+)
+from .post_api_governance_agent_stops_by_id_approve_response_409_trace import (
+    PostApiGovernanceAgentStopsByIdApproveResponse409Trace,
+)
 from .post_api_governance_agent_stops_by_id_approve_response_422 import (
     PostApiGovernanceAgentStopsByIdApproveResponse422,
 )
@@ -7157,6 +7169,16 @@ from .post_api_governance_agent_stops_by_id_deny_response_404_meta import (
 )
 from .post_api_governance_agent_stops_by_id_deny_response_404_trace import (
     PostApiGovernanceAgentStopsByIdDenyResponse404Trace,
+)
+from .post_api_governance_agent_stops_by_id_deny_response_409 import PostApiGovernanceAgentStopsByIdDenyResponse409
+from .post_api_governance_agent_stops_by_id_deny_response_409_fault import (
+    PostApiGovernanceAgentStopsByIdDenyResponse409Fault,
+)
+from .post_api_governance_agent_stops_by_id_deny_response_409_meta import (
+    PostApiGovernanceAgentStopsByIdDenyResponse409Meta,
+)
+from .post_api_governance_agent_stops_by_id_deny_response_409_trace import (
+    PostApiGovernanceAgentStopsByIdDenyResponse409Trace,
 )
 from .post_api_governance_agent_stops_by_id_deny_response_422 import PostApiGovernanceAgentStopsByIdDenyResponse422
 from .post_api_governance_agent_stops_by_id_deny_response_422_fault import (
@@ -7262,6 +7284,18 @@ from .post_api_governance_agent_stops_by_id_restore_response_404_meta import (
 from .post_api_governance_agent_stops_by_id_restore_response_404_trace import (
     PostApiGovernanceAgentStopsByIdRestoreResponse404Trace,
 )
+from .post_api_governance_agent_stops_by_id_restore_response_409 import (
+    PostApiGovernanceAgentStopsByIdRestoreResponse409,
+)
+from .post_api_governance_agent_stops_by_id_restore_response_409_fault import (
+    PostApiGovernanceAgentStopsByIdRestoreResponse409Fault,
+)
+from .post_api_governance_agent_stops_by_id_restore_response_409_meta import (
+    PostApiGovernanceAgentStopsByIdRestoreResponse409Meta,
+)
+from .post_api_governance_agent_stops_by_id_restore_response_409_trace import (
+    PostApiGovernanceAgentStopsByIdRestoreResponse409Trace,
+)
 from .post_api_governance_agent_stops_by_id_restore_response_422 import (
     PostApiGovernanceAgentStopsByIdRestoreResponse422,
 )
@@ -7336,6 +7370,10 @@ from .post_api_governance_agents_by_id_stop_response_404 import PostApiGovernanc
 from .post_api_governance_agents_by_id_stop_response_404_fault import PostApiGovernanceAgentsByIdStopResponse404Fault
 from .post_api_governance_agents_by_id_stop_response_404_meta import PostApiGovernanceAgentsByIdStopResponse404Meta
 from .post_api_governance_agents_by_id_stop_response_404_trace import PostApiGovernanceAgentsByIdStopResponse404Trace
+from .post_api_governance_agents_by_id_stop_response_409 import PostApiGovernanceAgentsByIdStopResponse409
+from .post_api_governance_agents_by_id_stop_response_409_fault import PostApiGovernanceAgentsByIdStopResponse409Fault
+from .post_api_governance_agents_by_id_stop_response_409_meta import PostApiGovernanceAgentsByIdStopResponse409Meta
+from .post_api_governance_agents_by_id_stop_response_409_trace import PostApiGovernanceAgentsByIdStopResponse409Trace
 from .post_api_governance_agents_by_id_stop_response_422 import PostApiGovernanceAgentsByIdStopResponse422
 from .post_api_governance_agents_by_id_stop_response_422_fault import PostApiGovernanceAgentsByIdStopResponse422Fault
 from .post_api_governance_agents_by_id_stop_response_422_meta import PostApiGovernanceAgentsByIdStopResponse422Meta
@@ -14264,6 +14302,10 @@ __all__ = (
     "PostApiGovernanceAgentsByIdStopResponse404Fault",
     "PostApiGovernanceAgentsByIdStopResponse404Meta",
     "PostApiGovernanceAgentsByIdStopResponse404Trace",
+    "PostApiGovernanceAgentsByIdStopResponse409",
+    "PostApiGovernanceAgentsByIdStopResponse409Fault",
+    "PostApiGovernanceAgentsByIdStopResponse409Meta",
+    "PostApiGovernanceAgentsByIdStopResponse409Trace",
     "PostApiGovernanceAgentsByIdStopResponse422",
     "PostApiGovernanceAgentsByIdStopResponse422Fault",
     "PostApiGovernanceAgentsByIdStopResponse422Meta",
@@ -14301,6 +14343,10 @@ __all__ = (
     "PostApiGovernanceAgentStopsByIdApproveResponse404Fault",
     "PostApiGovernanceAgentStopsByIdApproveResponse404Meta",
     "PostApiGovernanceAgentStopsByIdApproveResponse404Trace",
+    "PostApiGovernanceAgentStopsByIdApproveResponse409",
+    "PostApiGovernanceAgentStopsByIdApproveResponse409Fault",
+    "PostApiGovernanceAgentStopsByIdApproveResponse409Meta",
+    "PostApiGovernanceAgentStopsByIdApproveResponse409Trace",
     "PostApiGovernanceAgentStopsByIdApproveResponse422",
     "PostApiGovernanceAgentStopsByIdApproveResponse422Fault",
     "PostApiGovernanceAgentStopsByIdApproveResponse422Meta",
@@ -14338,6 +14384,10 @@ __all__ = (
     "PostApiGovernanceAgentStopsByIdDenyResponse404Fault",
     "PostApiGovernanceAgentStopsByIdDenyResponse404Meta",
     "PostApiGovernanceAgentStopsByIdDenyResponse404Trace",
+    "PostApiGovernanceAgentStopsByIdDenyResponse409",
+    "PostApiGovernanceAgentStopsByIdDenyResponse409Fault",
+    "PostApiGovernanceAgentStopsByIdDenyResponse409Meta",
+    "PostApiGovernanceAgentStopsByIdDenyResponse409Trace",
     "PostApiGovernanceAgentStopsByIdDenyResponse422",
     "PostApiGovernanceAgentStopsByIdDenyResponse422Fault",
     "PostApiGovernanceAgentStopsByIdDenyResponse422Meta",
@@ -14374,6 +14424,10 @@ __all__ = (
     "PostApiGovernanceAgentStopsByIdRestoreResponse404Fault",
     "PostApiGovernanceAgentStopsByIdRestoreResponse404Meta",
     "PostApiGovernanceAgentStopsByIdRestoreResponse404Trace",
+    "PostApiGovernanceAgentStopsByIdRestoreResponse409",
+    "PostApiGovernanceAgentStopsByIdRestoreResponse409Fault",
+    "PostApiGovernanceAgentStopsByIdRestoreResponse409Meta",
+    "PostApiGovernanceAgentStopsByIdRestoreResponse409Trace",
     "PostApiGovernanceAgentStopsByIdRestoreResponse422",
     "PostApiGovernanceAgentStopsByIdRestoreResponse422Fault",
     "PostApiGovernanceAgentStopsByIdRestoreResponse422Meta",

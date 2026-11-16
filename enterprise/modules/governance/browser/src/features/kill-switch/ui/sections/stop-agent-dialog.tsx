@@ -1,20 +1,41 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { Dialog } from "@langwatch/design-system/dialog";
-import { Field, List, Text, Textarea, VStack } from "@langwatch/design-system/primitives";
-import { SkeletonRows } from "@langwatch/design-system/skeletons";
-import { useState } from "react";
+import { Field, Textarea, VStack } from "@langwatch/design-system/primitives";
+import { HandledErrorAlert } from "@langwatch/error-views";
 
-import { api } from "../../../../behavior/governance-api.ts";
-import {
-  useGovernanceToaster,
-  useShowErrorToast,
-} from "../../../../behavior/governance-feedback.ts";
-import { useKillSwitchRefresh } from "../../behavior/use-kill-switch.ts";
-import { STOP_TARGET_KIND_LABELS } from "../../model/kill-switch-copy.ts";
+import { useStopReason } from "../../behavior/use-stop-reason.ts";
+import { useStopRequest } from "../../behavior/use-stop-request.ts";
+import { StopPlanPreview } from "../blocks/stop-plan-preview.tsx";
+
+function ReasonField({
+  value,
+  error,
+  onChange,
+}: {
+  value: string;
+  error: string | null;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <Field.Root invalid={error !== null} required>
+      <Field.Label>Reason</Field.Label>
+      <Textarea
+        aria-label="Reason"
+        value={value}
+        maxLength={2000}
+        placeholder="Leaking customer data in replies"
+        onChange={(event) => onChange(event.target.value)}
+      />
+      <Field.HelperText>Kept in the audit log and sent with the webhook.</Field.HelperText>
+      <Field.ErrorText>{error}</Field.ErrorText>
+    </Field.Root>
+  );
+}
 
 /**
- * Stopping an agent from the UI: it names every target the plan acts on and asks why.
- * A stop pressed here is immediate. Spec: enterprise/modules/governance/specs/agent-kill-switch.feature
+ * Stopping an agent from the UI: it names every target the plan acts on and asks why. Confirm
+ * waits for the plan read. A stop pressed here is immediate.
+ * Spec: enterprise/modules/governance/specs/agent-kill-switch.feature
  */
 export function StopAgentDialog({
   organizationId,
@@ -29,42 +50,22 @@ export function StopAgentDialog({
   open: boolean;
   onClose: () => void;
 }) {
-  const [reason, setReason] = useState("");
-  const [reasonError, setReasonError] = useState<string | null>(null);
-  const toaster = useGovernanceToaster();
-  const showErrorToast = useShowErrorToast();
-  const refresh = useKillSwitchRefresh({ organizationId });
-  const plan = api.governanceKillSwitch.plan.useQuery(
-    { organizationId, agentId },
-    { enabled: open && !!organizationId, refetchOnWindowFocus: false },
-  );
-  const stop = api.governanceKillSwitch.requestStop.useMutation();
+  const reason = useStopReason();
+  const request = useStopRequest({ organizationId, agentId, agentName, open });
 
   const close = () => {
-    if (stop.isPending) return;
-    setReason("");
-    setReasonError(null);
+    if (request.isStopping) return;
+    reason.clear();
+    request.reset();
     onClose();
   };
 
   const confirm = async () => {
-    const trimmed = reason.trim();
-    if (!trimmed) {
-      setReasonError("Say why you are stopping this agent.");
-      return;
-    }
-    try {
-      await stop.mutateAsync({ organizationId, agentId, reason: trimmed });
-      toaster.create({ title: `Stopping ${agentName}`, type: "success" });
-      await refresh.afterStopChange();
-      setReason("");
-      onClose();
-    } catch (error) {
-      showErrorToast({ error, fallbackTitle: "Couldn't stop the agent" });
-    }
+    const trimmed = reason.take();
+    if (!trimmed) return;
+    request.reset();
+    if (await request.requestStop({ reason: trimmed })) close();
   };
-
-  const targets = plan.data?.targets ?? [];
 
   return (
     <Dialog
@@ -75,52 +76,25 @@ export function StopAgentDialog({
       size="md"
       title={`Stop ${agentName}?`}
       description="This stops the agent where it runs, at once. You can restore it later."
-      busy={stop.isPending}
+      busy={request.isStopping}
       data-testid="stop-agent-dialog"
       primaryAction={{
         label: "Stop agent",
         danger: true,
-        loading: stop.isPending,
+        loading: request.isStopping,
+        disabledReason: request.confirmBlockedReason,
         onClick: () => void confirm(),
       }}
     >
       <VStack align="stretch" gap={4}>
-        {plan.isPending ? (
-          <SkeletonRows rows={2} label="Loading the stop plan" />
-        ) : (
-          <VStack align="stretch" gap={1}>
-            <Text textStyle="sm" fontWeight="medium">
-              {targets.length === 1
-                ? "This stops 1 target"
-                : `This stops ${targets.length} targets`}
-            </Text>
-            <List.Root paddingStart={5} data-testid="stop-agent-targets">
-              {targets.map((row) => (
-                <List.Item key={row.id} textStyle="sm">
-                  {row.label}{" "}
-                  <Text as="span" color="fg.muted">
-                    ({STOP_TARGET_KIND_LABELS[row.target.kind]})
-                  </Text>
-                </List.Item>
-              ))}
-            </List.Root>
-          </VStack>
-        )}
-        <Field.Root invalid={reasonError !== null} required>
-          <Field.Label>Reason</Field.Label>
-          <Textarea
-            aria-label="Reason"
-            value={reason}
-            maxLength={2000}
-            placeholder="Leaking customer data in replies"
-            onChange={(event) => {
-              setReason(event.target.value);
-              setReasonError(null);
-            }}
-          />
-          <Field.HelperText>Kept in the audit log and sent with the webhook.</Field.HelperText>
-          <Field.ErrorText>{reasonError}</Field.ErrorText>
-        </Field.Root>
+        {request.planChanged ? <HandledErrorAlert error={request.planChanged} /> : null}
+        <StopPlanPreview
+          targets={request.plan.targets}
+          isLoading={request.plan.isLoading}
+          error={request.plan.error}
+          onRetry={request.plan.retry}
+        />
+        <ReasonField value={reason.value} error={reason.error} onChange={reason.change} />
       </VStack>
     </Dialog>
   );

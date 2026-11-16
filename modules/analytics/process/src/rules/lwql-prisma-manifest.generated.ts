@@ -2717,6 +2717,15 @@ export interface LwqlPrismaRows {
     readonly agentId: "String";
     readonly stopId: "String";
     readonly claimedAt: "DateTime";
+    readonly sentAt: "DateTime?";
+    readonly decision: "String?";
+  };
+  readonly AgentStopTargetPriorState: {
+    readonly organizationId: "String";
+    readonly stopId: "String";
+    readonly targetId: "String";
+    readonly wasStopped: "Boolean";
+    readonly recordedAt: "DateTime";
   };
   readonly IdentityMatch: {
     readonly id: "String";

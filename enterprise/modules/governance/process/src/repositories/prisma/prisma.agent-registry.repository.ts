@@ -343,6 +343,12 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`agent-registry:${organizationId
     };
   }): Promise<AgentRegistryEvent> {
     return this.prisma.$transaction(async (transaction) => {
+      // The lock `applyChanges` takes: a feed reader never passes a sequence still uncommitted.
+      await transaction.$executeRaw` ${skipTenantCheck({
+        // Advisory-lock helper, the key names one organisation's registry.
+        SKIP_TENANT_CHECK: true,
+      })}
+SELECT pg_advisory_xact_lock(hashtextextended(${`agent-registry:${organizationId}`}, 0))`;
       const held = await transaction.agentRegistryEvent.findFirst({
         where: { organizationId, id: event.id },
       });

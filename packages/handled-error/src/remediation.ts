@@ -589,6 +589,12 @@ const registry = {
     tips: ["Restore a stop whose status is `quarantined`, `stop_failed` or `restore_failed`"],
     docsPath: "/governance/kill-switch",
   },
+  agent_stop_plan_changed: {
+    tips: [
+      "Read the plan again with GET /api/governance/agents/{agentId}/stop-plan and confirm its targets",
+    ],
+    docsPath: "/governance/kill-switch",
+  },
   agent_stop_plan_empty: {
     tips: ["Set the agent's targets with PUT /api/governance/agents/{agentId}/stop-plan"],
     docsPath: "/governance/kill-switch",
@@ -602,6 +608,12 @@ const registry = {
       "A serving endpoint target names a Databricks Genie governance source of this organisation",
       "A Bedrock target names an AWS connection of this organisation",
       "A virtual key target names a virtual key of this organisation",
+    ],
+    docsPath: "/governance/kill-switch",
+  },
+  governance_aws_connection_in_use: {
+    tips: [
+      "Remove the Bedrock targets that use it from every stop plan, and restore the stops that still hold it",
     ],
     docsPath: "/governance/kill-switch",
   },

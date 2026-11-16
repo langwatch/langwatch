@@ -7,6 +7,7 @@ import type { ActivityMonitorRepository } from "./activity-monitor.repository.ts
 import type { AgentRegistryRepository } from "./agent-registry.repository.ts";
 import type { AgentStopClaimRepository } from "./agent-stop-claim.repository.ts";
 import type { AgentStopPlanRepository } from "./agent-stop-plan.repository.ts";
+import type { AgentStopTargetPriorStateRepository } from "./agent-stop-target-prior-state.repository.ts";
 import type { AgentStopRepository } from "./agent-stop.repository.ts";
 import type { AggregateReconcileLockRepository } from "./aggregate-reconcile-lock.repository.ts";
 import type { AiToolCatalogRepository } from "./ai-tool-catalog.repository.ts";
@@ -142,9 +143,10 @@ export interface GovernanceOcsfEventWriter {
 export interface GovernanceRepositories {
   readonly activityMonitor: ActivityMonitorRepository;
   readonly agentRegistry: AgentRegistryRepository;
-  /** The kill switch: stop plans, open-stop claims, AWS connections and the AgentStop projection. */
+  /** The kill switch: plans, claims, target prior states, AWS connections, the AgentStop projection. */
   readonly agentStopPlans: AgentStopPlanRepository;
   readonly agentStopClaims: AgentStopClaimRepository;
+  readonly agentStopTargetPriorStates: AgentStopTargetPriorStateRepository;
   readonly agentStops: AgentStopRepository;
   readonly awsConnections: GovernanceAwsConnectionRepository;
   readonly aggregateReconcileLock: AggregateReconcileLockRepository;

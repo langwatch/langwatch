@@ -29,6 +29,7 @@ import { COPILOT_STUDIO_DATAVERSE_ADAPTER_ID } from "../../../microsoft/rules/da
 import type { RegistryDraft } from "../../../registry/rules/registry-entry.rules.ts";
 import { planRegistryChanges } from "../../../registry/rules/registry-reconcile.rules.ts";
 import { buildAgentStopPipeline } from "../../eventing/agent-stop.pipeline.ts";
+import { AgentStopClaimService } from "../agent-stop-claim.service.ts";
 import { AgentStopPlanService } from "../agent-stop-plan.service.ts";
 import { AgentStopTargetService } from "../agent-stop-target.service.ts";
 import { type AgentStopCaller, AgentStopService } from "../agent-stop.service.ts";
@@ -162,7 +163,7 @@ export async function killSwitchHarness({ maxAttempts = 3 }: { maxAttempts?: num
   });
   const virtualKeyCalls: VirtualKeyCall[] = [];
   const keyRefusals = new Map<string, string>();
-  /** A key's status before any stop; absent means ACTIVE. */
+  /** A key's current status; absent means ACTIVE. A disable or enable that succeeds changes it. */
   const keyStatuses = new Map<string, GatewayVirtualKeyRecord["status"]>();
   const refuseKey = (code: string) => {
     const error = new Error(code);
@@ -178,12 +179,14 @@ export async function killSwitchHarness({ maxAttempts = 3 }: { maxAttempts?: num
       virtualKeyCalls.push({ action: "disable", input });
       const code = keyRefusals.get("disable");
       if (code) throw refuseKey(code);
+      keyStatuses.set(input.id, "DISABLED");
       return virtualKey(input.id);
     },
     enableVirtualKey: async (input) => {
       virtualKeyCalls.push({ action: "enable", input });
       const code = keyRefusals.get("enable");
       if (code) throw refuseKey(code);
+      keyStatuses.set(input.id, "ACTIVE");
       return virtualKey(input.id);
     },
   });
@@ -207,6 +210,8 @@ export async function killSwitchHarness({ maxAttempts = 3 }: { maxAttempts?: num
   });
   const connections = GovernanceAwsConnectionService.create({
     connections: repositories.awsConnections,
+    plans: repositories.agentStopPlans,
+    stops: repositories.agentStops,
   });
   const connection = await connections.createConnection({
     organizationId: ORG,
@@ -223,7 +228,15 @@ export async function killSwitchHarness({ maxAttempts = 3 }: { maxAttempts?: num
     processStore: InMemoryProcessStore.createForTesting(),
   });
   let commands: Record<string, { send(payload: unknown): Promise<unknown> }> = {};
+  /** How many more times recording each target's outcome is refused, by target id. */
+  const recordRefusals = new Map<string, number>();
   const send = async (name: string, payload: unknown) => {
+    const targetId = (payload as { targetId?: string }).targetId;
+    const refusals = targetId ? (recordRefusals.get(targetId) ?? 0) : 0;
+    if (name.startsWith("recordTarget") && targetId && refusals > 0) {
+      recordRefusals.set(targetId, refusals - 1);
+      throw new Error(`seeded refusal recording ${targetId}`);
+    }
     const sender = commands[name];
     if (!sender) throw new Error(`no ${name} command`);
     await sender.send(payload);
@@ -237,7 +250,10 @@ export async function killSwitchHarness({ maxAttempts = 3 }: { maxAttempts?: num
   });
   const stops = AgentStopService.create({
     stops: repositories.agentStops,
-    claims: repositories.agentStopClaims,
+    claims: AgentStopClaimService.create({
+      claims: repositories.agentStopClaims,
+      stops: repositories.agentStops,
+    }),
     plans,
     registry: repositories.agentRegistry,
     auditLog,
@@ -251,6 +267,7 @@ export async function killSwitchHarness({ maxAttempts = 3 }: { maxAttempts?: num
     signIn: MemoryProviderSignInChannel.create(),
     servingEndpoints,
     awsConnections: repositories.awsConnections,
+    priorStates: repositories.agentStopTargetPriorStates,
     bedrock,
     virtualKeys: gateway,
     registry: {
@@ -310,6 +327,7 @@ export async function killSwitchHarness({ maxAttempts = 3 }: { maxAttempts?: num
     virtualKeyCalls,
     keyRefusals,
     keyStatuses,
+    recordRefusals,
     fullPlan,
     setFullPlan,
     stopOf,

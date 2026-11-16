@@ -1,4 +1,4 @@
-from typing import Any, cast
+from typing import Any
 from urllib.parse import quote
 
 import httpx
@@ -11,6 +11,7 @@ from ...models.post_api_governance_agents_by_id_stop_response_400 import PostApi
 from ...models.post_api_governance_agents_by_id_stop_response_401 import PostApiGovernanceAgentsByIdStopResponse401
 from ...models.post_api_governance_agents_by_id_stop_response_403 import PostApiGovernanceAgentsByIdStopResponse403
 from ...models.post_api_governance_agents_by_id_stop_response_404 import PostApiGovernanceAgentsByIdStopResponse404
+from ...models.post_api_governance_agents_by_id_stop_response_409 import PostApiGovernanceAgentsByIdStopResponse409
 from ...models.post_api_governance_agents_by_id_stop_response_422 import PostApiGovernanceAgentsByIdStopResponse422
 from ...models.post_api_governance_agents_by_id_stop_response_500 import PostApiGovernanceAgentsByIdStopResponse500
 from ...types import Response, safe_http_status
@@ -41,12 +42,12 @@ def _get_kwargs(
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
 ) -> (
-    Any
-    | PostApiGovernanceAgentsByIdStopResponse202
+    PostApiGovernanceAgentsByIdStopResponse202
     | PostApiGovernanceAgentsByIdStopResponse400
     | PostApiGovernanceAgentsByIdStopResponse401
     | PostApiGovernanceAgentsByIdStopResponse403
     | PostApiGovernanceAgentsByIdStopResponse404
+    | PostApiGovernanceAgentsByIdStopResponse409
     | PostApiGovernanceAgentsByIdStopResponse422
     | PostApiGovernanceAgentsByIdStopResponse500
     | None
@@ -77,7 +78,8 @@ def _parse_response(
         return response_404
 
     if response.status_code == 409:
-        response_409 = cast(Any, None)
+        response_409 = PostApiGovernanceAgentsByIdStopResponse409.from_dict(response.json())
+
         return response_409
 
     if response.status_code == 422:
@@ -99,12 +101,12 @@ def _parse_response(
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
 ) -> Response[
-    Any
-    | PostApiGovernanceAgentsByIdStopResponse202
+    PostApiGovernanceAgentsByIdStopResponse202
     | PostApiGovernanceAgentsByIdStopResponse400
     | PostApiGovernanceAgentsByIdStopResponse401
     | PostApiGovernanceAgentsByIdStopResponse403
     | PostApiGovernanceAgentsByIdStopResponse404
+    | PostApiGovernanceAgentsByIdStopResponse409
     | PostApiGovernanceAgentsByIdStopResponse422
     | PostApiGovernanceAgentsByIdStopResponse500
 ]:
@@ -125,21 +127,23 @@ def sync_detailed(
     client: AuthenticatedClient,
     body: PostApiGovernanceAgentsByIdStopBody,
 ) -> Response[
-    Any
-    | PostApiGovernanceAgentsByIdStopResponse202
+    PostApiGovernanceAgentsByIdStopResponse202
     | PostApiGovernanceAgentsByIdStopResponse400
     | PostApiGovernanceAgentsByIdStopResponse401
     | PostApiGovernanceAgentsByIdStopResponse403
     | PostApiGovernanceAgentsByIdStopResponse404
+    | PostApiGovernanceAgentsByIdStopResponse409
     | PostApiGovernanceAgentsByIdStopResponse422
     | PostApiGovernanceAgentsByIdStopResponse500
 ]:
     """Stop an agent
 
-     Requests a stop of the agent on every target of its plan. A `critical` stop is applied at once; any
-    other severity waits for an approval by another credential (`status: pending_approval`). The targets
-    are applied in the background: read the stop back to follow each target's outcome. A trace rule's
-    webhook action can post here with the API key in its `Authorization` header.
+     Requests a stop of the agent on every target of its plan. Send `expectedTargetIds` with the plan's
+    target ids to refuse the stop (`agent_stop_plan_changed`) when the plan changed since you read it. A
+    `critical` stop is applied at once; any other severity waits for an approval by another credential
+    (`status: pending_approval`). The targets are applied in the background: read the stop back to
+    follow each target's outcome. A trace rule's webhook action can post here with the API key in its
+    `Authorization` header.
 
     Args:
         agent_id (str):
@@ -150,7 +154,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Any | PostApiGovernanceAgentsByIdStopResponse202 | PostApiGovernanceAgentsByIdStopResponse400 | PostApiGovernanceAgentsByIdStopResponse401 | PostApiGovernanceAgentsByIdStopResponse403 | PostApiGovernanceAgentsByIdStopResponse404 | PostApiGovernanceAgentsByIdStopResponse422 | PostApiGovernanceAgentsByIdStopResponse500]
+        Response[PostApiGovernanceAgentsByIdStopResponse202 | PostApiGovernanceAgentsByIdStopResponse400 | PostApiGovernanceAgentsByIdStopResponse401 | PostApiGovernanceAgentsByIdStopResponse403 | PostApiGovernanceAgentsByIdStopResponse404 | PostApiGovernanceAgentsByIdStopResponse409 | PostApiGovernanceAgentsByIdStopResponse422 | PostApiGovernanceAgentsByIdStopResponse500]
     """
 
     kwargs = _get_kwargs(
@@ -171,22 +175,24 @@ def sync(
     client: AuthenticatedClient,
     body: PostApiGovernanceAgentsByIdStopBody,
 ) -> (
-    Any
-    | PostApiGovernanceAgentsByIdStopResponse202
+    PostApiGovernanceAgentsByIdStopResponse202
     | PostApiGovernanceAgentsByIdStopResponse400
     | PostApiGovernanceAgentsByIdStopResponse401
     | PostApiGovernanceAgentsByIdStopResponse403
     | PostApiGovernanceAgentsByIdStopResponse404
+    | PostApiGovernanceAgentsByIdStopResponse409
     | PostApiGovernanceAgentsByIdStopResponse422
     | PostApiGovernanceAgentsByIdStopResponse500
     | None
 ):
     """Stop an agent
 
-     Requests a stop of the agent on every target of its plan. A `critical` stop is applied at once; any
-    other severity waits for an approval by another credential (`status: pending_approval`). The targets
-    are applied in the background: read the stop back to follow each target's outcome. A trace rule's
-    webhook action can post here with the API key in its `Authorization` header.
+     Requests a stop of the agent on every target of its plan. Send `expectedTargetIds` with the plan's
+    target ids to refuse the stop (`agent_stop_plan_changed`) when the plan changed since you read it. A
+    `critical` stop is applied at once; any other severity waits for an approval by another credential
+    (`status: pending_approval`). The targets are applied in the background: read the stop back to
+    follow each target's outcome. A trace rule's webhook action can post here with the API key in its
+    `Authorization` header.
 
     Args:
         agent_id (str):
@@ -197,7 +203,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Any | PostApiGovernanceAgentsByIdStopResponse202 | PostApiGovernanceAgentsByIdStopResponse400 | PostApiGovernanceAgentsByIdStopResponse401 | PostApiGovernanceAgentsByIdStopResponse403 | PostApiGovernanceAgentsByIdStopResponse404 | PostApiGovernanceAgentsByIdStopResponse422 | PostApiGovernanceAgentsByIdStopResponse500
+        PostApiGovernanceAgentsByIdStopResponse202 | PostApiGovernanceAgentsByIdStopResponse400 | PostApiGovernanceAgentsByIdStopResponse401 | PostApiGovernanceAgentsByIdStopResponse403 | PostApiGovernanceAgentsByIdStopResponse404 | PostApiGovernanceAgentsByIdStopResponse409 | PostApiGovernanceAgentsByIdStopResponse422 | PostApiGovernanceAgentsByIdStopResponse500
     """
 
     return sync_detailed(
@@ -213,21 +219,23 @@ async def asyncio_detailed(
     client: AuthenticatedClient,
     body: PostApiGovernanceAgentsByIdStopBody,
 ) -> Response[
-    Any
-    | PostApiGovernanceAgentsByIdStopResponse202
+    PostApiGovernanceAgentsByIdStopResponse202
     | PostApiGovernanceAgentsByIdStopResponse400
     | PostApiGovernanceAgentsByIdStopResponse401
     | PostApiGovernanceAgentsByIdStopResponse403
     | PostApiGovernanceAgentsByIdStopResponse404
+    | PostApiGovernanceAgentsByIdStopResponse409
     | PostApiGovernanceAgentsByIdStopResponse422
     | PostApiGovernanceAgentsByIdStopResponse500
 ]:
     """Stop an agent
 
-     Requests a stop of the agent on every target of its plan. A `critical` stop is applied at once; any
-    other severity waits for an approval by another credential (`status: pending_approval`). The targets
-    are applied in the background: read the stop back to follow each target's outcome. A trace rule's
-    webhook action can post here with the API key in its `Authorization` header.
+     Requests a stop of the agent on every target of its plan. Send `expectedTargetIds` with the plan's
+    target ids to refuse the stop (`agent_stop_plan_changed`) when the plan changed since you read it. A
+    `critical` stop is applied at once; any other severity waits for an approval by another credential
+    (`status: pending_approval`). The targets are applied in the background: read the stop back to
+    follow each target's outcome. A trace rule's webhook action can post here with the API key in its
+    `Authorization` header.
 
     Args:
         agent_id (str):
@@ -238,7 +246,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Any | PostApiGovernanceAgentsByIdStopResponse202 | PostApiGovernanceAgentsByIdStopResponse400 | PostApiGovernanceAgentsByIdStopResponse401 | PostApiGovernanceAgentsByIdStopResponse403 | PostApiGovernanceAgentsByIdStopResponse404 | PostApiGovernanceAgentsByIdStopResponse422 | PostApiGovernanceAgentsByIdStopResponse500]
+        Response[PostApiGovernanceAgentsByIdStopResponse202 | PostApiGovernanceAgentsByIdStopResponse400 | PostApiGovernanceAgentsByIdStopResponse401 | PostApiGovernanceAgentsByIdStopResponse403 | PostApiGovernanceAgentsByIdStopResponse404 | PostApiGovernanceAgentsByIdStopResponse409 | PostApiGovernanceAgentsByIdStopResponse422 | PostApiGovernanceAgentsByIdStopResponse500]
     """
 
     kwargs = _get_kwargs(
@@ -257,22 +265,24 @@ async def asyncio(
     client: AuthenticatedClient,
     body: PostApiGovernanceAgentsByIdStopBody,
 ) -> (
-    Any
-    | PostApiGovernanceAgentsByIdStopResponse202
+    PostApiGovernanceAgentsByIdStopResponse202
     | PostApiGovernanceAgentsByIdStopResponse400
     | PostApiGovernanceAgentsByIdStopResponse401
     | PostApiGovernanceAgentsByIdStopResponse403
     | PostApiGovernanceAgentsByIdStopResponse404
+    | PostApiGovernanceAgentsByIdStopResponse409
     | PostApiGovernanceAgentsByIdStopResponse422
     | PostApiGovernanceAgentsByIdStopResponse500
     | None
 ):
     """Stop an agent
 
-     Requests a stop of the agent on every target of its plan. A `critical` stop is applied at once; any
-    other severity waits for an approval by another credential (`status: pending_approval`). The targets
-    are applied in the background: read the stop back to follow each target's outcome. A trace rule's
-    webhook action can post here with the API key in its `Authorization` header.
+     Requests a stop of the agent on every target of its plan. Send `expectedTargetIds` with the plan's
+    target ids to refuse the stop (`agent_stop_plan_changed`) when the plan changed since you read it. A
+    `critical` stop is applied at once; any other severity waits for an approval by another credential
+    (`status: pending_approval`). The targets are applied in the background: read the stop back to
+    follow each target's outcome. A trace rule's webhook action can post here with the API key in its
+    `Authorization` header.
 
     Args:
         agent_id (str):
@@ -283,7 +293,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Any | PostApiGovernanceAgentsByIdStopResponse202 | PostApiGovernanceAgentsByIdStopResponse400 | PostApiGovernanceAgentsByIdStopResponse401 | PostApiGovernanceAgentsByIdStopResponse403 | PostApiGovernanceAgentsByIdStopResponse404 | PostApiGovernanceAgentsByIdStopResponse422 | PostApiGovernanceAgentsByIdStopResponse500
+        PostApiGovernanceAgentsByIdStopResponse202 | PostApiGovernanceAgentsByIdStopResponse400 | PostApiGovernanceAgentsByIdStopResponse401 | PostApiGovernanceAgentsByIdStopResponse403 | PostApiGovernanceAgentsByIdStopResponse404 | PostApiGovernanceAgentsByIdStopResponse409 | PostApiGovernanceAgentsByIdStopResponse422 | PostApiGovernanceAgentsByIdStopResponse500
     """
 
     return (

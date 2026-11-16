@@ -64,4 +64,23 @@ export class MemoryAgentStopPlanRepository extends AgentStopPlanRepository {
         targetCount: targets.length,
       }));
   }
+
+  async findAgentIdsByAwsConnection({
+    organizationId,
+    awsConnectionId,
+  }: {
+    organizationId: string;
+    awsConnectionId: string;
+  }): Promise<string[]> {
+    const prefix = `${organizationId}\u0000`;
+    return [...this.plans.entries()]
+      .filter(([key]) => key.startsWith(prefix))
+      .filter(([, targets]) =>
+        targets.some(
+          ({ target }) =>
+            target.kind === "bedrock_agent_alias" && target.awsConnectionId === awsConnectionId,
+        ),
+      )
+      .map(([key]) => key.slice(prefix.length));
+  }
 }

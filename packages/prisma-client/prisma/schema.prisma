@@ -7466,6 +7466,7 @@ model AgentStop {
   decidedByUserId     String?
   decidedByApiKeyId   String?
   restoredByUserId    String?
+  restoredByApiKeyId  String?
   targets             Json
   requestedAt         DateTime
   decidedAt           DateTime?
@@ -7486,13 +7487,29 @@ model AgentStop {
 /// The one open stop an agent may have: the api takes this row before it sends a stop's request,
 /// so two requests at once cannot both open one. A later request takes it over once the stop it
 /// names has closed.
+/// `sentAt` is set once the request command was sent: from then on the claim passes on only after
+/// its stop closed, never on age. `decision` is taken by the one approve or deny that wins.
 model AgentStopClaim {
   organizationId String
   agentId        String
   stopId         String
   claimedAt      DateTime
+  sentAt         DateTime?
+  decision       String?
 
   @@id([organizationId, agentId])
+}
+
+/// Whether a target was already stopped before a stop first touched it, recorded once before the
+/// stop's platform call, so a retried call after a success still knows the change is the stop's own.
+model AgentStopTargetPriorState {
+  organizationId String
+  stopId         String
+  targetId       String
+  wasStopped     Boolean
+  recordedAt     DateTime
+
+  @@id([organizationId, stopId, targetId])
 }
 
 /// The dated match table: "`user_abc123` on Anthropic is platform user #42,

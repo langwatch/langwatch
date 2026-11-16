@@ -4,6 +4,7 @@ import {
   type AgentStopPlanTarget,
   agentStopTargetSchema,
 } from "@langwatch/enterprise-governance-contract";
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 
 import {
@@ -64,6 +65,12 @@ export class PrismaAgentStopPlanRepository extends AgentStopPlanRepository {
     targets: readonly AgentStopPlanTarget[];
   }): Promise<StoredAgentStopPlanTarget[]> {
     return this.prisma.$transaction(async (transaction) => {
+      // Taken even for an empty plan: a concurrent non-empty write could still insert rows.
+      await transaction.$executeRaw` ${skipTenantCheck({
+        // Advisory-lock helper, the key names one agent's plan.
+        SKIP_TENANT_CHECK: true,
+      })}
+SELECT pg_advisory_xact_lock(hashtextextended(${`agent-stop-plan:${organizationId}:${agentId}`}, 0))`;
       await transaction.agentStopPlanTarget.deleteMany({ where: { organizationId, agentId } });
       if (targets.length > 0) {
         await transaction.agentStopPlanTarget.createMany({
@@ -97,5 +104,20 @@ export class PrismaAgentStopPlanRepository extends AgentStopPlanRepository {
       _count: { _all: true },
     });
     return rows.map((row) => ({ agentId: row.agentId, targetCount: row._count._all }));
+  }
+
+  async findAgentIdsByAwsConnection({
+    organizationId,
+    awsConnectionId,
+  }: {
+    organizationId: string;
+    awsConnectionId: string;
+  }): Promise<string[]> {
+    const rows = await this.prisma.agentStopPlanTarget.findMany({
+      where: { organizationId, target: { path: ["awsConnectionId"], equals: awsConnectionId } },
+      select: { agentId: true },
+      distinct: ["agentId"],
+    });
+    return rows.map((row) => row.agentId);
   }
 }

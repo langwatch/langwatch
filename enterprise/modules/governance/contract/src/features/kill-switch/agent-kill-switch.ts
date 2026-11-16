@@ -215,9 +215,13 @@ export interface AgentStopViewSchema extends Named<typeof agentStopViewSchemaDef
 export const agentStopViewSchema: AgentStopViewSchema = agentStopViewSchemaDefinition;
 export type AgentStopView = z.infer<typeof agentStopViewSchema>;
 
+/** The plan target ids the caller confirmed; a stop is refused when the plan no longer matches. */
+const expectedTargetIdsSchema = z.string().min(1).array().max(AGENT_STOP_PLAN_TARGETS_MAX);
+
 const requestAgentStopInputSchemaDefinition = z.object({
   reason: z.string().trim().min(1).max(2000),
   severity: z.enum(AGENT_STOP_SEVERITIES).default("high"),
+  expectedTargetIds: expectedTargetIdsSchema.optional(),
 });
 export interface RequestAgentStopInputSchema extends Named<
   typeof requestAgentStopInputSchemaDefinition
@@ -445,12 +449,18 @@ export const agentKillSwitchSummarySchema: AgentKillSwitchSummarySchema =
   agentKillSwitchSummarySchemaDefinition;
 export type AgentKillSwitchSummary = z.infer<typeof agentKillSwitchSummarySchema>;
 
+/** Every stop event, hinted to the stop's organisation: a stop's progress changes both reads. */
+const AGENT_STOP_READ_HINTS = Object.values(AGENT_STOP_EVENT_TYPES).map((event) => ({
+  event,
+  scope: "organizationId",
+}));
+
 export const governanceKillSwitchTrpc = defineTrpcContract("governanceKillSwitch")
-  .query("summaries")
+  .query("summaries", { invalidatedBy: AGENT_STOP_READ_HINTS })
   .withInput(z.object(organizationScope))
   .withOutput(agentKillSwitchSummarySchema.array())
 
-  .query("pendingApprovals")
+  .query("pendingApprovals", { invalidatedBy: AGENT_STOP_READ_HINTS })
   .withInput(z.object(organizationScope))
   .withOutput(agentStopViewSchema.array())
 
@@ -475,7 +485,13 @@ export const governanceKillSwitchTrpc = defineTrpcContract("governanceKillSwitch
   .withOutput(z.object({ deleted: z.boolean() }))
 
   .mutation("requestStop")
-  .withInput(z.object({ ...agentScope, reason: z.string().trim().min(1).max(2000) }))
+  .withInput(
+    z.object({
+      ...agentScope,
+      reason: z.string().trim().min(1).max(2000),
+      expectedTargetIds: expectedTargetIdsSchema.optional(),
+    }),
+  )
   .withOutput(agentStopViewSchema)
 
   .mutation("approveStop")

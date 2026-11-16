@@ -393,6 +393,40 @@ export class AgentStopPlanEmptyError extends HandledError {
   }
 }
 
+/** The plan changed after the caller read it, so the stop would act on unconfirmed targets. */
+export class AgentStopPlanChangedError extends HandledError {
+  declare readonly code: "agent_stop_plan_changed";
+
+  constructor(agentId: string) {
+    super("agent_stop_plan_changed", "The agent's stop plan changed since it was read.", {
+      httpStatus: 409,
+      fault: "customer",
+      meta: { agentId },
+      ...remediation("agent_stop_plan_changed"),
+    });
+    this.name = "AgentStopPlanChangedError";
+  }
+}
+
+/** A plan target or an unrestored stop still signs with the connection. */
+export class GovernanceAwsConnectionInUseError extends HandledError {
+  declare readonly code: "governance_aws_connection_in_use";
+
+  constructor(meta: { connectionId: string; agentIds: string[] }) {
+    super(
+      "governance_aws_connection_in_use",
+      "A stop plan or an open stop still uses this AWS connection.",
+      {
+        httpStatus: 409,
+        fault: "customer",
+        meta,
+        ...remediation("governance_aws_connection_in_use"),
+      },
+    );
+    this.name = "GovernanceAwsConnectionInUseError";
+  }
+}
+
 export class AgentStopAlreadyOpenError extends HandledError {
   declare readonly code: "agent_stop_already_open";
 

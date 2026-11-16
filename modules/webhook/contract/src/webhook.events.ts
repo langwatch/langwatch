@@ -152,7 +152,8 @@ export const WEBHOOK_EVENT_TYPES = [
     family: "governance",
     schemaVersion: "1",
     isEmitting: true,
-    description: "Every target a stop applied was reverted, so the agent runs again.",
+    description:
+      "Every target the stop changed was reverted; a target that was already stopped before the stop stays stopped.",
   },
   {
     type: "governance.agent.restore_failed",

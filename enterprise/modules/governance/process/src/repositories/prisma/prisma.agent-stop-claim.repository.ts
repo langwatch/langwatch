@@ -1,12 +1,20 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
-import { type AgentStopClaim, AgentStopClaimRepository } from "../agent-stop-claim.repository.ts";
+import {
+  type AgentStopClaim,
+  type AgentStopClaimDecision,
+  AgentStopClaimRepository,
+} from "../agent-stop-claim.repository.ts";
 
-type ClaimDatabase = Pick<PrismaClient, "agentStopClaim">;
+type ClaimDatabase = Pick<PrismaClient, "agentStopClaim" | "$executeRaw">;
 
-/** The primary key (organizationId, agentId) is what refuses a second claim at the same moment. */
+/**
+ * The primary key (organizationId, agentId) is what refuses a second claim at the same moment.
+ * The swap and the decision are SQL, so a writer parked on the row lock re-checks the committed row.
+ */
 export class PrismaAgentStopClaimRepository extends AgentStopClaimRepository {
   private constructor(private readonly prisma: ClaimDatabase) {
     super();
@@ -43,9 +51,68 @@ export class PrismaAgentStopClaimRepository extends AgentStopClaimRepository {
   }): Promise<AgentStopClaim[]> {
     const rows = await this.prisma.agentStopClaim.findMany({
       where: { organizationId, agentId },
-      select: { stopId: true, claimedAt: true },
+      select: { stopId: true, claimedAt: true, sentAt: true },
     });
-    return rows.map((row) => ({ stopId: row.stopId, claimedAt: row.claimedAt.getTime() }));
+    return rows.map((row) => ({
+      stopId: row.stopId,
+      claimedAt: row.claimedAt.getTime(),
+      sentAt: row.sentAt ? row.sentAt.getTime() : null,
+    }));
+  }
+
+  async markSent({
+    organizationId,
+    agentId,
+    stopId,
+    sentAt,
+  }: {
+    organizationId: string;
+    agentId: string;
+    stopId: string;
+    sentAt: number;
+  }): Promise<void> {
+    await this.prisma.agentStopClaim.updateMany({
+      where: { organizationId, agentId, stopId },
+      data: { sentAt: new Date(sentAt) },
+    });
+  }
+
+  async takeDecision({
+    organizationId,
+    stopId,
+    decision,
+  }: {
+    organizationId: string;
+    stopId: string;
+    decision: AgentStopClaimDecision;
+  }): Promise<boolean> {
+    const count = await this.prisma.$executeRaw`
+      ${skipTenantCheck({
+        // The claim is addressed by its organisation and stop, both in the WHERE.
+        SKIP_TENANT_CHECK: true,
+      })}
+      UPDATE "AgentStopClaim"
+         SET "decision" = ${decision}
+       WHERE "organizationId" = ${organizationId}
+         AND "stopId" = ${stopId}
+         AND "decision" IS NULL
+    `;
+    return count === 1;
+  }
+
+  async releaseDecision({
+    organizationId,
+    stopId,
+    decision,
+  }: {
+    organizationId: string;
+    stopId: string;
+    decision: AgentStopClaimDecision;
+  }): Promise<void> {
+    await this.prisma.agentStopClaim.updateMany({
+      where: { organizationId, stopId, decision },
+      data: { decision: null },
+    });
   }
 
   async swap({
@@ -61,10 +128,18 @@ export class PrismaAgentStopClaimRepository extends AgentStopClaimRepository {
     toStopId: string;
     claimedAt: number;
   }): Promise<boolean> {
-    const { count } = await this.prisma.agentStopClaim.updateMany({
-      where: { organizationId, agentId, stopId: fromStopId },
-      data: { stopId: toStopId, claimedAt: new Date(claimedAt) },
-    });
+    const count = await this.prisma.$executeRaw`
+      ${skipTenantCheck({
+        // The claim is addressed by its organisation and agent, both in the WHERE.
+        SKIP_TENANT_CHECK: true,
+      })}
+      UPDATE "AgentStopClaim"
+         SET "stopId" = ${toStopId}, "claimedAt" = ${new Date(claimedAt)},
+             "sentAt" = NULL, "decision" = NULL
+       WHERE "organizationId" = ${organizationId}
+         AND "agentId" = ${agentId}
+         AND "stopId" = ${fromStopId}
+    `;
     return count === 1;
   }
 

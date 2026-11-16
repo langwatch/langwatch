@@ -534,6 +534,7 @@ export interface GovernanceRestApi {
     organizationId: string;
     connection: AwsConnectionInput;
   }): Promise<AwsConnectionView>;
+  /** Throws `governance_aws_connection_in_use` while a plan target or unrestored stop uses it. */
   deleteAwsConnection(input: {
     organizationId: string;
     connectionId: string;
@@ -543,6 +544,8 @@ export interface GovernanceRestApi {
     agentId: string;
     reason: string;
     severity: AgentStopSeverity;
+    /** Throws `agent_stop_plan_changed` when given and the plan no longer holds exactly these. */
+    expectedTargetIds?: readonly string[];
     caller: AgentStopCaller;
   }): Promise<AgentStopView>;
   approveAgentStop(input: {

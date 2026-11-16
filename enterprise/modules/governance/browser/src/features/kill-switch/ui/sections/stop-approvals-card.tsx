@@ -14,12 +14,7 @@ import {
 import type { AgentStopView } from "@langwatch/enterprise-governance-contract";
 import { useState } from "react";
 
-import { api } from "../../../../behavior/governance-api.ts";
-import {
-  useGovernanceToaster,
-  useShowErrorToast,
-} from "../../../../behavior/governance-feedback.ts";
-import { useKillSwitchRefresh } from "../../behavior/use-kill-switch.ts";
+import { useStopDecisions } from "../../behavior/use-stop-decisions.ts";
 import {
   STOP_SEVERITY_LABELS,
   STOP_SEVERITY_PALETTES,
@@ -130,37 +125,10 @@ export function StopApprovalsCard({
   canManage: boolean;
 }) {
   const [denying, setDenying] = useState<AgentStopView | null>(null);
-  const toaster = useGovernanceToaster();
-  const showErrorToast = useShowErrorToast();
-  const refresh = useKillSwitchRefresh({ organizationId });
-  const approve = api.governanceKillSwitch.approveStop.useMutation();
-  const deny = api.governanceKillSwitch.denyStop.useMutation();
+  const decisions = useStopDecisions({ organizationId });
 
-  const approveStop = async (stop: AgentStopView) => {
-    try {
-      await approve.mutateAsync({ organizationId, stopId: stop.id });
-      toaster.create({ title: `Stopping ${stop.agentName}`, type: "success" });
-      await refresh.afterStopChange();
-    } catch (error) {
-      showErrorToast({ error, fallbackTitle: "Couldn't approve the stop" });
-    }
-  };
-
-  const denyStop = async (note: string) => {
-    if (!denying) return;
-    const trimmed = note.trim();
-    try {
-      await deny.mutateAsync({
-        organizationId,
-        stopId: denying.id,
-        ...(trimmed ? { note: trimmed } : {}),
-      });
-      toaster.create({ title: `Stop of ${denying.agentName} denied`, type: "info" });
-      await refresh.afterStopChange();
-      setDenying(null);
-    } catch (error) {
-      showErrorToast({ error, fallbackTitle: "Couldn't deny the stop" });
-    }
+  const denyStop = async ({ stop, note }: { stop: AgentStopView; note: string }) => {
+    if (await decisions.denyStop({ stop, note })) setDenying(null);
   };
 
   return (
@@ -177,8 +145,8 @@ export function StopApprovalsCard({
             key={stop.id}
             stop={stop}
             canManage={canManage}
-            isApproving={approve.isPending && approve.variables?.stopId === stop.id}
-            onApprove={() => void approveStop(stop)}
+            isApproving={decisions.approvingStopId === stop.id}
+            onApprove={() => void decisions.approveStop(stop)}
             onDeny={() => setDenying(stop)}
           />
         ))}
@@ -187,9 +155,9 @@ export function StopApprovalsCard({
         <DenyStopDialog
           key={denying.id}
           stop={denying}
-          isDenying={deny.isPending}
+          isDenying={decisions.isDenying}
           onCancel={() => setDenying(null)}
-          onDeny={(note) => void denyStop(note)}
+          onDeny={(note) => void denyStop({ stop: denying, note })}
         />
       ) : null}
     </Card>

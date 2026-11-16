@@ -1,7 +1,13 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-/** The stop that holds an agent's claim, and when it took it (epoch milliseconds). */
-export type AgentStopClaim = { stopId: string; claimedAt: number };
+/**
+ * The stop that holds an agent's claim, when it took it and when its request was sent (epoch
+ * milliseconds; null until then).
+ */
+export type AgentStopClaim = { stopId: string; claimedAt: number; sentAt: number | null };
+
+/** The one decision a pending stop takes. */
+export type AgentStopClaimDecision = "approve" | "deny";
 
 /**
  * Each agent's one open stop, taken before the stop's request is sent (specs/agent-kill-switch.feature).
@@ -20,7 +26,26 @@ export abstract class AgentStopClaimRepository {
     organizationId: string;
     agentId: string;
   }): Promise<AgentStopClaim[]>;
-  /** Hands the claim from `fromStopId` to `toStopId`; false when someone else moved it first. */
+  /** Marks the request of `stopId` sent; from then on its claim never passes on by age. */
+  abstract markSent(input: {
+    organizationId: string;
+    agentId: string;
+    stopId: string;
+    sentAt: number;
+  }): Promise<void>;
+  /** Takes the stop's one decision; false when another approve or deny took it first. */
+  abstract takeDecision(input: {
+    organizationId: string;
+    stopId: string;
+    decision: AgentStopClaimDecision;
+  }): Promise<boolean>;
+  /** Gives the decision back when its command was never sent. */
+  abstract releaseDecision(input: {
+    organizationId: string;
+    stopId: string;
+    decision: AgentStopClaimDecision;
+  }): Promise<void>;
+  /** Hands the claim from `fromStopId` to `toStopId`, unsent and undecided; false when moved first. */
   abstract swap(input: {
     organizationId: string;
     agentId: string;

@@ -12,11 +12,14 @@ export type BedrockAliasTarget = {
 };
 
 /**
- * Setting a Bedrock agent alias's invocation state: read the alias, then update it with its own
- * name, description and routing so nothing but the state changes. An alias already in `state` is
- * left alone (`changed: false`). Throws with the SDK error's name.
+ * A Bedrock agent alias's invocation state. Setting it reads the alias, then updates it with its
+ * own name, description and routing at once, so nothing but the state changes; an alias already in
+ * `state` is left alone (`changed: false`). Both throw with the SDK error's name.
  */
 export interface BedrockAgentAliasChannel {
+  getInvocationState(
+    args: BedrockAliasTarget & { signal?: AbortSignal },
+  ): Promise<BedrockInvocationState>;
   setInvocationState(
     args: BedrockAliasTarget & { state: BedrockInvocationState; signal?: AbortSignal },
   ): Promise<{ changed: boolean }>;

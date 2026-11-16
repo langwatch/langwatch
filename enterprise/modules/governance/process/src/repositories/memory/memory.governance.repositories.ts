@@ -8,6 +8,7 @@ import { MemoryActivityMonitorRepository } from "./memory.activity-monitor.repos
 import { MemoryAgentRegistryRepository } from "./memory.agent-registry.repository.ts";
 import { MemoryAgentStopClaimRepository } from "./memory.agent-stop-claim.repository.ts";
 import { MemoryAgentStopPlanRepository } from "./memory.agent-stop-plan.repository.ts";
+import { MemoryAgentStopTargetPriorStateRepository } from "./memory.agent-stop-target-prior-state.repository.ts";
 import { MemoryAgentStopRepository } from "./memory.agent-stop.repository.ts";
 import { MemoryAggregateReconcileLockRepository } from "./memory.aggregate-reconcile-lock.repository.ts";
 import { MemoryAiToolCatalogRepository } from "./memory.ai-tool-catalog.repository.ts";
@@ -71,6 +72,7 @@ export class MemoryGovernanceRepositories {
       agentRegistry: MemoryAgentRegistryRepository.create(),
       agentStopPlans: MemoryAgentStopPlanRepository.create(),
       agentStopClaims: MemoryAgentStopClaimRepository.create(),
+      agentStopTargetPriorStates: MemoryAgentStopTargetPriorStateRepository.create(),
       agentStops: MemoryAgentStopRepository.create(),
       awsConnections: MemoryGovernanceAwsConnectionRepository.create(),
       aggregateReconcileLock: MemoryAggregateReconcileLockRepository.create(),

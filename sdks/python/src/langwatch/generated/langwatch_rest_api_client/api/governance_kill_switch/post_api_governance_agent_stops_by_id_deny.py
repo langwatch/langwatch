@@ -1,4 +1,4 @@
-from typing import Any, cast
+from typing import Any
 from urllib.parse import quote
 
 import httpx
@@ -20,6 +20,9 @@ from ...models.post_api_governance_agent_stops_by_id_deny_response_403 import (
 )
 from ...models.post_api_governance_agent_stops_by_id_deny_response_404 import (
     PostApiGovernanceAgentStopsByIdDenyResponse404,
+)
+from ...models.post_api_governance_agent_stops_by_id_deny_response_409 import (
+    PostApiGovernanceAgentStopsByIdDenyResponse409,
 )
 from ...models.post_api_governance_agent_stops_by_id_deny_response_422 import (
     PostApiGovernanceAgentStopsByIdDenyResponse422,
@@ -56,12 +59,12 @@ def _get_kwargs(
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
 ) -> (
-    Any
-    | PostApiGovernanceAgentStopsByIdDenyResponse200
+    PostApiGovernanceAgentStopsByIdDenyResponse200
     | PostApiGovernanceAgentStopsByIdDenyResponse400
     | PostApiGovernanceAgentStopsByIdDenyResponse401
     | PostApiGovernanceAgentStopsByIdDenyResponse403
     | PostApiGovernanceAgentStopsByIdDenyResponse404
+    | PostApiGovernanceAgentStopsByIdDenyResponse409
     | PostApiGovernanceAgentStopsByIdDenyResponse422
     | PostApiGovernanceAgentStopsByIdDenyResponse500
     | None
@@ -92,7 +95,8 @@ def _parse_response(
         return response_404
 
     if response.status_code == 409:
-        response_409 = cast(Any, None)
+        response_409 = PostApiGovernanceAgentStopsByIdDenyResponse409.from_dict(response.json())
+
         return response_409
 
     if response.status_code == 422:
@@ -114,12 +118,12 @@ def _parse_response(
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
 ) -> Response[
-    Any
-    | PostApiGovernanceAgentStopsByIdDenyResponse200
+    PostApiGovernanceAgentStopsByIdDenyResponse200
     | PostApiGovernanceAgentStopsByIdDenyResponse400
     | PostApiGovernanceAgentStopsByIdDenyResponse401
     | PostApiGovernanceAgentStopsByIdDenyResponse403
     | PostApiGovernanceAgentStopsByIdDenyResponse404
+    | PostApiGovernanceAgentStopsByIdDenyResponse409
     | PostApiGovernanceAgentStopsByIdDenyResponse422
     | PostApiGovernanceAgentStopsByIdDenyResponse500
 ]:
@@ -140,12 +144,12 @@ def sync_detailed(
     client: AuthenticatedClient,
     body: PostApiGovernanceAgentStopsByIdDenyBody | Unset = UNSET,
 ) -> Response[
-    Any
-    | PostApiGovernanceAgentStopsByIdDenyResponse200
+    PostApiGovernanceAgentStopsByIdDenyResponse200
     | PostApiGovernanceAgentStopsByIdDenyResponse400
     | PostApiGovernanceAgentStopsByIdDenyResponse401
     | PostApiGovernanceAgentStopsByIdDenyResponse403
     | PostApiGovernanceAgentStopsByIdDenyResponse404
+    | PostApiGovernanceAgentStopsByIdDenyResponse409
     | PostApiGovernanceAgentStopsByIdDenyResponse422
     | PostApiGovernanceAgentStopsByIdDenyResponse500
 ]:
@@ -163,7 +167,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Any | PostApiGovernanceAgentStopsByIdDenyResponse200 | PostApiGovernanceAgentStopsByIdDenyResponse400 | PostApiGovernanceAgentStopsByIdDenyResponse401 | PostApiGovernanceAgentStopsByIdDenyResponse403 | PostApiGovernanceAgentStopsByIdDenyResponse404 | PostApiGovernanceAgentStopsByIdDenyResponse422 | PostApiGovernanceAgentStopsByIdDenyResponse500]
+        Response[PostApiGovernanceAgentStopsByIdDenyResponse200 | PostApiGovernanceAgentStopsByIdDenyResponse400 | PostApiGovernanceAgentStopsByIdDenyResponse401 | PostApiGovernanceAgentStopsByIdDenyResponse403 | PostApiGovernanceAgentStopsByIdDenyResponse404 | PostApiGovernanceAgentStopsByIdDenyResponse409 | PostApiGovernanceAgentStopsByIdDenyResponse422 | PostApiGovernanceAgentStopsByIdDenyResponse500]
     """
 
     kwargs = _get_kwargs(
@@ -184,12 +188,12 @@ def sync(
     client: AuthenticatedClient,
     body: PostApiGovernanceAgentStopsByIdDenyBody | Unset = UNSET,
 ) -> (
-    Any
-    | PostApiGovernanceAgentStopsByIdDenyResponse200
+    PostApiGovernanceAgentStopsByIdDenyResponse200
     | PostApiGovernanceAgentStopsByIdDenyResponse400
     | PostApiGovernanceAgentStopsByIdDenyResponse401
     | PostApiGovernanceAgentStopsByIdDenyResponse403
     | PostApiGovernanceAgentStopsByIdDenyResponse404
+    | PostApiGovernanceAgentStopsByIdDenyResponse409
     | PostApiGovernanceAgentStopsByIdDenyResponse422
     | PostApiGovernanceAgentStopsByIdDenyResponse500
     | None
@@ -208,7 +212,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Any | PostApiGovernanceAgentStopsByIdDenyResponse200 | PostApiGovernanceAgentStopsByIdDenyResponse400 | PostApiGovernanceAgentStopsByIdDenyResponse401 | PostApiGovernanceAgentStopsByIdDenyResponse403 | PostApiGovernanceAgentStopsByIdDenyResponse404 | PostApiGovernanceAgentStopsByIdDenyResponse422 | PostApiGovernanceAgentStopsByIdDenyResponse500
+        PostApiGovernanceAgentStopsByIdDenyResponse200 | PostApiGovernanceAgentStopsByIdDenyResponse400 | PostApiGovernanceAgentStopsByIdDenyResponse401 | PostApiGovernanceAgentStopsByIdDenyResponse403 | PostApiGovernanceAgentStopsByIdDenyResponse404 | PostApiGovernanceAgentStopsByIdDenyResponse409 | PostApiGovernanceAgentStopsByIdDenyResponse422 | PostApiGovernanceAgentStopsByIdDenyResponse500
     """
 
     return sync_detailed(
@@ -224,12 +228,12 @@ async def asyncio_detailed(
     client: AuthenticatedClient,
     body: PostApiGovernanceAgentStopsByIdDenyBody | Unset = UNSET,
 ) -> Response[
-    Any
-    | PostApiGovernanceAgentStopsByIdDenyResponse200
+    PostApiGovernanceAgentStopsByIdDenyResponse200
     | PostApiGovernanceAgentStopsByIdDenyResponse400
     | PostApiGovernanceAgentStopsByIdDenyResponse401
     | PostApiGovernanceAgentStopsByIdDenyResponse403
     | PostApiGovernanceAgentStopsByIdDenyResponse404
+    | PostApiGovernanceAgentStopsByIdDenyResponse409
     | PostApiGovernanceAgentStopsByIdDenyResponse422
     | PostApiGovernanceAgentStopsByIdDenyResponse500
 ]:
@@ -247,7 +251,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Any | PostApiGovernanceAgentStopsByIdDenyResponse200 | PostApiGovernanceAgentStopsByIdDenyResponse400 | PostApiGovernanceAgentStopsByIdDenyResponse401 | PostApiGovernanceAgentStopsByIdDenyResponse403 | PostApiGovernanceAgentStopsByIdDenyResponse404 | PostApiGovernanceAgentStopsByIdDenyResponse422 | PostApiGovernanceAgentStopsByIdDenyResponse500]
+        Response[PostApiGovernanceAgentStopsByIdDenyResponse200 | PostApiGovernanceAgentStopsByIdDenyResponse400 | PostApiGovernanceAgentStopsByIdDenyResponse401 | PostApiGovernanceAgentStopsByIdDenyResponse403 | PostApiGovernanceAgentStopsByIdDenyResponse404 | PostApiGovernanceAgentStopsByIdDenyResponse409 | PostApiGovernanceAgentStopsByIdDenyResponse422 | PostApiGovernanceAgentStopsByIdDenyResponse500]
     """
 
     kwargs = _get_kwargs(
@@ -266,12 +270,12 @@ async def asyncio(
     client: AuthenticatedClient,
     body: PostApiGovernanceAgentStopsByIdDenyBody | Unset = UNSET,
 ) -> (
-    Any
-    | PostApiGovernanceAgentStopsByIdDenyResponse200
+    PostApiGovernanceAgentStopsByIdDenyResponse200
     | PostApiGovernanceAgentStopsByIdDenyResponse400
     | PostApiGovernanceAgentStopsByIdDenyResponse401
     | PostApiGovernanceAgentStopsByIdDenyResponse403
     | PostApiGovernanceAgentStopsByIdDenyResponse404
+    | PostApiGovernanceAgentStopsByIdDenyResponse409
     | PostApiGovernanceAgentStopsByIdDenyResponse422
     | PostApiGovernanceAgentStopsByIdDenyResponse500
     | None
@@ -290,7 +294,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Any | PostApiGovernanceAgentStopsByIdDenyResponse200 | PostApiGovernanceAgentStopsByIdDenyResponse400 | PostApiGovernanceAgentStopsByIdDenyResponse401 | PostApiGovernanceAgentStopsByIdDenyResponse403 | PostApiGovernanceAgentStopsByIdDenyResponse404 | PostApiGovernanceAgentStopsByIdDenyResponse422 | PostApiGovernanceAgentStopsByIdDenyResponse500
+        PostApiGovernanceAgentStopsByIdDenyResponse200 | PostApiGovernanceAgentStopsByIdDenyResponse400 | PostApiGovernanceAgentStopsByIdDenyResponse401 | PostApiGovernanceAgentStopsByIdDenyResponse403 | PostApiGovernanceAgentStopsByIdDenyResponse404 | PostApiGovernanceAgentStopsByIdDenyResponse409 | PostApiGovernanceAgentStopsByIdDenyResponse422 | PostApiGovernanceAgentStopsByIdDenyResponse500
     """
 
     return (

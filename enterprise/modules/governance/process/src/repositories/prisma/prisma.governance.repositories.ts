@@ -7,6 +7,7 @@ import type { GovernanceRepositories } from "../governance.repositories.ts";
 import { PrismaAgentRegistryRepository } from "./prisma.agent-registry.repository.ts";
 import { PrismaAgentStopClaimRepository } from "./prisma.agent-stop-claim.repository.ts";
 import { PrismaAgentStopPlanRepository } from "./prisma.agent-stop-plan.repository.ts";
+import { PrismaAgentStopTargetPriorStateRepository } from "./prisma.agent-stop-target-prior-state.repository.ts";
 import { PrismaAgentStopRepository } from "./prisma.agent-stop.repository.ts";
 import { PrismaAggregateReconcileLockRepository } from "./prisma.aggregate-reconcile-lock.repository.ts";
 import { PrismaAiToolCatalogRepository } from "./prisma.ai-tool-catalog.repository.ts";
@@ -53,6 +54,7 @@ export class PostgresGovernanceRepositories {
       agentRegistry: PrismaAgentRegistryRepository.create(prisma),
       agentStopPlans: PrismaAgentStopPlanRepository.create(prisma),
       agentStopClaims: PrismaAgentStopClaimRepository.create(prisma),
+      agentStopTargetPriorStates: PrismaAgentStopTargetPriorStateRepository.create(prisma),
       agentStops: PrismaAgentStopRepository.create(prisma),
       awsConnections: PrismaGovernanceAwsConnectionRepository.create({
         database: prisma,

@@ -39,6 +39,8 @@ import { foldAgentStop } from "./agent-stop.projection.ts";
 export const AGENT_STOP_PROCESS_NAME = "agentStop" as const;
 /** A platform call that fails this many times is recorded failed with its error code. */
 export const AGENT_STOP_MAX_ATTEMPTS = 5;
+/** Deliveries past the platform budget, for recording an outcome whose first record failed. */
+export const AGENT_STOP_SETTLE_ATTEMPTS = 5;
 
 const AGENT_STOP_INTENT_TYPES = {
   APPLY: "applyTarget",
@@ -90,14 +92,18 @@ export interface AgentStopIntentExecutors {
 }
 
 /**
- * A person's id when one decided or requested; a machine credential with no owner acts as a
- * stable service principal named after the key, as the gateway does for an ownerless key.
+ * A restore acts as whoever asked for it; a stop as whoever decided, else requested it. A machine
+ * credential with no owner acts as a stable service principal named after the key, as the gateway
+ * does for an ownerless key.
  */
 function actorUserIdOf({ stop, restoring }: { stop: AgentStopRecord; restoring: boolean }): string {
-  const person =
-    (restoring ? stop.restoredByUserId : null) ?? stop.decidedByUserId ?? stop.requestedByUserId;
+  const [person, key] = restoring
+    ? [stop.restoredByUserId, stop.restoredByApiKeyId]
+    : [
+        stop.decidedByUserId ?? stop.requestedByUserId,
+        stop.decidedByApiKeyId ?? stop.requestedByApiKeyId,
+      ];
   if (person) return person;
-  const key = stop.decidedByApiKeyId ?? stop.requestedByApiKeyId;
   return key ? `svc_${key}` : `svc_${stop.id}`;
 }
 
@@ -224,7 +230,7 @@ export function agentStopProcessManager({
       built = built.on(schema, (state, data, context) => evolve({ state, type, data, context }));
     }
     return built.outbox({
-      maxAttempts: AGENT_STOP_MAX_ATTEMPTS,
+      maxAttempts: AGENT_STOP_MAX_ATTEMPTS + AGENT_STOP_SETTLE_ATTEMPTS,
       ...(retryDelayMs ? { retryDelayMs } : {}),
     });
   };

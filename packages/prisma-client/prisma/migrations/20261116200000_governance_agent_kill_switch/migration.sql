@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS "AgentStop" (
     "decidedByUserId" TEXT,
     "decidedByApiKeyId" TEXT,
     "restoredByUserId" TEXT,
+    "restoredByApiKeyId" TEXT,
     "targets" JSONB NOT NULL,
     "requestedAt" TIMESTAMP(3) NOT NULL,
     "decidedAt" TIMESTAMP(3),
@@ -63,8 +64,20 @@ CREATE TABLE IF NOT EXISTS "AgentStopClaim" (
     "agentId" TEXT NOT NULL,
     "stopId" TEXT NOT NULL,
     "claimedAt" TIMESTAMP(3) NOT NULL,
+    "sentAt" TIMESTAMP(3),
+    "decision" TEXT,
 
     CONSTRAINT "AgentStopClaim_pkey" PRIMARY KEY ("organizationId","agentId")
+);
+
+CREATE TABLE IF NOT EXISTS "AgentStopTargetPriorState" (
+    "organizationId" TEXT NOT NULL,
+    "stopId" TEXT NOT NULL,
+    "targetId" TEXT NOT NULL,
+    "wasStopped" BOOLEAN NOT NULL,
+    "recordedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "AgentStopTargetPriorState_pkey" PRIMARY KEY ("organizationId","stopId","targetId")
 );
 
 CREATE INDEX IF NOT EXISTS "AgentStopPlanTarget_organizationId_agentId_idx" ON "AgentStopPlanTarget"("organizationId", "agentId");

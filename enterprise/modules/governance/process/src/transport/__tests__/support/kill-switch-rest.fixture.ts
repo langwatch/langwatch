@@ -102,11 +102,14 @@ function planOfType(type: string): Plan {
   };
 }
 
-export async function buildKillSwitchRest({
-  grants = ["governance:view", "governance:manage"],
-  planType = "ENTERPRISE",
-}: { grants?: string[]; planType?: string } = {}) {
-  const repositories = MemoryGovernanceRepositories.create();
+/** The governance application over memory, with a gateway double that records each disable. */
+async function governanceAppOf({
+  repositories,
+  planType,
+}: {
+  repositories: ReturnType<typeof MemoryGovernanceRepositories.create>;
+  planType: string;
+}) {
   const disabled: GatewayVirtualKeyDisableCommand[] = [];
   const app = await GovernanceModule.create({
     config: void 0,
@@ -146,6 +149,13 @@ export async function buildKillSwitchRest({
     resources: new ResourceScope(),
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
   });
+  return { app, disabled };
+}
+
+/** The registry agent "support-bot" with a one-key stop plan. */
+async function seedAgent(
+  repositories: ReturnType<typeof MemoryGovernanceRepositories.create>,
+): Promise<void> {
   await repositories.agentRegistry.applyChanges({
     organizationId: ORG,
     plan: (stored) =>
@@ -168,14 +178,18 @@ export async function buildKillSwitchRest({
       },
     ],
   });
+}
 
-  const eventing = new EventSourcing({
-    eventStore: EventStoreMemory.createForTesting(),
-    processStore: InMemoryProcessStore.createForTesting(),
-  });
-  const pipeline = eventing.register(app.agentStopPipeline({ participation: "consume" }));
-  app.connectAgentStop(pipeline.commands);
-
+/** The REST family mounted on a runtime whose keys hold `grants` and whose plan is `planType`. */
+function mountKillSwitchRest({
+  app,
+  grants,
+  planType,
+}: {
+  app: Awaited<ReturnType<typeof governanceAppOf>>["app"];
+  grants: string[];
+  planType: string;
+}) {
   const runtime = createRestRuntime({
     audit: { record: () => {} },
     authorization: restTestAuthorization(),
@@ -204,8 +218,7 @@ export async function buildKillSwitchRest({
     credential: "organization",
     onError: canonicalErrorResponse,
   });
-
-  const call = ({
+  return ({
     method,
     path,
     body,
@@ -221,6 +234,21 @@ export async function buildKillSwitchRest({
       headers: { Authorization: `Bearer ${key.bearer}`, "Content-Type": "application/json" },
       ...(body === undefined ? {} : { body }),
     });
+}
 
+export async function buildKillSwitchRest({
+  grants = ["governance:view", "governance:manage"],
+  planType = "ENTERPRISE",
+}: { grants?: string[]; planType?: string } = {}) {
+  const repositories = MemoryGovernanceRepositories.create();
+  const { app, disabled } = await governanceAppOf({ repositories, planType });
+  await seedAgent(repositories);
+  const eventing = new EventSourcing({
+    eventStore: EventStoreMemory.createForTesting(),
+    processStore: InMemoryProcessStore.createForTesting(),
+  });
+  const pipeline = eventing.register(app.agentStopPipeline({ participation: "consume" }));
+  app.connectAgentStop(pipeline.commands);
+  const call = mountKillSwitchRest({ app, grants, planType });
   return { app, repositories, eventing, disabled, call };
 }

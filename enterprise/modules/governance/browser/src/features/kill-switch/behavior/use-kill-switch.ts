@@ -6,7 +6,10 @@
 import { api } from "../../../behavior/governance-api.ts";
 import { summariesByRowId } from "../model/kill-switch-copy.ts";
 
-/** Each row's open stop and plan size, plus the stops waiting for a decision. */
+/**
+ * Each row's open stop and plan size, plus the stops waiting for a decision. A failed read comes
+ * back as `error` with its `retry`, never as an empty answer.
+ */
 export function useKillSwitchReads({
   organizationId,
   enabled,
@@ -15,17 +18,18 @@ export function useKillSwitchReads({
   enabled: boolean;
 }) {
   const active = enabled && !!organizationId;
-  const summaries = api.governanceKillSwitch.summaries.useQuery(
-    { organizationId },
-    { enabled: active, refetchOnWindowFocus: false },
-  );
-  const pending = api.governanceKillSwitch.pendingApprovals.useQuery(
-    { organizationId },
-    { enabled: active, refetchOnWindowFocus: false },
-  );
+  const options = { enabled: active, refetchOnWindowFocus: false };
+  const summaries = api.governanceKillSwitch.summaries.useQuery({ organizationId }, options);
+  const pending = api.governanceKillSwitch.pendingApprovals.useQuery({ organizationId }, options);
+  const summaryRows = active ? (summaries.data ?? []) : [];
+  const pendingApprovals = active ? (pending.data ?? []) : [];
   return {
-    byRowId: summariesByRowId(active ? (summaries.data ?? []) : []),
-    pendingApprovals: active ? (pending.data ?? []) : [],
+    byRowId: summariesByRowId(summaryRows),
+    pendingApprovals,
+    summariesError: active ? summaries.error : null,
+    pendingApprovalsError: active ? pending.error : null,
+    retrySummaries: () => void summaries.refetch(),
+    retryPendingApprovals: () => void pending.refetch(),
   };
 }
 
@@ -33,6 +37,7 @@ export function useKillSwitchReads({
 export function useKillSwitchRefresh({ organizationId }: { organizationId: string }) {
   const utils = api.useUtils();
   return {
+    /** Re-reads now; the read hints of the stop's events refresh them as the worker moves it. */
     afterStopChange: async () => {
       await Promise.all([
         utils.governanceKillSwitch.summaries.invalidate({ organizationId }),

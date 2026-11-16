@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -19,10 +19,12 @@ class PostApiGovernanceAgentsByIdStopBody:
         reason (str):
         severity (PostApiGovernanceAgentsByIdStopBodySeverity | Unset):  Default:
             PostApiGovernanceAgentsByIdStopBodySeverity.HIGH.
+        expected_target_ids (list[str] | Unset):
     """
 
     reason: str
     severity: PostApiGovernanceAgentsByIdStopBodySeverity | Unset = PostApiGovernanceAgentsByIdStopBodySeverity.HIGH
+    expected_target_ids: list[str] | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -31,6 +33,10 @@ class PostApiGovernanceAgentsByIdStopBody:
         severity: str | Unset = UNSET
         if not isinstance(self.severity, Unset):
             severity = self.severity.value
+
+        expected_target_ids: list[str] | Unset = UNSET
+        if not isinstance(self.expected_target_ids, Unset):
+            expected_target_ids = self.expected_target_ids
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
@@ -41,6 +47,8 @@ class PostApiGovernanceAgentsByIdStopBody:
         )
         if severity is not UNSET:
             field_dict["severity"] = severity
+        if expected_target_ids is not UNSET:
+            field_dict["expectedTargetIds"] = expected_target_ids
 
         return field_dict
 
@@ -56,9 +64,12 @@ class PostApiGovernanceAgentsByIdStopBody:
         else:
             severity = PostApiGovernanceAgentsByIdStopBodySeverity(_severity)
 
+        expected_target_ids = cast(list[str], d.pop("expectedTargetIds", UNSET))
+
         post_api_governance_agents_by_id_stop_body = cls(
             reason=reason,
             severity=severity,
+            expected_target_ids=expected_target_ids,
         )
 
         post_api_governance_agents_by_id_stop_body.additional_properties = d

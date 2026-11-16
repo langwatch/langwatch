@@ -27962,7 +27962,7 @@
     {
       "name": "AgentStopClaim",
       "tableName": "AgentStopClaim",
-      "documentation": "The one open stop an agent may have: the api takes this row before it sends a stop's request,\nso two requests at once cannot both open one. A later request takes it over once the stop it\nnames has closed.",
+      "documentation": "The one open stop an agent may have: the api takes this row before it sends a stop's request,\nso two requests at once cannot both open one. A later request takes it over once the stop it\nnames has closed.\n`sentAt` is set once the request command was sent: from then on the claim passes on only after\nits stop closed, never on age. `decision` is taken by the one approve or deny that wins.",
       "primaryKey": [
         "organizationId",
         "agentId"
@@ -27998,6 +27998,81 @@
         {
           "name": "claimedAt",
           "columnName": "claimedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "sentAt",
+          "columnName": "sentAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "decision",
+          "columnName": "decision",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "AgentStopTargetPriorState",
+      "tableName": "AgentStopTargetPriorState",
+      "documentation": "Whether a target was already stopped before a stop first touched it, recorded once before the\nstop's platform call, so a retried call after a success still knows the change is the stop's own.",
+      "primaryKey": [
+        "organizationId",
+        "stopId",
+        "targetId"
+      ],
+      "fields": [
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "stopId",
+          "columnName": "stopId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "targetId",
+          "columnName": "targetId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "wasStopped",
+          "columnName": "wasStopped",
+          "type": "Boolean",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "recordedAt",
+          "columnName": "recordedAt",
           "type": "DateTime",
           "kind": "scalar",
           "isList": false,

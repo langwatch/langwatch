@@ -6,6 +6,7 @@
  */
 import {
   canonicalBaseResponses,
+  canonicalConflictResponses,
   canonicalNotFoundResponses,
   canonicalUnprocessableResponses,
   defineRestRouter,
@@ -29,7 +30,12 @@ import {
 
 const TAGS = ["Governance / Kill Switch"];
 
-const conflictResponses = { 409: { description: "The stop is not in a state that allows this" } };
+const conflictResponses = {
+  409: {
+    ...canonicalConflictResponses[409],
+    description: "The stop or its plan is not in a state that allows this",
+  },
+};
 
 /** An API key acts as itself, owner kept for the trail; a person's CLI token acts as that person. */
 function agentStopCallerOfKey(key: RestKeyCredential): AgentStopCaller {
@@ -107,7 +113,7 @@ export const agentKillSwitchRest = defineRestRouter(GovernanceRestApi)
     summary: "Stop an agent",
     tags: TAGS,
     description:
-      "Requests a stop of the agent on every target of its plan. A `critical` stop is applied at once; any other severity waits for an approval by another credential (`status: pending_approval`). The targets are applied in the background: read the stop back to follow each target's outcome. A trace rule's webhook action can post here with the API key in its `Authorization` header.",
+      "Requests a stop of the agent on every target of its plan. Send `expectedTargetIds` with the plan's target ids to refuse the stop (`agent_stop_plan_changed`) when the plan changed since you read it. A `critical` stop is applied at once; any other severity waits for an approval by another credential (`status: pending_approval`). The targets are applied in the background: read the stop back to follow each target's outcome. A trace rule's webhook action can post here with the API key in its `Authorization` header.",
     responses: {
       ...canonicalBaseResponses,
       ...canonicalUnprocessableResponses,
@@ -121,6 +127,7 @@ export const agentKillSwitchRest = defineRestRouter(GovernanceRestApi)
       agentId: input.agentId,
       reason: input.reason,
       severity: input.severity,
+      ...(input.expectedTargetIds ? { expectedTargetIds: input.expectedTargetIds } : {}),
       caller: agentStopCallerOfKey(key),
     }),
   }))

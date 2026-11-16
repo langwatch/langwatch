@@ -200,6 +200,7 @@ export const prismaTableCatalogue = {
   "GovernanceAwsConnection": "GovernanceAwsConnection",
   "AgentStop": "AgentStop",
   "AgentStopClaim": "AgentStopClaim",
+  "AgentStopTargetPriorState": "AgentStopTargetPriorState",
   "IdentityMatch": "IdentityMatch",
   "GovernanceTenantHistory": "GovernanceTenantHistory",
   "ErasedIdentifierSuppression": "ErasedIdentifierSuppression",
@@ -3235,6 +3236,7 @@ export const prismaModelFieldCatalogue = {
     "decidedByUserId",
     "decidedByApiKeyId",
     "restoredByUserId",
+    "restoredByApiKeyId",
     "targets",
     "requestedAt",
     "decidedAt",
@@ -3252,7 +3254,16 @@ export const prismaModelFieldCatalogue = {
     "organizationId",
     "agentId",
     "stopId",
-    "claimedAt"
+    "claimedAt",
+    "sentAt",
+    "decision"
+  ],
+  "AgentStopTargetPriorState": [
+    "organizationId",
+    "stopId",
+    "targetId",
+    "wasStopped",
+    "recordedAt"
   ],
   "IdentityMatch": [
     "id",
@@ -4028,6 +4039,7 @@ export const prismaRelationCatalogue = {
   "GovernanceAwsConnection": {},
   "AgentStop": {},
   "AgentStopClaim": {},
+  "AgentStopTargetPriorState": {},
   "IdentityMatch": {},
   "GovernanceTenantHistory": {},
   "ErasedIdentifierSuppression": {},

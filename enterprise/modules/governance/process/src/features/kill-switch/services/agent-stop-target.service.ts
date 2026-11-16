@@ -15,6 +15,7 @@ import {
   KillSwitchPlatformError,
 } from "../../../channels/databricks-serving-endpoint.channel.ts";
 import type { ProviderSignInChannel } from "../../../channels/provider-sign-in.channel.ts";
+import type { AgentStopTargetPriorStateRepository } from "../../../repositories/agent-stop-target-prior-state.repository.ts";
 import type { GovernanceAwsConnectionRepository } from "../../../repositories/governance-aws-connection.repository.ts";
 import type { SourceCredentialAccessService } from "../../ingestion-source/services/source-credential-access.service.ts";
 import type { AgentRegistryService } from "../../registry/services/agent-registry.service.ts";
@@ -35,6 +36,7 @@ interface AgentStopTargetDependencies {
   servingEndpoints: DatabricksServingEndpointChannel;
   awsConnections: Pick<GovernanceAwsConnectionRepository, "getCredentials">;
   bedrock: BedrockAgentAliasChannel;
+  priorStates: AgentStopTargetPriorStateRepository;
   virtualKeys: Pick<GatewayApi, "findVirtualKeyById" | "disableVirtualKey" | "enableVirtualKey">;
   registry: Pick<AgentRegistryService, "announceStop">;
   auditLog: Pick<AuditLogApi, "record">;
@@ -46,8 +48,9 @@ type Direction = "stop" | "restore";
 
 /**
  * The worker's half of a stop: one platform call per intent, then the outcome recorded as a
- * command. A failing call is thrown back to the outbox until its last attempt, which records the
- * target failed with a stable error code instead. Every call here is idempotent on the platform.
+ * command. A failing call is thrown back to the outbox until `maxAttempts`; later attempts record
+ * the target failed instead, and only a failing record is retried, within the outbox's own budget.
+ * Whether a target was stopped before the stop is recorded once, before the first call.
  */
 export class AgentStopTargetService implements AgentStopIntentExecutors {
   private constructor(private readonly deps: AgentStopTargetDependencies) {}
@@ -142,7 +145,38 @@ export class AgentStopTargetService implements AgentStopIntentExecutors {
     }
   }
 
-  /** A key that is not active when the stop arrives is left alone, so a restore leaves it too. */
+  /**
+   * Stops a key or alias unless it was already stopped before this stop first touched it. The
+   * prior state is read and recorded once, so a retry after a successful call (live state now
+   * stopped) still counts the change as the stop's own and the restore reverts it.
+   */
+  private async stopUnlessAlreadyStopped({
+    intent,
+    isStopped,
+    stop,
+  }: {
+    intent: AgentStopApplyIntent;
+    isStopped: () => Promise<boolean>;
+    stop: () => Promise<unknown>;
+  }): Promise<{ changed: boolean }> {
+    const key = {
+      organizationId: intent.organizationId,
+      stopId: intent.stopId,
+      targetId: intent.target.id,
+    };
+    const [recorded] = await this.deps.priorStates.findPriorStates(key);
+    const wasStopped =
+      recorded ??
+      (await this.deps.priorStates.recordOnce({
+        ...key,
+        wasStopped: await isStopped(),
+        recordedAt: this.deps.now(),
+      }));
+    if (wasStopped) return { changed: false };
+    await stop();
+    return { changed: true };
+  }
+
   private async callVirtualKey({
     intent,
     virtualKeyId,
@@ -158,13 +192,52 @@ export class AgentStopTargetService implements AgentStopIntentExecutors {
       await this.deps.virtualKeys.enableVirtualKey(command);
       return { changed: true };
     }
-    const key = await this.deps.virtualKeys.findVirtualKeyById(virtualKeyId, organizationId);
-    if (key && key.status !== "ACTIVE") return { changed: false };
-    await this.deps.virtualKeys.disableVirtualKey({
-      ...command,
-      reason: `kill switch stop ${intent.stopId}: ${intent.reason}`,
+    return this.stopUnlessAlreadyStopped({
+      intent,
+      isStopped: async () => {
+        const key = await this.deps.virtualKeys.findVirtualKeyById(virtualKeyId, organizationId);
+        return key !== null && key.status !== "ACTIVE";
+      },
+      stop: () =>
+        this.deps.virtualKeys.disableVirtualKey({
+          ...command,
+          reason: `kill switch stop ${intent.stopId}: ${intent.reason}`,
+        }),
     });
-    return { changed: true };
+  }
+
+  private async callBedrock({
+    intent,
+    target,
+    direction,
+  }: {
+    intent: AgentStopApplyIntent;
+    target: Extract<AgentStopTarget, { kind: "bedrock_agent_alias" }>;
+    direction: Direction;
+  }): Promise<{ changed: boolean }> {
+    const alias = {
+      credentials: await this.deps.awsConnections.getCredentials({
+        organizationId: intent.organizationId,
+        id: target.awsConnectionId,
+      }),
+      region: target.region,
+      agentId: target.agentId,
+      agentAliasId: target.agentAliasId,
+    };
+    if (direction === "restore") {
+      await this.deps.bedrock.setInvocationState({
+        ...alias,
+        state: BEDROCK_INVOCATION_STATES.restore,
+      });
+      return { changed: true };
+    }
+    return this.stopUnlessAlreadyStopped({
+      intent,
+      isStopped: async () =>
+        (await this.deps.bedrock.getInvocationState(alias)) === BEDROCK_INVOCATION_STATES.stop,
+      stop: () =>
+        this.deps.bedrock.setInvocationState({ ...alias, state: BEDROCK_INVOCATION_STATES.stop }),
+    });
   }
 
   private async call({
@@ -201,19 +274,8 @@ export class AgentStopTargetService implements AgentStopIntentExecutors {
             return { changed: true };
           },
         });
-      case "bedrock_agent_alias": {
-        const credentials = await this.deps.awsConnections.getCredentials({
-          organizationId,
-          id: target.awsConnectionId,
-        });
-        return this.deps.bedrock.setInvocationState({
-          credentials,
-          region: target.region,
-          agentId: target.agentId,
-          agentAliasId: target.agentAliasId,
-          state: BEDROCK_INVOCATION_STATES[direction],
-        });
-      }
+      case "bedrock_agent_alias":
+        return this.callBedrock({ intent, target, direction });
       case "gateway_virtual_key":
         return this.callVirtualKey({ intent, virtualKeyId: target.virtualKeyId, direction });
     }

@@ -526,6 +526,20 @@ function AgentsPage() {
             the page's one claim about the whole screen; above the chips
             because the strip summarizes the fleet rather than whatever the
             chips have left of it. */}
+          {killSwitch.summariesError ? (
+            <HandledErrorAlert
+              error={killSwitch.summariesError}
+              fallbackTitle="Couldn't load the agents' stop state"
+              onRetry={killSwitch.retrySummaries}
+            />
+          ) : null}
+          {killSwitch.pendingApprovalsError ? (
+            <HandledErrorAlert
+              error={killSwitch.pendingApprovalsError}
+              fallbackTitle="Couldn't load the stops waiting for approval"
+              onRetry={killSwitch.retryPendingApprovals}
+            />
+          ) : null}
           {killSwitch.pendingApprovals.length > 0 && (
             <StopApprovalsCard
               organizationId={organizationId}

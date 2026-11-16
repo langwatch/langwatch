@@ -3807,6 +3807,10 @@ const presentations = {
     title: "This stop cannot be restored",
     describe: () => "Only a quarantined stop, or one that failed, can be restored.",
   },
+  agent_stop_plan_changed: {
+    title: "The stop plan changed",
+    describe: () => "Someone edited this agent's stop plan. Check the targets again, then confirm.",
+  },
   agent_stop_plan_empty: {
     title: "This agent has no stop plan",
     describe: () =>
@@ -3820,6 +3824,11 @@ const presentations = {
     title: "A stop plan target is not valid",
     describe: () =>
       "Each target must name a Databricks source, an AWS connection or a virtual key of this organisation.",
+  },
+  governance_aws_connection_in_use: {
+    title: "This AWS connection is still in use",
+    describe: () =>
+      "A stop plan target or a stop that is not restored yet signs with it. Remove those targets or restore the stop first.",
   },
   governance_aws_connection_not_found: {
     title: "AWS connection not found",

@@ -1,10 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { Field, HStack, Input, Text, VStack, Button } from "@langwatch/design-system/primitives";
-import { SegmentedControl } from "@langwatch/design-system/segmented-control";
-import {
-  type AwsConnectionView,
-  awsConnectionInputSchema,
-} from "@langwatch/enterprise-governance-contract";
+import { Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import type { AwsConnectionView } from "@langwatch/enterprise-governance-contract";
 import { Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 
@@ -14,16 +10,7 @@ import {
   useShowErrorToast,
 } from "../../../../behavior/governance-feedback.ts";
 import { useKillSwitchRefresh } from "../../behavior/use-kill-switch.ts";
-
-type Credential = "keys" | "role";
-
-const EMPTY_FORM = {
-  name: "",
-  accessKeyId: "",
-  secretAccessKey: "",
-  roleArn: "",
-  externalId: "",
-};
+import { AwsConnectionForm } from "./aws-connection-form.tsx";
 
 /** How a connection signs in, as its row says it. Never the secret. */
 function connectionDetail(connection: AwsConnectionView): string {
@@ -34,7 +21,41 @@ function connectionDetail(connection: AwsConnectionView): string {
   return parts.join(" · ");
 }
 
-/** The AWS connections a Bedrock target signs with: list, add and delete. */
+function ConnectionRow({
+  connection,
+  isDeleting,
+  onDelete,
+}: {
+  connection: AwsConnectionView;
+  isDeleting: boolean;
+  onDelete: () => void;
+}) {
+  return (
+    <HStack justify="space-between" data-testid="aws-connection-row">
+      <VStack align="start" gap={0}>
+        <Text textStyle="sm">{connection.name}</Text>
+        <Text textStyle="xs" color="fg.muted">
+          {connectionDetail(connection)}
+        </Text>
+      </VStack>
+      <Button
+        size="xs"
+        variant="ghost"
+        colorPalette="red"
+        aria-label={`Delete ${connection.name}`}
+        loading={isDeleting}
+        onClick={onDelete}
+      >
+        <Trash2 size={14} />
+      </Button>
+    </HStack>
+  );
+}
+
+/**
+ * The AWS connections a Bedrock target signs with: list, add and delete. A delete refused because
+ * a plan or an open stop still signs with the connection shows the refusal's own words.
+ */
 export function AwsConnectionsSection({
   organizationId,
   connections,
@@ -43,49 +64,10 @@ export function AwsConnectionsSection({
   connections: readonly AwsConnectionView[];
 }) {
   const [adding, setAdding] = useState(false);
-  const [credential, setCredential] = useState<Credential>("keys");
-  const [form, setForm] = useState(EMPTY_FORM);
-  const [formError, setFormError] = useState<string | null>(null);
   const toaster = useGovernanceToaster();
   const showErrorToast = useShowErrorToast();
   const refresh = useKillSwitchRefresh({ organizationId });
-  const create = api.governanceKillSwitch.createAwsConnection.useMutation();
   const remove = api.governanceKillSwitch.deleteAwsConnection.useMutation();
-
-  const set = (field: keyof typeof EMPTY_FORM) => (event: { target: { value: string } }) => {
-    setForm((previous) => ({ ...previous, [field]: event.target.value }));
-    setFormError(null);
-  };
-
-  const submit = async () => {
-    const optional = (value: string) => (value.trim() ? value.trim() : undefined);
-    const parsed = awsConnectionInputSchema.safeParse(
-      credential === "keys"
-        ? {
-            name: form.name,
-            accessKeyId: optional(form.accessKeyId),
-            secretAccessKey: optional(form.secretAccessKey),
-          }
-        : {
-            name: form.name,
-            roleArn: optional(form.roleArn),
-            externalId: optional(form.externalId),
-          },
-    );
-    if (!parsed.success) {
-      setFormError(parsed.error.issues[0]?.message ?? "Check the connection's fields.");
-      return;
-    }
-    try {
-      await create.mutateAsync({ organizationId, connection: parsed.data });
-      toaster.create({ title: "AWS connection added", type: "success" });
-      await refresh.afterConnectionChange();
-      setForm(EMPTY_FORM);
-      setAdding(false);
-    } catch (error) {
-      showErrorToast({ error, fallbackTitle: "Couldn't add the AWS connection" });
-    }
-  };
 
   const deleteConnection = async (connection: AwsConnectionView) => {
     try {
@@ -115,114 +97,15 @@ export function AwsConnectionsSection({
         </Text>
       ) : null}
       {connections.map((connection) => (
-        <HStack key={connection.id} justify="space-between" data-testid="aws-connection-row">
-          <VStack align="start" gap={0}>
-            <Text textStyle="sm">{connection.name}</Text>
-            <Text textStyle="xs" color="fg.muted">
-              {connectionDetail(connection)}
-            </Text>
-          </VStack>
-          <Button
-            size="xs"
-            variant="ghost"
-            colorPalette="red"
-            aria-label={`Delete ${connection.name}`}
-            loading={remove.isPending && remove.variables?.connectionId === connection.id}
-            onClick={() => void deleteConnection(connection)}
-          >
-            <Trash2 size={14} />
-          </Button>
-        </HStack>
+        <ConnectionRow
+          key={connection.id}
+          connection={connection}
+          isDeleting={remove.isPending && remove.variables?.connectionId === connection.id}
+          onDelete={() => void deleteConnection(connection)}
+        />
       ))}
       {adding && (
-        <VStack align="stretch" gap={3} data-testid="aws-connection-form">
-          <Field.Root required>
-            <Field.Label>Name</Field.Label>
-            <Input aria-label="Connection name" value={form.name} onChange={set("name")} />
-          </Field.Root>
-          <SegmentedControl
-            size="sm"
-            aria-label="How it signs in"
-            value={credential}
-            onValueChange={({ value }) => {
-              setCredential(value === "role" ? "role" : "keys");
-              setFormError(null);
-            }}
-            items={[
-              { value: "keys", label: "Access key" },
-              { value: "role", label: "Role to assume" },
-            ]}
-          />
-          {credential === "keys" ? (
-            <>
-              <Field.Root required>
-                <Field.Label>Access key id</Field.Label>
-                <Input
-                  aria-label="Access key id"
-                  value={form.accessKeyId}
-                  onChange={set("accessKeyId")}
-                />
-              </Field.Root>
-              <Field.Root required>
-                <Field.Label>Secret access key</Field.Label>
-                <Input
-                  aria-label="Secret access key"
-                  type="password"
-                  autoComplete="off"
-                  value={form.secretAccessKey}
-                  onChange={set("secretAccessKey")}
-                />
-                <Field.HelperText>Stored encrypted and never shown again.</Field.HelperText>
-              </Field.Root>
-            </>
-          ) : (
-            <>
-              <Field.Root required>
-                <Field.Label>Role ARN</Field.Label>
-                <Input
-                  aria-label="Role ARN"
-                  placeholder="arn:aws:iam::123456789012:role/langwatch-kill-switch"
-                  value={form.roleArn}
-                  onChange={set("roleArn")}
-                />
-              </Field.Root>
-              <Field.Root>
-                <Field.Label>External id</Field.Label>
-                <Input
-                  aria-label="External id"
-                  value={form.externalId}
-                  onChange={set("externalId")}
-                />
-              </Field.Root>
-            </>
-          )}
-          {formError ? (
-            <Text textStyle="sm" color="fg.error" role="alert">
-              {formError}
-            </Text>
-          ) : null}
-          <HStack justify="end" gap={2}>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => {
-                setAdding(false);
-                setForm(EMPTY_FORM);
-                setFormError(null);
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              loading={create.isPending}
-              onClick={() => void submit()}
-            >
-              Add connection
-            </Button>
-          </HStack>
-        </VStack>
+        <AwsConnectionForm organizationId={organizationId} onDone={() => setAdding(false)} />
       )}
     </VStack>
   );

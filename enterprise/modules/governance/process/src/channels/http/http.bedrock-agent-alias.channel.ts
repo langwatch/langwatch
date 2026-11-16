@@ -32,17 +32,80 @@ export class HttpBedrockAgentAliasChannel implements BedrockAgentAliasChannel {
     return new HttpBedrockAgentAliasChannel(endpoint);
   }
 
+  async getInvocationState({
+    signal,
+    ...target
+  }: BedrockAliasTarget & { signal?: AbortSignal }): Promise<BedrockInvocationState> {
+    const client = this.clientFor(target);
+    try {
+      return (await this.readAlias({ client, target, signal })).aliasInvocationState;
+    } finally {
+      client.destroy();
+    }
+  }
+
+  /**
+   * The read sits right before the update to keep the window small: UpdateAgentAlias has no
+   * conditional write, so a deployment between the two is overwritten (docs/governance/kill-switch.mdx).
+   */
   async setInvocationState({
-    credentials,
-    region,
-    agentId,
-    agentAliasId,
     state,
     signal,
+    ...target
   }: BedrockAliasTarget & {
     state: BedrockInvocationState;
     signal?: AbortSignal;
   }): Promise<{ changed: boolean }> {
+    const client = this.clientFor(target);
+    try {
+      const alias = await this.readAlias({ client, target, signal });
+      if (alias.aliasInvocationState === state) return { changed: false };
+      await client.send(
+        new UpdateAgentAliasCommand({
+          agentId: target.agentId,
+          agentAliasId: target.agentAliasId,
+          agentAliasName: alias.agentAliasName,
+          description: alias.description,
+          routingConfiguration: alias.routingConfiguration,
+          aliasInvocationState: state,
+        }),
+        { abortSignal: signal },
+      );
+      return { changed: true };
+    } finally {
+      client.destroy();
+    }
+  }
+
+  private async readAlias({
+    client,
+    target,
+    signal,
+  }: {
+    client: BedrockAgentClient;
+    target: BedrockAliasTarget;
+    signal: AbortSignal | undefined;
+  }) {
+    const { agentId, agentAliasId } = target;
+    const { agentAlias } = await client.send(new GetAgentAliasCommand({ agentId, agentAliasId }), {
+      abortSignal: signal,
+    });
+    if (!agentAlias?.agentAliasName) {
+      throw new KillSwitchPlatformError({
+        code: "bedrock_alias_unreadable",
+        message: `Bedrock answered no alias name for ${agentId}/${agentAliasId}`,
+      });
+    }
+    return {
+      agentAliasName: agentAlias.agentAliasName,
+      description: agentAlias.description,
+      routingConfiguration: agentAlias.routingConfiguration,
+      aliasInvocationState: (agentAlias.aliasInvocationState ??
+        "ACCEPT_INVOCATIONS") as BedrockInvocationState,
+    };
+  }
+
+  private clientFor({ credentials, region }: BedrockAliasTarget): BedrockAgentClient {
     // With neither a key pair nor a role, the SDK would sign as the deployment itself.
     const hasKeyPair = Boolean(credentials.accessKeyId && credentials.secretAccessKey);
     if (!hasKeyPair && !credentials.roleArn) {
@@ -51,7 +114,7 @@ export class HttpBedrockAgentAliasChannel implements BedrockAgentAliasChannel {
         message: "The AWS connection holds neither an access key pair nor a role to assume",
       });
     }
-    const client = new BedrockAgentClient(
+    return new BedrockAgentClient(
       this.#aws.build({
         region,
         endpoint: this.endpoint,
@@ -71,34 +134,5 @@ export class HttpBedrockAgentAliasChannel implements BedrockAgentAliasChannel {
           : null,
       }),
     );
-    try {
-      const { agentAlias } = await client.send(
-        new GetAgentAliasCommand({ agentId, agentAliasId }),
-        {
-          abortSignal: signal,
-        },
-      );
-      if (!agentAlias?.agentAliasName) {
-        throw new KillSwitchPlatformError({
-          code: "bedrock_alias_unreadable",
-          message: `Bedrock answered no alias name for ${agentId}/${agentAliasId}`,
-        });
-      }
-      if (agentAlias.aliasInvocationState === state) return { changed: false };
-      await client.send(
-        new UpdateAgentAliasCommand({
-          agentId,
-          agentAliasId,
-          agentAliasName: agentAlias.agentAliasName,
-          description: agentAlias.description,
-          routingConfiguration: agentAlias.routingConfiguration,
-          aliasInvocationState: state,
-        }),
-        { abortSignal: signal },
-      );
-      return { changed: true };
-    } finally {
-      client.destroy();
-    }
   }
 }

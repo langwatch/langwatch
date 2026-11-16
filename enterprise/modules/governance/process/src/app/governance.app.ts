@@ -309,6 +309,7 @@ import {
   type AgentStopPipelineDefinition,
   buildAgentStopPipeline,
 } from "../features/kill-switch/eventing/agent-stop.pipeline.ts";
+import { AgentStopClaimService } from "../features/kill-switch/services/agent-stop-claim.service.ts";
 import { AgentStopPlanService } from "../features/kill-switch/services/agent-stop-plan.service.ts";
 import { AgentStopTargetService } from "../features/kill-switch/services/agent-stop-target.service.ts";
 import {
@@ -951,13 +952,18 @@ export class GovernanceModule implements GovernanceRestApi {
     });
     this.awsConnections = GovernanceAwsConnectionService.create({
       connections: repositories.awsConnections,
+      plans: repositories.agentStopPlans,
+      stops: repositories.agentStops,
     });
     const sendAgentStop: AgentStopCommandSend = async (name, payload) => {
       await this.agentStopSender(name).send(payload);
     };
     this.agentStops = AgentStopService.create({
       stops: repositories.agentStops,
-      claims: repositories.agentStopClaims,
+      claims: AgentStopClaimService.create({
+        claims: repositories.agentStopClaims,
+        stops: repositories.agentStops,
+      }),
       plans: this.agentStopPlans,
       registry: repositories.agentRegistry,
       auditLog: dependencies.auditLog,
@@ -969,6 +975,7 @@ export class GovernanceModule implements GovernanceRestApi {
       signIn,
       servingEndpoints: killSwitchChannels.live.servingEndpoints.create({ http }),
       awsConnections: repositories.awsConnections,
+      priorStates: repositories.agentStopTargetPriorStates,
       bedrock: killSwitchChannels.live.bedrockAliases.create({ endpoint: bedrockAgentEndpoint }),
       virtualKeys: dependencies.gateway,
       registry: this.agentRegistry,
@@ -1927,6 +1934,7 @@ export class GovernanceModule implements GovernanceRestApi {
     agentId: string;
     reason: string;
     severity: AgentStopSeverity;
+    expectedTargetIds?: readonly string[];
     caller: AgentStopCaller;
   }): Promise<AgentStopView> {
     return this.agentStops.requestStop(input);

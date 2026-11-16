@@ -58,12 +58,48 @@ export class MemoryBedrockAgentAliasChannel implements BedrockAgentAliasChannel 
     this.refusal = name;
   }
 
+  /** The alias as stored now, for a test that asserts on its state; throws when never seeded. */
+  getAlias({
+    agentId,
+    agentAliasId,
+  }: {
+    agentId: string;
+    agentAliasId: string;
+  }): MemoryBedrockAlias {
+    const alias = this.aliases.get(`${agentId}/${agentAliasId}`);
+    if (!alias) throw new Error(`no alias ${agentId}/${agentAliasId} was seeded`);
+    return structuredClone(alias);
+  }
+
+  async getInvocationState({
+    agentId,
+    agentAliasId,
+  }: BedrockAliasTarget): Promise<BedrockInvocationState> {
+    return this.read({ agentId, agentAliasId }).aliasInvocationState;
+  }
+
   async setInvocationState({
     region,
     agentId,
     agentAliasId,
     state,
   }: BedrockAliasTarget & { state: BedrockInvocationState }): Promise<{ changed: boolean }> {
+    const alias = this.read({ agentId, agentAliasId });
+    if (alias.aliasInvocationState === state) return { changed: false };
+    alias.aliasInvocationState = state;
+    this.updates.push({
+      region,
+      agentId,
+      agentAliasId,
+      agentAliasName: alias.agentAliasName,
+      description: alias.description,
+      routingConfiguration: structuredClone(alias.routingConfiguration),
+      aliasInvocationState: state,
+    });
+    return { changed: true };
+  }
+
+  private read({ agentId, agentAliasId }: { agentId: string; agentAliasId: string }) {
     if (this.refusal) {
       const error = new Error(`seeded ${this.refusal}`);
       error.name = this.refusal;
@@ -77,17 +113,6 @@ export class MemoryBedrockAgentAliasChannel implements BedrockAgentAliasChannel 
         message: `no alias ${agentId}/${agentAliasId}`,
       });
     }
-    if (alias.aliasInvocationState === state) return { changed: false };
-    alias.aliasInvocationState = state;
-    this.updates.push({
-      region,
-      agentId,
-      agentAliasId,
-      agentAliasName: alias.agentAliasName,
-      description: alias.description,
-      routingConfiguration: structuredClone(alias.routingConfiguration),
-      aliasInvocationState: state,
-    });
-    return { changed: true };
+    return alias;
   }
 }

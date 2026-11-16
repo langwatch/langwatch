@@ -221,9 +221,14 @@ export class MemoryAgentRegistryRepository extends AgentRegistryRepository {
       stop: AgentStopView;
     };
   }): Promise<AgentRegistryEvent> {
-    const held = this.eventsOf(organizationId).find((candidate) => candidate.event.id === event.id);
+    const heldEvent = () =>
+      this.eventsOf(organizationId).find((candidate) => candidate.event.id === event.id);
+    const held = heldEvent();
     if (held) return structuredClone(held.event);
     const entry = await this.getEntry({ organizationId, id: event.entryId });
+    // Checked again after the await: an overlapping call with the same id may have appended.
+    const appendedMeanwhile = heldEvent();
+    if (appendedMeanwhile) return structuredClone(appendedMeanwhile.event);
     this.sequence += 1n;
     const appended: AgentRegistryEvent = {
       ...registryEventOf({

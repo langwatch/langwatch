@@ -16407,6 +16407,30 @@ func (e PostApiGovernanceAgentStopsByIdApprove404JSONResponseBodyFault) Valid() 
 	}
 }
 
+// Defines values for PostApiGovernanceAgentStopsByIdApprove409JSONResponseBodyFault.
+const (
+	PostApiGovernanceAgentStopsByIdApprove409JSONResponseBodyFaultCustomer         PostApiGovernanceAgentStopsByIdApprove409JSONResponseBodyFault = "customer"
+	PostApiGovernanceAgentStopsByIdApprove409JSONResponseBodyFaultPlatform         PostApiGovernanceAgentStopsByIdApprove409JSONResponseBodyFault = "platform"
+	PostApiGovernanceAgentStopsByIdApprove409JSONResponseBodyFaultPresumedPlatform PostApiGovernanceAgentStopsByIdApprove409JSONResponseBodyFault = "presumed_platform"
+	PostApiGovernanceAgentStopsByIdApprove409JSONResponseBodyFaultProvider         PostApiGovernanceAgentStopsByIdApprove409JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PostApiGovernanceAgentStopsByIdApprove409JSONResponseBodyFault enum.
+func (e PostApiGovernanceAgentStopsByIdApprove409JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PostApiGovernanceAgentStopsByIdApprove409JSONResponseBodyFaultCustomer:
+		return true
+	case PostApiGovernanceAgentStopsByIdApprove409JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGovernanceAgentStopsByIdApprove409JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PostApiGovernanceAgentStopsByIdApprove409JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PostApiGovernanceAgentStopsByIdApprove422JSONResponseBodyFault.
 const (
 	PostApiGovernanceAgentStopsByIdApprove422JSONResponseBodyFaultCustomer         PostApiGovernanceAgentStopsByIdApprove422JSONResponseBodyFault = "customer"
@@ -16722,6 +16746,30 @@ func (e PostApiGovernanceAgentStopsByIdDeny404JSONResponseBodyFault) Valid() boo
 	}
 }
 
+// Defines values for PostApiGovernanceAgentStopsByIdDeny409JSONResponseBodyFault.
+const (
+	PostApiGovernanceAgentStopsByIdDeny409JSONResponseBodyFaultCustomer         PostApiGovernanceAgentStopsByIdDeny409JSONResponseBodyFault = "customer"
+	PostApiGovernanceAgentStopsByIdDeny409JSONResponseBodyFaultPlatform         PostApiGovernanceAgentStopsByIdDeny409JSONResponseBodyFault = "platform"
+	PostApiGovernanceAgentStopsByIdDeny409JSONResponseBodyFaultPresumedPlatform PostApiGovernanceAgentStopsByIdDeny409JSONResponseBodyFault = "presumed_platform"
+	PostApiGovernanceAgentStopsByIdDeny409JSONResponseBodyFaultProvider         PostApiGovernanceAgentStopsByIdDeny409JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PostApiGovernanceAgentStopsByIdDeny409JSONResponseBodyFault enum.
+func (e PostApiGovernanceAgentStopsByIdDeny409JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PostApiGovernanceAgentStopsByIdDeny409JSONResponseBodyFaultCustomer:
+		return true
+	case PostApiGovernanceAgentStopsByIdDeny409JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGovernanceAgentStopsByIdDeny409JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PostApiGovernanceAgentStopsByIdDeny409JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PostApiGovernanceAgentStopsByIdDeny422JSONResponseBodyFault.
 const (
 	PostApiGovernanceAgentStopsByIdDeny422JSONResponseBodyFaultCustomer         PostApiGovernanceAgentStopsByIdDeny422JSONResponseBodyFault = "customer"
@@ -17031,6 +17079,30 @@ func (e PostApiGovernanceAgentStopsByIdRestore404JSONResponseBodyFault) Valid() 
 	case PostApiGovernanceAgentStopsByIdRestore404JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiGovernanceAgentStopsByIdRestore404JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiGovernanceAgentStopsByIdRestore409JSONResponseBodyFault.
+const (
+	PostApiGovernanceAgentStopsByIdRestore409JSONResponseBodyFaultCustomer         PostApiGovernanceAgentStopsByIdRestore409JSONResponseBodyFault = "customer"
+	PostApiGovernanceAgentStopsByIdRestore409JSONResponseBodyFaultPlatform         PostApiGovernanceAgentStopsByIdRestore409JSONResponseBodyFault = "platform"
+	PostApiGovernanceAgentStopsByIdRestore409JSONResponseBodyFaultPresumedPlatform PostApiGovernanceAgentStopsByIdRestore409JSONResponseBodyFault = "presumed_platform"
+	PostApiGovernanceAgentStopsByIdRestore409JSONResponseBodyFaultProvider         PostApiGovernanceAgentStopsByIdRestore409JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PostApiGovernanceAgentStopsByIdRestore409JSONResponseBodyFault enum.
+func (e PostApiGovernanceAgentStopsByIdRestore409JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PostApiGovernanceAgentStopsByIdRestore409JSONResponseBodyFaultCustomer:
+		return true
+	case PostApiGovernanceAgentStopsByIdRestore409JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGovernanceAgentStopsByIdRestore409JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PostApiGovernanceAgentStopsByIdRestore409JSONResponseBodyFaultProvider:
 		return true
 	default:
 		return false
@@ -17685,6 +17757,30 @@ func (e PostApiGovernanceAgentsByIdStop404JSONResponseBodyFault) Valid() bool {
 	case PostApiGovernanceAgentsByIdStop404JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiGovernanceAgentsByIdStop404JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiGovernanceAgentsByIdStop409JSONResponseBodyFault.
+const (
+	PostApiGovernanceAgentsByIdStop409JSONResponseBodyFaultCustomer         PostApiGovernanceAgentsByIdStop409JSONResponseBodyFault = "customer"
+	PostApiGovernanceAgentsByIdStop409JSONResponseBodyFaultPlatform         PostApiGovernanceAgentsByIdStop409JSONResponseBodyFault = "platform"
+	PostApiGovernanceAgentsByIdStop409JSONResponseBodyFaultPresumedPlatform PostApiGovernanceAgentsByIdStop409JSONResponseBodyFault = "presumed_platform"
+	PostApiGovernanceAgentsByIdStop409JSONResponseBodyFaultProvider         PostApiGovernanceAgentsByIdStop409JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PostApiGovernanceAgentsByIdStop409JSONResponseBodyFault enum.
+func (e PostApiGovernanceAgentsByIdStop409JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PostApiGovernanceAgentsByIdStop409JSONResponseBodyFaultCustomer:
+		return true
+	case PostApiGovernanceAgentsByIdStop409JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGovernanceAgentsByIdStop409JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PostApiGovernanceAgentsByIdStop409JSONResponseBodyFaultProvider:
 		return true
 	default:
 		return false
@@ -51828,6 +51924,9 @@ type PostApiGovernanceAgentStopsByIdApprove403JSONResponseBodyFault string
 // PostApiGovernanceAgentStopsByIdApprove404JSONResponseBodyFault defines parameters for PostApiGovernanceAgentStopsByIdApprove.
 type PostApiGovernanceAgentStopsByIdApprove404JSONResponseBodyFault string
 
+// PostApiGovernanceAgentStopsByIdApprove409JSONResponseBodyFault defines parameters for PostApiGovernanceAgentStopsByIdApprove.
+type PostApiGovernanceAgentStopsByIdApprove409JSONResponseBodyFault string
+
 // PostApiGovernanceAgentStopsByIdApprove422JSONResponseBodyFault defines parameters for PostApiGovernanceAgentStopsByIdApprove.
 type PostApiGovernanceAgentStopsByIdApprove422JSONResponseBodyFault string
 
@@ -51902,6 +52001,9 @@ type PostApiGovernanceAgentStopsByIdDeny403JSONResponseBodyFault string
 // PostApiGovernanceAgentStopsByIdDeny404JSONResponseBodyFault defines parameters for PostApiGovernanceAgentStopsByIdDeny.
 type PostApiGovernanceAgentStopsByIdDeny404JSONResponseBodyFault string
 
+// PostApiGovernanceAgentStopsByIdDeny409JSONResponseBodyFault defines parameters for PostApiGovernanceAgentStopsByIdDeny.
+type PostApiGovernanceAgentStopsByIdDeny409JSONResponseBodyFault string
+
 // PostApiGovernanceAgentStopsByIdDeny422JSONResponseBodyFault defines parameters for PostApiGovernanceAgentStopsByIdDeny.
 type PostApiGovernanceAgentStopsByIdDeny422JSONResponseBodyFault string
 
@@ -51970,6 +52072,9 @@ type PostApiGovernanceAgentStopsByIdRestore403JSONResponseBodyFault string
 
 // PostApiGovernanceAgentStopsByIdRestore404JSONResponseBodyFault defines parameters for PostApiGovernanceAgentStopsByIdRestore.
 type PostApiGovernanceAgentStopsByIdRestore404JSONResponseBodyFault string
+
+// PostApiGovernanceAgentStopsByIdRestore409JSONResponseBodyFault defines parameters for PostApiGovernanceAgentStopsByIdRestore.
+type PostApiGovernanceAgentStopsByIdRestore409JSONResponseBodyFault string
 
 // PostApiGovernanceAgentStopsByIdRestore422JSONResponseBodyFault defines parameters for PostApiGovernanceAgentStopsByIdRestore.
 type PostApiGovernanceAgentStopsByIdRestore422JSONResponseBodyFault string
@@ -52048,8 +52153,9 @@ type GetApiGovernanceAgentsByIdStop500JSONResponseBodyFault string
 
 // PostApiGovernanceAgentsByIdStopJSONBody defines parameters for PostApiGovernanceAgentsByIdStop.
 type PostApiGovernanceAgentsByIdStopJSONBody struct {
-	Reason   string                                           `json:"reason"`
-	Severity *PostApiGovernanceAgentsByIdStopJSONBodySeverity `json:"severity,omitempty"`
+	ExpectedTargetIds *[]string                                        `json:"expectedTargetIds,omitempty"`
+	Reason            string                                           `json:"reason"`
+	Severity          *PostApiGovernanceAgentsByIdStopJSONBodySeverity `json:"severity,omitempty"`
 }
 
 // PostApiGovernanceAgentsByIdStopJSONBodySeverity defines parameters for PostApiGovernanceAgentsByIdStop.
@@ -52117,6 +52223,9 @@ type PostApiGovernanceAgentsByIdStop403JSONResponseBodyFault string
 
 // PostApiGovernanceAgentsByIdStop404JSONResponseBodyFault defines parameters for PostApiGovernanceAgentsByIdStop.
 type PostApiGovernanceAgentsByIdStop404JSONResponseBodyFault string
+
+// PostApiGovernanceAgentsByIdStop409JSONResponseBodyFault defines parameters for PostApiGovernanceAgentsByIdStop.
+type PostApiGovernanceAgentsByIdStop409JSONResponseBodyFault string
 
 // PostApiGovernanceAgentsByIdStop422JSONResponseBodyFault defines parameters for PostApiGovernanceAgentsByIdStop.
 type PostApiGovernanceAgentsByIdStop422JSONResponseBodyFault string
@@ -177758,6 +177867,25 @@ type PostApiGovernanceAgentStopsByIdApproveResponse struct {
 		TraceId *string `json:"trace_id,omitempty"`
 		Type    string  `json:"type"`
 	}
+	JSON409 *struct {
+		Code      string                                                          `json:"code"`
+		DocsUrl   *string                                                         `json:"docs_url,omitempty"`
+		Fault     *PostApiGovernanceAgentStopsByIdApprove409JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                          `json:"message"`
+		Meta      *map[string]interface{}                                         `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                  `json:"reasons,omitempty"`
+		Retryable bool                                                            `json:"retryable"`
+		SpanId    *string                                                         `json:"span_id,omitempty"`
+		Tips      *[]string                                                       `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
 	JSON422 *struct {
 		Code      string                                                          `json:"code"`
 		DocsUrl   *string                                                         `json:"docs_url,omitempty"`
@@ -177934,6 +178062,25 @@ type PostApiGovernanceAgentStopsByIdDenyResponse struct {
 		TraceId *string `json:"trace_id,omitempty"`
 		Type    string  `json:"type"`
 	}
+	JSON409 *struct {
+		Code      string                                                       `json:"code"`
+		DocsUrl   *string                                                      `json:"docs_url,omitempty"`
+		Fault     *PostApiGovernanceAgentStopsByIdDeny409JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                       `json:"message"`
+		Meta      *map[string]interface{}                                      `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                               `json:"reasons,omitempty"`
+		Retryable bool                                                         `json:"retryable"`
+		SpanId    *string                                                      `json:"span_id,omitempty"`
+		Tips      *[]string                                                    `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
 	JSON422 *struct {
 		Code      string                                                       `json:"code"`
 		DocsUrl   *string                                                      `json:"docs_url,omitempty"`
@@ -178095,6 +178242,25 @@ type PostApiGovernanceAgentStopsByIdRestoreResponse struct {
 		Code      string                                                          `json:"code"`
 		DocsUrl   *string                                                         `json:"docs_url,omitempty"`
 		Fault     *PostApiGovernanceAgentStopsByIdRestore404JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                          `json:"message"`
+		Meta      *map[string]interface{}                                         `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                  `json:"reasons,omitempty"`
+		Retryable bool                                                            `json:"retryable"`
+		SpanId    *string                                                         `json:"span_id,omitempty"`
+		Tips      *[]string                                                       `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON409 *struct {
+		Code      string                                                          `json:"code"`
+		DocsUrl   *string                                                         `json:"docs_url,omitempty"`
+		Fault     *PostApiGovernanceAgentStopsByIdRestore409JSONResponseBodyFault `json:"fault,omitempty"`
 		Message   string                                                          `json:"message"`
 		Meta      *map[string]interface{}                                         `json:"meta,omitempty"`
 		Reasons   *[]interface{}                                                  `json:"reasons,omitempty"`
@@ -178447,6 +178613,25 @@ type PostApiGovernanceAgentsByIdStopResponse struct {
 		Code      string                                                   `json:"code"`
 		DocsUrl   *string                                                  `json:"docs_url,omitempty"`
 		Fault     *PostApiGovernanceAgentsByIdStop404JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                   `json:"message"`
+		Meta      *map[string]interface{}                                  `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                           `json:"reasons,omitempty"`
+		Retryable bool                                                     `json:"retryable"`
+		SpanId    *string                                                  `json:"span_id,omitempty"`
+		Tips      *[]string                                                `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON409 *struct {
+		Code      string                                                   `json:"code"`
+		DocsUrl   *string                                                  `json:"docs_url,omitempty"`
+		Fault     *PostApiGovernanceAgentsByIdStop409JSONResponseBodyFault `json:"fault,omitempty"`
 		Message   string                                                   `json:"message"`
 		Meta      *map[string]interface{}                                  `json:"meta,omitempty"`
 		Reasons   *[]interface{}                                           `json:"reasons,omitempty"`
@@ -213754,6 +213939,31 @@ func ParsePostApiGovernanceAgentStopsByIdApproveResponse(rsp *http.Response) (*P
 		}
 		response.JSON404 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest struct {
+			Code      string                                                          `json:"code"`
+			DocsUrl   *string                                                         `json:"docs_url,omitempty"`
+			Fault     *PostApiGovernanceAgentStopsByIdApprove409JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                          `json:"message"`
+			Meta      *map[string]interface{}                                         `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                  `json:"reasons,omitempty"`
+			Retryable bool                                                            `json:"retryable"`
+			SpanId    *string                                                         `json:"span_id,omitempty"`
+			Tips      *[]string                                                       `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
 		var dest struct {
 			Code      string                                                          `json:"code"`
@@ -213962,6 +214172,31 @@ func ParsePostApiGovernanceAgentStopsByIdDenyResponse(rsp *http.Response) (*Post
 		}
 		response.JSON404 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest struct {
+			Code      string                                                       `json:"code"`
+			DocsUrl   *string                                                      `json:"docs_url,omitempty"`
+			Fault     *PostApiGovernanceAgentStopsByIdDeny409JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                       `json:"message"`
+			Meta      *map[string]interface{}                                      `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                               `json:"reasons,omitempty"`
+			Retryable bool                                                         `json:"retryable"`
+			SpanId    *string                                                      `json:"span_id,omitempty"`
+			Tips      *[]string                                                    `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
 		var dest struct {
 			Code      string                                                       `json:"code"`
@@ -214169,6 +214404,31 @@ func ParsePostApiGovernanceAgentStopsByIdRestoreResponse(rsp *http.Response) (*P
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest struct {
+			Code      string                                                          `json:"code"`
+			DocsUrl   *string                                                         `json:"docs_url,omitempty"`
+			Fault     *PostApiGovernanceAgentStopsByIdRestore409JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                          `json:"message"`
+			Meta      *map[string]interface{}                                         `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                  `json:"reasons,omitempty"`
+			Retryable bool                                                            `json:"retryable"`
+			SpanId    *string                                                         `json:"span_id,omitempty"`
+			Tips      *[]string                                                       `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
 		var dest struct {
@@ -214585,6 +214845,31 @@ func ParsePostApiGovernanceAgentsByIdStopResponse(rsp *http.Response) (*PostApiG
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest struct {
+			Code      string                                                   `json:"code"`
+			DocsUrl   *string                                                  `json:"docs_url,omitempty"`
+			Fault     *PostApiGovernanceAgentsByIdStop409JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                   `json:"message"`
+			Meta      *map[string]interface{}                                  `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                           `json:"reasons,omitempty"`
+			Retryable bool                                                     `json:"retryable"`
+			SpanId    *string                                                  `json:"span_id,omitempty"`
+			Tips      *[]string                                                `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
 		var dest struct {

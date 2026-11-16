@@ -15,7 +15,10 @@ export abstract class AgentStopPlanRepository {
     organizationId: string;
     agentId: string;
   }): Promise<StoredAgentStopPlanTarget[]>;
-  /** Replaces every target of the agent at once; an empty list clears the plan. */
+  /**
+   * Replaces every target of the agent at once; an empty list clears the plan. Writes of one agent
+   * are serialised, so two at once never leave rows of both.
+   */
   abstract replaceTargets(input: {
     organizationId: string;
     agentId: string;
@@ -23,4 +26,9 @@ export abstract class AgentStopPlanRepository {
   }): Promise<StoredAgentStopPlanTarget[]>;
   /** Every agent of the organisation that holds a plan. */
   abstract findPlanCounts(input: { organizationId: string }): Promise<AgentStopPlanCount[]>;
+  /** The agents whose plan holds a Bedrock target signing with the connection. */
+  abstract findAgentIdsByAwsConnection(input: {
+    organizationId: string;
+    awsConnectionId: string;
+  }): Promise<string[]>;
 }

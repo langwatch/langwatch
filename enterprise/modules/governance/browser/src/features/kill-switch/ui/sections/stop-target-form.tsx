@@ -13,46 +13,16 @@ import {
   AGENT_STOP_TARGET_KINDS,
   type AgentStopTarget,
   type AgentStopTargetKind,
-  agentStopTargetSchema,
 } from "@langwatch/enterprise-governance-contract";
-import { useState } from "react";
 
+import {
+  type TargetFieldBinding,
+  type TargetFields,
+  useStopTargetDraft,
+} from "../../behavior/use-stop-target-draft.ts";
 import { STOP_TARGET_KIND_LABELS } from "../../model/kill-switch-copy.ts";
 
 type Option = { value: string; label: string };
-
-const EMPTY_FIELDS = {
-  ingestionSourceId: "",
-  endpointName: "",
-  awsConnectionId: "",
-  region: "",
-  agentId: "",
-  agentAliasId: "",
-  virtualKeyId: "",
-};
-type TargetFields = typeof EMPTY_FIELDS;
-
-function draftTarget({ kind, fields }: { kind: AgentStopTargetKind; fields: TargetFields }) {
-  const trim = (value: string) => value.trim();
-  switch (kind) {
-    case "databricks_serving_endpoint":
-      return {
-        kind,
-        ingestionSourceId: fields.ingestionSourceId,
-        endpointName: trim(fields.endpointName),
-      };
-    case "bedrock_agent_alias":
-      return {
-        kind,
-        awsConnectionId: fields.awsConnectionId,
-        region: trim(fields.region),
-        agentId: trim(fields.agentId),
-        agentAliasId: trim(fields.agentAliasId),
-      };
-    case "gateway_virtual_key":
-      return { kind, virtualKeyId: trim(fields.virtualKeyId) };
-  }
-}
 
 function OptionSelect({
   label,
@@ -116,63 +86,20 @@ function TextField({
   );
 }
 
-const KIND_OPTIONS: Option[] = AGENT_STOP_TARGET_KINDS.map((kind) => ({
-  value: kind,
-  label: STOP_TARGET_KIND_LABELS[kind],
-}));
-
-const isTargetKind = (value: string): value is AgentStopTargetKind =>
-  AGENT_STOP_TARGET_KINDS.some((kind) => kind === value);
-
-/** One new plan target of any kind, checked against the contract before it joins the plan. */
-export function StopTargetForm({
+/** The fields one target kind asks for. */
+function TargetKindFields({
+  kind,
   databricksSources,
   awsConnections,
-  onAdd,
+  field,
 }: {
+  kind: AgentStopTargetKind;
   databricksSources: readonly Option[];
   awsConnections: readonly Option[];
-  onAdd: (target: AgentStopTarget) => void;
+  field: (name: keyof TargetFields) => TargetFieldBinding;
 }) {
-  const [kind, setKind] = useState<AgentStopTargetKind>("databricks_serving_endpoint");
-  const [fields, setFields] = useState(EMPTY_FIELDS);
-  const [error, setError] = useState<string | null>(null);
-
-  const field = (name: keyof TargetFields) => ({
-    value: fields[name],
-    onChange: (value: string) => {
-      setFields((previous) => ({ ...previous, [name]: value }));
-      setError(null);
-    },
-  });
-
-  const add = () => {
-    const draft = draftTarget({ kind, fields });
-    if (Object.values(draft).some((value) => value === "")) {
-      setError("Fill in every field of the target.");
-      return;
-    }
-    const parsed = agentStopTargetSchema.safeParse(draft);
-    if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? "Fill in every field of the target.");
-      return;
-    }
-    onAdd(parsed.data);
-    setFields(EMPTY_FIELDS);
-  };
-
   return (
-    <VStack align="stretch" gap={3} data-testid="stop-target-form">
-      <OptionSelect
-        label="Target kind"
-        options={KIND_OPTIONS}
-        value={kind}
-        placeholder="Pick a kind"
-        onChange={(value) => {
-          if (isTargetKind(value)) setKind(value);
-          setError(null);
-        }}
-      />
+    <>
       {kind === "databricks_serving_endpoint" && (
         <>
           <OptionSelect
@@ -210,13 +137,49 @@ export function StopTargetForm({
       {kind === "gateway_virtual_key" && (
         <TextField label="Virtual key id" {...field("virtualKeyId")} />
       )}
-      {error ? (
+    </>
+  );
+}
+
+const KIND_OPTIONS: Option[] = AGENT_STOP_TARGET_KINDS.map((kind) => ({
+  value: kind,
+  label: STOP_TARGET_KIND_LABELS[kind],
+}));
+
+/** One new plan target of any kind, checked against the contract before it joins the plan. */
+export function StopTargetForm({
+  databricksSources,
+  awsConnections,
+  onAdd,
+}: {
+  databricksSources: readonly Option[];
+  awsConnections: readonly Option[];
+  onAdd: (target: AgentStopTarget) => void;
+}) {
+  const draft = useStopTargetDraft({ onAdd });
+
+  return (
+    <VStack align="stretch" gap={3} data-testid="stop-target-form">
+      <OptionSelect
+        label="Target kind"
+        options={KIND_OPTIONS}
+        value={draft.kind}
+        placeholder="Pick a kind"
+        onChange={draft.pickKind}
+      />
+      <TargetKindFields
+        kind={draft.kind}
+        databricksSources={databricksSources}
+        awsConnections={awsConnections}
+        field={draft.field}
+      />
+      {draft.error ? (
         <Text textStyle="sm" color="fg.error" role="alert">
-          {error}
+          {draft.error}
         </Text>
       ) : null}
       <HStack justify="end">
-        <Button size="sm" variant="outline" onClick={add}>
+        <Button size="sm" variant="outline" onClick={draft.add}>
           Add target
         </Button>
       </HStack>

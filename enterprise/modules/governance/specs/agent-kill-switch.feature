@@ -25,18 +25,18 @@ Feature: Agent kill switch: stop a misbehaving agent where it runs, with approva
     When a person with governance:manage sets the plan of "support-bot" to a serving endpoint "support-bot-prod", the Bedrock alias "AGENT00001/ALIAS00001" in "eu-west-1" and a virtual key of the organisation
     Then the plan of "support-bot" lists the three targets
 
-  @unit
+  @integration
   Scenario: An agent with no stop plan yet still offers its kill switch actions
     Given "support-bot" has no stop plan and no stop
     When the Agents page reads the kill switch summaries
     Then "support-bot" has a summary with no plan targets and no open stop
 
-  @unit
+  @integration
   Scenario: A stop plan naming a virtual key of another organisation is refused
     When the plan of "support-bot" names a virtual key the organisation does not hold
     Then the write is refused with code "agent_stop_target_invalid"
 
-  @unit
+  @integration
   Scenario: A stop plan naming a Databricks source that is not Databricks is refused
     When the plan names a Copilot Studio source for a serving endpoint target
     Then the write is refused with code "agent_stop_target_invalid"
@@ -52,22 +52,35 @@ Feature: Agent kill switch: stop a misbehaving agent where it runs, with approva
     When a person stores an AWS connection with only a role ARN and an external id
     Then the connection is stored with no key pair
 
-  # Request and approval
+  @integration
+  Scenario: Two plan writes at once leave one whole plan
+    Given two people save a stop plan for "support-bot" at the same moment
+    When both writes commit
+    Then the plan holds the targets of exactly one write
 
   @unit
+  Scenario: An AWS connection a stop plan or an unrestored stop still uses cannot be deleted
+    Given a stop plan target or a stop that is not restored yet signs with an AWS connection
+    When the connection is deleted
+    Then the delete is refused with code "governance_aws_connection_in_use"
+    And the connection is kept until the plan drops it and the stop is restored
+
+  # Request and approval
+
+  @integration
   Scenario: A person with governance:manage pressing Stop stops at once
     Given "support-bot" has a stop plan
     When a person with governance:manage requests a stop from the UI
     Then a stop is requested with approval "immediate"
     And every target of the plan is applied
 
-  @unit
+  @integration
   Scenario: A critical stop from a machine credential stops at once
     Given "support-bot" has a stop plan
     When an API key with governance:manage requests a stop with severity "critical"
     Then every target of the plan is applied without waiting for an approval
 
-  @unit
+  @integration
   Scenario: A non-critical stop from a machine credential waits for an approval
     Given "support-bot" has a stop plan
     When an API key with governance:manage requests a stop with severity "high"
@@ -75,31 +88,31 @@ Feature: Agent kill switch: stop a misbehaving agent where it runs, with approva
     And no target is applied
     And one "governance.agent.stop_requested" event is pushed to subscribed webhook endpoints
 
-  @unit
+  @integration
   Scenario: Approving a pending stop applies its targets
     Given a stop of "support-bot" pending approval
     When a person with governance:manage approves it
     Then every target of the plan is applied
 
-  @unit
+  @integration
   Scenario: Denying a pending stop applies nothing
     Given a stop of "support-bot" pending approval
     When a person with governance:manage denies it
     Then the stop's status is "denied" and no target is applied
 
-  @unit
+  @integration
   Scenario: A decision on a stop that is no longer pending is refused
     Given a stop of "support-bot" that was approved
     When it is approved or denied again
     Then the decision is refused with code "agent_stop_not_pending"
 
-  @unit
+  @integration
   Scenario: The credential that requested a stop cannot approve it
     Given a stop of "support-bot" an API key requested, pending approval
     When the same API key approves it
     Then the approval is refused with code "agent_stop_self_approval"
 
-  @unit
+  @integration
   Scenario: A second stop while one is open is refused
     Given a stop of "support-bot" that is pending, stopping or quarantined
     When another stop of "support-bot" is requested
@@ -112,39 +125,60 @@ Feature: Agent kill switch: stop a misbehaving agent where it runs, with approva
     Then exactly one stop is opened
     And the other requests are refused with code "agent_stop_already_open"
 
+  @integration
+  Scenario: A stop confirmed against a plan that changed since is refused
+    Given a person read the stop plan of "support-bot"
+    And the plan was saved again since
+    When the person confirms the stop with the target ids they read
+    Then the stop is refused with code "agent_stop_plan_changed"
+    And no stop is requested
+
+  @integration
+  Scenario: Concurrent decisions on one pending stop accept only the first
+    Given a stop of "support-bot" pending approval
+    When one reviewer approves it while another denies it
+    Then one decision is accepted and the other is refused with code "agent_stop_not_pending"
+    And the audit log records only the accepted decision
+
   @unit
+  Scenario: A sent stop keeps its agent's claim however long the worker lags
+    Given a stop request was sent and the worker has not folded it yet
+    When another stop of the agent is requested long after
+    Then it is refused with code "agent_stop_already_open"
+
+  @integration
   Scenario: A stop of an agent with no stop plan is refused
     Given "support-bot" has no stop plan
     When a stop is requested
     Then the request is refused with code "agent_stop_plan_empty"
 
-  @unit
+  @integration
   Scenario: A stop of an agent outside the registry is refused
     When a stop is requested for an agent id the organisation's registry does not hold
     Then the request is refused with code "agent_registry_entry_not_found"
 
   # Applying the targets
 
-  @unit
+  @integration
   Scenario: A Databricks serving endpoint target stops the endpoint through its workspace
     Given a stop plan with the serving endpoint "support-bot-prod" of a Databricks source
     When the stop is applied
     Then the workspace is asked POST "/api/2.0/serving-endpoints/support-bot-prod/config:stop" with the source's token
 
-  @unit
+  @integration
   Scenario: A Bedrock agent alias target rejects invocations, keeping the alias's name and routing
     Given a stop plan with the Bedrock alias "ALIAS1" of agent "AGENT1"
     When the stop is applied
     Then the alias is read and updated with aliasInvocationState "REJECT_INVOCATIONS"
     And the update carries the alias's own name and routing configuration
 
-  @unit
+  @integration
   Scenario: A virtual key target disables the key with the stop's reason
     Given a stop plan with a virtual key
     When the stop is applied
     Then the gateway disables the key with a reason naming the stop
 
-  @unit
+  @integration
   Scenario: All targets applied quarantine the agent
     Given a stop being applied to three targets
     When the last target is applied
@@ -152,7 +186,7 @@ Feature: Agent kill switch: stop a misbehaving agent where it runs, with approva
     And one "governance.agent.quarantined" event is pushed carrying every target's outcome
     And the audit log records "governance.agent.quarantined" for the agent
 
-  @unit
+  @integration
   Scenario: A target the platform refuses is retried, then recorded as failed
     Given a stop whose Bedrock target answers an error on every attempt
     When the worker spends the target's attempts
@@ -160,15 +194,28 @@ Feature: Agent kill switch: stop a misbehaving agent where it runs, with approva
     And the stop's status is "stop_failed" once the other targets settle
     And one "governance.agent.stop_failed" event is pushed
 
-  @unit
+  @integration
   Scenario: A redelivered apply intent stops each target once
     Given a target's apply intent delivered twice
     When the worker runs both deliveries
     Then the target's applied event is recorded once
 
+  @integration
+  Scenario: A retried apply after a successful platform call still counts the change as the stop's own
+    Given the stop disabled the virtual key and set the Bedrock alias to reject invocations
+    And the apply intents are delivered again before their outcome was recorded
+    When the stop is restored
+    Then the virtual key is enabled and the Bedrock alias accepts invocations again
+
+  @integration
+  Scenario: An outcome whose first record fails is recorded on a later delivery
+    Given a target's platform call succeeds but recording its outcome fails on every platform attempt
+    When the worker delivers the intent again past the platform attempt budget
+    Then the outcome is recorded and the stop settles
+
   # Restore
 
-  @unit
+  @integration
   Scenario: A target already stopped before the stop is left as it was on restore
     Given the virtual key of "support-bot" is already disabled and its Bedrock alias already rejects invocations
     When a person stops "support-bot" and later restores it
@@ -176,30 +223,36 @@ Feature: Agent kill switch: stop a misbehaving agent where it runs, with approva
     And the restore leaves the virtual key disabled and the Bedrock alias rejecting invocations
     And the serving endpoint is stopped and started again
 
-  @unit
+  @integration
   Scenario: Restore reverts only the targets the stop applied
-    Given a quarantined stop whose virtual key target failed and whose other targets were applied
+    Given a stop in "stop_failed" whose virtual key target failed and whose other targets were applied
     When a person with governance:manage restores the agent
     Then the serving endpoint is started again with POST "/api/2.0/serving-endpoints/support-bot-prod/config:start"
     And the Bedrock alias is updated with aliasInvocationState "ACCEPT_INVOCATIONS"
     And the virtual key is not enabled
     And the stop's status is "restored" and one "governance.agent.restored" event is pushed
 
-  @unit
+  @integration
   Scenario: A target that cannot be reverted leaves the stop restore failed
-    Given a quarantined stop whose serving endpoint answers an error on start
+    Given a stop in "stop_failed" whose serving endpoint answers an error on start
     When the agent is restored and the attempts are spent
     Then the stop's status is "restore_failed" and one "governance.agent.restore_failed" event is pushed
 
-  @unit
+  @integration
   Scenario: Restoring a stop that is not quarantined is refused
     Given a stop of "support-bot" pending approval
     When it is restored
     Then the restore is refused with code "agent_stop_not_restorable"
 
+  @integration
+  Scenario: A restore acts as the credential that asked for it
+    Given a person stopped "support-bot"
+    When an API key with no owner restores it
+    Then the gateway enables the virtual key as the key's service principal
+
   # Audit
 
-  @unit
+  @integration
   Scenario: Request, approval, denial and restore each write an audit row
     When a stop of "support-bot" is requested, approved and later restored
     Then the audit log records "governance.agent.stop_requested", "governance.agent.stop_approved", "governance.agent.quarantined", "governance.agent.restore_requested" and "governance.agent.restored" with the agent as target
@@ -231,15 +284,21 @@ Feature: Agent kill switch: stop a misbehaving agent where it runs, with approva
     And GET /api/governance/agents/{agentId}/stop is asked
     Then the stop is answered with its targets
 
+  @unit
+  Scenario: The kill switch procedures need an Enterprise plan with the agent registry
+    Given an organisation whose plan lacks the agent registry
+    When a person with governance:manage stops an agent through the governance UI
+    Then the stop is refused after the permission check and never reaches the application
+
   # Trigger rules
 
-  @unit
+  @integration
   Scenario: A trace rule's webhook action can call the stop route
     Given an automation whose webhook action posts to the stop route with an API key header and severity "critical"
     When the stop route receives the automation's body
     Then the stop is recorded with trigger "api_key" and the automation's reason
 
-  @unit
+  @integration
   Scenario: The documented trace rule template keeps the body valid JSON for any trigger name
     Given the trigger's name holds double quotes and a backslash
     When the automation renders the documented webhook template and posts it to the stop route
