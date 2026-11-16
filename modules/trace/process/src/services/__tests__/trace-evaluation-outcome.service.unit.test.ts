@@ -73,13 +73,16 @@ function run(over: Partial<EvaluationRunData> = {}): EvaluationRunData {
 }
 
 /** A stored trace, evaluation's runs as scripted, and every outcome the service records. */
-async function compose({ now }: { now?: () => number } = {}) {
+async function compose({
+  now,
+  storedTraceId = TRACE_ID,
+}: { now?: () => number; storedTraceId?: string } = {}) {
   const traces = MemoryTraceAnalyticsRepository.create();
   await traces.upsert({
     row: TraceAnalyticsFoldProjection.projectAnalyticsStateToRow({
       state: {
         ...projection.init(),
-        traceId: TRACE_ID,
+        traceId: storedTraceId,
         spanCount: 1,
         storageAnchorMs: TRACE_ANCHOR_MS,
         occurredAt: TRACE_ANCHOR_MS,
@@ -283,12 +286,38 @@ describe("TraceEvaluationOutcomeService", () => {
   });
 });
 
-describe("TraceEvaluationOutcomeService given an evaluation naming no storable trace", () => {
+describe("TraceEvaluationOutcomeService given an evaluation naming no trace", () => {
+  /** @scenario "An evaluation naming no trace is not retried" */
+  it("completes a report with a blank trace id at once, logging the skip", async () => {
+    const { outcomes, recorded, logger } = await compose({ now: () => EVALUATED_AT });
+
+    await outcomes.recordReported({
+      data: {
+        evaluationId: "evaluation-3",
+        evaluatorName: "Toxicity",
+        traceId: "  ",
+        isGuardrail: false,
+        status: "processed",
+        passed: true,
+        label: null,
+      },
+      context: event("evaluation-event-6"),
+    });
+
+    expect(recorded).toEqual([]);
+    expect(logger.warn).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("TraceEvaluationOutcomeService given an evaluation naming the all-zero trace", () => {
   const ALL_ZERO_TRACE_ID = "00000000000000000000000000000000";
 
-  /** @scenario "An evaluation naming no storable trace is not retried" */
-  it("completes a report of the all-zero trace at once, recording nothing", async () => {
-    const { outcomes, recorded, logger } = await compose({ now: () => EVALUATED_AT });
+  /** @scenario "An evaluation naming the all-zero trace looks for it once" */
+  it("records the outcome when a trace is stored under the all-zero id", async () => {
+    const { outcomes, recorded } = await compose({
+      now: () => EVALUATED_AT,
+      storedTraceId: ALL_ZERO_TRACE_ID,
+    });
 
     await outcomes.recordReported({
       data: {
@@ -303,13 +332,12 @@ describe("TraceEvaluationOutcomeService given an evaluation naming no storable t
       context: event("evaluation-event-6"),
     });
 
-    expect(recorded).toEqual([]);
-    expect(logger.warn).not.toHaveBeenCalled();
+    expect(recorded.map((each) => each.traceId)).toEqual([ALL_ZERO_TRACE_ID]);
   });
 
-  /** @scenario "An evaluation naming no storable trace is not retried" */
-  it("completes a completion whose run names the all-zero trace at once", async () => {
-    const { outcomes, recorded, evaluations } = await compose({ now: () => EVALUATED_AT });
+  /** @scenario "An evaluation naming the all-zero trace looks for it once" */
+  it("completes at once and logs the skip when no such trace is stored", async () => {
+    const { outcomes, recorded, evaluations, logger } = await compose({ now: () => EVALUATED_AT });
     evaluations.runs.set(`${TENANT}:evaluation-1`, run({ traceId: ALL_ZERO_TRACE_ID }));
 
     await outcomes.recordCompleted({
@@ -318,6 +346,7 @@ describe("TraceEvaluationOutcomeService given an evaluation naming no storable t
     });
 
     expect(recorded).toEqual([]);
+    expect(logger.warn).toHaveBeenCalledTimes(1);
   });
 });
 

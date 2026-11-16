@@ -34,10 +34,17 @@ Feature: Each evaluation's outcome is kept beside its trace's columns
     And the trace is looked for five times within the hour
 
   @unit
-  Scenario: An evaluation naming no storable trace is not retried
-    Given an evaluation whose trace id is blank or all zeros
+  Scenario: An evaluation naming no trace is not retried
+    Given an evaluation whose trace id is blank
     When the trace subscriber handles it
-    Then no outcome is recorded and the delivery completes at once
+    Then no outcome is recorded, the delivery completes at once and the skip is logged
+
+  @unit
+  Scenario: An evaluation naming the all-zero trace looks for it once
+    Given an evaluation whose trace id is all zeros
+    When the trace subscriber handles it
+    Then the outcome is recorded if a trace is stored under that id
+    And otherwise the delivery completes at once and the skip is logged
 
   @unit
   Scenario: An evaluation of a trace still not stored after the wait records nothing

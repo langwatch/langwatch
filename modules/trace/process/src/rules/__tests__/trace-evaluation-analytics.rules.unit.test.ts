@@ -9,7 +9,7 @@ import {
   EVALUATED_TRACE_WAIT_MS,
   evaluatedTraceRetryAfterMs,
   type LiveTraceEvaluationAnalyticsRow,
-  namesStorableTrace,
+  evaluatedTraceWaitOf,
   type TraceEvaluationAnalyticsRow,
   traceEvaluationRowWrites,
 } from "../trace-evaluation-analytics.rules.ts";
@@ -131,24 +131,30 @@ describe("evaluatedTraceRetryAfterMs", () => {
   });
 });
 
-describe("namesStorableTrace", () => {
-  /** @scenario "An evaluation naming no storable trace is not retried" */
+describe("evaluatedTraceWaitOf", () => {
+  /** @scenario "An evaluation naming no trace is not retried" */
+  it.each([
+    ["a blank id", "   "],
+    ["an empty id", ""],
+    ["no id", null],
+  ])("never waits for %s", (_, traceId) => {
+    expect(evaluatedTraceWaitOf(traceId)).toBe("none");
+  });
+
+  /** @scenario "An evaluation naming the all-zero trace looks for it once" */
   it.each([
     ["the W3C all-zero id", "00000000000000000000000000000000"],
     ["a nil UUID", "00000000-0000-0000-0000-000000000000"],
     ["a single zero", "0"],
-    ["a blank id", "   "],
-    ["an empty id", ""],
-    ["no id", null],
-  ])("refuses %s", (_, traceId) => {
-    expect(namesStorableTrace(traceId)).toBe(false);
+  ])("looks once for %s", (_, traceId) => {
+    expect(evaluatedTraceWaitOf(traceId)).toBe("once");
   });
 
   it.each([
     ["a W3C id", "4bf92f3577b34da6a3ce929d0e0e4736"],
     ["an SDK's own id", "trace_7Vb2kQ"],
     ["an id that only starts with zeros", "00000000000000000000000000000001"],
-  ])("accepts %s", (_, traceId) => {
-    expect(namesStorableTrace(traceId)).toBe(true);
+  ])("waits on the ladder for %s", (_, traceId) => {
+    expect(evaluatedTraceWaitOf(traceId)).toBe("ladder");
   });
 });

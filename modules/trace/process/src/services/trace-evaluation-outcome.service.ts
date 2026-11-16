@@ -12,7 +12,7 @@ import {
   boundedOutcomeCommand,
   EVALUATED_TRACE_WAIT_MS,
   evaluatedTraceRetryAfterMs,
-  namesStorableTrace,
+  evaluatedTraceWaitOf,
 } from "../rules/trace-evaluation-analytics.rules.ts";
 import type { TraceAnchorService } from "./trace-anchor.service.ts";
 import type { TraceProcessingCommandsService } from "./trace-processing-commands.service.ts";
@@ -96,7 +96,6 @@ export class TraceEvaluationOutcomeService {
       evaluationId: data.evaluationId,
     });
     if (!run) throw new EvaluationRunNotYetReadableError(data.evaluationId);
-    if (!namesStorableTrace(run.traceId)) return;
     await this.recordFromEvent({
       context,
       traceId: run.traceId,
@@ -122,8 +121,6 @@ export class TraceEvaluationOutcomeService {
     >;
     context: EvaluationEventContext;
   }): Promise<void> {
-    // No trace is ever stored under a blank or all-zero id, so waiting an hour for one is waste.
-    if (!namesStorableTrace(data.traceId)) return;
     await this.recordFromEvent({
       context,
       traceId: data.traceId,
@@ -144,9 +141,17 @@ export class TraceEvaluationOutcomeService {
     outcome,
   }: {
     context: EvaluationEventContext;
-    traceId: string;
+    traceId: string | null | undefined;
     outcome: Omit<PendingEvaluationOutcome, "traceId" | "evaluationOccurredAt" | "sourceEventId">;
   }): Promise<void> {
+    const wait = evaluatedTraceWaitOf(traceId);
+    if (wait === "none" || traceId === null || traceId === undefined) {
+      this.deps.logger.warn(
+        { tenantId: context.tenantId, evaluationId: outcome.evaluationId },
+        "skipped an evaluation outcome that names no trace",
+      );
+      return;
+    }
     const anchors = await this.deps.anchors.traceAnchors({
       tenantId: context.tenantId,
       traces: [{ traceId, nearMs: context.occurredAt }],
@@ -157,7 +162,7 @@ export class TraceEvaluationOutcomeService {
     if (occurredAt === undefined) {
       // Main joined at read time, so a late trace still matched: wait for it while it may come.
       const waitedMs = nowMs - context.createdAt;
-      if (waitedMs <= EVALUATED_TRACE_WAIT_MS) {
+      if (wait === "ladder" && waitedMs <= EVALUATED_TRACE_WAIT_MS) {
         throw new EvaluatedTraceNotYetStoredError({
           traceId,
           retryAfterMs: evaluatedTraceRetryAfterMs(waitedMs),
@@ -165,7 +170,9 @@ export class TraceEvaluationOutcomeService {
       }
       this.deps.logger.warn(
         { tenantId: context.tenantId, traceId, evaluationId: outcome.evaluationId },
-        "skipped an evaluation outcome whose trace was not stored within the wait",
+        wait === "once"
+          ? "skipped an evaluation outcome whose all-zero trace is not stored"
+          : "skipped an evaluation outcome whose trace was not stored within the wait",
       );
       return;
     }
