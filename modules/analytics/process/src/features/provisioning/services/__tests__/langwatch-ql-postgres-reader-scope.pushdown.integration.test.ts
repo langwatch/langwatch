@@ -45,6 +45,7 @@ describe("given the generated Postgres views", () => {
   });
 
   describe("when the views are inspected", () => {
+    /** @scenario "Every approved Postgres view is a security barrier and keeps the tenant filter pushed down" */
     it("every view has security_barrier=true", async () => {
       const list = VIEW_NAMES.map((n) => `'${n}'`).join(",");
       const offenders = await admin(
@@ -91,6 +92,7 @@ describe("given the generated Postgres views", () => {
     // project): each is the most likely place for the barrier to keep the filter above a join.
     // The filter must land on the scan of the relation that carries the project column: the
     // last hop's relation, or the base itself when the path is empty.
+    /** @scenario "Every approved Postgres view is a security barrier and keeps the tenant filter pushed down" */
     it.each(widest.map((view) => [view.postgres.approvedView, depth(view)] as const))(
       "%s (%i hops): pushdown guard: the TenantId filter is applied on the tenant relation's scan",
       async (name) => {

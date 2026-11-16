@@ -189,10 +189,7 @@ export class LangWatchQLProductionProvisioningService {
     role?: string;
     views?: readonly LangWatchQLViewDefinition[];
   } = {}): string[] {
-    return [
-      ...this.guardedGrantStatements({ schema, role, views }),
-      ...this.postgresScopedReaderGrantStatements({ schema, views }),
-    ];
+    return this.guardedGrantStatements({ schema, role, views });
   }
 
   /**

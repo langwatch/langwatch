@@ -56,7 +56,7 @@ export interface ScopeHarness {
   runAs: (args: { user: string; sql: string }) => Promise<string>;
   admin: (sql: string) => Promise<string>;
   applyAll: (statements: string[]) => Promise<void>;
-  /** The app's own statements: the views, then the shared reader's grants. */
+  /** The app's own statements: the views, then the shared reader's and the group's grants. */
   provisionViews: () => Promise<void>;
   /** Every view's full rows, as one login sees them, in one round trip. */
   readAllViews: (user: string) => Promise<RowsByView>;
@@ -115,6 +115,7 @@ export async function startScopeHarness(): Promise<ScopeHarness> {
     applyAll([
       ...provisioning.postgresApprovedViewStatements({ schema: SCHEMA, readerRole: SHARED_READER }),
       ...provisioning.postgresReaderGrantStatements({ schema: SCHEMA, role: SHARED_READER }),
+      ...provisioning.postgresScopedReaderGrantStatements({ schema: SCHEMA }),
     ]);
 
   async function readAllViews(user: string): Promise<RowsByView> {

@@ -531,17 +531,15 @@ function postgresStatements({
   }
   const absent = gaps.filter((gap) => gap.absent).map((gap) => gap.view);
   const views = (approvedViews: string[]) => selfProvisioning.postgresDatasets({ approvedViews });
+  const gapViews = views(gaps.map((gap) => gap.view));
   return [
     ...lwqlProvisioning.postgresApprovedViewStatements({
       schema,
       readerRole,
       views: views(absent),
     }),
-    ...lwqlProvisioning.postgresReaderGrantStatements({
-      schema,
-      role: readerRole,
-      views: views(gaps.map((gap) => gap.view)),
-    }),
+    ...lwqlProvisioning.postgresReaderGrantStatements({ schema, role: readerRole, views: gapViews }),
+    ...lwqlProvisioning.postgresScopedReaderGrantStatements({ schema, views: gapViews }),
   ];
 }
 

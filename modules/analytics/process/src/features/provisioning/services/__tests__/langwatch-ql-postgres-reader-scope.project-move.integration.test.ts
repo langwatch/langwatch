@@ -46,6 +46,7 @@ describe("given per-reader row scoping over every generated Postgres view", () =
       ungrouped = await harness.readAllViews(READER_NONE);
     });
 
+    /** @scenario "A Postgres reader login with no organization role sees no rows" */
     it.each(VIEW_NAMES)("%s: a group member with no org role sees no rows", (view) => {
       expect(ungrouped[view]).toEqual([]);
     });
@@ -89,6 +90,7 @@ describe("given per-reader row scoping over every generated Postgres view", () =
       expect(movedOrganizations[PROJECT_A]).toBe(ORG_B);
     });
 
+    /** @scenario "A Postgres reader's row scope follows a project moved to another organization" */
     it.each(VIEW_NAMES)("%s: the org_a login no longer sees the moved project", (view) => {
       expect(tenantsOf(movedA[view] as Row[])).not.toContain(PROJECT_A);
     });

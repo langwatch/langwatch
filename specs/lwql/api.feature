@@ -1167,6 +1167,67 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     When a deploy's converge runs and restores the row-scoped view
     Then the scoped-reader group has SELECT on it again, with no manual step
 
+  # Every approved Postgres view carries a per-reader row scope: the shared
+  # reader login keeps every row, and any other login sees only the projects of
+  # the organizations whose lwql_org_<md5(organizationId)> role it is a member of.
+  @integration
+  Scenario: Each Postgres reader login sees only its own organizations' projects
+    Given two logins in the scoped-reader group, each holding one organization's role
+    And the shared reader login
+    When each reads every approved Postgres view
+    Then the shared reader sees exactly the rows it saw before row scoping
+    And each organization login sees only its organization's projects
+    And its rows equal the shared reader's rows filtered to that organization
+
+  @integration
+  Scenario: A Postgres reader's row scope follows a project moved to another organization
+    Given a project belongs to org_a and an org_b login reads every approved view
+    When the project moves to a team of org_b
+    Then the org_a login no longer sees the moved project
+    And the org_b login sees the moved project's rows and every row it saw before
+
+  @integration
+  Scenario: A Postgres reader login with no organization role sees no rows
+    Given a login in the scoped-reader group that holds no organization role
+    When it reads every approved Postgres view
+    Then every view returns no rows
+
+  # A view without the barrier lets a caller's leaky function see rows the
+  # scope predicate would remove; the barrier must not cost the tenant filter
+  # its pushdown onto the scan of the relation carrying the project id.
+  @integration
+  Scenario: Every approved Postgres view is a security barrier and keeps the tenant filter pushed down
+    Given the approved Postgres views are provisioned
+    Then every one is created with security_barrier=true
+    And on the deepest join paths a TenantId filter is applied on the tenant relation's scan
+    And no subquery scan above the barrier carries that filter
+
+  # The scoped-reader group's grant reads the live view's stored definition
+  # (pg_get_viewdef): it must be a security barrier and carry the org-role
+  # lookup, the pg_auth_members join and the rolname = current_user tie.
+  @integration
+  Scenario: The scoped-reader group is granted only a live view that is provably row-scoped
+    Given a live approved view that is unscoped, or carries the org-role lookup without the membership join or the session-user tie
+    And the scoped-reader group holds a stale SELECT on it
+    When the app grants the approved views
+    Then the group's SELECT on that view is revoked
+    And the group keeps SELECT on every row-scoped view
+
+  @integration
+  Scenario: Provisioning without the scoped-reader group is unchanged
+    Given a deployment where the scoped-reader group does not exist
+    When the app provisions the approved views
+    Then provisioning succeeds without creating the group
+    And the shared reader still reads every view
+
+  @integration
+  Scenario: The scoped-reader gap probe on a deployment without the group reports nothing and raises nothing
+    Given live approved views, and a role name that may or may not exist
+    When the converge asks which approved views that role cannot select
+    Then a role that does not exist yields no views and no error
+    And a view that does not exist is never named
+    And a live view is named only when the role has no SELECT on it
+
   # A deploy converges views after the engine tables and stops at the first
   # failing statement, so a deploy whose PostgreSQL bridge fails never replaces
   # the views over fact tables. The check is the backstop (#9245).

@@ -51,6 +51,7 @@ describe("given per-reader row scoping over every generated Postgres view", () =
       expect(tenantsOf(shared[view] as Row[])).toEqual(baseline[view]);
     });
 
+    /** @scenario "Each Postgres reader login sees only its own organizations' projects" */
     it.each(VIEW_NAMES)("%s: an org_a login sees only org_a projects", (view) => {
       const foreign = (readerA[view] as Row[]).filter(
         (row) => organizations[row.TenantId] !== ORG_A,

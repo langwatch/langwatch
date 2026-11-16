@@ -25,9 +25,10 @@ describe("given the scoped-reader group and the app's view provisioning", () => 
   const canSelect = (view: string) =>
     admin(`SELECT has_table_privilege('${GROUP}', '${q(SCHEMA)}.${q(view)}', 'SELECT')`);
   const grantAsApp = () =>
-    harness.applyAll(
-      provisioning.postgresReaderGrantStatements({ schema: SCHEMA, role: SHARED_READER }),
-    );
+    harness.applyAll([
+      ...provisioning.postgresReaderGrantStatements({ schema: SCHEMA, role: SHARED_READER }),
+      ...provisioning.postgresScopedReaderGrantStatements({ schema: SCHEMA }),
+    ]);
 
   beforeAll(async () => {
     harness = await startScopeHarness();
@@ -96,6 +97,7 @@ describe("given the scoped-reader group and the app's view provisioning", () => 
       await grantAsApp();
     });
 
+    /** @scenario "The scoped-reader group is granted only a live view that is provably row-scoped" */
     it("the group has no SELECT on the unscoped view, a stale grant included", async () => {
       expect(await canSelect(stale)).toBe("f");
     });
@@ -168,6 +170,7 @@ describe("given the scoped-reader group and the app's view provisioning", () => 
       await grantAsApp();
     });
 
+    /** @scenario "The scoped-reader group is granted only a live view that is provably row-scoped" */
     it("the group has no SELECT on a view with no membership join, a stale grant included", async () => {
       expect(await canSelect(withoutMembership)).toBe("f");
     });
@@ -207,6 +210,7 @@ describe("given a deployment where the scoped-reader group does not exist", () =
   });
 
   describe("when the app provisions the views", () => {
+    /** @scenario "Provisioning without the scoped-reader group is unchanged" */
     it("provisioning succeeds unchanged", () => {
       expect(outcome).toBe("ok");
     });

@@ -57,6 +57,10 @@ export class PrismaLangWatchQLPostgresRepository extends LangWatchQLPostgresRepo
     return approvedViewRowsSchema.parse(rows);
   }
 
+  /**
+   * CASE fixes the evaluation order an AND list leaves to the planner: `has_table_privilege`
+   * raises on an unknown role name, so it runs only once the role and the view are known to exist.
+   */
   async findScopedReaderMissingViews({
     schema,
     role,
@@ -67,10 +71,13 @@ export class PrismaLangWatchQLPostgresRepository extends LangWatchQLPostgresRepo
     views: readonly string[];
   }): Promise<string[]> {
     const rows = await this.database.$queryRawUnsafe(
-      `${CATALOG}\nSELECT v AS view FROM unnest($3::text[]) AS v ` +
-        `WHERE EXISTS (SELECT 1 FROM pg_roles WHERE rolname = $2::text) ` +
-        `AND to_regclass(format('%I.%I', $1::text, v)) IS NOT NULL ` +
-        `AND NOT has_table_privilege($2::text, format('%I.%I', $1::text, v), 'SELECT') ` +
+      `${CATALOG}\nSELECT v AS view ` +
+        `FROM unnest($3::text[]) AS v, to_regclass(format('%I.%I', $1::text, v)) AS rel ` +
+        `WHERE CASE ` +
+        `WHEN NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = $2::text) THEN false ` +
+        `WHEN rel IS NULL THEN false ` +
+        `ELSE NOT has_table_privilege($2::text, rel, 'SELECT') ` +
+        `END ` +
         `ORDER BY v`,
       schema,
       role,
