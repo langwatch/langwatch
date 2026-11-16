@@ -271,8 +271,6 @@ export interface TraceApi extends TraceOtlpIngestApi {
       scrollId?: string | null;
       /** The v1 REST search's filter as written; trace compiles it into the read (Decided 25). */
       filter?: TraceListFilter;
-      /** The proof the filter's side-table checks read under (ADR-177 block C). */
-      authorization?: Authorization;
       /** Refuse above this plan bound instead of clamping to the list bound. */
       refuseAbove?: "tracesPageSizeMax" | "tracesDownloadPageSizeMax";
     };

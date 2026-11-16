@@ -242,17 +242,20 @@ describe("TraceLegacyReadClickHouseRepository tenant markers", () => {
   });
 
   describe("when the proof names another project than the read", () => {
-    it("reads only the proof's project", async () => {
+    it("refuses with project_permission_denied and reads nothing", async () => {
       const { read, statements, built } = harness();
 
-      await read.findTracesWithSpans({
-        authorization: ownProof({ projectId: "project-2" }),
-        projectId: PROJECT_ID,
-        traceIds: ["trace-1"],
-        protections: PROTECTIONS,
-      });
+      await expect(
+        read.findTracesWithSpans({
+          authorization: ownProof({ projectId: "project-2" }),
+          projectId: PROJECT_ID,
+          traceIds: ["trace-1"],
+          protections: PROTECTIONS,
+        }),
+      ).rejects.toMatchObject({ code: "project_permission_denied" });
 
-      expectBuiltFencedTo({ built, statements: statements(), projectId: "project-2" });
+      expect(statements()).toEqual([]);
+      expect(built).toEqual([]);
     });
   });
 });

@@ -10,7 +10,7 @@ import { ownProof } from "../../../../../__tests__/support/authorization-proofs.
 import { traceSummaryRow } from "../../../../../repositories/clickhouse/__tests__/support/trace-summary-row.support.ts";
 import { mappedLegacyRead } from "./support/legacy-trace-mapping.support.ts";
 
-const OWN_READ = ownProof({ projectId: "proj-1" });
+const OWN_READ = ownProof({ projectId: "project_joined_cap" });
 
 const mockClickHouseQuery = vi.hoisted(() => vi.fn());
 

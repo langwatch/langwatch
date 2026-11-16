@@ -8,7 +8,7 @@ import {
   RequestValidationError,
   resolver,
 } from "@langwatch/api/rest";
-import type { Authorization, PrincipalRef } from "@langwatch/authorization";
+import type { PrincipalRef } from "@langwatch/authorization";
 import { createLogger } from "@langwatch/observability";
 import { resolveRequestBound } from "@langwatch/plans";
 import { toEpochMs } from "@langwatch/time";
@@ -209,14 +209,12 @@ async function searchTraces({
   scope,
   project,
   caller,
-  authorization,
 }: {
   app: TraceApi;
   input: z.infer<typeof traceSearchBodySchema>;
   scope: { id: string };
   project: { projectSlug: string };
   caller: { principal: PrincipalRef | null };
-  authorization: Authorization;
 }): Promise<string> {
   const params = input;
   const {
@@ -272,7 +270,6 @@ async function searchTraces({
         protections,
         hideExplorerOrigins: !namesOriginFilter(searchFields.filters),
       },
-      authorization,
       ...(projection ? { projection: projection.plan } : {}),
     },
   });
@@ -322,8 +319,8 @@ function createTracesRest() {
         ...SHARED_ERROR_ANSWERS,
       },
     })
-    .handle(async ({ app, input, scope, authorization, response }, project, caller) =>
-      response.buffer(await searchTraces({ app, input, scope, project, caller, authorization }), {
+    .handle(async ({ app, input, scope, response }, project, caller) =>
+      response.buffer(await searchTraces({ app, input, scope, project, caller }), {
         mediaType: "application/json",
       }),
     );

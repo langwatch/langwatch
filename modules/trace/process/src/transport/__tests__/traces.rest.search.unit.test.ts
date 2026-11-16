@@ -635,16 +635,6 @@ describe("POST /search with a trace filter", () => {
       expect(filterWhere?.params[window![2]!]).toBe(5000);
     });
 
-    it("reads through the door's proof, fenced to the key's own project", async () => {
-      const { send, listTraces } = mount();
-      await send({ startDate: 1000, endDate: 5000, filter: "status:error" });
-      expect(vi.mocked(listTraces).mock.calls[0]?.[0]?.options?.authorization).toEqual(
-        expect.objectContaining({
-          grants: [expect.objectContaining({ projectId: "project-123", kind: "own" })],
-        }),
-      );
-    });
-
     it("does not forward the raw string as a search field", async () => {
       const { send, listTraces } = mount();
       await send({ startDate: 1000, endDate: 5000, filter: "status:error" });

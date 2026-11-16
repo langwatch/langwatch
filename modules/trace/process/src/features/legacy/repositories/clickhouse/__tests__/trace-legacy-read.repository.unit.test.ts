@@ -31,15 +31,6 @@ vi.mock("langwatch", () => ({
   }),
 }));
 
-// Stub the filter module to return empty conditions
-vi.mock("~/server/filters/clickhouse", () => ({
-  generateClickHouseFilterConditions: () => ({
-    conditions: [],
-    params: {},
-    hasUnsupportedFilters: false,
-  }),
-}));
-
 type SentStatement = { query: string; query_params: Record<string, unknown> };
 
 /** The statement the built read sent as the `index`th call. */

@@ -42,6 +42,18 @@ Feature: Trace filters compile to built conditions
     When the read compiles the filter for its scope
     Then the read is refused with filter_value_refused and reads no trace
 
+  @unit
+  Scenario: A legacy read refuses a project its proof does not grant
+    Given a legacy read names a project beside the proof it reads under
+    When no grant of the proof reads that project, a braid alone reaches it, or the proof is narrowed to another
+    Then the read is refused with project_permission_denied before any read
+
+  @integration
+  Scenario: Legacy filtered reads keep main's rows with another tenant sharing trace ids
+    Given two tenants whose summaries, spans and evaluation runs share trace ids
+    When the legacy list and summary reads run each legacy filter family as the app reader
+    Then each returns the rows main returned for the read's tenant, and none of the other tenant's
+
   @integration
   Scenario: Each filter kind keeps main's rows with another tenant sharing trace ids
     Given two tenants whose traces, spans, evaluations, scenario runs and judgements share ids

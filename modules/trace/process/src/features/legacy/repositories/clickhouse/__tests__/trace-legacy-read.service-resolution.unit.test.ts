@@ -33,15 +33,6 @@ const { mockClickHouseQuery } = vi.hoisted(() => ({
  */
 const testResolveClickHouseClient = () => Promise.resolve({ query: mockClickHouseQuery } as never);
 
-// Stub the filter module to return empty conditions
-vi.mock("~/server/filters/clickhouse", () => ({
-  generateClickHouseFilterConditions: () => ({
-    conditions: [],
-    params: {},
-    hasUnsupportedFilters: false,
-  }),
-}));
-
 vi.mock("langwatch", () => ({
   getLangWatchTracer: () => ({
     withActiveSpan: (_name: string, ...args: unknown[]) => {

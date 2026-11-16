@@ -21,14 +21,6 @@ const traceCanonicalisation = TraceCanonicalisationService.create();
  * repository takes the resolver, so the fake sits with every other dependency. */
 const testResolveClickHouseClient = () => Promise.resolve({ query: mockClickHouseQuery } as never);
 
-vi.mock("~/server/filters/clickhouse", () => ({
-  generateClickHouseFilterConditions: () => ({
-    conditions: [],
-    params: {},
-    hasUnsupportedFilters: false,
-  }),
-}));
-
 vi.mock("langwatch", () => ({
   getLangWatchTracer: () => ({
     withActiveSpan: (_name: string, ...args: unknown[]) => {

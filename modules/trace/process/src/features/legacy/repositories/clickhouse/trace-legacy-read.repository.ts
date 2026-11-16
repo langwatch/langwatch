@@ -1,5 +1,5 @@
 import { annotationSuggestedOutput } from "@langwatch/annotation-contract";
-import type { Authorization } from "@langwatch/authorization";
+import { type Authorization, ProjectPermissionDeniedError } from "@langwatch/authorization";
 import {
   type AuthorizedClickHouse,
   type ClickHouseQueryClient,
@@ -63,6 +63,7 @@ import { type ClickHouseEvaluationRunRow } from "../../../../rules/trace-evaluat
 import { mapEventAttrsToEvent } from "../../../../rules/trace-event-attribute-mapping.rules.ts";
 import { type EventSpanRow } from "../../../../rules/trace-event-attribute-mapping.rules.ts";
 import type { TraceFilterCondition } from "../../../query/repositories/clickhouse/clickhouse.trace-filter-condition.mapper.ts";
+import { proofGrantsProject } from "../../rules/trace-legacy-project-grant.rules.ts";
 import {
   type PromptStudioSpanRow,
   derivePromptStudioSpan,
@@ -305,6 +306,19 @@ function eventOccurrenceWindows(occurredAts: number[]): { from: number; to: numb
  * Thrown when no ClickHouse client can be resolved for a project — always a configuration
  * problem (e.g. CLICKHOUSE_URL unset), never missing data. Callers surface it as such.
  */
+/** Refuses, before any read, a project the proof does not grant: the proof decides the tenant. */
+function refuseUngranted({
+  authorization,
+  projectId,
+}: {
+  authorization: Authorization;
+  projectId: string;
+}): void {
+  if (!proofGrantsProject({ authorization, projectId })) {
+    throw new ProjectPermissionDeniedError("traces:view");
+  }
+}
+
 class ClickHouseClientUnavailableError extends Error {
   constructor(projectId: string) {
     super(
@@ -1221,6 +1235,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     authorization: Authorization;
     projectId: string;
   }) {
+    refuseUngranted({ authorization, projectId });
     if (!this.store.clickhouse) throw new ClickHouseClientUnavailableError(projectId);
     return this.store.clickhouse.as(authorization, { reads: "traces" });
   }
@@ -1366,6 +1381,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
         attributes: { "tenant.id": projectId, "thread.id": threadId },
       },
       async () => {
+        refuseUngranted({ authorization, projectId });
         const reader = this.builtReader(projectId);
 
         this.logger.debug({ projectId, threadId }, "Fetching traces by thread ID from ClickHouse");
@@ -1437,6 +1453,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
         },
       },
       async () => {
+        refuseUngranted({ authorization, projectId });
         const reader = this.builtReader(projectId);
 
         if (threadIds.length === 0) {
