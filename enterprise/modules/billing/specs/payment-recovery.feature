@@ -332,11 +332,18 @@ Feature: A paid organization whose card fails is told, reminded, paused and rest
     And the organization is on the Free plan like any cancelled subscription
 
   @unit
-  Scenario: An invoice voided or marked uncollectible by staff closes the case
+  Scenario: An invoice voided by staff closes the case
     Given an organization with an open recovery case
-    When the invoice is voided or marked uncollectible in Stripe
+    When the invoice is voided in Stripe
     Then the case closes and the organization keeps its paid plan
     And no further reminder is sent
+
+  @unit
+  Scenario: An invoice marked uncollectible keeps the case open until it is paid
+    Given an organization with an open recovery case
+    When the invoice is marked uncollectible in Stripe, by staff or by Stripe after its last retry
+    Then the case stays open, so the organization moves to Free on day 21 and stays there
+    And the reminders go on, and paying the invoice restores the plan
 
   @unit
   Scenario: A subscription Stripe marks unpaid stays paused, not cancelled

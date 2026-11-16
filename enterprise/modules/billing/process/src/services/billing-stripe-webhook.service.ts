@@ -70,7 +70,7 @@ type WebhookService = {
 /** Failed payment recovery's reactions to invoice events (ADR-002). */
 export type PaymentRecoveryHandler = Pick<
   PaymentRecoveryService,
-  "paymentFailed" | "invoicePaid" | "invoiceClosedUnpaid"
+  "paymentFailed" | "invoicePaid" | "invoiceVoided"
 >;
 
 /** The invoice fields recovery reads, from Stripe's object. */
@@ -249,10 +249,12 @@ export class EEWebhookService implements WebhookService {
       await this.recovery?.invoicePaid({ invoice: recoveryInvoiceOf(event.data.object) });
       return event.type === "invoice.paid" ? { status: "ok" } : null;
     }
-    if (event.type === "invoice.voided" || event.type === "invoice.marked_uncollectible") {
-      await this.recovery?.invoiceClosedUnpaid({ invoice: recoveryInvoiceOf(event.data.object) });
+    if (event.type === "invoice.voided") {
+      await this.recovery?.invoiceVoided({ invoice: recoveryInvoiceOf(event.data.object) });
       return { status: "ok" };
     }
+    // Still payable, so the case stays open: no plan back without payment.
+    if (event.type === "invoice.marked_uncollectible") return { status: "ok" };
     return null;
   }
 

@@ -156,8 +156,11 @@ export class PaymentRecoveryService {
     for (const mail of restored) await this.mail.deliver(mail);
   }
 
-  /** Voided or marked uncollectible by staff: the case closes, the plan stays, nothing is mailed. */
-  async invoiceClosedUnpaid({ invoice }: { invoice: RecoveryInvoice }): Promise<void> {
+  /**
+   * Voided by staff: the case closes, the plan stays, nothing is mailed. An uncollectible invoice
+   * can still be paid, so it keeps the case open.
+   */
+  async invoiceVoided({ invoice }: { invoice: RecoveryInvoice }): Promise<void> {
     const subscription = invoice.subscriptionId
       ? await this.options.subscriptions.findByStripeId(invoice.subscriptionId)
       : null;
@@ -281,7 +284,7 @@ export class PaymentRecoveryService {
       for (const mail of restored) await this.mail.deliver(mail);
       return "closed";
     }
-    if (invoice.status === "void" || invoice.status === "uncollectible") {
+    if (invoice.status === "void") {
       await this.options.recoveries.close({
         subscriptionId: open.subscriptionId,
         invoiceId: open.invoiceId,

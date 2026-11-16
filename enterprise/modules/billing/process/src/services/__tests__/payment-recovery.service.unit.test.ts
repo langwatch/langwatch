@@ -140,7 +140,8 @@ function setUp({ plan = "GROWTH_SEAT_EUR_MONTHLY" }: { plan?: string } = {}) {
     },
     kinds: () => emails.sent.map((sent) => sent.email.kind),
     /** Sets the invoice's status at Stripe, as a later read would answer it. */
-    settle: (status: "paid" | "void") => invoices.settle({ invoiceId: RENEWAL.id, status }),
+    settle: (status: "paid" | "void" | "uncollectible") =>
+      invoices.settle({ invoiceId: RENEWAL.id, status }),
   };
 }
 
@@ -438,10 +439,27 @@ describe("given an open recovery case", () => {
     });
   });
 
-  describe("when the invoice is voided or marked uncollectible", () => {
-    /** @scenario "An invoice voided or marked uncollectible by staff closes the case" */
+  describe("when the invoice is marked uncollectible", () => {
+    /** @scenario "An invoice marked uncollectible keeps the case open until it is paid" */
+    it("keeps the case open, mails the reminders and pauses on day 21", async () => {
+      world.settle("uncollectible");
+      world.at(dayOf(3));
+      expect(await world.service.sweep()).toMatchObject({ notified: 1, closed: 0 });
+
+      world.at(dayOf(21, 1));
+      await world.service.sweep();
+
+      expect(world.kinds()).toContain("paused");
+      expect(await world.service.summary({ organizationId: "org_1" })).toEqual({
+        state: "paused",
+      });
+    });
+  });
+
+  describe("when the invoice is voided", () => {
+    /** @scenario "An invoice voided by staff closes the case" */
     it("closes the case silently and sends no further reminder", async () => {
-      await world.service.invoiceClosedUnpaid({ invoice: RENEWAL });
+      await world.service.invoiceVoided({ invoice: RENEWAL });
       world.at(dayOf(7));
       await world.service.sweep();
 

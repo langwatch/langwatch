@@ -35,8 +35,8 @@ class RecordingRecovery implements PaymentRecoveryHandler {
   async invoicePaid({ invoice }: { invoice: RecoveryInvoice }) {
     this.record({ operation: "invoicePaid", invoice });
   }
-  async invoiceClosedUnpaid({ invoice }: { invoice: RecoveryInvoice }) {
-    this.record({ operation: "invoiceClosedUnpaid", invoice });
+  async invoiceVoided({ invoice }: { invoice: RecoveryInvoice }) {
+    this.record({ operation: "invoiceVoided", invoice });
   }
 
   private record(call: Call) {
@@ -167,15 +167,18 @@ describe("given the Stripe callback with payment recovery composed", () => {
     expect(recovery.calls.map((call) => call.operation)).toEqual(["invoicePaid", "invoicePaid"]);
   });
 
-  /** @scenario "An invoice voided or marked uncollectible by staff closes the case" */
-  it("hands a voided and a written-off invoice to recovery", async () => {
+  /** @scenario "An invoice voided by staff closes the case" */
+  it("hands a voided invoice to recovery", async () => {
     expect(await handled("invoice.voided")).toEqual({ status: "ok" });
+
+    expect(recovery.calls.map((call) => call.operation)).toEqual(["invoiceVoided"]);
+  });
+
+  /** @scenario "An invoice marked uncollectible keeps the case open until it is paid" */
+  it("acknowledges an uncollectible invoice without closing the case", async () => {
     expect(await handled("invoice.marked_uncollectible")).toEqual({ status: "ok" });
 
-    expect(recovery.calls.map((call) => call.operation)).toEqual([
-      "invoiceClosedUnpaid",
-      "invoiceClosedUnpaid",
-    ]);
+    expect(recovery.calls).toEqual([]);
   });
 
   /** @scenario "A database failure while opening a case makes Stripe retry" */
