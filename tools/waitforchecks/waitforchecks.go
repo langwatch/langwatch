@@ -44,8 +44,7 @@ type checkRun struct {
 }
 
 type checkRunsPage struct {
-	TotalCount int        `json:"total_count"`
-	CheckRuns  []checkRun `json:"check_runs"`
+	CheckRuns []checkRun `json:"check_runs"`
 }
 
 // statusError is a non-2xx answer from the API.
