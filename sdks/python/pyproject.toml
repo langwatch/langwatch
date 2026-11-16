@@ -1,6 +1,6 @@
 [project]
 name = "langwatch"
-version = "1.4.0" # remember to also update it in src/langwatch/__version__.py
+version = "1.4.1" # remember to also update it in src/langwatch/__version__.py
 description = "LangWatch Python SDK, for monitoring your LLMs"
 authors = [{ name = "Langwatch Engineers", email = "engineering@langwatch.ai" }]
 requires-python = ">=3.10,<3.14"
@@ -36,7 +36,7 @@ dependencies = [
     "tenacity>=8.0.0",
     "termcolor>=3.0.1",
     "deprecated>=1.2.18",
-    "python-liquid>=2.2.0",
+    "python-liquid>=2.2.1,<3", # security: floor past GHSA-vq2f-vcc9-j8mv, PYSEC-2026-3035; cap: 3.0 removed UndefinedError (specs/python-sdk/dependency-ranges.feature)
     "pydantic>=2",
     "attrs>=26.1.0",
     "pksuid>=1.1.2",
