@@ -1,6 +1,7 @@
 # size-ha.yaml — High-availability production. 3-node replicated ClickHouse.
 #
-# 3 app replicas, 3 workers, 2 NLP/langevals, replicated CH with Keeper.
+# 3 app replicas, 3 workers, 2 NLP/langevals, replicated CH with Keeper,
+# 2 PII redaction model replicas (7Gi each; piiRedactionModel.enabled=false skips them).
 # Combine with access, external database, and cold storage overlays.
 # Requires app.dataplane (S3 or Azure Blob) for stored objects; the
 # cold-storage-s3.yaml overlay configures ClickHouse cold storage and
@@ -48,6 +49,27 @@ langevals:
   resources:
     requests: { cpu: 1, memory: 4Gi }
     limits: { cpu: 2, memory: 8Gi }
+
+piiRedactionModel:
+  # Strict PII analysis on the PII redaction model, with Presidio as its
+  # fallback. Needs the model image (images.pii_redaction_model) and its pull
+  # secret (piiRedactionModel.imagePullSecrets); set enabled: false to stay on
+  # Presidio. 7Gi per replica, reserved.
+  enabled: true
+  replicaCount: 2
+  resources:
+    requests: { cpu: 2, memory: 7Gi }
+    limits: { cpu: 4, memory: 7Gi }
+  podDisruptionBudget:
+    maxUnavailable: 1
+  # One replica per zone where the cluster has zones.
+  topologySpreadConstraints:
+    - maxSkew: 1
+      topologyKey: topology.kubernetes.io/zone
+      whenUnsatisfiable: ScheduleAnyway
+      labelSelector:
+        matchLabels:
+          app.kubernetes.io/component: pii-redaction-model
 
 clickhouse:
   chartManaged: true

@@ -1,0 +1,160 @@
+{{- if .Values.piiRedactionModel.enabled }}
+{{- $image := .Values.images.pii_redaction_model }}
+{{- if or (not $image.repository) (not $image.tag) }}
+{{- fail "piiRedactionModel.enabled needs images.pii_redaction_model.repository and images.pii_redaction_model.tag: the PII redaction model image is distributed separately from the other LangWatch images. Set both (and piiRedactionModel.imagePullSecrets for a private registry), or set piiRedactionModel.enabled=false to keep strict PII analysis on Presidio." }}
+{{- end }}
+# Deployment for the PII redaction model: the strict PII detector (Level 0
+# patterns plus the GLiNER and PII-Tracer models) the app and the workers call
+# over HTTP instead of Presidio. It stores nothing and calls nothing.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-pii-redaction-model
+  labels:
+    app.kubernetes.io/name: {{ .Release.Name }}-pii-redaction-model
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: pii-redaction-model
+    {{- /* The common labels without their name and instance, which name this
+           component above: a repeated key is invalid YAML. */}}
+    {{- toYaml (omit (include "langwatch.labels" . | fromYaml) "app.kubernetes.io/name" "app.kubernetes.io/instance") | nindent 4 }}
+    {{- with .Values.piiRedactionModel.deployment.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .Values.piiRedactionModel.deployment.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  replicas: {{ .Values.piiRedactionModel.replicaCount }}
+  {{- with .Values.piiRedactionModel.deployment.strategy }}
+  strategy:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- if hasKey (default (dict) .Values.piiRedactionModel.deployment) "revisionHistoryLimit" }}
+  revisionHistoryLimit: {{ .Values.piiRedactionModel.deployment.revisionHistoryLimit }}
+  {{- end }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Release.Name }}-pii-redaction-model
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ .Release.Name }}-pii-redaction-model
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: pii-redaction-model
+        {{- with .Values.piiRedactionModel.pod.labels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        {{- with (coalesce .Values.piiRedactionModel.pod.annotations .Values.global.podAnnotations) }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      # The model calls nothing, the Kubernetes API included.
+      automountServiceAccountToken: {{ .Values.global.automountServiceAccountToken }}
+      {{- with .Values.piiRedactionModel.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      # A stopping pod drains for up to 90 s: 30 s to read a body, the 55 s
+      # request deadline and 5 s. At Kubernetes' default 30 s a long request
+      # in flight is killed with the pod (measured on k3s); at 100 s it is
+      # answered and the pod exits 0. The image has no shell, so there is no
+      # preStop sleep.
+      terminationGracePeriodSeconds: {{ .Values.piiRedactionModel.terminationGracePeriodSeconds }}
+      # The image is distroless :nonroot, built to run as uid 65532 (as
+      # Cloud runs it); pin that over the chart-wide 1000.
+      securityContext:
+        {{- include "langwatch.podSecurityContext" (dict "ctx" . "component" .Values.piiRedactionModel "base" (dict "runAsUser" 65532 "runAsGroup" 65532 "fsGroup" 65532)) | nindent 8 }}
+
+      {{- with (coalesce .Values.piiRedactionModel.nodeSelector .Values.global.scheduling.nodeSelector) }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      {{- with (coalesce .Values.piiRedactionModel.tolerations .Values.global.scheduling.tolerations) }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      {{- with (coalesce .Values.piiRedactionModel.affinity .Values.global.scheduling.affinity) }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      {{- with (coalesce .Values.piiRedactionModel.topologySpreadConstraints .Values.global.scheduling.topologySpreadConstraints) }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      {{- with (coalesce .Values.piiRedactionModel.priorityClassName .Values.global.scheduling.priorityClassName) }}
+      priorityClassName: {{ . | quote }}
+      {{- end }}
+
+      containers:
+        - name: {{ .Release.Name }}-pii-redaction-model
+          securityContext:
+            {{- include "langwatch.containerSecurityContext" (dict "ctx" . "component" .Values.piiRedactionModel) | nindent 12 }}
+          image: "{{ $image.repository }}:{{ $image.tag }}"
+          imagePullPolicy: {{ $image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: PORT
+              value: "8080"
+            # Every Level 1 component in one pod: the mixed build's GLiNER (fp32)
+            # and PII-Tracer (int8), plus the Level 0 patterns.
+            - name: PII_COMPONENTS
+              value: "level0,gliner,tracer"
+            - name: THREADS
+              value: {{ include "langwatch.piiRedactionModel.threads" . | quote }}
+            # One synthetic sentence through each model at start; a model
+            # that fails it stops the process instead of serving.
+            - name: PII_WARMUP
+              value: "1"
+            # One request at a time per pod, the service's default. More share
+            # the same model sessions, so memory grows with requests in flight
+            # and the memory limit below is only validated at 1.
+            - name: PII_MAX_CONCURRENT_REQUESTS
+              value: "1"
+            {{- with .Values.piiRedactionModel.extraEnvs }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          resources:
+            {{- toYaml .Values.piiRedactionModel.resources | nindent 12 }}
+          # The models load and warm up before the port answers: 3 to 6 s with
+          # the image already on the node. 120 s (24 x 5 s) leaves room for a
+          # slow node; liveness waits for it, so a slow load is never killed.
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 24
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          volumeMounts:
+            # Read-only root filesystem; ONNX Runtime and Go may want scratch.
+            - name: tmp-dir
+              mountPath: /tmp
+      volumes:
+        - name: tmp-dir
+          emptyDir:
+            sizeLimit: {{ .Values.piiRedactionModel.scratchSizeLimit }}
+{{- end }}

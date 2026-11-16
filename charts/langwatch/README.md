@@ -54,10 +54,10 @@ All overlays live in `examples/overlays/`:
 | Overlay                        | Description                                                                                                                                              |
 | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Size** (pick one)            |                                                                                                                                                          |
-| `size-minimal`                 | CI smoke test — absolute minimum resources                                                                                                               |
-| `size-dev`                     | Local dev / small team                                                                                                                                   |
-| `size-prod`                    | Production — single-node ClickHouse, 2 app/worker replicas                                                                                               |
-| `size-ha`                      | HA production — 3-node replicated ClickHouse, 3 app/worker replicas                                                                                      |
+| `size-minimal`                 | CI smoke test: absolute minimum resources; no PII redaction model                                                                                       |
+| `size-dev`                     | Local dev / small team; no PII redaction model                                                                                                           |
+| `size-prod`                    | Production: single-node ClickHouse, 2 app/worker replicas, 1 PII redaction model replica (7Gi)                                                          |
+| `size-ha`                      | HA production: 3-node replicated ClickHouse, 3 app/worker replicas, 2 PII redaction model replicas (7Gi each)                                           |
 | **Access** (pick one)          |                                                                                                                                                          |
 | `access-nodeport`              | Kind: NodePort 30560 → http://localhost:30560                                                                                                            |
 | `access-ingress`               | Cloud: Ingress + TLS (nginx class)                                                                                                                       |
@@ -71,7 +71,24 @@ All overlays live in `examples/overlays/`:
 | `cold-storage-s3`              | S3 cold storage tiering + backups                                                                                                                        |
 | `strict-admission`             | Toggles for Pod Security Admission `restricted` / Gatekeeper / Kyverno clusters                                                                          |
 
-> **Sizing notes.** The Node app and workers need roughly **2Gi to boot** (they cold-load the TS server through tsx); the `size-minimal` and `size-dev` overlays account for this, so don't trim app/worker memory below ~2Gi or they OOM at startup. **ClickHouse memory scales with ingest volume** - the chart-managed defaults in `size-minimal`/`size-dev` (1-2Gi) are for light/local use; raise `clickhouse.memory` (and `cpu`) before pushing real trace throughput, or a large ingest burst will OOM it.
+> **Sizing notes.** The Node app and workers need roughly **2Gi to boot** (they cold-load the TS server through tsx); the `size-minimal` and `size-dev` overlays account for this, so don't trim app/worker memory below ~2Gi or they OOM at startup. **ClickHouse memory scales with ingest volume** - the chart-managed defaults in `size-minimal`/`size-dev` (1-2Gi) are for light/local use; raise `clickhouse.memory` (and `cpu`) before pushing real trace throughput, or a large ingest burst will OOM it. **The PII redaction model** (on in `size-prod` and `size-ha`) reserves 7Gi and 2 CPU per replica and needs its image and pull secret: see [PII redaction model](#pii-redaction-model).
+
+### PII redaction model
+
+Organizations on the Strict PII level can have their PII analysis done by the PII redaction model instead of Presidio, as on LangWatch Cloud. With `piiRedactionModel.enabled: true` the chart runs the model as a Deployment and Service and sets `PII_REDACTION_MODEL_ENDPOINT` on the app and the workers. `size-prod` and `size-ha` turn it on; the default values, `size-dev` and `size-minimal` leave it off.
+
+- **Image.** One image, distributed separately from the other LangWatch images: `images.pii_redaction_model.repository` and `.tag`, with `piiRedactionModel.imagePullSecrets` for a private registry. Without a repository and tag the chart refuses to render.
+- **Sizing.** 7Gi memory (request equals limit) and 2 CPU requested, 4 CPU limit per replica, one request at a time. Measured peak 4.1 to 4.6 GiB per request, 5.3 GB on a 100,000-character text, no OOM at 7Gi.
+- **Fallback.** A model that is down, slow (50 s) or given more than 8,000 characters in one batch sends that batch to Presidio, then Google DLP if configured. Turning the model off never stops strict redaction.
+- **Flags.** Deploying the model forces `release_pii_redaction_model_enabled` (route every Strict organization) and `release_pii_redaction_model_free` (record calls at zero). Set `piiRedactionModel.enableForAllOrganizations` or `piiRedactionModel.recordAtZeroPrice` to `false` to leave either to the flag store.
+- **External model.** `piiRedactionModel.externalEndpoint` points the app and workers at a model this release does not deploy.
+
+```bash
+helm install lw . -f examples/overlays/size-prod.yaml -f examples/overlays/access-ingress.yaml \
+  --set images.pii_redaction_model.repository=<registry>/pii-redaction-model \
+  --set images.pii_redaction_model.tag=<tag> \
+  --set 'piiRedactionModel.imagePullSecrets[0].name=<pull-secret>'
+```
 
 ### All-in-one profiles
 
@@ -440,6 +457,9 @@ npx @bitnami/readme-generator-for-helm --readme ./README.md --values values.yaml
 | `images.langevals.repository`     | Langevals image repository.                                         | `""`  |
 | `images.langevals.tag`            | Langevals image tag.                                                | `""`  |
 | `images.langevals.pullPolicy`     | Langevals image pull policy.                                        | `""`  |
+| `images.pii_redaction_model.repository` | PII redaction model image repository.                         | `langwatch/pii-redaction-model` |
+| `images.pii_redaction_model.tag`        | PII redaction model image tag.                                | `3.23.0` |
+| `images.pii_redaction_model.pullPolicy` | PII redaction model image pull policy.                        | `IfNotPresent` |
 
 ### LangWatch app
 
@@ -791,6 +811,39 @@ npx @bitnami/readme-generator-for-helm --readme ./README.md --values values.yaml
 | `langevals.extraInitContainers`             | Additional init containers.                                                                                                                                                                                             | `[]`        |
 | `langevals.extraLifecycle`                  | Additional lifecycle hooks.                                                                                                                                                                                             | `{}`        |
 | `langevals.extraVolumeMounts`               | Additional volume mounts.                                                                                                                                                                                               | `[]`        |
+
+### PII redaction model service
+
+| Name | Description | Value |
+| ---- | ----------- | ----- |
+| `piiRedactionModel.enabled` | Deploy the PII redaction model (Deployment, Service and PDB) and point the app and workers at it. | `false` |
+| `piiRedactionModel.externalEndpoint` | PII_REDACTION_MODEL_ENDPOINT for a model this release does not deploy (an http(s) address or a Lambda alias ARN). Ignored when enabled. | `""` |
+| `piiRedactionModel.enableForAllOrganizations` | Route every Strict organization to the model as soon as it is configured. False keeps release_pii_redaction_model_enabled authoritative. | `true` |
+| `piiRedactionModel.recordAtZeroPrice` | Record model calls at zero (release_pii_redaction_model_free). False records them at the Cloud price. | `true` |
+| `piiRedactionModel.imagePullSecrets` | Pull secrets for images.pii_redaction_model, e.g. [{ name: langwatch-registry }]. | `[]` |
+| `piiRedactionModel.replicaCount` | Number of PII redaction model replicas. | `1` |
+| `piiRedactionModel.service.port` | Service port. | `8080` |
+| `piiRedactionModel.resources.requests.cpu` | Requested CPU. | `2` |
+| `piiRedactionModel.resources.requests.memory` | Requested memory. | `7Gi` |
+| `piiRedactionModel.resources.limits.cpu` | CPU limit (also THREADS). | `4` |
+| `piiRedactionModel.resources.limits.memory` | Memory limit. | `7Gi` |
+| `piiRedactionModel.terminationGracePeriodSeconds` | Time a stopping pod gets to answer requests in flight (up to 90 s by default). | `100` |
+| `piiRedactionModel.scratchSizeLimit` | Size cap for the /tmp emptyDir under the read-only root filesystem. | `256Mi` |
+| `piiRedactionModel.podSecurityContext` | Pod security context overrides. | `{}` |
+| `piiRedactionModel.containerSecurityContext` | Container security context overrides. | `{}` |
+| `piiRedactionModel.podDisruptionBudget` | PodDisruptionBudget spec overrides (rendered with more than one replica). | `{}` |
+| `piiRedactionModel.nodeSelector` | Node selector overrides. | `{}` |
+| `piiRedactionModel.tolerations` | Tolerations overrides. | `[]` |
+| `piiRedactionModel.affinity` | Affinity overrides. | `{}` |
+| `piiRedactionModel.topologySpreadConstraints` | Topology spread constraints. | `[]` |
+| `piiRedactionModel.priorityClassName` | PriorityClass for PII redaction model pods. | `""` |
+| `piiRedactionModel.pod.annotations` | Additional pod annotations. | `{}` |
+| `piiRedactionModel.pod.labels` | Additional pod labels. | `{}` |
+| `piiRedactionModel.deployment.annotations` | Additional deployment annotations. | `{}` |
+| `piiRedactionModel.deployment.labels` | Additional deployment labels. | `{}` |
+| `piiRedactionModel.deployment.strategy` | Deployment strategy overrides. | `{}` |
+| `piiRedactionModel.deployment.revisionHistoryLimit` | Number of old replicasets to retain. | `10` |
+| `piiRedactionModel.extraEnvs` | Additional environment variables for the model container. | `[]` |
 
 ### CronJobs
 

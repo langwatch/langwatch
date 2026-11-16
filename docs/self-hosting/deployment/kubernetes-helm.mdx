@@ -624,6 +624,6 @@ redis:
 For clusters without internet access:
 
 1. Push LangWatch images to your private registry
-2. Update `images.app.repository`, `images.langwatch_nlp.repository`, `images.langevals.repository`, plus the bundled services listed in [Docker Images](/self-hosting/deployment/docker-images#private-registries)
+2. Update `images.app.repository`, `images.langwatch_nlp.repository`, `images.langevals.repository`, `images.pii_redaction_model.repository` (when `piiRedactionModel.enabled`, as in `size-prod` and `size-ha`), plus the bundled services listed in [Docker Images](/self-hosting/deployment/docker-images#private-registries)
 3. If your registry requires authentication, attach the pull secret to the ServiceAccount the pods use. The chart has no chart-wide `imagePullSecrets` value; see [Private Registries](/self-hosting/deployment/docker-images#private-registries)
 4. License with a signed license key in `app.license.key`, not an activation code: redeeming a code needs outbound access to `connect.langwatch.ai`

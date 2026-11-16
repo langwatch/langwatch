@@ -171,6 +171,18 @@ images:
     repository: langwatch/langevals
     tag: 3.23.0 # x-release-please-version
     pullPolicy: IfNotPresent
+  # The PII redaction model (piiRedactionModel below). Distributed separately
+  # from the other LangWatch images, as one image: the mixed build (GLiNER fp32
+  # plus PII-Tracer int8), about 7 GB unpacked. Used only when
+  # piiRedactionModel.enabled. A private registry needs
+  # piiRedactionModel.imagePullSecrets.
+  ## @param images.pii_redaction_model.repository [string] PII redaction model image repository.
+  ## @param images.pii_redaction_model.tag [string] PII redaction model image tag.
+  ## @param images.pii_redaction_model.pullPolicy [string] PII redaction model image pull policy.
+  pii_redaction_model:
+    repository: langwatch/pii-redaction-model
+    tag: 3.23.0 # x-release-please-version
+    pullPolicy: IfNotPresent
 
 # =============================================================================
 # LangWatch Main Application Configuration
@@ -1517,6 +1529,103 @@ langevals:
   # See: https://kubespec.dev/v1/Pod#spec.containers.volumeMounts
   ## @param langevals.extraVolumeMounts [array] Additional volume mounts.
   extraVolumeMounts: []
+
+# =============================================================================
+# PII Redaction Model
+# =============================================================================
+# The strict PII detector (Level 0 patterns plus the GLiNER and PII-Tracer
+# models) the app and the workers call instead of Presidio for an
+# organization whose privacy policy resolves to Strict. Enabled, the chart
+# runs it as a Deployment and Service and sets PII_REDACTION_MODEL_ENDPOINT on
+# the app and the workers. Any failure of the model (unreachable, slow, over
+# 8,000 characters in a batch) falls back to Presidio, then Google DLP if
+# configured, as with the model off.
+#
+# Off by default and in size-dev / size-minimal; size-prod and size-ha turn it
+# on. Each replica needs a 7Gi memory reservation.
+## @section PII redaction model
+piiRedactionModel:
+  ## @param piiRedactionModel.enabled [default: false] Deploy the PII redaction model (Deployment, Service and PDB) and point the app and workers at it.
+  enabled: false
+
+  # A model run outside this release (another namespace, another cluster, or
+  # Cloud's Lambda alias ARN for an install on AWS). Used only while enabled
+  # is false; enabled always points at the chart's own Service.
+  ## @param piiRedactionModel.externalEndpoint [string] PII_REDACTION_MODEL_ENDPOINT for a model this release does not deploy (an http(s) address or a Lambda alias ARN). Ignored when enabled.
+  externalEndpoint: ""
+
+  # Deploying the model is the decision to use it: force
+  # release_pii_redaction_model_enabled for every organization. False leaves
+  # the choice per organization to the flag store (/ops/feature-flags).
+  ## @param piiRedactionModel.enableForAllOrganizations [default: true] Route every Strict organization to the model as soon as it is configured. False keeps release_pii_redaction_model_enabled authoritative.
+  enableForAllOrganizations: true
+  # The install runs the model itself, so record its calls at a price of zero
+  # (release_pii_redaction_model_free) instead of Cloud's per-character price.
+  ## @param piiRedactionModel.recordAtZeroPrice [default: true] Record model calls at zero (release_pii_redaction_model_free). False records them at the Cloud price.
+  recordAtZeroPrice: true
+
+  ## @param piiRedactionModel.imagePullSecrets [array] Pull secrets for images.pii_redaction_model, e.g. [{ name: langwatch-registry }]. The pod uses the namespace default ServiceAccount, so secrets attached there work too.
+  imagePullSecrets: []
+
+  # Measured: one request at a time, peak 4.1 to 4.6 GiB (x86 and arm64), 5.3 GB
+  # for a 100,000-character text under a 7 GB limit with no OOM; a pod rests at
+  # 1.2 GB and keeps about 4.2 GB after its first long text. Requests equal to
+  # the limit for memory, so the scheduler only places it where 7Gi is free.
+  # Inference is CPU bound; THREADS follows the CPU limit.
+  ## @param piiRedactionModel.replicaCount [default: 1] Number of PII redaction model replicas.
+  replicaCount: 1
+  ## @extra piiRedactionModel.service Service for the PII redaction model.
+  ## @param piiRedactionModel.service.port [default: 8080] Service port.
+  service: { port: 8080 }
+  ## @extra piiRedactionModel.resources Resource requests and limits.
+  ## @param piiRedactionModel.resources.requests.cpu [string, default: 2] Requested CPU.
+  ## @param piiRedactionModel.resources.requests.memory [string, default: 7Gi] Requested memory.
+  ## @param piiRedactionModel.resources.limits.cpu [string, default: 4] CPU limit (also THREADS).
+  ## @param piiRedactionModel.resources.limits.memory [string, default: 7Gi] Memory limit.
+  resources:
+    requests: { cpu: 2, memory: 7Gi }
+    limits: { cpu: 4, memory: 7Gi }
+  ## @param piiRedactionModel.terminationGracePeriodSeconds [default: 100] Time a stopping pod gets to answer requests in flight (up to 90 s by default).
+  terminationGracePeriodSeconds: 100
+  ## @param piiRedactionModel.scratchSizeLimit [string, default: 256Mi] Size cap for the /tmp emptyDir under the read-only root filesystem.
+  scratchSizeLimit: 256Mi
+
+  ## @param piiRedactionModel.podSecurityContext [object] Pod security context overrides.
+  podSecurityContext: {}
+  ## @param piiRedactionModel.containerSecurityContext [object] Container security context overrides.
+  containerSecurityContext: {}
+  ## @param piiRedactionModel.podDisruptionBudget [object] PodDisruptionBudget spec overrides (rendered with more than one replica).
+  podDisruptionBudget: {}
+  ## @param piiRedactionModel.nodeSelector [object] Node selector overrides.
+  nodeSelector: {}
+  ## @param piiRedactionModel.tolerations [array] Tolerations overrides.
+  tolerations: []
+  ## @param piiRedactionModel.affinity [object] Affinity overrides.
+  affinity: {}
+  ## @param piiRedactionModel.topologySpreadConstraints [array] Topology spread constraints.
+  topologySpreadConstraints: []
+  ## @param piiRedactionModel.priorityClassName [string] PriorityClass for PII redaction model pods (overrides global.scheduling.priorityClassName).
+  priorityClassName: ""
+  ## @extra piiRedactionModel.pod Pod-level metadata.
+  pod:
+    ## @param piiRedactionModel.pod.annotations [object] Additional pod annotations.
+    annotations: {}
+    ## @param piiRedactionModel.pod.labels [object] Additional pod labels.
+    labels: {}
+  ## @extra piiRedactionModel.deployment Deployment-level metadata and strategy.
+  deployment:
+    ## @param piiRedactionModel.deployment.annotations [object] Additional deployment annotations.
+    annotations: {}
+    ## @param piiRedactionModel.deployment.labels [object] Additional deployment labels.
+    labels: {}
+    ## @param piiRedactionModel.deployment.strategy [object] Deployment strategy overrides.
+    strategy: {}
+    ## @param piiRedactionModel.deployment.revisionHistoryLimit [default: 10] Number of old replicasets to retain.
+    revisionHistoryLimit: 10
+  # PII_REQUEST_TIMEOUT_SECONDS, PII_REQUEST_MAX_CHARS and the PII_SPLIT_*
+  # settings are documented with the image.
+  ## @param piiRedactionModel.extraEnvs [array] Additional environment variables for the model container.
+  extraEnvs: []
 
 # =============================================================================
 # CronJobs Configuration

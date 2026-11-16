@@ -50,6 +50,11 @@ langwatch_nlp:
 langevals:
   replicaCount: 0
 
+# The PII redaction model image is distributed separately and is not in CI.
+# size-prod and size-ha turn it on; keep the Deployment, without pods.
+piiRedactionModel:
+  replicaCount: 0
+
 # ── ClickHouse (chart-managed, known password for testing) ───────────────────
 clickhouse:
   chartManaged: true
