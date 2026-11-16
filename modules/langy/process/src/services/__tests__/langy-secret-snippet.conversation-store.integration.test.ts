@@ -80,6 +80,7 @@ function recordingService() {
       createTurnId: () => TURN,
     },
     turnOrder: null,
+    events: null,
   });
 
   return { service, events };
