@@ -2,6 +2,7 @@ import { nowInstant, toEpochMs } from "@langwatch/time";
 
 import { isQueryMemoryLimitExceeded } from "../services/errorHandling.ts";
 import { pMapLimited } from "./pMapLimited.ts";
+import { isAtOrBeforeCutoff } from "./replayConstants.ts";
 import { pauseProjection, unpauseProjection, waitForAllActiveJobs } from "./replayDrain.ts";
 import {
   type CutoffInfo,
@@ -9,6 +10,8 @@ import {
   type OccurredAtBounds,
   REPLAY_ALL_TENANTS,
   type ReplayEvent,
+  type ReplayEventSource,
+  maxEventPosition,
 } from "./replayEventSource.ts";
 import {
   FoldAccumulator,
@@ -45,6 +48,36 @@ import type {
  * each phase transition), so per-event emits don't hammer Redis for no benefit.
  */
 const PROGRESS_EMIT_EVERY_EVENTS = 5000;
+
+/** What one page of a paged aggregate may hold: its events and payload bytes. */
+export interface AggregatePage {
+  maxEvents: number;
+  maxPayloadBytes: number;
+}
+
+/**
+ * A page sorts what it sends, as the bulk read does, so these caps bound one statement's memory at
+ * half the bulk read's payload budget. event_log keeps an aggregate in IdempotencyKey order, not
+ * time order, so every page re-scans the rest of it: fewer, fuller pages cost less.
+ */
+export const AGGREGATE_PAGE: AggregatePage = {
+  maxEvents: 1_000,
+  maxPayloadBytes: 32 * 1024 * 1024,
+};
+
+/**
+ * Paged attempts at one aggregate that may start and not finish before its lane fails by name. A
+ * deadline cut cannot be saved once the deadline has passed, so a start counts until it finishes.
+ */
+export const MAX_UNFINISHED_PAGED_ATTEMPTS = 3;
+
+/** A lone aggregate whose paged attempts kept being cut: paging it again would be cut again. */
+class AggregatePagingCutError extends Error {
+  constructor({ attempts }: { attempts: number }) {
+    super(`paged replay cut ${attempts} times before it finished`);
+    this.name = "AggregatePagingCutError";
+  }
+}
 
 interface AggregateEntry {
   tenantId: string;
@@ -331,17 +364,24 @@ class FoldMapReplayRun {
     }
     this.skippedCount = skippedCount;
     this.aggregatesCompleted = skippedCount;
-    this.totalBatches = Math.ceil(remaining.length / this.aggregateBatchSize);
+    // An aggregate an earlier run paged pages at once, never failing its bulk reads again.
+    const pagedBefore = this.callbacks?.paging?.unfinished;
+    const batches = remaining
+      .filter((key) => pagedBefore?.has(key))
+      .map((key) => ({ batchKeys: [key], paged: true }));
+    const bulk = remaining.filter((key) => !pagedBefore?.has(key));
+    for (let i = 0; i < bulk.length; i += this.aggregateBatchSize) {
+      batches.push({ batchKeys: bulk.slice(i, i + this.aggregateBatchSize), paged: false });
+    }
+    this.totalBatches = batches.length;
     this.runTenantCount = new Set(
       remaining.map((key) => this.aggregateProjectionMap.get(key)!.tenantId),
     ).size;
 
-    for (let i = 0; i < remaining.length; i += this.aggregateBatchSize) {
+    for (const [index, batch] of batches.entries()) {
       // A stop between batches keeps the completed sets, so the next run skips what finished.
       this.callbacks?.signal?.throwIfAborted();
-      const batchKeys = remaining.slice(i, i + this.aggregateBatchSize);
-      const batchNum = Math.floor(i / this.aggregateBatchSize) + 1;
-      const completed = await this.runOneBatch({ batchKeys, batchNum });
+      const completed = await this.runOneBatch({ ...batch, batchNum: index + 1 });
       if (!completed) return this.result();
     }
 
@@ -400,13 +440,15 @@ class FoldMapReplayRun {
     };
   }
 
-  /** Returns false when the batch failed and the run must stop. */
+  /** Returns false when the batch failed and the run must stop; `paged` pages its one aggregate. */
   private async runOneBatch({
     batchKeys,
     batchNum,
+    paged = false,
   }: {
     batchKeys: string[];
     batchNum: number;
+    paged?: boolean;
   }): Promise<boolean> {
     const batchStartTime = nowInstant().epochMilliseconds;
     const progress = this.buildProgress({ batchKeys, batchNum });
@@ -423,8 +465,18 @@ class FoldMapReplayRun {
     };
 
     const mapWrites: MapWrites = { started: false };
+    const readEvents: ReadEvents = paged
+      ? (input) =>
+          pageAggregateEvents({
+            ...input,
+            eventSource: this.ctx.eventSource,
+            signal: this.callbacks?.signal,
+            log: this.log,
+          })
+      : (input) => this.ctx.eventSource.streamEventsForAggregates(input);
     let batchResult: { eventsReplayed: number };
     try {
+      if (paged) await this.startPaging({ batchKeys });
       batchResult = await replayBatch({
         ctx: this.ctx,
         batchKeys,
@@ -435,15 +487,18 @@ class FoldMapReplayRun {
         log: this.log,
         emit,
         mapWrites,
+        readEvents,
       });
     } catch (error) {
-      if (batchKeys.length > 1 && isQueryMemoryLimitExceeded(error) && !mapWrites.started) {
-        return this.splitBatch({ error, batchKeys, batchNum });
+      if (!paged && isQueryMemoryLimitExceeded(error) && !mapWrites.started) {
+        if (batchKeys.length > 1) return this.splitBatch({ error, batchKeys, batchNum });
+        return this.pageLoneAggregate({ error, batchKeys, batchNum });
       }
       await this.handleBatchFailure({ error, batchKeys, batchNum, progress });
       this.callbacks?.signal?.throwIfAborted();
       return false;
     }
+    if (paged) this.callbacks?.paging?.finished({ key: batchKeys[0]! });
 
     this.totalEventsReplayed += batchResult.eventsReplayed;
     this.aggregatesCompleted += batchKeys.length;
@@ -500,12 +555,50 @@ class FoldMapReplayRun {
   }
 
   /**
-   * The failure's text; a lone aggregate still over the memory limit is named, never its tenant.
+   * A lone aggregate over the memory limit on its bulk read pages instead: its markers clear and it
+   * reruns, reading its events a page at a time. Only before a map write, as a split.
+   */
+  private async pageLoneAggregate({
+    error,
+    batchKeys,
+    batchNum,
+  }: {
+    error: unknown;
+    batchKeys: string[];
+    batchNum: number;
+  }): Promise<boolean> {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    this.log.write({ step: "page-batch", batch: batchNum, error: errorMsg });
+    await clearFailedBatchMarkers({
+      redis: this.ctx.redis,
+      projectionNames: this.selected.allProjectionNames,
+      aggKeys: batchKeys,
+      log: this.log,
+    });
+    this.callbacks?.signal?.throwIfAborted();
+    return this.runOneBatch({ batchKeys, batchNum, paged: true });
+  }
+
+  /** Counts a paged attempt before its first page, refusing one whose earlier attempts were cut. */
+  private async startPaging({ batchKeys }: { batchKeys: string[] }): Promise<void> {
+    const paging = this.callbacks?.paging;
+    const [key] = batchKeys;
+    if (!paging || key === undefined) return;
+    const attempts = paging.unfinished.get(key) ?? 0;
+    if (attempts >= MAX_UNFINISHED_PAGED_ATTEMPTS) throw new AggregatePagingCutError({ attempts });
+    await paging.started({ key });
+  }
+
+  /**
+   * The failure's text; a lone aggregate still over the memory limit, or cut paging too often, is
+   * named, never its tenant.
    */
   private describeFailure({ error, batchKeys }: { error: unknown; batchKeys: string[] }): string {
     const errorMsg = error instanceof Error ? error.message : String(error);
     const [onlyKey] = batchKeys;
-    if (batchKeys.length !== 1 || onlyKey === undefined || !isQueryMemoryLimitExceeded(error)) {
+    const namesAggregate =
+      isQueryMemoryLimitExceeded(error) || error instanceof AggregatePagingCutError;
+    if (batchKeys.length !== 1 || onlyKey === undefined || !namesAggregate) {
       return errorMsg;
     }
     const entry = this.aggregateProjectionMap.get(onlyKey)!;
@@ -989,8 +1082,80 @@ function makeOnEvent({
   };
 }
 
+/** How a batch reads one tenant's events: the bulk stream, or its lone aggregate's pages. */
+type ReadEvents = ReplayEventSource["streamEventsForAggregates"];
+
 /**
- * The unpaused replay section: stream every tenant's events (in parallel,
+ * A lone aggregate's events in pages behind an `(EventTimestamp, EventId)` cursor, up to the latest
+ * of `cutoffs`, each handed to `onEvent` as the bulk stream hands it; a stop is checked before each
+ * page. Each page's size and time is logged, numbers only, so a paged aggregate's cost is visible.
+ */
+export async function pageAggregateEvents({
+  eventSource,
+  signal,
+  log,
+  page = AGGREGATE_PAGE,
+  tenantId,
+  aggregateIds,
+  eventTypes,
+  cutoffs,
+  occurredAtBounds,
+  onEvent,
+}: Parameters<ReadEvents>[0] & {
+  eventSource: ReplayEventSource;
+  signal: AbortSignal | undefined;
+  log: ReplayLogWriter;
+  page?: AggregatePage;
+}): Promise<{ eventsApplied: number }> {
+  const maxCutoff = maxEventPosition(cutoffs.values());
+  let cursor: CutoffInfo | undefined;
+  let eventsApplied = 0;
+  for (let pageNum = 1; ; pageNum++) {
+    signal?.throwIfAborted();
+    const pageStart = nowInstant().epochMilliseconds;
+    const events = await eventSource.loadAggregateEvents({
+      tenantId,
+      aggregateIds,
+      eventTypes,
+      maxCutoff,
+      cursor,
+      batchSize: page.maxEvents,
+      maxPayloadBytes: page.maxPayloadBytes,
+      occurredAtBounds,
+    });
+    const last = events.at(-1);
+    if (!last) return { eventsApplied };
+    for (const event of events) {
+      // As the bulk stream skips a row past its aggregate's cutoff: live owns it.
+      const cutoff = cutoffs.get(aggregateKey(event));
+      if (
+        cutoff &&
+        !isAtOrBeforeCutoff({
+          eventTimestamp: event.timestamp,
+          eventId: event.id,
+          cutoffTimestamp: cutoff.timestamp,
+          cutoffEventId: cutoff.eventId,
+        })
+      ) {
+        continue;
+      }
+      const maybePromise = onEvent(event);
+      if (maybePromise instanceof Promise) await maybePromise;
+      eventsApplied++;
+    }
+    cursor = { timestamp: last.timestamp, eventId: last.id };
+    log.write({
+      step: "page-aggregate",
+      page: pageNum,
+      events: events.length,
+      ms: nowInstant().epochMilliseconds - pageStart,
+      totalEvents: eventsApplied,
+    });
+  }
+}
+
+/**
+ * The unpaused replay section: read every tenant's events (in parallel,
  * cutoff-filtered) into one accumulator per projection, then flush. The
  * batch's aggregates stay protected by their cutoff markers, not the pause.
  */
@@ -1004,6 +1169,7 @@ async function streamApplyAndWrite({
   concurrency,
   emit,
   mapWrites,
+  readEvents,
 }: {
   ctx: ReplayContext;
   groups: BatchGroups;
@@ -1014,6 +1180,7 @@ async function streamApplyAndWrite({
   concurrency: number;
   emit: EmitFn;
   mapWrites: MapWrites;
+  readEvents: ReadEvents;
 }): Promise<{ eventsProcessed: number }> {
   emit("replay", 0);
   const accumulators = buildAccumulators({ ctx, groups, selected });
@@ -1039,7 +1206,7 @@ async function streamApplyAndWrite({
       if (aggIds.length === 0) return;
 
       try {
-        await ctx.eventSource.streamEventsForAggregates({
+        await readEvents({
           tenantId,
           aggregateIds: aggIds,
           eventTypes: selected.allEventTypes,
@@ -1126,6 +1293,7 @@ async function replayBatch({
   log,
   emit,
   mapWrites,
+  readEvents,
 }: {
   ctx: ReplayContext;
   batchKeys: string[];
@@ -1136,6 +1304,7 @@ async function replayBatch({
   log: ReplayLogWriter;
   emit: EmitFn;
   mapWrites: MapWrites;
+  readEvents: ReadEvents;
 }): Promise<{ eventsReplayed: number }> {
   const groups = groupBatch({ batchKeys, aggregateProjectionMap });
 
@@ -1165,6 +1334,7 @@ async function replayBatch({
     concurrency,
     emit,
     mapWrites,
+    readEvents,
   });
 
   log.write({

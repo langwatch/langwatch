@@ -2,6 +2,7 @@
 
 exports[`the @langwatch/eventing public surface > given the . entry > exports exactly the recorded names and kinds > . 1`] = `
 [
+  "AGGREGATE_PAGE: object",
   "AbstractEventStore: class [countEventsBefore, enrichRecordsForStorage, findEventsOfAggregates, getEvent, getEvents, getEventsOccurredSince, getEventsUpTo, getEventsUpToPaged, hasMissingAggregateId, instrument, logError, logWarning, onStoreSuccess, postProcessEvents, readEvents, readEventsUpToPagedFromRepository, storeEvents]",
   "AbstractFoldProjection: class [apply, dispatchMap, eventTypes, init]",
   "AbstractMapProjection: class [dispatchMap, eventTypes, map]",
@@ -43,6 +44,7 @@ exports[`the @langwatch/eventing public surface > given the . entry > exports ex
   "JsonSafetyError: class []",
   "MARKER_TTL_SECONDS: number",
   "MAX_APPLIED_EVENT_IDS: number",
+  "MAX_UNFINISHED_PAGED_ATTEMPTS: number",
   "MapProjectionExecutor: class [execute, executeBatch, isDuplicateDelivery, mapBatchItems, persistMappedBatch]",
   "NonCriticalError: class []",
   "NoopReplayMarkerChecker: class [check]",
@@ -156,6 +158,7 @@ exports[`the @langwatch/eventing public surface > given the . entry > exports ex
   "optimizeTouchedTables: function",
   "orderEvents: function",
   "pMapLimited: function",
+  "pageAggregateEvents: function",
   "parseEventPayload: function",
   "parseRetryAfterMs: function",
   "pipelineRetentionOf: function",
