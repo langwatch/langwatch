@@ -1,5 +1,6 @@
 import { GROWTH_INCLUDED_RETENTION_DAYS } from "@langwatch/data-retention-contract";
 import type { Named } from "@langwatch/module";
+import { Temporal } from "@langwatch/time";
 import { z } from "zod";
 
 import { InvalidSeatCountError } from "./billing.errors.ts";
@@ -307,4 +308,10 @@ export function dailyGbMonthShare({
   daysInMonth: number;
 }): number {
   return bytes / BYTES_PER_GB / daysInMonth;
+}
+
+/** The UTC calendar day a storage measurement was taken on, and how many days its month has. */
+export function retentionStorageDayOf(atMs: number): { day: string; daysInMonth: number } {
+  const date = Temporal.Instant.fromEpochMilliseconds(atMs).toZonedDateTimeISO("UTC").toPlainDate();
+  return { day: date.toString(), daysInMonth: date.daysInMonth };
 }

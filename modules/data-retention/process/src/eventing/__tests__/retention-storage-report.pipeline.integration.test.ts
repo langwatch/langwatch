@@ -1,5 +1,3 @@
-/** @vitest-environment node */
-
 /**
  * The event-sourced report end to end: the measure command reads the migrated ClickHouse, records
  * one event per organization and day, and the billing process sends it to the meter through its
@@ -15,6 +13,8 @@ import {
   startTestClickHouseEndpoints,
 } from "@langwatch/clickhouse-client/testing";
 import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
+/** @vitest-environment node */
+import { retentionStorageDayOf } from "@langwatch/enterprise-billing-contract";
 import type {
   BillingApi,
   RetentionStorageOutcome,
@@ -27,7 +27,6 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { ClickHouseStorageMeterRepository } from "../../repositories/clickhouse/clickhouse.storage-meter.repository.ts";
 import { MemoryDataRetentionRepository } from "../../repositories/memory/memory.data-retention.repository.ts";
-import { retentionStorageDayOf } from "../../rules/retention-storage.rules.ts";
 import { RetentionStorageReportService } from "../../services/retention-storage-report.service.ts";
 import { ReportRetentionStorageCommand } from "../retention-storage-report.commands.ts";
 import type { ReportRetentionStorageCommandData } from "../retention-storage-report.events.ts";

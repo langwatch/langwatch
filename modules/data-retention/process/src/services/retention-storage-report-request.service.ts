@@ -3,11 +3,11 @@
  * daily wake and the hand-run task alike. The measuring and the billing run behind the command.
  * Spec: specs/billing/retention-storage-billing.feature
  */
+import { retentionStorageDayOf } from "@langwatch/enterprise-billing-contract";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
 import type { ReportRetentionStorageCommandData } from "../eventing/retention-storage-report.events.ts";
-import { retentionStorageDayOf } from "../rules/retention-storage.rules.ts";
 import type { RetentionStorageReportService } from "./retention-storage-report.service.ts";
 
 const logger = createLogger("langwatch:data-retention:retention-storage");

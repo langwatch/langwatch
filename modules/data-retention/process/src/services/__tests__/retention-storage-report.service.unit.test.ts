@@ -2,6 +2,7 @@
  * The daily measurement of storage kept past the 90 days Growth includes, handed to billing.
  * @see specs/billing/retention-storage-billing.feature
  */
+import { retentionStorageDayOf } from "@langwatch/enterprise-billing-contract";
 import {
   type BillingApi,
   type RetentionStorageOutcome,
@@ -12,10 +13,7 @@ import { describe, expect, it } from "vitest";
 
 import { MemoryDataRetentionRepository } from "../../repositories/memory/memory.data-retention.repository.ts";
 import { MemoryStorageMeterRepository } from "../../repositories/memory/memory.storage-meter.repository.ts";
-import {
-  longestRetentionDays,
-  retentionStorageDayOf,
-} from "../../rules/retention-storage.rules.ts";
+import { longestRetentionDays } from "../../rules/retention-storage.rules.ts";
 import { RetentionStorageReportService } from "../retention-storage-report.service.ts";
 
 const DAY_MS = 86_400_000;

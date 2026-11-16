@@ -6,6 +6,7 @@ import { randomUUID } from "node:crypto";
  * per-organization. See {@link specs/data-retention-service.feature}
  */
 import type { ScopeAssignment } from "@langwatch/data-retention-contract";
+import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -329,4 +330,3 @@ describe.skipIf(!databaseUrl)("given the Postgres data retention repository", ()
     });
   });
 });
-import { createLogger } from "@langwatch/observability";

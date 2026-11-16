@@ -71,8 +71,6 @@ export class MemoryRetroactiveRetentionRepository implements RetroactiveRetentio
 
   /** Stored items keyed `project/category`: each one's age and stamped days; tests set it. */
   readonly storedItems = new Map<string, { ageDays: number; retentionDays: number }[]>();
-  /** Counts to refuse as an unreachable store would; tests set it. */
-  refuseNextCounts = 0;
 
   async countPastRetention(input: {
     projectId: string;
@@ -80,10 +78,6 @@ export class MemoryRetroactiveRetentionRepository implements RetroactiveRetentio
     retentionDays: number;
     nowMs: number;
   }): Promise<number> {
-    if (this.refuseNextCounts > 0) {
-      this.refuseNextCounts -= 1;
-      throw new Error("Stored data could not be counted");
-    }
     if (input.retentionDays === 0) return 0;
     return (this.storedItems.get(`${input.projectId}/${input.category}`) ?? []).filter(
       (item) =>
