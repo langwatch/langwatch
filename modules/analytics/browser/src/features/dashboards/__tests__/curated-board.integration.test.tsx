@@ -145,7 +145,13 @@ describe("given a member opens a From LangWatch board", () => {
   it("points back to the old Analytics", async () => {
     openCurated({ templateId: "release" });
 
-    expect(await screen.findByTestId("old-analytics-banner")).toBeInTheDocument();
+    expect(await screen.findByTestId("old-analytics-banner")).toHaveTextContent(
+      "Looking for the old Analytics? It is still here.",
+    );
+    expect(screen.getByRole("link", { name: "Open Analytics" })).toHaveAttribute(
+      "href",
+      "/test-project/analytics",
+    );
   });
 
   describe("when the board is Can I trust my numbers?", () => {
