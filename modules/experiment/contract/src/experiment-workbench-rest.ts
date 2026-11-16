@@ -296,7 +296,13 @@ const executionSummarySchemaDefinition = z.object({
         name: z.string(),
         passed: z.number(),
         failed: z.number(),
-        passRate: z.number(),
+        errored: z
+          .number()
+          .optional()
+          .describe("Cells where the evaluator crashed and gave no verdict"),
+        passRate: z
+          .number()
+          .describe("Percentage of verdicts that passed; 0 when passed and failed are both 0"),
         avgScore: z.number().optional(),
       }),
     )
