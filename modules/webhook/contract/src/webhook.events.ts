@@ -123,6 +123,14 @@ export const WEBHOOK_EVENT_TYPES = [
     description:
       "An agent seen in the organisation's traffic matches no listed source and is flagged as shadow.",
   },
+  {
+    type: "ocsf.event",
+    family: "ocsf",
+    schemaVersion: "1",
+    isEmitting: true,
+    description:
+      "One OCSF 1.9.0 governance event for a SIEM, batched per delivery like every event type. Sent only to endpoints that name this type or ocsf.*, never to *.",
+  },
 ] as const satisfies readonly WebhookEventType[];
 
 export type WebhookEventTypeName = (typeof WEBHOOK_EVENT_TYPES)[number]["type"];

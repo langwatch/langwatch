@@ -45,6 +45,11 @@ export class MemoryOcsfEventsRepository
     const rows = [...this.eventsByKey.values()]
       .filter((row) => row.tenantId === input.tenantId)
       .filter(
+        (row) => input.untilMs === undefined || row.eventTime.epochMilliseconds < input.untilMs,
+      )
+      .filter((row) => input.sourceType === undefined || row.sourceType === input.sourceType)
+      .filter((row) => input.sourceId === undefined || row.sourceId === input.sourceId)
+      .filter(
         (row) =>
           row.eventTime.epochMilliseconds > input.sinceMs ||
           (row.eventTime.epochMilliseconds === input.sinceMs && row.eventId > input.sinceEventId),
@@ -61,10 +66,10 @@ export class MemoryOcsfEventsRepository
       traceId: row.traceId,
       sourceId: row.sourceId,
       sourceType: row.sourceType,
-      classUid: 6003,
-      categoryUid: 6,
+      classUid: row.classUid ?? 6003,
+      categoryUid: row.categoryUid ?? 6,
       activityId: row.activityId,
-      typeUid: 6003 * 100 + row.activityId,
+      typeUid: row.typeUid ?? (row.classUid ?? 6003) * 100 + row.activityId,
       severityId: row.severityId,
       eventTimeMs: row.eventTime.epochMilliseconds,
       actorUserId: row.actorUserId,

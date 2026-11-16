@@ -71,6 +71,10 @@ export interface GovernanceOcsfEventsReader {
     sinceMs: number;
     sinceEventId: string;
     limit: number;
+    /** Exclusive upper bound on EventTime. */
+    untilMs?: number;
+    sourceType?: string;
+    sourceId?: string;
   }): Promise<GovernanceOcsfExportRow[]>;
 }
 
@@ -98,12 +102,16 @@ export type GovernanceOcsfEventInput = {
  * written one row at a time is a page of round trips.
  */
 export interface GovernanceOcsfEventSink {
-  insertEvents(rows: GovernanceOcsfEventInput[]): Promise<void>;
+  insertEvents(rows: GovernanceOcsfEvent[]): Promise<void>;
 }
 
 export type GovernanceOcsfEvent = {
   tenantId: string;
   eventId: string;
+  /** OCSF class of an event pushed in from another source; LangWatch's own rows are 6003. */
+  classUid?: number;
+  categoryUid?: number;
+  typeUid?: number;
   traceId: string;
   sourceId: string;
   sourceType: string;

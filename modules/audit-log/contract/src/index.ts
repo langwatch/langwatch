@@ -17,6 +17,12 @@ export {
   type AuditLogHistoryEntrySchema,
   type AuditLogTargetEntrySchema,
   type FindAuditLogByTargetKindInputSchema,
+  auditLogExportEntrySchema,
+  type AuditLogExportEntry,
+  type AuditLogExportEntrySchema,
+  findAuditLogForOrganizationInputSchema,
+  type FindAuditLogForOrganizationInput,
+  type FindAuditLogForOrganizationInputSchema,
 } from "./audit-log.ts";
 export {
   auditLogIntentSchema,

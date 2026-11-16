@@ -179,4 +179,45 @@ describe("given the memory-backed audit log repositories", () => {
       ).resolves.toEqual([]);
     });
   });
+
+  describe("when the SIEM export reads an organisation's trail", () => {
+    /** @scenario "An organisation's trail reads its own and its projects' entries oldest first after a watermark" */
+    it("answers the organisation's and its projects' entries after the watermark, oldest first", async () => {
+      const { entries } = instantiateRepositories(auditLogRepositories, {
+        tier: "memory",
+        members: {},
+      });
+      const write = (
+        key: string,
+        at: number,
+        scope: { organizationId?: string; projectId?: string },
+      ) =>
+        entries.createOnce({
+          entry: { ...scope, action: `test.${key}` },
+          idempotencyKey: `audit_${key}`,
+          occurredAt: at,
+        });
+      await write("org-first", 1_000, { organizationId: "org-1" });
+      await write("project-same-ms", 2_000, { projectId: PROJECT_ID });
+      await write("org-same-ms", 2_000, { organizationId: "org-1" });
+      await write("other-org", 2_500, { organizationId: "org-2" });
+      await write("project-last", 3_000, { projectId: PROJECT_ID });
+
+      const read = (afterMs: number, afterId: string) =>
+        entries.findForOrganization({
+          organizationId: "org-1",
+          projectIds: [PROJECT_ID],
+          afterMs,
+          afterId,
+          limit: 2,
+        });
+      const first = await read(0, "");
+      const second = await read(first[1]!.createdAt.getTime(), first[1]!.id);
+      const pages = [...first, ...second];
+
+      expect(pages.map((entry) => entry.createdAt.getTime())).toEqual([1_000, 2_000, 2_000, 3_000]);
+      expect(pages[1]!.id < pages[2]!.id).toBe(true);
+      expect(pages.map((entry) => entry.action)).not.toContain("test.other-org");
+    });
+  });
 });

@@ -65,6 +65,10 @@ export interface FindOcsfEventsInput {
   /** EventId watermark paired with sinceMs; disambiguates same-millisecond rows. */
   sinceEventId: string;
   limit: number;
+  /** Exclusive upper bound on EventTime. */
+  untilMs?: number;
+  sourceType?: string;
+  sourceId?: string;
 }
 
 /**
@@ -204,10 +208,10 @@ function toOcsfEventValues(row: GovernanceOcsfEvent): Record<string, unknown> {
     TraceId: row.traceId,
     SourceId: row.sourceId,
     SourceType: row.sourceType,
-    ClassUid: OCSF_CLASS_API_ACTIVITY,
-    CategoryUid: OCSF_CATEGORY_APPLICATION_ACTIVITY,
+    ClassUid: row.classUid ?? OCSF_CLASS_API_ACTIVITY,
+    CategoryUid: row.categoryUid ?? OCSF_CATEGORY_APPLICATION_ACTIVITY,
     ActivityId: row.activityId,
-    TypeUid: OCSF_CLASS_API_ACTIVITY * 100 + row.activityId,
+    TypeUid: row.typeUid ?? (row.classUid ?? OCSF_CLASS_API_ACTIVITY) * 100 + row.activityId,
     SeverityId: row.severityId,
     // `eventTime` is a Temporal Instant on this branch; the client wants a Date.
     EventTime: toDate(row.eventTime),
@@ -295,6 +299,13 @@ export class ClickHouseOcsfEventsRepository
    */
   async findAll(input: FindOcsfEventsInput): Promise<GovernanceOcsfExportRow[]> {
     const client = await this.resolveClient(input.tenantId);
+    const filters = [
+      input.untilMs === undefined
+        ? ""
+        : "AND EventTime < fromUnixTimestamp64Milli({untilMs:UInt64})",
+      input.sourceType === undefined ? "" : "AND SourceType = {sourceType:String}",
+      input.sourceId === undefined ? "" : "AND SourceId = {sourceId:String}",
+    ].join(" ");
     const result = await client.query({
       query: `
         SELECT
@@ -320,12 +331,14 @@ export class ClickHouseOcsfEventsRepository
         WHERE TenantId = {tenantId:String}
           AND EventTime >= fromUnixTimestamp64Milli({sinceMs:UInt64})
           AND (EventTime, EventId) > (fromUnixTimestamp64Milli({sinceMs:UInt64}), {sinceEventId:String})
+          ${filters}
           AND (TenantId, EventId, LastUpdatedAt, EventTime) IN (
             SELECT TenantId, EventId, max(LastUpdatedAt), argMax(EventTime, LastUpdatedAt) AS LatestTime
             FROM ${TABLE_NAME}
             WHERE TenantId = {tenantId:String}
               AND EventTime >= fromUnixTimestamp64Milli({sinceMs:UInt64})
               AND (EventTime, EventId) > (fromUnixTimestamp64Milli({sinceMs:UInt64}), {sinceEventId:String})
+              ${filters}
             GROUP BY TenantId, EventId
             ORDER BY LatestTime ASC, EventId ASC
             LIMIT {limit:UInt32}
@@ -338,6 +351,9 @@ export class ClickHouseOcsfEventsRepository
         sinceMs: input.sinceMs,
         sinceEventId: input.sinceEventId,
         limit: input.limit,
+        ...(input.untilMs === undefined ? {} : { untilMs: input.untilMs }),
+        ...(input.sourceType === undefined ? {} : { sourceType: input.sourceType }),
+        ...(input.sourceId === undefined ? {} : { sourceId: input.sourceId }),
       },
       format: "JSONEachRow",
     });
