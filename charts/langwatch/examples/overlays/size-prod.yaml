@@ -1,7 +1,8 @@
 # size-prod.yaml — Production sizing. Single-node ClickHouse.
 #
-# 2 app replicas, 2 workers, PDBs, chart-managed ClickHouse, the PII redaction
-# model (one 7Gi replica; set piiRedactionModel.enabled=false to skip it).
+# 2 app replicas, 2 workers, PDBs, chart-managed ClickHouse. The PII redaction
+# model is sized (one replica, 7Gi memory) but off until its public image ships
+# (I08, after I07).
 # Combine with an access overlay and optionally external database overlays.
 # Requires app.dataplane (S3 or Azure Blob) for stored objects.
 #
@@ -45,10 +46,11 @@ langevals:
 
 piiRedactionModel:
   # Strict PII analysis on the PII redaction model, with Presidio as its
-  # fallback. Needs the model image (images.pii_redaction_model) and its pull
-  # secret (piiRedactionModel.imagePullSecrets); set enabled: false to stay on
-  # Presidio. 7Gi per replica, reserved.
-  enabled: true
+  # fallback. Off until the public image langwatch/pii-redaction-model is
+  # published (item I08, after the licence check in the binary, I07); then set
+  # enabled: true here. The sizing below is ready: 7Gi memory request and limit
+  # per replica.
+  enabled: false
   replicaCount: 1
   resources:
     requests: { cpu: 2, memory: 7Gi }

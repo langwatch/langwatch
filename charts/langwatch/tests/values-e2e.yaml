@@ -51,7 +51,7 @@ langevals:
   replicaCount: 0
 
 # The PII redaction model image is distributed separately and is not in CI.
-# size-prod and size-ha turn it on; keep the Deployment, without pods.
+# Off in every profile today; if a profile turns it on, keep the Deployment without pods.
 piiRedactionModel:
   replicaCount: 0
 

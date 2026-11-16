@@ -1,7 +1,8 @@
 # size-ha.yaml — High-availability production. 3-node replicated ClickHouse.
 #
-# 3 app replicas, 3 workers, 2 NLP/langevals, replicated CH with Keeper,
-# 2 PII redaction model replicas (7Gi each; piiRedactionModel.enabled=false skips them).
+# 3 app replicas, 3 workers, 2 NLP/langevals, replicated CH with Keeper. The PII
+# redaction model is sized (2 replicas, 7Gi memory each) but off until its public
+# image ships (I08, after I07).
 # Combine with access, external database, and cold storage overlays.
 # Requires app.dataplane (S3 or Azure Blob) for stored objects; the
 # cold-storage-s3.yaml overlay configures ClickHouse cold storage and
@@ -52,10 +53,11 @@ langevals:
 
 piiRedactionModel:
   # Strict PII analysis on the PII redaction model, with Presidio as its
-  # fallback. Needs the model image (images.pii_redaction_model) and its pull
-  # secret (piiRedactionModel.imagePullSecrets); set enabled: false to stay on
-  # Presidio. 7Gi per replica, reserved.
-  enabled: true
+  # fallback. Off until the public image langwatch/pii-redaction-model is
+  # published (item I08, after the licence check in the binary, I07); then set
+  # enabled: true here. The sizing below is ready: 7Gi memory request and limit
+  # per replica.
+  enabled: false
   replicaCount: 2
   resources:
     requests: { cpu: 2, memory: 7Gi }

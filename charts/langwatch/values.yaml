@@ -171,11 +171,11 @@ images:
     repository: langwatch/langevals
     tag: 3.23.0 # x-release-please-version
     pullPolicy: IfNotPresent
-  # The PII redaction model (piiRedactionModel below). Distributed separately
-  # from the other LangWatch images, as one image: the mixed build (GLiNER fp32
-  # plus PII-Tracer int8), about 7 GB unpacked. Used only when
-  # piiRedactionModel.enabled. A private registry needs
-  # piiRedactionModel.imagePullSecrets.
+  # The PII redaction model (piiRedactionModel below): one public multi-arch
+  # image, the mixed build (GLiNER fp32 plus PII-Tracer int8), versioned with
+  # the release. Its source is not public and the binary checks the licence.
+  # Used only when piiRedactionModel.enabled; enable once the public image is
+  # published (item I08), which waits on the licence check in the binary (I07).
   ## @param images.pii_redaction_model.repository [string] PII redaction model image repository.
   ## @param images.pii_redaction_model.tag [string] PII redaction model image tag.
   ## @param images.pii_redaction_model.pullPolicy [string] PII redaction model image pull policy.
@@ -1541,8 +1541,11 @@ langevals:
 # 8,000 characters in a batch) falls back to Presidio, then Google DLP if
 # configured, as with the model off.
 #
-# Off by default and in size-dev / size-minimal; size-prod and size-ha turn it
-# on. Each replica needs a 7Gi memory reservation.
+# Off by default and in every size profile: enable once the public image
+# langwatch/pii-redaction-model is published (item I08, which waits on the
+# licence check in the binary, I07). size-prod and size-ha
+# already carry its sizing, so turning it on there is one line. Each replica
+# needs a 7Gi memory reservation.
 ## @section PII redaction model
 piiRedactionModel:
   ## @param piiRedactionModel.enabled [default: false] Deploy the PII redaction model (Deployment, Service and PDB) and point the app and workers at it.
@@ -1559,16 +1562,19 @@ piiRedactionModel:
   # the choice per organization to the flag store (/ops/feature-flags).
   ## @param piiRedactionModel.enableForAllOrganizations [default: true] Route every Strict organization to the model as soon as it is configured. False keeps release_pii_redaction_model_enabled authoritative.
   enableForAllOrganizations: true
-  # The install runs the model itself, so record its calls at a price of zero
-  # (release_pii_redaction_model_free) instead of Cloud's per-character price.
+  # A self-hosted install runs the model on its own nodes, so its calls are
+  # recorded at a price of zero (release_pii_redaction_model_free), never at
+  # Cloud's per-character price.
   ## @param piiRedactionModel.recordAtZeroPrice [default: true] Record model calls at zero (release_pii_redaction_model_free). False records them at the Cloud price.
   recordAtZeroPrice: true
 
-  ## @param piiRedactionModel.imagePullSecrets [array] Pull secrets for images.pii_redaction_model, e.g. [{ name: langwatch-registry }]. The pod uses the namespace default ServiceAccount, so secrets attached there work too.
+  # Optional. The default image is public; set this only for a mirror in a
+  # private registry.
+  ## @param piiRedactionModel.imagePullSecrets [array] Optional pull secrets, only for a private mirror of images.pii_redaction_model (the default image is public), e.g. [{ name: my-registry }].
   imagePullSecrets: []
 
   # Measured: one request at a time, peak 4.1 to 4.6 GiB (x86 and arm64), 5.3 GB
-  # for a 100,000-character text under a 7 GB limit with no OOM; a pod rests at
+  # for a 100,000-character text under a 7 GB memory limit with no OOM; a pod rests at
   # 1.2 GB and keeps about 4.2 GB after its first long text. Requests equal to
   # the limit for memory, so the scheduler only places it where 7Gi is free.
   # Inference is CPU bound; THREADS follows the CPU limit.

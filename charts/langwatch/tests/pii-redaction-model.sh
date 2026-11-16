@@ -66,26 +66,26 @@ test_default_install_has_no_model() {
   ok "default: no model, no endpoint"
 }
 
-# @scenario "The dev and minimal profiles leave the model off"
-test_dev_and_minimal_profiles_are_off() {
+# @scenario "Every size profile leaves the model off"
+test_every_profile_is_off() {
   local profile out
-  for profile in size-dev size-minimal; do
+  for profile in size-dev size-minimal size-prod size-ha; do
     out=$(render "$BASE -f examples/overlays/$profile.yaml")
-    if [ -n "$(only "$out" "pii_redaction_model/deployment")" ]; then
-      fail "$profile" "renders a PII redaction model Deployment"
+    if [ -n "$(only "$out" "pii_redaction_model/")" ] || [ -n "$(endpoint_sources "$out")" ]; then
+      fail "$profile" "renders the PII redaction model or its endpoint"
       continue
     fi
     ok "$profile: model off"
   done
 }
 
-# @scenario "The prod and HA profiles turn the model on with its measured sizing"
-test_prod_and_ha_profiles_are_on() {
+# @scenario "Turned on, the prod and HA profiles run the model with its measured sizing"
+test_prod_and_ha_profiles_when_enabled() {
   local profile replicas out deploy got_replicas memory pdb
   for pair in "size-prod:1" "size-ha:2"; do
     profile=${pair%%:*}
     replicas=${pair##*:}
-    out=$(render "$BASE -f examples/overlays/$profile.yaml")
+    out=$(render "$BASE -f examples/overlays/$profile.yaml --set piiRedactionModel.enabled=true")
     deploy=$(only "$out" "pii_redaction_model/deployment")
     if [ -z "$deploy" ]; then
       fail "$profile" "renders no PII redaction model Deployment"
@@ -177,6 +177,16 @@ test_external_endpoint() {
 # @scenario "The image, pull secrets and probes come from values and the image's contract"
 test_image_secrets_probes() {
   local deploy probes
+  deploy=$(only "$(render "$ON")" "pii_redaction_model/deployment")
+  if ! printf '%s\n' "$deploy" | grep -qE 'image: "langwatch/pii-redaction-model:[0-9]+\.[0-9]+\.[0-9]+"'; then
+    fail "default image" "not the public langwatch/pii-redaction-model at a release version"
+    return
+  fi
+  if printf '%s\n' "$deploy" | grep -q 'imagePullSecrets:'; then
+    fail "default image" "renders imagePullSecrets without any being set"
+    return
+  fi
+  ok "default image public, no pull secret"
   deploy=$(only "$(render "$ON --set images.pii_redaction_model.repository=registry.example/pii --set images.pii_redaction_model.tag=1.2.3 --set piiRedactionModel.imagePullSecrets[0].name=lw-registry --set piiRedactionModel.resources.limits.cpu=3")" "pii_redaction_model/deployment")
   if ! printf '%s\n' "$deploy" | grep -q 'image: "registry.example/pii:1.2.3"'; then
     fail "image" "image is not registry.example/pii:1.2.3"
@@ -216,8 +226,8 @@ test_refuses_without_image() {
 }
 
 test_default_install_has_no_model
-test_dev_and_minimal_profiles_are_off
-test_prod_and_ha_profiles_are_on
+test_every_profile_is_off
+test_prod_and_ha_profiles_when_enabled
 test_enabled_wires_app_and_workers_only
 test_flags_follow_the_toggles
 test_external_endpoint

@@ -1,7 +1,7 @@
 {{- if .Values.piiRedactionModel.enabled }}
 {{- $image := .Values.images.pii_redaction_model }}
 {{- if or (not $image.repository) (not $image.tag) }}
-{{- fail "piiRedactionModel.enabled needs images.pii_redaction_model.repository and images.pii_redaction_model.tag: the PII redaction model image is distributed separately from the other LangWatch images. Set both (and piiRedactionModel.imagePullSecrets for a private registry), or set piiRedactionModel.enabled=false to keep strict PII analysis on Presidio." }}
+{{- fail "piiRedactionModel.enabled needs images.pii_redaction_model.repository and images.pii_redaction_model.tag: they default to the public langwatch/pii-redaction-model image at the chart's release. Set both (and piiRedactionModel.imagePullSecrets for a private mirror), or set piiRedactionModel.enabled=false to keep strict PII analysis on Presidio." }}
 {{- end }}
 # Deployment for the PII redaction model: the strict PII detector (Level 0
 # patterns plus the GLiNER and PII-Tracer models) the app and the workers call
