@@ -45,8 +45,9 @@ failing|paused --voided, uncollectible, deleted--> none (no email)
 - **Closing.** `invoice.paid` for the case's invoice clears it with a conditional write; the write
   that clears it sends one email, unless the case closed before its day 3 email. `past_due` and `unpaid` updates no longer cancel the row.
 - **Self-healing.** Every sweep reads each open case's invoice from Stripe, notice due or not, and
-  closes a case whose invoice is paid, void or uncollectible. A lost `invoice.paid` event therefore
-  restores a paused organization within an hour.
+  closes a case whose invoice is paid or void; an uncollectible invoice leaves the case open and the
+  organization on Free. A lost `invoice.paid` event therefore restores a paused organization within
+  an hour.
 - **Mail.** Five transactional emails (failed on day 3, reminder on day 7, final on day 14,
   paused on day 21, restored on payment) go through billing's own mail channel over
   `@langwatch/mail`, to the organization's admins and Billing role holders (authz

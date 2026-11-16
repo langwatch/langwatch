@@ -30,11 +30,7 @@ interface TraceListQueryResult {
    * would enrich a row from the backend has to sit the preview out.
    */
   isSamplePreview: boolean;
-  /** Traces held back while the organization is over its plan; `null` when nothing is. */
-  withheld: TraceListWithheld | null;
 }
-
-export type TraceListWithheld = { count: number; members: number; maxMembers: number };
 
 /**
  * Pure tRPC + mapping layer.
@@ -141,7 +137,6 @@ export function useTraceListQuery(): TraceListQueryResult {
       isError: false,
       error: null,
       isSamplePreview: true,
-      withheld: null,
     };
   }
 
@@ -156,6 +151,5 @@ export function useTraceListQuery(): TraceListQueryResult {
     isError: query.isError,
     error: query.error,
     isSamplePreview: false,
-    withheld: query.data?.withheld ?? null,
   };
 }
