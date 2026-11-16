@@ -78,7 +78,8 @@ class DeferredJobSpan implements Span {
     spanId: randomBytes(8).toString("hex"),
     traceFlags: TraceFlags.NONE,
   };
-  private readonly attributes: Attributes;
+  private readonly initialAttributes: Attributes;
+  private readonly updatedAttributes: Attributes = {};
   private readonly links: Link[] = [];
   private readonly events: BufferedEvent[] = [];
   private status: SpanStatus | undefined;
@@ -101,7 +102,7 @@ class DeferredJobSpan implements Span {
   }) {
     this.name = name;
     this.kind = kind;
-    this.attributes = { ...attributes };
+    this.initialAttributes = { ...attributes };
     this.customAttributes = customAttributes;
   }
 
@@ -111,13 +112,13 @@ class DeferredJobSpan implements Span {
 
   setAttribute(key: string, value: AttributeValue): this {
     if (this.real) this.real.setAttribute(key, value);
-    else this.attributes[key] = value;
+    else this.updatedAttributes[key] = value;
     return this;
   }
 
   setAttributes(attributes: Attributes): this {
     if (this.real) this.real.setAttributes(attributes);
-    else Object.assign(this.attributes, attributes);
+    else Object.assign(this.updatedAttributes, attributes);
     return this;
   }
 
@@ -188,7 +189,11 @@ class DeferredJobSpan implements Span {
       {
         kind: this.kind,
         startTime: this.startTime,
-        attributes: { ...this.attributes, ...this.customAttributes() },
+        attributes: {
+          ...this.initialAttributes,
+          ...this.customAttributes(),
+          ...this.updatedAttributes,
+        },
         links: this.links,
       },
       parent,
