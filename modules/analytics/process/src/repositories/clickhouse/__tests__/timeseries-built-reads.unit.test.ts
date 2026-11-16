@@ -14,6 +14,10 @@ import { evalSlimTimeseriesRead } from "../clickhouse.eval-slim-timeseries-query
 import { rollupTimeseriesRead } from "../clickhouse.rollup-timeseries-query.mapper.ts";
 import { slimTimeseriesRead } from "../clickhouse.slim-timeseries-query.mapper.ts";
 import type { TimeseriesRead } from "../clickhouse.timeseries-query-shared.mapper.ts";
+import {
+  servesStandardTraceSummaries,
+  traceSummariesTimeseriesRead,
+} from "../clickhouse.trace-summaries-timeseries-query.mapper.ts";
 
 const dates = {
   projectId: "tenant-a",
@@ -75,6 +79,11 @@ describe("each timeseries read on the typed builder", () => {
       "evaluation_analytics",
       evalSlimTimeseriesRead,
       { series: [series("evaluations.evaluation_score", "avg")], timeScale: 60 },
+    ],
+    [
+      "trace_summaries",
+      traceSummariesTimeseriesRead,
+      { series: [series("performance.total_cost", "sum")], timeScale: 60 },
     ],
   ];
 
@@ -347,5 +356,75 @@ describe("the evaluation slim read", () => {
         filters: { "metadata.key": ["a", "b"] },
       }),
     ).toThrow(/Eval slim builder cannot serve filter "metadata.key"/);
+  });
+});
+
+describe("the standard trace_summaries read", () => {
+  const statement = inlined(
+    read(traceSummariesTimeseriesRead, {
+      series: [series("performance.total_cost", "sum")],
+      filters: { "spans.type": ["llm"] },
+      negateFilters: true,
+      excludeOrigins: ["evaluation"],
+      timeScale: 60,
+    }),
+  );
+
+  it("elects each trace's latest version by an IN-tuple over the proof's windows", () => {
+    expect(statement).toMatch(/\(TenantId, TraceId, UpdatedAt\) IN \(/);
+  });
+
+  it("negates a side-table filter as NOT IN, and leaves the origin exclusion un-negated", () => {
+    expect(statement).toMatch(/NOT IN \(/);
+    expect(statement).toContain(`NOT (Attributes['langwatch.origin'] IN (["evaluation"]))`);
+  });
+
+  it("sums cost as main did, zero over no rows", () => {
+    expect(statement).toContain("coalesce(sum(TotalCost), 0)");
+  });
+});
+
+describe("which queries the standard trace_summaries read serves", () => {
+  const base: Pick<TimeseriesQueryInput, "series" | "timeScale"> = {
+    series: [series("performance.total_cost", "sum")],
+    timeScale: 60,
+  };
+  const serves = (input: Partial<Omit<TimeseriesQueryInput, keyof typeof dates>>) =>
+    servesStandardTraceSummaries({ ...dates, ...base, ...input });
+
+  it("serves trace-row metrics bucketed by date, filtered, negated or trace-scoped", () => {
+    expect(serves({})).toBe(true);
+    expect(
+      serves({ filters: { "evaluations.passed": { ev: ["true"] } }, negateFilters: true }),
+    ).toBe(true);
+    expect(serves({ traceIds: ["t"] })).toBe(true);
+  });
+
+  it("leaves the both-periods summary, joins, pipelines and array groupings to their shapes", () => {
+    expect(serves({ timeScale: "full" })).toBe(false);
+    expect(serves({ groupBy: "metadata.labels" })).toBe(false);
+    expect(serves({ groupBy: "metadata.model" })).toBe(false);
+    expect(serves({ series: [series("evaluations.evaluation_score", "avg")] })).toBe(false);
+    expect(serves({ series: [series("events.event_type", "cardinality")] })).toBe(false);
+    expect(
+      serves({
+        series: [
+          {
+            ...series("performance.total_cost", "sum"),
+            pipeline: { field: "user_id", aggregation: "avg" },
+          } as AnalyticsSeries,
+        ],
+      }),
+    ).toBe(false);
+    expect(
+      serves({
+        series: [
+          {
+            ...series("performance.total_cost", "sum"),
+            filters: { "spans.type": ["llm"] },
+          } as AnalyticsSeries,
+        ],
+      }),
+    ).toBe(false);
   });
 });

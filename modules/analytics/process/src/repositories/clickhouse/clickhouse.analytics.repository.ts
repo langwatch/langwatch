@@ -48,6 +48,10 @@ import { rollupTimeseriesRead } from "./clickhouse.rollup-timeseries-query.mappe
 import { slimTimeseriesRead } from "./clickhouse.slim-timeseries-query.mapper.ts";
 import type { TimeseriesRead } from "./clickhouse.timeseries-query-shared.mapper.ts";
 import { parseTimeseriesRows } from "./clickhouse.timeseries-row-parser.mapper.ts";
+import {
+  servesStandardTraceSummaries,
+  traceSummariesTimeseriesRead,
+} from "./clickhouse.trace-summaries-timeseries-query.mapper.ts";
 
 /** A series asked under one project and a proof minted for another; nothing is read. */
 class AnalyticsProofProjectMismatchError extends Error {
@@ -115,8 +119,6 @@ export class ClickHouseAnalyticsRepository extends AnalyticsRepository {
     if (!projectId.trim()) {
       throw new Error("Analytics timeseries projectId is required");
     }
-    const builtRead = BUILT_READS[query.table];
-
     const builderInput: TimeseriesQueryInput = {
       projectId,
       startDate: toDate(query.startDate),
@@ -136,6 +138,11 @@ export class ClickHouseAnalyticsRepository extends AnalyticsRepository {
       query.maxResultRows === undefined
         ? {}
         : { max_result_rows: String(query.maxResultRows), result_overflow_mode: "throw" };
+
+    const builtRead =
+      query.table === "trace_summaries" && servesStandardTraceSummaries(builderInput)
+        ? traceSummariesTimeseriesRead
+        : BUILT_READS[query.table];
 
     try {
       const rows = builtRead

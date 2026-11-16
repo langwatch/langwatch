@@ -1,0 +1,224 @@
+/**
+ * The standard `trace_summaries` timeseries read on the typed builder (ADR-202): trace-row metrics
+ * over each trace's latest version, by date and a trace column. Joins, pipelines and the
+ * both-periods summary stay on the text path.
+ */
+
+import { isZeroWhenAbsentSeries, type AnalyticsSeries } from "@langwatch/analytics-contract";
+import {
+  clickhouseRead,
+  column,
+  type Condition,
+  cond,
+  fn,
+  param,
+  type ReaderReadStatement,
+} from "@langwatch/clickhouse-client/builder";
+
+import type { TimeseriesQueryInput } from "./clickhouse.aggregation-builder.mapper.ts";
+import {
+  type AnalyticsFilterInput,
+  analyticsFilterCondition,
+  filterTranslations,
+} from "./clickhouse.filter-conditions.mapper.ts";
+import {
+  type MetricSource,
+  type MetricSpec,
+  metricSpecFor,
+  renderMetric,
+} from "./clickhouse.metric-spec.mapper.ts";
+import { buildMetricAlias } from "./clickhouse.metric-translator.mapper.ts";
+import {
+  allOf,
+  dateBucket,
+  groupKeyOf,
+  inEitherPeriod,
+  type Measure,
+  periodOf,
+  type TimeseriesRead,
+} from "./clickhouse.timeseries-query-shared.mapper.ts";
+import { traceSummaries as ts } from "./clickhouse.trace-summaries.table.ts";
+
+type Summaries = "trace_summaries";
+
+/** The trace columns this shape groups by; each says whether it answers for its own empty value. */
+const GROUP_BYS: Record<string, { key: Measure<Summaries>; handlesUnknown: boolean }> = {
+  "topics.topics": { key: ts.TopicId, handlesUnknown: false },
+  "traces.trace_name": {
+    key: fn.if(cond.eq(ts.TraceName, ""), param.string("unknown"), ts.TraceName),
+    handlesUnknown: true,
+  },
+  "metadata.user_id": { key: fn.mapGet(ts.Attributes, "langwatch.user_id"), handlesUnknown: false },
+  "metadata.thread_id": {
+    key: fn.mapGet(ts.Attributes, "gen_ai.conversation.id"),
+    handlesUnknown: false,
+  },
+  "metadata.customer_id": {
+    key: fn.mapGet(ts.Attributes, "langwatch.customer_id"),
+    handlesUnknown: false,
+  },
+  // A trace-level fact, as the `traces.error` filter reads it.
+  "error.has_error": {
+    key: fn.if(ts.ContainsErrorStatus, param.string("with error"), param.string("without error")),
+    handlesUnknown: true,
+  },
+};
+
+const unjoined = (table: string) => (): never => {
+  throw new Error(`The standard trace_summaries read joins no ${table}.`);
+};
+
+/** A metric's columns on the elected trace row. */
+const SOURCE: MetricSource<Summaries> = {
+  trace: (name) => ts[name],
+  attribute: (key) => fn.mapGet(ts.Attributes, key),
+  span: unjoined("stored_spans"),
+  evaluation: unjoined("evaluation_runs"),
+};
+
+function specOf(series: AnalyticsSeries, index: number): MetricSpec {
+  return metricSpecFor({
+    metric: series.metric,
+    aggregation: series.aggregation,
+    index,
+    key: series.key,
+    subkey: series.subkey,
+  });
+}
+
+/** A series' own filters as row conditions (none when it has none); side tables refuse. */
+function seriesConditions(series: AnalyticsSeries): Condition<Summaries>[] {
+  const translations = filterTranslations({
+    filters: (series.filters ?? {}) as AnalyticsFilterInput,
+    ts,
+  });
+  return translations.map((translation) => {
+    if (translation.kind !== "row") {
+      throw new Error("A series filter on a side table is not a standard trace_summaries read.");
+    }
+    return translation.condition as Condition<Summaries>;
+  });
+}
+
+/**
+ * Whether the standard shape serves this query, as main's buildTimeseriesQuery routed it: no
+ * summary-without-grouping, no pipeline, every metric and series filter on the trace row alone.
+ */
+export function servesStandardTraceSummaries(input: TimeseriesQueryInput): boolean {
+  if (input.timeScale === "full" && !input.groupBy) return false;
+  if (typeof input.timeScale !== "number" && input.timeScale !== "full") return false;
+  if (input.groupBy && !GROUP_BYS[input.groupBy]) return false;
+  return input.series.every((series, index) => {
+    if (series.pipeline) return false;
+    const spec = specOf(series, index);
+    if (spec.joins.length > 0 || spec.outer || spec.form !== "scalar") return false;
+    const filters = (series.filters ?? {}) as AnalyticsFilterInput;
+    return filterTranslations({ filters, ts }).every((translation) => translation.kind === "row");
+  });
+}
+
+/**
+ * A series' own filter and percentage mode (main's shapeSeriesExpression): percentage is ES's
+ * `bucket_script`, and a non-additive series reads NULL, not 0, when nothing matched its filter.
+ */
+function seriesMeasure(series: AnalyticsSeries, index: number): Measure<Summaries> {
+  const spec = specOf(series, index);
+  const conditions = seriesConditions(series);
+  const when = conditions.length > 0 ? allOf(conditions) : undefined;
+  const filtered = renderMetric({ spec, source: SOURCE, when });
+  if (!when) return filtered;
+  const shaped = series.asPercent
+    ? (() => {
+        const all = renderMetric({ spec, source: SOURCE });
+        return fn.if(
+          cond.gt(all, 0),
+          fn.multiply(fn.divide(filtered, all), 100),
+          param.uint32(0),
+        ) as Measure<Summaries>;
+      })()
+    : filtered;
+  if (isZeroWhenAbsentSeries(series)) return shaped;
+  return fn.if(
+    cond.gt(fn.countIf(when), 0),
+    shaped,
+    fn.nullAs(column.nullable(column.float64())),
+  ) as Measure<Summaries>;
+}
+
+/** A grouping's `group_key`: its own expression when it answers for its empty value. */
+function groupKeyFor(grouping: {
+  key: Measure<Summaries>;
+  handlesUnknown: boolean;
+}): Measure<Summaries> {
+  return grouping.handlesUnknown ? grouping.key : groupKeyOf(grouping.key);
+}
+
+/** The trace scope and the origin exclusion: outside the negate toggle. */
+function restrictionsOf(input: TimeseriesQueryInput): Condition<Summaries>[] {
+  const restrictions: Condition<Summaries>[] = [];
+  if (input.traceIds && input.traceIds.length > 0) {
+    restrictions.push(cond.oneOf(ts.TraceId, input.traceIds));
+  }
+  if (input.excludeOrigins && input.excludeOrigins.length > 0) {
+    restrictions.push(
+      cond.not(cond.oneOf(fn.mapGet(ts.Attributes, "langwatch.origin"), input.excludeOrigins)),
+    );
+  }
+  return restrictions;
+}
+
+/** The standard trace_summaries timeseries read; see {@link servesStandardTraceSummaries}. */
+export function traceSummariesTimeseriesRead({
+  scope,
+  input,
+  settings,
+}: TimeseriesRead): ReaderReadStatement {
+  const selection: Record<string, Measure<Summaries>> = { period: periodOf(ts.OccurredAt, input) };
+  const date =
+    typeof input.timeScale === "number"
+      ? dateBucket(ts.OccurredAt, input.timeScale, input.timeZone ?? "UTC")
+      : undefined;
+  if (date) selection.date = date;
+  const grouping = input.groupBy ? GROUP_BYS[input.groupBy] : undefined;
+  const groupKey = grouping ? groupKeyFor(grouping) : undefined;
+  if (groupKey) selection.group_key = groupKey;
+  input.series.forEach((series, index) => {
+    const alias = buildMetricAlias({
+      index,
+      metric: series.metric,
+      aggregation: series.aggregation,
+      key: series.key,
+      subkey: series.subkey,
+    });
+    selection[alias] = seriesMeasure(series, index);
+  });
+
+  const restrictions = restrictionsOf(input);
+  const filters = analyticsFilterCondition({
+    filters: (input.filters ?? {}) as AnalyticsFilterInput,
+    ts,
+    spanWindow: {
+      startMs: input.previousPeriodStartDate.getTime(),
+      endMs: input.endDate.getTime(),
+    },
+    negated: input.negateFilters === true,
+  });
+
+  const keys = [selection.period!, ...(date ? [date] : []), ...(groupKey ? [groupKey] : [])];
+  const grouped = clickhouseRead({ scope })
+    .from(ts)
+    .withinWindows()
+    .select(selection)
+    .where(() => inEitherPeriod(ts.OccurredAt, input))
+    .where((ops) => allOf([filters(ops), ...restrictions]), { inElection: false })
+    .latestVersion()
+    .groupBy(...keys);
+  const having =
+    groupKey && !grouping?.handlesUnknown
+      ? grouped.having(({ ne }) => ne(groupKey, param.string("")))
+      : grouped;
+  const ordered = having.orderBy("period");
+  return (date ? ordered.orderBy("date") : ordered)
+    .settings({ ...settings, log_comment: "analytics:timeseries:trace_summaries" })
+    .build() as ReaderReadStatement;
+}

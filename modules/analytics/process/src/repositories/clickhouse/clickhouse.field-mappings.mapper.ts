@@ -104,7 +104,7 @@ export type CHTable = "trace_summaries" | "stored_spans" | "evaluation_runs";
  * (`aggregation-builder.ts`). ADR-034 routing metadata (`availableOn`) has
  * moved to `../routing/field-availability.ts`, consumed there directly.
  */
-interface FieldMapping {
+export interface FieldMapping {
   /** The ClickHouse table containing this field */
   table: CHTable;
   /** The ClickHouse column expression (may include map access) */

@@ -63,11 +63,11 @@ const SENTIMENT_METRIC_KEYS = ["sentiment.thumbs_up_down"] as const;
 
 const THREADS_METRIC_KEYS = ["threads.average_duration_per_thread"] as const;
 
-type MetadataMetricKey = (typeof METADATA_METRIC_KEYS)[number];
+export type MetadataMetricKey = (typeof METADATA_METRIC_KEYS)[number];
 type PerformanceMetricKey = (typeof PERFORMANCE_METRIC_KEYS)[number];
-type EvaluationMetricKey = (typeof EVALUATION_METRIC_KEYS)[number];
-type EventMetricKey = (typeof EVENT_METRIC_KEYS)[number];
-type SentimentMetricKey = (typeof SENTIMENT_METRIC_KEYS)[number];
+export type EvaluationMetricKey = (typeof EVALUATION_METRIC_KEYS)[number];
+export type EventMetricKey = (typeof EVENT_METRIC_KEYS)[number];
+export type SentimentMetricKey = (typeof SENTIMENT_METRIC_KEYS)[number];
 type ThreadsMetricKey = (typeof THREADS_METRIC_KEYS)[number];
 
 function memberOf<T extends string>(keys: readonly T[]): (metric: string) => metric is T {
@@ -75,11 +75,11 @@ function memberOf<T extends string>(keys: readonly T[]): (metric: string) => met
   return (metric: string): metric is T => set.has(metric);
 }
 
-const isMetadataMetricKey = memberOf(METADATA_METRIC_KEYS);
+export const isMetadataMetricKey = memberOf(METADATA_METRIC_KEYS);
 const isPerformanceMetricKey = memberOf(PERFORMANCE_METRIC_KEYS);
-const isEvaluationMetricKey = memberOf(EVALUATION_METRIC_KEYS);
-const isEventMetricKey = memberOf(EVENT_METRIC_KEYS);
-const isSentimentMetricKey = memberOf(SENTIMENT_METRIC_KEYS);
+export const isEvaluationMetricKey = memberOf(EVALUATION_METRIC_KEYS);
+export const isEventMetricKey = memberOf(EVENT_METRIC_KEYS);
+export const isSentimentMetricKey = memberOf(SENTIMENT_METRIC_KEYS);
 const isThreadsMetricKey = memberOf(THREADS_METRIC_KEYS);
 
 /**
@@ -105,7 +105,7 @@ function isKnownMetricKey(metric: string): boolean {
  * Refuse a metric the translator has no expression for, naming the series the
  * caller sent it in. The rejected text is never echoed back or compiled.
  */
-function unknownMetricError(index: number): ValidationError {
+export function unknownMetricError(index: number): ValidationError {
   return new ValidationError("Unknown analytics metric", {
     meta: {
       fieldErrors: {

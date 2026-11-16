@@ -29,6 +29,7 @@ import {
   analyticsFilterCondition,
 } from "../clickhouse.filter-conditions.mapper.ts";
 import { FilterOptionsClickHouseRepository } from "../clickhouse.filter-options.repository.ts";
+import { servesStandardTraceSummaries } from "../clickhouse.trace-summaries-timeseries-query.mapper.ts";
 import { traceSummaries } from "../clickhouse.trace-summaries.table.ts";
 import * as conditions from "./built-reads.filter-conditions.fixture.ts";
 import * as pickers from "./built-reads.filter-pickers.fixture.ts";
@@ -120,6 +121,19 @@ beforeAll(async () => {
       "evaluation_analytics_rollup",
       timeseries.EVAL_ROLLUP_SEEDS.map((seed) => timeseries.evalRollupRow(tenantId, seed)),
     );
+    const summaries = timeseries.TRACE_SEEDS.map((seed) => timeseries.summaryRows(tenantId, seed));
+    await insert(
+      "trace_summaries",
+      summaries.map((row) => row.summary),
+    );
+    await insert(
+      "stored_spans",
+      summaries.flatMap((row) => (row.span ? [row.span] : [])),
+    );
+    await insert(
+      "evaluation_runs",
+      summaries.flatMap((row) => (row.run ? [row.run] : [])),
+    );
   }
 }, 300_000);
 
@@ -131,7 +145,11 @@ afterAll(async () => {
     await deleteMigratedTenantRows({ client, tenantId, tables: conditions.SEEDED_TABLES });
   }
   for (const tenantId of [timeseries.TENANT_A, timeseries.TENANT_B, timeseries.AGGREGATE]) {
-    await deleteMigratedTenantRows({ client, tenantId, tables: [...timeseries.TABLES] });
+    await deleteMigratedTenantRows({
+      client,
+      tenantId,
+      tables: [...timeseries.TABLES, ...timeseries.SUMMARY_TABLES],
+    });
   }
 });
 
@@ -197,6 +215,22 @@ async function builtPairs({
   return literal(pairs, conditions.RUN);
 }
 
+/** A shape's dashboard query. */
+const timeseriesInput = (shape: timeseries.Shape, projectId: string) =>
+  ({
+    projectId,
+    startDate: timeseries.START,
+    endDate: timeseries.END,
+    series: shape.series,
+    filters: shape.filters ?? {},
+    groupBy: shape.groupBy,
+    negateFilters: shape.negateFilters,
+    traceIds: shape.traceIds,
+    excludeOrigins: shape.excludeOrigins,
+    timeScale: shape.timeScale,
+    timeZone: shape.timeZone ?? "UTC",
+  }) as Parameters<ClickHouseAnalyticsRepository["runTimeseries"]>[0]["input"];
+
 /** The built timeseries read, through the repository as the service calls it. */
 async function builtTimeseries({
   shape,
@@ -210,17 +244,7 @@ async function builtTimeseries({
   const result = await analytics.runTimeseries({
     table: shape.table as AnalyticsTable,
     authorization: proof,
-    input: {
-      projectId,
-      startDate: timeseries.START,
-      endDate: timeseries.END,
-      series: shape.series,
-      filters: shape.filters ?? {},
-      groupBy: shape.groupBy,
-      excludeOrigins: shape.excludeOrigins,
-      timeScale: shape.timeScale,
-      timeZone: shape.timeZone ?? "UTC",
-    } as Parameters<ClickHouseAnalyticsRepository["runTimeseries"]>[0]["input"],
+    input: timeseriesInput(shape, projectId),
     startDate: Temporal.Instant.fromEpochMilliseconds(timeseries.START),
     endDate: Temporal.Instant.fromEpochMilliseconds(timeseries.END),
     previousPeriodStartDate: Temporal.Instant.fromEpochMilliseconds(timeseries.PREVIOUS_START),
@@ -389,6 +413,19 @@ describe("timeseries reads built on the typed builder", () => {
       expect(toTwelveDigits(await builtTimeseries({ shape, projectId, proof: proof() }))).toEqual(
         toTwelveDigits(want),
       );
+    });
+  });
+
+  describe("given the standard trace_summaries shapes", () => {
+    it.each(timeseries.SUMMARY_SHAPES)("$name is a built read", (shape) => {
+      expect(
+        servesStandardTraceSummaries({
+          ...timeseriesInput(shape, timeseries.TENANT_A),
+          startDate: new Date(timeseries.START),
+          endDate: new Date(timeseries.END),
+          previousPeriodStartDate: new Date(timeseries.PREVIOUS_START),
+        }),
+      ).toBe(true);
     });
   });
 

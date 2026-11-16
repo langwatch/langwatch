@@ -1,6 +1,6 @@
 /**
  * `trace_summaries`, owned by trace and shared to analytics (clickhouse-table-ownership.ts): only
- * the columns analytics' filters, filter options, top documents and feedbacks read. A trace's
+ * the columns analytics' filters, pickers, top documents, feedbacks and metrics read. A trace's
  * latest version is elected by (TenantId, TraceId) on `UpdatedAt`, as the raw IN-tuple dedup did.
  */
 import { column, defineClickHouseTable } from "@langwatch/clickhouse-client/builder";
@@ -17,6 +17,15 @@ const columns = {
   HasAnnotation: column.nullable(column.bool()),
   TraceName: column.string(),
   Models: column.array(column.string()),
+  CreatedAt: column.dateTime64({ precision: 3 }),
+  TotalDurationMs: column.int64(),
+  TimeToFirstTokenMs: column.nullable(column.uint32()),
+  TotalCost: column.nullable(column.float64()),
+  NonBilledCost: column.nullable(column.float64()),
+  TotalPromptTokenCount: column.nullable(column.uint32()),
+  TotalCompletionTokenCount: column.nullable(column.uint32()),
+  TokensPerSecond: column.nullable(column.uint32()),
+  ErrorMessage: column.nullable(column.string()),
 };
 
 /** The columns, so a read may alias the table and still hand it to the filter translator. */

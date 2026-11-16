@@ -96,6 +96,113 @@ export function traceRow(tenantId: string, seed: TraceSeed) {
   };
 }
 
+/** The tables the trace_summaries (path A) cases seed. */
+export const SUMMARY_TABLES = ["trace_summaries", "stored_spans", "evaluation_runs"] as const;
+
+/**
+ * A trace_summaries version of a trace seed, with one span and one evaluation run for the first
+ * version of each trace. Trace 1 has no NonBilledCost and the legacy non-billable flag.
+ */
+export function summaryRows(tenantId: string, seed: TraceSeed) {
+  const tag = tagOf(tenantId);
+  const scale = scaleOf(tenantId);
+  const i = seed.index;
+  const odd = i % 2 === 1;
+  const traceId = `trace-${RUN}-${i}`;
+  const at = stamp(seed.time);
+  const attributes: Record<string, string> = {
+    outcome: i === 1 ? "fail" : "ok",
+    [`${tag}.only`]: "v",
+    "gen_ai.conversation.id": `${tag}-thread-${i % 3}`,
+    "langwatch.customer_id": i === 4 ? "" : `${tag}-customer`,
+    "langwatch.prompt_ids": JSON.stringify([`${tag}-prompt-${i % 2}`]),
+    "langwatch.reserved.cache_read_tokens": String(i * scale),
+    "langwatch.reserved.cache_creation_tokens": String(2 * scale),
+    "langwatch.reserved.reasoning_tokens": String(odd ? 0 : scale),
+  };
+  if (i !== 1) {
+    attributes["langwatch.user_id"] = `${tag}-user-${i === 4 ? 0 : i}`;
+    attributes["langwatch.labels"] = JSON.stringify([`${tag}-label-${i % 2}`, `${tag}-label-x`]);
+  } else {
+    attributes["langwatch.cost.non_billable"] = "true";
+  }
+  if (odd) attributes["langwatch.origin"] = "evaluation";
+  const summary = {
+    ProjectionId: `proj-${randomUUID()}`,
+    TenantId: tenantId,
+    TraceId: traceId,
+    Version: "v1",
+    Attributes: attributes,
+    OccurredAt: at,
+    CreatedAt: at,
+    UpdatedAt: stamp(seed.updated ?? seed.time),
+    ComputedIOSchemaVersion: "",
+    TotalDurationMs: (i + 1) * 100 * scale,
+    TimeToFirstTokenMs: i === 1 ? null : (i + 1) * 10 * scale,
+    TokensPerSecond: (i + 1) * scale,
+    TotalPromptTokenCount: (i + 1) * 3 * scale,
+    TotalCompletionTokenCount: odd ? null : (i + 1) * 5 * scale,
+    TotalCost: seed.cost === null ? null : seed.cost * scale,
+    NonBilledCost: seed.cost === null || i === 1 ? null : (seed.cost * scale) / 4,
+    SpanCount: seed.spanCount ?? 1,
+    ContainsErrorStatus: odd ? 1 : 0,
+    ContainsOKStatus: 1,
+    Models: [],
+    TokensEstimated: false,
+    OutputFromRootSpan: 0,
+    OutputSpanEndTimeMs: 0,
+    BlockedByGuardrail: 0,
+    TopicId: i === 1 ? null : `${tag}-topic-${i % 2}`,
+    SubTopicId: `${tag}-sub-${i % 2}`,
+    HasAnnotation: 0,
+    TraceName: i === 1 ? "" : `${tag}-name-${i % 2}`,
+  };
+  if (seed.updated !== undefined && seed.updated !== seed.time) return { summary };
+  const span = {
+    ProjectionId: `proj-span-${randomUUID()}`,
+    TenantId: tenantId,
+    TraceId: traceId,
+    SpanId: `span-${RUN}-${i}`,
+    Sampled: 1,
+    StartTime: at,
+    EndTime: at,
+    DurationMs: 1,
+    SpanName: "span",
+    SpanKind: 1,
+    ServiceName: "test-service",
+    ResourceAttributes: {},
+    SpanAttributes: { "langwatch.span.type": odd ? "tool" : "llm" },
+    ScopeName: "",
+    "Events.Timestamp": [at],
+    "Events.Name": ["other"],
+    "Events.Attributes": [{}],
+    "Links.TraceId": [],
+    "Links.SpanId": [],
+    "Links.Attributes": [],
+    DroppedAttributesCount: 0,
+    DroppedEventsCount: 0,
+    DroppedLinksCount: 0,
+  };
+  const run = {
+    ProjectionId: `proj-${randomUUID()}`,
+    TenantId: tenantId,
+    EvaluationId: `eval-${RUN}-${i}`,
+    Version: "1",
+    EvaluatorId: "ev",
+    EvaluatorName: "check",
+    EvaluatorType: "langevals/exact_match",
+    TraceId: traceId,
+    Status: "processed",
+    Score: i / 10,
+    Passed: i === 4 ? 0 : 1,
+    Label: "good",
+    LastProcessedEventId: `evt-${randomUUID()}`,
+    ScheduledAt: at,
+    UpdatedAt: at,
+  };
+  return { summary, span, run };
+}
+
 export const ROLLUP_SEEDS = [
   { minute: "05:00:00", model: "m-1", n: 1 },
   { minute: "09:00:00", model: "m-1", n: 2 },
@@ -278,10 +385,12 @@ export const PROOFS: { name: string; projectId: string; proof: () => Authorizati
 
 export type Shape = {
   name: string;
-  table: TimeseriesTable;
+  table: TimeseriesTable | "trace_summaries";
   series: AnalyticsSeries[];
   groupBy?: string;
   filters?: AnalyticsFilters;
+  negateFilters?: boolean;
+  traceIds?: string[];
   excludeOrigins?: string[];
   timeScale: number | "full";
   timeZone?: string;
@@ -376,6 +485,98 @@ export const SLIM_GROUP_BYS = [
   "metadata.thread_id",
   "metadata.customer_id",
   "metadata.labels",
+];
+
+/** Series on the trace row only: every value metric, the counts, a mapped column and span types. */
+export const SUMMARY_SERIES: AnalyticsSeries[] = [
+  ...SLIM_SERIES,
+  { metric: "metadata.span_type", aggregation: "cardinality" } as AnalyticsSeries,
+  { metric: "metrics.total_cost", aggregation: "max" } as AnalyticsSeries,
+];
+const clean = { "traces.error": ["false"] } as AnalyticsFilters;
+/** A series' own filter: additive and not, as a count, and as a percentage. */
+export const SUMMARY_FILTERED_SERIES: AnalyticsSeries[] = [
+  { metric: "performance.total_cost", aggregation: "sum", filters: clean } as AnalyticsSeries,
+  { metric: "performance.completion_time", aggregation: "avg", filters: clean } as AnalyticsSeries,
+  {
+    metric: "metadata.trace_id",
+    aggregation: "cardinality",
+    filters: clean,
+    asPercent: true,
+  } as AnalyticsSeries,
+  {
+    metric: "performance.total_cost",
+    aggregation: "max",
+    filters: clean,
+    asPercent: true,
+  } as AnalyticsSeries,
+];
+const summaryFilters: [string, AnalyticsFilters, boolean][] = [
+  ["topics.topics", { "topics.topics": both((t) => `${t}-topic-0`) }, false],
+  ["traces.name, negated", { "traces.name": both((t) => `${t}-name-0`) }, true],
+  ["spans.type", { "spans.type": ["tool"] } as AnalyticsFilters, false],
+  ["spans.type, negated", { "spans.type": ["tool"] } as AnalyticsFilters, true],
+  ["evaluations.passed", { "evaluations.passed": { ev: ["false"] } } as AnalyticsFilters, false],
+];
+
+/** Path A: the standard trace_summaries shape (numeric scale, or full with a grouping). */
+export const SUMMARY_SHAPES: Shape[] = [
+  {
+    name: "summaries, every metric, 30 minutes in Amsterdam",
+    table: "trace_summaries",
+    series: SUMMARY_SERIES,
+    timeScale: 30,
+    timeZone: "Europe/Amsterdam",
+  },
+  {
+    name: "summaries, every metric, daily",
+    table: "trace_summaries",
+    series: SUMMARY_SERIES,
+    timeScale: 1440,
+  },
+  ...SLIM_GROUP_BYS.filter((groupBy) => groupBy !== "metadata.labels").map((groupBy): Shape => ({
+    name: `summaries by ${groupBy}`,
+    table: "trace_summaries",
+    series: SLIM_SHORT,
+    groupBy,
+    timeScale: "full",
+  })),
+  ...summaryFilters.map(([name, filters, negateFilters]): Shape => ({
+    name: `summaries filtered on ${name}`,
+    table: "trace_summaries",
+    series: SLIM_SHORT,
+    filters,
+    negateFilters,
+    timeScale: 60,
+  })),
+  {
+    name: "summaries for two traces",
+    table: "trace_summaries",
+    series: SLIM_SHORT,
+    traceIds: [`trace-${RUN}-0`, `trace-${RUN}-4`],
+    timeScale: 60,
+  },
+  {
+    name: "summaries excluding origins, grouped by trace name",
+    table: "trace_summaries",
+    series: SLIM_SHORT,
+    excludeOrigins: ["evaluation"],
+    groupBy: "traces.trace_name",
+    timeScale: 60,
+  },
+  {
+    name: "summaries with series filters, hourly",
+    table: "trace_summaries",
+    series: SUMMARY_FILTERED_SERIES,
+    timeScale: 60,
+  },
+  {
+    name: "summaries with series filters, by user",
+    table: "trace_summaries",
+    series: SUMMARY_FILTERED_SERIES,
+    groupBy: "metadata.user_id",
+    timeScale: "full",
+  },
 ];
 
 export const SHAPES: Shape[] = [
@@ -480,4 +681,5 @@ export const SHAPES: Shape[] = [
     timeScale: 60,
     timeZone: "Europe/Amsterdam",
   },
+  ...SUMMARY_SHAPES,
 ];
