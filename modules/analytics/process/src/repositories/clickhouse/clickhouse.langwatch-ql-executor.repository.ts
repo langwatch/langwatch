@@ -83,10 +83,13 @@ function namesAnAppFunction(sql: string): boolean {
   return lwqlAppFunctionNames().some((name) => new RegExp(`\\b${name}\\s*\\(`, "i").test(sql));
 }
 
-/** The refusal names, as an unknown table function, a floored twin this statement reads. */
+/**
+ * The refusal names, as an unknown table function, a floored twin this statement reads.
+ * Matched on the twin's own name: the rewrite keeps the caller's quoting of the database.
+ */
 function namesMissingFlooredTwin({ error, sql }: { error: unknown; sql: string }): boolean {
-  const relation = extractUnknownTableFunction(error);
-  return relation !== undefined && isFlooredViewName(relation) && sql.includes(`${relation}(`);
+  const twin = extractUnknownTableFunction(error)?.split(".").at(-1);
+  return twin !== undefined && isFlooredViewName(twin) && sql.includes(`${twin}(`);
 }
 
 /** What a failed governed run is reported as. */

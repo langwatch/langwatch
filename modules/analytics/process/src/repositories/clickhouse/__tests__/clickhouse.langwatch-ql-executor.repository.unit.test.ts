@@ -101,6 +101,9 @@ const FLOORED_READ =
   "toTimeZone(toDateTime64((subtractDays(now(), 7)), 3), timezone())) AS trace_metrics " +
   "WHERE OccurredAt >= subtractDays(now(), 7)";
 
+/** As the floor rewrites a caller who wrote `` `analytics`.trace_metrics ``. */
+const QUOTED_FLOORED_READ = FLOORED_READ.replace("analytics.", "`analytics`.");
+
 describe("given a floored statement on a deployment whose twin is not provisioned yet", () => {
   describe("when the server reports the twin as an unknown table function", () => {
     /** @scenario "A twin the server reports as an unknown table function is unavailable" */
@@ -108,6 +111,15 @@ describe("given a floored statement on a deployment whose twin is not provisione
       queryMock.mockRejectedValueOnce(unknownTableFunction("analytics.trace_metrics__floor"));
 
       expect((await refusalOf(FLOORED_READ)).code).toBe("lwql_unavailable");
+    });
+  });
+
+  describe("when the statement quotes the twin's database", () => {
+    /** @scenario "A twin the server reports as an unknown table function is unavailable" */
+    it("refuses with lwql_unavailable, so the floor sends it as written", async () => {
+      queryMock.mockRejectedValueOnce(unknownTableFunction("analytics.trace_metrics__floor"));
+
+      expect((await refusalOf(QUOTED_FLOORED_READ)).code).toBe("lwql_unavailable");
     });
   });
 });
@@ -122,6 +134,16 @@ describe("given an unknown function that is not a floored twin", () => {
       queryMock.mockRejectedValueOnce(unknownTableFunction("nosuchtf"));
 
       expect(await refusalOf("SELECT 1 FROM nosuchtf(1)")).toEqual(UNMAPPED_UNKNOWN_FUNCTION);
+    });
+  });
+
+  describe("when the named twin is not the one the statement reads", () => {
+    /** @scenario "A twin the server reports as an unknown table function is unavailable" */
+    it("passes the driver's error through, as before", async () => {
+      queryMock.mockRejectedValueOnce(unknownTableFunction("analytics.trace_metrics__floor"));
+      const sql = QUOTED_FLOORED_READ.replace("trace_metrics__floor(", "span_metrics__floor(");
+
+      expect(await refusalOf(sql)).toEqual(UNMAPPED_UNKNOWN_FUNCTION);
     });
   });
 
