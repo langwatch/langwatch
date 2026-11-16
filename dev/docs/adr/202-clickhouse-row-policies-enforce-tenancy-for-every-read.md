@@ -174,6 +174,8 @@ Migration path: about 139 non-test TypeScript files under ClickHouse repository 
 25. Other modules hand `TraceApi` a filter as written, never compiled text; trace compiles it inside each read, and `translateTraceFilter` only validates.
 26. Analytics narrows filter options with its own filter translator on the builder; `TraceApi.translateLegacyFilters` goes.
 27. Under a share, a filter's side-table check (evaluations, spans, scenario runs, Instant Eval judgments) reads only rows inside the share's windows, on each table's own time column; out-of-window rows never decide whether a trace matches. This is stricter than main for shared projects only.
+28. Under a share, the session-groups log search reads only `log_records` rows inside the share's windows, on `TimeUnixMs`; a log line outside the window no longer admits a session.
+29. Analytics answers differ from main where main's answer was wrong: under an aggregate proof each member's trace counts separately; pipeline series main dropped are computed; a pipeline or evaluation series beside span or run metrics is read on its own; span-grouped counts honour the metric's condition; evaluation metrics compute per run; span-grouped event, thumbs and token values count only the spans or events behind each group key.
 
 ## Open questions for Alex
 
