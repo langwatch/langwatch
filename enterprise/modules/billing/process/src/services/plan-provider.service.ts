@@ -25,6 +25,38 @@ export const NUMERIC_OVERRIDE_FIELDS: NumericOverrideField[] = [
   "maxMessagesPerMonth",
 ];
 
+type ActiveSubscription = NonNullable<
+  Awaited<ReturnType<BillingSubscriptionRepository["findActive"]>>
+>;
+
+function customLimitsOf(subscription: ActiveSubscription): Partial<PlanInfo> {
+  const customLimits: Partial<PlanInfo> = {};
+  for (const field of NUMERIC_OVERRIDE_FIELDS) {
+    if (subscription[field] != null) customLimits[field] = subscription[field]!;
+  }
+  // Seats lowered from the next cycle stay usable until the period paid for ends.
+  if (subscription.maxMembers != null) {
+    customLimits.maxMembers = effectiveMaxMembers({
+      ...subscription,
+      maxMembers: subscription.maxMembers,
+      now: nowInstant(),
+    });
+  }
+  return customLimits;
+}
+
+/** Before the pause, an unpaid invoice holds new members and seats on every non-Enterprise plan. */
+function recoveryHoldOf(
+  subscription: ActiveSubscription,
+): Pick<PlanInfo, "additionsHeldForPayment"> {
+  const held = isPlanHeldForRecovery({
+    startedAt: subscription.paymentRecoveryStartedAt,
+    plan: subscription.plan,
+    now: nowInstant(),
+  });
+  return held ? { additionsHeldForPayment: true } : {};
+}
+
 export class SaaSPlanProviderService extends BillingService {
   private constructor(
     private readonly subscriptions: BillingSubscriptionRepository,
@@ -62,21 +94,6 @@ export class SaaSPlanProviderService extends BillingService {
     // it can, and then which one answers decides the plan.
     const activeSubscription = await this.subscriptions.findActive(organizationId);
 
-    const customLimits: Partial<PlanInfo> = {};
-    for (const field of NUMERIC_OVERRIDE_FIELDS) {
-      if (activeSubscription?.[field] != null) {
-        customLimits[field] = activeSubscription[field]!;
-      }
-    }
-    // Seats lowered from the next cycle stay usable until the period paid for ends.
-    if (activeSubscription?.maxMembers != null) {
-      customLimits.maxMembers = effectiveMaxMembers({
-        ...activeSubscription,
-        maxMembers: activeSubscription.maxMembers,
-        now: nowInstant(),
-      });
-    }
-
     if (!activeSubscription) {
       return {
         ...getFreePlanLimits(),
@@ -99,14 +116,8 @@ export class SaaSPlanProviderService extends BillingService {
 
     const subscriptionPlan = activeSubscription.plan as string | undefined;
     const isKnownPlan = subscriptionPlan != null && subscriptionPlan in PLAN_LIMITS;
-    // Before the pause, an unpaid invoice holds new members and seats on every non-Enterprise plan.
-    const held = isPlanHeldForRecovery({
-      startedAt: activeSubscription.paymentRecoveryStartedAt,
-      plan: activeSubscription.plan,
-      now: nowInstant(),
-    })
-      ? { additionsHeldForPayment: true }
-      : {};
+    const customLimits = customLimitsOf(activeSubscription);
+    const held = recoveryHoldOf(activeSubscription);
 
     if (isKnownPlan) {
       return {
