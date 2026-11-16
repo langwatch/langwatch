@@ -1,5 +1,5 @@
 import type { Logger } from "@langwatch/observability";
-import { nowInstant } from "@langwatch/time";
+import { nowEpochMs } from "@langwatch/time";
 import type fastq from "fastq";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
@@ -248,7 +248,7 @@ export class GroupQueueMetricsCollector {
     readyKey: string;
     keyPrefix: string;
   }): Promise<void> {
-    const nowMs = nowInstant().epochMilliseconds;
+    const nowMs = nowEpochMs();
     const eligible = readyEntries(
       await this.params.redisConnection.zrangebyscore(
         readyKey,
@@ -564,7 +564,7 @@ export class GroupQueueMetricsCollector {
   private async warnOfDeepestGroup({ keyPrefix }: { keyPrefix: string }): Promise<void> {
     const groupId = this.stagingDeepestGroupId;
     if (groupId === null || this.stagingDepthMax < STAGING_DEPTH_REPORT_FLOOR) return;
-    const nowMs = nowInstant().epochMilliseconds;
+    const nowMs = nowEpochMs();
     if (nowMs - this.stagingDepthWarnedAtMs < STAGING_DEPTH_WARN_INTERVAL_MS) return;
     this.stagingDepthWarnedAtMs = nowMs;
     const isBlocked = await this.params.redisConnection

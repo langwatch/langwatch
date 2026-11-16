@@ -29,7 +29,8 @@ const agentId = generate("agent").toString(); // modules/agent/process/src/rules
 
 ## Time
 
-`@langwatch/time` is the one clock. `nowInstant()` for now, `Temporal` for arithmetic, `toDate` / `fromDate` only where a
+`@langwatch/time` is the one clock. `nowInstant()` for now as an Instant, `nowEpochMs()` when you only need the
+epoch millisecond count (no Instant is built, so prefer it on hot paths), `Temporal` for arithmetic, `toDate` / `fromDate` only where a
 boundary (Prisma, a driver) hands or wants a `Date`, `nextCronFireAt` for schedules, `formatDistance*` for relative text.
 Do not write `new Date(x)` or `Date.now()` in module code (`langwatch/temporal-only` names the fix).
 A service that needs a different clock takes `now: () => Instant` as an option, and memory twins take one too
