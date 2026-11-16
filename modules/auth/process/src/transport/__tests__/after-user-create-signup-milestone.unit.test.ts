@@ -31,9 +31,7 @@ vi.mock("@langwatch/observability", async () => {
   return {
     ...actual,
     createLogger: (name: string) =>
-      name === "langwatch:better-auth:hooks"
-        ? hooksLogger
-        : actual.createLogger(name),
+      name === "langwatch:better-auth:hooks" ? hooksLogger : actual.createLogger(name),
   };
 });
 

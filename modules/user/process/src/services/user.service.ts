@@ -212,12 +212,8 @@ export class UserService {
     return this.repository.create(createUserInputSchema.parse(input));
   }
 
-  /** The created fact for an account Better Auth wrote, through the same outbox as a mint. */
-  async recordCreated(input: UserIdInput): Promise<void> {
-    const parsed = userIdInputSchema.parse(input);
-
-    await this.repository.appendCreatedFact(parsed.id);
-  }
+  recordCreated = (input: UserIdInput): Promise<void> =>
+    this.repository.appendCreatedFact(userIdInputSchema.parse(input).id);
 
   /**
    * The signup form's mint: its registered fact commits with the account. Born confirmed when a
