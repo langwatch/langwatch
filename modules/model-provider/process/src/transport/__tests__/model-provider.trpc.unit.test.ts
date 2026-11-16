@@ -178,6 +178,31 @@ describe("the modelProvider tRPC namespace", () => {
 
       expect(answer.chat).toEqual(["openai/gpt-5"]);
     });
+
+    describe("given a caller who may view project B but not project A", () => {
+      const viewsOnlyB: ModelProviderTestDecision = (_permission, scope) =>
+        scope.tier === "project" && scope.id === "project_b";
+
+      /** @scenario "Listing models for a scope the caller cannot view is refused" */
+      it("refuses scopes [A] asked for from project B", async () => {
+        const { caller } = mount({ permits: viewsOnlyB });
+
+        await expect(
+          caller.getModelOptionsForScopes({ projectId: "project_b", scopes: SCOPES }),
+        ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      });
+
+      it("answers scopes [B] asked for from project B", async () => {
+        const { caller } = mount({ permits: viewsOnlyB });
+
+        const answer = await caller.getModelOptionsForScopes({
+          projectId: "project_b",
+          scopes: [{ scopeType: "PROJECT", scopeId: "project_b" }],
+        });
+
+        expect(answer.emptyProviders).toEqual({ chat: [], embedding: [] });
+      });
+    });
   });
 
   describe("given a caller whose rights sit on a project or organization other than the one named", () => {

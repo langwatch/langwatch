@@ -85,8 +85,8 @@ export const modelProviderTrpcTransport: TrpcRouterDeclaration<
 
   .procedure("getModelOptionsForScopes")
   .withPermission("project:view")
-  .handle(({ app, input }) =>
-    app.getModelOptionsForScopes({ projectId: input.projectId, scopes: input.scopes }),
+  .handle(({ app, input, actor }) =>
+    app.getModelOptionsForScopes({ projectId: input.projectId, scopes: input.scopes }, actor),
   )
 
   .procedure("listAllForOrganizationForFrontend")

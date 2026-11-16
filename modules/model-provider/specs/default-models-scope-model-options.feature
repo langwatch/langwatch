@@ -51,6 +51,12 @@ Feature: Default models offer only what the picked scopes can run
     Then the read is refused with code "model_provider_invalid"
 
   @unit
+  Scenario: Listing models for a scope the caller cannot view is refused
+    Given the caller may view project B but not project A
+    When the caller lists, from project B, the models for project A
+    Then the read is refused before any provider of project A is read
+
+  @unit
   Scenario: Listing models with no scope picked offers nothing
     When the models for no scope are listed
     Then no model is offered and no provider is named

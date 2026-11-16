@@ -324,12 +324,13 @@ export interface ModelProviderApi {
   }): Promise<readonly BuiltInModel[]>;
   /**
    * The chat and embedding models a Default models config on these scopes may pick: only those
-   * every scope runs, plus the providers that hold none of a kind. Other organizations refused.
+   * every scope runs, plus the providers that hold none of a kind. Other organizations, and any
+   * scope the caller may not view, are refused.
    */
-  getModelOptionsForScopes(input: {
-    projectId: string;
-    scopes: readonly ModelDefaultScope[];
-  }): Promise<ScopeModelOptions>;
+  getModelOptionsForScopes(
+    input: { projectId: string; scopes: readonly ModelDefaultScope[] },
+    by: ModelProviderCaller,
+  ): Promise<ScopeModelOptions>;
   findAlternateModel(input: {
     projectId: string;
     featureKey: string;

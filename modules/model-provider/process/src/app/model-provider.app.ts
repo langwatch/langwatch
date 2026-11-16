@@ -794,11 +794,11 @@ export class ModelProviderModule implements ModelProviderApi {
     return this.#modelProviders.listDecisionModelsForScopes(input);
   }
 
-  getModelOptionsForScopes(input: {
-    projectId: string;
-    scopes: readonly ModelDefaultScope[];
-  }): Promise<ScopeModelOptions> {
-    return this.#modelProviders.getModelOptionsForScopes(input);
+  getModelOptionsForScopes(
+    input: { projectId: string; scopes: readonly ModelDefaultScope[] },
+    by: ModelProviderCaller,
+  ): Promise<ScopeModelOptions> {
+    return this.#modelProviders.getModelOptionsForScopes({ ...input, actorId: by.id });
   }
 
   findAlternateModel(input: {

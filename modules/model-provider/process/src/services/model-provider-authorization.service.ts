@@ -1,7 +1,8 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type {
-  ModelDefaultScope,
-  ModelDefaultApiKeyPrincipal,
+import {
+  ModelProviderScopeForbiddenError,
+  type ModelDefaultScope,
+  type ModelDefaultApiKeyPrincipal,
 } from "@langwatch/model-provider-contract";
 
 import { modelDefaultWritePermission } from "../rules/model-default-write-permission.rules.ts";
@@ -29,6 +30,17 @@ export class ModelProviderAuthorizationService {
       scope,
       ModelProviderAuthorizationService.readPermission(scope.scopeType),
     );
+  }
+
+  /** Refuses the first scope the actor may not read, naming the permission that was checked. */
+  async assertCanReadAll(actorId: string, scopes: readonly ModelDefaultScope[]): Promise<void> {
+    for (const scope of scopes) {
+      if (await this.canRead(actorId, scope)) continue;
+      throw new ModelProviderScopeForbiddenError({
+        scopeType: scope.scopeType,
+        requiredPermission: ModelProviderAuthorizationService.readPermission(scope.scopeType),
+      });
+    }
   }
 
   async canWrite(actorId: string, scope: ModelDefaultScope): Promise<boolean> {
