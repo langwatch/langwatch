@@ -2,7 +2,8 @@
  * @vitest-environment node
  * A dated widget read on a deployment whose trace_metrics__floor is not provisioned yet (a rolling
  * deploy) answers through the shipped executor as written, with the rows the whole-history view
- * returns, instead of refusing. Its own suite database, so dropping the twin touches no other suite.
+ * returns, instead of refusing.
+ * Its own suite database, so dropping the twin touches no other suite.
  * @see specs/lwql/dedup-floor.feature
  */
 import { readFileSync } from "node:fs";
