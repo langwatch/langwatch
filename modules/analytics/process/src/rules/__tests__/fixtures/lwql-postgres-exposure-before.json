@@ -300,6 +300,8 @@
     ["Metadata", "metadata", ["output"]],
     ["FirstSeenAt", "firstSeenAt", []],
     ["LastSeenAt", "lastSeenAt", []],
+    ["IngestionSourceId", "ingestionSourceId", []],
+    ["GoneAt", "goneAt", []],
     ["CreatedAt", "createdAt", []],
     ["UpdatedAt", "updatedAt", []]
   ],

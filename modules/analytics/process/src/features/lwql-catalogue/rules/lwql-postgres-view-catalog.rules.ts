@@ -491,6 +491,8 @@ export const LWQL_POSTGRES_CATALOGUE = defineLwqlCatalog({
       Metadata: { source: "metadata", content: "output" },
       FirstSeenAt: { source: "firstSeenAt" },
       LastSeenAt: { source: "lastSeenAt" },
+      IngestionSourceId: { source: "ingestionSourceId" },
+      GoneAt: { source: "goneAt" },
       CreatedAt: { source: "createdAt" },
       UpdatedAt: { source: "updatedAt" },
     },

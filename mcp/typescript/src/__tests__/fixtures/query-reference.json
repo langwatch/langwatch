@@ -11146,7 +11146,8 @@
           "joinKeys": [
             "TenantId",
             "DiscoveredAgentId",
-            "RawAgentId"
+            "RawAgentId",
+            "IngestionSourceId"
           ],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
@@ -11215,6 +11216,22 @@
               "name": "LastSeenAt",
               "type": "DateTime64(3)",
               "description": "LastSeenAt",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "IngestionSourceId",
+              "type": "Nullable(String)",
+              "description": "The governance source whose listing last named this agent; null for older sightings.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "GoneAt",
+              "type": "Nullable(DateTime64(3))",
+              "description": "Set when that source's listing stopped naming the agent; cleared when a listing names it again.",
               "unit": null,
               "gates": [],
               "available": true
