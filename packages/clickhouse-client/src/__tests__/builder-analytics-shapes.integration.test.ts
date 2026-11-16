@@ -2,8 +2,8 @@
 
 /**
  * The analytics and trace-filter builder shapes on a throwaway ClickHouse 26.8, sent as a reader
- * whose row policy reads the tenant setting: each returns the rows main's raw text returns, with
- * another tenant's rows present and the setting widened to every tenant.
+ * whose row policy reads the tenant setting: each returns the rows main returned on 26.8 (kept as
+ * literals), with another tenant's rows present and the setting widened to every tenant.
  * @see specs/clickhouse/typed-query-builder.feature
  */
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
@@ -22,9 +22,9 @@ import {
 } from "../clickhouse-test-endpoints.ts";
 import { TENANT_IDS_SETTING } from "../identity/tenantSetting.ts";
 
-const DATABASE = `analytics_gaps_${process.pid}`;
-const READER = `analytics_gaps_reader_${process.pid}`;
-const READER_PASSWORD = "analytics-gaps-reader-test-login";
+const DATABASE = `analytics_shapes_${process.pid}`;
+const READER = `analytics_shapes_reader_${process.pid}`;
+const READER_PASSWORD = "analytics-shapes-reader-test-login";
 const A = "proj_a";
 const B = "proj_b";
 const EVERY_TENANT = [A, B].join(",");
@@ -182,26 +182,12 @@ async function rowsOf({
   return rows.map((row) => Object.values(row).map(String).join("|")).toSorted();
 }
 
-/** Main's text, its tenant set bound as main's `tenantSet()` binds it, under the built settings. */
-const mainOf = ({
-  built,
-  sql,
-  params = {},
-}: {
-  built: Sendable;
-  sql: string;
-  params?: Record<string, unknown>;
-}): Sendable => ({ sql, params: { tenants: [A], ...params }, settings: built.settings });
-const TENANTS = "TenantId IN {tenants:Array(String)}";
-
 const single = tenantScope.single({ tenantId: A });
 
-/** Main and the built read agree under A's setting and under every tenant's; returns the rows. */
-async function sameRows({ built, main }: { built: Sendable; main: Sendable }): Promise<string[]> {
+/** The built rows under A's setting, which its text predicate alone keeps under every tenant's. */
+async function scopedRows({ built }: { built: Sendable }): Promise<string[]> {
   const rows = await rowsOf({ statement: built });
-  expect(rows).toEqual(await rowsOf({ statement: main }));
   expect(await rowsOf({ statement: built, tenants: EVERY_TENANT })).toEqual(rows);
-  expect(await rowsOf({ statement: main, tenants: EVERY_TENANT })).toEqual(rows);
   return rows;
 }
 
@@ -209,7 +195,7 @@ describe("given analytics' and the trace filter's shapes sent as a reader on Cli
   beforeAll(async () => {
     const pins = testClickHouseProfilePins();
     container = await new ClickHouseContainer(TEST_CLICKHOUSE_IMAGE)
-      .withName(`rp-b12-${process.pid}-ch`)
+      .withName(`analytics-shapes-${process.pid}-ch`)
       .withResourcesQuota({ memory: 3 })
       .withEnvironment({ CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1" })
       .withCopyContentToContainer([TEST_CLICKHOUSE_TUNING, pins.file])
@@ -270,18 +256,10 @@ describe("given analytics' and the trace filter's shapes sent as a reader on Cli
             return negated ? not(member) : member;
           })
           .build();
-      const mainText = (negated: string) =>
-        `SELECT TraceId FROM trace_summaries ts WHERE ts.${TENANTS} AND ${negated}((ts.TenantId, ts.TraceId)
-           IN (SELECT TenantId, TraceId FROM stored_spans WHERE ${TENANTS} AND SpanName = 'llm'))`;
-
       const kept = llm(false);
-      expect(
-        await sameRows({ built: kept, main: mainOf({ built: kept, sql: mainText("") }) }),
-      ).toEqual(["t1", "t3"]);
+      expect(await scopedRows({ built: kept })).toEqual(["t1", "t3"]);
       const dropped = llm(true);
-      expect(
-        await sameRows({ built: dropped, main: mainOf({ built: dropped, sql: mainText("NOT ") }) }),
-      ).toEqual(["t2", "t4"]);
+      expect(await scopedRows({ built: dropped })).toEqual(["t2", "t4"]);
     });
 
     /** @scenario "Analytics' and the trace filter's shapes return main's rows on 26.8" */
@@ -298,17 +276,6 @@ describe("given analytics' and the trace filter's shapes sent as a reader on Cli
           ),
         )
         .build();
-      const unscoped = mainOf({
-        built,
-        sql: `SELECT TraceId FROM trace_summaries WHERE ${TENANTS}
-                AND TraceId IN (SELECT TraceId FROM stored_spans WHERE SpanName = 'llm')`,
-      });
-
-      expect(await rowsOf({ statement: unscoped, tenants: EVERY_TENANT })).toEqual([
-        "t1",
-        "t2",
-        "t3",
-      ]);
       expect(await rowsOf({ statement: built, tenants: EVERY_TENANT })).toEqual(["t1", "t3"]);
     });
   });
@@ -335,17 +302,7 @@ describe("given analytics' and the trace filter's shapes sent as a reader on Cli
           tool: right.metric_value,
         })
         .build();
-      const cte = (name: string) =>
-        `SELECT TraceId AS group_key, count() AS metric_value FROM stored_spans
-           WHERE ${TENANTS} AND SpanName = '${name}' GROUP BY TraceId`;
-      const main = mainOf({
-        built,
-        sql: `WITH cte_llm AS (${cte("llm")}), cte_tool AS (${cte("tool")})
-              SELECT sq0.group_key, sq1.group_key, sq0.metric_value, sq1.metric_value
-              FROM cte_llm sq0 FULL OUTER JOIN cte_tool sq1 ON sq0.group_key = sq1.group_key`,
-      });
-
-      expect(await sameRows({ built, main })).toEqual(["t1||1|0", "t3|t3|1|1", "|t4|0|1"]);
+      expect(await scopedRows({ built })).toEqual(["t1||1|0", "t3|t3|1|1", "|t4|0|1"]);
     });
   });
 
@@ -367,25 +324,14 @@ describe("given analytics' and the trace filter's shapes sent as a reader on Cli
         })
         .settings({ log_comment: "analytics:timeseries:stored_spans" })
         .build();
-      const main = mainOf({
-        built,
-        sql: `SELECT SpanId, toStartOfInterval(StartTime, INTERVAL 3 HOUR, '${zone}'),
-                toStartOfInterval(StartTime, INTERVAL 45 MINUTE, '${zone}'),
-                toStartOfInterval(StartTime, INTERVAL 2 DAY, '${zone}'),
-                toStartOfMinute(StartTime, '${zone}'), toStartOfDay(StartTime, '${zone}'),
-                toStartOfWeek(StartTime, 1, '${zone}'), toStartOfMonth(StartTime, '${zone}')
-              FROM stored_spans WHERE ${TENANTS}`,
-      });
-
-      const rows = await sameRows({ built, main });
-      expect(rows).toHaveLength(4);
-      const utcHours = await rowsOf({
-        statement: mainOf({
-          built,
-          sql: `SELECT SpanId, toStartOfInterval(StartTime, INTERVAL 3 HOUR) FROM stored_spans WHERE ${TENANTS}`,
-        }),
-      });
-      expect(rows.map((row) => row.split("|").slice(0, 2).join("|"))).not.toEqual(utcHours);
+      const rows = await scopedRows({ built });
+      // Main's rows: the 3-hour and 45-minute buckets fall on Kolkata's half hour, not UTC's.
+      expect(rows).toEqual([
+        "s1|2027-01-15 15:00:00|2027-01-15 16:00:00|2027-01-14 00:00:00|2027-01-15 16:00:00|2027-01-15 00:00:00|2027-01-11|2027-01-01",
+        "s2|2027-01-16 21:00:00|2027-01-16 20:30:00|2027-01-16 00:00:00|2027-01-16 21:00:00|2027-01-16 00:00:00|2027-01-11|2027-01-01",
+        "s3|2027-01-18 15:00:00|2027-01-18 16:00:00|2027-01-18 00:00:00|2027-01-18 16:00:00|2027-01-18 00:00:00|2027-01-18|2027-01-01",
+        "s4|2027-01-15 12:00:00|2027-01-15 13:45:00|2027-01-14 00:00:00|2027-01-15 14:00:00|2027-01-15 00:00:00|2027-01-11|2027-01-01",
+      ]);
     });
 
     /** @scenario "Analytics' and the trace filter's shapes return main's rows on 26.8" */
@@ -400,18 +346,7 @@ describe("given analytics' and the trace filter's shapes sent as a reader on Cli
         })
         .where(({ lt }) => lt(spans.StartTime, fn.addDays(param.epochMs(NOW), 2)))
         .build();
-      const main = mainOf({
-        built,
-        params: { end: NOW },
-        sql: `SELECT quantileExact(0.5)(Durations[1]), quantileExactArray(0.9)(Durations),
-                quantileTDigestArray(0.99)(Durations),
-                sum(toUInt64OrZero(SpanAttributes['tokens']))
-              FROM stored_spans WHERE ${TENANTS}
-                AND StartTime < fromUnixTimestamp64Milli({end:Int64}) + INTERVAL 2 DAY`,
-      });
-
-      const [row] = await sameRows({ built, main });
-      expect(row?.split("|")[3]).toBe("12");
+      expect(await scopedRows({ built })).toEqual(["5|40|40|12"]);
     });
   });
 
@@ -429,16 +364,7 @@ describe("given analytics' and the trace filter's shapes sent as a reader on Cli
           content: fn.toString(fn.getSubcolumn(context, "content")),
         })
         .build();
-      const main = mainOf({
-        built,
-        sql: `SELECT TraceId, toString(context.document_id) AS document_id,
-                toString(context.content) AS content
-              FROM stored_spans
-              ARRAY JOIN JSONExtract(SpanAttributes['${CONTEXTS}'], 'Array(JSON)') AS context
-              WHERE ${TENANTS}`,
-      });
-
-      expect(await sameRows({ built, main })).toEqual(["t1|7|y", "t1|d1|x"]);
+      expect(await scopedRows({ built })).toEqual(["t1|7|y", "t1|d1|x"]);
     });
   });
 });

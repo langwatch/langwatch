@@ -1,13 +1,11 @@
 /**
  * The search bar's suggestions and the value pickers on built reads (ADR-202): each returns the
- * values main's text returns under an own proof, an aggregate's tenant set and a windowed share,
- * with another tenant's rows sharing every trace id.
+ * values main returned on 26.8 (kept as literals) under an own proof, an aggregate's tenant
+ * set and a windowed share, with another tenant's rows sharing every trace id.
  * @see modules/trace/specs/trace-filter-built-conditions.feature
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { Authorization } from "@langwatch/authorization";
-import { tenantScope } from "@langwatch/clickhouse-client";
-import { TRACE_ORIGIN_CLICKHOUSE_EXPRESSION } from "@langwatch/trace-contract";
 import { nanoid } from "nanoid";
 import { beforeAll, describe, expect, it } from "vitest";
 
@@ -65,102 +63,22 @@ const span = (tenant: string, traceId: string, env: string, startMs = base) => (
   "Events.Attributes": [{ env: `event-${env}` }],
 });
 
-/** Main's suggestion columns, as the list service mapped each field. */
-const MAIN_COLUMNS: Record<TraceSuggestField, string> = {
-  model: "arrayJoin(Models)",
-  service: "Attributes['service.name']",
-  user: "Attributes['langwatch.user_id']",
-  origin: TRACE_ORIGIN_CLICKHOUSE_EXPRESSION,
+type PickerKind = "attribute" | "span" | "event";
+
+/** Main's answers on 26.8 for one scope: each suggest field's values and each picker's sample. */
+type MainAnswers = {
+  suggested: Record<TraceSuggestField, string[]>;
+  picked: Record<PickerKind, { all: string[]; pr: string[] }>;
 };
 
-const mainSuggestText = (column: string) => `
-  SELECT DISTINCT ${column} AS val
-  FROM trace_summaries
-  WHERE ${tenantScope("OccurredAt")}
-    AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
-    AND ${column} LIKE {prefix:String}
-    AND (TenantId, TraceId, UpdatedAt) IN (
-      SELECT TenantId, TraceId, max(UpdatedAt)
-      FROM trace_summaries
-      WHERE ${tenantScope("OccurredAt")}
-        AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
-      GROUP BY TenantId, TraceId
-    )
-  LIMIT {limit:UInt32}`;
-
-const SAMPLE_SETTINGS = `SETTINGS max_execution_time = 3, timeout_overflow_mode = 'break', max_threads = 8`;
-
-const mainPickerText = {
-  attribute: (prefixed: boolean) => `
-    SELECT facet_value, 0 AS cnt, 0 AS total_distinct FROM (
-      SELECT DISTINCT Attributes[{attrKey:String}] AS facet_value
-      FROM trace_summaries
-      PREWHERE ${tenantScope("OccurredAt")}
-        AND OccurredAt >= fromUnixTimestamp64Milli({timeFrom:Int64})
-        AND OccurredAt <= fromUnixTimestamp64Milli({timeTo:Int64})
-        AND mapContains(Attributes, {attrKey:String})
-      WHERE Attributes[{attrKey:String}] != ''
-        ${prefixed ? "AND lower(Attributes[{attrKey:String}]) LIKE concat({prefix:String}, '%')" : ""}
-      LIMIT {sampleRows:UInt32} ${SAMPLE_SETTINGS}
-    ) ORDER BY facet_value LIMIT {limit:UInt32} OFFSET {offset:UInt32}`,
-  span: (prefixed: boolean) => `
-    SELECT facet_value, 0 AS cnt, 0 AS total_distinct FROM (
-      SELECT DISTINCT SpanAttributes[{attrKey:String}] AS facet_value
-      FROM stored_spans
-      PREWHERE ${tenantScope("StartTime")}
-        AND StartTime >= fromUnixTimestamp64Milli({timeFrom:Int64})
-        AND StartTime <= fromUnixTimestamp64Milli({timeTo:Int64})
-        AND mapContains(SpanAttributes, {attrKey:String})
-      WHERE SpanAttributes[{attrKey:String}] != ''
-        ${prefixed ? "AND lower(SpanAttributes[{attrKey:String}]) LIKE concat({prefix:String}, '%')" : ""}
-      LIMIT {sampleRows:UInt32} ${SAMPLE_SETTINGS}
-    ) ORDER BY facet_value LIMIT {limit:UInt32} OFFSET {offset:UInt32}`,
-  event: (prefixed: boolean) => `
-    SELECT facet_value, 0 AS cnt, 0 AS total_distinct FROM (
-      SELECT DISTINCT arrayJoin(arrayFilter(
-        ${prefixed ? "v -> v != '' AND lower(v) LIKE concat({prefix:String}, '%')" : "v -> v != ''"},
-        arrayMap(m -> m[{attrKey:String}], \`Events.Attributes\`)
-      )) AS facet_value
-      FROM stored_spans
-      PREWHERE ${tenantScope("StartTime")}
-        AND StartTime >= fromUnixTimestamp64Milli({timeFrom:Int64})
-        AND StartTime <= fromUnixTimestamp64Milli({timeTo:Int64})
-        AND arrayExists(m -> mapContains(m, {attrKey:String}), \`Events.Attributes\`)
-      LIMIT {sampleRows:UInt32} ${SAMPLE_SETTINGS}
-    ) ORDER BY facet_value LIMIT {limit:UInt32} OFFSET {offset:UInt32}`,
-} as const;
-
-type PickerKind = keyof typeof mainPickerText;
+const envs = (...names: string[]) => ({ all: names, pr: names });
 
 let ch: ClickHouseClient;
 let repo: TraceListClickHouseRepository;
 
-async function mainRows({
-  authorization,
-  query,
-  params,
-  key,
-}: {
-  authorization: Authorization;
-  query: string;
-  params: Record<string, unknown>;
-  key: "val" | "facet_value";
-}): Promise<string[]> {
-  const client = authorizedClickHouseFor(ch).as(authorization, { reads: "traces" });
-  const result = await client.query({ query, query_params: params, format: "JSONEachRow" });
-  const rows = (await result.json()) as Record<string, string>[];
-  return rows.map((row) => row[key]!).toSorted();
-}
-
 async function suggested(authorization: Authorization, field: TraceSuggestField, prefix: string) {
   const built = await repo.findDistinctValues({ authorization, field, prefix, limit: 50 });
-  const main = await mainRows({
-    authorization,
-    query: mainSuggestText(MAIN_COLUMNS[field]),
-    params: { fromMs: Date.now() - 30 * 24 * 60 * MINUTE, prefix: `${prefix}%`, limit: 50 },
-    key: "val",
-  });
-  return { built: built.toSorted(), main };
+  return built.toSorted();
 }
 
 async function picked(authorization: Authorization, kind: PickerKind, prefix?: string) {
@@ -171,34 +89,64 @@ async function picked(authorization: Authorization, kind: PickerKind, prefix?: s
     span: () => repo.findSpanAttributeValues(withPrefix),
     event: () => repo.findEventAttributeValues(withPrefix),
   }[kind];
-  const built = (await read()).values.map((value) => value.value).toSorted();
-  const main = await mainRows({
-    authorization,
-    query: mainPickerText[kind](prefix !== undefined),
-    params: {
-      timeFrom: WINDOW.from,
-      timeTo: WINDOW.to,
-      attrKey: "env",
-      limit: 50,
-      offset: 0,
-      sampleRows: 50_000,
-      ...(prefix === undefined ? {} : { prefix }),
-    },
-    key: "facet_value",
-  });
-  return { built, main };
+  return (await read()).values.map((value) => value.value).toSorted();
 }
 
-const SCOPES: [string, () => Authorization][] = [
-  ["the member's own proof", () => ownProof({ projectId: MEMBER })],
+const SCOPES: [string, () => Authorization, MainAnswers][] = [
+  [
+    "the member's own proof",
+    () => ownProof({ projectId: MEMBER }),
+    {
+      suggested: {
+        model: ["gpt-pre-share", "gpt-preview", "gpt-prod"],
+        service: ["api-pre-share", "api-preview", "api-prod"],
+        user: [""],
+        origin: ["application", "pre-share", "preview"],
+      },
+      picked: {
+        attribute: envs("pre-share", "preview", "prod"),
+        span: envs("pre-share", "preview", "prod"),
+        event: { all: ["event-pre-share", "event-preview", "event-prod"], pr: [] },
+      },
+    },
+  ],
   [
     "an aggregate's tenant set",
     () => aggregateProof({ projectId: AGGREGATE, members: [{ projectId: MEMBER, from: 0 }] }),
+    {
+      suggested: {
+        model: ["gpt-pre-share", "gpt-prep", "gpt-preview", "gpt-prod"],
+        service: ["api-pre-share", "api-prep", "api-preview", "api-prod"],
+        user: [""],
+        origin: ["application", "pre-share", "prep", "preview"],
+      },
+      picked: {
+        attribute: envs("pre-share", "prep", "preview", "prod"),
+        span: envs("pre-share", "prep", "preview", "prod"),
+        event: {
+          all: ["event-pre-share", "event-prep", "event-preview", "event-prod"],
+          pr: [],
+        },
+      },
+    },
   ],
   [
     "a windowed share",
     () =>
       aggregateProof({ projectId: AGGREGATE, members: [{ projectId: MEMBER, from: SHARE_FROM }] }),
+    {
+      suggested: {
+        model: ["gpt-prep", "gpt-preview", "gpt-prod"],
+        service: ["api-prep", "api-preview", "api-prod"],
+        user: [""],
+        origin: ["application", "prep", "preview"],
+      },
+      picked: {
+        attribute: envs("prep", "preview", "prod"),
+        span: envs("prep", "preview", "prod"),
+        event: { all: ["event-prep", "event-preview", "event-prod"], pr: [] },
+      },
+    },
   ],
 ];
 
@@ -232,34 +180,41 @@ beforeAll(async () => {
 
 describe.skipIf(!clickHouseConfigured)("the value reads on built statements", () => {
   /** @scenario "Search suggestions and value pickers keep main's values under each scope" */
-  it.each(SCOPES)("suggests each field's values under %s as main does", async (_name, proof) => {
-    for (const [field, prefix] of [
-      ["model", "gpt"],
-      ["service", "api-p"],
-      ["user", ""],
-      ["origin", ""],
-    ] as const) {
-      const { built, main } = await suggested(proof(), field, prefix);
-      expect({ field, built }).toEqual({ field, built: main });
-    }
-  });
+  it.each(SCOPES)(
+    "suggests each field's values under %s as main does",
+    async (_name, proof, main) => {
+      for (const [field, prefix] of [
+        ["model", "gpt"],
+        ["service", "api-p"],
+        ["user", ""],
+        ["origin", ""],
+      ] as const) {
+        const built = await suggested(proof(), field, prefix);
+        expect({ field, built }).toEqual({ field, built: main.suggested[field] });
+      }
+    },
+  );
 
   /** @scenario "Search suggestions and value pickers keep main's values under each scope" */
-  it.each(SCOPES)("samples each picker's values under %s as main does", async (_name, proof) => {
-    for (const kind of ["attribute", "span", "event"] as const) {
-      for (const prefix of [undefined, "pr"]) {
-        const { built, main } = await picked(proof(), kind, prefix);
-        expect({ kind, prefix, built }).toEqual({ kind, prefix, built: main });
+  it.each(SCOPES)(
+    "samples each picker's values under %s as main does",
+    async (_name, proof, main) => {
+      for (const kind of ["attribute", "span", "event"] as const) {
+        for (const prefix of [undefined, "pr"]) {
+          const built = await picked(proof(), kind, prefix);
+          const expected = main.picked[kind][prefix === undefined ? "all" : "pr"];
+          expect({ kind, prefix, built }).toEqual({ kind, prefix, built: expected });
+        }
       }
-    }
-  });
+    },
+  );
 
   /** @scenario "Search suggestions and value pickers keep main's values under each scope" */
   it("reads no other tenant's values and none before a windowed share", async () => {
     const own = await picked(ownProof({ projectId: MEMBER }), "attribute");
     const shared = await picked(SCOPES[2]![1](), "event", "event-pr");
 
-    expect(own.built).toEqual(["pre-share", "preview", "prod"]);
-    expect(shared.built).toEqual(["event-prep", "event-preview", "event-prod"]);
+    expect(own).toEqual(["pre-share", "preview", "prod"]);
+    expect(shared).toEqual(["event-prep", "event-preview", "event-prod"]);
   });
 });

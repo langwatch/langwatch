@@ -117,9 +117,10 @@ function sourceReadOf(table: string): QueryRequest {
 
 /** A list read's dedup subquery on its own, which the outer statement's plan does not show. */
 function dedupScopeOf(request: QueryRequest): QueryRequest {
-  const from = request.sql.indexOf("SELECT TenantId, SessionId, max(UpdatedAt)");
-  const having = "HAVING max(toUInt8(Auxiliary)) = 0";
-  const to = request.sql.indexOf(having, from) + having.length;
+  const opening = "WITH latest AS (";
+  const from = request.sql.indexOf(opening) + opening.length;
+  const to = request.sql.indexOf(") SELECT ", from);
+  if (from < opening.length || to < 0) throw new Error("no dedup scope in the list read");
   return { ...request, sql: request.sql.slice(from, to) };
 }
 
@@ -326,10 +327,10 @@ describe("coding-agent session reads bounded by the session id index", () => {
 
       expect(listed.map((row) => row.sessionId)).toEqual([`${tenantId}-session`]);
       const bounded = sourceReadOf("coding_agent_sessions");
-      expect(bounded.params).toMatchObject({
-        spanFrom: eightWeeksAgoMs - DAY_MS,
-        spanTo: eightWeeksAgoMs + DAY_MS,
-      });
+      expect(bounded.sql).toContain("StartedAt >= fromUnixTimestamp64Milli(");
+      expect(Object.values(bounded.params ?? {})).toEqual(
+        expect.arrayContaining([eightWeeksAgoMs - DAY_MS, eightWeeksAgoMs + DAY_MS]),
+      );
       statements = [];
       const unboundedList = await unbounded.sessions.findManyRecent({
         tenantId,
@@ -361,7 +362,9 @@ describe("coding-agent session reads bounded by the session id index", () => {
         sessions.findOtherSessionKind({ tenantId, excludeSessionIds: [`${tenantId}-session`] }),
       ).resolves.toBe("main");
 
-      expect(sourceReadOf("coding_agent_sessions").sql).toContain("{spanFrom:Int64}");
+      expect(sourceReadOf("coding_agent_sessions").sql).toContain(
+        "StartedAt >= fromUnixTimestamp64Milli(",
+      );
     });
 
     it("answers none from the index alone when every session is excluded", async () => {

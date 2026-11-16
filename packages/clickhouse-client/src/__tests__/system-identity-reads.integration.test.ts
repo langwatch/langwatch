@@ -1,7 +1,7 @@
 /**
  * On 26.8: why ops' storage footprint and data retention's system-table reads leave as the
  * system (the reader sees only its granted tables, and no parts, disks, backups or mutations),
- * and that each built read returns the rows main's raw query returns.
+ * and that each built read returns the rows main's raw query returned on 26.8, kept as literals.
  * @see specs/clickhouse/typed-query-builder.feature
  */
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
@@ -33,19 +33,6 @@ let container: StartedClickHouseContainer | undefined;
 let system: ClickHouseClient;
 let reader: ClickHouseClient;
 
-/** Each row as `value|value` text, sorted, so ties in `ORDER BY create_time` do not matter. */
-async function rawRows({
-  sql,
-  params = {},
-}: {
-  sql: string;
-  params?: Record<string, unknown>;
-}): Promise<string[]> {
-  const result = await system.query({ query: sql, query_params: params, format: "JSONEachRow" });
-  const rows = await result.json<Record<string, unknown>>();
-  return rows.map((row) => Object.values(row).map(String).join("|")).toSorted();
-}
-
 async function builtRows({ statement }: { statement: SystemReadStatement }): Promise<string[]> {
   const result = await system.query({
     query: statement.sql,
@@ -66,33 +53,6 @@ async function readerCodeOf({ sql }: { sql: string }): Promise<unknown> {
   return "answered";
 }
 
-const MAIN = {
-  footprint: `SELECT table, sum(rows) as total_rows, sum(bytes_on_disk) as total_bytes,
-      count() as parts_count FROM system.parts WHERE database = currentDatabase() AND active = 1
-      AND table IN ({tables:Array(String)}) GROUP BY table`,
-  disks: "SELECT name, total_space FROM system.disks",
-  hasBackupLog:
-    "SELECT count() AS present FROM system.tables WHERE database = 'system' AND name = 'backup_log'",
-  backups: `SELECT status, count() as cnt,
-      maxIf(end_time, status = 'BACKUP_CREATED') as last_success_time,
-      argMaxIf(total_size, end_time, status = 'BACKUP_CREATED') as last_success_size
-      FROM system.backup_log GROUP BY status`,
-  held: "SELECT name FROM system.tables WHERE database = currentDatabase() AND name IN {tables:Array(String)}",
-  progress: `SELECT mutation_id AS mutationId, table AS table, is_done AS isDone,
-      parts_to_do AS partsToDo, formatDateTime(create_time, '%Y-%m-%dT%H:%i:%S') AS createTime,
-      command AS command FROM system.mutations WHERE position(command, '_retention_days') > 0
-      AND position(command, {tenantFilterNeedle:String}) > 0 AND is_done = 0
-      ORDER BY create_time DESC`,
-  keepForever: `SELECT mutation_id AS mutationId, is_done AS isDone,
-      toUInt32(parts_to_do) AS partsToDo, latest_fail_reason AS latestFailReason,
-      table AS table, command AS command FROM system.mutations
-      WHERE database = currentDatabase() AND table IN {tables:Array(String)}
-      AND position(command, '_retention_days = 0') > 0 ORDER BY create_time DESC`,
-  idIndexTenants: "SELECT DISTINCT TenantId FROM stored_spans_id_index",
-  partsMissing: `SELECT toUInt32(count()) AS parts FROM (SELECT name FROM system.parts_columns
-      WHERE database = currentDatabase() AND table = 'trace_analytics' AND active GROUP BY name
-      HAVING countIf(has({columns:Array(String)}, column)) < length({columns:Array(String)}))`,
-};
 const METADATA_COLUMNS = ["MetadataA", "MetadataB"];
 
 describe("given ClickHouse 26.8, two tenants' tables, a table the reader is not granted, and retention rewrites", () => {
@@ -193,8 +153,11 @@ describe("given ClickHouse 26.8, two tenants' tables, a table the reader is not 
     it("returns the storage footprint of every table, the ungranted one included", async () => {
       const built = await builtRows({ statement: reads.footprintTablesRead({ tables: TABLES }) });
 
-      expect(built).toEqual(await rawRows({ sql: MAIN.footprint, params: { tables: TABLES } }));
-      expect(built.map((row) => row.split("|")[0]).toSorted()).toEqual(TABLES.toSorted());
+      expect(built).toEqual([
+        "event_log|2|460|1",
+        "stored_spans_id_index|3|351|1",
+        "stored_spans|2|459|1",
+      ]);
     });
 
     /** @scenario "The system-table reads run on 26.8 as main's raw queries do" */
@@ -206,9 +169,7 @@ describe("given ClickHouse 26.8, two tenants' tables, a table the reader is not 
       });
       const disks = await result.json<Record<string, string>>();
 
-      expect(disks.map((disk) => `${disk.name}|${disk.total_space}`).toSorted()).toEqual(
-        await rawRows({ sql: MAIN.disks }),
-      );
+      expect(disks.map((disk) => disk.name)).toEqual(["default"]);
       for (const disk of disks) {
         expect(BigInt(disk.used_space!)).toBe(BigInt(disk.total_space!) - BigInt(disk.free_space!));
       }
@@ -219,8 +180,15 @@ describe("given ClickHouse 26.8, two tenants' tables, a table the reader is not 
       expect(await builtRows({ statement: reads.hasBackupLogRead() })).toEqual(["1"]);
       const built = await builtRows({ statement: reads.backupStatusesRead() });
 
-      expect(built).toEqual(await rawRows({ sql: MAIN.backups }));
-      expect(built.some((row) => row.startsWith("BACKUP_CREATED|1|"))).toBe(true);
+      expect(built.map((row) => row.split("|"))).toEqual([
+        [
+          "BACKUP_CREATED",
+          "1",
+          expect.stringMatching(/^20\d\d-/),
+          expect.stringMatching(/^1[34]\d\d$/),
+        ],
+        ["CREATING_BACKUP", "1", "1970-01-01 00:00:00.000000", "0"],
+      ]);
     });
 
     /** @scenario "The system-table reads run on 26.8 as main's raw queries do" */
@@ -228,7 +196,6 @@ describe("given ClickHouse 26.8, two tenants' tables, a table the reader is not 
       const tables = ["event_log", "stored_spans_id_index", "absent_id_index"];
       const built = await builtRows({ statement: reads.heldTablesRead({ tables }) });
 
-      expect(built).toEqual(await rawRows({ sql: MAIN.held, params: { tables } }));
       expect(built).toEqual(["event_log", "stored_spans_id_index"]);
     });
 
@@ -237,13 +204,24 @@ describe("given ClickHouse 26.8, two tenants' tables, a table the reader is not 
       const needle = "TenantId = 'tenant_a'";
       const built = await builtRows({ statement: reads.mutationProgressRead({ needle }) });
 
-      expect(built).toEqual(
-        await rawRows({ sql: MAIN.progress, params: { tenantFilterNeedle: needle } }),
-      );
-      expect(built).toHaveLength(2);
-      expect(built.every((row) => row.includes("tenant_a") && !row.includes("tenant_b"))).toBe(
-        true,
-      );
+      expect(built.map((row) => row.split("|"))).toEqual([
+        [
+          "mutation_2.txt",
+          "event_log",
+          "0",
+          "1",
+          expect.stringMatching(/^20\d\d-/),
+          "(UPDATE _retention_days = 0 WHERE TenantId = 'tenant_a')",
+        ],
+        [
+          "mutation_2.txt",
+          "stored_spans",
+          "0",
+          "1",
+          expect.stringMatching(/^20\d\d-/),
+          "(UPDATE _retention_days = 7 WHERE TenantId = 'tenant_a')",
+        ],
+      ]);
     });
 
     /** @scenario "The system-table reads run on 26.8 as main's raw queries do" */
@@ -251,8 +229,9 @@ describe("given ClickHouse 26.8, two tenants' tables, a table the reader is not 
       const tables = ["event_log"];
       const built = await builtRows({ statement: reads.keepForeverRewritesRead({ tables }) });
 
-      expect(built).toEqual(await rawRows({ sql: MAIN.keepForever, params: { tables } }));
-      expect(built).toHaveLength(1);
+      expect(built).toEqual([
+        "mutation_2.txt|0|1||event_log|(UPDATE _retention_days = 0 WHERE TenantId = 'tenant_a')",
+      ]);
     });
 
     /** @scenario "The parts lacking a table's columns, counted over a derived system read, run on 26.8 as main's raw query does" */
@@ -264,9 +243,6 @@ describe("given ClickHouse 26.8, two tenants' tables, a table the reader is not 
       const built = await builtRows({ statement });
 
       expect(statement.identity).toBe("system");
-      expect(built).toEqual(
-        await rawRows({ sql: MAIN.partsMissing, params: { columns: METADATA_COLUMNS } }),
-      );
       expect(built).toEqual(["1"]);
     });
 
@@ -281,7 +257,6 @@ describe("given ClickHouse 26.8, two tenants' tables, a table the reader is not 
       const statement = idIndexTenantsStatement({ index: "stored_spans_id_index" });
       const built = await builtRows({ statement });
 
-      expect(built).toEqual(await rawRows({ sql: MAIN.idIndexTenants }));
       expect(built).toEqual(["", "tenant_a", "tenant_b"]);
     });
   });

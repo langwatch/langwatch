@@ -1,7 +1,6 @@
 /**
  * Ops' storage footprint and data retention's system-table reads, built as their ports will write
- * them (handoff rp-b9-builder-system-tables, section 12). The unit and 26.8 suites share them; the
- * 26.8 suite holds main's raw text beside each.
+ * them. The unit and 26.8 suites share them; the 26.8 suite asserts main's rows as literals.
  */
 import { column, cond, param } from "../../builder/expression.ts";
 import { fn } from "../../builder/functions.ts";

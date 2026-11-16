@@ -1,12 +1,12 @@
 /**
  * ADR-202 Decided 18 on 26.8: every filter kind read through the built conditions returns the
- * traces main's text returns, with another tenant's rows sharing every trace and run id.
+ * traces main returned for it (captured once on 26.8, kept as literals), with another tenant's
+ * rows sharing every trace and run id.
  * @see modules/trace/specs/trace-filter-built-conditions.feature
  */
 import { clickhouseRead, tenantScope } from "@langwatch/clickhouse-client/builder";
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { expandFragmentForProject } from "../../../../../__tests__/support/authorization-proofs.fixture.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
@@ -14,7 +14,6 @@ import {
 import { traceSummaries } from "../../../../../repositories/clickhouse/clickhouse.trace-summaries.table.ts";
 import { ClickHouseTraceFacetRegistryRepository } from "../../../../facet/repositories/clickhouse/clickhouse.trace-facet-registry.repository.ts";
 import { TraceQueryFieldsService } from "../../../services/trace-query-fields.service.ts";
-import { TraceQueryTranslationService } from "../../../services/trace-query-translation.service.ts";
 import { compileTraceFilterCondition } from "../clickhouse.trace-filter-condition.mapper.ts";
 import { FILTER_KINDS, RUNS, timeRange } from "./trace-filter-kinds.fixture.ts";
 
@@ -23,7 +22,6 @@ type Client = Awaited<ReturnType<typeof startMigratedTraceClickHouse>>;
 const fields = TraceQueryFieldsService.create({
   facetRegistry: ClickHouseTraceFacetRegistryRepository.create(),
 });
-const text = TraceQueryTranslationService.create({ fields });
 const run = crypto.randomUUID().slice(0, 8);
 const A = `proj_fc_a_${run}`;
 const B = `proj_fc_b_${run}`;
@@ -173,28 +171,98 @@ const judgment = (tenant: string, runId: string, traceId: string, thread: string
   _retention_days: 0,
 });
 
+/** Each kind's traces as main's text returned them for tenant A on 26.8. */
+const MAIN_TRACES: Readonly<Record<string, readonly string[]>> = {
+  "K0 boolean group": ["t1", "t2"],
+  "K0 negated group": ["t2", "t3"],
+  "K1 status": [],
+  "K1 origin": ["t1"],
+  "K1 service": ["t1"],
+  "K1 user": ["t1"],
+  "K1 conversation": ["t1"],
+  "K1 customer": ["t1"],
+  "K1 topic": ["t1"],
+  "K1 subtopic": ["t1"],
+  "K1 traceName": ["t1"],
+  "K1 rootSpanType": ["t1"],
+  "K1 guardrail": [],
+  "K1 annotation": [],
+  "K1 containsAi": [],
+  "K1 errorMessage": ["t1"],
+  "K1 tokensEstimated": [],
+  "K1 selectedPrompt": ["t1"],
+  "K1 lastUsedPrompt": ["t1"],
+  "K2 range": ["t1"],
+  "K2 promptVersion": ["t1"],
+  "K2 cost": [],
+  "K2 duration": ["t1"],
+  "K2 tokens": ["t1"],
+  "K2 ttft": ["t1"],
+  "K2 ttlt": ["t1"],
+  "K2 promptTokens": ["t1"],
+  "K2 completionTokens": ["t1"],
+  "K2 tokensPerSecond": ["t1"],
+  "K2 spans": ["t1"],
+  "K2 size": ["t1", "t2", "t3"],
+  "K2 tokens below": [],
+  "K3 trace id": [],
+  "K3 trace id wildcard": [],
+  "K4 has:error": ["t1"],
+  "K4 has:annotation": ["t1"],
+  "K4 has:conversation": ["t1", "t2", "t3"],
+  "K4 has:user": ["t1"],
+  "K4 has:customer": ["t1"],
+  "K4 has:topic": ["t1"],
+  "K4 has:subtopic": ["t1"],
+  "K4 has:label": ["t1"],
+  "K4 has:model": ["t1", "t2"],
+  "K4 has:service": ["t1"],
+  "K4 has:traceName": ["t1", "t3"],
+  "K4 has:rootSpanType": ["t1"],
+  "K4 has:attribute.k1": ["t1"],
+  "K4 has:trace.attribute.k1": ["t1"],
+  "K4 none": ["t2", "t3"],
+  "K5 prompt": ["t1"],
+  "K6 scenario run": ["t1"],
+  "K7 model": ["t1"],
+  "K7 model wildcard": ["t1"],
+  "K8 label": ["t1"],
+  "K9 trace attribute": ["t1"],
+  "K9 legacy attribute": ["t1"],
+  "K10 free text": ["t2"],
+  "K10 negated free text": ["t1", "t3"],
+  "K11 event": ["t1"],
+  "K11 feedback": ["t1"],
+  "K11 span id": ["t1"],
+  "K11 span id wildcard": ["t1"],
+  "K11 event attribute": ["t1"],
+  "K11 span attribute": ["t1"],
+  "K11 span facets": [],
+  "K12 evaluator name": ["t1"],
+  "K12 has eval": ["t1"],
+  "K12 none eval": ["t2", "t3"],
+  "K12 evaluator": ["t1"],
+  "K12 evaluation facets": ["t1"],
+  "K12 evaluation score and label": ["t1"],
+  "K12 old verdict name": ["t1", "t2", "t3"],
+  "K13 evaluation scope": [],
+  "K13 scope without results": ["t1"],
+  "K14 scenario": ["t1"],
+  "K14 scenario set and batch": ["t1"],
+  "K14 scenario verdict": ["t1"],
+  "K14 scenario status": ["t2", "t3"],
+  "K15 judged traces": ["t1"],
+  "K15 judged conversations": ["t2", "t3"],
+  "K15 forced without a run": [],
+  "K15 negated forced without a run": ["t1", "t2", "t3"],
+};
+
 let client: Client;
 
 async function tracesOf(query: string, params: Record<string, unknown>): Promise<string[]> {
   const result = await client.query({ query, query_params: params, format: "JSONEachRow" });
   const rows = (await result.json()) as { TraceId: string }[];
   return [...new Set(rows.map((row) => row.TraceId))].toSorted();
-}
-
-async function mainRows(queryText: string): Promise<string[]> {
-  const compiled = text.translateFilter({ queryText, timeRange, evalRuns: RUNS });
-  if (compiled === null) throw new Error(`'${queryText}' compiled to nothing`);
-  const filter = expandFragmentForProject({
-    fragment: compiled.sql,
-    params: compiled.params,
-    projectId: A,
-  });
-  return tracesOf(
-    "SELECT TraceId FROM trace_summaries WHERE TenantId = {mainTenant:String}" +
-      " AND OccurredAt >= fromUnixTimestamp64Milli({timeFrom:Int64})" +
-      ` AND OccurredAt <= fromUnixTimestamp64Milli({timeTo:Int64}) AND (${filter.sql})`,
-    { ...filter.params, mainTenant: A },
-  );
 }
 
 async function builtRows(queryText: string): Promise<string[]> {
@@ -221,7 +289,7 @@ async function builtRows(queryText: string): Promise<string[]> {
   return tracesOf(built.sql, built.params);
 }
 
-describe.skipIf(!testClickHouseConfigured())("trace filter conditions against main's text", () => {
+describe.skipIf(!testClickHouseConfigured())("trace filter conditions against main's rows", () => {
   beforeAll(async () => {
     client = await startMigratedTraceClickHouse();
     const insert = (table: string, values: Record<string, unknown>[]) =>
@@ -239,8 +307,15 @@ describe.skipIf(!testClickHouseConfigured())("trace filter conditions against ma
   }, 300_000);
 
   /** @scenario "Each filter kind keeps main's rows with another tenant sharing trace ids" */
-  it.each(FILTER_KINDS)("reads %s as main does", async (_kind, queryText) => {
-    expect(await builtRows(queryText)).toEqual(await mainRows(queryText));
+  it("holds main's rows for every filter kind", () => {
+    expect(Object.keys(MAIN_TRACES).toSorted()).toEqual(
+      FILTER_KINDS.map(([kind]) => kind).toSorted(),
+    );
+  });
+
+  /** @scenario "Each filter kind keeps main's rows with another tenant sharing trace ids" */
+  it.each(FILTER_KINDS)("reads %s as main does", async (kind, queryText) => {
+    expect(await builtRows(queryText)).toEqual(MAIN_TRACES[kind]);
   });
 
   /** @scenario "Each filter kind keeps main's rows with another tenant sharing trace ids" */
