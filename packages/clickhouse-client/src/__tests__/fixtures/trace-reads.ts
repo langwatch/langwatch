@@ -1,7 +1,6 @@
 /**
- * Trace's remaining raw reads, built as their ports will write them (handoff
- * rp-b10-builder-trace-gaps, section 12). The unit and 26.8 suites share them; the 26.8 suite
- * holds main's raw text beside each.
+ * Trace's session, instant-eval, evaluation-run and braid reads, built with the typed builder.
+ * The builder unit suite and the 26.8 row suite (trace-reads.integration.test.ts) share them.
  */
 import type { CompiledWhere } from "@langwatch/authorization";
 

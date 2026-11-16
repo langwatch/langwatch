@@ -19,7 +19,7 @@ import {
   sessionPageRead,
   spans,
   summaries,
-} from "../../__tests__/fixtures/trace-gap-reads.ts";
+} from "../../__tests__/fixtures/trace-reads.ts";
 import { TENANT_IDS_SETTING } from "../../identity/tenantSetting.ts";
 import { braidCondition } from "../braid-condition.ts";
 import { column, param } from "../expression.ts";

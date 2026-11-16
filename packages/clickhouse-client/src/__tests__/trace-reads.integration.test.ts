@@ -1,9 +1,9 @@
 /** @vitest-environment node */
 
 /**
- * Trace's remaining reads (fixtures/trace-gap-reads.ts) on a throwaway ClickHouse 26.8, sent as a
- * reader whose row policy reads the tenant setting: each returns the rows main's raw text returns,
- * with unmerged versions present, and another tenant's rows never appear.
+ * Trace's built reads (fixtures/trace-reads.ts) on a throwaway ClickHouse 26.8, sent as a reader
+ * whose row policy reads the tenant setting: each returns the literal rows main's raw reads
+ * returned, with unmerged versions present, and another tenant's rows never appear.
  * @see specs/clickhouse/typed-query-builder.feature
  */
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
@@ -11,7 +11,6 @@ import type { CompiledWhere } from "@langwatch/authorization";
 import { ClickHouseContainer, type StartedClickHouseContainer } from "@testcontainers/clickhouse";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { braidConditionExpression } from "../authorized-reads.ts";
 import { type ReaderScope, tenantScope } from "../builder/scope.ts";
 import {
   TEST_CLICKHOUSE_IMAGE,
@@ -29,12 +28,12 @@ import {
   sessionCountRead,
   sessionMembersRead,
   sessionPageRead,
-} from "./fixtures/trace-gap-reads.ts";
+} from "./fixtures/trace-reads.ts";
 
-const DATABASE = `trace_gaps_${process.pid}`;
-const BARE = `trace_gaps_bare_${process.pid}`;
-const READER = `trace_gaps_reader_${process.pid}`;
-const READER_PASSWORD = "trace-gaps-reader-test-login";
+const DATABASE = `trace_reads_${process.pid}`;
+const BARE = `trace_reads_bare_${process.pid}`;
+const READER = `trace_reads_reader_${process.pid}`;
+const READER_PASSWORD = "trace-reads-reader-test-login";
 const A = "proj_a";
 const B = "proj_b";
 const C = "proj_c";
@@ -43,7 +42,6 @@ const DAY = 86_400_000;
 const POLICY =
   "has(arrayFilter(tenant -> notEmpty(tenant), " +
   `splitByChar(',', getSetting('${TENANT_IDS_SETTING}'))), TenantId)`;
-const CONVERSATION = "Attributes['gen_ai.conversation.id']";
 
 const at = (ms: number) => new Date(ms).toISOString().replace("T", " ").replace("Z", "");
 
@@ -172,7 +170,6 @@ const braidOf = (fromAgo: number) => ({
   fromMs: NOW - fromAgo,
   untilMs: NOW,
 });
-const millis = (param: string) => `fromUnixTimestamp64Milli({${param}:Int64})`;
 
 let container: StartedClickHouseContainer | undefined;
 let admin: ClickHouseClient;
@@ -187,18 +184,16 @@ type Sendable = {
 /** The rows a statement returns as the reader, as `value|value` text, sorted unless ordered. */
 async function rowsOf({
   statement,
-  params = statement.params,
   database = DATABASE,
   ordered = false,
 }: {
   statement: Sendable;
-  params?: Readonly<Record<string, unknown>>;
   database?: string;
   ordered?: boolean;
 }): Promise<string[]> {
   const result = await readers[database]!.query({
     query: statement.sql,
-    query_params: { ...params },
+    query_params: { ...statement.params },
     clickhouse_settings: statement.settings as Record<string, string | number>,
     format: "JSONEachRow",
   });
@@ -208,26 +203,14 @@ async function rowsOf({
   return ordered ? rows : rows.toSorted();
 }
 
-/** Main's text sent with the built statement's settings, so the same row policy applies. */
-const mainOf = ({ built, sql }: { built: Sendable; sql: string }): Sendable => ({
-  sql,
-  params: {},
-  settings: built.settings,
-});
-
-const dedupOf = (where: string) =>
-  `(TenantId, TraceId, UpdatedAt) IN (SELECT TenantId, TraceId, max(UpdatedAt) FROM trace_summaries
-     WHERE ${where} GROUP BY TenantId, TraceId)`;
-const TENANTS = "TenantId IN {tenants:Array(String)}";
-
 const set: ReaderScope = tenantScope.set({ tenantIds: [A, B] });
 const single: ReaderScope = tenantScope.single({ tenantId: A });
 
-describe("given trace's remaining reads sent as a reader under a row policy on ClickHouse 26.8", () => {
+describe("given trace's built reads sent as a reader under a row policy on ClickHouse 26.8", () => {
   beforeAll(async () => {
     const pins = testClickHouseProfilePins();
     container = await new ClickHouseContainer(TEST_CLICKHOUSE_IMAGE)
-      .withName(`rp-b10-${process.pid}-ch`)
+      .withName(`trace-reads-${process.pid}-ch`)
       .withResourcesQuota({ memory: 3 })
       .withEnvironment({ CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1" })
       .withCopyContentToContainer([TEST_CLICKHOUSE_TUNING, pins.file])
@@ -324,141 +307,58 @@ describe("given trace's remaining reads sent as a reader under a row policy on C
 
   describe("when session-groups' count is built with a two-argument uniqExact", () => {
     /** @scenario "Trace's remaining reads return main's rows on 26.8" */
-    it("returns main's count, on latest versions and tenants A and B only", async () => {
-      const built = sessionCountRead({ scope: set });
-      const main = await rowsOf({
-        statement: mainOf({
-          built,
-          sql: `SELECT uniqExact(TenantId, ${CONVERSATION}) AS totalHits FROM trace_summaries
-            WHERE ${TENANTS} AND ${CONVERSATION} != '' AND ${dedupOf(TENANTS)}`,
-        }),
-        params: { tenants: [A, B] },
-      });
-
+    it("counts sessions of latest versions, tenants A and B only", async () => {
       // A: c2, c1, c3, c5; B: c1, c6.
-      expect(main).toEqual(["6"]);
-      expect(await rowsOf({ statement: built })).toEqual(main);
+      expect(await rowsOf({ statement: sessionCountRead({ scope: set }) })).toEqual(["6"]);
     });
   });
 
   describe("when session-groups' page is built with a keyset over aggregates in HAVING", () => {
-    const mainPage = (having: string) => `
-      SELECT TenantId, ${CONVERSATION} AS ConversationId, count() AS TraceCount,
-        sum(TotalCost) AS SessionCost
-      FROM trace_summaries
-      WHERE ${TENANTS} AND ${CONVERSATION} != '' AND ${dedupOf(TENANTS)}
-      GROUP BY TenantId, ConversationId
-      ${having}
-      ORDER BY sum(TotalCost) DESC, ConversationId ASC, TenantId ASC
-      LIMIT 2`;
-    const HAVING = `HAVING (sum(TotalCost) < {cursorSortValue:Float64} OR (sum(TotalCost) =
-      {cursorSortValue:Float64} AND (ConversationId, TenantId) > ({cursorConversationId:String},
-      {cursorTenantId:String})))`;
-
     /** @scenario "Trace's remaining reads return main's rows on 26.8" */
-    it("returns main's pages in main's order, the second after a tie on the sort value", async () => {
+    it("returns pages by cost, the second after a tie on the sort value", async () => {
       const first = sessionPageRead({ scope: set, cursor: undefined, limit: 2 });
-      const mainFirst = await rowsOf({
-        statement: mainOf({ built: first, sql: mainPage("") }),
-        params: { tenants: [A, B] },
-        ordered: true,
-      });
-      expect(mainFirst).toEqual(["proj_b|c1|1|5", "proj_a|c2|1|3"]);
-      expect(await rowsOf({ statement: first, ordered: true })).toEqual(mainFirst);
+      expect(await rowsOf({ statement: first, ordered: true })).toEqual([
+        "proj_b|c1|1|5",
+        "proj_a|c2|1|3",
+      ]);
 
       const cursor = { sortValue: 2, conversationId: "c1", tenantId: A };
       const second = sessionPageRead({ scope: set, cursor, limit: 2 });
-      const mainSecond = await rowsOf({
-        statement: mainOf({ built: second, sql: mainPage(HAVING) }),
-        params: {
-          tenants: [A, B],
-          cursorSortValue: 2,
-          cursorConversationId: "c1",
-          cursorTenantId: A,
-        },
-        ordered: true,
-      });
-      expect(mainSecond).toEqual(["proj_a|c3|1|2", "proj_b|c6|1|2"]);
-      expect(await rowsOf({ statement: second, ordered: true })).toEqual(mainSecond);
+      expect(await rowsOf({ statement: second, ordered: true })).toEqual([
+        "proj_a|c3|1|2",
+        "proj_b|c6|1|2",
+      ]);
     });
   });
 
   describe("when session-groups' membership is built as a tuple looked up in two CTEs", () => {
     /** @scenario "Trace's remaining reads return main's rows on 26.8" */
-    it("returns main's traces of the IN (… UNION DISTINCT …) read", async () => {
+    it("returns the traces of sessions matching either the cost or the log term", async () => {
       const built = sessionMembersRead({ scope: set, minCost: 3, term: "hello" });
-      const main = await rowsOf({
-        statement: mainOf({
-          built,
-          sql: `SELECT TraceId FROM trace_summaries
-            WHERE ${TENANTS} AND ${CONVERSATION} != '' AND ${dedupOf(TENANTS)}
-              AND (TenantId, ${CONVERSATION}) IN (
-                SELECT DISTINCT TenantId, ${CONVERSATION} AS SessionId FROM trace_summaries
-                WHERE ${TENANTS} AND ${CONVERSATION} != '' AND ${dedupOf(TENANTS)}
-                  AND (TotalCost >= {minCost:Float64})
-                UNION DISTINCT
-                SELECT DISTINCT TenantId, ProviderSessionId AS SessionId FROM log_records
-                WHERE ${TENANTS} AND ProviderSessionId != ''
-                  AND (positionCaseInsensitive(ifNull(BodyText, ''), {term:String}) > 0))`,
-        }),
-        params: { tenants: [A, B], minCost: 3, term: "hello" },
-      });
 
       // A: t1 (c2, cost 3), t5 (c5's log); B: t1 (c1, cost 5), t6 (c6's log). Never C's t7.
-      expect(main).toEqual(["t1", "t1", "t5", "t6"]);
-      expect(await rowsOf({ statement: built })).toEqual(main);
+      expect(await rowsOf({ statement: built })).toEqual(["t1", "t1", "t5", "t6"]);
     });
   });
 
   describe("when instant-eval's run dating elects on a tuple version with LIMIT 1 BY", () => {
     /** @scenario "Trace's remaining reads return main's rows on 26.8" */
-    it("returns main's one row per run, the tie broken as main's tuple breaks it", async () => {
+    it("returns one row per run, a WrittenAt tie broken by AcceptedAt then LastEventId", async () => {
       const built = instantEvalRunsRead({ scope: single, runIds: ["r1", "r2", "r1"] });
-      const main = await rowsOf({
-        statement: mainOf({
-          built,
-          sql: `SELECT t.RunId AS RunId, toUnixTimestamp64Milli(t.CreatedAt) AS CreatedAt,
-              toUnixTimestamp64Milli(t.FinishedAt) AS FinishedAt
-            FROM instant_eval_runs AS t
-            WHERE t.TenantId = {tenantId:String} AND t.RunId IN ({runIds:Array(String)})
-              AND (t.TenantId, t.RunId, (t.WrittenAt, ifNull(t.AcceptedAt, toDateTime64(0, 3)), t.LastEventId)) IN (
-                SELECT TenantId, RunId, max((WrittenAt, ifNull(AcceptedAt, toDateTime64(0, 3)), LastEventId))
-                FROM instant_eval_runs
-                WHERE TenantId = {tenantId:String} AND RunId IN ({runIds:Array(String)})
-                GROUP BY TenantId, RunId)
-            LIMIT 1 BY t.RunId`,
-        }),
-        params: { tenantId: A, runIds: ["r1", "r2"] },
-      });
 
-      expect(main).toEqual([`r1|${NOW - 20}|null`, `r2|${NOW - 40}|null`]);
-      expect(await rowsOf({ statement: built })).toEqual(main);
+      expect(await rowsOf({ statement: built })).toEqual([
+        `r1|${NOW - 20}|null`,
+        `r2|${NOW - 40}|null`,
+      ]);
     });
   });
 
   describe("when evaluation-runs' attempts are read from targets with and without the columns", () => {
-    const mainRuns = (attempts: string) => `
-      SELECT EvaluationId, ${attempts}, toUnixTimestamp64Milli(LastAttemptAt) AS LastAttemptAtMs
-      FROM evaluation_runs AS r
-      WHERE r.TenantId = {tenantId:String}
-        AND r.ScheduledAt >= now() - INTERVAL 7 DAY
-        AND r.TraceId = {traceId:String}
-        AND (r.TenantId, r.EvaluationId, r.UpdatedAt) IN (
-          SELECT TenantId, EvaluationId, max(UpdatedAt) FROM evaluation_runs
-          WHERE TenantId = {tenantId:String} AND ScheduledAt >= now() - INTERVAL 7 DAY
-            AND TraceId = {traceId:String}
-          GROUP BY TenantId, EvaluationId)
-      ORDER BY r.UpdatedAt DESC`;
-    const ATTEMPTS = {
-      Attempts: "toUInt16(0)",
-      LastAttemptAt: "CAST(NULL AS Nullable(DateTime64(3)))",
-    } as const;
-
     /** @scenario "Trace's remaining reads return main's rows on 26.8" */
-    it("returns main's rows from each target, absent columns as their defaults", async () => {
+    it("returns each target's rows, absent columns as their defaults", async () => {
       const expected: Record<string, string[]> = {
-        [DATABASE]: [`ev1|2|${at(NOW - 100)}|${NOW - 100}`, "ev2|0|null|null"],
-        [BARE]: ["ev1|0|null|null", "ev2|0|null|null"],
+        [DATABASE]: [`ev1|2|${NOW - 100}`, "ev2|0|null"],
+        [BARE]: ["ev1|0|null", "ev2|0|null"],
       };
       for (const database of [DATABASE, BARE]) {
         const columns = ClickHouseColumns.over({
@@ -472,23 +372,9 @@ describe("given trace's remaining reads sent as a reader under a row policy on C
         });
         const holds = await columns.holds({ table: "evaluation_runs" });
         const built = evaluationAttemptsRead({ scope: single, traceId: "tr", holds });
-        const attempts = await columns.select({
-          table: "evaluation_runs",
-          alias: "r",
-          columns: ATTEMPTS,
-        });
-        const main = await rowsOf({
-          statement: mainOf({ built, sql: mainRuns(attempts) }),
-          params: { tenantId: A, traceId: "tr" },
-          database,
-          ordered: true,
-        });
 
-        expect(main).toEqual(expected[database]);
-        // Main also selects the raw LastAttemptAt beside its epoch ms; the port reads only the ms.
-        const withoutRawMoment = main.map((row) => row.split("|").toSpliced(2, 1).join("|"));
         expect(await rowsOf({ statement: built, database, ordered: true })).toEqual(
-          withoutRawMoment,
+          expected[database],
         );
       }
     });
@@ -496,82 +382,34 @@ describe("given trace's remaining reads sent as a reader under a row policy on C
 
   describe("when trace braid's owner activity is built with braid conditions inside argMax", () => {
     /** @scenario "Trace braid's reads return main's rows on 26.8" */
-    it("returns main's per-braid span counts of latest versions", async () => {
+    it("returns per-braid span counts of latest versions", async () => {
       const braids = [braidOf(1000), braidOf(5000)] as const;
       const built = braidActivityRead({ scope: single, braids, sinceMs: NOW - 10_000 });
-      const params: Record<string, unknown> = { tenantId: A, sinceMs: NOW - 10_000 };
-      const windowed = braids.map((braid, index) => {
-        const name = `a${index}`;
-        const condition = braidConditionExpression({ ...braid, prefix: name });
-        Object.assign(params, condition.params, {
-          [`${name}_fromMs`]: braid.fromMs,
-          [`${name}_untilMs`]: braid.untilMs,
-        });
-        const window = `StartTime >= ${millis(`${name}_fromMs`)} AND StartTime < ${millis(`${name}_untilMs`)}`;
-        return `argMax((${window} AND ${condition.sql}), UpdatedAt) AS ${name}`;
-      });
-      const main = await rowsOf({
-        statement: mainOf({
-          built,
-          sql: `SELECT sum(a0) AS a0, sum(a1) AS a1 FROM (
-            SELECT ${windowed.join(", ")} FROM stored_spans
-            WHERE TenantId = {tenantId:String} AND StartTime >= ${millis("sinceMs")}
-            GROUP BY TraceId, SpanId)`,
-        }),
-        params,
-      });
 
       // s2 in both; s3 only in the wide braid; s1's latest version is not web; B's s9 never.
-      expect(main).toEqual(["1|2"]);
-      expect(await rowsOf({ statement: built })).toEqual(main);
+      expect(await rowsOf({ statement: built })).toEqual(["1|2"]);
     });
 
     /** @scenario "Trace braid's reads return main's rows on 26.8" */
-    it("returns main's marked spans of a trace", async () => {
-      const braid = braidOf(1000);
-      const built = braidMarkedRead({ scope: single, braid, traceId: "t1" });
-      const condition = braidConditionExpression({ ...braid, prefix: "braid0" });
-      const main = await rowsOf({
-        statement: mainOf({
-          built,
-          sql: `SELECT SpanId, ${condition.sql} AS Braided FROM stored_spans
-            WHERE TenantId = {tenantId:String} AND TraceId = {traceId:String}
-              AND (TenantId, TraceId, SpanId, UpdatedAt) IN (
-                SELECT TenantId, TraceId, SpanId, max(UpdatedAt) FROM stored_spans
-                WHERE TenantId = {tenantId:String} AND TraceId = {traceId:String}
-                GROUP BY TenantId, TraceId, SpanId)`,
-        }),
-        params: { tenantId: A, traceId: "t1", ...condition.params },
-      });
+    it("marks the spans of a trace that match the braid, on latest versions", async () => {
+      const built = braidMarkedRead({ scope: single, braid: braidOf(1000), traceId: "t1" });
 
-      expect(main).toEqual(["s1|0", "s2|1"]);
-      expect(await rowsOf({ statement: built })).toEqual(main);
+      expect(await rowsOf({ statement: built })).toEqual(["s1|0", "s2|1"]);
     });
   });
 
   describe("when trace braid's attribute keys are built with arrayJoin in a derived read", () => {
     /** @scenario "Trace braid's reads return main's rows on 26.8" */
-    it("returns main's ARRAY JOIN key counts in main's order", async () => {
+    it("returns key counts over the sample, by count then key", async () => {
       const input = { sinceMs: NOW - 10_000, excludedPrefix: "langwatch.", limit: 10 };
       const built = attributeKeysRead({ scope: single, sampleRows: 50_000, ...input });
-      const main = await rowsOf({
-        statement: mainOf({
-          built,
-          sql: `SELECT key, count() AS spanCount FROM (
-              SELECT SpanAttributes FROM stored_spans
-              WHERE TenantId = {tenantId:String} AND StartTime >= ${millis("sinceMs")}
-              LIMIT {sampleRows:UInt32})
-            ARRAY JOIN mapKeys(SpanAttributes) AS key
-            WHERE NOT startsWith(key, {excludedPrefix:String})
-            GROUP BY key ORDER BY spanCount DESC, key ASC LIMIT {limit:UInt32}`,
-        }),
-        params: { tenantId: A, sampleRows: 50_000, ...input },
-        ordered: true,
-      });
 
-      // Every version is sampled, as main samples them: s1's two versions count twice.
-      expect(main).toEqual(["orchestrator|4", "model|2", "region|1"]);
-      expect(await rowsOf({ statement: built, ordered: true })).toEqual(main);
+      // Every version is sampled: s1's two versions count twice.
+      expect(await rowsOf({ statement: built, ordered: true })).toEqual([
+        "orchestrator|4",
+        "model|2",
+        "region|1",
+      ]);
     });
   });
 });

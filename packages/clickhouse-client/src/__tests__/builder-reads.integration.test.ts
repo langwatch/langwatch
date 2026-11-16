@@ -537,7 +537,7 @@ const seriesPoints = clickhouseRead({ scope: single })
   .as("series_points");
 
 type SeekOps = ConditionOps<"series_points" | "spans", Record<never, never>>;
-/** main's orderedAfter and orderedBefore: (SeekTime, TimeUnixNano, PointId) past one span end. */
+/** Ordered after or before a span end on (SeekTime, TimeUnixNano, PointId). */
 function pastEnd({ ops, past, end }: { ops: SeekOps; past: "gt" | "lt"; end: "From" | "To" }) {
   const { and, eq, or } = ops;
   const beyond = ops[past];
@@ -598,54 +598,6 @@ const builtSeek = () =>
     )
     .build();
 
-/** main's SUCCESSOR_SEEK_QUERY (metric-data-point-append repository), SEEK_SELECT inlined. */
-const orderedPast = (operator: ">" | "<", bound: "From" | "To") =>
-  `(series_points.SeekTime ${operator} spans.Span${bound}Time
-     OR (series_points.SeekTime = spans.Span${bound}Time
-       AND (series_points.TimeUnixNano ${operator} spans.Span${bound}Nano
-         OR (series_points.TimeUnixNano = spans.Span${bound}Nano
-           AND series_points.PointId ${operator} spans.Span${bound}Point))))`;
-const RAW_SEEK = `
-  WITH spans AS (
-    SELECT
-      span.1 AS SpanSeriesId,
-      fromUnixTimestamp64Milli(span.2) AS SpanFromTime,
-      toUInt64(span.3) AS SpanFromNano,
-      span.4 AS SpanFromPoint,
-      fromUnixTimestamp64Milli(span.5) AS SpanToTime,
-      toUInt64(span.6) AS SpanToNano,
-      span.7 AS SpanToPoint
-    FROM (
-      SELECT arrayJoin(arrayZip(
-        {seriesIds:Array(String)},
-        {fromTimes:Array(Int64)}, {fromNanos:Array(String)}, {fromPoints:Array(String)},
-        {toTimes:Array(Int64)}, {toNanos:Array(String)}, {toPoints:Array(String)}
-      )) AS span
-    )
-  ),
-  series_points AS (
-    SELECT SeriesId, PointId, toUnixTimestamp64Milli(TimeUnixMs) AS TimeUnixMs, TimeUnixNano,
-      MetricKind, AggregationTemporality, metric_data_points.TimeUnixMs AS SeekTime
-    FROM metric_data_points
-    WHERE TenantId = {tenantId:String}
-      AND SeriesId IN {seriesIds:Array(String)}
-      AND metric_data_points.TimeUnixMs >= fromUnixTimestamp64Milli({scanFrom:Int64})
-  )
-  SELECT * FROM (
-    (SELECT series_points.*
-     FROM series_points INNER JOIN spans ON CAST(series_points.SeriesId AS String) = spans.SpanSeriesId
-     WHERE series_points.SeekTime <= fromUnixTimestamp64Milli({latestSpanEnd:Int64})
-       AND ${orderedPast(">", "From")} AND ${orderedPast("<", "To")})
-    UNION ALL
-    (SELECT series_points.*
-     FROM series_points INNER JOIN spans ON CAST(series_points.SeriesId AS String) = spans.SpanSeriesId
-     WHERE series_points.SeekTime >= fromUnixTimestamp64Milli({earliestSpanEnd:Int64})
-       AND ${orderedPast(">", "To")}
-     ORDER BY series_points.SeriesId ASC, series_points.SeekTime ASC,
-       series_points.TimeUnixNano ASC, series_points.PointId ASC
-     LIMIT 1 BY SeriesId)
-  )`;
-
 /** stored_spans' engine, ReplacingMergeTree(StartTime) (goose 00002); the version is UpdatedAt. */
 const versionedSpans = defineClickHouseTable({
   name: "versioned_spans",
@@ -691,13 +643,6 @@ const builtVersioned = () =>
     .where(({ eq }) => eq(versionedSpans.TraceId, "tv"))
     .latestVersion({ version: versionedSpans.StartTime })
     .build();
-/** main's full-record span election (trace-full-record-rows repository), unbounded. */
-const RAW_VERSIONED = `SELECT SpanId, SpanName FROM versioned_spans
-  WHERE TenantId = {tenantId:String} AND TraceId = {traceId:String}
-    AND (TenantId, TraceId, SpanId, StartTime) IN (SELECT TenantId, TraceId, SpanId, max(StartTime)
-      FROM versioned_spans WHERE TenantId = {tenantId:String} AND TraceId = {traceId:String}
-      GROUP BY TenantId, TraceId, SpanId)`;
-
 /** The columns of stored_spans the signals read touches, in a table no other shape reads. */
 const signalSpans = defineClickHouseTable({
   name: "signal_spans",
@@ -767,78 +712,46 @@ const SIGNAL_SPANS = [
 type SignalKeys = Expression<readonly string[], "span_keys">;
 const prefixed = (prefix: string) => (keys: SignalKeys) =>
   fn.arrayExists((key) => fn.startsWith(key, prefix), keys);
-/** main's SIGNAL_BUCKET_PREDICATES (span-storage repository): each bucket's text and its build. */
-const SIGNAL_BUCKETS: readonly (readonly [
-  string,
-  string,
-  (keys: SignalKeys) => Condition<"span_keys">,
-])[] = [
+/** The LangWatch signal buckets: each bucket's name and the condition on a span's keys. */
+const SIGNAL_BUCKETS: readonly (readonly [string, (keys: SignalKeys) => Condition<"span_keys">])[] =
   [
-    "prompt",
-    "arrayExists(k -> startsWith(k, 'langwatch.prompt.'), keys)",
-    prefixed("langwatch.prompt."),
-  ],
-  [
-    "scenario",
-    "arrayExists(k -> startsWith(k, 'langwatch.scenario.') OR k = 'scenario.run_id', keys)",
-    (keys) =>
-      fn.arrayExists(
-        (key) =>
-          cond.or(fn.startsWith(key, "langwatch.scenario."), cond.eq(key, "scenario.run_id")),
-        keys,
-      ),
-  ],
-  [
-    "user",
-    "arrayExists(k -> k = 'langwatch.user_id' OR startsWith(k, 'langwatch.user.'), keys)",
-    (keys) =>
-      fn.arrayExists(
-        (key) => cond.or(cond.eq(key, "langwatch.user_id"), fn.startsWith(key, "langwatch.user.")),
-        keys,
-      ),
-  ],
-  [
-    "thread",
-    "arrayExists(k -> k = 'gen_ai.conversation.id' OR k = 'langgraph.thread_id' OR startsWith(k, 'langwatch.thread.'), keys)",
-    (keys) =>
-      fn.arrayExists(
-        (key) =>
-          cond.or(
-            cond.eq(key, "gen_ai.conversation.id"),
-            cond.eq(key, "langgraph.thread_id"),
-            fn.startsWith(key, "langwatch.thread."),
-          ),
-        keys,
-      ),
-  ],
-  [
-    "evaluation",
-    "arrayExists(k -> startsWith(k, 'langwatch.evaluation'), keys)",
-    prefixed("langwatch.evaluation"),
-  ],
-  ["rag", "arrayExists(k -> startsWith(k, 'langwatch.rag.'), keys)", prefixed("langwatch.rag.")],
-  [
-    "metadata",
-    "arrayExists(k -> startsWith(k, 'langwatch.metadata.'), keys)",
-    prefixed("langwatch.metadata."),
-  ],
-  ["genai", "arrayExists(k -> startsWith(k, 'gen_ai.'), keys)", prefixed("gen_ai.")],
-];
-/** main's findLangwatchSignalsByTraceId for one project, its id-bound marker left out. */
-const RAW_SIGNALS = `SELECT SpanId,
-    arrayFilter(x -> x != '', [
-      ${SIGNAL_BUCKETS.map(([bucket, text]) => `if(${text}, '${bucket}', '')`).join(",\n      ")}
-    ]) AS Signals
-  FROM (
-    SELECT SpanId, mapKeys(SpanAttributes) AS keys
-    FROM signal_spans
-    WHERE TenantId = {tenantId:String} AND TraceId = {traceId:String}
-      AND (TenantId, TraceId, SpanId, UpdatedAt) IN (SELECT TenantId, TraceId, SpanId, max(UpdatedAt)
-        FROM signal_spans WHERE TenantId = {tenantId:String} AND TraceId = {traceId:String}
-        GROUP BY TenantId, TraceId, SpanId)
-    ORDER BY StartTime ASC
-    LIMIT 10000
-  )`;
+    ["prompt", prefixed("langwatch.prompt.")],
+    [
+      "scenario",
+      (keys) =>
+        fn.arrayExists(
+          (key) =>
+            cond.or(fn.startsWith(key, "langwatch.scenario."), cond.eq(key, "scenario.run_id")),
+          keys,
+        ),
+    ],
+    [
+      "user",
+      (keys) =>
+        fn.arrayExists(
+          (key) =>
+            cond.or(cond.eq(key, "langwatch.user_id"), fn.startsWith(key, "langwatch.user.")),
+          keys,
+        ),
+    ],
+    [
+      "thread",
+      (keys) =>
+        fn.arrayExists(
+          (key) =>
+            cond.or(
+              cond.eq(key, "gen_ai.conversation.id"),
+              cond.eq(key, "langgraph.thread_id"),
+              fn.startsWith(key, "langwatch.thread."),
+            ),
+          keys,
+        ),
+    ],
+    ["evaluation", prefixed("langwatch.evaluation")],
+    ["rag", prefixed("langwatch.rag.")],
+    ["metadata", prefixed("langwatch.metadata.")],
+    ["genai", prefixed("gen_ai.")],
+  ];
 function builtSignals() {
   const spanKeys = clickhouseRead({ scope: single })
     .from(signalSpans)
@@ -855,7 +768,7 @@ function builtSignals() {
       Signals: fn.arrayFilter(
         (signal) => cond.ne(signal, ""),
         fn.array(
-          ...SIGNAL_BUCKETS.map(([bucket, , has]) =>
+          ...SIGNAL_BUCKETS.map(([bucket, has]) =>
             fn.if(has(spanKeys.keys), param.string(bucket), ""),
           ),
         ),
@@ -864,7 +777,7 @@ function builtSignals() {
     .build();
 }
 
-/** The second census's shapes: nested columns, AggregateFunction merges, lambdas and casts. */
+/** Nested columns, AggregateFunction merges, lambdas and casts. */
 const CENSUS_SHAPES: Record<string, { statement: () => Sendable; rows: string[] }> = {
   "nested columns on the latest version": {
     statement: () =>
@@ -1106,8 +1019,8 @@ function windowed({ statement, key }: { statement: Sendable; key: string }): Sen
   return { ...statement, ...bound.render(windowFragment({ fromMs: NOW - 60_000, toMs: NOW })) };
 }
 
-/** The third census's shapes: the reads the evaluation and scenario ports stopped on. */
-const GAPS_3_SHAPES: Record<string, { statement: () => Sendable; rows: string[] }> = {
+/** Nullable and listed ids, derived joins, chained CTEs and scalar subqueries. */
+const JOIN_AND_SUBQUERY_SHAPES: Record<string, { statement: () => Sendable; rows: string[] }> = {
   "a list of ids bounding a nullable id column": {
     statement: () =>
       windowed({
@@ -1212,8 +1125,8 @@ const GAPS_3_SHAPES: Record<string, { statement: () => Sendable; rows: string[] 
   },
 };
 
-/** The fourth census's shapes: an election repeating an id bound, a JSON path from a lambda. */
-const GAPS_4_SHAPES: Record<string, { statement: () => Sendable; rows: string[] }> = {
+/** An election repeating an id bound, and a JSON path from a lambda's parameter. */
+const ID_BOUND_AND_JSON_SHAPES: Record<string, { statement: () => Sendable; rows: string[] }> = {
   "a latest-version election repeating an id bound outside the sort key": {
     statement: () =>
       windowed({
@@ -1400,7 +1313,7 @@ describe("given builder statements sent as a reader under a row policy on ClickH
     });
   }
 
-  for (const [name, shape] of Object.entries(GAPS_3_SHAPES)) {
+  for (const [name, shape] of Object.entries(JOIN_AND_SUBQUERY_SHAPES)) {
     describe(`when ${name} is built and sent`, () => {
       /** @scenario "Nullable and listed ids, derived joins, chained CTEs and scalar subqueries run on 26.8" */
       it("returns exactly its tenant's rows", async () => {
@@ -1416,7 +1329,7 @@ describe("given builder statements sent as a reader under a row policy on ClickH
     });
   }
 
-  for (const [name, shape] of Object.entries(GAPS_4_SHAPES)) {
+  for (const [name, shape] of Object.entries(ID_BOUND_AND_JSON_SHAPES)) {
     describe(`when ${name} is built and sent`, () => {
       /** @scenario "A repeated id bound and a JSON path from a lambda's parameter run on 26.8" */
       it("returns exactly its tenant's rows", async () => {
@@ -1450,7 +1363,7 @@ describe("given builder statements sent as a reader under a row policy on ClickH
         .build();
 
     /** @scenario "An outer-only cursor and zipped tuple membership run on 26.8 as main's reads do" */
-    it("leaves off the span whose latest version moved before the cursor, as main pages it", async () => {
+    it("leaves off the span whose latest version moved before the cursor", async () => {
       expect(await rowsOf({ statement: page({ inElection: false }) })).toEqual(["s2"]);
     });
 
@@ -1474,13 +1387,6 @@ describe("given builder statements sent as a reader under a row policy on ClickH
           ),
         )
         .build();
-    const raw = () => ({
-      sql: `SELECT TraceId, SpanId FROM paged_spans WHERE TenantId = {tenantId:String}
-              AND (TraceId, SpanId) IN arrayZip({traceIds:Array(String)}, {spanIds:Array(String)})`,
-      params: { tenantId: A, traceIds, spanIds },
-      settings: built().settings,
-    });
-
     /** @scenario "An outer-only cursor and zipped tuple membership run on 26.8 as main's reads do" */
     it("returns exactly its tenant's keys, also when the setting lists every tenant", async () => {
       expect(await rowsOf({ statement: built() })).toEqual(["k03|s0", "k07|s0"]);
@@ -1491,61 +1397,53 @@ describe("given builder statements sent as a reader under a row policy on ClickH
     });
 
     /** @scenario "An outer-only cursor and zipped tuple membership run on 26.8 as main's reads do" */
-    it("prunes the primary key on TraceId and SpanId to the granules the raw form reads", async () => {
+    it("prunes the primary key on TraceId and SpanId to the granules main's raw form read", async () => {
       const ours = await primaryKeyOf({ statement: built() });
-      const main = await primaryKeyOf({ statement: raw() });
 
-      expect(ours).toEqual(main);
-      expect(ours.keys).toEqual(expect.arrayContaining(["TraceId", "SpanId"]));
+      // Main's `(TraceId, SpanId) IN arrayZip(...)` read 4 of 69 granules on these rows.
+      expect(ours).toEqual({
+        keys: ["TenantId", "TraceId", "SpanId"],
+        granules: { read: 4, total: 69 },
+      });
       expect(ours.granules.read).toBeLessThan(ours.granules.total / 4);
     });
   });
 
   describe("when the metric successor seek is built from bound span rows and sent", () => {
     /** @scenario "The metric successor seek runs on 26.8 as main's raw query does" */
-    it("returns the rows main's raw query returns, also when the setting lists every tenant", async () => {
+    it("returns each series' points inside a span and its first point past the span", async () => {
       const built = builtSeek();
-      const main = await rowsOf({
-        statement: { sql: RAW_SEEK, params: seekParams, settings: built.settings },
-      });
+      const point = (series: string, id: number, ms: number) =>
+        `${series}|${pointIdOf(id)}|${NOW + ms}|${id === 3 ? 2 : 1}|gauge|unspecified|${at(NOW + ms)}`;
+      const expected = [
+        point(SERIES_1, 2, 200),
+        point(SERIES_1, 3, 200),
+        point(SERIES_1, 5, 400),
+        point(SERIES_2, 13, 300),
+      ];
 
-      expect(main.map((row) => Number(row.split("|")[1]))).toEqual([2, 3, 5, 13]);
-      expect(await rowsOf({ statement: built })).toEqual(main);
-      expect(await rowsOf({ statement: built, tenants: EVERY_TENANT })).toEqual(main);
+      expect(await rowsOf({ statement: built })).toEqual(expected);
+      expect(await rowsOf({ statement: built, tenants: EVERY_TENANT })).toEqual(expected);
     });
   });
 
   describe("when a read elects on StartTime, the column its engine replaces by", () => {
     /** @scenario "An election on a named version column runs on 26.8 as main's read does" */
-    it("returns both versions sharing the latest StartTime, as main's raw read does", async () => {
-      const built = builtVersioned();
-      const main = await rowsOf({
-        statement: {
-          sql: RAW_VERSIONED,
-          params: { tenantId: A, traceId: "tv" },
-          settings: built.settings,
-        },
-      });
+    it("returns both versions sharing the latest StartTime", async () => {
+      const expected = ["s1|first", "s1|second", "s2|only"];
 
-      expect(main).toEqual(["s1|first", "s1|second", "s2|only"]);
-      expect(await rowsOf({ statement: built })).toEqual(main);
-      expect(await rowsOf({ statement: built, tenants: EVERY_TENANT })).toEqual(main);
+      expect(await rowsOf({ statement: builtVersioned() })).toEqual(expected);
+      expect(await rowsOf({ statement: builtVersioned(), tenants: EVERY_TENANT })).toEqual(
+        expected,
+      );
     });
   });
 
   describe("when trace's LangWatch signals read is built from an array literal and conditions", () => {
     /** @scenario "Trace's LangWatch signals read runs on 26.8 as main's raw query does" */
-    it("returns the rows main's raw query returns, also when the setting lists every tenant", async () => {
+    it("returns each latest span's signal buckets, also when the setting lists every tenant", async () => {
       const built = builtSignals();
-      const main = await rowsOf({
-        statement: {
-          sql: RAW_SIGNALS,
-          params: { tenantId: A, traceId: "tsig" },
-          settings: built.settings,
-        },
-      });
-
-      expect(main).toEqual([
+      const expected = [
         "s1|prompt,genai",
         "s2|scenario",
         "s3|user,thread",
@@ -1553,9 +1451,10 @@ describe("given builder statements sent as a reader under a row policy on ClickH
         "s5|",
         "s6|scenario,user,thread,evaluation,rag,metadata",
         "s7|",
-      ]);
-      expect(await rowsOf({ statement: built })).toEqual(main);
-      expect(await rowsOf({ statement: built, tenants: EVERY_TENANT })).toEqual(main);
+      ];
+
+      expect(await rowsOf({ statement: built })).toEqual(expected);
+      expect(await rowsOf({ statement: built, tenants: EVERY_TENANT })).toEqual(expected);
     });
   });
 
