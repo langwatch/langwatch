@@ -8,6 +8,9 @@ from ...client import AuthenticatedClient, Client
 from ...models.delete_api_v1_analytics_reports_by_report_id_response_200 import (
     DeleteApiV1AnalyticsReportsByReportIdResponse200,
 )
+from ...models.delete_api_v1_analytics_reports_by_report_id_response_400 import (
+    DeleteApiV1AnalyticsReportsByReportIdResponse400,
+)
 from ...types import Response, safe_http_status
 
 
@@ -27,11 +30,16 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> DeleteApiV1AnalyticsReportsByReportIdResponse200 | None:
+) -> DeleteApiV1AnalyticsReportsByReportIdResponse200 | DeleteApiV1AnalyticsReportsByReportIdResponse400 | None:
     if response.status_code == 200:
         response_200 = DeleteApiV1AnalyticsReportsByReportIdResponse200.from_dict(response.json())
 
         return response_200
+
+    if response.status_code == 400:
+        response_400 = DeleteApiV1AnalyticsReportsByReportIdResponse400.from_dict(response.json())
+
+        return response_400
 
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
@@ -41,7 +49,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[DeleteApiV1AnalyticsReportsByReportIdResponse200]:
+) -> Response[DeleteApiV1AnalyticsReportsByReportIdResponse200 | DeleteApiV1AnalyticsReportsByReportIdResponse400]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -57,7 +65,7 @@ def sync_detailed(
     report_id: str,
     *,
     client: AuthenticatedClient,
-) -> Response[DeleteApiV1AnalyticsReportsByReportIdResponse200]:
+) -> Response[DeleteApiV1AnalyticsReportsByReportIdResponse200 | DeleteApiV1AnalyticsReportsByReportIdResponse400]:
     """Delete a dashboard and its graphs (hard delete, cascade). The Analytics Reports dashboards API is
     deprecated; use the Dashboards API at /api/v1/dashboards.
 
@@ -69,7 +77,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[DeleteApiV1AnalyticsReportsByReportIdResponse200]
+        Response[DeleteApiV1AnalyticsReportsByReportIdResponse200 | DeleteApiV1AnalyticsReportsByReportIdResponse400]
     """
 
     kwargs = _get_kwargs(
@@ -87,7 +95,7 @@ def sync(
     report_id: str,
     *,
     client: AuthenticatedClient,
-) -> DeleteApiV1AnalyticsReportsByReportIdResponse200 | None:
+) -> DeleteApiV1AnalyticsReportsByReportIdResponse200 | DeleteApiV1AnalyticsReportsByReportIdResponse400 | None:
     """Delete a dashboard and its graphs (hard delete, cascade). The Analytics Reports dashboards API is
     deprecated; use the Dashboards API at /api/v1/dashboards.
 
@@ -99,7 +107,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        DeleteApiV1AnalyticsReportsByReportIdResponse200
+        DeleteApiV1AnalyticsReportsByReportIdResponse200 | DeleteApiV1AnalyticsReportsByReportIdResponse400
     """
 
     return sync_detailed(
@@ -112,7 +120,7 @@ async def asyncio_detailed(
     report_id: str,
     *,
     client: AuthenticatedClient,
-) -> Response[DeleteApiV1AnalyticsReportsByReportIdResponse200]:
+) -> Response[DeleteApiV1AnalyticsReportsByReportIdResponse200 | DeleteApiV1AnalyticsReportsByReportIdResponse400]:
     """Delete a dashboard and its graphs (hard delete, cascade). The Analytics Reports dashboards API is
     deprecated; use the Dashboards API at /api/v1/dashboards.
 
@@ -124,7 +132,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[DeleteApiV1AnalyticsReportsByReportIdResponse200]
+        Response[DeleteApiV1AnalyticsReportsByReportIdResponse200 | DeleteApiV1AnalyticsReportsByReportIdResponse400]
     """
 
     kwargs = _get_kwargs(
@@ -140,7 +148,7 @@ async def asyncio(
     report_id: str,
     *,
     client: AuthenticatedClient,
-) -> DeleteApiV1AnalyticsReportsByReportIdResponse200 | None:
+) -> DeleteApiV1AnalyticsReportsByReportIdResponse200 | DeleteApiV1AnalyticsReportsByReportIdResponse400 | None:
     """Delete a dashboard and its graphs (hard delete, cascade). The Analytics Reports dashboards API is
     deprecated; use the Dashboards API at /api/v1/dashboards.
 
@@ -152,7 +160,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        DeleteApiV1AnalyticsReportsByReportIdResponse200
+        DeleteApiV1AnalyticsReportsByReportIdResponse200 | DeleteApiV1AnalyticsReportsByReportIdResponse400
     """
 
     return (

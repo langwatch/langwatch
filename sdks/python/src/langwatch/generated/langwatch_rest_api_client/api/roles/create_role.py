@@ -6,6 +6,7 @@ from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.create_role_body import CreateRoleBody
 from ...models.create_role_response_201 import CreateRoleResponse201
+from ...models.create_role_response_400 import CreateRoleResponse400
 from ...types import Response, safe_http_status
 
 
@@ -28,11 +29,18 @@ def _get_kwargs(
     return _kwargs
 
 
-def _parse_response(*, client: AuthenticatedClient | Client, response: httpx.Response) -> CreateRoleResponse201 | None:
+def _parse_response(
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> CreateRoleResponse201 | CreateRoleResponse400 | None:
     if response.status_code == 201:
         response_201 = CreateRoleResponse201.from_dict(response.json())
 
         return response_201
+
+    if response.status_code == 400:
+        response_400 = CreateRoleResponse400.from_dict(response.json())
+
+        return response_400
 
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
@@ -42,7 +50,7 @@ def _parse_response(*, client: AuthenticatedClient | Client, response: httpx.Res
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[CreateRoleResponse201]:
+) -> Response[CreateRoleResponse201 | CreateRoleResponse400]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -58,7 +66,7 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     body: CreateRoleBody,
-) -> Response[CreateRoleResponse201]:
+) -> Response[CreateRoleResponse201 | CreateRoleResponse400]:
     """Create a custom role from resource:action permission keys. The name is unique within the
     organization; a taken name answers 409 custom_role_name_taken.
 
@@ -70,7 +78,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[CreateRoleResponse201]
+        Response[CreateRoleResponse201 | CreateRoleResponse400]
     """
 
     kwargs = _get_kwargs(
@@ -88,7 +96,7 @@ def sync(
     *,
     client: AuthenticatedClient,
     body: CreateRoleBody,
-) -> CreateRoleResponse201 | None:
+) -> CreateRoleResponse201 | CreateRoleResponse400 | None:
     """Create a custom role from resource:action permission keys. The name is unique within the
     organization; a taken name answers 409 custom_role_name_taken.
 
@@ -100,7 +108,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        CreateRoleResponse201
+        CreateRoleResponse201 | CreateRoleResponse400
     """
 
     return sync_detailed(
@@ -113,7 +121,7 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
     body: CreateRoleBody,
-) -> Response[CreateRoleResponse201]:
+) -> Response[CreateRoleResponse201 | CreateRoleResponse400]:
     """Create a custom role from resource:action permission keys. The name is unique within the
     organization; a taken name answers 409 custom_role_name_taken.
 
@@ -125,7 +133,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[CreateRoleResponse201]
+        Response[CreateRoleResponse201 | CreateRoleResponse400]
     """
 
     kwargs = _get_kwargs(
@@ -141,7 +149,7 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     body: CreateRoleBody,
-) -> CreateRoleResponse201 | None:
+) -> CreateRoleResponse201 | CreateRoleResponse400 | None:
     """Create a custom role from resource:action permission keys. The name is unique within the
     organization; a taken name answers 409 custom_role_name_taken.
 
@@ -153,7 +161,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        CreateRoleResponse201
+        CreateRoleResponse201 | CreateRoleResponse400
     """
 
     return (

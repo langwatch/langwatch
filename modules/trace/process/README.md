@@ -2012,7 +2012,14 @@ interface Input {
 type Output = {
   spanId: string;
   signals: (
-    "prompt" | "scenario" | "user" | "thread" | "evaluation" | "rag" | "metadata" | "genai"
+    | "prompt"
+    | "scenario"
+    | "user"
+    | "thread"
+    | "evaluation"
+    | "rag"
+    | "metadata"
+    | "genai"
   )[];
   ownerProjectId?: string | null;
 }[];

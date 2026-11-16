@@ -7,6 +7,7 @@ from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.patch_api_workflows_by_id_body import PatchApiWorkflowsByIdBody
 from ...models.patch_api_workflows_by_id_response_200 import PatchApiWorkflowsByIdResponse200
+from ...models.patch_api_workflows_by_id_response_400 import PatchApiWorkflowsByIdResponse400
 from ...types import UNSET, Response, Unset, safe_http_status
 
 
@@ -35,11 +36,16 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Any | PatchApiWorkflowsByIdResponse200 | None:
+) -> Any | PatchApiWorkflowsByIdResponse200 | PatchApiWorkflowsByIdResponse400 | None:
     if response.status_code == 200:
         response_200 = PatchApiWorkflowsByIdResponse200.from_dict(response.json())
 
         return response_200
+
+    if response.status_code == 400:
+        response_400 = PatchApiWorkflowsByIdResponse400.from_dict(response.json())
+
+        return response_400
 
     if response.status_code == 404:
         response_404 = cast(Any, None)
@@ -53,7 +59,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[Any | PatchApiWorkflowsByIdResponse200]:
+) -> Response[Any | PatchApiWorkflowsByIdResponse200 | PatchApiWorkflowsByIdResponse400]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -70,7 +76,7 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     body: PatchApiWorkflowsByIdBody | Unset = UNSET,
-) -> Response[Any | PatchApiWorkflowsByIdResponse200]:
+) -> Response[Any | PatchApiWorkflowsByIdResponse200 | PatchApiWorkflowsByIdResponse400]:
     """Update a workflow's metadata (name, icon, description)
 
     Args:
@@ -82,7 +88,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Any | PatchApiWorkflowsByIdResponse200]
+        Response[Any | PatchApiWorkflowsByIdResponse200 | PatchApiWorkflowsByIdResponse400]
     """
 
     kwargs = _get_kwargs(
@@ -102,7 +108,7 @@ def sync(
     *,
     client: AuthenticatedClient,
     body: PatchApiWorkflowsByIdBody | Unset = UNSET,
-) -> Any | PatchApiWorkflowsByIdResponse200 | None:
+) -> Any | PatchApiWorkflowsByIdResponse200 | PatchApiWorkflowsByIdResponse400 | None:
     """Update a workflow's metadata (name, icon, description)
 
     Args:
@@ -114,7 +120,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Any | PatchApiWorkflowsByIdResponse200
+        Any | PatchApiWorkflowsByIdResponse200 | PatchApiWorkflowsByIdResponse400
     """
 
     return sync_detailed(
@@ -129,7 +135,7 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
     body: PatchApiWorkflowsByIdBody | Unset = UNSET,
-) -> Response[Any | PatchApiWorkflowsByIdResponse200]:
+) -> Response[Any | PatchApiWorkflowsByIdResponse200 | PatchApiWorkflowsByIdResponse400]:
     """Update a workflow's metadata (name, icon, description)
 
     Args:
@@ -141,7 +147,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Any | PatchApiWorkflowsByIdResponse200]
+        Response[Any | PatchApiWorkflowsByIdResponse200 | PatchApiWorkflowsByIdResponse400]
     """
 
     kwargs = _get_kwargs(
@@ -159,7 +165,7 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     body: PatchApiWorkflowsByIdBody | Unset = UNSET,
-) -> Any | PatchApiWorkflowsByIdResponse200 | None:
+) -> Any | PatchApiWorkflowsByIdResponse200 | PatchApiWorkflowsByIdResponse400 | None:
     """Update a workflow's metadata (name, icon, description)
 
     Args:
@@ -171,7 +177,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Any | PatchApiWorkflowsByIdResponse200
+        Any | PatchApiWorkflowsByIdResponse200 | PatchApiWorkflowsByIdResponse400
     """
 
     return (

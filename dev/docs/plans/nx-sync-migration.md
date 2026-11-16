@@ -38,7 +38,7 @@ Key facts that shape the plan:
 Evidence, in an APFS clone of the checkout at 10:46:
 
 - `bash dev/scripts/devscripts.sh sync-references` (check mode): `0 of 541 tsconfig
-files differ; 0 undeducible entries`, exit 0.
+  files differ; 0 undeducible entries`, exit 0.
 - A throwaway Go test calling `droppedEdges(d.buildEdges())`: 276 members, 244
   producers, 2,254 producer edges, **0 dropped**. Same with the group removed
   (every member its own producer): 0 dropped, no cycle.
@@ -74,7 +74,7 @@ Cost of removing it (the edits, all mechanical):
 
 - 11 member `tsconfig.build.json` become ordinary producers, copied from
   `modules/agent/browser/tsconfig.build.json` (`extends: ["./tsconfig.json",
-"../../../tsconfig.emit.json"]`, `rootDir: src`, `outDir: dist`,
+  "../../../tsconfig.emit.json"]`, `rootDir: src`, `outDir: dist`,
   `files: ["./src/<name>.web.ts"]`, the standard test excludes). Written and
   applied in the clone; `sync-references --write` then reported 0 drift.
 - `customConditions` is then read by no tsconfig. The manifest condition stays:
@@ -170,7 +170,7 @@ Why this shape:
   the enforcer's contract-build-config and public-declarations, the Docker and
   CI steps, the nx.json outputs, the docs. Nx already lists it as a runtime name.
 - The container keeps `compilerOptions`, so the build (`extends: ["./tsconfig.json",
-emit]`) and the check configs (`extends: "./tsconfig.json"`) are unchanged in
+  emit]`) and the check configs (`extends: "./tsconfig.json"`) are unchanged in
   what they inherit, and tools that read the nearest `tsconfig.json`
   (vite/vitest's transformer, `find-residue.mjs` `paths`) still see the same options.
 - `composite: true` on the container satisfies the root filter. `noEmit: false`
@@ -251,7 +251,7 @@ Rules 8-9 are by hand.
   `node_modules/.pnpm/node_modules` today, so without the extension @nx/js falls
   through to the root TS 7 and crashes. Unverified until the install runs.
 - `nx.json`: `"sync": { "applyChanges": true, "generatorOptions": { "@nx/js:typescript-sync":
-{ "runtimeTsConfigFileNames": ["tsconfig.build.json", "tsconfig.app.json"] } } }`.
+  { "runtimeTsConfigFileNames": ["tsconfig.build.json", "tsconfig.app.json"] } } }`.
   No `plugins` entry for `@nx/js/typescript`: nothing is inferred.
 - `dev/nx/workspace-plugin.mjs`: `syncGenerators: ["@nx/js:typescript-sync"]` on
   `typecheck`, so `nx typecheck` syncs first. `pnpm sync:references` -> `nx sync`;
@@ -301,7 +301,7 @@ this order, on a quiet host:
 
 1. Clone (`cp -cR`, excluding `.worktrees`, `.env*`); `pnpm add -w -D @nx/js@23.2.1`
    plus the `packageExtensions` entry; confirm `node -p "require.resolve('typescript',
-{paths:[require.resolve('@nx/js')]})"` lands on 6.0.3.
+   {paths:[require.resolve('@nx/js')]})"` lands on 6.0.3.
 2. Codemod on three packages only (`modules/agent/contract`, `modules/agent/process`,
    `modules/agent/browser`), `nx sync`, and record the diff: expected to rewrite
    references across the whole tree and empty the root solution of every

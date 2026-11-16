@@ -6,6 +6,7 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.get_organization_member_access_response_200 import GetOrganizationMemberAccessResponse200
+from ...models.get_organization_member_access_response_400 import GetOrganizationMemberAccessResponse400
 from ...types import Response, safe_http_status
 
 
@@ -25,11 +26,16 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> GetOrganizationMemberAccessResponse200 | None:
+) -> GetOrganizationMemberAccessResponse200 | GetOrganizationMemberAccessResponse400 | None:
     if response.status_code == 200:
         response_200 = GetOrganizationMemberAccessResponse200.from_dict(response.json())
 
         return response_200
+
+    if response.status_code == 400:
+        response_400 = GetOrganizationMemberAccessResponse400.from_dict(response.json())
+
+        return response_400
 
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
@@ -39,7 +45,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[GetOrganizationMemberAccessResponse200]:
+) -> Response[GetOrganizationMemberAccessResponse200 | GetOrganizationMemberAccessResponse400]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -55,7 +61,7 @@ def sync_detailed(
     user_id: str,
     *,
     client: AuthenticatedClient,
-) -> Response[GetOrganizationMemberAccessResponse200]:
+) -> Response[GetOrganizationMemberAccessResponse200 | GetOrganizationMemberAccessResponse400]:
     """The member's full access breakdown: organization role, group memberships with their bindings, and
     direct bindings, each with the permissions it grants and the scope it grants them on.
 
@@ -67,7 +73,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetOrganizationMemberAccessResponse200]
+        Response[GetOrganizationMemberAccessResponse200 | GetOrganizationMemberAccessResponse400]
     """
 
     kwargs = _get_kwargs(
@@ -85,7 +91,7 @@ def sync(
     user_id: str,
     *,
     client: AuthenticatedClient,
-) -> GetOrganizationMemberAccessResponse200 | None:
+) -> GetOrganizationMemberAccessResponse200 | GetOrganizationMemberAccessResponse400 | None:
     """The member's full access breakdown: organization role, group memberships with their bindings, and
     direct bindings, each with the permissions it grants and the scope it grants them on.
 
@@ -97,7 +103,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetOrganizationMemberAccessResponse200
+        GetOrganizationMemberAccessResponse200 | GetOrganizationMemberAccessResponse400
     """
 
     return sync_detailed(
@@ -110,7 +116,7 @@ async def asyncio_detailed(
     user_id: str,
     *,
     client: AuthenticatedClient,
-) -> Response[GetOrganizationMemberAccessResponse200]:
+) -> Response[GetOrganizationMemberAccessResponse200 | GetOrganizationMemberAccessResponse400]:
     """The member's full access breakdown: organization role, group memberships with their bindings, and
     direct bindings, each with the permissions it grants and the scope it grants them on.
 
@@ -122,7 +128,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetOrganizationMemberAccessResponse200]
+        Response[GetOrganizationMemberAccessResponse200 | GetOrganizationMemberAccessResponse400]
     """
 
     kwargs = _get_kwargs(
@@ -138,7 +144,7 @@ async def asyncio(
     user_id: str,
     *,
     client: AuthenticatedClient,
-) -> GetOrganizationMemberAccessResponse200 | None:
+) -> GetOrganizationMemberAccessResponse200 | GetOrganizationMemberAccessResponse400 | None:
     """The member's full access breakdown: organization role, group memberships with their bindings, and
     direct bindings, each with the permissions it grants and the scope it grants them on.
 
@@ -150,7 +156,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetOrganizationMemberAccessResponse200
+        GetOrganizationMemberAccessResponse200 | GetOrganizationMemberAccessResponse400
     """
 
     return (

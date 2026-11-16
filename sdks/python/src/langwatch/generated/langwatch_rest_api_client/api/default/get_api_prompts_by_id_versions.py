@@ -5,7 +5,6 @@ import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
-from ...models.get_api_prompts_by_id_versions_response_200_item import GetApiPromptsByIdVersionsResponse200Item
 from ...models.get_api_prompts_by_id_versions_response_400 import GetApiPromptsByIdVersionsResponse400
 from ...models.get_api_prompts_by_id_versions_response_401 import GetApiPromptsByIdVersionsResponse401
 from ...models.get_api_prompts_by_id_versions_response_404 import GetApiPromptsByIdVersionsResponse404
@@ -36,19 +35,8 @@ def _parse_response(
     | GetApiPromptsByIdVersionsResponse404
     | GetApiPromptsByIdVersionsResponse422
     | GetApiPromptsByIdVersionsResponse500
-    | list[GetApiPromptsByIdVersionsResponse200Item]
     | None
 ):
-    if response.status_code == 200:
-        response_200 = []
-        _response_200 = response.json()
-        for response_200_item_data in _response_200:
-            response_200_item = GetApiPromptsByIdVersionsResponse200Item.from_dict(response_200_item_data)
-
-            response_200.append(response_200_item)
-
-        return response_200
-
     if response.status_code == 400:
         response_400 = GetApiPromptsByIdVersionsResponse400.from_dict(response.json())
 
@@ -88,7 +76,6 @@ def _build_response(
     | GetApiPromptsByIdVersionsResponse404
     | GetApiPromptsByIdVersionsResponse422
     | GetApiPromptsByIdVersionsResponse500
-    | list[GetApiPromptsByIdVersionsResponse200Item]
 ]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
@@ -111,7 +98,6 @@ def sync_detailed(
     | GetApiPromptsByIdVersionsResponse404
     | GetApiPromptsByIdVersionsResponse422
     | GetApiPromptsByIdVersionsResponse500
-    | list[GetApiPromptsByIdVersionsResponse200Item]
 ]:
     """Get all versions for a prompt. Does not include base prompt data, only versioned data.
 
@@ -123,7 +109,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetApiPromptsByIdVersionsResponse400 | GetApiPromptsByIdVersionsResponse401 | GetApiPromptsByIdVersionsResponse404 | GetApiPromptsByIdVersionsResponse422 | GetApiPromptsByIdVersionsResponse500 | list[GetApiPromptsByIdVersionsResponse200Item]]
+        Response[GetApiPromptsByIdVersionsResponse400 | GetApiPromptsByIdVersionsResponse401 | GetApiPromptsByIdVersionsResponse404 | GetApiPromptsByIdVersionsResponse422 | GetApiPromptsByIdVersionsResponse500]
     """
 
     kwargs = _get_kwargs(
@@ -147,7 +133,6 @@ def sync(
     | GetApiPromptsByIdVersionsResponse404
     | GetApiPromptsByIdVersionsResponse422
     | GetApiPromptsByIdVersionsResponse500
-    | list[GetApiPromptsByIdVersionsResponse200Item]
     | None
 ):
     """Get all versions for a prompt. Does not include base prompt data, only versioned data.
@@ -160,7 +145,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetApiPromptsByIdVersionsResponse400 | GetApiPromptsByIdVersionsResponse401 | GetApiPromptsByIdVersionsResponse404 | GetApiPromptsByIdVersionsResponse422 | GetApiPromptsByIdVersionsResponse500 | list[GetApiPromptsByIdVersionsResponse200Item]
+        GetApiPromptsByIdVersionsResponse400 | GetApiPromptsByIdVersionsResponse401 | GetApiPromptsByIdVersionsResponse404 | GetApiPromptsByIdVersionsResponse422 | GetApiPromptsByIdVersionsResponse500
     """
 
     return sync_detailed(
@@ -179,7 +164,6 @@ async def asyncio_detailed(
     | GetApiPromptsByIdVersionsResponse404
     | GetApiPromptsByIdVersionsResponse422
     | GetApiPromptsByIdVersionsResponse500
-    | list[GetApiPromptsByIdVersionsResponse200Item]
 ]:
     """Get all versions for a prompt. Does not include base prompt data, only versioned data.
 
@@ -191,7 +175,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetApiPromptsByIdVersionsResponse400 | GetApiPromptsByIdVersionsResponse401 | GetApiPromptsByIdVersionsResponse404 | GetApiPromptsByIdVersionsResponse422 | GetApiPromptsByIdVersionsResponse500 | list[GetApiPromptsByIdVersionsResponse200Item]]
+        Response[GetApiPromptsByIdVersionsResponse400 | GetApiPromptsByIdVersionsResponse401 | GetApiPromptsByIdVersionsResponse404 | GetApiPromptsByIdVersionsResponse422 | GetApiPromptsByIdVersionsResponse500]
     """
 
     kwargs = _get_kwargs(
@@ -213,7 +197,6 @@ async def asyncio(
     | GetApiPromptsByIdVersionsResponse404
     | GetApiPromptsByIdVersionsResponse422
     | GetApiPromptsByIdVersionsResponse500
-    | list[GetApiPromptsByIdVersionsResponse200Item]
     | None
 ):
     """Get all versions for a prompt. Does not include base prompt data, only versioned data.
@@ -226,7 +209,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetApiPromptsByIdVersionsResponse400 | GetApiPromptsByIdVersionsResponse401 | GetApiPromptsByIdVersionsResponse404 | GetApiPromptsByIdVersionsResponse422 | GetApiPromptsByIdVersionsResponse500 | list[GetApiPromptsByIdVersionsResponse200Item]
+        GetApiPromptsByIdVersionsResponse400 | GetApiPromptsByIdVersionsResponse401 | GetApiPromptsByIdVersionsResponse404 | GetApiPromptsByIdVersionsResponse422 | GetApiPromptsByIdVersionsResponse500
     """
 
     return (

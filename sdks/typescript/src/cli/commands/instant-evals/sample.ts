@@ -35,7 +35,7 @@ export const sampleInstantEvalCommand = async (
       data: sample,
       table: () =>
         printSample({
-          rows: sample.rows as Record<string, unknown>[],
+          rows: sample.rows,
           judgments: sample.judgments,
         }),
     };

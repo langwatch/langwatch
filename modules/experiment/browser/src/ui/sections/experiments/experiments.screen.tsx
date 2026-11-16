@@ -239,11 +239,7 @@ const ExperimentActionsMenu = ({
   </Menu.Root>
 );
 
-const PrimaryMetric = ({
-  metric,
-}: {
-  metric: ExperimentListRow["runsSummary"]["primaryMetric"];
-}) =>
+const PrimaryMetric = ({ metric }: { metric: ExperimentListRow["runsSummary"]["primaryMetric"] }) =>
   metric ? (
     <>
       <Text as="span" textStyle="caption" color="fg.muted">

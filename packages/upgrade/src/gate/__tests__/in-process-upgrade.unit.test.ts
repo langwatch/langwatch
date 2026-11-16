@@ -53,8 +53,8 @@ describe("passRequestReconciler()", () => {
     const reconciler = passRequestReconciler({
       modules: {
         tasks: <Task>(isTask: (contribution: unknown) => contribution is Task) =>
-          [{ name: "request-system-migrations-pass", run: async () => undefined }].flatMap(
-            (each) => (isTask(each) ? [each] : []),
+          [{ name: "request-system-migrations-pass", run: async () => undefined }].flatMap((each) =>
+            isTask(each) ? [each] : [],
           ),
         runListedWork: async () => {
           throw new Error("Queue work had not all run within 60000 ms");

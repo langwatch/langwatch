@@ -672,8 +672,8 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
           "string.attr": "valid string",
           "number.attr": 42,
           "boolean.attr": true,
-          "array.attr": [1, 2, 3] as any, // Not valid AttributeValue
-          "object.attr": { key: "value" } as any, // Not valid AttributeValue
+          "array.attr": [1, 2, 3], // Not valid AttributeValue
+          "object.attr": { key: "value" }, // Not valid AttributeValue
         },
       };
 
@@ -708,7 +708,7 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
           "valid.number": 42,
           "valid.boolean": true,
           "date.value": new Date() as any, // Not valid AttributeValue
-          "null.value": null as any, // Not valid AttributeValue
+          "null.value": null, // Not valid AttributeValue
         },
       };
 
@@ -740,7 +740,7 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
         body: "Valid log message",
         attributes: {
           "valid.attr": "valid value",
-          "problematic.attr": undefined as any, // Invalid attribute
+          "problematic.attr": undefined, // Invalid attribute
         },
       };
 

@@ -188,14 +188,14 @@ Rendering rules, each a security property:
   alone.
 - **Owner spans only in traces the reader holds, enforced by the fence.** The conditions marker puts every
   braid clause under one semi-join, `TraceId IN (SELECT TraceId FROM stored_spans WHERE TenantId IN
-<own> AND StartTime >= <earliest braid window start> ...)`, the reader bound as a parameter. The marker
+  <own> AND StartTime >= <earliest braid window start> ...)`, the reader bound as a parameter. The marker
   names the read's trace id (`traceId=`) or its own lower bound (`sinceMs=`), which narrows the
   semi-join to no wider than the outer read. A trace window read beside braids stays outside it. A
   trace counts as held when the reader has a span of it on or after the earliest braid window's start.
 - **Owner rows leave only through the conditions marker.** Under braids the client refuses a plain
   `{{tenantScope}}` or `{{tenantSet}}` marker (`plain-marker-under-braids`), and accepts the election
   marker only right after `(TenantId, TraceId, SpanId, UpdatedAt) IN (SELECT TenantId, TraceId, SpanId,
-max(UpdatedAt) FROM stored_spans WHERE`, in the WHERE of a select a windowed marker fences
+  max(UpdatedAt) FROM stored_spans WHERE`, in the WHERE of a select a windowed marker fences
   (`loose-latest-version-marker`), so its keys only filter a conditioned select.
 - Every cache and log key that the fence feeds (`readScopeKeyOf`, `tenantScopeKey`, the discovery and facet
   caches) carries a digest of the compiled tree and the compiler version.

@@ -6,6 +6,7 @@ from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.register_langy_control_session_body import RegisterLangyControlSessionBody
 from ...models.register_langy_control_session_response_200 import RegisterLangyControlSessionResponse200
+from ...models.register_langy_control_session_response_400 import RegisterLangyControlSessionResponse400
 from ...types import Response, safe_http_status
 
 
@@ -30,11 +31,16 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> RegisterLangyControlSessionResponse200 | None:
+) -> RegisterLangyControlSessionResponse200 | RegisterLangyControlSessionResponse400 | None:
     if response.status_code == 200:
         response_200 = RegisterLangyControlSessionResponse200.from_dict(response.json())
 
         return response_200
+
+    if response.status_code == 400:
+        response_400 = RegisterLangyControlSessionResponse400.from_dict(response.json())
+
+        return response_400
 
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
@@ -44,7 +50,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[RegisterLangyControlSessionResponse200]:
+) -> Response[RegisterLangyControlSessionResponse200 | RegisterLangyControlSessionResponse400]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -60,7 +66,7 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     body: RegisterLangyControlSessionBody,
-) -> Response[RegisterLangyControlSessionResponse200]:
+) -> Response[RegisterLangyControlSessionResponse200 | RegisterLangyControlSessionResponse400]:
     """The registered frame with its instance token, or the refused frame with its reason.
 
     Args:
@@ -71,7 +77,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[RegisterLangyControlSessionResponse200]
+        Response[RegisterLangyControlSessionResponse200 | RegisterLangyControlSessionResponse400]
     """
 
     kwargs = _get_kwargs(
@@ -89,7 +95,7 @@ def sync(
     *,
     client: AuthenticatedClient,
     body: RegisterLangyControlSessionBody,
-) -> RegisterLangyControlSessionResponse200 | None:
+) -> RegisterLangyControlSessionResponse200 | RegisterLangyControlSessionResponse400 | None:
     """The registered frame with its instance token, or the refused frame with its reason.
 
     Args:
@@ -100,7 +106,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        RegisterLangyControlSessionResponse200
+        RegisterLangyControlSessionResponse200 | RegisterLangyControlSessionResponse400
     """
 
     return sync_detailed(
@@ -113,7 +119,7 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
     body: RegisterLangyControlSessionBody,
-) -> Response[RegisterLangyControlSessionResponse200]:
+) -> Response[RegisterLangyControlSessionResponse200 | RegisterLangyControlSessionResponse400]:
     """The registered frame with its instance token, or the refused frame with its reason.
 
     Args:
@@ -124,7 +130,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[RegisterLangyControlSessionResponse200]
+        Response[RegisterLangyControlSessionResponse200 | RegisterLangyControlSessionResponse400]
     """
 
     kwargs = _get_kwargs(
@@ -140,7 +146,7 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     body: RegisterLangyControlSessionBody,
-) -> RegisterLangyControlSessionResponse200 | None:
+) -> RegisterLangyControlSessionResponse200 | RegisterLangyControlSessionResponse400 | None:
     """The registered frame with its instance token, or the refused frame with its reason.
 
     Args:
@@ -151,7 +157,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        RegisterLangyControlSessionResponse200
+        RegisterLangyControlSessionResponse200 | RegisterLangyControlSessionResponse400
     """
 
     return (

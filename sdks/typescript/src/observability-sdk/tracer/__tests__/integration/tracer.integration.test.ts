@@ -458,7 +458,7 @@ describe("Tracer Integration Tests", () => {
           span.setAttribute("valid.string", "normal string");
           span.setAttribute("valid.number", 42);
           span.setAttribute("valid.boolean", true);
-          span.setAttribute("array.value", [1, 2, 3] as any); // Not valid AttributeValue
+          span.setAttribute("array.value", [1, 2, 3]); // Not valid AttributeValue
           span.setAttribute("object.value", { key: "value" } as any); // Not valid AttributeValue
           span.setAttribute("date.value", new Date() as any); // Not valid AttributeValue
           span.setAttribute("null.value", null as any); // Not valid AttributeValue

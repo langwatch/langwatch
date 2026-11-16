@@ -210,6 +210,6 @@ export class SuitesApiService {
       error,
       response,
       onError: this.handleApiError.bind(this),
-    }) as unknown as { id: string; archived: boolean };
+    });
   }
 }

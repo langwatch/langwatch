@@ -56,7 +56,7 @@ an OpenAI provider with a base URL into chat completions before it leaves.
   it answers text. The tool is the one the last user message names (longest
   match), else a seeded pick. Arguments are drawn from the tool's JSON schema.
 - **Langy mode** (model name containing `langy-echo`, or `X-Llmsim-Mode:
-langy`): no Markov text; llmsim does what the last user message says.
+  langy`): no Markov text; llmsim does what the last user message says.
   - A plain message is echoed back verbatim, streaming included.
   - `/tool <name> <json args>` lines are tool calls, exactly as written;
     several lines make several calls in one turn. Other lines are text.

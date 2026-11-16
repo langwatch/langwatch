@@ -360,7 +360,7 @@ describe("agent tunnel session", () => {
       for (const [event, listeners] of prior) {
         process.removeAllListeners(event);
         for (const listener of listeners) {
-          process.on(event, listener as () => void);
+          process.on(event, listener);
         }
       }
     }

@@ -200,7 +200,7 @@ stack is down.
 Two ways, both wired by `make observability-connect`:
 
 1. **gcx CLI** — Grafana's official CLI. `connect` runs `gcx login local
---server http://localhost:3000 --token <token>`. Then:
+   --server http://localhost:3000 --token <token>`. Then:
 
    ```bash
    # Logs for one service, most recent first.

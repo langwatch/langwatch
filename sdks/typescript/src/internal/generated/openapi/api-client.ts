@@ -1599,7 +1599,7 @@ export interface components {
             comment: string | null;
             isThumbsUp: boolean | null;
             scoreOptions: {
-                [key: string]: components["schemas"]["JsonValue"];
+                [key: string]: components["schemas"]["__schema0"];
             };
             expectedOutput: string | null;
             anchorKind: string | null;
@@ -1612,7 +1612,9 @@ export interface components {
         } & {
             [key: string]: unknown;
         };
-        JsonValue: RecursiveJsonValue;
+        __schema0: string | number | boolean | null | components["schemas"]["__schema0"][] | {
+            [key: string]: components["schemas"]["__schema0"];
+        };
     };
     responses: never;
     parameters: never;
@@ -1732,6 +1734,20 @@ export interface operations {
                             total: number;
                             totalPages: number;
                         };
+                    };
+                };
+            };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
                     };
                 };
             };
@@ -2256,6 +2272,20 @@ export interface operations {
                     };
                 };
             };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
+                    };
+                };
+            };
         };
     };
     getAgent: {
@@ -2365,6 +2395,20 @@ export interface operations {
                         updatedAt: string;
                         /** Format: uri */
                         platformUrl: string;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
                     };
                 };
             };
@@ -2489,6 +2533,20 @@ export interface operations {
                     };
                 };
             };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
+                    };
+                };
+            };
         };
     };
     archiveAgent: {
@@ -2515,6 +2573,20 @@ export interface operations {
                         /** @enum {string} */
                         type: "signature" | "code" | "workflow" | "http" | "connected" | "voice";
                         archivedAt: string | null;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
                     };
                 };
             };
@@ -2639,6 +2711,20 @@ export interface operations {
                     };
                 };
             };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
+                    };
+                };
+            };
         };
     };
     listAgentVersions: {
@@ -2691,6 +2777,20 @@ export interface operations {
                     };
                 };
             };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
+                    };
+                };
+            };
         };
     };
     assignAgentLabel: {
@@ -2727,6 +2827,20 @@ export interface operations {
                     };
                 };
             };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
+                    };
+                };
+            };
         };
     };
     removeAgentLabel: {
@@ -2753,6 +2867,20 @@ export interface operations {
                         label: string;
                         /** @constant */
                         removed: true;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
                     };
                 };
             };
@@ -2842,6 +2970,20 @@ export interface operations {
                             label: string | null;
                         };
                         durationMs: number;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
                     };
                 };
             };
@@ -4074,6 +4216,20 @@ export interface operations {
                     };
                 };
             };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
+                    };
+                };
+            };
         };
     };
     getApiAnnotationsId: {
@@ -4095,6 +4251,20 @@ export interface operations {
                 content: {
                     "application/json": {
                         data: components["schemas"]["Annotation"];
+                    };
+                };
+            };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
                     };
                 };
             };
@@ -4120,6 +4290,20 @@ export interface operations {
                     "application/json": {
                         status: string;
                         message: string;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
                     };
                 };
             };
@@ -4155,6 +4339,20 @@ export interface operations {
                     };
                 };
             };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
+                    };
+                };
+            };
         };
     };
     getApiAnnotationsTraceId: {
@@ -4178,6 +4376,20 @@ export interface operations {
                 content: {
                     "application/json": {
                         data: components["schemas"]["Annotation"][];
+                    };
+                };
+            };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
                     };
                 };
             };
@@ -4210,6 +4422,20 @@ export interface operations {
                 content: {
                     "application/json": {
                         data: components["schemas"]["Annotation"];
+                    };
+                };
+            };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
                     };
                 };
             };
@@ -4822,6 +5048,20 @@ export interface operations {
                     };
                 };
             };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
+                    };
+                };
+            };
         };
     };
     getApiTriggersById: {
@@ -4915,6 +5155,20 @@ export interface operations {
                     };
                 };
             };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
+                    };
+                };
+            };
             /** @description Not Found */
             404: {
                 headers: {
@@ -4949,6 +5203,20 @@ export interface operations {
                     "application/json": {
                         id: string;
                         deleted: boolean;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
                     };
                 };
             };
@@ -5196,6 +5464,20 @@ export interface operations {
                     };
                 };
             };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
+                    };
+                };
+            };
             /** @description Not Found */
             404: {
                 headers: {
@@ -5275,6 +5557,20 @@ export interface operations {
                     };
                 };
             };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
+                    };
+                };
+            };
         };
     };
     getApiV1AnalyticsReportsByReportId: {
@@ -5326,6 +5622,20 @@ export interface operations {
                     };
                 };
             };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
+                    };
+                };
+            };
         };
     };
     deleteApiV1AnalyticsReportsByReportId: {
@@ -5348,6 +5658,20 @@ export interface operations {
                     "application/json": {
                         id: string;
                         name: string;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
                     };
                 };
             };
@@ -5385,6 +5709,20 @@ export interface operations {
                         /** Format: date-time */
                         updatedAt: string;
                         platformUrl: string;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
                     };
                 };
             };
@@ -7394,6 +7732,20 @@ export interface operations {
                     }[];
                 };
             };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
+                    };
+                };
+            };
         };
     };
     postApiGraphs: {
@@ -7447,6 +7799,20 @@ export interface operations {
                     };
                 };
             };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
+                    };
+                };
+            };
         };
     };
     getApiGraphsById: {
@@ -7485,6 +7851,20 @@ export interface operations {
                     };
                 };
             };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
+                    };
+                };
+            };
         };
     };
     deleteApiGraphsById: {
@@ -7507,6 +7887,20 @@ export interface operations {
                     "application/json": {
                         id: string;
                         deleted: boolean;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
                     };
                 };
             };
@@ -7557,6 +7951,20 @@ export interface operations {
                         rowSpan: number;
                         createdAt: string;
                         updatedAt: string;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
                     };
                 };
             };
@@ -8900,6 +9308,20 @@ export interface operations {
                     };
                 };
             };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
+                    };
+                };
+            };
         };
     };
     postApiDataset: {
@@ -8950,6 +9372,20 @@ export interface operations {
                         /** Format: date-time */
                         updatedAt: string;
                         platformUrl: string;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
                     };
                 };
             };
@@ -9012,6 +9448,20 @@ export interface operations {
                     };
                 };
             };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
+                    };
+                };
+            };
         };
     };
     postApiDatasetBySlugOrIdRecords: {
@@ -9055,6 +9505,20 @@ export interface operations {
                     };
                 };
             };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
+                    };
+                };
+            };
         };
     };
     deleteApiDatasetBySlugOrIdRecords: {
@@ -9082,6 +9546,20 @@ export interface operations {
                 content: {
                     "application/json": {
                         deletedCount: number;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
                     };
                 };
             };
@@ -9133,6 +9611,20 @@ export interface operations {
                     };
                 };
             };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
+                    };
+                };
+            };
         };
     };
     deleteApiDatasetBySlugOrId: {
@@ -9156,6 +9648,20 @@ export interface operations {
                         id: string;
                         /** @constant */
                         archived: true;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
                     };
                 };
             };
@@ -9208,6 +9714,20 @@ export interface operations {
                         /** Format: date-time */
                         updatedAt: string;
                         platformUrl: string;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
                     };
                 };
             };
@@ -9270,6 +9790,20 @@ export interface operations {
                         createdAt: string;
                         /** Format: date-time */
                         updatedAt: string;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
                     };
                 };
             };
@@ -9423,6 +9957,20 @@ export interface operations {
                     };
                 };
             };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
+                    };
+                };
+            };
         };
     };
     getApiEvaluatorsByIdOrSlug: {
@@ -9494,6 +10042,20 @@ export interface operations {
                         } | null;
                         /** Format: uri */
                         platformUrl: string;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
                     };
                 };
             };
@@ -9638,6 +10200,20 @@ export interface operations {
                     };
                 };
             };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
+                    };
+                };
+            };
             /** @description Not Found */
             404: {
                 headers: {
@@ -9699,6 +10275,20 @@ export interface operations {
                             label: string;
                             version: number;
                         }[];
+                    };
+                };
+            };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
                     };
                 };
             };
@@ -9800,6 +10390,20 @@ export interface operations {
                         label: string;
                         /** @constant */
                         removed: true;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
                     };
                 };
             };
@@ -9983,6 +10587,20 @@ export interface operations {
                         };
                         /** @description Trace id for failures that carry no code, to quote in support */
                         traceId?: string;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
                     };
                 };
             };
@@ -10225,6 +10843,20 @@ export interface operations {
                     };
                 };
             };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
+                    };
+                };
+            };
             /** @description Missing or invalid API key, or the key lacks the permission */
             401: {
                 headers: {
@@ -10286,6 +10918,20 @@ export interface operations {
                             totalHits: number;
                             hasMore: boolean;
                         };
+                    };
+                };
+            };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
                     };
                 };
             };
@@ -10423,6 +11069,20 @@ export interface operations {
                             /** @description When the run ended. */
                             finishedAt: string | null;
                         }[];
+                    };
+                };
+            };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
                     };
                 };
             };
@@ -10754,6 +11414,20 @@ export interface operations {
                     };
                 };
             };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
+                    };
+                };
+            };
             /** @description This project holds no run with that id (instant_eval_not_found) */
             404: {
                 headers: {
@@ -10843,6 +11517,20 @@ export interface operations {
                         startedAt: string | null;
                         /** @description When the run ended. */
                         finishedAt: string | null;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
                     };
                 };
             };
@@ -10954,6 +11642,20 @@ export interface operations {
                     };
                 };
             };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
+                    };
+                };
+            };
             /** @description This project holds no run with that id (instant_eval_not_found) */
             404: {
                 headers: {
@@ -11023,6 +11725,20 @@ export interface operations {
                             /** @description When the judgement was made. */
                             occurredAt: string;
                         }[];
+                    };
+                };
+            };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
                     };
                 };
             };
@@ -11395,7 +12111,7 @@ export interface operations {
                         }[];
                         /** @default {} */
                         parameters: {
-                            [key: string]: components["schemas"]["JsonValue"];
+                            [key: string]: components["schemas"]["__schema0"];
                         };
                         platformUrl: string;
                     }[];
@@ -11498,7 +12214,7 @@ export interface operations {
                     tags?: string[];
                     /** @default {} */
                     parameters?: {
-                        [key: string]: components["schemas"]["JsonValue"];
+                        [key: string]: components["schemas"]["__schema0"];
                     };
                 };
             };
@@ -11603,7 +12319,7 @@ export interface operations {
                         }[];
                         /** @default {} */
                         parameters: {
-                            [key: string]: components["schemas"]["JsonValue"];
+                            [key: string]: components["schemas"]["__schema0"];
                         };
                         platformUrl: string;
                     };
@@ -12186,7 +12902,7 @@ export interface operations {
                         }[];
                         /** @default {} */
                         parameters: {
-                            [key: string]: components["schemas"]["JsonValue"];
+                            [key: string]: components["schemas"]["__schema0"];
                         };
                         platformUrl: string;
                     }[];
@@ -12367,7 +13083,7 @@ export interface operations {
                         }[];
                         /** @default {} */
                         parameters: {
-                            [key: string]: components["schemas"]["JsonValue"];
+                            [key: string]: components["schemas"]["__schema0"];
                         };
                         platformUrl: string;
                     };
@@ -12478,7 +13194,7 @@ export interface operations {
                     tags?: string[];
                     /** @default {} */
                     parameters?: {
-                        [key: string]: components["schemas"]["JsonValue"];
+                        [key: string]: components["schemas"]["__schema0"];
                     };
                     /** @enum {string} */
                     scope?: "PROJECT" | "ORGANIZATION";
@@ -12586,7 +13302,7 @@ export interface operations {
                         }[];
                         /** @default {} */
                         parameters: {
-                            [key: string]: components["schemas"]["JsonValue"];
+                            [key: string]: components["schemas"]["__schema0"];
                         };
                         platformUrl: string;
                     };
@@ -12957,7 +13673,7 @@ export interface operations {
                             }[];
                             /** @default {} */
                             parameters: {
-                                [key: string]: components["schemas"]["JsonValue"];
+                                [key: string]: components["schemas"]["__schema0"];
                             };
                         };
                         conflictInfo?: {
@@ -13243,6 +13959,20 @@ export interface operations {
                     };
                 };
             };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
+                    };
+                };
+            };
         };
     };
     getApiScenariosById: {
@@ -13294,6 +14024,20 @@ export interface operations {
                         };
                         /** Format: uri */
                         platformUrl: string;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
                     };
                 };
             };
@@ -13396,6 +14140,20 @@ export interface operations {
                     };
                 };
             };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
+                    };
+                };
+            };
             /** @description Scenario not found */
             404: {
                 headers: {
@@ -13429,6 +14187,20 @@ export interface operations {
                     "application/json": {
                         id: string;
                         archived: boolean;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
                     };
                 };
             };
@@ -13531,6 +14303,20 @@ export interface operations {
                     };
                 };
             };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
+                    };
+                };
+            };
             /** @description Scenario not found */
             404: {
                 headers: {
@@ -13583,6 +14369,20 @@ export interface operations {
                         }[];
                         /** @description Pass as cursor to read the page below this one. Null on the last page. */
                         nextCursor: number | null;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
                     };
                 };
             };
@@ -13658,6 +14458,20 @@ export interface operations {
                                 [key: string]: string | number | boolean;
                             };
                         };
+                    };
+                };
+            };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
                     };
                 };
             };
@@ -13770,6 +14584,20 @@ export interface operations {
                     };
                 };
             };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
+                    };
+                };
+            };
         };
     };
     getApiSimulationRunsByScenarioRunId: {
@@ -13859,6 +14687,20 @@ export interface operations {
                     };
                 };
             };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
+                    };
+                };
+            };
             /** @description Not found */
             404: {
                 headers: {
@@ -13918,6 +14760,20 @@ export interface operations {
                     };
                 };
             };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
+                    };
+                };
+            };
         };
     };
     testAgent: {
@@ -13945,6 +14801,20 @@ export interface operations {
                         batchRunId: string;
                         /** @description The internal set that holds agent test runs. */
                         setId: string;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
                     };
                 };
             };
@@ -14058,6 +14928,20 @@ export interface operations {
                          */
                         platformUrl: string;
                     }[];
+                };
+            };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
+                    };
                 };
             };
         };
@@ -14225,6 +15109,20 @@ export interface operations {
                     };
                 };
             };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
+                    };
+                };
+            };
         };
     };
     getRunPlan: {
@@ -14337,6 +15235,20 @@ export interface operations {
                     };
                 };
             };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
+                    };
+                };
+            };
             /** @description Not Found */
             404: {
                 headers: {
@@ -14377,6 +15289,20 @@ export interface operations {
                          * @constant
                          */
                         archived: true;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
                     };
                 };
             };
@@ -14486,6 +15412,20 @@ export interface operations {
                     };
                 };
             };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
+                    };
+                };
+            };
             /** @description Not Found */
             404: {
                 headers: {
@@ -14574,6 +15514,20 @@ export interface operations {
                          */
                         platformUrl: string;
                     }[];
+                };
+            };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
+                    };
                 };
             };
         };
@@ -14691,6 +15645,20 @@ export interface operations {
                     };
                 };
             };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
+                    };
+                };
+            };
         };
     };
     getTestSuite: {
@@ -14776,6 +15744,20 @@ export interface operations {
                     };
                 };
             };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
+                    };
+                };
+            };
             /** @description Not Found */
             404: {
                 headers: {
@@ -14816,6 +15798,20 @@ export interface operations {
                          * @constant
                          */
                         archived: true;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
                     };
                 };
             };
@@ -14946,6 +15942,20 @@ export interface operations {
                          * @description Where to open this test suite in the LangWatch platform.
                          */
                         platformUrl: string;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
                     };
                 };
             };
@@ -15085,6 +16095,20 @@ export interface operations {
                     };
                 };
             };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
+                    };
+                };
+            };
             /** @description Not Found */
             404: {
                 headers: {
@@ -15171,6 +16195,20 @@ export interface operations {
                         /** Format: uri */
                         platformUrl: string;
                     }[];
+                };
+            };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
+                    };
                 };
             };
         };
@@ -15302,6 +16340,20 @@ export interface operations {
                     };
                 };
             };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
+                    };
+                };
+            };
         };
     };
     getApiSuitesById: {
@@ -15377,6 +16429,20 @@ export interface operations {
                     };
                 };
             };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
+                    };
+                };
+            };
             /** @description Not Found */
             404: {
                 headers: {
@@ -15411,6 +16477,20 @@ export interface operations {
                     "application/json": {
                         id: string;
                         archived: boolean;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
                     };
                 };
             };
@@ -15548,6 +16628,20 @@ export interface operations {
                     };
                 };
             };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
+                    };
+                };
+            };
             /** @description Not Found */
             404: {
                 headers: {
@@ -15632,6 +16726,20 @@ export interface operations {
                         updatedAt: string;
                         /** Format: uri */
                         platformUrl: string;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
                     };
                 };
             };
@@ -15746,6 +16854,20 @@ export interface operations {
                         planName?: string;
                         created?: boolean;
                         planSlug: string;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
                     };
                 };
             };
@@ -16429,6 +17551,20 @@ export interface operations {
                     };
                 };
             };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
+                    };
+                };
+            };
             /** @description The project holds no workflow with this id */
             404: {
                 headers: {
@@ -16458,6 +17594,20 @@ export interface operations {
                     "application/json": {
                         id: string;
                         archived: boolean;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
                     };
                 };
             };
@@ -16509,6 +17659,20 @@ export interface operations {
                     };
                 };
             };
+            /** @description Validation Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: false;
+                        error: unknown[];
+                        data: unknown;
+                    };
+                };
+            };
             /** @description The project holds no workflow with this id */
             404: {
                 headers: {
@@ -16519,16 +17683,3 @@ export interface operations {
         };
     };
 }
-
-/**
- * Recursive JSON value for components["schemas"]["JsonValue"]: hoisted to a
- * standalone alias because TypeScript rejects the self-referential
- * indexed-access form openapi-typescript emits for recursive components.
- */
-export type RecursiveJsonValue =
-    | string
-    | number
-    | boolean
-    | null
-    | RecursiveJsonValue[]
-    | { [key: string]: RecursiveJsonValue };

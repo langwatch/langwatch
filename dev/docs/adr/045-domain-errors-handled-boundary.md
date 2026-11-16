@@ -90,12 +90,12 @@ Concretely:
 5. **Handled-ness is preserved across the Go↔TS boundary.** When the control
    plane proxies a Go service, an `herr` envelope is adapted into a
    `HandledError` (`Code → code`, `meta → meta`, `trace_id/span_id →
-traceId/spanId`, `reasons → reasons`); a plain Go `error` stays unhandled and
+   traceId/spanId`, `reasons → reasons`); a plain Go `error` stays unhandled and
    becomes "unknown." A handled error in Go is a handled error in the browser.
 
 6. **Non-tRPC/Hono transports carry the same shape.** Streamed responses (e.g.
    the Langy chat NDJSON stream) that today emit `{ type: "error", error:
-string }` must instead emit the `SerializedHandledError` on their error event,
+   string }` must instead emit the `SerializedHandledError` on their error event,
    so the client's handled/unknown logic is identical regardless of transport.
 
 7. **The client is the single place that decides presentation.** A shared reader

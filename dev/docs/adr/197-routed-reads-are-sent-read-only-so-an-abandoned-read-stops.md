@@ -39,7 +39,7 @@ read's own settings. Commands and inserts are sent as before.
   `DESCRIBE`, `EXISTS`, `EXPLAIN`, `system.*` reads and table functions. It
   refuses writes to tables, `ALTER`, `OPTIMIZE`, DDL and `SYSTEM` with
   READONLY (164). It is not a write firewall: `INSERT INTO FUNCTION null(…)
-SELECT` still runs under it.
+  SELECT` still runs under it.
 - A READONLY (164) refusal is an error like any other. The driver never
   resends the read without the two settings. Statement text carrying its own
   `SETTINGS readonly=0` draws the same code and message as a `readonly=1`

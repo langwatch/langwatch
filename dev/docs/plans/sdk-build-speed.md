@@ -114,7 +114,7 @@ Two shape changes, both real:
 2. **The internal module tree becomes visible as 161 extra `.d.ts` files.** The
    same types ship today, inlined into the bundle; they would now ship as
    separate files under `dist/internal/**`, `dist/client-sdk/**`. `files:
-["dist"]` already covers them.
+   ["dist"]` already covers them.
 
 ### 2.3 Two `.ts` specifiers leak into the per-file emit
 

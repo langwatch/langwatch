@@ -63,9 +63,9 @@ Three rules hold that file, and all three are mechanical:
 import { defineWebModule } from "@langwatch/ui-composition";
 
 import { traceApi } from "./model/trace-api.ts";
-import { traceScreens } from "./ui/trace-screens.ts";
-import { traceDrawers } from "./ui/trace-drawers.ts";
 import { TraceStreamProvider } from "./model/trace-stream.provider.tsx";
+import { traceDrawers } from "./ui/trace-drawers.ts";
+import { traceScreens } from "./ui/trace-screens.ts";
 
 export const traceWeb = defineWebModule("trace")
   .withApi(traceApi)

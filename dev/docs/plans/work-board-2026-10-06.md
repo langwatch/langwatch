@@ -56,7 +56,7 @@ doing it carries them out and makes none of its own.
 - No new foreign key or `@relation`; migrations are additive (nullable or default).
 - Checks: `pnpm exec oxfmt --write` and `pnpm exec oxlint --quiet --type-aware --config .oxlintrc.jsonc` on
   touched files; the touched packages' tests (`VITEST_MAX_WORKERS=2 pnpm --filter <pkg> test`); `pnpm
---filter <pkg> typecheck`; `pnpm --filter @langwatch/architecture-enforcer check:feature-parity` lines for
+  --filter <pkg> typecheck`; `pnpm --filter @langwatch/architecture-enforcer check:feature-parity` lines for
   touched specs; `pnpm check:readmes` if you change a module's statics, peers, tables or routes (run
   `pnpm generate:readmes`).
 - British English, no em dashes, comments five lines maximum, Conventional Commits, no secrets.

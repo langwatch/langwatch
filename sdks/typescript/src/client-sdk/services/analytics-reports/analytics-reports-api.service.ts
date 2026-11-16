@@ -72,7 +72,7 @@ export class AnalyticsReportsApiService {
       error,
       response,
       onError: this.handleApiError.bind(this),
-    }) as unknown as { data: AnalyticsReportSummary[] };
+    });
   }
 
   async get(id: string): Promise<AnalyticsReportDetail> {
@@ -88,7 +88,7 @@ export class AnalyticsReportsApiService {
       error,
       response,
       onError: this.handleApiError.bind(this),
-    }) as unknown as AnalyticsReportDetail;
+    });
   }
 
   async create(params: { name: string }): Promise<AnalyticsReportDetail> {
@@ -134,6 +134,6 @@ export class AnalyticsReportsApiService {
       error,
       response,
       onError: this.handleApiError.bind(this),
-    }) as unknown as { id: string; name: string };
+    });
   }
 }

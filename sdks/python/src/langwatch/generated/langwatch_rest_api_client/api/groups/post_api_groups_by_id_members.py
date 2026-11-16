@@ -7,6 +7,7 @@ from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.post_api_groups_by_id_members_body import PostApiGroupsByIdMembersBody
 from ...models.post_api_groups_by_id_members_response_201 import PostApiGroupsByIdMembersResponse201
+from ...models.post_api_groups_by_id_members_response_400 import PostApiGroupsByIdMembersResponse400
 from ...types import Response, safe_http_status
 
 
@@ -34,11 +35,16 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> PostApiGroupsByIdMembersResponse201 | None:
+) -> PostApiGroupsByIdMembersResponse201 | PostApiGroupsByIdMembersResponse400 | None:
     if response.status_code == 201:
         response_201 = PostApiGroupsByIdMembersResponse201.from_dict(response.json())
 
         return response_201
+
+    if response.status_code == 400:
+        response_400 = PostApiGroupsByIdMembersResponse400.from_dict(response.json())
+
+        return response_400
 
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
@@ -48,7 +54,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[PostApiGroupsByIdMembersResponse201]:
+) -> Response[PostApiGroupsByIdMembersResponse201 | PostApiGroupsByIdMembersResponse400]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -65,7 +71,7 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     body: PostApiGroupsByIdMembersBody,
-) -> Response[PostApiGroupsByIdMembersResponse201]:
+) -> Response[PostApiGroupsByIdMembersResponse201 | PostApiGroupsByIdMembersResponse400]:
     """Add a member to a group
 
     Args:
@@ -77,7 +83,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PostApiGroupsByIdMembersResponse201]
+        Response[PostApiGroupsByIdMembersResponse201 | PostApiGroupsByIdMembersResponse400]
     """
 
     kwargs = _get_kwargs(
@@ -97,7 +103,7 @@ def sync(
     *,
     client: AuthenticatedClient,
     body: PostApiGroupsByIdMembersBody,
-) -> PostApiGroupsByIdMembersResponse201 | None:
+) -> PostApiGroupsByIdMembersResponse201 | PostApiGroupsByIdMembersResponse400 | None:
     """Add a member to a group
 
     Args:
@@ -109,7 +115,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PostApiGroupsByIdMembersResponse201
+        PostApiGroupsByIdMembersResponse201 | PostApiGroupsByIdMembersResponse400
     """
 
     return sync_detailed(
@@ -124,7 +130,7 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
     body: PostApiGroupsByIdMembersBody,
-) -> Response[PostApiGroupsByIdMembersResponse201]:
+) -> Response[PostApiGroupsByIdMembersResponse201 | PostApiGroupsByIdMembersResponse400]:
     """Add a member to a group
 
     Args:
@@ -136,7 +142,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PostApiGroupsByIdMembersResponse201]
+        Response[PostApiGroupsByIdMembersResponse201 | PostApiGroupsByIdMembersResponse400]
     """
 
     kwargs = _get_kwargs(
@@ -154,7 +160,7 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     body: PostApiGroupsByIdMembersBody,
-) -> PostApiGroupsByIdMembersResponse201 | None:
+) -> PostApiGroupsByIdMembersResponse201 | PostApiGroupsByIdMembersResponse400 | None:
     """Add a member to a group
 
     Args:
@@ -166,7 +172,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PostApiGroupsByIdMembersResponse201
+        PostApiGroupsByIdMembersResponse201 | PostApiGroupsByIdMembersResponse400
     """
 
     return (

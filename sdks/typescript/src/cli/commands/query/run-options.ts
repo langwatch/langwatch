@@ -104,7 +104,7 @@ export function resolveTimeWindow({
 function tableCell(value: unknown): string {
   if (value === null || value === undefined) return "";
   if (typeof value === "object") return JSON.stringify(value);
-  return String(value as string | number | boolean);
+  return String(value);
 }
 
 export function printTable(result: {

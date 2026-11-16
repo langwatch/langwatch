@@ -343,9 +343,9 @@ verified.
    default `errorURL` is `${baseURL}/error` which hits the built-in
    BetterAuth HTML error page, not our `/auth/error` with friendly
    messages. Fix: `onAPIError: { errorURL: \`${env.NEXTAUTH_URL}/auth/error\` }`.
-Plus a `normalizeErrorCode` helper maps BetterAuth's native codes
-(`email_doesn't_match`, `LINKING_DIFFERENT_EMAILS_NOT_ALLOWED`) to
-the legacy UI codes (`DIFFERENT_EMAIL_NOT_ALLOWED`).
+   Plus a `normalizeErrorCode` helper maps BetterAuth's native codes
+   (`email_doesn't_match`, `LINKING_DIFFERENT_EMAILS_NOT_ALLOWED`) to
+   the legacy UI codes (`DIFFERENT_EMAIL_NOT_ALLOWED`).
 
 8. **OAuth callback path mismatch breaks Auth0/Okta** — BetterAuth's
    genericOAuth plugin uses `/api/auth/oauth2/callback/{provider}`, but
@@ -493,7 +493,7 @@ the legacy UI codes (`DIFFERENT_EMAIL_NOT_ALLOWED`).
     `UserService.deactivate` writes `deactivatedAt`" — true as a
     literal grep claim, but missed react-admin's dynamic-proxy write
     path. Fixed by intercepting `resource === "user" && method ===
-"update"` in `src/pages/api/admin/[resource].ts` BEFORE
+    "update"` in `src/pages/api/admin/[resource].ts` BEFORE
     `defaultHandler` runs and routing the side-effect fields
     (`deactivatedAt`, `email`) through `UserService` instead. Added
     explicit audit log calls for the side-effect writes since the
@@ -653,7 +653,7 @@ the legacy UI codes (`DIFFERENT_EMAIL_NOT_ALLOWED`).
     the attacker can sign in from another device, persist past
     session expiry, or pivot to other accounts (password reuse).
     Fix: per-user `rateLimit({key: user.changePassword:${userId},
-windowSeconds: 60*15, max: 5})` mirroring `/forget-password`'s
+    windowSeconds: 60*15, max: 5})` mirroring `/forget-password`'s
     budget. Verified by `iter49-bug36-changepw-rate-limit.ts`
     that does 5 wrong attempts (UNAUTHORIZED), then a 6th
     (TOO_MANY_REQUESTS), then verifies even the CORRECT password
@@ -670,7 +670,7 @@ windowSeconds: 60*15, max: 5})` mirroring `/forget-password`'s
     and both delete — leaving the user with zero accounts and
     no way to sign in. Fix: wrap count + findFirst + delete in
     a single `prisma.$transaction(..., { isolationLevel:
-"Serializable" })`. Verified by
+    "Serializable" })`. Verified by
     `iter49-bug37-unlink-race.ts` which fires two parallel
     `unlinkAccount` calls against a 2-account user and verifies
     exactly ONE succeeds (200) and the other is rejected (400),
@@ -1021,7 +1021,7 @@ this is okay.
 4. Curl `POST /api/auth/sign-out` with valid session. **Expected:** 200
    AND the session row is deleted from the DB AND the Redis cache for
    that token is cleared. Verify with `SELECT * FROM "Session" WHERE
-"sessionToken" = 'X'` → 0 rows.
+   "sessionToken" = 'X'` → 0 rows.
 
 #### C2. Cross-origin sign-out rejected (bug #31)
 

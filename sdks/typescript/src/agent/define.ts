@@ -389,7 +389,7 @@ export function connectAgent(
   // A function's own `name` is read-only but configurable, so it is defined rather than assigned.
   Object.defineProperty(connected, "name", { value: name, configurable: true });
 
-  return connected as ConnectedAgent<Record<string, AgentParameterValue>, Record<string, unknown>>;
+  return connected;
 }
 
 export { AgentParameterError };

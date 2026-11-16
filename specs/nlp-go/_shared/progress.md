@@ -147,7 +147,7 @@ topic clustering on Python. Roll out per-project via feature flag.
 6. **Streaming.** SSE pass-through with no buffering, idle timeouts, heartbeats,
    and client-cancellation propagation.
 7. **Telemetry with correct origin.** Every span tagged with `langwatch.origin ∈
-{workflow, evaluation, playground, topic_clustering}`. Origin is set at the
+   {workflow, evaluation, playground, topic_clustering}`. Origin is set at the
    request boundary and propagates to every child span (engine, block, gateway
    call, code-sandbox subprocess). See `telemetry.feature`.
 8. **Optimization is dead.** When `release_nlp_go_engine_enabled` is on for a

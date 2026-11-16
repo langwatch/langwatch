@@ -123,7 +123,7 @@ beforeEach(() => {
       schema: mockSchema,
       reference: mockReference,
     } as unknown as InstanceType<typeof QueryApiService>;
-  } as unknown as typeof QueryApiService);
+  });
 
   vi.spyOn(console, "log").mockImplementation(() => undefined);
   vi.spyOn(console, "error").mockImplementation(() => undefined);

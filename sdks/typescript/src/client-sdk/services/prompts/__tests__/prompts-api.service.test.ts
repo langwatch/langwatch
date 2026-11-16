@@ -20,7 +20,7 @@ describe("PromptsApiService.renameTag", () => {
     service = new PromptsApiService({
       langwatchApiClient: apiClient,
       logger: mock(),
-    } as InternalConfig);
+    });
   });
 
   /** @scenario renameTag calls PUT /api/v1/prompts/tags/{tag} with new name */
@@ -58,7 +58,7 @@ describe("PromptsApiService.get", () => {
     service = new PromptsApiService({
       langwatchApiClient: apiClient,
       logger: mock(),
-    } as InternalConfig);
+    });
   });
 
   describe("when fetching with a tag", () => {
@@ -111,7 +111,7 @@ describe("PromptsApiService.sync", () => {
     service = new PromptsApiService({
       langwatchApiClient: apiClient,
       logger: mock(),
-    } as InternalConfig);
+    });
   });
 
   const syncArgs = {
@@ -170,7 +170,7 @@ describe("PromptsApiService.handleApiError", () => {
     service = new PromptsApiService({
       langwatchApiClient: mock(),
       logger: mock(),
-    } as InternalConfig);
+    });
     // @ts-expect-error - handleApiError is private but we need to bind it to the service
     handleApiError = service.handleApiError.bind(service);
   });

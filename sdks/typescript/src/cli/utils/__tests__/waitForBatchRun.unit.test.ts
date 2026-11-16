@@ -146,7 +146,7 @@ describe("waitForBatchRun()", () => {
       answersWith([{ batchRunId: "batch_123", status: "IN_PROGRESS" }]);
       const exit = vi.spyOn(process, "exit").mockImplementation(((): never => {
         throw new Error("process.exit called");
-      }) as never);
+      }));
 
       const answer = await wait({ advanceMs: 45 * 60 * 1000 + 3000 });
 

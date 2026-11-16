@@ -6,6 +6,7 @@ from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.post_api_dataset_body import PostApiDatasetBody
 from ...models.post_api_dataset_response_201 import PostApiDatasetResponse201
+from ...models.post_api_dataset_response_400 import PostApiDatasetResponse400
 from ...types import Response, safe_http_status
 
 
@@ -30,11 +31,16 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> PostApiDatasetResponse201 | None:
+) -> PostApiDatasetResponse201 | PostApiDatasetResponse400 | None:
     if response.status_code == 201:
         response_201 = PostApiDatasetResponse201.from_dict(response.json())
 
         return response_201
+
+    if response.status_code == 400:
+        response_400 = PostApiDatasetResponse400.from_dict(response.json())
+
+        return response_400
 
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
@@ -44,7 +50,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[PostApiDatasetResponse201]:
+) -> Response[PostApiDatasetResponse201 | PostApiDatasetResponse400]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -60,7 +66,7 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     body: PostApiDatasetBody,
-) -> Response[PostApiDatasetResponse201]:
+) -> Response[PostApiDatasetResponse201 | PostApiDatasetResponse400]:
     """Create a new dataset, optionally with its first rows in `entries`, written in the same call.
 
     Args:
@@ -71,7 +77,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PostApiDatasetResponse201]
+        Response[PostApiDatasetResponse201 | PostApiDatasetResponse400]
     """
 
     kwargs = _get_kwargs(
@@ -89,7 +95,7 @@ def sync(
     *,
     client: AuthenticatedClient,
     body: PostApiDatasetBody,
-) -> PostApiDatasetResponse201 | None:
+) -> PostApiDatasetResponse201 | PostApiDatasetResponse400 | None:
     """Create a new dataset, optionally with its first rows in `entries`, written in the same call.
 
     Args:
@@ -100,7 +106,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PostApiDatasetResponse201
+        PostApiDatasetResponse201 | PostApiDatasetResponse400
     """
 
     return sync_detailed(
@@ -113,7 +119,7 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
     body: PostApiDatasetBody,
-) -> Response[PostApiDatasetResponse201]:
+) -> Response[PostApiDatasetResponse201 | PostApiDatasetResponse400]:
     """Create a new dataset, optionally with its first rows in `entries`, written in the same call.
 
     Args:
@@ -124,7 +130,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PostApiDatasetResponse201]
+        Response[PostApiDatasetResponse201 | PostApiDatasetResponse400]
     """
 
     kwargs = _get_kwargs(
@@ -140,7 +146,7 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     body: PostApiDatasetBody,
-) -> PostApiDatasetResponse201 | None:
+) -> PostApiDatasetResponse201 | PostApiDatasetResponse400 | None:
     """Create a new dataset, optionally with its first rows in `entries`, written in the same call.
 
     Args:
@@ -151,7 +157,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PostApiDatasetResponse201
+        PostApiDatasetResponse201 | PostApiDatasetResponse400
     """
 
     return (

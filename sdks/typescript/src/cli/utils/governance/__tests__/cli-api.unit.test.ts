@@ -147,7 +147,7 @@ describe("cli-api — auth contract", () => {
             access_token: "at_new",
             refresh_token: "rt_new",
             expires_in: 3600,
-          })) as never,
+          })),
           saveImpl: vi.fn(),
           loadImpl: vi.fn() as never,
         },
@@ -173,7 +173,7 @@ describe("cli-api — auth contract", () => {
             access_token: "at_new",
             refresh_token: "rt_new",
             expires_in: 3600,
-          })) as never,
+          })),
           saveImpl: vi.fn(),
           loadImpl: vi.fn() as never,
         },
@@ -195,8 +195,8 @@ describe("cli-api — auth contract", () => {
           refreshDeps: {
             refreshImpl: (async () => {
               throw new DeviceFlowError("unauthorized", "revoked");
-            }) as never,
-            loadImpl: (() => cfg) as never,
+            }),
+            loadImpl: (() => cfg),
             saveImpl: vi.fn(),
           },
         }),

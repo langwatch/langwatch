@@ -49,7 +49,7 @@ The member record itself is built, tested and unconnected to any module:
   `buildClaimedMembers({ source, claims })` (builds exactly the union of
   claimed names, in the source's order, wrapping a member-only refusal as
   `MissingMemberError { module, member, cause }`), and `membersFor(members,
-names)` (the per-module slice). This file is imported by `application.ts`
+  names)` (the per-module slice). This file is imported by `application.ts`
   but not yet called from it - see the gap below.
 - `packages/eventing/src/pipeline/eventingModule.ts`'s `defineEventingModule`
   and `.withEventing(...)` on the module builder, landed at c747279e4e and in
@@ -90,7 +90,7 @@ written to replace:
 - `application.ts` imports `buildClaimedMembers` and `membersFor` from
   `module-members.ts` and never calls either.
 - `persistenceFor(members)` still reads `pool.prisma === undefined ? "memory"
-: "postgres"` - the exact inference ADR-144 decision 2 refuses.
+  : "postgres"` - the exact inference ADR-144 decision 2 refuses.
 - `packages/runtime-composition/tests/infrastructure-needs.unit.test.ts` still
   exercises the discarded `.needs<I>()(...)` / `.build()` shape against
   `createApp({ role, infrastructure: {...} })`, a signature `application.ts`
@@ -232,7 +232,7 @@ and writes, checked in:
 
 - `modules/server-modules.generated.ts` -
   `export const serverModules = [agentServer, analyticsServer,
-annotationServer, apiKeyServer, …] as const;`
+  annotationServer, apiKeyServer, …] as const;`
 - `modules/web-modules.generated.ts` - the same for the web half.
 
 This landed at a different location than either document originally said:
@@ -270,7 +270,7 @@ Per module, in one lane, one commit:
 1. `api-production.composition.ts` loses the module's lines.
 2. `apps/api/src/features/<m>/` is deleted.
 3. `modules/<m>/server/src/<m>.server.ts` gains `static readonly reads =
-reads(...)` on its App, only where the App genuinely reads a member -
+   reads(...)` on its App, only where the App genuinely reads a member -
    annotation and api-key needed none.
 4. the address inventory is regenerated and reviewed as a diff of **zero**
    lines.
@@ -296,7 +296,7 @@ A Sonnet lane follows this and nothing else.
      rows the revocation queries never find);
    - **the module's own config slice**, where the value has an environment
      binding the module already declares - give the App a `static readonly
-configSchema` and read `setup.config` (api-key's `API_KEY_PEPPER`);
+     configSchema` and read `setup.config` (api-key's `API_KEY_PEPPER`);
    - **a named member**, stated with `static readonly reads = reads(...)`
      on the App, and only then.
      A member that fits none of the four is a finding to report, not a member to

@@ -565,7 +565,7 @@ collision with `trace/server`.
 - **Every ClickHouse query.** Checked against
   `dev/docs/best_practices/clickhouse-queries.md`: `TenantId` is the first
   predicate in all nine (`clickhouse.experiment-run.repository.ts:213, 266, 279,
-284, 338, 344, 366, 382, 433, 438, 586, 593`), dedup uses the IN-tuple form
+  284, 338, 344, 366, 382, 433, 438, 586, 593`), dedup uses the IN-tuple form
   (`:281-287, 371-388, 435-441, 590-596`) not `LIMIT 1 BY`, the item and trace
   reads carry `OccurredAt` partition bounds on **both** the outer and inner
   scopes (`:369-370, 385-386, 588-589, 593-595`), and sort keys use

@@ -4,7 +4,6 @@ from collections.abc import Mapping
 from typing import Any, Literal, TypeVar, cast
 
 from attrs import define as _attrs_define
-from attrs import field as _attrs_field
 
 from ..types import UNSET, Unset
 
@@ -21,7 +20,6 @@ class SpanInputOutputType1ValueItemContentType0Type1ItemType2ImageUrl:
 
     url: str
     detail: Literal["auto"] | Literal["high"] | Literal["low"] | Unset = UNSET
-    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         url = self.url
@@ -33,7 +31,7 @@ class SpanInputOutputType1ValueItemContentType0Type1ItemType2ImageUrl:
             detail = self.detail
 
         field_dict: dict[str, Any] = {}
-        field_dict.update(self.additional_properties)
+
         field_dict.update(
             {
                 "url": url,
@@ -72,21 +70,4 @@ class SpanInputOutputType1ValueItemContentType0Type1ItemType2ImageUrl:
             detail=detail,
         )
 
-        span_input_output_type_1_value_item_content_type_0_type_1_item_type_2_image_url.additional_properties = d
         return span_input_output_type_1_value_item_content_type_0_type_1_item_type_2_image_url
-
-    @property
-    def additional_keys(self) -> list[str]:
-        return list(self.additional_properties.keys())
-
-    def __getitem__(self, key: str) -> Any:
-        return self.additional_properties[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.additional_properties[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.additional_properties[key]
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.additional_properties

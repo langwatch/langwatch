@@ -6,6 +6,7 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.get_api_key_response_200 import GetApiKeyResponse200
+from ...models.get_api_key_response_400 import GetApiKeyResponse400
 from ...types import Response, safe_http_status
 
 
@@ -25,11 +26,16 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Any | GetApiKeyResponse200 | None:
+) -> Any | GetApiKeyResponse200 | GetApiKeyResponse400 | None:
     if response.status_code == 200:
         response_200 = GetApiKeyResponse200.from_dict(response.json())
 
         return response_200
+
+    if response.status_code == 400:
+        response_400 = GetApiKeyResponse400.from_dict(response.json())
+
+        return response_400
 
     if response.status_code == 401:
         response_401 = cast(Any, None)
@@ -51,7 +57,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[Any | GetApiKeyResponse200]:
+) -> Response[Any | GetApiKeyResponse200 | GetApiKeyResponse400]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -67,7 +73,7 @@ def sync_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
-) -> Response[Any | GetApiKeyResponse200]:
+) -> Response[Any | GetApiKeyResponse200 | GetApiKeyResponse400]:
     """Get an API key
 
      Read one API key by id, including its role bindings, permission mode and explicit permissions.
@@ -83,7 +89,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Any | GetApiKeyResponse200]
+        Response[Any | GetApiKeyResponse200 | GetApiKeyResponse400]
     """
 
     kwargs = _get_kwargs(
@@ -101,7 +107,7 @@ def sync(
     id: str,
     *,
     client: AuthenticatedClient,
-) -> Any | GetApiKeyResponse200 | None:
+) -> Any | GetApiKeyResponse200 | GetApiKeyResponse400 | None:
     """Get an API key
 
      Read one API key by id, including its role bindings, permission mode and explicit permissions.
@@ -117,7 +123,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Any | GetApiKeyResponse200
+        Any | GetApiKeyResponse200 | GetApiKeyResponse400
     """
 
     return sync_detailed(
@@ -130,7 +136,7 @@ async def asyncio_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
-) -> Response[Any | GetApiKeyResponse200]:
+) -> Response[Any | GetApiKeyResponse200 | GetApiKeyResponse400]:
     """Get an API key
 
      Read one API key by id, including its role bindings, permission mode and explicit permissions.
@@ -146,7 +152,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Any | GetApiKeyResponse200]
+        Response[Any | GetApiKeyResponse200 | GetApiKeyResponse400]
     """
 
     kwargs = _get_kwargs(
@@ -162,7 +168,7 @@ async def asyncio(
     id: str,
     *,
     client: AuthenticatedClient,
-) -> Any | GetApiKeyResponse200 | None:
+) -> Any | GetApiKeyResponse200 | GetApiKeyResponse400 | None:
     """Get an API key
 
      Read one API key by id, including its role bindings, permission mode and explicit permissions.
@@ -178,7 +184,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Any | GetApiKeyResponse200
+        Any | GetApiKeyResponse200 | GetApiKeyResponse400
     """
 
     return (

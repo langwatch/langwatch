@@ -222,19 +222,19 @@ shape.
 
 - **Step id**: `prisma:<folder>`, `clickhouse:<5-digit version>`, `<module>:<kebab-name>`.
 - **Manifest** (`packages/upgrade/releases/<version>.json`, `mig-s2-manifests`): `{ release, previous,
-cutAt, steps: [{ id, kind, mode, owner, description }] }`, steps in rethink 6.3's order.
+  cutAt, steps: [{ id, kind, mode, owner, description }] }`, steps in rethink 6.3's order.
 - **Floor** (`packages/upgrade/releases/lts-floor.json`, `mig-s2-manifests` writes it first):
   `{ release, namedAt }`.
 - **Ledger additions** (`mig-ledger-widen`): step columns `owner`, `description`; tables
   `_langwatch_upgrade_target (step_id, target, status, version, last_error, updated_at)`,
   `_langwatch_upgrade_lease (name, owner, image, host, heartbeat_at, expires_at)`,
   `_langwatch_upgrade_presence (process_id, role, image, release, steps jsonb, started_at,
-heartbeat_at)`; run column `floor`.
+  heartbeat_at)`; run column `floor`.
 - **Declared step** (`mig-declare`, `packages/upgrade/src/step/`): `{ id, kind, mode, description,
-run({ checkpoint, dryRun, signal }), needsOldWritersGone? }`; collected as tasks are, with an
+  run({ checkpoint, dryRun, signal }), needsOldWritersGone? }`; collected as tasks are, with an
   `isMigrationStep` guard so `packages/process` takes `unknown[]` exactly as `withTasks` does.
 - **Reader** (`mig-u1-reader`): `UpgradeReader` with `status()`, `listReleases()`, `listSteps({ release?,
-mode?, status? })`, `getStep({ id })`, `listRuns({ cursor? })`, `getRun({ id })`, schemas in
+  mode?, status? })`, `getStep({ id })`, `listRuns({ cursor? })`, `getRun({ id })`, schemas in
   `packages/upgrade/src/reader/reader.schema.ts`, written first.
 - **Package entry**: `mig-ledger-widen` adds one wildcard subpath export to
   `packages/upgrade/package.json` in its first step, so each lane exports from its own

@@ -73,7 +73,7 @@ export class DashboardsApiService {
   async list(): Promise<{ data: DashboardListItem[] }> {
     const { data, error, response } = await this.apiClient.GET("/api/v1/dashboards");
     if (error) this.handleApiError({ operation: "list dashboards", error, response });
-    return data as { data: DashboardListItem[] };
+    return data;
   }
 
   async get(dashboardId: string): Promise<Dashboard> {
@@ -82,7 +82,7 @@ export class DashboardsApiService {
       params: { path: { dashboardId } },
     });
     if (error) this.handleApiError({ operation, error, response });
-    return data as Dashboard;
+    return data;
   }
 
   async create({ name }: { name: string }): Promise<Dashboard> {
@@ -90,7 +90,7 @@ export class DashboardsApiService {
       body: { name },
     });
     if (error) this.handleApiError({ operation: "create dashboard", error, response });
-    return data as Dashboard;
+    return data;
   }
 
   /** `description: null` clears it; a field left out keeps its value. */
@@ -115,7 +115,7 @@ export class DashboardsApiService {
       },
     );
     if (error) this.handleApiError({ operation, error, response });
-    return data as Dashboard;
+    return data;
   }
 
   /** Deletes the dashboard with the widgets on it; answers its id and name. */
@@ -128,7 +128,7 @@ export class DashboardsApiService {
       },
     );
     if (error) this.handleApiError({ operation, error, response });
-    return data as { id: string; name: string };
+    return data;
   }
 
   async listWidgets(dashboardId: string): Promise<{ data: DashboardWidget[] }> {
@@ -140,7 +140,7 @@ export class DashboardsApiService {
       },
     );
     if (error) this.handleApiError({ operation, error, response });
-    return data as { data: DashboardWidget[] };
+    return data;
   }
 
   /** Creates a widget placed on this dashboard. */
@@ -157,7 +157,7 @@ export class DashboardsApiService {
       { params: { path: { dashboardId } }, body: widget },
     );
     if (error) this.handleApiError({ operation, error, response });
-    return data as DashboardWidget;
+    return data;
   }
 
   async getWidget({
@@ -173,7 +173,7 @@ export class DashboardsApiService {
       { params: { path: { dashboardId, widgetId } } },
     );
     if (error) this.handleApiError({ operation, error, response });
-    return data as DashboardWidget;
+    return data;
   }
 
   async updateWidget({
@@ -191,7 +191,7 @@ export class DashboardsApiService {
       { params: { path: { dashboardId, widgetId } }, body: changes },
     );
     if (error) this.handleApiError({ operation, error, response });
-    return data as DashboardWidget;
+    return data;
   }
 
   /** The route answers `204` with no body. */

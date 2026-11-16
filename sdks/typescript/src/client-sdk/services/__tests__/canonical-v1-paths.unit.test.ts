@@ -138,7 +138,7 @@ describe("given the request paths the TypeScript SDK builds", () => {
       const service = new PromptsApiService({
         langwatchApiClient: { GET: get } as unknown as LangwatchApiClient,
         logger: mock(),
-      } as InternalConfig);
+      });
 
       await service.get("greeting-bot");
 

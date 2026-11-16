@@ -6,8 +6,8 @@ use one shared table look so they read consistently. That look lives in
 restyle a Chakra `Table.Root` per page.
 
 ```tsx
-import { Table } from "@langwatch/design-system/primitives";
 import { ListTable } from "@langwatch/design-system/list-table";
+import { Table } from "@langwatch/design-system/primitives";
 
 <ListTable>
   <Table.Header>

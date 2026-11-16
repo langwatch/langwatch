@@ -129,7 +129,7 @@ describe("grants create", () => {
     it("fails naming the three scope types and makes no request", async () => {
       const exit = vi.spyOn(process, "exit").mockImplementation((() => {
         throw new Error("exited");
-      }) as never);
+      }));
       const errors: string[] = [];
       vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => {
         errors.push(args.map(String).join(" "));

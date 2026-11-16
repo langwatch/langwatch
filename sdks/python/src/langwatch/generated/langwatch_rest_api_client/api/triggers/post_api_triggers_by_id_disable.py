@@ -6,6 +6,7 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.post_api_triggers_by_id_disable_response_200 import PostApiTriggersByIdDisableResponse200
+from ...models.post_api_triggers_by_id_disable_response_400 import PostApiTriggersByIdDisableResponse400
 from ...models.post_api_triggers_by_id_disable_response_404 import PostApiTriggersByIdDisableResponse404
 from ...types import Response, safe_http_status
 
@@ -26,11 +27,21 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> PostApiTriggersByIdDisableResponse200 | PostApiTriggersByIdDisableResponse404 | None:
+) -> (
+    PostApiTriggersByIdDisableResponse200
+    | PostApiTriggersByIdDisableResponse400
+    | PostApiTriggersByIdDisableResponse404
+    | None
+):
     if response.status_code == 200:
         response_200 = PostApiTriggersByIdDisableResponse200.from_dict(response.json())
 
         return response_200
+
+    if response.status_code == 400:
+        response_400 = PostApiTriggersByIdDisableResponse400.from_dict(response.json())
+
+        return response_400
 
     if response.status_code == 404:
         response_404 = PostApiTriggersByIdDisableResponse404.from_dict(response.json())
@@ -45,7 +56,11 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[PostApiTriggersByIdDisableResponse200 | PostApiTriggersByIdDisableResponse404]:
+) -> Response[
+    PostApiTriggersByIdDisableResponse200
+    | PostApiTriggersByIdDisableResponse400
+    | PostApiTriggersByIdDisableResponse404
+]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -61,7 +76,11 @@ def sync_detailed(
     trigger_id: str,
     *,
     client: AuthenticatedClient,
-) -> Response[PostApiTriggersByIdDisableResponse200 | PostApiTriggersByIdDisableResponse404]:
+) -> Response[
+    PostApiTriggersByIdDisableResponse200
+    | PostApiTriggersByIdDisableResponse400
+    | PostApiTriggersByIdDisableResponse404
+]:
     """Pause an automation. A report stops claiming its schedule.
 
     Args:
@@ -72,7 +91,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PostApiTriggersByIdDisableResponse200 | PostApiTriggersByIdDisableResponse404]
+        Response[PostApiTriggersByIdDisableResponse200 | PostApiTriggersByIdDisableResponse400 | PostApiTriggersByIdDisableResponse404]
     """
 
     kwargs = _get_kwargs(
@@ -90,7 +109,12 @@ def sync(
     trigger_id: str,
     *,
     client: AuthenticatedClient,
-) -> PostApiTriggersByIdDisableResponse200 | PostApiTriggersByIdDisableResponse404 | None:
+) -> (
+    PostApiTriggersByIdDisableResponse200
+    | PostApiTriggersByIdDisableResponse400
+    | PostApiTriggersByIdDisableResponse404
+    | None
+):
     """Pause an automation. A report stops claiming its schedule.
 
     Args:
@@ -101,7 +125,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PostApiTriggersByIdDisableResponse200 | PostApiTriggersByIdDisableResponse404
+        PostApiTriggersByIdDisableResponse200 | PostApiTriggersByIdDisableResponse400 | PostApiTriggersByIdDisableResponse404
     """
 
     return sync_detailed(
@@ -114,7 +138,11 @@ async def asyncio_detailed(
     trigger_id: str,
     *,
     client: AuthenticatedClient,
-) -> Response[PostApiTriggersByIdDisableResponse200 | PostApiTriggersByIdDisableResponse404]:
+) -> Response[
+    PostApiTriggersByIdDisableResponse200
+    | PostApiTriggersByIdDisableResponse400
+    | PostApiTriggersByIdDisableResponse404
+]:
     """Pause an automation. A report stops claiming its schedule.
 
     Args:
@@ -125,7 +153,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PostApiTriggersByIdDisableResponse200 | PostApiTriggersByIdDisableResponse404]
+        Response[PostApiTriggersByIdDisableResponse200 | PostApiTriggersByIdDisableResponse400 | PostApiTriggersByIdDisableResponse404]
     """
 
     kwargs = _get_kwargs(
@@ -141,7 +169,12 @@ async def asyncio(
     trigger_id: str,
     *,
     client: AuthenticatedClient,
-) -> PostApiTriggersByIdDisableResponse200 | PostApiTriggersByIdDisableResponse404 | None:
+) -> (
+    PostApiTriggersByIdDisableResponse200
+    | PostApiTriggersByIdDisableResponse400
+    | PostApiTriggersByIdDisableResponse404
+    | None
+):
     """Pause an automation. A report stops claiming its schedule.
 
     Args:
@@ -152,7 +185,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PostApiTriggersByIdDisableResponse200 | PostApiTriggersByIdDisableResponse404
+        PostApiTriggersByIdDisableResponse200 | PostApiTriggersByIdDisableResponse400 | PostApiTriggersByIdDisableResponse404
     """
 
     return (

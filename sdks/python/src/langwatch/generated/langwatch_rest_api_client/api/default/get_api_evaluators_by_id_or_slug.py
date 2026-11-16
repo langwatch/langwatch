@@ -6,6 +6,7 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.get_api_evaluators_by_id_or_slug_response_200 import GetApiEvaluatorsByIdOrSlugResponse200
+from ...models.get_api_evaluators_by_id_or_slug_response_400 import GetApiEvaluatorsByIdOrSlugResponse400
 from ...models.get_api_evaluators_by_id_or_slug_response_404 import GetApiEvaluatorsByIdOrSlugResponse404
 from ...types import UNSET, Response, Unset, safe_http_status
 
@@ -38,11 +39,21 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> GetApiEvaluatorsByIdOrSlugResponse200 | GetApiEvaluatorsByIdOrSlugResponse404 | None:
+) -> (
+    GetApiEvaluatorsByIdOrSlugResponse200
+    | GetApiEvaluatorsByIdOrSlugResponse400
+    | GetApiEvaluatorsByIdOrSlugResponse404
+    | None
+):
     if response.status_code == 200:
         response_200 = GetApiEvaluatorsByIdOrSlugResponse200.from_dict(response.json())
 
         return response_200
+
+    if response.status_code == 400:
+        response_400 = GetApiEvaluatorsByIdOrSlugResponse400.from_dict(response.json())
+
+        return response_400
 
     if response.status_code == 404:
         response_404 = GetApiEvaluatorsByIdOrSlugResponse404.from_dict(response.json())
@@ -57,7 +68,11 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[GetApiEvaluatorsByIdOrSlugResponse200 | GetApiEvaluatorsByIdOrSlugResponse404]:
+) -> Response[
+    GetApiEvaluatorsByIdOrSlugResponse200
+    | GetApiEvaluatorsByIdOrSlugResponse400
+    | GetApiEvaluatorsByIdOrSlugResponse404
+]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -75,7 +90,11 @@ def sync_detailed(
     client: AuthenticatedClient,
     label: str | Unset = UNSET,
     version: int | Unset = UNSET,
-) -> Response[GetApiEvaluatorsByIdOrSlugResponse200 | GetApiEvaluatorsByIdOrSlugResponse404]:
+) -> Response[
+    GetApiEvaluatorsByIdOrSlugResponse200
+    | GetApiEvaluatorsByIdOrSlugResponse400
+    | GetApiEvaluatorsByIdOrSlugResponse404
+]:
     """Get a specific evaluator by ID or slug, at the latest version unless `label` or `version` is given.
     The address also takes a suffix: `toxicity:production`, `toxicity:2` or `toxicity:latest`.
 
@@ -89,7 +108,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetApiEvaluatorsByIdOrSlugResponse200 | GetApiEvaluatorsByIdOrSlugResponse404]
+        Response[GetApiEvaluatorsByIdOrSlugResponse200 | GetApiEvaluatorsByIdOrSlugResponse400 | GetApiEvaluatorsByIdOrSlugResponse404]
     """
 
     kwargs = _get_kwargs(
@@ -111,7 +130,12 @@ def sync(
     client: AuthenticatedClient,
     label: str | Unset = UNSET,
     version: int | Unset = UNSET,
-) -> GetApiEvaluatorsByIdOrSlugResponse200 | GetApiEvaluatorsByIdOrSlugResponse404 | None:
+) -> (
+    GetApiEvaluatorsByIdOrSlugResponse200
+    | GetApiEvaluatorsByIdOrSlugResponse400
+    | GetApiEvaluatorsByIdOrSlugResponse404
+    | None
+):
     """Get a specific evaluator by ID or slug, at the latest version unless `label` or `version` is given.
     The address also takes a suffix: `toxicity:production`, `toxicity:2` or `toxicity:latest`.
 
@@ -125,7 +149,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetApiEvaluatorsByIdOrSlugResponse200 | GetApiEvaluatorsByIdOrSlugResponse404
+        GetApiEvaluatorsByIdOrSlugResponse200 | GetApiEvaluatorsByIdOrSlugResponse400 | GetApiEvaluatorsByIdOrSlugResponse404
     """
 
     return sync_detailed(
@@ -142,7 +166,11 @@ async def asyncio_detailed(
     client: AuthenticatedClient,
     label: str | Unset = UNSET,
     version: int | Unset = UNSET,
-) -> Response[GetApiEvaluatorsByIdOrSlugResponse200 | GetApiEvaluatorsByIdOrSlugResponse404]:
+) -> Response[
+    GetApiEvaluatorsByIdOrSlugResponse200
+    | GetApiEvaluatorsByIdOrSlugResponse400
+    | GetApiEvaluatorsByIdOrSlugResponse404
+]:
     """Get a specific evaluator by ID or slug, at the latest version unless `label` or `version` is given.
     The address also takes a suffix: `toxicity:production`, `toxicity:2` or `toxicity:latest`.
 
@@ -156,7 +184,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetApiEvaluatorsByIdOrSlugResponse200 | GetApiEvaluatorsByIdOrSlugResponse404]
+        Response[GetApiEvaluatorsByIdOrSlugResponse200 | GetApiEvaluatorsByIdOrSlugResponse400 | GetApiEvaluatorsByIdOrSlugResponse404]
     """
 
     kwargs = _get_kwargs(
@@ -176,7 +204,12 @@ async def asyncio(
     client: AuthenticatedClient,
     label: str | Unset = UNSET,
     version: int | Unset = UNSET,
-) -> GetApiEvaluatorsByIdOrSlugResponse200 | GetApiEvaluatorsByIdOrSlugResponse404 | None:
+) -> (
+    GetApiEvaluatorsByIdOrSlugResponse200
+    | GetApiEvaluatorsByIdOrSlugResponse400
+    | GetApiEvaluatorsByIdOrSlugResponse404
+    | None
+):
     """Get a specific evaluator by ID or slug, at the latest version unless `label` or `version` is given.
     The address also takes a suffix: `toxicity:production`, `toxicity:2` or `toxicity:latest`.
 
@@ -190,7 +223,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetApiEvaluatorsByIdOrSlugResponse200 | GetApiEvaluatorsByIdOrSlugResponse404
+        GetApiEvaluatorsByIdOrSlugResponse200 | GetApiEvaluatorsByIdOrSlugResponse400 | GetApiEvaluatorsByIdOrSlugResponse404
     """
 
     return (

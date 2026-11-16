@@ -6,6 +6,7 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.regenerate_project_api_key_response_200 import RegenerateProjectApiKeyResponse200
+from ...models.regenerate_project_api_key_response_400 import RegenerateProjectApiKeyResponse400
 from ...types import Response, safe_http_status
 
 
@@ -25,11 +26,16 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Any | RegenerateProjectApiKeyResponse200 | None:
+) -> Any | RegenerateProjectApiKeyResponse200 | RegenerateProjectApiKeyResponse400 | None:
     if response.status_code == 200:
         response_200 = RegenerateProjectApiKeyResponse200.from_dict(response.json())
 
         return response_200
+
+    if response.status_code == 400:
+        response_400 = RegenerateProjectApiKeyResponse400.from_dict(response.json())
+
+        return response_400
 
     if response.status_code == 401:
         response_401 = cast(Any, None)
@@ -47,7 +53,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[Any | RegenerateProjectApiKeyResponse200]:
+) -> Response[Any | RegenerateProjectApiKeyResponse200 | RegenerateProjectApiKeyResponse400]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -63,7 +69,7 @@ def sync_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
-) -> Response[Any | RegenerateProjectApiKeyResponse200]:
+) -> Response[Any | RegenerateProjectApiKeyResponse200 | RegenerateProjectApiKeyResponse400]:
     """Regenerate the project API key
 
      Deprecated. Project base keys can be rotated only by a signed-in project administrator in the
@@ -77,7 +83,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Any | RegenerateProjectApiKeyResponse200]
+        Response[Any | RegenerateProjectApiKeyResponse200 | RegenerateProjectApiKeyResponse400]
     """
 
     kwargs = _get_kwargs(
@@ -95,7 +101,7 @@ def sync(
     id: str,
     *,
     client: AuthenticatedClient,
-) -> Any | RegenerateProjectApiKeyResponse200 | None:
+) -> Any | RegenerateProjectApiKeyResponse200 | RegenerateProjectApiKeyResponse400 | None:
     """Regenerate the project API key
 
      Deprecated. Project base keys can be rotated only by a signed-in project administrator in the
@@ -109,7 +115,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Any | RegenerateProjectApiKeyResponse200
+        Any | RegenerateProjectApiKeyResponse200 | RegenerateProjectApiKeyResponse400
     """
 
     return sync_detailed(
@@ -122,7 +128,7 @@ async def asyncio_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
-) -> Response[Any | RegenerateProjectApiKeyResponse200]:
+) -> Response[Any | RegenerateProjectApiKeyResponse200 | RegenerateProjectApiKeyResponse400]:
     """Regenerate the project API key
 
      Deprecated. Project base keys can be rotated only by a signed-in project administrator in the
@@ -136,7 +142,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Any | RegenerateProjectApiKeyResponse200]
+        Response[Any | RegenerateProjectApiKeyResponse200 | RegenerateProjectApiKeyResponse400]
     """
 
     kwargs = _get_kwargs(
@@ -152,7 +158,7 @@ async def asyncio(
     id: str,
     *,
     client: AuthenticatedClient,
-) -> Any | RegenerateProjectApiKeyResponse200 | None:
+) -> Any | RegenerateProjectApiKeyResponse200 | RegenerateProjectApiKeyResponse400 | None:
     """Regenerate the project API key
 
      Deprecated. Project base keys can be rotated only by a signed-in project administrator in the
@@ -166,7 +172,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Any | RegenerateProjectApiKeyResponse200
+        Any | RegenerateProjectApiKeyResponse200 | RegenerateProjectApiKeyResponse400
     """
 
     return (

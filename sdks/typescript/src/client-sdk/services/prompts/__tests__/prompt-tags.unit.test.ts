@@ -26,7 +26,7 @@ describe("Prompt Tags", () => {
         service = new PromptsApiService({
           langwatchApiClient: apiClient,
           logger: mock(),
-        } as InternalConfig);
+        });
       });
 
       /** @scenario Assign tag to existing version */
@@ -93,7 +93,7 @@ describe("Prompt Tags", () => {
         service = new PromptsApiService({
           langwatchApiClient: apiClient,
           logger: mock(),
-        } as InternalConfig);
+        });
       });
 
       it("propagates the error", async () => {

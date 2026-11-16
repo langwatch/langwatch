@@ -6,6 +6,7 @@ from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.list_organization_members_include_disabled import ListOrganizationMembersIncludeDisabled
 from ...models.list_organization_members_response_200 import ListOrganizationMembersResponse200
+from ...models.list_organization_members_response_400 import ListOrganizationMembersResponse400
 from ...types import UNSET, Response, Unset, safe_http_status
 
 
@@ -41,11 +42,16 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> ListOrganizationMembersResponse200 | None:
+) -> ListOrganizationMembersResponse200 | ListOrganizationMembersResponse400 | None:
     if response.status_code == 200:
         response_200 = ListOrganizationMembersResponse200.from_dict(response.json())
 
         return response_200
+
+    if response.status_code == 400:
+        response_400 = ListOrganizationMembersResponse400.from_dict(response.json())
+
+        return response_400
 
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
@@ -55,7 +61,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[ListOrganizationMembersResponse200]:
+) -> Response[ListOrganizationMembersResponse200 | ListOrganizationMembersResponse400]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -73,7 +79,7 @@ def sync_detailed(
     include_disabled: ListOrganizationMembersIncludeDisabled | Unset = UNSET,
     offset: int | Unset = UNSET,
     limit: int | Unset = UNSET,
-) -> Response[ListOrganizationMembersResponse200]:
+) -> Response[ListOrganizationMembersResponse200 | ListOrganizationMembersResponse400]:
     """List the organization's members with their organization role and disabled status. Disabled members
     are included only when includeDisabled=true.
 
@@ -87,7 +93,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ListOrganizationMembersResponse200]
+        Response[ListOrganizationMembersResponse200 | ListOrganizationMembersResponse400]
     """
 
     kwargs = _get_kwargs(
@@ -109,7 +115,7 @@ def sync(
     include_disabled: ListOrganizationMembersIncludeDisabled | Unset = UNSET,
     offset: int | Unset = UNSET,
     limit: int | Unset = UNSET,
-) -> ListOrganizationMembersResponse200 | None:
+) -> ListOrganizationMembersResponse200 | ListOrganizationMembersResponse400 | None:
     """List the organization's members with their organization role and disabled status. Disabled members
     are included only when includeDisabled=true.
 
@@ -123,7 +129,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ListOrganizationMembersResponse200
+        ListOrganizationMembersResponse200 | ListOrganizationMembersResponse400
     """
 
     return sync_detailed(
@@ -140,7 +146,7 @@ async def asyncio_detailed(
     include_disabled: ListOrganizationMembersIncludeDisabled | Unset = UNSET,
     offset: int | Unset = UNSET,
     limit: int | Unset = UNSET,
-) -> Response[ListOrganizationMembersResponse200]:
+) -> Response[ListOrganizationMembersResponse200 | ListOrganizationMembersResponse400]:
     """List the organization's members with their organization role and disabled status. Disabled members
     are included only when includeDisabled=true.
 
@@ -154,7 +160,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ListOrganizationMembersResponse200]
+        Response[ListOrganizationMembersResponse200 | ListOrganizationMembersResponse400]
     """
 
     kwargs = _get_kwargs(
@@ -174,7 +180,7 @@ async def asyncio(
     include_disabled: ListOrganizationMembersIncludeDisabled | Unset = UNSET,
     offset: int | Unset = UNSET,
     limit: int | Unset = UNSET,
-) -> ListOrganizationMembersResponse200 | None:
+) -> ListOrganizationMembersResponse200 | ListOrganizationMembersResponse400 | None:
     """List the organization's members with their organization role and disabled status. Disabled members
     are included only when includeDisabled=true.
 
@@ -188,7 +194,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ListOrganizationMembersResponse200
+        ListOrganizationMembersResponse200 | ListOrganizationMembersResponse400
     """
 
     return (

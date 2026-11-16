@@ -29,7 +29,7 @@ describe("Tag CRUD", () => {
       service = new PromptsApiService({
         langwatchApiClient: apiClient,
         logger: mock(),
-      } as InternalConfig);
+      });
     });
 
     describe("listTags()", () => {

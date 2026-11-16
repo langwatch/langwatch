@@ -229,7 +229,7 @@ function NewInstallsChart({ weeks }: { weeks: SelfHostedInstanceSummary["newPerW
           <Tooltip
             cursor={{ fill: "var(--chakra-colors-bg-muted)" }}
             formatter={(value) => [value, "New installs"]}
-            labelFormatter={(label) => `Week from ${label}`}
+            labelFormatter={(label) => <>Week from {label}</>}
             contentStyle={{
               background: "var(--chakra-colors-bg-panel)",
               border: "1px solid var(--chakra-colors-border)",

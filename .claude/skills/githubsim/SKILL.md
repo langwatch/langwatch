@@ -74,7 +74,7 @@ makes every minted token answer 401. Without haven: `make service svc=githubsim`
 - GH-13/GH-31: `app delete --installation <id> --deliver`, then reconnect; PR history stays.
 - GH-15: do not select `+github` and leave `GITHUB_LANGY_APP_ID` unset.
 - CA-15/CA-41: `pr open|merge --deliver` then the Pull Requests page; `fault add --status 429
---retry-after 30 --match /pulls` for the snapshot-on-rate-limit state.
+  --retry-after 30 --match /pulls` for the snapshot-on-rate-limit state.
 - CA-21/CA-37/CA-38/CA-40/CA-42: a PR whose `--head` equals the coding session's branch,
   opened with `--deliver`, binds usage to the project. Pass `host=github.com` to the PR usage APIs
   when PRs were stored before `+github`: the default host is now the githubsim host.

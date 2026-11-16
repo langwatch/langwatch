@@ -527,7 +527,7 @@ function SpendSparkline({
               formatter={(value, name) =>
                 name === "spendUsd" ? [`$${Number(value).toFixed(4)}`, "Spend"] : [value, name]
               }
-              labelFormatter={(label) => String(label ?? "")}
+              labelFormatter={(label) => label ?? ""}
               contentStyle={{ fontSize: TYPE_SCALE_PX.caption }}
             />
             <Area

@@ -56,7 +56,7 @@ For whoever is committing:
 - Commit by explicit pathspec, never `git add -A` and never `git add .` while
   another agent is editing. Name the directories.
 - Build the untracked half of a slice from `git ls-files --others
---exclude-standard <dirs>`, never from `git status` rows. A status row for an
+  --exclude-standard <dirs>`, never from `git status` rows. A status row for an
   untracked directory names the _directory_, not its files, and a slice built
   that way once dropped 136 files.
 - Never `git stash` in a shared checkout. The stash stack is global and a bare
@@ -132,7 +132,7 @@ The developer runs this branch while you work. Every step you land keeps it
 starting:
 
 - Declare a new dependency in `package.json` and run `env -u CI pnpm install
---filter "<package>..."` **before** the first import of it is written.
+  --filter "<package>..."` **before** the first import of it is written.
 - Delete an export only in the same step that repoints or removes its importers.
   Check with `rush ts references` first.
 - Change a constructor's shape and every caller in the same step.

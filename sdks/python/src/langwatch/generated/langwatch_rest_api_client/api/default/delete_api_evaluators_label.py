@@ -6,6 +6,7 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.delete_api_evaluators_label_response_200 import DeleteApiEvaluatorsLabelResponse200
+from ...models.delete_api_evaluators_label_response_400 import DeleteApiEvaluatorsLabelResponse400
 from ...models.delete_api_evaluators_label_response_404 import DeleteApiEvaluatorsLabelResponse404
 from ...types import Response, safe_http_status
 
@@ -28,11 +29,21 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> DeleteApiEvaluatorsLabelResponse200 | DeleteApiEvaluatorsLabelResponse404 | None:
+) -> (
+    DeleteApiEvaluatorsLabelResponse200
+    | DeleteApiEvaluatorsLabelResponse400
+    | DeleteApiEvaluatorsLabelResponse404
+    | None
+):
     if response.status_code == 200:
         response_200 = DeleteApiEvaluatorsLabelResponse200.from_dict(response.json())
 
         return response_200
+
+    if response.status_code == 400:
+        response_400 = DeleteApiEvaluatorsLabelResponse400.from_dict(response.json())
+
+        return response_400
 
     if response.status_code == 404:
         response_404 = DeleteApiEvaluatorsLabelResponse404.from_dict(response.json())
@@ -47,7 +58,9 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[DeleteApiEvaluatorsLabelResponse200 | DeleteApiEvaluatorsLabelResponse404]:
+) -> Response[
+    DeleteApiEvaluatorsLabelResponse200 | DeleteApiEvaluatorsLabelResponse400 | DeleteApiEvaluatorsLabelResponse404
+]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -64,7 +77,9 @@ def sync_detailed(
     label: str,
     *,
     client: AuthenticatedClient,
-) -> Response[DeleteApiEvaluatorsLabelResponse200 | DeleteApiEvaluatorsLabelResponse404]:
+) -> Response[
+    DeleteApiEvaluatorsLabelResponse200 | DeleteApiEvaluatorsLabelResponse400 | DeleteApiEvaluatorsLabelResponse404
+]:
     """Remove a deploy label from an evaluator
 
     Args:
@@ -76,7 +91,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[DeleteApiEvaluatorsLabelResponse200 | DeleteApiEvaluatorsLabelResponse404]
+        Response[DeleteApiEvaluatorsLabelResponse200 | DeleteApiEvaluatorsLabelResponse400 | DeleteApiEvaluatorsLabelResponse404]
     """
 
     kwargs = _get_kwargs(
@@ -96,7 +111,12 @@ def sync(
     label: str,
     *,
     client: AuthenticatedClient,
-) -> DeleteApiEvaluatorsLabelResponse200 | DeleteApiEvaluatorsLabelResponse404 | None:
+) -> (
+    DeleteApiEvaluatorsLabelResponse200
+    | DeleteApiEvaluatorsLabelResponse400
+    | DeleteApiEvaluatorsLabelResponse404
+    | None
+):
     """Remove a deploy label from an evaluator
 
     Args:
@@ -108,7 +128,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        DeleteApiEvaluatorsLabelResponse200 | DeleteApiEvaluatorsLabelResponse404
+        DeleteApiEvaluatorsLabelResponse200 | DeleteApiEvaluatorsLabelResponse400 | DeleteApiEvaluatorsLabelResponse404
     """
 
     return sync_detailed(
@@ -123,7 +143,9 @@ async def asyncio_detailed(
     label: str,
     *,
     client: AuthenticatedClient,
-) -> Response[DeleteApiEvaluatorsLabelResponse200 | DeleteApiEvaluatorsLabelResponse404]:
+) -> Response[
+    DeleteApiEvaluatorsLabelResponse200 | DeleteApiEvaluatorsLabelResponse400 | DeleteApiEvaluatorsLabelResponse404
+]:
     """Remove a deploy label from an evaluator
 
     Args:
@@ -135,7 +157,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[DeleteApiEvaluatorsLabelResponse200 | DeleteApiEvaluatorsLabelResponse404]
+        Response[DeleteApiEvaluatorsLabelResponse200 | DeleteApiEvaluatorsLabelResponse400 | DeleteApiEvaluatorsLabelResponse404]
     """
 
     kwargs = _get_kwargs(
@@ -153,7 +175,12 @@ async def asyncio(
     label: str,
     *,
     client: AuthenticatedClient,
-) -> DeleteApiEvaluatorsLabelResponse200 | DeleteApiEvaluatorsLabelResponse404 | None:
+) -> (
+    DeleteApiEvaluatorsLabelResponse200
+    | DeleteApiEvaluatorsLabelResponse400
+    | DeleteApiEvaluatorsLabelResponse404
+    | None
+):
     """Remove a deploy label from an evaluator
 
     Args:
@@ -165,7 +192,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        DeleteApiEvaluatorsLabelResponse200 | DeleteApiEvaluatorsLabelResponse404
+        DeleteApiEvaluatorsLabelResponse200 | DeleteApiEvaluatorsLabelResponse400 | DeleteApiEvaluatorsLabelResponse404
     """
 
     return (

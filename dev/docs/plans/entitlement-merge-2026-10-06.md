@@ -200,7 +200,7 @@ Edges that keep each module in a cycle after the merge and R8:
   `-> authz` (`:197`) and `-> notification` (`:205`) are acyclic.
 - **Licensing**: `-> organization` (`licensing.app.ts:167`), `-> project` (`:171`), `-> gateway`
   (`:165`). Licensing is cyclic independently of entitlement: `licensing -> organization -> identity ->
-licensing` (identity asks `isPlatformSsoLicensed`).
+  licensing` (identity asks `isPlatformSsoLicensed`).
 
 **Smallest further cut set** taking all three out (beyond R8): 12 edges, entitlement ->
 {organization, project, trace, user}, billing -> {audit-log, data-retention, gateway, organization,

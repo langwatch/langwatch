@@ -87,7 +87,7 @@ describe("given a command fails with a domain error", () => {
 
     vi.mocked(TracesApiService).mockImplementation(function () {
       return { search: vi.fn().mockRejectedValue(notFound()) };
-    } as never);
+    });
   });
 
   afterEach(() => {

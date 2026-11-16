@@ -59,7 +59,7 @@ it.
 
 4. **Reading it** — `make observability-connect` mints a Grafana service-account
    token and wires two read paths for an agent: the **`gcx` CLI** (`gcx logs/
-metrics/traces query`) and the **Grafana skills** plugins
+   metrics/traces query`) and the **Grafana skills** plugins
    (`grafana-lgtm`/`grafana-core`/`grafana-datasources`).
 
 ## Consequences

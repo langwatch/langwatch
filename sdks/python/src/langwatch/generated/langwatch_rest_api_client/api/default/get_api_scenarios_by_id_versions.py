@@ -6,6 +6,7 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.get_api_scenarios_by_id_versions_response_200 import GetApiScenariosByIdVersionsResponse200
+from ...models.get_api_scenarios_by_id_versions_response_400 import GetApiScenariosByIdVersionsResponse400
 from ...models.get_api_scenarios_by_id_versions_response_404 import GetApiScenariosByIdVersionsResponse404
 from ...types import UNSET, Response, Unset, safe_http_status
 
@@ -38,11 +39,21 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> GetApiScenariosByIdVersionsResponse200 | GetApiScenariosByIdVersionsResponse404 | None:
+) -> (
+    GetApiScenariosByIdVersionsResponse200
+    | GetApiScenariosByIdVersionsResponse400
+    | GetApiScenariosByIdVersionsResponse404
+    | None
+):
     if response.status_code == 200:
         response_200 = GetApiScenariosByIdVersionsResponse200.from_dict(response.json())
 
         return response_200
+
+    if response.status_code == 400:
+        response_400 = GetApiScenariosByIdVersionsResponse400.from_dict(response.json())
+
+        return response_400
 
     if response.status_code == 404:
         response_404 = GetApiScenariosByIdVersionsResponse404.from_dict(response.json())
@@ -57,7 +68,11 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[GetApiScenariosByIdVersionsResponse200 | GetApiScenariosByIdVersionsResponse404]:
+) -> Response[
+    GetApiScenariosByIdVersionsResponse200
+    | GetApiScenariosByIdVersionsResponse400
+    | GetApiScenariosByIdVersionsResponse404
+]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -75,7 +90,11 @@ def sync_detailed(
     client: AuthenticatedClient,
     limit: int | Unset = UNSET,
     cursor: int | Unset = UNSET,
-) -> Response[GetApiScenariosByIdVersionsResponse200 | GetApiScenariosByIdVersionsResponse404]:
+) -> Response[
+    GetApiScenariosByIdVersionsResponse200
+    | GetApiScenariosByIdVersionsResponse400
+    | GetApiScenariosByIdVersionsResponse404
+]:
     """List the saved versions of a scenario, newest first. A scenario saved before versions were recorded
     closes its history with a synthesized Created entry.
 
@@ -89,7 +108,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetApiScenariosByIdVersionsResponse200 | GetApiScenariosByIdVersionsResponse404]
+        Response[GetApiScenariosByIdVersionsResponse200 | GetApiScenariosByIdVersionsResponse400 | GetApiScenariosByIdVersionsResponse404]
     """
 
     kwargs = _get_kwargs(
@@ -111,7 +130,12 @@ def sync(
     client: AuthenticatedClient,
     limit: int | Unset = UNSET,
     cursor: int | Unset = UNSET,
-) -> GetApiScenariosByIdVersionsResponse200 | GetApiScenariosByIdVersionsResponse404 | None:
+) -> (
+    GetApiScenariosByIdVersionsResponse200
+    | GetApiScenariosByIdVersionsResponse400
+    | GetApiScenariosByIdVersionsResponse404
+    | None
+):
     """List the saved versions of a scenario, newest first. A scenario saved before versions were recorded
     closes its history with a synthesized Created entry.
 
@@ -125,7 +149,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetApiScenariosByIdVersionsResponse200 | GetApiScenariosByIdVersionsResponse404
+        GetApiScenariosByIdVersionsResponse200 | GetApiScenariosByIdVersionsResponse400 | GetApiScenariosByIdVersionsResponse404
     """
 
     return sync_detailed(
@@ -142,7 +166,11 @@ async def asyncio_detailed(
     client: AuthenticatedClient,
     limit: int | Unset = UNSET,
     cursor: int | Unset = UNSET,
-) -> Response[GetApiScenariosByIdVersionsResponse200 | GetApiScenariosByIdVersionsResponse404]:
+) -> Response[
+    GetApiScenariosByIdVersionsResponse200
+    | GetApiScenariosByIdVersionsResponse400
+    | GetApiScenariosByIdVersionsResponse404
+]:
     """List the saved versions of a scenario, newest first. A scenario saved before versions were recorded
     closes its history with a synthesized Created entry.
 
@@ -156,7 +184,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetApiScenariosByIdVersionsResponse200 | GetApiScenariosByIdVersionsResponse404]
+        Response[GetApiScenariosByIdVersionsResponse200 | GetApiScenariosByIdVersionsResponse400 | GetApiScenariosByIdVersionsResponse404]
     """
 
     kwargs = _get_kwargs(
@@ -176,7 +204,12 @@ async def asyncio(
     client: AuthenticatedClient,
     limit: int | Unset = UNSET,
     cursor: int | Unset = UNSET,
-) -> GetApiScenariosByIdVersionsResponse200 | GetApiScenariosByIdVersionsResponse404 | None:
+) -> (
+    GetApiScenariosByIdVersionsResponse200
+    | GetApiScenariosByIdVersionsResponse400
+    | GetApiScenariosByIdVersionsResponse404
+    | None
+):
     """List the saved versions of a scenario, newest first. A scenario saved before versions were recorded
     closes its history with a synthesized Created entry.
 
@@ -190,7 +223,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetApiScenariosByIdVersionsResponse200 | GetApiScenariosByIdVersionsResponse404
+        GetApiScenariosByIdVersionsResponse200 | GetApiScenariosByIdVersionsResponse400 | GetApiScenariosByIdVersionsResponse404
     """
 
     return (

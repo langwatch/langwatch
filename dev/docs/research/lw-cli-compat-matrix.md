@@ -96,8 +96,8 @@ P1 output contract & agent mode · P2 HandledError-driven errors · P3 discovera
   binary (verified: `bun run build:binary`, `skills list/get` from
   `dist/bin/langwatch`).
 - `lw skills list|get <name>|install [name…] [--all] [--dir] [--dry-run]
-[--force]|uninstall [name…] [--all] [--dir] [--dry-run] [-y]|update [name…]
-[--dir] [--dry-run] [--force]` (`sdks/typescript/src/cli/commands/skills/`),
+  [--force]|uninstall [name…] [--all] [--dir] [--dry-run] [-y]|update [name…]
+  [--dir] [--dry-run] [--force]` (`sdks/typescript/src/cli/commands/skills/`),
   gcx semantics; install root `<dir>/skills/<slug>/SKILL.md`, recipes nested
   `recipes/<slug>/`, default dir `~/.agents`. `get` prints the raw body
   (human AND agent mode; `-o json/yaml` for structure). Installed files carry
@@ -252,7 +252,7 @@ P1 output contract & agent mode · P2 HandledError-driven errors · P3 discovera
       durable `messages` read model until the fold leaves active/running and return
       the final assistant text (optionally SSE from the Redis token buffer exactly
       as `onTurnStream` does). The CLI side is then small: `lw ask "<question>"
-[--json]`, help text steering agents to deterministic commands first.
+  [--json]`, help text steering agents to deterministic commands first.
 - [x] ~~Decide whether `lw ask` needs a server endpoint (scope check in P5)~~ —
       yes, see above.
 - [x] ~~P5 docs: `docs/skills/directory.mdx` + `docs/integration/cli.mdx`~~ —

@@ -4,7 +4,6 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, Literal, TypeVar, cast
 
 from attrs import define as _attrs_define
-from attrs import field as _attrs_field
 
 from ..types import UNSET, Unset
 
@@ -37,7 +36,6 @@ class PostApiGuardrailsByEvaluatorEvaluateResponse200Type0:
     details: str | Unset = UNSET
     cost: PostApiGuardrailsByEvaluatorEvaluateResponse200Type0Cost | Unset = UNSET
     raw_response: Any | Unset = UNSET
-    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         status = self.status
@@ -57,7 +55,7 @@ class PostApiGuardrailsByEvaluatorEvaluateResponse200Type0:
         raw_response = self.raw_response
 
         field_dict: dict[str, Any] = {}
-        field_dict.update(self.additional_properties)
+
         field_dict.update(
             {
                 "status": status,
@@ -116,21 +114,4 @@ class PostApiGuardrailsByEvaluatorEvaluateResponse200Type0:
             raw_response=raw_response,
         )
 
-        post_api_guardrails_by_evaluator_evaluate_response_200_type_0.additional_properties = d
         return post_api_guardrails_by_evaluator_evaluate_response_200_type_0
-
-    @property
-    def additional_keys(self) -> list[str]:
-        return list(self.additional_properties.keys())
-
-    def __getitem__(self, key: str) -> Any:
-        return self.additional_properties[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.additional_properties[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.additional_properties[key]
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.additional_properties

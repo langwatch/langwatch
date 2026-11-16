@@ -99,7 +99,7 @@ export class TestSuitesApiService {
       error,
       response,
       onError: this.handleApiError.bind(this),
-    }) as unknown as TestSuite[];
+    });
   }
 
   async create(params: CreateTestSuiteBody): Promise<TestSuite> {
@@ -112,7 +112,7 @@ export class TestSuitesApiService {
       error,
       response,
       onError: this.handleApiError.bind(this),
-    }) as unknown as TestSuite;
+    });
   }
 
   async get(id: string): Promise<TestSuiteDetail> {
@@ -125,7 +125,7 @@ export class TestSuitesApiService {
       error,
       response,
       onError: this.handleApiError.bind(this),
-    }) as unknown as TestSuiteDetail;
+    });
   }
 
   /**
@@ -144,7 +144,7 @@ export class TestSuitesApiService {
       error,
       response,
       onError: this.handleApiError.bind(this),
-    }) as unknown as TestSuite;
+    });
   }
 
   /** Renames a suite. The slug is kept, so links and run history stay put. */
@@ -159,7 +159,7 @@ export class TestSuitesApiService {
       error,
       response,
       onError: this.handleApiError.bind(this),
-    }) as unknown as TestSuite;
+    });
   }
 
   /** Archives a suite. The scenarios filed in it are archived with it. */
@@ -173,7 +173,7 @@ export class TestSuitesApiService {
       error,
       response,
       onError: this.handleApiError.bind(this),
-    }) as unknown as { id: string; archived: true };
+    });
   }
 
   /**
@@ -193,6 +193,6 @@ export class TestSuitesApiService {
       error,
       response,
       onError: this.handleApiError.bind(this),
-    }) as unknown as TestSuiteRunResult;
+    });
   }
 }

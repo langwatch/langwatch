@@ -6,6 +6,7 @@ from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.put_api_v1_analytics_reports_reorder_body import PutApiV1AnalyticsReportsReorderBody
 from ...models.put_api_v1_analytics_reports_reorder_response_200 import PutApiV1AnalyticsReportsReorderResponse200
+from ...models.put_api_v1_analytics_reports_reorder_response_400 import PutApiV1AnalyticsReportsReorderResponse400
 from ...types import Response, safe_http_status
 
 
@@ -30,11 +31,16 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> PutApiV1AnalyticsReportsReorderResponse200 | None:
+) -> PutApiV1AnalyticsReportsReorderResponse200 | PutApiV1AnalyticsReportsReorderResponse400 | None:
     if response.status_code == 200:
         response_200 = PutApiV1AnalyticsReportsReorderResponse200.from_dict(response.json())
 
         return response_200
+
+    if response.status_code == 400:
+        response_400 = PutApiV1AnalyticsReportsReorderResponse400.from_dict(response.json())
+
+        return response_400
 
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
@@ -44,7 +50,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[PutApiV1AnalyticsReportsReorderResponse200]:
+) -> Response[PutApiV1AnalyticsReportsReorderResponse200 | PutApiV1AnalyticsReportsReorderResponse400]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -60,7 +66,7 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     body: PutApiV1AnalyticsReportsReorderBody,
-) -> Response[PutApiV1AnalyticsReportsReorderResponse200]:
+) -> Response[PutApiV1AnalyticsReportsReorderResponse200 | PutApiV1AnalyticsReportsReorderResponse400]:
     """Reorder dashboards by providing an ordered list of IDs. The Analytics Reports dashboards API is
     deprecated; use the Dashboards API at /api/v1/dashboards.
 
@@ -72,7 +78,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PutApiV1AnalyticsReportsReorderResponse200]
+        Response[PutApiV1AnalyticsReportsReorderResponse200 | PutApiV1AnalyticsReportsReorderResponse400]
     """
 
     kwargs = _get_kwargs(
@@ -90,7 +96,7 @@ def sync(
     *,
     client: AuthenticatedClient,
     body: PutApiV1AnalyticsReportsReorderBody,
-) -> PutApiV1AnalyticsReportsReorderResponse200 | None:
+) -> PutApiV1AnalyticsReportsReorderResponse200 | PutApiV1AnalyticsReportsReorderResponse400 | None:
     """Reorder dashboards by providing an ordered list of IDs. The Analytics Reports dashboards API is
     deprecated; use the Dashboards API at /api/v1/dashboards.
 
@@ -102,7 +108,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PutApiV1AnalyticsReportsReorderResponse200
+        PutApiV1AnalyticsReportsReorderResponse200 | PutApiV1AnalyticsReportsReorderResponse400
     """
 
     return sync_detailed(
@@ -115,7 +121,7 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
     body: PutApiV1AnalyticsReportsReorderBody,
-) -> Response[PutApiV1AnalyticsReportsReorderResponse200]:
+) -> Response[PutApiV1AnalyticsReportsReorderResponse200 | PutApiV1AnalyticsReportsReorderResponse400]:
     """Reorder dashboards by providing an ordered list of IDs. The Analytics Reports dashboards API is
     deprecated; use the Dashboards API at /api/v1/dashboards.
 
@@ -127,7 +133,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PutApiV1AnalyticsReportsReorderResponse200]
+        Response[PutApiV1AnalyticsReportsReorderResponse200 | PutApiV1AnalyticsReportsReorderResponse400]
     """
 
     kwargs = _get_kwargs(
@@ -143,7 +149,7 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     body: PutApiV1AnalyticsReportsReorderBody,
-) -> PutApiV1AnalyticsReportsReorderResponse200 | None:
+) -> PutApiV1AnalyticsReportsReorderResponse200 | PutApiV1AnalyticsReportsReorderResponse400 | None:
     """Reorder dashboards by providing an ordered list of IDs. The Analytics Reports dashboards API is
     deprecated; use the Dashboards API at /api/v1/dashboards.
 
@@ -155,7 +161,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PutApiV1AnalyticsReportsReorderResponse200
+        PutApiV1AnalyticsReportsReorderResponse200 | PutApiV1AnalyticsReportsReorderResponse400
     """
 
     return (

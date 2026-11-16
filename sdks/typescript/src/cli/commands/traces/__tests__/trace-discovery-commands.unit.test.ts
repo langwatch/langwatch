@@ -133,10 +133,10 @@ beforeEach(async () => {
     return { facets: mockFacets, search: mockSearch } as unknown as InstanceType<
       typeof TracesApiService
     >;
-  } as unknown as typeof TracesApiService);
+  });
   vi.mocked(QueryApiService).mockImplementation(function () {
     return { reference: mockReference } as unknown as InstanceType<typeof QueryApiService>;
-  } as unknown as typeof QueryApiService);
+  });
 
   vi.spyOn(console, "log").mockImplementation(() => undefined);
   vi.spyOn(console, "error").mockImplementation(() => undefined);

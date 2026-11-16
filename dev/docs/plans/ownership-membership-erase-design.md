@@ -106,7 +106,7 @@ task converges the tables.
   - It lives in `process/src/eventing/<m>.erasure.ts`, a new filename kind in feature-layout-policy.
   - It is installed through `.withEventing` and calls no peer.
 - **Plan.** A frozen set of root ids: `{ kind: user-erase | organization-purge, userId?, organizationIds, teamIds,
-projectIds }`.
+  projectIds }`.
 - **Run.**
   - A keyed process manager, `erasureRun`, on the member-built `data_erasure` pipeline.
   - Its surface is `eventing.erasures.request`, `status` and `redrive`.

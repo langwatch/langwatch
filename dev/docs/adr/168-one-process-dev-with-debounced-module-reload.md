@@ -71,7 +71,7 @@ From this worktree's api lane log (29 Sept, 148 restarts over five hours):
    serialised: a second debounce firing during a 5 s takedown runs `takeDown` and `spawnOne`
    again, so two children can run at once. The log shows it: 9 `EADDRINUSE` boot failures.
 3. **Half-written trees crash the lane, and the crash is fatal.** `Cannot find module
-.../metered-usage-warning.service.ts`, `WebhookGovernanceDeliveryService is not defined` (4):
+   .../metered-usage-warning.service.ts`, `WebhookGovernanceDeliveryService is not defined` (4):
    an import landed before its target. A crashed child after a restart makes the supervisor
    exit. Under haven the lane respawns every 1 s through pnpm again. Under `pnpm dev`,
    `concurrently --kill-others-on-fail` takes the whole stack down.

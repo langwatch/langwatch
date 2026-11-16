@@ -320,7 +320,7 @@ the application re-exports at `:36` so its own test can reach into it.
 `BillingCooldownCache.claim?` (`:36`) is optional, and `:284` pays for it:
 
 ```ts
-const claimed = await (this.planCooldown.claim?.(organizationId, true) ?? false);
+const claimed = await(this.planCooldown.claim?.(organizationId, true) ?? false);
 ```
 
 Both implementations define `claim` — `MemoryCooldownCache:56` and the app's

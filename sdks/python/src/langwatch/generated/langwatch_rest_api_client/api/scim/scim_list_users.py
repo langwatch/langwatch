@@ -5,6 +5,7 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.scim_list_users_response_200 import ScimListUsersResponse200
+from ...models.scim_list_users_response_400 import ScimListUsersResponse400
 from ...models.scim_list_users_response_401 import ScimListUsersResponse401
 from ...models.scim_list_users_response_403 import ScimListUsersResponse403
 from ...types import UNSET, Response, Unset, safe_http_status
@@ -38,11 +39,16 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> ScimListUsersResponse200 | ScimListUsersResponse401 | ScimListUsersResponse403 | None:
+) -> ScimListUsersResponse200 | ScimListUsersResponse400 | ScimListUsersResponse401 | ScimListUsersResponse403 | None:
     if response.status_code == 200:
         response_200 = ScimListUsersResponse200.from_dict(response.json())
 
         return response_200
+
+    if response.status_code == 400:
+        response_400 = ScimListUsersResponse400.from_dict(response.json())
+
+        return response_400
 
     if response.status_code == 401:
         response_401 = ScimListUsersResponse401.from_dict(response.json())
@@ -62,7 +68,9 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[ScimListUsersResponse200 | ScimListUsersResponse401 | ScimListUsersResponse403]:
+) -> Response[
+    ScimListUsersResponse200 | ScimListUsersResponse400 | ScimListUsersResponse401 | ScimListUsersResponse403
+]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -80,7 +88,9 @@ def sync_detailed(
     filter_: str | Unset = UNSET,
     start_index: int | Unset = UNSET,
     count: int | Unset = UNSET,
-) -> Response[ScimListUsersResponse200 | ScimListUsersResponse401 | ScimListUsersResponse403]:
+) -> Response[
+    ScimListUsersResponse200 | ScimListUsersResponse400 | ScimListUsersResponse401 | ScimListUsersResponse403
+]:
     r"""List provisioned users
 
      The members of the organization the token belongs to, as SCIM users. Two filter expressions are
@@ -98,7 +108,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ScimListUsersResponse200 | ScimListUsersResponse401 | ScimListUsersResponse403]
+        Response[ScimListUsersResponse200 | ScimListUsersResponse400 | ScimListUsersResponse401 | ScimListUsersResponse403]
     """
 
     kwargs = _get_kwargs(
@@ -120,7 +130,7 @@ def sync(
     filter_: str | Unset = UNSET,
     start_index: int | Unset = UNSET,
     count: int | Unset = UNSET,
-) -> ScimListUsersResponse200 | ScimListUsersResponse401 | ScimListUsersResponse403 | None:
+) -> ScimListUsersResponse200 | ScimListUsersResponse400 | ScimListUsersResponse401 | ScimListUsersResponse403 | None:
     r"""List provisioned users
 
      The members of the organization the token belongs to, as SCIM users. Two filter expressions are
@@ -138,7 +148,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ScimListUsersResponse200 | ScimListUsersResponse401 | ScimListUsersResponse403
+        ScimListUsersResponse200 | ScimListUsersResponse400 | ScimListUsersResponse401 | ScimListUsersResponse403
     """
 
     return sync_detailed(
@@ -155,7 +165,9 @@ async def asyncio_detailed(
     filter_: str | Unset = UNSET,
     start_index: int | Unset = UNSET,
     count: int | Unset = UNSET,
-) -> Response[ScimListUsersResponse200 | ScimListUsersResponse401 | ScimListUsersResponse403]:
+) -> Response[
+    ScimListUsersResponse200 | ScimListUsersResponse400 | ScimListUsersResponse401 | ScimListUsersResponse403
+]:
     r"""List provisioned users
 
      The members of the organization the token belongs to, as SCIM users. Two filter expressions are
@@ -173,7 +185,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ScimListUsersResponse200 | ScimListUsersResponse401 | ScimListUsersResponse403]
+        Response[ScimListUsersResponse200 | ScimListUsersResponse400 | ScimListUsersResponse401 | ScimListUsersResponse403]
     """
 
     kwargs = _get_kwargs(
@@ -193,7 +205,7 @@ async def asyncio(
     filter_: str | Unset = UNSET,
     start_index: int | Unset = UNSET,
     count: int | Unset = UNSET,
-) -> ScimListUsersResponse200 | ScimListUsersResponse401 | ScimListUsersResponse403 | None:
+) -> ScimListUsersResponse200 | ScimListUsersResponse400 | ScimListUsersResponse401 | ScimListUsersResponse403 | None:
     r"""List provisioned users
 
      The members of the organization the token belongs to, as SCIM users. Two filter expressions are
@@ -211,7 +223,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ScimListUsersResponse200 | ScimListUsersResponse401 | ScimListUsersResponse403
+        ScimListUsersResponse200 | ScimListUsersResponse400 | ScimListUsersResponse401 | ScimListUsersResponse403
     """
 
     return (

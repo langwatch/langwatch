@@ -4,6 +4,7 @@ User-facing resource IDs (URLs, exports, support tickets, API contracts) use **K
 
 ```typescript
 import { generate } from "xksuid";
+
 import { KSUID_RESOURCES } from "./model/constants"; // package-local; see below
 
 const id = generate(KSUID_RESOURCES.MODEL_PROVIDER).toString();

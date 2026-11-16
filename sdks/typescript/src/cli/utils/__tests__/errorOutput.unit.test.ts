@@ -43,8 +43,8 @@ const handledError = ({
   code = "dataset_not_found",
   message = "Dataset not found: sales-q3",
   httpStatus = 404,
-  meta = { id: "sales-q3" } as Record<string, unknown>,
-  traceId = "4bf92f3577b34da6a3ce929d0e0e4736" as string | undefined,
+  meta = { id: "sales-q3" },
+  traceId = "4bf92f3577b34da6a3ce929d0e0e4736",
   traceUrl = undefined as string | undefined,
   reasons = undefined as
     | { kind: string; retryable?: boolean; meta?: Record<string, unknown> }[]

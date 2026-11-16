@@ -5,6 +5,7 @@ import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
+from ...models.scim_delete_group_response_400 import ScimDeleteGroupResponse400
 from ...models.scim_delete_group_response_401 import ScimDeleteGroupResponse401
 from ...models.scim_delete_group_response_403 import ScimDeleteGroupResponse403
 from ...models.scim_delete_group_response_404 import ScimDeleteGroupResponse404
@@ -27,7 +28,14 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Any | ScimDeleteGroupResponse401 | ScimDeleteGroupResponse403 | ScimDeleteGroupResponse404 | None:
+) -> (
+    Any
+    | ScimDeleteGroupResponse400
+    | ScimDeleteGroupResponse401
+    | ScimDeleteGroupResponse403
+    | ScimDeleteGroupResponse404
+    | None
+):
     if response.status_code == 200:
         response_200 = cast(Any, None)
         return response_200
@@ -35,6 +43,11 @@ def _parse_response(
     if response.status_code == 204:
         response_204 = cast(Any, None)
         return response_204
+
+    if response.status_code == 400:
+        response_400 = ScimDeleteGroupResponse400.from_dict(response.json())
+
+        return response_400
 
     if response.status_code == 401:
         response_401 = ScimDeleteGroupResponse401.from_dict(response.json())
@@ -59,7 +72,13 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[Any | ScimDeleteGroupResponse401 | ScimDeleteGroupResponse403 | ScimDeleteGroupResponse404]:
+) -> Response[
+    Any
+    | ScimDeleteGroupResponse400
+    | ScimDeleteGroupResponse401
+    | ScimDeleteGroupResponse403
+    | ScimDeleteGroupResponse404
+]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -75,7 +94,13 @@ def sync_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
-) -> Response[Any | ScimDeleteGroupResponse401 | ScimDeleteGroupResponse403 | ScimDeleteGroupResponse404]:
+) -> Response[
+    Any
+    | ScimDeleteGroupResponse400
+    | ScimDeleteGroupResponse401
+    | ScimDeleteGroupResponse403
+    | ScimDeleteGroupResponse404
+]:
     """Deprovision a group
 
      Deletes the group along with its memberships and every role binding granted through it, so the
@@ -90,7 +115,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Any | ScimDeleteGroupResponse401 | ScimDeleteGroupResponse403 | ScimDeleteGroupResponse404]
+        Response[Any | ScimDeleteGroupResponse400 | ScimDeleteGroupResponse401 | ScimDeleteGroupResponse403 | ScimDeleteGroupResponse404]
     """
 
     kwargs = _get_kwargs(
@@ -108,7 +133,14 @@ def sync(
     id: str,
     *,
     client: AuthenticatedClient,
-) -> Any | ScimDeleteGroupResponse401 | ScimDeleteGroupResponse403 | ScimDeleteGroupResponse404 | None:
+) -> (
+    Any
+    | ScimDeleteGroupResponse400
+    | ScimDeleteGroupResponse401
+    | ScimDeleteGroupResponse403
+    | ScimDeleteGroupResponse404
+    | None
+):
     """Deprovision a group
 
      Deletes the group along with its memberships and every role binding granted through it, so the
@@ -123,7 +155,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Any | ScimDeleteGroupResponse401 | ScimDeleteGroupResponse403 | ScimDeleteGroupResponse404
+        Any | ScimDeleteGroupResponse400 | ScimDeleteGroupResponse401 | ScimDeleteGroupResponse403 | ScimDeleteGroupResponse404
     """
 
     return sync_detailed(
@@ -136,7 +168,13 @@ async def asyncio_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
-) -> Response[Any | ScimDeleteGroupResponse401 | ScimDeleteGroupResponse403 | ScimDeleteGroupResponse404]:
+) -> Response[
+    Any
+    | ScimDeleteGroupResponse400
+    | ScimDeleteGroupResponse401
+    | ScimDeleteGroupResponse403
+    | ScimDeleteGroupResponse404
+]:
     """Deprovision a group
 
      Deletes the group along with its memberships and every role binding granted through it, so the
@@ -151,7 +189,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Any | ScimDeleteGroupResponse401 | ScimDeleteGroupResponse403 | ScimDeleteGroupResponse404]
+        Response[Any | ScimDeleteGroupResponse400 | ScimDeleteGroupResponse401 | ScimDeleteGroupResponse403 | ScimDeleteGroupResponse404]
     """
 
     kwargs = _get_kwargs(
@@ -167,7 +205,14 @@ async def asyncio(
     id: str,
     *,
     client: AuthenticatedClient,
-) -> Any | ScimDeleteGroupResponse401 | ScimDeleteGroupResponse403 | ScimDeleteGroupResponse404 | None:
+) -> (
+    Any
+    | ScimDeleteGroupResponse400
+    | ScimDeleteGroupResponse401
+    | ScimDeleteGroupResponse403
+    | ScimDeleteGroupResponse404
+    | None
+):
     """Deprovision a group
 
      Deletes the group along with its memberships and every role binding granted through it, so the
@@ -182,7 +227,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Any | ScimDeleteGroupResponse401 | ScimDeleteGroupResponse403 | ScimDeleteGroupResponse404
+        Any | ScimDeleteGroupResponse400 | ScimDeleteGroupResponse401 | ScimDeleteGroupResponse403 | ScimDeleteGroupResponse404
     """
 
     return (

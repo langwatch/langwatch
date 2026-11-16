@@ -174,7 +174,7 @@ export async function buildInstantEvalRunBody({
       sql: statement,
       ...parametersOf(flags),
       ...nameAndLimit(flags),
-    } as InstantEvalRunBody;
+    };
   }
 
   if (questions.length === 0) {
@@ -194,7 +194,7 @@ export async function buildInstantEvalRunBody({
     ...(flags.filter === undefined ? {} : { filter: flags.filter }),
     ...readWindow({ flags, now }),
     ...nameAndLimit(flags),
-  } as InstantEvalRunBody;
+  };
 }
 
 async function readQuestions({

@@ -6,6 +6,7 @@ from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.create_role_binding_body import CreateRoleBindingBody
 from ...models.create_role_binding_response_201 import CreateRoleBindingResponse201
+from ...models.create_role_binding_response_400 import CreateRoleBindingResponse400
 from ...types import Response, safe_http_status
 
 
@@ -30,11 +31,16 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> CreateRoleBindingResponse201 | None:
+) -> CreateRoleBindingResponse201 | CreateRoleBindingResponse400 | None:
     if response.status_code == 201:
         response_201 = CreateRoleBindingResponse201.from_dict(response.json())
 
         return response_201
+
+    if response.status_code == 400:
+        response_400 = CreateRoleBindingResponse400.from_dict(response.json())
+
+        return response_400
 
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
@@ -44,7 +50,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[CreateRoleBindingResponse201]:
+) -> Response[CreateRoleBindingResponse201 | CreateRoleBindingResponse400]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -60,7 +66,7 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     body: CreateRoleBindingBody,
-) -> Response[CreateRoleBindingResponse201]:
+) -> Response[CreateRoleBindingResponse201 | CreateRoleBindingResponse400]:
     """Create a role binding for exactly one principal: a user, a group, or an API key. Every reference is
     checked against the caller's organization; an identical binding is written again, because bindings
     are never unique. Pass expiresAt to time-box the access: it stops granting at that moment on its
@@ -77,7 +83,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[CreateRoleBindingResponse201]
+        Response[CreateRoleBindingResponse201 | CreateRoleBindingResponse400]
     """
 
     kwargs = _get_kwargs(
@@ -95,7 +101,7 @@ def sync(
     *,
     client: AuthenticatedClient,
     body: CreateRoleBindingBody,
-) -> CreateRoleBindingResponse201 | None:
+) -> CreateRoleBindingResponse201 | CreateRoleBindingResponse400 | None:
     """Create a role binding for exactly one principal: a user, a group, or an API key. Every reference is
     checked against the caller's organization; an identical binding is written again, because bindings
     are never unique. Pass expiresAt to time-box the access: it stops granting at that moment on its
@@ -112,7 +118,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        CreateRoleBindingResponse201
+        CreateRoleBindingResponse201 | CreateRoleBindingResponse400
     """
 
     return sync_detailed(
@@ -125,7 +131,7 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
     body: CreateRoleBindingBody,
-) -> Response[CreateRoleBindingResponse201]:
+) -> Response[CreateRoleBindingResponse201 | CreateRoleBindingResponse400]:
     """Create a role binding for exactly one principal: a user, a group, or an API key. Every reference is
     checked against the caller's organization; an identical binding is written again, because bindings
     are never unique. Pass expiresAt to time-box the access: it stops granting at that moment on its
@@ -142,7 +148,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[CreateRoleBindingResponse201]
+        Response[CreateRoleBindingResponse201 | CreateRoleBindingResponse400]
     """
 
     kwargs = _get_kwargs(
@@ -158,7 +164,7 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     body: CreateRoleBindingBody,
-) -> CreateRoleBindingResponse201 | None:
+) -> CreateRoleBindingResponse201 | CreateRoleBindingResponse400 | None:
     """Create a role binding for exactly one principal: a user, a group, or an API key. Every reference is
     checked against the caller's organization; an identical binding is written again, because bindings
     are never unique. Pass expiresAt to time-box the access: it stops granting at that moment on its
@@ -175,7 +181,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        CreateRoleBindingResponse201
+        CreateRoleBindingResponse201 | CreateRoleBindingResponse400
     """
 
     return (

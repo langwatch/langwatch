@@ -115,7 +115,7 @@ describe("docsCommand()", () => {
   let fetchSpy: any;
 
   beforeEach(() => {
-    stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation((() => true) as any);
+    stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation((() => true));
     fetchSpy = vi.spyOn(global, "fetch").mockResolvedValue(
       new Response("# Hello\nbody\n", {
         status: 200,

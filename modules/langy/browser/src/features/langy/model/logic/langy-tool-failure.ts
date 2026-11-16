@@ -551,8 +551,5 @@ function firstLine(raw: string): string {
     /failed to|request failed|error|self_signed_cert_in_chain/i.test(line),
   );
   const line = named ?? lines.find((part) => part.length > 0) ?? raw;
-  return line
-    .replace(/^✖\s*/, "")
-    .trim()
-    .slice(0, 300);
+  return line.replace(/^✖\s*/, "").trim().slice(0, 300);
 }

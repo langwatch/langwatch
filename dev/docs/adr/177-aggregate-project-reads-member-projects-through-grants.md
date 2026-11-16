@@ -113,7 +113,7 @@ on the Postgres side.
 2. **The scope rule is stored on the project, as data.** A new nullable
    column `Project.aggregateRule` (JSON) holds one of three shapes:
    `{ kind: "all-personal" }`, `{ kind: "personal-by-department",
-departmentId }`, or `{ kind: "explicit", projectIds: [...] }`. The default
+   departmentId }`, or `{ kind: "explicit", projectIds: [...] }`. The default
    on creation is `all-personal`. Any project in the organisation may be
    named by an explicit rule, including other people's personal projects,
    because only organisation admins can open the aggregate (choice 5).
@@ -173,7 +173,7 @@ departmentId }`, or `{ kind: "explicit", projectIds: [...] }`. The default
 6. **Every trace read carries an ADR-166 `Authorization` proof, and the
    store client adds the tenant set.** A trace route calls
    `withPermission("traces:view")`, which asks `authz.authorize({ principal,
-permission, scope: { projectId } })` and receives a sealed proof: the
+   permission, scope: { projectId } })` and receives a sealed proof: the
    actor, the principal, the organisation, one `own` grant for the aggregate
    with the caller's full permission set, one `shared` grant per live
    `project-reader` row with the single permission, its `via` grant id and
@@ -185,7 +185,7 @@ permission, scope: { projectId } })` and receives a sealed proof: the
    that does not cover the named resource, with a named error and no row
    data in the log, and otherwise ANDs
    `TenantId IN (own ∪ shared) AND (TenantId IN own OR (TenantId IN shared
-AND StartTime within the grant's window))` onto the query. A trace from a
+   AND StartTime within the grant's window))` onto the query. A trace from a
    project outside the proof contributes nothing. Member traces are
    first-class rows in the list and link to their own detail page under the
    aggregate's slug, carrying the owning project id for display; the detail
@@ -711,7 +711,7 @@ side keeps its existing guards until ADR-166's `prisma.as` lands.
   failed ClickHouse's 256 KiB `max_query_size` from about 800 members, well
   short of the 2,000 this ADR sizes for. That shape is gone. The client now
   emits decision 6 as written: `TenantId IN all AND (TenantId IN own OR
-(TenantId IN shared AND <time> inside the window))`, with the shared
+  (TenantId IN shared AND <time> inside the window))`, with the shared
   tenants and their window edges bound as three parallel array parameters
   and each tenant's edges looked up with `transform`, which builds one hash
   table per block rather than scanning per row. An open window binds its

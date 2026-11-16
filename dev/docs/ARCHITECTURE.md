@@ -664,9 +664,10 @@ string (Alex, 2026-10-01). Only `config.ts` reads `process.env`, apps' `main.ts`
 ```ts
 // apps/api/src/main.ts
 import "@langwatch/time/polyfill";
-import { processModules } from "./process-modules.generated.ts";
 import { processTelemetry } from "@langwatch/observability/node";
 import { processConfig, Server } from "@langwatch/process";
+
+import { processModules } from "./process-modules.generated.ts";
 
 const server = await Server.create("langwatch-api")
   .withConfig(processConfig(processModules))
@@ -1293,7 +1294,7 @@ There is one cipher: stored secrets are encrypted through the stores' `encryptio
    passes only when every claimant holds that same handle (Alex, 2026-09-25).
    A fallback between secrets is declared, not configured: the owner declares each handle and
    resolves them in one record `into`, first answer wins. The API-key pepper is `API_KEY_PEPPER ?? CREDENTIALS_SECRET ??
-NEXTAUTH_SECRET`, and the boot refuses when none answers (Alex, 2026-09-28).
+   NEXTAUTH_SECRET`, and the boot refuses when none answers (Alex, 2026-09-28).
 
 **Config is drilled, never ambient.** There is no async context, and the container (§4) hands
 each module only its own slice. The process config is one object composed of
@@ -1896,7 +1897,7 @@ office deactivates only through user, so it keeps no picked date (Alex, 2026-10-
 - **What a route needs beyond its input is middleware context, supplied by its own module** (Alex, 2026-10-10).
   `defineMiddlewareContext(name, schema)` declares it, the route names it with `.withMiddlewareContext(x)`, and the
   module installer supplies every name its routes ask for with `.provideMiddlewareContext({ name: (request,
-{ app, dependencies }) => value })`. A missing or extra key or a mistyped value does not compile, a module whose
+  { app, dependencies }) => value })`. A missing or extra key or a mistyped value does not compile, a module whose
   routes need context it never provides does not publish, and the mount still refuses an unprovided name. No
   process supplies a module's context; a value several modules need is a shared helper (`projectRequestContextOf`
   in `@langwatch/api/rest`). `.withHeaders(...)` values bind themselves.
@@ -1981,7 +1982,7 @@ office deactivates only through user, so it keeps no picked date (Alex, 2026-10-
 - A protocol whose handler must write the raw Node response itself (hosted MCP's SDK transports) is a
   declared raw HTTP door, `RawHttpProtocol` (`@langwatch/api`): exact paths, prefixes claiming a path and
   everything beneath it, and `open(app)` run once at mount returning `{ handle({ request, response }),
-close() }`. The api's `serve()` answers a claimed request ahead of every route, as main's listener did;
+  close() }`. The api's `serve()` answers a claimed request ahead of every route, as main's listener did;
   `close` runs at shutdown, before the stores close (Alex, 2026-09-27).
 - The API door is bound once, by auth, with `bindApiDoor` in its `provideMiddlewareBindings`; the container
   hands installed bindings to the surface factory, which opens it ahead of REST and tRPC. None or two
@@ -2003,14 +2004,14 @@ close() }`. The api's `serve()` answers a claimed request ahead of every route, 
   crashed presenting the document rather than at the split.
 - **The OpenAPI document is generated, never committed** (Rogerio, 2026-10-02). The api builds it
   once at boot from the routes it mounts and serves it at `/api/openapi.json`; `pnpm --filter
-@langwatch/platform-api openapi:generate` mounts the same declarations on a host whose doors all
+  @langwatch/platform-api openapi:generate` mounts the same declarations on a host whose doors all
   refuse and writes it to `specs/api-reference/openapi-document.json`, which git ignores. The
   document names each route once, at its `/api/v1` address. A published name the declaration no
   longer spells (an `operationId`, a component) is kept with `.withDocs({ operationId })` and
   `.meta({ id })` on the route's own schemas, never by editing output. What is committed is what
   is generated from it: the TypeScript, Python and Go clients and the docs site copy
   (`docs/api-reference/openapiLangWatch.json`, which Mintlify needs in the repository). `make
-sync-all-openapi` regenerates all four, and the `openapi-clients` CI job fails on any diff.
+  sync-all-openapi` regenerates all four, and the `openapi-clients` CI job fails on any diff.
 - **Middleware never does the framework's work** (Alex, 2026-10-05): middleware doing what the API framework
   does (authentication, JSON body parsing) and a route opened to any authenticated or unauthenticated caller
   are drift, caught by lint rules whose message tells the agent why and what to use instead. Those guard

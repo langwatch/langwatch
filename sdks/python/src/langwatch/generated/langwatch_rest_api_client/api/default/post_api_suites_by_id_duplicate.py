@@ -6,6 +6,7 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.post_api_suites_by_id_duplicate_response_201 import PostApiSuitesByIdDuplicateResponse201
+from ...models.post_api_suites_by_id_duplicate_response_400 import PostApiSuitesByIdDuplicateResponse400
 from ...models.post_api_suites_by_id_duplicate_response_404 import PostApiSuitesByIdDuplicateResponse404
 from ...types import Response, safe_http_status
 
@@ -26,11 +27,21 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> PostApiSuitesByIdDuplicateResponse201 | PostApiSuitesByIdDuplicateResponse404 | None:
+) -> (
+    PostApiSuitesByIdDuplicateResponse201
+    | PostApiSuitesByIdDuplicateResponse400
+    | PostApiSuitesByIdDuplicateResponse404
+    | None
+):
     if response.status_code == 201:
         response_201 = PostApiSuitesByIdDuplicateResponse201.from_dict(response.json())
 
         return response_201
+
+    if response.status_code == 400:
+        response_400 = PostApiSuitesByIdDuplicateResponse400.from_dict(response.json())
+
+        return response_400
 
     if response.status_code == 404:
         response_404 = PostApiSuitesByIdDuplicateResponse404.from_dict(response.json())
@@ -45,7 +56,11 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[PostApiSuitesByIdDuplicateResponse201 | PostApiSuitesByIdDuplicateResponse404]:
+) -> Response[
+    PostApiSuitesByIdDuplicateResponse201
+    | PostApiSuitesByIdDuplicateResponse400
+    | PostApiSuitesByIdDuplicateResponse404
+]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -61,7 +76,11 @@ def sync_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
-) -> Response[PostApiSuitesByIdDuplicateResponse201 | PostApiSuitesByIdDuplicateResponse404]:
+) -> Response[
+    PostApiSuitesByIdDuplicateResponse201
+    | PostApiSuitesByIdDuplicateResponse400
+    | PostApiSuitesByIdDuplicateResponse404
+]:
     """Duplicate a suite (run plan). Deprecated: use /api/v1/run-plans and /api/v1/test-suites.
 
     Args:
@@ -72,7 +91,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PostApiSuitesByIdDuplicateResponse201 | PostApiSuitesByIdDuplicateResponse404]
+        Response[PostApiSuitesByIdDuplicateResponse201 | PostApiSuitesByIdDuplicateResponse400 | PostApiSuitesByIdDuplicateResponse404]
     """
 
     kwargs = _get_kwargs(
@@ -90,7 +109,12 @@ def sync(
     id: str,
     *,
     client: AuthenticatedClient,
-) -> PostApiSuitesByIdDuplicateResponse201 | PostApiSuitesByIdDuplicateResponse404 | None:
+) -> (
+    PostApiSuitesByIdDuplicateResponse201
+    | PostApiSuitesByIdDuplicateResponse400
+    | PostApiSuitesByIdDuplicateResponse404
+    | None
+):
     """Duplicate a suite (run plan). Deprecated: use /api/v1/run-plans and /api/v1/test-suites.
 
     Args:
@@ -101,7 +125,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PostApiSuitesByIdDuplicateResponse201 | PostApiSuitesByIdDuplicateResponse404
+        PostApiSuitesByIdDuplicateResponse201 | PostApiSuitesByIdDuplicateResponse400 | PostApiSuitesByIdDuplicateResponse404
     """
 
     return sync_detailed(
@@ -114,7 +138,11 @@ async def asyncio_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
-) -> Response[PostApiSuitesByIdDuplicateResponse201 | PostApiSuitesByIdDuplicateResponse404]:
+) -> Response[
+    PostApiSuitesByIdDuplicateResponse201
+    | PostApiSuitesByIdDuplicateResponse400
+    | PostApiSuitesByIdDuplicateResponse404
+]:
     """Duplicate a suite (run plan). Deprecated: use /api/v1/run-plans and /api/v1/test-suites.
 
     Args:
@@ -125,7 +153,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PostApiSuitesByIdDuplicateResponse201 | PostApiSuitesByIdDuplicateResponse404]
+        Response[PostApiSuitesByIdDuplicateResponse201 | PostApiSuitesByIdDuplicateResponse400 | PostApiSuitesByIdDuplicateResponse404]
     """
 
     kwargs = _get_kwargs(
@@ -141,7 +169,12 @@ async def asyncio(
     id: str,
     *,
     client: AuthenticatedClient,
-) -> PostApiSuitesByIdDuplicateResponse201 | PostApiSuitesByIdDuplicateResponse404 | None:
+) -> (
+    PostApiSuitesByIdDuplicateResponse201
+    | PostApiSuitesByIdDuplicateResponse400
+    | PostApiSuitesByIdDuplicateResponse404
+    | None
+):
     """Duplicate a suite (run plan). Deprecated: use /api/v1/run-plans and /api/v1/test-suites.
 
     Args:
@@ -152,7 +185,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PostApiSuitesByIdDuplicateResponse201 | PostApiSuitesByIdDuplicateResponse404
+        PostApiSuitesByIdDuplicateResponse201 | PostApiSuitesByIdDuplicateResponse400 | PostApiSuitesByIdDuplicateResponse404
     """
 
     return (

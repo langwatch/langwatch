@@ -361,7 +361,7 @@ class SharedFolderSession {
     this.handled.add(call.callId);
     this.client.noteInFlight(call.callId);
     const decision = decide({
-      call: call as LocalToolCall,
+      call: call,
       root: this.root,
       grants: this.grants,
       skipPermissions: this.skipPermissions,

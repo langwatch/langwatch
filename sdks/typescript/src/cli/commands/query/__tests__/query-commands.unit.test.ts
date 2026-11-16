@@ -98,13 +98,13 @@ beforeEach(async () => {
     return {
       query: mockQuery,
     } as unknown as InstanceType<typeof QueryApiService>;
-  } as unknown as typeof QueryApiService);
+  });
 
   vi.spyOn(console, "log").mockImplementation(() => undefined);
   vi.spyOn(console, "error").mockImplementation(() => undefined);
   stdoutWrite = vi
     .spyOn(process.stdout, "write")
-    .mockImplementation(() => true) as unknown as MockInstance<(chunk: unknown) => boolean>;
+    .mockImplementation(() => true);
   vi.spyOn(process, "exit").mockImplementation((code) => {
     throw new ProcessExitError(code as number);
   });

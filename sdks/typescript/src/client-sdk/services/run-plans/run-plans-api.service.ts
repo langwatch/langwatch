@@ -92,7 +92,7 @@ export class RunPlansApiService {
       error,
       response,
       onError: this.handleApiError.bind(this),
-    }) as unknown as RunPlan[];
+    });
   }
 
   async get(id: string): Promise<RunPlan> {
@@ -105,7 +105,7 @@ export class RunPlansApiService {
       error,
       response,
       onError: this.handleApiError.bind(this),
-    }) as unknown as RunPlan;
+    });
   }
 
   /**
@@ -121,7 +121,7 @@ export class RunPlansApiService {
       error,
       response,
       onError: this.handleApiError.bind(this),
-    }) as unknown as RunPlanRunResult;
+    });
   }
 
   /** Runs a plan again with the configuration it already holds. */
@@ -136,7 +136,7 @@ export class RunPlansApiService {
       error,
       response,
       onError: this.handleApiError.bind(this),
-    }) as unknown as RunPlanRunResult;
+    });
   }
 
   async archive(id: string): Promise<{ id: string; archived: true }> {
@@ -149,7 +149,7 @@ export class RunPlansApiService {
       error,
       response,
       onError: this.handleApiError.bind(this),
-    }) as unknown as { id: string; archived: true };
+    });
   }
 }
 

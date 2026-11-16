@@ -6,7 +6,7 @@ export function stableJson(value: unknown): string | undefined {
     inner && typeof inner === "object" && !Array.isArray(inner)
       ? Object.fromEntries(Object.entries(inner).toSorted(([a], [b]) => a.localeCompare(b)))
       : inner,
-  ) as string | undefined;
+  );
 }
 
 /** A key column's value as a comparable string, so 1 and "1" stay different keys. */

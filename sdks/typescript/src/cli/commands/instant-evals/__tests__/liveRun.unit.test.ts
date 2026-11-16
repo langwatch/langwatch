@@ -146,7 +146,7 @@ describe("followInstantEvalRun, given a run to follow", () => {
       const get = vi.fn();
 
       const live = await followInstantEvalRun({
-        service: { get } as never,
+        service: { get },
         run: run({ status: "finished" }),
         machine: true,
       });
@@ -164,7 +164,7 @@ describe("followInstantEvalRun, given a run to follow", () => {
         .mockResolvedValueOnce(run({ status: "finished", matched: 1_284 }));
 
       const live = await followInstantEvalRun({
-        service: { get } as never,
+        service: { get },
         run: run(),
         machine: true,
         sleep: async () => undefined,
@@ -182,7 +182,7 @@ describe("followInstantEvalRun, given a run to follow", () => {
       let clock = 0;
 
       const live = await followInstantEvalRun({
-        service: { get } as never,
+        service: { get },
         run: run(),
         machine: true,
         timeoutMs: 10_000,
@@ -203,7 +203,7 @@ describe("followInstantEvalRun, given a run to follow", () => {
       const get = vi.fn().mockRejectedValue(new Error("down"));
 
       const live = await followInstantEvalRun({
-        service: { get } as never,
+        service: { get },
         run: run(),
         machine: true,
         sleep: async () => undefined,
@@ -239,7 +239,7 @@ describe("printInstantEvalRows, given a model-call run", () => {
           error: null,
           occurredAt: "2026-09-18T12:00:00.000Z",
           ...overrides,
-        }) as InstantEvalJudgment;
+        });
       const printed: string[] = [];
       const logSpy = vi.spyOn(console, "log").mockImplementation((...parts: unknown[]) => {
         printed.push(parts.map(String).join(" "));

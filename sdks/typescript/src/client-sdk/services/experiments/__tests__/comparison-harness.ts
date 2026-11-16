@@ -123,7 +123,7 @@ export const createHarness = () => {
     }
 
     return new Response(JSON.stringify({}), { status: 200 });
-  }) as typeof fetch;
+  });
 
   return harness;
 };

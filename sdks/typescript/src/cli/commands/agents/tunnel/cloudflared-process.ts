@@ -73,5 +73,5 @@ export function launchQuickTunnel({
     recentLog: () => recent.join("\n"),
     once: (event: string, listener: (...args: never[]) => void) =>
       events.once(event, listener as (...args: unknown[]) => void),
-  } as TunnelHandle;
+  };
 }

@@ -372,7 +372,7 @@ finding at `server/maintenance/process-retention-sweep.intent.ts:14`.
     matched", deliberately, so that watching the prompt tells an attacker
     nothing; (b) the better-auth passkey plugin does not throw on an abandoned
     ceremony — it **resolves**, carrying a synthetic `code:
-ERROR_CEREMONY_ABORTED` / `status: 400`, a refusal's clothes on something
+    ERROR_CEREMONY_ABORTED` / `status: 400`, a refusal's clothes on something
     the server never saw. (b) is the whole reason the check reads the resolved
     `code` instead of a thrown exception's `name`, and it now looks arbitrary.
 
@@ -529,7 +529,7 @@ only one in the whole drive to drop a _named security property_.
     `modules/langy/contract/src/cards/__tests__/digest.unit.test.ts`. The
     original enumerated them precisely: trace search returns
     `{ traces, pagination.totalHits }`, dataset list `{ data,
-pagination.total }`, prompt/evaluator/scenario lists are bare arrays,
+    pagination.total }`, prompt/evaluator/scenario lists are bare arrays,
     experiment status is a single run document, analytics is a timeseries.
     The compressed version keeps the first two and collapses the rest to
     "others are bare arrays or documents", losing the analytics-timeseries

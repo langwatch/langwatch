@@ -101,7 +101,7 @@ beforeEach(() => {
       status,
       headers: { "Content-Type": "application/json" },
     });
-  }) as unknown as typeof fetch;
+  });
   vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
     logged.push(stripColour(args.map(String).join(" ")));
   });
@@ -306,5 +306,5 @@ function wrapStatus(inner: typeof fetch, statusFor: (body: unknown) => number): 
       status: statusFor(body),
       headers: { "Content-Type": "application/json" },
     });
-  }) as typeof fetch;
+  });
 }

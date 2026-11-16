@@ -188,7 +188,7 @@ export function installProcessInterceptors(): () => void {
       const done = typeof encodingOrCallback === "function" ? encodingOrCallback : callback;
       done?.();
       return true;
-    }) as typeof realStdoutWrite;
+    });
   };
 
   process.stdout.write = intercept("stdout", realStdoutWrite);
@@ -202,7 +202,7 @@ export function installProcessInterceptors(): () => void {
     }
     context.finalize(code ?? 0);
     throw new DaemonExitSignal(context.exitCode);
-  }) as typeof process.exit;
+  });
 
   return () => {
     process.stdout.write = realStdoutWrite;

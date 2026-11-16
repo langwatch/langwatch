@@ -99,10 +99,7 @@ const configDataFrom = (localConfig: LocalPromptConfig): ConfigData => {
   const configData: ConfigData = {
     model: localConfig.model,
     prompt: PromptConverter.extractSystemPrompt(localConfig.messages),
-    messages: PromptConverter.filterNonSystemMessages(localConfig.messages) as {
-      role: "system" | "user" | "assistant";
-      content: string;
-    }[],
+    messages: PromptConverter.filterNonSystemMessages(localConfig.messages),
     temperature: localConfig.modelParameters?.temperature,
     max_tokens: localConfig.modelParameters?.max_tokens,
     inputs: [{ identifier: "input", type: "str" }],

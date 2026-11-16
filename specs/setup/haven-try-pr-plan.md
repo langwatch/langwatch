@@ -72,8 +72,8 @@ provision→codegen→migrate→seed→supervise pipeline with zero refactor.
    place it at `<worktreesBase>/pr-<N>` (the sibling `worktrees/` dir, overridable
    via `HAVEN_WORKTREE_DIR`); the dir name makes the slug deterministically
    `pr-<n>` → `app.pr-<n>.langwatch.localhost`. Same-repo: `git fetch origin
-<headRefName>` + `git worktree add`. **Fork/cross-repo**: `git fetch origin
-pull/<N>/head:pr-<N>` then add — no fork remote needed. Copy `.env`s via the
+   <headRefName>` + `git worktree add`. **Fork/cross-repo**: `git fetch origin
+   pull/<N>/head:pr-<N>` then add — no fork remote needed. Copy `.env`s via the
    drift-aware copier in `dev/scripts/worktree.sh:124-186` (reuse, don't reimplement).
 3. **Install deps** (reuse Supervisor). `pnpm install` in the worktree via
    `Supervisor.RunOnce` (`app/ports.go:56-61`, the one-shot mechanism `Up` already

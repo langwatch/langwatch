@@ -129,11 +129,10 @@ export interface VerifiedMark {
 
 /** A span's verified marks, read from its `params` however far they are unflattened. */
 export function verifiedMarksOf({ params }: { params: unknown }): VerifiedMark[] {
-  const marks = stringLeavesAt({ value: params, path: "" }).flatMap(
-    ([path = "", projectId = ""]) =>
-      path.startsWith(VERIFIED_ATTRIBUTE_PREFIX)
-        ? [{ key: path.slice(VERIFIED_ATTRIBUTE_PREFIX.length), projectId }]
-        : [],
+  const marks = stringLeavesAt({ value: params, path: "" }).flatMap(([path = "", projectId = ""]) =>
+    path.startsWith(VERIFIED_ATTRIBUTE_PREFIX)
+      ? [{ key: path.slice(VERIFIED_ATTRIBUTE_PREFIX.length), projectId }]
+      : [],
   );
   return [
     ...new Map(marks.map((mark) => [JSON.stringify([mark.key, mark.projectId]), mark])).values(),

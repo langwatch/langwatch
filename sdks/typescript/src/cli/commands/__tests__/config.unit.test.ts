@@ -28,7 +28,7 @@ describe("config commands", () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {
       throw new Error("process.exit called");
-    }) as never);
+    }));
   });
 
   afterEach(() => {

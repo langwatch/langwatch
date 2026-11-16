@@ -211,7 +211,7 @@ without new infrastructure.
   injected implementation is rate-limited per project
   (`createRateLimitedBootstrap`, one commit per project per claim window).
 - `LegacyImportTopicClusteringMigration` (`modules/topic/process/src/
-migrations/legacy-import.topic-clustering.migration.ts`) seeds processes for existing eligible
+  migrations/legacy-import.topic-clustering.migration.ts`) seeds processes for existing eligible
   projects (`firstMessage: true`). Safe to re-run: bootstrap is idempotent.
 - **It covers dormant projects only.** Any project that ingests re-asserts
   its own schedule, so its remaining job is projects that have ingested

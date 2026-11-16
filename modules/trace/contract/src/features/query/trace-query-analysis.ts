@@ -167,7 +167,11 @@ function extractExplicitRange(
 ): { from?: number; to?: number } | null {
   if (node.expression.type !== "RangeExpression") return null;
 
-  return { from: node.expression.range.min, to: node.expression.range.max };
+  const { min, max } = node.expression.range;
+  return {
+    from: typeof min === "number" ? min : undefined,
+    to: typeof max === "number" ? max : undefined,
+  };
 }
 
 /** The open-ended range a `field:>n` / `field:<n` comparison stands for. */

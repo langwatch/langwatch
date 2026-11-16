@@ -354,7 +354,7 @@ describe("healRevokedIngestKey", () => {
             tool_project_keys: {
               claude: { secret: "ik-lw-project-key", project_id: "proj_1" },
             },
-          } as Partial<GovernanceConfig>),
+          }),
       });
 
       const healed = await healRevokedIngestKey({

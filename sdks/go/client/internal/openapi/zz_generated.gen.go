@@ -6543,6 +6543,21 @@ func (e RevokeWorkerSessionKey200JSONResponseBodyOutcome) Valid() bool {
 	}
 }
 
+// Defines values for RevokeWorkerSessionKey400JSONResponseBodySuccess.
+const (
+	RevokeWorkerSessionKey400JSONResponseBodySuccessFalse RevokeWorkerSessionKey400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the RevokeWorkerSessionKey400JSONResponseBodySuccess enum.
+func (e RevokeWorkerSessionKey400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case RevokeWorkerSessionKey400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for IngestTurnResultJSONBodyStatus.
 const (
 	IngestTurnResultJSONBodyStatusCompleted IngestTurnResultJSONBodyStatus = "completed"
@@ -6570,6 +6585,21 @@ const (
 func (e IngestTurnResult202JSONResponseBodyStatus) Valid() bool {
 	switch e {
 	case Accepted:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for IngestTurnResult400JSONResponseBodySuccess.
+const (
+	IngestTurnResult400JSONResponseBodySuccessFalse IngestTurnResult400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the IngestTurnResult400JSONResponseBodySuccess enum.
+func (e IngestTurnResult400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case IngestTurnResult400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -6615,6 +6645,21 @@ const (
 func (e ScimListGroups200JSONResponseBodySchemas) Valid() bool {
 	switch e {
 	case ScimListGroups200JSONResponseBodySchemasUrnIetfParamsScimApiMessages20ListResponse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ScimListGroups400JSONResponseBodySuccess.
+const (
+	ScimListGroups400JSONResponseBodySuccessFalse ScimListGroups400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the ScimListGroups400JSONResponseBodySuccess enum.
+func (e ScimListGroups400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case ScimListGroups400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -6741,6 +6786,21 @@ func (e ScimCreateGroup409JSONResponseBodySchemas) Valid() bool {
 	}
 }
 
+// Defines values for ScimDeleteGroup400JSONResponseBodySuccess.
+const (
+	ScimDeleteGroup400JSONResponseBodySuccessFalse ScimDeleteGroup400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the ScimDeleteGroup400JSONResponseBodySuccess enum.
+func (e ScimDeleteGroup400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case ScimDeleteGroup400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ScimDeleteGroup401JSONResponseBodySchemas.
 const (
 	ScimDeleteGroup401JSONResponseBodySchemasUrnIetfParamsScimApiMessages20Error ScimDeleteGroup401JSONResponseBodySchemas = "urn:ietf:params:scim:api:messages:2.0:Error"
@@ -6810,6 +6870,21 @@ const (
 func (e ScimGetGroup200JSONResponseBodySchemas) Valid() bool {
 	switch e {
 	case ScimGetGroup200JSONResponseBodySchemasUrnIetfParamsScimSchemasCore20Group:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ScimGetGroup400JSONResponseBodySuccess.
+const (
+	ScimGetGroup400JSONResponseBodySuccessFalse ScimGetGroup400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the ScimGetGroup400JSONResponseBodySuccess enum.
+func (e ScimGetGroup400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case ScimGetGroup400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -7212,6 +7287,21 @@ func (e ScimListUsers200JSONResponseBodySchemas) Valid() bool {
 	}
 }
 
+// Defines values for ScimListUsers400JSONResponseBodySuccess.
+const (
+	ScimListUsers400JSONResponseBodySuccessFalse ScimListUsers400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the ScimListUsers400JSONResponseBodySuccess enum.
+func (e ScimListUsers400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case ScimListUsers400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ScimListUsers401JSONResponseBodySchemas.
 const (
 	ScimListUsers401JSONResponseBodySchemasUrnIetfParamsScimApiMessages20Error ScimListUsers401JSONResponseBodySchemas = "urn:ietf:params:scim:api:messages:2.0:Error"
@@ -7332,6 +7422,21 @@ func (e ScimCreateUser409JSONResponseBodySchemas) Valid() bool {
 	}
 }
 
+// Defines values for ScimDeleteUser400JSONResponseBodySuccess.
+const (
+	ScimDeleteUser400JSONResponseBodySuccessFalse ScimDeleteUser400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the ScimDeleteUser400JSONResponseBodySuccess enum.
+func (e ScimDeleteUser400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case ScimDeleteUser400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ScimDeleteUser401JSONResponseBodySchemas.
 const (
 	ScimDeleteUser401JSONResponseBodySchemasUrnIetfParamsScimApiMessages20Error ScimDeleteUser401JSONResponseBodySchemas = "urn:ietf:params:scim:api:messages:2.0:Error"
@@ -7401,6 +7506,21 @@ const (
 func (e ScimGetUser200JSONResponseBodySchemas) Valid() bool {
 	switch e {
 	case ScimGetUser200JSONResponseBodySchemasUrnIetfParamsScimSchemasCore20User:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ScimGetUser400JSONResponseBodySuccess.
+const (
+	ScimGetUser400JSONResponseBodySuccessFalse ScimGetUser400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the ScimGetUser400JSONResponseBodySuccess enum.
+func (e ScimGetUser400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case ScimGetUser400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -8178,6 +8298,21 @@ func (e GetApiTraceId200JSONResponseBodySpans2Type16) Valid() bool {
 	}
 }
 
+// Defines values for GetApiTraceId400JSONResponseBodySuccess.
+const (
+	GetApiTraceId400JSONResponseBodySuccessFalse GetApiTraceId400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetApiTraceId400JSONResponseBodySuccess enum.
+func (e GetApiTraceId400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetApiTraceId400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PostApiTraceIdShare200JSONResponseBodyStatus.
 const (
 	PostApiTraceIdShare200JSONResponseBodyStatusSuccess PostApiTraceIdShare200JSONResponseBodyStatus = "success"
@@ -8193,6 +8328,21 @@ func (e PostApiTraceIdShare200JSONResponseBodyStatus) Valid() bool {
 	}
 }
 
+// Defines values for PostApiTraceIdShare400JSONResponseBodySuccess.
+const (
+	PostApiTraceIdShare400JSONResponseBodySuccessFalse PostApiTraceIdShare400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the PostApiTraceIdShare400JSONResponseBodySuccess enum.
+func (e PostApiTraceIdShare400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case PostApiTraceIdShare400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PostApiTraceIdUnshare200JSONResponseBodyStatus.
 const (
 	PostApiTraceIdUnshare200JSONResponseBodyStatusSuccess PostApiTraceIdUnshare200JSONResponseBodyStatus = "success"
@@ -8202,6 +8352,21 @@ const (
 func (e PostApiTraceIdUnshare200JSONResponseBodyStatus) Valid() bool {
 	switch e {
 	case PostApiTraceIdUnshare200JSONResponseBodyStatusSuccess:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTraceIdUnshare400JSONResponseBodySuccess.
+const (
+	PostApiTraceIdUnshare400JSONResponseBodySuccessFalse PostApiTraceIdUnshare400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the PostApiTraceIdUnshare400JSONResponseBodySuccess enum.
+func (e PostApiTraceIdUnshare400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case PostApiTraceIdUnshare400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -8247,6 +8412,21 @@ const (
 func (e StartAdminImpersonation200JSONResponseBodyMessage) Valid() bool {
 	switch e {
 	case ImpersonationStarted:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for StartAdminImpersonation400JSONResponseBodySuccess.
+const (
+	StartAdminImpersonation400JSONResponseBodySuccessFalse StartAdminImpersonation400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the StartAdminImpersonation400JSONResponseBodySuccess enum.
+func (e StartAdminImpersonation400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case StartAdminImpersonation400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -8304,6 +8484,21 @@ func (e RunAdminOperationJSONBodyParamsSortOrder) Valid() bool {
 	case ASC:
 		return true
 	case DESC:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RunAdminOperation400JSONResponseBodySuccess.
+const (
+	RunAdminOperation400JSONResponseBodySuccessFalse RunAdminOperation400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the RunAdminOperation400JSONResponseBodySuccess enum.
+func (e RunAdminOperation400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case RunAdminOperation400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -8772,6 +8967,21 @@ func (e ListAgents200JSONResponseBodyDataType) Valid() bool {
 	case ListAgents200JSONResponseBodyDataTypeVoice:
 		return true
 	case ListAgents200JSONResponseBodyDataTypeWorkflow:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListAgents400JSONResponseBodySuccess.
+const (
+	ListAgents400JSONResponseBodySuccessFalse ListAgents400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the ListAgents400JSONResponseBodySuccess enum.
+func (e ListAgents400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case ListAgents400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -10254,6 +10464,21 @@ func (e CreateAgent201JSONResponseBodyType) Valid() bool {
 	}
 }
 
+// Defines values for CreateAgent400JSONResponseBodySuccess.
+const (
+	CreateAgent400JSONResponseBodySuccessFalse CreateAgent400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the CreateAgent400JSONResponseBodySuccess enum.
+func (e CreateAgent400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case CreateAgent400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PostConnectedAgentFramesJSONBodyFrames0Protocol.
 const (
 	PostConnectedAgentFramesJSONBodyFrames0ProtocolN1 PostConnectedAgentFramesJSONBodyFrames0Protocol = 1
@@ -10344,6 +10569,21 @@ func (e PostConnectedAgentFramesJSONBodyFrames2Type) Valid() bool {
 	}
 }
 
+// Defines values for PostConnectedAgentFrames400JSONResponseBodySuccess.
+const (
+	PostConnectedAgentFrames400JSONResponseBodySuccessFalse PostConnectedAgentFrames400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the PostConnectedAgentFrames400JSONResponseBodySuccess enum.
+func (e PostConnectedAgentFrames400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case PostConnectedAgentFrames400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PollConnectedAgentInstance200JSONResponseBodyFrames0Kind.
 const (
 	PollConnectedAgentInstance200JSONResponseBodyFrames0KindSetup    PollConnectedAgentInstance200JSONResponseBodyFrames0Kind = "setup"
@@ -10419,6 +10659,21 @@ const (
 func (e PollConnectedAgentInstance200JSONResponseBodyFrames1Type) Valid() bool {
 	switch e {
 	case PollConnectedAgentInstance200JSONResponseBodyFrames1TypeCancel:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PollConnectedAgentInstance400JSONResponseBodySuccess.
+const (
+	PollConnectedAgentInstance400JSONResponseBodySuccessFalse PollConnectedAgentInstance400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the PollConnectedAgentInstance400JSONResponseBodySuccess enum.
+func (e PollConnectedAgentInstance400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case PollConnectedAgentInstance400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -10596,6 +10851,21 @@ func (e RegisterConnectedAgentInstance200JSONResponseBodyFrame1Type) Valid() boo
 	}
 }
 
+// Defines values for RegisterConnectedAgentInstance400JSONResponseBodySuccess.
+const (
+	RegisterConnectedAgentInstance400JSONResponseBodySuccessFalse RegisterConnectedAgentInstance400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the RegisterConnectedAgentInstance400JSONResponseBodySuccess enum.
+func (e RegisterConnectedAgentInstance400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case RegisterConnectedAgentInstance400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for RemoveAgentLabel200JSONResponseBodyRemoved.
 const (
 	RemoveAgentLabel200JSONResponseBodyRemovedTrue RemoveAgentLabel200JSONResponseBodyRemoved = true
@@ -10605,6 +10875,36 @@ const (
 func (e RemoveAgentLabel200JSONResponseBodyRemoved) Valid() bool {
 	switch e {
 	case RemoveAgentLabel200JSONResponseBodyRemovedTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RemoveAgentLabel400JSONResponseBodySuccess.
+const (
+	RemoveAgentLabel400JSONResponseBodySuccessFalse RemoveAgentLabel400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the RemoveAgentLabel400JSONResponseBodySuccess enum.
+func (e RemoveAgentLabel400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case RemoveAgentLabel400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AssignAgentLabel400JSONResponseBodySuccess.
+const (
+	AssignAgentLabel400JSONResponseBodySuccessFalse AssignAgentLabel400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the AssignAgentLabel400JSONResponseBodySuccess enum.
+func (e AssignAgentLabel400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case AssignAgentLabel400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -10662,6 +10962,21 @@ func (e ListAgentVersions200JSONResponseBodyDataType) Valid() bool {
 	}
 }
 
+// Defines values for ListAgentVersions400JSONResponseBodySuccess.
+const (
+	ListAgentVersions400JSONResponseBodySuccessFalse ListAgentVersions400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the ListAgentVersions400JSONResponseBodySuccess enum.
+func (e ListAgentVersions400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case ListAgentVersions400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ArchiveAgent200JSONResponseBodyType.
 const (
 	ArchiveAgent200JSONResponseBodyTypeCode      ArchiveAgent200JSONResponseBodyType = "code"
@@ -10686,6 +11001,21 @@ func (e ArchiveAgent200JSONResponseBodyType) Valid() bool {
 	case ArchiveAgent200JSONResponseBodyTypeVoice:
 		return true
 	case ArchiveAgent200JSONResponseBodyTypeWorkflow:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ArchiveAgent400JSONResponseBodySuccess.
+const (
+	ArchiveAgent400JSONResponseBodySuccessFalse ArchiveAgent400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the ArchiveAgent400JSONResponseBodySuccess enum.
+func (e ArchiveAgent400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case ArchiveAgent400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -10770,6 +11100,21 @@ func (e GetAgent200JSONResponseBodyType) Valid() bool {
 	case GetAgent200JSONResponseBodyTypeVoice:
 		return true
 	case GetAgent200JSONResponseBodyTypeWorkflow:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetAgent400JSONResponseBodySuccess.
+const (
+	GetAgent400JSONResponseBodySuccessFalse GetAgent400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetAgent400JSONResponseBodySuccess enum.
+func (e GetAgent400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetAgent400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -10890,6 +11235,21 @@ func (e UpdateAgent200JSONResponseBodyType) Valid() bool {
 	}
 }
 
+// Defines values for UpdateAgent400JSONResponseBodySuccess.
+const (
+	UpdateAgent400JSONResponseBodySuccessFalse UpdateAgent400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the UpdateAgent400JSONResponseBodySuccess enum.
+func (e UpdateAgent400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case UpdateAgent400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ReplaceAgentJSONBodyType.
 const (
 	ReplaceAgentJSONBodyTypeCode      ReplaceAgentJSONBodyType = "code"
@@ -11004,6 +11364,21 @@ func (e ReplaceAgent200JSONResponseBodyType) Valid() bool {
 	}
 }
 
+// Defines values for ReplaceAgent400JSONResponseBodySuccess.
+const (
+	ReplaceAgent400JSONResponseBodySuccessFalse ReplaceAgent400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the ReplaceAgent400JSONResponseBodySuccess enum.
+func (e ReplaceAgent400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case ReplaceAgent400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for CallConnectedAgentJSONBodyKind.
 const (
 	CallConnectedAgentJSONBodyKindSetup    CallConnectedAgentJSONBodyKind = "setup"
@@ -11019,6 +11394,36 @@ func (e CallConnectedAgentJSONBodyKind) Valid() bool {
 	case CallConnectedAgentJSONBodyKindTeardown:
 		return true
 	case CallConnectedAgentJSONBodyKindTurn:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CallConnectedAgent400JSONResponseBodySuccess.
+const (
+	CallConnectedAgent400JSONResponseBodySuccessFalse CallConnectedAgent400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the CallConnectedAgent400JSONResponseBodySuccess enum.
+func (e CallConnectedAgent400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case CallConnectedAgent400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for TestAgent400JSONResponseBodySuccess.
+const (
+	TestAgent400JSONResponseBodySuccessFalse TestAgent400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the TestAgent400JSONResponseBodySuccess enum.
+func (e TestAgent400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case TestAgent400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -11130,6 +11535,21 @@ func (e PostApiAnalyticsJSONBodyTimeScale0) Valid() bool {
 	}
 }
 
+// Defines values for PostApiV1AnalyticsReports400JSONResponseBodySuccess.
+const (
+	PostApiV1AnalyticsReports400JSONResponseBodySuccessFalse PostApiV1AnalyticsReports400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the PostApiV1AnalyticsReports400JSONResponseBodySuccess enum.
+func (e PostApiV1AnalyticsReports400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case PostApiV1AnalyticsReports400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PutApiV1AnalyticsReportsReorder200JSONResponseBodySuccess.
 const (
 	PutApiV1AnalyticsReportsReorder200JSONResponseBodySuccessTrue PutApiV1AnalyticsReportsReorder200JSONResponseBodySuccess = true
@@ -11139,6 +11559,66 @@ const (
 func (e PutApiV1AnalyticsReportsReorder200JSONResponseBodySuccess) Valid() bool {
 	switch e {
 	case PutApiV1AnalyticsReportsReorder200JSONResponseBodySuccessTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PutApiV1AnalyticsReportsReorder400JSONResponseBodySuccess.
+const (
+	PutApiV1AnalyticsReportsReorder400JSONResponseBodySuccessFalse PutApiV1AnalyticsReportsReorder400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the PutApiV1AnalyticsReportsReorder400JSONResponseBodySuccess enum.
+func (e PutApiV1AnalyticsReportsReorder400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case PutApiV1AnalyticsReportsReorder400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeleteApiV1AnalyticsReportsByReportId400JSONResponseBodySuccess.
+const (
+	DeleteApiV1AnalyticsReportsByReportId400JSONResponseBodySuccessFalse DeleteApiV1AnalyticsReportsByReportId400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the DeleteApiV1AnalyticsReportsByReportId400JSONResponseBodySuccess enum.
+func (e DeleteApiV1AnalyticsReportsByReportId400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case DeleteApiV1AnalyticsReportsByReportId400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiV1AnalyticsReportsByReportId400JSONResponseBodySuccess.
+const (
+	GetApiV1AnalyticsReportsByReportId400JSONResponseBodySuccessFalse GetApiV1AnalyticsReportsByReportId400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetApiV1AnalyticsReportsByReportId400JSONResponseBodySuccess enum.
+func (e GetApiV1AnalyticsReportsByReportId400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetApiV1AnalyticsReportsByReportId400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiV1AnalyticsReportsByReportId400JSONResponseBodySuccess.
+const (
+	PatchApiV1AnalyticsReportsByReportId400JSONResponseBodySuccessFalse PatchApiV1AnalyticsReportsByReportId400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the PatchApiV1AnalyticsReportsByReportId400JSONResponseBodySuccess enum.
+func (e PatchApiV1AnalyticsReportsByReportId400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case PatchApiV1AnalyticsReportsByReportId400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -11268,6 +11748,21 @@ func (e GetApiAnnotationsParamsAnchor) Valid() bool {
 	}
 }
 
+// Defines values for GetApiAnnotations400JSONResponseBodySuccess.
+const (
+	GetApiAnnotations400JSONResponseBodySuccessFalse GetApiAnnotations400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetApiAnnotations400JSONResponseBodySuccess enum.
+func (e GetApiAnnotations400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetApiAnnotations400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GetApiAnnotationsTraceIdParamsAnchor.
 const (
 	GetApiAnnotationsTraceIdParamsAnchorAll   GetApiAnnotationsTraceIdParamsAnchor = "all"
@@ -11280,6 +11775,81 @@ func (e GetApiAnnotationsTraceIdParamsAnchor) Valid() bool {
 	case GetApiAnnotationsTraceIdParamsAnchorAll:
 		return true
 	case GetApiAnnotationsTraceIdParamsAnchorTrace:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiAnnotationsTraceId400JSONResponseBodySuccess.
+const (
+	GetApiAnnotationsTraceId400JSONResponseBodySuccessFalse GetApiAnnotationsTraceId400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetApiAnnotationsTraceId400JSONResponseBodySuccess enum.
+func (e GetApiAnnotationsTraceId400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetApiAnnotationsTraceId400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiAnnotationsTraceId400JSONResponseBodySuccess.
+const (
+	PostApiAnnotationsTraceId400JSONResponseBodySuccessFalse PostApiAnnotationsTraceId400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the PostApiAnnotationsTraceId400JSONResponseBodySuccess enum.
+func (e PostApiAnnotationsTraceId400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case PostApiAnnotationsTraceId400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeleteApiAnnotationsId400JSONResponseBodySuccess.
+const (
+	DeleteApiAnnotationsId400JSONResponseBodySuccessFalse DeleteApiAnnotationsId400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the DeleteApiAnnotationsId400JSONResponseBodySuccess enum.
+func (e DeleteApiAnnotationsId400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case DeleteApiAnnotationsId400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiAnnotationsId400JSONResponseBodySuccess.
+const (
+	GetApiAnnotationsId400JSONResponseBodySuccessFalse GetApiAnnotationsId400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetApiAnnotationsId400JSONResponseBodySuccess enum.
+func (e GetApiAnnotationsId400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetApiAnnotationsId400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiAnnotationsId400JSONResponseBodySuccess.
+const (
+	PatchApiAnnotationsId400JSONResponseBodySuccessFalse PatchApiAnnotationsId400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the PatchApiAnnotationsId400JSONResponseBodySuccess enum.
+func (e PatchApiAnnotationsId400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case PatchApiAnnotationsId400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -11370,6 +11940,21 @@ func (e CreateApiKeyJSONBodyPermissionMode) Valid() bool {
 	}
 }
 
+// Defines values for CreateApiKey400JSONResponseBodySuccess.
+const (
+	CreateApiKey400JSONResponseBodySuccessFalse CreateApiKey400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the CreateApiKey400JSONResponseBodySuccess enum.
+func (e CreateApiKey400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case CreateApiKey400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for CreateFullAccessApiKeyJSONBodyBindingsRole.
 const (
 	CreateFullAccessApiKeyJSONBodyBindingsRoleADMIN  CreateFullAccessApiKeyJSONBodyBindingsRole = "ADMIN"
@@ -11454,6 +12039,21 @@ func (e CreateFullAccessApiKeyJSONBodyPermissionMode) Valid() bool {
 	}
 }
 
+// Defines values for CreateFullAccessApiKey400JSONResponseBodySuccess.
+const (
+	CreateFullAccessApiKey400JSONResponseBodySuccessFalse CreateFullAccessApiKey400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the CreateFullAccessApiKey400JSONResponseBodySuccess enum.
+func (e CreateFullAccessApiKey400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case CreateFullAccessApiKey400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for CreateIngestionApiKeyJSONBodyBindingsRole.
 const (
 	CreateIngestionApiKeyJSONBodyBindingsRoleADMIN  CreateIngestionApiKeyJSONBodyBindingsRole = "ADMIN"
@@ -11532,6 +12132,36 @@ func (e CreateIngestionApiKeyJSONBodyPermissionMode) Valid() bool {
 	case CreateIngestionApiKeyJSONBodyPermissionModeReadonly:
 		return true
 	case CreateIngestionApiKeyJSONBodyPermissionModeRestricted:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CreateIngestionApiKey400JSONResponseBodySuccess.
+const (
+	CreateIngestionApiKey400JSONResponseBodySuccessFalse CreateIngestionApiKey400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the CreateIngestionApiKey400JSONResponseBodySuccess enum.
+func (e CreateIngestionApiKey400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case CreateIngestionApiKey400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RevokeApiKey400JSONResponseBodySuccess.
+const (
+	RevokeApiKey400JSONResponseBodySuccessFalse RevokeApiKey400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the RevokeApiKey400JSONResponseBodySuccess enum.
+func (e RevokeApiKey400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case RevokeApiKey400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -11640,6 +12270,21 @@ func (e GetApiKey200JSONResponseBodyRoleBindingsScopeType) Valid() bool {
 	case GetApiKey200JSONResponseBodyRoleBindingsScopeTypePROJECT:
 		return true
 	case GetApiKey200JSONResponseBodyRoleBindingsScopeTypeTEAM:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiKey400JSONResponseBodySuccess.
+const (
+	GetApiKey400JSONResponseBodySuccessFalse GetApiKey400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetApiKey400JSONResponseBodySuccess enum.
+func (e GetApiKey400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetApiKey400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -11820,6 +12465,21 @@ func (e UpdateApiKey200JSONResponseBodyRoleBindingsScopeType) Valid() bool {
 	}
 }
 
+// Defines values for UpdateApiKey400JSONResponseBodySuccess.
+const (
+	UpdateApiKey400JSONResponseBodySuccessFalse UpdateApiKey400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the UpdateApiKey400JSONResponseBodySuccess enum.
+func (e UpdateApiKey400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case UpdateApiKey400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ReadCliBootstrap200JSONResponseBodyBudgetPeriod.
 const (
 	MONTHLY ReadCliBootstrap200JSONResponseBodyBudgetPeriod = "MONTHLY"
@@ -11916,6 +12576,21 @@ func (e ReadCliBudgetStatus402JSONResponseBodyErrorType) Valid() bool {
 	}
 }
 
+// Defines values for WatchCliDeviceApproval400JSONResponseBodySuccess.
+const (
+	WatchCliDeviceApproval400JSONResponseBodySuccessFalse WatchCliDeviceApproval400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the WatchCliDeviceApproval400JSONResponseBodySuccess enum.
+func (e WatchCliDeviceApproval400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case WatchCliDeviceApproval400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ReadCliIngestionKeyState200JSONResponseBodyStatus.
 const (
 	ReadCliIngestionKeyState200JSONResponseBodyStatusLive    ReadCliIngestionKeyState200JSONResponseBodyStatus = "live"
@@ -11931,6 +12606,21 @@ func (e ReadCliIngestionKeyState200JSONResponseBodyStatus) Valid() bool {
 	case ReadCliIngestionKeyState200JSONResponseBodyStatusRevoked:
 		return true
 	case ReadCliIngestionKeyState200JSONResponseBodyStatusUnknown:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for LookupCliDeviceCode400JSONResponseBodySuccess.
+const (
+	LookupCliDeviceCode400JSONResponseBodySuccessFalse LookupCliDeviceCode400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the LookupCliDeviceCode400JSONResponseBodySuccess enum.
+func (e LookupCliDeviceCode400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case LookupCliDeviceCode400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -11967,6 +12657,21 @@ func (e SubmitBugReportJSONBodySource) Valid() bool {
 	case SubmitBugReportJSONBodySourceCli:
 		return true
 	case SubmitBugReportJSONBodySourceMcp:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SubmitBugReport400JSONResponseBodySuccess.
+const (
+	SubmitBugReport400JSONResponseBodySuccessFalse SubmitBugReport400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the SubmitBugReport400JSONResponseBodySuccess enum.
+func (e SubmitBugReport400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case SubmitBugReport400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -14457,6 +15162,21 @@ func (e GetApiDataset200JSONResponseBodyDataColumnTypesType) Valid() bool {
 	}
 }
 
+// Defines values for GetApiDataset400JSONResponseBodySuccess.
+const (
+	GetApiDataset400JSONResponseBodySuccessFalse GetApiDataset400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetApiDataset400JSONResponseBodySuccess enum.
+func (e GetApiDataset400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetApiDataset400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PostApiDatasetJSONBodyColumnTypesType.
 const (
 	PostApiDatasetJSONBodyColumnTypesTypeAnnotations  PostApiDatasetJSONBodyColumnTypesType = "annotations"
@@ -14559,6 +15279,36 @@ func (e PostApiDataset201JSONResponseBodyColumnTypesType) Valid() bool {
 	}
 }
 
+// Defines values for PostApiDataset400JSONResponseBodySuccess.
+const (
+	PostApiDataset400JSONResponseBodySuccessFalse PostApiDataset400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the PostApiDataset400JSONResponseBodySuccess enum.
+func (e PostApiDataset400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case PostApiDataset400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiDatasetAttachments400JSONResponseBodySuccess.
+const (
+	PostApiDatasetAttachments400JSONResponseBodySuccessFalse PostApiDatasetAttachments400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the PostApiDatasetAttachments400JSONResponseBodySuccess enum.
+func (e PostApiDatasetAttachments400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case PostApiDatasetAttachments400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PostApiDatasetAttachmentsUploads201JSONResponseBodyMethod.
 const (
 	PostApiDatasetAttachmentsUploads201JSONResponseBodyMethodPUT PostApiDatasetAttachmentsUploads201JSONResponseBodyMethod = "PUT"
@@ -14568,6 +15318,21 @@ const (
 func (e PostApiDatasetAttachmentsUploads201JSONResponseBodyMethod) Valid() bool {
 	switch e {
 	case PostApiDatasetAttachmentsUploads201JSONResponseBodyMethodPUT:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiDatasetAttachmentsUploads400JSONResponseBodySuccess.
+const (
+	PostApiDatasetAttachmentsUploads400JSONResponseBodySuccessFalse PostApiDatasetAttachmentsUploads400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the PostApiDatasetAttachmentsUploads400JSONResponseBodySuccess enum.
+func (e PostApiDatasetAttachmentsUploads400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case PostApiDatasetAttachmentsUploads400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -14643,6 +15408,21 @@ const (
 func (e PostApiDatasetImports201JSONResponseBodyStatus) Valid() bool {
 	switch e {
 	case Processing:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiDatasetImports400JSONResponseBodySuccess.
+const (
+	PostApiDatasetImports400JSONResponseBodySuccessFalse PostApiDatasetImports400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the PostApiDatasetImports400JSONResponseBodySuccess enum.
+func (e PostApiDatasetImports400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case PostApiDatasetImports400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -14751,6 +15531,21 @@ func (e GetApiDatasetBySlugEntries200JSONResponseBodyDatasetColumnTypesType) Val
 	}
 }
 
+// Defines values for GetApiDatasetBySlugEntries400JSONResponseBodySuccess.
+const (
+	GetApiDatasetBySlugEntries400JSONResponseBodySuccessFalse GetApiDatasetBySlugEntries400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetApiDatasetBySlugEntries400JSONResponseBodySuccess enum.
+func (e GetApiDatasetBySlugEntries400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetApiDatasetBySlugEntries400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PostApiDatasetBySlugEntries200JSONResponseBodySuccess.
 const (
 	PostApiDatasetBySlugEntries200JSONResponseBodySuccessTrue PostApiDatasetBySlugEntries200JSONResponseBodySuccess = true
@@ -14766,6 +15561,21 @@ func (e PostApiDatasetBySlugEntries200JSONResponseBodySuccess) Valid() bool {
 	}
 }
 
+// Defines values for PostApiDatasetBySlugEntries400JSONResponseBodySuccess.
+const (
+	PostApiDatasetBySlugEntries400JSONResponseBodySuccessFalse PostApiDatasetBySlugEntries400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the PostApiDatasetBySlugEntries400JSONResponseBodySuccess enum.
+func (e PostApiDatasetBySlugEntries400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case PostApiDatasetBySlugEntries400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for DeleteApiDatasetBySlugOrId200JSONResponseBodyArchived.
 const (
 	DeleteApiDatasetBySlugOrId200JSONResponseBodyArchivedTrue DeleteApiDatasetBySlugOrId200JSONResponseBodyArchived = true
@@ -14775,6 +15585,21 @@ const (
 func (e DeleteApiDatasetBySlugOrId200JSONResponseBodyArchived) Valid() bool {
 	switch e {
 	case DeleteApiDatasetBySlugOrId200JSONResponseBodyArchivedTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeleteApiDatasetBySlugOrId400JSONResponseBodySuccess.
+const (
+	DeleteApiDatasetBySlugOrId400JSONResponseBodySuccessFalse DeleteApiDatasetBySlugOrId400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the DeleteApiDatasetBySlugOrId400JSONResponseBodySuccess enum.
+func (e DeleteApiDatasetBySlugOrId400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case DeleteApiDatasetBySlugOrId400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -14826,6 +15651,21 @@ func (e GetApiDatasetBySlugOrId200JSONResponseBodyColumnTypesType) Valid() bool 
 	case GetApiDatasetBySlugOrId200JSONResponseBodyColumnTypesTypeSpans:
 		return true
 	case GetApiDatasetBySlugOrId200JSONResponseBodyColumnTypesTypeString:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiDatasetBySlugOrId400JSONResponseBodySuccess.
+const (
+	GetApiDatasetBySlugOrId400JSONResponseBodySuccessFalse GetApiDatasetBySlugOrId400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetApiDatasetBySlugOrId400JSONResponseBodySuccess enum.
+func (e GetApiDatasetBySlugOrId400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetApiDatasetBySlugOrId400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -14934,6 +15774,51 @@ func (e PatchApiDatasetBySlugOrId200JSONResponseBodyColumnTypesType) Valid() boo
 	}
 }
 
+// Defines values for PatchApiDatasetBySlugOrId400JSONResponseBodySuccess.
+const (
+	PatchApiDatasetBySlugOrId400JSONResponseBodySuccessFalse PatchApiDatasetBySlugOrId400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the PatchApiDatasetBySlugOrId400JSONResponseBodySuccess enum.
+func (e PatchApiDatasetBySlugOrId400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case PatchApiDatasetBySlugOrId400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiDatasetBySlugOrIdImports400JSONResponseBodySuccess.
+const (
+	PostApiDatasetBySlugOrIdImports400JSONResponseBodySuccessFalse PostApiDatasetBySlugOrIdImports400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the PostApiDatasetBySlugOrIdImports400JSONResponseBodySuccess enum.
+func (e PostApiDatasetBySlugOrIdImports400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case PostApiDatasetBySlugOrIdImports400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeleteApiDatasetBySlugOrIdRecords400JSONResponseBodySuccess.
+const (
+	DeleteApiDatasetBySlugOrIdRecords400JSONResponseBodySuccessFalse DeleteApiDatasetBySlugOrIdRecords400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the DeleteApiDatasetBySlugOrIdRecords400JSONResponseBodySuccess enum.
+func (e DeleteApiDatasetBySlugOrIdRecords400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case DeleteApiDatasetBySlugOrIdRecords400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GetApiDatasetBySlugOrIdRecords200JSONResponseBodyDatasetColumnTypesType.
 const (
 	GetApiDatasetBySlugOrIdRecords200JSONResponseBodyDatasetColumnTypesTypeAnnotations  GetApiDatasetBySlugOrIdRecords200JSONResponseBodyDatasetColumnTypesType = "annotations"
@@ -14979,6 +15864,66 @@ func (e GetApiDatasetBySlugOrIdRecords200JSONResponseBodyDatasetColumnTypesType)
 	case GetApiDatasetBySlugOrIdRecords200JSONResponseBodyDatasetColumnTypesTypeSpans:
 		return true
 	case GetApiDatasetBySlugOrIdRecords200JSONResponseBodyDatasetColumnTypesTypeString:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiDatasetBySlugOrIdRecords400JSONResponseBodySuccess.
+const (
+	GetApiDatasetBySlugOrIdRecords400JSONResponseBodySuccessFalse GetApiDatasetBySlugOrIdRecords400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetApiDatasetBySlugOrIdRecords400JSONResponseBodySuccess enum.
+func (e GetApiDatasetBySlugOrIdRecords400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetApiDatasetBySlugOrIdRecords400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiDatasetBySlugOrIdRecords400JSONResponseBodySuccess.
+const (
+	PostApiDatasetBySlugOrIdRecords400JSONResponseBodySuccessFalse PostApiDatasetBySlugOrIdRecords400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the PostApiDatasetBySlugOrIdRecords400JSONResponseBodySuccess enum.
+func (e PostApiDatasetBySlugOrIdRecords400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case PostApiDatasetBySlugOrIdRecords400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiDatasetBySlugOrIdRecordsByRecordId400JSONResponseBodySuccess.
+const (
+	PatchApiDatasetBySlugOrIdRecordsByRecordId400JSONResponseBodySuccessFalse PatchApiDatasetBySlugOrIdRecordsByRecordId400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the PatchApiDatasetBySlugOrIdRecordsByRecordId400JSONResponseBodySuccess enum.
+func (e PatchApiDatasetBySlugOrIdRecordsByRecordId400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case PatchApiDatasetBySlugOrIdRecordsByRecordId400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiDatasetBySlugOrIdUpload400JSONResponseBodySuccess.
+const (
+	PostApiDatasetBySlugOrIdUpload400JSONResponseBodySuccessFalse PostApiDatasetBySlugOrIdUpload400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the PostApiDatasetBySlugOrIdUpload400JSONResponseBodySuccess enum.
+func (e PostApiDatasetBySlugOrIdUpload400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case PostApiDatasetBySlugOrIdUpload400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -15084,6 +16029,21 @@ func (e GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataTrigger) Valid() b
 	}
 }
 
+// Defines values for GetApiDatasetBySlugOrIdVersions400JSONResponseBodySuccess.
+const (
+	GetApiDatasetBySlugOrIdVersions400JSONResponseBodySuccessFalse GetApiDatasetBySlugOrIdVersions400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetApiDatasetBySlugOrIdVersions400JSONResponseBodySuccess enum.
+func (e GetApiDatasetBySlugOrIdVersions400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetApiDatasetBySlugOrIdVersions400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PostApiDatasetBySlugOrIdVersions200JSONResponseBodyAuthorKind.
 const (
 	PostApiDatasetBySlugOrIdVersions200JSONResponseBodyAuthorKindApiKey PostApiDatasetBySlugOrIdVersions200JSONResponseBodyAuthorKind = "api_key"
@@ -15177,6 +16137,21 @@ func (e PostApiDatasetBySlugOrIdVersions200JSONResponseBodyTrigger) Valid() bool
 	case PostApiDatasetBySlugOrIdVersions200JSONResponseBodyTriggerManual:
 		return true
 	case PostApiDatasetBySlugOrIdVersions200JSONResponseBodyTriggerRestore:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiDatasetBySlugOrIdVersions400JSONResponseBodySuccess.
+const (
+	PostApiDatasetBySlugOrIdVersions400JSONResponseBodySuccessFalse PostApiDatasetBySlugOrIdVersions400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the PostApiDatasetBySlugOrIdVersions400JSONResponseBodySuccess enum.
+func (e PostApiDatasetBySlugOrIdVersions400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case PostApiDatasetBySlugOrIdVersions400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -15282,6 +16257,21 @@ func (e GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionTrigge
 	}
 }
 
+// Defines values for GetApiDatasetBySlugOrIdVersionsByVersion400JSONResponseBodySuccess.
+const (
+	GetApiDatasetBySlugOrIdVersionsByVersion400JSONResponseBodySuccessFalse GetApiDatasetBySlugOrIdVersionsByVersion400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetApiDatasetBySlugOrIdVersionsByVersion400JSONResponseBodySuccess enum.
+func (e GetApiDatasetBySlugOrIdVersionsByVersion400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetApiDatasetBySlugOrIdVersionsByVersion400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionAuthorKind.
 const (
 	PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionAuthorKindApiKey PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionAuthorKind = "api_key"
@@ -15381,6 +16371,21 @@ func (e PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersi
 	}
 }
 
+// Defines values for PostApiDatasetBySlugOrIdVersionsByVersionRestore400JSONResponseBodySuccess.
+const (
+	PostApiDatasetBySlugOrIdVersionsByVersionRestore400JSONResponseBodySuccessFalse PostApiDatasetBySlugOrIdVersionsByVersionRestore400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the PostApiDatasetBySlugOrIdVersionsByVersionRestore400JSONResponseBodySuccess enum.
+func (e PostApiDatasetBySlugOrIdVersionsByVersionRestore400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case PostApiDatasetBySlugOrIdVersionsByVersionRestore400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for RevokeDocsSession200JSONResponseBodyRevoked.
 const (
 	RevokeDocsSession200JSONResponseBodyRevokedTrue RevokeDocsSession200JSONResponseBodyRevoked = true
@@ -15390,6 +16395,21 @@ const (
 func (e RevokeDocsSession200JSONResponseBodyRevoked) Valid() bool {
 	switch e {
 	case RevokeDocsSession200JSONResponseBodyRevokedTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ReceiveElevenLabsWebhook400JSONResponseBodySuccess.
+const (
+	ReceiveElevenLabsWebhook400JSONResponseBodySuccessFalse ReceiveElevenLabsWebhook400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the ReceiveElevenLabsWebhook400JSONResponseBodySuccess enum.
+func (e ReceiveElevenLabsWebhook400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case ReceiveElevenLabsWebhook400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -15657,6 +16677,21 @@ func (e PostApiEvaluatorsJSONBodyType) Valid() bool {
 	}
 }
 
+// Defines values for PostApiEvaluators400JSONResponseBodySuccess.
+const (
+	PostApiEvaluators400JSONResponseBodySuccessFalse PostApiEvaluators400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the PostApiEvaluators400JSONResponseBodySuccess enum.
+func (e PostApiEvaluators400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case PostApiEvaluators400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for DeleteApiEvaluatorsLabel200JSONResponseBodyRemoved.
 const (
 	DeleteApiEvaluatorsLabel200JSONResponseBodyRemovedTrue DeleteApiEvaluatorsLabel200JSONResponseBodyRemoved = true
@@ -15666,6 +16701,21 @@ const (
 func (e DeleteApiEvaluatorsLabel200JSONResponseBodyRemoved) Valid() bool {
 	switch e {
 	case DeleteApiEvaluatorsLabel200JSONResponseBodyRemovedTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeleteApiEvaluatorsLabel400JSONResponseBodySuccess.
+const (
+	DeleteApiEvaluatorsLabel400JSONResponseBodySuccessFalse DeleteApiEvaluatorsLabel400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the DeleteApiEvaluatorsLabel400JSONResponseBodySuccess enum.
+func (e DeleteApiEvaluatorsLabel400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case DeleteApiEvaluatorsLabel400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -15714,6 +16764,51 @@ func (e GetApiEvaluatorsVersions200JSONResponseBodyDataType) Valid() bool {
 	}
 }
 
+// Defines values for GetApiEvaluatorsVersions400JSONResponseBodySuccess.
+const (
+	GetApiEvaluatorsVersions400JSONResponseBodySuccessFalse GetApiEvaluatorsVersions400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetApiEvaluatorsVersions400JSONResponseBodySuccess enum.
+func (e GetApiEvaluatorsVersions400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetApiEvaluatorsVersions400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiEvaluatorsByIdOrSlug400JSONResponseBodySuccess.
+const (
+	GetApiEvaluatorsByIdOrSlug400JSONResponseBodySuccessFalse GetApiEvaluatorsByIdOrSlug400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetApiEvaluatorsByIdOrSlug400JSONResponseBodySuccess enum.
+func (e GetApiEvaluatorsByIdOrSlug400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetApiEvaluatorsByIdOrSlug400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeleteApiEvaluatorsById400JSONResponseBodySuccess.
+const (
+	DeleteApiEvaluatorsById400JSONResponseBodySuccessFalse DeleteApiEvaluatorsById400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the DeleteApiEvaluatorsById400JSONResponseBodySuccess enum.
+func (e DeleteApiEvaluatorsById400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case DeleteApiEvaluatorsById400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PostApiEventsTrack200JSONResponseBodyMessage.
 const (
 	PostApiEventsTrack200JSONResponseBodyMessageEventTracked PostApiEventsTrack200JSONResponseBodyMessage = "Event tracked"
@@ -15750,6 +16845,21 @@ func (e PostApiExperimentInitJSONBodyExperimentType) Valid() bool {
 	}
 }
 
+// Defines values for GetApiExperiments400JSONResponseBodySuccess.
+const (
+	GetApiExperiments400JSONResponseBodySuccessFalse GetApiExperiments400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetApiExperiments400JSONResponseBodySuccess enum.
+func (e GetApiExperiments400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetApiExperiments400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GetApiExperimentsRunsByRunId200JSONResponseBodyStatus.
 const (
 	GetApiExperimentsRunsByRunId200JSONResponseBodyStatusCompleted GetApiExperimentsRunsByRunId200JSONResponseBodyStatus = "completed"
@@ -15777,6 +16887,21 @@ func (e GetApiExperimentsRunsByRunId200JSONResponseBodyStatus) Valid() bool {
 	}
 }
 
+// Defines values for GetApiExperimentsRunsByRunId400JSONResponseBodySuccess.
+const (
+	GetApiExperimentsRunsByRunId400JSONResponseBodySuccessFalse GetApiExperimentsRunsByRunId400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetApiExperimentsRunsByRunId400JSONResponseBodySuccess enum.
+func (e GetApiExperimentsRunsByRunId400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetApiExperimentsRunsByRunId400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GetApiExperimentsRunsByRunIdResults200JSONResponseBodyEvaluationsStatus.
 const (
 	GetApiExperimentsRunsByRunIdResults200JSONResponseBodyEvaluationsStatusError     GetApiExperimentsRunsByRunIdResults200JSONResponseBodyEvaluationsStatus = "error"
@@ -15798,6 +16923,36 @@ func (e GetApiExperimentsRunsByRunIdResults200JSONResponseBodyEvaluationsStatus)
 	}
 }
 
+// Defines values for GetApiExperimentsRunsByRunIdResults400JSONResponseBodySuccess.
+const (
+	GetApiExperimentsRunsByRunIdResults400JSONResponseBodySuccessFalse GetApiExperimentsRunsByRunIdResults400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetApiExperimentsRunsByRunIdResults400JSONResponseBodySuccess enum.
+func (e GetApiExperimentsRunsByRunIdResults400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetApiExperimentsRunsByRunIdResults400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiExperimentsBySlug400JSONResponseBodySuccess.
+const (
+	GetApiExperimentsBySlug400JSONResponseBodySuccessFalse GetApiExperimentsBySlug400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetApiExperimentsBySlug400JSONResponseBodySuccess enum.
+func (e GetApiExperimentsBySlug400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetApiExperimentsBySlug400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PostApiExperimentsBySlugRun200JSONResponseBodyStatus.
 const (
 	PostApiExperimentsBySlugRun200JSONResponseBodyStatusRunning PostApiExperimentsBySlugRun200JSONResponseBodyStatus = "running"
@@ -15807,6 +16962,66 @@ const (
 func (e PostApiExperimentsBySlugRun200JSONResponseBodyStatus) Valid() bool {
 	switch e {
 	case PostApiExperimentsBySlugRun200JSONResponseBodyStatusRunning:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiExperimentsBySlugVersionsByVersionRestore400JSONResponseBodySuccess.
+const (
+	PostApiExperimentsBySlugVersionsByVersionRestore400JSONResponseBodySuccessFalse PostApiExperimentsBySlugVersionsByVersionRestore400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the PostApiExperimentsBySlugVersionsByVersionRestore400JSONResponseBodySuccess enum.
+func (e PostApiExperimentsBySlugVersionsByVersionRestore400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case PostApiExperimentsBySlugVersionsByVersionRestore400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ReadProjectStoredObjectBytes400JSONResponseBodySuccess.
+const (
+	ReadProjectStoredObjectBytes400JSONResponseBodySuccessFalse ReadProjectStoredObjectBytes400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the ReadProjectStoredObjectBytes400JSONResponseBodySuccess enum.
+func (e ReadProjectStoredObjectBytes400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case ReadProjectStoredObjectBytes400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ReadNamedProjectStoredObjectBytes400JSONResponseBodySuccess.
+const (
+	ReadNamedProjectStoredObjectBytes400JSONResponseBodySuccessFalse ReadNamedProjectStoredObjectBytes400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the ReadNamedProjectStoredObjectBytes400JSONResponseBodySuccess enum.
+func (e ReadNamedProjectStoredObjectBytes400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case ReadNamedProjectStoredObjectBytes400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ReadStoredObjectBytes400JSONResponseBodySuccess.
+const (
+	ReadStoredObjectBytes400JSONResponseBodySuccessFalse ReadStoredObjectBytes400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the ReadStoredObjectBytes400JSONResponseBodySuccess enum.
+func (e ReadStoredObjectBytes400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case ReadStoredObjectBytes400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -17607,6 +18822,21 @@ func (e ListGrants200JSONResponseBodyGrantsStatus) Valid() bool {
 	}
 }
 
+// Defines values for ListGrants400JSONResponseBodySuccess.
+const (
+	ListGrants400JSONResponseBodySuccessFalse ListGrants400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the ListGrants400JSONResponseBodySuccess enum.
+func (e ListGrants400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case ListGrants400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for CreateGrantJSONBodyPrincipalType.
 const (
 	CreateGrantJSONBodyPrincipalTypeApiKey CreateGrantJSONBodyPrincipalType = "apiKey"
@@ -17709,6 +18939,21 @@ func (e CreateGrant201JSONResponseBodyStatus) Valid() bool {
 	}
 }
 
+// Defines values for CreateGrant400JSONResponseBodySuccess.
+const (
+	CreateGrant400JSONResponseBodySuccessFalse CreateGrant400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the CreateGrant400JSONResponseBodySuccess enum.
+func (e CreateGrant400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case CreateGrant400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for RevokeGrant200JSONResponseBodyRevoked.
 const (
 	RevokeGrant200JSONResponseBodyRevokedTrue RevokeGrant200JSONResponseBodyRevoked = true
@@ -17718,6 +18963,21 @@ const (
 func (e RevokeGrant200JSONResponseBodyRevoked) Valid() bool {
 	switch e {
 	case RevokeGrant200JSONResponseBodyRevokedTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RevokeGrant400JSONResponseBodySuccess.
+const (
+	RevokeGrant400JSONResponseBodySuccessFalse RevokeGrant400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the RevokeGrant400JSONResponseBodySuccess enum.
+func (e RevokeGrant400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case RevokeGrant400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -17784,6 +19044,21 @@ func (e GetGrant200JSONResponseBodyStatus) Valid() bool {
 	}
 }
 
+// Defines values for GetGrant400JSONResponseBodySuccess.
+const (
+	GetGrant400JSONResponseBodySuccessFalse GetGrant400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetGrant400JSONResponseBodySuccess enum.
+func (e GetGrant400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetGrant400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for UpdateGrant200JSONResponseBodyPrincipalType.
 const (
 	UpdateGrant200JSONResponseBodyPrincipalTypeApiKey UpdateGrant200JSONResponseBodyPrincipalType = "apiKey"
@@ -17844,6 +19119,96 @@ func (e UpdateGrant200JSONResponseBodyStatus) Valid() bool {
 	}
 }
 
+// Defines values for UpdateGrant400JSONResponseBodySuccess.
+const (
+	UpdateGrant400JSONResponseBodySuccessFalse UpdateGrant400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the UpdateGrant400JSONResponseBodySuccess enum.
+func (e UpdateGrant400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case UpdateGrant400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGraphs400JSONResponseBodySuccess.
+const (
+	GetApiGraphs400JSONResponseBodySuccessFalse GetApiGraphs400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetApiGraphs400JSONResponseBodySuccess enum.
+func (e GetApiGraphs400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetApiGraphs400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiGraphs400JSONResponseBodySuccess.
+const (
+	PostApiGraphs400JSONResponseBodySuccessFalse PostApiGraphs400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the PostApiGraphs400JSONResponseBodySuccess enum.
+func (e PostApiGraphs400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case PostApiGraphs400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeleteApiGraphsById400JSONResponseBodySuccess.
+const (
+	DeleteApiGraphsById400JSONResponseBodySuccessFalse DeleteApiGraphsById400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the DeleteApiGraphsById400JSONResponseBodySuccess enum.
+func (e DeleteApiGraphsById400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case DeleteApiGraphsById400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGraphsById400JSONResponseBodySuccess.
+const (
+	GetApiGraphsById400JSONResponseBodySuccessFalse GetApiGraphsById400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetApiGraphsById400JSONResponseBodySuccess enum.
+func (e GetApiGraphsById400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetApiGraphsById400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiGraphsById400JSONResponseBodySuccess.
+const (
+	PatchApiGraphsById400JSONResponseBodySuccessFalse PatchApiGraphsById400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the PatchApiGraphsById400JSONResponseBodySuccess enum.
+func (e PatchApiGraphsById400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case PatchApiGraphsById400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GetApiGroups200JSONResponseBodyDataBindingsRole.
 const (
 	GetApiGroups200JSONResponseBodyDataBindingsRoleADMIN  GetApiGroups200JSONResponseBodyDataBindingsRole = "ADMIN"
@@ -17883,6 +19248,21 @@ func (e GetApiGroups200JSONResponseBodyDataBindingsScopeType) Valid() bool {
 	case GetApiGroups200JSONResponseBodyDataBindingsScopeTypePROJECT:
 		return true
 	case GetApiGroups200JSONResponseBodyDataBindingsScopeTypeTEAM:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGroups400JSONResponseBodySuccess.
+const (
+	GetApiGroups400JSONResponseBodySuccessFalse GetApiGroups400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetApiGroups400JSONResponseBodySuccess enum.
+func (e GetApiGroups400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetApiGroups400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -17934,6 +19314,36 @@ func (e PostApiGroupsJSONBodyBindingsScopeType) Valid() bool {
 	}
 }
 
+// Defines values for PostApiGroups400JSONResponseBodySuccess.
+const (
+	PostApiGroups400JSONResponseBodySuccessFalse PostApiGroups400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the PostApiGroups400JSONResponseBodySuccess enum.
+func (e PostApiGroups400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case PostApiGroups400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeleteApiGroupsById400JSONResponseBodySuccess.
+const (
+	DeleteApiGroupsById400JSONResponseBodySuccessFalse DeleteApiGroupsById400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the DeleteApiGroupsById400JSONResponseBodySuccess enum.
+func (e DeleteApiGroupsById400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case DeleteApiGroupsById400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GetApiGroupsById200JSONResponseBodyBindingsRole.
 const (
 	GetApiGroupsById200JSONResponseBodyBindingsRoleADMIN  GetApiGroupsById200JSONResponseBodyBindingsRole = "ADMIN"
@@ -17979,6 +19389,36 @@ func (e GetApiGroupsById200JSONResponseBodyBindingsScopeType) Valid() bool {
 	}
 }
 
+// Defines values for GetApiGroupsById400JSONResponseBodySuccess.
+const (
+	GetApiGroupsById400JSONResponseBodySuccessFalse GetApiGroupsById400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetApiGroupsById400JSONResponseBodySuccess enum.
+func (e GetApiGroupsById400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetApiGroupsById400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiGroupsById400JSONResponseBodySuccess.
+const (
+	PatchApiGroupsById400JSONResponseBodySuccessFalse PatchApiGroupsById400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the PatchApiGroupsById400JSONResponseBodySuccess enum.
+func (e PatchApiGroupsById400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case PatchApiGroupsById400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GetApiGroupsByIdBindings200JSONResponseBodyDataRole.
 const (
 	GetApiGroupsByIdBindings200JSONResponseBodyDataRoleADMIN  GetApiGroupsByIdBindings200JSONResponseBodyDataRole = "ADMIN"
@@ -18018,6 +19458,21 @@ func (e GetApiGroupsByIdBindings200JSONResponseBodyDataScopeType) Valid() bool {
 	case GetApiGroupsByIdBindings200JSONResponseBodyDataScopeTypePROJECT:
 		return true
 	case GetApiGroupsByIdBindings200JSONResponseBodyDataScopeTypeTEAM:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGroupsByIdBindings400JSONResponseBodySuccess.
+const (
+	GetApiGroupsByIdBindings400JSONResponseBodySuccessFalse GetApiGroupsByIdBindings400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetApiGroupsByIdBindings400JSONResponseBodySuccess enum.
+func (e GetApiGroupsByIdBindings400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetApiGroupsByIdBindings400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -18108,6 +19563,81 @@ func (e PostApiGroupsByIdBindings201JSONResponseBodyScopeType) Valid() bool {
 	case PostApiGroupsByIdBindings201JSONResponseBodyScopeTypePROJECT:
 		return true
 	case PostApiGroupsByIdBindings201JSONResponseBodyScopeTypeTEAM:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiGroupsByIdBindings400JSONResponseBodySuccess.
+const (
+	PostApiGroupsByIdBindings400JSONResponseBodySuccessFalse PostApiGroupsByIdBindings400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the PostApiGroupsByIdBindings400JSONResponseBodySuccess enum.
+func (e PostApiGroupsByIdBindings400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case PostApiGroupsByIdBindings400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeleteApiGroupsByIdBindingsByBindingId400JSONResponseBodySuccess.
+const (
+	DeleteApiGroupsByIdBindingsByBindingId400JSONResponseBodySuccessFalse DeleteApiGroupsByIdBindingsByBindingId400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the DeleteApiGroupsByIdBindingsByBindingId400JSONResponseBodySuccess enum.
+func (e DeleteApiGroupsByIdBindingsByBindingId400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case DeleteApiGroupsByIdBindingsByBindingId400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGroupsByIdMembers400JSONResponseBodySuccess.
+const (
+	GetApiGroupsByIdMembers400JSONResponseBodySuccessFalse GetApiGroupsByIdMembers400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetApiGroupsByIdMembers400JSONResponseBodySuccess enum.
+func (e GetApiGroupsByIdMembers400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetApiGroupsByIdMembers400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiGroupsByIdMembers400JSONResponseBodySuccess.
+const (
+	PostApiGroupsByIdMembers400JSONResponseBodySuccessFalse PostApiGroupsByIdMembers400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the PostApiGroupsByIdMembers400JSONResponseBodySuccess enum.
+func (e PostApiGroupsByIdMembers400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case PostApiGroupsByIdMembers400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeleteApiGroupsByIdMembersByUserId400JSONResponseBodySuccess.
+const (
+	DeleteApiGroupsByIdMembersByUserId400JSONResponseBodySuccessFalse DeleteApiGroupsByIdMembersByUserId400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the DeleteApiGroupsByIdMembersByUserId400JSONResponseBodySuccess enum.
+func (e DeleteApiGroupsByIdMembersByUserId400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case DeleteApiGroupsByIdMembersByUserId400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -18219,6 +19749,21 @@ func (e ListInstantEvalRuns200JSONResponseBodyRunsStatus) Valid() bool {
 	case ListInstantEvalRuns200JSONResponseBodyRunsStatusQueued:
 		return true
 	case ListInstantEvalRuns200JSONResponseBodyRunsStatusRunning:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListInstantEvalRuns400JSONResponseBodySuccess.
+const (
+	ListInstantEvalRuns400JSONResponseBodySuccessFalse ListInstantEvalRuns400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the ListInstantEvalRuns400JSONResponseBodySuccess enum.
+func (e ListInstantEvalRuns400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case ListInstantEvalRuns400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -18411,6 +19956,21 @@ func (e GetInstantEvalRun200JSONResponseBodyStatus) Valid() bool {
 	}
 }
 
+// Defines values for GetInstantEvalRun400JSONResponseBodySuccess.
+const (
+	GetInstantEvalRun400JSONResponseBodySuccessFalse GetInstantEvalRun400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetInstantEvalRun400JSONResponseBodySuccess enum.
+func (e GetInstantEvalRun400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetInstantEvalRun400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for CancelInstantEvalRun200JSONResponseBodyQuestionsKind.
 const (
 	CancelInstantEvalRun200JSONResponseBodyQuestionsKindBoolean  CancelInstantEvalRun200JSONResponseBodyQuestionsKind = "boolean"
@@ -18456,6 +20016,21 @@ func (e CancelInstantEvalRun200JSONResponseBodyStatus) Valid() bool {
 	case CancelInstantEvalRun200JSONResponseBodyStatusQueued:
 		return true
 	case CancelInstantEvalRun200JSONResponseBodyStatusRunning:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CancelInstantEvalRun400JSONResponseBodySuccess.
+const (
+	CancelInstantEvalRun400JSONResponseBodySuccessFalse CancelInstantEvalRun400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the CancelInstantEvalRun400JSONResponseBodySuccess enum.
+func (e CancelInstantEvalRun400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case CancelInstantEvalRun400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -18558,6 +20133,21 @@ func (e ListInstantEvalRunResults200JSONResponseBodyJudgmentsStatus) Valid() boo
 	}
 }
 
+// Defines values for ListInstantEvalRunResults400JSONResponseBodySuccess.
+const (
+	ListInstantEvalRunResults400JSONResponseBodySuccessFalse ListInstantEvalRunResults400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the ListInstantEvalRunResults400JSONResponseBodySuccess enum.
+func (e ListInstantEvalRunResults400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case ListInstantEvalRunResults400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for SampleInstantEvalRun200JSONResponseBodyJudgmentsStatus.
 const (
 	SampleInstantEvalRun200JSONResponseBodyJudgmentsStatusFailed  SampleInstantEvalRun200JSONResponseBodyJudgmentsStatus = "failed"
@@ -18573,6 +20163,21 @@ func (e SampleInstantEvalRun200JSONResponseBodyJudgmentsStatus) Valid() bool {
 	case SampleInstantEvalRun200JSONResponseBodyJudgmentsStatusJudged:
 		return true
 	case SampleInstantEvalRun200JSONResponseBodyJudgmentsStatusSkipped:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SampleInstantEvalRun400JSONResponseBodySuccess.
+const (
+	SampleInstantEvalRun400JSONResponseBodySuccessFalse SampleInstantEvalRun400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the SampleInstantEvalRun400JSONResponseBodySuccess enum.
+func (e SampleInstantEvalRun400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case SampleInstantEvalRun400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -18813,6 +20418,21 @@ const (
 func (e PostLangyControlFramesJSONBodyFrames5Type) Valid() bool {
 	switch e {
 	case PostLangyControlFramesJSONBodyFrames5TypeDeregister:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostLangyControlFrames400JSONResponseBodySuccess.
+const (
+	PostLangyControlFrames400JSONResponseBodySuccessFalse PostLangyControlFrames400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the PostLangyControlFrames400JSONResponseBodySuccess enum.
+func (e PostLangyControlFrames400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case PostLangyControlFrames400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -19203,6 +20823,21 @@ func (e PollLangyControlSession200JSONResponseBodyFrames6Type) Valid() bool {
 	}
 }
 
+// Defines values for PollLangyControlSession400JSONResponseBodySuccess.
+const (
+	PollLangyControlSession400JSONResponseBodySuccessFalse PollLangyControlSession400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the PollLangyControlSession400JSONResponseBodySuccess enum.
+func (e PollLangyControlSession400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case PollLangyControlSession400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for RegisterLangyControlSessionJSONBodyProtocol.
 const (
 	RegisterLangyControlSessionJSONBodyProtocolN1 RegisterLangyControlSessionJSONBodyProtocol = 1
@@ -19323,6 +20958,36 @@ func (e RegisterLangyControlSession200JSONResponseBodyFrame1Type) Valid() bool {
 	}
 }
 
+// Defines values for RegisterLangyControlSession400JSONResponseBodySuccess.
+const (
+	RegisterLangyControlSession400JSONResponseBodySuccessFalse RegisterLangyControlSession400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the RegisterLangyControlSession400JSONResponseBodySuccess enum.
+func (e RegisterLangyControlSession400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case RegisterLangyControlSession400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ApproveLangyControlRequest400JSONResponseBodySuccess.
+const (
+	ApproveLangyControlRequest400JSONResponseBodySuccessFalse ApproveLangyControlRequest400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the ApproveLangyControlRequest400JSONResponseBodySuccess enum.
+func (e ApproveLangyControlRequest400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case ApproveLangyControlRequest400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for CancelLangyControlRequest200JSONResponseBodyCancelled.
 const (
 	CancelLangyControlRequest200JSONResponseBodyCancelledTrue CancelLangyControlRequest200JSONResponseBodyCancelled = true
@@ -19332,6 +20997,21 @@ const (
 func (e CancelLangyControlRequest200JSONResponseBodyCancelled) Valid() bool {
 	switch e {
 	case CancelLangyControlRequest200JSONResponseBodyCancelledTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CancelLangyControlRequest400JSONResponseBodySuccess.
+const (
+	CancelLangyControlRequest400JSONResponseBodySuccessFalse CancelLangyControlRequest400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the CancelLangyControlRequest400JSONResponseBodySuccess enum.
+func (e CancelLangyControlRequest400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case CancelLangyControlRequest400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -19359,6 +21039,21 @@ func (e StartLangyConversationTurnJSONBodyMessagesRole) Valid() bool {
 	}
 }
 
+// Defines values for StartLangyConversationTurn400JSONResponseBodySuccess.
+const (
+	StartLangyConversationTurn400JSONResponseBodySuccessFalse StartLangyConversationTurn400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the StartLangyConversationTurn400JSONResponseBodySuccess enum.
+func (e StartLangyConversationTurn400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case StartLangyConversationTurn400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ContinueLangyConversationTurnJSONBodyMessagesRole.
 const (
 	ContinueLangyConversationTurnJSONBodyMessagesRoleAssistant ContinueLangyConversationTurnJSONBodyMessagesRole = "assistant"
@@ -19374,6 +21069,21 @@ func (e ContinueLangyConversationTurnJSONBodyMessagesRole) Valid() bool {
 	case ContinueLangyConversationTurnJSONBodyMessagesRoleSystem:
 		return true
 	case ContinueLangyConversationTurnJSONBodyMessagesRoleUser:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ContinueLangyConversationTurn400JSONResponseBodySuccess.
+const (
+	ContinueLangyConversationTurn400JSONResponseBodySuccessFalse ContinueLangyConversationTurn400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the ContinueLangyConversationTurn400JSONResponseBodySuccess enum.
+func (e ContinueLangyConversationTurn400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case ContinueLangyConversationTurn400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -19443,6 +21153,21 @@ func (e LangyLocalReadCall200JSONResponseBodyState) Valid() bool {
 	}
 }
 
+// Defines values for LangyLocalReadCall400JSONResponseBodySuccess.
+const (
+	LangyLocalReadCall400JSONResponseBodySuccessFalse LangyLocalReadCall400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the LangyLocalReadCall400JSONResponseBodySuccess enum.
+func (e LangyLocalReadCall400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case LangyLocalReadCall400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for LangyLocalCancelCall200JSONResponseBodyCancelled.
 const (
 	LangyLocalCancelCall200JSONResponseBodyCancelledTrue LangyLocalCancelCall200JSONResponseBodyCancelled = true
@@ -19452,6 +21177,36 @@ const (
 func (e LangyLocalCancelCall200JSONResponseBodyCancelled) Valid() bool {
 	switch e {
 	case LangyLocalCancelCall200JSONResponseBodyCancelledTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for LangyLocalCancelCall400JSONResponseBodySuccess.
+const (
+	LangyLocalCancelCall400JSONResponseBodySuccessFalse LangyLocalCancelCall400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the LangyLocalCancelCall400JSONResponseBodySuccess enum.
+func (e LangyLocalCancelCall400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case LangyLocalCancelCall400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for LangyLocalCreateRequest400JSONResponseBodySuccess.
+const (
+	LangyLocalCreateRequest400JSONResponseBodySuccessFalse LangyLocalCreateRequest400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the LangyLocalCreateRequest400JSONResponseBodySuccess enum.
+func (e LangyLocalCreateRequest400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case LangyLocalCreateRequest400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -19473,6 +21228,21 @@ func (e LangyLocalWorkspace200JSONResponseBodyCodeAccessPreference) Valid() bool
 	}
 }
 
+// Defines values for LangyLocalWorkspace400JSONResponseBodySuccess.
+const (
+	LangyLocalWorkspace400JSONResponseBodySuccessFalse LangyLocalWorkspace400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the LangyLocalWorkspace400JSONResponseBodySuccess enum.
+func (e LangyLocalWorkspace400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case LangyLocalWorkspace400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for LangyLocalStartWaitJSONBodyKind.
 const (
 	Question LangyLocalStartWaitJSONBodyKind = "question"
@@ -19482,6 +21252,21 @@ const (
 func (e LangyLocalStartWaitJSONBodyKind) Valid() bool {
 	switch e {
 	case Question:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for LangyLocalStartWait400JSONResponseBodySuccess.
+const (
+	LangyLocalStartWait400JSONResponseBodySuccessFalse LangyLocalStartWait400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the LangyLocalStartWait400JSONResponseBodySuccess enum.
+func (e LangyLocalStartWait400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case LangyLocalStartWait400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -19506,6 +21291,21 @@ func (e LangyLocalReadWait200JSONResponseBodyState) Valid() bool {
 	case LangyLocalReadWait200JSONResponseBodyStateExpired:
 		return true
 	case LangyLocalReadWait200JSONResponseBodyStatePending:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for LangyLocalReadWait400JSONResponseBodySuccess.
+const (
+	LangyLocalReadWait400JSONResponseBodySuccessFalse LangyLocalReadWait400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the LangyLocalReadWait400JSONResponseBodySuccess enum.
+func (e LangyLocalReadWait400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case LangyLocalReadWait400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -20160,6 +21960,36 @@ func (e PostApiMonitors201JSONResponseBodyExecutionMode) Valid() bool {
 	}
 }
 
+// Defines values for PostApiMonitors400JSONResponseBodySuccess.
+const (
+	PostApiMonitors400JSONResponseBodySuccessFalse PostApiMonitors400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the PostApiMonitors400JSONResponseBodySuccess enum.
+func (e PostApiMonitors400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case PostApiMonitors400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeleteApiMonitorsById400JSONResponseBodySuccess.
+const (
+	DeleteApiMonitorsById400JSONResponseBodySuccessFalse DeleteApiMonitorsById400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the DeleteApiMonitorsById400JSONResponseBodySuccess enum.
+func (e DeleteApiMonitorsById400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case DeleteApiMonitorsById400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GetApiMonitorsById200JSONResponseBodyExecutionMode.
 const (
 	GetApiMonitorsById200JSONResponseBodyExecutionModeASGUARDRAIL GetApiMonitorsById200JSONResponseBodyExecutionMode = "AS_GUARDRAIL"
@@ -20175,6 +22005,21 @@ func (e GetApiMonitorsById200JSONResponseBodyExecutionMode) Valid() bool {
 	case GetApiMonitorsById200JSONResponseBodyExecutionModeMANUALLY:
 		return true
 	case GetApiMonitorsById200JSONResponseBodyExecutionModeONMESSAGE:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiMonitorsById400JSONResponseBodySuccess.
+const (
+	GetApiMonitorsById400JSONResponseBodySuccessFalse GetApiMonitorsById400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetApiMonitorsById400JSONResponseBodySuccess enum.
+func (e GetApiMonitorsById400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetApiMonitorsById400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -20241,6 +22086,36 @@ func (e PatchApiMonitorsById200JSONResponseBodyExecutionMode) Valid() bool {
 	}
 }
 
+// Defines values for PatchApiMonitorsById400JSONResponseBodySuccess.
+const (
+	PatchApiMonitorsById400JSONResponseBodySuccessFalse PatchApiMonitorsById400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the PatchApiMonitorsById400JSONResponseBodySuccess enum.
+func (e PatchApiMonitorsById400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case PatchApiMonitorsById400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiMonitorsByIdToggle400JSONResponseBodySuccess.
+const (
+	PostApiMonitorsByIdToggle400JSONResponseBodySuccessFalse PostApiMonitorsByIdToggle400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the PostApiMonitorsByIdToggle400JSONResponseBodySuccess enum.
+func (e PostApiMonitorsByIdToggle400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case PostApiMonitorsByIdToggle400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ExplainClickHouseQueryJSONBodyType.
 const (
 	AST      ExplainClickHouseQueryJSONBodyType = "AST"
@@ -20262,6 +22137,21 @@ func (e ExplainClickHouseQueryJSONBodyType) Valid() bool {
 	case PLAN:
 		return true
 	case SYNTAX:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ExplainClickHouseQuery400JSONResponseBodySuccess.
+const (
+	ExplainClickHouseQuery400JSONResponseBodySuccessFalse ExplainClickHouseQuery400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the ExplainClickHouseQuery400JSONResponseBodySuccess enum.
+func (e ExplainClickHouseQuery400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case ExplainClickHouseQuery400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -20292,6 +22182,21 @@ func (e PostApiOptimizationByWorkflowIdByVersionId200JSONResponseBodyStatus) Val
 	case PostApiOptimizationByWorkflowIdByVersionId200JSONResponseBodyStatusSuccess:
 		return true
 	case PostApiOptimizationByWorkflowIdByVersionId200JSONResponseBodyStatusWaiting:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiOptimizationByWorkflowIdByVersionId400JSONResponseBodySuccess.
+const (
+	PostApiOptimizationByWorkflowIdByVersionId400JSONResponseBodySuccessFalse PostApiOptimizationByWorkflowIdByVersionId400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the PostApiOptimizationByWorkflowIdByVersionId400JSONResponseBodySuccess enum.
+func (e PostApiOptimizationByWorkflowIdByVersionId400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case PostApiOptimizationByWorkflowIdByVersionId400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -20448,6 +22353,21 @@ func (e CreateOrganizationInvites201JSONResponseBodyInvitesRole) Valid() bool {
 	}
 }
 
+// Defines values for CreateOrganizationInvites400JSONResponseBodySuccess.
+const (
+	CreateOrganizationInvites400JSONResponseBodySuccessFalse CreateOrganizationInvites400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the CreateOrganizationInvites400JSONResponseBodySuccess enum.
+func (e CreateOrganizationInvites400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case CreateOrganizationInvites400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for RevokeOrganizationInvite200JSONResponseBodySuccess.
 const (
 	RevokeOrganizationInvite200JSONResponseBodySuccessTrue RevokeOrganizationInvite200JSONResponseBodySuccess = true
@@ -20457,6 +22377,21 @@ const (
 func (e RevokeOrganizationInvite200JSONResponseBodySuccess) Valid() bool {
 	switch e {
 	case RevokeOrganizationInvite200JSONResponseBodySuccessTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RevokeOrganizationInvite400JSONResponseBodySuccess.
+const (
+	RevokeOrganizationInvite400JSONResponseBodySuccessFalse RevokeOrganizationInvite400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the RevokeOrganizationInvite400JSONResponseBodySuccess enum.
+func (e RevokeOrganizationInvite400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case RevokeOrganizationInvite400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -20505,6 +22440,21 @@ func (e ListOrganizationMembers200JSONResponseBodyMembersRole) Valid() bool {
 	}
 }
 
+// Defines values for ListOrganizationMembers400JSONResponseBodySuccess.
+const (
+	ListOrganizationMembers400JSONResponseBodySuccessFalse ListOrganizationMembers400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the ListOrganizationMembers400JSONResponseBodySuccess enum.
+func (e ListOrganizationMembers400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case ListOrganizationMembers400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for RemoveOrganizationMember200JSONResponseBodySuccess.
 const (
 	RemoveOrganizationMember200JSONResponseBodySuccessTrue RemoveOrganizationMember200JSONResponseBodySuccess = true
@@ -20514,6 +22464,21 @@ const (
 func (e RemoveOrganizationMember200JSONResponseBodySuccess) Valid() bool {
 	switch e {
 	case RemoveOrganizationMember200JSONResponseBodySuccessTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RemoveOrganizationMember400JSONResponseBodySuccess.
+const (
+	RemoveOrganizationMember400JSONResponseBodySuccessFalse RemoveOrganizationMember400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the RemoveOrganizationMember400JSONResponseBodySuccess enum.
+func (e RemoveOrganizationMember400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case RemoveOrganizationMember400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -20568,6 +22533,21 @@ func (e GetOrganizationMember200JSONResponseBodyTeamsRole) Valid() bool {
 	}
 }
 
+// Defines values for GetOrganizationMember400JSONResponseBodySuccess.
+const (
+	GetOrganizationMember400JSONResponseBodySuccessFalse GetOrganizationMember400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetOrganizationMember400JSONResponseBodySuccess enum.
+func (e GetOrganizationMember400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetOrganizationMember400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for UpdateOrganizationMemberJSONBodyRole.
 const (
 	UpdateOrganizationMemberJSONBodyRoleADMIN     UpdateOrganizationMemberJSONBodyRole = "ADMIN"
@@ -20616,6 +22596,21 @@ func (e UpdateOrganizationMember200JSONResponseBodyRole) Valid() bool {
 	}
 }
 
+// Defines values for UpdateOrganizationMember400JSONResponseBodySuccess.
+const (
+	UpdateOrganizationMember400JSONResponseBodySuccessFalse UpdateOrganizationMember400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the UpdateOrganizationMember400JSONResponseBodySuccess enum.
+func (e UpdateOrganizationMember400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case UpdateOrganizationMember400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GetOrganizationMemberAccess200JSONResponseBodyDirectBindingsScopeType.
 const (
 	GetOrganizationMemberAccess200JSONResponseBodyDirectBindingsScopeTypeORGANIZATION GetOrganizationMemberAccess200JSONResponseBodyDirectBindingsScopeType = "ORGANIZATION"
@@ -20652,6 +22647,51 @@ func (e GetOrganizationMemberAccess200JSONResponseBodyGroupsBindingsScopeType) V
 	case GetOrganizationMemberAccess200JSONResponseBodyGroupsBindingsScopeTypePROJECT:
 		return true
 	case GetOrganizationMemberAccess200JSONResponseBodyGroupsBindingsScopeTypeTEAM:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetOrganizationMemberAccess400JSONResponseBodySuccess.
+const (
+	GetOrganizationMemberAccess400JSONResponseBodySuccessFalse GetOrganizationMemberAccess400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetOrganizationMemberAccess400JSONResponseBodySuccess enum.
+func (e GetOrganizationMemberAccess400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetOrganizationMemberAccess400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ProvisionOrganization400JSONResponseBodySuccess.
+const (
+	ProvisionOrganization400JSONResponseBodySuccessFalse ProvisionOrganization400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the ProvisionOrganization400JSONResponseBodySuccess enum.
+func (e ProvisionOrganization400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case ProvisionOrganization400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetOrganizationById400JSONResponseBodySuccess.
+const (
+	GetOrganizationById400JSONResponseBodySuccessFalse GetOrganizationById400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetOrganizationById400JSONResponseBodySuccess enum.
+func (e GetOrganizationById400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetOrganizationById400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -20721,6 +22761,21 @@ func (e GetPlatformHealth200JSONResponseBodyStatus) Valid() bool {
 	case GetPlatformHealth200JSONResponseBodyStatusHealthy:
 		return true
 	case GetPlatformHealth200JSONResponseBodyStatusUnhealthy:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetPlatformHealth400JSONResponseBodySuccess.
+const (
+	GetPlatformHealth400JSONResponseBodySuccessFalse GetPlatformHealth400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetPlatformHealth400JSONResponseBodySuccess enum.
+func (e GetPlatformHealth400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetPlatformHealth400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -20865,6 +22920,21 @@ func (e GetPlatformHealthSubsystem200JSONResponseBodyStatus) Valid() bool {
 	}
 }
 
+// Defines values for GetPlatformHealthSubsystem400JSONResponseBodySuccess.
+const (
+	GetPlatformHealthSubsystem400JSONResponseBodySuccessFalse GetPlatformHealthSubsystem400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetPlatformHealthSubsystem400JSONResponseBodySuccess enum.
+func (e GetPlatformHealthSubsystem400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetPlatformHealthSubsystem400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GetPlatformHealthSubsystem503JSONResponseBodyChecksName.
 const (
 	GetPlatformHealthSubsystem503JSONResponseBodyChecksNameCollector   GetPlatformHealthSubsystem503JSONResponseBodyChecksName = "collector"
@@ -20934,6 +23004,36 @@ func (e GetPlatformHealthSubsystem503JSONResponseBodyStatus) Valid() bool {
 	}
 }
 
+// Defines values for ListProjects400JSONResponseBodySuccess.
+const (
+	ListProjects400JSONResponseBodySuccessFalse ListProjects400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the ListProjects400JSONResponseBodySuccess enum.
+func (e ListProjects400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case ListProjects400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ArchiveProject400JSONResponseBodySuccess.
+const (
+	ArchiveProject400JSONResponseBodySuccessFalse ArchiveProject400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the ArchiveProject400JSONResponseBodySuccess enum.
+func (e ArchiveProject400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case ArchiveProject400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GetProject200JSONResponseBodyPiiRedactionLevel.
 const (
 	GetProject200JSONResponseBodyPiiRedactionLevelDISABLED  GetProject200JSONResponseBodyPiiRedactionLevel = "DISABLED"
@@ -20949,6 +23049,21 @@ func (e GetProject200JSONResponseBodyPiiRedactionLevel) Valid() bool {
 	case GetProject200JSONResponseBodyPiiRedactionLevelESSENTIAL:
 		return true
 	case GetProject200JSONResponseBodyPiiRedactionLevelSTRICT:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetProject400JSONResponseBodySuccess.
+const (
+	GetProject400JSONResponseBodySuccessFalse GetProject400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetProject400JSONResponseBodySuccess enum.
+func (e GetProject400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetProject400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -20991,6 +23106,51 @@ func (e UpdateProject200JSONResponseBodyPiiRedactionLevel) Valid() bool {
 	case UpdateProject200JSONResponseBodyPiiRedactionLevelESSENTIAL:
 		return true
 	case UpdateProject200JSONResponseBodyPiiRedactionLevelSTRICT:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UpdateProject400JSONResponseBodySuccess.
+const (
+	UpdateProject400JSONResponseBodySuccessFalse UpdateProject400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the UpdateProject400JSONResponseBodySuccess enum.
+func (e UpdateProject400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case UpdateProject400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetProjectApiKey400JSONResponseBodySuccess.
+const (
+	GetProjectApiKey400JSONResponseBodySuccessFalse GetProjectApiKey400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetProjectApiKey400JSONResponseBodySuccess enum.
+func (e GetProjectApiKey400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetProjectApiKey400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RegenerateProjectApiKey400JSONResponseBodySuccess.
+const (
+	RegenerateProjectApiKey400JSONResponseBodySuccessFalse RegenerateProjectApiKey400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the RegenerateProjectApiKey400JSONResponseBodySuccess enum.
+func (e RegenerateProjectApiKey400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case RegenerateProjectApiKey400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -29382,6 +31542,21 @@ func (e ListRoleBindings200JSONResponseBodyBindingsScopeType) Valid() bool {
 	}
 }
 
+// Defines values for ListRoleBindings400JSONResponseBodySuccess.
+const (
+	ListRoleBindings400JSONResponseBodySuccessFalse ListRoleBindings400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the ListRoleBindings400JSONResponseBodySuccess enum.
+func (e ListRoleBindings400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case ListRoleBindings400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for CreateRoleBindingJSONBodyRole.
 const (
 	CreateRoleBindingJSONBodyRoleADMIN  CreateRoleBindingJSONBodyRole = "ADMIN"
@@ -29493,6 +31668,21 @@ func (e CreateRoleBinding201JSONResponseBodyScopeType) Valid() bool {
 	}
 }
 
+// Defines values for CreateRoleBinding400JSONResponseBodySuccess.
+const (
+	CreateRoleBinding400JSONResponseBodySuccessFalse CreateRoleBinding400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the CreateRoleBinding400JSONResponseBodySuccess enum.
+func (e CreateRoleBinding400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case CreateRoleBinding400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for DeleteRoleBinding200JSONResponseBodySuccess.
 const (
 	DeleteRoleBinding200JSONResponseBodySuccessTrue DeleteRoleBinding200JSONResponseBodySuccess = true
@@ -29502,6 +31692,21 @@ const (
 func (e DeleteRoleBinding200JSONResponseBodySuccess) Valid() bool {
 	switch e {
 	case DeleteRoleBinding200JSONResponseBodySuccessTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeleteRoleBinding400JSONResponseBodySuccess.
+const (
+	DeleteRoleBinding400JSONResponseBodySuccessFalse DeleteRoleBinding400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the DeleteRoleBinding400JSONResponseBodySuccess enum.
+func (e DeleteRoleBinding400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case DeleteRoleBinding400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -29598,6 +31803,21 @@ func (e UpdateRoleBinding200JSONResponseBodyScopeType) Valid() bool {
 	}
 }
 
+// Defines values for UpdateRoleBinding400JSONResponseBodySuccess.
+const (
+	UpdateRoleBinding400JSONResponseBodySuccessFalse UpdateRoleBinding400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the UpdateRoleBinding400JSONResponseBodySuccess enum.
+func (e UpdateRoleBinding400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case UpdateRoleBinding400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ListRolesParamsBuiltIn.
 const (
 	ListRolesParamsBuiltInFalse ListRolesParamsBuiltIn = "false"
@@ -29616,6 +31836,36 @@ func (e ListRolesParamsBuiltIn) Valid() bool {
 	}
 }
 
+// Defines values for ListRoles400JSONResponseBodySuccess.
+const (
+	ListRoles400JSONResponseBodySuccessFalse ListRoles400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the ListRoles400JSONResponseBodySuccess enum.
+func (e ListRoles400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case ListRoles400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CreateRole400JSONResponseBodySuccess.
+const (
+	CreateRole400JSONResponseBodySuccessFalse CreateRole400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the CreateRole400JSONResponseBodySuccess enum.
+func (e CreateRole400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case CreateRole400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for DeleteRole200JSONResponseBodySuccess.
 const (
 	DeleteRole200JSONResponseBodySuccessTrue DeleteRole200JSONResponseBodySuccess = true
@@ -29625,6 +31875,51 @@ const (
 func (e DeleteRole200JSONResponseBodySuccess) Valid() bool {
 	switch e {
 	case DeleteRole200JSONResponseBodySuccessTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeleteRole400JSONResponseBodySuccess.
+const (
+	DeleteRole400JSONResponseBodySuccessFalse DeleteRole400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the DeleteRole400JSONResponseBodySuccess enum.
+func (e DeleteRole400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case DeleteRole400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetRole400JSONResponseBodySuccess.
+const (
+	GetRole400JSONResponseBodySuccessFalse GetRole400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetRole400JSONResponseBodySuccess enum.
+func (e GetRole400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetRole400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UpdateRole400JSONResponseBodySuccess.
+const (
+	UpdateRole400JSONResponseBodySuccessFalse UpdateRole400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the UpdateRole400JSONResponseBodySuccess enum.
+func (e UpdateRole400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case UpdateRole400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -29796,6 +32091,21 @@ func (e ListRunPlans200JSONResponseBodyTargetsType) Valid() bool {
 	case ListRunPlans200JSONResponseBodyTargetsTypeVoice:
 		return true
 	case ListRunPlans200JSONResponseBodyTargetsTypeWorkflow:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListRunPlans400JSONResponseBodySuccess.
+const (
+	ListRunPlans400JSONResponseBodySuccessFalse ListRunPlans400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the ListRunPlans400JSONResponseBodySuccess enum.
+func (e ListRunPlans400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case ListRunPlans400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -30033,6 +32343,21 @@ func (e RunRunPlan200JSONResponseBodyItemsTargetType) Valid() bool {
 	}
 }
 
+// Defines values for RunRunPlan400JSONResponseBodySuccess.
+const (
+	RunRunPlan400JSONResponseBodySuccessFalse RunRunPlan400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the RunRunPlan400JSONResponseBodySuccess enum.
+func (e RunRunPlan400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case RunRunPlan400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ArchiveRunPlan200JSONResponseBodyArchived.
 const (
 	ArchiveRunPlan200JSONResponseBodyArchivedTrue ArchiveRunPlan200JSONResponseBodyArchived = true
@@ -30042,6 +32367,21 @@ const (
 func (e ArchiveRunPlan200JSONResponseBodyArchived) Valid() bool {
 	switch e {
 	case ArchiveRunPlan200JSONResponseBodyArchivedTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ArchiveRunPlan400JSONResponseBodySuccess.
+const (
+	ArchiveRunPlan400JSONResponseBodySuccessFalse ArchiveRunPlan400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the ArchiveRunPlan400JSONResponseBodySuccess enum.
+func (e ArchiveRunPlan400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case ArchiveRunPlan400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -30219,6 +32559,21 @@ func (e GetRunPlan200JSONResponseBodyTargetsType) Valid() bool {
 	}
 }
 
+// Defines values for GetRunPlan400JSONResponseBodySuccess.
+const (
+	GetRunPlan400JSONResponseBodySuccessFalse GetRunPlan400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetRunPlan400JSONResponseBodySuccess enum.
+func (e GetRunPlan400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetRunPlan400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for RerunRunPlan200JSONResponseBodyItemsTargetScenarioMappings0Type.
 const (
 	RerunRunPlan200JSONResponseBodyItemsTargetScenarioMappings0TypeSource RerunRunPlan200JSONResponseBodyItemsTargetScenarioMappings0Type = "source"
@@ -30273,6 +32628,21 @@ func (e RerunRunPlan200JSONResponseBodyItemsTargetType) Valid() bool {
 	case RerunRunPlan200JSONResponseBodyItemsTargetTypeVoice:
 		return true
 	case RerunRunPlan200JSONResponseBodyItemsTargetTypeWorkflow:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RerunRunPlan400JSONResponseBodySuccess.
+const (
+	RerunRunPlan400JSONResponseBodySuccessFalse RerunRunPlan400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the RerunRunPlan400JSONResponseBodySuccess enum.
+func (e RerunRunPlan400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case RerunRunPlan400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -31371,6 +33741,36 @@ func (e PostApiScenarios201JSONResponseBodyParametersType) Valid() bool {
 	}
 }
 
+// Defines values for PostApiScenarios400JSONResponseBodySuccess.
+const (
+	PostApiScenarios400JSONResponseBodySuccessFalse PostApiScenarios400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the PostApiScenarios400JSONResponseBodySuccess enum.
+func (e PostApiScenarios400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case PostApiScenarios400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeleteApiScenariosById400JSONResponseBodySuccess.
+const (
+	DeleteApiScenariosById400JSONResponseBodySuccessFalse DeleteApiScenariosById400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the DeleteApiScenariosById400JSONResponseBodySuccess enum.
+func (e DeleteApiScenariosById400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case DeleteApiScenariosById400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GetApiScenariosById200JSONResponseBodyParametersType.
 const (
 	GetApiScenariosById200JSONResponseBodyParametersTypeBoolean GetApiScenariosById200JSONResponseBodyParametersType = "boolean"
@@ -31386,6 +33786,21 @@ func (e GetApiScenariosById200JSONResponseBodyParametersType) Valid() bool {
 	case GetApiScenariosById200JSONResponseBodyParametersTypeNumber:
 		return true
 	case GetApiScenariosById200JSONResponseBodyParametersTypeString:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiScenariosById400JSONResponseBodySuccess.
+const (
+	GetApiScenariosById400JSONResponseBodySuccessFalse GetApiScenariosById400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetApiScenariosById400JSONResponseBodySuccess enum.
+func (e GetApiScenariosById400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetApiScenariosById400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -31434,6 +33849,21 @@ func (e PatchApiScenariosById200JSONResponseBodyParametersType) Valid() bool {
 	}
 }
 
+// Defines values for PatchApiScenariosById400JSONResponseBodySuccess.
+const (
+	PatchApiScenariosById400JSONResponseBodySuccessFalse PatchApiScenariosById400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the PatchApiScenariosById400JSONResponseBodySuccess enum.
+func (e PatchApiScenariosById400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case PatchApiScenariosById400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PutApiScenariosByIdJSONBodyParametersType.
 const (
 	PutApiScenariosByIdJSONBodyParametersTypeBoolean PutApiScenariosByIdJSONBodyParametersType = "boolean"
@@ -31476,6 +33906,36 @@ func (e PutApiScenariosById200JSONResponseBodyParametersType) Valid() bool {
 	}
 }
 
+// Defines values for PutApiScenariosById400JSONResponseBodySuccess.
+const (
+	PutApiScenariosById400JSONResponseBodySuccessFalse PutApiScenariosById400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the PutApiScenariosById400JSONResponseBodySuccess enum.
+func (e PutApiScenariosById400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case PutApiScenariosById400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiScenariosByIdVersions400JSONResponseBodySuccess.
+const (
+	GetApiScenariosByIdVersions400JSONResponseBodySuccessFalse GetApiScenariosByIdVersions400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetApiScenariosByIdVersions400JSONResponseBodySuccess enum.
+func (e GetApiScenariosByIdVersions400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetApiScenariosByIdVersions400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GetApiScenariosByIdVersionsByVersion200JSONResponseBodySnapshotParametersType.
 const (
 	GetApiScenariosByIdVersionsByVersion200JSONResponseBodySnapshotParametersTypeBoolean GetApiScenariosByIdVersionsByVersion200JSONResponseBodySnapshotParametersType = "boolean"
@@ -31497,6 +33957,21 @@ func (e GetApiScenariosByIdVersionsByVersion200JSONResponseBodySnapshotParameter
 	}
 }
 
+// Defines values for GetApiScenariosByIdVersionsByVersion400JSONResponseBodySuccess.
+const (
+	GetApiScenariosByIdVersionsByVersion400JSONResponseBodySuccessFalse GetApiScenariosByIdVersionsByVersion400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetApiScenariosByIdVersionsByVersion400JSONResponseBodySuccess enum.
+func (e GetApiScenariosByIdVersionsByVersion400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetApiScenariosByIdVersionsByVersion400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for RevokeScimToken200JSONResponseBodySuccess.
 const (
 	RevokeScimToken200JSONResponseBodySuccessTrue RevokeScimToken200JSONResponseBodySuccess = true
@@ -31512,6 +33987,51 @@ func (e RevokeScimToken200JSONResponseBodySuccess) Valid() bool {
 	}
 }
 
+// Defines values for RevokeScimToken400JSONResponseBodySuccess.
+const (
+	RevokeScimToken400JSONResponseBodySuccessFalse RevokeScimToken400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the RevokeScimToken400JSONResponseBodySuccess enum.
+func (e RevokeScimToken400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case RevokeScimToken400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiSecrets400JSONResponseBodySuccess.
+const (
+	GetApiSecrets400JSONResponseBodySuccessFalse GetApiSecrets400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetApiSecrets400JSONResponseBodySuccess enum.
+func (e GetApiSecrets400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetApiSecrets400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiSecrets400JSONResponseBodySuccess.
+const (
+	PostApiSecrets400JSONResponseBodySuccessFalse PostApiSecrets400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the PostApiSecrets400JSONResponseBodySuccess enum.
+func (e PostApiSecrets400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case PostApiSecrets400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for DeleteApiSecretsById200JSONResponseBodyDeleted.
 const (
 	DeleteApiSecretsById200JSONResponseBodyDeletedTrue DeleteApiSecretsById200JSONResponseBodyDeleted = true
@@ -31521,6 +34041,51 @@ const (
 func (e DeleteApiSecretsById200JSONResponseBodyDeleted) Valid() bool {
 	switch e {
 	case DeleteApiSecretsById200JSONResponseBodyDeletedTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeleteApiSecretsById400JSONResponseBodySuccess.
+const (
+	DeleteApiSecretsById400JSONResponseBodySuccessFalse DeleteApiSecretsById400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the DeleteApiSecretsById400JSONResponseBodySuccess enum.
+func (e DeleteApiSecretsById400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case DeleteApiSecretsById400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiSecretsById400JSONResponseBodySuccess.
+const (
+	GetApiSecretsById400JSONResponseBodySuccessFalse GetApiSecretsById400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetApiSecretsById400JSONResponseBodySuccess enum.
+func (e GetApiSecretsById400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetApiSecretsById400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PutApiSecretsById400JSONResponseBodySuccess.
+const (
+	PutApiSecretsById400JSONResponseBodySuccessFalse PutApiSecretsById400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the PutApiSecretsById400JSONResponseBodySuccess enum.
+func (e PutApiSecretsById400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case PutApiSecretsById400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -31590,6 +34155,51 @@ func (e GetApiSimulationRuns200JSONResponseBodyRunsResultsEvaluationsStatus) Val
 	}
 }
 
+// Defines values for GetApiSimulationRuns400JSONResponseBodySuccess.
+const (
+	GetApiSimulationRuns400JSONResponseBodySuccessFalse GetApiSimulationRuns400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetApiSimulationRuns400JSONResponseBodySuccess enum.
+func (e GetApiSimulationRuns400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetApiSimulationRuns400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiSimulationRunsBatchesList400JSONResponseBodySuccess.
+const (
+	GetApiSimulationRunsBatchesList400JSONResponseBodySuccessFalse GetApiSimulationRunsBatchesList400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetApiSimulationRunsBatchesList400JSONResponseBodySuccess enum.
+func (e GetApiSimulationRunsBatchesList400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetApiSimulationRunsBatchesList400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiSimulationRunsBatchesByBatchRunId400JSONResponseBodySuccess.
+const (
+	GetApiSimulationRunsBatchesByBatchRunId400JSONResponseBodySuccessFalse GetApiSimulationRunsBatchesByBatchRunId400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetApiSimulationRunsBatchesByBatchRunId400JSONResponseBodySuccess enum.
+func (e GetApiSimulationRunsBatchesByBatchRunId400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetApiSimulationRunsBatchesByBatchRunId400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GetApiSimulationRunsByScenarioRunId200JSONResponseBodyResultsCriteriaStatus.
 const (
 	GetApiSimulationRunsByScenarioRunId200JSONResponseBodyResultsCriteriaStatusFailed       GetApiSimulationRunsByScenarioRunId200JSONResponseBodyResultsCriteriaStatus = "failed"
@@ -31632,6 +34242,21 @@ func (e GetApiSimulationRunsByScenarioRunId200JSONResponseBodyResultsEvaluations
 	case GetApiSimulationRunsByScenarioRunId200JSONResponseBodyResultsEvaluationsStatusScored:
 		return true
 	case GetApiSimulationRunsByScenarioRunId200JSONResponseBodyResultsEvaluationsStatusSkipped:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiSimulationRunsByScenarioRunId400JSONResponseBodySuccess.
+const (
+	GetApiSimulationRunsByScenarioRunId400JSONResponseBodySuccessFalse GetApiSimulationRunsByScenarioRunId400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetApiSimulationRunsByScenarioRunId400JSONResponseBodySuccess enum.
+func (e GetApiSimulationRunsByScenarioRunId400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetApiSimulationRunsByScenarioRunId400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -31683,6 +34308,21 @@ const (
 func (e CreateStoredObjectUpload200JSONResponseBodyMethod) Valid() bool {
 	switch e {
 	case CreateStoredObjectUpload200JSONResponseBodyMethodPUT:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CreateStoredObjectUpload400JSONResponseBodySuccess.
+const (
+	CreateStoredObjectUpload400JSONResponseBodySuccessFalse CreateStoredObjectUpload400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the CreateStoredObjectUpload400JSONResponseBodySuccess enum.
+func (e CreateStoredObjectUpload400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case CreateStoredObjectUpload400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -31815,6 +34455,36 @@ func (e ConfirmStoredObjectUpload200JSONResponseBodyAudience) Valid() bool {
 	case ConfirmStoredObjectUpload200JSONResponseBodyAudienceWebhookEndpointsView:
 		return true
 	case ConfirmStoredObjectUpload200JSONResponseBodyAudienceWorkflowsView:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ConfirmStoredObjectUpload400JSONResponseBodySuccess.
+const (
+	ConfirmStoredObjectUpload400JSONResponseBodySuccessFalse ConfirmStoredObjectUpload400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the ConfirmStoredObjectUpload400JSONResponseBodySuccess enum.
+func (e ConfirmStoredObjectUpload400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case ConfirmStoredObjectUpload400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeleteStoredObject400JSONResponseBodySuccess.
+const (
+	DeleteStoredObject400JSONResponseBodySuccessFalse DeleteStoredObject400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the DeleteStoredObject400JSONResponseBodySuccess enum.
+func (e DeleteStoredObject400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case DeleteStoredObject400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -32259,6 +34929,21 @@ func (e GetStoredObject200JSONResponseBodyMetadataStatus) Valid() bool {
 	}
 }
 
+// Defines values for GetStoredObject400JSONResponseBodySuccess.
+const (
+	GetStoredObject400JSONResponseBodySuccessFalse GetStoredObject400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetStoredObject400JSONResponseBodySuccess enum.
+func (e GetStoredObject400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetStoredObject400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GetApiSuitesParamsKind.
 const (
 	GetApiSuitesParamsKindCustom GetApiSuitesParamsKind = "custom"
@@ -32409,6 +35094,21 @@ func (e GetApiSuites200JSONResponseBodyTargetsType) Valid() bool {
 	case GetApiSuites200JSONResponseBodyTargetsTypeVoice:
 		return true
 	case GetApiSuites200JSONResponseBodyTargetsTypeWorkflow:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiSuites400JSONResponseBodySuccess.
+const (
+	GetApiSuites400JSONResponseBodySuccessFalse GetApiSuites400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetApiSuites400JSONResponseBodySuccess enum.
+func (e GetApiSuites400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetApiSuites400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -32691,6 +35391,36 @@ func (e PostApiSuites201JSONResponseBodyTargetsType) Valid() bool {
 	}
 }
 
+// Defines values for PostApiSuites400JSONResponseBodySuccess.
+const (
+	PostApiSuites400JSONResponseBodySuccessFalse PostApiSuites400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the PostApiSuites400JSONResponseBodySuccess enum.
+func (e PostApiSuites400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case PostApiSuites400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeleteApiSuitesById400JSONResponseBodySuccess.
+const (
+	DeleteApiSuitesById400JSONResponseBodySuccessFalse DeleteApiSuitesById400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the DeleteApiSuitesById400JSONResponseBodySuccess enum.
+func (e DeleteApiSuitesById400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case DeleteApiSuitesById400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GetApiSuitesById200JSONResponseBodyKind.
 const (
 	GetApiSuitesById200JSONResponseBodyKindCustom GetApiSuitesById200JSONResponseBodyKind = "custom"
@@ -32823,6 +35553,21 @@ func (e GetApiSuitesById200JSONResponseBodyTargetsType) Valid() bool {
 	case GetApiSuitesById200JSONResponseBodyTargetsTypeVoice:
 		return true
 	case GetApiSuitesById200JSONResponseBodyTargetsTypeWorkflow:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiSuitesById400JSONResponseBodySuccess.
+const (
+	GetApiSuitesById400JSONResponseBodySuccessFalse GetApiSuitesById400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetApiSuitesById400JSONResponseBodySuccess enum.
+func (e GetApiSuitesById400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetApiSuitesById400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -33087,6 +35832,21 @@ func (e PatchApiSuitesById200JSONResponseBodyTargetsType) Valid() bool {
 	}
 }
 
+// Defines values for PatchApiSuitesById400JSONResponseBodySuccess.
+const (
+	PatchApiSuitesById400JSONResponseBodySuccessFalse PatchApiSuitesById400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the PatchApiSuitesById400JSONResponseBodySuccess enum.
+func (e PatchApiSuitesById400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case PatchApiSuitesById400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PostApiSuitesByIdDuplicate201JSONResponseBodyKind.
 const (
 	PostApiSuitesByIdDuplicate201JSONResponseBodyKindCustom PostApiSuitesByIdDuplicate201JSONResponseBodyKind = "custom"
@@ -33225,6 +35985,21 @@ func (e PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsType) Valid() bool {
 	}
 }
 
+// Defines values for PostApiSuitesByIdDuplicate400JSONResponseBodySuccess.
+const (
+	PostApiSuitesByIdDuplicate400JSONResponseBodySuccessFalse PostApiSuitesByIdDuplicate400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the PostApiSuitesByIdDuplicate400JSONResponseBodySuccess enum.
+func (e PostApiSuitesByIdDuplicate400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case PostApiSuitesByIdDuplicate400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PostApiSuitesByIdRunJSONBodyTargetsScenarioMappings0Type.
 const (
 	PostApiSuitesByIdRunJSONBodyTargetsScenarioMappings0TypeSource PostApiSuitesByIdRunJSONBodyTargetsScenarioMappings0Type = "source"
@@ -33345,6 +36120,96 @@ func (e PostApiSuitesByIdRun200JSONResponseBodyItemsTargetType) Valid() bool {
 	}
 }
 
+// Defines values for PostApiSuitesByIdRun400JSONResponseBodySuccess.
+const (
+	PostApiSuitesByIdRun400JSONResponseBodySuccessFalse PostApiSuitesByIdRun400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the PostApiSuitesByIdRun400JSONResponseBodySuccess enum.
+func (e PostApiSuitesByIdRun400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case PostApiSuitesByIdRun400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiTeams400JSONResponseBodySuccess.
+const (
+	GetApiTeams400JSONResponseBodySuccessFalse GetApiTeams400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetApiTeams400JSONResponseBodySuccess enum.
+func (e GetApiTeams400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetApiTeams400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTeams400JSONResponseBodySuccess.
+const (
+	PostApiTeams400JSONResponseBodySuccessFalse PostApiTeams400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the PostApiTeams400JSONResponseBodySuccess enum.
+func (e PostApiTeams400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case PostApiTeams400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeleteApiTeamsById400JSONResponseBodySuccess.
+const (
+	DeleteApiTeamsById400JSONResponseBodySuccessFalse DeleteApiTeamsById400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the DeleteApiTeamsById400JSONResponseBodySuccess enum.
+func (e DeleteApiTeamsById400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case DeleteApiTeamsById400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiTeamsById400JSONResponseBodySuccess.
+const (
+	GetApiTeamsById400JSONResponseBodySuccessFalse GetApiTeamsById400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetApiTeamsById400JSONResponseBodySuccess enum.
+func (e GetApiTeamsById400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetApiTeamsById400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiTeamsById400JSONResponseBodySuccess.
+const (
+	PatchApiTeamsById400JSONResponseBodySuccessFalse PatchApiTeamsById400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the PatchApiTeamsById400JSONResponseBodySuccess enum.
+func (e PatchApiTeamsById400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case PatchApiTeamsById400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GetApiTeamsByIdMembers200JSONResponseBodyDataRole.
 const (
 	GetApiTeamsByIdMembers200JSONResponseBodyDataRoleADMIN  GetApiTeamsByIdMembers200JSONResponseBodyDataRole = "ADMIN"
@@ -33369,6 +36234,21 @@ func (e GetApiTeamsByIdMembers200JSONResponseBodyDataRole) Valid() bool {
 	}
 }
 
+// Defines values for GetApiTeamsByIdMembers400JSONResponseBodySuccess.
+const (
+	GetApiTeamsByIdMembers400JSONResponseBodySuccessFalse GetApiTeamsByIdMembers400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetApiTeamsByIdMembers400JSONResponseBodySuccess enum.
+func (e GetApiTeamsByIdMembers400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetApiTeamsByIdMembers400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PostApiTeamsByIdMembersJSONBodyRole.
 const (
 	ADMIN  PostApiTeamsByIdMembersJSONBodyRole = "ADMIN"
@@ -33384,6 +36264,51 @@ func (e PostApiTeamsByIdMembersJSONBodyRole) Valid() bool {
 	case MEMBER:
 		return true
 	case VIEWER:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTeamsByIdMembers400JSONResponseBodySuccess.
+const (
+	PostApiTeamsByIdMembers400JSONResponseBodySuccessFalse PostApiTeamsByIdMembers400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the PostApiTeamsByIdMembers400JSONResponseBodySuccess enum.
+func (e PostApiTeamsByIdMembers400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case PostApiTeamsByIdMembers400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeleteApiTeamsByIdMembersByUserId400JSONResponseBodySuccess.
+const (
+	DeleteApiTeamsByIdMembersByUserId400JSONResponseBodySuccessFalse DeleteApiTeamsByIdMembersByUserId400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the DeleteApiTeamsByIdMembersByUserId400JSONResponseBodySuccess enum.
+func (e DeleteApiTeamsByIdMembersByUserId400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case DeleteApiTeamsByIdMembersByUserId400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiTeamsByIdProjects400JSONResponseBodySuccess.
+const (
+	GetApiTeamsByIdProjects400JSONResponseBodySuccessFalse GetApiTeamsByIdProjects400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetApiTeamsByIdProjects400JSONResponseBodySuccess enum.
+func (e GetApiTeamsByIdProjects400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetApiTeamsByIdProjects400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -33456,6 +36381,21 @@ func (e ListTestSuites200JSONResponseBodyFieldsType) Valid() bool {
 	case ListTestSuites200JSONResponseBodyFieldsTypeNumber:
 		return true
 	case ListTestSuites200JSONResponseBodyFieldsTypeText:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListTestSuites400JSONResponseBodySuccess.
+const (
+	ListTestSuites400JSONResponseBodySuccessFalse ListTestSuites400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the ListTestSuites400JSONResponseBodySuccess enum.
+func (e ListTestSuites400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case ListTestSuites400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -33606,6 +36546,21 @@ func (e CreateTestSuite201JSONResponseBodyFieldsType) Valid() bool {
 	}
 }
 
+// Defines values for CreateTestSuite400JSONResponseBodySuccess.
+const (
+	CreateTestSuite400JSONResponseBodySuccessFalse CreateTestSuite400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the CreateTestSuite400JSONResponseBodySuccess enum.
+func (e CreateTestSuite400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case CreateTestSuite400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ArchiveTestSuite200JSONResponseBodyArchived.
 const (
 	ArchiveTestSuite200JSONResponseBodyArchivedTrue ArchiveTestSuite200JSONResponseBodyArchived = true
@@ -33615,6 +36570,21 @@ const (
 func (e ArchiveTestSuite200JSONResponseBodyArchived) Valid() bool {
 	switch e {
 	case ArchiveTestSuite200JSONResponseBodyArchivedTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ArchiveTestSuite400JSONResponseBodySuccess.
+const (
+	ArchiveTestSuite400JSONResponseBodySuccessFalse ArchiveTestSuite400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the ArchiveTestSuite400JSONResponseBodySuccess enum.
+func (e ArchiveTestSuite400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case ArchiveTestSuite400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -33687,6 +36657,21 @@ func (e GetTestSuite200JSONResponseBodyFieldsType) Valid() bool {
 	case GetTestSuite200JSONResponseBodyFieldsTypeNumber:
 		return true
 	case GetTestSuite200JSONResponseBodyFieldsTypeText:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetTestSuite400JSONResponseBodySuccess.
+const (
+	GetTestSuite400JSONResponseBodySuccessFalse GetTestSuite400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetTestSuite400JSONResponseBodySuccess enum.
+func (e GetTestSuite400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetTestSuite400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -33837,6 +36822,21 @@ func (e UpdateTestSuite200JSONResponseBodyFieldsType) Valid() bool {
 	}
 }
 
+// Defines values for UpdateTestSuite400JSONResponseBodySuccess.
+const (
+	UpdateTestSuite400JSONResponseBodySuccessFalse UpdateTestSuite400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the UpdateTestSuite400JSONResponseBodySuccess enum.
+func (e UpdateTestSuite400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case UpdateTestSuite400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for RunTestSuiteJSONBodyTargetsScenarioMappings0Type.
 const (
 	RunTestSuiteJSONBodyTargetsScenarioMappings0TypeSource RunTestSuiteJSONBodyTargetsScenarioMappings0Type = "source"
@@ -33951,6 +36951,21 @@ func (e RunTestSuite200JSONResponseBodyItemsTargetType) Valid() bool {
 	case RunTestSuite200JSONResponseBodyItemsTargetTypeVoice:
 		return true
 	case RunTestSuite200JSONResponseBodyItemsTargetTypeWorkflow:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RunTestSuite400JSONResponseBodySuccess.
+const (
+	RunTestSuite400JSONResponseBodySuccessFalse RunTestSuite400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the RunTestSuite400JSONResponseBodySuccess enum.
+func (e RunTestSuite400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case RunTestSuite400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -34128,6 +37143,21 @@ const (
 func (e PostApiTracesSearchJSONBodyFrom) Valid() bool {
 	switch e {
 	case Traces:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiTracesByTraceIdMetadata400JSONResponseBodySuccess.
+const (
+	PatchApiTracesByTraceIdMetadata400JSONResponseBodySuccessFalse PatchApiTracesByTraceIdMetadata400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the PatchApiTracesByTraceIdMetadata400JSONResponseBodySuccess enum.
+func (e PatchApiTracesByTraceIdMetadata400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case PatchApiTracesByTraceIdMetadata400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -35892,6 +38922,36 @@ func (e PostApiTriggers201JSONResponseBodyTemplatesSlackTemplateType) Valid() bo
 	}
 }
 
+// Defines values for PostApiTriggers400JSONResponseBodySuccess.
+const (
+	PostApiTriggers400JSONResponseBodySuccessFalse PostApiTriggers400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggers400JSONResponseBodySuccess enum.
+func (e PostApiTriggers400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case PostApiTriggers400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeleteApiTriggersById400JSONResponseBodySuccess.
+const (
+	DeleteApiTriggersById400JSONResponseBodySuccessFalse DeleteApiTriggersById400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the DeleteApiTriggersById400JSONResponseBodySuccess enum.
+func (e DeleteApiTriggersById400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case DeleteApiTriggersById400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GetApiTriggersById200JSONResponseBodyAction.
 const (
 	GetApiTriggersById200JSONResponseBodyActionADDTOANNOTATIONQUEUE GetApiTriggersById200JSONResponseBodyAction = "ADD_TO_ANNOTATION_QUEUE"
@@ -36135,6 +39195,21 @@ func (e GetApiTriggersById200JSONResponseBodyTemplatesSlackTemplateType) Valid()
 	case GetApiTriggersById200JSONResponseBodyTemplatesSlackTemplateTypeBlockKit:
 		return true
 	case GetApiTriggersById200JSONResponseBodyTemplatesSlackTemplateTypeString:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiTriggersById400JSONResponseBodySuccess.
+const (
+	GetApiTriggersById400JSONResponseBodySuccessFalse GetApiTriggersById400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetApiTriggersById400JSONResponseBodySuccess enum.
+func (e GetApiTriggersById400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetApiTriggersById400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -36681,6 +39756,21 @@ func (e PatchApiTriggersById200JSONResponseBodyTemplatesSlackTemplateType) Valid
 	}
 }
 
+// Defines values for PatchApiTriggersById400JSONResponseBodySuccess.
+const (
+	PatchApiTriggersById400JSONResponseBodySuccessFalse PatchApiTriggersById400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the PatchApiTriggersById400JSONResponseBodySuccess enum.
+func (e PatchApiTriggersById400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case PatchApiTriggersById400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PostApiTriggersByIdDisable200JSONResponseBodyAction.
 const (
 	PostApiTriggersByIdDisable200JSONResponseBodyActionADDTOANNOTATIONQUEUE PostApiTriggersByIdDisable200JSONResponseBodyAction = "ADD_TO_ANNOTATION_QUEUE"
@@ -36930,6 +40020,21 @@ func (e PostApiTriggersByIdDisable200JSONResponseBodyTemplatesSlackTemplateType)
 	}
 }
 
+// Defines values for PostApiTriggersByIdDisable400JSONResponseBodySuccess.
+const (
+	PostApiTriggersByIdDisable400JSONResponseBodySuccessFalse PostApiTriggersByIdDisable400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersByIdDisable400JSONResponseBodySuccess enum.
+func (e PostApiTriggersByIdDisable400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case PostApiTriggersByIdDisable400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PostApiTriggersByIdEnable200JSONResponseBodyAction.
 const (
 	PostApiTriggersByIdEnable200JSONResponseBodyActionADDTOANNOTATIONQUEUE PostApiTriggersByIdEnable200JSONResponseBodyAction = "ADD_TO_ANNOTATION_QUEUE"
@@ -37007,13 +40112,13 @@ func (e PostApiTriggersByIdEnable200JSONResponseBodyGraphAlert0Operator) Valid()
 
 // Defines values for PostApiTriggersByIdEnable200JSONResponseBodyGraphAlert0TimePeriod0.
 const (
-	PostApiTriggersByIdEnable200JSONResponseBodyGraphAlert0TimePeriod0N1 PostApiTriggersByIdEnable200JSONResponseBodyGraphAlert0TimePeriod0 = 1
+	N1 PostApiTriggersByIdEnable200JSONResponseBodyGraphAlert0TimePeriod0 = 1
 )
 
 // Valid indicates whether the value is a known member of the PostApiTriggersByIdEnable200JSONResponseBodyGraphAlert0TimePeriod0 enum.
 func (e PostApiTriggersByIdEnable200JSONResponseBodyGraphAlert0TimePeriod0) Valid() bool {
 	switch e {
-	case PostApiTriggersByIdEnable200JSONResponseBodyGraphAlert0TimePeriod0N1:
+	case N1:
 		return true
 	default:
 		return false
@@ -37179,6 +40284,36 @@ func (e PostApiTriggersByIdEnable200JSONResponseBodyTemplatesSlackTemplateType) 
 	}
 }
 
+// Defines values for PostApiTriggersByIdEnable400JSONResponseBodySuccess.
+const (
+	PostApiTriggersByIdEnable400JSONResponseBodySuccessFalse PostApiTriggersByIdEnable400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersByIdEnable400JSONResponseBodySuccess enum.
+func (e PostApiTriggersByIdEnable400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case PostApiTriggersByIdEnable400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiTriggersByIdFires400JSONResponseBodySuccess.
+const (
+	GetApiTriggersByIdFires400JSONResponseBodySuccessFalse GetApiTriggersByIdFires400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetApiTriggersByIdFires400JSONResponseBodySuccess enum.
+func (e GetApiTriggersByIdFires400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetApiTriggersByIdFires400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PostApiTriggersByIdTestFire200JSONResponseBodyChannel.
 const (
 	PostApiTriggersByIdTestFire200JSONResponseBodyChannelEmail   PostApiTriggersByIdTestFire200JSONResponseBodyChannel = "email"
@@ -37200,6 +40335,36 @@ func (e PostApiTriggersByIdTestFire200JSONResponseBodyChannel) Valid() bool {
 	}
 }
 
+// Defines values for PostApiTriggersByIdTestFire400JSONResponseBodySuccess.
+const (
+	PostApiTriggersByIdTestFire400JSONResponseBodySuccessFalse PostApiTriggersByIdTestFire400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersByIdTestFire400JSONResponseBodySuccess enum.
+func (e PostApiTriggersByIdTestFire400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case PostApiTriggersByIdTestFire400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ReadUserAvatarBytes400JSONResponseBodySuccess.
+const (
+	ReadUserAvatarBytes400JSONResponseBodySuccessFalse ReadUserAvatarBytes400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the ReadUserAvatarBytes400JSONResponseBodySuccess enum.
+func (e ReadUserAvatarBytes400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case ReadUserAvatarBytes400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ReceiveStripeWebhook200JSONResponseBodyReceived.
 const (
 	ReceiveStripeWebhook200JSONResponseBodyReceivedTrue ReceiveStripeWebhook200JSONResponseBodyReceived = true
@@ -37209,6 +40374,51 @@ const (
 func (e ReceiveStripeWebhook200JSONResponseBodyReceived) Valid() bool {
 	switch e {
 	case ReceiveStripeWebhook200JSONResponseBodyReceivedTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeleteApiWorkflowsById400JSONResponseBodySuccess.
+const (
+	DeleteApiWorkflowsById400JSONResponseBodySuccessFalse DeleteApiWorkflowsById400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the DeleteApiWorkflowsById400JSONResponseBodySuccess enum.
+func (e DeleteApiWorkflowsById400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case DeleteApiWorkflowsById400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiWorkflowsById400JSONResponseBodySuccess.
+const (
+	GetApiWorkflowsById400JSONResponseBodySuccessFalse GetApiWorkflowsById400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetApiWorkflowsById400JSONResponseBodySuccess enum.
+func (e GetApiWorkflowsById400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetApiWorkflowsById400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiWorkflowsById400JSONResponseBodySuccess.
+const (
+	PatchApiWorkflowsById400JSONResponseBodySuccessFalse PatchApiWorkflowsById400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the PatchApiWorkflowsById400JSONResponseBodySuccess enum.
+func (e PatchApiWorkflowsById400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case PatchApiWorkflowsById400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -37245,6 +40455,21 @@ func (e PostApiWorkflowsByWorkflowIdRun200JSONResponseBodyStatus) Valid() bool {
 	}
 }
 
+// Defines values for PostApiWorkflowsByWorkflowIdRun400JSONResponseBodySuccess.
+const (
+	PostApiWorkflowsByWorkflowIdRun400JSONResponseBodySuccessFalse PostApiWorkflowsByWorkflowIdRun400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the PostApiWorkflowsByWorkflowIdRun400JSONResponseBodySuccess enum.
+func (e PostApiWorkflowsByWorkflowIdRun400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case PostApiWorkflowsByWorkflowIdRun400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PostApiWorkflowsByWorkflowIdByVersionIdRun200JSONResponseBodyStatus.
 const (
 	PostApiWorkflowsByWorkflowIdByVersionIdRun200JSONResponseBodyStatusError   PostApiWorkflowsByWorkflowIdByVersionIdRun200JSONResponseBodyStatus = "error"
@@ -37269,6 +40494,21 @@ func (e PostApiWorkflowsByWorkflowIdByVersionIdRun200JSONResponseBodyStatus) Val
 	case PostApiWorkflowsByWorkflowIdByVersionIdRun200JSONResponseBodyStatusSuccess:
 		return true
 	case PostApiWorkflowsByWorkflowIdByVersionIdRun200JSONResponseBodyStatusWaiting:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiWorkflowsByWorkflowIdByVersionIdRun400JSONResponseBodySuccess.
+const (
+	PostApiWorkflowsByWorkflowIdByVersionIdRun400JSONResponseBodySuccessFalse PostApiWorkflowsByWorkflowIdByVersionIdRun400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the PostApiWorkflowsByWorkflowIdByVersionIdRun400JSONResponseBodySuccess enum.
+func (e PostApiWorkflowsByWorkflowIdByVersionIdRun400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case PostApiWorkflowsByWorkflowIdByVersionIdRun400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -37467,15 +40707,45 @@ func (e PostApiWebhooksV1Endpoints201JSONResponseBodyData1Status) Valid() bool {
 	}
 }
 
+// Defines values for PostApiWebhooksV1Endpoints400JSONResponseBodySuccess.
+const (
+	PostApiWebhooksV1Endpoints400JSONResponseBodySuccessFalse PostApiWebhooksV1Endpoints400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the PostApiWebhooksV1Endpoints400JSONResponseBodySuccess enum.
+func (e PostApiWebhooksV1Endpoints400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case PostApiWebhooksV1Endpoints400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for DeleteApiWebhooksV1EndpointsById200JSONResponseBodyDataArchived.
 const (
-	DeleteApiWebhooksV1EndpointsById200JSONResponseBodyDataArchivedTrue DeleteApiWebhooksV1EndpointsById200JSONResponseBodyDataArchived = true
+	True DeleteApiWebhooksV1EndpointsById200JSONResponseBodyDataArchived = true
 )
 
 // Valid indicates whether the value is a known member of the DeleteApiWebhooksV1EndpointsById200JSONResponseBodyDataArchived enum.
 func (e DeleteApiWebhooksV1EndpointsById200JSONResponseBodyDataArchived) Valid() bool {
 	switch e {
-	case DeleteApiWebhooksV1EndpointsById200JSONResponseBodyDataArchivedTrue:
+	case True:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeleteApiWebhooksV1EndpointsById400JSONResponseBodySuccess.
+const (
+	DeleteApiWebhooksV1EndpointsById400JSONResponseBodySuccessFalse DeleteApiWebhooksV1EndpointsById400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the DeleteApiWebhooksV1EndpointsById400JSONResponseBodySuccess enum.
+func (e DeleteApiWebhooksV1EndpointsById400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case DeleteApiWebhooksV1EndpointsById400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -37563,6 +40833,21 @@ func (e GetApiWebhooksV1EndpointsById200JSONResponseBodyData1Status) Valid() boo
 	case GetApiWebhooksV1EndpointsById200JSONResponseBodyData1StatusActive:
 		return true
 	case GetApiWebhooksV1EndpointsById200JSONResponseBodyData1StatusDisabled:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiWebhooksV1EndpointsById400JSONResponseBodySuccess.
+const (
+	GetApiWebhooksV1EndpointsById400JSONResponseBodySuccessFalse GetApiWebhooksV1EndpointsById400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetApiWebhooksV1EndpointsById400JSONResponseBodySuccess enum.
+func (e GetApiWebhooksV1EndpointsById400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetApiWebhooksV1EndpointsById400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -37692,6 +40977,21 @@ func (e PatchApiWebhooksV1EndpointsById200JSONResponseBodyData1Status) Valid() b
 	}
 }
 
+// Defines values for PatchApiWebhooksV1EndpointsById400JSONResponseBodySuccess.
+const (
+	PatchApiWebhooksV1EndpointsById400JSONResponseBodySuccessFalse PatchApiWebhooksV1EndpointsById400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the PatchApiWebhooksV1EndpointsById400JSONResponseBodySuccess enum.
+func (e PatchApiWebhooksV1EndpointsById400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case PatchApiWebhooksV1EndpointsById400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcome.
 const (
 	Pending   GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcome = "pending"
@@ -37716,6 +41016,21 @@ func (e GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcome) V
 	}
 }
 
+// Defines values for GetApiWebhooksV1EndpointsByIdDeliveries400JSONResponseBodySuccess.
+const (
+	GetApiWebhooksV1EndpointsByIdDeliveries400JSONResponseBodySuccessFalse GetApiWebhooksV1EndpointsByIdDeliveries400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetApiWebhooksV1EndpointsByIdDeliveries400JSONResponseBodySuccess enum.
+func (e GetApiWebhooksV1EndpointsByIdDeliveries400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetApiWebhooksV1EndpointsByIdDeliveries400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GetApiWebhooksV1EndpointsByIdHealth200JSONResponseBodyDataStatus.
 const (
 	GetApiWebhooksV1EndpointsByIdHealth200JSONResponseBodyDataStatusActive   GetApiWebhooksV1EndpointsByIdHealth200JSONResponseBodyDataStatus = "active"
@@ -37728,6 +41043,21 @@ func (e GetApiWebhooksV1EndpointsByIdHealth200JSONResponseBodyDataStatus) Valid(
 	case GetApiWebhooksV1EndpointsByIdHealth200JSONResponseBodyDataStatusActive:
 		return true
 	case GetApiWebhooksV1EndpointsByIdHealth200JSONResponseBodyDataStatusDisabled:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiWebhooksV1EndpointsByIdHealth400JSONResponseBodySuccess.
+const (
+	GetApiWebhooksV1EndpointsByIdHealth400JSONResponseBodySuccessFalse GetApiWebhooksV1EndpointsByIdHealth400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetApiWebhooksV1EndpointsByIdHealth400JSONResponseBodySuccess enum.
+func (e GetApiWebhooksV1EndpointsByIdHealth400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetApiWebhooksV1EndpointsByIdHealth400JSONResponseBodySuccessFalse:
 		return true
 	default:
 		return false
@@ -37821,6 +41151,66 @@ func (e PostApiWebhooksV1EndpointsByIdRollSecret200JSONResponseBodyData1Status) 
 	}
 }
 
+// Defines values for PostApiWebhooksV1EndpointsByIdRollSecret400JSONResponseBodySuccess.
+const (
+	PostApiWebhooksV1EndpointsByIdRollSecret400JSONResponseBodySuccessFalse PostApiWebhooksV1EndpointsByIdRollSecret400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the PostApiWebhooksV1EndpointsByIdRollSecret400JSONResponseBodySuccess enum.
+func (e PostApiWebhooksV1EndpointsByIdRollSecret400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case PostApiWebhooksV1EndpointsByIdRollSecret400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiWebhooksV1EndpointsByIdTest400JSONResponseBodySuccess.
+const (
+	PostApiWebhooksV1EndpointsByIdTest400JSONResponseBodySuccessFalse PostApiWebhooksV1EndpointsByIdTest400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the PostApiWebhooksV1EndpointsByIdTest400JSONResponseBodySuccess enum.
+func (e PostApiWebhooksV1EndpointsByIdTest400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case PostApiWebhooksV1EndpointsByIdTest400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiWebhooksV1Events400JSONResponseBodySuccess.
+const (
+	GetApiWebhooksV1Events400JSONResponseBodySuccessFalse GetApiWebhooksV1Events400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetApiWebhooksV1Events400JSONResponseBodySuccess enum.
+func (e GetApiWebhooksV1Events400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetApiWebhooksV1Events400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiWebhooksV1EventsById400JSONResponseBodySuccess.
+const (
+	GetApiWebhooksV1EventsById400JSONResponseBodySuccessFalse GetApiWebhooksV1EventsById400JSONResponseBodySuccess = false
+)
+
+// Valid indicates whether the value is a known member of the GetApiWebhooksV1EventsById400JSONResponseBodySuccess enum.
+func (e GetApiWebhooksV1EventsById400JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case GetApiWebhooksV1EventsById400JSONResponseBodySuccessFalse:
+		return true
+	default:
+		return false
+	}
+}
+
 // AgUiToolCall defines model for AgUiToolCall.
 type AgUiToolCall struct {
 	EncryptedValue       *string                `json:"encryptedValue,omitempty"`
@@ -37842,21 +41232,21 @@ type AgUiToolCallType string
 
 // Annotation defines model for Annotation.
 type Annotation struct {
-	AnchorId             *string                `json:"anchorId"`
-	AnchorKind           *string                `json:"anchorKind"`
-	AnchorPath           *string                `json:"anchorPath"`
-	Comment              *string                `json:"comment"`
-	CreatedAt            time.Time              `json:"createdAt"`
-	Email                *string                `json:"email"`
-	ExpectedOutput       *string                `json:"expectedOutput"`
-	Id                   string                 `json:"id"`
-	IsThumbsUp           *bool                  `json:"isThumbsUp"`
-	ProjectId            string                 `json:"projectId"`
-	ScoreOptions         map[string]*JsonValue  `json:"scoreOptions"`
-	TraceId              string                 `json:"traceId"`
-	UpdatedAt            time.Time              `json:"updatedAt"`
-	UserId               *string                `json:"userId"`
-	AdditionalProperties map[string]interface{} `json:"-"`
+	AnchorId             *string                                 `json:"anchorId"`
+	AnchorKind           *string                                 `json:"anchorKind"`
+	AnchorPath           *string                                 `json:"anchorPath"`
+	Comment              *string                                 `json:"comment"`
+	CreatedAt            time.Time                               `json:"createdAt"`
+	Email                *string                                 `json:"email"`
+	ExpectedOutput       *string                                 `json:"expectedOutput"`
+	Id                   string                                  `json:"id"`
+	IsThumbsUp           *bool                                   `json:"isThumbsUp"`
+	ProjectId            string                                  `json:"projectId"`
+	ScoreOptions         map[string]*UnderscoreUnderscoreSchema0 `json:"scoreOptions"`
+	TraceId              string                                  `json:"traceId"`
+	UpdatedAt            time.Time                               `json:"updatedAt"`
+	UserId               *string                                 `json:"userId"`
+	AdditionalProperties map[string]interface{}                  `json:"-"`
 }
 
 // ApiKeyInfo defines model for ApiKeyInfo.
@@ -38008,103 +41398,20 @@ type JsonValue4 map[string]*JsonValue
 
 // Metadata defines model for Metadata.
 type Metadata struct {
-	CustomerId           *string                                  `json:"customer_id,omitempty"`
-	Labels               *[]string                                `json:"labels,omitempty"`
-	PromptIds            *[]string                                `json:"prompt_ids,omitempty"`
-	PromptVersionIds     *[]string                                `json:"prompt_version_ids,omitempty"`
-	SdkLanguage          *string                                  `json:"sdk_language,omitempty"`
-	SdkName              *string                                  `json:"sdk_name,omitempty"`
-	SdkVersion           *string                                  `json:"sdk_version,omitempty"`
-	SubtopicId           *string                                  `json:"subtopic_id,omitempty"`
-	TelemetrySdkLanguage *string                                  `json:"telemetry_sdk_language,omitempty"`
-	TelemetrySdkName     *string                                  `json:"telemetry_sdk_name,omitempty"`
-	TelemetrySdkVersion  *string                                  `json:"telemetry_sdk_version,omitempty"`
-	ThreadId             *string                                  `json:"thread_id,omitempty"`
-	TopicId              *string                                  `json:"topic_id,omitempty"`
-	UserId               *string                                  `json:"user_id,omitempty"`
-	AdditionalProperties map[string]Metadata_AdditionalProperties `json:"-"`
-}
-
-// Metadata0 defines model for .
-type Metadata0 struct {
-	union json.RawMessage
-}
-
-// Metadata00 defines model for .
-type Metadata00 = string
-
-// Metadata01 defines model for .
-type Metadata01 = float32
-
-// Metadata02 defines model for .
-type Metadata02 = bool
-
-// Metadata03 defines model for .
-type Metadata03 = interface{}
-
-// Metadata1 defines model for .
-type Metadata1 = []*Metadata_1_Item
-
-// Metadata10 defines model for .
-type Metadata10 = string
-
-// Metadata11 defines model for .
-type Metadata11 = float32
-
-// Metadata12 defines model for .
-type Metadata12 = bool
-
-// Metadata13 defines model for .
-type Metadata13 = interface{}
-
-// Metadata_1_Item defines model for Metadata.1.Item.
-type Metadata_1_Item struct {
-	union json.RawMessage
-}
-
-// Metadata2 defines model for .
-type Metadata2 map[string]*Metadata_2_AdditionalProperties
-
-// Metadata20 defines model for .
-type Metadata20 = string
-
-// Metadata21 defines model for .
-type Metadata21 = float32
-
-// Metadata22 defines model for .
-type Metadata22 = bool
-
-// Metadata23 defines model for .
-type Metadata23 = interface{}
-
-// Metadata_2_AdditionalProperties defines model for Metadata.2.AdditionalProperties.
-type Metadata_2_AdditionalProperties struct {
-	union json.RawMessage
-}
-
-// Metadata3 defines model for .
-type Metadata3 map[string]map[string]*Metadata_3_AdditionalProperties
-
-// Metadata30 defines model for .
-type Metadata30 = string
-
-// Metadata31 defines model for .
-type Metadata31 = float32
-
-// Metadata32 defines model for .
-type Metadata32 = bool
-
-// Metadata33 defines model for .
-type Metadata33 = interface{}
-
-// Metadata_3_AdditionalProperties defines model for Metadata.3.AdditionalProperties.
-type Metadata_3_AdditionalProperties struct {
-	union json.RawMessage
-}
-
-// Metadata_AdditionalProperties defines model for Metadata.AdditionalProperties.
-type Metadata_AdditionalProperties struct {
-	union json.RawMessage
+	CustomerId           *string   `json:"customer_id,omitempty"`
+	Labels               *[]string `json:"labels,omitempty"`
+	PromptIds            *[]string `json:"prompt_ids,omitempty"`
+	PromptVersionIds     *[]string `json:"prompt_version_ids,omitempty"`
+	SdkLanguage          *string   `json:"sdk_language,omitempty"`
+	SdkName              *string   `json:"sdk_name,omitempty"`
+	SdkVersion           *string   `json:"sdk_version,omitempty"`
+	SubtopicId           *string   `json:"subtopic_id,omitempty"`
+	TelemetrySdkLanguage *string   `json:"telemetry_sdk_language,omitempty"`
+	TelemetrySdkName     *string   `json:"telemetry_sdk_name,omitempty"`
+	TelemetrySdkVersion  *string   `json:"telemetry_sdk_version,omitempty"`
+	ThreadId             *string   `json:"thread_id,omitempty"`
+	TopicId              *string   `json:"topic_id,omitempty"`
+	UserId               *string   `json:"user_id,omitempty"`
 }
 
 // Metrics defines model for Metrics.
@@ -40416,6 +43723,26 @@ type Trace_Spans_Item struct {
 	union json.RawMessage
 }
 
+// UnderscoreUnderscoreSchema0 defines model for __schema0.
+type UnderscoreUnderscoreSchema0 struct {
+	union json.RawMessage
+}
+
+// Schema00 defines model for .
+type Schema00 = string
+
+// Schema01 defines model for .
+type Schema01 = float32
+
+// Schema02 defines model for .
+type Schema02 = bool
+
+// Schema03 defines model for .
+type Schema03 = []*UnderscoreUnderscoreSchema0
+
+// Schema04 defines model for .
+type Schema04 map[string]*UnderscoreUnderscoreSchema0
+
 // adminApiKeyContextKey is the context key for admin_api_key security scheme
 type adminApiKeyContextKey string
 
@@ -41884,6 +45211,9 @@ type RevokeWorkerSessionKeyJSONBody struct {
 // RevokeWorkerSessionKey200JSONResponseBodyOutcome defines parameters for RevokeWorkerSessionKey.
 type RevokeWorkerSessionKey200JSONResponseBodyOutcome string
 
+// RevokeWorkerSessionKey400JSONResponseBodySuccess defines parameters for RevokeWorkerSessionKey.
+type RevokeWorkerSessionKey400JSONResponseBodySuccess bool
+
 // IngestTurnResultJSONBody defines parameters for IngestTurnResult.
 type IngestTurnResultJSONBody struct {
 	ConversationId string                         `json:"conversationId"`
@@ -41906,6 +45236,9 @@ type IngestTurnResultJSONBodyStatus string
 
 // IngestTurnResult202JSONResponseBodyStatus defines parameters for IngestTurnResult.
 type IngestTurnResult202JSONResponseBodyStatus string
+
+// IngestTurnResult400JSONResponseBodySuccess defines parameters for IngestTurnResult.
+type IngestTurnResult400JSONResponseBodySuccess bool
 
 // IngestBrowserTracesTextBody defines parameters for IngestBrowserTraces.
 type IngestBrowserTracesTextBody interface{}
@@ -41933,6 +45266,9 @@ type ScimListGroups200JSONResponseBodyResourcesSchemas string
 
 // ScimListGroups200JSONResponseBodySchemas defines parameters for ScimListGroups.
 type ScimListGroups200JSONResponseBodySchemas string
+
+// ScimListGroups400JSONResponseBodySuccess defines parameters for ScimListGroups.
+type ScimListGroups400JSONResponseBodySuccess bool
 
 // ScimListGroups401JSONResponseBodySchemas defines parameters for ScimListGroups.
 type ScimListGroups401JSONResponseBodySchemas string
@@ -41969,6 +45305,9 @@ type ScimCreateGroup403JSONResponseBodySchemas string
 // ScimCreateGroup409JSONResponseBodySchemas defines parameters for ScimCreateGroup.
 type ScimCreateGroup409JSONResponseBodySchemas string
 
+// ScimDeleteGroup400JSONResponseBodySuccess defines parameters for ScimDeleteGroup.
+type ScimDeleteGroup400JSONResponseBodySuccess bool
+
 // ScimDeleteGroup401JSONResponseBodySchemas defines parameters for ScimDeleteGroup.
 type ScimDeleteGroup401JSONResponseBodySchemas string
 
@@ -41989,6 +45328,9 @@ type ScimGetGroup200JSONResponseBodyMetaResourceType string
 
 // ScimGetGroup200JSONResponseBodySchemas defines parameters for ScimGetGroup.
 type ScimGetGroup200JSONResponseBodySchemas string
+
+// ScimGetGroup400JSONResponseBodySuccess defines parameters for ScimGetGroup.
+type ScimGetGroup400JSONResponseBodySuccess bool
 
 // ScimGetGroup401JSONResponseBodySchemas defines parameters for ScimGetGroup.
 type ScimGetGroup401JSONResponseBodySchemas string
@@ -42101,6 +45443,9 @@ type ScimListUsers200JSONResponseBodyResourcesSchemas string
 // ScimListUsers200JSONResponseBodySchemas defines parameters for ScimListUsers.
 type ScimListUsers200JSONResponseBodySchemas string
 
+// ScimListUsers400JSONResponseBodySuccess defines parameters for ScimListUsers.
+type ScimListUsers400JSONResponseBodySuccess bool
+
 // ScimListUsers401JSONResponseBodySchemas defines parameters for ScimListUsers.
 type ScimListUsers401JSONResponseBodySchemas string
 
@@ -42150,6 +45495,9 @@ type ScimCreateUser403JSONResponseBodySchemas string
 // ScimCreateUser409JSONResponseBodySchemas defines parameters for ScimCreateUser.
 type ScimCreateUser409JSONResponseBodySchemas string
 
+// ScimDeleteUser400JSONResponseBodySuccess defines parameters for ScimDeleteUser.
+type ScimDeleteUser400JSONResponseBodySuccess bool
+
 // ScimDeleteUser401JSONResponseBodySchemas defines parameters for ScimDeleteUser.
 type ScimDeleteUser401JSONResponseBodySchemas string
 
@@ -42164,6 +45512,9 @@ type ScimGetUser200JSONResponseBodyMetaResourceType string
 
 // ScimGetUser200JSONResponseBodySchemas defines parameters for ScimGetUser.
 type ScimGetUser200JSONResponseBodySchemas string
+
+// ScimGetUser400JSONResponseBodySuccess defines parameters for ScimGetUser.
+type ScimGetUser400JSONResponseBodySuccess bool
 
 // ScimGetUser401JSONResponseBodySchemas defines parameters for ScimGetUser.
 type ScimGetUser401JSONResponseBodySchemas string
@@ -43430,11 +46781,20 @@ type GetApiTraceId200JSONResponseBody_Spans_Item struct {
 	union json.RawMessage
 }
 
+// GetApiTraceId400JSONResponseBodySuccess defines parameters for GetApiTraceId.
+type GetApiTraceId400JSONResponseBodySuccess bool
+
 // PostApiTraceIdShare200JSONResponseBodyStatus defines parameters for PostApiTraceIdShare.
 type PostApiTraceIdShare200JSONResponseBodyStatus string
 
+// PostApiTraceIdShare400JSONResponseBodySuccess defines parameters for PostApiTraceIdShare.
+type PostApiTraceIdShare400JSONResponseBodySuccess bool
+
 // PostApiTraceIdUnshare200JSONResponseBodyStatus defines parameters for PostApiTraceIdUnshare.
 type PostApiTraceIdUnshare200JSONResponseBodyStatus string
+
+// PostApiTraceIdUnshare400JSONResponseBodySuccess defines parameters for PostApiTraceIdUnshare.
+type PostApiTraceIdUnshare400JSONResponseBodySuccess bool
 
 // PostApiTrackEventJSONBody defines parameters for PostApiTrackEvent.
 type PostApiTrackEventJSONBody struct {
@@ -43460,6 +46820,9 @@ type StartAdminImpersonationJSONBody struct {
 
 // StartAdminImpersonation200JSONResponseBodyMessage defines parameters for StartAdminImpersonation.
 type StartAdminImpersonation200JSONResponseBodyMessage string
+
+// StartAdminImpersonation400JSONResponseBodySuccess defines parameters for StartAdminImpersonation.
+type StartAdminImpersonation400JSONResponseBodySuccess bool
 
 // RunAdminOperationJSONBody defines parameters for RunAdminOperation.
 type RunAdminOperationJSONBody struct {
@@ -43500,6 +46863,9 @@ type RunAdminOperationJSONBody_Params struct {
 	} `json:"sort,omitempty"`
 	AdditionalProperties map[string]interface{} `json:"-"`
 }
+
+// RunAdminOperation400JSONResponseBodySuccess defines parameters for RunAdminOperation.
+type RunAdminOperation400JSONResponseBodySuccess bool
 
 // DeleteApiAgentCacheByName400JSONResponseBodyFault defines parameters for DeleteApiAgentCacheByName.
 type DeleteApiAgentCacheByName400JSONResponseBodyFault string
@@ -43660,6 +47026,9 @@ type ListAgents200JSONResponseBodyDataVersion0 = int
 type ListAgents200JSONResponseBody_Data_Version struct {
 	union json.RawMessage
 }
+
+// ListAgents400JSONResponseBodySuccess defines parameters for ListAgents.
+type ListAgents400JSONResponseBodySuccess bool
 
 // CreateAgentJSONBody defines parameters for CreateAgent.
 type CreateAgentJSONBody struct {
@@ -44299,6 +47668,9 @@ type CreateAgent201JSONResponseBody_Version struct {
 	union json.RawMessage
 }
 
+// CreateAgent400JSONResponseBodySuccess defines parameters for CreateAgent.
+type CreateAgent400JSONResponseBodySuccess bool
+
 // PostConnectedAgentFramesJSONBody defines parameters for PostConnectedAgentFrames.
 type PostConnectedAgentFramesJSONBody struct {
 	Frames []PostConnectedAgentFramesJSONBody_Frames_Item `json:"frames"`
@@ -44376,6 +47748,9 @@ type PostConnectedAgentFramesJSONBodyFrames2Type string
 type PostConnectedAgentFramesJSONBody_Frames_Item struct {
 	union json.RawMessage
 }
+
+// PostConnectedAgentFrames400JSONResponseBodySuccess defines parameters for PostConnectedAgentFrames.
+type PostConnectedAgentFrames400JSONResponseBodySuccess bool
 
 // PollConnectedAgentInstanceParams defines parameters for PollConnectedAgentInstance.
 type PollConnectedAgentInstanceParams struct {
@@ -44456,6 +47831,9 @@ type PollConnectedAgentInstance200JSONResponseBodyFrames1Type string
 type PollConnectedAgentInstance200JSONResponseBody_Frames_Item struct {
 	union json.RawMessage
 }
+
+// PollConnectedAgentInstance400JSONResponseBodySuccess defines parameters for PollConnectedAgentInstance.
+type PollConnectedAgentInstance400JSONResponseBodySuccess bool
 
 // RegisterConnectedAgentInstanceJSONBody defines parameters for RegisterConnectedAgentInstance.
 type RegisterConnectedAgentInstanceJSONBody struct {
@@ -44571,8 +47949,14 @@ type RegisterConnectedAgentInstance200JSONResponseBody_Frame struct {
 	union json.RawMessage
 }
 
+// RegisterConnectedAgentInstance400JSONResponseBodySuccess defines parameters for RegisterConnectedAgentInstance.
+type RegisterConnectedAgentInstance400JSONResponseBodySuccess bool
+
 // RemoveAgentLabel200JSONResponseBodyRemoved defines parameters for RemoveAgentLabel.
 type RemoveAgentLabel200JSONResponseBodyRemoved bool
+
+// RemoveAgentLabel400JSONResponseBodySuccess defines parameters for RemoveAgentLabel.
+type RemoveAgentLabel400JSONResponseBodySuccess bool
 
 // AssignAgentLabelJSONBody defines parameters for AssignAgentLabel.
 type AssignAgentLabelJSONBody struct {
@@ -44580,14 +47964,23 @@ type AssignAgentLabelJSONBody struct {
 	Version int `json:"version"`
 }
 
+// AssignAgentLabel400JSONResponseBodySuccess defines parameters for AssignAgentLabel.
+type AssignAgentLabel400JSONResponseBodySuccess bool
+
 // ListAgentVersions200JSONResponseBodyDataAuthorKind defines parameters for ListAgentVersions.
 type ListAgentVersions200JSONResponseBodyDataAuthorKind string
 
 // ListAgentVersions200JSONResponseBodyDataType defines parameters for ListAgentVersions.
 type ListAgentVersions200JSONResponseBodyDataType string
 
+// ListAgentVersions400JSONResponseBodySuccess defines parameters for ListAgentVersions.
+type ListAgentVersions400JSONResponseBodySuccess bool
+
 // ArchiveAgent200JSONResponseBodyType defines parameters for ArchiveAgent.
 type ArchiveAgent200JSONResponseBodyType string
+
+// ArchiveAgent400JSONResponseBodySuccess defines parameters for ArchiveAgent.
+type ArchiveAgent400JSONResponseBodySuccess bool
 
 // GetAgentParams defines parameters for GetAgent.
 type GetAgentParams struct {
@@ -44691,6 +48084,9 @@ type GetAgent200JSONResponseBodyVersion0 = int
 type GetAgent200JSONResponseBody_Version struct {
 	union json.RawMessage
 }
+
+// GetAgent400JSONResponseBodySuccess defines parameters for GetAgent.
+type GetAgent400JSONResponseBodySuccess bool
 
 // UpdateAgentJSONBody defines parameters for UpdateAgent.
 type UpdateAgentJSONBody struct {
@@ -44799,6 +48195,9 @@ type UpdateAgent200JSONResponseBody_Version struct {
 	union json.RawMessage
 }
 
+// UpdateAgent400JSONResponseBodySuccess defines parameters for UpdateAgent.
+type UpdateAgent400JSONResponseBodySuccess bool
+
 // ReplaceAgentJSONBody defines parameters for ReplaceAgent.
 type ReplaceAgentJSONBody struct {
 	// CommitMessage What changed, kept on the version this write creates.
@@ -44906,6 +48305,9 @@ type ReplaceAgent200JSONResponseBody_Version struct {
 	union json.RawMessage
 }
 
+// ReplaceAgent400JSONResponseBodySuccess defines parameters for ReplaceAgent.
+type ReplaceAgent400JSONResponseBodySuccess bool
+
 // CallConnectedAgentJSONBody defines parameters for CallConnectedAgent.
 type CallConnectedAgentJSONBody struct {
 	// Kind A turn, or a scenario run's setup or teardown hook. Defaults to a turn.
@@ -45010,6 +48412,12 @@ type CallConnectedAgent200JSONResponseBodyState0 map[string]interface{}
 type CallConnectedAgent200JSONResponseBody_State struct {
 	union json.RawMessage
 }
+
+// CallConnectedAgent400JSONResponseBodySuccess defines parameters for CallConnectedAgent.
+type CallConnectedAgent400JSONResponseBodySuccess bool
+
+// TestAgent400JSONResponseBodySuccess defines parameters for TestAgent.
+type TestAgent400JSONResponseBodySuccess bool
 
 // PostApiAnalyticsJSONBody defines parameters for PostApiAnalytics.
 type PostApiAnalyticsJSONBody struct {
@@ -45967,6 +49375,9 @@ type PostApiV1AnalyticsReportsJSONBody struct {
 	Name string `json:"name"`
 }
 
+// PostApiV1AnalyticsReports400JSONResponseBodySuccess defines parameters for PostApiV1AnalyticsReports.
+type PostApiV1AnalyticsReports400JSONResponseBodySuccess bool
+
 // PutApiV1AnalyticsReportsReorderJSONBody defines parameters for PutApiV1AnalyticsReportsReorder.
 type PutApiV1AnalyticsReportsReorderJSONBody struct {
 	DashboardIds []string `json:"dashboardIds"`
@@ -45975,10 +49386,22 @@ type PutApiV1AnalyticsReportsReorderJSONBody struct {
 // PutApiV1AnalyticsReportsReorder200JSONResponseBodySuccess defines parameters for PutApiV1AnalyticsReportsReorder.
 type PutApiV1AnalyticsReportsReorder200JSONResponseBodySuccess bool
 
+// PutApiV1AnalyticsReportsReorder400JSONResponseBodySuccess defines parameters for PutApiV1AnalyticsReportsReorder.
+type PutApiV1AnalyticsReportsReorder400JSONResponseBodySuccess bool
+
+// DeleteApiV1AnalyticsReportsByReportId400JSONResponseBodySuccess defines parameters for DeleteApiV1AnalyticsReportsByReportId.
+type DeleteApiV1AnalyticsReportsByReportId400JSONResponseBodySuccess bool
+
+// GetApiV1AnalyticsReportsByReportId400JSONResponseBodySuccess defines parameters for GetApiV1AnalyticsReportsByReportId.
+type GetApiV1AnalyticsReportsByReportId400JSONResponseBodySuccess bool
+
 // PatchApiV1AnalyticsReportsByReportIdJSONBody defines parameters for PatchApiV1AnalyticsReportsByReportId.
 type PatchApiV1AnalyticsReportsByReportIdJSONBody struct {
 	Name string `json:"name"`
 }
+
+// PatchApiV1AnalyticsReportsByReportId400JSONResponseBodySuccess defines parameters for PatchApiV1AnalyticsReportsByReportId.
+type PatchApiV1AnalyticsReportsByReportId400JSONResponseBodySuccess bool
 
 // PostApiAnalyticsTimeseriesJSONBody defines parameters for PostApiAnalyticsTimeseries.
 type PostApiAnalyticsTimeseriesJSONBody struct {
@@ -46939,6 +50362,9 @@ type GetApiAnnotationsParams struct {
 // GetApiAnnotationsParamsAnchor defines parameters for GetApiAnnotations.
 type GetApiAnnotationsParamsAnchor string
 
+// GetApiAnnotations400JSONResponseBodySuccess defines parameters for GetApiAnnotations.
+type GetApiAnnotations400JSONResponseBodySuccess bool
+
 // GetApiAnnotationsTraceIdParams defines parameters for GetApiAnnotationsTraceId.
 type GetApiAnnotationsTraceIdParams struct {
 	Anchor *GetApiAnnotationsTraceIdParamsAnchor `form:"anchor,omitempty" json:"anchor,omitempty"`
@@ -46947,6 +50373,9 @@ type GetApiAnnotationsTraceIdParams struct {
 // GetApiAnnotationsTraceIdParamsAnchor defines parameters for GetApiAnnotationsTraceId.
 type GetApiAnnotationsTraceIdParamsAnchor string
 
+// GetApiAnnotationsTraceId400JSONResponseBodySuccess defines parameters for GetApiAnnotationsTraceId.
+type GetApiAnnotationsTraceId400JSONResponseBodySuccess bool
+
 // PostApiAnnotationsTraceIdJSONBody defines parameters for PostApiAnnotationsTraceId.
 type PostApiAnnotationsTraceIdJSONBody struct {
 	Comment    string  `json:"comment"`
@@ -46954,12 +50383,24 @@ type PostApiAnnotationsTraceIdJSONBody struct {
 	IsThumbsUp bool    `json:"isThumbsUp"`
 }
 
+// PostApiAnnotationsTraceId400JSONResponseBodySuccess defines parameters for PostApiAnnotationsTraceId.
+type PostApiAnnotationsTraceId400JSONResponseBodySuccess bool
+
+// DeleteApiAnnotationsId400JSONResponseBodySuccess defines parameters for DeleteApiAnnotationsId.
+type DeleteApiAnnotationsId400JSONResponseBodySuccess bool
+
+// GetApiAnnotationsId400JSONResponseBodySuccess defines parameters for GetApiAnnotationsId.
+type GetApiAnnotationsId400JSONResponseBodySuccess bool
+
 // PatchApiAnnotationsIdJSONBody defines parameters for PatchApiAnnotationsId.
 type PatchApiAnnotationsIdJSONBody struct {
 	Comment    string  `json:"comment"`
 	Email      *string `json:"email,omitempty"`
 	IsThumbsUp bool    `json:"isThumbsUp"`
 }
+
+// PatchApiAnnotationsId400JSONResponseBodySuccess defines parameters for PatchApiAnnotationsId.
+type PatchApiAnnotationsId400JSONResponseBodySuccess bool
 
 // CreateApiKeyJSONBody defines parameters for CreateApiKey.
 type CreateApiKeyJSONBody struct {
@@ -47006,6 +50447,9 @@ type CreateApiKeyJSONBodyKeyType string
 // CreateApiKeyJSONBodyPermissionMode defines parameters for CreateApiKey.
 type CreateApiKeyJSONBodyPermissionMode string
 
+// CreateApiKey400JSONResponseBodySuccess defines parameters for CreateApiKey.
+type CreateApiKey400JSONResponseBodySuccess bool
+
 // CreateFullAccessApiKeyJSONBody defines parameters for CreateFullAccessApiKey.
 type CreateFullAccessApiKeyJSONBody struct {
 	// AssignedToUserId Organization admins only: the member who owns the key and whose access caps it. Defaults to the caller.
@@ -47050,6 +50494,9 @@ type CreateFullAccessApiKeyJSONBodyKeyType string
 
 // CreateFullAccessApiKeyJSONBodyPermissionMode defines parameters for CreateFullAccessApiKey.
 type CreateFullAccessApiKeyJSONBodyPermissionMode string
+
+// CreateFullAccessApiKey400JSONResponseBodySuccess defines parameters for CreateFullAccessApiKey.
+type CreateFullAccessApiKey400JSONResponseBodySuccess bool
 
 // CreateIngestionApiKeyJSONBody defines parameters for CreateIngestionApiKey.
 type CreateIngestionApiKeyJSONBody struct {
@@ -47096,6 +50543,12 @@ type CreateIngestionApiKeyJSONBodyKeyType string
 // CreateIngestionApiKeyJSONBodyPermissionMode defines parameters for CreateIngestionApiKey.
 type CreateIngestionApiKeyJSONBodyPermissionMode string
 
+// CreateIngestionApiKey400JSONResponseBodySuccess defines parameters for CreateIngestionApiKey.
+type CreateIngestionApiKey400JSONResponseBodySuccess bool
+
+// RevokeApiKey400JSONResponseBodySuccess defines parameters for RevokeApiKey.
+type RevokeApiKey400JSONResponseBodySuccess bool
+
 // GetApiKey200JSONResponseBodyBindingsRole defines parameters for GetApiKey.
 type GetApiKey200JSONResponseBodyBindingsRole string
 
@@ -47110,6 +50563,9 @@ type GetApiKey200JSONResponseBodyRoleBindingsRole string
 
 // GetApiKey200JSONResponseBodyRoleBindingsScopeType defines parameters for GetApiKey.
 type GetApiKey200JSONResponseBodyRoleBindingsScopeType string
+
+// GetApiKey400JSONResponseBodySuccess defines parameters for GetApiKey.
+type GetApiKey400JSONResponseBodySuccess bool
 
 // UpdateApiKeyJSONBody defines parameters for UpdateApiKey.
 type UpdateApiKeyJSONBody struct {
@@ -47154,6 +50610,9 @@ type UpdateApiKey200JSONResponseBodyRoleBindingsRole string
 // UpdateApiKey200JSONResponseBodyRoleBindingsScopeType defines parameters for UpdateApiKey.
 type UpdateApiKey200JSONResponseBodyRoleBindingsScopeType string
 
+// UpdateApiKey400JSONResponseBodySuccess defines parameters for UpdateApiKey.
+type UpdateApiKey400JSONResponseBodySuccess bool
+
 // ApproveCliDeviceCodeJSONBody defines parameters for ApproveCliDeviceCode.
 type ApproveCliDeviceCodeJSONBody interface{}
 
@@ -47179,6 +50638,9 @@ type DenyCliDeviceCodeJSONBody interface{}
 type WatchCliDeviceApprovalParams struct {
 	DeviceCode string `form:"device_code" json:"device_code"`
 }
+
+// WatchCliDeviceApproval400JSONResponseBodySuccess defines parameters for WatchCliDeviceApproval.
+type WatchCliDeviceApproval400JSONResponseBodySuccess bool
 
 // StartCliDeviceCodeJSONBody defines parameters for StartCliDeviceCode.
 type StartCliDeviceCodeJSONBody interface{}
@@ -47210,6 +50672,9 @@ type EndCliDeviceSessionJSONBody interface{}
 type LookupCliDeviceCodeParams struct {
 	UserCode *string `form:"user_code,omitempty" json:"user_code,omitempty"`
 }
+
+// LookupCliDeviceCode400JSONResponseBodySuccess defines parameters for LookupCliDeviceCode.
+type LookupCliDeviceCode400JSONResponseBodySuccess bool
 
 // ReadCliProjectKeyJSONBody defines parameters for ReadCliProjectKey.
 type ReadCliProjectKeyJSONBody interface{}
@@ -47253,6 +50718,9 @@ type SubmitBugReportJSONBody_Metadata_AdditionalProperties struct {
 
 // SubmitBugReportJSONBodySource defines parameters for SubmitBugReport.
 type SubmitBugReportJSONBodySource string
+
+// SubmitBugReport400JSONResponseBodySuccess defines parameters for SubmitBugReport.
+type SubmitBugReport400JSONResponseBodySuccess bool
 
 // GetApiCheckup200JSONResponseBodyRowsCost defines parameters for GetApiCheckup.
 type GetApiCheckup200JSONResponseBodyRowsCost string
@@ -47949,6 +51417,9 @@ type GetApiDatasetParams struct {
 // GetApiDataset200JSONResponseBodyDataColumnTypesType defines parameters for GetApiDataset.
 type GetApiDataset200JSONResponseBodyDataColumnTypesType string
 
+// GetApiDataset400JSONResponseBodySuccess defines parameters for GetApiDataset.
+type GetApiDataset400JSONResponseBodySuccess bool
+
 // PostApiDatasetJSONBody defines parameters for PostApiDataset.
 type PostApiDatasetJSONBody struct {
 	ColumnTypes *[]struct {
@@ -47974,6 +51445,9 @@ type PostApiDatasetJSONBody_Entries_Item struct {
 // PostApiDataset201JSONResponseBodyColumnTypesType defines parameters for PostApiDataset.
 type PostApiDataset201JSONResponseBodyColumnTypesType string
 
+// PostApiDataset400JSONResponseBodySuccess defines parameters for PostApiDataset.
+type PostApiDataset400JSONResponseBodySuccess bool
+
 // PostApiDatasetAttachmentsMultipartBody defines parameters for PostApiDatasetAttachments.
 type PostApiDatasetAttachmentsMultipartBody struct {
 	// DatasetId The dataset that owns the file. Omit it while the dataset is still a draft.
@@ -47986,6 +51460,9 @@ type PostApiDatasetAttachmentsParams struct {
 	// ProjectId The project the file is stored for.
 	ProjectId string `form:"projectId" json:"projectId"`
 }
+
+// PostApiDatasetAttachments400JSONResponseBodySuccess defines parameters for PostApiDatasetAttachments.
+type PostApiDatasetAttachments400JSONResponseBodySuccess bool
 
 // PostApiDatasetAttachmentsUploadsJSONBody defines parameters for PostApiDatasetAttachmentsUploads.
 type PostApiDatasetAttachmentsUploadsJSONBody struct {
@@ -48001,6 +51478,9 @@ type PostApiDatasetAttachmentsUploadsJSONBody struct {
 
 // PostApiDatasetAttachmentsUploads201JSONResponseBodyMethod defines parameters for PostApiDatasetAttachmentsUploads.
 type PostApiDatasetAttachmentsUploads201JSONResponseBodyMethod string
+
+// PostApiDatasetAttachmentsUploads400JSONResponseBodySuccess defines parameters for PostApiDatasetAttachmentsUploads.
+type PostApiDatasetAttachmentsUploads400JSONResponseBodySuccess bool
 
 // PostApiDatasetEvaluateJSONBody defines parameters for PostApiDatasetEvaluate.
 type PostApiDatasetEvaluateJSONBody struct {
@@ -48104,6 +51584,9 @@ type PostApiDatasetEvaluate200JSONResponseBody struct {
 // PostApiDatasetImports201JSONResponseBodyStatus defines parameters for PostApiDatasetImports.
 type PostApiDatasetImports201JSONResponseBodyStatus string
 
+// PostApiDatasetImports400JSONResponseBodySuccess defines parameters for PostApiDatasetImports.
+type PostApiDatasetImports400JSONResponseBodySuccess bool
+
 // PostApiDatasetUploadMultipartBody defines parameters for PostApiDatasetUpload.
 type PostApiDatasetUploadMultipartBody struct {
 	File openapi_types.File `json:"file"`
@@ -48122,14 +51605,26 @@ type GetApiDatasetBySlugEntriesParams struct {
 // GetApiDatasetBySlugEntries200JSONResponseBodyDatasetColumnTypesType defines parameters for GetApiDatasetBySlugEntries.
 type GetApiDatasetBySlugEntries200JSONResponseBodyDatasetColumnTypesType string
 
+// GetApiDatasetBySlugEntries400JSONResponseBodySuccess defines parameters for GetApiDatasetBySlugEntries.
+type GetApiDatasetBySlugEntries400JSONResponseBodySuccess bool
+
 // PostApiDatasetBySlugEntries200JSONResponseBodySuccess defines parameters for PostApiDatasetBySlugEntries.
 type PostApiDatasetBySlugEntries200JSONResponseBodySuccess bool
+
+// PostApiDatasetBySlugEntries400JSONResponseBodySuccess defines parameters for PostApiDatasetBySlugEntries.
+type PostApiDatasetBySlugEntries400JSONResponseBodySuccess bool
 
 // DeleteApiDatasetBySlugOrId200JSONResponseBodyArchived defines parameters for DeleteApiDatasetBySlugOrId.
 type DeleteApiDatasetBySlugOrId200JSONResponseBodyArchived bool
 
+// DeleteApiDatasetBySlugOrId400JSONResponseBodySuccess defines parameters for DeleteApiDatasetBySlugOrId.
+type DeleteApiDatasetBySlugOrId400JSONResponseBodySuccess bool
+
 // GetApiDatasetBySlugOrId200JSONResponseBodyColumnTypesType defines parameters for GetApiDatasetBySlugOrId.
 type GetApiDatasetBySlugOrId200JSONResponseBodyColumnTypesType string
+
+// GetApiDatasetBySlugOrId400JSONResponseBodySuccess defines parameters for GetApiDatasetBySlugOrId.
+type GetApiDatasetBySlugOrId400JSONResponseBodySuccess bool
 
 // PatchApiDatasetBySlugOrIdJSONBody defines parameters for PatchApiDatasetBySlugOrId.
 type PatchApiDatasetBySlugOrIdJSONBody struct {
@@ -48151,10 +51646,19 @@ type PatchApiDatasetBySlugOrIdJSONBodyColumnTypesType string
 // PatchApiDatasetBySlugOrId200JSONResponseBodyColumnTypesType defines parameters for PatchApiDatasetBySlugOrId.
 type PatchApiDatasetBySlugOrId200JSONResponseBodyColumnTypesType string
 
+// PatchApiDatasetBySlugOrId400JSONResponseBodySuccess defines parameters for PatchApiDatasetBySlugOrId.
+type PatchApiDatasetBySlugOrId400JSONResponseBodySuccess bool
+
+// PostApiDatasetBySlugOrIdImports400JSONResponseBodySuccess defines parameters for PostApiDatasetBySlugOrIdImports.
+type PostApiDatasetBySlugOrIdImports400JSONResponseBodySuccess bool
+
 // DeleteApiDatasetBySlugOrIdRecordsJSONBody defines parameters for DeleteApiDatasetBySlugOrIdRecords.
 type DeleteApiDatasetBySlugOrIdRecordsJSONBody struct {
 	RecordIds []string `json:"recordIds"`
 }
+
+// DeleteApiDatasetBySlugOrIdRecords400JSONResponseBodySuccess defines parameters for DeleteApiDatasetBySlugOrIdRecords.
+type DeleteApiDatasetBySlugOrIdRecords400JSONResponseBodySuccess bool
 
 // GetApiDatasetBySlugOrIdRecordsParams defines parameters for GetApiDatasetBySlugOrIdRecords.
 type GetApiDatasetBySlugOrIdRecordsParams struct {
@@ -48165,20 +51669,32 @@ type GetApiDatasetBySlugOrIdRecordsParams struct {
 // GetApiDatasetBySlugOrIdRecords200JSONResponseBodyDatasetColumnTypesType defines parameters for GetApiDatasetBySlugOrIdRecords.
 type GetApiDatasetBySlugOrIdRecords200JSONResponseBodyDatasetColumnTypesType string
 
+// GetApiDatasetBySlugOrIdRecords400JSONResponseBodySuccess defines parameters for GetApiDatasetBySlugOrIdRecords.
+type GetApiDatasetBySlugOrIdRecords400JSONResponseBodySuccess bool
+
 // PostApiDatasetBySlugOrIdRecordsJSONBody defines parameters for PostApiDatasetBySlugOrIdRecords.
 type PostApiDatasetBySlugOrIdRecordsJSONBody struct {
 	Entries []map[string]interface{} `json:"entries"`
 }
+
+// PostApiDatasetBySlugOrIdRecords400JSONResponseBodySuccess defines parameters for PostApiDatasetBySlugOrIdRecords.
+type PostApiDatasetBySlugOrIdRecords400JSONResponseBodySuccess bool
 
 // PatchApiDatasetBySlugOrIdRecordsByRecordIdJSONBody defines parameters for PatchApiDatasetBySlugOrIdRecordsByRecordId.
 type PatchApiDatasetBySlugOrIdRecordsByRecordIdJSONBody struct {
 	Entry map[string]interface{} `json:"entry"`
 }
 
+// PatchApiDatasetBySlugOrIdRecordsByRecordId400JSONResponseBodySuccess defines parameters for PatchApiDatasetBySlugOrIdRecordsByRecordId.
+type PatchApiDatasetBySlugOrIdRecordsByRecordId400JSONResponseBodySuccess bool
+
 // PostApiDatasetBySlugOrIdUploadMultipartBody defines parameters for PostApiDatasetBySlugOrIdUpload.
 type PostApiDatasetBySlugOrIdUploadMultipartBody struct {
 	File openapi_types.File `json:"file"`
 }
+
+// PostApiDatasetBySlugOrIdUpload400JSONResponseBodySuccess defines parameters for PostApiDatasetBySlugOrIdUpload.
+type PostApiDatasetBySlugOrIdUpload400JSONResponseBodySuccess bool
 
 // GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataAuthorKind defines parameters for GetApiDatasetBySlugOrIdVersions.
 type GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataAuthorKind string
@@ -48188,6 +51704,9 @@ type GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesType strin
 
 // GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataTrigger defines parameters for GetApiDatasetBySlugOrIdVersions.
 type GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataTrigger string
+
+// GetApiDatasetBySlugOrIdVersions400JSONResponseBodySuccess defines parameters for GetApiDatasetBySlugOrIdVersions.
+type GetApiDatasetBySlugOrIdVersions400JSONResponseBodySuccess bool
 
 // PostApiDatasetBySlugOrIdVersionsJSONBody defines parameters for PostApiDatasetBySlugOrIdVersions.
 type PostApiDatasetBySlugOrIdVersionsJSONBody struct {
@@ -48202,6 +51721,9 @@ type PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesType string
 
 // PostApiDatasetBySlugOrIdVersions200JSONResponseBodyTrigger defines parameters for PostApiDatasetBySlugOrIdVersions.
 type PostApiDatasetBySlugOrIdVersions200JSONResponseBodyTrigger string
+
+// PostApiDatasetBySlugOrIdVersions400JSONResponseBodySuccess defines parameters for PostApiDatasetBySlugOrIdVersions.
+type PostApiDatasetBySlugOrIdVersions400JSONResponseBodySuccess bool
 
 // GetApiDatasetBySlugOrIdVersionsByVersionParams defines parameters for GetApiDatasetBySlugOrIdVersionsByVersion.
 type GetApiDatasetBySlugOrIdVersionsByVersionParams struct {
@@ -48218,6 +51740,9 @@ type GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTyp
 // GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionTrigger defines parameters for GetApiDatasetBySlugOrIdVersionsByVersion.
 type GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionTrigger string
 
+// GetApiDatasetBySlugOrIdVersionsByVersion400JSONResponseBodySuccess defines parameters for GetApiDatasetBySlugOrIdVersionsByVersion.
+type GetApiDatasetBySlugOrIdVersionsByVersion400JSONResponseBodySuccess bool
+
 // PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionAuthorKind defines parameters for PostApiDatasetBySlugOrIdVersionsByVersionRestore.
 type PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionAuthorKind string
 
@@ -48226,6 +51751,9 @@ type PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionC
 
 // PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionTrigger defines parameters for PostApiDatasetBySlugOrIdVersionsByVersionRestore.
 type PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionTrigger string
+
+// PostApiDatasetBySlugOrIdVersionsByVersionRestore400JSONResponseBodySuccess defines parameters for PostApiDatasetBySlugOrIdVersionsByVersionRestore.
+type PostApiDatasetBySlugOrIdVersionsByVersionRestore400JSONResponseBodySuccess bool
 
 // RevokeDocsSession200JSONResponseBodyRevoked defines parameters for RevokeDocsSession.
 type RevokeDocsSession200JSONResponseBodyRevoked bool
@@ -48307,6 +51835,9 @@ type PostApiDspyLogStepsJSONBody_Predictors_Predictor struct {
 
 // ReceiveElevenLabsWebhookTextBody defines parameters for ReceiveElevenLabsWebhook.
 type ReceiveElevenLabsWebhookTextBody interface{}
+
+// ReceiveElevenLabsWebhook400JSONResponseBodySuccess defines parameters for ReceiveElevenLabsWebhook.
+type ReceiveElevenLabsWebhook400JSONResponseBodySuccess bool
 
 // PostApiEvaluationsBatchLogResultsJSONBody defines parameters for PostApiEvaluationsBatchLogResults.
 type PostApiEvaluationsBatchLogResultsJSONBody struct {
@@ -48672,8 +52203,14 @@ type PostApiEvaluators200JSONResponseBody_Version struct {
 	union json.RawMessage
 }
 
+// PostApiEvaluators400JSONResponseBodySuccess defines parameters for PostApiEvaluators.
+type PostApiEvaluators400JSONResponseBodySuccess bool
+
 // DeleteApiEvaluatorsLabel200JSONResponseBodyRemoved defines parameters for DeleteApiEvaluatorsLabel.
 type DeleteApiEvaluatorsLabel200JSONResponseBodyRemoved bool
+
+// DeleteApiEvaluatorsLabel400JSONResponseBodySuccess defines parameters for DeleteApiEvaluatorsLabel.
+type DeleteApiEvaluatorsLabel400JSONResponseBodySuccess bool
 
 // PutApiEvaluatorsLabelJSONBody defines parameters for PutApiEvaluatorsLabel.
 type PutApiEvaluatorsLabelJSONBody struct {
@@ -48686,6 +52223,9 @@ type GetApiEvaluatorsVersions200JSONResponseBodyDataAuthorKind string
 
 // GetApiEvaluatorsVersions200JSONResponseBodyDataType defines parameters for GetApiEvaluatorsVersions.
 type GetApiEvaluatorsVersions200JSONResponseBodyDataType string
+
+// GetApiEvaluatorsVersions400JSONResponseBodySuccess defines parameters for GetApiEvaluatorsVersions.
+type GetApiEvaluatorsVersions400JSONResponseBodySuccess bool
 
 // GetApiEvaluatorsByIdOrSlugParams defines parameters for GetApiEvaluatorsByIdOrSlug.
 type GetApiEvaluatorsByIdOrSlugParams struct {
@@ -48725,6 +52265,12 @@ type GetApiEvaluatorsByIdOrSlug200JSONResponseBodyVersion0 = int
 type GetApiEvaluatorsByIdOrSlug200JSONResponseBody_Version struct {
 	union json.RawMessage
 }
+
+// GetApiEvaluatorsByIdOrSlug400JSONResponseBodySuccess defines parameters for GetApiEvaluatorsByIdOrSlug.
+type GetApiEvaluatorsByIdOrSlug400JSONResponseBodySuccess bool
+
+// DeleteApiEvaluatorsById400JSONResponseBodySuccess defines parameters for DeleteApiEvaluatorsById.
+type DeleteApiEvaluatorsById400JSONResponseBodySuccess bool
 
 // PutApiEvaluatorsByIdJSONBody defines parameters for PutApiEvaluatorsById.
 type PutApiEvaluatorsByIdJSONBody struct {
@@ -48798,6 +52344,9 @@ type GetApiExperimentsParams struct {
 	PageSize *int `form:"pageSize,omitempty" json:"pageSize,omitempty"`
 }
 
+// GetApiExperiments400JSONResponseBodySuccess defines parameters for GetApiExperiments.
+type GetApiExperiments400JSONResponseBodySuccess bool
+
 // PostApiExperimentsJSONBody defines parameters for PostApiExperiments.
 type PostApiExperimentsJSONBody struct {
 	// Name Name for the experiment. A draft name is picked when omitted.
@@ -48829,6 +52378,9 @@ type GetApiExperimentsRuns200JSONResponseBody_Runs_Concurrency struct {
 
 // GetApiExperimentsRunsByRunId200JSONResponseBodyStatus defines parameters for GetApiExperimentsRunsByRunId.
 type GetApiExperimentsRunsByRunId200JSONResponseBodyStatus string
+
+// GetApiExperimentsRunsByRunId400JSONResponseBodySuccess defines parameters for GetApiExperimentsRunsByRunId.
+type GetApiExperimentsRunsByRunId400JSONResponseBodySuccess bool
 
 // GetApiExperimentsRunsByRunIdResultsParams defines parameters for GetApiExperimentsRunsByRunIdResults.
 type GetApiExperimentsRunsByRunIdResultsParams struct {
@@ -48893,6 +52445,12 @@ type GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Targets struct {
 	union json.RawMessage
 }
 
+// GetApiExperimentsRunsByRunIdResults400JSONResponseBodySuccess defines parameters for GetApiExperimentsRunsByRunIdResults.
+type GetApiExperimentsRunsByRunIdResults400JSONResponseBodySuccess bool
+
+// GetApiExperimentsBySlug400JSONResponseBodySuccess defines parameters for GetApiExperimentsBySlug.
+type GetApiExperimentsBySlug400JSONResponseBodySuccess bool
+
 // PostApiExperimentsBySlugRunJSONBody defines parameters for PostApiExperimentsBySlugRun.
 type PostApiExperimentsBySlugRunJSONBody struct {
 	Concurrency    *int                                                                            `json:"concurrency,omitempty"`
@@ -48937,6 +52495,9 @@ type GetApiExperimentsBySlugVersions200JSONResponseBody_NextCursor struct {
 	union json.RawMessage
 }
 
+// PostApiExperimentsBySlugVersionsByVersionRestore400JSONResponseBodySuccess defines parameters for PostApiExperimentsBySlugVersionsByVersionRestore.
+type PostApiExperimentsBySlugVersionsByVersionRestore400JSONResponseBodySuccess bool
+
 // GetApiExperimentsBySlugWorkbenchStateParams defines parameters for GetApiExperimentsBySlugWorkbenchState.
 type GetApiExperimentsBySlugWorkbenchStateParams struct {
 	// Fields Set to `version` to answer with the version and timestamp only
@@ -48960,10 +52521,19 @@ type ReadProjectStoredObjectBytesParams struct {
 	Filename *string `form:"filename,omitempty" json:"filename,omitempty"`
 }
 
+// ReadProjectStoredObjectBytes400JSONResponseBodySuccess defines parameters for ReadProjectStoredObjectBytes.
+type ReadProjectStoredObjectBytes400JSONResponseBodySuccess bool
+
+// ReadNamedProjectStoredObjectBytes400JSONResponseBodySuccess defines parameters for ReadNamedProjectStoredObjectBytes.
+type ReadNamedProjectStoredObjectBytes400JSONResponseBodySuccess bool
+
 // ReadStoredObjectBytesParams defines parameters for ReadStoredObjectBytes.
 type ReadStoredObjectBytesParams struct {
 	Filename *string `form:"filename,omitempty" json:"filename,omitempty"`
 }
+
+// ReadStoredObjectBytes400JSONResponseBodySuccess defines parameters for ReadStoredObjectBytes.
+type ReadStoredObjectBytes400JSONResponseBodySuccess bool
 
 // PostApiGovernanceIngestionTemplatesJSONBody defines parameters for PostApiGovernanceIngestionTemplates.
 type PostApiGovernanceIngestionTemplatesJSONBody struct {
@@ -49373,6 +52943,9 @@ type ListGrants200JSONResponseBodyGrantsScopeType string
 // ListGrants200JSONResponseBodyGrantsStatus defines parameters for ListGrants.
 type ListGrants200JSONResponseBodyGrantsStatus string
 
+// ListGrants400JSONResponseBodySuccess defines parameters for ListGrants.
+type ListGrants400JSONResponseBodySuccess bool
+
 // CreateGrantJSONBody defines parameters for CreateGrant.
 type CreateGrantJSONBody struct {
 	ExpiresAt *time.Time `json:"expiresAt,omitempty"`
@@ -49408,8 +52981,14 @@ type CreateGrant201JSONResponseBodyScopeType string
 // CreateGrant201JSONResponseBodyStatus defines parameters for CreateGrant.
 type CreateGrant201JSONResponseBodyStatus string
 
+// CreateGrant400JSONResponseBodySuccess defines parameters for CreateGrant.
+type CreateGrant400JSONResponseBodySuccess bool
+
 // RevokeGrant200JSONResponseBodyRevoked defines parameters for RevokeGrant.
 type RevokeGrant200JSONResponseBodyRevoked bool
+
+// RevokeGrant400JSONResponseBodySuccess defines parameters for RevokeGrant.
+type RevokeGrant400JSONResponseBodySuccess bool
 
 // GetGrant200JSONResponseBodyPrincipalType defines parameters for GetGrant.
 type GetGrant200JSONResponseBodyPrincipalType string
@@ -49419,6 +52998,9 @@ type GetGrant200JSONResponseBodyScopeType string
 
 // GetGrant200JSONResponseBodyStatus defines parameters for GetGrant.
 type GetGrant200JSONResponseBodyStatus string
+
+// GetGrant400JSONResponseBodySuccess defines parameters for GetGrant.
+type GetGrant400JSONResponseBodySuccess bool
 
 // UpdateGrantJSONBody defines parameters for UpdateGrant.
 type UpdateGrantJSONBody struct {
@@ -49434,10 +53016,16 @@ type UpdateGrant200JSONResponseBodyScopeType string
 // UpdateGrant200JSONResponseBodyStatus defines parameters for UpdateGrant.
 type UpdateGrant200JSONResponseBodyStatus string
 
+// UpdateGrant400JSONResponseBodySuccess defines parameters for UpdateGrant.
+type UpdateGrant400JSONResponseBodySuccess bool
+
 // GetApiGraphsParams defines parameters for GetApiGraphs.
 type GetApiGraphsParams struct {
 	DashboardId *string `form:"dashboardId,omitempty" json:"dashboardId,omitempty"`
 }
+
+// GetApiGraphs400JSONResponseBodySuccess defines parameters for GetApiGraphs.
+type GetApiGraphs400JSONResponseBodySuccess bool
 
 // PostApiGraphsJSONBody defines parameters for PostApiGraphs.
 type PostApiGraphsJSONBody struct {
@@ -49451,12 +53039,24 @@ type PostApiGraphsJSONBody struct {
 	RowSpan     *float32                `json:"rowSpan,omitempty"`
 }
 
+// PostApiGraphs400JSONResponseBodySuccess defines parameters for PostApiGraphs.
+type PostApiGraphs400JSONResponseBodySuccess bool
+
+// DeleteApiGraphsById400JSONResponseBodySuccess defines parameters for DeleteApiGraphsById.
+type DeleteApiGraphsById400JSONResponseBodySuccess bool
+
+// GetApiGraphsById400JSONResponseBodySuccess defines parameters for GetApiGraphsById.
+type GetApiGraphsById400JSONResponseBodySuccess bool
+
 // PatchApiGraphsByIdJSONBody defines parameters for PatchApiGraphsById.
 type PatchApiGraphsByIdJSONBody struct {
 	Filters *map[string]interface{} `json:"filters,omitempty"`
 	Graph   *map[string]interface{} `json:"graph,omitempty"`
 	Name    *string                 `json:"name,omitempty"`
 }
+
+// PatchApiGraphsById400JSONResponseBodySuccess defines parameters for PatchApiGraphsById.
+type PatchApiGraphsById400JSONResponseBodySuccess bool
 
 // GetApiGroupsParams defines parameters for GetApiGroups.
 type GetApiGroupsParams struct {
@@ -49469,6 +53069,9 @@ type GetApiGroups200JSONResponseBodyDataBindingsRole string
 
 // GetApiGroups200JSONResponseBodyDataBindingsScopeType defines parameters for GetApiGroups.
 type GetApiGroups200JSONResponseBodyDataBindingsScopeType string
+
+// GetApiGroups400JSONResponseBodySuccess defines parameters for GetApiGroups.
+type GetApiGroups400JSONResponseBodySuccess bool
 
 // PostApiGroupsJSONBody defines parameters for PostApiGroups.
 type PostApiGroupsJSONBody struct {
@@ -49488,22 +53091,37 @@ type PostApiGroupsJSONBodyBindingsRole string
 // PostApiGroupsJSONBodyBindingsScopeType defines parameters for PostApiGroups.
 type PostApiGroupsJSONBodyBindingsScopeType string
 
+// PostApiGroups400JSONResponseBodySuccess defines parameters for PostApiGroups.
+type PostApiGroups400JSONResponseBodySuccess bool
+
+// DeleteApiGroupsById400JSONResponseBodySuccess defines parameters for DeleteApiGroupsById.
+type DeleteApiGroupsById400JSONResponseBodySuccess bool
+
 // GetApiGroupsById200JSONResponseBodyBindingsRole defines parameters for GetApiGroupsById.
 type GetApiGroupsById200JSONResponseBodyBindingsRole string
 
 // GetApiGroupsById200JSONResponseBodyBindingsScopeType defines parameters for GetApiGroupsById.
 type GetApiGroupsById200JSONResponseBodyBindingsScopeType string
 
+// GetApiGroupsById400JSONResponseBodySuccess defines parameters for GetApiGroupsById.
+type GetApiGroupsById400JSONResponseBodySuccess bool
+
 // PatchApiGroupsByIdJSONBody defines parameters for PatchApiGroupsById.
 type PatchApiGroupsByIdJSONBody struct {
 	Name string `json:"name"`
 }
+
+// PatchApiGroupsById400JSONResponseBodySuccess defines parameters for PatchApiGroupsById.
+type PatchApiGroupsById400JSONResponseBodySuccess bool
 
 // GetApiGroupsByIdBindings200JSONResponseBodyDataRole defines parameters for GetApiGroupsByIdBindings.
 type GetApiGroupsByIdBindings200JSONResponseBodyDataRole string
 
 // GetApiGroupsByIdBindings200JSONResponseBodyDataScopeType defines parameters for GetApiGroupsByIdBindings.
 type GetApiGroupsByIdBindings200JSONResponseBodyDataScopeType string
+
+// GetApiGroupsByIdBindings400JSONResponseBodySuccess defines parameters for GetApiGroupsByIdBindings.
+type GetApiGroupsByIdBindings400JSONResponseBodySuccess bool
 
 // PostApiGroupsByIdBindingsJSONBody defines parameters for PostApiGroupsByIdBindings.
 type PostApiGroupsByIdBindingsJSONBody struct {
@@ -49525,10 +53143,25 @@ type PostApiGroupsByIdBindings201JSONResponseBodyRole string
 // PostApiGroupsByIdBindings201JSONResponseBodyScopeType defines parameters for PostApiGroupsByIdBindings.
 type PostApiGroupsByIdBindings201JSONResponseBodyScopeType string
 
+// PostApiGroupsByIdBindings400JSONResponseBodySuccess defines parameters for PostApiGroupsByIdBindings.
+type PostApiGroupsByIdBindings400JSONResponseBodySuccess bool
+
+// DeleteApiGroupsByIdBindingsByBindingId400JSONResponseBodySuccess defines parameters for DeleteApiGroupsByIdBindingsByBindingId.
+type DeleteApiGroupsByIdBindingsByBindingId400JSONResponseBodySuccess bool
+
+// GetApiGroupsByIdMembers400JSONResponseBodySuccess defines parameters for GetApiGroupsByIdMembers.
+type GetApiGroupsByIdMembers400JSONResponseBodySuccess bool
+
 // PostApiGroupsByIdMembersJSONBody defines parameters for PostApiGroupsByIdMembers.
 type PostApiGroupsByIdMembersJSONBody struct {
 	UserId string `json:"userId"`
 }
+
+// PostApiGroupsByIdMembers400JSONResponseBodySuccess defines parameters for PostApiGroupsByIdMembers.
+type PostApiGroupsByIdMembers400JSONResponseBodySuccess bool
+
+// DeleteApiGroupsByIdMembersByUserId400JSONResponseBodySuccess defines parameters for DeleteApiGroupsByIdMembersByUserId.
+type DeleteApiGroupsByIdMembersByUserId400JSONResponseBodySuccess bool
 
 // PostApiGuardrailsByEvaluatorEvaluateJSONBody defines parameters for PostApiGuardrailsByEvaluatorEvaluate.
 type PostApiGuardrailsByEvaluatorEvaluateJSONBody struct {
@@ -49677,6 +53310,9 @@ type ListInstantEvalRuns200JSONResponseBodyRunsTotal0 = int
 type ListInstantEvalRuns200JSONResponseBody_Runs_Total struct {
 	union json.RawMessage
 }
+
+// ListInstantEvalRuns400JSONResponseBodySuccess defines parameters for ListInstantEvalRuns.
+type ListInstantEvalRuns400JSONResponseBodySuccess bool
 
 // CreateInstantEvalRunJSONBody defines parameters for CreateInstantEvalRun.
 type CreateInstantEvalRunJSONBody struct {
@@ -49932,6 +53568,9 @@ type GetInstantEvalRun200JSONResponseBody_Total struct {
 	union json.RawMessage
 }
 
+// GetInstantEvalRun400JSONResponseBodySuccess defines parameters for GetInstantEvalRun.
+type GetInstantEvalRun400JSONResponseBodySuccess bool
+
 // CancelInstantEvalRun200JSONResponseBodyMatched0 defines parameters for CancelInstantEvalRun.
 type CancelInstantEvalRun200JSONResponseBodyMatched0 = int
 
@@ -49976,6 +53615,9 @@ type CancelInstantEvalRun200JSONResponseBody_Total struct {
 	union json.RawMessage
 }
 
+// CancelInstantEvalRun400JSONResponseBodySuccess defines parameters for CancelInstantEvalRun.
+type CancelInstantEvalRun400JSONResponseBodySuccess bool
+
 // CancelInstantEvalRun409JSONResponseBodyFault defines parameters for CancelInstantEvalRun.
 type CancelInstantEvalRun409JSONResponseBodyFault string
 
@@ -50014,6 +53656,9 @@ type ListInstantEvalRunResults200JSONResponseBody_Judgments_Probabilities struct
 // ListInstantEvalRunResults200JSONResponseBodyJudgmentsStatus defines parameters for ListInstantEvalRunResults.
 type ListInstantEvalRunResults200JSONResponseBodyJudgmentsStatus string
 
+// ListInstantEvalRunResults400JSONResponseBodySuccess defines parameters for ListInstantEvalRunResults.
+type ListInstantEvalRunResults400JSONResponseBodySuccess bool
+
 // SampleInstantEvalRunParams defines parameters for SampleInstantEvalRun.
 type SampleInstantEvalRunParams struct {
 	// N Rows to re-read, at most twenty five.
@@ -50030,6 +53675,9 @@ type SampleInstantEvalRun200JSONResponseBody_Judgments_Probabilities struct {
 
 // SampleInstantEvalRun200JSONResponseBodyJudgmentsStatus defines parameters for SampleInstantEvalRun.
 type SampleInstantEvalRun200JSONResponseBodyJudgmentsStatus string
+
+// SampleInstantEvalRun400JSONResponseBodySuccess defines parameters for SampleInstantEvalRun.
+type SampleInstantEvalRun400JSONResponseBodySuccess bool
 
 // PostLangyControlFramesJSONBody defines parameters for PostLangyControlFrames.
 type PostLangyControlFramesJSONBody struct {
@@ -50175,6 +53823,9 @@ type PostLangyControlFramesJSONBodyFrames5Type string
 type PostLangyControlFramesJSONBody_Frames_Item struct {
 	union json.RawMessage
 }
+
+// PostLangyControlFrames400JSONResponseBodySuccess defines parameters for PostLangyControlFrames.
+type PostLangyControlFrames400JSONResponseBodySuccess bool
 
 // PollLangyControlSessionParams defines parameters for PollLangyControlSession.
 type PollLangyControlSessionParams struct {
@@ -50451,6 +54102,9 @@ type PollLangyControlSession200JSONResponseBody_Frames_Item struct {
 	union json.RawMessage
 }
 
+// PollLangyControlSession400JSONResponseBodySuccess defines parameters for PollLangyControlSession.
+type PollLangyControlSession400JSONResponseBodySuccess bool
+
 // RegisterLangyControlSessionJSONBody defines parameters for RegisterLangyControlSession.
 type RegisterLangyControlSessionJSONBody struct {
 	Cli struct {
@@ -50532,6 +54186,9 @@ type RegisterLangyControlSession200JSONResponseBody_Frame struct {
 	union json.RawMessage
 }
 
+// RegisterLangyControlSession400JSONResponseBodySuccess defines parameters for RegisterLangyControlSession.
+type RegisterLangyControlSession400JSONResponseBodySuccess bool
+
 // ApproveLangyControlRequestJSONBody defines parameters for ApproveLangyControlRequest.
 type ApproveLangyControlRequestJSONBody struct {
 	Workspace struct {
@@ -50549,8 +54206,14 @@ type ApproveLangyControlRequestJSONBody struct {
 	} `json:"workspace"`
 }
 
+// ApproveLangyControlRequest400JSONResponseBodySuccess defines parameters for ApproveLangyControlRequest.
+type ApproveLangyControlRequest400JSONResponseBodySuccess bool
+
 // CancelLangyControlRequest200JSONResponseBodyCancelled defines parameters for CancelLangyControlRequest.
 type CancelLangyControlRequest200JSONResponseBodyCancelled bool
+
+// CancelLangyControlRequest400JSONResponseBodySuccess defines parameters for CancelLangyControlRequest.
+type CancelLangyControlRequest400JSONResponseBodySuccess bool
 
 // StartLangyConversationTurnJSONBody defines parameters for StartLangyConversationTurn.
 type StartLangyConversationTurnJSONBody struct {
@@ -50558,7 +54221,7 @@ type StartLangyConversationTurnJSONBody struct {
 	IdempotencyKey      string `json:"idempotencyKey"`
 	Messages            []struct {
 		Content *string                                        `json:"content,omitempty"`
-		Parts   *[]map[string]*JsonValue                       `json:"parts,omitempty"`
+		Parts   *[]map[string]*UnderscoreUnderscoreSchema0     `json:"parts,omitempty"`
 		Role    StartLangyConversationTurnJSONBodyMessagesRole `json:"role"`
 	} `json:"messages"`
 	ModelOverride *string `json:"modelOverride,omitempty"`
@@ -50567,13 +54230,16 @@ type StartLangyConversationTurnJSONBody struct {
 // StartLangyConversationTurnJSONBodyMessagesRole defines parameters for StartLangyConversationTurn.
 type StartLangyConversationTurnJSONBodyMessagesRole string
 
+// StartLangyConversationTurn400JSONResponseBodySuccess defines parameters for StartLangyConversationTurn.
+type StartLangyConversationTurn400JSONResponseBodySuccess bool
+
 // ContinueLangyConversationTurnJSONBody defines parameters for ContinueLangyConversationTurn.
 type ContinueLangyConversationTurnJSONBody struct {
 	AdoptConversationId *bool  `json:"adoptConversationId,omitempty"`
 	IdempotencyKey      string `json:"idempotencyKey"`
 	Messages            []struct {
 		Content *string                                           `json:"content,omitempty"`
-		Parts   *[]map[string]*JsonValue                          `json:"parts,omitempty"`
+		Parts   *[]map[string]*UnderscoreUnderscoreSchema0        `json:"parts,omitempty"`
 		Role    ContinueLangyConversationTurnJSONBodyMessagesRole `json:"role"`
 	} `json:"messages"`
 	ModelOverride *string `json:"modelOverride,omitempty"`
@@ -50581,6 +54247,9 @@ type ContinueLangyConversationTurnJSONBody struct {
 
 // ContinueLangyConversationTurnJSONBodyMessagesRole defines parameters for ContinueLangyConversationTurn.
 type ContinueLangyConversationTurnJSONBodyMessagesRole string
+
+// ContinueLangyConversationTurn400JSONResponseBodySuccess defines parameters for ContinueLangyConversationTurn.
+type ContinueLangyConversationTurn400JSONResponseBodySuccess bool
 
 // LangyLocalStartCallTextBody defines parameters for LangyLocalStartCall.
 type LangyLocalStartCallTextBody interface{}
@@ -50591,13 +54260,22 @@ type LangyLocalReadCall200JSONResponseBodyErrorCode string
 // LangyLocalReadCall200JSONResponseBodyState defines parameters for LangyLocalReadCall.
 type LangyLocalReadCall200JSONResponseBodyState string
 
+// LangyLocalReadCall400JSONResponseBodySuccess defines parameters for LangyLocalReadCall.
+type LangyLocalReadCall400JSONResponseBodySuccess bool
+
 // LangyLocalCancelCall200JSONResponseBodyCancelled defines parameters for LangyLocalCancelCall.
 type LangyLocalCancelCall200JSONResponseBodyCancelled bool
+
+// LangyLocalCancelCall400JSONResponseBodySuccess defines parameters for LangyLocalCancelCall.
+type LangyLocalCancelCall400JSONResponseBodySuccess bool
 
 // LangyLocalCreateRequestJSONBody defines parameters for LangyLocalCreateRequest.
 type LangyLocalCreateRequestJSONBody struct {
 	ConversationId string `json:"conversationId"`
 }
+
+// LangyLocalCreateRequest400JSONResponseBodySuccess defines parameters for LangyLocalCreateRequest.
+type LangyLocalCreateRequest400JSONResponseBodySuccess bool
 
 // LangyLocalWorkspaceParams defines parameters for LangyLocalWorkspace.
 type LangyLocalWorkspaceParams struct {
@@ -50606,6 +54284,9 @@ type LangyLocalWorkspaceParams struct {
 
 // LangyLocalWorkspace200JSONResponseBodyCodeAccessPreference defines parameters for LangyLocalWorkspace.
 type LangyLocalWorkspace200JSONResponseBodyCodeAccessPreference string
+
+// LangyLocalWorkspace400JSONResponseBodySuccess defines parameters for LangyLocalWorkspace.
+type LangyLocalWorkspace400JSONResponseBodySuccess bool
 
 // LangyUiActionsDispatchTextBody defines parameters for LangyUiActionsDispatch.
 type LangyUiActionsDispatchTextBody interface{}
@@ -50633,8 +54314,14 @@ type LangyLocalStartWaitJSONBody struct {
 // LangyLocalStartWaitJSONBodyKind defines parameters for LangyLocalStartWait.
 type LangyLocalStartWaitJSONBodyKind string
 
+// LangyLocalStartWait400JSONResponseBodySuccess defines parameters for LangyLocalStartWait.
+type LangyLocalStartWait400JSONResponseBodySuccess bool
+
 // LangyLocalReadWait200JSONResponseBodyState defines parameters for LangyLocalReadWait.
 type LangyLocalReadWait200JSONResponseBodyState string
+
+// LangyLocalReadWait400JSONResponseBodySuccess defines parameters for LangyLocalReadWait.
+type LangyLocalReadWait400JSONResponseBodySuccess bool
 
 // GetApiMeUsageParams defines parameters for GetApiMeUsage.
 type GetApiMeUsageParams struct {
@@ -50788,11 +54475,11 @@ type PostApiMonitorsJSONBody struct {
 		Expansions []string               `json:"expansions"`
 		Mapping    map[string]interface{} `json:"mapping"`
 	} `json:"mappings,omitempty"`
-	Name              string                 `json:"name"`
-	Parameters        *map[string]*JsonValue `json:"parameters,omitempty"`
-	Preconditions     *[]interface{}         `json:"preconditions,omitempty"`
-	Sample            *float32               `json:"sample,omitempty"`
-	ThreadIdleTimeout *int                   `json:"threadIdleTimeout,omitempty"`
+	Name              string                                   `json:"name"`
+	Parameters        *map[string]*UnderscoreUnderscoreSchema0 `json:"parameters,omitempty"`
+	Preconditions     *[]interface{}                           `json:"preconditions,omitempty"`
+	Sample            *float32                                 `json:"sample,omitempty"`
+	ThreadIdleTimeout *int                                     `json:"threadIdleTimeout,omitempty"`
 }
 
 // PostApiMonitorsJSONBodyEvaluatorLabel0 defines parameters for PostApiMonitors.
@@ -50812,8 +54499,17 @@ type PostApiMonitorsJSONBodyLevel string
 // PostApiMonitors201JSONResponseBodyExecutionMode defines parameters for PostApiMonitors.
 type PostApiMonitors201JSONResponseBodyExecutionMode string
 
+// PostApiMonitors400JSONResponseBodySuccess defines parameters for PostApiMonitors.
+type PostApiMonitors400JSONResponseBodySuccess bool
+
+// DeleteApiMonitorsById400JSONResponseBodySuccess defines parameters for DeleteApiMonitorsById.
+type DeleteApiMonitorsById400JSONResponseBodySuccess bool
+
 // GetApiMonitorsById200JSONResponseBodyExecutionMode defines parameters for GetApiMonitorsById.
 type GetApiMonitorsById200JSONResponseBodyExecutionMode string
+
+// GetApiMonitorsById400JSONResponseBodySuccess defines parameters for GetApiMonitorsById.
+type GetApiMonitorsById400JSONResponseBodySuccess bool
 
 // PatchApiMonitorsByIdJSONBody defines parameters for PatchApiMonitorsById.
 type PatchApiMonitorsByIdJSONBody struct {
@@ -50853,10 +54549,16 @@ type PatchApiMonitorsByIdJSONBodyLevel string
 // PatchApiMonitorsById200JSONResponseBodyExecutionMode defines parameters for PatchApiMonitorsById.
 type PatchApiMonitorsById200JSONResponseBodyExecutionMode string
 
+// PatchApiMonitorsById400JSONResponseBodySuccess defines parameters for PatchApiMonitorsById.
+type PatchApiMonitorsById400JSONResponseBodySuccess bool
+
 // PostApiMonitorsByIdToggleJSONBody defines parameters for PostApiMonitorsByIdToggle.
 type PostApiMonitorsByIdToggleJSONBody struct {
 	Enabled bool `json:"enabled"`
 }
+
+// PostApiMonitorsByIdToggle400JSONResponseBodySuccess defines parameters for PostApiMonitorsByIdToggle.
+type PostApiMonitorsByIdToggle400JSONResponseBodySuccess bool
 
 // ExplainClickHouseQueryJSONBody defines parameters for ExplainClickHouseQuery.
 type ExplainClickHouseQueryJSONBody struct {
@@ -50867,11 +54569,17 @@ type ExplainClickHouseQueryJSONBody struct {
 // ExplainClickHouseQueryJSONBodyType defines parameters for ExplainClickHouseQuery.
 type ExplainClickHouseQueryJSONBodyType string
 
+// ExplainClickHouseQuery400JSONResponseBodySuccess defines parameters for ExplainClickHouseQuery.
+type ExplainClickHouseQuery400JSONResponseBodySuccess bool
+
 // PostApiOptimizationByWorkflowIdByVersionIdJSONBody defines parameters for PostApiOptimizationByWorkflowIdByVersionId.
 type PostApiOptimizationByWorkflowIdByVersionIdJSONBody map[string]interface{}
 
 // PostApiOptimizationByWorkflowIdByVersionId200JSONResponseBodyStatus defines parameters for PostApiOptimizationByWorkflowIdByVersionId.
 type PostApiOptimizationByWorkflowIdByVersionId200JSONResponseBodyStatus string
+
+// PostApiOptimizationByWorkflowIdByVersionId400JSONResponseBodySuccess defines parameters for PostApiOptimizationByWorkflowIdByVersionId.
+type PostApiOptimizationByWorkflowIdByVersionId400JSONResponseBodySuccess bool
 
 // GetOrganization200JSONResponseBodyPrimaryIntent defines parameters for GetOrganization.
 type GetOrganization200JSONResponseBodyPrimaryIntent string
@@ -50920,8 +54628,14 @@ type CreateOrganizationInvitesJSONBodyInvitesTeamsRole string
 // CreateOrganizationInvites201JSONResponseBodyInvitesRole defines parameters for CreateOrganizationInvites.
 type CreateOrganizationInvites201JSONResponseBodyInvitesRole string
 
+// CreateOrganizationInvites400JSONResponseBodySuccess defines parameters for CreateOrganizationInvites.
+type CreateOrganizationInvites400JSONResponseBodySuccess bool
+
 // RevokeOrganizationInvite200JSONResponseBodySuccess defines parameters for RevokeOrganizationInvite.
 type RevokeOrganizationInvite200JSONResponseBodySuccess bool
+
+// RevokeOrganizationInvite400JSONResponseBodySuccess defines parameters for RevokeOrganizationInvite.
+type RevokeOrganizationInvite400JSONResponseBodySuccess bool
 
 // ListOrganizationMembersParams defines parameters for ListOrganizationMembers.
 type ListOrganizationMembersParams struct {
@@ -50936,14 +54650,23 @@ type ListOrganizationMembersParamsIncludeDisabled string
 // ListOrganizationMembers200JSONResponseBodyMembersRole defines parameters for ListOrganizationMembers.
 type ListOrganizationMembers200JSONResponseBodyMembersRole string
 
+// ListOrganizationMembers400JSONResponseBodySuccess defines parameters for ListOrganizationMembers.
+type ListOrganizationMembers400JSONResponseBodySuccess bool
+
 // RemoveOrganizationMember200JSONResponseBodySuccess defines parameters for RemoveOrganizationMember.
 type RemoveOrganizationMember200JSONResponseBodySuccess bool
+
+// RemoveOrganizationMember400JSONResponseBodySuccess defines parameters for RemoveOrganizationMember.
+type RemoveOrganizationMember400JSONResponseBodySuccess bool
 
 // GetOrganizationMember200JSONResponseBodyRole defines parameters for GetOrganizationMember.
 type GetOrganizationMember200JSONResponseBodyRole string
 
 // GetOrganizationMember200JSONResponseBodyTeamsRole defines parameters for GetOrganizationMember.
 type GetOrganizationMember200JSONResponseBodyTeamsRole string
+
+// GetOrganizationMember400JSONResponseBodySuccess defines parameters for GetOrganizationMember.
+type GetOrganizationMember400JSONResponseBodySuccess bool
 
 // UpdateOrganizationMemberJSONBody defines parameters for UpdateOrganizationMember.
 type UpdateOrganizationMemberJSONBody struct {
@@ -50957,11 +54680,17 @@ type UpdateOrganizationMemberJSONBodyRole string
 // UpdateOrganizationMember200JSONResponseBodyRole defines parameters for UpdateOrganizationMember.
 type UpdateOrganizationMember200JSONResponseBodyRole string
 
+// UpdateOrganizationMember400JSONResponseBodySuccess defines parameters for UpdateOrganizationMember.
+type UpdateOrganizationMember400JSONResponseBodySuccess bool
+
 // GetOrganizationMemberAccess200JSONResponseBodyDirectBindingsScopeType defines parameters for GetOrganizationMemberAccess.
 type GetOrganizationMemberAccess200JSONResponseBodyDirectBindingsScopeType string
 
 // GetOrganizationMemberAccess200JSONResponseBodyGroupsBindingsScopeType defines parameters for GetOrganizationMemberAccess.
 type GetOrganizationMemberAccess200JSONResponseBodyGroupsBindingsScopeType string
+
+// GetOrganizationMemberAccess400JSONResponseBodySuccess defines parameters for GetOrganizationMemberAccess.
+type GetOrganizationMemberAccess400JSONResponseBodySuccess bool
 
 // ProvisionOrganizationJSONBody defines parameters for ProvisionOrganization.
 type ProvisionOrganizationJSONBody struct {
@@ -50969,6 +54698,12 @@ type ProvisionOrganizationJSONBody struct {
 	Name            string  `json:"name"`
 	Slug            *string `json:"slug,omitempty"`
 }
+
+// ProvisionOrganization400JSONResponseBodySuccess defines parameters for ProvisionOrganization.
+type ProvisionOrganization400JSONResponseBodySuccess bool
+
+// GetOrganizationById400JSONResponseBodySuccess defines parameters for GetOrganizationById.
+type GetOrganizationById400JSONResponseBodySuccess bool
 
 // GetPlatformHealthParams defines parameters for GetPlatformHealth.
 type GetPlatformHealthParams struct {
@@ -50984,6 +54719,9 @@ type GetPlatformHealth200JSONResponseBodyChecksStatus string
 
 // GetPlatformHealth200JSONResponseBodyStatus defines parameters for GetPlatformHealth.
 type GetPlatformHealth200JSONResponseBodyStatus string
+
+// GetPlatformHealth400JSONResponseBodySuccess defines parameters for GetPlatformHealth.
+type GetPlatformHealth400JSONResponseBodySuccess bool
 
 // GetPlatformHealth503JSONResponseBodyChecksName defines parameters for GetPlatformHealth.
 type GetPlatformHealth503JSONResponseBodyChecksName string
@@ -51009,6 +54747,9 @@ type GetPlatformHealthSubsystem200JSONResponseBodyChecksStatus string
 // GetPlatformHealthSubsystem200JSONResponseBodyStatus defines parameters for GetPlatformHealthSubsystem.
 type GetPlatformHealthSubsystem200JSONResponseBodyStatus string
 
+// GetPlatformHealthSubsystem400JSONResponseBodySuccess defines parameters for GetPlatformHealthSubsystem.
+type GetPlatformHealthSubsystem400JSONResponseBodySuccess bool
+
 // GetPlatformHealthSubsystem503JSONResponseBodyChecksName defines parameters for GetPlatformHealthSubsystem.
 type GetPlatformHealthSubsystem503JSONResponseBodyChecksName string
 
@@ -51023,6 +54764,9 @@ type ListProjectsParams struct {
 	Page  *int `form:"page,omitempty" json:"page,omitempty"`
 	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
 }
+
+// ListProjects400JSONResponseBodySuccess defines parameters for ListProjects.
+type ListProjects400JSONResponseBodySuccess bool
 
 // CreateProjectJSONBody defines parameters for CreateProject.
 type CreateProjectJSONBody struct {
@@ -51042,8 +54786,14 @@ type CreateProjectJSONBody struct {
 	TeamId *string `json:"teamId,omitempty"`
 }
 
+// ArchiveProject400JSONResponseBodySuccess defines parameters for ArchiveProject.
+type ArchiveProject400JSONResponseBodySuccess bool
+
 // GetProject200JSONResponseBodyPiiRedactionLevel defines parameters for GetProject.
 type GetProject200JSONResponseBodyPiiRedactionLevel string
+
+// GetProject400JSONResponseBodySuccess defines parameters for GetProject.
+type GetProject400JSONResponseBodySuccess bool
 
 // UpdateProjectJSONBody defines parameters for UpdateProject.
 type UpdateProjectJSONBody struct {
@@ -51063,6 +54813,15 @@ type UpdateProjectJSONBodyPiiRedactionLevel string
 
 // UpdateProject200JSONResponseBodyPiiRedactionLevel defines parameters for UpdateProject.
 type UpdateProject200JSONResponseBodyPiiRedactionLevel string
+
+// UpdateProject400JSONResponseBodySuccess defines parameters for UpdateProject.
+type UpdateProject400JSONResponseBodySuccess bool
+
+// GetProjectApiKey400JSONResponseBodySuccess defines parameters for GetProjectApiKey.
+type GetProjectApiKey400JSONResponseBodySuccess bool
+
+// RegenerateProjectApiKey400JSONResponseBodySuccess defines parameters for RegenerateProjectApiKey.
+type RegenerateProjectApiKey400JSONResponseBodySuccess bool
 
 // GetApiV1ProjectsByProjectIdAnalyticsBoards200JSONResponseBodyDataScope defines parameters for GetApiV1ProjectsByProjectIdAnalyticsBoards.
 type GetApiV1ProjectsByProjectIdAnalyticsBoards200JSONResponseBodyDataScope string
@@ -51834,12 +55593,12 @@ type PostApiPromptsJSONBody struct {
 		JsonSchema *PostApiPromptsJSONBody_Outputs_JsonSchema `json:"json_schema,omitempty"`
 		Type       PostApiPromptsJSONBodyOutputsType          `json:"type"`
 	} `json:"outputs,omitempty"`
-	Parameters    *map[string]*JsonValue               `json:"parameters,omitempty"`
-	Prompt        *string                              `json:"prompt,omitempty"`
-	SchemaVersion *PostApiPromptsJSONBodySchemaVersion `json:"schemaVersion,omitempty"`
-	Scope         *PostApiPromptsJSONBodyScope         `json:"scope,omitempty"`
-	Tags          *[]string                            `json:"tags,omitempty"`
-	Temperature   *float32                             `json:"temperature,omitempty"`
+	Parameters    *map[string]*UnderscoreUnderscoreSchema0 `json:"parameters,omitempty"`
+	Prompt        *string                                  `json:"prompt,omitempty"`
+	SchemaVersion *PostApiPromptsJSONBodySchemaVersion     `json:"schemaVersion,omitempty"`
+	Scope         *PostApiPromptsJSONBodyScope             `json:"scope,omitempty"`
+	Tags          *[]string                                `json:"tags,omitempty"`
+	Temperature   *float32                                 `json:"temperature,omitempty"`
 }
 
 // PostApiPromptsJSONBodyInputsType defines parameters for PostApiPrompts.
@@ -51959,12 +55718,12 @@ type PutApiPromptsByIdJSONBody struct {
 		JsonSchema *PutApiPromptsByIdJSONBody_Outputs_JsonSchema `json:"json_schema,omitempty"`
 		Type       PutApiPromptsByIdJSONBodyOutputsType          `json:"type"`
 	} `json:"outputs,omitempty"`
-	Parameters    *map[string]*JsonValue                  `json:"parameters,omitempty"`
-	Prompt        *string                                 `json:"prompt,omitempty"`
-	SchemaVersion *PutApiPromptsByIdJSONBodySchemaVersion `json:"schemaVersion,omitempty"`
-	Scope         *PutApiPromptsByIdJSONBodyScope         `json:"scope,omitempty"`
-	Tags          *[]string                               `json:"tags,omitempty"`
-	Temperature   *float32                                `json:"temperature,omitempty"`
+	Parameters    *map[string]*UnderscoreUnderscoreSchema0 `json:"parameters,omitempty"`
+	Prompt        *string                                  `json:"prompt,omitempty"`
+	SchemaVersion *PutApiPromptsByIdJSONBodySchemaVersion  `json:"schemaVersion,omitempty"`
+	Scope         *PutApiPromptsByIdJSONBodyScope          `json:"scope,omitempty"`
+	Tags          *[]string                                `json:"tags,omitempty"`
+	Temperature   *float32                                 `json:"temperature,omitempty"`
 }
 
 // PutApiPromptsByIdJSONBodyInputsType defines parameters for PutApiPromptsById.
@@ -52485,6 +56244,9 @@ type ListRoleBindings200JSONResponseBodyBindingsRole string
 // ListRoleBindings200JSONResponseBodyBindingsScopeType defines parameters for ListRoleBindings.
 type ListRoleBindings200JSONResponseBodyBindingsScopeType string
 
+// ListRoleBindings400JSONResponseBodySuccess defines parameters for ListRoleBindings.
+type ListRoleBindings400JSONResponseBodySuccess bool
+
 // CreateRoleBindingJSONBody defines parameters for CreateRoleBinding.
 type CreateRoleBindingJSONBody struct {
 	ApiKeyId     *string                            `json:"apiKeyId,omitempty"`
@@ -52512,8 +56274,14 @@ type CreateRoleBinding201JSONResponseBodyRole string
 // CreateRoleBinding201JSONResponseBodyScopeType defines parameters for CreateRoleBinding.
 type CreateRoleBinding201JSONResponseBodyScopeType string
 
+// CreateRoleBinding400JSONResponseBodySuccess defines parameters for CreateRoleBinding.
+type CreateRoleBinding400JSONResponseBodySuccess bool
+
 // DeleteRoleBinding200JSONResponseBodySuccess defines parameters for DeleteRoleBinding.
 type DeleteRoleBinding200JSONResponseBodySuccess bool
+
+// DeleteRoleBinding400JSONResponseBodySuccess defines parameters for DeleteRoleBinding.
+type DeleteRoleBinding400JSONResponseBodySuccess bool
 
 // UpdateRoleBindingJSONBody defines parameters for UpdateRoleBinding.
 type UpdateRoleBindingJSONBody struct {
@@ -52533,6 +56301,9 @@ type UpdateRoleBinding200JSONResponseBodyRole string
 // UpdateRoleBinding200JSONResponseBodyScopeType defines parameters for UpdateRoleBinding.
 type UpdateRoleBinding200JSONResponseBodyScopeType string
 
+// UpdateRoleBinding400JSONResponseBodySuccess defines parameters for UpdateRoleBinding.
+type UpdateRoleBinding400JSONResponseBodySuccess bool
+
 // ListRolesParams defines parameters for ListRoles.
 type ListRolesParams struct {
 	BuiltIn *ListRolesParamsBuiltIn `form:"builtIn,omitempty" json:"builtIn,omitempty"`
@@ -52541,6 +56312,9 @@ type ListRolesParams struct {
 // ListRolesParamsBuiltIn defines parameters for ListRoles.
 type ListRolesParamsBuiltIn string
 
+// ListRoles400JSONResponseBodySuccess defines parameters for ListRoles.
+type ListRoles400JSONResponseBodySuccess bool
+
 // CreateRoleJSONBody defines parameters for CreateRole.
 type CreateRoleJSONBody struct {
 	Description *string  `json:"description,omitempty"`
@@ -52548,8 +56322,17 @@ type CreateRoleJSONBody struct {
 	Permissions []string `json:"permissions"`
 }
 
+// CreateRole400JSONResponseBodySuccess defines parameters for CreateRole.
+type CreateRole400JSONResponseBodySuccess bool
+
 // DeleteRole200JSONResponseBodySuccess defines parameters for DeleteRole.
 type DeleteRole200JSONResponseBodySuccess bool
+
+// DeleteRole400JSONResponseBodySuccess defines parameters for DeleteRole.
+type DeleteRole400JSONResponseBodySuccess bool
+
+// GetRole400JSONResponseBodySuccess defines parameters for GetRole.
+type GetRole400JSONResponseBodySuccess bool
 
 // UpdateRoleJSONBody defines parameters for UpdateRole.
 type UpdateRoleJSONBody struct {
@@ -52557,6 +56340,9 @@ type UpdateRoleJSONBody struct {
 	Name        *string   `json:"name,omitempty"`
 	Permissions *[]string `json:"permissions,omitempty"`
 }
+
+// UpdateRole400JSONResponseBodySuccess defines parameters for UpdateRole.
+type UpdateRole400JSONResponseBodySuccess bool
 
 // ListRunPlansParams defines parameters for ListRunPlans.
 type ListRunPlansParams struct {
@@ -52670,6 +56456,9 @@ type ListRunPlans200JSONResponseBody_Targets_ScenarioMappings_AdditionalProperti
 
 // ListRunPlans200JSONResponseBodyTargetsType defines parameters for ListRunPlans.
 type ListRunPlans200JSONResponseBodyTargetsType string
+
+// ListRunPlans400JSONResponseBodySuccess defines parameters for ListRunPlans.
+type ListRunPlans400JSONResponseBodySuccess bool
 
 // RunRunPlanJSONBody defines parameters for RunRunPlan.
 type RunRunPlanJSONBody struct {
@@ -52906,8 +56695,14 @@ type RunRunPlan200JSONResponseBody_Items_Target_ScenarioMappings_AdditionalPrope
 // RunRunPlan200JSONResponseBodyItemsTargetType defines parameters for RunRunPlan.
 type RunRunPlan200JSONResponseBodyItemsTargetType string
 
+// RunRunPlan400JSONResponseBodySuccess defines parameters for RunRunPlan.
+type RunRunPlan400JSONResponseBodySuccess bool
+
 // ArchiveRunPlan200JSONResponseBodyArchived defines parameters for ArchiveRunPlan.
 type ArchiveRunPlan200JSONResponseBodyArchived bool
+
+// ArchiveRunPlan400JSONResponseBodySuccess defines parameters for ArchiveRunPlan.
+type ArchiveRunPlan400JSONResponseBodySuccess bool
 
 // GetRunPlan200JSONResponseBodyEvaluatorsMappings0 defines parameters for GetRunPlan.
 type GetRunPlan200JSONResponseBodyEvaluatorsMappings0 struct {
@@ -53016,6 +56811,9 @@ type GetRunPlan200JSONResponseBody_Targets_ScenarioMappings_AdditionalProperties
 // GetRunPlan200JSONResponseBodyTargetsType defines parameters for GetRunPlan.
 type GetRunPlan200JSONResponseBodyTargetsType string
 
+// GetRunPlan400JSONResponseBodySuccess defines parameters for GetRunPlan.
+type GetRunPlan400JSONResponseBodySuccess bool
+
 // RerunRunPlanJSONBody defines parameters for RerunRunPlan.
 type RerunRunPlanJSONBody struct {
 	// IdempotencyKey Repeat the same key to make a retry join the batch the first call started instead of running everything again. Send the same request with it: the same key over a different configuration starts its own batch. Defaults to a new key per call.
@@ -53082,6 +56880,9 @@ type RerunRunPlan200JSONResponseBody_Items_Target_ScenarioMappings_AdditionalPro
 
 // RerunRunPlan200JSONResponseBodyItemsTargetType defines parameters for RerunRunPlan.
 type RerunRunPlan200JSONResponseBodyItemsTargetType string
+
+// RerunRunPlan400JSONResponseBodySuccess defines parameters for RerunRunPlan.
+type RerunRunPlan400JSONResponseBodySuccess bool
 
 // DeleteApiScenarioEventsParams defines parameters for DeleteApiScenarioEvents.
 type DeleteApiScenarioEventsParams struct {
@@ -54113,6 +57914,12 @@ type PostApiScenarios201JSONResponseBody_Parameters_Options_Item struct {
 // PostApiScenarios201JSONResponseBodyParametersType defines parameters for PostApiScenarios.
 type PostApiScenarios201JSONResponseBodyParametersType string
 
+// PostApiScenarios400JSONResponseBodySuccess defines parameters for PostApiScenarios.
+type PostApiScenarios400JSONResponseBodySuccess bool
+
+// DeleteApiScenariosById400JSONResponseBodySuccess defines parameters for DeleteApiScenariosById.
+type DeleteApiScenariosById400JSONResponseBodySuccess bool
+
 // GetApiScenariosById200JSONResponseBodyFields0 defines parameters for GetApiScenariosById.
 type GetApiScenariosById200JSONResponseBodyFields0 = string
 
@@ -54173,6 +57980,9 @@ type GetApiScenariosById200JSONResponseBody_Parameters_Options_Item struct {
 
 // GetApiScenariosById200JSONResponseBodyParametersType defines parameters for GetApiScenariosById.
 type GetApiScenariosById200JSONResponseBodyParametersType string
+
+// GetApiScenariosById400JSONResponseBodySuccess defines parameters for GetApiScenariosById.
+type GetApiScenariosById400JSONResponseBodySuccess bool
 
 // PatchApiScenariosByIdJSONBody defines parameters for PatchApiScenariosById.
 type PatchApiScenariosByIdJSONBody struct {
@@ -54349,6 +58159,9 @@ type PatchApiScenariosById200JSONResponseBody_Parameters_Options_Item struct {
 // PatchApiScenariosById200JSONResponseBodyParametersType defines parameters for PatchApiScenariosById.
 type PatchApiScenariosById200JSONResponseBodyParametersType string
 
+// PatchApiScenariosById400JSONResponseBodySuccess defines parameters for PatchApiScenariosById.
+type PatchApiScenariosById400JSONResponseBodySuccess bool
+
 // PutApiScenariosByIdJSONBody defines parameters for PutApiScenariosById.
 type PutApiScenariosByIdJSONBody struct {
 	Criteria *[]string `json:"criteria,omitempty"`
@@ -54524,6 +58337,9 @@ type PutApiScenariosById200JSONResponseBody_Parameters_Options_Item struct {
 // PutApiScenariosById200JSONResponseBodyParametersType defines parameters for PutApiScenariosById.
 type PutApiScenariosById200JSONResponseBodyParametersType string
 
+// PutApiScenariosById400JSONResponseBodySuccess defines parameters for PutApiScenariosById.
+type PutApiScenariosById400JSONResponseBodySuccess bool
+
 // GetApiScenariosByIdVersionsParams defines parameters for GetApiScenariosByIdVersions.
 type GetApiScenariosByIdVersionsParams struct {
 	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
@@ -54539,6 +58355,9 @@ type GetApiScenariosByIdVersions200JSONResponseBodyNextCursor0 = int
 type GetApiScenariosByIdVersions200JSONResponseBody_NextCursor struct {
 	union json.RawMessage
 }
+
+// GetApiScenariosByIdVersions400JSONResponseBodySuccess defines parameters for GetApiScenariosByIdVersions.
+type GetApiScenariosByIdVersions400JSONResponseBodySuccess bool
 
 // GetApiScenariosByIdVersionsByVersion200JSONResponseBodySnapshotFields0 defines parameters for GetApiScenariosByIdVersionsByVersion.
 type GetApiScenariosByIdVersionsByVersion200JSONResponseBodySnapshotFields0 = string
@@ -54585,6 +58404,9 @@ type GetApiScenariosByIdVersionsByVersion200JSONResponseBody_Snapshot_Parameters
 // GetApiScenariosByIdVersionsByVersion200JSONResponseBodySnapshotParametersType defines parameters for GetApiScenariosByIdVersionsByVersion.
 type GetApiScenariosByIdVersionsByVersion200JSONResponseBodySnapshotParametersType string
 
+// GetApiScenariosByIdVersionsByVersion400JSONResponseBodySuccess defines parameters for GetApiScenariosByIdVersionsByVersion.
+type GetApiScenariosByIdVersionsByVersion400JSONResponseBodySuccess bool
+
 // CreateScimTokenJSONBody defines parameters for CreateScimToken.
 type CreateScimTokenJSONBody struct {
 	ConnectionId *string `json:"connectionId,omitempty"`
@@ -54594,10 +58416,16 @@ type CreateScimTokenJSONBody struct {
 // RevokeScimToken200JSONResponseBodySuccess defines parameters for RevokeScimToken.
 type RevokeScimToken200JSONResponseBodySuccess bool
 
+// RevokeScimToken400JSONResponseBodySuccess defines parameters for RevokeScimToken.
+type RevokeScimToken400JSONResponseBodySuccess bool
+
 // GetApiSecretsParams defines parameters for GetApiSecrets.
 type GetApiSecretsParams struct {
 	ProjectId *string `form:"projectId,omitempty" json:"projectId,omitempty"`
 }
+
+// GetApiSecrets400JSONResponseBodySuccess defines parameters for GetApiSecrets.
+type GetApiSecrets400JSONResponseBodySuccess bool
 
 // PostApiSecretsJSONBody defines parameters for PostApiSecrets.
 type PostApiSecretsJSONBody struct {
@@ -54605,6 +58433,9 @@ type PostApiSecretsJSONBody struct {
 	ProjectId *string `json:"projectId,omitempty"`
 	Value     string  `json:"value"`
 }
+
+// PostApiSecrets400JSONResponseBodySuccess defines parameters for PostApiSecrets.
+type PostApiSecrets400JSONResponseBodySuccess bool
 
 // DeleteApiSecretsByIdJSONBody defines parameters for DeleteApiSecretsById.
 type DeleteApiSecretsByIdJSONBody struct {
@@ -54614,16 +58445,25 @@ type DeleteApiSecretsByIdJSONBody struct {
 // DeleteApiSecretsById200JSONResponseBodyDeleted defines parameters for DeleteApiSecretsById.
 type DeleteApiSecretsById200JSONResponseBodyDeleted bool
 
+// DeleteApiSecretsById400JSONResponseBodySuccess defines parameters for DeleteApiSecretsById.
+type DeleteApiSecretsById400JSONResponseBodySuccess bool
+
 // GetApiSecretsByIdParams defines parameters for GetApiSecretsById.
 type GetApiSecretsByIdParams struct {
 	ProjectId *string `form:"projectId,omitempty" json:"projectId,omitempty"`
 }
+
+// GetApiSecretsById400JSONResponseBodySuccess defines parameters for GetApiSecretsById.
+type GetApiSecretsById400JSONResponseBodySuccess bool
 
 // PutApiSecretsByIdJSONBody defines parameters for PutApiSecretsById.
 type PutApiSecretsByIdJSONBody struct {
 	ProjectId *string `json:"projectId,omitempty"`
 	Value     string  `json:"value"`
 }
+
+// PutApiSecretsById400JSONResponseBodySuccess defines parameters for PutApiSecretsById.
+type PutApiSecretsById400JSONResponseBodySuccess bool
 
 // GetApiSimulationRunsParams defines parameters for GetApiSimulationRuns.
 type GetApiSimulationRunsParams struct {
@@ -54653,12 +58493,21 @@ type GetApiSimulationRuns200JSONResponseBody_Runs_ScenarioVersion struct {
 	union json.RawMessage
 }
 
+// GetApiSimulationRuns400JSONResponseBodySuccess defines parameters for GetApiSimulationRuns.
+type GetApiSimulationRuns400JSONResponseBodySuccess bool
+
 // GetApiSimulationRunsBatchesListParams defines parameters for GetApiSimulationRunsBatchesList.
 type GetApiSimulationRunsBatchesListParams struct {
 	ScenarioSetId string  `form:"scenarioSetId" json:"scenarioSetId"`
 	Limit         *int    `form:"limit,omitempty" json:"limit,omitempty"`
 	Cursor        *string `form:"cursor,omitempty" json:"cursor,omitempty"`
 }
+
+// GetApiSimulationRunsBatchesList400JSONResponseBodySuccess defines parameters for GetApiSimulationRunsBatchesList.
+type GetApiSimulationRunsBatchesList400JSONResponseBodySuccess bool
+
+// GetApiSimulationRunsBatchesByBatchRunId400JSONResponseBodySuccess defines parameters for GetApiSimulationRunsBatchesByBatchRunId.
+type GetApiSimulationRunsBatchesByBatchRunId400JSONResponseBodySuccess bool
 
 // GetApiSimulationRunsByScenarioRunId200JSONResponseBodyResultsCriteriaStatus defines parameters for GetApiSimulationRunsByScenarioRunId.
 type GetApiSimulationRunsByScenarioRunId200JSONResponseBodyResultsCriteriaStatus string
@@ -54673,6 +58522,9 @@ type GetApiSimulationRunsByScenarioRunId200JSONResponseBodyScenarioVersion0 = in
 type GetApiSimulationRunsByScenarioRunId200JSONResponseBody_ScenarioVersion struct {
 	union json.RawMessage
 }
+
+// GetApiSimulationRunsByScenarioRunId400JSONResponseBodySuccess defines parameters for GetApiSimulationRunsByScenarioRunId.
+type GetApiSimulationRunsByScenarioRunId400JSONResponseBodySuccess bool
 
 // GetApiSlackConnections200JSONResponseBodyKind defines parameters for GetApiSlackConnections.
 type GetApiSlackConnections200JSONResponseBodyKind string
@@ -54692,6 +58544,9 @@ type CreateStoredObjectUploadJSONBody struct {
 // CreateStoredObjectUpload200JSONResponseBodyMethod defines parameters for CreateStoredObjectUpload.
 type CreateStoredObjectUpload200JSONResponseBodyMethod string
 
+// CreateStoredObjectUpload400JSONResponseBodySuccess defines parameters for CreateStoredObjectUpload.
+type CreateStoredObjectUpload400JSONResponseBodySuccess bool
+
 // ConfirmStoredObjectUploadJSONBody defines parameters for ConfirmStoredObjectUpload.
 type ConfirmStoredObjectUploadJSONBody struct {
 	ProjectId string `json:"projectId"`
@@ -54700,11 +58555,17 @@ type ConfirmStoredObjectUploadJSONBody struct {
 // ConfirmStoredObjectUpload200JSONResponseBodyAudience defines parameters for ConfirmStoredObjectUpload.
 type ConfirmStoredObjectUpload200JSONResponseBodyAudience string
 
+// ConfirmStoredObjectUpload400JSONResponseBodySuccess defines parameters for ConfirmStoredObjectUpload.
+type ConfirmStoredObjectUpload400JSONResponseBodySuccess bool
+
 // DeleteStoredObjectJSONBody defines parameters for DeleteStoredObject.
 type DeleteStoredObjectJSONBody struct {
 	IdempotencyKey string `json:"idempotencyKey"`
 	ProjectId      string `json:"projectId"`
 }
+
+// DeleteStoredObject400JSONResponseBodySuccess defines parameters for DeleteStoredObject.
+type DeleteStoredObject400JSONResponseBodySuccess bool
 
 // GetStoredObjectParams defines parameters for GetStoredObject.
 type GetStoredObjectParams struct {
@@ -54726,6 +58587,9 @@ type GetStoredObject200JSONResponseBodyMetadataAudiences string
 
 // GetStoredObject200JSONResponseBodyMetadataStatus defines parameters for GetStoredObject.
 type GetStoredObject200JSONResponseBodyMetadataStatus string
+
+// GetStoredObject400JSONResponseBodySuccess defines parameters for GetStoredObject.
+type GetStoredObject400JSONResponseBodySuccess bool
 
 // GetApiSuitesParams defines parameters for GetApiSuites.
 type GetApiSuitesParams struct {
@@ -54818,6 +58682,9 @@ type GetApiSuites200JSONResponseBody_Targets_ScenarioMappings_AdditionalProperti
 
 // GetApiSuites200JSONResponseBodyTargetsType defines parameters for GetApiSuites.
 type GetApiSuites200JSONResponseBodyTargetsType string
+
+// GetApiSuites400JSONResponseBodySuccess defines parameters for GetApiSuites.
+type GetApiSuites400JSONResponseBodySuccess bool
 
 // PostApiSuitesJSONBody defines parameters for PostApiSuites.
 type PostApiSuitesJSONBody struct {
@@ -55007,6 +58874,12 @@ type PostApiSuites201JSONResponseBody_Targets_ScenarioMappings_AdditionalPropert
 // PostApiSuites201JSONResponseBodyTargetsType defines parameters for PostApiSuites.
 type PostApiSuites201JSONResponseBodyTargetsType string
 
+// PostApiSuites400JSONResponseBodySuccess defines parameters for PostApiSuites.
+type PostApiSuites400JSONResponseBodySuccess bool
+
+// DeleteApiSuitesById400JSONResponseBodySuccess defines parameters for DeleteApiSuitesById.
+type DeleteApiSuitesById400JSONResponseBodySuccess bool
+
 // GetApiSuitesById200JSONResponseBodyKind defines parameters for GetApiSuitesById.
 type GetApiSuitesById200JSONResponseBodyKind string
 
@@ -55089,6 +58962,9 @@ type GetApiSuitesById200JSONResponseBody_Targets_ScenarioMappings_AdditionalProp
 
 // GetApiSuitesById200JSONResponseBodyTargetsType defines parameters for GetApiSuitesById.
 type GetApiSuitesById200JSONResponseBodyTargetsType string
+
+// GetApiSuitesById400JSONResponseBodySuccess defines parameters for GetApiSuitesById.
+type GetApiSuitesById400JSONResponseBodySuccess bool
 
 // PatchApiSuitesByIdJSONBody defines parameters for PatchApiSuitesById.
 type PatchApiSuitesByIdJSONBody struct {
@@ -55272,6 +59148,9 @@ type PatchApiSuitesById200JSONResponseBody_Targets_ScenarioMappings_AdditionalPr
 // PatchApiSuitesById200JSONResponseBodyTargetsType defines parameters for PatchApiSuitesById.
 type PatchApiSuitesById200JSONResponseBodyTargetsType string
 
+// PatchApiSuitesById400JSONResponseBodySuccess defines parameters for PatchApiSuitesById.
+type PatchApiSuitesById400JSONResponseBodySuccess bool
+
 // PostApiSuitesByIdDuplicate201JSONResponseBodyKind defines parameters for PostApiSuitesByIdDuplicate.
 type PostApiSuitesByIdDuplicate201JSONResponseBodyKind string
 
@@ -55354,6 +59233,9 @@ type PostApiSuitesByIdDuplicate201JSONResponseBody_Targets_ScenarioMappings_Addi
 
 // PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsType defines parameters for PostApiSuitesByIdDuplicate.
 type PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsType string
+
+// PostApiSuitesByIdDuplicate400JSONResponseBodySuccess defines parameters for PostApiSuitesByIdDuplicate.
+type PostApiSuitesByIdDuplicate400JSONResponseBodySuccess bool
 
 // PostApiSuitesByIdRunJSONBody defines parameters for PostApiSuitesByIdRun.
 type PostApiSuitesByIdRunJSONBody struct {
@@ -55483,24 +59365,45 @@ type PostApiSuitesByIdRun200JSONResponseBody_Items_Target_ScenarioMappings_Addit
 // PostApiSuitesByIdRun200JSONResponseBodyItemsTargetType defines parameters for PostApiSuitesByIdRun.
 type PostApiSuitesByIdRun200JSONResponseBodyItemsTargetType string
 
+// PostApiSuitesByIdRun400JSONResponseBodySuccess defines parameters for PostApiSuitesByIdRun.
+type PostApiSuitesByIdRun400JSONResponseBodySuccess bool
+
 // GetApiTeamsParams defines parameters for GetApiTeams.
 type GetApiTeamsParams struct {
 	Page  *int `form:"page,omitempty" json:"page,omitempty"`
 	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
+// GetApiTeams400JSONResponseBodySuccess defines parameters for GetApiTeams.
+type GetApiTeams400JSONResponseBodySuccess bool
+
 // PostApiTeamsJSONBody defines parameters for PostApiTeams.
 type PostApiTeamsJSONBody struct {
 	Name string `json:"name"`
 }
+
+// PostApiTeams400JSONResponseBodySuccess defines parameters for PostApiTeams.
+type PostApiTeams400JSONResponseBodySuccess bool
+
+// DeleteApiTeamsById400JSONResponseBodySuccess defines parameters for DeleteApiTeamsById.
+type DeleteApiTeamsById400JSONResponseBodySuccess bool
+
+// GetApiTeamsById400JSONResponseBodySuccess defines parameters for GetApiTeamsById.
+type GetApiTeamsById400JSONResponseBodySuccess bool
 
 // PatchApiTeamsByIdJSONBody defines parameters for PatchApiTeamsById.
 type PatchApiTeamsByIdJSONBody struct {
 	Name *string `json:"name,omitempty"`
 }
 
+// PatchApiTeamsById400JSONResponseBodySuccess defines parameters for PatchApiTeamsById.
+type PatchApiTeamsById400JSONResponseBodySuccess bool
+
 // GetApiTeamsByIdMembers200JSONResponseBodyDataRole defines parameters for GetApiTeamsByIdMembers.
 type GetApiTeamsByIdMembers200JSONResponseBodyDataRole string
+
+// GetApiTeamsByIdMembers400JSONResponseBodySuccess defines parameters for GetApiTeamsByIdMembers.
+type GetApiTeamsByIdMembers400JSONResponseBodySuccess bool
 
 // PostApiTeamsByIdMembersJSONBody defines parameters for PostApiTeamsByIdMembers.
 type PostApiTeamsByIdMembersJSONBody struct {
@@ -55510,6 +59413,15 @@ type PostApiTeamsByIdMembersJSONBody struct {
 
 // PostApiTeamsByIdMembersJSONBodyRole defines parameters for PostApiTeamsByIdMembers.
 type PostApiTeamsByIdMembersJSONBodyRole string
+
+// PostApiTeamsByIdMembers400JSONResponseBodySuccess defines parameters for PostApiTeamsByIdMembers.
+type PostApiTeamsByIdMembers400JSONResponseBodySuccess bool
+
+// DeleteApiTeamsByIdMembersByUserId400JSONResponseBodySuccess defines parameters for DeleteApiTeamsByIdMembersByUserId.
+type DeleteApiTeamsByIdMembersByUserId400JSONResponseBodySuccess bool
+
+// GetApiTeamsByIdProjects400JSONResponseBodySuccess defines parameters for GetApiTeamsByIdProjects.
+type GetApiTeamsByIdProjects400JSONResponseBodySuccess bool
 
 // ListTestSuitesParams defines parameters for ListTestSuites.
 type ListTestSuitesParams struct {
@@ -55546,6 +59458,9 @@ type ListTestSuites200JSONResponseBody_Evaluators_Mappings_AdditionalProperties 
 
 // ListTestSuites200JSONResponseBodyFieldsType defines parameters for ListTestSuites.
 type ListTestSuites200JSONResponseBodyFieldsType string
+
+// ListTestSuites400JSONResponseBodySuccess defines parameters for ListTestSuites.
+type ListTestSuites400JSONResponseBodySuccess bool
 
 // CreateTestSuiteJSONBody defines parameters for CreateTestSuite.
 type CreateTestSuiteJSONBody struct {
@@ -55637,8 +59552,14 @@ type CreateTestSuite201JSONResponseBody_Evaluators_Mappings_AdditionalProperties
 // CreateTestSuite201JSONResponseBodyFieldsType defines parameters for CreateTestSuite.
 type CreateTestSuite201JSONResponseBodyFieldsType string
 
+// CreateTestSuite400JSONResponseBodySuccess defines parameters for CreateTestSuite.
+type CreateTestSuite400JSONResponseBodySuccess bool
+
 // ArchiveTestSuite200JSONResponseBodyArchived defines parameters for ArchiveTestSuite.
 type ArchiveTestSuite200JSONResponseBodyArchived bool
+
+// ArchiveTestSuite400JSONResponseBodySuccess defines parameters for ArchiveTestSuite.
+type ArchiveTestSuite400JSONResponseBodySuccess bool
 
 // GetTestSuite200JSONResponseBodyEvaluatorsMappings0 defines parameters for GetTestSuite.
 type GetTestSuite200JSONResponseBodyEvaluatorsMappings0 struct {
@@ -55669,6 +59590,9 @@ type GetTestSuite200JSONResponseBody_Evaluators_Mappings_AdditionalProperties st
 
 // GetTestSuite200JSONResponseBodyFieldsType defines parameters for GetTestSuite.
 type GetTestSuite200JSONResponseBodyFieldsType string
+
+// GetTestSuite400JSONResponseBodySuccess defines parameters for GetTestSuite.
+type GetTestSuite400JSONResponseBodySuccess bool
 
 // UpdateTestSuiteJSONBody defines parameters for UpdateTestSuite.
 type UpdateTestSuiteJSONBody struct {
@@ -55759,6 +59683,9 @@ type UpdateTestSuite200JSONResponseBody_Evaluators_Mappings_AdditionalProperties
 
 // UpdateTestSuite200JSONResponseBodyFieldsType defines parameters for UpdateTestSuite.
 type UpdateTestSuite200JSONResponseBodyFieldsType string
+
+// UpdateTestSuite400JSONResponseBodySuccess defines parameters for UpdateTestSuite.
+type UpdateTestSuite400JSONResponseBodySuccess bool
 
 // RunTestSuiteJSONBody defines parameters for RunTestSuite.
 type RunTestSuiteJSONBody struct {
@@ -55904,6 +59831,9 @@ type RunTestSuite200JSONResponseBody_Items_Target_ScenarioMappings_AdditionalPro
 
 // RunTestSuite200JSONResponseBodyItemsTargetType defines parameters for RunTestSuite.
 type RunTestSuite200JSONResponseBodyItemsTargetType string
+
+// RunTestSuite400JSONResponseBodySuccess defines parameters for RunTestSuite.
+type RunTestSuite400JSONResponseBodySuccess bool
 
 // GetApiTracesFacetsParams defines parameters for GetApiTracesFacets.
 type GetApiTracesFacetsParams struct {
@@ -56578,6 +60508,9 @@ type PatchApiTracesByTraceIdMetadataJSONBodyMetadata4 map[string]interface{}
 type PatchApiTracesByTraceIdMetadataJSONBody_Metadata_AdditionalProperties struct {
 	union json.RawMessage
 }
+
+// PatchApiTracesByTraceIdMetadata400JSONResponseBodySuccess defines parameters for PatchApiTracesByTraceIdMetadata.
+type PatchApiTracesByTraceIdMetadata400JSONResponseBodySuccess bool
 
 // GetApiTracesByTraceIdTranscript200JSONResponseBody defines parameters for GetApiTracesByTraceIdTranscript.
 type GetApiTracesByTraceIdTranscript200JSONResponseBody struct {
@@ -58024,6 +61957,12 @@ type PostApiTriggers201JSONResponseBody_Report struct {
 // PostApiTriggers201JSONResponseBodyTemplatesSlackTemplateType defines parameters for PostApiTriggers.
 type PostApiTriggers201JSONResponseBodyTemplatesSlackTemplateType string
 
+// PostApiTriggers400JSONResponseBodySuccess defines parameters for PostApiTriggers.
+type PostApiTriggers400JSONResponseBodySuccess bool
+
+// DeleteApiTriggersById400JSONResponseBodySuccess defines parameters for DeleteApiTriggersById.
+type DeleteApiTriggersById400JSONResponseBodySuccess bool
+
 // GetApiTriggersById200JSONResponseBodyAction defines parameters for GetApiTriggersById.
 type GetApiTriggersById200JSONResponseBodyAction string
 
@@ -58123,6 +62062,9 @@ type GetApiTriggersById200JSONResponseBody_Report struct {
 
 // GetApiTriggersById200JSONResponseBodyTemplatesSlackTemplateType defines parameters for GetApiTriggersById.
 type GetApiTriggersById200JSONResponseBodyTemplatesSlackTemplateType string
+
+// GetApiTriggersById400JSONResponseBodySuccess defines parameters for GetApiTriggersById.
+type GetApiTriggersById400JSONResponseBodySuccess bool
 
 // PatchApiTriggersByIdJSONBody defines parameters for PatchApiTriggersById.
 type PatchApiTriggersByIdJSONBody struct {
@@ -58446,6 +62388,9 @@ type PatchApiTriggersById200JSONResponseBody_Report struct {
 // PatchApiTriggersById200JSONResponseBodyTemplatesSlackTemplateType defines parameters for PatchApiTriggersById.
 type PatchApiTriggersById200JSONResponseBodyTemplatesSlackTemplateType string
 
+// PatchApiTriggersById400JSONResponseBodySuccess defines parameters for PatchApiTriggersById.
+type PatchApiTriggersById400JSONResponseBodySuccess bool
+
 // PostApiTriggersByIdDisable200JSONResponseBodyAction defines parameters for PostApiTriggersByIdDisable.
 type PostApiTriggersByIdDisable200JSONResponseBodyAction string
 
@@ -58545,6 +62490,9 @@ type PostApiTriggersByIdDisable200JSONResponseBody_Report struct {
 
 // PostApiTriggersByIdDisable200JSONResponseBodyTemplatesSlackTemplateType defines parameters for PostApiTriggersByIdDisable.
 type PostApiTriggersByIdDisable200JSONResponseBodyTemplatesSlackTemplateType string
+
+// PostApiTriggersByIdDisable400JSONResponseBodySuccess defines parameters for PostApiTriggersByIdDisable.
+type PostApiTriggersByIdDisable400JSONResponseBodySuccess bool
 
 // PostApiTriggersByIdEnable200JSONResponseBodyAction defines parameters for PostApiTriggersByIdEnable.
 type PostApiTriggersByIdEnable200JSONResponseBodyAction string
@@ -58646,6 +62594,9 @@ type PostApiTriggersByIdEnable200JSONResponseBody_Report struct {
 // PostApiTriggersByIdEnable200JSONResponseBodyTemplatesSlackTemplateType defines parameters for PostApiTriggersByIdEnable.
 type PostApiTriggersByIdEnable200JSONResponseBodyTemplatesSlackTemplateType string
 
+// PostApiTriggersByIdEnable400JSONResponseBodySuccess defines parameters for PostApiTriggersByIdEnable.
+type PostApiTriggersByIdEnable400JSONResponseBodySuccess bool
+
 // GetApiTriggersByIdFiresParams defines parameters for GetApiTriggersByIdFires.
 type GetApiTriggersByIdFiresParams struct {
 	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
@@ -58654,16 +62605,31 @@ type GetApiTriggersByIdFiresParams struct {
 	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
 }
 
+// GetApiTriggersByIdFires400JSONResponseBodySuccess defines parameters for GetApiTriggersByIdFires.
+type GetApiTriggersByIdFires400JSONResponseBodySuccess bool
+
 // PostApiTriggersByIdTestFire200JSONResponseBodyChannel defines parameters for PostApiTriggersByIdTestFire.
 type PostApiTriggersByIdTestFire200JSONResponseBodyChannel string
+
+// PostApiTriggersByIdTestFire400JSONResponseBodySuccess defines parameters for PostApiTriggersByIdTestFire.
+type PostApiTriggersByIdTestFire400JSONResponseBodySuccess bool
 
 // ConfirmOneClickUnsubscribeParams defines parameters for ConfirmOneClickUnsubscribe.
 type ConfirmOneClickUnsubscribeParams struct {
 	Token *string `form:"token,omitempty" json:"token,omitempty"`
 }
 
+// ReadUserAvatarBytes400JSONResponseBodySuccess defines parameters for ReadUserAvatarBytes.
+type ReadUserAvatarBytes400JSONResponseBodySuccess bool
+
 // ReceiveStripeWebhook200JSONResponseBodyReceived defines parameters for ReceiveStripeWebhook.
 type ReceiveStripeWebhook200JSONResponseBodyReceived bool
+
+// DeleteApiWorkflowsById400JSONResponseBodySuccess defines parameters for DeleteApiWorkflowsById.
+type DeleteApiWorkflowsById400JSONResponseBodySuccess bool
+
+// GetApiWorkflowsById400JSONResponseBodySuccess defines parameters for GetApiWorkflowsById.
+type GetApiWorkflowsById400JSONResponseBodySuccess bool
 
 // PatchApiWorkflowsByIdJSONBody defines parameters for PatchApiWorkflowsById.
 type PatchApiWorkflowsByIdJSONBody struct {
@@ -58671,6 +62637,9 @@ type PatchApiWorkflowsByIdJSONBody struct {
 	Icon        *string `json:"icon,omitempty"`
 	Name        *string `json:"name,omitempty"`
 }
+
+// PatchApiWorkflowsById400JSONResponseBodySuccess defines parameters for PatchApiWorkflowsById.
+type PatchApiWorkflowsById400JSONResponseBodySuccess bool
 
 // PostApiWorkflowsByIdEvaluateJSONBody defines parameters for PostApiWorkflowsByIdEvaluate.
 type PostApiWorkflowsByIdEvaluateJSONBody struct {
@@ -58713,11 +62682,17 @@ type PostApiWorkflowsByWorkflowIdRunJSONBody map[string]interface{}
 // PostApiWorkflowsByWorkflowIdRun200JSONResponseBodyStatus defines parameters for PostApiWorkflowsByWorkflowIdRun.
 type PostApiWorkflowsByWorkflowIdRun200JSONResponseBodyStatus string
 
+// PostApiWorkflowsByWorkflowIdRun400JSONResponseBodySuccess defines parameters for PostApiWorkflowsByWorkflowIdRun.
+type PostApiWorkflowsByWorkflowIdRun400JSONResponseBodySuccess bool
+
 // PostApiWorkflowsByWorkflowIdByVersionIdRunJSONBody defines parameters for PostApiWorkflowsByWorkflowIdByVersionIdRun.
 type PostApiWorkflowsByWorkflowIdByVersionIdRunJSONBody map[string]interface{}
 
 // PostApiWorkflowsByWorkflowIdByVersionIdRun200JSONResponseBodyStatus defines parameters for PostApiWorkflowsByWorkflowIdByVersionIdRun.
 type PostApiWorkflowsByWorkflowIdByVersionIdRun200JSONResponseBodyStatus string
+
+// PostApiWorkflowsByWorkflowIdByVersionIdRun400JSONResponseBodySuccess defines parameters for PostApiWorkflowsByWorkflowIdByVersionIdRun.
+type PostApiWorkflowsByWorkflowIdByVersionIdRun400JSONResponseBodySuccess bool
 
 // ReceiveAuth0ScimWebhookJSONBody defines parameters for ReceiveAuth0ScimWebhook.
 type ReceiveAuth0ScimWebhookJSONBody interface{}
@@ -58888,8 +62863,14 @@ type PostApiWebhooksV1Endpoints201JSONResponseBody_Data struct {
 	union json.RawMessage
 }
 
+// PostApiWebhooksV1Endpoints400JSONResponseBodySuccess defines parameters for PostApiWebhooksV1Endpoints.
+type PostApiWebhooksV1Endpoints400JSONResponseBodySuccess bool
+
 // DeleteApiWebhooksV1EndpointsById200JSONResponseBodyDataArchived defines parameters for DeleteApiWebhooksV1EndpointsById.
 type DeleteApiWebhooksV1EndpointsById200JSONResponseBodyDataArchived bool
+
+// DeleteApiWebhooksV1EndpointsById400JSONResponseBodySuccess defines parameters for DeleteApiWebhooksV1EndpointsById.
+type DeleteApiWebhooksV1EndpointsById400JSONResponseBodySuccess bool
 
 // GetApiWebhooksV1EndpointsById200JSONResponseBodyData0 defines parameters for GetApiWebhooksV1EndpointsById.
 type GetApiWebhooksV1EndpointsById200JSONResponseBodyData0 struct {
@@ -58959,6 +62940,9 @@ type GetApiWebhooksV1EndpointsById200JSONResponseBodyData1Status string
 type GetApiWebhooksV1EndpointsById200JSONResponseBody_Data struct {
 	union json.RawMessage
 }
+
+// GetApiWebhooksV1EndpointsById400JSONResponseBodySuccess defines parameters for GetApiWebhooksV1EndpointsById.
+type GetApiWebhooksV1EndpointsById400JSONResponseBodySuccess bool
 
 // PatchApiWebhooksV1EndpointsByIdJSONBody defines parameters for PatchApiWebhooksV1EndpointsById.
 type PatchApiWebhooksV1EndpointsByIdJSONBody struct {
@@ -59053,6 +63037,9 @@ type PatchApiWebhooksV1EndpointsById200JSONResponseBody_Data struct {
 	union json.RawMessage
 }
 
+// PatchApiWebhooksV1EndpointsById400JSONResponseBodySuccess defines parameters for PatchApiWebhooksV1EndpointsById.
+type PatchApiWebhooksV1EndpointsById400JSONResponseBodySuccess bool
+
 // GetApiWebhooksV1EndpointsByIdDeliveriesParams defines parameters for GetApiWebhooksV1EndpointsByIdDeliveries.
 type GetApiWebhooksV1EndpointsByIdDeliveriesParams struct {
 	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
@@ -59062,8 +63049,14 @@ type GetApiWebhooksV1EndpointsByIdDeliveriesParams struct {
 // GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcome defines parameters for GetApiWebhooksV1EndpointsByIdDeliveries.
 type GetApiWebhooksV1EndpointsByIdDeliveries200JSONResponseBodyDataOutcome string
 
+// GetApiWebhooksV1EndpointsByIdDeliveries400JSONResponseBodySuccess defines parameters for GetApiWebhooksV1EndpointsByIdDeliveries.
+type GetApiWebhooksV1EndpointsByIdDeliveries400JSONResponseBodySuccess bool
+
 // GetApiWebhooksV1EndpointsByIdHealth200JSONResponseBodyDataStatus defines parameters for GetApiWebhooksV1EndpointsByIdHealth.
 type GetApiWebhooksV1EndpointsByIdHealth200JSONResponseBodyDataStatus string
+
+// GetApiWebhooksV1EndpointsByIdHealth400JSONResponseBodySuccess defines parameters for GetApiWebhooksV1EndpointsByIdHealth.
+type GetApiWebhooksV1EndpointsByIdHealth400JSONResponseBodySuccess bool
 
 // PostApiWebhooksV1EndpointsByIdRollSecret200JSONResponseBodyData0 defines parameters for PostApiWebhooksV1EndpointsByIdRollSecret.
 type PostApiWebhooksV1EndpointsByIdRollSecret200JSONResponseBodyData0 struct {
@@ -59136,6 +63129,12 @@ type PostApiWebhooksV1EndpointsByIdRollSecret200JSONResponseBody_Data struct {
 	union json.RawMessage
 }
 
+// PostApiWebhooksV1EndpointsByIdRollSecret400JSONResponseBodySuccess defines parameters for PostApiWebhooksV1EndpointsByIdRollSecret.
+type PostApiWebhooksV1EndpointsByIdRollSecret400JSONResponseBodySuccess bool
+
+// PostApiWebhooksV1EndpointsByIdTest400JSONResponseBodySuccess defines parameters for PostApiWebhooksV1EndpointsByIdTest.
+type PostApiWebhooksV1EndpointsByIdTest400JSONResponseBodySuccess bool
+
 // GetApiWebhooksV1EventsParams defines parameters for GetApiWebhooksV1Events.
 type GetApiWebhooksV1EventsParams struct {
 	Type   *string `form:"type,omitempty" json:"type,omitempty"`
@@ -59144,6 +63143,12 @@ type GetApiWebhooksV1EventsParams struct {
 	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
 	Limit  *int    `form:"limit,omitempty" json:"limit,omitempty"`
 }
+
+// GetApiWebhooksV1Events400JSONResponseBodySuccess defines parameters for GetApiWebhooksV1Events.
+type GetApiWebhooksV1Events400JSONResponseBodySuccess bool
+
+// GetApiWebhooksV1EventsById400JSONResponseBodySuccess defines parameters for GetApiWebhooksV1EventsById.
+type GetApiWebhooksV1EventsById400JSONResponseBodySuccess bool
 
 // PostApiGatewayV1BudgetsJSONRequestBody defines body for PostApiGatewayV1Budgets for application/json ContentType.
 type PostApiGatewayV1BudgetsJSONRequestBody PostApiGatewayV1BudgetsJSONBody
@@ -60089,269 +64094,6 @@ func (a Annotation) MarshalJSON() ([]byte, error) {
 	object["userId"], err = json.Marshal(a.UserId)
 	if err != nil {
 		return nil, fmt.Errorf("error marshaling 'userId': %w", err)
-	}
-
-	for fieldName, field := range a.AdditionalProperties {
-		object[fieldName], err = json.Marshal(field)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
-		}
-	}
-	return json.Marshal(object)
-}
-
-// Getter for additional properties for Metadata. Returns the specified
-// element and whether it was found
-func (a Metadata) Get(fieldName string) (value Metadata_AdditionalProperties, found bool) {
-	if a.AdditionalProperties != nil {
-		value, found = a.AdditionalProperties[fieldName]
-	}
-	return
-}
-
-// Setter for additional properties for Metadata
-func (a *Metadata) Set(fieldName string, value Metadata_AdditionalProperties) {
-	if a.AdditionalProperties == nil {
-		a.AdditionalProperties = make(map[string]Metadata_AdditionalProperties)
-	}
-	a.AdditionalProperties[fieldName] = value
-}
-
-// Override default JSON handling for Metadata to handle AdditionalProperties
-func (a *Metadata) UnmarshalJSON(b []byte) error {
-	object := make(map[string]json.RawMessage)
-	err := json.Unmarshal(b, &object)
-	if err != nil {
-		return err
-	}
-
-	if raw, found := object["customer_id"]; found {
-		err = json.Unmarshal(raw, &a.CustomerId)
-		if err != nil {
-			return fmt.Errorf("error reading 'customer_id': %w", err)
-		}
-		delete(object, "customer_id")
-	}
-
-	if raw, found := object["labels"]; found {
-		err = json.Unmarshal(raw, &a.Labels)
-		if err != nil {
-			return fmt.Errorf("error reading 'labels': %w", err)
-		}
-		delete(object, "labels")
-	}
-
-	if raw, found := object["prompt_ids"]; found {
-		err = json.Unmarshal(raw, &a.PromptIds)
-		if err != nil {
-			return fmt.Errorf("error reading 'prompt_ids': %w", err)
-		}
-		delete(object, "prompt_ids")
-	}
-
-	if raw, found := object["prompt_version_ids"]; found {
-		err = json.Unmarshal(raw, &a.PromptVersionIds)
-		if err != nil {
-			return fmt.Errorf("error reading 'prompt_version_ids': %w", err)
-		}
-		delete(object, "prompt_version_ids")
-	}
-
-	if raw, found := object["sdk_language"]; found {
-		err = json.Unmarshal(raw, &a.SdkLanguage)
-		if err != nil {
-			return fmt.Errorf("error reading 'sdk_language': %w", err)
-		}
-		delete(object, "sdk_language")
-	}
-
-	if raw, found := object["sdk_name"]; found {
-		err = json.Unmarshal(raw, &a.SdkName)
-		if err != nil {
-			return fmt.Errorf("error reading 'sdk_name': %w", err)
-		}
-		delete(object, "sdk_name")
-	}
-
-	if raw, found := object["sdk_version"]; found {
-		err = json.Unmarshal(raw, &a.SdkVersion)
-		if err != nil {
-			return fmt.Errorf("error reading 'sdk_version': %w", err)
-		}
-		delete(object, "sdk_version")
-	}
-
-	if raw, found := object["subtopic_id"]; found {
-		err = json.Unmarshal(raw, &a.SubtopicId)
-		if err != nil {
-			return fmt.Errorf("error reading 'subtopic_id': %w", err)
-		}
-		delete(object, "subtopic_id")
-	}
-
-	if raw, found := object["telemetry_sdk_language"]; found {
-		err = json.Unmarshal(raw, &a.TelemetrySdkLanguage)
-		if err != nil {
-			return fmt.Errorf("error reading 'telemetry_sdk_language': %w", err)
-		}
-		delete(object, "telemetry_sdk_language")
-	}
-
-	if raw, found := object["telemetry_sdk_name"]; found {
-		err = json.Unmarshal(raw, &a.TelemetrySdkName)
-		if err != nil {
-			return fmt.Errorf("error reading 'telemetry_sdk_name': %w", err)
-		}
-		delete(object, "telemetry_sdk_name")
-	}
-
-	if raw, found := object["telemetry_sdk_version"]; found {
-		err = json.Unmarshal(raw, &a.TelemetrySdkVersion)
-		if err != nil {
-			return fmt.Errorf("error reading 'telemetry_sdk_version': %w", err)
-		}
-		delete(object, "telemetry_sdk_version")
-	}
-
-	if raw, found := object["thread_id"]; found {
-		err = json.Unmarshal(raw, &a.ThreadId)
-		if err != nil {
-			return fmt.Errorf("error reading 'thread_id': %w", err)
-		}
-		delete(object, "thread_id")
-	}
-
-	if raw, found := object["topic_id"]; found {
-		err = json.Unmarshal(raw, &a.TopicId)
-		if err != nil {
-			return fmt.Errorf("error reading 'topic_id': %w", err)
-		}
-		delete(object, "topic_id")
-	}
-
-	if raw, found := object["user_id"]; found {
-		err = json.Unmarshal(raw, &a.UserId)
-		if err != nil {
-			return fmt.Errorf("error reading 'user_id': %w", err)
-		}
-		delete(object, "user_id")
-	}
-
-	if len(object) != 0 {
-		a.AdditionalProperties = make(map[string]Metadata_AdditionalProperties)
-		for fieldName, fieldBuf := range object {
-			var fieldVal Metadata_AdditionalProperties
-			err := json.Unmarshal(fieldBuf, &fieldVal)
-			if err != nil {
-				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
-			}
-			a.AdditionalProperties[fieldName] = fieldVal
-		}
-	}
-	return nil
-}
-
-// Override default JSON handling for Metadata to handle AdditionalProperties
-func (a Metadata) MarshalJSON() ([]byte, error) {
-	var err error
-	object := make(map[string]json.RawMessage)
-
-	if a.CustomerId != nil {
-		object["customer_id"], err = json.Marshal(a.CustomerId)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'customer_id': %w", err)
-		}
-	}
-
-	if a.Labels != nil {
-		object["labels"], err = json.Marshal(a.Labels)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'labels': %w", err)
-		}
-	}
-
-	if a.PromptIds != nil {
-		object["prompt_ids"], err = json.Marshal(a.PromptIds)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'prompt_ids': %w", err)
-		}
-	}
-
-	if a.PromptVersionIds != nil {
-		object["prompt_version_ids"], err = json.Marshal(a.PromptVersionIds)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'prompt_version_ids': %w", err)
-		}
-	}
-
-	if a.SdkLanguage != nil {
-		object["sdk_language"], err = json.Marshal(a.SdkLanguage)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'sdk_language': %w", err)
-		}
-	}
-
-	if a.SdkName != nil {
-		object["sdk_name"], err = json.Marshal(a.SdkName)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'sdk_name': %w", err)
-		}
-	}
-
-	if a.SdkVersion != nil {
-		object["sdk_version"], err = json.Marshal(a.SdkVersion)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'sdk_version': %w", err)
-		}
-	}
-
-	if a.SubtopicId != nil {
-		object["subtopic_id"], err = json.Marshal(a.SubtopicId)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'subtopic_id': %w", err)
-		}
-	}
-
-	if a.TelemetrySdkLanguage != nil {
-		object["telemetry_sdk_language"], err = json.Marshal(a.TelemetrySdkLanguage)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'telemetry_sdk_language': %w", err)
-		}
-	}
-
-	if a.TelemetrySdkName != nil {
-		object["telemetry_sdk_name"], err = json.Marshal(a.TelemetrySdkName)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'telemetry_sdk_name': %w", err)
-		}
-	}
-
-	if a.TelemetrySdkVersion != nil {
-		object["telemetry_sdk_version"], err = json.Marshal(a.TelemetrySdkVersion)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'telemetry_sdk_version': %w", err)
-		}
-	}
-
-	if a.ThreadId != nil {
-		object["thread_id"], err = json.Marshal(a.ThreadId)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'thread_id': %w", err)
-		}
-	}
-
-	if a.TopicId != nil {
-		object["topic_id"], err = json.Marshal(a.TopicId)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'topic_id': %w", err)
-		}
-	}
-
-	if a.UserId != nil {
-		object["user_id"], err = json.Marshal(a.UserId)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'user_id': %w", err)
-		}
 	}
 
 	for fieldName, field := range a.AdditionalProperties {
@@ -69749,576 +73491,6 @@ func (t JsonValue) MarshalJSON() ([]byte, error) {
 }
 
 func (t *JsonValue) UnmarshalJSON(b []byte) error {
-	err := t.union.UnmarshalJSON(b)
-	return err
-}
-
-// AsMetadata00 returns the union data inside the Metadata0 as a Metadata00
-func (t Metadata0) AsMetadata00() (Metadata00, error) {
-	var body Metadata00
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromMetadata00 overwrites any union data inside the Metadata0 as the provided Metadata00
-func (t *Metadata0) FromMetadata00(v Metadata00) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeMetadata00 performs a merge with any union data inside the Metadata0, using the provided Metadata00
-func (t *Metadata0) MergeMetadata00(v Metadata00) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsMetadata01 returns the union data inside the Metadata0 as a Metadata01
-func (t Metadata0) AsMetadata01() (Metadata01, error) {
-	var body Metadata01
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromMetadata01 overwrites any union data inside the Metadata0 as the provided Metadata01
-func (t *Metadata0) FromMetadata01(v Metadata01) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeMetadata01 performs a merge with any union data inside the Metadata0, using the provided Metadata01
-func (t *Metadata0) MergeMetadata01(v Metadata01) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsMetadata02 returns the union data inside the Metadata0 as a Metadata02
-func (t Metadata0) AsMetadata02() (Metadata02, error) {
-	var body Metadata02
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromMetadata02 overwrites any union data inside the Metadata0 as the provided Metadata02
-func (t *Metadata0) FromMetadata02(v Metadata02) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeMetadata02 performs a merge with any union data inside the Metadata0, using the provided Metadata02
-func (t *Metadata0) MergeMetadata02(v Metadata02) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsMetadata03 returns the union data inside the Metadata0 as a Metadata03
-func (t Metadata0) AsMetadata03() (Metadata03, error) {
-	var body Metadata03
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromMetadata03 overwrites any union data inside the Metadata0 as the provided Metadata03
-func (t *Metadata0) FromMetadata03(v Metadata03) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeMetadata03 performs a merge with any union data inside the Metadata0, using the provided Metadata03
-func (t *Metadata0) MergeMetadata03(v Metadata03) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-func (t Metadata0) MarshalJSON() ([]byte, error) {
-	b, err := t.union.MarshalJSON()
-	return b, err
-}
-
-func (t *Metadata0) UnmarshalJSON(b []byte) error {
-	err := t.union.UnmarshalJSON(b)
-	return err
-}
-
-// AsMetadata10 returns the union data inside the Metadata_1_Item as a Metadata10
-func (t Metadata_1_Item) AsMetadata10() (Metadata10, error) {
-	var body Metadata10
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromMetadata10 overwrites any union data inside the Metadata_1_Item as the provided Metadata10
-func (t *Metadata_1_Item) FromMetadata10(v Metadata10) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeMetadata10 performs a merge with any union data inside the Metadata_1_Item, using the provided Metadata10
-func (t *Metadata_1_Item) MergeMetadata10(v Metadata10) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsMetadata11 returns the union data inside the Metadata_1_Item as a Metadata11
-func (t Metadata_1_Item) AsMetadata11() (Metadata11, error) {
-	var body Metadata11
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromMetadata11 overwrites any union data inside the Metadata_1_Item as the provided Metadata11
-func (t *Metadata_1_Item) FromMetadata11(v Metadata11) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeMetadata11 performs a merge with any union data inside the Metadata_1_Item, using the provided Metadata11
-func (t *Metadata_1_Item) MergeMetadata11(v Metadata11) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsMetadata12 returns the union data inside the Metadata_1_Item as a Metadata12
-func (t Metadata_1_Item) AsMetadata12() (Metadata12, error) {
-	var body Metadata12
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromMetadata12 overwrites any union data inside the Metadata_1_Item as the provided Metadata12
-func (t *Metadata_1_Item) FromMetadata12(v Metadata12) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeMetadata12 performs a merge with any union data inside the Metadata_1_Item, using the provided Metadata12
-func (t *Metadata_1_Item) MergeMetadata12(v Metadata12) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsMetadata13 returns the union data inside the Metadata_1_Item as a Metadata13
-func (t Metadata_1_Item) AsMetadata13() (Metadata13, error) {
-	var body Metadata13
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromMetadata13 overwrites any union data inside the Metadata_1_Item as the provided Metadata13
-func (t *Metadata_1_Item) FromMetadata13(v Metadata13) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeMetadata13 performs a merge with any union data inside the Metadata_1_Item, using the provided Metadata13
-func (t *Metadata_1_Item) MergeMetadata13(v Metadata13) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-func (t Metadata_1_Item) MarshalJSON() ([]byte, error) {
-	b, err := t.union.MarshalJSON()
-	return b, err
-}
-
-func (t *Metadata_1_Item) UnmarshalJSON(b []byte) error {
-	err := t.union.UnmarshalJSON(b)
-	return err
-}
-
-// AsMetadata20 returns the union data inside the Metadata_2_AdditionalProperties as a Metadata20
-func (t Metadata_2_AdditionalProperties) AsMetadata20() (Metadata20, error) {
-	var body Metadata20
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromMetadata20 overwrites any union data inside the Metadata_2_AdditionalProperties as the provided Metadata20
-func (t *Metadata_2_AdditionalProperties) FromMetadata20(v Metadata20) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeMetadata20 performs a merge with any union data inside the Metadata_2_AdditionalProperties, using the provided Metadata20
-func (t *Metadata_2_AdditionalProperties) MergeMetadata20(v Metadata20) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsMetadata21 returns the union data inside the Metadata_2_AdditionalProperties as a Metadata21
-func (t Metadata_2_AdditionalProperties) AsMetadata21() (Metadata21, error) {
-	var body Metadata21
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromMetadata21 overwrites any union data inside the Metadata_2_AdditionalProperties as the provided Metadata21
-func (t *Metadata_2_AdditionalProperties) FromMetadata21(v Metadata21) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeMetadata21 performs a merge with any union data inside the Metadata_2_AdditionalProperties, using the provided Metadata21
-func (t *Metadata_2_AdditionalProperties) MergeMetadata21(v Metadata21) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsMetadata22 returns the union data inside the Metadata_2_AdditionalProperties as a Metadata22
-func (t Metadata_2_AdditionalProperties) AsMetadata22() (Metadata22, error) {
-	var body Metadata22
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromMetadata22 overwrites any union data inside the Metadata_2_AdditionalProperties as the provided Metadata22
-func (t *Metadata_2_AdditionalProperties) FromMetadata22(v Metadata22) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeMetadata22 performs a merge with any union data inside the Metadata_2_AdditionalProperties, using the provided Metadata22
-func (t *Metadata_2_AdditionalProperties) MergeMetadata22(v Metadata22) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsMetadata23 returns the union data inside the Metadata_2_AdditionalProperties as a Metadata23
-func (t Metadata_2_AdditionalProperties) AsMetadata23() (Metadata23, error) {
-	var body Metadata23
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromMetadata23 overwrites any union data inside the Metadata_2_AdditionalProperties as the provided Metadata23
-func (t *Metadata_2_AdditionalProperties) FromMetadata23(v Metadata23) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeMetadata23 performs a merge with any union data inside the Metadata_2_AdditionalProperties, using the provided Metadata23
-func (t *Metadata_2_AdditionalProperties) MergeMetadata23(v Metadata23) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-func (t Metadata_2_AdditionalProperties) MarshalJSON() ([]byte, error) {
-	b, err := t.union.MarshalJSON()
-	return b, err
-}
-
-func (t *Metadata_2_AdditionalProperties) UnmarshalJSON(b []byte) error {
-	err := t.union.UnmarshalJSON(b)
-	return err
-}
-
-// AsMetadata30 returns the union data inside the Metadata_3_AdditionalProperties as a Metadata30
-func (t Metadata_3_AdditionalProperties) AsMetadata30() (Metadata30, error) {
-	var body Metadata30
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromMetadata30 overwrites any union data inside the Metadata_3_AdditionalProperties as the provided Metadata30
-func (t *Metadata_3_AdditionalProperties) FromMetadata30(v Metadata30) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeMetadata30 performs a merge with any union data inside the Metadata_3_AdditionalProperties, using the provided Metadata30
-func (t *Metadata_3_AdditionalProperties) MergeMetadata30(v Metadata30) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsMetadata31 returns the union data inside the Metadata_3_AdditionalProperties as a Metadata31
-func (t Metadata_3_AdditionalProperties) AsMetadata31() (Metadata31, error) {
-	var body Metadata31
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromMetadata31 overwrites any union data inside the Metadata_3_AdditionalProperties as the provided Metadata31
-func (t *Metadata_3_AdditionalProperties) FromMetadata31(v Metadata31) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeMetadata31 performs a merge with any union data inside the Metadata_3_AdditionalProperties, using the provided Metadata31
-func (t *Metadata_3_AdditionalProperties) MergeMetadata31(v Metadata31) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsMetadata32 returns the union data inside the Metadata_3_AdditionalProperties as a Metadata32
-func (t Metadata_3_AdditionalProperties) AsMetadata32() (Metadata32, error) {
-	var body Metadata32
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromMetadata32 overwrites any union data inside the Metadata_3_AdditionalProperties as the provided Metadata32
-func (t *Metadata_3_AdditionalProperties) FromMetadata32(v Metadata32) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeMetadata32 performs a merge with any union data inside the Metadata_3_AdditionalProperties, using the provided Metadata32
-func (t *Metadata_3_AdditionalProperties) MergeMetadata32(v Metadata32) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsMetadata33 returns the union data inside the Metadata_3_AdditionalProperties as a Metadata33
-func (t Metadata_3_AdditionalProperties) AsMetadata33() (Metadata33, error) {
-	var body Metadata33
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromMetadata33 overwrites any union data inside the Metadata_3_AdditionalProperties as the provided Metadata33
-func (t *Metadata_3_AdditionalProperties) FromMetadata33(v Metadata33) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeMetadata33 performs a merge with any union data inside the Metadata_3_AdditionalProperties, using the provided Metadata33
-func (t *Metadata_3_AdditionalProperties) MergeMetadata33(v Metadata33) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-func (t Metadata_3_AdditionalProperties) MarshalJSON() ([]byte, error) {
-	b, err := t.union.MarshalJSON()
-	return b, err
-}
-
-func (t *Metadata_3_AdditionalProperties) UnmarshalJSON(b []byte) error {
-	err := t.union.UnmarshalJSON(b)
-	return err
-}
-
-// AsMetadata0 returns the union data inside the Metadata_AdditionalProperties as a Metadata0
-func (t Metadata_AdditionalProperties) AsMetadata0() (Metadata0, error) {
-	var body Metadata0
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromMetadata0 overwrites any union data inside the Metadata_AdditionalProperties as the provided Metadata0
-func (t *Metadata_AdditionalProperties) FromMetadata0(v Metadata0) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeMetadata0 performs a merge with any union data inside the Metadata_AdditionalProperties, using the provided Metadata0
-func (t *Metadata_AdditionalProperties) MergeMetadata0(v Metadata0) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsMetadata1 returns the union data inside the Metadata_AdditionalProperties as a Metadata1
-func (t Metadata_AdditionalProperties) AsMetadata1() (Metadata1, error) {
-	var body Metadata1
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromMetadata1 overwrites any union data inside the Metadata_AdditionalProperties as the provided Metadata1
-func (t *Metadata_AdditionalProperties) FromMetadata1(v Metadata1) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeMetadata1 performs a merge with any union data inside the Metadata_AdditionalProperties, using the provided Metadata1
-func (t *Metadata_AdditionalProperties) MergeMetadata1(v Metadata1) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsMetadata2 returns the union data inside the Metadata_AdditionalProperties as a Metadata2
-func (t Metadata_AdditionalProperties) AsMetadata2() (Metadata2, error) {
-	var body Metadata2
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromMetadata2 overwrites any union data inside the Metadata_AdditionalProperties as the provided Metadata2
-func (t *Metadata_AdditionalProperties) FromMetadata2(v Metadata2) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeMetadata2 performs a merge with any union data inside the Metadata_AdditionalProperties, using the provided Metadata2
-func (t *Metadata_AdditionalProperties) MergeMetadata2(v Metadata2) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsMetadata3 returns the union data inside the Metadata_AdditionalProperties as a Metadata3
-func (t Metadata_AdditionalProperties) AsMetadata3() (Metadata3, error) {
-	var body Metadata3
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromMetadata3 overwrites any union data inside the Metadata_AdditionalProperties as the provided Metadata3
-func (t *Metadata_AdditionalProperties) FromMetadata3(v Metadata3) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeMetadata3 performs a merge with any union data inside the Metadata_AdditionalProperties, using the provided Metadata3
-func (t *Metadata_AdditionalProperties) MergeMetadata3(v Metadata3) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-func (t Metadata_AdditionalProperties) MarshalJSON() ([]byte, error) {
-	b, err := t.union.MarshalJSON()
-	return b, err
-}
-
-func (t *Metadata_AdditionalProperties) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }
@@ -80773,6 +83945,146 @@ func (t Trace_Spans_Item) MarshalJSON() ([]byte, error) {
 }
 
 func (t *Trace_Spans_Item) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsSchema00 returns the union data inside the UnderscoreUnderscoreSchema0 as a Schema00
+func (t UnderscoreUnderscoreSchema0) AsSchema00() (Schema00, error) {
+	var body Schema00
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSchema00 overwrites any union data inside the UnderscoreUnderscoreSchema0 as the provided Schema00
+func (t *UnderscoreUnderscoreSchema0) FromSchema00(v Schema00) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSchema00 performs a merge with any union data inside the UnderscoreUnderscoreSchema0, using the provided Schema00
+func (t *UnderscoreUnderscoreSchema0) MergeSchema00(v Schema00) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSchema01 returns the union data inside the UnderscoreUnderscoreSchema0 as a Schema01
+func (t UnderscoreUnderscoreSchema0) AsSchema01() (Schema01, error) {
+	var body Schema01
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSchema01 overwrites any union data inside the UnderscoreUnderscoreSchema0 as the provided Schema01
+func (t *UnderscoreUnderscoreSchema0) FromSchema01(v Schema01) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSchema01 performs a merge with any union data inside the UnderscoreUnderscoreSchema0, using the provided Schema01
+func (t *UnderscoreUnderscoreSchema0) MergeSchema01(v Schema01) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSchema02 returns the union data inside the UnderscoreUnderscoreSchema0 as a Schema02
+func (t UnderscoreUnderscoreSchema0) AsSchema02() (Schema02, error) {
+	var body Schema02
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSchema02 overwrites any union data inside the UnderscoreUnderscoreSchema0 as the provided Schema02
+func (t *UnderscoreUnderscoreSchema0) FromSchema02(v Schema02) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSchema02 performs a merge with any union data inside the UnderscoreUnderscoreSchema0, using the provided Schema02
+func (t *UnderscoreUnderscoreSchema0) MergeSchema02(v Schema02) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSchema03 returns the union data inside the UnderscoreUnderscoreSchema0 as a Schema03
+func (t UnderscoreUnderscoreSchema0) AsSchema03() (Schema03, error) {
+	var body Schema03
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSchema03 overwrites any union data inside the UnderscoreUnderscoreSchema0 as the provided Schema03
+func (t *UnderscoreUnderscoreSchema0) FromSchema03(v Schema03) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSchema03 performs a merge with any union data inside the UnderscoreUnderscoreSchema0, using the provided Schema03
+func (t *UnderscoreUnderscoreSchema0) MergeSchema03(v Schema03) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSchema04 returns the union data inside the UnderscoreUnderscoreSchema0 as a Schema04
+func (t UnderscoreUnderscoreSchema0) AsSchema04() (Schema04, error) {
+	var body Schema04
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSchema04 overwrites any union data inside the UnderscoreUnderscoreSchema0 as the provided Schema04
+func (t *UnderscoreUnderscoreSchema0) FromSchema04(v Schema04) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSchema04 performs a merge with any union data inside the UnderscoreUnderscoreSchema0, using the provided Schema04
+func (t *UnderscoreUnderscoreSchema0) MergeSchema04(v Schema04) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t UnderscoreUnderscoreSchema0) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *UnderscoreUnderscoreSchema0) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }
@@ -163374,6 +166686,11 @@ type RevokeWorkerSessionKeyResponse struct {
 	JSON200      *struct {
 		Outcome RevokeWorkerSessionKey200JSONResponseBodyOutcome `json:"outcome"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                      `json:"data"`
+		Error   []interface{}                                    `json:"error"`
+		Success RevokeWorkerSessionKey400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -163440,6 +166757,11 @@ type IngestTurnResultResponse struct {
 	HTTPResponse *http.Response
 	JSON202      *struct {
 		Status IngestTurnResult202JSONResponseBodyStatus `json:"status"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                `json:"data"`
+		Error   []interface{}                              `json:"error"`
+		Success IngestTurnResult400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -163519,6 +166841,11 @@ type ScimListGroupsResponse struct {
 		Schemas      []ScimListGroups200JSONResponseBodySchemas `json:"schemas"`
 		StartIndex   int                                        `json:"startIndex"`
 		TotalResults int                                        `json:"totalResults"`
+	}
+	JSON400 *struct {
+		Data    interface{}                              `json:"data"`
+		Error   []interface{}                            `json:"error"`
+		Success ScimListGroups400JSONResponseBodySuccess `json:"success"`
 	}
 	JSON401 *struct {
 		Detail   string                                     `json:"detail"`
@@ -163629,7 +166956,12 @@ func (r ScimCreateGroupResponse) ContentType() string {
 type ScimDeleteGroupResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON401      *struct {
+	JSON400      *struct {
+		Data    interface{}                               `json:"data"`
+		Error   []interface{}                             `json:"error"`
+		Success ScimDeleteGroup400JSONResponseBodySuccess `json:"success"`
+	}
+	JSON401 *struct {
 		Detail   string                                      `json:"detail"`
 		Schemas  []ScimDeleteGroup401JSONResponseBodySchemas `json:"schemas"`
 		ScimType *string                                     `json:"scimType,omitempty"`
@@ -163690,6 +167022,11 @@ type ScimGetGroupResponse struct {
 			ResourceType ScimGetGroup200JSONResponseBodyMetaResourceType `json:"resourceType"`
 		} `json:"meta"`
 		Schemas []ScimGetGroup200JSONResponseBodySchemas `json:"schemas"`
+	}
+	JSON400 *struct {
+		Data    interface{}                            `json:"data"`
+		Error   []interface{}                          `json:"error"`
+		Success ScimGetGroup400JSONResponseBodySuccess `json:"success"`
 	}
 	JSON401 *struct {
 		Detail   string                                   `json:"detail"`
@@ -164071,6 +167408,11 @@ type ScimListUsersResponse struct {
 		StartIndex   int                                       `json:"startIndex"`
 		TotalResults int                                       `json:"totalResults"`
 	}
+	JSON400 *struct {
+		Data    interface{}                             `json:"data"`
+		Error   []interface{}                           `json:"error"`
+		Success ScimListUsers400JSONResponseBodySuccess `json:"success"`
+	}
 	JSON401 *struct {
 		Detail   string                                    `json:"detail"`
 		Schemas  []ScimListUsers401JSONResponseBodySchemas `json:"schemas"`
@@ -164186,7 +167528,12 @@ func (r ScimCreateUserResponse) ContentType() string {
 type ScimDeleteUserResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON401      *struct {
+	JSON400      *struct {
+		Data    interface{}                              `json:"data"`
+		Error   []interface{}                            `json:"error"`
+		Success ScimDeleteUser400JSONResponseBodySuccess `json:"success"`
+	}
+	JSON401 *struct {
 		Detail   string                                     `json:"detail"`
 		Schemas  []ScimDeleteUser401JSONResponseBodySchemas `json:"schemas"`
 		ScimType *string                                    `json:"scimType,omitempty"`
@@ -164253,6 +167600,11 @@ type ScimGetUserResponse struct {
 		} `json:"name"`
 		Schemas  []ScimGetUser200JSONResponseBodySchemas `json:"schemas"`
 		UserName string                                  `json:"userName"`
+	}
+	JSON400 *struct {
+		Data    interface{}                           `json:"data"`
+		Error   []interface{}                         `json:"error"`
+		Success ScimGetUser400JSONResponseBodySuccess `json:"success"`
 	}
 	JSON401 *struct {
 		Detail   string                                  `json:"detail"`
@@ -164522,6 +167874,11 @@ type GetApiTraceIdResponse struct {
 		Timestamps                 Timestamps                                    `json:"timestamps"`
 		TraceId                    string                                        `json:"trace_id"`
 	}
+	JSON400 *struct {
+		Data    interface{}                             `json:"data"`
+		Error   []interface{}                           `json:"error"`
+		Success GetApiTraceId400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -164555,6 +167912,11 @@ type PostApiTraceIdShareResponse struct {
 		Path   string                                       `json:"path"`
 		Status PostApiTraceIdShare200JSONResponseBodyStatus `json:"status"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                   `json:"data"`
+		Error   []interface{}                                 `json:"error"`
+		Success PostApiTraceIdShare400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -164586,6 +167948,11 @@ type PostApiTraceIdUnshareResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *struct {
 		Status PostApiTraceIdUnshare200JSONResponseBodyStatus `json:"status"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                     `json:"data"`
+		Error   []interface{}                                   `json:"error"`
+		Success PostApiTraceIdUnshare400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -164683,6 +168050,11 @@ type StartAdminImpersonationResponse struct {
 	JSON200      *struct {
 		Message StartAdminImpersonation200JSONResponseBodyMessage `json:"message"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                       `json:"data"`
+		Error   []interface{}                                     `json:"error"`
+		Success StartAdminImpersonation400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -164715,6 +168087,11 @@ type RunAdminOperationResponse struct {
 	JSON200      *struct {
 		Data  interface{} `json:"data"`
 		Total *int        `json:"total,omitempty"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                 `json:"data"`
+		Error   []interface{}                               `json:"error"`
+		Success RunAdminOperation400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -165268,6 +168645,11 @@ type ListAgentsResponse struct {
 			TotalPages int `json:"totalPages"`
 		} `json:"pagination"`
 	}
+	JSON400 *struct {
+		Data    interface{}                          `json:"data"`
+		Error   []interface{}                        `json:"error"`
+		Success ListAgents400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -165375,6 +168757,11 @@ type CreateAgentResponse struct {
 		// Version The version this response shows: the latest, unless a label or a version was asked for. Null for connected agents, which are versioned by their code.
 		Version *CreateAgent201JSONResponseBody_Version `json:"version"`
 	}
+	JSON400 *struct {
+		Data    interface{}                           `json:"data"`
+		Error   []interface{}                         `json:"error"`
+		Success CreateAgent400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -165407,6 +168794,11 @@ type PostConnectedAgentFramesResponse struct {
 	JSON200      *struct {
 		Accepted int `json:"accepted"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                        `json:"data"`
+		Error   []interface{}                                      `json:"error"`
+		Success PostConnectedAgentFrames400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -165438,6 +168830,11 @@ type PollConnectedAgentInstanceResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *struct {
 		Frames []PollConnectedAgentInstance200JSONResponseBody_Frames_Item `json:"frames"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                          `json:"data"`
+		Error   []interface{}                                        `json:"error"`
+		Success PollConnectedAgentInstance400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -165472,6 +168869,11 @@ type RegisterConnectedAgentInstanceResponse struct {
 		Frame         RegisterConnectedAgentInstance200JSONResponseBody_Frame `json:"frame"`
 		InstanceToken *string                                                 `json:"instanceToken,omitempty"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                              `json:"data"`
+		Error   []interface{}                                            `json:"error"`
+		Success RegisterConnectedAgentInstance400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -165504,6 +168906,11 @@ type RemoveAgentLabelResponse struct {
 	JSON200      *struct {
 		Label   string                                     `json:"label"`
 		Removed RemoveAgentLabel200JSONResponseBodyRemoved `json:"removed"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                `json:"data"`
+		Error   []interface{}                              `json:"error"`
+		Success RemoveAgentLabel400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -165538,6 +168945,11 @@ type AssignAgentLabelResponse struct {
 		Label     string `json:"label"`
 		Version   int    `json:"version"`
 		VersionId string `json:"versionId"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                `json:"data"`
+		Error   []interface{}                              `json:"error"`
+		Success AssignAgentLabel400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -165594,6 +169006,11 @@ type ListAgentVersionsResponse struct {
 			Version int    `json:"version"`
 		} `json:"labels"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                 `json:"data"`
+		Error   []interface{}                               `json:"error"`
+		Success ListAgentVersions400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -165628,6 +169045,11 @@ type ArchiveAgentResponse struct {
 		Id         string                              `json:"id"`
 		Name       string                              `json:"name"`
 		Type       ArchiveAgent200JSONResponseBodyType `json:"type"`
+	}
+	JSON400 *struct {
+		Data    interface{}                            `json:"data"`
+		Error   []interface{}                          `json:"error"`
+		Success ArchiveAgent400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -165736,6 +169158,11 @@ type GetAgentResponse struct {
 		// Version The version this response shows: the latest, unless a label or a version was asked for. Null for connected agents, which are versioned by their code.
 		Version *GetAgent200JSONResponseBody_Version `json:"version"`
 	}
+	JSON400 *struct {
+		Data    interface{}                        `json:"data"`
+		Error   []interface{}                      `json:"error"`
+		Success GetAgent400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -165842,6 +169269,11 @@ type UpdateAgentResponse struct {
 
 		// Version The version this response shows: the latest, unless a label or a version was asked for. Null for connected agents, which are versioned by their code.
 		Version *UpdateAgent200JSONResponseBody_Version `json:"version"`
+	}
+	JSON400 *struct {
+		Data    interface{}                           `json:"data"`
+		Error   []interface{}                         `json:"error"`
+		Success UpdateAgent400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -165950,6 +169382,11 @@ type ReplaceAgentResponse struct {
 		// Version The version this response shows: the latest, unless a label or a version was asked for. Null for connected agents, which are versioned by their code.
 		Version *ReplaceAgent200JSONResponseBody_Version `json:"version"`
 	}
+	JSON400 *struct {
+		Data    interface{}                            `json:"data"`
+		Error   []interface{}                          `json:"error"`
+		Success ReplaceAgent400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -165995,6 +169432,11 @@ type CallConnectedAgentResponse struct {
 		// State Setup's state, a turn's state update, or the object teardown returned.
 		State *CallConnectedAgent200JSONResponseBody_State `json:"state,omitempty"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                  `json:"data"`
+		Error   []interface{}                                `json:"error"`
+		Success CallConnectedAgent400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -166033,6 +169475,11 @@ type TestAgentResponse struct {
 
 		// SetId The internal set that holds agent test runs.
 		SetId string `json:"setId"`
+	}
+	JSON400 *struct {
+		Data    interface{}                         `json:"data"`
+		Error   []interface{}                       `json:"error"`
+		Success TestAgent400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -166154,6 +169601,11 @@ type PostApiV1AnalyticsReportsResponse struct {
 		PlatformUrl string    `json:"platformUrl"`
 		UpdatedAt   time.Time `json:"updatedAt"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                         `json:"data"`
+		Error   []interface{}                                       `json:"error"`
+		Success PostApiV1AnalyticsReports400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -166185,6 +169637,11 @@ type PutApiV1AnalyticsReportsReorderResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *struct {
 		Success PutApiV1AnalyticsReportsReorder200JSONResponseBodySuccess `json:"success"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                               `json:"data"`
+		Error   []interface{}                                             `json:"error"`
+		Success PutApiV1AnalyticsReportsReorder400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -166218,6 +169675,11 @@ type DeleteApiV1AnalyticsReportsByReportIdResponse struct {
 	JSON200      *struct {
 		Id   string `json:"id"`
 		Name string `json:"name"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                                     `json:"data"`
+		Error   []interface{}                                                   `json:"error"`
+		Success DeleteApiV1AnalyticsReportsByReportId400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -166270,6 +169732,11 @@ type GetApiV1AnalyticsReportsByReportIdResponse struct {
 		PlatformUrl string    `json:"platformUrl"`
 		UpdatedAt   time.Time `json:"updatedAt"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                                  `json:"data"`
+		Error   []interface{}                                                `json:"error"`
+		Success GetApiV1AnalyticsReportsByReportId400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -166306,6 +169773,11 @@ type PatchApiV1AnalyticsReportsByReportIdResponse struct {
 		Order       int       `json:"order"`
 		PlatformUrl string    `json:"platformUrl"`
 		UpdatedAt   time.Time `json:"updatedAt"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                                    `json:"data"`
+		Error   []interface{}                                                  `json:"error"`
+		Success PatchApiV1AnalyticsReportsByReportId400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -166388,6 +169860,11 @@ type GetApiAnnotationsResponse struct {
 	JSON200      *struct {
 		Data []Annotation `json:"data"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                 `json:"data"`
+		Error   []interface{}                               `json:"error"`
+		Success GetApiAnnotations400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -166420,6 +169897,11 @@ type GetApiAnnotationsTraceIdResponse struct {
 	JSON200      *struct {
 		Data []Annotation `json:"data"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                        `json:"data"`
+		Error   []interface{}                                      `json:"error"`
+		Success GetApiAnnotationsTraceId400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -166451,6 +169933,11 @@ type PostApiAnnotationsTraceIdResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *struct {
 		Data Annotation `json:"data"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                         `json:"data"`
+		Error   []interface{}                                       `json:"error"`
+		Success PostApiAnnotationsTraceId400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -166485,6 +169972,11 @@ type DeleteApiAnnotationsIdResponse struct {
 		Message string `json:"message"`
 		Status  string `json:"status"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                      `json:"data"`
+		Error   []interface{}                                    `json:"error"`
+		Success DeleteApiAnnotationsId400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -166517,6 +170009,11 @@ type GetApiAnnotationsIdResponse struct {
 	JSON200      *struct {
 		Data Annotation `json:"data"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                   `json:"data"`
+		Error   []interface{}                                 `json:"error"`
+		Success GetApiAnnotationsId400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -166548,6 +170045,11 @@ type PatchApiAnnotationsIdResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *struct {
 		Data Annotation `json:"data"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                     `json:"data"`
+		Error   []interface{}                                   `json:"error"`
+		Success PatchApiAnnotationsId400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -166618,6 +170120,11 @@ type CreateApiKeyResponse struct {
 		} `json:"apiKey"`
 		Token string `json:"token"`
 	}
+	JSON400 *struct {
+		Data    interface{}                            `json:"data"`
+		Error   []interface{}                          `json:"error"`
+		Success CreateApiKey400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -166654,6 +170161,11 @@ type CreateFullAccessApiKeyResponse struct {
 			Name      string    `json:"name"`
 		} `json:"apiKey"`
 		Token string `json:"token"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                      `json:"data"`
+		Error   []interface{}                                    `json:"error"`
+		Success CreateFullAccessApiKey400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -166692,6 +170204,11 @@ type CreateIngestionApiKeyResponse struct {
 		} `json:"apiKey"`
 		Token string `json:"token"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                     `json:"data"`
+		Error   []interface{}                                   `json:"error"`
+		Success CreateIngestionApiKey400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -166723,6 +170240,11 @@ type RevokeApiKeyResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *struct {
 		Success bool `json:"success"`
+	}
+	JSON400 *struct {
+		Data    interface{}                            `json:"data"`
+		Error   []interface{}                          `json:"error"`
+		Success RevokeApiKey400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -166778,6 +170300,11 @@ type GetApiKeyResponse struct {
 			ScopeType GetApiKey200JSONResponseBodyRoleBindingsScopeType `json:"scopeType"`
 		} `json:"roleBindings"`
 	}
+	JSON400 *struct {
+		Data    interface{}                         `json:"data"`
+		Error   []interface{}                       `json:"error"`
+		Success GetApiKey400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -166831,6 +170358,11 @@ type UpdateApiKeyResponse struct {
 			ScopeId   string                                               `json:"scopeId"`
 			ScopeType UpdateApiKey200JSONResponseBodyRoleBindingsScopeType `json:"scopeType"`
 		} `json:"roleBindings"`
+	}
+	JSON400 *struct {
+		Data    interface{}                            `json:"data"`
+		Error   []interface{}                          `json:"error"`
+		Success UpdateApiKey400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -167219,6 +170751,11 @@ func (r DenyCliDeviceCodeResponse) ContentType() string {
 type WatchCliDeviceApprovalResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	JSON400      *struct {
+		Data    interface{}                                      `json:"data"`
+		Error   []interface{}                                    `json:"error"`
+		Success WatchCliDeviceApproval400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -167976,6 +171513,11 @@ func (r EndCliDeviceSessionResponse) ContentType() string {
 type LookupCliDeviceCodeResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	JSON400      *struct {
+		Data    interface{}                                   `json:"data"`
+		Error   []interface{}                                 `json:"error"`
+		Success LookupCliDeviceCode400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -168265,6 +171807,11 @@ func (r IssueCliVirtualKeyResponse) ContentType() string {
 type SubmitBugReportResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	JSON400      *struct {
+		Data    interface{}                               `json:"data"`
+		Error   []interface{}                             `json:"error"`
+		Success SubmitBugReport400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -169969,6 +173516,11 @@ type GetApiDatasetResponse struct {
 			TotalPages int `json:"totalPages"`
 		} `json:"pagination"`
 	}
+	JSON400 *struct {
+		Data    interface{}                             `json:"data"`
+		Error   []interface{}                           `json:"error"`
+		Success GetApiDataset400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -170010,6 +173562,11 @@ type PostApiDatasetResponse struct {
 		Slug        string    `json:"slug"`
 		UpdatedAt   time.Time `json:"updatedAt"`
 	}
+	JSON400 *struct {
+		Data    interface{}                              `json:"data"`
+		Error   []interface{}                            `json:"error"`
+		Success PostApiDataset400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -170040,6 +173597,11 @@ type PostApiDatasetAttachmentsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *DatasetAttachment
+	JSON400      *struct {
+		Data    interface{}                                         `json:"data"`
+		Error   []interface{}                                       `json:"error"`
+		Success PostApiDatasetAttachments400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -170075,6 +173637,11 @@ type PostApiDatasetAttachmentsUploadsResponse struct {
 		Method    PostApiDatasetAttachmentsUploads201JSONResponseBodyMethod `json:"method"`
 		ObjectId  string                                                    `json:"objectId"`
 		UploadUrl string                                                    `json:"uploadUrl"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                                `json:"data"`
+		Error   []interface{}                                              `json:"error"`
+		Success PostApiDatasetAttachmentsUploads400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -170174,6 +173741,11 @@ type PostApiDatasetImportsResponse struct {
 		Slug      string                                         `json:"slug"`
 		Status    PostApiDatasetImports201JSONResponseBodyStatus `json:"status"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                     `json:"data"`
+		Error   []interface{}                                   `json:"error"`
+		Success PostApiDatasetImports400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -170272,6 +173844,11 @@ type GetApiDatasetBySlugEntriesResponse struct {
 			TotalPages int `json:"totalPages"`
 		} `json:"pagination"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                          `json:"data"`
+		Error   []interface{}                                        `json:"error"`
+		Success GetApiDatasetBySlugEntries400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -170303,6 +173880,11 @@ type PostApiDatasetBySlugEntriesResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *struct {
 		Success PostApiDatasetBySlugEntries200JSONResponseBodySuccess `json:"success"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                           `json:"data"`
+		Error   []interface{}                                         `json:"error"`
+		Success PostApiDatasetBySlugEntries400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -170336,6 +173918,11 @@ type DeleteApiDatasetBySlugOrIdResponse struct {
 	JSON200      *struct {
 		Archived DeleteApiDatasetBySlugOrId200JSONResponseBodyArchived `json:"archived"`
 		Id       string                                                `json:"id"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                          `json:"data"`
+		Error   []interface{}                                        `json:"error"`
+		Success DeleteApiDatasetBySlugOrId400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -170386,6 +173973,11 @@ type GetApiDatasetBySlugOrIdResponse struct {
 		Slug        string    `json:"slug"`
 		UpdatedAt   time.Time `json:"updatedAt"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                       `json:"data"`
+		Error   []interface{}                                     `json:"error"`
+		Success GetApiDatasetBySlugOrId400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -170427,6 +174019,11 @@ type PatchApiDatasetBySlugOrIdResponse struct {
 		Slug        string    `json:"slug"`
 		UpdatedAt   time.Time `json:"updatedAt"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                         `json:"data"`
+		Error   []interface{}                                       `json:"error"`
+		Success PatchApiDatasetBySlugOrId400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -170460,6 +174057,11 @@ type PostApiDatasetBySlugOrIdImportsResponse struct {
 		DatasetId      string `json:"datasetId"`
 		RecordsCreated int    `json:"recordsCreated"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                               `json:"data"`
+		Error   []interface{}                                             `json:"error"`
+		Success PostApiDatasetBySlugOrIdImports400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -170491,6 +174093,11 @@ type DeleteApiDatasetBySlugOrIdRecordsResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *struct {
 		DeletedCount int `json:"deletedCount"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                                 `json:"data"`
+		Error   []interface{}                                               `json:"error"`
+		Success DeleteApiDatasetBySlugOrIdRecords400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -170549,6 +174156,11 @@ type GetApiDatasetBySlugOrIdRecordsResponse struct {
 			TotalPages int `json:"totalPages"`
 		} `json:"pagination"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                              `json:"data"`
+		Error   []interface{}                                            `json:"error"`
+		Success GetApiDatasetBySlugOrIdRecords400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -170587,6 +174199,11 @@ type PostApiDatasetBySlugOrIdRecordsResponse struct {
 			ProjectId string                 `json:"projectId"`
 			UpdatedAt time.Time              `json:"updatedAt"`
 		} `json:"data"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                               `json:"data"`
+		Error   []interface{}                                             `json:"error"`
+		Success PostApiDatasetBySlugOrIdRecords400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -170633,6 +174250,11 @@ type PatchApiDatasetBySlugOrIdRecordsByRecordIdResponse struct {
 		ProjectId string                 `json:"projectId"`
 		UpdatedAt time.Time              `json:"updatedAt"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                                          `json:"data"`
+		Error   []interface{}                                                        `json:"error"`
+		Success PatchApiDatasetBySlugOrIdRecordsByRecordId400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -170665,6 +174287,11 @@ type PostApiDatasetBySlugOrIdUploadResponse struct {
 	JSON200      *struct {
 		DatasetId      string `json:"datasetId"`
 		RecordsCreated int    `json:"recordsCreated"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                              `json:"data"`
+		Error   []interface{}                                            `json:"error"`
+		Success PostApiDatasetBySlugOrIdUpload400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -170721,6 +174348,11 @@ type GetApiDatasetBySlugOrIdVersionsResponse struct {
 		} `json:"data"`
 		Restorable bool `json:"restorable"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                               `json:"data"`
+		Error   []interface{}                                             `json:"error"`
+		Success GetApiDatasetBySlugOrIdVersions400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -170771,6 +174403,11 @@ type PostApiDatasetBySlugOrIdVersionsResponse struct {
 		SizeBytes           int                                                        `json:"sizeBytes"`
 		Trigger             PostApiDatasetBySlugOrIdVersions200JSONResponseBodyTrigger `json:"trigger"`
 		Version             int                                                        `json:"version"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                                `json:"data"`
+		Error   []interface{}                                              `json:"error"`
+		Success PostApiDatasetBySlugOrIdVersions400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -170834,6 +174471,11 @@ type GetApiDatasetBySlugOrIdVersionsByVersionResponse struct {
 			Version             int                                                                       `json:"version"`
 		} `json:"version"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                                        `json:"data"`
+		Error   []interface{}                                                      `json:"error"`
+		Success GetApiDatasetBySlugOrIdVersionsByVersion400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -170887,6 +174529,11 @@ type PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse struct {
 			Trigger             PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionTrigger `json:"trigger"`
 			Version             int                                                                               `json:"version"`
 		} `json:"version"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                                                `json:"data"`
+		Error   []interface{}                                                              `json:"error"`
+		Success PostApiDatasetBySlugOrIdVersionsByVersionRestore400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -170982,6 +174629,11 @@ func (r PostApiDspyLogStepsResponse) ContentType() string {
 type ReceiveElevenLabsWebhookResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	JSON400      *struct {
+		Data    interface{}                                        `json:"data"`
+		Error   []interface{}                                      `json:"error"`
+		Success ReceiveElevenLabsWebhook400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -171379,6 +175031,11 @@ type PostApiEvaluatorsResponse struct {
 		WorkflowId   *string                                       `json:"workflowId"`
 		WorkflowName *string                                       `json:"workflowName,omitempty"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                 `json:"data"`
+		Error   []interface{}                               `json:"error"`
+		Success PostApiEvaluators400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -171411,6 +175068,11 @@ type DeleteApiEvaluatorsLabelResponse struct {
 	JSON200      *struct {
 		Label   string                                             `json:"label"`
 		Removed DeleteApiEvaluatorsLabel200JSONResponseBodyRemoved `json:"removed"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                        `json:"data"`
+		Error   []interface{}                                      `json:"error"`
+		Success DeleteApiEvaluatorsLabel400JSONResponseBodySuccess `json:"success"`
 	}
 	JSON404 *struct {
 		Error   string  `json:"error"`
@@ -171513,6 +175175,11 @@ type GetApiEvaluatorsVersionsResponse struct {
 			Version int    `json:"version"`
 		} `json:"labels"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                        `json:"data"`
+		Error   []interface{}                                      `json:"error"`
+		Success GetApiEvaluatorsVersions400JSONResponseBodySuccess `json:"success"`
+	}
 	JSON404 *struct {
 		Error   string  `json:"error"`
 		Message *string `json:"message,omitempty"`
@@ -171586,6 +175253,11 @@ type GetApiEvaluatorsByIdOrSlugResponse struct {
 		WorkflowId   *string                                                `json:"workflowId"`
 		WorkflowName *string                                                `json:"workflowName,omitempty"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                          `json:"data"`
+		Error   []interface{}                                        `json:"error"`
+		Success GetApiEvaluatorsByIdOrSlug400JSONResponseBodySuccess `json:"success"`
+	}
 	JSON404 *struct {
 		Error   string  `json:"error"`
 		Message *string `json:"message,omitempty"`
@@ -171621,6 +175293,11 @@ type DeleteApiEvaluatorsByIdResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *struct {
 		Success bool `json:"success"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                       `json:"data"`
+		Error   []interface{}                                     `json:"error"`
+		Success DeleteApiEvaluatorsById400JSONResponseBodySuccess `json:"success"`
 	}
 	JSON404 *struct {
 		Error   string  `json:"error"`
@@ -171834,6 +175511,11 @@ type GetApiExperimentsResponse struct {
 			PageSize  float32 `json:"pageSize"`
 			TotalHits float32 `json:"totalHits"`
 		} `json:"pagination"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                 `json:"data"`
+		Error   []interface{}                               `json:"error"`
+		Success GetApiExperiments400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -172071,6 +175753,11 @@ type GetApiExperimentsRunsByRunIdResponse struct {
 		// TraceId Trace id for failures that carry no code, to quote in support
 		TraceId *string `json:"traceId,omitempty"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                            `json:"data"`
+		Error   []interface{}                                          `json:"error"`
+		Success GetApiExperimentsRunsByRunId400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -172184,6 +175871,11 @@ type GetApiExperimentsRunsByRunIdResultsResponse struct {
 		Total             *float32 `json:"total,omitempty"`
 		WorkflowVersionId *string  `json:"workflowVersionId,omitempty"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                                   `json:"data"`
+		Error   []interface{}                                                 `json:"error"`
+		Success GetApiExperimentsRunsByRunIdResults400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -172223,6 +175915,11 @@ type GetApiExperimentsBySlugResponse struct {
 		Type       string  `json:"type"`
 		UpdatedAt  string  `json:"updatedAt"`
 		WorkflowId *string `json:"workflowId"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                       `json:"data"`
+		Error   []interface{}                                     `json:"error"`
+		Success GetApiExperimentsBySlug400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -172358,6 +176055,11 @@ type PostApiExperimentsBySlugVersionsByVersionRestoreResponse struct {
 		// Version The new version the restore wrote. History is never rewritten, so the restored version is still in the list.
 		Version float32 `json:"version"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                                                `json:"data"`
+		Error   []interface{}                                                              `json:"error"`
+		Success PostApiExperimentsBySlugVersionsByVersionRestore400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -172463,6 +176165,11 @@ func (r PutApiExperimentsBySlugWorkbenchStateResponse) ContentType() string {
 type ReadProjectStoredObjectBytesResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	JSON400      *struct {
+		Data    interface{}                                            `json:"data"`
+		Error   []interface{}                                          `json:"error"`
+		Success ReadProjectStoredObjectBytes400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -172492,6 +176199,11 @@ func (r ReadProjectStoredObjectBytesResponse) ContentType() string {
 type ReadNamedProjectStoredObjectBytesResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	JSON400      *struct {
+		Data    interface{}                                                 `json:"data"`
+		Error   []interface{}                                               `json:"error"`
+		Success ReadNamedProjectStoredObjectBytes400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -172521,6 +176233,11 @@ func (r ReadNamedProjectStoredObjectBytesResponse) ContentType() string {
 type ReadStoredObjectBytesResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	JSON400      *struct {
+		Data    interface{}                                     `json:"data"`
+		Error   []interface{}                                   `json:"error"`
+		Success ReadStoredObjectBytes400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -174179,6 +177896,11 @@ type ListGrantsResponse struct {
 		} `json:"grants"`
 		NextCursor *string `json:"nextCursor"`
 	}
+	JSON400 *struct {
+		Data    interface{}                          `json:"data"`
+		Error   []interface{}                        `json:"error"`
+		Success ListGrants400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -174229,6 +177951,11 @@ type CreateGrantResponse struct {
 		} `json:"scope"`
 		Status CreateGrant201JSONResponseBodyStatus `json:"status"`
 	}
+	JSON400 *struct {
+		Data    interface{}                           `json:"data"`
+		Error   []interface{}                         `json:"error"`
+		Success CreateGrant400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -174261,6 +177988,11 @@ type RevokeGrantResponse struct {
 	JSON200      *struct {
 		Id      string                                `json:"id"`
 		Revoked RevokeGrant200JSONResponseBodyRevoked `json:"revoked"`
+	}
+	JSON400 *struct {
+		Data    interface{}                           `json:"data"`
+		Error   []interface{}                         `json:"error"`
+		Success RevokeGrant400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -174312,6 +178044,11 @@ type GetGrantResponse struct {
 		} `json:"scope"`
 		Status GetGrant200JSONResponseBodyStatus `json:"status"`
 	}
+	JSON400 *struct {
+		Data    interface{}                        `json:"data"`
+		Error   []interface{}                      `json:"error"`
+		Success GetGrant400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -174362,6 +178099,11 @@ type UpdateGrantResponse struct {
 		} `json:"scope"`
 		Status UpdateGrant200JSONResponseBodyStatus `json:"status"`
 	}
+	JSON400 *struct {
+		Data    interface{}                           `json:"data"`
+		Error   []interface{}                         `json:"error"`
+		Success UpdateGrant400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -174403,6 +178145,11 @@ type GetApiGraphsResponse struct {
 		Name        string                  `json:"name"`
 		RowSpan     float32                 `json:"rowSpan"`
 		UpdatedAt   string                  `json:"updatedAt"`
+	}
+	JSON400 *struct {
+		Data    interface{}                            `json:"data"`
+		Error   []interface{}                          `json:"error"`
+		Success GetApiGraphs400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -174446,6 +178193,11 @@ type PostApiGraphsResponse struct {
 		RowSpan     float32                 `json:"rowSpan"`
 		UpdatedAt   string                  `json:"updatedAt"`
 	}
+	JSON400 *struct {
+		Data    interface{}                             `json:"data"`
+		Error   []interface{}                           `json:"error"`
+		Success PostApiGraphs400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -174478,6 +178230,11 @@ type DeleteApiGraphsByIdResponse struct {
 	JSON200      *struct {
 		Deleted bool   `json:"deleted"`
 		Id      string `json:"id"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                   `json:"data"`
+		Error   []interface{}                                 `json:"error"`
+		Success DeleteApiGraphsById400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -174521,6 +178278,11 @@ type GetApiGraphsByIdResponse struct {
 		RowSpan     float32                 `json:"rowSpan"`
 		UpdatedAt   string                  `json:"updatedAt"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                `json:"data"`
+		Error   []interface{}                              `json:"error"`
+		Success GetApiGraphsById400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -174562,6 +178324,11 @@ type PatchApiGraphsByIdResponse struct {
 		Name        string                  `json:"name"`
 		RowSpan     float32                 `json:"rowSpan"`
 		UpdatedAt   string                  `json:"updatedAt"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                  `json:"data"`
+		Error   []interface{}                                `json:"error"`
+		Success PatchApiGraphsById400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -174616,6 +178383,11 @@ type GetApiGroupsResponse struct {
 			Total int `json:"total"`
 		} `json:"pagination"`
 	}
+	JSON400 *struct {
+		Data    interface{}                            `json:"data"`
+		Error   []interface{}                          `json:"error"`
+		Success GetApiGroups400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -174652,6 +178424,11 @@ type PostApiGroupsResponse struct {
 		OrganizationId string    `json:"organizationId"`
 		Slug           string    `json:"slug"`
 	}
+	JSON400 *struct {
+		Data    interface{}                             `json:"data"`
+		Error   []interface{}                           `json:"error"`
+		Success PostApiGroups400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -174683,6 +178460,11 @@ type DeleteApiGroupsByIdResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *struct {
 		Success bool `json:"success"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                   `json:"data"`
+		Error   []interface{}                                 `json:"error"`
+		Success DeleteApiGroupsById400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -174733,6 +178515,11 @@ type GetApiGroupsByIdResponse struct {
 		ScimSource *string `json:"scimSource"`
 		Slug       string  `json:"slug"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                `json:"data"`
+		Error   []interface{}                              `json:"error"`
+		Success GetApiGroupsById400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -174766,6 +178553,11 @@ type PatchApiGroupsByIdResponse struct {
 		Id   string `json:"id"`
 		Name string `json:"name"`
 		Slug string `json:"slug"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                  `json:"data"`
+		Error   []interface{}                                `json:"error"`
+		Success PatchApiGroupsById400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -174806,6 +178598,11 @@ type GetApiGroupsByIdBindingsResponse struct {
 			ScopeType      GetApiGroupsByIdBindings200JSONResponseBodyDataScopeType `json:"scopeType"`
 		} `json:"data"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                        `json:"data"`
+		Error   []interface{}                                      `json:"error"`
+		Success GetApiGroupsByIdBindings400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -174841,6 +178638,11 @@ type PostApiGroupsByIdBindingsResponse struct {
 		ScopeId   string                                                `json:"scopeId"`
 		ScopeType PostApiGroupsByIdBindings201JSONResponseBodyScopeType `json:"scopeType"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                         `json:"data"`
+		Error   []interface{}                                       `json:"error"`
+		Success PostApiGroupsByIdBindings400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -174872,6 +178674,11 @@ type DeleteApiGroupsByIdBindingsByBindingIdResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *struct {
 		Success bool `json:"success"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                                      `json:"data"`
+		Error   []interface{}                                                    `json:"error"`
+		Success DeleteApiGroupsByIdBindingsByBindingId400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -174909,6 +178716,11 @@ type GetApiGroupsByIdMembersResponse struct {
 			UserId string  `json:"userId"`
 		} `json:"data"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                       `json:"data"`
+		Error   []interface{}                                     `json:"error"`
+		Success GetApiGroupsByIdMembers400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -174941,6 +178753,11 @@ type PostApiGroupsByIdMembersResponse struct {
 	JSON201      *struct {
 		Success bool `json:"success"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                        `json:"data"`
+		Error   []interface{}                                      `json:"error"`
+		Success PostApiGroupsByIdMembers400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -174972,6 +178789,11 @@ type DeleteApiGroupsByIdMembersByUserIdResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *struct {
 		Success bool `json:"success"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                                  `json:"data"`
+		Error   []interface{}                                                `json:"error"`
+		Success DeleteApiGroupsByIdMembersByUserId400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -175150,6 +178972,11 @@ type ListInstantEvalRunsResponse struct {
 			// UpdatedAt When the run was last written to.
 			UpdatedAt string `json:"updatedAt"`
 		} `json:"runs"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                   `json:"data"`
+		Error   []interface{}                                 `json:"error"`
+		Success ListInstantEvalRuns400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -175412,6 +179239,11 @@ type GetInstantEvalRunResponse struct {
 		// UpdatedAt When the run was last written to.
 		UpdatedAt string `json:"updatedAt"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                 `json:"data"`
+		Error   []interface{}                               `json:"error"`
+		Success GetInstantEvalRun400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -175517,6 +179349,11 @@ type CancelInstantEvalRunResponse struct {
 		// UpdatedAt When the run was last written to.
 		UpdatedAt string `json:"updatedAt"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                    `json:"data"`
+		Error   []interface{}                                  `json:"error"`
+		Success CancelInstantEvalRun400JSONResponseBodySuccess `json:"success"`
+	}
 	JSON409 *struct {
 		Code      string                                        `json:"code"`
 		DocsUrl   *string                                       `json:"docs_url,omitempty"`
@@ -175611,6 +179448,11 @@ type ListInstantEvalRunResultsResponse struct {
 		// NextCursor Pass as cursor to read the page after this one. Absent on the last page.
 		NextCursor *string `json:"nextCursor,omitempty"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                         `json:"data"`
+		Error   []interface{}                                       `json:"error"`
+		Success ListInstantEvalRunResults400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -175686,6 +179528,11 @@ type SampleInstantEvalRunResponse struct {
 		// Rows The statement's own rows, with each judged column holding the text that was judged rather than the verdict.
 		Rows []map[string]interface{} `json:"rows"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                    `json:"data"`
+		Error   []interface{}                                  `json:"error"`
+		Success SampleInstantEvalRun400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -175719,6 +179566,11 @@ type PostLangyControlFramesResponse struct {
 		// Accepted How many frames were taken.
 		Accepted int `json:"accepted"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                      `json:"data"`
+		Error   []interface{}                                    `json:"error"`
+		Success PostLangyControlFrames400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -175751,6 +179603,11 @@ type PollLangyControlSessionResponse struct {
 	JSON200      *struct {
 		// Frames The frames waiting for the folder; empty once the poll wait passes with none.
 		Frames []PollLangyControlSession200JSONResponseBody_Frames_Item `json:"frames"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                       `json:"data"`
+		Error   []interface{}                                     `json:"error"`
+		Success PollLangyControlSession400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -175787,6 +179644,11 @@ type RegisterLangyControlSessionResponse struct {
 
 		// InstanceToken The token the poll and frames endpoints are addressed with, in the X-Agent-Instance-Token header. Present when the register was accepted.
 		InstanceToken *string `json:"instanceToken,omitempty"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                           `json:"data"`
+		Error   []interface{}                                         `json:"error"`
+		Success RegisterLangyControlSession400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -175867,6 +179729,11 @@ type ApproveLangyControlRequestResponse struct {
 		Endpoint   string `json:"endpoint"`
 		SessionKey string `json:"sessionKey"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                          `json:"data"`
+		Error   []interface{}                                        `json:"error"`
+		Success ApproveLangyControlRequest400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -175903,6 +179770,11 @@ type CancelLangyControlRequestResponse struct {
 		// Id The request that was cancelled.
 		Id string `json:"id"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                         `json:"data"`
+		Error   []interface{}                                       `json:"error"`
+		Success CancelLangyControlRequest400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -175932,6 +179804,11 @@ func (r CancelLangyControlRequestResponse) ContentType() string {
 type StartLangyConversationTurnResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	JSON400      *struct {
+		Data    interface{}                                          `json:"data"`
+		Error   []interface{}                                        `json:"error"`
+		Success StartLangyConversationTurn400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -175961,6 +179838,11 @@ func (r StartLangyConversationTurnResponse) ContentType() string {
 type ContinueLangyConversationTurnResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	JSON400      *struct {
+		Data    interface{}                                             `json:"data"`
+		Error   []interface{}                                           `json:"error"`
+		Success ContinueLangyConversationTurn400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -176041,6 +179923,11 @@ type LangyLocalReadCallResponse struct {
 		State LangyLocalReadCall200JSONResponseBodyState `json:"state"`
 		Text  *string                                    `json:"text,omitempty"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                  `json:"data"`
+		Error   []interface{}                                `json:"error"`
+		Success LangyLocalReadCall400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -176073,6 +179960,11 @@ type LangyLocalCancelCallResponse struct {
 	JSON200      *struct {
 		CallId    string                                           `json:"callId"`
 		Cancelled LangyLocalCancelCall200JSONResponseBodyCancelled `json:"cancelled"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                    `json:"data"`
+		Error   []interface{}                                  `json:"error"`
+		Success LangyLocalCancelCall400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -176115,6 +180007,11 @@ type LangyLocalCreateRequestResponse struct {
 			ProjectId         string `json:"projectId"`
 			ProjectName       string `json:"projectName"`
 		} `json:"request"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                       `json:"data"`
+		Error   []interface{}                                     `json:"error"`
+		Success LangyLocalCreateRequest400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -176175,6 +180072,11 @@ type LangyLocalWorkspaceResponse struct {
 			PythonVersion   *string `json:"pythonVersion,omitempty"`
 			Root            string  `json:"root"`
 		} `json:"workspace,omitempty"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                   `json:"data"`
+		Error   []interface{}                                 `json:"error"`
+		Success LangyLocalWorkspace400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -176266,6 +180168,11 @@ type LangyLocalStartWaitResponse struct {
 	JSON200      *struct {
 		WaitId string `json:"waitId"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                   `json:"data"`
+		Error   []interface{}                                 `json:"error"`
+		Success LangyLocalStartWait400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -176303,6 +180210,11 @@ type LangyLocalReadWaitResponse struct {
 		} `json:"answers,omitempty"`
 		State  LangyLocalReadWait200JSONResponseBodyState `json:"state"`
 		WaitId string                                     `json:"waitId"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                  `json:"data"`
+		Error   []interface{}                                `json:"error"`
+		Success LangyLocalReadWait400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -176927,6 +180839,11 @@ type PostApiMonitorsResponse struct {
 		// UpdatedById The user who changed the monitor last.
 		UpdatedById *string `json:"updatedById"`
 	}
+	JSON400 *struct {
+		Data    interface{}                               `json:"data"`
+		Error   []interface{}                             `json:"error"`
+		Success PostApiMonitors400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -176959,6 +180876,11 @@ type DeleteApiMonitorsByIdResponse struct {
 	JSON200      *struct {
 		Deleted bool   `json:"deleted"`
 		Id      string `json:"id"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                     `json:"data"`
+		Error   []interface{}                                   `json:"error"`
+		Success DeleteApiMonitorsById400JSONResponseBodySuccess `json:"success"`
 	}
 	JSON404 *struct {
 		Error   string  `json:"error"`
@@ -177025,6 +180947,11 @@ type GetApiMonitorsByIdResponse struct {
 		// UpdatedById The user who changed the monitor last.
 		UpdatedById *string `json:"updatedById"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                  `json:"data"`
+		Error   []interface{}                                `json:"error"`
+		Success GetApiMonitorsById400JSONResponseBodySuccess `json:"success"`
+	}
 	JSON404 *struct {
 		Error   string  `json:"error"`
 		Message *string `json:"message,omitempty"`
@@ -177090,6 +181017,11 @@ type PatchApiMonitorsByIdResponse struct {
 		// UpdatedById The user who changed the monitor last.
 		UpdatedById *string `json:"updatedById"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                    `json:"data"`
+		Error   []interface{}                                  `json:"error"`
+		Success PatchApiMonitorsById400JSONResponseBodySuccess `json:"success"`
+	}
 	JSON404 *struct {
 		Error   string  `json:"error"`
 		Message *string `json:"message,omitempty"`
@@ -177127,6 +181059,11 @@ type PostApiMonitorsByIdToggleResponse struct {
 		Enabled bool   `json:"enabled"`
 		Id      string `json:"id"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                         `json:"data"`
+		Error   []interface{}                                       `json:"error"`
+		Success PostApiMonitorsByIdToggle400JSONResponseBodySuccess `json:"success"`
+	}
 	JSON404 *struct {
 		Error   string  `json:"error"`
 		Message *string `json:"message,omitempty"`
@@ -177160,6 +181097,11 @@ func (r PostApiMonitorsByIdToggleResponse) ContentType() string {
 type ExplainClickHouseQueryResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	JSON400      *struct {
+		Data    interface{}                                      `json:"data"`
+		Error   []interface{}                                    `json:"error"`
+		Success ExplainClickHouseQuery400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -177202,6 +181144,11 @@ type PostApiOptimizationByWorkflowIdByVersionIdResponse struct {
 		Status    PostApiOptimizationByWorkflowIdByVersionId200JSONResponseBodyStatus `json:"status"`
 		TotalCost *float32                                                            `json:"total_cost,omitempty"`
 		TraceId   *string                                                             `json:"trace_id,omitempty"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                                          `json:"data"`
+		Error   []interface{}                                                        `json:"error"`
+		Success PostApiOptimizationByWorkflowIdByVersionId400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -177382,6 +181329,11 @@ type CreateOrganizationInvitesResponse struct {
 			} `json:"teams"`
 		} `json:"invites"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                         `json:"data"`
+		Error   []interface{}                                       `json:"error"`
+		Success CreateOrganizationInvites400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -177413,6 +181365,11 @@ type RevokeOrganizationInviteResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *struct {
 		Success RevokeOrganizationInvite200JSONResponseBodySuccess `json:"success"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                        `json:"data"`
+		Error   []interface{}                                      `json:"error"`
+		Success RevokeOrganizationInvite400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -177459,6 +181416,11 @@ type ListOrganizationMembersResponse struct {
 		} `json:"members"`
 		TotalCount float32 `json:"totalCount"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                       `json:"data"`
+		Error   []interface{}                                     `json:"error"`
+		Success ListOrganizationMembers400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -177490,6 +181452,11 @@ type RemoveOrganizationMemberResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *struct {
 		Success RemoveOrganizationMember200JSONResponseBodySuccess `json:"success"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                        `json:"data"`
+		Error   []interface{}                                      `json:"error"`
+		Success RemoveOrganizationMember400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -177540,6 +181507,11 @@ type GetOrganizationMemberResponse struct {
 		} `json:"user"`
 		UserId string `json:"userId"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                     `json:"data"`
+		Error   []interface{}                                   `json:"error"`
+		Success GetOrganizationMember400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -177585,6 +181557,11 @@ type UpdateOrganizationMemberResponse struct {
 			Name  *string `json:"name"`
 		} `json:"user"`
 		UserId string `json:"userId"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                        `json:"data"`
+		Error   []interface{}                                      `json:"error"`
+		Success UpdateOrganizationMember400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -177649,6 +181626,11 @@ type GetOrganizationMemberAccessResponse struct {
 			OrgRole            string   `json:"orgRole"`
 			OrgRolePermissions []string `json:"orgRolePermissions"`
 		} `json:"user"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                           `json:"data"`
+		Error   []interface{}                                         `json:"error"`
+		Success GetOrganizationMemberAccess400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -177732,6 +181714,11 @@ type ProvisionOrganizationResponse struct {
 			Slug string `json:"slug"`
 		} `json:"team"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                     `json:"data"`
+		Error   []interface{}                                   `json:"error"`
+		Success ProvisionOrganization400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -177768,6 +181755,11 @@ type GetOrganizationByIdResponse struct {
 			Name      string    `json:"name"`
 			Slug      string    `json:"slug"`
 		} `json:"organization"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                   `json:"data"`
+		Error   []interface{}                                 `json:"error"`
+		Success GetOrganizationById400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -177807,6 +181799,11 @@ type GetPlatformHealthResponse struct {
 			Status     GetPlatformHealth200JSONResponseBodyChecksStatus `json:"status"`
 		} `json:"checks"`
 		Status GetPlatformHealth200JSONResponseBodyStatus `json:"status"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                 `json:"data"`
+		Error   []interface{}                               `json:"error"`
+		Success GetPlatformHealth400JSONResponseBodySuccess `json:"success"`
 	}
 	JSON503 *struct {
 		CheckedAt string `json:"checkedAt"`
@@ -177857,6 +181854,11 @@ type GetPlatformHealthSubsystemResponse struct {
 		} `json:"checks"`
 		Status GetPlatformHealthSubsystem200JSONResponseBodyStatus `json:"status"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                          `json:"data"`
+		Error   []interface{}                                        `json:"error"`
+		Success GetPlatformHealthSubsystem400JSONResponseBodySuccess `json:"success"`
+	}
 	JSON503 *struct {
 		CheckedAt string `json:"checkedAt"`
 		Checks    []struct {
@@ -177899,6 +181901,11 @@ type ListProjectsResponse struct {
 	JSON200      *struct {
 		Data       []Project  `json:"data"`
 		Pagination Pagination `json:"pagination"`
+	}
+	JSON400 *struct {
+		Data    interface{}                            `json:"data"`
+		Error   []interface{}                          `json:"error"`
+		Success ListProjects400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -177975,6 +181982,11 @@ type ArchiveProjectResponse struct {
 		Id         string    `json:"id"`
 		Name       string    `json:"name"`
 	}
+	JSON400 *struct {
+		Data    interface{}                              `json:"data"`
+		Error   []interface{}                            `json:"error"`
+		Success ArchiveProject400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -178014,6 +182026,11 @@ type GetProjectResponse struct {
 		Slug              string                                         `json:"slug"`
 		TeamId            string                                         `json:"teamId"`
 		UpdatedAt         time.Time                                      `json:"updatedAt"`
+	}
+	JSON400 *struct {
+		Data    interface{}                          `json:"data"`
+		Error   []interface{}                        `json:"error"`
+		Success GetProject400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -178055,6 +182072,11 @@ type UpdateProjectResponse struct {
 		TeamId            string                                            `json:"teamId"`
 		UpdatedAt         time.Time                                         `json:"updatedAt"`
 	}
+	JSON400 *struct {
+		Data    interface{}                             `json:"data"`
+		Error   []interface{}                           `json:"error"`
+		Success UpdateProject400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -178087,6 +182109,11 @@ type GetProjectApiKeyResponse struct {
 	JSON200      *struct {
 		ApiKey string `json:"apiKey"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                `json:"data"`
+		Error   []interface{}                              `json:"error"`
+		Success GetProjectApiKey400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -178118,6 +182145,11 @@ type RegenerateProjectApiKeyResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *struct {
 		ApiKey string `json:"apiKey"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                       `json:"data"`
+		Error   []interface{}                                     `json:"error"`
+		Success RegenerateProjectApiKey400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -180470,10 +184502,10 @@ type GetApiPromptsResponse struct {
 			JsonSchema *GetApiPrompts200JSONResponseBody_Outputs_JsonSchema `json:"json_schema,omitempty"`
 			Type       GetApiPrompts200JSONResponseBodyOutputsType          `json:"type"`
 		} `json:"outputs"`
-		Parameters         map[string]*JsonValue `json:"parameters"`
-		PlatformUrl        string                `json:"platformUrl"`
-		ProjectId          string                `json:"projectId"`
-		Prompt             string                `json:"prompt"`
+		Parameters         map[string]*UnderscoreUnderscoreSchema0 `json:"parameters"`
+		PlatformUrl        string                                  `json:"platformUrl"`
+		ProjectId          string                                  `json:"projectId"`
+		Prompt             string                                  `json:"prompt"`
 		PromptingTechnique *struct {
 			Demonstrations *struct {
 				Id     *string `json:"id,omitempty"`
@@ -180586,10 +184618,10 @@ type PostApiPromptsResponse struct {
 			JsonSchema *PostApiPrompts200JSONResponseBody_Outputs_JsonSchema `json:"json_schema,omitempty"`
 			Type       PostApiPrompts200JSONResponseBodyOutputsType          `json:"type"`
 		} `json:"outputs"`
-		Parameters         map[string]*JsonValue `json:"parameters"`
-		PlatformUrl        string                `json:"platformUrl"`
-		ProjectId          string                `json:"projectId"`
-		Prompt             string                `json:"prompt"`
+		Parameters         map[string]*UnderscoreUnderscoreSchema0 `json:"parameters"`
+		PlatformUrl        string                                  `json:"platformUrl"`
+		ProjectId          string                                  `json:"projectId"`
+		Prompt             string                                  `json:"prompt"`
 		PromptingTechnique *struct {
 			Demonstrations *struct {
 				Id     *string `json:"id,omitempty"`
@@ -180954,10 +184986,10 @@ type GetApiPromptsByIdResponse struct {
 			JsonSchema *GetApiPromptsById200JSONResponseBody_Outputs_JsonSchema `json:"json_schema,omitempty"`
 			Type       GetApiPromptsById200JSONResponseBodyOutputsType          `json:"type"`
 		} `json:"outputs"`
-		Parameters         map[string]*JsonValue `json:"parameters"`
-		PlatformUrl        string                `json:"platformUrl"`
-		ProjectId          string                `json:"projectId"`
-		Prompt             string                `json:"prompt"`
+		Parameters         map[string]*UnderscoreUnderscoreSchema0 `json:"parameters"`
+		PlatformUrl        string                                  `json:"platformUrl"`
+		ProjectId          string                                  `json:"projectId"`
+		Prompt             string                                  `json:"prompt"`
 		PromptingTechnique *struct {
 			Demonstrations *struct {
 				Id     *string `json:"id,omitempty"`
@@ -181074,10 +185106,10 @@ type PutApiPromptsByIdResponse struct {
 			JsonSchema *PutApiPromptsById200JSONResponseBody_Outputs_JsonSchema `json:"json_schema,omitempty"`
 			Type       PutApiPromptsById200JSONResponseBodyOutputsType          `json:"type"`
 		} `json:"outputs"`
-		Parameters         map[string]*JsonValue `json:"parameters"`
-		PlatformUrl        string                `json:"platformUrl"`
-		ProjectId          string                `json:"projectId"`
-		Prompt             string                `json:"prompt"`
+		Parameters         map[string]*UnderscoreUnderscoreSchema0 `json:"parameters"`
+		PlatformUrl        string                                  `json:"platformUrl"`
+		ProjectId          string                                  `json:"projectId"`
+		Prompt             string                                  `json:"prompt"`
 		PromptingTechnique *struct {
 			Demonstrations *struct {
 				Id     *string `json:"id,omitempty"`
@@ -181271,9 +185303,9 @@ type PostApiPromptsByIdSyncResponse struct {
 				JsonSchema *PostApiPromptsByIdSync200JSONResponseBody_Prompt_Outputs_JsonSchema `json:"json_schema,omitempty"`
 				Type       PostApiPromptsByIdSync200JSONResponseBodyPromptOutputsType           `json:"type"`
 			} `json:"outputs"`
-			Parameters         map[string]*JsonValue `json:"parameters"`
-			ProjectId          string                `json:"projectId"`
-			Prompt             string                `json:"prompt"`
+			Parameters         map[string]*UnderscoreUnderscoreSchema0 `json:"parameters"`
+			ProjectId          string                                  `json:"projectId"`
+			Prompt             string                                  `json:"prompt"`
 			PromptingTechnique *struct {
 				Demonstrations *struct {
 					Id     *string `json:"id,omitempty"`
@@ -181442,10 +185474,10 @@ type GetApiPromptsByIdVersionsResponse struct {
 			JsonSchema *GetApiPromptsByIdVersions200JSONResponseBody_Outputs_JsonSchema `json:"json_schema,omitempty"`
 			Type       GetApiPromptsByIdVersions200JSONResponseBodyOutputsType          `json:"type"`
 		} `json:"outputs"`
-		Parameters         map[string]*JsonValue `json:"parameters"`
-		PlatformUrl        string                `json:"platformUrl"`
-		ProjectId          string                `json:"projectId"`
-		Prompt             string                `json:"prompt"`
+		Parameters         map[string]*UnderscoreUnderscoreSchema0 `json:"parameters"`
+		PlatformUrl        string                                  `json:"platformUrl"`
+		ProjectId          string                                  `json:"projectId"`
+		Prompt             string                                  `json:"prompt"`
 		PromptingTechnique *struct {
 			Demonstrations *struct {
 				Id     *string `json:"id,omitempty"`
@@ -181562,10 +185594,10 @@ type PostApiPromptsByIdVersionsByVersionIdRestoreResponse struct {
 			JsonSchema *PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBody_Outputs_JsonSchema `json:"json_schema,omitempty"`
 			Type       PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyOutputsType          `json:"type"`
 		} `json:"outputs"`
-		Parameters         map[string]*JsonValue `json:"parameters"`
-		PlatformUrl        string                `json:"platformUrl"`
-		ProjectId          string                `json:"projectId"`
-		Prompt             string                `json:"prompt"`
+		Parameters         map[string]*UnderscoreUnderscoreSchema0 `json:"parameters"`
+		PlatformUrl        string                                  `json:"platformUrl"`
+		ProjectId          string                                  `json:"projectId"`
+		Prompt             string                                  `json:"prompt"`
 		PromptingTechnique *struct {
 			Demonstrations *struct {
 				Id     *string `json:"id,omitempty"`
@@ -182192,6 +186224,11 @@ type ListRoleBindingsResponse struct {
 		} `json:"bindings"`
 		TotalCount float32 `json:"totalCount"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                `json:"data"`
+		Error   []interface{}                              `json:"error"`
+		Success ListRoleBindings400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -182237,6 +186274,11 @@ type CreateRoleBindingResponse struct {
 		ScopeName *string                                       `json:"scopeName"`
 		ScopeType CreateRoleBinding201JSONResponseBodyScopeType `json:"scopeType"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                 `json:"data"`
+		Error   []interface{}                               `json:"error"`
+		Success CreateRoleBinding400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -182268,6 +186310,11 @@ type DeleteRoleBindingResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *struct {
 		Success DeleteRoleBinding200JSONResponseBodySuccess `json:"success"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                 `json:"data"`
+		Error   []interface{}                               `json:"error"`
+		Success DeleteRoleBinding400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -182314,6 +186361,11 @@ type UpdateRoleBindingResponse struct {
 		ScopeName *string                                       `json:"scopeName"`
 		ScopeType UpdateRoleBinding200JSONResponseBodyScopeType `json:"scopeType"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                 `json:"data"`
+		Error   []interface{}                               `json:"error"`
+		Success UpdateRoleBinding400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -182354,6 +186406,11 @@ type ListRolesResponse struct {
 			UpdatedAt   *time.Time `json:"updatedAt"`
 		} `json:"roles"`
 	}
+	JSON400 *struct {
+		Data    interface{}                         `json:"data"`
+		Error   []interface{}                       `json:"error"`
+		Success ListRoles400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -182391,6 +186448,11 @@ type CreateRoleResponse struct {
 		Name        string     `json:"name"`
 		Permissions []string   `json:"permissions"`
 		UpdatedAt   *time.Time `json:"updatedAt"`
+	}
+	JSON400 *struct {
+		Data    interface{}                          `json:"data"`
+		Error   []interface{}                        `json:"error"`
+		Success CreateRole400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -182462,6 +186524,11 @@ type DeleteRoleResponse struct {
 	JSON200      *struct {
 		Success DeleteRole200JSONResponseBodySuccess `json:"success"`
 	}
+	JSON400 *struct {
+		Data    interface{}                          `json:"data"`
+		Error   []interface{}                        `json:"error"`
+		Success DeleteRole400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -182500,6 +186567,11 @@ type GetRoleResponse struct {
 		Permissions []string   `json:"permissions"`
 		UpdatedAt   *time.Time `json:"updatedAt"`
 	}
+	JSON400 *struct {
+		Data    interface{}                       `json:"data"`
+		Error   []interface{}                     `json:"error"`
+		Success GetRole400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -182537,6 +186609,11 @@ type UpdateRoleResponse struct {
 		Name        string     `json:"name"`
 		Permissions []string   `json:"permissions"`
 		UpdatedAt   *time.Time `json:"updatedAt"`
+	}
+	JSON400 *struct {
+		Data    interface{}                          `json:"data"`
+		Error   []interface{}                        `json:"error"`
+		Success UpdateRole400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -182631,6 +186708,11 @@ type ListRunPlansResponse struct {
 		// UpdatedAt When the plan was last written.
 		UpdatedAt string `json:"updatedAt"`
 	}
+	JSON400 *struct {
+		Data    interface{}                            `json:"data"`
+		Error   []interface{}                          `json:"error"`
+		Success ListRunPlans400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -182715,6 +186797,11 @@ type RunRunPlanResponse struct {
 			Targets []string `json:"targets"`
 		} `json:"skippedArchived"`
 	}
+	JSON400 *struct {
+		Data    interface{}                          `json:"data"`
+		Error   []interface{}                        `json:"error"`
+		Success RunRunPlan400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -182750,6 +186837,11 @@ type ArchiveRunPlanResponse struct {
 
 		// Id The run plan that was archived.
 		Id string `json:"id"`
+	}
+	JSON400 *struct {
+		Data    interface{}                              `json:"data"`
+		Error   []interface{}                            `json:"error"`
+		Success ArchiveRunPlan400JSONResponseBodySuccess `json:"success"`
 	}
 	JSON404 *struct {
 		Error   string  `json:"error"`
@@ -182848,6 +186940,11 @@ type GetRunPlanResponse struct {
 		// UpdatedAt When the plan was last written.
 		UpdatedAt string `json:"updatedAt"`
 	}
+	JSON400 *struct {
+		Data    interface{}                          `json:"data"`
+		Error   []interface{}                        `json:"error"`
+		Success GetRunPlan400JSONResponseBodySuccess `json:"success"`
+	}
 	JSON404 *struct {
 		Error   string  `json:"error"`
 		Message *string `json:"message,omitempty"`
@@ -182935,6 +187032,11 @@ type RerunRunPlanResponse struct {
 			// Targets Targets left out because they are archived.
 			Targets []string `json:"targets"`
 		} `json:"skippedArchived"`
+	}
+	JSON400 *struct {
+		Data    interface{}                            `json:"data"`
+		Error   []interface{}                          `json:"error"`
+		Success RerunRunPlan400JSONResponseBodySuccess `json:"success"`
 	}
 	JSON404 *struct {
 		Error   string  `json:"error"`
@@ -183219,6 +187321,11 @@ type PostApiScenariosResponse struct {
 		// TestSuiteId The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites.
 		TestSuiteId *string `json:"testSuiteId,omitempty"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                `json:"data"`
+		Error   []interface{}                              `json:"error"`
+		Success PostApiScenarios400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -183251,6 +187358,11 @@ type DeleteApiScenariosByIdResponse struct {
 	JSON200      *struct {
 		Archived bool   `json:"archived"`
 		Id       string `json:"id"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                      `json:"data"`
+		Error   []interface{}                                    `json:"error"`
+		Success DeleteApiScenariosById400JSONResponseBodySuccess `json:"success"`
 	}
 	JSON404 *struct {
 		Error string `json:"error"`
@@ -183319,6 +187431,11 @@ type GetApiScenariosByIdResponse struct {
 		// TestSuiteId The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites.
 		TestSuiteId *string `json:"testSuiteId,omitempty"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                   `json:"data"`
+		Error   []interface{}                                 `json:"error"`
+		Success GetApiScenariosById400JSONResponseBodySuccess `json:"success"`
+	}
 	JSON404 *struct {
 		Error string `json:"error"`
 	}
@@ -183385,6 +187502,11 @@ type PatchApiScenariosByIdResponse struct {
 
 		// TestSuiteId The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites.
 		TestSuiteId *string `json:"testSuiteId,omitempty"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                     `json:"data"`
+		Error   []interface{}                                   `json:"error"`
+		Success PatchApiScenariosById400JSONResponseBodySuccess `json:"success"`
 	}
 	JSON404 *struct {
 		Error string `json:"error"`
@@ -183453,6 +187575,11 @@ type PutApiScenariosByIdResponse struct {
 		// TestSuiteId The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites.
 		TestSuiteId *string `json:"testSuiteId,omitempty"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                   `json:"data"`
+		Error   []interface{}                                 `json:"error"`
+		Success PutApiScenariosById400JSONResponseBodySuccess `json:"success"`
+	}
 	JSON404 *struct {
 		Error string `json:"error"`
 	}
@@ -183508,6 +187635,11 @@ type GetApiScenariosByIdVersionsResponse struct {
 			// Version The version number, counting from 1.
 			Version int `json:"version"`
 		} `json:"versions"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                           `json:"data"`
+		Error   []interface{}                                         `json:"error"`
+		Success GetApiScenariosByIdVersions400JSONResponseBodySuccess `json:"success"`
 	}
 	JSON404 *struct {
 		Error string `json:"error"`
@@ -183587,6 +187719,11 @@ type GetApiScenariosByIdVersionsByVersionResponse struct {
 
 		// Version The version number, counting from 1.
 		Version int `json:"version"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                                    `json:"data"`
+		Error   []interface{}                                                  `json:"error"`
+		Success GetApiScenariosByIdVersionsByVersion400JSONResponseBodySuccess `json:"success"`
 	}
 	JSON404 *struct {
 		Error string `json:"error"`
@@ -183696,6 +187833,11 @@ type RevokeScimTokenResponse struct {
 	JSON200      *struct {
 		Success RevokeScimToken200JSONResponseBodySuccess `json:"success"`
 	}
+	JSON400 *struct {
+		Data    interface{}                               `json:"data"`
+		Error   []interface{}                             `json:"error"`
+		Success RevokeScimToken400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -183731,6 +187873,11 @@ type GetApiSecretsResponse struct {
 		Name      string    `json:"name"`
 		ProjectId string    `json:"projectId"`
 		UpdatedAt time.Time `json:"updatedAt"`
+	}
+	JSON400 *struct {
+		Data    interface{}                             `json:"data"`
+		Error   []interface{}                           `json:"error"`
+		Success GetApiSecrets400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -183768,6 +187915,11 @@ type PostApiSecretsResponse struct {
 		ProjectId string    `json:"projectId"`
 		UpdatedAt time.Time `json:"updatedAt"`
 	}
+	JSON400 *struct {
+		Data    interface{}                              `json:"data"`
+		Error   []interface{}                            `json:"error"`
+		Success PostApiSecrets400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -183800,6 +187952,11 @@ type DeleteApiSecretsByIdResponse struct {
 	JSON200      *struct {
 		Deleted DeleteApiSecretsById200JSONResponseBodyDeleted `json:"deleted"`
 		Id      string                                         `json:"id"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                    `json:"data"`
+		Error   []interface{}                                  `json:"error"`
+		Success DeleteApiSecretsById400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -183837,6 +187994,11 @@ type GetApiSecretsByIdResponse struct {
 		ProjectId string    `json:"projectId"`
 		UpdatedAt time.Time `json:"updatedAt"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                 `json:"data"`
+		Error   []interface{}                               `json:"error"`
+		Success GetApiSecretsById400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -183872,6 +188034,11 @@ type PutApiSecretsByIdResponse struct {
 		Name      string    `json:"name"`
 		ProjectId string    `json:"projectId"`
 		UpdatedAt time.Time `json:"updatedAt"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                 `json:"data"`
+		Error   []interface{}                               `json:"error"`
+		Success PutApiSecretsById400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -183969,6 +188136,11 @@ type GetApiSimulationRunsResponse struct {
 			UpdatedAt       float32                                                       `json:"updatedAt"`
 		} `json:"runs"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                    `json:"data"`
+		Error   []interface{}                                  `json:"error"`
+		Success GetApiSimulationRuns400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -184023,6 +188195,11 @@ type GetApiSimulationRunsBatchesListResponse struct {
 		HasMore    *bool   `json:"hasMore,omitempty"`
 		NextCursor *string `json:"nextCursor,omitempty"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                               `json:"data"`
+		Error   []interface{}                                             `json:"error"`
+		Success GetApiSimulationRunsBatchesList400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -184072,6 +188249,11 @@ type GetApiSimulationRunsBatchesByBatchRunIdResponse struct {
 		SettledCount float32 `json:"settledCount"`
 		StalledCount float32 `json:"stalledCount"`
 		TotalCount   float32 `json:"totalCount"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                                       `json:"data"`
+		Error   []interface{}                                                     `json:"error"`
+		Success GetApiSimulationRunsBatchesByBatchRunId400JSONResponseBodySuccess `json:"success"`
 	}
 	JSON404 *struct {
 		Error string `json:"error"`
@@ -184168,6 +188350,11 @@ type GetApiSimulationRunsByScenarioRunIdResponse struct {
 		TotalCost       *float32                                                                `json:"totalCost,omitempty"`
 		UpdatedAt       float32                                                                 `json:"updatedAt"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                                   `json:"data"`
+		Error   []interface{}                                                 `json:"error"`
+		Success GetApiSimulationRunsByScenarioRunId400JSONResponseBodySuccess `json:"success"`
+	}
 	JSON404 *struct {
 		Error string `json:"error"`
 	}
@@ -184252,6 +188439,11 @@ type CreateStoredObjectUploadResponse struct {
 		ObjectId  string                                            `json:"objectId"`
 		UploadUrl string                                            `json:"uploadUrl"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                        `json:"data"`
+		Error   []interface{}                                      `json:"error"`
+		Success CreateStoredObjectUpload400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -184290,6 +188482,11 @@ type ConfirmStoredObjectUploadResponse struct {
 		ProjectId  string                                               `json:"projectId"`
 		Sha256     string                                               `json:"sha256"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                         `json:"data"`
+		Error   []interface{}                                       `json:"error"`
+		Success ConfirmStoredObjectUpload400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -184323,6 +188520,11 @@ type DeleteStoredObjectResponse struct {
 		DeletedAt  time.Time `json:"deletedAt"`
 		Generation int       `json:"generation"`
 		Id         string    `json:"id"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                  `json:"data"`
+		Error   []interface{}                                `json:"error"`
+		Success DeleteStoredObject400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -184382,6 +188584,11 @@ type GetStoredObjectResponse struct {
 			Status GetStoredObject200JSONResponseBodyMetadataStatus `json:"status"`
 		} `json:"metadata"`
 	}
+	JSON400 *struct {
+		Data    interface{}                               `json:"data"`
+		Error   []interface{}                             `json:"error"`
+		Success GetStoredObject400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -184435,6 +188642,11 @@ type GetApiSuitesResponse struct {
 			Type                    GetApiSuites200JSONResponseBodyTargetsType                                                `json:"type"`
 		} `json:"targets"`
 		UpdatedAt string `json:"updatedAt"`
+	}
+	JSON400 *struct {
+		Data    interface{}                            `json:"data"`
+		Error   []interface{}                          `json:"error"`
+		Success GetApiSuites400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -184490,6 +188702,11 @@ type PostApiSuitesResponse struct {
 		} `json:"targets"`
 		UpdatedAt string `json:"updatedAt"`
 	}
+	JSON400 *struct {
+		Data    interface{}                             `json:"data"`
+		Error   []interface{}                           `json:"error"`
+		Success PostApiSuites400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -184522,6 +188739,11 @@ type DeleteApiSuitesByIdResponse struct {
 	JSON200      *struct {
 		Archived bool   `json:"archived"`
 		Id       string `json:"id"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                   `json:"data"`
+		Error   []interface{}                                 `json:"error"`
+		Success DeleteApiSuitesById400JSONResponseBodySuccess `json:"success"`
 	}
 	JSON404 *struct {
 		Error   string  `json:"error"`
@@ -184581,6 +188803,11 @@ type GetApiSuitesByIdResponse struct {
 		} `json:"targets"`
 		UpdatedAt string `json:"updatedAt"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                `json:"data"`
+		Error   []interface{}                              `json:"error"`
+		Success GetApiSuitesById400JSONResponseBodySuccess `json:"success"`
+	}
 	JSON404 *struct {
 		Error   string  `json:"error"`
 		Message *string `json:"message,omitempty"`
@@ -184638,6 +188865,11 @@ type PatchApiSuitesByIdResponse struct {
 			Type                    PatchApiSuitesById200JSONResponseBodyTargetsType                                                `json:"type"`
 		} `json:"targets"`
 		UpdatedAt string `json:"updatedAt"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                  `json:"data"`
+		Error   []interface{}                                `json:"error"`
+		Success PatchApiSuitesById400JSONResponseBodySuccess `json:"success"`
 	}
 	JSON404 *struct {
 		Error   string  `json:"error"`
@@ -184697,6 +188929,11 @@ type PostApiSuitesByIdDuplicateResponse struct {
 		} `json:"targets"`
 		UpdatedAt string `json:"updatedAt"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                          `json:"data"`
+		Error   []interface{}                                        `json:"error"`
+		Success PostApiSuitesByIdDuplicate400JSONResponseBodySuccess `json:"success"`
+	}
 	JSON404 *struct {
 		Error   string  `json:"error"`
 		Message *string `json:"message,omitempty"`
@@ -184755,6 +188992,11 @@ type PostApiSuitesByIdRunResponse struct {
 			Targets   []string `json:"targets"`
 		} `json:"skippedArchived"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                    `json:"data"`
+		Error   []interface{}                                  `json:"error"`
+		Success PostApiSuitesByIdRun400JSONResponseBodySuccess `json:"success"`
+	}
 	JSON404 *struct {
 		Error   string  `json:"error"`
 		Message *string `json:"message,omitempty"`
@@ -184803,6 +189045,11 @@ type GetApiTeamsResponse struct {
 			Total int `json:"total"`
 		} `json:"pagination"`
 	}
+	JSON400 *struct {
+		Data    interface{}                           `json:"data"`
+		Error   []interface{}                         `json:"error"`
+		Success GetApiTeams400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -184840,6 +189087,11 @@ type PostApiTeamsResponse struct {
 		Slug           string    `json:"slug"`
 		UpdatedAt      time.Time `json:"updatedAt"`
 	}
+	JSON400 *struct {
+		Data    interface{}                            `json:"data"`
+		Error   []interface{}                          `json:"error"`
+		Success PostApiTeams400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -184873,6 +189125,11 @@ type DeleteApiTeamsByIdResponse struct {
 		ArchivedAt *time.Time `json:"archivedAt"`
 		Id         string     `json:"id"`
 		Name       string     `json:"name"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                  `json:"data"`
+		Error   []interface{}                                `json:"error"`
+		Success DeleteApiTeamsById400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -184911,6 +189168,11 @@ type GetApiTeamsByIdResponse struct {
 		Slug           string    `json:"slug"`
 		UpdatedAt      time.Time `json:"updatedAt"`
 	}
+	JSON400 *struct {
+		Data    interface{}                               `json:"data"`
+		Error   []interface{}                             `json:"error"`
+		Success GetApiTeamsById400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -184947,6 +189209,11 @@ type PatchApiTeamsByIdResponse struct {
 		OrganizationId string    `json:"organizationId"`
 		Slug           string    `json:"slug"`
 		UpdatedAt      time.Time `json:"updatedAt"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                 `json:"data"`
+		Error   []interface{}                               `json:"error"`
+		Success PatchApiTeamsById400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -184985,6 +189252,11 @@ type GetApiTeamsByIdMembersResponse struct {
 			UserId string                                            `json:"userId"`
 		} `json:"data"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                      `json:"data"`
+		Error   []interface{}                                    `json:"error"`
+		Success GetApiTeamsByIdMembers400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -185017,6 +189289,11 @@ type PostApiTeamsByIdMembersResponse struct {
 	JSON201      *struct {
 		Success bool `json:"success"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                       `json:"data"`
+		Error   []interface{}                                     `json:"error"`
+		Success PostApiTeamsByIdMembers400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -185048,6 +189325,11 @@ type DeleteApiTeamsByIdMembersByUserIdResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *struct {
 		Success bool `json:"success"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                                 `json:"data"`
+		Error   []interface{}                                               `json:"error"`
+		Success DeleteApiTeamsByIdMembersByUserId400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -185086,6 +189368,11 @@ type GetApiTeamsByIdProjectsResponse struct {
 			Slug      string    `json:"slug"`
 			UpdatedAt time.Time `json:"updatedAt"`
 		} `json:"data"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                       `json:"data"`
+		Error   []interface{}                                     `json:"error"`
+		Success GetApiTeamsByIdProjects400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -185168,6 +189455,11 @@ type ListTestSuitesResponse struct {
 		// UpdatedAt When the suite was last written.
 		UpdatedAt string `json:"updatedAt"`
 	}
+	JSON400 *struct {
+		Data    interface{}                              `json:"data"`
+		Error   []interface{}                            `json:"error"`
+		Success ListTestSuites400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -185249,6 +189541,11 @@ type CreateTestSuiteResponse struct {
 		// UpdatedAt When the suite was last written.
 		UpdatedAt string `json:"updatedAt"`
 	}
+	JSON400 *struct {
+		Data    interface{}                               `json:"data"`
+		Error   []interface{}                             `json:"error"`
+		Success CreateTestSuite400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -185284,6 +189581,11 @@ type ArchiveTestSuiteResponse struct {
 
 		// Id The test suite that was archived.
 		Id string `json:"id"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                `json:"data"`
+		Error   []interface{}                              `json:"error"`
+		Success ArchiveTestSuite400JSONResponseBodySuccess `json:"success"`
 	}
 	JSON404 *struct {
 		Error   string  `json:"error"`
@@ -185379,6 +189681,11 @@ type GetTestSuiteResponse struct {
 		// UpdatedAt When the suite was last written.
 		UpdatedAt string `json:"updatedAt"`
 	}
+	JSON400 *struct {
+		Data    interface{}                            `json:"data"`
+		Error   []interface{}                          `json:"error"`
+		Success GetTestSuite400JSONResponseBodySuccess `json:"success"`
+	}
 	JSON404 *struct {
 		Error   string  `json:"error"`
 		Message *string `json:"message,omitempty"`
@@ -185463,6 +189770,11 @@ type UpdateTestSuiteResponse struct {
 
 		// UpdatedAt When the suite was last written.
 		UpdatedAt string `json:"updatedAt"`
+	}
+	JSON400 *struct {
+		Data    interface{}                               `json:"data"`
+		Error   []interface{}                             `json:"error"`
+		Success UpdateTestSuite400JSONResponseBodySuccess `json:"success"`
 	}
 	JSON404 *struct {
 		Error   string  `json:"error"`
@@ -185551,6 +189863,11 @@ type RunTestSuiteResponse struct {
 			// Targets Targets left out because they are archived.
 			Targets []string `json:"targets"`
 		} `json:"skippedArchived"`
+	}
+	JSON400 *struct {
+		Data    interface{}                            `json:"data"`
+		Error   []interface{}                          `json:"error"`
+		Success RunTestSuite400JSONResponseBodySuccess `json:"success"`
 	}
 	JSON404 *struct {
 		Error   string  `json:"error"`
@@ -185758,6 +190075,11 @@ type PatchApiTracesByTraceIdMetadataResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *struct {
 		TraceId string `json:"traceId"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                               `json:"data"`
+		Error   []interface{}                                             `json:"error"`
+		Success PatchApiTracesByTraceIdMetadata400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -185974,6 +190296,11 @@ type PostApiTriggersResponse struct {
 		TraceDebounceMs *float32 `json:"traceDebounceMs"`
 		UpdatedAt       string   `json:"updatedAt"`
 	}
+	JSON400 *struct {
+		Data    interface{}                               `json:"data"`
+		Error   []interface{}                             `json:"error"`
+		Success PostApiTriggers400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -186006,6 +190333,11 @@ type DeleteApiTriggersByIdResponse struct {
 	JSON200      *struct {
 		Deleted bool   `json:"deleted"`
 		Id      string `json:"id"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                     `json:"data"`
+		Error   []interface{}                                   `json:"error"`
+		Success DeleteApiTriggersById400JSONResponseBodySuccess `json:"success"`
 	}
 	JSON404 *struct {
 		Error   string  `json:"error"`
@@ -186076,6 +190408,11 @@ type GetApiTriggersByIdResponse struct {
 		TraceDebounceMs *float32 `json:"traceDebounceMs"`
 		UpdatedAt       string   `json:"updatedAt"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                  `json:"data"`
+		Error   []interface{}                                `json:"error"`
+		Success GetApiTriggersById400JSONResponseBodySuccess `json:"success"`
+	}
 	JSON404 *struct {
 		Error   string  `json:"error"`
 		Message *string `json:"message,omitempty"`
@@ -186144,6 +190481,11 @@ type PatchApiTriggersByIdResponse struct {
 		} `json:"templates"`
 		TraceDebounceMs *float32 `json:"traceDebounceMs"`
 		UpdatedAt       string   `json:"updatedAt"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                    `json:"data"`
+		Error   []interface{}                                  `json:"error"`
+		Success PatchApiTriggersById400JSONResponseBodySuccess `json:"success"`
 	}
 	JSON404 *struct {
 		Error   string  `json:"error"`
@@ -186214,6 +190556,11 @@ type PostApiTriggersByIdDisableResponse struct {
 		TraceDebounceMs *float32 `json:"traceDebounceMs"`
 		UpdatedAt       string   `json:"updatedAt"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                          `json:"data"`
+		Error   []interface{}                                        `json:"error"`
+		Success PostApiTriggersByIdDisable400JSONResponseBodySuccess `json:"success"`
+	}
 	JSON404 *struct {
 		Error   string  `json:"error"`
 		Message *string `json:"message,omitempty"`
@@ -186283,6 +190630,11 @@ type PostApiTriggersByIdEnableResponse struct {
 		TraceDebounceMs *float32 `json:"traceDebounceMs"`
 		UpdatedAt       string   `json:"updatedAt"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                         `json:"data"`
+		Error   []interface{}                                       `json:"error"`
+		Success PostApiTriggersByIdEnable400JSONResponseBodySuccess `json:"success"`
+	}
 	JSON404 *struct {
 		Error   string  `json:"error"`
 		Message *string `json:"message,omitempty"`
@@ -186329,6 +190681,11 @@ type GetApiTriggersByIdFiresResponse struct {
 		// NextCursor Pass as `cursor` to read the page after this one. Null on the last page.
 		NextCursor *string `json:"nextCursor"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                       `json:"data"`
+		Error   []interface{}                                     `json:"error"`
+		Success GetApiTriggersByIdFires400JSONResponseBodySuccess `json:"success"`
+	}
 	JSON404 *struct {
 		Error   string  `json:"error"`
 		Message *string `json:"message,omitempty"`
@@ -186373,6 +190730,11 @@ type PostApiTriggersByIdTestFireResponse struct {
 
 		// UsedDefault Whether the LangWatch default message was rendered because this automation states no template of its own.
 		UsedDefault bool `json:"usedDefault"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                           `json:"data"`
+		Error   []interface{}                                         `json:"error"`
+		Success PostApiTriggersByIdTestFire400JSONResponseBodySuccess `json:"success"`
 	}
 	JSON404 *struct {
 		Error   string  `json:"error"`
@@ -186439,6 +190801,11 @@ func (r ConfirmOneClickUnsubscribeResponse) ContentType() string {
 type ReadUserAvatarBytesResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	JSON400      *struct {
+		Data    interface{}                                   `json:"data"`
+		Error   []interface{}                                 `json:"error"`
+		Success ReadUserAvatarBytes400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -186544,6 +190911,11 @@ type DeleteApiWorkflowsByIdResponse struct {
 		Archived bool   `json:"archived"`
 		Id       string `json:"id"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                      `json:"data"`
+		Error   []interface{}                                    `json:"error"`
+		Success DeleteApiWorkflowsById400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -186584,6 +190956,11 @@ type GetApiWorkflowsByIdResponse struct {
 		PlatformUrl string  `json:"platformUrl"`
 		UpdatedAt   string  `json:"updatedAt"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                   `json:"data"`
+		Error   []interface{}                                 `json:"error"`
+		Success GetApiWorkflowsById400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -186623,6 +191000,11 @@ type PatchApiWorkflowsByIdResponse struct {
 		Name        string  `json:"name"`
 		PlatformUrl string  `json:"platformUrl"`
 		UpdatedAt   string  `json:"updatedAt"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                     `json:"data"`
+		Error   []interface{}                                   `json:"error"`
+		Success PatchApiWorkflowsById400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -186702,6 +191084,11 @@ type PostApiWorkflowsByWorkflowIdRunResponse struct {
 		TotalCost *float32                                                 `json:"total_cost,omitempty"`
 		TraceId   *string                                                  `json:"trace_id,omitempty"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                               `json:"data"`
+		Error   []interface{}                                             `json:"error"`
+		Success PostApiWorkflowsByWorkflowIdRun400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -186744,6 +191131,11 @@ type PostApiWorkflowsByWorkflowIdByVersionIdRunResponse struct {
 		Status    PostApiWorkflowsByWorkflowIdByVersionIdRun200JSONResponseBodyStatus `json:"status"`
 		TotalCost *float32                                                            `json:"total_cost,omitempty"`
 		TraceId   *string                                                             `json:"trace_id,omitempty"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                                          `json:"data"`
+		Error   []interface{}                                                        `json:"error"`
+		Success PostApiWorkflowsByWorkflowIdByVersionIdRun400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -186838,6 +191230,11 @@ type PostApiWebhooksV1EndpointsResponse struct {
 	JSON201      *struct {
 		Data PostApiWebhooksV1Endpoints201JSONResponseBody_Data `json:"data"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                          `json:"data"`
+		Error   []interface{}                                        `json:"error"`
+		Success PostApiWebhooksV1Endpoints400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -186872,6 +191269,11 @@ type DeleteApiWebhooksV1EndpointsByIdResponse struct {
 			Archived DeleteApiWebhooksV1EndpointsById200JSONResponseBodyDataArchived `json:"archived"`
 		} `json:"data"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                                `json:"data"`
+		Error   []interface{}                                              `json:"error"`
+		Success DeleteApiWebhooksV1EndpointsById400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -186904,6 +191306,11 @@ type GetApiWebhooksV1EndpointsByIdResponse struct {
 	JSON200      *struct {
 		Data GetApiWebhooksV1EndpointsById200JSONResponseBody_Data `json:"data"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                             `json:"data"`
+		Error   []interface{}                                           `json:"error"`
+		Success GetApiWebhooksV1EndpointsById400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -186935,6 +191342,11 @@ type PatchApiWebhooksV1EndpointsByIdResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *struct {
 		Data PatchApiWebhooksV1EndpointsById200JSONResponseBody_Data `json:"data"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                               `json:"data"`
+		Error   []interface{}                                             `json:"error"`
+		Success PatchApiWebhooksV1EndpointsById400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -186981,6 +191393,11 @@ type GetApiWebhooksV1EndpointsByIdDeliveriesResponse struct {
 		// NextCursor Pass back as `cursor` for the next page. Null means the walk is exhausted; a full page does NOT mean there is more.
 		NextCursor *string `json:"next_cursor"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                                       `json:"data"`
+		Error   []interface{}                                                     `json:"error"`
+		Success GetApiWebhooksV1EndpointsByIdDeliveries400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -187024,6 +191441,11 @@ type GetApiWebhooksV1EndpointsByIdHealthResponse struct {
 			SuccessRate            *float32                                                         `json:"success_rate"`
 		} `json:"data"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                                   `json:"data"`
+		Error   []interface{}                                                 `json:"error"`
+		Success GetApiWebhooksV1EndpointsByIdHealth400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -187055,6 +191477,11 @@ type PostApiWebhooksV1EndpointsByIdRollSecretResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *struct {
 		Data PostApiWebhooksV1EndpointsByIdRollSecret200JSONResponseBody_Data `json:"data"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                                        `json:"data"`
+		Error   []interface{}                                                      `json:"error"`
+		Success PostApiWebhooksV1EndpointsByIdRollSecret400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -187092,6 +191519,11 @@ type PostApiWebhooksV1EndpointsByIdTestResponse struct {
 			ResponseBody   *string `json:"response_body,omitempty"`
 			ResponseStatus *int    `json:"response_status"`
 		} `json:"data"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                                  `json:"data"`
+		Error   []interface{}                                                `json:"error"`
+		Success PostApiWebhooksV1EndpointsByIdTest400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -187172,6 +191604,11 @@ type GetApiWebhooksV1EventsResponse struct {
 		// NextCursor Pass back as `cursor` for the next page. Null means the walk is exhausted; a full page does NOT mean there is more.
 		NextCursor *string `json:"next_cursor"`
 	}
+	JSON400 *struct {
+		Data    interface{}                                      `json:"data"`
+		Error   []interface{}                                    `json:"error"`
+		Success GetApiWebhooksV1Events400JSONResponseBodySuccess `json:"success"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -187209,6 +191646,11 @@ type GetApiWebhooksV1EventsByIdResponse struct {
 			SchemaVersion string                 `json:"schema_version"`
 			Type          string                 `json:"type"`
 		} `json:"data"`
+	}
+	JSON400 *struct {
+		Data    interface{}                                          `json:"data"`
+		Error   []interface{}                                        `json:"error"`
+		Success GetApiWebhooksV1EventsById400JSONResponseBodySuccess `json:"success"`
 	}
 }
 
@@ -197008,6 +201450,17 @@ func ParseRevokeWorkerSessionKeyResponse(rsp *http.Response) (*RevokeWorkerSessi
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                      `json:"data"`
+			Error   []interface{}                                    `json:"error"`
+			Success RevokeWorkerSessionKey400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -197066,6 +201519,17 @@ func ParseIngestTurnResultResponse(rsp *http.Response) (*IngestTurnResultRespons
 			return nil, err
 		}
 		response.JSON202 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                `json:"data"`
+			Error   []interface{}                              `json:"error"`
+			Success IngestTurnResult400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -197128,6 +201592,17 @@ func ParseScimListGroupsResponse(rsp *http.Response) (*ScimListGroupsResponse, e
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                              `json:"data"`
+			Error   []interface{}                            `json:"error"`
+			Success ScimListGroups400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest struct {
@@ -197260,6 +201735,17 @@ func ParseScimDeleteGroupResponse(rsp *http.Response) (*ScimDeleteGroupResponse,
 	}
 
 	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                               `json:"data"`
+			Error   []interface{}                             `json:"error"`
+			Success ScimDeleteGroup400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest struct {
 			Detail   string                                      `json:"detail"`
@@ -197335,6 +201821,17 @@ func ParseScimGetGroupResponse(rsp *http.Response) (*ScimGetGroupResponse, error
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                            `json:"data"`
+			Error   []interface{}                          `json:"error"`
+			Success ScimGetGroup400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest struct {
@@ -197758,6 +202255,17 @@ func ParseScimListUsersResponse(rsp *http.Response) (*ScimListUsersResponse, err
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                             `json:"data"`
+			Error   []interface{}                           `json:"error"`
+			Success ScimListUsers400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest struct {
 			Detail   string                                    `json:"detail"`
@@ -197895,6 +202403,17 @@ func ParseScimDeleteUserResponse(rsp *http.Response) (*ScimDeleteUserResponse, e
 	}
 
 	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                              `json:"data"`
+			Error   []interface{}                            `json:"error"`
+			Success ScimDeleteUser400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest struct {
 			Detail   string                                     `json:"detail"`
@@ -197976,6 +202495,17 @@ func ParseScimGetUserResponse(rsp *http.Response) (*ScimGetUserResponse, error) 
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                           `json:"data"`
+			Error   []interface{}                         `json:"error"`
+			Success ScimGetUser400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest struct {
@@ -198295,6 +202825,17 @@ func ParseGetApiTraceIdResponse(rsp *http.Response) (*GetApiTraceIdResponse, err
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                             `json:"data"`
+			Error   []interface{}                           `json:"error"`
+			Success GetApiTraceId400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -198324,6 +202865,17 @@ func ParsePostApiTraceIdShareResponse(rsp *http.Response) (*PostApiTraceIdShareR
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                   `json:"data"`
+			Error   []interface{}                                 `json:"error"`
+			Success PostApiTraceIdShare400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -198351,6 +202903,17 @@ func ParsePostApiTraceIdUnshareResponse(rsp *http.Response) (*PostApiTraceIdUnsh
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                     `json:"data"`
+			Error   []interface{}                                   `json:"error"`
+			Success PostApiTraceIdUnshare400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -198436,6 +202999,17 @@ func ParseStartAdminImpersonationResponse(rsp *http.Response) (*StartAdminImpers
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                       `json:"data"`
+			Error   []interface{}                                     `json:"error"`
+			Success StartAdminImpersonation400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -198464,6 +203038,17 @@ func ParseRunAdminOperationResponse(rsp *http.Response) (*RunAdminOperationRespo
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                 `json:"data"`
+			Error   []interface{}                               `json:"error"`
+			Success RunAdminOperation400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -199093,6 +203678,17 @@ func ParseListAgentsResponse(rsp *http.Response) (*ListAgentsResponse, error) {
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                          `json:"data"`
+			Error   []interface{}                        `json:"error"`
+			Success ListAgents400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -199196,6 +203792,17 @@ func ParseCreateAgentResponse(rsp *http.Response) (*CreateAgentResponse, error) 
 		}
 		response.JSON201 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                           `json:"data"`
+			Error   []interface{}                         `json:"error"`
+			Success CreateAgent400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -199224,6 +203831,17 @@ func ParsePostConnectedAgentFramesResponse(rsp *http.Response) (*PostConnectedAg
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                        `json:"data"`
+			Error   []interface{}                                      `json:"error"`
+			Success PostConnectedAgentFrames400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -199251,6 +203869,17 @@ func ParsePollConnectedAgentInstanceResponse(rsp *http.Response) (*PollConnected
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                          `json:"data"`
+			Error   []interface{}                                        `json:"error"`
+			Success PollConnectedAgentInstance400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -199281,6 +203910,17 @@ func ParseRegisterConnectedAgentInstanceResponse(rsp *http.Response) (*RegisterC
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                              `json:"data"`
+			Error   []interface{}                                            `json:"error"`
+			Success RegisterConnectedAgentInstance400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -199309,6 +203949,17 @@ func ParseRemoveAgentLabelResponse(rsp *http.Response) (*RemoveAgentLabelRespons
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                `json:"data"`
+			Error   []interface{}                              `json:"error"`
+			Success RemoveAgentLabel400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -199339,6 +203990,17 @@ func ParseAssignAgentLabelResponse(rsp *http.Response) (*AssignAgentLabelRespons
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                `json:"data"`
+			Error   []interface{}                              `json:"error"`
+			Success AssignAgentLabel400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -199391,6 +204053,17 @@ func ParseListAgentVersionsResponse(rsp *http.Response) (*ListAgentVersionsRespo
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                 `json:"data"`
+			Error   []interface{}                               `json:"error"`
+			Success ListAgentVersions400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -199421,6 +204094,17 @@ func ParseArchiveAgentResponse(rsp *http.Response) (*ArchiveAgentResponse, error
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                            `json:"data"`
+			Error   []interface{}                          `json:"error"`
+			Success ArchiveAgent400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -199525,6 +204209,17 @@ func ParseGetAgentResponse(rsp *http.Response) (*GetAgentResponse, error) {
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                        `json:"data"`
+			Error   []interface{}                      `json:"error"`
+			Success GetAgent400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -199627,6 +204322,17 @@ func ParseUpdateAgentResponse(rsp *http.Response) (*UpdateAgentResponse, error) 
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                           `json:"data"`
+			Error   []interface{}                         `json:"error"`
+			Success UpdateAgent400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -199731,6 +204437,17 @@ func ParseReplaceAgentResponse(rsp *http.Response) (*ReplaceAgentResponse, error
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                            `json:"data"`
+			Error   []interface{}                          `json:"error"`
+			Success ReplaceAgent400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -199772,6 +204489,17 @@ func ParseCallConnectedAgentResponse(rsp *http.Response) (*CallConnectedAgentRes
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                  `json:"data"`
+			Error   []interface{}                                `json:"error"`
+			Success CallConnectedAgent400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -199806,6 +204534,17 @@ func ParseTestAgentResponse(rsp *http.Response) (*TestAgentResponse, error) {
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                         `json:"data"`
+			Error   []interface{}                       `json:"error"`
+			Success TestAgent400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -199927,6 +204666,17 @@ func ParsePostApiV1AnalyticsReportsResponse(rsp *http.Response) (*PostApiV1Analy
 		}
 		response.JSON201 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                         `json:"data"`
+			Error   []interface{}                                       `json:"error"`
+			Success PostApiV1AnalyticsReports400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -199954,6 +204704,17 @@ func ParsePutApiV1AnalyticsReportsReorderResponse(rsp *http.Response) (*PutApiV1
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                               `json:"data"`
+			Error   []interface{}                                             `json:"error"`
+			Success PutApiV1AnalyticsReportsReorder400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -199983,6 +204744,17 @@ func ParseDeleteApiV1AnalyticsReportsByReportIdResponse(rsp *http.Response) (*De
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                                     `json:"data"`
+			Error   []interface{}                                                   `json:"error"`
+			Success DeleteApiV1AnalyticsReportsByReportId400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -200031,6 +204803,17 @@ func ParseGetApiV1AnalyticsReportsByReportIdResponse(rsp *http.Response) (*GetAp
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                                  `json:"data"`
+			Error   []interface{}                                                `json:"error"`
+			Success GetApiV1AnalyticsReportsByReportId400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -200063,6 +204846,17 @@ func ParsePatchApiV1AnalyticsReportsByReportIdResponse(rsp *http.Response) (*Pat
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                                    `json:"data"`
+			Error   []interface{}                                                  `json:"error"`
+			Success PatchApiV1AnalyticsReportsByReportId400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -200161,6 +204955,17 @@ func ParseGetApiAnnotationsResponse(rsp *http.Response) (*GetApiAnnotationsRespo
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                 `json:"data"`
+			Error   []interface{}                               `json:"error"`
+			Success GetApiAnnotations400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -200189,6 +204994,17 @@ func ParseGetApiAnnotationsTraceIdResponse(rsp *http.Response) (*GetApiAnnotatio
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                        `json:"data"`
+			Error   []interface{}                                      `json:"error"`
+			Success GetApiAnnotationsTraceId400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -200216,6 +205032,17 @@ func ParsePostApiAnnotationsTraceIdResponse(rsp *http.Response) (*PostApiAnnotat
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                         `json:"data"`
+			Error   []interface{}                                       `json:"error"`
+			Success PostApiAnnotationsTraceId400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -200246,6 +205073,17 @@ func ParseDeleteApiAnnotationsIdResponse(rsp *http.Response) (*DeleteApiAnnotati
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                      `json:"data"`
+			Error   []interface{}                                    `json:"error"`
+			Success DeleteApiAnnotationsId400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -200274,6 +205112,17 @@ func ParseGetApiAnnotationsIdResponse(rsp *http.Response) (*GetApiAnnotationsIdR
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                   `json:"data"`
+			Error   []interface{}                                 `json:"error"`
+			Success GetApiAnnotationsId400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -200301,6 +205150,17 @@ func ParsePatchApiAnnotationsIdResponse(rsp *http.Response) (*PatchApiAnnotation
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                     `json:"data"`
+			Error   []interface{}                                   `json:"error"`
+			Success PatchApiAnnotationsId400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -200363,6 +205223,17 @@ func ParseCreateApiKeyResponse(rsp *http.Response) (*CreateApiKeyResponse, error
 		}
 		response.JSON201 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                            `json:"data"`
+			Error   []interface{}                          `json:"error"`
+			Success CreateApiKey400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -200395,6 +205266,17 @@ func ParseCreateFullAccessApiKeyResponse(rsp *http.Response) (*CreateFullAccessA
 			return nil, err
 		}
 		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                      `json:"data"`
+			Error   []interface{}                                    `json:"error"`
+			Success CreateFullAccessApiKey400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -200429,6 +205311,17 @@ func ParseCreateIngestionApiKeyResponse(rsp *http.Response) (*CreateIngestionApi
 		}
 		response.JSON201 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                     `json:"data"`
+			Error   []interface{}                                   `json:"error"`
+			Success CreateIngestionApiKey400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -200456,6 +205349,17 @@ func ParseRevokeApiKeyResponse(rsp *http.Response) (*RevokeApiKeyResponse, error
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                            `json:"data"`
+			Error   []interface{}                          `json:"error"`
+			Success RevokeApiKey400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -200507,6 +205411,17 @@ func ParseGetApiKeyResponse(rsp *http.Response) (*GetApiKeyResponse, error) {
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                         `json:"data"`
+			Error   []interface{}                       `json:"error"`
+			Success GetApiKey400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -200556,6 +205471,17 @@ func ParseUpdateApiKeyResponse(rsp *http.Response) (*UpdateApiKeyResponse, error
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                            `json:"data"`
+			Error   []interface{}                          `json:"error"`
+			Success UpdateApiKey400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -201037,6 +205963,20 @@ func ParseWatchCliDeviceApprovalResponse(rsp *http.Response) (*WatchCliDeviceApp
 	response := &WatchCliDeviceApprovalResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                      `json:"data"`
+			Error   []interface{}                                    `json:"error"`
+			Success WatchCliDeviceApproval400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -202096,6 +207036,20 @@ func ParseLookupCliDeviceCodeResponse(rsp *http.Response) (*LookupCliDeviceCodeR
 		HTTPResponse: rsp,
 	}
 
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                   `json:"data"`
+			Error   []interface{}                                 `json:"error"`
+			Success LookupCliDeviceCode400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	}
+
 	return response, nil
 }
 
@@ -202495,6 +207449,20 @@ func ParseSubmitBugReportResponse(rsp *http.Response) (*SubmitBugReportResponse,
 	response := &SubmitBugReportResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                               `json:"data"`
+			Error   []interface{}                             `json:"error"`
+			Success SubmitBugReport400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -204475,6 +209443,17 @@ func ParseGetApiDatasetResponse(rsp *http.Response) (*GetApiDatasetResponse, err
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                             `json:"data"`
+			Error   []interface{}                           `json:"error"`
+			Success GetApiDataset400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -204512,6 +209491,17 @@ func ParsePostApiDatasetResponse(rsp *http.Response) (*PostApiDatasetResponse, e
 		}
 		response.JSON201 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                              `json:"data"`
+			Error   []interface{}                            `json:"error"`
+			Success PostApiDataset400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -204537,6 +209527,17 @@ func ParsePostApiDatasetAttachmentsResponse(rsp *http.Response) (*PostApiDataset
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                         `json:"data"`
+			Error   []interface{}                                       `json:"error"`
+			Success PostApiDatasetAttachments400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -204569,6 +209570,17 @@ func ParsePostApiDatasetAttachmentsUploadsResponse(rsp *http.Response) (*PostApi
 			return nil, err
 		}
 		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                                `json:"data"`
+			Error   []interface{}                                              `json:"error"`
+			Success PostApiDatasetAttachmentsUploads400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -204684,6 +209696,17 @@ func ParsePostApiDatasetImportsResponse(rsp *http.Response) (*PostApiDatasetImpo
 		}
 		response.JSON201 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                     `json:"data"`
+			Error   []interface{}                                   `json:"error"`
+			Success PostApiDatasetImports400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -204774,6 +209797,17 @@ func ParseGetApiDatasetBySlugEntriesResponse(rsp *http.Response) (*GetApiDataset
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                          `json:"data"`
+			Error   []interface{}                                        `json:"error"`
+			Success GetApiDatasetBySlugEntries400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -204801,6 +209835,17 @@ func ParsePostApiDatasetBySlugEntriesResponse(rsp *http.Response) (*PostApiDatas
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                           `json:"data"`
+			Error   []interface{}                                         `json:"error"`
+			Success PostApiDatasetBySlugEntries400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -204830,6 +209875,17 @@ func ParseDeleteApiDatasetBySlugOrIdResponse(rsp *http.Response) (*DeleteApiData
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                          `json:"data"`
+			Error   []interface{}                                        `json:"error"`
+			Success DeleteApiDatasetBySlugOrId400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -204876,6 +209932,17 @@ func ParseGetApiDatasetBySlugOrIdResponse(rsp *http.Response) (*GetApiDatasetByS
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                       `json:"data"`
+			Error   []interface{}                                     `json:"error"`
+			Success GetApiDatasetBySlugOrId400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -204913,6 +209980,17 @@ func ParsePatchApiDatasetBySlugOrIdResponse(rsp *http.Response) (*PatchApiDatase
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                         `json:"data"`
+			Error   []interface{}                                       `json:"error"`
+			Success PatchApiDatasetBySlugOrId400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -204942,6 +210020,17 @@ func ParsePostApiDatasetBySlugOrIdImportsResponse(rsp *http.Response) (*PostApiD
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                               `json:"data"`
+			Error   []interface{}                                             `json:"error"`
+			Success PostApiDatasetBySlugOrIdImports400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -204969,6 +210058,17 @@ func ParseDeleteApiDatasetBySlugOrIdRecordsResponse(rsp *http.Response) (*Delete
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                                 `json:"data"`
+			Error   []interface{}                                               `json:"error"`
+			Success DeleteApiDatasetBySlugOrIdRecords400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -205023,6 +210123,17 @@ func ParseGetApiDatasetBySlugOrIdRecordsResponse(rsp *http.Response) (*GetApiDat
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                              `json:"data"`
+			Error   []interface{}                                            `json:"error"`
+			Success GetApiDatasetBySlugOrIdRecords400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -205057,6 +210168,17 @@ func ParsePostApiDatasetBySlugOrIdRecordsResponse(rsp *http.Response) (*PostApiD
 			return nil, err
 		}
 		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                               `json:"data"`
+			Error   []interface{}                                             `json:"error"`
+			Success PostApiDatasetBySlugOrIdRecords400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -205105,6 +210227,17 @@ func ParsePatchApiDatasetBySlugOrIdRecordsByRecordIdResponse(rsp *http.Response)
 		}
 		response.JSON201 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                                          `json:"data"`
+			Error   []interface{}                                                        `json:"error"`
+			Success PatchApiDatasetBySlugOrIdRecordsByRecordId400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -205133,6 +210266,17 @@ func ParsePostApiDatasetBySlugOrIdUploadResponse(rsp *http.Response) (*PostApiDa
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                              `json:"data"`
+			Error   []interface{}                                            `json:"error"`
+			Success PostApiDatasetBySlugOrIdUpload400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -205185,6 +210329,17 @@ func ParseGetApiDatasetBySlugOrIdVersionsResponse(rsp *http.Response) (*GetApiDa
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                               `json:"data"`
+			Error   []interface{}                                             `json:"error"`
+			Success GetApiDatasetBySlugOrIdVersions400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -205231,6 +210386,17 @@ func ParsePostApiDatasetBySlugOrIdVersionsResponse(rsp *http.Response) (*PostApi
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                                `json:"data"`
+			Error   []interface{}                                              `json:"error"`
+			Success PostApiDatasetBySlugOrIdVersions400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -205290,6 +210456,17 @@ func ParseGetApiDatasetBySlugOrIdVersionsByVersionResponse(rsp *http.Response) (
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                                        `json:"data"`
+			Error   []interface{}                                                      `json:"error"`
+			Success GetApiDatasetBySlugOrIdVersionsByVersion400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -205339,6 +210516,17 @@ func ParsePostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse(rsp *http.Res
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                                                `json:"data"`
+			Error   []interface{}                                                              `json:"error"`
+			Success PostApiDatasetBySlugOrIdVersionsByVersionRestore400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -205413,6 +210601,20 @@ func ParseReceiveElevenLabsWebhookResponse(rsp *http.Response) (*ReceiveElevenLa
 	response := &ReceiveElevenLabsWebhookResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                        `json:"data"`
+			Error   []interface{}                                      `json:"error"`
+			Success ReceiveElevenLabsWebhook400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -205852,6 +211054,17 @@ func ParsePostApiEvaluatorsResponse(rsp *http.Response) (*PostApiEvaluatorsRespo
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                 `json:"data"`
+			Error   []interface{}                               `json:"error"`
+			Success PostApiEvaluators400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -205880,6 +211093,17 @@ func ParseDeleteApiEvaluatorsLabelResponse(rsp *http.Response) (*DeleteApiEvalua
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                        `json:"data"`
+			Error   []interface{}                                      `json:"error"`
+			Success DeleteApiEvaluatorsLabel400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest struct {
@@ -205992,6 +211216,17 @@ func ParseGetApiEvaluatorsVersionsResponse(rsp *http.Response) (*GetApiEvaluator
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                        `json:"data"`
+			Error   []interface{}                                      `json:"error"`
+			Success GetApiEvaluatorsVersions400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest struct {
 			Error   string  `json:"error"`
@@ -206067,6 +211302,17 @@ func ParseGetApiEvaluatorsByIdOrSlugResponse(rsp *http.Response) (*GetApiEvaluat
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                          `json:"data"`
+			Error   []interface{}                                        `json:"error"`
+			Success GetApiEvaluatorsByIdOrSlug400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest struct {
 			Error   string  `json:"error"`
@@ -206104,6 +211350,17 @@ func ParseDeleteApiEvaluatorsByIdResponse(rsp *http.Response) (*DeleteApiEvaluat
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                       `json:"data"`
+			Error   []interface{}                                     `json:"error"`
+			Success DeleteApiEvaluatorsById400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest struct {
@@ -206344,6 +211601,17 @@ func ParseGetApiExperimentsResponse(rsp *http.Response) (*GetApiExperimentsRespo
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                 `json:"data"`
+			Error   []interface{}                               `json:"error"`
+			Success GetApiExperiments400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -206574,6 +211842,17 @@ func ParseGetApiExperimentsRunsByRunIdResponse(rsp *http.Response) (*GetApiExper
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                            `json:"data"`
+			Error   []interface{}                                          `json:"error"`
+			Success GetApiExperimentsRunsByRunId400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -206683,6 +211962,17 @@ func ParseGetApiExperimentsRunsByRunIdResultsResponse(rsp *http.Response) (*GetA
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                                   `json:"data"`
+			Error   []interface{}                                                 `json:"error"`
+			Success GetApiExperimentsRunsByRunIdResults400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -206718,6 +212008,17 @@ func ParseGetApiExperimentsBySlugResponse(rsp *http.Response) (*GetApiExperiment
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                       `json:"data"`
+			Error   []interface{}                                     `json:"error"`
+			Success GetApiExperimentsBySlug400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -206844,6 +212145,17 @@ func ParsePostApiExperimentsBySlugVersionsByVersionRestoreResponse(rsp *http.Res
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                                                `json:"data"`
+			Error   []interface{}                                                              `json:"error"`
+			Success PostApiExperimentsBySlugVersionsByVersionRestore400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -206930,6 +212242,20 @@ func ParseReadProjectStoredObjectBytesResponse(rsp *http.Response) (*ReadProject
 		HTTPResponse: rsp,
 	}
 
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                            `json:"data"`
+			Error   []interface{}                                          `json:"error"`
+			Success ReadProjectStoredObjectBytes400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	}
+
 	return response, nil
 }
 
@@ -206946,6 +212272,20 @@ func ParseReadNamedProjectStoredObjectBytesResponse(rsp *http.Response) (*ReadNa
 		HTTPResponse: rsp,
 	}
 
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                                 `json:"data"`
+			Error   []interface{}                                               `json:"error"`
+			Success ReadNamedProjectStoredObjectBytes400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	}
+
 	return response, nil
 }
 
@@ -206960,6 +212300,20 @@ func ParseReadStoredObjectBytesResponse(rsp *http.Response) (*ReadStoredObjectBy
 	response := &ReadStoredObjectBytesResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                     `json:"data"`
+			Error   []interface{}                                   `json:"error"`
+			Success ReadStoredObjectBytes400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -208936,6 +214290,17 @@ func ParseListGrantsResponse(rsp *http.Response) (*ListGrantsResponse, error) {
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                          `json:"data"`
+			Error   []interface{}                        `json:"error"`
+			Success ListGrants400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -208982,6 +214347,17 @@ func ParseCreateGrantResponse(rsp *http.Response) (*CreateGrantResponse, error) 
 		}
 		response.JSON201 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                           `json:"data"`
+			Error   []interface{}                         `json:"error"`
+			Success CreateGrant400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -209010,6 +214386,17 @@ func ParseRevokeGrantResponse(rsp *http.Response) (*RevokeGrantResponse, error) 
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                           `json:"data"`
+			Error   []interface{}                         `json:"error"`
+			Success RevokeGrant400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -209057,6 +214444,17 @@ func ParseGetGrantResponse(rsp *http.Response) (*GetGrantResponse, error) {
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                        `json:"data"`
+			Error   []interface{}                      `json:"error"`
+			Success GetGrant400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -209103,6 +214501,17 @@ func ParseUpdateGrantResponse(rsp *http.Response) (*UpdateGrantResponse, error) 
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                           `json:"data"`
+			Error   []interface{}                         `json:"error"`
+			Success UpdateGrant400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -209140,6 +214549,17 @@ func ParseGetApiGraphsResponse(rsp *http.Response) (*GetApiGraphsResponse, error
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                            `json:"data"`
+			Error   []interface{}                          `json:"error"`
+			Success GetApiGraphs400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -209179,6 +214599,17 @@ func ParsePostApiGraphsResponse(rsp *http.Response) (*PostApiGraphsResponse, err
 		}
 		response.JSON201 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                             `json:"data"`
+			Error   []interface{}                           `json:"error"`
+			Success PostApiGraphs400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -209207,6 +214638,17 @@ func ParseDeleteApiGraphsByIdResponse(rsp *http.Response) (*DeleteApiGraphsByIdR
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                   `json:"data"`
+			Error   []interface{}                                 `json:"error"`
+			Success DeleteApiGraphsById400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -209246,6 +214688,17 @@ func ParseGetApiGraphsByIdResponse(rsp *http.Response) (*GetApiGraphsByIdRespons
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                `json:"data"`
+			Error   []interface{}                              `json:"error"`
+			Success GetApiGraphsById400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -209283,6 +214736,17 @@ func ParsePatchApiGraphsByIdResponse(rsp *http.Response) (*PatchApiGraphsByIdRes
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                  `json:"data"`
+			Error   []interface{}                                `json:"error"`
+			Success PatchApiGraphsById400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -209333,6 +214797,17 @@ func ParseGetApiGroupsResponse(rsp *http.Response) (*GetApiGroupsResponse, error
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                            `json:"data"`
+			Error   []interface{}                          `json:"error"`
+			Success GetApiGroups400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -209365,6 +214840,17 @@ func ParsePostApiGroupsResponse(rsp *http.Response) (*PostApiGroupsResponse, err
 		}
 		response.JSON201 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                             `json:"data"`
+			Error   []interface{}                           `json:"error"`
+			Success PostApiGroups400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -209392,6 +214878,17 @@ func ParseDeleteApiGroupsByIdResponse(rsp *http.Response) (*DeleteApiGroupsByIdR
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                   `json:"data"`
+			Error   []interface{}                                 `json:"error"`
+			Success DeleteApiGroupsById400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -209438,6 +214935,17 @@ func ParseGetApiGroupsByIdResponse(rsp *http.Response) (*GetApiGroupsByIdRespons
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                `json:"data"`
+			Error   []interface{}                              `json:"error"`
+			Success GetApiGroupsById400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -209467,6 +214975,17 @@ func ParsePatchApiGroupsByIdResponse(rsp *http.Response) (*PatchApiGroupsByIdRes
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                  `json:"data"`
+			Error   []interface{}                                `json:"error"`
+			Success PatchApiGroupsById400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -209503,6 +215022,17 @@ func ParseGetApiGroupsByIdBindingsResponse(rsp *http.Response) (*GetApiGroupsByI
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                        `json:"data"`
+			Error   []interface{}                                      `json:"error"`
+			Success GetApiGroupsByIdBindings400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -209534,6 +215064,17 @@ func ParsePostApiGroupsByIdBindingsResponse(rsp *http.Response) (*PostApiGroupsB
 		}
 		response.JSON201 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                         `json:"data"`
+			Error   []interface{}                                       `json:"error"`
+			Success PostApiGroupsByIdBindings400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -209561,6 +215102,17 @@ func ParseDeleteApiGroupsByIdBindingsByBindingIdResponse(rsp *http.Response) (*D
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                                      `json:"data"`
+			Error   []interface{}                                                    `json:"error"`
+			Success DeleteApiGroupsByIdBindingsByBindingId400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -209594,6 +215146,17 @@ func ParseGetApiGroupsByIdMembersResponse(rsp *http.Response) (*GetApiGroupsById
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                       `json:"data"`
+			Error   []interface{}                                     `json:"error"`
+			Success GetApiGroupsByIdMembers400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -209622,6 +215185,17 @@ func ParsePostApiGroupsByIdMembersResponse(rsp *http.Response) (*PostApiGroupsBy
 		}
 		response.JSON201 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                        `json:"data"`
+			Error   []interface{}                                      `json:"error"`
+			Success PostApiGroupsByIdMembers400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -209649,6 +215223,17 @@ func ParseDeleteApiGroupsByIdMembersByUserIdResponse(rsp *http.Response) (*Delet
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                                  `json:"data"`
+			Error   []interface{}                                                `json:"error"`
+			Success DeleteApiGroupsByIdMembersByUserId400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -209843,6 +215428,17 @@ func ParseListInstantEvalRunsResponse(rsp *http.Response) (*ListInstantEvalRunsR
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                   `json:"data"`
+			Error   []interface{}                                 `json:"error"`
+			Success ListInstantEvalRuns400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -210093,6 +215689,17 @@ func ParseGetInstantEvalRunResponse(rsp *http.Response) (*GetInstantEvalRunRespo
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                 `json:"data"`
+			Error   []interface{}                               `json:"error"`
+			Success GetInstantEvalRun400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -210194,6 +215801,17 @@ func ParseCancelInstantEvalRunResponse(rsp *http.Response) (*CancelInstantEvalRu
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                    `json:"data"`
+			Error   []interface{}                                  `json:"error"`
+			Success CancelInstantEvalRun400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
 		var dest struct {
 			Code      string                                        `json:"code"`
@@ -210290,6 +215908,17 @@ func ParseListInstantEvalRunResultsResponse(rsp *http.Response) (*ListInstantEva
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                         `json:"data"`
+			Error   []interface{}                                       `json:"error"`
+			Success ListInstantEvalRunResults400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -210361,6 +215990,17 @@ func ParseSampleInstantEvalRunResponse(rsp *http.Response) (*SampleInstantEvalRu
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                    `json:"data"`
+			Error   []interface{}                                  `json:"error"`
+			Success SampleInstantEvalRun400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -210390,6 +216030,17 @@ func ParsePostLangyControlFramesResponse(rsp *http.Response) (*PostLangyControlF
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                      `json:"data"`
+			Error   []interface{}                                    `json:"error"`
+			Success PostLangyControlFrames400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -210418,6 +216069,17 @@ func ParsePollLangyControlSessionResponse(rsp *http.Response) (*PollLangyControl
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                       `json:"data"`
+			Error   []interface{}                                     `json:"error"`
+			Success PollLangyControlSession400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -210450,6 +216112,17 @@ func ParseRegisterLangyControlSessionResponse(rsp *http.Response) (*RegisterLang
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                           `json:"data"`
+			Error   []interface{}                                         `json:"error"`
+			Success RegisterLangyControlSession400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -210522,6 +216195,17 @@ func ParseApproveLangyControlRequestResponse(rsp *http.Response) (*ApproveLangyC
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                          `json:"data"`
+			Error   []interface{}                                        `json:"error"`
+			Success ApproveLangyControlRequest400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -210554,6 +216238,17 @@ func ParseCancelLangyControlRequestResponse(rsp *http.Response) (*CancelLangyCon
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                         `json:"data"`
+			Error   []interface{}                                       `json:"error"`
+			Success CancelLangyControlRequest400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -210572,6 +216267,20 @@ func ParseStartLangyConversationTurnResponse(rsp *http.Response) (*StartLangyCon
 		HTTPResponse: rsp,
 	}
 
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                          `json:"data"`
+			Error   []interface{}                                        `json:"error"`
+			Success StartLangyConversationTurn400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	}
+
 	return response, nil
 }
 
@@ -210586,6 +216295,20 @@ func ParseContinueLangyConversationTurnResponse(rsp *http.Response) (*ContinueLa
 	response := &ContinueLangyConversationTurnResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                             `json:"data"`
+			Error   []interface{}                                           `json:"error"`
+			Success ContinueLangyConversationTurn400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -210658,6 +216381,17 @@ func ParseLangyLocalReadCallResponse(rsp *http.Response) (*LangyLocalReadCallRes
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                  `json:"data"`
+			Error   []interface{}                                `json:"error"`
+			Success LangyLocalReadCall400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -210686,6 +216420,17 @@ func ParseLangyLocalCancelCallResponse(rsp *http.Response) (*LangyLocalCancelCal
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                    `json:"data"`
+			Error   []interface{}                                  `json:"error"`
+			Success LangyLocalCancelCall400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -210724,6 +216469,17 @@ func ParseLangyLocalCreateRequestResponse(rsp *http.Response) (*LangyLocalCreate
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                       `json:"data"`
+			Error   []interface{}                                     `json:"error"`
+			Success LangyLocalCreateRequest400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -210780,6 +216536,17 @@ func ParseLangyLocalWorkspaceResponse(rsp *http.Response) (*LangyLocalWorkspaceR
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                   `json:"data"`
+			Error   []interface{}                                 `json:"error"`
+			Success LangyLocalWorkspace400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -210841,6 +216608,17 @@ func ParseLangyLocalStartWaitResponse(rsp *http.Response) (*LangyLocalStartWaitR
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                   `json:"data"`
+			Error   []interface{}                                 `json:"error"`
+			Success LangyLocalStartWait400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -210874,6 +216652,17 @@ func ParseLangyLocalReadWaitResponse(rsp *http.Response) (*LangyLocalReadWaitRes
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                  `json:"data"`
+			Error   []interface{}                                `json:"error"`
+			Success LangyLocalReadWait400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -211656,6 +217445,17 @@ func ParsePostApiMonitorsResponse(rsp *http.Response) (*PostApiMonitorsResponse,
 		}
 		response.JSON201 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                               `json:"data"`
+			Error   []interface{}                             `json:"error"`
+			Success PostApiMonitors400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -211684,6 +217484,17 @@ func ParseDeleteApiMonitorsByIdResponse(rsp *http.Response) (*DeleteApiMonitorsB
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                     `json:"data"`
+			Error   []interface{}                                   `json:"error"`
+			Success DeleteApiMonitorsById400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest struct {
@@ -211752,6 +217563,17 @@ func ParseGetApiMonitorsByIdResponse(rsp *http.Response) (*GetApiMonitorsByIdRes
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                  `json:"data"`
+			Error   []interface{}                                `json:"error"`
+			Success GetApiMonitorsById400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest struct {
 			Error   string  `json:"error"`
@@ -211819,6 +217641,17 @@ func ParsePatchApiMonitorsByIdResponse(rsp *http.Response) (*PatchApiMonitorsByI
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                    `json:"data"`
+			Error   []interface{}                                  `json:"error"`
+			Success PatchApiMonitorsById400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest struct {
 			Error   string  `json:"error"`
@@ -211858,6 +217691,17 @@ func ParsePostApiMonitorsByIdToggleResponse(rsp *http.Response) (*PostApiMonitor
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                         `json:"data"`
+			Error   []interface{}                                       `json:"error"`
+			Success PostApiMonitorsByIdToggle400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest struct {
 			Error   string  `json:"error"`
@@ -211884,6 +217728,20 @@ func ParseExplainClickHouseQueryResponse(rsp *http.Response) (*ExplainClickHouse
 	response := &ExplainClickHouseQueryResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                      `json:"data"`
+			Error   []interface{}                                    `json:"error"`
+			Success ExplainClickHouseQuery400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -211922,6 +217780,17 @@ func ParsePostApiOptimizationByWorkflowIdByVersionIdResponse(rsp *http.Response)
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                                          `json:"data"`
+			Error   []interface{}                                                        `json:"error"`
+			Success PostApiOptimizationByWorkflowIdByVersionId400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -212086,6 +217955,17 @@ func ParseCreateOrganizationInvitesResponse(rsp *http.Response) (*CreateOrganiza
 		}
 		response.JSON201 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                         `json:"data"`
+			Error   []interface{}                                       `json:"error"`
+			Success CreateOrganizationInvites400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -212113,6 +217993,17 @@ func ParseRevokeOrganizationInviteResponse(rsp *http.Response) (*RevokeOrganizat
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                        `json:"data"`
+			Error   []interface{}                                      `json:"error"`
+			Success RevokeOrganizationInvite400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -212155,6 +218046,17 @@ func ParseListOrganizationMembersResponse(rsp *http.Response) (*ListOrganization
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                       `json:"data"`
+			Error   []interface{}                                     `json:"error"`
+			Success ListOrganizationMembers400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -212182,6 +218084,17 @@ func ParseRemoveOrganizationMemberResponse(rsp *http.Response) (*RemoveOrganizat
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                        `json:"data"`
+			Error   []interface{}                                      `json:"error"`
+			Success RemoveOrganizationMember400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -212228,6 +218141,17 @@ func ParseGetOrganizationMemberResponse(rsp *http.Response) (*GetOrganizationMem
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                     `json:"data"`
+			Error   []interface{}                                   `json:"error"`
+			Success GetOrganizationMember400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -212269,6 +218193,17 @@ func ParseUpdateOrganizationMemberResponse(rsp *http.Response) (*UpdateOrganizat
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                        `json:"data"`
+			Error   []interface{}                                      `json:"error"`
+			Success UpdateOrganizationMember400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -212329,6 +218264,17 @@ func ParseGetOrganizationMemberAccessResponse(rsp *http.Response) (*GetOrganizat
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                           `json:"data"`
+			Error   []interface{}                                         `json:"error"`
+			Success GetOrganizationMemberAccess400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -212404,6 +218350,17 @@ func ParseProvisionOrganizationResponse(rsp *http.Response) (*ProvisionOrganizat
 		}
 		response.JSON201 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                     `json:"data"`
+			Error   []interface{}                                   `json:"error"`
+			Success ProvisionOrganization400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -212436,6 +218393,17 @@ func ParseGetOrganizationByIdResponse(rsp *http.Response) (*GetOrganizationByIdR
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                   `json:"data"`
+			Error   []interface{}                                 `json:"error"`
+			Success GetOrganizationById400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -212471,6 +218439,17 @@ func ParseGetPlatformHealthResponse(rsp *http.Response) (*GetPlatformHealthRespo
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                 `json:"data"`
+			Error   []interface{}                               `json:"error"`
+			Success GetPlatformHealth400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
 		var dest struct {
@@ -212523,6 +218502,17 @@ func ParseGetPlatformHealthSubsystemResponse(rsp *http.Response) (*GetPlatformHe
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                          `json:"data"`
+			Error   []interface{}                                        `json:"error"`
+			Success GetPlatformHealthSubsystem400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
 		var dest struct {
 			CheckedAt string `json:"checkedAt"`
@@ -212567,6 +218557,17 @@ func ParseListProjectsResponse(rsp *http.Response) (*ListProjectsResponse, error
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                            `json:"data"`
+			Error   []interface{}                          `json:"error"`
+			Success ListProjects400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -212635,6 +218636,17 @@ func ParseArchiveProjectResponse(rsp *http.Response) (*ArchiveProjectResponse, e
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                              `json:"data"`
+			Error   []interface{}                            `json:"error"`
+			Success ArchiveProject400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -212670,6 +218682,17 @@ func ParseGetProjectResponse(rsp *http.Response) (*GetProjectResponse, error) {
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                          `json:"data"`
+			Error   []interface{}                        `json:"error"`
+			Success GetProject400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -212707,6 +218730,17 @@ func ParseUpdateProjectResponse(rsp *http.Response) (*UpdateProjectResponse, err
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                             `json:"data"`
+			Error   []interface{}                           `json:"error"`
+			Success UpdateProject400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -212735,6 +218769,17 @@ func ParseGetProjectApiKeyResponse(rsp *http.Response) (*GetProjectApiKeyRespons
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                `json:"data"`
+			Error   []interface{}                              `json:"error"`
+			Success GetProjectApiKey400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -212762,6 +218807,17 @@ func ParseRegenerateProjectApiKeyResponse(rsp *http.Response) (*RegenerateProjec
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                       `json:"data"`
+			Error   []interface{}                                     `json:"error"`
+			Success RegenerateProjectApiKey400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -215511,10 +221567,10 @@ func ParseGetApiPromptsResponse(rsp *http.Response) (*GetApiPromptsResponse, err
 				JsonSchema *GetApiPrompts200JSONResponseBody_Outputs_JsonSchema `json:"json_schema,omitempty"`
 				Type       GetApiPrompts200JSONResponseBodyOutputsType          `json:"type"`
 			} `json:"outputs"`
-			Parameters         map[string]*JsonValue `json:"parameters"`
-			PlatformUrl        string                `json:"platformUrl"`
-			ProjectId          string                `json:"projectId"`
-			Prompt             string                `json:"prompt"`
+			Parameters         map[string]*UnderscoreUnderscoreSchema0 `json:"parameters"`
+			PlatformUrl        string                                  `json:"platformUrl"`
+			ProjectId          string                                  `json:"projectId"`
+			Prompt             string                                  `json:"prompt"`
 			PromptingTechnique *struct {
 				Demonstrations *struct {
 					Id     *string `json:"id,omitempty"`
@@ -215647,10 +221703,10 @@ func ParsePostApiPromptsResponse(rsp *http.Response) (*PostApiPromptsResponse, e
 				JsonSchema *PostApiPrompts200JSONResponseBody_Outputs_JsonSchema `json:"json_schema,omitempty"`
 				Type       PostApiPrompts200JSONResponseBodyOutputsType          `json:"type"`
 			} `json:"outputs"`
-			Parameters         map[string]*JsonValue `json:"parameters"`
-			PlatformUrl        string                `json:"platformUrl"`
-			ProjectId          string                `json:"projectId"`
-			Prompt             string                `json:"prompt"`
+			Parameters         map[string]*UnderscoreUnderscoreSchema0 `json:"parameters"`
+			PlatformUrl        string                                  `json:"platformUrl"`
+			ProjectId          string                                  `json:"projectId"`
+			Prompt             string                                  `json:"prompt"`
 			PromptingTechnique *struct {
 				Demonstrations *struct {
 					Id     *string `json:"id,omitempty"`
@@ -216147,10 +222203,10 @@ func ParseGetApiPromptsByIdResponse(rsp *http.Response) (*GetApiPromptsByIdRespo
 				JsonSchema *GetApiPromptsById200JSONResponseBody_Outputs_JsonSchema `json:"json_schema,omitempty"`
 				Type       GetApiPromptsById200JSONResponseBodyOutputsType          `json:"type"`
 			} `json:"outputs"`
-			Parameters         map[string]*JsonValue `json:"parameters"`
-			PlatformUrl        string                `json:"platformUrl"`
-			ProjectId          string                `json:"projectId"`
-			Prompt             string                `json:"prompt"`
+			Parameters         map[string]*UnderscoreUnderscoreSchema0 `json:"parameters"`
+			PlatformUrl        string                                  `json:"platformUrl"`
+			ProjectId          string                                  `json:"projectId"`
+			Prompt             string                                  `json:"prompt"`
 			PromptingTechnique *struct {
 				Demonstrations *struct {
 					Id     *string `json:"id,omitempty"`
@@ -216293,10 +222349,10 @@ func ParsePutApiPromptsByIdResponse(rsp *http.Response) (*PutApiPromptsByIdRespo
 				JsonSchema *PutApiPromptsById200JSONResponseBody_Outputs_JsonSchema `json:"json_schema,omitempty"`
 				Type       PutApiPromptsById200JSONResponseBodyOutputsType          `json:"type"`
 			} `json:"outputs"`
-			Parameters         map[string]*JsonValue `json:"parameters"`
-			PlatformUrl        string                `json:"platformUrl"`
-			ProjectId          string                `json:"projectId"`
-			Prompt             string                `json:"prompt"`
+			Parameters         map[string]*UnderscoreUnderscoreSchema0 `json:"parameters"`
+			PlatformUrl        string                                  `json:"platformUrl"`
+			ProjectId          string                                  `json:"projectId"`
+			Prompt             string                                  `json:"prompt"`
 			PromptingTechnique *struct {
 				Demonstrations *struct {
 					Id     *string `json:"id,omitempty"`
@@ -216522,9 +222578,9 @@ func ParsePostApiPromptsByIdSyncResponse(rsp *http.Response) (*PostApiPromptsByI
 					JsonSchema *PostApiPromptsByIdSync200JSONResponseBody_Prompt_Outputs_JsonSchema `json:"json_schema,omitempty"`
 					Type       PostApiPromptsByIdSync200JSONResponseBodyPromptOutputsType           `json:"type"`
 				} `json:"outputs"`
-				Parameters         map[string]*JsonValue `json:"parameters"`
-				ProjectId          string                `json:"projectId"`
-				Prompt             string                `json:"prompt"`
+				Parameters         map[string]*UnderscoreUnderscoreSchema0 `json:"parameters"`
+				ProjectId          string                                  `json:"projectId"`
+				Prompt             string                                  `json:"prompt"`
 				PromptingTechnique *struct {
 					Demonstrations *struct {
 						Id     *string `json:"id,omitempty"`
@@ -216739,10 +222795,10 @@ func ParseGetApiPromptsByIdVersionsResponse(rsp *http.Response) (*GetApiPromptsB
 				JsonSchema *GetApiPromptsByIdVersions200JSONResponseBody_Outputs_JsonSchema `json:"json_schema,omitempty"`
 				Type       GetApiPromptsByIdVersions200JSONResponseBodyOutputsType          `json:"type"`
 			} `json:"outputs"`
-			Parameters         map[string]*JsonValue `json:"parameters"`
-			PlatformUrl        string                `json:"platformUrl"`
-			ProjectId          string                `json:"projectId"`
-			Prompt             string                `json:"prompt"`
+			Parameters         map[string]*UnderscoreUnderscoreSchema0 `json:"parameters"`
+			PlatformUrl        string                                  `json:"platformUrl"`
+			ProjectId          string                                  `json:"projectId"`
+			Prompt             string                                  `json:"prompt"`
 			PromptingTechnique *struct {
 				Demonstrations *struct {
 					Id     *string `json:"id,omitempty"`
@@ -216885,10 +222941,10 @@ func ParsePostApiPromptsByIdVersionsByVersionIdRestoreResponse(rsp *http.Respons
 				JsonSchema *PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBody_Outputs_JsonSchema `json:"json_schema,omitempty"`
 				Type       PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyOutputsType          `json:"type"`
 			} `json:"outputs"`
-			Parameters         map[string]*JsonValue `json:"parameters"`
-			PlatformUrl        string                `json:"platformUrl"`
-			ProjectId          string                `json:"projectId"`
-			Prompt             string                `json:"prompt"`
+			Parameters         map[string]*UnderscoreUnderscoreSchema0 `json:"parameters"`
+			PlatformUrl        string                                  `json:"platformUrl"`
+			ProjectId          string                                  `json:"projectId"`
+			Prompt             string                                  `json:"prompt"`
 			PromptingTechnique *struct {
 				Demonstrations *struct {
 					Id     *string `json:"id,omitempty"`
@@ -217618,6 +223674,17 @@ func ParseListRoleBindingsResponse(rsp *http.Response) (*ListRoleBindingsRespons
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                `json:"data"`
+			Error   []interface{}                              `json:"error"`
+			Success ListRoleBindings400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -217659,6 +223726,17 @@ func ParseCreateRoleBindingResponse(rsp *http.Response) (*CreateRoleBindingRespo
 		}
 		response.JSON201 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                 `json:"data"`
+			Error   []interface{}                               `json:"error"`
+			Success CreateRoleBinding400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -217686,6 +223764,17 @@ func ParseDeleteRoleBindingResponse(rsp *http.Response) (*DeleteRoleBindingRespo
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                 `json:"data"`
+			Error   []interface{}                               `json:"error"`
+			Success DeleteRoleBinding400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -217728,6 +223817,17 @@ func ParseUpdateRoleBindingResponse(rsp *http.Response) (*UpdateRoleBindingRespo
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                 `json:"data"`
+			Error   []interface{}                               `json:"error"`
+			Success UpdateRoleBinding400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -217764,6 +223864,17 @@ func ParseListRolesResponse(rsp *http.Response) (*ListRolesResponse, error) {
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                         `json:"data"`
+			Error   []interface{}                       `json:"error"`
+			Success ListRoles400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -217797,6 +223908,17 @@ func ParseCreateRoleResponse(rsp *http.Response) (*CreateRoleResponse, error) {
 			return nil, err
 		}
 		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                          `json:"data"`
+			Error   []interface{}                        `json:"error"`
+			Success CreateRole400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -217860,6 +223982,17 @@ func ParseDeleteRoleResponse(rsp *http.Response) (*DeleteRoleResponse, error) {
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                          `json:"data"`
+			Error   []interface{}                        `json:"error"`
+			Success DeleteRole400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -217894,6 +224027,17 @@ func ParseGetRoleResponse(rsp *http.Response) (*GetRoleResponse, error) {
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                       `json:"data"`
+			Error   []interface{}                     `json:"error"`
+			Success GetRole400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -217927,6 +224071,17 @@ func ParseUpdateRoleResponse(rsp *http.Response) (*UpdateRoleResponse, error) {
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                          `json:"data"`
+			Error   []interface{}                        `json:"error"`
+			Success UpdateRole400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -218017,6 +224172,17 @@ func ParseListRunPlansResponse(rsp *http.Response) (*ListRunPlansResponse, error
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                            `json:"data"`
+			Error   []interface{}                          `json:"error"`
+			Success ListRunPlans400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -218097,6 +224263,17 @@ func ParseRunRunPlanResponse(rsp *http.Response) (*RunRunPlanResponse, error) {
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                          `json:"data"`
+			Error   []interface{}                        `json:"error"`
+			Success RunRunPlan400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -218128,6 +224305,17 @@ func ParseArchiveRunPlanResponse(rsp *http.Response) (*ArchiveRunPlanResponse, e
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                              `json:"data"`
+			Error   []interface{}                            `json:"error"`
+			Success ArchiveRunPlan400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest struct {
@@ -218228,6 +224416,17 @@ func ParseGetRunPlanResponse(rsp *http.Response) (*GetRunPlanResponse, error) {
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                          `json:"data"`
+			Error   []interface{}                        `json:"error"`
+			Success GetRunPlan400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest struct {
 			Error   string  `json:"error"`
@@ -218317,6 +224516,17 @@ func ParseRerunRunPlanResponse(rsp *http.Response) (*RerunRunPlanResponse, error
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                            `json:"data"`
+			Error   []interface{}                          `json:"error"`
+			Success RerunRunPlan400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest struct {
@@ -218665,6 +224875,17 @@ func ParsePostApiScenariosResponse(rsp *http.Response) (*PostApiScenariosRespons
 		}
 		response.JSON201 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                `json:"data"`
+			Error   []interface{}                              `json:"error"`
+			Success PostApiScenarios400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -218693,6 +224914,17 @@ func ParseDeleteApiScenariosByIdResponse(rsp *http.Response) (*DeleteApiScenario
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                      `json:"data"`
+			Error   []interface{}                                    `json:"error"`
+			Success DeleteApiScenariosById400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest struct {
@@ -218763,6 +224995,17 @@ func ParseGetApiScenariosByIdResponse(rsp *http.Response) (*GetApiScenariosByIdR
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                   `json:"data"`
+			Error   []interface{}                                 `json:"error"`
+			Success GetApiScenariosById400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest struct {
 			Error string `json:"error"`
@@ -218831,6 +225074,17 @@ func ParsePatchApiScenariosByIdResponse(rsp *http.Response) (*PatchApiScenariosB
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                     `json:"data"`
+			Error   []interface{}                                   `json:"error"`
+			Success PatchApiScenariosById400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest struct {
@@ -218901,6 +225155,17 @@ func ParsePutApiScenariosByIdResponse(rsp *http.Response) (*PutApiScenariosByIdR
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                   `json:"data"`
+			Error   []interface{}                                 `json:"error"`
+			Success PutApiScenariosById400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest struct {
 			Error string `json:"error"`
@@ -218958,6 +225223,17 @@ func ParseGetApiScenariosByIdVersionsResponse(rsp *http.Response) (*GetApiScenar
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                           `json:"data"`
+			Error   []interface{}                                         `json:"error"`
+			Success GetApiScenariosByIdVersions400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest struct {
@@ -219039,6 +225315,17 @@ func ParseGetApiScenariosByIdVersionsByVersionResponse(rsp *http.Response) (*Get
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                                    `json:"data"`
+			Error   []interface{}                                                  `json:"error"`
+			Success GetApiScenariosByIdVersionsByVersion400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest struct {
@@ -219142,6 +225429,17 @@ func ParseRevokeScimTokenResponse(rsp *http.Response) (*RevokeScimTokenResponse,
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                               `json:"data"`
+			Error   []interface{}                             `json:"error"`
+			Success RevokeScimToken400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -219173,6 +225471,17 @@ func ParseGetApiSecretsResponse(rsp *http.Response) (*GetApiSecretsResponse, err
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                             `json:"data"`
+			Error   []interface{}                           `json:"error"`
+			Success GetApiSecrets400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -219206,6 +225515,17 @@ func ParsePostApiSecretsResponse(rsp *http.Response) (*PostApiSecretsResponse, e
 		}
 		response.JSON201 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                              `json:"data"`
+			Error   []interface{}                            `json:"error"`
+			Success PostApiSecrets400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -219234,6 +225554,17 @@ func ParseDeleteApiSecretsByIdResponse(rsp *http.Response) (*DeleteApiSecretsByI
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                    `json:"data"`
+			Error   []interface{}                                  `json:"error"`
+			Success DeleteApiSecretsById400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -219267,6 +225598,17 @@ func ParseGetApiSecretsByIdResponse(rsp *http.Response) (*GetApiSecretsByIdRespo
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                 `json:"data"`
+			Error   []interface{}                               `json:"error"`
+			Success GetApiSecretsById400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -219298,6 +225640,17 @@ func ParsePutApiSecretsByIdResponse(rsp *http.Response) (*PutApiSecretsByIdRespo
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                 `json:"data"`
+			Error   []interface{}                               `json:"error"`
+			Success PutApiSecretsById400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -219391,6 +225744,17 @@ func ParseGetApiSimulationRunsResponse(rsp *http.Response) (*GetApiSimulationRun
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                    `json:"data"`
+			Error   []interface{}                                  `json:"error"`
+			Success GetApiSimulationRuns400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -219441,6 +225805,17 @@ func ParseGetApiSimulationRunsBatchesListResponse(rsp *http.Response) (*GetApiSi
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                               `json:"data"`
+			Error   []interface{}                                             `json:"error"`
+			Success GetApiSimulationRunsBatchesList400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -219486,6 +225861,17 @@ func ParseGetApiSimulationRunsBatchesByBatchRunIdResponse(rsp *http.Response) (*
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                                       `json:"data"`
+			Error   []interface{}                                                     `json:"error"`
+			Success GetApiSimulationRunsBatchesByBatchRunId400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest struct {
@@ -219584,6 +225970,17 @@ func ParseGetApiSimulationRunsByScenarioRunIdResponse(rsp *http.Response) (*GetA
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                                   `json:"data"`
+			Error   []interface{}                                                 `json:"error"`
+			Success GetApiSimulationRunsByScenarioRunId400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest struct {
 			Error string `json:"error"`
@@ -219666,6 +226063,17 @@ func ParseCreateStoredObjectUploadResponse(rsp *http.Response) (*CreateStoredObj
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                        `json:"data"`
+			Error   []interface{}                                      `json:"error"`
+			Success CreateStoredObjectUpload400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -219700,6 +226108,17 @@ func ParseConfirmStoredObjectUploadResponse(rsp *http.Response) (*ConfirmStoredO
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                         `json:"data"`
+			Error   []interface{}                                       `json:"error"`
+			Success ConfirmStoredObjectUpload400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -219729,6 +226148,17 @@ func ParseDeleteStoredObjectResponse(rsp *http.Response) (*DeleteStoredObjectRes
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                  `json:"data"`
+			Error   []interface{}                                `json:"error"`
+			Success DeleteStoredObject400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -219784,6 +226214,17 @@ func ParseGetStoredObjectResponse(rsp *http.Response) (*GetStoredObjectResponse,
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                               `json:"data"`
+			Error   []interface{}                             `json:"error"`
+			Success GetStoredObject400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -219833,6 +226274,17 @@ func ParseGetApiSuitesResponse(rsp *http.Response) (*GetApiSuitesResponse, error
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                            `json:"data"`
+			Error   []interface{}                          `json:"error"`
+			Success GetApiSuites400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -219884,6 +226336,17 @@ func ParsePostApiSuitesResponse(rsp *http.Response) (*PostApiSuitesResponse, err
 		}
 		response.JSON201 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                             `json:"data"`
+			Error   []interface{}                           `json:"error"`
+			Success PostApiSuites400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -219912,6 +226375,17 @@ func ParseDeleteApiSuitesByIdResponse(rsp *http.Response) (*DeleteApiSuitesByIdR
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                   `json:"data"`
+			Error   []interface{}                                 `json:"error"`
+			Success DeleteApiSuitesById400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest struct {
@@ -219973,6 +226447,17 @@ func ParseGetApiSuitesByIdResponse(rsp *http.Response) (*GetApiSuitesByIdRespons
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                `json:"data"`
+			Error   []interface{}                              `json:"error"`
+			Success GetApiSuitesById400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest struct {
 			Error   string  `json:"error"`
@@ -220032,6 +226517,17 @@ func ParsePatchApiSuitesByIdResponse(rsp *http.Response) (*PatchApiSuitesByIdRes
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                  `json:"data"`
+			Error   []interface{}                                `json:"error"`
+			Success PatchApiSuitesById400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest struct {
@@ -220093,6 +226589,17 @@ func ParsePostApiSuitesByIdDuplicateResponse(rsp *http.Response) (*PostApiSuites
 		}
 		response.JSON201 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                          `json:"data"`
+			Error   []interface{}                                        `json:"error"`
+			Success PostApiSuitesByIdDuplicate400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest struct {
 			Error   string  `json:"error"`
@@ -220153,6 +226660,17 @@ func ParsePostApiSuitesByIdRunResponse(rsp *http.Response) (*PostApiSuitesByIdRu
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                    `json:"data"`
+			Error   []interface{}                                  `json:"error"`
+			Success PostApiSuitesByIdRun400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest struct {
 			Error   string  `json:"error"`
@@ -220203,6 +226721,17 @@ func ParseGetApiTeamsResponse(rsp *http.Response) (*GetApiTeamsResponse, error) 
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                           `json:"data"`
+			Error   []interface{}                         `json:"error"`
+			Success GetApiTeams400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -220236,6 +226765,17 @@ func ParsePostApiTeamsResponse(rsp *http.Response) (*PostApiTeamsResponse, error
 		}
 		response.JSON201 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                            `json:"data"`
+			Error   []interface{}                          `json:"error"`
+			Success PostApiTeams400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -220265,6 +226805,17 @@ func ParseDeleteApiTeamsByIdResponse(rsp *http.Response) (*DeleteApiTeamsByIdRes
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                  `json:"data"`
+			Error   []interface{}                                `json:"error"`
+			Success DeleteApiTeamsById400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -220299,6 +226850,17 @@ func ParseGetApiTeamsByIdResponse(rsp *http.Response) (*GetApiTeamsByIdResponse,
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                               `json:"data"`
+			Error   []interface{}                             `json:"error"`
+			Success GetApiTeamsById400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -220331,6 +226893,17 @@ func ParsePatchApiTeamsByIdResponse(rsp *http.Response) (*PatchApiTeamsByIdRespo
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                 `json:"data"`
+			Error   []interface{}                               `json:"error"`
+			Success PatchApiTeamsById400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -220365,6 +226938,17 @@ func ParseGetApiTeamsByIdMembersResponse(rsp *http.Response) (*GetApiTeamsByIdMe
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                      `json:"data"`
+			Error   []interface{}                                    `json:"error"`
+			Success GetApiTeamsByIdMembers400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -220393,6 +226977,17 @@ func ParsePostApiTeamsByIdMembersResponse(rsp *http.Response) (*PostApiTeamsById
 		}
 		response.JSON201 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                       `json:"data"`
+			Error   []interface{}                                     `json:"error"`
+			Success PostApiTeamsByIdMembers400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -220420,6 +227015,17 @@ func ParseDeleteApiTeamsByIdMembersByUserIdResponse(rsp *http.Response) (*Delete
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                                 `json:"data"`
+			Error   []interface{}                                               `json:"error"`
+			Success DeleteApiTeamsByIdMembersByUserId400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -220454,6 +227060,17 @@ func ParseGetApiTeamsByIdProjectsResponse(rsp *http.Response) (*GetApiTeamsByIdP
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                       `json:"data"`
+			Error   []interface{}                                     `json:"error"`
+			Success GetApiTeamsByIdProjects400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -220532,6 +227149,17 @@ func ParseListTestSuitesResponse(rsp *http.Response) (*ListTestSuitesResponse, e
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                              `json:"data"`
+			Error   []interface{}                            `json:"error"`
+			Success ListTestSuites400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -220609,6 +227237,17 @@ func ParseCreateTestSuiteResponse(rsp *http.Response) (*CreateTestSuiteResponse,
 		}
 		response.JSON201 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                               `json:"data"`
+			Error   []interface{}                             `json:"error"`
+			Success CreateTestSuite400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -220640,6 +227279,17 @@ func ParseArchiveTestSuiteResponse(rsp *http.Response) (*ArchiveTestSuiteRespons
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                `json:"data"`
+			Error   []interface{}                              `json:"error"`
+			Success ArchiveTestSuite400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest struct {
@@ -220737,6 +227387,17 @@ func ParseGetTestSuiteResponse(rsp *http.Response) (*GetTestSuiteResponse, error
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                            `json:"data"`
+			Error   []interface{}                          `json:"error"`
+			Success GetTestSuite400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest struct {
 			Error   string  `json:"error"`
@@ -220823,6 +227484,17 @@ func ParseUpdateTestSuiteResponse(rsp *http.Response) (*UpdateTestSuiteResponse,
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                               `json:"data"`
+			Error   []interface{}                             `json:"error"`
+			Success UpdateTestSuite400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest struct {
@@ -220913,6 +227585,17 @@ func ParseRunTestSuiteResponse(rsp *http.Response) (*RunTestSuiteResponse, error
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                            `json:"data"`
+			Error   []interface{}                          `json:"error"`
+			Success RunTestSuite400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest struct {
@@ -221201,6 +227884,17 @@ func ParsePatchApiTracesByTraceIdMetadataResponse(rsp *http.Response) (*PatchApi
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                               `json:"data"`
+			Error   []interface{}                                             `json:"error"`
+			Success PatchApiTracesByTraceIdMetadata400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -221436,6 +228130,17 @@ func ParsePostApiTriggersResponse(rsp *http.Response) (*PostApiTriggersResponse,
 		}
 		response.JSON201 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                               `json:"data"`
+			Error   []interface{}                             `json:"error"`
+			Success PostApiTriggers400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -221464,6 +228169,17 @@ func ParseDeleteApiTriggersByIdResponse(rsp *http.Response) (*DeleteApiTriggersB
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                     `json:"data"`
+			Error   []interface{}                                   `json:"error"`
+			Success DeleteApiTriggersById400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest struct {
@@ -221536,6 +228252,17 @@ func ParseGetApiTriggersByIdResponse(rsp *http.Response) (*GetApiTriggersByIdRes
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                  `json:"data"`
+			Error   []interface{}                                `json:"error"`
+			Success GetApiTriggersById400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest struct {
 			Error   string  `json:"error"`
@@ -221606,6 +228333,17 @@ func ParsePatchApiTriggersByIdResponse(rsp *http.Response) (*PatchApiTriggersByI
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                    `json:"data"`
+			Error   []interface{}                                  `json:"error"`
+			Success PatchApiTriggersById400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest struct {
@@ -221678,6 +228416,17 @@ func ParsePostApiTriggersByIdDisableResponse(rsp *http.Response) (*PostApiTrigge
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                          `json:"data"`
+			Error   []interface{}                                        `json:"error"`
+			Success PostApiTriggersByIdDisable400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest struct {
 			Error   string  `json:"error"`
@@ -221749,6 +228498,17 @@ func ParsePostApiTriggersByIdEnableResponse(rsp *http.Response) (*PostApiTrigger
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                         `json:"data"`
+			Error   []interface{}                                       `json:"error"`
+			Success PostApiTriggersByIdEnable400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest struct {
 			Error   string  `json:"error"`
@@ -221797,6 +228557,17 @@ func ParseGetApiTriggersByIdFiresResponse(rsp *http.Response) (*GetApiTriggersBy
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                       `json:"data"`
+			Error   []interface{}                                     `json:"error"`
+			Success GetApiTriggersByIdFires400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest struct {
 			Error   string  `json:"error"`
@@ -221843,6 +228614,17 @@ func ParsePostApiTriggersByIdTestFireResponse(rsp *http.Response) (*PostApiTrigg
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                           `json:"data"`
+			Error   []interface{}                                         `json:"error"`
+			Success PostApiTriggersByIdTestFire400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest struct {
@@ -221898,6 +228680,20 @@ func ParseReadUserAvatarBytesResponse(rsp *http.Response) (*ReadUserAvatarBytesR
 	response := &ReadUserAvatarBytesResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                   `json:"data"`
+			Error   []interface{}                                 `json:"error"`
+			Success ReadUserAvatarBytes400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -221991,6 +228787,17 @@ func ParseDeleteApiWorkflowsByIdResponse(rsp *http.Response) (*DeleteApiWorkflow
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                      `json:"data"`
+			Error   []interface{}                                    `json:"error"`
+			Success DeleteApiWorkflowsById400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -222027,6 +228834,17 @@ func ParseGetApiWorkflowsByIdResponse(rsp *http.Response) (*GetApiWorkflowsByIdR
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                   `json:"data"`
+			Error   []interface{}                                 `json:"error"`
+			Success GetApiWorkflowsById400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -222062,6 +228880,17 @@ func ParsePatchApiWorkflowsByIdResponse(rsp *http.Response) (*PatchApiWorkflowsB
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                     `json:"data"`
+			Error   []interface{}                                   `json:"error"`
+			Success PatchApiWorkflowsById400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -222133,6 +228962,17 @@ func ParsePostApiWorkflowsByWorkflowIdRunResponse(rsp *http.Response) (*PostApiW
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                               `json:"data"`
+			Error   []interface{}                                             `json:"error"`
+			Success PostApiWorkflowsByWorkflowIdRun400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -222171,6 +229011,17 @@ func ParsePostApiWorkflowsByWorkflowIdByVersionIdRunResponse(rsp *http.Response)
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                                          `json:"data"`
+			Error   []interface{}                                                        `json:"error"`
+			Success PostApiWorkflowsByWorkflowIdByVersionIdRun400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -222244,6 +229095,17 @@ func ParsePostApiWebhooksV1EndpointsResponse(rsp *http.Response) (*PostApiWebhoo
 		}
 		response.JSON201 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                          `json:"data"`
+			Error   []interface{}                                        `json:"error"`
+			Success PostApiWebhooksV1Endpoints400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -222274,6 +229136,17 @@ func ParseDeleteApiWebhooksV1EndpointsByIdResponse(rsp *http.Response) (*DeleteA
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                                `json:"data"`
+			Error   []interface{}                                              `json:"error"`
+			Success DeleteApiWebhooksV1EndpointsById400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -222302,6 +229175,17 @@ func ParseGetApiWebhooksV1EndpointsByIdResponse(rsp *http.Response) (*GetApiWebh
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                             `json:"data"`
+			Error   []interface{}                                           `json:"error"`
+			Success GetApiWebhooksV1EndpointsById400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -222329,6 +229213,17 @@ func ParsePatchApiWebhooksV1EndpointsByIdResponse(rsp *http.Response) (*PatchApi
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                               `json:"data"`
+			Error   []interface{}                                             `json:"error"`
+			Success PatchApiWebhooksV1EndpointsById400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -222371,6 +229266,17 @@ func ParseGetApiWebhooksV1EndpointsByIdDeliveriesResponse(rsp *http.Response) (*
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                                       `json:"data"`
+			Error   []interface{}                                                     `json:"error"`
+			Success GetApiWebhooksV1EndpointsByIdDeliveries400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -222410,6 +229316,17 @@ func ParseGetApiWebhooksV1EndpointsByIdHealthResponse(rsp *http.Response) (*GetA
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                                   `json:"data"`
+			Error   []interface{}                                                 `json:"error"`
+			Success GetApiWebhooksV1EndpointsByIdHealth400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -222437,6 +229354,17 @@ func ParsePostApiWebhooksV1EndpointsByIdRollSecretResponse(rsp *http.Response) (
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                                        `json:"data"`
+			Error   []interface{}                                                      `json:"error"`
+			Success PostApiWebhooksV1EndpointsByIdRollSecret400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -222470,6 +229398,17 @@ func ParsePostApiWebhooksV1EndpointsByIdTestResponse(rsp *http.Response) (*PostA
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                                  `json:"data"`
+			Error   []interface{}                                                `json:"error"`
+			Success PostApiWebhooksV1EndpointsByIdTest400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 
@@ -222542,6 +229481,17 @@ func ParseGetApiWebhooksV1EventsResponse(rsp *http.Response) (*GetApiWebhooksV1E
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                      `json:"data"`
+			Error   []interface{}                                    `json:"error"`
+			Success GetApiWebhooksV1Events400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -222575,6 +229525,17 @@ func ParseGetApiWebhooksV1EventsByIdResponse(rsp *http.Response) (*GetApiWebhook
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Data    interface{}                                          `json:"data"`
+			Error   []interface{}                                        `json:"error"`
+			Success GetApiWebhooksV1EventsById400JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	}
 

@@ -241,10 +241,10 @@ Phase 3  api lane     delete everything the table below names; four specs; READM
    `trpc-failure-trace.ts`, `trpc-caller-trace.ts`; the output check from
    `trpc-service-builder.ts` (`validateDeclaredOutput`, `guardStream`). `mount` builds the
    procedure record directly on `root.procedure.input(member.input).use(chain).query|mutation|
-subscription(handler)`; no service builder in between. `defineTrpcRouter(...).build().router`
+   subscription(handler)`; no service builder in between. `defineTrpcRouter(...).build().router`
    takes the runtime, not a `TrpcService`.
 3. **`rest/rest-runtime.ts`**: `createRestRuntime(ports)` returning `{ mount(declaration, app):
-Hono }`. One handler per route: body limit, authenticate, parse params/query/body with the
+   Hono }`. One handler per route: body limit, authenticate, parse params/query/body with the
    declared schemas, `decide`, handler, output check, respond (204 on void), audit;
    `onError` renders `HandledError` as its envelope and everything else as 500 + trace id.
    Paths: `/api/<ns>/<version>/<path>` exact and `/api/<ns>/<path>` for the router's version.

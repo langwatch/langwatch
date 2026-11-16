@@ -8,6 +8,9 @@ from ...client import AuthenticatedClient, Client
 from ...models.post_api_experiments_by_slug_versions_by_version_restore_response_200 import (
     PostApiExperimentsBySlugVersionsByVersionRestoreResponse200,
 )
+from ...models.post_api_experiments_by_slug_versions_by_version_restore_response_400 import (
+    PostApiExperimentsBySlugVersionsByVersionRestoreResponse400,
+)
 from ...types import Response, safe_http_status
 
 
@@ -29,11 +32,21 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Any | PostApiExperimentsBySlugVersionsByVersionRestoreResponse200 | None:
+) -> (
+    Any
+    | PostApiExperimentsBySlugVersionsByVersionRestoreResponse200
+    | PostApiExperimentsBySlugVersionsByVersionRestoreResponse400
+    | None
+):
     if response.status_code == 200:
         response_200 = PostApiExperimentsBySlugVersionsByVersionRestoreResponse200.from_dict(response.json())
 
         return response_200
+
+    if response.status_code == 400:
+        response_400 = PostApiExperimentsBySlugVersionsByVersionRestoreResponse400.from_dict(response.json())
+
+        return response_400
 
     if response.status_code == 401:
         response_401 = cast(Any, None)
@@ -55,7 +68,11 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[Any | PostApiExperimentsBySlugVersionsByVersionRestoreResponse200]:
+) -> Response[
+    Any
+    | PostApiExperimentsBySlugVersionsByVersionRestoreResponse200
+    | PostApiExperimentsBySlugVersionsByVersionRestoreResponse400
+]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -72,7 +89,11 @@ def sync_detailed(
     version: int,
     *,
     client: AuthenticatedClient,
-) -> Response[Any | PostApiExperimentsBySlugVersionsByVersionRestoreResponse200]:
+) -> Response[
+    Any
+    | PostApiExperimentsBySlugVersionsByVersionRestoreResponse200
+    | PostApiExperimentsBySlugVersionsByVersionRestoreResponse400
+]:
     """Restore an experiment version
 
      Bring an old setup back by writing it forward as a new save. History is never rewritten: the version
@@ -87,7 +108,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Any | PostApiExperimentsBySlugVersionsByVersionRestoreResponse200]
+        Response[Any | PostApiExperimentsBySlugVersionsByVersionRestoreResponse200 | PostApiExperimentsBySlugVersionsByVersionRestoreResponse400]
     """
 
     kwargs = _get_kwargs(
@@ -107,7 +128,12 @@ def sync(
     version: int,
     *,
     client: AuthenticatedClient,
-) -> Any | PostApiExperimentsBySlugVersionsByVersionRestoreResponse200 | None:
+) -> (
+    Any
+    | PostApiExperimentsBySlugVersionsByVersionRestoreResponse200
+    | PostApiExperimentsBySlugVersionsByVersionRestoreResponse400
+    | None
+):
     """Restore an experiment version
 
      Bring an old setup back by writing it forward as a new save. History is never rewritten: the version
@@ -122,7 +148,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Any | PostApiExperimentsBySlugVersionsByVersionRestoreResponse200
+        Any | PostApiExperimentsBySlugVersionsByVersionRestoreResponse200 | PostApiExperimentsBySlugVersionsByVersionRestoreResponse400
     """
 
     return sync_detailed(
@@ -137,7 +163,11 @@ async def asyncio_detailed(
     version: int,
     *,
     client: AuthenticatedClient,
-) -> Response[Any | PostApiExperimentsBySlugVersionsByVersionRestoreResponse200]:
+) -> Response[
+    Any
+    | PostApiExperimentsBySlugVersionsByVersionRestoreResponse200
+    | PostApiExperimentsBySlugVersionsByVersionRestoreResponse400
+]:
     """Restore an experiment version
 
      Bring an old setup back by writing it forward as a new save. History is never rewritten: the version
@@ -152,7 +182,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Any | PostApiExperimentsBySlugVersionsByVersionRestoreResponse200]
+        Response[Any | PostApiExperimentsBySlugVersionsByVersionRestoreResponse200 | PostApiExperimentsBySlugVersionsByVersionRestoreResponse400]
     """
 
     kwargs = _get_kwargs(
@@ -170,7 +200,12 @@ async def asyncio(
     version: int,
     *,
     client: AuthenticatedClient,
-) -> Any | PostApiExperimentsBySlugVersionsByVersionRestoreResponse200 | None:
+) -> (
+    Any
+    | PostApiExperimentsBySlugVersionsByVersionRestoreResponse200
+    | PostApiExperimentsBySlugVersionsByVersionRestoreResponse400
+    | None
+):
     """Restore an experiment version
 
      Bring an old setup back by writing it forward as a new save. History is never rewritten: the version
@@ -185,7 +220,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Any | PostApiExperimentsBySlugVersionsByVersionRestoreResponse200
+        Any | PostApiExperimentsBySlugVersionsByVersionRestoreResponse200 | PostApiExperimentsBySlugVersionsByVersionRestoreResponse400
     """
 
     return (

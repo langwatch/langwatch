@@ -420,7 +420,7 @@ both were wrong, on measurement:
 
 - `idempotency` and `rateLimiter` are members 11 and 12 of the fourteen. The api
   derives each from the member record already - `apiIdempotencyLedger({ config,
-members })`, `apiRateLimiter({ config, members })` - so a builder call would be
+  members })`, `apiRateLimiter({ config, members })` - so a builder call would be
   a second place to supply what a member already carries.
 - Neither fails open. Idempotency is opt-in PER ROUTE, and a route that opts in
   where the runtime has no port throws at mount: "declares itself replayable

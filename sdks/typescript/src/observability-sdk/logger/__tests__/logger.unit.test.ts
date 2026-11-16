@@ -28,7 +28,7 @@ describe("LangWatchLoggerInternal enabled()", () => {
       emit: vi.fn(),
       enabled: vi.fn().mockReturnValue(true),
     };
-    const logger = createLangWatchLogger(wrappedLogger as any);
+    const logger = createLangWatchLogger(wrappedLogger);
 
     expect(logger.enabled()).toBe(true);
     expect(wrappedLogger.enabled).toHaveBeenCalledWith(undefined);
@@ -70,7 +70,7 @@ describe("LangWatch Logger", () => {
         getLogger: vi.fn().mockReturnValue(customLoggerInstance),
       };
 
-      setLangWatchLoggerProvider(customProvider as any);
+      setLangWatchLoggerProvider(customProvider);
 
       // Verify that subsequent logger calls use the custom provider
       const logger = getLangWatchLogger("test-logger");
@@ -133,7 +133,7 @@ describe("LangWatch Logger", () => {
         getLogger: vi.fn().mockReturnValue(mockLogger),
       };
 
-      const logger = getLangWatchLoggerFromProvider(customProvider as any, "custom-logger");
+      const logger = getLangWatchLoggerFromProvider(customProvider, "custom-logger");
 
       expect(logger).toBeDefined();
       expect(customProvider.getLogger).toHaveBeenCalledWith("custom-logger", undefined);
@@ -145,7 +145,7 @@ describe("LangWatch Logger", () => {
       };
 
       const logger = getLangWatchLoggerFromProvider(
-        customProvider as any,
+        customProvider,
         "custom-logger",
         "2.0.0",
       );
@@ -412,7 +412,7 @@ describe("LangWatch Logger", () => {
       const logRecord: LangWatchLogRecord = {
         severityText: "INFO",
         severityNumber: 9,
-        body: null as any,
+        body: null,
         attributes: { test: "value" },
       };
 
@@ -496,7 +496,7 @@ describe("LangWatch Logger", () => {
         getLogger: vi.fn().mockReturnValue(mockLogger),
       };
 
-      getLangWatchLoggerFromProvider(customProvider as any, "test-logger");
+      getLangWatchLoggerFromProvider(customProvider, "test-logger");
 
       expect(customProvider.getLogger).toHaveBeenCalledWith("test-logger", undefined);
     });

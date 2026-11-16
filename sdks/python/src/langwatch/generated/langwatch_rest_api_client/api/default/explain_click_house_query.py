@@ -1,10 +1,11 @@
-from typing import Any
+from typing import Any, cast
 
 import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.explain_click_house_query_body import ExplainClickHouseQueryBody
+from ...models.explain_click_house_query_response_400 import ExplainClickHouseQueryResponse400
 from ...types import Response, safe_http_status
 
 
@@ -27,9 +28,17 @@ def _get_kwargs(
     return _kwargs
 
 
-def _parse_response(*, client: AuthenticatedClient | Client, response: httpx.Response) -> Any | None:
+def _parse_response(
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Any | ExplainClickHouseQueryResponse400 | None:
     if response.status_code == 200:
-        return None
+        response_200 = cast(Any, None)
+        return response_200
+
+    if response.status_code == 400:
+        response_400 = ExplainClickHouseQueryResponse400.from_dict(response.json())
+
+        return response_400
 
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
@@ -37,7 +46,9 @@ def _parse_response(*, client: AuthenticatedClient | Client, response: httpx.Res
         return None
 
 
-def _build_response(*, client: AuthenticatedClient | Client, response: httpx.Response) -> Response[Any]:
+def _build_response(
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Response[Any | ExplainClickHouseQueryResponse400]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -53,7 +64,7 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     body: ExplainClickHouseQueryBody,
-) -> Response[Any]:
+) -> Response[Any | ExplainClickHouseQueryResponse400]:
     """Explain a ClickHouse query as the read-only operator account
 
      the operator tool reads a status and a message: 401, 400, 502 and 503 and the EXPLAIN rows all keep
@@ -67,7 +78,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Any]
+        Response[Any | ExplainClickHouseQueryResponse400]
     """
 
     kwargs = _get_kwargs(
@@ -81,11 +92,11 @@ def sync_detailed(
     return _build_response(client=client, response=response)
 
 
-async def asyncio_detailed(
+def sync(
     *,
     client: AuthenticatedClient,
     body: ExplainClickHouseQueryBody,
-) -> Response[Any]:
+) -> Any | ExplainClickHouseQueryResponse400 | None:
     """Explain a ClickHouse query as the read-only operator account
 
      the operator tool reads a status and a message: 401, 400, 502 and 503 and the EXPLAIN rows all keep
@@ -99,7 +110,34 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Any]
+        Any | ExplainClickHouseQueryResponse400
+    """
+
+    return sync_detailed(
+        client=client,
+        body=body,
+    ).parsed
+
+
+async def asyncio_detailed(
+    *,
+    client: AuthenticatedClient,
+    body: ExplainClickHouseQueryBody,
+) -> Response[Any | ExplainClickHouseQueryResponse400]:
+    """Explain a ClickHouse query as the read-only operator account
+
+     the operator tool reads a status and a message: 401, 400, 502 and 503 and the EXPLAIN rows all keep
+    the exact bodies the agent already parses
+
+    Args:
+        body (ExplainClickHouseQueryBody):
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
+
+    Returns:
+        Response[Any | ExplainClickHouseQueryResponse400]
     """
 
     kwargs = _get_kwargs(
@@ -109,3 +147,32 @@ async def asyncio_detailed(
     response = await client.get_async_httpx_client().request(**kwargs)
 
     return _build_response(client=client, response=response)
+
+
+async def asyncio(
+    *,
+    client: AuthenticatedClient,
+    body: ExplainClickHouseQueryBody,
+) -> Any | ExplainClickHouseQueryResponse400 | None:
+    """Explain a ClickHouse query as the read-only operator account
+
+     the operator tool reads a status and a message: 401, 400, 502 and 503 and the EXPLAIN rows all keep
+    the exact bodies the agent already parses
+
+    Args:
+        body (ExplainClickHouseQueryBody):
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
+
+    Returns:
+        Any | ExplainClickHouseQueryResponse400
+    """
+
+    return (
+        await asyncio_detailed(
+            client=client,
+            body=body,
+        )
+    ).parsed

@@ -7,6 +7,7 @@ from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.patch_api_traces_by_trace_id_metadata_body import PatchApiTracesByTraceIdMetadataBody
 from ...models.patch_api_traces_by_trace_id_metadata_response_200 import PatchApiTracesByTraceIdMetadataResponse200
+from ...models.patch_api_traces_by_trace_id_metadata_response_400 import PatchApiTracesByTraceIdMetadataResponse400
 from ...types import Response, safe_http_status
 
 
@@ -34,11 +35,16 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> PatchApiTracesByTraceIdMetadataResponse200 | None:
+) -> PatchApiTracesByTraceIdMetadataResponse200 | PatchApiTracesByTraceIdMetadataResponse400 | None:
     if response.status_code == 200:
         response_200 = PatchApiTracesByTraceIdMetadataResponse200.from_dict(response.json())
 
         return response_200
+
+    if response.status_code == 400:
+        response_400 = PatchApiTracesByTraceIdMetadataResponse400.from_dict(response.json())
+
+        return response_400
 
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
@@ -48,7 +54,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[PatchApiTracesByTraceIdMetadataResponse200]:
+) -> Response[PatchApiTracesByTraceIdMetadataResponse200 | PatchApiTracesByTraceIdMetadataResponse400]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -65,7 +71,7 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     body: PatchApiTracesByTraceIdMetadataBody,
-) -> Response[PatchApiTracesByTraceIdMetadataResponse200]:
+) -> Response[PatchApiTracesByTraceIdMetadataResponse200 | PatchApiTracesByTraceIdMetadataResponse400]:
     """Update metadata on a trace after creation. Inserts a synthetic span carrying the new attributes
     through the standard ingestion pipeline. New keys are added, existing keys are updated, missing keys
     are preserved. Labels replace entirely.
@@ -79,7 +85,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PatchApiTracesByTraceIdMetadataResponse200]
+        Response[PatchApiTracesByTraceIdMetadataResponse200 | PatchApiTracesByTraceIdMetadataResponse400]
     """
 
     kwargs = _get_kwargs(
@@ -99,7 +105,7 @@ def sync(
     *,
     client: AuthenticatedClient,
     body: PatchApiTracesByTraceIdMetadataBody,
-) -> PatchApiTracesByTraceIdMetadataResponse200 | None:
+) -> PatchApiTracesByTraceIdMetadataResponse200 | PatchApiTracesByTraceIdMetadataResponse400 | None:
     """Update metadata on a trace after creation. Inserts a synthetic span carrying the new attributes
     through the standard ingestion pipeline. New keys are added, existing keys are updated, missing keys
     are preserved. Labels replace entirely.
@@ -113,7 +119,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PatchApiTracesByTraceIdMetadataResponse200
+        PatchApiTracesByTraceIdMetadataResponse200 | PatchApiTracesByTraceIdMetadataResponse400
     """
 
     return sync_detailed(
@@ -128,7 +134,7 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
     body: PatchApiTracesByTraceIdMetadataBody,
-) -> Response[PatchApiTracesByTraceIdMetadataResponse200]:
+) -> Response[PatchApiTracesByTraceIdMetadataResponse200 | PatchApiTracesByTraceIdMetadataResponse400]:
     """Update metadata on a trace after creation. Inserts a synthetic span carrying the new attributes
     through the standard ingestion pipeline. New keys are added, existing keys are updated, missing keys
     are preserved. Labels replace entirely.
@@ -142,7 +148,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PatchApiTracesByTraceIdMetadataResponse200]
+        Response[PatchApiTracesByTraceIdMetadataResponse200 | PatchApiTracesByTraceIdMetadataResponse400]
     """
 
     kwargs = _get_kwargs(
@@ -160,7 +166,7 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     body: PatchApiTracesByTraceIdMetadataBody,
-) -> PatchApiTracesByTraceIdMetadataResponse200 | None:
+) -> PatchApiTracesByTraceIdMetadataResponse200 | PatchApiTracesByTraceIdMetadataResponse400 | None:
     """Update metadata on a trace after creation. Inserts a synthetic span carrying the new attributes
     through the standard ingestion pipeline. New keys are added, existing keys are updated, missing keys
     are preserved. Labels replace entirely.
@@ -174,7 +180,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PatchApiTracesByTraceIdMetadataResponse200
+        PatchApiTracesByTraceIdMetadataResponse200 | PatchApiTracesByTraceIdMetadataResponse400
     """
 
     return (

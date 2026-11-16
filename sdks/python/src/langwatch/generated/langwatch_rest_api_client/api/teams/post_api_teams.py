@@ -6,6 +6,7 @@ from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.post_api_teams_body import PostApiTeamsBody
 from ...models.post_api_teams_response_201 import PostApiTeamsResponse201
+from ...models.post_api_teams_response_400 import PostApiTeamsResponse400
 from ...types import Response, safe_http_status
 
 
@@ -30,11 +31,16 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> PostApiTeamsResponse201 | None:
+) -> PostApiTeamsResponse201 | PostApiTeamsResponse400 | None:
     if response.status_code == 201:
         response_201 = PostApiTeamsResponse201.from_dict(response.json())
 
         return response_201
+
+    if response.status_code == 400:
+        response_400 = PostApiTeamsResponse400.from_dict(response.json())
+
+        return response_400
 
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
@@ -44,7 +50,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[PostApiTeamsResponse201]:
+) -> Response[PostApiTeamsResponse201 | PostApiTeamsResponse400]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -60,7 +66,7 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     body: PostApiTeamsBody,
-) -> Response[PostApiTeamsResponse201]:
+) -> Response[PostApiTeamsResponse201 | PostApiTeamsResponse400]:
     """Create a new team that can group projects and members
 
     Args:
@@ -71,7 +77,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PostApiTeamsResponse201]
+        Response[PostApiTeamsResponse201 | PostApiTeamsResponse400]
     """
 
     kwargs = _get_kwargs(
@@ -89,7 +95,7 @@ def sync(
     *,
     client: AuthenticatedClient,
     body: PostApiTeamsBody,
-) -> PostApiTeamsResponse201 | None:
+) -> PostApiTeamsResponse201 | PostApiTeamsResponse400 | None:
     """Create a new team that can group projects and members
 
     Args:
@@ -100,7 +106,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PostApiTeamsResponse201
+        PostApiTeamsResponse201 | PostApiTeamsResponse400
     """
 
     return sync_detailed(
@@ -113,7 +119,7 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
     body: PostApiTeamsBody,
-) -> Response[PostApiTeamsResponse201]:
+) -> Response[PostApiTeamsResponse201 | PostApiTeamsResponse400]:
     """Create a new team that can group projects and members
 
     Args:
@@ -124,7 +130,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PostApiTeamsResponse201]
+        Response[PostApiTeamsResponse201 | PostApiTeamsResponse400]
     """
 
     kwargs = _get_kwargs(
@@ -140,7 +146,7 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     body: PostApiTeamsBody,
-) -> PostApiTeamsResponse201 | None:
+) -> PostApiTeamsResponse201 | PostApiTeamsResponse400 | None:
     """Create a new team that can group projects and members
 
     Args:
@@ -151,7 +157,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PostApiTeamsResponse201
+        PostApiTeamsResponse201 | PostApiTeamsResponse400
     """
 
     return (
