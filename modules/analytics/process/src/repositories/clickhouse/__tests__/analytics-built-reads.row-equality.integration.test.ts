@@ -34,6 +34,7 @@ import {
 import { FilterOptionsClickHouseRepository } from "../clickhouse.filter-options.repository.ts";
 import { servesJoinedTraceSummaries } from "../clickhouse.joined-timeseries-query.mapper.ts";
 import { servesMixedEval } from "../clickhouse.mixed-eval-timeseries-query.mapper.ts";
+import { servesSpanGrouped } from "../clickhouse.span-grouped-timeseries-query.mapper.ts";
 import { servesStandardTraceSummaries } from "../clickhouse.trace-summaries-timeseries-query.mapper.ts";
 import { traceSummaries } from "../clickhouse.trace-summaries.table.ts";
 import * as costReads from "./built-reads.aggregate-cost-reads.fixture.ts";
@@ -591,6 +592,29 @@ describe("timeseries reads built on the typed builder", () => {
         ).toBe(true);
       },
     );
+  });
+
+  describe("given trace metrics grouped by a key a trace holds several of", () => {
+    describe.each(timeseries.PROOFS)("given $name", ({ projectId, proof }) => {
+      it.each(timeseries.SPAN_GROUPED_SHAPES)("$name answers main's buckets", async (shape) => {
+        const want = expected.timeseries[`${literal(projectId, timeseries.RUN)}|${shape.name}`];
+        const got = await builtTimeseries({ shape, projectId, proof: proof() });
+
+        expect(want).toBeDefined();
+        expect(toTwelveDigits(got)).toEqual(toTwelveDigits(want));
+      });
+    });
+
+    it.each(timeseries.SPAN_GROUPED_SHAPES)("$name is a built read", (shape) => {
+      expect(
+        servesSpanGrouped({
+          ...timeseriesInput(shape, timeseries.TENANT_A),
+          startDate: new Date(timeseries.START),
+          endDate: new Date(timeseries.END),
+          previousPeriodStartDate: new Date(timeseries.PREVIOUS_START),
+        }),
+      ).toBe(true);
+    });
   });
 
   describe("given the aggregate reads B inside its window", () => {

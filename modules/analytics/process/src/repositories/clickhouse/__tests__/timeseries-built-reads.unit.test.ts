@@ -21,6 +21,10 @@ import {
 } from "../clickhouse.mixed-eval-timeseries-query.mapper.ts";
 import { rollupTimeseriesRead } from "../clickhouse.rollup-timeseries-query.mapper.ts";
 import { slimTimeseriesRead } from "../clickhouse.slim-timeseries-query.mapper.ts";
+import {
+  servesSpanGrouped,
+  spanGroupedTimeseriesRead,
+} from "../clickhouse.span-grouped-timeseries-query.mapper.ts";
 import type { TimeseriesRead } from "../clickhouse.timeseries-query-shared.mapper.ts";
 import {
   servesStandardTraceSummaries,
@@ -575,6 +579,101 @@ describe("the trace_summaries read joined to spans or runs", () => {
             ...spans[0]!,
             pipeline: { field: "user_id", aggregation: "avg" },
           } as AnalyticsSeries,
+        ],
+      }),
+    ).toBe(false);
+  });
+});
+
+describe("the trace_summaries read grouped by a key a trace holds several of", () => {
+  const trace = [series("performance.total_cost", "sum")];
+
+  it.each([
+    ["own", "metadata.labels", 60],
+    ["aggregate", "metadata.labels", "full"],
+    ["own", "metadata.span_type", "full"],
+    ["aggregate", "sentiment.thumbs_up_down", 60],
+  ] as const)(
+    "is a reader statement whose tenants are the %s proof's, grouped by %s at scale %s",
+    (proof, groupBy, timeScale) => {
+      const statement = read(
+        spanGroupedTimeseriesRead,
+        { series: trace, groupBy, timeScale },
+        proof,
+      );
+      const tenants = proof === "own" ? ["tenant-a"] : ["tenant-a", "member-b"];
+
+      expect(statement.identity).toBe("reader");
+      expect(statement.kind).toBe("tenant");
+      expect(statement.tenantIds?.toSorted()).toEqual(tenants.toSorted());
+      expect(statement.settings.SQL_langwatch_tenant_ids.split(",").toSorted()).toEqual(
+        tenants.toSorted(),
+      );
+      expect(statement.sql).toContain(
+        "log_comment = 'analytics:timeseries:trace_summaries:span_grouped'",
+      );
+    },
+  );
+
+  it("keeps one row per member's trace and key, joining spans on the member and the trace", () => {
+    const statement = inlined(
+      read(spanGroupedTimeseriesRead, {
+        series: trace,
+        groupBy: "events.event_type",
+        timeScale: 60,
+      }),
+    );
+
+    expect(statement.match(/INNER JOIN/g)).toHaveLength(1);
+    expect(statement).toMatch(/spans\.TenantId = trace_summaries\.TenantId/);
+    expect(statement).toMatch(/GROUP BY trace_summaries\.TenantId, trace_summaries\.TraceId/);
+    expect(statement).toContain("arrayJoin(spans.eventNames)");
+    expect(statement).toMatch(/HAVING .+ != ''/s);
+  });
+
+  it("keeps only the filtered labels when it filters and groups by labels", () => {
+    const statement = inlined(
+      read(spanGroupedTimeseriesRead, {
+        series: trace,
+        groupBy: "metadata.labels",
+        filters: { "metadata.labels": ["a-label-0"] },
+        timeScale: 60,
+      }),
+    );
+
+    expect(statement).not.toContain("INNER JOIN");
+    expect(statement).toContain('WHERE group_key IN (["a-label-0"])');
+  });
+
+  it("serves trace-row metrics under the four groupings, and leaves the rest to their shapes", () => {
+    const serves = (input: Partial<Omit<TimeseriesQueryInput, keyof typeof dates>>) =>
+      servesSpanGrouped({
+        ...dates,
+        series: trace,
+        timeScale: 60,
+        groupBy: "metadata.labels",
+        ...input,
+      });
+
+    expect(serves({})).toBe(true);
+    expect(serves({ groupBy: "metadata.span_type", timeScale: "full" })).toBe(true);
+    expect(serves({ groupBy: "events.event_type" })).toBe(true);
+    expect(serves({ groupBy: "sentiment.thumbs_up_down" })).toBe(true);
+    expect(serves({ groupBy: "metadata.model" })).toBe(false);
+    expect(serves({ groupBy: "topics.topics" })).toBe(false);
+    expect(serves({ groupBy: undefined })).toBe(false);
+    expect(serves({ series: [series("sentiment.thumbs_up_down", "avg")] })).toBe(false);
+    expect(
+      serves({
+        series: [
+          { ...series("evaluations.evaluation_score", "avg"), key: "ev" } as AnalyticsSeries,
+        ],
+      }),
+    ).toBe(false);
+    expect(
+      serves({
+        series: [
+          { ...trace[0]!, pipeline: { field: "user_id", aggregation: "avg" } } as AnalyticsSeries,
         ],
       }),
     ).toBe(false);

@@ -879,6 +879,85 @@ export const JOINED_SHAPES: Shape[] = [
   },
 ];
 
+const SPAN_GROUPINGS = [
+  "metadata.labels",
+  "metadata.span_type",
+  "events.event_type",
+  "sentiment.thumbs_up_down",
+];
+
+/** Per-trace pipelines, which main read as their inner metric under these groupings. */
+const PER_TRACE_PIPELINES: AnalyticsSeries[] = [
+  mixed("performance.total_cost", "sum", { pipeline: { field: "trace_id", aggregation: "avg" } }),
+  mixed("performance.completion_time", "avg", {
+    pipeline: { field: "trace_id", aggregation: "max" },
+    filters: clean,
+  }),
+  mixed("performance.total_cost", "max", { pipeline: { field: "trace_id", aggregation: "sum" } }),
+  mixed("metadata.trace_id", "cardinality"),
+];
+
+/** Path A, span-grouped: trace metrics by a key a trace holds several of, once per trace, key. */
+export const SPAN_GROUPED_SHAPES: Shape[] = [
+  ...SPAN_GROUPINGS.flatMap((groupBy): Shape[] => [
+    {
+      name: `span-grouped by ${groupBy}, every metric, hourly`,
+      table: "trace_summaries",
+      series: SUMMARY_SERIES,
+      groupBy,
+      timeScale: 60,
+    },
+    {
+      name: `span-grouped by ${groupBy}, both periods`,
+      table: "trace_summaries",
+      series: SLIM_SHORT,
+      groupBy,
+      timeScale: "full",
+    },
+    {
+      name: `span-grouped by ${groupBy}, series filters, daily in Amsterdam`,
+      table: "trace_summaries",
+      series: SUMMARY_FILTERED_SERIES,
+      groupBy,
+      timeScale: 1440,
+      timeZone: "Europe/Amsterdam",
+    },
+  ]),
+  ...["metadata.labels", "metadata.span_type"].map((groupBy): Shape => ({
+    name: `span-grouped per-trace pipelines by ${groupBy}, hourly`,
+    table: "trace_summaries",
+    series: PER_TRACE_PIPELINES,
+    groupBy,
+    timeScale: 60,
+  })),
+  {
+    name: "span-grouped by metadata.labels, filtered on two labels",
+    table: "trace_summaries",
+    series: SLIM_SHORT,
+    filters: { "metadata.labels": both((t) => `${t}-label-0`) },
+    groupBy: "metadata.labels",
+    timeScale: 60,
+  },
+  {
+    name: "span-grouped by metadata.span_type, filtered on spans.type, negated",
+    table: "trace_summaries",
+    series: SLIM_SHORT,
+    filters: { "spans.type": ["tool"] } as AnalyticsFilters,
+    negateFilters: true,
+    groupBy: "metadata.span_type",
+    timeScale: "full",
+  },
+  {
+    name: "span-grouped by events.event_type, for three traces, excluding evaluation origins",
+    table: "trace_summaries",
+    series: SLIM_SHORT,
+    traceIds: [`trace-${RUN}-0`, `trace-${RUN}-1`, `trace-${RUN}-4`],
+    excludeOrigins: ["evaluation"],
+    groupBy: "events.event_type",
+    timeScale: 60,
+  },
+];
+
 export const SHAPES: Shape[] = [
   {
     name: "rollup, full",

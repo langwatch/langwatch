@@ -159,7 +159,7 @@ export function servesJoinedTraceSummaries(input: TimeseriesQueryInput): boolean
 }
 
 /** Spans within main's StartTime envelope and the proof's windows; main elected no version. */
-function spansOf(scope: ProofScope, input: TimeseriesQueryInput) {
+function spansRead(scope: ProofScope, input: TimeseriesQueryInput) {
   const from = param.epochMs(input.previousPeriodStartDate.getTime() - SPAN_MARGIN_MS);
   const until = param.epochMs(input.endDate.getTime() + SPAN_MARGIN_MS);
   return clickhouseRead({ scope })
@@ -176,7 +176,13 @@ function spansOf(scope: ProofScope, input: TimeseriesQueryInput) {
     .as("spans");
 }
 
-type Spans = ReturnType<typeof spansOf>;
+/** The spans as a derived table, for the joined read and the span-grouped read. */
+export type JoinedSpans = ReturnType<typeof spansRead>;
+type Spans = JoinedSpans;
+
+export function spansOf(scope: ProofScope, input: TimeseriesQueryInput): JoinedSpans {
+  return spansRead(scope, input);
+}
 
 const SPAN_COLUMNS: Record<SpanMetricColumn, "SpanAttributes" | "eventNames" | "eventAttributes"> =
   {

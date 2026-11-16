@@ -110,14 +110,14 @@ export function runsOf(scope: ProofScope, input: TimeseriesQueryInput): JoinedRu
 type PerTraceKeys = { period: boolean; date: boolean; groupKey: boolean };
 
 /** Per trace: each run metric over its runs, each trace operand, condition and series filter. */
-function carriedPerTrace({
+export function carriedPerTrace<T extends string>({
   input,
   source,
 }: {
   input: TimeseriesQueryInput;
-  source: MetricSource<Joined>;
-}): Record<string, Measure<Joined>> {
-  const carried: Record<string, Measure<Joined>> = {};
+  source: MetricSource<T>;
+}): Record<string, Measure<T>> {
+  const carried: Record<string, Measure<T>> = {};
   for (const [index, series] of input.series.entries()) {
     const spec = specOf(series, index);
     const operand = spec.operand?.(source);
@@ -126,7 +126,7 @@ function carriedPerTrace({
     else if (operand) carried[`v${index}`] = fn.any(operand);
     if (!isEvaluation(spec) && condition) carried[`c${index}`] = fn.any(condition);
     const conditions = seriesConditions(series);
-    if (conditions.length > 0) carried[`f${index}`] = fn.any(allOf(conditions));
+    if (conditions.length > 0) carried[`f${index}`] = fn.any(allOf(conditions)) as Measure<T>;
   }
   return carried;
 }
@@ -259,7 +259,8 @@ function seriesAcrossTraces({
   });
 }
 
-function measuresOver(
+/** Every series over the per-trace rows {@link carriedPerTrace} carried. */
+export function measuresOver(
   input: TimeseriesQueryInput,
   perTrace: Record<string, Measure>,
 ): Record<string, Measure> {

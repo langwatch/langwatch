@@ -54,6 +54,10 @@ import {
 import { translatingQueryFailures } from "./clickhouse.query-error-translation.mapper.ts";
 import { rollupTimeseriesRead } from "./clickhouse.rollup-timeseries-query.mapper.ts";
 import { slimTimeseriesRead } from "./clickhouse.slim-timeseries-query.mapper.ts";
+import {
+  servesSpanGrouped,
+  spanGroupedTimeseriesRead,
+} from "./clickhouse.span-grouped-timeseries-query.mapper.ts";
 import type { TimeseriesRead } from "./clickhouse.timeseries-query-shared.mapper.ts";
 import { parseTimeseriesRows } from "./clickhouse.timeseries-row-parser.mapper.ts";
 import {
@@ -96,6 +100,7 @@ function routeOf({
   if (servesStandardTraceSummaries(input)) return built(traceSummariesTimeseriesRead);
   if (servesMixedEval(input)) return built(mixedEvalTimeseriesRead);
   if (servesJoinedTraceSummaries(input)) return built(joinedTimeseriesRead);
+  if (servesSpanGrouped(input)) return built(spanGroupedTimeseriesRead);
   return { kind: "text" };
 }
 
