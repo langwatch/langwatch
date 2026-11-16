@@ -5,7 +5,10 @@
  */
 import { createHash } from "node:crypto";
 
-import type { DataRetentionApi } from "@langwatch/data-retention-contract";
+import {
+  type DataRetentionApi,
+  INDEFINITE_RETENTION_DAYS,
+} from "@langwatch/data-retention-contract";
 import { HandledError, ValidationError } from "@langwatch/handled-error";
 import { ObjectBodyShortError, ObjectBodyTooLargeError } from "@langwatch/process-stores";
 import {
@@ -214,7 +217,8 @@ export class StoredObjectUploadService {
         tenantId: input.projectId,
         ownerKind: input.ownerKind,
         ownerId: input.ownerId,
-        retainUntil: now.add({ hours: days * 24 }),
+        // Indefinite retention holds with no end; `now + 0` would end it at once.
+        retainUntil: days === INDEFINITE_RETENTION_DAYS ? null : now.add({ hours: days * 24 }),
         createdAt: now,
         updatedAt: now,
       },
@@ -231,7 +235,7 @@ export class StoredObjectUploadService {
     for (const owner of owners) await this.options.ownerLinks.raise({ ...owner, objectId });
   }
 
-  /** The row with the caller's audience added; written only when it was missing. */
+  /** The row with the caller's audience added; the write changes only a row still available. */
   private async withAudience({
     value,
     audience,
@@ -241,14 +245,15 @@ export class StoredObjectUploadService {
   }): Promise<StoredObjectRecord> {
     if (value.audiences.includes(audience)) return value;
 
-    const widened: StoredObjectRecord = {
-      ...value,
-      audiences: [...value.audiences, audience],
-      updatedAt: this.options.now(),
-    };
-    await this.options.records.upsert(widened);
+    const at = this.options.now();
+    await this.options.records.addAudience({
+      tenantId: value.tenantId,
+      id: value.id,
+      audience,
+      at,
+    });
 
-    return widened;
+    return { ...value, audiences: [...value.audiences, audience], updatedAt: at };
   }
 
   async createUpload(

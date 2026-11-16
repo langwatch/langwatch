@@ -9,16 +9,46 @@ import type {
   StoredObjectProjectId,
 } from "@langwatch/stored-object-contract";
 import { Temporal } from "@langwatch/time";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
+import { MemoryStoredObjectOwnerLinkRepository } from "../memory/memory.stored-object-owner-link.repository.ts";
 import { MemoryStoredObjectRecordRepository } from "../memory/memory.stored-object-record.repository.ts";
+import { PrismaStoredObjectOwnerLinkRepository } from "../prisma/prisma.stored-object-owner-link.repository.ts";
+import { PrismaStoredObjectRecordRepository } from "../prisma/prisma.stored-object-record.repository.ts";
+import type { StoredObjectOwnerLinkRepository } from "../stored-object-owner-link.repository.ts";
 import type {
   StoredObjectRecord,
   StoredObjectRecordRepository,
 } from "../stored-object-record.repository.ts";
+import { emptyTenants, findPrismaTestClients } from "./support/prisma-test-database.support.ts";
 
-const backends: readonly { name: string; create: () => StoredObjectRecordRepository }[] = [
-  { name: "memory", create: () => MemoryStoredObjectRecordRepository.create() },
+const backends: readonly {
+  name: string;
+  create: () => StoredObjectRecordRepository;
+  createWithLinks: () => {
+    records: StoredObjectRecordRepository;
+    links: StoredObjectOwnerLinkRepository;
+  };
+  reset: () => Promise<void>;
+}[] = [
+  {
+    name: "memory",
+    create: () => MemoryStoredObjectRecordRepository.create(),
+    createWithLinks: () => {
+      const links = MemoryStoredObjectOwnerLinkRepository.create();
+      return { records: MemoryStoredObjectRecordRepository.create([], links), links };
+    },
+    reset: async () => {},
+  },
+  ...findPrismaTestClients().map((prisma) => ({
+    name: "Postgres",
+    create: () => PrismaStoredObjectRecordRepository.create({ prisma }),
+    createWithLinks: () => ({
+      records: PrismaStoredObjectRecordRepository.create({ prisma }),
+      links: PrismaStoredObjectOwnerLinkRepository.create({ prisma }),
+    }),
+    reset: () => emptyTenants({ prisma, tenantIds: [ACME, OTHER] }),
+  })),
 ];
 
 const ACME = "project_acme" as StoredObjectProjectId;
@@ -52,182 +82,246 @@ function record(overrides: Partial<StoredObjectRecord> = {}): StoredObjectRecord
   };
 }
 
-describe.each(backends)("given the $name stored-object record repository", ({ create }) => {
-  describe("when the tenant has written no row", () => {
-    /** @scenario "The memory and Postgres stored-object repositories answer alike" */
-    it("answers nothing for an id it never held", async () => {
-      const repository = create();
+describe.each(backends)(
+  "given the $name stored-object record repository",
+  ({ create, createWithLinks, reset }) => {
+    beforeEach(reset);
 
-      await expect(
-        repository.findById({ tenantId: ACME, id: "so_absent" as StoredObjectId }),
-      ).resolves.toBeNull();
-    });
+    describe("when the tenant has written no row", () => {
+      /** @scenario "The memory and Postgres stored-object repositories answer alike" */
+      it("answers nothing for an id it never held", async () => {
+        const repository = create();
 
-    it("counts no active bytes", async () => {
-      const repository = create();
+        await expect(
+          repository.findById({ tenantId: ACME, id: "so_absent" as StoredObjectId }),
+        ).resolves.toBeNull();
+      });
 
-      await expect(repository.countActive({ tenantId: ACME })).resolves.toEqual({
-        activeObjectCount: 0,
-        activeByteLength: 0,
+      it("counts no active bytes", async () => {
+        const repository = create();
+
+        await expect(repository.countActive({ tenantId: ACME })).resolves.toEqual({
+          activeObjectCount: 0,
+          activeByteLength: 0,
+        });
+      });
+
+      it("pages nothing", async () => {
+        const repository = create();
+
+        await expect(repository.findPage({ tenantId: ACME, limit: 10 })).resolves.toEqual([]);
       });
     });
 
-    it("pages nothing", async () => {
-      const repository = create();
+    describe("when a row is written", () => {
+      /** @scenario "The memory and Postgres stored-object repositories answer alike" */
+      it("reads the row back on its own compound key", async () => {
+        const repository = create();
+        const written = record();
 
-      await expect(repository.findPage({ tenantId: ACME, limit: 10 })).resolves.toEqual([]);
-    });
-  });
+        await repository.upsert(written);
 
-  describe("when a row is written", () => {
-    /** @scenario "The memory and Postgres stored-object repositories answer alike" */
-    it("reads the row back on its own compound key", async () => {
-      const repository = create();
-      const written = record();
+        await expect(repository.findById({ tenantId: ACME, id: written.id })).resolves.toEqual(
+          written,
+        );
+      });
 
-      await repository.upsert(written);
+      /** @scenario "The memory and Postgres stored-object repositories answer alike" */
+      it("rewrites the same row rather than adding a second one", async () => {
+        const repository = create();
 
-      await expect(repository.findById({ tenantId: ACME, id: written.id })).resolves.toEqual(
-        written,
-      );
-    });
+        await repository.upsert(record());
+        await repository.upsert(record({ generation: 1, status: "deleted", deletedAt: AT }));
 
-    /** @scenario "The memory and Postgres stored-object repositories answer alike" */
-    it("rewrites the same row rather than adding a second one", async () => {
-      const repository = create();
+        await expect(repository.findPage({ tenantId: ACME, limit: 10 })).resolves.toMatchObject([
+          { generation: 1, status: "deleted" },
+        ]);
+      });
 
-      await repository.upsert(record());
-      await repository.upsert(record({ generation: 1, status: "deleted", deletedAt: AT }));
+      it("counts and sums only the rows that are available", async () => {
+        const repository = create();
 
-      await expect(repository.findPage({ tenantId: ACME, limit: 10 })).resolves.toMatchObject([
-        { generation: 1, status: "deleted" },
-      ]);
-    });
+        await repository.upsert(record({ id: "so_a" as StoredObjectId, byteLength: 3 }));
+        await repository.upsert(record({ id: "so_b" as StoredObjectId, byteLength: 5 }));
+        await repository.upsert(
+          record({ id: "so_c" as StoredObjectId, byteLength: 9, status: "deleted" }),
+        );
 
-    it("counts and sums only the rows that are available", async () => {
-      const repository = create();
+        await expect(repository.countActive({ tenantId: ACME })).resolves.toEqual({
+          activeObjectCount: 2,
+          activeByteLength: 8,
+        });
+      });
 
-      await repository.upsert(record({ id: "so_a" as StoredObjectId, byteLength: 3 }));
-      await repository.upsert(record({ id: "so_b" as StoredObjectId, byteLength: 5 }));
-      await repository.upsert(
-        record({ id: "so_c" as StoredObjectId, byteLength: 9, status: "deleted" }),
-      );
+      it("counts only the purpose it was asked about", async () => {
+        const repository = create();
 
-      await expect(repository.countActive({ tenantId: ACME })).resolves.toEqual({
-        activeObjectCount: 2,
-        activeByteLength: 8,
+        await repository.upsert(record({ id: "so_a" as StoredObjectId, byteLength: 3 }));
+        await repository.upsert(
+          record({ id: "so_b" as StoredObjectId, byteLength: 5, purpose: "scenario_content" }),
+        );
+
+        await expect(
+          repository.countActive({ tenantId: ACME, purpose: "scenario_content" }),
+        ).resolves.toEqual({ activeObjectCount: 1, activeByteLength: 5 });
       });
     });
 
-    it("counts only the purpose it was asked about", async () => {
-      const repository = create();
+    describe("when a page is asked for", () => {
+      /** @scenario "The memory and Postgres stored-object repositories answer alike" */
+      it("orders by id and resumes after the id it was given", async () => {
+        const repository = create();
 
-      await repository.upsert(record({ id: "so_a" as StoredObjectId, byteLength: 3 }));
-      await repository.upsert(
-        record({ id: "so_b" as StoredObjectId, byteLength: 5, purpose: "scenario_content" }),
-      );
+        for (const id of ["so_c", "so_a", "so_b"]) {
+          await repository.upsert(record({ id: id as StoredObjectId }));
+        }
 
-      await expect(
-        repository.countActive({ tenantId: ACME, purpose: "scenario_content" }),
-      ).resolves.toEqual({ activeObjectCount: 1, activeByteLength: 5 });
-    });
-  });
+        await expect(repository.findPage({ tenantId: ACME, limit: 2 })).resolves.toMatchObject([
+          { id: "so_a" },
+          { id: "so_b" },
+        ]);
 
-  describe("when a page is asked for", () => {
-    /** @scenario "The memory and Postgres stored-object repositories answer alike" */
-    it("orders by id and resumes after the id it was given", async () => {
-      const repository = create();
-
-      for (const id of ["so_c", "so_a", "so_b"]) {
-        await repository.upsert(record({ id: id as StoredObjectId }));
-      }
-
-      await expect(repository.findPage({ tenantId: ACME, limit: 2 })).resolves.toMatchObject([
-        { id: "so_a" },
-        { id: "so_b" },
-      ]);
-
-      await expect(
-        repository.findPage({ tenantId: ACME, afterId: "so_b" as StoredObjectId, limit: 10 }),
-      ).resolves.toMatchObject([{ id: "so_c" }]);
-    });
-
-    it("narrows to one lifecycle status", async () => {
-      const repository = create();
-      const status: StoredObjectLifecycleStatus = "pending";
-
-      await repository.upsert(record({ id: "so_a" as StoredObjectId }));
-      await repository.upsert(record({ id: "so_b" as StoredObjectId, status }));
-
-      await expect(
-        repository.findPage({ tenantId: ACME, status, limit: 10 }),
-      ).resolves.toMatchObject([{ id: "so_b" }]);
-    });
-
-    it("narrows to the rows that expired before a moment", async () => {
-      const repository = create();
-      const expired = Temporal.Instant.from("2026-08-21T00:00:00.000Z");
-
-      await repository.upsert(record({ id: "so_a" as StoredObjectId, expiresAt: expired }));
-      await repository.upsert(record({ id: "so_b" as StoredObjectId, expiresAt: null }));
-
-      await expect(
-        repository.findPage({ tenantId: ACME, expiresBefore: AT, limit: 10 }),
-      ).resolves.toMatchObject([{ id: "so_a" }]);
-    });
-  });
-
-  describe("when another tenant holds a row with the same id", () => {
-    /** @scenario "The memory and Postgres stored-object repositories answer alike" */
-    it("never answers the other tenant's row", async () => {
-      const repository = create();
-
-      await repository.upsert(record({ tenantId: OTHER }));
-
-      await expect(
-        repository.findById({ tenantId: ACME, id: "so_aaaaaaaa" as StoredObjectId }),
-      ).resolves.toBeNull();
-      await expect(repository.countActive({ tenantId: ACME })).resolves.toEqual({
-        activeObjectCount: 0,
-        activeByteLength: 0,
-      });
-      await expect(repository.findPage({ tenantId: ACME, limit: 10 })).resolves.toEqual([]);
-    });
-
-    it("keeps both tenants' rows apart under one id", async () => {
-      const repository = create();
-
-      await repository.upsert(record({ tenantId: ACME, byteLength: 3 }));
-      await repository.upsert(record({ tenantId: OTHER, byteLength: 7 }));
-
-      await expect(repository.countActive({ tenantId: OTHER })).resolves.toEqual({
-        activeObjectCount: 1,
-        activeByteLength: 7,
-      });
-    });
-  });
-
-  describe("when rows hold the same bytes", () => {
-    it("finds only available rows of the same purpose, digest and media type, oldest first", async () => {
-      const repository = create();
-      const later = record({ id: "so_bbbbbbbb" as StoredObjectId });
-      await repository.upsert(later);
-      await repository.upsert(record());
-      await repository.upsert(record({ id: "so_deleted" as StoredObjectId, status: "deleted" }));
-      await repository.upsert(
-        record({ id: "so_scenario" as StoredObjectId, purpose: "scenario_event" }),
-      );
-      await repository.upsert(record({ id: "so_octet" as StoredObjectId, mediaType: "image/png" }));
-      await repository.upsert(record({ id: "so_other" as StoredObjectId, tenantId: OTHER }));
-
-      const found = await repository.findReusable({
-        tenantId: ACME,
-        purpose: "trace_content",
-        sha256: "a".repeat(64),
-        mediaType: "application/octet-stream",
+        await expect(
+          repository.findPage({ tenantId: ACME, afterId: "so_b" as StoredObjectId, limit: 10 }),
+        ).resolves.toMatchObject([{ id: "so_c" }]);
       });
 
-      expect(found.map((value) => value.id)).toEqual(["so_aaaaaaaa", "so_bbbbbbbb"]);
+      it("narrows to one lifecycle status", async () => {
+        const repository = create();
+        const status: StoredObjectLifecycleStatus = "pending";
+
+        await repository.upsert(record({ id: "so_a" as StoredObjectId }));
+        await repository.upsert(record({ id: "so_b" as StoredObjectId, status }));
+
+        await expect(
+          repository.findPage({ tenantId: ACME, status, limit: 10 }),
+        ).resolves.toMatchObject([{ id: "so_b" }]);
+      });
+
+      it("narrows to the rows that expired before a moment", async () => {
+        const repository = create();
+        const expired = Temporal.Instant.from("2026-08-21T00:00:00.000Z");
+
+        await repository.upsert(record({ id: "so_a" as StoredObjectId, expiresAt: expired }));
+        await repository.upsert(record({ id: "so_b" as StoredObjectId, expiresAt: null }));
+
+        await expect(
+          repository.findPage({ tenantId: ACME, expiresBefore: AT, limit: 10 }),
+        ).resolves.toMatchObject([{ id: "so_a" }]);
+      });
     });
-  });
-});
+
+    describe("when another tenant holds a row with the same id", () => {
+      /** @scenario "The memory and Postgres stored-object repositories answer alike" */
+      it("never answers the other tenant's row", async () => {
+        const repository = create();
+
+        await repository.upsert(record({ tenantId: OTHER }));
+
+        await expect(
+          repository.findById({ tenantId: ACME, id: "so_aaaaaaaa" as StoredObjectId }),
+        ).resolves.toBeNull();
+        await expect(repository.countActive({ tenantId: ACME })).resolves.toEqual({
+          activeObjectCount: 0,
+          activeByteLength: 0,
+        });
+        await expect(repository.findPage({ tenantId: ACME, limit: 10 })).resolves.toEqual([]);
+      });
+
+      it("keeps both tenants' rows apart under one id", async () => {
+        const repository = create();
+
+        await repository.upsert(record({ tenantId: ACME, byteLength: 3 }));
+        await repository.upsert(record({ tenantId: OTHER, byteLength: 7 }));
+
+        await expect(repository.countActive({ tenantId: OTHER })).resolves.toEqual({
+          activeObjectCount: 1,
+          activeByteLength: 7,
+        });
+      });
+    });
+
+    describe("when rows hold the same bytes", () => {
+      it("finds only available rows of the same purpose, digest and media type, oldest first", async () => {
+        const repository = create();
+        const later = record({ id: "so_bbbbbbbb" as StoredObjectId });
+        await repository.upsert(later);
+        await repository.upsert(record());
+        await repository.upsert(record({ id: "so_deleted" as StoredObjectId, status: "deleted" }));
+        await repository.upsert(
+          record({ id: "so_scenario" as StoredObjectId, purpose: "scenario_event" }),
+        );
+        await repository.upsert(
+          record({ id: "so_octet" as StoredObjectId, mediaType: "image/png" }),
+        );
+        await repository.upsert(record({ id: "so_other" as StoredObjectId, tenantId: OTHER }));
+
+        const found = await repository.findReusable({
+          tenantId: ACME,
+          purpose: "trace_content",
+          sha256: "a".repeat(64),
+          mediaType: "application/octet-stream",
+        });
+
+        expect(found.map((value) => value.id)).toEqual(["so_aaaaaaaa", "so_bbbbbbbb"]);
+      });
+    });
+
+    describe("when the sweep deletes an object only if no live link holds it", () => {
+      /** @scenario "An object another owner still holds survives the sweep" */
+      it("keeps a held object and deletes it once every link has ended", async () => {
+        const { records, links } = createWithLinks();
+        const id = "so_aaaaaaaa" as StoredObjectId;
+        const link = {
+          tenantId: ACME,
+          objectId: id,
+          ownerKind: "trace",
+          createdAt: AT,
+          updatedAt: AT,
+        };
+        await records.upsert(record());
+        await links.raise({ ...link, ownerId: "t1", retainUntil: AT.add({ hours: 24 }) });
+        await links.raise({ ...link, ownerId: "t2", retainUntil: AT.add({ hours: 48 }) });
+
+        const at = (hours: number) => AT.add({ hours });
+        await expect(
+          records.markDeletedIfUnheld({ tenantId: ACME, id, now: at(30) }),
+        ).resolves.toBe(false);
+        await expect(records.findById({ tenantId: ACME, id })).resolves.toMatchObject({
+          status: "available",
+        });
+        await expect(
+          records.markDeletedIfUnheld({ tenantId: ACME, id, now: at(48) }),
+        ).resolves.toBe(true);
+        await expect(records.findById({ tenantId: ACME, id })).resolves.toMatchObject({
+          status: "deleted",
+        });
+        await expect(
+          records.markDeletedIfUnheld({ tenantId: ACME, id, now: at(48) }),
+        ).resolves.toBe(false);
+      });
+    });
+
+    describe("when a reuse adds its audience", () => {
+      /** @scenario "A reuse adds the caller's audience" */
+      it("appends it once, and never to a row that is no longer available", async () => {
+        const { records } = createWithLinks();
+        const id = "so_aaaaaaaa" as StoredObjectId;
+        const gone = "so_deleted" as StoredObjectId;
+        await records.upsert(record());
+        await records.upsert(record({ id: gone, status: "deleted" }));
+
+        await records.addAudience({ tenantId: ACME, id, audience: "traces:view", at: AT });
+        await records.addAudience({ tenantId: ACME, id, audience: "traces:view", at: AT });
+        await records.addAudience({ tenantId: ACME, id: gone, audience: "traces:view", at: AT });
+
+        await expect(records.findById({ tenantId: ACME, id })).resolves.toMatchObject({
+          audiences: ["project:view", "traces:view"],
+        });
+        await expect(records.findById({ tenantId: ACME, id: gone })).resolves.toMatchObject({
+          audiences: ["project:view"],
+        });
+      });
+    });
+  },
+);

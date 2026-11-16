@@ -151,6 +151,9 @@ describe("the Stored Objects persistence", () => {
     expect(
       readFileSync(path.join(PROCESS_ROOT, "src", "services", "stored-object.service.ts"), "utf8"),
     ).toMatch(/export class StoredObjectService\b/);
-    expect(existsSync(path.join(PROCESS_ROOT, "src", "eventing"))).toBe(false);
+    expect(readdirSync(path.join(PROCESS_ROOT, "src", "eventing")).toSorted()).toEqual([
+      "stored-object-retention-sweep.process.ts",
+      "stored-object-retention.pipeline.ts",
+    ]);
   });
 });

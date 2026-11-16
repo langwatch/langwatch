@@ -81,3 +81,13 @@ ownerKind, ownerId, retainUntil, createdAt, updatedAt)`, records who holds
   peer: it only records a fact.
 - The pending-upload and deleted-object cleanups remain uncalled; scheduling
   them is separate work.
+- A project with indefinite trace retention writes links with no end, which
+  the sweep never selects.
+- Decision 4 leaves a window of microseconds: under READ COMMITTED, a reuse
+  whose link commits after the sweep's UPDATE began but before it reached the
+  row is not seen by its NOT EXISTS, and the reuse answers an object just
+  deleted. Closing it needs both sides to lock the object row in one
+  transaction; the cost of losing it is one span's media failing to load.
+- The fact is sent after the retroactive update is triggered, without an
+  outbox. If sending fails, the request errors while the rewrite runs; a retry
+  re-triggers it and records the fact.

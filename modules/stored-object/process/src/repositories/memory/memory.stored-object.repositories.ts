@@ -60,9 +60,11 @@ export class MemoryStoredObjectRepositories {
   static create({
     objectStorage,
   }: Readonly<{ objectStorage: ObjectStorage }>): StoredObjectRepositories {
+    const ownerLinks = MemoryStoredObjectOwnerLinkRepository.create();
+
     return {
-      records: MemoryStoredObjectRecordRepository.create(),
-      ownerLinks: MemoryStoredObjectOwnerLinkRepository.create(),
+      records: MemoryStoredObjectRecordRepository.create([], ownerLinks),
+      ownerLinks,
       bytes: ObjectStorageStoredObjectBytesRepository.create({ objectStorage }),
       legacyIndex: MemoryStoredObjectsRepository.create(),
       legacyStorage: ObjectStorageStoredObjectLegacyStorageRepository.create(objectStorage),

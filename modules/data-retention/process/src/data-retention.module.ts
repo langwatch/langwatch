@@ -6,6 +6,7 @@ import { defineProcessModule, type PublishedProcessModule } from "@langwatch/pro
 import { defineMigrationStep } from "@langwatch/upgrade/step";
 
 import { DataRetentionModule } from "./app/data-retention.app.ts";
+import { dataRetentionFactsEventing } from "./eventing/data-retention-facts.pipeline.ts";
 import { dataRetentionSeatPolicyEventing } from "./eventing/data-retention-seat-policy.pipeline.ts";
 import { dataRetentionRepositories } from "./repositories/data-retention-repositories.registry.ts";
 import { EventLogKeepForeverService } from "./services/event-log-keep-forever.service.ts";
@@ -20,6 +21,7 @@ export const dataRetentionProcessModule: PublishedProcessModule<
   .withApi(DataRetentionModule)
   .withTransports(dataRetentionTrpcTransport)
   .withEventing(dataRetentionSeatPolicyEventing)
+  .withEventing(dataRetentionFactsEventing)
   .withMigrations(({ repositories }) => [
     defineMigrationStep({
       id: "data-retention:keep-control-plane-events-forever",
