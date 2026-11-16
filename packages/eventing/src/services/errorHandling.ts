@@ -1,4 +1,3 @@
-import { isInsertFailure } from "@langwatch/clickhouse-client";
 import { NonRetryableGroupQueueError } from "@langwatch/group-queue";
 import { HandledError } from "@langwatch/handled-error";
 import type { createLogger } from "@langwatch/observability";
@@ -763,26 +762,35 @@ const CLICKHOUSE_INSERT_ONLY_DATA_ERRORS: ReadonlySet<string> = new Set([
  * also carries ClickHouse's error name, so another library's numeric code is never read as one.
  */
 export function isPermanentClickHouseError(error: unknown): boolean {
-  return permanentDataErrorAt({ error, depth: 0 });
+  const nodes = causeGraphOf({ error, depth: 0 });
+  if (nodes.some((node) => classifyClickHouseError(node) === ErrorCategory.RECOVERABLE)) {
+    return false;
+  }
+  return nodes.some(refusesTheData);
 }
 
-function permanentDataErrorAt({ error, depth }: { error: unknown; depth: number }): boolean {
-  if (depth > MAX_CAUSE_DEPTH || error === null || typeof error !== "object") return false;
-  if (classifyClickHouseError(error) === ErrorCategory.RECOVERABLE) return false;
-  if (refusesTheData(error)) return true;
-  if (HandledError.isHandled(error)) {
-    const reasons: readonly unknown[] = error.reasons ?? [];
-    if (reasons.some((reason) => permanentDataErrorAt({ error: reason, depth: depth + 1 }))) {
-      return true;
-    }
-  }
-  return permanentDataErrorAt({ error: Reflect.get(error, "cause"), depth: depth + 1 });
+/** Every error object reachable through causes and handled reasons, to MAX_CAUSE_DEPTH. */
+function causeGraphOf({ error, depth }: { error: unknown; depth: number }): object[] {
+  if (depth > MAX_CAUSE_DEPTH || error === null || typeof error !== "object") return [];
+  const reasons: readonly unknown[] = HandledError.isHandled(error) ? (error.reasons ?? []) : [];
+  return [
+    error,
+    ...reasons.flatMap((reason) => causeGraphOf({ error: reason, depth: depth + 1 })),
+    ...causeGraphOf({ error: Reflect.get(error, "cause"), depth: depth + 1 }),
+  ];
 }
 
 function refusesTheData(error: object): boolean {
   const refusal = dataRefusalNameOf(error);
   if (refusal === "") return false;
   return !CLICKHOUSE_INSERT_ONLY_DATA_ERRORS.has(refusal) || isInsertFailure(error);
+}
+
+/** The ClickHouse client's insert mark, by its registered name: eventing may not import it. */
+const INSERT_FAILURE_MARK = Symbol.for("langwatch.clickhouse.insert-failure");
+
+function isInsertFailure(error: object): boolean {
+  return Reflect.get(error, INSERT_FAILURE_MARK) === true;
 }
 
 /** The ClickHouse error name of a refusal of the data, or "" when the error is none. */
