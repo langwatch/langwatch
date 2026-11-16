@@ -146,6 +146,14 @@ Mints a directory account with no sign-in method of its own.
 create(input: CreateUserInput): Promise<UserProfile>;
 ```
 
+#### `recordCreated`
+
+Commits the created fact for an account Better Auth wrote itself (social and single sign-on sign-up), which never passes a mint here. Keyed by the user, so a repeat records nothing new.
+
+```typescript
+recordCreated(input: UserIdInput): Promise<void>;
+```
+
 #### `createPasskeyUser`
 
 Mints an account whose only sign-in method is the passkey about to be registered.
