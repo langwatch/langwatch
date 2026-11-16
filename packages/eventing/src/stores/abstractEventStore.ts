@@ -19,7 +19,11 @@ import {
   validateEventTenant,
 } from "./eventStoreUtils.ts";
 import { rehydrationLowerBoundMs } from "./rehydrationWindow.ts";
-import type { EventRecord, EventRepository } from "./repositories/eventRepository.types.ts";
+import type {
+  EventLogProbe,
+  EventRecord,
+  EventRepository,
+} from "./repositories/eventRepository.types.ts";
 
 /**
  * Abstract base with template-method skeleton; subclasses customize via hooks like
@@ -504,6 +508,66 @@ export abstract class AbstractEventStore<
               aggregateType,
               beforeTimestamp,
               beforeEventId,
+            },
+            error,
+          );
+          throw error;
+        }
+      },
+    );
+  }
+
+  async probeEventsBefore({
+    aggregateId,
+    context,
+    aggregateType,
+    event,
+  }: {
+    aggregateId: string;
+    context: EventStoreReadContext<EventType>;
+    aggregateType: AggregateType;
+    event: EventType;
+  }): Promise<EventLogProbe> {
+    EventUtils.validateTenantId(context, `${this.constructor.name}.probeEventsBefore`);
+
+    if (this.hasMissingAggregateId(aggregateId)) {
+      this.logWarning(
+        `${this.constructor.name}.probeEventsBefore`,
+        { tenantId: context.tenantId, aggregateType },
+        "Skipped event_log probe for an empty aggregateId (would scan the whole empty-id key range); reporting no events",
+      );
+      return { hasEvent: false, hasEarlierEvents: false };
+    }
+
+    return this.instrument(
+      `${this.constructor.name}.probeEventsBefore`,
+      {
+        "aggregate.id": String(aggregateId),
+        "tenant.id": context.tenantId,
+        "aggregate.type": aggregateType,
+        "probe.event_id": event.id,
+        "probe.timestamp": event.createdAt,
+      },
+      async () => {
+        try {
+          return await this.repository.probeEventRecordsBefore({
+            tenantId: context.tenantId,
+            aggregateType,
+            aggregateId,
+            eventTimestamp: event.createdAt,
+            eventId: event.id,
+            // The same partition-pruning anchor the store-miss re-fold's history read takes.
+            occurredAtFromMs: rehydrationLowerBoundMs(aggregateType, event.occurredAt),
+          });
+        } catch (error) {
+          this.logError(
+            `${this.constructor.name}.probeEventsBefore`,
+            {
+              aggregateId: String(aggregateId),
+              tenantId: context.tenantId,
+              aggregateType,
+              eventId: event.id,
+              eventTimestamp: event.createdAt,
             },
             error,
           );

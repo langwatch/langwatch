@@ -4,6 +4,7 @@ import type { AggregateType } from "../domain/aggregateType.ts";
 import { type TenantId, TenantIdSchema } from "../domain/tenantId.ts";
 import type { Event } from "../domain/types.ts";
 import type { EventLogPageCursor } from "./event-log-page-order.ts";
+import type { EventLogProbe } from "./repositories/eventRepository.types.ts";
 
 /**
  * Event store read context; tenantId is REQUIRED for tenant isolation.
@@ -147,6 +148,18 @@ export interface ReadOnlyEventStore<EventType extends Event = Event> {
     beforeTimestamp: number;
     beforeEventId: string;
   }): Promise<number>;
+
+  /**
+   * Whether the log, as the replica answering sees it, holds `event` and any event accepted
+   * before it: two existence checks, no rows read. Optional: a fold without it keeps replaying
+   * its history on a store miss. Validates tenantId like getEvents.
+   */
+  probeEventsBefore?(request: {
+    aggregateId: string;
+    context: EventStoreReadContext<EventType>;
+    aggregateType: AggregateType;
+    event: EventType;
+  }): Promise<EventLogProbe>;
 }
 
 /**

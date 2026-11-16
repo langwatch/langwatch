@@ -26,6 +26,15 @@ export interface EventOccurredAtWindow {
 }
 
 /**
+ * What one replica of the event log shows about an aggregate around one of its events: whether
+ * it holds that event, and whether it holds any event the log accepted before it.
+ */
+export interface EventLogProbe {
+  hasEvent: boolean;
+  hasEarlierEvents: boolean;
+}
+
+/**
  * Repository interface for event data access: raw CRUD operations without
  * business logic. Validation, transformation and deduplication belong to the
  * store layer that uses this repository.
@@ -106,6 +115,19 @@ export interface EventRepository {
     beforeTimestamp: number;
     beforeEventId: string;
   }): Promise<number>;
+
+  /**
+   * Whether the log holds an event and any event accepted before it, without reading either:
+   * each answer stops at its first row. `occurredAtFromMs` only prunes partitions.
+   */
+  probeEventRecordsBefore(request: {
+    tenantId: string;
+    aggregateType: string;
+    aggregateId: string;
+    eventTimestamp: number;
+    eventId: string;
+    occurredAtFromMs?: number;
+  }): Promise<EventLogProbe>;
 
   /**
    * Inserts event records into storage.

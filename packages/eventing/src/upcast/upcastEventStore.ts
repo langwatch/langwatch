@@ -100,6 +100,23 @@ class UpcastingEventStore<EventType extends Event> implements EventStore<EventTy
     return counts.reduce((sum, count) => sum + count, 0);
   }
 
+  /** Across the renamed types too: an aggregate's earlier events may sit under a former type. */
+  get probeEventsBefore(): EventStore<EventType>["probeEventsBefore"] {
+    const probe = this.store.probeEventsBefore?.bind(this.store);
+    if (!probe) return undefined;
+    return async (request) => {
+      const probes = await Promise.all(
+        this.#aggregateTypes(request.aggregateType).map((aggregateType) =>
+          probe({ ...request, aggregateType }),
+        ),
+      );
+      return {
+        hasEvent: probes.some((each) => each.hasEvent),
+        hasEarlierEvents: probes.some((each) => each.hasEarlierEvents),
+      };
+    };
+  }
+
   /** The pipeline's own aggregate type and those it renamed; any other aggregate reads as asked. */
   #aggregateTypes(aggregateType: string): string[] {
     const own = this.upcaster.upcasts?.aggregateType;

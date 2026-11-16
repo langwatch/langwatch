@@ -2,6 +2,7 @@ import type { ExhaustedOutcome } from "@langwatch/group-queue";
 
 import type { Event } from "../domain/types.ts";
 import type { EventLogPageCursor } from "../stores/event-log-page-order.ts";
+import type { EventLogProbe } from "../stores/repositories/eventRepository.types.ts";
 import type { ProjectionStoreContext } from "./projectionStoreContext.ts";
 
 // Stateful projection folding events into accumulated state via pure functions:
@@ -75,6 +76,14 @@ export interface FoldProjectionDefinition<State, E extends Event = Event> {
     after: EventLogPageCursor | undefined;
     limit: number;
   }) => Promise<Event[]>;
+
+  // Whether the log holds `event` and anything accepted before it, for a store miss under
+  // refoldOnStoreMiss to tell a new aggregate from a saved state not visible yet. Auto-wired.
+  eventLogProbe?: (context: {
+    tenantId: string;
+    aggregateId: string;
+    event: Event;
+  }) => Promise<EventLogProbe>;
 }
 
 /**

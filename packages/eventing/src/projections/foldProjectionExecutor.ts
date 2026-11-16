@@ -7,8 +7,10 @@ import {
   incrementEsFoldReadWindowFallbackTotal,
   incrementEsFoldRefoldOnMissTotal,
   incrementEsFoldRefoldTotal,
+  incrementEsFoldStoreMissProbeTotal,
   observeEsFoldBlindReapplyEvents,
 } from "../metrics.ts";
+import { FoldStateNotVisibleError } from "../services/errorHandling.ts";
 import {
   type EventLogPageCursor,
   eventLogPageCursorAfter,
@@ -297,15 +299,24 @@ export class FoldProjectionExecutor {
   /** Backoff between re-reads of an incomplete re-fold history. */
   private readonly refoldHistoryRetryDelaysMs: readonly number[];
 
+  /**
+   * How many deliveries of a job may hand a store miss back to the queue, to wait for a replica
+   * to show the saved state, before the next miss re-folds from the event log. 0 re-folds at once.
+   */
+  private readonly storeMissRetries: number;
+
   constructor({
     refoldPageSize = 1000,
     refoldHistoryRetryDelaysMs = [50, 150],
+    storeMissRetries = 2,
   }: {
     refoldPageSize?: number;
     refoldHistoryRetryDelaysMs?: readonly number[];
+    storeMissRetries?: number;
   } = {}) {
     this.refoldPageSize = refoldPageSize;
     this.refoldHistoryRetryDelaysMs = refoldHistoryRetryDelaysMs;
+    this.storeMissRetries = storeMissRetries;
   }
 
   // Loads state with applied-event-id set for dedup. Windowed read retries
@@ -600,8 +611,9 @@ export class FoldProjectionExecutor {
   }
 
   /**
-   * The absent-miss re-fold branch of `execute`: re-folds from scratch and commits
-   * when nothing is loaded, the miss isn't trusted absent, and the projection opts in.
+   * The absent-miss re-fold branch of `execute`: when nothing is loaded, the miss isn't trusted
+   * absent, and the projection opts in, it folds a new aggregate from init or waits for the
+   * saved state (`probeBeforeRefold`), else re-folds from scratch and commits.
    * Extracted so its branching is counted apart from `execute`'s complexity.
    */
   private async handleAbsentMiss<State, E extends Event>({
@@ -623,6 +635,11 @@ export class FoldProjectionExecutor {
   }): Promise<{ handled: true; state: State } | { handled: false }> {
     if (loaded !== null || absentTrusted || !this.shouldRefoldOnMiss(projection)) {
       return { handled: false };
+    }
+    const verdict = await this.probeBeforeRefold({ projection, delivered: [event], context, miss });
+    if (verdict === "new") {
+      const state = await this.foldNewAggregate({ projection, delivered: [event], context });
+      return { handled: true, state };
     }
 
     const refolded = await this.refoldUpToDelivered(projection, [event], context);
@@ -646,6 +663,97 @@ export class FoldProjectionExecutor {
     }
     this.assertUndecodableWasRebuilt(projection, miss);
     return { handled: false };
+  }
+
+  /**
+   * Asks the event log, before a store-miss re-fold replays it, whether the aggregate is new.
+   * Answers `new` when the log shows the first delivered event and nothing before it. When it
+   * shows earlier events, or not even the delivered one, the saved state most likely sits on a
+   * replica that has not caught up: the job goes back to the queue for a short wait, up to
+   * `storeMissRetries` deliveries, and only then re-folds. Undecodable rows re-fold at once.
+   */
+  private async probeBeforeRefold<State, E extends Event>({
+    projection,
+    delivered,
+    context,
+    miss,
+  }: {
+    projection: FoldProjectionDefinition<State, E>;
+    delivered: readonly E[];
+    context: ProjectionStoreContext;
+    miss: "absent" | "undecodable" | undefined;
+  }): Promise<"new" | "refold"> {
+    const deliveryAttempt = context.deliveryAttempt;
+    // Outside the queue (replay, inline folds) nothing would retry the job, and a keyed fold's
+    // state spans aggregates, so one aggregate's log cannot prove it new.
+    if (
+      miss !== "absent" ||
+      deliveryAttempt === undefined ||
+      context.key !== undefined ||
+      this.storeMissRetries <= 0
+    ) {
+      return "refold";
+    }
+    const probe = projection.eventLogProbe;
+    if (!probe) return "refold";
+
+    // Callers deliver at least one event; the earliest by arrival is where the log's order starts.
+    const first = delivered.toSorted(compareArrival)[0]!;
+    const shown = await probe({
+      tenantId: context.tenantId,
+      aggregateId: context.aggregateId,
+      event: first,
+    });
+    if (shown.hasEvent && !shown.hasEarlierEvents) {
+      incrementEsFoldStoreMissProbeTotal(projection.name, "new_aggregate");
+      return "new";
+    }
+    if (deliveryAttempt > this.storeMissRetries) {
+      incrementEsFoldStoreMissProbeTotal(projection.name, "refold_after_retries");
+      return "refold";
+    }
+    const missing = shown.hasEarlierEvents ? "state" : "log";
+    incrementEsFoldStoreMissProbeTotal(
+      projection.name,
+      missing === "state" ? "retried_state_not_visible" : "retried_log_not_visible",
+    );
+    throw new FoldStateNotVisibleError({
+      projectionName: projection.name,
+      aggregateId: context.aggregateId,
+      missing,
+      deliveryAttempt,
+    });
+  }
+
+  /**
+   * Folds an aggregate the event log shows nothing before from init() and commits it. Nothing
+   * earlier exists, so a redelivered event here rebuilds the same state rather than doubling it.
+   */
+  private async foldNewAggregate<State, E extends Event>({
+    projection,
+    delivered,
+    context,
+  }: {
+    projection: FoldProjectionDefinition<State, E>;
+    delivered: readonly E[];
+    context: ProjectionStoreContext;
+  }): Promise<State> {
+    let state = projection.init();
+    for (const event of delivered) {
+      state = projection.apply(state, event);
+    }
+    await projection.store.store(
+      state,
+      withAppliedEventIds(
+        context,
+        this.appliedIdsForCommit({
+          context,
+          loadedAppliedIds: [],
+          deliveredIds: delivered.map(appliedTokenOf),
+        }),
+      ),
+    );
+    return state;
   }
 
   /**
@@ -696,7 +804,8 @@ export class FoldProjectionExecutor {
 
   /**
    * A batch whose state could not be loaded: refolds from the history when the
-   * projection asks for it. Answers the refolded state, or none to fold on top.
+   * projection asks for it, after the same probe as the single-event path.
+   * Answers the refolded or new state, or none to fold on top.
    */
   private async refoldBatchAfterMiss<State, E extends Event>({
     projection,
@@ -725,6 +834,15 @@ export class FoldProjectionExecutor {
     }
 
     if (!absentTrusted && this.shouldRefoldOnMiss(projection)) {
+      const verdict = await this.probeBeforeRefold({
+        projection,
+        delivered: ordered,
+        context,
+        miss,
+      });
+      if (verdict === "new") {
+        return [await this.foldNewAggregate({ projection, delivered: ordered, context })];
+      }
       const refolded = await this.refoldUpToDelivered(projection, ordered, context);
       // Counted as on the single-event path above.
       incrementEsFoldRefoldOnMissTotal(projection.name, refolded === null ? "absent" : "performed");

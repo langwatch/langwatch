@@ -97,7 +97,8 @@ export class CodingAgentSessionFoldProjection
   /**
    * Read back committed state per ADR-066. A schema-gated miss refolds once;
    * steady-state delivery never reads `event_log`. Out-of-order refolds stay
-   * off since accumulators commute. A miss widens back to 30 days, then rebuilds from the log.
+   * off since accumulators commute. A miss widens back to 30 days; then a new session folds
+   * from empty, and one with history waits twice for a lagging replica before it is rebuilt.
    */
   override options: FoldProjectionOptions = {
     refoldOnStoreMiss: true,

@@ -4,6 +4,7 @@ import { EventNotFoundError } from "../../services/errorHandling.ts";
 import { compareOrdinal } from "../../utils/compareOrdinal.ts";
 import { compareEventLogPagePositions, type EventLogPageCursor } from "../event-log-page-order.ts";
 import type {
+  EventLogProbe,
   EventOccurredAtWindow,
   EventRecord,
   EventRepository,
@@ -253,6 +254,33 @@ export class EventRepositoryMemory implements EventRepository {
       }
       return false;
     }).length;
+  }
+
+  async probeEventRecordsBefore({
+    tenantId,
+    aggregateType,
+    aggregateId,
+    eventTimestamp,
+    eventId,
+  }: {
+    tenantId: string;
+    aggregateType: string;
+    aggregateId: string;
+    eventTimestamp: number;
+    eventId: string;
+    occurredAtFromMs?: number;
+  }): Promise<EventLogProbe> {
+    const key = `${tenantId}:${aggregateType}:${String(aggregateId)}`;
+    const records = this.eventsByKey.get(key) ?? [];
+    return {
+      hasEvent: records.some((record) => record.EventId === eventId),
+      hasEarlierEvents: records.some(
+        (record) =>
+          record.EventId !== eventId &&
+          (record.EventTimestamp < eventTimestamp ||
+            (record.EventTimestamp === eventTimestamp && record.EventId < eventId)),
+      ),
+    };
   }
 
   async insertEventRecords(records: EventRecord[]): Promise<void> {

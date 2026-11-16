@@ -273,6 +273,39 @@ export class UnroutableQueuedJobError extends RecoverableError {
 }
 
 /**
+ * A fold's store missed state the event log says it should hold, most likely because the
+ * replica that answered has not caught up with the write yet. The queue holds the job a few
+ * seconds and retries it rather than replaying the aggregate's history at once.
+ */
+export class FoldStateNotVisibleError extends RecoverableError {
+  override readonly name = "FoldStateNotVisibleError";
+  readonly projectionName: string;
+  /** `state`: earlier events exist but no saved state; `log`: the log lacks the event itself. */
+  readonly missing: "state" | "log";
+
+  constructor({
+    projectionName,
+    aggregateId,
+    missing,
+    deliveryAttempt,
+  }: {
+    projectionName: string;
+    aggregateId: string;
+    missing: "state" | "log";
+    deliveryAttempt: number;
+  }) {
+    super(
+      missing === "state"
+        ? `Fold ${projectionName} found no saved state for aggregate ${aggregateId}, whose event log has earlier events; waiting for it to become visible`
+        : `Fold ${projectionName} could not see the delivered event for aggregate ${aggregateId} in the event log yet; waiting before deciding it is new`,
+      { projectionName, aggregateId, missing, deliveryAttempt },
+    );
+    this.projectionName = projectionName;
+    this.missing = missing;
+  }
+}
+
+/**
  * Error thrown when validation fails (invalid data, missing fields, etc.).
  */
 export class ValidationError extends CriticalError {

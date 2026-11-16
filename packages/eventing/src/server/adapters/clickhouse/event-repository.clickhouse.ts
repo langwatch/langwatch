@@ -3,6 +3,7 @@ import { createLogger } from "@langwatch/observability";
 import { ConfigurationError, EventNotFoundError } from "../../../services/errorHandling.ts";
 import type { EventLogPageCursor } from "../../../stores/event-log-page-order.ts";
 import type {
+  EventLogProbe,
   EventOccurredAtWindow,
   EventRecord,
   EventRepository,
@@ -727,6 +728,86 @@ export class EventingClickHouseEventRepository implements EventRepository {
           error,
         },
         "Failed to count event records from ClickHouse",
+      );
+      throw error;
+    }
+  }
+
+  async probeEventRecordsBefore(request: {
+    tenantId: string;
+    aggregateType: string;
+    aggregateId: string;
+    eventTimestamp: number;
+    eventId: string;
+    occurredAtFromMs?: number;
+  }): Promise<EventLogProbe> {
+    const { tenantId, aggregateType, aggregateId, eventTimestamp, eventId } = request;
+    try {
+      const occurredAtFromMs = await this.occurredAtFloor({
+        tenantId,
+        aggregateType,
+        aggregateId,
+        occurredAtFromMs: request.occurredAtFromMs,
+      });
+      const hasLowerBound = typeof occurredAtFromMs === "number" && occurredAtFromMs > 0;
+      const aggregateRows = `
+        FROM event_log
+        WHERE TenantId = {tenantId:String}
+          AND AggregateType = {aggregateType:String}
+          AND AggregateId = {aggregateId:String}
+          ${hasLowerBound ? "AND (EventOccurredAt = 0 OR EventOccurredAt >= {occurredAtFromMs:UInt64})" : ""}`;
+      const client = await this.getClient(tenantId);
+      // Two existence checks in one statement, each stopping at its first row: the WHERE fixes
+      // the sort key's prefix, so neither reads past the aggregate's own granules.
+      const result = await client.query({
+        query: `
+          SELECT
+            (SELECT count() FROM (
+              SELECT 1 ${aggregateRows}
+                AND EventId = {eventId:String}
+              LIMIT 1
+            )) AS hasEvent,
+            (SELECT count() FROM (
+              SELECT 1 ${aggregateRows}
+                AND (
+                  EventTimestamp < {eventTimestamp:UInt64}
+                  OR (EventTimestamp = {eventTimestamp:UInt64} AND EventId < {eventId:String})
+                )
+                AND EventId != {eventId:String}
+              LIMIT 1
+            )) AS hasEarlierEvents
+        `,
+        query_params: {
+          tenantId,
+          aggregateType,
+          aggregateId: String(aggregateId),
+          eventTimestamp,
+          eventId,
+          ...(hasLowerBound ? { occurredAtFromMs } : {}),
+        },
+        format: "JSONEachRow",
+        ...(hasLowerBound ? {} : { SKIP_COLD_SCAN_CHECK: true as const }),
+      });
+      const rows = await result.json<{
+        hasEvent: string | number;
+        hasEarlierEvents: string | number;
+      }>();
+      const row = rows[0];
+      return {
+        hasEvent: Number(row?.hasEvent ?? 0) > 0,
+        hasEarlierEvents: Number(row?.hasEarlierEvents ?? 0) > 0,
+      };
+    } catch (error) {
+      this.logger.warn(
+        {
+          tenantId,
+          aggregateType,
+          aggregateId: String(aggregateId),
+          eventTimestamp,
+          eventId,
+          error,
+        },
+        "Failed to probe event records from ClickHouse",
       );
       throw error;
     }
