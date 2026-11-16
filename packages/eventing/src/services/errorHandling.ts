@@ -1,3 +1,4 @@
+import { isInsertFailure } from "@langwatch/clickhouse-client";
 import { NonRetryableGroupQueueError } from "@langwatch/group-queue";
 import { HandledError } from "@langwatch/handled-error";
 import type { createLogger } from "@langwatch/observability";
@@ -746,9 +747,15 @@ const CLICKHOUSE_PERMANENT_DATA_ERRORS: ReadonlyMap<string, string> = new Map([
   ["CANNOT_INSERT_NULL_IN_ORDINARY_COLUMN", "349"],
 ]);
 
-const CLICKHOUSE_PERMANENT_DATA_CODES: ReadonlySet<string> = new Set(
-  CLICKHOUSE_PERMANENT_DATA_ERRORS.values(),
+const CLICKHOUSE_PERMANENT_DATA_NAMES_BY_CODE: ReadonlyMap<string, string> = new Map(
+  [...CLICKHOUSE_PERMANENT_DATA_ERRORS].map(([name, code]) => [code, name]),
 );
+
+/** Refusals of the data only when an insert met them: on a read, a column may be changing type. */
+const CLICKHOUSE_INSERT_ONLY_DATA_ERRORS: ReadonlySet<string> = new Set([
+  "ILLEGAL_TYPE_OF_ARGUMENT",
+  "TYPE_MISMATCH",
+]);
 
 /**
  * Whether ClickHouse refused the data itself (a parse or type error), read through causes and
@@ -773,17 +780,25 @@ function permanentDataErrorAt({ error, depth }: { error: unknown; depth: number 
 }
 
 function refusesTheData(error: object): boolean {
+  const refusal = dataRefusalNameOf(error);
+  if (refusal === "") return false;
+  return !CLICKHOUSE_INSERT_ONLY_DATA_ERRORS.has(refusal) || isInsertFailure(error);
+}
+
+/** The ClickHouse error name of a refusal of the data, or "" when the error is none. */
+function dataRefusalNameOf(error: object): string {
   const type = Reflect.get(error, "type");
   if (typeof type === "string") {
-    if (CLICKHOUSE_PERMANENT_DATA_ERRORS.has(type)) return true;
+    if (CLICKHOUSE_PERMANENT_DATA_ERRORS.has(type)) return type;
     const code = String(Reflect.get(error, "code"));
-    if (CLICKHOUSE_PERMANENT_DATA_CODES.has(code)) return true;
+    const named = CLICKHOUSE_PERMANENT_DATA_NAMES_BY_CODE.get(code);
+    if (named !== undefined) return named;
   }
   const message = error instanceof Error ? error.message : "";
   for (const name of CLICKHOUSE_PERMANENT_DATA_ERRORS.keys()) {
-    if (message.includes(name)) return true;
+    if (message.includes(name)) return name;
   }
-  return false;
+  return "";
 }
 
 const PROJECT_GONE_NAME = "ProjectNotFoundError";

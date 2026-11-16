@@ -1,3 +1,4 @@
+import { markInsertFailure } from "@langwatch/clickhouse-client";
 import { HandledError } from "@langwatch/handled-error";
 import { describe, expect, it, vi } from "vitest";
 
@@ -722,10 +723,18 @@ describe("isPermanentClickHouseError", () => {
     it.each([
       ["27", "CANNOT_PARSE_INPUT_ASSERTION_FAILED", "Cannot parse input: expected '\"' before"],
       ["6", "CANNOT_PARSE_TEXT", "Cannot parse string 'abc' as UInt64"],
-      ["53", "TYPE_MISMATCH", "Type mismatch in IN or VALUES section"],
-      ["43", "ILLEGAL_TYPE_OF_ARGUMENT", "Illegal type String of argument of function plus"],
     ])("refuses retrying code %s (%s)", (code, type, message) => {
       expect(isPermanentClickHouseError(clickHouseServerError({ code, type, message }))).toBe(true);
+    });
+
+    it.each([
+      ["53", "TYPE_MISMATCH", "Type mismatch in IN or VALUES section"],
+      ["43", "ILLEGAL_TYPE_OF_ARGUMENT", "Illegal type String of argument of function plus"],
+    ])("refuses retrying code %s (%s) when an insert met it", (code, type, message) => {
+      const error = clickHouseServerError({ code, type, message });
+      markInsertFailure(error);
+
+      expect(isPermanentClickHouseError(error)).toBe(true);
     });
 
     it("recognises the name in a message that crossed a serialisation boundary", () => {
@@ -760,6 +769,19 @@ describe("isPermanentClickHouseError", () => {
 
       expect(isPermanentClickHouseError(error)).toBe(false);
     });
+
+    it.each([
+      ["53", "TYPE_MISMATCH", "Type mismatch in IN or VALUES section"],
+      ["43", "ILLEGAL_TYPE_OF_ARGUMENT", "Illegal type String of argument of function plus"],
+    ])(
+      "retries code %s (%s) on a read, where a column may be changing type",
+      (code, type, message) => {
+        const error = clickHouseServerError({ code, type, message });
+
+        expect(isPermanentClickHouseError(error)).toBe(false);
+        expect(isPermanentClickHouseError(new Error("read failed", { cause: error }))).toBe(false);
+      },
+    );
 
     it("retries an overload even when a parse error rides beside it", () => {
       const shed = new ClickHouseOverloadedError({
