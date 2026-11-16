@@ -12,7 +12,10 @@ import { fileURLToPath } from "node:url";
 
 import { type ClickHouseClient, ClickHouseLogLevel, createClient } from "@clickhouse/client";
 import type { LangWatchQLResourceLimits } from "@langwatch/analytics-contract/langwatch-ql-limits";
-import { testClickHouseProfilePins } from "@langwatch/clickhouse-client/testing";
+import {
+  reusesTestContainers,
+  testClickHouseProfilePins,
+} from "@langwatch/clickhouse-client/testing";
 import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
 import { ClickHouseContainer, type StartedClickHouseContainer } from "@testcontainers/clickhouse";
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
@@ -371,7 +374,7 @@ export async function startLangWatchQLClickHouse({
     .slice(0, 16);
 
   const configDirectory = mkdtempSync(join(tmpdir(), "lwql-config-"));
-  const container = await new ClickHouseContainer(image)
+  const configured = new ClickHouseContainer(image)
     .withUsername(ADMIN_USER)
     .withPassword(ADMIN_PASSWORD)
     .withLabels({
@@ -406,9 +409,10 @@ export async function startLangWatchQLClickHouse({
     ])
     // Reaching PostgreSQL on the docker host; see the module comment.
     .withExtraHosts([{ host: "host.docker.internal", ipAddress: "host-gateway" }])
-    .withReuse()
-    .withStartupTimeout(120_000)
-    .start();
+    .withStartupTimeout(120_000);
+  const container = await (
+    reusesTestContainers(process.env) ? configured.withReuse() : configured
+  ).start();
 
   const httpUrl = container.getHttpUrl();
   const admin = createClient({

@@ -270,3 +270,15 @@ Feature: A package's integration suite runs in CI when it declares one
       Given package-suites failed or was cancelled in the previous finished run on main
       When it is red again
       Then Slack gets nothing new
+
+  Rule: A test database does not outlive its test file on CI
+
+    # Main runs every suite in one job. Reused test databases were never stopped,
+    # so about 35 idle ClickHouse servers piled up and the last suites' own servers
+    # stopped answering within 120s on runners without swap.
+    @unit @regression
+    Scenario: On CI a test database stops when its test file ends
+      Given an integration test file that starts a ClickHouse test container on CI
+      When the file ends
+      Then its container is stopped rather than kept for reuse
+      And on a developer machine containers are still reused between runs

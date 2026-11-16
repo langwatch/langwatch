@@ -3,7 +3,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-import { migrateTestClickHouseOnce } from "../clickhouse-test-endpoints.ts";
+import { migrateTestClickHouseOnce, reusesTestContainers } from "../clickhouse-test-endpoints.ts";
 
 describe("migrateTestClickHouseOnce", () => {
   describe("given the same ClickHouse URL is asked to migrate twice", () => {
@@ -33,6 +33,21 @@ describe("migrateTestClickHouseOnce", () => {
 
         expect(migrate).toHaveBeenCalledTimes(2);
       });
+    });
+  });
+});
+
+describe("reusesTestContainers", () => {
+  describe("given a CI run", () => {
+    /** @scenario "On CI a test database stops when its test file ends" */
+    it("does not reuse, so the reaper stops each container when its file ends", () => {
+      expect(reusesTestContainers({ CI: "true" })).toBe(false);
+    });
+  });
+
+  describe("given a developer machine", () => {
+    it("reuses containers, so the next local run starts fast", () => {
+      expect(reusesTestContainers({})).toBe(true);
     });
   });
 });

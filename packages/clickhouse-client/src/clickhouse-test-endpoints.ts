@@ -134,6 +134,16 @@ export function nativeClickHouseBaseUrl(
 }
 
 /**
+ * Off CI a container is kept for the next run. On CI it is not, so the reaper stops it
+ * when its file ends: main's one job otherwise piled up ~35 (package-suite-integration-lane).
+ */
+export function reusesTestContainers(
+  environment: Readonly<Record<string, string | undefined>>,
+): boolean {
+  return !environment.CI;
+}
+
+/**
  * URLs whose schema this process has already migrated: goose is blocking
  * and applies the whole set, so without this a shard's files sharing an
  * endpoint would each re-run migration against an already-migrated database.
@@ -178,7 +188,7 @@ export async function startTestClickHouseEndpoints({
   const baseUrl = nativeClickHouseBaseUrl(environment);
   return baseUrl
     ? startNativeEndpoints({ suite, names, baseUrl })
-    : startContainerEndpoints({ suite, names, image });
+    : startContainerEndpoints({ suite, names, image, reuse: reusesTestContainers(environment) });
 }
 
 /** One database per endpoint on the shared native server. */
@@ -204,35 +214,34 @@ async function startNativeEndpoints({
 }
 
 /**
- * One reusable container per endpoint, labelled so `docker ps` and
- * globalSetup.ts's cleanup can find them. Reuse keys on configuration, so
- * the distinct labels are what keep endpoints from collapsing into one.
+ * One container per endpoint, reused off CI (reusesTestContainers). Reuse keys
+ * on configuration, so the distinct labels keep endpoints from collapsing into one.
  */
 async function startContainerEndpoints({
   suite,
   names,
   image,
+  reuse,
 }: {
   suite: string;
   names: string[];
   image: string;
+  reuse: boolean;
 }): Promise<TestClickHouseEndpoint[]> {
   const pins = testClickHouseProfilePins();
   const started = await Promise.all(
-    names.map(async (name): Promise<[string, StartedClickHouseContainer]> => [
-      name,
-      await new ClickHouseContainer(image)
+    names.map(async (name): Promise<[string, StartedClickHouseContainer]> => {
+      const container = new ClickHouseContainer(image)
         .withLabels({
           "langwatch.test": "true",
           [`langwatch.test.${suite}`]: name,
           ...TEST_CLICKHOUSE_TUNING_LABEL,
           ...pins.label,
         })
-        .withReuse()
         .withCopyContentToContainer([TEST_CLICKHOUSE_TUNING, pins.file])
-        .withStartupTimeout(120_000)
-        .start(),
-    ]),
+        .withStartupTimeout(120_000);
+      return [name, await (reuse ? container.withReuse() : container).start()];
+    }),
   );
 
   const endpoints: TestClickHouseEndpoint[] = [];
