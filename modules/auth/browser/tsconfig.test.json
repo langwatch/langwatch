@@ -1,6 +1,7 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
+    "types": ["node"],
     "composite": false,
     "noEmit": true,
     "tsBuildInfoFile": "dist/tsconfig.test.tsbuildinfo"

@@ -11,11 +11,20 @@ type Unsubscribable = { unsubscribe: () => void };
 
 /** The three procedures a turn runs on, off the api provider's own client. */
 export type LangyTurnClient = {
-  langy: Pick<
-    LangyTrpcClient["langy"],
-    "createConversation" | "continueConversation" | "onTurnStream"
-  >;
+  langy: Pick<LangyTrpcClient["langy"], "createConversation" | "continueConversation"> & {
+    onTurnStream: { subscribe: TurnStreamSubscribe };
+  };
 };
+
+/** The callback form of the turn stream: the only one that hands back an unsubscribable. */
+type TurnStreamSubscribe = (
+  input: { projectId: string; conversationId: string; turnId: string },
+  callbacks: {
+    onData: (entry: LangyStreamWireEntry) => void;
+    onError: (err: unknown) => void;
+    onComplete: () => void;
+  },
+) => Unsubscribable;
 
 /**
  * The per-turn request inputs the transport owns.
