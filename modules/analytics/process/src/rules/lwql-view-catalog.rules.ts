@@ -553,13 +553,13 @@ const EVALUATIONS: UngatedViewDefinition = {
   joinKeys: ["TenantId", "TraceId"],
   timeColumn: "ScheduledAt",
   freshness: PROJECTION_FRESHNESS,
+  // No floor: a newer version may carry an earlier ScheduledAt (analytics ADR-006, amendment
+  // 2026-11-16).
   dedup: {
     keyColumns: ["TenantId", "EvaluationId"],
     versionColumn: "UpdatedAt",
     strategy: "latest-in-order",
     tieBreakColumns: ["Version"],
-    // Set once, by the run's scheduled event (analytics ADR-006, amendment 2026-11-16).
-    floorColumn: "ScheduledAt",
   },
   columns: [
     {

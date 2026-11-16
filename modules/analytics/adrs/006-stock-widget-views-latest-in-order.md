@@ -86,8 +86,8 @@ new MATERIALIZED column.
   `stored_spans` keeps one.
 - **Time pruning.** `span_metrics`, which takes no dedup, prunes by time through the caller's
   filter. On the eight `latest-in-order` views a time filter applies after the dedup: their cost
-  grows with the project's history, not the period. `trace_metrics` and `evaluations` prune only
-  through their floored twins' bound (amended 2026-11-16). Measured below (for the argMax form).
+  grows with the project's history, not the period. `trace_metrics` prunes only through its
+  floored twin's bound (amended 2026-11-16). Measured below (for the argMax form).
 - **Rollout and rollback.** A row an old writer writes during the rollout, or after a rollback,
   holds '' in the three 00128 columns and has no `span_analytics` row until a replay reaches it.
   `span_metrics` is empty before its replay runs, and holds nothing older than the floor.
@@ -164,7 +164,7 @@ The stock evaluation widgets read `trace_evaluation_metrics` and `trace_evaluati
 retraction for every change. Those views take neither `FINAL` nor `LIMIT 1 BY` but the `settled`
 strategy: `GROUP BY` every column read, `HAVING sum(Sign) > 0` (ADR-007).
 
-## Amendment 2026-11-16: floored twins for trace_metrics and evaluations
+## Amendment 2026-11-16: a floored twin for trace_metrics, none for evaluations
 
 `LIMIT 1 BY` stops the caller's `WHERE` from reaching the table: a local `EXPLAIN indexes = 1`
 of the changes and capability-gap stock queries shows `MinMax Condition: true` on every
@@ -189,11 +189,15 @@ an earlier floor column than an older one (ADR-005, decision 2). Per view:
   version sits before the floor while the older one sits after it: the twin would drop the newer
   version and return the stale row, where the view returns none. `traces` keeps reading its whole
   history until the anchor cannot fall.
-- **`evaluations`, `ScheduledAt`: holds while the scheduled event folds first.** Only
-  `handleEvaluationScheduled` sets it; the row writes `scheduledAt ?? createdAt`, and `createdAt` is
-  the fold's clock when it first folds the run. A run whose start or result folded before its
-  scheduled event would have its `ScheduledAt` fall; the fold orders a run's events by accept
-  time, and the scheduler emits the scheduled event first. A replay moves it later, never earlier.
+- **`evaluations`, `ScheduledAt`: not monotone, not floored.** The row writes
+  `scheduledAt ?? createdAt` (`evaluation-run-write.repository.ts`), and only the scheduled event
+  sets `scheduledAt`. No producer of that event was found after #2248 replaced the two-step
+  evaluation events with one `reportEvaluation`, so `ScheduledAt` is likely the wall clock of the
+  fold that first built the run's state. No cache sits in front of the run store
+  (`evaluation-processing-stores.pipeline.ts`), so a fold whose read misses or returns a stale
+  version can write a later version with an earlier `ScheduledAt` than the one before it. The twin
+  would then return that stale earlier version where the view returns no row. `evaluations` keeps
+  reading its whole history; its stock reads bounded on `ScheduledAt` are sent as written.
 
 Not floored: `simulations` (its row is stamped `StartedAt ?? CreatedAt`, the fold's clock, until
 the started event brings an earlier time; a snapshot before the started event does the same) and

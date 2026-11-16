@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
- * evaluations keeps each run's latest version by a LIMIT 1 BY whose key lacks ScheduledAt; a stock
- * read bounded below on ScheduledAt goes to the floored twin, which must return the view's rows.
+ * evaluations takes no floored twin: a newer version of a run may carry an earlier ScheduledAt.
+ * A stock read bounded below on ScheduledAt reads the view as written and returns its rows.
  * @see specs/lwql/dedup-floor.feature
  * @see modules/analytics/adrs/006-stock-widget-views-latest-in-order.md
  */
@@ -49,7 +49,6 @@ const SCHEDULED_READS = [
 ];
 
 const readsOfView = (sql: string) => sql.match(/\bFROM evaluations\b/g)?.length ?? 0;
-const readsOfTwin = (sql: string) => sql.match(/\bFROM evaluations__floor\(/g)?.length ?? 0;
 
 const TENANT = TENANT_A.tenantId;
 const DAY = 86_400_000;
@@ -62,8 +61,6 @@ const PARAMETERS = {
   dashboard_context_period_end: at(PERIOD_END),
   dashboard_context_sources: ["application"],
 };
-const START = "{dashboard_context_period_start:DateTime}";
-const END = "{dashboard_context_period_end:DateTime}";
 
 /** The traces the runs evaluate, by day after the period start. */
 const TRACES = [
@@ -81,11 +78,7 @@ const CHECK = "Quality";
 type Version = { day: number; details: string; label?: string; passed?: 0 | 1 };
 type Run = { id: string; trace: string; evaluator: string; scheduled: number; versions: Version[] };
 
-/**
- * Each run's two versions, oldest first, by the day each was written. ScheduledAt is set once, so
- * versions straddle a stock bound only on UpdatedAt: day 0 (the period start), day 4 (ans-review's
- * last three days) and day -7 (ans-outcomes' previous period).
- */
+/** Each run's two versions, oldest first, by the day each was written. */
 const RUNS: Run[] = [
   {
     id: "field-in",
@@ -246,12 +239,6 @@ function runRows(version: number): Record<string, unknown>[] {
   });
 }
 
-const latestOf = (ids: string[]) =>
-  ids.map((id) => ({
-    EvaluationId: id,
-    Details: RUNS.find((run) => run.id === id)?.versions.at(-1)?.details,
-  }));
-
 /** Rows in a stable order: a stock query's ORDER BY can tie, or be absent. */
 const stable = (rows: Record<string, unknown>[]) =>
   rows.map((row) => JSON.stringify(row)).toSorted();
@@ -270,20 +257,13 @@ describe("given evaluation runs whose versions straddle each stock bound", () =>
     return result.json<Record<string, unknown>>();
   }
 
-  /** The rows as written (the whole-history dedup) and as the executor sends the statement. */
-  async function both(sql: string) {
-    const sent = floorLangWatchQLDedup({
-      sql,
-      database: harness.names.database,
-      views: LWQL_VIEW_CATALOG,
-    });
-    return { written: await rows(sql), sent: await rows(sent), twinReads: readsOfTwin(sent) };
-  }
-
   beforeAll(async () => {
     // ask-cannot/topics reads `topics`, which is PostgreSQL-resident.
     postgres = await startLangWatchQLPostgres();
-    harness = await startLangWatchQLClickHouse({ suite: "evaluations-floor", facts: "migrated" });
+    harness = await startLangWatchQLClickHouse({
+      suite: "evaluations-unfloored",
+      facts: "migrated",
+    });
     const { names, factDatabase: facts } = harness;
     await mapPostgresIntoClickHouse({ harness, postgres });
     await harness.applyAsAdmin(
@@ -317,7 +297,7 @@ describe("given evaluation runs whose versions straddle each stock bound", () =>
     await postgres?.stop();
   });
 
-  /** @scenario "Every stock read of evaluations bounded below on ScheduledAt returns the view's rows through its floored twin" */
+  /** @scenario "Every stock read of evaluations bounded below on ScheduledAt reads the view as written and returns its rows" */
   it("names every stock query that reads evaluations bounded below on ScheduledAt", () => {
     const bounded = [...STOCK]
       .filter(([, sql]) => readsOfView(sql) > 0 && sql.includes("ScheduledAt >="))
@@ -326,40 +306,22 @@ describe("given evaluation runs whose versions straddle each stock bound", () =>
     expect(bounded.toSorted()).toEqual(SCHEDULED_READS);
   });
 
-  /** @scenario "Every stock read of evaluations bounded below on ScheduledAt returns the view's rows through its floored twin" */
+  /** @scenario "Every stock read of evaluations bounded below on ScheduledAt reads the view as written and returns its rows" */
   it.each(SCHEDULED_READS)(
-    "returns the view's rows for %s through evaluations__floor",
+    "reads evaluations as written for %s and returns its rows",
     async (label) => {
       const sql = STOCK.get(label) ?? "";
-      const { written, sent, twinReads } = await both(sql);
+      const sent = floorLangWatchQLDedup({
+        sql,
+        database: harness.names.database,
+        views: LWQL_VIEW_CATALOG,
+      });
+      const written = await rows(sql);
 
+      expect(sent, label).not.toContain("evaluations__floor(");
+      expect(readsOfView(sent), label).toBe(readsOfView(sql));
       expect(written.length, label).toBeGreaterThan(0);
-      expect(twinReads, label).toBe(readsOfView(sql));
-      expect(stable(sent), label).toEqual(stable(written));
+      expect(stable(await rows(sent)), label).toEqual(stable(written));
     },
   );
-
-  /** @scenario "Every stock read of evaluations bounded below on ScheduledAt returns the view's rows through its floored twin" */
-  it("keeps each run's latest version from the bound, as the whole-history view does", async () => {
-    const ids = RUNS.map(({ id }) => `'${id}'`).join(", ");
-    const { written, sent, twinReads } = await both(
-      `SELECT EvaluationId, Details FROM evaluations ` +
-        `WHERE ScheduledAt >= ${START} AND ScheduledAt < ${END} ` +
-        `AND EvaluationId IN (${ids}) ORDER BY EvaluationId`,
-    );
-
-    expect(written).toEqual(
-      latestOf([
-        "check-flagged",
-        "check-recovered",
-        "check-straddle",
-        "field-fixed",
-        "field-in",
-        "judge-in",
-        "judge-late",
-      ]),
-    );
-    expect(twinReads).toBe(1);
-    expect(sent).toEqual(written);
-  });
 });

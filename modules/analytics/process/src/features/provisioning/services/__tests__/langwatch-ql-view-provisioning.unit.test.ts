@@ -509,12 +509,9 @@ describe("given the views pinned to latest-in-order", () => {
   });
 
   /** @scenario "A floored twin of a latest-in-order view reads the source from its bound before LIMIT 1 BY" */
-  it.each([
-    ["trace_metrics", "trace_analytics", "OccurredAt"],
-    ["evaluations", "evaluation_runs", "ScheduledAt"],
-  ])("floors %s's read of %s on %s before it keeps one version", (name, table, column) => {
-    const view = pickLwqlViewByName(name);
-    if (!view) throw new Error(`${name} is not in the catalog`);
+  it("floors trace_metrics' read of trace_analytics on OccurredAt before LIMIT 1 BY", () => {
+    const view = pickLwqlViewByName("trace_metrics");
+    if (!view) throw new Error("trace_metrics is not in the catalog");
     const twins = viewStatements.flooredViewStatements({
       names: NAMES,
       sourceDatabase: SOURCE_DATABASE,
@@ -523,17 +520,17 @@ describe("given the views pinned to latest-in-order", () => {
     });
 
     expect(twins).toHaveLength(1);
-    expect(twins[0]).toMatch(new RegExp(`^CREATE OR REPLACE VIEW langwatch\\.${name}__floor\\n`));
+    expect(twins[0]).toMatch(/^CREATE OR REPLACE VIEW langwatch\.trace_metrics__floor\n/);
     expect(twins[0]).toContain(
-      `  FROM langwatch.${table}\n` +
-        `  WHERE \`${column}\` >= {lwql_floor:DateTime64(3)}\n` +
+      "  FROM langwatch.trace_analytics\n" +
+        "  WHERE `OccurredAt` >= {lwql_floor:DateTime64(3)}\n" +
         "  ORDER BY ",
     );
-    expect(render(name)).not.toContain("lwql_floor");
+    expect(render("trace_metrics")).not.toContain("lwql_floor");
   });
 
   /** @scenario "A floored twin of a latest-in-order view reads the source from its bound before LIMIT 1 BY" */
-  it.each(["traces", "simulations"])(
+  it.each(["traces", "evaluations", "simulations"])(
     "provisions no twin for %s, a latest-in-order view that declares no floor column",
     (name) => {
       const view = pickLwqlViewByName(name);

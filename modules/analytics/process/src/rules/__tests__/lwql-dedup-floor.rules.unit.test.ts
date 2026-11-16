@@ -229,15 +229,12 @@ describe("given a view whose dedup declares no floor column", () => {
 
 describe("given a statement that reads a latest-in-order view", () => {
   /** @scenario "A read bounded below on a latest-in-order view's floor column reads its floored twin" */
-  it.each([
-    ["trace_metrics", "OccurredAt"],
-    ["evaluations", "ScheduledAt"],
-  ])("reads %s's floored twin from the bound on %s", (view, column) => {
-    expect(
-      send(`SELECT TraceId FROM ${view} WHERE ${column} >= ${START} AND ${column} < ${END}`),
-    ).toBe(
-      `SELECT TraceId FROM ${view}__floor(lwql_floor = ${floorOf(START)}) AS ${view} ` +
-        `WHERE ${column} >= ${START} AND ${column} < ${END}`,
+  it("reads trace_metrics' floored twin from the bound on OccurredAt", () => {
+    const where = `WHERE OccurredAt >= ${START} AND OccurredAt < ${END}`;
+
+    expect(send(`SELECT TraceId FROM trace_metrics ${where}`)).toBe(
+      `SELECT TraceId FROM trace_metrics__floor(lwql_floor = ${floorOf(START)}) ` +
+        `AS trace_metrics ${where}`,
     );
   });
 
@@ -250,9 +247,22 @@ describe("given a statement that reads a latest-in-order view", () => {
     );
   });
 
-  /** @scenario "A read bounded below on traces.OccurredAt keeps the whole-history dedup" */
-  it("sends a traces read bounded on OccurredAt as written", () => {
-    const sql = `SELECT TraceId FROM traces WHERE OccurredAt >= ${START} AND OccurredAt < ${END}`;
+  /** @scenario "A read bounded below on traces.OccurredAt or evaluations.ScheduledAt keeps the whole-history dedup" */
+  it.each([
+    ["traces", "OccurredAt"],
+    ["evaluations", "ScheduledAt"],
+  ])("sends a %s read bounded on %s as written", (view, column) => {
+    const sql = `SELECT TraceId FROM ${view} WHERE ${column} >= ${START} AND ${column} < ${END}`;
+
+    expect(send(sql)).toBe(sql);
+  });
+
+  /** @scenario "A read bounded below on traces.OccurredAt or evaluations.ScheduledAt keeps the whole-history dedup" */
+  it("sends a saved widget's aliased evaluations read with a lower date bound as written", () => {
+    const sql =
+      "SELECT e.EvaluatorName, count() AS runs FROM lwql.evaluations AS e " +
+      `WHERE e.ScheduledAt >= least(subtractDays(${START}, 1), subtractDays(${START}, 90)) ` +
+      "GROUP BY e.EvaluatorName";
 
     expect(send(sql)).toBe(sql);
   });
@@ -295,6 +305,7 @@ const UNFLOORED: Readonly<Record<string, string>> = {
   simulations: "StartedAt falls between versions: a run's queued row is stamped at fold time",
   coding_sessions: "StartedAt is the minimum of the session's signals, so it falls (ADR-071)",
   traces: "OccurredAt can fall when a fold misses its row (trace-summary.projection.ts:144,222)",
+  evaluations: "ScheduledAt can fall: a fold that misses or reads stale restamps it (ADR-006)",
   // A floor on these would be exact (time column in the dedup key, or the version itself).
   experiment_items: "follow-up: floor on OccurredAt, the version column",
   simulation_trace_metrics: "follow-up: floor on OccurredAt, the version column",

@@ -100,32 +100,31 @@ Feature: A read bounded below on evaluation_metrics.OccurredAt deduplicates only
 
   @unit
   Scenario: A read bounded below on a latest-in-order view's floor column reads its floored twin
-    Given a statement that reads trace_metrics bounded below on OccurredAt, or evaluations bounded below on ScheduledAt
+    Given a statement that reads trace_metrics bounded below on OccurredAt
     And a bound that takes the least of two query constants
     When the executor sends it
     Then it reads the view's floored twin from that bound
 
   @unit
-  Scenario: A read bounded below on traces.OccurredAt keeps the whole-history dedup
-    Given a statement that reads traces bounded below on OccurredAt
-    And a newer version of a trace can carry an earlier OccurredAt than an older one
-    When the executor sends it
-    Then it reads traces as written, with no floored twin
+  Scenario: A read bounded below on traces.OccurredAt or evaluations.ScheduledAt keeps the whole-history dedup
+    Given a statement that reads traces bounded below on OccurredAt, or evaluations bounded below on ScheduledAt
+    And a newer version of a row in either can carry an earlier value of that column than an older one
+    When the executor sends it, as a stock query or as a saved widget's own read
+    Then it reads the view as written, with no floored twin
 
   @unit
   Scenario: A floored twin of a latest-in-order view reads the source from its bound before LIMIT 1 BY
-    Given trace_metrics and evaluations, which declare a floor column
-    When their floored twins are provisioned
-    Then each twin reads its source table from the bound before it keeps one version per key
-    And a latest-in-order view that declares no floor column, such as traces or simulations, gets no twin
+    Given trace_metrics, which declares a floor column
+    When its floored twin is provisioned
+    Then the twin reads its source table from the bound before it keeps one version per key
+    And a latest-in-order view that declares no floor column, such as traces, evaluations or simulations, gets no twin
 
   @integration
-  Scenario: Every stock read of evaluations bounded below on ScheduledAt returns the view's rows through its floored twin
-    Given evaluation runs whose ScheduledAt is set once and whose versions are written on either side of each stock bound
-    And a run wholly before the bound, and runs whose latest version replaces an earlier outcome
+  Scenario: Every stock read of evaluations bounded below on ScheduledAt reads the view as written and returns its rows
+    Given evaluation runs whose versions are written on either side of each stock bound
     When each stock query that bounds evaluations below on ScheduledAt is read as written and as the executor sends it
-    Then the executor sends every read of evaluations to evaluations__floor
-    And it returns the rows the whole-history view returns
+    Then the executor sends every read of evaluations to the view itself, with no floored twin
+    And it returns the rows the statement returns as written
 
   @unit
   Scenario: A completeness report on a floored view reads its floored twin
