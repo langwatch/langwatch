@@ -375,6 +375,40 @@ describe("hoistStraySchemaDefs", () => {
     });
   });
 
+  describe("given an anonymous JSON value the adapter already put in components", () => {
+    /** @scenario "An anonymous definition the adapter already put in components is renamed" */
+    it("renames it to JsonValue and repoints every reference", () => {
+      const ref = { $ref: "#/components/schemas/__schema0" };
+      const document = {
+        components: {
+          schemas: {
+            __schema0: {
+              anyOf: [
+                { type: "string" },
+                { type: "number" },
+                { type: "boolean" },
+                { type: "null" },
+                { type: "array", items: { ...ref } },
+                {
+                  type: "object",
+                  propertyNames: { type: "string" },
+                  additionalProperties: { ...ref },
+                },
+              ],
+            },
+          } as Record<string, unknown>,
+        },
+        paths: { "/a": { get: { schema: { type: "array", items: { ...ref } } } } },
+      };
+
+      hoistStraySchemaDefs(document);
+
+      expect(Object.keys(document.components.schemas)).toEqual(["JsonValue"]);
+      expect(document.paths["/a"].get.schema.items.$ref).toBe("#/components/schemas/JsonValue");
+      expect(JSON.stringify(document)).not.toContain("__schema0");
+    });
+  });
+
   describe("given two different definitions the schemas named alike", () => {
     /** @scenario "Two different schemas cannot claim one component name" */
     it("fails the document naming the component", () => {

@@ -93,11 +93,11 @@ describe("refreshSession", () => {
   it("reports rejected when the server says the token is gone", async () => {
     const cfg = baseConfig();
     const outcome = await refreshSession(cfg, {
-      refreshImpl: (async () => {
+      refreshImpl: async () => {
         throw new DeviceFlowError("unauthorized", "session revoked");
-      }),
+      },
       // Nothing newer on disk: the rejection is real.
-      loadImpl: (() => baseConfig()),
+      loadImpl: () => baseConfig(),
       saveImpl: vi.fn(),
     });
 
@@ -111,7 +111,7 @@ describe("refreshSession", () => {
     });
     const outcome = await refreshSession(baseConfig(), {
       refreshImpl: refreshImpl,
-      loadImpl: (() => baseConfig({ refresh_token: "lw_rt_other" })),
+      loadImpl: () => baseConfig({ refresh_token: "lw_rt_other" }),
       saveImpl: vi.fn(),
     });
 
@@ -132,7 +132,7 @@ describe("refreshSession", () => {
 
     const outcome = await refreshSession(cfg, {
       refreshImpl: refreshImpl,
-      loadImpl: (() => baseConfig({ refresh_token: "lw_rt_sibling" })),
+      loadImpl: () => baseConfig({ refresh_token: "lw_rt_sibling" }),
       saveImpl: vi.fn(),
     });
 
@@ -147,7 +147,7 @@ describe("refreshSession", () => {
       // has to read as something when the wrapper prints it. Rejecting
       // through the mock keeps the non-Error value without a bare `throw`.
       refreshImpl: vi.fn().mockRejectedValue("socket hang up") as never,
-      loadImpl: (() => baseConfig()),
+      loadImpl: () => baseConfig(),
       saveImpl: vi.fn(),
     });
 
@@ -167,7 +167,7 @@ describe("refreshSession", () => {
 
     const outcome = await refreshSession(baseConfig(), {
       refreshImpl: refreshImpl,
-      loadImpl: (() => baseConfig({ refresh_token: "lw_rt_sibling" })),
+      loadImpl: () => baseConfig({ refresh_token: "lw_rt_sibling" }),
       saveImpl: vi.fn(),
     });
 
@@ -180,9 +180,9 @@ describe("refreshSession", () => {
   it("reports a network failure separately, leaving the token in place", async () => {
     const cfg = baseConfig();
     const outcome = await refreshSession(cfg, {
-      refreshImpl: (async () => {
+      refreshImpl: async () => {
         throw new Error("connect ECONNREFUSED");
-      }),
+      },
       loadImpl: vi.fn() as never,
       saveImpl: vi.fn(),
     });
@@ -220,10 +220,10 @@ describe("refreshSession", () => {
       const cfg = baseConfig();
       try {
         const outcome = await refreshSession(cfg, {
-          refreshImpl: (async () => freshPair),
-          saveImpl: (() => {
+          refreshImpl: async () => freshPair,
+          saveImpl: () => {
             throw new Error("EROFS: read-only file system");
-          }),
+          },
           loadImpl: vi.fn() as never,
           writeProblemImpl: () => undefined,
         });
@@ -254,7 +254,7 @@ describe("refreshSessionIfExpired", () => {
   it("refreshes once the recorded expiry has passed", async () => {
     const cfg = baseConfig({ expires_at: 1 });
     const outcome = await refreshSessionIfExpired(cfg, {
-      refreshImpl: (async () => freshPair),
+      refreshImpl: async () => freshPair,
       saveImpl: vi.fn(),
       loadImpl: vi.fn() as never,
     });

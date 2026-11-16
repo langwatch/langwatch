@@ -127,9 +127,9 @@ describe("grants create", () => {
   describe("when the scope type is not one the grants family knows", () => {
     /** @scenario A scope type the grants family does not know is refused before any request */
     it("fails naming the three scope types and makes no request", async () => {
-      const exit = vi.spyOn(process, "exit").mockImplementation((() => {
+      const exit = vi.spyOn(process, "exit").mockImplementation(() => {
         throw new Error("exited");
-      }));
+      });
       const errors: string[] = [];
       vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => {
         errors.push(args.map(String).join(" "));

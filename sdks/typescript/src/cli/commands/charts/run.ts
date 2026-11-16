@@ -29,8 +29,11 @@ const OFFERED_GRANULARITY_STEP_NAMES = "1 (1 second), 60 (1 minute), 3600 (1 hou
 
 const formatChartCellValue = (value: unknown): string => {
   if (value === null || value === undefined) return "";
-  if (typeof value === "object") return JSON.stringify(value);
-  return String(value);
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean" || typeof value === "bigint") {
+    return String(value);
+  }
+  return JSON.stringify(value) ?? "";
 };
 
 /**

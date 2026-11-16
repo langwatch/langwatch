@@ -5,6 +5,7 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.get_api_annotations_anchor import GetApiAnnotationsAnchor
+from ...models.get_api_annotations_response_200 import GetApiAnnotationsResponse200
 from ...models.get_api_annotations_response_400 import GetApiAnnotationsResponse400
 from ...types import UNSET, Response, Unset, safe_http_status
 
@@ -35,7 +36,12 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> GetApiAnnotationsResponse400 | None:
+) -> GetApiAnnotationsResponse200 | GetApiAnnotationsResponse400 | None:
+    if response.status_code == 200:
+        response_200 = GetApiAnnotationsResponse200.from_dict(response.json())
+
+        return response_200
+
     if response.status_code == 400:
         response_400 = GetApiAnnotationsResponse400.from_dict(response.json())
 
@@ -49,7 +55,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[GetApiAnnotationsResponse400]:
+) -> Response[GetApiAnnotationsResponse200 | GetApiAnnotationsResponse400]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -65,7 +71,7 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     anchor: GetApiAnnotationsAnchor | Unset = GetApiAnnotationsAnchor.ALL,
-) -> Response[GetApiAnnotationsResponse400]:
+) -> Response[GetApiAnnotationsResponse200 | GetApiAnnotationsResponse400]:
     """List annotations in the caller’s project
 
     Args:
@@ -76,7 +82,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetApiAnnotationsResponse400]
+        Response[GetApiAnnotationsResponse200 | GetApiAnnotationsResponse400]
     """
 
     kwargs = _get_kwargs(
@@ -94,7 +100,7 @@ def sync(
     *,
     client: AuthenticatedClient,
     anchor: GetApiAnnotationsAnchor | Unset = GetApiAnnotationsAnchor.ALL,
-) -> GetApiAnnotationsResponse400 | None:
+) -> GetApiAnnotationsResponse200 | GetApiAnnotationsResponse400 | None:
     """List annotations in the caller’s project
 
     Args:
@@ -105,7 +111,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetApiAnnotationsResponse400
+        GetApiAnnotationsResponse200 | GetApiAnnotationsResponse400
     """
 
     return sync_detailed(
@@ -118,7 +124,7 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
     anchor: GetApiAnnotationsAnchor | Unset = GetApiAnnotationsAnchor.ALL,
-) -> Response[GetApiAnnotationsResponse400]:
+) -> Response[GetApiAnnotationsResponse200 | GetApiAnnotationsResponse400]:
     """List annotations in the caller’s project
 
     Args:
@@ -129,7 +135,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetApiAnnotationsResponse400]
+        Response[GetApiAnnotationsResponse200 | GetApiAnnotationsResponse400]
     """
 
     kwargs = _get_kwargs(
@@ -145,7 +151,7 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     anchor: GetApiAnnotationsAnchor | Unset = GetApiAnnotationsAnchor.ALL,
-) -> GetApiAnnotationsResponse400 | None:
+) -> GetApiAnnotationsResponse200 | GetApiAnnotationsResponse400 | None:
     """List annotations in the caller’s project
 
     Args:
@@ -156,7 +162,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetApiAnnotationsResponse400
+        GetApiAnnotationsResponse200 | GetApiAnnotationsResponse400
     """
 
     return (

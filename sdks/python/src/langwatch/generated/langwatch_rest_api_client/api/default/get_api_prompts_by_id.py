@@ -5,6 +5,7 @@ import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
+from ...models.get_api_prompts_by_id_response_200 import GetApiPromptsByIdResponse200
 from ...models.get_api_prompts_by_id_response_400 import GetApiPromptsByIdResponse400
 from ...models.get_api_prompts_by_id_response_401 import GetApiPromptsByIdResponse401
 from ...models.get_api_prompts_by_id_response_404 import GetApiPromptsByIdResponse404
@@ -42,13 +43,19 @@ def _get_kwargs(
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
 ) -> (
-    GetApiPromptsByIdResponse400
+    GetApiPromptsByIdResponse200
+    | GetApiPromptsByIdResponse400
     | GetApiPromptsByIdResponse401
     | GetApiPromptsByIdResponse404
     | GetApiPromptsByIdResponse422
     | GetApiPromptsByIdResponse500
     | None
 ):
+    if response.status_code == 200:
+        response_200 = GetApiPromptsByIdResponse200.from_dict(response.json())
+
+        return response_200
+
     if response.status_code == 400:
         response_400 = GetApiPromptsByIdResponse400.from_dict(response.json())
 
@@ -83,7 +90,8 @@ def _parse_response(
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
 ) -> Response[
-    GetApiPromptsByIdResponse400
+    GetApiPromptsByIdResponse200
+    | GetApiPromptsByIdResponse400
     | GetApiPromptsByIdResponse401
     | GetApiPromptsByIdResponse404
     | GetApiPromptsByIdResponse422
@@ -107,7 +115,8 @@ def sync_detailed(
     version: int | Unset = UNSET,
     tag: str | Unset = UNSET,
 ) -> Response[
-    GetApiPromptsByIdResponse400
+    GetApiPromptsByIdResponse200
+    | GetApiPromptsByIdResponse400
     | GetApiPromptsByIdResponse401
     | GetApiPromptsByIdResponse404
     | GetApiPromptsByIdResponse422
@@ -128,7 +137,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetApiPromptsByIdResponse400 | GetApiPromptsByIdResponse401 | GetApiPromptsByIdResponse404 | GetApiPromptsByIdResponse422 | GetApiPromptsByIdResponse500]
+        Response[GetApiPromptsByIdResponse200 | GetApiPromptsByIdResponse400 | GetApiPromptsByIdResponse401 | GetApiPromptsByIdResponse404 | GetApiPromptsByIdResponse422 | GetApiPromptsByIdResponse500]
     """
 
     kwargs = _get_kwargs(
@@ -151,7 +160,8 @@ def sync(
     version: int | Unset = UNSET,
     tag: str | Unset = UNSET,
 ) -> (
-    GetApiPromptsByIdResponse400
+    GetApiPromptsByIdResponse200
+    | GetApiPromptsByIdResponse400
     | GetApiPromptsByIdResponse401
     | GetApiPromptsByIdResponse404
     | GetApiPromptsByIdResponse422
@@ -173,7 +183,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetApiPromptsByIdResponse400 | GetApiPromptsByIdResponse401 | GetApiPromptsByIdResponse404 | GetApiPromptsByIdResponse422 | GetApiPromptsByIdResponse500
+        GetApiPromptsByIdResponse200 | GetApiPromptsByIdResponse400 | GetApiPromptsByIdResponse401 | GetApiPromptsByIdResponse404 | GetApiPromptsByIdResponse422 | GetApiPromptsByIdResponse500
     """
 
     return sync_detailed(
@@ -191,7 +201,8 @@ async def asyncio_detailed(
     version: int | Unset = UNSET,
     tag: str | Unset = UNSET,
 ) -> Response[
-    GetApiPromptsByIdResponse400
+    GetApiPromptsByIdResponse200
+    | GetApiPromptsByIdResponse400
     | GetApiPromptsByIdResponse401
     | GetApiPromptsByIdResponse404
     | GetApiPromptsByIdResponse422
@@ -212,7 +223,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetApiPromptsByIdResponse400 | GetApiPromptsByIdResponse401 | GetApiPromptsByIdResponse404 | GetApiPromptsByIdResponse422 | GetApiPromptsByIdResponse500]
+        Response[GetApiPromptsByIdResponse200 | GetApiPromptsByIdResponse400 | GetApiPromptsByIdResponse401 | GetApiPromptsByIdResponse404 | GetApiPromptsByIdResponse422 | GetApiPromptsByIdResponse500]
     """
 
     kwargs = _get_kwargs(
@@ -233,7 +244,8 @@ async def asyncio(
     version: int | Unset = UNSET,
     tag: str | Unset = UNSET,
 ) -> (
-    GetApiPromptsByIdResponse400
+    GetApiPromptsByIdResponse200
+    | GetApiPromptsByIdResponse400
     | GetApiPromptsByIdResponse401
     | GetApiPromptsByIdResponse404
     | GetApiPromptsByIdResponse422
@@ -255,7 +267,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetApiPromptsByIdResponse400 | GetApiPromptsByIdResponse401 | GetApiPromptsByIdResponse404 | GetApiPromptsByIdResponse422 | GetApiPromptsByIdResponse500
+        GetApiPromptsByIdResponse200 | GetApiPromptsByIdResponse400 | GetApiPromptsByIdResponse401 | GetApiPromptsByIdResponse404 | GetApiPromptsByIdResponse422 | GetApiPromptsByIdResponse500
     """
 
     return (

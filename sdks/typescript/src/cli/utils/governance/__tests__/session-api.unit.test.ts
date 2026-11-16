@@ -19,14 +19,13 @@ import {
   mintProjectIngestionKey,
 } from "../session-api";
 
-const liveSession = (): GovernanceConfig =>
-  ({
-    control_plane_url: "https://app.langwatch.ai",
-    gateway_url: "https://gateway.langwatch.ai",
-    access_token: "lw_at_test",
-    refresh_token: "lw_rt_test",
-    expires_at: Math.floor(Date.now() / 1000) + 3600,
-  });
+const liveSession = (): GovernanceConfig => ({
+  control_plane_url: "https://app.langwatch.ai",
+  gateway_url: "https://gateway.langwatch.ai",
+  access_token: "lw_at_test",
+  refresh_token: "lw_rt_test",
+  expires_at: Math.floor(Date.now() / 1000) + 3600,
+});
 
 const jsonResponse = (status: number, body: unknown): Response =>
   new Response(JSON.stringify(body), {

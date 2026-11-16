@@ -1599,7 +1599,7 @@ export interface components {
             comment: string | null;
             isThumbsUp: boolean | null;
             scoreOptions: {
-                [key: string]: components["schemas"]["__schema0"];
+                [key: string]: components["schemas"]["JsonValue"];
             };
             expectedOutput: string | null;
             anchorKind: string | null;
@@ -1612,9 +1612,7 @@ export interface components {
         } & {
             [key: string]: unknown;
         };
-        __schema0: string | number | boolean | null | components["schemas"]["__schema0"][] | {
-            [key: string]: components["schemas"]["__schema0"];
-        };
+        JsonValue: RecursiveJsonValue;
     };
     responses: never;
     parameters: never;
@@ -12111,7 +12109,7 @@ export interface operations {
                         }[];
                         /** @default {} */
                         parameters: {
-                            [key: string]: components["schemas"]["__schema0"];
+                            [key: string]: components["schemas"]["JsonValue"];
                         };
                         platformUrl: string;
                     }[];
@@ -12214,7 +12212,7 @@ export interface operations {
                     tags?: string[];
                     /** @default {} */
                     parameters?: {
-                        [key: string]: components["schemas"]["__schema0"];
+                        [key: string]: components["schemas"]["JsonValue"];
                     };
                 };
             };
@@ -12319,7 +12317,7 @@ export interface operations {
                         }[];
                         /** @default {} */
                         parameters: {
-                            [key: string]: components["schemas"]["__schema0"];
+                            [key: string]: components["schemas"]["JsonValue"];
                         };
                         platformUrl: string;
                     };
@@ -12902,7 +12900,7 @@ export interface operations {
                         }[];
                         /** @default {} */
                         parameters: {
-                            [key: string]: components["schemas"]["__schema0"];
+                            [key: string]: components["schemas"]["JsonValue"];
                         };
                         platformUrl: string;
                     }[];
@@ -13083,7 +13081,7 @@ export interface operations {
                         }[];
                         /** @default {} */
                         parameters: {
-                            [key: string]: components["schemas"]["__schema0"];
+                            [key: string]: components["schemas"]["JsonValue"];
                         };
                         platformUrl: string;
                     };
@@ -13194,7 +13192,7 @@ export interface operations {
                     tags?: string[];
                     /** @default {} */
                     parameters?: {
-                        [key: string]: components["schemas"]["__schema0"];
+                        [key: string]: components["schemas"]["JsonValue"];
                     };
                     /** @enum {string} */
                     scope?: "PROJECT" | "ORGANIZATION";
@@ -13302,7 +13300,7 @@ export interface operations {
                         }[];
                         /** @default {} */
                         parameters: {
-                            [key: string]: components["schemas"]["__schema0"];
+                            [key: string]: components["schemas"]["JsonValue"];
                         };
                         platformUrl: string;
                     };
@@ -13673,7 +13671,7 @@ export interface operations {
                             }[];
                             /** @default {} */
                             parameters: {
-                                [key: string]: components["schemas"]["__schema0"];
+                                [key: string]: components["schemas"]["JsonValue"];
                             };
                         };
                         conflictInfo?: {
@@ -17683,3 +17681,16 @@ export interface operations {
         };
     };
 }
+
+/**
+ * Recursive JSON value for components["schemas"]["JsonValue"]: hoisted to a
+ * standalone alias because TypeScript rejects the self-referential
+ * indexed-access form openapi-typescript emits for recursive components.
+ */
+export type RecursiveJsonValue =
+    | string
+    | number
+    | boolean
+    | null
+    | RecursiveJsonValue[]
+    | { [key: string]: RecursiveJsonValue };

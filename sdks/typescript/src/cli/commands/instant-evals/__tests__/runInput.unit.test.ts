@@ -54,7 +54,7 @@ const build = (args: {
   buildInstantEvalRunBody({
     ...(args.instructions === undefined ? {} : { instructions: args.instructions }),
     drafts: args.drafts ?? [],
-    flags: (args.flags ?? {}),
+    flags: args.flags ?? {},
     now: NOW,
   });
 

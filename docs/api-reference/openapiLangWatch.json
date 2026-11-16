@@ -100,7 +100,7 @@
               "type": "string"
             },
             "additionalProperties": {
-              "$ref": "#/components/schemas/__schema0"
+              "$ref": "#/components/schemas/JsonValue"
             }
           },
           "expectedOutput": {
@@ -461,37 +461,6 @@
           "sizeBytes"
         ],
         "additionalProperties": false
-      },
-      "__schema0": {
-        "anyOf": [
-          {
-            "type": "string"
-          },
-          {
-            "type": "number"
-          },
-          {
-            "type": "boolean"
-          },
-          {
-            "type": "null"
-          },
-          {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/__schema0"
-            }
-          },
-          {
-            "type": "object",
-            "propertyNames": {
-              "type": "string"
-            },
-            "additionalProperties": {
-              "$ref": "#/components/schemas/__schema0"
-            }
-          }
-        ]
       },
       "AgUiToolCall": {
         "type": "object",
@@ -91921,7 +91890,7 @@
                               "type": "string"
                             },
                             "additionalProperties": {
-                              "$ref": "#/components/schemas/__schema0"
+                              "$ref": "#/components/schemas/JsonValue"
                             }
                           }
                         },
@@ -92051,7 +92020,7 @@
                               "type": "string"
                             },
                             "additionalProperties": {
-                              "$ref": "#/components/schemas/__schema0"
+                              "$ref": "#/components/schemas/JsonValue"
                             }
                           }
                         },
@@ -97434,7 +97403,7 @@
                       "type": "string"
                     },
                     "additionalProperties": {
-                      "$ref": "#/components/schemas/__schema0"
+                      "$ref": "#/components/schemas/JsonValue"
                     }
                   },
                   "mappings": {
@@ -104939,7 +104908,7 @@
                           "type": "string"
                         },
                         "additionalProperties": {
-                          "$ref": "#/components/schemas/__schema0"
+                          "$ref": "#/components/schemas/JsonValue"
                         }
                       },
                       "platformUrl": {
@@ -105474,7 +105443,7 @@
                         "type": "string"
                       },
                       "additionalProperties": {
-                        "$ref": "#/components/schemas/__schema0"
+                        "$ref": "#/components/schemas/JsonValue"
                       }
                     },
                     "platformUrl": {
@@ -105784,7 +105753,7 @@
                       "type": "string"
                     },
                     "additionalProperties": {
-                      "$ref": "#/components/schemas/__schema0"
+                      "$ref": "#/components/schemas/JsonValue"
                     }
                   }
                 },
@@ -106995,7 +106964,7 @@
                           "type": "string"
                         },
                         "additionalProperties": {
-                          "$ref": "#/components/schemas/__schema0"
+                          "$ref": "#/components/schemas/JsonValue"
                         }
                       },
                       "platformUrl": {
@@ -107564,7 +107533,7 @@
                         "type": "string"
                       },
                       "additionalProperties": {
-                        "$ref": "#/components/schemas/__schema0"
+                        "$ref": "#/components/schemas/JsonValue"
                       }
                     },
                     "platformUrl": {
@@ -108140,7 +108109,7 @@
                         "type": "string"
                       },
                       "additionalProperties": {
-                        "$ref": "#/components/schemas/__schema0"
+                        "$ref": "#/components/schemas/JsonValue"
                       }
                     },
                     "platformUrl": {
@@ -108722,7 +108691,7 @@
                         "type": "string"
                       },
                       "additionalProperties": {
-                        "$ref": "#/components/schemas/__schema0"
+                        "$ref": "#/components/schemas/JsonValue"
                       }
                     },
                     "platformUrl": {
@@ -109052,7 +109021,7 @@
                       "type": "string"
                     },
                     "additionalProperties": {
-                      "$ref": "#/components/schemas/__schema0"
+                      "$ref": "#/components/schemas/JsonValue"
                     }
                   },
                   "scope": {
@@ -109646,7 +109615,7 @@
                             "type": "string"
                           },
                           "additionalProperties": {
-                            "$ref": "#/components/schemas/__schema0"
+                            "$ref": "#/components/schemas/JsonValue"
                           }
                         }
                       },

@@ -144,11 +144,7 @@ describe("LangWatch Logger", () => {
         getLogger: vi.fn().mockReturnValue(mockLogger),
       };
 
-      const logger = getLangWatchLoggerFromProvider(
-        customProvider,
-        "custom-logger",
-        "2.0.0",
-      );
+      const logger = getLangWatchLoggerFromProvider(customProvider, "custom-logger", "2.0.0");
 
       expect(logger).toBeDefined();
       expect(customProvider.getLogger).toHaveBeenCalledWith("custom-logger", "2.0.0");

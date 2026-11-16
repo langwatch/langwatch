@@ -169,7 +169,7 @@ export function installProcessInterceptors(): () => void {
     stream: OutputStream,
     real: typeof realStdoutWrite,
   ): typeof realStdoutWrite => {
-    return ((
+    return (
       chunk: string | Uint8Array,
       encodingOrCallback?: BufferEncoding | ((error?: Error | null) => void),
       callback?: (error?: Error | null) => void,
@@ -188,13 +188,13 @@ export function installProcessInterceptors(): () => void {
       const done = typeof encodingOrCallback === "function" ? encodingOrCallback : callback;
       done?.();
       return true;
-    });
+    };
   };
 
   process.stdout.write = intercept("stdout", realStdoutWrite);
   process.stderr.write = intercept("stderr", realStderrWrite);
 
-  process.exit = ((code?: number): never => {
+  process.exit = (code?: number): never => {
     const context = storage.getStore();
     if (!context) {
       // Not inside a request — this is the daemon's own shutdown path.
@@ -202,7 +202,7 @@ export function installProcessInterceptors(): () => void {
     }
     context.finalize(code ?? 0);
     throw new DaemonExitSignal(context.exitCode);
-  });
+  };
 
   return () => {
     process.stdout.write = realStdoutWrite;

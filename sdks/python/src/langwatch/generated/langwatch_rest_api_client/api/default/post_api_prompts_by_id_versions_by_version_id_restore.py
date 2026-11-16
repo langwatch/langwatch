@@ -5,6 +5,9 @@ import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
+from ...models.post_api_prompts_by_id_versions_by_version_id_restore_response_200 import (
+    PostApiPromptsByIdVersionsByVersionIdRestoreResponse200,
+)
 from ...models.post_api_prompts_by_id_versions_by_version_id_restore_response_400 import (
     PostApiPromptsByIdVersionsByVersionIdRestoreResponse400,
 )
@@ -42,13 +45,19 @@ def _get_kwargs(
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
 ) -> (
-    PostApiPromptsByIdVersionsByVersionIdRestoreResponse400
+    PostApiPromptsByIdVersionsByVersionIdRestoreResponse200
+    | PostApiPromptsByIdVersionsByVersionIdRestoreResponse400
     | PostApiPromptsByIdVersionsByVersionIdRestoreResponse401
     | PostApiPromptsByIdVersionsByVersionIdRestoreResponse404
     | PostApiPromptsByIdVersionsByVersionIdRestoreResponse422
     | PostApiPromptsByIdVersionsByVersionIdRestoreResponse500
     | None
 ):
+    if response.status_code == 200:
+        response_200 = PostApiPromptsByIdVersionsByVersionIdRestoreResponse200.from_dict(response.json())
+
+        return response_200
+
     if response.status_code == 400:
         response_400 = PostApiPromptsByIdVersionsByVersionIdRestoreResponse400.from_dict(response.json())
 
@@ -83,7 +92,8 @@ def _parse_response(
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
 ) -> Response[
-    PostApiPromptsByIdVersionsByVersionIdRestoreResponse400
+    PostApiPromptsByIdVersionsByVersionIdRestoreResponse200
+    | PostApiPromptsByIdVersionsByVersionIdRestoreResponse400
     | PostApiPromptsByIdVersionsByVersionIdRestoreResponse401
     | PostApiPromptsByIdVersionsByVersionIdRestoreResponse404
     | PostApiPromptsByIdVersionsByVersionIdRestoreResponse422
@@ -106,7 +116,8 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
 ) -> Response[
-    PostApiPromptsByIdVersionsByVersionIdRestoreResponse400
+    PostApiPromptsByIdVersionsByVersionIdRestoreResponse200
+    | PostApiPromptsByIdVersionsByVersionIdRestoreResponse400
     | PostApiPromptsByIdVersionsByVersionIdRestoreResponse401
     | PostApiPromptsByIdVersionsByVersionIdRestoreResponse404
     | PostApiPromptsByIdVersionsByVersionIdRestoreResponse422
@@ -124,7 +135,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PostApiPromptsByIdVersionsByVersionIdRestoreResponse400 | PostApiPromptsByIdVersionsByVersionIdRestoreResponse401 | PostApiPromptsByIdVersionsByVersionIdRestoreResponse404 | PostApiPromptsByIdVersionsByVersionIdRestoreResponse422 | PostApiPromptsByIdVersionsByVersionIdRestoreResponse500]
+        Response[PostApiPromptsByIdVersionsByVersionIdRestoreResponse200 | PostApiPromptsByIdVersionsByVersionIdRestoreResponse400 | PostApiPromptsByIdVersionsByVersionIdRestoreResponse401 | PostApiPromptsByIdVersionsByVersionIdRestoreResponse404 | PostApiPromptsByIdVersionsByVersionIdRestoreResponse422 | PostApiPromptsByIdVersionsByVersionIdRestoreResponse500]
     """
 
     kwargs = _get_kwargs(
@@ -145,7 +156,8 @@ def sync(
     *,
     client: AuthenticatedClient,
 ) -> (
-    PostApiPromptsByIdVersionsByVersionIdRestoreResponse400
+    PostApiPromptsByIdVersionsByVersionIdRestoreResponse200
+    | PostApiPromptsByIdVersionsByVersionIdRestoreResponse400
     | PostApiPromptsByIdVersionsByVersionIdRestoreResponse401
     | PostApiPromptsByIdVersionsByVersionIdRestoreResponse404
     | PostApiPromptsByIdVersionsByVersionIdRestoreResponse422
@@ -164,7 +176,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PostApiPromptsByIdVersionsByVersionIdRestoreResponse400 | PostApiPromptsByIdVersionsByVersionIdRestoreResponse401 | PostApiPromptsByIdVersionsByVersionIdRestoreResponse404 | PostApiPromptsByIdVersionsByVersionIdRestoreResponse422 | PostApiPromptsByIdVersionsByVersionIdRestoreResponse500
+        PostApiPromptsByIdVersionsByVersionIdRestoreResponse200 | PostApiPromptsByIdVersionsByVersionIdRestoreResponse400 | PostApiPromptsByIdVersionsByVersionIdRestoreResponse401 | PostApiPromptsByIdVersionsByVersionIdRestoreResponse404 | PostApiPromptsByIdVersionsByVersionIdRestoreResponse422 | PostApiPromptsByIdVersionsByVersionIdRestoreResponse500
     """
 
     return sync_detailed(
@@ -180,7 +192,8 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
 ) -> Response[
-    PostApiPromptsByIdVersionsByVersionIdRestoreResponse400
+    PostApiPromptsByIdVersionsByVersionIdRestoreResponse200
+    | PostApiPromptsByIdVersionsByVersionIdRestoreResponse400
     | PostApiPromptsByIdVersionsByVersionIdRestoreResponse401
     | PostApiPromptsByIdVersionsByVersionIdRestoreResponse404
     | PostApiPromptsByIdVersionsByVersionIdRestoreResponse422
@@ -198,7 +211,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PostApiPromptsByIdVersionsByVersionIdRestoreResponse400 | PostApiPromptsByIdVersionsByVersionIdRestoreResponse401 | PostApiPromptsByIdVersionsByVersionIdRestoreResponse404 | PostApiPromptsByIdVersionsByVersionIdRestoreResponse422 | PostApiPromptsByIdVersionsByVersionIdRestoreResponse500]
+        Response[PostApiPromptsByIdVersionsByVersionIdRestoreResponse200 | PostApiPromptsByIdVersionsByVersionIdRestoreResponse400 | PostApiPromptsByIdVersionsByVersionIdRestoreResponse401 | PostApiPromptsByIdVersionsByVersionIdRestoreResponse404 | PostApiPromptsByIdVersionsByVersionIdRestoreResponse422 | PostApiPromptsByIdVersionsByVersionIdRestoreResponse500]
     """
 
     kwargs = _get_kwargs(
@@ -217,7 +230,8 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
 ) -> (
-    PostApiPromptsByIdVersionsByVersionIdRestoreResponse400
+    PostApiPromptsByIdVersionsByVersionIdRestoreResponse200
+    | PostApiPromptsByIdVersionsByVersionIdRestoreResponse400
     | PostApiPromptsByIdVersionsByVersionIdRestoreResponse401
     | PostApiPromptsByIdVersionsByVersionIdRestoreResponse404
     | PostApiPromptsByIdVersionsByVersionIdRestoreResponse422
@@ -236,7 +250,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PostApiPromptsByIdVersionsByVersionIdRestoreResponse400 | PostApiPromptsByIdVersionsByVersionIdRestoreResponse401 | PostApiPromptsByIdVersionsByVersionIdRestoreResponse404 | PostApiPromptsByIdVersionsByVersionIdRestoreResponse422 | PostApiPromptsByIdVersionsByVersionIdRestoreResponse500
+        PostApiPromptsByIdVersionsByVersionIdRestoreResponse200 | PostApiPromptsByIdVersionsByVersionIdRestoreResponse400 | PostApiPromptsByIdVersionsByVersionIdRestoreResponse401 | PostApiPromptsByIdVersionsByVersionIdRestoreResponse404 | PostApiPromptsByIdVersionsByVersionIdRestoreResponse422 | PostApiPromptsByIdVersionsByVersionIdRestoreResponse500
     """
 
     return (

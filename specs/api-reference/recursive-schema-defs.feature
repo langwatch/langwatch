@@ -60,3 +60,10 @@ Feature: A recursive response schema publishes a document that resolves
     When the document is written
     Then the named definition keeps "__hoisted0"
     And the anonymous definition is published under another name
+
+  Scenario: An anonymous definition the adapter already put in components is renamed
+    Given the document already carries an anonymous "any JSON value" definition "__schema0" in "components.schemas"
+    And a route refers to it
+    When the document is written
+    Then "components.schemas" holds one "JsonValue" definition and no "__schema0"
+    And the route and the definition's self-references point at "JsonValue"

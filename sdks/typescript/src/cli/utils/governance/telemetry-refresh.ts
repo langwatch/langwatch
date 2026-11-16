@@ -396,7 +396,7 @@ const CLAUDE_LOCAL_SETTINGS = ".claude/settings.local.json";
 /** Git's exit status for `args` run in `cwd`: "missing" without git, null when it hangs. */
 function gitStatus(cwd: string, args: string[]): number | null | "missing" {
   const run = spawnSync("git", args, { cwd, stdio: "ignore", timeout: 2000 });
-  if ((run.error)?.code === "ENOENT") return "missing";
+  if (run.error?.code === "ENOENT") return "missing";
   return run.status;
 }
 

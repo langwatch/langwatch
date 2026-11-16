@@ -49,7 +49,7 @@ const runHookProcessWith = async ({
 };
 
 /** A collector that never answers and ignores being given up on. */
-const silentCollector: typeof fetch = (() => new Promise<never>(() => undefined));
+const silentCollector: typeof fetch = () => new Promise<never>(() => undefined);
 
 /** Far more than a session payload holds, on a pipe the seam keeps open. */
 const oversizedWrite = () => {

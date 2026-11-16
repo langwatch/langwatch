@@ -6,6 +6,7 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.get_api_annotations_trace_id_anchor import GetApiAnnotationsTraceIdAnchor
+from ...models.get_api_annotations_trace_id_response_200 import GetApiAnnotationsTraceIdResponse200
 from ...models.get_api_annotations_trace_id_response_400 import GetApiAnnotationsTraceIdResponse400
 from ...types import UNSET, Response, Unset, safe_http_status
 
@@ -39,7 +40,12 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> GetApiAnnotationsTraceIdResponse400 | None:
+) -> GetApiAnnotationsTraceIdResponse200 | GetApiAnnotationsTraceIdResponse400 | None:
+    if response.status_code == 200:
+        response_200 = GetApiAnnotationsTraceIdResponse200.from_dict(response.json())
+
+        return response_200
+
     if response.status_code == 400:
         response_400 = GetApiAnnotationsTraceIdResponse400.from_dict(response.json())
 
@@ -53,7 +59,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[GetApiAnnotationsTraceIdResponse400]:
+) -> Response[GetApiAnnotationsTraceIdResponse200 | GetApiAnnotationsTraceIdResponse400]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -70,7 +76,7 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     anchor: GetApiAnnotationsTraceIdAnchor | Unset = GetApiAnnotationsTraceIdAnchor.ALL,
-) -> Response[GetApiAnnotationsTraceIdResponse400]:
+) -> Response[GetApiAnnotationsTraceIdResponse200 | GetApiAnnotationsTraceIdResponse400]:
     """List annotations on a trace in the caller’s project
 
     Args:
@@ -83,7 +89,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetApiAnnotationsTraceIdResponse400]
+        Response[GetApiAnnotationsTraceIdResponse200 | GetApiAnnotationsTraceIdResponse400]
     """
 
     kwargs = _get_kwargs(
@@ -103,7 +109,7 @@ def sync(
     *,
     client: AuthenticatedClient,
     anchor: GetApiAnnotationsTraceIdAnchor | Unset = GetApiAnnotationsTraceIdAnchor.ALL,
-) -> GetApiAnnotationsTraceIdResponse400 | None:
+) -> GetApiAnnotationsTraceIdResponse200 | GetApiAnnotationsTraceIdResponse400 | None:
     """List annotations on a trace in the caller’s project
 
     Args:
@@ -116,7 +122,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetApiAnnotationsTraceIdResponse400
+        GetApiAnnotationsTraceIdResponse200 | GetApiAnnotationsTraceIdResponse400
     """
 
     return sync_detailed(
@@ -131,7 +137,7 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
     anchor: GetApiAnnotationsTraceIdAnchor | Unset = GetApiAnnotationsTraceIdAnchor.ALL,
-) -> Response[GetApiAnnotationsTraceIdResponse400]:
+) -> Response[GetApiAnnotationsTraceIdResponse200 | GetApiAnnotationsTraceIdResponse400]:
     """List annotations on a trace in the caller’s project
 
     Args:
@@ -144,7 +150,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetApiAnnotationsTraceIdResponse400]
+        Response[GetApiAnnotationsTraceIdResponse200 | GetApiAnnotationsTraceIdResponse400]
     """
 
     kwargs = _get_kwargs(
@@ -162,7 +168,7 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     anchor: GetApiAnnotationsTraceIdAnchor | Unset = GetApiAnnotationsTraceIdAnchor.ALL,
-) -> GetApiAnnotationsTraceIdResponse400 | None:
+) -> GetApiAnnotationsTraceIdResponse200 | GetApiAnnotationsTraceIdResponse400 | None:
     """List annotations on a trace in the caller’s project
 
     Args:
@@ -175,7 +181,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetApiAnnotationsTraceIdResponse400
+        GetApiAnnotationsTraceIdResponse200 | GetApiAnnotationsTraceIdResponse400
     """
 
     return (

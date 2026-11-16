@@ -140,9 +140,9 @@ describe("resolveCredentials()", () => {
     mockedResolveProjectSelector.mockReset();
     logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
     errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {
+    exitSpy = vi.spyOn(process, "exit").mockImplementation(() => {
       throw new Error("process.exit called");
-    }));
+    });
   });
 
   afterEach(() => {

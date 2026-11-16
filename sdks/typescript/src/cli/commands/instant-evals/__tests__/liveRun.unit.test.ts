@@ -223,23 +223,22 @@ describe("printInstantEvalRows, given a model-call run", () => {
         status: "finished",
         sql: "SELECT TraceId, SpanId FROM analytics.spans WHERE SpanAttributes['langwatch.span.type'] = 'llm'",
       });
-      const judgment = (overrides: Partial<InstantEvalJudgment>): InstantEvalJudgment =>
-        ({
-          traceId: "trace_1",
-          questionId: "q1",
-          threadId: "",
-          spanId: "",
-          kind: "boolean",
-          status: "judged",
-          passed: true,
-          score: null,
-          label: null,
-          probability: 0.9,
-          probabilities: null,
-          error: null,
-          occurredAt: "2026-09-18T12:00:00.000Z",
-          ...overrides,
-        });
+      const judgment = (overrides: Partial<InstantEvalJudgment>): InstantEvalJudgment => ({
+        traceId: "trace_1",
+        questionId: "q1",
+        threadId: "",
+        spanId: "",
+        kind: "boolean",
+        status: "judged",
+        passed: true,
+        score: null,
+        label: null,
+        probability: 0.9,
+        probabilities: null,
+        error: null,
+        occurredAt: "2026-09-18T12:00:00.000Z",
+        ...overrides,
+      });
       const printed: string[] = [];
       const logSpy = vi.spyOn(console, "log").mockImplementation((...parts: unknown[]) => {
         printed.push(parts.map(String).join(" "));

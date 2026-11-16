@@ -41232,21 +41232,21 @@ type AgUiToolCallType string
 
 // Annotation defines model for Annotation.
 type Annotation struct {
-	AnchorId             *string                                 `json:"anchorId"`
-	AnchorKind           *string                                 `json:"anchorKind"`
-	AnchorPath           *string                                 `json:"anchorPath"`
-	Comment              *string                                 `json:"comment"`
-	CreatedAt            time.Time                               `json:"createdAt"`
-	Email                *string                                 `json:"email"`
-	ExpectedOutput       *string                                 `json:"expectedOutput"`
-	Id                   string                                  `json:"id"`
-	IsThumbsUp           *bool                                   `json:"isThumbsUp"`
-	ProjectId            string                                  `json:"projectId"`
-	ScoreOptions         map[string]*UnderscoreUnderscoreSchema0 `json:"scoreOptions"`
-	TraceId              string                                  `json:"traceId"`
-	UpdatedAt            time.Time                               `json:"updatedAt"`
-	UserId               *string                                 `json:"userId"`
-	AdditionalProperties map[string]interface{}                  `json:"-"`
+	AnchorId             *string                `json:"anchorId"`
+	AnchorKind           *string                `json:"anchorKind"`
+	AnchorPath           *string                `json:"anchorPath"`
+	Comment              *string                `json:"comment"`
+	CreatedAt            time.Time              `json:"createdAt"`
+	Email                *string                `json:"email"`
+	ExpectedOutput       *string                `json:"expectedOutput"`
+	Id                   string                 `json:"id"`
+	IsThumbsUp           *bool                  `json:"isThumbsUp"`
+	ProjectId            string                 `json:"projectId"`
+	ScoreOptions         map[string]*JsonValue  `json:"scoreOptions"`
+	TraceId              string                 `json:"traceId"`
+	UpdatedAt            time.Time              `json:"updatedAt"`
+	UserId               *string                `json:"userId"`
+	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
 // ApiKeyInfo defines model for ApiKeyInfo.
@@ -43722,26 +43722,6 @@ type Trace_Spans_2_Type struct {
 type Trace_Spans_Item struct {
 	union json.RawMessage
 }
-
-// UnderscoreUnderscoreSchema0 defines model for __schema0.
-type UnderscoreUnderscoreSchema0 struct {
-	union json.RawMessage
-}
-
-// Schema00 defines model for .
-type Schema00 = string
-
-// Schema01 defines model for .
-type Schema01 = float32
-
-// Schema02 defines model for .
-type Schema02 = bool
-
-// Schema03 defines model for .
-type Schema03 = []*UnderscoreUnderscoreSchema0
-
-// Schema04 defines model for .
-type Schema04 map[string]*UnderscoreUnderscoreSchema0
 
 // adminApiKeyContextKey is the context key for admin_api_key security scheme
 type adminApiKeyContextKey string
@@ -54221,7 +54201,7 @@ type StartLangyConversationTurnJSONBody struct {
 	IdempotencyKey      string `json:"idempotencyKey"`
 	Messages            []struct {
 		Content *string                                        `json:"content,omitempty"`
-		Parts   *[]map[string]*UnderscoreUnderscoreSchema0     `json:"parts,omitempty"`
+		Parts   *[]map[string]*JsonValue                       `json:"parts,omitempty"`
 		Role    StartLangyConversationTurnJSONBodyMessagesRole `json:"role"`
 	} `json:"messages"`
 	ModelOverride *string `json:"modelOverride,omitempty"`
@@ -54239,7 +54219,7 @@ type ContinueLangyConversationTurnJSONBody struct {
 	IdempotencyKey      string `json:"idempotencyKey"`
 	Messages            []struct {
 		Content *string                                           `json:"content,omitempty"`
-		Parts   *[]map[string]*UnderscoreUnderscoreSchema0        `json:"parts,omitempty"`
+		Parts   *[]map[string]*JsonValue                          `json:"parts,omitempty"`
 		Role    ContinueLangyConversationTurnJSONBodyMessagesRole `json:"role"`
 	} `json:"messages"`
 	ModelOverride *string `json:"modelOverride,omitempty"`
@@ -54475,11 +54455,11 @@ type PostApiMonitorsJSONBody struct {
 		Expansions []string               `json:"expansions"`
 		Mapping    map[string]interface{} `json:"mapping"`
 	} `json:"mappings,omitempty"`
-	Name              string                                   `json:"name"`
-	Parameters        *map[string]*UnderscoreUnderscoreSchema0 `json:"parameters,omitempty"`
-	Preconditions     *[]interface{}                           `json:"preconditions,omitempty"`
-	Sample            *float32                                 `json:"sample,omitempty"`
-	ThreadIdleTimeout *int                                     `json:"threadIdleTimeout,omitempty"`
+	Name              string                 `json:"name"`
+	Parameters        *map[string]*JsonValue `json:"parameters,omitempty"`
+	Preconditions     *[]interface{}         `json:"preconditions,omitempty"`
+	Sample            *float32               `json:"sample,omitempty"`
+	ThreadIdleTimeout *int                   `json:"threadIdleTimeout,omitempty"`
 }
 
 // PostApiMonitorsJSONBodyEvaluatorLabel0 defines parameters for PostApiMonitors.
@@ -55593,12 +55573,12 @@ type PostApiPromptsJSONBody struct {
 		JsonSchema *PostApiPromptsJSONBody_Outputs_JsonSchema `json:"json_schema,omitempty"`
 		Type       PostApiPromptsJSONBodyOutputsType          `json:"type"`
 	} `json:"outputs,omitempty"`
-	Parameters    *map[string]*UnderscoreUnderscoreSchema0 `json:"parameters,omitempty"`
-	Prompt        *string                                  `json:"prompt,omitempty"`
-	SchemaVersion *PostApiPromptsJSONBodySchemaVersion     `json:"schemaVersion,omitempty"`
-	Scope         *PostApiPromptsJSONBodyScope             `json:"scope,omitempty"`
-	Tags          *[]string                                `json:"tags,omitempty"`
-	Temperature   *float32                                 `json:"temperature,omitempty"`
+	Parameters    *map[string]*JsonValue               `json:"parameters,omitempty"`
+	Prompt        *string                              `json:"prompt,omitempty"`
+	SchemaVersion *PostApiPromptsJSONBodySchemaVersion `json:"schemaVersion,omitempty"`
+	Scope         *PostApiPromptsJSONBodyScope         `json:"scope,omitempty"`
+	Tags          *[]string                            `json:"tags,omitempty"`
+	Temperature   *float32                             `json:"temperature,omitempty"`
 }
 
 // PostApiPromptsJSONBodyInputsType defines parameters for PostApiPrompts.
@@ -55718,12 +55698,12 @@ type PutApiPromptsByIdJSONBody struct {
 		JsonSchema *PutApiPromptsByIdJSONBody_Outputs_JsonSchema `json:"json_schema,omitempty"`
 		Type       PutApiPromptsByIdJSONBodyOutputsType          `json:"type"`
 	} `json:"outputs,omitempty"`
-	Parameters    *map[string]*UnderscoreUnderscoreSchema0 `json:"parameters,omitempty"`
-	Prompt        *string                                  `json:"prompt,omitempty"`
-	SchemaVersion *PutApiPromptsByIdJSONBodySchemaVersion  `json:"schemaVersion,omitempty"`
-	Scope         *PutApiPromptsByIdJSONBodyScope          `json:"scope,omitempty"`
-	Tags          *[]string                                `json:"tags,omitempty"`
-	Temperature   *float32                                 `json:"temperature,omitempty"`
+	Parameters    *map[string]*JsonValue                  `json:"parameters,omitempty"`
+	Prompt        *string                                 `json:"prompt,omitempty"`
+	SchemaVersion *PutApiPromptsByIdJSONBodySchemaVersion `json:"schemaVersion,omitempty"`
+	Scope         *PutApiPromptsByIdJSONBodyScope         `json:"scope,omitempty"`
+	Tags          *[]string                               `json:"tags,omitempty"`
+	Temperature   *float32                                `json:"temperature,omitempty"`
 }
 
 // PutApiPromptsByIdJSONBodyInputsType defines parameters for PutApiPromptsById.
@@ -83945,146 +83925,6 @@ func (t Trace_Spans_Item) MarshalJSON() ([]byte, error) {
 }
 
 func (t *Trace_Spans_Item) UnmarshalJSON(b []byte) error {
-	err := t.union.UnmarshalJSON(b)
-	return err
-}
-
-// AsSchema00 returns the union data inside the UnderscoreUnderscoreSchema0 as a Schema00
-func (t UnderscoreUnderscoreSchema0) AsSchema00() (Schema00, error) {
-	var body Schema00
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromSchema00 overwrites any union data inside the UnderscoreUnderscoreSchema0 as the provided Schema00
-func (t *UnderscoreUnderscoreSchema0) FromSchema00(v Schema00) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeSchema00 performs a merge with any union data inside the UnderscoreUnderscoreSchema0, using the provided Schema00
-func (t *UnderscoreUnderscoreSchema0) MergeSchema00(v Schema00) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsSchema01 returns the union data inside the UnderscoreUnderscoreSchema0 as a Schema01
-func (t UnderscoreUnderscoreSchema0) AsSchema01() (Schema01, error) {
-	var body Schema01
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromSchema01 overwrites any union data inside the UnderscoreUnderscoreSchema0 as the provided Schema01
-func (t *UnderscoreUnderscoreSchema0) FromSchema01(v Schema01) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeSchema01 performs a merge with any union data inside the UnderscoreUnderscoreSchema0, using the provided Schema01
-func (t *UnderscoreUnderscoreSchema0) MergeSchema01(v Schema01) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsSchema02 returns the union data inside the UnderscoreUnderscoreSchema0 as a Schema02
-func (t UnderscoreUnderscoreSchema0) AsSchema02() (Schema02, error) {
-	var body Schema02
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromSchema02 overwrites any union data inside the UnderscoreUnderscoreSchema0 as the provided Schema02
-func (t *UnderscoreUnderscoreSchema0) FromSchema02(v Schema02) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeSchema02 performs a merge with any union data inside the UnderscoreUnderscoreSchema0, using the provided Schema02
-func (t *UnderscoreUnderscoreSchema0) MergeSchema02(v Schema02) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsSchema03 returns the union data inside the UnderscoreUnderscoreSchema0 as a Schema03
-func (t UnderscoreUnderscoreSchema0) AsSchema03() (Schema03, error) {
-	var body Schema03
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromSchema03 overwrites any union data inside the UnderscoreUnderscoreSchema0 as the provided Schema03
-func (t *UnderscoreUnderscoreSchema0) FromSchema03(v Schema03) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeSchema03 performs a merge with any union data inside the UnderscoreUnderscoreSchema0, using the provided Schema03
-func (t *UnderscoreUnderscoreSchema0) MergeSchema03(v Schema03) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsSchema04 returns the union data inside the UnderscoreUnderscoreSchema0 as a Schema04
-func (t UnderscoreUnderscoreSchema0) AsSchema04() (Schema04, error) {
-	var body Schema04
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromSchema04 overwrites any union data inside the UnderscoreUnderscoreSchema0 as the provided Schema04
-func (t *UnderscoreUnderscoreSchema0) FromSchema04(v Schema04) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeSchema04 performs a merge with any union data inside the UnderscoreUnderscoreSchema0, using the provided Schema04
-func (t *UnderscoreUnderscoreSchema0) MergeSchema04(v Schema04) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-func (t UnderscoreUnderscoreSchema0) MarshalJSON() ([]byte, error) {
-	b, err := t.union.MarshalJSON()
-	return b, err
-}
-
-func (t *UnderscoreUnderscoreSchema0) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }
@@ -184502,10 +184342,10 @@ type GetApiPromptsResponse struct {
 			JsonSchema *GetApiPrompts200JSONResponseBody_Outputs_JsonSchema `json:"json_schema,omitempty"`
 			Type       GetApiPrompts200JSONResponseBodyOutputsType          `json:"type"`
 		} `json:"outputs"`
-		Parameters         map[string]*UnderscoreUnderscoreSchema0 `json:"parameters"`
-		PlatformUrl        string                                  `json:"platformUrl"`
-		ProjectId          string                                  `json:"projectId"`
-		Prompt             string                                  `json:"prompt"`
+		Parameters         map[string]*JsonValue `json:"parameters"`
+		PlatformUrl        string                `json:"platformUrl"`
+		ProjectId          string                `json:"projectId"`
+		Prompt             string                `json:"prompt"`
 		PromptingTechnique *struct {
 			Demonstrations *struct {
 				Id     *string `json:"id,omitempty"`
@@ -184618,10 +184458,10 @@ type PostApiPromptsResponse struct {
 			JsonSchema *PostApiPrompts200JSONResponseBody_Outputs_JsonSchema `json:"json_schema,omitempty"`
 			Type       PostApiPrompts200JSONResponseBodyOutputsType          `json:"type"`
 		} `json:"outputs"`
-		Parameters         map[string]*UnderscoreUnderscoreSchema0 `json:"parameters"`
-		PlatformUrl        string                                  `json:"platformUrl"`
-		ProjectId          string                                  `json:"projectId"`
-		Prompt             string                                  `json:"prompt"`
+		Parameters         map[string]*JsonValue `json:"parameters"`
+		PlatformUrl        string                `json:"platformUrl"`
+		ProjectId          string                `json:"projectId"`
+		Prompt             string                `json:"prompt"`
 		PromptingTechnique *struct {
 			Demonstrations *struct {
 				Id     *string `json:"id,omitempty"`
@@ -184986,10 +184826,10 @@ type GetApiPromptsByIdResponse struct {
 			JsonSchema *GetApiPromptsById200JSONResponseBody_Outputs_JsonSchema `json:"json_schema,omitempty"`
 			Type       GetApiPromptsById200JSONResponseBodyOutputsType          `json:"type"`
 		} `json:"outputs"`
-		Parameters         map[string]*UnderscoreUnderscoreSchema0 `json:"parameters"`
-		PlatformUrl        string                                  `json:"platformUrl"`
-		ProjectId          string                                  `json:"projectId"`
-		Prompt             string                                  `json:"prompt"`
+		Parameters         map[string]*JsonValue `json:"parameters"`
+		PlatformUrl        string                `json:"platformUrl"`
+		ProjectId          string                `json:"projectId"`
+		Prompt             string                `json:"prompt"`
 		PromptingTechnique *struct {
 			Demonstrations *struct {
 				Id     *string `json:"id,omitempty"`
@@ -185106,10 +184946,10 @@ type PutApiPromptsByIdResponse struct {
 			JsonSchema *PutApiPromptsById200JSONResponseBody_Outputs_JsonSchema `json:"json_schema,omitempty"`
 			Type       PutApiPromptsById200JSONResponseBodyOutputsType          `json:"type"`
 		} `json:"outputs"`
-		Parameters         map[string]*UnderscoreUnderscoreSchema0 `json:"parameters"`
-		PlatformUrl        string                                  `json:"platformUrl"`
-		ProjectId          string                                  `json:"projectId"`
-		Prompt             string                                  `json:"prompt"`
+		Parameters         map[string]*JsonValue `json:"parameters"`
+		PlatformUrl        string                `json:"platformUrl"`
+		ProjectId          string                `json:"projectId"`
+		Prompt             string                `json:"prompt"`
 		PromptingTechnique *struct {
 			Demonstrations *struct {
 				Id     *string `json:"id,omitempty"`
@@ -185303,9 +185143,9 @@ type PostApiPromptsByIdSyncResponse struct {
 				JsonSchema *PostApiPromptsByIdSync200JSONResponseBody_Prompt_Outputs_JsonSchema `json:"json_schema,omitempty"`
 				Type       PostApiPromptsByIdSync200JSONResponseBodyPromptOutputsType           `json:"type"`
 			} `json:"outputs"`
-			Parameters         map[string]*UnderscoreUnderscoreSchema0 `json:"parameters"`
-			ProjectId          string                                  `json:"projectId"`
-			Prompt             string                                  `json:"prompt"`
+			Parameters         map[string]*JsonValue `json:"parameters"`
+			ProjectId          string                `json:"projectId"`
+			Prompt             string                `json:"prompt"`
 			PromptingTechnique *struct {
 				Demonstrations *struct {
 					Id     *string `json:"id,omitempty"`
@@ -185474,10 +185314,10 @@ type GetApiPromptsByIdVersionsResponse struct {
 			JsonSchema *GetApiPromptsByIdVersions200JSONResponseBody_Outputs_JsonSchema `json:"json_schema,omitempty"`
 			Type       GetApiPromptsByIdVersions200JSONResponseBodyOutputsType          `json:"type"`
 		} `json:"outputs"`
-		Parameters         map[string]*UnderscoreUnderscoreSchema0 `json:"parameters"`
-		PlatformUrl        string                                  `json:"platformUrl"`
-		ProjectId          string                                  `json:"projectId"`
-		Prompt             string                                  `json:"prompt"`
+		Parameters         map[string]*JsonValue `json:"parameters"`
+		PlatformUrl        string                `json:"platformUrl"`
+		ProjectId          string                `json:"projectId"`
+		Prompt             string                `json:"prompt"`
 		PromptingTechnique *struct {
 			Demonstrations *struct {
 				Id     *string `json:"id,omitempty"`
@@ -185594,10 +185434,10 @@ type PostApiPromptsByIdVersionsByVersionIdRestoreResponse struct {
 			JsonSchema *PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBody_Outputs_JsonSchema `json:"json_schema,omitempty"`
 			Type       PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyOutputsType          `json:"type"`
 		} `json:"outputs"`
-		Parameters         map[string]*UnderscoreUnderscoreSchema0 `json:"parameters"`
-		PlatformUrl        string                                  `json:"platformUrl"`
-		ProjectId          string                                  `json:"projectId"`
-		Prompt             string                                  `json:"prompt"`
+		Parameters         map[string]*JsonValue `json:"parameters"`
+		PlatformUrl        string                `json:"platformUrl"`
+		ProjectId          string                `json:"projectId"`
+		Prompt             string                `json:"prompt"`
 		PromptingTechnique *struct {
 			Demonstrations *struct {
 				Id     *string `json:"id,omitempty"`
@@ -221567,10 +221407,10 @@ func ParseGetApiPromptsResponse(rsp *http.Response) (*GetApiPromptsResponse, err
 				JsonSchema *GetApiPrompts200JSONResponseBody_Outputs_JsonSchema `json:"json_schema,omitempty"`
 				Type       GetApiPrompts200JSONResponseBodyOutputsType          `json:"type"`
 			} `json:"outputs"`
-			Parameters         map[string]*UnderscoreUnderscoreSchema0 `json:"parameters"`
-			PlatformUrl        string                                  `json:"platformUrl"`
-			ProjectId          string                                  `json:"projectId"`
-			Prompt             string                                  `json:"prompt"`
+			Parameters         map[string]*JsonValue `json:"parameters"`
+			PlatformUrl        string                `json:"platformUrl"`
+			ProjectId          string                `json:"projectId"`
+			Prompt             string                `json:"prompt"`
 			PromptingTechnique *struct {
 				Demonstrations *struct {
 					Id     *string `json:"id,omitempty"`
@@ -221703,10 +221543,10 @@ func ParsePostApiPromptsResponse(rsp *http.Response) (*PostApiPromptsResponse, e
 				JsonSchema *PostApiPrompts200JSONResponseBody_Outputs_JsonSchema `json:"json_schema,omitempty"`
 				Type       PostApiPrompts200JSONResponseBodyOutputsType          `json:"type"`
 			} `json:"outputs"`
-			Parameters         map[string]*UnderscoreUnderscoreSchema0 `json:"parameters"`
-			PlatformUrl        string                                  `json:"platformUrl"`
-			ProjectId          string                                  `json:"projectId"`
-			Prompt             string                                  `json:"prompt"`
+			Parameters         map[string]*JsonValue `json:"parameters"`
+			PlatformUrl        string                `json:"platformUrl"`
+			ProjectId          string                `json:"projectId"`
+			Prompt             string                `json:"prompt"`
 			PromptingTechnique *struct {
 				Demonstrations *struct {
 					Id     *string `json:"id,omitempty"`
@@ -222203,10 +222043,10 @@ func ParseGetApiPromptsByIdResponse(rsp *http.Response) (*GetApiPromptsByIdRespo
 				JsonSchema *GetApiPromptsById200JSONResponseBody_Outputs_JsonSchema `json:"json_schema,omitempty"`
 				Type       GetApiPromptsById200JSONResponseBodyOutputsType          `json:"type"`
 			} `json:"outputs"`
-			Parameters         map[string]*UnderscoreUnderscoreSchema0 `json:"parameters"`
-			PlatformUrl        string                                  `json:"platformUrl"`
-			ProjectId          string                                  `json:"projectId"`
-			Prompt             string                                  `json:"prompt"`
+			Parameters         map[string]*JsonValue `json:"parameters"`
+			PlatformUrl        string                `json:"platformUrl"`
+			ProjectId          string                `json:"projectId"`
+			Prompt             string                `json:"prompt"`
 			PromptingTechnique *struct {
 				Demonstrations *struct {
 					Id     *string `json:"id,omitempty"`
@@ -222349,10 +222189,10 @@ func ParsePutApiPromptsByIdResponse(rsp *http.Response) (*PutApiPromptsByIdRespo
 				JsonSchema *PutApiPromptsById200JSONResponseBody_Outputs_JsonSchema `json:"json_schema,omitempty"`
 				Type       PutApiPromptsById200JSONResponseBodyOutputsType          `json:"type"`
 			} `json:"outputs"`
-			Parameters         map[string]*UnderscoreUnderscoreSchema0 `json:"parameters"`
-			PlatformUrl        string                                  `json:"platformUrl"`
-			ProjectId          string                                  `json:"projectId"`
-			Prompt             string                                  `json:"prompt"`
+			Parameters         map[string]*JsonValue `json:"parameters"`
+			PlatformUrl        string                `json:"platformUrl"`
+			ProjectId          string                `json:"projectId"`
+			Prompt             string                `json:"prompt"`
 			PromptingTechnique *struct {
 				Demonstrations *struct {
 					Id     *string `json:"id,omitempty"`
@@ -222578,9 +222418,9 @@ func ParsePostApiPromptsByIdSyncResponse(rsp *http.Response) (*PostApiPromptsByI
 					JsonSchema *PostApiPromptsByIdSync200JSONResponseBody_Prompt_Outputs_JsonSchema `json:"json_schema,omitempty"`
 					Type       PostApiPromptsByIdSync200JSONResponseBodyPromptOutputsType           `json:"type"`
 				} `json:"outputs"`
-				Parameters         map[string]*UnderscoreUnderscoreSchema0 `json:"parameters"`
-				ProjectId          string                                  `json:"projectId"`
-				Prompt             string                                  `json:"prompt"`
+				Parameters         map[string]*JsonValue `json:"parameters"`
+				ProjectId          string                `json:"projectId"`
+				Prompt             string                `json:"prompt"`
 				PromptingTechnique *struct {
 					Demonstrations *struct {
 						Id     *string `json:"id,omitempty"`
@@ -222795,10 +222635,10 @@ func ParseGetApiPromptsByIdVersionsResponse(rsp *http.Response) (*GetApiPromptsB
 				JsonSchema *GetApiPromptsByIdVersions200JSONResponseBody_Outputs_JsonSchema `json:"json_schema,omitempty"`
 				Type       GetApiPromptsByIdVersions200JSONResponseBodyOutputsType          `json:"type"`
 			} `json:"outputs"`
-			Parameters         map[string]*UnderscoreUnderscoreSchema0 `json:"parameters"`
-			PlatformUrl        string                                  `json:"platformUrl"`
-			ProjectId          string                                  `json:"projectId"`
-			Prompt             string                                  `json:"prompt"`
+			Parameters         map[string]*JsonValue `json:"parameters"`
+			PlatformUrl        string                `json:"platformUrl"`
+			ProjectId          string                `json:"projectId"`
+			Prompt             string                `json:"prompt"`
 			PromptingTechnique *struct {
 				Demonstrations *struct {
 					Id     *string `json:"id,omitempty"`
@@ -222941,10 +222781,10 @@ func ParsePostApiPromptsByIdVersionsByVersionIdRestoreResponse(rsp *http.Respons
 				JsonSchema *PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBody_Outputs_JsonSchema `json:"json_schema,omitempty"`
 				Type       PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyOutputsType          `json:"type"`
 			} `json:"outputs"`
-			Parameters         map[string]*UnderscoreUnderscoreSchema0 `json:"parameters"`
-			PlatformUrl        string                                  `json:"platformUrl"`
-			ProjectId          string                                  `json:"projectId"`
-			Prompt             string                                  `json:"prompt"`
+			Parameters         map[string]*JsonValue `json:"parameters"`
+			PlatformUrl        string                `json:"platformUrl"`
+			ProjectId          string                `json:"projectId"`
+			Prompt             string                `json:"prompt"`
 			PromptingTechnique *struct {
 				Demonstrations *struct {
 					Id     *string `json:"id,omitempty"`

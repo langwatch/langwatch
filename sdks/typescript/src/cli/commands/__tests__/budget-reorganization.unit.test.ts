@@ -299,12 +299,12 @@ describe("gateway-budgets create", () => {
 
 /** Answers with a status that depends on the request body, keeping the JSON the route wrote. */
 function wrapStatus(inner: typeof fetch, statusFor: (body: unknown) => number): typeof fetch {
-  return (async (input: string | URL | Request, init?: RequestInit) => {
+  return async (input: string | URL | Request, init?: RequestInit) => {
     const response = await inner(input, init);
     const body = init?.body ? JSON.parse(init.body as string) : undefined;
     return new Response(await response.text(), {
       status: statusFor(body),
       headers: { "Content-Type": "application/json" },
     });
-  });
+  };
 }
