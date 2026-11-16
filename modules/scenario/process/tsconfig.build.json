@@ -82,6 +82,9 @@
       "path": "../../../packages/observability/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/otlp/tsconfig.build.json"
+    },
+    {
       "path": "../../model-provider/contract/tsconfig.build.json"
     },
     {
