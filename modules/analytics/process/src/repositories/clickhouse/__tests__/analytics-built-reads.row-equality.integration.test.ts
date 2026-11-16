@@ -32,6 +32,7 @@ import {
   analyticsFilterCondition,
 } from "../clickhouse.filter-conditions.mapper.ts";
 import { FilterOptionsClickHouseRepository } from "../clickhouse.filter-options.repository.ts";
+import { servesMixedEval } from "../clickhouse.mixed-eval-timeseries-query.mapper.ts";
 import { servesStandardTraceSummaries } from "../clickhouse.trace-summaries-timeseries-query.mapper.ts";
 import { traceSummaries } from "../clickhouse.trace-summaries.table.ts";
 import * as costReads from "./built-reads.aggregate-cost-reads.fixture.ts";
@@ -53,6 +54,8 @@ const expected = JSON.parse(
   pickers: Record<string, FilterOption[]>;
   conditions: Record<string, string[]>;
   timeseries: Record<string, AnalyticsTimeseriesResult>;
+  /** The mixed read under the aggregate: each member's trace once; see its describe. */
+  mixedPerMember: Record<string, AnalyticsTimeseriesResult>;
 };
 
 /** A read's answer with its suite's run id written as the literals write it. */
@@ -449,6 +452,81 @@ describe("timeseries reads built on the typed builder", () => {
     it.each(timeseries.SUMMARY_SHAPES)("$name is a built read", (shape) => {
       expect(
         servesStandardTraceSummaries({
+          ...timeseriesInput(shape, timeseries.TENANT_A),
+          startDate: new Date(timeseries.START),
+          endDate: new Date(timeseries.END),
+          previousPeriodStartDate: new Date(timeseries.PREVIOUS_START),
+        }),
+      ).toBe(true);
+    });
+  });
+
+  describe("given trace metrics mixed with evaluation metrics", () => {
+    const [own, aggregate] = timeseries.PROOFS;
+
+    it.each(timeseries.MIXED_SHAPES)(
+      "$name answers main's buckets under one tenant's proof",
+      async (shape) => {
+        const want =
+          expected.timeseries[`${literal(own!.projectId, timeseries.RUN)}|${shape.name}`];
+
+        expect(want).toBeDefined();
+        expect(
+          toTwelveDigits(
+            await builtTimeseries({ shape, projectId: own!.projectId, proof: own!.proof() }),
+          ),
+        ).toEqual(toTwelveDigits(want));
+      },
+    );
+
+    /*
+     * Main grouped the per-trace rows by trace id alone, so two members' traces sharing an id
+     * merged into one, `any()` picking either member's values. The built read keeps one row per
+     * member's trace; these are its answers, the summary's checked by hand below.
+     */
+    it.each(timeseries.MIXED_SHAPES)(
+      "$name counts each member's trace once under an aggregate",
+      async (shape) => {
+        const want =
+          expected.mixedPerMember[`${literal(aggregate!.projectId, timeseries.RUN)}|${shape.name}`];
+
+        expect(want).toBeDefined();
+        expect(
+          toTwelveDigits(
+            await builtTimeseries({
+              shape,
+              projectId: aggregate!.projectId,
+              proof: aggregate!.proof(),
+            }),
+          ),
+        ).toEqual(toTwelveDigits(want));
+      },
+    );
+
+    it("adds both members' traces 3, which share an id, in the previous period", async () => {
+      const shape = timeseries.MIXED_SHAPES.find(
+        (each) => each.name === "mixed summary, both periods",
+      )!;
+      const result = await builtTimeseries({
+        shape,
+        projectId: aggregate!.projectId,
+        proof: aggregate!.proof(),
+      });
+      const [previous] = result.previousPeriod;
+
+      // A's trace 3 costs 4 over 400 ms; B's, scaled by 100, 400 over 40,000 ms; one run each.
+      expect(previous).toMatchObject({
+        "0/performance.total_cost/sum": 404,
+        "1/performance.completion_time/avg": 20200,
+        "4/metadata.trace_id/cardinality": 1,
+        "5/metadata.user_id/cardinality": 2,
+        "13/evaluations.evaluation_runs/cardinality/ev": 2,
+      });
+    });
+
+    it.each(timeseries.MIXED_SHAPES)("$name is a built read", (shape) => {
+      expect(
+        servesMixedEval({
           ...timeseriesInput(shape, timeseries.TENANT_A),
           startDate: new Date(timeseries.START),
           endDate: new Date(timeseries.END),

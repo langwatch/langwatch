@@ -5,7 +5,6 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  ArrayMetricConditionUnbuiltError,
   type MetricSource,
   metricSpecFor,
   pipelineMetricSpecFor,
@@ -72,15 +71,25 @@ describe("metricSpecFor", () => {
 });
 
 describe("renderMetric", () => {
-  it("refuses an array metric with a condition until the builder has -ArrayIf", () => {
-    expect(() =>
-      renderMetric({
-        spec: spec("events.event_score"),
+  it.each([
+    ["avg", "avgArrayIf"],
+    ["sum", "sumArrayIf"],
+    ["min", "minArrayIf"],
+    ["max", "maxArrayIf"],
+    ["cardinality", "uniqArrayIf"],
+    ["median", "quantileExactArrayIf"],
+    ["count", "sumIf"],
+  ])(
+    "conditions an array metric's %s with %s, as main's series filter did",
+    (aggregation, name) => {
+      const measure = renderMetric({
+        spec: spec("events.event_score", aggregation),
         source: SOURCE,
         when: ts.ContainsErrorStatus,
-      }),
-    ).toThrow(ArrayMetricConditionUnbuiltError);
-  });
+      });
+      expect(JSON.stringify(measure.node)).toContain(`"${name}"`);
+    },
+  );
 
   it("leaves a re-aggregated metric to its query shape", () => {
     expect(() =>

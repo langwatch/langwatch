@@ -11,6 +11,10 @@ import { analyticsProof } from "../../__tests__/analytics-proof.fixture.ts";
 import type { TimeseriesQueryInput } from "../clickhouse.aggregation-builder.mapper.ts";
 import { evalRollupTimeseriesRead } from "../clickhouse.eval-rollup-timeseries-query.mapper.ts";
 import { evalSlimTimeseriesRead } from "../clickhouse.eval-slim-timeseries-query.mapper.ts";
+import {
+  mixedEvalTimeseriesRead,
+  servesMixedEval,
+} from "../clickhouse.mixed-eval-timeseries-query.mapper.ts";
 import { rollupTimeseriesRead } from "../clickhouse.rollup-timeseries-query.mapper.ts";
 import { slimTimeseriesRead } from "../clickhouse.slim-timeseries-query.mapper.ts";
 import type { TimeseriesRead } from "../clickhouse.timeseries-query-shared.mapper.ts";
@@ -418,6 +422,69 @@ describe("the both-periods trace_summaries summary", () => {
     const statement = inlined(read(traceSummariesTimeseriesRead, input));
 
     expect(statement).toMatch(/coalesce\(.*sum\(TotalCost\).*, 0\)/);
+  });
+});
+
+describe("the mixed trace and evaluation read", () => {
+  const mix = [
+    series("performance.total_cost", "sum"),
+    { ...series("evaluations.evaluation_score", "avg"), key: "ev" } as AnalyticsSeries,
+  ];
+
+  it.each([
+    ["own", 60],
+    ["aggregate", 60],
+    ["own", "full"],
+    ["aggregate", "full"],
+  ] as const)(
+    "is a reader statement whose tenants are the %s proof's at scale %s",
+    (proof, timeScale) => {
+      const statement = read(mixedEvalTimeseriesRead, { series: mix, timeScale }, proof);
+      const tenants = proof === "own" ? ["tenant-a"] : ["tenant-a", "member-b"];
+
+      expect(statement.identity).toBe("reader");
+      expect(statement.kind).toBe("tenant");
+      expect(statement.tenantIds?.toSorted()).toEqual(tenants.toSorted());
+      expect(statement.settings.SQL_langwatch_tenant_ids.split(",").toSorted()).toEqual(
+        tenants.toSorted(),
+      );
+      expect(statement.sql).toContain(
+        "log_comment = 'analytics:timeseries:trace_summaries:mixed_eval'",
+      );
+    },
+  );
+
+  it("aggregates the runs per member's trace before re-aggregating across traces", () => {
+    const statement = inlined(read(mixedEvalTimeseriesRead, { series: mix, timeScale: 60 }));
+
+    expect(statement).toMatch(/INNER JOIN/);
+    expect(statement).toMatch(/GROUP BY trace_summaries\.TenantId, trace_summaries\.TraceId/);
+    expect(statement).toMatch(/avg\(m1\)/);
+    expect(statement).toMatch(/coalesce\(sum\(v0\), 0\)/);
+  });
+
+  it("serves trace metrics beside run metrics, and nothing else", () => {
+    const serves = (input: Partial<Omit<TimeseriesQueryInput, keyof typeof dates>>) =>
+      servesMixedEval({ ...dates, series: mix, timeScale: 60, ...input });
+
+    expect(serves({})).toBe(true);
+    expect(serves({ timeScale: "full", groupBy: "metadata.user_id" })).toBe(true);
+    expect(serves({ series: [mix[0]!] })).toBe(false);
+    expect(serves({ series: [mix[1]!] })).toBe(false);
+    expect(serves({ groupBy: "metadata.model" })).toBe(false);
+    expect(serves({ series: [...mix, series("metadata.span_type", "count")] })).toBe(false);
+    expect(serves({ series: [...mix, series("events.event_score", "avg")] })).toBe(false);
+    expect(
+      serves({
+        series: [
+          ...mix,
+          {
+            ...series("performance.total_cost", "sum"),
+            pipeline: { field: "user_id", aggregation: "avg" },
+          } as AnalyticsSeries,
+        ],
+      }),
+    ).toBe(false);
   });
 });
 

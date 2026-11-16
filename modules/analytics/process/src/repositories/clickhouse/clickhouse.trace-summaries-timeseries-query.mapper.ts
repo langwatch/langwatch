@@ -8,12 +8,12 @@ import { isZeroWhenAbsentSeries, type AnalyticsSeries } from "@langwatch/analyti
 import {
   clickhouseRead,
   type ClickHouseReadStart,
-  column,
   type Condition,
   cond,
   fn,
   param,
   type ProofScope,
+  type ReadOps,
   type ReaderReadStatement,
 } from "@langwatch/clickhouse-client/builder";
 
@@ -28,6 +28,7 @@ import {
   type MetricSpec,
   metricSpecFor,
   renderMetric,
+  shapeSeries,
 } from "./clickhouse.metric-spec.mapper.ts";
 import { buildMetricAlias } from "./clickhouse.metric-translator.mapper.ts";
 import {
@@ -46,7 +47,7 @@ import { traceSummaries as ts } from "./clickhouse.trace-summaries.table.ts";
 type Summaries = "trace_summaries";
 
 /** The trace columns this shape groups by; each says whether it answers for its own empty value. */
-const GROUP_BYS: Record<string, { key: Measure<Summaries>; handlesUnknown: boolean }> = {
+export const GROUP_BYS: Record<string, { key: Measure<Summaries>; handlesUnknown: boolean }> = {
   "topics.topics": { key: ts.TopicId, handlesUnknown: false },
   "traces.trace_name": {
     key: fn.if(cond.eq(ts.TraceName, ""), param.string("unknown"), ts.TraceName),
@@ -80,7 +81,7 @@ const SOURCE: MetricSource<Summaries> = {
   evaluation: unjoined("evaluation_runs"),
 };
 
-function specOf(series: AnalyticsSeries, index: number): MetricSpec {
+export function specOf(series: AnalyticsSeries, index: number): MetricSpec {
   return metricSpecFor({
     metric: series.metric,
     aggregation: series.aggregation,
@@ -91,7 +92,7 @@ function specOf(series: AnalyticsSeries, index: number): MetricSpec {
 }
 
 /** A series' own filters as row conditions (none when it has none); side tables refuse. */
-function seriesConditions(series: AnalyticsSeries): Condition<Summaries>[] {
+export function seriesConditions(series: AnalyticsSeries): Condition<Summaries>[] {
   const translations = filterTranslations({
     filters: (series.filters ?? {}) as AnalyticsFilterInput,
     ts,
@@ -120,36 +121,19 @@ export function servesStandardTraceSummaries(input: TimeseriesQueryInput): boole
   });
 }
 
-/**
- * A series' own filter and percentage mode (main's shapeSeriesExpression): percentage is ES's
- * `bucket_script`, and a non-additive series reads NULL, not 0, when nothing matched its filter.
- */
+/** A series' measure on the elected trace row, under its own filter and percentage mode. */
 function seriesMeasure(series: AnalyticsSeries, index: number): Measure<Summaries> {
   const spec = specOf(series, index);
   const conditions = seriesConditions(series);
-  const when = conditions.length > 0 ? allOf(conditions) : undefined;
-  const filtered = renderMetric({ spec, source: SOURCE, when });
-  if (!when) return filtered;
-  const shaped = series.asPercent
-    ? (() => {
-        const all = renderMetric({ spec, source: SOURCE });
-        return fn.if(
-          cond.gt(all, 0),
-          fn.multiply(fn.divide(filtered, all), 100),
-          param.uint32(0),
-        ) as Measure<Summaries>;
-      })()
-    : filtered;
-  if (isZeroWhenAbsentSeries(series)) return shaped;
-  return fn.if(
-    cond.gt(fn.countIf(when), 0),
-    shaped,
-    fn.nullAs(column.nullable(column.float64())),
-  ) as Measure<Summaries>;
+  return shapeSeries({
+    series,
+    when: conditions.length > 0 ? allOf(conditions) : undefined,
+    render: (when) => renderMetric({ spec, source: SOURCE, when }),
+  });
 }
 
 /** A grouping's `group_key`: its own expression when it answers for its empty value. */
-function groupKeyFor(grouping: {
+export function groupKeyFor(grouping: {
   key: Measure<Summaries>;
   handlesUnknown: boolean;
 }): Measure<Summaries> {
@@ -173,19 +157,29 @@ function restrictionsOf(input: TimeseriesQueryInput): Condition<Summaries>[] {
 /** Each series' alias and measure, in the order the dashboard asked them. */
 function seriesSelection(input: TimeseriesQueryInput): [string, Measure<Summaries>][] {
   return input.series.map((series, index) => [
-    buildMetricAlias({
-      index,
-      metric: series.metric,
-      aggregation: series.aggregation,
-      key: series.key,
-      subkey: series.subkey,
-    }),
+    seriesAlias(series, index),
     seriesMeasure(series, index),
   ]);
 }
 
+/** A series' result key, as the row parser reads it. */
+export function seriesAlias(series: AnalyticsSeries, index: number): string {
+  return buildMetricAlias({
+    index,
+    metric: series.metric,
+    aggregation: series.aggregation,
+    key: series.key,
+    subkey: series.subkey,
+  });
+}
+
 /** The dashboard's filters, under the negate toggle, and the restrictions outside it. */
-function filtersOf(input: TimeseriesQueryInput) {
+export function filtersOf(input: TimeseriesQueryInput): {
+  filters: <Tables extends string, Ctes extends Record<string, unknown>>(
+    ops: ReadOps<ProofScope, Tables | Summaries, Ctes>,
+  ) => Condition<Tables | Summaries>;
+  restrictions: Condition<Summaries>[];
+} {
   const restrictions = restrictionsOf(input);
   const filters = analyticsFilterCondition({
     filters: (input.filters ?? {}) as AnalyticsFilterInput,

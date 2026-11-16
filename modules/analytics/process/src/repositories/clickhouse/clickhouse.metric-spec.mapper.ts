@@ -4,7 +4,12 @@
  * translator beside it serves the shapes not yet on the builder, until they are ported.
  */
 
-import type { AggregationTypes, PipelineAggregationTypes } from "@langwatch/analytics-contract";
+import {
+  type AggregationTypes,
+  type AnalyticsSeries,
+  isZeroWhenAbsentSeries,
+  type PipelineAggregationTypes,
+} from "@langwatch/analytics-contract";
 import {
   column,
   type Condition,
@@ -489,13 +494,6 @@ export function pipelineMetricSpecFor({
   return { ...inner, outer: { kind: "per-entity", key, aggregation: pipelineAggregation } };
 }
 
-/** A builder refusal the port has not closed yet: the `-ArrayIf` aggregates. */
-export class ArrayMetricConditionUnbuiltError extends Error {
-  constructor() {
-    super("An array metric with a condition has no -ArrayIf aggregate on the builder yet.");
-  }
-}
-
 function quantileAggregate<T extends string>(
   { level, mode }: { level: number; mode: PercentileMode },
   of: Measure<T>,
@@ -553,24 +551,38 @@ function scalarAggregate<T extends string>({
   return aggregate.fn === "sum" && zeroWhenEmpty ? fn.coalesce(value, ZERO) : value;
 }
 
-function arrayAggregate<T extends string>(aggregate: MetricAggregate, of: Measure<T>): Measure<T> {
+function arrayQuantile<T extends string>(
+  { level, mode }: { level: number; mode: PercentileMode },
+  of: Measure<T>,
+  when: Condition<T> | undefined,
+): Measure<T> {
+  if (mode === "tdigest") {
+    return when ? fn.quantileTDigestArrayIf(level, of, when) : fn.quantileTDigestArray(level, of);
+  }
+  return when ? fn.quantileExactArrayIf(level, of, when) : fn.quantileExactArray(level, of);
+}
+
+/** Main's array forms; a condition takes the `-ArrayIf` combinator, array first (cond scalar). */
+function arrayAggregate<T extends string>(
+  aggregate: MetricAggregate,
+  of: Measure<T>,
+  when: Condition<T> | undefined,
+): Measure<T> {
   switch (aggregate.fn) {
     case "quantile":
-      return aggregate.mode === "tdigest"
-        ? fn.quantileTDigestArray(aggregate.level, of)
-        : fn.quantileExactArray(aggregate.level, of);
+      return arrayQuantile(aggregate, of, when);
     case "sum":
-      return fn.coalesce(fn.sumArray(of), ZERO);
+      return fn.coalesce(when ? fn.sumArrayIf(of, when) : fn.sumArray(of), ZERO);
     case "avg":
-      return fn.avgArray(of);
+      return when ? fn.avgArrayIf(of, when) : fn.avgArray(of);
     case "min":
-      return fn.minArray(of);
+      return when ? fn.minArrayIf(of, when) : fn.minArray(of);
     case "max":
-      return fn.maxArray(of);
+      return when ? fn.maxArrayIf(of, when) : fn.maxArray(of);
     case "uniq":
-      return fn.uniqArray(of);
+      return when ? fn.uniqArrayIf(of, when) : fn.uniqArray(of);
     case "count":
-      return fn.sum(fn.length(of));
+      return when ? fn.sumIf(fn.length(of), when) : fn.sum(fn.length(of));
   }
 }
 
@@ -594,11 +606,41 @@ export function renderMetric<T extends string>({
   const condition = own && when ? cond.and(own, when) : (own ?? when);
   const of = spec.operand?.(source);
   if (spec.form === "array") {
-    if (condition) throw new ArrayMetricConditionUnbuiltError();
     if (!of) throw new Error("An array metric needs an operand.");
-    return arrayAggregate(spec.aggregate, of);
+    return arrayAggregate(spec.aggregate, of, condition);
   }
   return scalarAggregate({ aggregate: spec.aggregate, of, when: condition, zeroWhenEmpty: !own });
+}
+
+/**
+ * A series' own filter and percentage mode over `render` (main's shapeSeriesExpression): percentage
+ * is ES's `bucket_script`, and a non-additive series reads NULL, not 0, when nothing matched.
+ */
+export function shapeSeries<T extends string>({
+  series,
+  when,
+  render,
+}: {
+  series: AnalyticsSeries;
+  when: Condition<T> | undefined;
+  render: (when?: Condition<T>) => Measure<T>;
+}): Measure<T> {
+  const filtered = render(when);
+  if (!when) return filtered;
+  const all = series.asPercent ? render() : undefined;
+  const shaped = all
+    ? (fn.if(
+        cond.gt(all, 0),
+        fn.multiply(fn.divide(filtered, all), 100),
+        param.uint32(0),
+      ) as Measure<T>)
+    : filtered;
+  if (isZeroWhenAbsentSeries(series)) return shaped;
+  return fn.if(
+    cond.gt(fn.countIf(when), 0),
+    shaped,
+    fn.nullAs(column.nullable(column.float64())),
+  ) as Measure<T>;
 }
 
 /** The thread-duration inner value: first to last trace of a thread, in ms, capped. */

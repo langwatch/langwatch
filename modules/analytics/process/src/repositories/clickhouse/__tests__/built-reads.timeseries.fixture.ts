@@ -606,6 +606,105 @@ export const SUMMARY_SHAPES: Shape[] = [
   },
 ];
 
+const mixed = (metric: string, aggregation: string, extra: Record<string, unknown> = {}) =>
+  ({ metric, aggregation, ...extra }) as AnalyticsSeries;
+/** Trace metrics beside run metrics: main pre-aggregates the runs per trace (issue #3088). */
+export const MIXED_SERIES: AnalyticsSeries[] = [
+  mixed("performance.total_cost", "sum"),
+  mixed("performance.completion_time", "avg"),
+  mixed("performance.completion_time", "median"),
+  mixed("performance.total_cost", "max"),
+  mixed("metadata.trace_id", "cardinality"),
+  mixed("metadata.user_id", "cardinality"),
+  ...(["avg", "sum", "min", "max", "median", "cardinality"] as const).map((aggregation) =>
+    mixed("evaluations.evaluation_score", aggregation, { key: "ev" }),
+  ),
+  mixed("evaluations.evaluation_pass_rate", "avg"),
+  mixed("evaluations.evaluation_runs", "cardinality", { key: "ev" }),
+  mixed("evaluations.evaluation_runs", "cardinality"),
+];
+/** A series' own filter on both sides of the mix, additive and not, and as a percentage. */
+export const MIXED_FILTERED_SERIES: AnalyticsSeries[] = [
+  mixed("performance.total_cost", "sum", { filters: clean }),
+  mixed("metadata.trace_id", "cardinality", { filters: clean, asPercent: true }),
+  mixed("evaluations.evaluation_score", "avg", { key: "ev", filters: clean }),
+  mixed("evaluations.evaluation_runs", "cardinality", { filters: clean, asPercent: true }),
+  mixed("evaluations.evaluation_pass_rate", "sum", { filters: clean }),
+];
+const MIXED_SHORT: AnalyticsSeries[] = [
+  mixed("performance.total_cost", "sum"),
+  mixed("metadata.trace_id", "cardinality"),
+  mixed("evaluations.evaluation_score", "avg", { key: "ev" }),
+  mixed("evaluations.evaluation_runs", "cardinality"),
+];
+
+/** Path A, mixed: trace and evaluation metrics in one graph. */
+export const MIXED_SHAPES: Shape[] = [
+  {
+    name: "mixed, every metric, hourly",
+    table: "trace_summaries",
+    series: MIXED_SERIES,
+    timeScale: 60,
+  },
+  {
+    name: "mixed, every metric, daily in Amsterdam",
+    table: "trace_summaries",
+    series: MIXED_SERIES,
+    timeScale: 1440,
+    timeZone: "Europe/Amsterdam",
+  },
+  {
+    name: "mixed summary, both periods",
+    table: "trace_summaries",
+    series: MIXED_SERIES,
+    timeScale: "full",
+  },
+  ...["error.has_error", "topics.topics", "traces.trace_name", "metadata.user_id"].map(
+    (groupBy): Shape => ({
+      name: `mixed by ${groupBy}`,
+      table: "trace_summaries",
+      series: MIXED_SHORT,
+      groupBy,
+      timeScale: "full",
+    }),
+  ),
+  {
+    name: "mixed with series filters, hourly",
+    table: "trace_summaries",
+    series: MIXED_FILTERED_SERIES,
+    timeScale: 60,
+  },
+  {
+    name: "mixed summary with series filters, both periods",
+    table: "trace_summaries",
+    series: MIXED_FILTERED_SERIES,
+    timeScale: "full",
+  },
+  {
+    name: "mixed filtered on evaluations.passed",
+    table: "trace_summaries",
+    series: MIXED_SHORT,
+    filters: { "evaluations.passed": { ev: ["false"] } } as AnalyticsFilters,
+    timeScale: 60,
+  },
+  {
+    name: "mixed filtered on spans.type, negated, both periods",
+    table: "trace_summaries",
+    series: MIXED_SHORT,
+    filters: { "spans.type": ["tool"] } as AnalyticsFilters,
+    negateFilters: true,
+    timeScale: "full",
+  },
+  {
+    name: "mixed for two traces, excluding evaluation origins",
+    table: "trace_summaries",
+    series: MIXED_SHORT,
+    traceIds: [`trace-${RUN}-0`, `trace-${RUN}-1`, `trace-${RUN}-4`],
+    excludeOrigins: ["evaluation"],
+    timeScale: 60,
+  },
+];
+
 export const SHAPES: Shape[] = [
   {
     name: "rollup, full",

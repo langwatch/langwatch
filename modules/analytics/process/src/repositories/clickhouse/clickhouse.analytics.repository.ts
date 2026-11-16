@@ -43,6 +43,10 @@ import {
   feedbacksRead,
   topDocumentsRead,
 } from "./clickhouse.feedback-document-reads.mapper.ts";
+import {
+  mixedEvalTimeseriesRead,
+  servesMixedEval,
+} from "./clickhouse.mixed-eval-timeseries-query.mapper.ts";
 import { translatingQueryFailures } from "./clickhouse.query-error-translation.mapper.ts";
 import { rollupTimeseriesRead } from "./clickhouse.rollup-timeseries-query.mapper.ts";
 import { slimTimeseriesRead } from "./clickhouse.slim-timeseries-query.mapper.ts";
@@ -70,6 +74,25 @@ const BUILT_READS: Partial<Record<AnalyticsTable, (read: TimeseriesRead) => Read
     evaluation_analytics_rollup: evalRollupTimeseriesRead,
     evaluation_analytics: evalSlimTimeseriesRead,
   };
+
+type TimeseriesReader = (read: TimeseriesRead) => ReaderReadStatement;
+/** How a query is read: a built read, or main's text while its shape is not ported yet. */
+type TimeseriesRoute = { kind: "built"; read: TimeseriesReader } | { kind: "text" };
+
+function routeOf({
+  table,
+  input,
+}: {
+  table: AnalyticsTable;
+  input: TimeseriesQueryInput;
+}): TimeseriesRoute {
+  const built = (read: TimeseriesReader | undefined): TimeseriesRoute =>
+    read ? { kind: "built", read } : { kind: "text" };
+  if (table !== "trace_summaries") return built(BUILT_READS[table]);
+  if (servesStandardTraceSummaries(input)) return built(traceSummariesTimeseriesRead);
+  if (servesMixedEval(input)) return built(mixedEvalTimeseriesRead);
+  return { kind: "text" };
+}
 
 /** What an analytics statement is sent through: the fenced reader. */
 type TimeseriesStatementClient = {
@@ -139,21 +162,19 @@ export class ClickHouseAnalyticsRepository extends AnalyticsRepository {
         ? {}
         : { max_result_rows: String(query.maxResultRows), result_overflow_mode: "throw" };
 
-    const builtRead =
-      query.table === "trace_summaries" && servesStandardTraceSummaries(builderInput)
-        ? traceSummariesTimeseriesRead
-        : BUILT_READS[query.table];
+    const route = routeOf({ table: query.table, input: builderInput });
 
     try {
-      const rows = builtRead
-        ? await this.sent(
-            builtRead({
-              scope: this.proofScope({ authorization: query.authorization, projectId }),
-              input: builderInput,
-              settings: { ...ANALYTICS_CLICKHOUSE_SETTINGS, ...limits },
-            }),
-          )
-        : await this.legacyRows({ query, builderInput, limits });
+      const rows =
+        route.kind === "built"
+          ? await this.sent(
+              route.read({
+                scope: this.proofScope({ authorization: query.authorization, projectId }),
+                input: builderInput,
+                settings: { ...ANALYTICS_CLICKHOUSE_SETTINGS, ...limits },
+              }),
+            )
+          : await this.legacyRows({ query, builderInput, limits });
       const result = parseTimeseriesRows({
         rows: Array.isArray(rows) ? rows : [],
         series: query.input.series,
