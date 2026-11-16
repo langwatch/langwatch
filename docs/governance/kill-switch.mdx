@@ -5,7 +5,9 @@ sidebarTitle: Kill switch
 keywords: kill switch, stop agent, quarantine, Databricks model serving, Amazon Bedrock agents, virtual key, governance, approval
 ---
 
-When an agent misbehaves, the kill switch stops it on the targets of its stop plan. LangWatch stops the agent's Databricks model serving endpoint, sets its Amazon Bedrock agent alias to reject invocations, and disables the gateway virtual key its model calls use. A platform that is not in the plan keeps running. The agent shows as **Quarantined** in the Agents inventory, every step is in the audit log, and your webhook endpoints get a `governance.agent.*` event. **Restore** undoes every change the stop made.
+When an agent misbehaves, the kill switch stops it on the targets of its stop plan. LangWatch stops the agent's Databricks model serving endpoint, sets its Amazon Bedrock agent alias to reject invocations, and disables the gateway virtual key its model calls use. A platform that is not in the plan keeps running.
+
+The agent shows as **Quarantined** in the Agents inventory, every step is in the audit log, and your webhook endpoints get a `governance.agent.*` event. **Restore** undoes every change the stop made.
 
 The kill switch works on agents in the [agent registry](/governance/agent-registry) and is part of the Enterprise plan.
 
@@ -38,7 +40,7 @@ Any other stop from a machine credential waits for an approval. It shows as an a
 
 One agent has at most one open stop. A new request while one is pending, stopping or quarantined answers `409` with code `agent_stop_already_open`. When two people decide one pending stop at once, the first decision wins and the other answers `409` with code `agent_stop_not_pending`.
 
-To make sure a stop acts on the plan you checked, send the plan's target ids as `expectedTargetIds`. If the plan changed since you read it, the stop answers `409` with code `agent_stop_plan_changed` and nothing is stopped. The Agents page does this for you.
+To make sure a stop acts on the plan you checked, send the plan's target ids as `expectedTargetIds`. If the plan changed since you read it, the stop answers `409` with code `agent_stop_plan_changed` and no target is changed. The Agents page does this for you.
 
 An AWS connection that a stop plan target, or a stop that is not restored yet, still uses cannot be deleted: the delete answers `409` with code `governance_aws_connection_in_use`.
 
