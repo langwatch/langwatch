@@ -1,0 +1,83 @@
+# ADR-002: Content-addressed reuse and owner-linked retention
+
+**Date:** 2026-11-16
+
+**Status:** Accepted
+
+**Behavioural contract:**
+[Stored-object reuse and retention](../specs/stored-object-reuse-and-retention.feature),
+[Trace media blob extraction](../../../specs/trace-processing/trace-media-blob-extraction.feature)
+
+**Related:** [ADR-001](./001-package-boundary.md),
+[data-retention service](../../data-retention/specs/data-retention-service.feature)
+
+## Context
+
+Trace ingestion can lift inline media (base64 audio, data-URI images, file
+parts) out of span content into Stored Objects (`release_trace_media_extraction`).
+Two gaps keep that flag off:
+
+1. `storeFromBytes` mints a fresh id on every call and always answers
+   `isDuplicate: false`. The same image twice in one span, an SDK re-export
+   after a timeout, or the same recording on many traces each write a new
+   object. The trace spec's dedup scenarios passed only against a test fake
+   that content-addressed.
+2. Nothing deletes trace media. Rows are written with `expiresAt: null`, and
+   no scheduled cleanup runs in this module at all. Media outlives the trace's
+   retention indefinitely.
+
+Once objects are shared, deleting "the trace's objects" is wrong: another live
+trace may point at the same object. Retention also changes after the fact:
+`applyRetentionToExistingData` rewrites the TTL of a project's existing rows.
+Pins do not: pinning a trace does not change its retention (data-retention
+spec), so a pinned trace's rows still expire.
+
+## Decision
+
+1. **Reuse by content.** `storeFromBytes` hashes the bytes before writing. An
+   available object of the same project, purpose, SHA-256 and media type is
+   reused: no bytes are written, the caller's audience is added if missing,
+   and the answer is `isDuplicate: true`. Two concurrent first writes may
+   still create two objects; reuse is best-effort, not a uniqueness guarantee.
+2. **Owner links.** A new table, `StoredObjectOwner(tenantId, objectId,
+ownerKind, ownerId, retainUntil, createdAt, updatedAt)`, records who holds
+   an object and until when. Each `storeFromBytes` for a purpose that declares
+   a retention category writes the caller's link, or raises its `retainUntil`
+   when the link exists. A reuse adds a link; it never shortens another's.
+3. **The purpose declares its retention category.** `trace_content` follows
+   `traces`. `retainUntil` is now plus the project's resolved days for that
+   category, asked of `DataRetentionApi`. Purposes with no category write no
+   links and are never swept, so every object stored before this change, and
+   every other purpose, keeps today's behaviour.
+4. **Sweep by link.** A scheduled process manager in the worker pages links
+   past `retainUntil`, deletes them, and logically deletes each object left
+   with no live link through the existing delete path, whose provider cleanup
+   then follows. The object delete is conditional on "no live link" in one
+   statement, so a reuse racing the sweep either lands its link first (the
+   object survives) or finds the object deleted and writes fresh bytes.
+5. **Follow retroactive retention.** data-retention records a fact,
+   `retention_applied_to_existing_data` (project, category, days), when it
+   rewrites existing rows. A Stored Objects peer subscriber recomputes the
+   project's links for purposes in that category: `createdAt` plus the new
+   days. Pins are not followed, matching data-retention.
+6. **References stay strings.** A rewritten span part keeps
+   `/api/files/{projectId}/{id}`. Readers already treat it as an opaque
+   reference and exchange it for a short-lived signed URL; no delivery URL is
+   persisted. The trace contract owns the one builder and parser for it.
+7. **Project purge clears links.** Deleting a project's objects deletes their
+   links in the same pass.
+
+## Consequences
+
+- Repeated media costs one object per project and purpose. A scenario event
+  and a trace carrying the same recording remain two objects, because their
+  purposes (and audiences) differ.
+- Trace media lives exactly as long as the longest-retained trace that
+  references it, and follows retroactive retention changes in both
+  directions.
+- Objects extracted before this change carry no link and are never swept;
+  they are the few projects that opted into the flag early.
+- Stored Objects gains `DataRetentionApi` as a peer. data-retention gains no
+  peer: it only records a fact.
+- The pending-upload and deleted-object cleanups remain uncalled; scheduling
+  them is separate work.
