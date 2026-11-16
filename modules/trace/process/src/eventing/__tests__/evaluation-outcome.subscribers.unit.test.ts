@@ -34,7 +34,9 @@ function registeredPeerSubscribers(): EventSubscriberDefinition<never>[] {
     spanNormalization: createApiFixture<Options["spanNormalization"]>(),
     prepareEventForProjection: (event) => event,
     recordSpanCommand: createApiFixture<EventingRecordSpanAdapter>(),
-  }).build();
+  })
+    .build()
+    .build();
   const registered: EventSubscriberDefinition<never>[] = [];
   const registry = createApiFixture<Registry>({
     registerEventSubscriber: (subscriber) => void registered.push(subscriber),
