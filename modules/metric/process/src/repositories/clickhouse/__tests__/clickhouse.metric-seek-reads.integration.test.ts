@@ -152,7 +152,7 @@ function sorted(rows: Parameters<typeof metricPointFromSeekRow>[0][]): MetricSeq
 }
 
 beforeAll(async () => {
-  ({ client: ch, reading } = await startMigratedClickHouse({ suite: "seek-reads" }));
+  ({ client: ch, reading } = await startMigratedClickHouse());
   const repository = ClickHouseMetricDataPointAppendRepository.create({
     resolveClient: async () => ({
       insert: async (params) => {

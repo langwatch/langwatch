@@ -14,12 +14,16 @@ import {
   idIndexedClientDouble,
   partsAfterPartitionPruning,
   readyIdIndexedClientDouble,
+  type ScriptedStatements,
 } from "@langwatch/clickhouse-client/testing";
 import { generate } from "@langwatch/ksuid";
+import {
+  type MigratedAppReaderClickHouse,
+  startMigratedAppReaderClickHouse,
+} from "@langwatch/test-harness/clickhouse-app-reader";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { ownProof } from "../../../__tests__/support/authorization-proofs.fixture.ts";
-import { startMigratedClickHouse } from "../../../__tests__/support/monitor-performance.fixtures.ts";
 import {
   EVALUATION_ID_INDEXES,
   EVALUATION_SECOND_ID_INDEXES,
@@ -41,39 +45,46 @@ const retention = {
   getPlatformDefaultRetentionDays: () => 365,
 };
 
+let migrated: MigratedAppReaderClickHouse;
 let clickHouse: ClickHouseClient;
 let repository: EvaluationRunClickHouseReadRepository;
 let notReady: EvaluationRunClickHouseReadRepository;
 let statements: QueryRequest[] = [];
 const outcomes: { table: string; outcome: WindowedReadOutcome }[] = [];
 
+/** Answers each statement on `client`, keeping every statement it is asked. */
+function recording(client: ClickHouseClient): ScriptedStatements {
+  return {
+    async execute(request: QueryRequest) {
+      statements.push(request);
+      const result = await client.query({
+        query: request.sql,
+        format: "JSONEachRow",
+        ...(request.params === undefined ? {} : { query_params: request.params }),
+        ...(request.settings === undefined ? {} : { clickhouse_settings: request.settings }),
+      });
+      return { rows: await result.json() };
+    },
+  };
+}
+
 /**
- * The routed client over the migrated test server, keeping every statement it is asked, with
- * the run index read as filled when `ready` (no marker row is written to the shared server).
+ * The routed client over the migrated test server, reads as the app reader and the rest as the
+ * system, with the run index read as filled when `ready` (no marker row is written).
  */
 function recordingQueryClient({
-  client,
+  migrated,
   ready,
 }: {
-  client: ClickHouseClient;
+  migrated: MigratedAppReaderClickHouse;
   ready: boolean;
 }): Promise<ClickHouseQueryClient> {
   const make = ready ? readyIdIndexedClientDouble : idIndexedClientDouble;
   return Promise.resolve(
     make({
       indexes: [...EVALUATION_ID_INDEXES, ...EVALUATION_SECOND_ID_INDEXES],
-      driver: {
-        async execute(request: QueryRequest) {
-          statements.push(request);
-          const result = await client.query({
-            query: request.sql,
-            format: "JSONEachRow",
-            ...(request.params === undefined ? {} : { query_params: request.params }),
-            ...(request.settings === undefined ? {} : { clickhouse_settings: request.settings }),
-          });
-          return { rows: await result.json() };
-        },
-      },
+      driver: recording(migrated.admin),
+      reader: recording(migrated.readerConnection),
     }),
   );
 }
@@ -115,10 +126,15 @@ describe.skipIf(!clickHouseUrl)("a lookup of an evaluation run by id alone", () 
   const tracedId = `eval-traced-${generate("test").toString()}`;
 
   beforeAll(async () => {
-    clickHouse = await startMigratedClickHouse();
+    migrated = await startMigratedAppReaderClickHouse({
+      environment: process.env,
+      suite: "evaluation-tables-reader",
+      indexes: [...EVALUATION_ID_INDEXES, ...EVALUATION_SECOND_ID_INDEXES],
+    });
+    clickHouse = migrated.admin;
     setWindowedReadMetrics({ record: (outcome) => void outcomes.push(outcome) });
-    const ready = recordingQueryClient({ client: clickHouse, ready: true });
-    const unready = recordingQueryClient({ client: clickHouse, ready: false });
+    const ready = recordingQueryClient({ migrated, ready: true });
+    const unready = recordingQueryClient({ migrated, ready: false });
     repository = EvaluationRunClickHouseReadRepository.create({
       resolveQueryClient: () => ready,
     });
@@ -147,7 +163,7 @@ describe.skipIf(!clickHouseUrl)("a lookup of an evaluation run by id alone", () 
         query_params: { tenantId },
       });
     }
-    await clickHouse?.close();
+    await migrated?.close();
   });
 
   describe("given a run written eight weeks ago and its id index filled by the insert", () => {

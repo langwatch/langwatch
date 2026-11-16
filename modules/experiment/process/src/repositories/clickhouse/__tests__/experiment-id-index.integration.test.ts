@@ -3,11 +3,11 @@
 /**
  * Experiment lookups by id alone against the migrated ClickHouse (goose 00114): found through
  * the index, bounded to its range, reaching fewer parts than an unbounded read.
- * A native ClickHouse when LANGWATCH_TEST_CLICKHOUSE_URL is set, else a container; own database.
+ * Its own container with the app reader provisioned: reads as the reader, inserts as the system.
  */
 import { randomUUID } from "node:crypto";
 
-import { type ClickHouseClient, createClient } from "@clickhouse/client";
+import type { ClickHouseClient } from "@clickhouse/client";
 import {
   type ClickHouseQueryClient,
   type InsertRequest,
@@ -17,14 +17,15 @@ import {
 } from "@langwatch/clickhouse-client";
 import {
   idIndexedClientDouble,
-  migrateTestClickHouseOnce,
   partsAfterPartitionPruning,
   readyIdIndexedClientDouble,
   type ScriptedStatements,
-  startTestClickHouseEndpoints,
 } from "@langwatch/clickhouse-client/testing";
-import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
 import { createTenantId } from "@langwatch/eventing";
+import {
+  type MigratedAppReaderClickHouse,
+  startMigratedAppReaderClickHouse,
+} from "@langwatch/test-harness/clickhouse-app-reader";
 import { nowInstant } from "@langwatch/time";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
@@ -53,6 +54,7 @@ const eightWeeksAgoMs = now - 56 * DAY_MS;
 const decoyAgesInDays = [100, 200];
 const decoyIds = ["!decoy", "~decoy"];
 
+let migrated: MigratedAppReaderClickHouse;
 let ch: ClickHouseClient;
 let statements: QueryRequest[] = [];
 let outcomes: { table: string; outcome: WindowedReadOutcome }[] = [];
@@ -119,38 +121,22 @@ function writeGroups(): { id: string; atMs: number }[][] {
 }
 
 beforeAll(async () => {
-  const [endpoint] = await startTestClickHouseEndpoints({
-    suite: "experiment-id-index",
-    names: ["schema"],
+  migrated = await startMigratedAppReaderClickHouse({
     environment: process.env,
+    suite: "experiment-id-index",
+    indexes: [...EXPERIMENT_ID_INDEXES, ...EXPERIMENT_SECOND_ID_INDEXES],
   });
-  if (!endpoint) throw new Error("No ClickHouse endpoint was provisioned for the id-index suite");
-  await migrateTestClickHouseOnce({
-    url: endpoint.url,
-    migrate: async () => {
-      // CLICKHOUSE_CLUSTER switches every engine to its Replicated form, which needs a Keeper.
-      const previousCluster = process.env.CLICKHOUSE_CLUSTER;
-      delete process.env.CLICKHOUSE_CLUSTER;
-      try {
-        await ClickHouseMigrateTask.createFromConfig({
-          config: { buildTime: false, sharedUrl: endpoint.url, privateEndpoints: [] },
-        }).execute();
-      } finally {
-        if (previousCluster !== undefined) process.env.CLICKHOUSE_CLUSTER = previousCluster;
-      }
-    },
-  });
-  ch = createClient({
-    url: endpoint.url,
-    clickhouse_settings: { date_time_input_format: "best_effort" },
-  });
+  ch = migrated.admin;
+  // Reads go as the app reader, inserts as the system identity, as a worker holds the client.
   ready = await readyIdIndexedClientDouble({
     indexes: [...EXPERIMENT_ID_INDEXES, ...EXPERIMENT_SECOND_ID_INDEXES],
     driver: recordingDriver(ch),
+    reader: recordingDriver(migrated.readerConnection),
   });
   unready = idIndexedClientDouble({
     indexes: [...EXPERIMENT_ID_INDEXES, ...EXPERIMENT_SECOND_ID_INDEXES],
     driver: recordingDriver(ch),
+    reader: recordingDriver(migrated.readerConnection),
   });
   setWindowedReadMetrics({ record: (entry) => outcomes.push(entry) });
 
@@ -236,7 +222,7 @@ afterAll(async () => {
       query_params: { tenantId },
     });
   }
-  await ch.close();
+  await migrated.close();
 });
 
 describe("experiment lookups by id with the id index", () => {

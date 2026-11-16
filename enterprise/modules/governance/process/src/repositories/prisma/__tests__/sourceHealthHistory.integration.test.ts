@@ -12,17 +12,20 @@ import {
   vendorQueryDriver,
 } from "@langwatch/clickhouse-client/testing";
 import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
+import {
+  provisionTestAppReader,
+  type TestAppReader,
+} from "@langwatch/test-harness/clickhouse-app-reader";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { appReaderOver } from "../../../__tests__/migrated-clickhouse.harness.ts";
 import { createActivityMonitorTestService } from "../../../__tests__/testing.ts";
 import { memberClickHouseResolver } from "../../clickhouse/clickhouse.governance-clickhouse.repositories.ts";
 
 const DAY_MS = 86_400_000;
 
 let clickhouse: ClickHouseClient;
-let appReader: Awaited<ReturnType<typeof appReaderOver>>;
+let appReader: TestAppReader;
 
 /** ISO with its zone, so the server's own time zone cannot shift the row. */
 function timestamp(ms: number): string {
@@ -96,8 +99,9 @@ describe("source health during a historical provider import", () => {
       url: endpoint.url,
       clickhouse_settings: { date_time_input_format: "best_effort" },
     });
-    appReader = await appReaderOver({
+    appReader = await provisionTestAppReader({
       endpoint,
+      environment: process.env,
       system: vendorQueryDriver({ vendor: clickhouse }),
     });
   }, 600_000);
@@ -133,7 +137,7 @@ describe("source health during a historical provider import", () => {
       });
       const repository = createActivityMonitorTestService({
         prisma: prismaDouble({ project: { findFirst: async () => ({ id: tenantId }) } }),
-        clickhouse: memberClickHouseResolver(appReader.queryClient),
+        clickhouse: memberClickHouseResolver(appReader.worker),
         traces: {
           getAttributedTraceRecency: async () => ({ counts: [0, 0, 0], lastOccurredAtMs: 0 }),
         },

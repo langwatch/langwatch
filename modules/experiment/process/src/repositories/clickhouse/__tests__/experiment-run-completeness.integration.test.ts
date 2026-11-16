@@ -154,11 +154,11 @@ async function seedFinishedRun({
 }
 
 beforeAll(async () => {
-  ({ client } = await startMigratedClickHouse({ suite: "completeness" }));
+  ({ client } = await startMigratedClickHouse());
   repository = ClickHouseExperimentRunRepository.create({
     workflowVersions: { findByIds: async () => ({}) },
     resolveClient: ClickHouseExperimentSession.resolverOver(
-      (await startMigratedClickHouse({ suite: "completeness" })).reading,
+      (await startMigratedClickHouse()).reading,
     ),
     telemetry: {
       trace: async <T>(_input: unknown, operation: () => Promise<T>) => operation(),

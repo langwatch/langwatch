@@ -28,7 +28,7 @@ describe("metric's descriptors against the migrated schema", () => {
   let migrated: MigratedClickHouse;
 
   beforeAll(async () => {
-    migrated = await startMigratedClickHouse({ suite: "tables" });
+    migrated = await startMigratedClickHouse();
   }, 240_000);
 
   /** @scenario "The metric_data_points descriptor matches the migrated schema" */

@@ -57,6 +57,7 @@
   },
   "devDependencies": {
     "@clickhouse/client": "catalog:",
+    "@langwatch/clickhouse-migrations": "workspace:*",
     "@langwatch/instant-eval-judge-process": "workspace:*",
     "@langwatch/process-stores": "workspace:*",
     "@langwatch/test-harness": "workspace:*",

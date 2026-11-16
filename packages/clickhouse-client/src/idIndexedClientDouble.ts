@@ -23,23 +23,29 @@ const asScriptedRows = <Row>(rows: readonly unknown[]): Row[] =>
 export function idIndexedClientDouble({
   indexes,
   driver,
+  reader,
 }: {
   indexes: readonly IdIndexDeclaration[];
   /** Answers every statement but the readiness checks, as a test scripts it. */
   driver: ScriptedStatements;
+  /** The app reader's statements, as a process holding a reader sends reads; none by default. */
+  reader?: ScriptedStatements;
 }): ClickHouseQueryClient {
-  return clientOver({ indexes, driver, ready: false });
+  return clientOver({ indexes, driver, reader, ready: false });
 }
 
 /** A client whose declared indexes read as filled on the shared target, checked up front. */
 export async function readyIdIndexedClientDouble({
   indexes,
   driver,
+  reader,
 }: {
   indexes: readonly IdIndexDeclaration[];
   driver: ScriptedStatements;
+  /** The app reader's statements, as a process holding a reader sends reads; none by default. */
+  reader?: ScriptedStatements;
 }): Promise<ClickHouseQueryClient> {
-  const client = clientOver({ indexes, driver, ready: true });
+  const client = clientOver({ indexes, driver, reader, ready: true });
   for (const index of indexes) {
     const { source, key } = index;
     await client.idIndexes().check({ source, key, target: SHARED_CLICKHOUSE_TARGET });
@@ -49,14 +55,33 @@ export async function readyIdIndexedClientDouble({
 
 function clientOver({
   indexes,
-  driver: scripted,
+  driver,
+  reader,
   ready,
 }: {
   indexes: readonly IdIndexDeclaration[];
   driver: ScriptedStatements;
+  reader: ScriptedStatements | undefined;
   ready: boolean;
 }): ClickHouseQueryClient {
-  const driver: QueryDriver = {
+  const client = new ClickHouseQueryClient({
+    driver: scriptedDriver({ scripted: driver, ready }),
+    ...(reader ? { readerDriver: scriptedDriver({ scripted: reader, ready }) } : {}),
+    tenantGuard: new TenantGuard(),
+  });
+  client.declareIdIndexes({ indexes });
+  return client;
+}
+
+/** The scripted statements as a driver, the readiness checks answered by `ready`. */
+function scriptedDriver({
+  scripted,
+  ready,
+}: {
+  scripted: ScriptedStatements;
+  ready: boolean;
+}): QueryDriver {
+  return {
     execute: <Row>(request: QueryRequest): Promise<QueryResult<Row>> => {
       if (!isIdIndexReadinessStatement(request)) {
         return scripted.execute(request).then(({ rows }) => ({ rows: asScriptedRows<Row>(rows) }));
@@ -68,7 +93,4 @@ function clientOver({
     insert: async (request) => scripted.insert?.(request),
     command: async () => {},
   };
-  const client = new ClickHouseQueryClient({ driver, tenantGuard: new TenantGuard() });
-  client.declareIdIndexes({ indexes });
-  return client;
 }

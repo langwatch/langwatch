@@ -3,15 +3,14 @@
 // ClickHouse endpoint with the shipped goose migrations, for governance's ClickHouse suites.
 // Same shape as modules/experiment/process/src/__tests__/migrated-clickhouse.harness.ts.
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
-import { ClickHouseQueryClient, type QueryDriver, TenantGuard } from "@langwatch/clickhouse-client";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import {
   migrateTestClickHouseOnce,
   startTestClickHouseEndpoints,
   type TestClickHouseEndpoint,
-  vendorQueryDriver,
 } from "@langwatch/clickhouse-client/testing";
 import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
-import { provisionTestAppReader } from "@langwatch/test-harness/clickhouse-app-reader";
+import { startMigratedAppReaderClickHouse } from "@langwatch/test-harness/clickhouse-app-reader";
 
 const SYSTEM_SETTINGS = { date_time_input_format: "best_effort" } as const;
 
@@ -65,7 +64,7 @@ export interface MigratedClickHouseAsReader {
 }
 
 /**
- * The migrated endpoint with the app reader provisioned, enforcing (ADR-202). The reader's names
+ * The migrated container with the app reader provisioned, enforcing (ADR-202). The reader's names
  * are server-wide, so the suite starts its own container, never the shared native server.
  */
 export async function startMigratedClickHouseAsReader({
@@ -73,47 +72,6 @@ export async function startMigratedClickHouseAsReader({
 }: {
   suite: string;
 }): Promise<MigratedClickHouseAsReader> {
-  const { LANGWATCH_TEST_CLICKHOUSE_URL: _native, ...containerOnly } = process.env;
-  const endpoint = await migratedEndpoint({ suite, environment: containerOnly });
-  const client = createClient({ url: endpoint.url, clickhouse_settings: SYSTEM_SETTINGS });
-  const asReader = await appReaderOver({ endpoint, system: vendorQueryDriver({ vendor: client }) });
-  return {
-    client,
-    queryClient: asReader.queryClient,
-    async close() {
-      await Promise.all([asReader.close(), client.close()]);
-    },
-  };
-}
-
-/**
- * Provisions the app reader on `endpoint` (a container, never the shared native server) and
- * returns a client as a worker holds it: tenant reads as the reader, the rest on `system`.
- */
-export async function appReaderOver({
-  endpoint,
-  system,
-}: {
-  endpoint: TestClickHouseEndpoint;
-  system: QueryDriver;
-}): Promise<{
-  queryClient: ClickHouseQueryClient;
-  /** The reader's own driver, for a suite that composes its own system side. */
-  readerDriver: QueryDriver;
-  close(): Promise<void>;
-}> {
-  const appReader = await provisionTestAppReader({ endpoint, environment: process.env });
-  const readerConnection = createClient({ url: appReader.readerUrl });
-  const readerDriver = vendorQueryDriver({ vendor: readerConnection });
-  return {
-    queryClient: new ClickHouseQueryClient({
-      driver: system,
-      readerDriver,
-      tenantGuard: new TenantGuard(),
-    }),
-    readerDriver,
-    async close() {
-      await Promise.all([appReader.close(), readerConnection.close()]);
-    },
-  };
+  const opened = await startMigratedAppReaderClickHouse({ suite, environment: process.env });
+  return { client: opened.admin, queryClient: opened.worker, close: () => opened.close() };
 }

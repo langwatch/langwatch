@@ -112,11 +112,11 @@ async function recordVerdict(data: EvaluatorResultEventData): Promise<void> {
 }
 
 beforeAll(async () => {
-  ({ client } = await startMigratedClickHouse({ suite: "board-snapshot" }));
+  ({ client } = await startMigratedClickHouse());
   repository = ClickHouseExperimentRunRepository.create({
     workflowVersions: { findByIds: async () => ({}) },
     resolveClient: ClickHouseExperimentSession.resolverOver(
-      (await startMigratedClickHouse({ suite: "board-snapshot" })).reading,
+      (await startMigratedClickHouse()).reading,
     ),
     telemetry: {
       trace: async <T>(_input: unknown, operation: () => Promise<T>) => operation(),

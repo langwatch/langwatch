@@ -63,7 +63,7 @@ async function rowsOf(table: (typeof TABLES)[number]): Promise<Record<string, un
 }
 
 beforeAll(async () => {
-  const migrated = await startMigratedClickHouse({ suite: "projections" });
+  const migrated = await startMigratedClickHouse();
   ch = migrated.client;
   const port = metricClient(migrated);
   const repository = ClickHouseMetricDataPointAppendRepository.create({

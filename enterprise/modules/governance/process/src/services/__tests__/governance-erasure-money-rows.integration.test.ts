@@ -22,11 +22,14 @@ import {
   pulledUsageObservedEventSchema,
 } from "@langwatch/enterprise-governance-contract";
 import { createTenantId } from "@langwatch/eventing";
+import {
+  provisionTestAppReader,
+  type TestAppReader,
+} from "@langwatch/test-harness/clickhouse-app-reader";
 import { Temporal } from "@langwatch/time";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { appReaderOver } from "../../__tests__/migrated-clickhouse.harness.ts";
 import { observed } from "../../eventing/__tests__/governance-cost-rollup.fixtures.ts";
 import { GovernanceCostChargeMapProjection } from "../../eventing/governance-cost-charge.projection.ts";
 import { GovernanceCostRollupFoldProjection } from "../../eventing/governance-cost-rollup.projection.ts";
@@ -49,7 +52,7 @@ const SECOND_DAY_MS = Date.UTC(2026, 7, 21, 10);
 const ERASED_AT = Temporal.Instant.from("2026-09-02T00:00:00Z");
 
 let clickhouse: ClickHouseClient;
-let appReader: Awaited<ReturnType<typeof appReaderOver>>;
+let appReader: TestAppReader;
 let rollup: ClickHouseGovernanceCostRollupRepository;
 let charges: ClickHouseGovernanceCostChargeRepository;
 let rollupErasure: ClickHouseRollupErasureRepository;
@@ -277,15 +280,16 @@ describe.skipIf(
       },
     });
     clickhouse = createClient({ url: endpoint.url });
-    appReader = await appReaderOver({
+    appReader = await provisionTestAppReader({
       endpoint,
+      environment: process.env,
       system: vendorQueryDriver({ vendor: clickhouse }),
     });
     rollup = ClickHouseGovernanceCostRollupRepository.create(
-      memberClickHouseResolver(appReader.queryClient),
+      memberClickHouseResolver(appReader.worker),
     );
     charges = ClickHouseGovernanceCostChargeRepository.create(
-      memberClickHouseResolver(appReader.queryClient),
+      memberClickHouseResolver(appReader.worker),
     );
     rollupErasure = ClickHouseRollupErasureRepository.create(
       queryClient(clickhouse, appReader.readerDriver),

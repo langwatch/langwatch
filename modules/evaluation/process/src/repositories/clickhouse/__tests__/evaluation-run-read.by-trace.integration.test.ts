@@ -7,6 +7,11 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { narrowAuthorization } from "@langwatch/authorization";
 import type { EvaluationRunData } from "@langwatch/evaluation-contract";
+import {
+  type TestAppReader,
+  provisionTestAppReader,
+  startAppReaderEndpoint,
+} from "@langwatch/test-harness/clickhouse-app-reader";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
@@ -19,11 +24,6 @@ import {
 } from "../clickhouse.evaluation-id-indexes.database.ts";
 import { EvaluationRunClickHouseReadRepository } from "../evaluation-run-read.repository.ts";
 import { EvaluationRunClickHouseWriteRepository } from "../evaluation-run-write.repository.ts";
-import {
-  type AppReaderClickHouse,
-  appReaderClickHouseOver,
-  startAppReaderEndpoint,
-} from "./support/app-reader-clickhouse.support.ts";
 
 const TENANT = "tenant_by_trace";
 const TRACE_ID = "trace_by_trace_1";
@@ -84,14 +84,18 @@ function evaluationRun(overrides: Partial<EvaluationRunData>): EvaluationRunData
 }
 
 let client: ClickHouseClient;
-let clickHouse: AppReaderClickHouse;
+let clickHouse: TestAppReader;
 let reads: EvaluationRunClickHouseReadRepository;
 
 describe("given a trace whose evaluation runs are stored", () => {
   beforeAll(async () => {
-    const endpoint = await startAppReaderEndpoint({ suite: "evaluation-run-read-by-trace" });
-    clickHouse = await appReaderClickHouseOver({
+    const endpoint = await startAppReaderEndpoint({
+      suite: "evaluation-run-read-by-trace",
+      environment: process.env,
+    });
+    clickHouse = await provisionTestAppReader({
       endpoint,
+      environment: process.env,
       indexes: [...EVALUATION_ID_INDEXES, ...EVALUATION_SECOND_ID_INDEXES],
     });
     // The system identity writes; it parses the write's ISO moments as the production member does.
@@ -103,7 +107,7 @@ describe("given a trace whose evaluation runs are stored", () => {
     const resolveClient = async () => client as never;
     const writes = EvaluationRunClickHouseWriteRepository.create({ resolveClient });
     reads = EvaluationRunClickHouseReadRepository.create({
-      resolveQueryClient: async () => clickHouse.client,
+      resolveQueryClient: async () => clickHouse.worker,
     });
     const runs = [
       evaluationRun({}),

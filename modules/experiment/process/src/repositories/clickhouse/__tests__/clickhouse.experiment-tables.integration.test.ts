@@ -37,7 +37,7 @@ describe("experiment's descriptors against the migrated schema", () => {
   let migrated: MigratedClickHouse;
 
   beforeAll(async () => {
-    migrated = await startMigratedClickHouse({ suite: "tables" });
+    migrated = await startMigratedClickHouse();
   }, 240_000);
 
   it.each(DESCRIPTORS.map((table) => [table.$table.stored, table] as const))(
@@ -92,7 +92,7 @@ describe("experiment's stored bytes against the migrated schema", () => {
   }
 
   beforeAll(async () => {
-    migrated = await startMigratedClickHouse({ suite: "tables" });
+    migrated = await startMigratedClickHouse();
     for (const tenantId of [ours, theirs]) {
       for (const table of METERED_TABLES) {
         await migrated.client.insert({

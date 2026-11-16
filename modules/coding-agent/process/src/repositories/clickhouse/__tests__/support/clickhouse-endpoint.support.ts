@@ -1,14 +1,8 @@
 // Suites assert DDL↔repository contract on production schema; migrated
 // ClickHouse or skip if unconfigured.
 import { createClient, type ClickHouseClient } from "@clickhouse/client";
-import { ClickHouseQueryClient, type QueryDriver, TenantGuard } from "@langwatch/clickhouse-client";
-import {
-  migrateTestClickHouseOnce,
-  startTestClickHouseEndpoints,
-  vendorQueryDriver,
-} from "@langwatch/clickhouse-client/testing";
-import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
-import { provisionTestAppReader } from "@langwatch/test-harness/clickhouse-app-reader";
+import type { ClickHouseQueryClient, QueryDriver } from "@langwatch/clickhouse-client";
+import { startMigratedAppReaderClickHouse } from "@langwatch/test-harness/clickhouse-app-reader";
 
 import { CODING_AGENT_ID_INDEXES } from "../../clickhouse.coding-agent-id-indexes.database.ts";
 
@@ -51,44 +45,15 @@ export async function startCodingAgentClickHouseAsReader({
 }: {
   suite: string;
 }): Promise<CodingAgentClickHouseAsReader> {
-  const { LANGWATCH_TEST_CLICKHOUSE_URL: _native, ...containerOnly } = process.env;
-  const [endpoint] = await startTestClickHouseEndpoints({
+  const opened = await startMigratedAppReaderClickHouse({
+    environment: process.env,
     suite,
-    names: ["schema"],
-    environment: containerOnly,
+    indexes: CODING_AGENT_ID_INDEXES,
   });
-  if (!endpoint) throw new Error(`No ClickHouse endpoint was provisioned for ${suite}`);
-  await migrateTestClickHouseOnce({
-    url: endpoint.url,
-    migrate: async () => {
-      // CLICKHOUSE_CLUSTER switches every engine to its Replicated form, which needs a Keeper.
-      const previousCluster = process.env.CLICKHOUSE_CLUSTER;
-      delete process.env.CLICKHOUSE_CLUSTER;
-      try {
-        await ClickHouseMigrateTask.createFromConfig({
-          config: { buildTime: false, sharedUrl: endpoint.url, privateEndpoints: [] },
-        }).execute();
-      } finally {
-        if (previousCluster !== undefined) process.env.CLICKHOUSE_CLUSTER = previousCluster;
-      }
-    },
-  });
-  const appReader = await provisionTestAppReader({ endpoint, environment: process.env });
-  const ch = createTestClickHouseClient(new URL(endpoint.url));
-  const readerConnection = createClient({ url: appReader.readerUrl });
-  const readerDriver = vendorQueryDriver({ vendor: readerConnection });
-  const queryClient = new ClickHouseQueryClient({
-    driver: vendorQueryDriver({ vendor: ch }),
-    readerDriver,
-    tenantGuard: new TenantGuard(),
-  });
-  queryClient.declareIdIndexes({ indexes: CODING_AGENT_ID_INDEXES });
   return {
-    ch,
-    queryClient,
-    readerDriver,
-    async close() {
-      await Promise.all([appReader.close(), readerConnection.close(), ch.close()]);
-    },
+    ch: opened.admin,
+    queryClient: opened.worker,
+    readerDriver: opened.readerDriver,
+    close: () => opened.close(),
   };
 }

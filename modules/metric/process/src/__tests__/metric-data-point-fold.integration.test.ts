@@ -123,7 +123,7 @@ async function readRollups(seriesId: string) {
 }
 
 beforeAll(async () => {
-  migrated = await startMigratedClickHouse({ suite: "fold" });
+  migrated = await startMigratedClickHouse();
   ch = migrated.client;
   const port = metricClient(migrated);
   repo = ClickHouseMetricDataPointAppendRepository.create({

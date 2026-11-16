@@ -1,6 +1,11 @@
 /** @vitest-environment node */
 /** Spec: specs/evaluations/trace-evaluations-read.feature */
 import type { ClickHouseClient } from "@clickhouse/client";
+import {
+  type TestAppReader,
+  provisionTestAppReader,
+  startAppReaderEndpoint,
+} from "@langwatch/test-harness/clickhouse-app-reader";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { ownProof } from "../../../__tests__/support/authorization-proofs.fixture.ts";
@@ -9,11 +14,6 @@ import {
   EVALUATION_SECOND_ID_INDEXES,
 } from "../clickhouse.evaluation-id-indexes.database.ts";
 import { EvaluationRunClickHouseReadRepository } from "../evaluation-run-read.repository.ts";
-import {
-  type AppReaderClickHouse,
-  appReaderClickHouseOver,
-  startAppReaderEndpoint,
-} from "./support/app-reader-clickhouse.support.ts";
 
 const TENANT = "tenant_dedup";
 const TRACE_ID = "trace_dedup_1";
@@ -75,13 +75,17 @@ function row(overrides: Record<string, unknown>): Record<string, unknown> {
 }
 
 let client: ClickHouseClient;
-let clickHouse: AppReaderClickHouse;
+let clickHouse: TestAppReader;
 
 describe("given an evaluation whose row was rewritten as it progressed", () => {
   beforeAll(async () => {
-    const endpoint = await startAppReaderEndpoint({ suite: "evaluation-run-read-dedup" });
-    clickHouse = await appReaderClickHouseOver({
+    const endpoint = await startAppReaderEndpoint({
+      suite: "evaluation-run-read-dedup",
+      environment: process.env,
+    });
+    clickHouse = await provisionTestAppReader({
       endpoint,
+      environment: process.env,
       indexes: [...EVALUATION_ID_INDEXES, ...EVALUATION_SECOND_ID_INDEXES],
     });
     client = clickHouse.admin;
@@ -113,7 +117,7 @@ describe("given an evaluation whose row was rewritten as it progressed", () => {
     /** @scenario "A rewritten evaluation is not hidden by the read's own column aliases" */
     it("returns it through the by-trace read as well", async () => {
       const repository = EvaluationRunClickHouseReadRepository.create({
-        resolveQueryClient: async () => clickHouse.client,
+        resolveQueryClient: async () => clickHouse.worker,
       });
 
       const result = await repository.findByTraceId({

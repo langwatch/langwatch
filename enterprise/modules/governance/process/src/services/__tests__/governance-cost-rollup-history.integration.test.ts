@@ -22,11 +22,14 @@ import {
   pulledUsageObservedEventSchema,
 } from "@langwatch/enterprise-governance-contract";
 import { createTenantId } from "@langwatch/eventing";
+import {
+  provisionTestAppReader,
+  type TestAppReader,
+} from "@langwatch/test-harness/clickhouse-app-reader";
 import { type Instant, Temporal } from "@langwatch/time";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { appReaderOver } from "../../__tests__/migrated-clickhouse.harness.ts";
 import { GovernanceCostRollupFoldProjection } from "../../eventing/governance-cost-rollup.projection.ts";
 import { GovernanceCostRollupStore } from "../../eventing/governance-cost-rollup.store.ts";
 import { PulledUsagePricingService } from "../../features/ingestion-pull/services/pulled-usage-pricing.service.ts";
@@ -45,7 +48,7 @@ const RESTATED_READ = Temporal.Instant.from("2026-01-17T09:00:00.000Z");
 const NANO = 1_000_000_000;
 
 let clickhouse: ClickHouseClient;
-let appReader: Awaited<ReturnType<typeof appReaderOver>>;
+let appReader: TestAppReader;
 let repository: ClickHouseGovernanceCostRollupRepository;
 
 const records = PulledUsageRecordService.create(
@@ -197,12 +200,13 @@ describe.skipIf(
       },
     });
     clickhouse = createClient({ url: endpoint.url });
-    appReader = await appReaderOver({
+    appReader = await provisionTestAppReader({
       endpoint,
+      environment: process.env,
       system: vendorQueryDriver({ vendor: clickhouse }),
     });
     repository = ClickHouseGovernanceCostRollupRepository.create(
-      memberClickHouseResolver(appReader.queryClient),
+      memberClickHouseResolver(appReader.worker),
     );
     await clickhouse.command({ query: "SYSTEM STOP MERGES governance_cost_rollup_1d" });
   }, 600_000);

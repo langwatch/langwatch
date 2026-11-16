@@ -21,11 +21,14 @@ import {
   pulledUsageObservedEventSchema,
 } from "@langwatch/enterprise-governance-contract";
 import { createTenantId } from "@langwatch/eventing";
+import {
+  provisionTestAppReader,
+  type TestAppReader,
+} from "@langwatch/test-harness/clickhouse-app-reader";
 import { type Instant, Temporal } from "@langwatch/time";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { appReaderOver } from "../../__tests__/migrated-clickhouse.harness.ts";
 import { GovernanceCostRollupFoldProjection } from "../../eventing/governance-cost-rollup.projection.ts";
 import { GovernanceCostRollupStore } from "../../eventing/governance-cost-rollup.store.ts";
 import { PulledUsagePricingService } from "../../features/ingestion-pull/services/pulled-usage-pricing.service.ts";
@@ -45,7 +48,7 @@ const OBSERVED_AT = Temporal.Instant.from("2026-01-16T09:00:00.000Z");
 const RESTARTED_AT = Temporal.Instant.from("2026-01-16T11:00:00.000Z");
 
 let clickhouse: ClickHouseClient;
-let appReader: Awaited<ReturnType<typeof appReaderOver>>;
+let appReader: TestAppReader;
 let repository: ClickHouseGovernanceCostRollupRepository;
 let tenantId: string;
 
@@ -152,12 +155,13 @@ describe("given a read that recorded part of a period and then failed", () => {
       },
     });
     clickhouse = createClient({ url: endpoint.url });
-    appReader = await appReaderOver({
+    appReader = await provisionTestAppReader({
       endpoint,
+      environment: process.env,
       system: vendorQueryDriver({ vendor: clickhouse }),
     });
     repository = ClickHouseGovernanceCostRollupRepository.create(
-      memberClickHouseResolver(appReader.queryClient),
+      memberClickHouseResolver(appReader.worker),
     );
   }, 600_000);
 

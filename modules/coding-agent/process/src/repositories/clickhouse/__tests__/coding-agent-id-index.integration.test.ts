@@ -6,7 +6,7 @@
  */
 import { randomUUID } from "node:crypto";
 
-import { type ClickHouseClient, createClient } from "@clickhouse/client";
+import type { ClickHouseClient } from "@clickhouse/client";
 import {
   type ClickHouseQueryClient,
   type InsertRequest,
@@ -16,13 +16,14 @@ import {
 } from "@langwatch/clickhouse-client";
 import {
   idIndexedClientDouble,
-  migrateTestClickHouseOnce,
   partsAfterPartitionPruning,
   readyIdIndexedClientDouble,
   type ScriptedStatements,
-  startTestClickHouseEndpoints,
 } from "@langwatch/clickhouse-client/testing";
-import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
+import {
+  type MigratedAppReaderClickHouse,
+  startMigratedAppReaderClickHouse,
+} from "@langwatch/test-harness/clickhouse-app-reader";
 import { nowInstant } from "@langwatch/time";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
@@ -45,6 +46,7 @@ const eightWeeksAgoMs = nowInstant().epochMilliseconds - 56 * DAY_MS;
 const decoyAgesInDays = [100, 200];
 const decoyIds = ["!decoy", "~decoy"];
 
+let appReader: MigratedAppReaderClickHouse;
 let ch: ClickHouseClient;
 let statements: QueryRequest[] = [];
 let outcomes: { table: string; outcome: WindowedReadOutcome }[] = [];
@@ -122,38 +124,22 @@ function dedupScopeOf(request: QueryRequest): QueryRequest {
 }
 
 beforeAll(async () => {
-  const [endpoint] = await startTestClickHouseEndpoints({
-    suite: "coding-agent-id-index",
-    names: ["schema"],
+  appReader = await startMigratedAppReaderClickHouse({
     environment: process.env,
+    suite: "coding-agent-id-index",
+    indexes: CODING_AGENT_ID_INDEXES,
   });
-  if (!endpoint) throw new Error("No ClickHouse endpoint was provisioned for the id-index suite");
-  await migrateTestClickHouseOnce({
-    url: endpoint.url,
-    migrate: async () => {
-      // CLICKHOUSE_CLUSTER switches every engine to its Replicated form, which needs a Keeper.
-      const previousCluster = process.env.CLICKHOUSE_CLUSTER;
-      delete process.env.CLICKHOUSE_CLUSTER;
-      try {
-        await ClickHouseMigrateTask.createFromConfig({
-          config: { buildTime: false, sharedUrl: endpoint.url, privateEndpoints: [] },
-        }).execute();
-      } finally {
-        if (previousCluster !== undefined) process.env.CLICKHOUSE_CLUSTER = previousCluster;
-      }
-    },
-  });
-  ch = createClient({
-    url: endpoint.url,
-    clickhouse_settings: { date_time_input_format: "best_effort" },
-  });
+  ch = appReader.admin;
+  // Reads go as the app reader, inserts as the system identity, as a worker holds the client.
   clickhouse = await readyIdIndexedClientDouble({
     indexes: CODING_AGENT_ID_INDEXES,
     driver: recordingDriver(ch),
+    reader: recordingDriver(appReader.readerConnection),
   });
   unready = idIndexedClientDouble({
     indexes: CODING_AGENT_ID_INDEXES,
     driver: recordingDriver(ch),
+    reader: recordingDriver(appReader.readerConnection),
   });
   sessions = CodingAgentSessionClickHouseRepository.create({
     clickhouse,
@@ -250,7 +236,7 @@ afterAll(async () => {
       });
     }
   }
-  await ch.close();
+  await appReader.close();
 });
 
 describe("coding-agent lookups by id with the id index", () => {

@@ -119,7 +119,7 @@ async function storeStartedRun({
 }
 
 beforeAll(async () => {
-  ({ client } = await startMigratedClickHouse({ suite: "recorded-settings" }));
+  ({ client } = await startMigratedClickHouse());
   states = ClickHouseExperimentRunStateRepository.create({
     clickhouse: new SuiteClickHouse(),
     defaultRetentionDays: () => 90,
@@ -127,7 +127,7 @@ beforeAll(async () => {
   runs = ClickHouseExperimentRunRepository.create({
     workflowVersions: { findByIds: async () => ({}) },
     resolveClient: ClickHouseExperimentSession.resolverOver(
-      (await startMigratedClickHouse({ suite: "recorded-settings" })).reading,
+      (await startMigratedClickHouse()).reading,
     ),
     telemetry: {
       trace: async <T>(_input: unknown, operation: () => Promise<T>) => operation(),

@@ -1,8 +1,8 @@
 /** @vitest-environment node */
 
 /**
- * Log rows against two mutually isolated ClickHouse endpoints, written and read
- * through the routed `clickhouse` member the process hands this repository.
+ * Log rows against two mutually isolated ClickHouse endpoints, written as the system and read as
+ * the app reader through the routed `clickhouse` member the process hands this repository.
  * specs/private-dataplane/data-isolation.feature
  */
 import { randomUUID } from "node:crypto";
@@ -23,13 +23,14 @@ import {
   type TenantDirectory,
   TenantGuard,
 } from "@langwatch/clickhouse-client";
-import {
-  migrateTestClickHouseOnce,
-  privateRouteOrgId,
-  startTestClickHouseEndpoints,
-} from "@langwatch/clickhouse-client/testing";
+import { migrateTestClickHouseOnce, privateRouteOrgId } from "@langwatch/clickhouse-client/testing";
 import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
 import type { CanonicalLogRecord } from "@langwatch/log-contract";
+import {
+  provisionTestAppReader,
+  startAppReaderEndpoints,
+  type TestAppReader,
+} from "@langwatch/test-harness/clickhouse-app-reader";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { ClickHouseCanonicalLogRecordAppendRepository } from "../clickhouse.canonical-log-record-append.repository.ts";
@@ -62,7 +63,8 @@ class VendorFactory extends ClickHouseClientFactory<ClickHouseClient & { close()
   }
 }
 
-function routedMember({ sharedUrl, privateUrl }: { sharedUrl: string; privateUrl: string }) {
+/** One identity's connection: the private organization routed to `privateUrl`, the rest shared. */
+function connectionOver({ sharedUrl, privateUrl }: { sharedUrl: string; privateUrl: string }) {
   const table = parseRoutingTable({
     [`${PRIVATE_ROUTE_ENV_PREFIX}acme__${PRIVATE_ORGANIZATION}`]: privateUrl,
   });
@@ -74,21 +76,38 @@ function routedMember({ sharedUrl, privateUrl }: { sharedUrl: string; privateUrl
       cluster: "test",
     })),
   });
-  const connection = ClickHouseConnection.create({
+  return ClickHouseConnection.create({
     configuration,
     router: createTenantRouter({ table, directory }),
     clientFactory: new VendorFactory(),
   });
+}
+
+/** As a worker holds it: writes as the system, tenant reads as the app reader, both routed. */
+function routedMember({
+  system,
+  reader,
+}: {
+  system: { sharedUrl: string; privateUrl: string };
+  reader: { sharedUrl: string; privateUrl: string };
+}) {
+  const connection = connectionOver(system);
+  const readerConnection = connectionOver(reader);
   const clickhouse = new ClickHouseQueryClient({
     tenantGuard: new TenantGuard(),
     driver: routingDriver(connection),
+    readerDriver: routingDriver(readerConnection),
   });
   const logs = ClickHouseCanonicalLogRecordAppendRepository.create({
     resolveClient: ClickHouseCanonicalLogRecordAppendRepository.resolverOver(clickhouse),
     clickhouse,
     defaultRetentionDays: 30,
   });
-  return { connection, clickhouse, logs };
+  return {
+    clickhouse,
+    logs,
+    closeOnce: () => Promise.all([connection.closeOnce(), readerConnection.closeOnce()]),
+  };
 }
 
 function newRecordId(): string {
@@ -168,15 +187,17 @@ async function recordIdsOn(
 
 let sharedProbe: ClickHouseClient;
 let privateProbe: ClickHouseClient;
+let readers: TestAppReader[] = [];
 let routed: ReturnType<typeof routedMember>;
 let down: ReturnType<typeof routedMember>;
 
 describe("given one organization on a private ClickHouse instance and one on the shared instance", () => {
   beforeAll(async () => {
-    const [shared, isolated] = await startTestClickHouseEndpoints({
+    // The reader is one user per server (ADR-202 open question 1): one container per endpoint.
+    const [shared, isolated] = await startAppReaderEndpoints({
+      environment: process.env,
       suite: "ch-log-isolation",
       names: ["shared", "private"],
-      environment: process.env,
     });
     if (!shared || !isolated) throw new Error("Two ClickHouse endpoints were not provisioned");
 
@@ -208,15 +229,28 @@ describe("given one organization on a private ClickHouse instance and one on the
       });
     }
 
-    routed = routedMember({ sharedUrl: shared.url, privateUrl: isolated.url });
-    down = routedMember({ sharedUrl: shared.url, privateUrl: UNREACHABLE_URL });
+    readers = await Promise.all(
+      [shared, isolated].map((endpoint) =>
+        provisionTestAppReader({ endpoint, environment: process.env }),
+      ),
+    );
+    const [sharedReader, privateReader] = readers as [TestAppReader, TestAppReader];
+    routed = routedMember({
+      system: { sharedUrl: shared.url, privateUrl: isolated.url },
+      reader: { sharedUrl: sharedReader.readerUrl, privateUrl: privateReader.readerUrl },
+    });
+    down = routedMember({
+      system: { sharedUrl: shared.url, privateUrl: UNREACHABLE_URL },
+      reader: { sharedUrl: sharedReader.readerUrl, privateUrl: UNREACHABLE_URL },
+    });
     sharedProbe = createClient({ url: shared.url });
     privateProbe = createClient({ url: isolated.url });
   }, 600_000);
 
   afterAll(async () => {
-    await Promise.all([routed?.connection.closeOnce(), down?.connection.closeOnce()]);
+    await Promise.all([routed?.closeOnce(), down?.closeOnce()]);
     await Promise.all([sharedProbe?.close(), privateProbe?.close()]);
+    await Promise.all(readers.map((reader) => reader.close()));
   }, 60_000);
 
   describe("when a log record is written for the private-instance organization", () => {

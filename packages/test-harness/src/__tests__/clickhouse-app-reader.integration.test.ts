@@ -113,6 +113,27 @@ describe("provisionTestAppReader", () => {
     expect(rows).toHaveLength(3);
   });
 
+  it("holds the server until close, so another provision waits and every read answers", async () => {
+    let provisioned = false;
+    const waiting = provisionTestAppReader({ endpoint, environment: process.env }).then((next) => {
+      provisioned = true;
+      return next;
+    });
+
+    const answers = await Promise.all(
+      Array.from({ length: 60 }, () => appReader.reader.read(eventsOf({ tenantIds: [TENANT_A] }))),
+    );
+
+    for (const { rows } of answers) {
+      expect(rows.map(({ Event }) => Event).toSorted()).toEqual(["a1", "a2"]);
+    }
+    expect(provisioned).toBe(false);
+    await appReader.close();
+    appReader = await waiting;
+    const { rows } = await appReader.reader.read(eventsOf({ tenantIds: [TENANT_A] }));
+    expect(rows.map(({ Event }) => Event).toSorted()).toEqual(["a1", "a2"]);
+  });
+
   it("refuses the shared native server by the reader's name", async () => {
     await expect(
       provisionTestAppReader({

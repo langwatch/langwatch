@@ -7,6 +7,12 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { analyticsComparisonWindow } from "@langwatch/analytics-contract";
 import type { QueryDriver } from "@langwatch/clickhouse-client";
 import { generate } from "@langwatch/ksuid";
+import {
+  type TestAppReader,
+  provisionTestAppReader,
+  migrateAppReaderEndpoint,
+  startAppReaderEndpoint,
+} from "@langwatch/test-harness/clickhouse-app-reader";
 import { Temporal } from "@langwatch/time";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -17,12 +23,6 @@ import {
 } from "../../../__tests__/support/monitor-performance.fixtures.ts";
 import { MonitorPerformanceService } from "../../../features/monitors/services/monitor-performance.service.ts";
 import { ClickHouseMonitorPerformanceRepository } from "../monitor-performance.repository.ts";
-import {
-  type AppReaderClickHouse,
-  appReaderClickHouseOver,
-  migrateAppReaderEndpoint,
-  startAppReaderEndpoint,
-} from "./support/app-reader-clickhouse.support.ts";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const tenantId = `test-monitor-performance-${generate("test").toString()}`;
@@ -37,7 +37,7 @@ const previousStartMs = analyticsComparisonWindow({
 }).previousPeriodStart.epochMilliseconds;
 
 let clickHouse: ClickHouseClient;
-let appReader: AppReaderClickHouse;
+let appReader: TestAppReader;
 let service: MonitorPerformanceService;
 let queryCount = 0;
 
@@ -65,10 +65,15 @@ const readPerformance = (monitors: { id: string; isGuardrail: boolean }[]) =>
 describe("online evaluation monitor performance", () => {
   beforeAll(async () => {
     const endpoint = await startAppReaderEndpoint({
+      environment: process.env,
       suite: "evaluation-monitor-performance-reader",
     });
     await migrateAppReaderEndpoint({ endpoint });
-    appReader = await appReaderClickHouseOver({ endpoint, wrapReaderDriver: countingReads });
+    appReader = await provisionTestAppReader({
+      endpoint,
+      environment: process.env,
+      wrapReaderDriver: countingReads,
+    });
     clickHouse = appReader.admin;
     await seedMonitorPerformance({
       client: clickHouse,
@@ -83,7 +88,7 @@ describe("online evaluation monitor performance", () => {
     });
     service = MonitorPerformanceService.create({
       repository: ClickHouseMonitorPerformanceRepository.create({
-        resolveQueryClient: async () => appReader.client,
+        resolveQueryClient: async () => appReader.worker,
       }),
     });
   }, 180_000);

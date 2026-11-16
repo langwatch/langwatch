@@ -10325,6 +10325,9 @@ importers:
       '@clickhouse/client':
         specifier: 'catalog:'
         version: 1.23.0
+      '@langwatch/clickhouse-migrations':
+        specifier: workspace:*
+        version: link:../../../packages/clickhouse-migrations
       '@langwatch/instant-eval-judge-process':
         specifier: workspace:*
         version: link:../../instant-eval-judge/process

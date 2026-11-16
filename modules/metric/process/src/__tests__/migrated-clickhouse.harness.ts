@@ -1,12 +1,11 @@
 /**
  * ClickHouse endpoint with shipped migrations for metric suites, in a container with the app reader
- * provisioned (ADR-202): suites read as the reader and seed as the system identity. One endpoint
- * per suite: the reader is one user per server and each file provisions its own password.
+ * provisioned (ADR-202): suites read as the reader and seed as the system identity. Every metric
+ * file shares the one endpoint, one file at a time: each holds the server until its process ends.
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
-
-import { migratedAppReaderClickHouse } from "./support/app-reader-clickhouse.support.ts";
+import { startMigratedAppReaderClickHouse } from "@langwatch/test-harness/clickhouse-app-reader";
 
 export interface MigratedClickHouse {
   /** The system identity's client bound to the migrated database: seeds and cleanup. */
@@ -18,16 +17,15 @@ export interface MigratedClickHouse {
   database: string;
 }
 
-/** Starts (or reuses) the suite's own migrated endpoint with the reader provisioned. */
-export async function startMigratedClickHouse({
-  suite,
-}: {
-  suite: string;
-}): Promise<MigratedClickHouse> {
-  const opened = await migratedAppReaderClickHouse({ suite: `metric-migrated-${suite}` });
+/** Starts (or reuses) metric's migrated endpoint with the reader provisioned. */
+export async function startMigratedClickHouse(): Promise<MigratedClickHouse> {
+  const opened = await startMigratedAppReaderClickHouse({
+    suite: "metric-migrated",
+    environment: process.env,
+  });
   return {
     client: opened.admin,
-    reading: opened.client,
+    reading: opened.worker,
     url: opened.endpoint.url,
     database: opened.endpoint.database,
   };
