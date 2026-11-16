@@ -173,6 +173,17 @@ describe("job span sampling", () => {
     expect(exported[0]?.parent).toMatchObject({ isRemote: true, traceFlags: TraceFlags.SAMPLED });
   });
 
+  /** @scenario "A kept span survives a process sampler that samples no root" */
+  it("keeps a sampled job's span when the process samples no root", async () => {
+    uninstallInMemoryTracing();
+    installInMemoryTracing({ exported, rootSampled: false });
+    await runJob(async (span) => {
+      span.setStatus({ code: SpanStatusCode.ERROR });
+    }, true);
+    expect(exported).toHaveLength(1);
+    expect(exported[0]?.parent).toMatchObject({ isRemote: true, traceFlags: TraceFlags.SAMPLED });
+  });
+
   /** @scenario "An error escaping the job is recorded on its span" */
   it("records an error that escapes the job on its span and rethrows it", async () => {
     const boom = new Error("escaped");

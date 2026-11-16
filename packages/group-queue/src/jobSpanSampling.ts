@@ -178,12 +178,7 @@ class DeferredJobSpan implements Span {
   /** The real span, started at the job's start under a sampled remote stand-in parent. */
   private materialise(): Span | undefined {
     if (this.real || this.ended) return this.real;
-    // ParentBased keeps a sampled remote parent's child whatever its root ratio.
-    const parent = trace.setSpanContext(ROOT_CONTEXT, {
-      ...this.unsampledContext,
-      traceFlags: TraceFlags.SAMPLED,
-      isRemote: true,
-    });
+    const parent = keptParent(this.unsampledContext);
     const real = trace.getTracer("langwatch.group-queue").startSpan(
       this.name,
       {
@@ -203,6 +198,16 @@ class DeferredJobSpan implements Span {
     this.real = real;
     return real;
   }
+}
+
+/** A sampled remote parent: ParentBased keeps its child whatever the process's root ratio. */
+function keptParent({ traceId, spanId }: { traceId: string; spanId: string }) {
+  return trace.setSpanContext(ROOT_CONTEXT, {
+    traceId,
+    spanId,
+    traceFlags: TraceFlags.SAMPLED,
+    isRemote: true,
+  });
 }
 
 function isTimeInput(value: Attributes | TimeInput | undefined): value is TimeInput {
@@ -232,16 +237,21 @@ export async function withJobSpan<T>({
   if (sampled) {
     const tracer = trace.getTracer("langwatch.group-queue");
     const options = { kind, attributes: { ...attributes, ...customAttributes() } };
-    return tracer.startActiveSpan(name, options, async (span) => {
-      try {
-        return await operation(span);
-      } catch (err) {
-        recordEscapedError({ span, err });
-        throw err;
-      } finally {
-        span.end();
-      }
+    const parent = keptParent({
+      traceId: randomBytes(16).toString("hex"),
+      spanId: randomBytes(8).toString("hex"),
     });
+    const span = tracer.startSpan(name, options, parent);
+    try {
+      return await otelContext.with(trace.setSpan(otelContext.active(), span), () =>
+        operation(span),
+      );
+    } catch (err) {
+      recordEscapedError({ span, err });
+      throw err;
+    } finally {
+      span.end();
+    }
   }
   const span = new DeferredJobSpan({ name, kind, attributes, customAttributes });
   try {

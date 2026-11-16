@@ -627,16 +627,12 @@ describe("given a first-attempt job whose span was not sampled", () => {
     uninstallInMemoryTracing();
   });
 
-  /** @scenario "A handed-back job has a span carrying the hand-back, not an error" */
-  it("exports a span with the hand-back on every hand-back, without error status", async () => {
+  /** @scenario "A hand-back is not recorded on an unsampled job's span" */
+  it("exports no span for an unsampled job that is handed back", async () => {
     installInMemoryTracing({ exported });
     await handedBack();
     await handedBack();
-    expect(exported).toHaveLength(2);
-    for (const span of exported) {
-      expect(span.events).toEqual(["exception"]);
-      expect(span.status).toBeUndefined();
-    }
+    expect(exported).toEqual([]);
   });
 
   it("exports an error span for a failing job", async () => {

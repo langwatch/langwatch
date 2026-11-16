@@ -8,7 +8,8 @@ Feature: A claimed job keeps its consumer span for 1 in 10 successes and every f
   queue's options can replace. An unsampled job runs under a context that is not sampled, so the
   handler's own spans are dropped rather than exported as roots. When an unsampled job fails, its
   span is created then, starting at the job's start, with the error recorded, in the trace its
-  earlier logs carry, under a sampled remote parent a ParentBased sampler keeps. The ratio is
+  earlier logs carry. Every kept span starts under a sampled remote parent, which a ParentBased
+  sampler keeps whatever its root ratio, so this ratio alone decides. The ratio is
   JOB_SPAN_SAMPLE_RATIO (0.1). Execution, retry, dead-letter and metrics are unchanged.
 
   @unit
@@ -64,7 +65,14 @@ Feature: A claimed job keeps its consumer span for 1 in 10 successes and every f
     And the error is rethrown
 
   @unit
-  Scenario: A handed-back job has a span carrying the hand-back, not an error
+  Scenario: A kept span survives a process sampler that samples no root
+    Given a job the sampler keeps
+    And a process sampler whose root ratio keeps nothing
+    When the job runs
+    Then its span is exported under a sampled remote parent
+
+  @unit
+  Scenario: A hand-back is not recorded on an unsampled job's span
     Given a first attempt the sampler leaves out
     When its handler hands it back, once and again
-    Then each hand-back exports a span with the exception and no error status
+    Then no span is exported, because a hand-back is not a failure

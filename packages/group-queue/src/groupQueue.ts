@@ -2154,9 +2154,11 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
           })
         : undefined;
 
-    // Before any write that can throw. A hand-back is no failure: an exception, no error status.
-    span.recordException(error);
-    if (handBack?.kind !== "hand-back") span.setStatus({ code: SpanStatusCode.ERROR });
+    // Before any write that can throw. A hand-back is no failure, so it leaves the span alone.
+    if (handBack?.kind !== "hand-back") {
+      span.recordException(error);
+      span.setStatus({ code: SpanStatusCode.ERROR });
+    }
 
     // The batch stores its fold state only once, at the very end, so a
     // failure means nothing was persisted for the drained siblings.
