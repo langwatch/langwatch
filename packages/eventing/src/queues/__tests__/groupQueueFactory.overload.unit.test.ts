@@ -59,7 +59,7 @@ describe("backOffWhenOverloaded", () => {
       expect(error).toBeInstanceOf(GroupQueueError);
       expect(error).toMatchObject({ retryable: true, cause });
       expectNoSlotWait(error);
-      expect(error).toMatchObject({ message: expect.stringContaining("code 202") });
+      expect(error).toMatchObject({ cause: { code: "202" } });
     });
 
     it("spreads the waits of jobs refused together", async () => {

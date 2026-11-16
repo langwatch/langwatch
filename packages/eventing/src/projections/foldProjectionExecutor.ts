@@ -75,6 +75,20 @@ function compareFoldEvents<State, E extends Event>(
 }
 
 /**
+ * Whether a re-fold may read history in key-ordered pages: only an order-insensitive fold that
+ * does not follow accepted order, since a page puts a later event before an earlier one.
+ */
+function readsKeyOrderedPages<State, E extends Event>(
+  projection: FoldProjectionDefinition<State, E>,
+): boolean {
+  return (
+    projection.eventLoaderUpToPaged !== undefined &&
+    projection.options?.refoldOnOutOfOrder === false &&
+    projection.options?.eventOrdering !== "acceptedAt"
+  );
+}
+
+/**
  * Whether an out-of-order event should replay history rather than apply on top of
  * loaded state. See `FoldProjectionOptions.refoldOnOutOfOrder` for the opt-out;
  * accepted-order folds never enter this path.
@@ -1020,7 +1034,7 @@ export class FoldProjectionExecutor {
     // the log can account for the key, and the rebuild retries until it does.
     const missedToken = appliedTokenOf(missed);
     const redeliversAppliedKey = missedToken !== missed.id && appliedEventIds.includes(missedToken);
-    if (projection.eventLoaderUpToPaged && projection.options?.refoldOnOutOfOrder === false) {
+    if (readsKeyOrderedPages(projection)) {
       return this.streamRebuild({
         projection,
         missed,
@@ -1468,7 +1482,7 @@ export class FoldProjectionExecutor {
     // Stream the re-fold page-by-page when order-insensitive and a paginated loader is
     // wired, bounding memory for a huge aggregate (100k+ events). Gated on
     // refoldOnOutOfOrder: false since paged results arrive in key order, not time order.
-    if (projection.eventLoaderUpToPaged && projection.options?.refoldOnOutOfOrder === false) {
+    if (readsKeyOrderedPages(projection)) {
       return this.streamRefoldUpToDelivered({ projection, delivered, context, upToEvent });
     }
 

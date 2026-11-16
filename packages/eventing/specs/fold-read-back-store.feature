@@ -76,7 +76,7 @@ Feature: Fold projections read back their own state
   Scenario: a coalesced batch takes the same path as a single event
     Given a fold that rebuilds its state from the event log when the store misses
     When a batch of events misses its state
-    Then the log is asked about the batch's earliest event
+    Then the log is asked about the batch's latest event, not counting the batch's other events as earlier
     And the batch folds from empty, waits whole or rebuilds exactly as a single event would
 
   Scenario: an out-of-order event is folded in place, not replayed

@@ -262,6 +262,7 @@ export class EventRepositoryMemory implements EventRepository {
     aggregateId,
     eventTimestamp,
     eventId,
+    occurredAtFromMs,
     ignoreEventIds = [],
   }: {
     tenantId: string;
@@ -273,7 +274,12 @@ export class EventRepositoryMemory implements EventRepository {
     ignoreEventIds?: readonly string[];
   }): Promise<EventLogProbe> {
     const key = `${tenantId}:${aggregateType}:${String(aggregateId)}`;
-    const records = this.eventsByKey.get(key) ?? [];
+    const hasLowerBound = typeof occurredAtFromMs === "number" && occurredAtFromMs > 0;
+    // The same lower bound as the ClickHouse probe; an unknown occurred time stays in.
+    const records = (this.eventsByKey.get(key) ?? []).filter(
+      (record) =>
+        !hasLowerBound || !record.EventOccurredAt || record.EventOccurredAt >= occurredAtFromMs,
+    );
     return {
       hasEvent: records.some((record) => record.EventId === eventId),
       hasEarlierEvents: records.some(

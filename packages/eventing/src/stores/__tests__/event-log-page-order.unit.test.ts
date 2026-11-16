@@ -44,6 +44,17 @@ describe("event log page order", () => {
     });
   });
 
+  describe("given keys whose UTF-16 order differs from their byte order", () => {
+    it("orders them as ClickHouse compares bytes: U+E000 before a supplementary character", () => {
+      const events = [ev("astral", 1, "\u{10000}"), ev("private-use", 2, "\uE000")];
+
+      expect(events.toSorted(compareEventLogPageOrder).map((e) => e.id)).toEqual([
+        "private-use",
+        "astral",
+      ]);
+    });
+  });
+
   describe("given a page a store handed back in arrival order", () => {
     it("resumes after its furthest event in page order, not its last element", () => {
       const page = [ev("e4", 4, "k1"), ev("e5", 5, "k0")];

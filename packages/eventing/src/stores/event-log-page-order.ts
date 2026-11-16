@@ -18,10 +18,30 @@ export function compareEventLogPagePositions(
   left: EventLogPageCursor,
   right: EventLogPageCursor,
 ): number {
-  const byKey = compareOrdinal(left.idempotencyKey, right.idempotencyKey);
+  const byKey = compareCodePoints(left.idempotencyKey, right.idempotencyKey);
   if (byKey !== 0) return byKey;
   if (left.timestamp !== right.timestamp) return left.timestamp - right.timestamp;
   return compareOrdinal(left.eventId, right.eventId);
+}
+
+/**
+ * Code point order, which is UTF-8 byte order and so ClickHouse's: UTF-16 order differs once a
+ * surrogate pair meets a unit from U+E000 to U+FFFF, so those units are shifted to match.
+ */
+function compareCodePoints(left: string, right: string): number {
+  const length = Math.min(left.length, right.length);
+  for (let index = 0; index < length; index++) {
+    const leftUnit = left.charCodeAt(index);
+    const rightUnit = right.charCodeAt(index);
+    if (leftUnit !== rightUnit) return codePointRank(leftUnit) - codePointRank(rightUnit);
+  }
+  return left.length - right.length;
+}
+
+/** A UTF-16 unit's rank in code point order: surrogates sort after U+E000 to U+FFFF. */
+function codePointRank(unit: number): number {
+  if (unit < 0xd800) return unit;
+  return unit >= 0xe000 ? unit - 0x800 : unit + 0x2000;
 }
 
 /** An event's place in page order. */

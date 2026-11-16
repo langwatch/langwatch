@@ -78,6 +78,7 @@ describe("FoldProjectionExecutor streaming store-miss re-fold", () => {
 
   function makeFold(
     loader: (ctx: Parameters<ReturnType<typeof pagedLoaderFrom>>[0]) => Promise<Event[]>,
+    eventOrdering?: "acceptedAt",
   ) {
     const store = createMockFoldProjectionStore<CountState>();
     (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({ kind: "empty" });
@@ -85,7 +86,7 @@ describe("FoldProjectionExecutor streaming store-miss re-fold", () => {
       store,
       init,
       apply,
-      options: { refoldOnStoreMiss: true, refoldOnOutOfOrder: false },
+      options: { refoldOnStoreMiss: true, refoldOnOutOfOrder: false, eventOrdering },
     });
     foldDef.eventLoaderUpToPaged = loader;
     // The unbounded array loader must NOT be used when the streaming path runs.
@@ -141,6 +142,21 @@ describe("FoldProjectionExecutor streaming store-miss re-fold", () => {
           timestamp: 4,
           eventId: "e4",
         });
+      });
+    });
+
+    describe("when the fold follows accepted order", () => {
+      it("reads its history in time order, never in key-ordered pages", async () => {
+        const history = [ev("e1", 1, "z"), ev("e2", 2, "a")];
+        const loader = pagedLoaderFrom(history);
+        const { foldDef } = makeFold(loader, "acceptedAt");
+        foldDef.eventLoaderUpTo = vi.fn().mockResolvedValue(history);
+        const executor = new FoldProjectionExecutor({ refoldPageSize: 1 });
+
+        const result = (await executor.execute(foldDef, history[1]!, context)) as CountState;
+
+        expect(loader).not.toHaveBeenCalled();
+        expect(result.ids).toEqual(["e1", "e2"]);
       });
     });
 

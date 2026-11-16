@@ -783,6 +783,16 @@ describe("isPermanentClickHouseError", () => {
       },
     );
 
+    it("retries when a network failure sits deeper beside the refusal", () => {
+      const parse = clickHouseServerError({ code: "6", type: "CANNOT_PARSE_TEXT", message: "bad" });
+      const reset = Object.assign(new Error("socket hang up"), { code: "ECONNRESET" });
+      const handled = new ClickHouseUnavailableError({
+        reasons: [parse, new Error("request failed", { cause: reset })],
+      });
+
+      expect(isPermanentClickHouseError(handled)).toBe(false);
+    });
+
     it("retries an overload even when a parse error rides beside it", () => {
       const shed = new ClickHouseOverloadedError({
         reasons: [
