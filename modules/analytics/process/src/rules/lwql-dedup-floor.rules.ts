@@ -24,7 +24,7 @@ export function baseViewName(relation: string): string {
   return relation.endsWith(FLOOR_SUFFIX) ? relation.slice(0, -FLOOR_SUFFIX.length) : relation;
 }
 
-/** The views whose twin is provisioned: in-tuple or settled ones that declare a floor column. */
+/** The views whose twin is provisioned: those of a floored strategy that declare a floor column. */
 function floorableViews(
   views: readonly LangWatchQLViewDefinition[],
 ): { name: string; floorColumn: string }[] {
@@ -72,6 +72,8 @@ const QUERY_CONSTANT_FUNCTIONS: ReadonlySet<string> = new Set([
   "multiply",
   "intdiv",
   "datediff",
+  "least",
+  "greatest",
   "fromunixtimestamp",
   "fromunixtimestamp64milli",
   ...["second", "minute", "hour", "day", "week", "month", "quarter", "year"].flatMap((unit) => [

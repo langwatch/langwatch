@@ -76,3 +76,32 @@ Feature: A read bounded below on evaluation_metrics.OccurredAt deduplicates only
     When the floored statement is refused for access
     Then the executor sends the statement as written once and returns its rows
     And a deployment that denies the view itself still refuses as provisioning incomplete
+
+  # Latest-in-order views (analytics ADR-006, amendment 2026-11-16): the caller's bound cannot
+  # reach the table through LIMIT 1 BY, so a widget read every version the tenant ever wrote.
+
+  @unit
+  Scenario: A read bounded below on a latest-in-order view's floor column reads its floored twin
+    Given a statement that reads traces or trace_metrics bounded below on OccurredAt, or evaluations bounded below on ScheduledAt
+    And a bound that takes the least of two query constants
+    When the executor sends it
+    Then it reads the view's floored twin from that bound
+
+  @unit
+  Scenario: A floored twin of a latest-in-order view reads the source from its bound before LIMIT 1 BY
+    Given traces, trace_metrics and evaluations, which declare a floor column
+    When their floored twins are provisioned
+    Then each twin reads its source table from the bound before it keeps one version per key
+    And a latest-in-order view that declares no floor column, such as simulations, gets no twin
+
+  @unit
+  Scenario: Every trace read of the changes and capability-gap stock queries reads its floored twin
+    Given the stock queries for model and prompt changes and for capability gaps
+    When the executor sends them
+    Then every read of traces and trace_metrics goes to its floored twin
+
+  @unit
+  Scenario: Every deduplicated view floors a bounded read or says why it cannot
+    Given every catalog view whose dedup strategy, the shipped default included, is not none
+    Then each declares a floor column with a floored twin, or is listed with the reason it takes none
+    And the list names only deduplicated views that declare no floor column

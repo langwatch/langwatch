@@ -3,13 +3,17 @@
  * A read bounded below on a view's floor column is sent to the floored view, and only then.
  * @see specs/lwql/dedup-floor.feature
  * @see modules/analytics/adrs/005-evaluation-metrics-dedup-floor.md
+ * @see modules/analytics/adrs/006-stock-widget-views-latest-in-order.md
  */
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-import { floorLangWatchQLDedup } from "../lwql-dedup-floor.rules.ts";
+import { LangWatchQLViewDedupService } from "../../features/provisioning/services/langwatch-ql-view-dedup.service.ts";
+import { SHIPPED_LWQL_DEDUP } from "../../features/provisioning/services/langwatch-ql-view-statements.service.ts";
+import { LangWatchQLCatalogShapesService } from "../../services/langwatch-ql-catalog-shapes.service.ts";
+import { floorLangWatchQLDedup, flooredViewNames } from "../lwql-dedup-floor.rules.ts";
 import { LWQL_VIEW_CATALOG } from "../lwql-view-catalog.rules.ts";
 
 const START = "{dashboard_context_period_start:DateTime}";
@@ -213,9 +217,135 @@ describe("given a statement that reads evaluation_metrics", () => {
 describe("given a view whose dedup declares no floor column", () => {
   /** @scenario "A read bounded on another column keeps the whole-history dedup" */
   it("sends a read bounded on its time column as written", () => {
-    const sql = `SELECT TraceId FROM trace_metrics WHERE OccurredAt >= ${START}`;
+    const sql = `SELECT ScenarioRunId FROM simulations WHERE StartedAt >= ${START}`;
 
     expect(send(sql)).toBe(sql);
+  });
+});
+
+describe("given a statement that reads a latest-in-order view", () => {
+  /** @scenario "A read bounded below on a latest-in-order view's floor column reads its floored twin" */
+  it.each([
+    ["traces", "OccurredAt"],
+    ["trace_metrics", "OccurredAt"],
+    ["evaluations", "ScheduledAt"],
+  ])("reads %s's floored twin from the bound on %s", (view, column) => {
+    expect(
+      send(`SELECT TraceId FROM ${view} WHERE ${column} >= ${START} AND ${column} < ${END}`),
+    ).toBe(
+      `SELECT TraceId FROM ${view}__floor(lwql_floor = ${floorOf(START)}) AS ${view} ` +
+        `WHERE ${column} >= ${START} AND ${column} < ${END}`,
+    );
+  });
+
+  /** @scenario "A read bounded below on a latest-in-order view's floor column reads its floored twin" */
+  it("floors a bound that takes the least of two query constants", () => {
+    const bound = `least(subtractDays(${START}, 1), subtractDays(${START}, 90))`;
+
+    expect(send(`SELECT 1 FROM trace_metrics WHERE OccurredAt >= ${bound}`)).toContain(
+      `trace_metrics__floor(lwql_floor = ${floorOf(bound)})`,
+    );
+  });
+
+  /** @scenario "Every trace read of the changes and capability-gap stock queries reads its floored twin" */
+  it.each(["ck-trend/changes", "ext-cost-per-doc/changes", "ck-top-ask/gap"])(
+    "sends every traces and trace_metrics read of %s to its floored twin",
+    (label) => {
+      const sql = stock.get(label) ?? "";
+      const reads = sql.match(/FROM (traces|trace_metrics)\b/g) ?? [];
+      const sent = send(sql);
+
+      expect(reads.length, label).toBeGreaterThan(0);
+      expect(sent.match(/FROM (traces|trace_metrics)__floor\(lwql_floor = /g), label).toHaveLength(
+        reads.length,
+      );
+    },
+  );
+});
+
+/**
+ * The deduplicated views that take no floor, and why. Every other one declares a floor column,
+ * so a new view cannot ship reading its whole history by accident (analytics ADR-006).
+ */
+const UNFLOORED: Readonly<Record<string, string>> = {
+  // FINAL keeps the caller's WHERE on the table read, so partitions prune without a twin.
+  spans: "FINAL: the caller's bound reaches the read",
+  coding_session_events: "FINAL: the caller's bound reaches the read",
+  coding_tool_results: "FINAL: the caller's bound reaches the read",
+  judgments: "FINAL: the caller's bound reaches the read",
+  // Rollups group on their key and supersede no version, so there is no dedup to floor.
+  trace_metrics_by_minute: "aggregating rollup: no version to floor",
+  model_usage_by_minute: "aggregating rollup: no version to floor",
+  evaluation_metrics_by_minute: "aggregating rollup: no version to floor",
+  gateway_budget_totals: "aggregating rollup: no version to floor",
+  simulation_metric_rollups: "aggregating rollup: no version to floor",
+  simulations: "StartedAt falls between versions: a run's queued row is stamped at fold time",
+  coding_sessions: "StartedAt is the minimum of the session's signals, so it falls (ADR-071)",
+  // A floor on these would be exact (time column in the dedup key, or the version itself).
+  experiment_items: "follow-up: floor on OccurredAt, the version column",
+  simulation_trace_metrics: "follow-up: floor on OccurredAt, the version column",
+  governance_daily_cost_rollup: "follow-up: Day is in the dedup key",
+  governance_hourly_kpis: "follow-up: HourBucket is in the dedup key",
+  langy_usage_events: "follow-up: OccurredAt is in the dedup key",
+  logs: "follow-up: TimeUnixMs is in the dedup key",
+  metric_points: "follow-up: TimeUnixMs is in the dedup key",
+  metric_rollups: "follow-up: BucketStart is in the dedup key",
+  metric_series_definitions: "follow-up: floor on LastSeenAt, the version column",
+  session_metrics: "follow-up: floor on AsOf, the version column",
+  // Whether the time column holds across a row's versions is not yet read from their writers.
+  experiment_run_results: "not analysed: StartedAt stability across versions",
+  gateway_request_spend: "not analysed: OccurredAt stability across versions",
+  billing_events: "not analysed: EventTimestamp stability across versions",
+  coding_trace_sessions: "not analysed: OccurredAt stability across versions",
+  dspy_optimizer_steps: "not analysed: CreatedAt stability across versions",
+  gateway_budget_ledger: "not analysed: OccurredAt stability across versions",
+  governance_cost_restatements: "not analysed: Day stability across versions",
+  governance_security_events: "not analysed: EventTime stability across versions",
+  langy_conversation_messages: "not analysed: CreatedAt stability across versions",
+  legacy_event_log: "not analysed: EventOccurredAt stability across versions",
+  legacy_log_records: "not analysed: TimeUnixMs stability across versions",
+  legacy_metric_records: "not analysed: TimeUnixMs stability across versions",
+  log_ingestion_usage: "not analysed: AcceptedAt stability across versions",
+  metric_ingestion_usage: "not analysed: AcceptedAt stability across versions",
+  objects: "not analysed: created_at stability across versions",
+  test_suite_runs: "not analysed: StartedAt stability across versions",
+};
+
+describe("given every view the catalog deduplicates", () => {
+  const catalogShapes = LangWatchQLCatalogShapesService.create();
+  const viewDedup = LangWatchQLViewDedupService.create();
+  // A PostgreSQL-resident view holds one row per key and renders no dedup.
+  const deduplicated = LWQL_VIEW_CATALOG.filter(
+    (view) =>
+      !catalogShapes.isPostgresResident(view) &&
+      viewDedup.strategyFor({ view, dedup: SHIPPED_LWQL_DEDUP }) !== "none",
+  );
+
+  /** @scenario "Every deduplicated view floors a bounded read or says why it cannot" */
+  it("declares a floor column on each, or lists it with the reason it takes none", () => {
+    const unexplained = deduplicated
+      .filter((view) => view.dedup.floorColumn === undefined && !(view.name in UNFLOORED))
+      .map((view) => view.name);
+
+    expect(unexplained).toEqual([]);
+  });
+
+  /** @scenario "Every deduplicated view floors a bounded read or says why it cannot" */
+  it("lists only deduplicated views that declare no floor column", () => {
+    const listed = new Set(
+      deduplicated.filter((view) => view.dedup.floorColumn === undefined).map(({ name }) => name),
+    );
+
+    expect(Object.keys(UNFLOORED).filter((name) => !listed.has(name))).toEqual([]);
+  });
+
+  /** @scenario "Every deduplicated view floors a bounded read or says why it cannot" */
+  it("provisions a floored twin for each view that declares a floor column", () => {
+    const floored = deduplicated.filter((view) => view.dedup.floorColumn !== undefined);
+
+    expect(floored.map((view) => flooredViewNames([view]).length)).toEqual(
+      floored.map(() => 1),
+    );
   });
 });
 

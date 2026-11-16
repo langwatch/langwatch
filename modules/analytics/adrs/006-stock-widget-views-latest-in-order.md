@@ -161,3 +161,40 @@ The stock evaluation widgets read `trace_evaluation_metrics` and `trace_evaluati
 `trace_evaluation_analytics`, a `VersionedCollapsingMergeTree` the trace fold writes with a
 retraction for every change. Those views take neither `FINAL` nor `LIMIT 1 BY` but the `settled`
 strategy: `GROUP BY` every column read, `HAVING sum(Sign) > 0` (ADR-007).
+
+## Amendment 2026-11-16: floored twins for traces, trace_metrics and evaluations
+
+`LIMIT 1 BY` stops the caller's `WHERE` from reaching the table: a local `EXPLAIN indexes = 1`
+of the changes and capability-gap stock queries shows `MinMax Condition: true` on every
+`trace_summaries` and `trace_analytics` read, so each widget reads the tenant's whole history
+(87 production queries hit the 1 GB cap in seven days). ADR-005's floored twin now covers
+`latest-in-order`: the twin's subquery reads `WHERE <floor column> >= {lwql_floor}` before its
+`ORDER BY ... LIMIT 1 BY`, and the executor's rewrite is unchanged. The bound may also call
+`least` and `greatest`, which the sources lookup bound uses (ADR-003).
+
+A twin returns exactly the view's rows at or after the bound when no newer version of a row has
+an earlier floor column than an older one (ADR-005, decision 2). Per view:
+
+- **`trace_metrics`, `OccurredAt`: exact by construction.** `OccurredAt` is in the `LIMIT 1 BY`
+  key, so the floor keeps or drops a key's versions together. A trace whose anchor moved keeps its
+  two rows in both.
+- **`traces`, `OccurredAt`: holds while the anchor is frozen.** `trace_summaries.OccurredAt` is the
+  ADR-087 storage anchor: frozen on the first contribution (`anchorStorageTime` returns once
+  `storageAnchorMs > 0`), read back from the row and written as `storageAnchorMs ?? CreatedAt`.
+  It can fall only on paths ADR-005 already names as risks: a fold that misses its stored row
+  outside the ±7-day read window (`trustAbsentMiss`) or a replay re-anchors on the event it meets
+  first; and rows written before the ADR-087 stamp (2026-08-06), whose `OccurredAt` was the
+  minimum span start, keep an older, later version only where the two sit in different weekly
+  partitions.
+- **`evaluations`, `ScheduledAt`: holds while the scheduled event folds first.** Only
+  `handleEvaluationScheduled` sets it; the row writes `scheduledAt ?? createdAt`, and `createdAt` is
+  the fold's clock when it first folds the run. A run whose start or result folded before its
+  scheduled event would have its `ScheduledAt` fall; the fold orders a run's events by accept
+  time, and the scheduler emits the scheduled event first. A replay moves it later, never earlier.
+
+Not floored: `simulations` (its row is stamped `StartedAt ?? CreatedAt`, the fold's clock, until
+the started event brings an earlier time; a snapshot before the started event does the same) and
+`coding_sessions` (`StartedAt` is the minimum of the session's signals, ADR-071). `spans` keeps
+`FINAL`, through which the caller's bound already reaches the read (`MinMax` on `StartTime`).
+`lwql-dedup-floor.rules.unit.test.ts` lists every deduplicated view without a floor and the reason,
+so a new one cannot ship reading its whole history unremarked.

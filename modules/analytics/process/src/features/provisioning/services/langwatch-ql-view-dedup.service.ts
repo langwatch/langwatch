@@ -111,14 +111,18 @@ export class LangWatchQLViewDedupService {
   /**
    * The `latest-in-order` relation (analytics ADR-006): the table read in sort-key order, newest
    * version first within each key, keeping one row per sort key and stable column. `LIMIT 1 BY`
-   * streams over the read-in-order merge of the parts, and a filter on a key column prunes.
+   * streams over the read-in-order merge of the parts. A floored twin reads only the versions
+   * from its bound, which the caller's own `WHERE` cannot reach through `LIMIT 1 BY`.
    */
   private latestInOrderRelation({
     view,
     relation,
+    floor,
   }: {
     view: LangWatchQLViewDefinition;
     relation: string;
+    /** The floored twin's lower bound on the floor column; absent, every version is read. */
+    floor?: string;
   }): string {
     const { versionColumn, tieBreakColumns = [], stableColumns = [] } = view.dedup;
     if (!versionColumn || view.dedup.aggregating || view.join) {
@@ -142,9 +146,15 @@ export class LangWatchQLViewDedupService {
     const newestFirst = [versionColumn, ...tieBreakColumns].map(
       (column) => `${sqlText.quotedColumn(column)} DESC`,
     );
+    const { floorColumn } = view.dedup;
+    const where =
+      floor === undefined || floorColumn === undefined
+        ? ""
+        : `  WHERE ${sqlText.quotedColumn(catalogShapes.physicalColumn(view, floorColumn))} >= ${floor}\n`;
     return (
       `(\n  SELECT ${columns.join(", ")}\n` +
       `  FROM ${relation}\n` +
+      where +
       `  ORDER BY ${[...keyColumns, ...newestFirst].join(", ")}\n` +
       `  LIMIT 1 BY ${keyColumns.join(", ")}\n` +
       `) AS ${LWQL_SOURCE_ALIAS}`
@@ -226,16 +236,22 @@ export class LangWatchQLViewDedupService {
     relation,
     strategy,
     engineDedup,
+    floor,
   }: {
     view: LangWatchQLViewDefinition;
     relation: string;
     strategy: LangWatchQLDedupStrategy;
     engineDedup: boolean;
+    /** The floored twin's lower bound, read by the strategies that take one. */
+    floor?: string;
   }): string {
     const aliased = `${relation} AS ${LWQL_SOURCE_ALIAS}`;
     if (!engineDedup) return aliased;
     if (strategy === "final") return `${aliased} FINAL`;
-    if (strategy === "latest-in-order") return this.latestInOrderRelation({ view, relation });
+    if (strategy === "latest-in-order") {
+      const floored = floor === undefined ? {} : { floor };
+      return this.latestInOrderRelation({ view, relation, ...floored });
+    }
     return aliased;
   }
 }

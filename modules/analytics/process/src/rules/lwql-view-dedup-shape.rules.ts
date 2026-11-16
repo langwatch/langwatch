@@ -14,6 +14,7 @@ export type LangWatchQLDedupStrategy =
 /** The strategies whose view gets a floored twin when its dedup declares a floor column. */
 export const FLOORED_DEDUP_STRATEGIES: ReadonlySet<LangWatchQLDedupStrategy> = new Set([
   "in-tuple",
+  "latest-in-order",
   "settled",
 ]);
 
@@ -52,9 +53,9 @@ export interface LangWatchQLViewDedup {
    */
   readonly signColumn?: string;
   /**
-   * An in-tuple dataset's column that never falls from one version of a row to the next, so a
-   * read bounded below on it may dedup from that bound alone (analytics ADR-005). Under
-   * `settled`, any column a retraction copies unchanged (analytics ADR-007).
+   * An in-tuple or latest-in-order dataset's column that never falls from one version of a row
+   * to the next, so a read bounded below on it may dedup from that bound alone (analytics
+   * ADR-005, ADR-006). Under `settled`, any column a retraction copies unchanged (ADR-007).
    */
   readonly floorColumn?: string;
 }
