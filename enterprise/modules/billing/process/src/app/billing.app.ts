@@ -672,9 +672,17 @@ export class BillingModule
   }): Promise<{ success: boolean }> {
     await this.#paymentRecovery?.assertSeatsNotHeld({
       organizationId: input.organizationId,
-      adding: async () => input.upgradeMembers,
+      // The seat drawer always sends upgradeMembers; only more seats than today are held.
+      adding: () => this.#addsSeats({ ...input, newTotalSeats: input.totalMembers }),
     });
     return this.#subscriptionDoor.subscriptions.updateSubscriptionItems(input);
+  }
+
+  async #addsSeats(input: { organizationId: string; newTotalSeats: number }): Promise<boolean> {
+    const current = await this.#subscriptionDoor.subscriptions.findLastNonCancelledSubscription(
+      input.organizationId,
+    );
+    return input.newTotalSeats > (current?.maxMembers ?? 0);
   }
 
   async createOrUpdateSubscription(input: {
@@ -712,12 +720,7 @@ export class BillingModule
   }): Promise<unknown> {
     await this.#paymentRecovery?.assertSeatsNotHeld({
       organizationId: input.organizationId,
-      adding: async () => {
-        const current = await this.#subscriptionDoor.subscriptions.findLastNonCancelledSubscription(
-          input.organizationId,
-        );
-        return input.newTotalSeats > (current?.maxMembers ?? 0);
-      },
+      adding: () => this.#addsSeats(input),
     });
     return this.#subscriptionDoor.subscriptions.previewProration(input);
   }

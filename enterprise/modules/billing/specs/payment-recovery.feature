@@ -190,7 +190,7 @@ Feature: A paid organization whose card fails is told, reminded, paused and rest
     Given an organization with an open recovery case
     When an admin buys more member seats or Developer seats
     Then the purchase is refused with "seats_held_for_payment"
-    And lowering the Developer seats still goes through
+    And lowering the member seats or the Developer seats still goes through
 
   @unit
   Scenario: While a payment is unpaid, pricing more seats names the failed payment
