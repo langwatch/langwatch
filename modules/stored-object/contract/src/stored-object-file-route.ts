@@ -89,7 +89,12 @@ export function parseStoredObjectFileReference(
   const [path = "", query = ""] = reference.slice(STORED_OBJECT_FILES_PREFIX.length).split(/[?#]/);
   const [first, second, third] = path.split("/");
   if (!first) return undefined;
-  const named = third ?? new URLSearchParams(query).get("filename");
+  const named =
+    third ??
+    query
+      .split("&")
+      .find((pair) => pair.startsWith("filename="))
+      ?.slice("filename=".length);
   const filename = named ? decodeURIComponent(named) : undefined;
 
   return second
