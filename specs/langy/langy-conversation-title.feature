@@ -95,6 +95,26 @@ Feature: Langy conversation titles are derived, then generated once by a cheap m
     Then the placeholder title is kept
     And nothing is raised, so the process outbox does not retry it
 
+  @regression
+  Scenario: A title model whose provider is missing or turned off is not retried
+    Given the title model's provider is not set up for the project, or is turned off
+    When the title is generated
+    Then the placeholder title is kept
+    And nothing is raised, so the process outbox does not retry it
+
+  @regression
+  Scenario: A title request the provider refuses outright is not retried
+    Given the provider refuses the title request with a client error such as a rejected key
+    When the title is generated
+    Then the placeholder title is kept
+    And nothing is raised, so the process outbox does not retry it
+
+  @unit
+  Scenario: A provider failure a retry could fix is still raised
+    Given the title model fails with a server error, a timeout or a rate limit
+    When the title is generated
+    Then the failure is raised so the process outbox retries it
+
   @unit
   Scenario: A conversation with nothing to read is not retried
     Given a conversation whose transcript holds no text

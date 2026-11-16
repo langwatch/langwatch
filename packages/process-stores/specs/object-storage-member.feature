@@ -113,3 +113,46 @@ Feature: The object-storage member
     Given object storage on Azure Blob
     When a key segment holds a space, "?", "#" or "%"
     Then the request and the signed URL name the blob with each segment percent-encoded
+
+  @integration
+  Scenario: An existence check asks for the object's headers and opens no body
+    Given object storage on S3
+    When a module asks whether an object exists
+    Then the member sends a HEAD request and never a GET
+    And it answers true for a held object and false for one S3 does not hold
+
+  @unit
+  Scenario: Azure and filesystem existence checks read no body
+    Given object storage on Azure Blob, or on the local filesystem
+    When a module asks whether an object exists
+    Then Azure sends a HEAD request and the filesystem reads only the file's metadata
+    And each answers true for a held object and false for an absent one
+    And a refusal other than absence fails the check instead of answering false
+
+  @integration
+  Scenario: A body a reader stops early gives its connection back
+    Given object storage on S3 with a pool of 50 sockets
+    When more readers than the pool holds open a body and stop before reading a byte
+    Then each reader's connection is closed
+    And a later read still gets a socket and answers
+
+  @integration
+  Scenario: An S3 request that gets no answer fails within the request timeout
+    Given an S3 client
+    When S3 accepts a request and never answers it
+    Then the request fails with a TimeoutError instead of holding its socket
+    And a download whose body keeps arriving, or an upload still being acknowledged, is not cut
+
+  @integration
+  Scenario: A body that stops arriving is cut after the idle limit
+    Given object storage on S3
+    When an object's headers arrive and its bytes then stop for longer than the idle limit
+    Then the read fails with a TimeoutError
+    And the connection is closed, so its socket returns to the pool
+
+  @integration
+  Scenario: An upload that stops moving is cut after the idle limit
+    Given an S3 client
+    When S3 stops taking an upload's bytes and never answers, for longer than the idle limit
+    Then the write fails with a TimeoutError
+    And the connection is closed, so its socket returns to the pool

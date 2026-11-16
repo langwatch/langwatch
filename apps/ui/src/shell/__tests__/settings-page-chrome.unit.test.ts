@@ -59,6 +59,7 @@ const everythingOpen = {
   isLiteMember: false,
   hasOpsAccess: true,
   isPlatformAdmin: true,
+  braidsEnabled: true,
 };
 
 describe("given every page the Settings menu can open", () => {

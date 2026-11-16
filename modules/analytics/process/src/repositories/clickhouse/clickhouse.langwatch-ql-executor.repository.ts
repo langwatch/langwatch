@@ -19,6 +19,7 @@ import {
 import { nowInstant } from "@langwatch/time";
 
 import { lwqlAppFunctionNames } from "../../features/app-functions/rules/langwatch-ql-app-function-catalog.rules.ts";
+import { bindLangWatchQLInstantParameters } from "../../rules/langwatch-ql-instant-parameters.rules.ts";
 import {
   withoutTenantCapability,
   withTenantCapability,
@@ -194,7 +195,9 @@ export class ClickHouseLangWatchQLExecutorRepository extends LangWatchQLExecutor
         // the `FORMAT` it reads the response in.
         query: statement,
         format: "JSON",
-        query_params: parameters as Record<string, unknown> | undefined,
+        query_params: parameters
+          ? { ...bindLangWatchQLInstantParameters({ sql: statement, parameters }) }
+          : undefined,
       });
       const response = await resultSet.json<Record<string, unknown>>();
       const rows = response.data;

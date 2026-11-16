@@ -259,7 +259,7 @@ Feature: Braided spans in the reader's traces
       When sam selects a braided span
       Then commenting, suggesting an edit and opening it in the playground are off, each saying why
       And a prompt it ran is listed as the owner's, with opening the prompt and the playground off
-      And the span says it is shown because it matches the braid's condition
+      And the span says it is shown because it matches the braid's condition, each matched condition on its own line as code
 
     @integration
     Scenario: Opening the owner project is offered only to someone who can open it

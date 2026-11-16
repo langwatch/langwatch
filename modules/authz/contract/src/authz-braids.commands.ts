@@ -4,6 +4,9 @@ import { z } from "zod";
 
 import { authzPrincipalRefSchema } from "./authz.ts";
 
+/** The release flag braid management sits behind; braids already made apply either way. */
+export const BRAIDS_FLAG = "release_braids";
+
 /** Whose permissions bound a braid is the session's, so a procedure's input never names it. */
 const sessionShape = { actor: ledgerActorSchema, caller: authzPrincipalRefSchema };
 

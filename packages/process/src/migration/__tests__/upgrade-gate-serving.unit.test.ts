@@ -69,10 +69,10 @@ describe("the upgrade gate of an api that upgrades", () => {
       });
 
       await hosted.start?.();
-      const page = await fetch(`http://127.0.0.1:${thread.address.port}/settings`, {
+      const page = await fetch(`http://localhost:${thread.address.port}/settings`, {
         headers: { Accept: "text/html" },
       });
-      const ingest = await fetch(`http://127.0.0.1:${thread.address.port}/api/otel/v1/traces`, {
+      const ingest = await fetch(`http://localhost:${thread.address.port}/api/otel/v1/traces`, {
         method: "POST",
         body: "spans",
       });

@@ -1,4 +1,5 @@
 export { AwsClientProcessRuntime } from "./process-runtime.ts";
+export { defaultS3Host, s3RegionOf } from "./s3-region.ts";
 export {
   findLwaPreludeSeparator,
   LWA_DEFAULT_STATUS,

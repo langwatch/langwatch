@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   adminMenu,
+  isSettingsMenuItemActive,
   isSettingsMenuItemActiveAmong,
   settingsMenu,
   type SettingsMenuGates,
@@ -23,6 +24,7 @@ const EVERYTHING_CLOSED: SettingsMenuGates = {
   isLiteMember: false,
   hasOpsAccess: false,
   isPlatformAdmin: false,
+  braidsEnabled: false,
 };
 
 function hrefsIn(gates: Partial<SettingsMenuGates>): string[] {
@@ -196,12 +198,7 @@ describe("given the People & access group", () => {
     it("offers Teams & projects right after Users, on the Users page's teams tab", () => {
       expect(
         accessHrefsIn({ hasOrganizationPermission: (p) => p === "organization:manage" }),
-      ).toEqual([
-        "/settings/directory",
-        "/settings/directory?tab=teams",
-        "/settings/roles",
-        "/settings/organization-braids",
-      ]);
+      ).toEqual(["/settings/directory", "/settings/directory?tab=teams", "/settings/roles"]);
     });
 
     /** @scenario "Teams & projects asks who may manage the organization the way its tab does" */
@@ -272,9 +269,32 @@ describe("given the People & access group", () => {
   });
 });
 
+describe("given release_braids is off for the organisation", () => {
+  describe("when the menu is built for an organisation admin on Enterprise", () => {
+    /** @scenario "With release_braids off the settings menu offers no Braids entry" */
+    it("offers no Braids entry, for the project page or the organisation page", () => {
+      const gates = {
+        enterprisePlan: "included",
+        hasPermission: () => true,
+        hasOrganizationPermission: () => true,
+      } as const;
+
+      expect(hrefsIn({ ...gates, braidsEnabled: true })).toContain("/settings/braids");
+      for (const href of ["/settings/braids", "/settings/organization-braids"]) {
+        expect(hrefsIn({ ...gates, braidsEnabled: false })).not.toContain(href);
+      }
+    });
+  });
+});
+
 describe("given a plan that lacks Enterprise", () => {
   function lockedHrefsIn(gates: Partial<SettingsMenuGates>): string[] {
-    return settingsMenu({ ...EVERYTHING_CLOSED, enterprisePlan: "locked", ...gates })
+    return settingsMenu({
+      ...EVERYTHING_CLOSED,
+      enterprisePlan: "locked",
+      braidsEnabled: true,
+      ...gates,
+    })
       .flatMap((group) => group.items)
       .filter((item) => item.isLocked)
       .map((item) => item.href);
@@ -285,12 +305,38 @@ describe("given a plan that lacks Enterprise", () => {
     it("offers the enterprise entries locked", () => {
       expect(
         lockedHrefsIn({ hasPermission: () => true, hasOrganizationPermission: () => true }),
-      ).toEqual([
-        "/settings/audit-log",
-        "/settings/roles",
-        "/settings/organization-braids",
-        "/settings/braids",
+      ).toEqual(["/settings/audit-log", "/settings/roles", "/settings/braids"]);
+    });
+
+    /** @scenario "A branded feature's entries wear its mark" */
+    it("offers Braids once, under Project, marked as the braids feature", () => {
+      const braids = settingsMenu({
+        ...EVERYTHING_CLOSED,
+        enterprisePlan: "locked",
+        braidsEnabled: true,
+        hasPermission: () => true,
+        hasOrganizationPermission: () => true,
+      })
+        .flatMap((group) => group.items)
+        .filter((item) => item.label === "Braids");
+      expect(braids.map((item) => [item.href, item.feature])).toEqual([
+        ["/settings/braids", "braids"],
       ]);
+    });
+
+    /** @scenario "The organization's braids page lights the one Braids entry" */
+    it("lights that one Braids entry on the organization's braids page", () => {
+      const items = settingsMenu({
+        ...EVERYTHING_CLOSED,
+        enterprisePlan: "locked",
+        braidsEnabled: true,
+        hasPermission: () => true,
+        hasOrganizationPermission: () => true,
+      }).flatMap((group) => group.items);
+      const lit = items.filter((item) =>
+        isSettingsMenuItemActive({ item, pathname: "/settings/organization-braids" }),
+      );
+      expect(lit.map((item) => item.href)).toEqual(["/settings/braids"]);
     });
 
     /** @scenario "A plan without Enterprise sees its entries locked" */

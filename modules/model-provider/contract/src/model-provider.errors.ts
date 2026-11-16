@@ -256,6 +256,53 @@ export class ModelExecutionUnavailableError extends HandledError {
   }
 }
 
+/**
+ * A named model whose provider this project has not added, or has turned off. Distinct from
+ * `model_provider_disabled`, which carries the cascade scope its swap toast reads.
+ */
+export class ModelProviderUnavailableError extends HandledError {
+  declare readonly code: "model_provider_unavailable";
+
+  constructor(input: { providerKey: string; reason: "not_configured" | "disabled" }) {
+    super(
+      "model_provider_unavailable",
+      input.reason === "disabled"
+        ? `Model provider "${input.providerKey}" is configured but disabled.`
+        : `Model provider "${input.providerKey}" is not configured for this project.`,
+      {
+        httpStatus: 400,
+        // The project's provider settings decide it: a settings change fixes it, no retry does.
+        fault: "customer",
+        meta: { reason: input.reason },
+        ...remediation("model_provider_unavailable"),
+      },
+    );
+    this.name = "ModelProviderUnavailableError";
+  }
+}
+
+/** Configuration refusals: the project's settings decide them, so no retry can succeed. */
+const PERMANENT_AI_CALL_CODES: ReadonlySet<string> = new Set([
+  "model_execution_unavailable",
+  "model_not_configured",
+  "model_provider_disabled",
+  "model_provider_unavailable",
+  "model_restricted_for_execution",
+  "model_restricted_for_feature",
+]);
+
+/**
+ * Whether an AI call failed for a reason no retry can fix: a configuration refusal, or a
+ * provider rejection (`ai_call_failed`, not retryable) anywhere in the reason chain.
+ */
+export function isPermanentAiCallFailure(error: unknown): boolean {
+  if (!HandledError.isHandled(error)) return false;
+  if (PERMANENT_AI_CALL_CODES.has(error.code)) return true;
+  if (error.code === "ai_call_failed" && !error.retryable) return true;
+
+  return error.reasons.some(isPermanentAiCallFailure);
+}
+
 export class ModelProviderNotFoundError extends HandledError {
   declare readonly code: "model_provider_not_found";
 
@@ -761,15 +808,23 @@ export class AiCallFailedError extends HandledError {
     role,
     featureDisplayName,
     originalErrorMessage,
+    retryable = true,
+    reasons,
   }: {
     featureKey: string;
     role: ModelRole;
     featureDisplayName: string;
     originalErrorMessage: string;
+    /** False when the provider refused the request itself (a 4xx): a retry gets the same answer. */
+    retryable?: boolean;
+    /** The wrapped failure, so a handled cause keeps its code on the chain. */
+    reasons?: readonly Error[];
   }) {
     super("ai_call_failed", `AI call failed for "${featureKey}".`, {
       httpStatus: 400,
       fault: "provider",
+      retryable,
+      ...(reasons ? { reasons } : {}),
       // Read by the missing-model/AI-failure toast surface. Carried on the
       // handled payload (not only on the legacy `data.cause` sidecar) so the
       // bespoke `aiCallFailedCause` block in `trpc.ts` can be deleted without

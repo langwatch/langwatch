@@ -339,6 +339,14 @@
 /api-reference/gateway-virtual-keys/revoke-virtual-key
 /api-reference/gateway-virtual-keys/rotate-virtual-key-secret
 /api-reference/gateway-virtual-keys/update-virtual-key
+/api-reference/governance-agent-registry/get-one-registry-agent
+/api-reference/governance-agent-registry/get-the-registry-as-an-ard-manifest
+/api-reference/governance-agent-registry/get-the-registry-s-json-schemas
+/api-reference/governance-agent-registry/list-one-registry-agent-s-versions
+/api-reference/governance-agent-registry/list-the-organisation-s-agent-registry
+/api-reference/governance-agent-registry/overview
+/api-reference/governance-agent-registry/read-the-registry-change-feed
+/api-reference/governance-agent-registry/search-the-registry-ard-search
 /api-reference/grants
 /api-reference/grants/change-a-grant-s-role
 /api-reference/grants/get-a-grant
@@ -694,6 +702,7 @@
 /features/querying-your-data
 /features/topic-clustering
 /features/webhooks
+/governance/agent-registry
 /guardrails/overview
 /guardrails/setting-up-guardrails
 /hybrid-setup

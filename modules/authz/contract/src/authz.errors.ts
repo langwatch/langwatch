@@ -608,6 +608,20 @@ export class BraidConditionLimitReachedError extends HandledError {
   }
 }
 
+/** A braid management call while `release_braids` is off; existing braids keep applying. */
+export class BraidsNotEnabledError extends HandledError {
+  declare readonly code: "braids_not_enabled";
+
+  constructor() {
+    super("braids_not_enabled", "Braids are not enabled for this organisation", {
+      httpStatus: 403,
+      fault: "customer",
+      ...remediation("braids_not_enabled"),
+    });
+    this.name = "BraidsNotEnabledError";
+  }
+}
+
 /** The change is durable but the epoch did not move; repeating it finishes (ADR-201 §8). */
 export class AuthzEpochBumpFailedError extends HandledError {
   declare readonly code: "authz_epoch_bump_failed";

@@ -214,6 +214,7 @@ import {
   type TraceDrawerReadInput,
   type TraceResourceInfoDto,
   type OwnedSpan,
+  type TraceAgentSeen,
 } from "@langwatch/trace-contract";
 import type { ConversationView } from "@langwatch/trace-contract/conversation";
 import type { z } from "zod";
@@ -376,6 +377,7 @@ import type {
   StoredTraceSpan,
   TraceViewRead,
 } from "../repositories/span-storage.repository.ts";
+import type { TraceAgentTrafficRepository } from "../repositories/trace-agent-traffic.repository.ts";
 import type { TraceAttributeSpendRepository } from "../repositories/trace-attribute-spend.repository.ts";
 import type { TraceAttributedRollupRepository } from "../repositories/trace-attributed-rollup.repository.ts";
 import type { TraceEvaluationRunsReadRepository } from "../repositories/trace-evaluation-runs.repository.ts";
@@ -1048,6 +1050,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     app.#attributeSpend = setup.repositories.attributeSpend;
     app.#attributedRollup = setup.repositories.attributedRollup;
     app.#usageCount = setup.repositories.usageCount;
+    app.#agentTraffic = setup.repositories.agentTraffic;
     app.#spanAnalyticsFloor = setup.repositories.spanAnalyticsFloor;
     app.#preconditionSamples = TracePreconditionSampleService.create({
       traces: app,
@@ -1087,6 +1090,7 @@ export class TraceModule implements TraceApi, CollectorApp {
       evaluations: setup.channels.evaluations,
       anchors: traceAnchors,
       commands,
+      logger: createLogger("langwatch:trace:evaluation-outcomes"),
     });
     app.#processing = TraceProcessingRuntimeAdapter.create({
       role,
@@ -1421,6 +1425,7 @@ export class TraceModule implements TraceApi, CollectorApp {
   #attributeSpend: TraceAttributeSpendRepository | null = null;
   #attributedRollup: TraceAttributedRollupRepository | null = null;
   #usageCount: TraceUsageCountRepository | null = null;
+  #agentTraffic: TraceAgentTrafficRepository | null = null;
   #spanAnalyticsFloor: SpanAnalyticsFloorRepository | null = null;
   #preconditionSamples: TracePreconditionSampleService | null = null;
 
@@ -1828,7 +1833,10 @@ export class TraceModule implements TraceApi, CollectorApp {
     const pageSize = await this.#boundedPageSize({
       projectId: input.query.projectId,
       pageSize: input.query.pageSize,
-      refuseAbove: input.options?.refuseAbove,
+      // A page with spans is buffered whole (an api pod OOM), so every spans read takes its bound.
+      refuseAbove: input.options?.includeSpans
+        ? "tracesWithSpansPageSizeMax"
+        : input.options?.refuseAbove,
     });
 
     return this.#contentReader.listTraces({
@@ -1843,7 +1851,7 @@ export class TraceModule implements TraceApi, CollectorApp {
       },
     });
   }
-  /** The tRPC reads refuse above their named plan bound; every other caller clamps. */
+  /** The tRPC reads and every spans read refuse above their plan bound; others clamp. */
   async #boundedPageSize({
     projectId,
     pageSize,
@@ -1851,8 +1859,11 @@ export class TraceModule implements TraceApi, CollectorApp {
   }: {
     projectId: string;
     pageSize: number | undefined;
-    refuseAbove: "tracesPageSizeMax" | "tracesDownloadPageSizeMax" | undefined;
+    refuseAbove: traceContractModule.TracePageSizeBound | undefined;
   }): Promise<number | undefined> {
+    if (refuseAbove === "tracesWithSpansPageSizeMax") {
+      return this.#readBounds.spansPageSize({ projectId, pageSize });
+    }
     if (pageSize === undefined) return undefined;
     if (refuseAbove === undefined) return this.#readBounds.clampPageSize(projectId, pageSize);
     await this.#readBounds.assertPageSizeWithinBound({ projectId, pageSize, bound: refuseAbove });
@@ -3475,6 +3486,21 @@ export class TraceModule implements TraceApi, CollectorApp {
       sinceMs: input.sinceMs,
       attribute: input.attribute,
       groupByKey: input.groupByKey,
+    });
+  }
+
+  findAgentsSeen(input: {
+    projectId: string;
+    sinceMs: number;
+    limit: number;
+  }): Promise<TraceAgentSeen[]> {
+    if (!this.#agentTraffic) {
+      throw new TraceCapabilityUnavailableError("this process", "the agent traffic read");
+    }
+    return this.#agentTraffic.findAgentsSeen({
+      tenantId: input.projectId,
+      sinceMs: input.sinceMs,
+      limit: input.limit,
     });
   }
 

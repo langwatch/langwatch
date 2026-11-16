@@ -983,13 +983,16 @@ describe("given datasets created before versioning", () => {
       name: "unreadable-once",
       slug: "unreadable-once",
       columnTypes: [{ name: "input", type: "string" }],
+      contentLayout: "postgres",
     });
     await repositories.records.createMany({
       datasetId: legacy.id,
       projectId: "project-0",
       entries: [{ id: "a", input: "x" }],
     });
-    vi.spyOn(repositories.records, "findPage").mockRejectedValueOnce(new Error("connection reset"));
+    const findPage = vi
+      .spyOn(repositories.records, "findPage")
+      .mockRejectedValueOnce(new Error("connection reset"));
 
     const { saved, checkpoint } = checkpointOf(null);
     await expect(
@@ -1001,6 +1004,7 @@ describe("given datasets created before versioning", () => {
       }),
     ).rejects.toThrow("datasets got no first version");
 
+    expect(findPage).toHaveBeenCalled();
     expect(saved).toEqual([]);
   });
 

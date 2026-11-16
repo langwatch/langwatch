@@ -135,6 +135,7 @@ describe("given two organizations whose presence settings were stored before the
         recordIntegrationMethodChosen: idle,
         recordPersonalWorkspaceProvisioned: idle,
         recordTraceSharingDisabled: idle,
+        recordDocsPlaygroundSessionsDisabled: idle,
         recordMemberDisabled: idle,
         recordMemberEnabled: idle,
         recordMemberRemoved: idle,

@@ -30,7 +30,19 @@
       "path": "../../role/contract/tsconfig.build.json"
     },
     {
+      "path": "../../project/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../project/client/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/module/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../../feature-flag/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/design-system/tsconfig.build.json"
@@ -52,9 +64,6 @@
     },
     {
       "path": "../../../packages/api/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/module/tsconfig.build.json"
     }
   ],
   // Dependencies the build does not import get no reference; tsconfig.test.json holds test-only ones (tsconfig-shape-codemod).

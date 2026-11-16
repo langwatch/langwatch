@@ -52,7 +52,7 @@ export function wrapperFlagsHelp(tool: string): string {
 }
 
 /** Single-quote a string for safe interpolation into a `sh -c` command. */
-const shellQuote = (s: string): string => `'${s.replace(/'/g, "'\\''")}'`;
+export const shellQuote = (s: string): string => `'${s.replace(/'/g, "'\\''")}'`;
 
 /**
  * The user's interactive shell when it is one whose aliases and functions the

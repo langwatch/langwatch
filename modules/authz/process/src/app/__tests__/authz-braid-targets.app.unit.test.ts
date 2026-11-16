@@ -12,6 +12,7 @@ import { MemoryAuthzGrantProjectionRepository } from "../../repositories/memory/
 import { MemoryAuthzReadRepository } from "../../repositories/memory/memory.authz-read.repository.ts";
 import { MemoryAuthzRepositories } from "../../repositories/memory/memory.authz.repositories.ts";
 import { AuthzModule, type AuthzSetup } from "../authz.app.ts";
+import { memoryAuthzChannels } from "./authz-channels.fixture.ts";
 
 const ORG = "org_acme";
 const SPECIALISTS = "proj_specialists";
@@ -36,6 +37,7 @@ function composeOver(
     },
     resources: { own: () => void 0, ownService: () => void 0 },
     secrets: createApiFixture<AuthzSetup["secrets"]>(),
+    channels: memoryAuthzChannels({ braidsReleasedFor: [ORG] }),
     repositories: {
       ...MemoryAuthzRepositories.create(),
       read,
@@ -147,8 +149,11 @@ describe("AuthzApi.listBraidTargets", () => {
         caller: { type: "user", id: "user_ana" },
       });
 
-      expect(batched).toHaveBeenCalledTimes(1);
-      expect(batched).toHaveBeenCalledWith({ projectIds: [SPECIALISTS, ...EVERY_PROJECT] });
+      // The release_braids gate reads the braid's own project first; the picker reads in one.
+      expect(batched.mock.calls).toEqual([
+        [{ projectIds: [SPECIALISTS] }],
+        [{ projectIds: [SPECIALISTS, ...EVERY_PROJECT] }],
+      ]);
       expect(single).not.toHaveBeenCalled();
     });
   });
@@ -168,8 +173,25 @@ describe("AuthzApi.listBraidTargets", () => {
     });
   });
 
+  describe("when braids are released for one organisation and not another", () => {
+    /** @scenario "release_braids is answered for each organisation on its own" */
+    it("answers for the released organisation's project and refuses the other's", async () => {
+      const app = composeOver(await organisation());
+      const caller = { type: "user", id: "user_ana" } as const;
+
+      await expect(
+        app.listBraidTargets({ projectId: SPECIALISTS, projectIds: [ORCHESTRATOR], caller }),
+      ).resolves.toEqual(expect.any(Array));
+      await expect(
+        app.listBraidTargets({ projectId: ELSEWHERE, projectIds: [], caller }),
+      ).rejects.toMatchObject({ code: "braids_not_enabled" });
+    });
+  });
+
   describe("when the braid's own project is unknown", () => {
-    it("offers nothing", async () => {
+    // No organisation answers release_braids for it, so the gate fails closed before listing.
+    /** @scenario "A project with no organisation is refused as braids not enabled" */
+    it("refuses as braids not enabled", async () => {
       const app = composeOver(await organisation());
 
       await expect(
@@ -178,7 +200,7 @@ describe("AuthzApi.listBraidTargets", () => {
           projectIds: EVERY_PROJECT,
           caller: { type: "user", id: "user_ana" },
         }),
-      ).resolves.toEqual([]);
+      ).rejects.toMatchObject({ code: "braids_not_enabled" });
     });
   });
 });

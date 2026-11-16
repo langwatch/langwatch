@@ -74,6 +74,20 @@ export interface LwqlClickHouseRows {
     readonly Branch: "String";
     readonly AiUnits: "Float64";
   };
+  readonly coding_agent_session_events_id_index: {
+    readonly TenantId: "String";
+    readonly SessionId: "String";
+    readonly FromAt: "SimpleAggregateFunction(min, DateTime64(3))";
+    readonly ToAt: "SimpleAggregateFunction(max, DateTime64(3))";
+    readonly _retention_days: "SimpleAggregateFunction(max, UInt16)";
+  };
+  readonly coding_agent_session_events_id_index_mv: {
+    readonly TenantId: "String";
+    readonly SessionId: "String";
+    readonly FromAt: "DateTime64(3)";
+    readonly ToAt: "DateTime64(3)";
+    readonly _retention_days: "UInt16";
+  };
   readonly coding_agent_sessions: {
     readonly TenantId: "String";
     readonly SessionId: "String";
@@ -175,12 +189,40 @@ export interface LwqlClickHouseRows {
     readonly Auxiliary: "Bool";
     readonly UsageByContext: "Array(Tuple(String, String, String, String, UInt64, UInt64, UInt64, UInt64, Float64))";
   };
+  readonly coding_agent_sessions_id_index: {
+    readonly TenantId: "String";
+    readonly SessionId: "String";
+    readonly FromAt: "SimpleAggregateFunction(min, DateTime64(3))";
+    readonly ToAt: "SimpleAggregateFunction(max, DateTime64(3))";
+    readonly _retention_days: "SimpleAggregateFunction(max, UInt16)";
+  };
+  readonly coding_agent_sessions_id_index_mv: {
+    readonly TenantId: "String";
+    readonly SessionId: "String";
+    readonly FromAt: "DateTime64(3)";
+    readonly ToAt: "DateTime64(3)";
+    readonly _retention_days: "UInt16";
+  };
   readonly coding_agent_trace_sessions: {
     readonly TenantId: "String";
     readonly TraceId: "String";
     readonly SessionId: "String";
     readonly OccurredAt: "DateTime64(3)";
     readonly UpdatedAt: "DateTime64(3)";
+    readonly _retention_days: "UInt16";
+  };
+  readonly coding_agent_trace_sessions_id_index: {
+    readonly TenantId: "String";
+    readonly TraceId: "String";
+    readonly FromAt: "SimpleAggregateFunction(min, DateTime64(3))";
+    readonly ToAt: "SimpleAggregateFunction(max, DateTime64(3))";
+    readonly _retention_days: "SimpleAggregateFunction(max, UInt16)";
+  };
+  readonly coding_agent_trace_sessions_id_index_mv: {
+    readonly TenantId: "String";
+    readonly TraceId: "String";
+    readonly FromAt: "DateTime64(3)";
+    readonly ToAt: "DateTime64(3)";
     readonly _retention_days: "UInt16";
   };
   readonly dspy_steps: {
@@ -205,6 +247,22 @@ export interface LwqlClickHouseRows {
     readonly UpdatedAt: "DateTime64(3)";
     readonly _retention_days: "UInt16";
     readonly _size_bytes: "UInt32";
+  };
+  readonly dspy_steps_id_index: {
+    readonly TenantId: "String";
+    readonly ExperimentId: "String";
+    readonly RunId: "String";
+    readonly FromAt: "SimpleAggregateFunction(min, DateTime64(3))";
+    readonly ToAt: "SimpleAggregateFunction(max, DateTime64(3))";
+    readonly _retention_days: "SimpleAggregateFunction(max, UInt16)";
+  };
+  readonly dspy_steps_id_index_mv: {
+    readonly TenantId: "String";
+    readonly ExperimentId: "String";
+    readonly RunId: "String";
+    readonly FromAt: "DateTime64(3)";
+    readonly ToAt: "DateTime64(3)";
+    readonly _retention_days: "UInt16";
   };
   readonly evaluation_analytics: {
     readonly TenantId: "String";
@@ -234,6 +292,20 @@ export interface LwqlClickHouseRows {
     readonly StartedAt: "UInt64";
     readonly CompletedAt: "UInt64";
     readonly AppliedEventIds: "Array(String)";
+  };
+  readonly evaluation_analytics_id_index: {
+    readonly TenantId: "String";
+    readonly EvaluationId: "String";
+    readonly FromAt: "SimpleAggregateFunction(min, DateTime64(3))";
+    readonly ToAt: "SimpleAggregateFunction(max, DateTime64(3))";
+    readonly _retention_days: "SimpleAggregateFunction(max, UInt16)";
+  };
+  readonly evaluation_analytics_id_index_mv: {
+    readonly TenantId: "String";
+    readonly EvaluationId: "String";
+    readonly FromAt: "DateTime64(3)";
+    readonly ToAt: "DateTime64(3)";
+    readonly _retention_days: "UInt16";
   };
   readonly evaluation_analytics_rollup: {
     readonly TenantId: "String";
@@ -285,6 +357,39 @@ export interface LwqlClickHouseRows {
     readonly LastEventOccurredAt: "DateTime64(3)";
     readonly _retention_days: "UInt16";
     readonly _size_bytes: "UInt32";
+    readonly IdLayout: "LowCardinality(Nullable(String))";
+  };
+  readonly evaluation_runs_by_trace_id_index: {
+    readonly TenantId: "String";
+    readonly TraceId: "String";
+    readonly FromAt: "SimpleAggregateFunction(min, DateTime64(3))";
+    readonly ToAt: "SimpleAggregateFunction(max, DateTime64(3))";
+    readonly RetainAt: "SimpleAggregateFunction(max, DateTime64(3))";
+    readonly _retention_days: "SimpleAggregateFunction(max, UInt16)";
+  };
+  readonly evaluation_runs_by_trace_id_index_mv: {
+    readonly TenantId: "String";
+    readonly TraceId: "String";
+    readonly FromAt: "DateTime64(3)";
+    readonly ToAt: "DateTime64(3)";
+    readonly RetainAt: "DateTime64(3)";
+    readonly _retention_days: "UInt16";
+  };
+  readonly evaluation_runs_id_index: {
+    readonly TenantId: "String";
+    readonly EvaluationId: "String";
+    readonly FromAt: "SimpleAggregateFunction(min, DateTime64(3))";
+    readonly ToAt: "SimpleAggregateFunction(max, DateTime64(3))";
+    readonly RetainAt: "SimpleAggregateFunction(max, DateTime64(3))";
+    readonly _retention_days: "SimpleAggregateFunction(max, UInt16)";
+  };
+  readonly evaluation_runs_id_index_mv: {
+    readonly TenantId: "String";
+    readonly EvaluationId: "String";
+    readonly FromAt: "DateTime64(3)";
+    readonly ToAt: "DateTime64(3)";
+    readonly RetainAt: "DateTime64(3)";
+    readonly _retention_days: "UInt16";
   };
   readonly event_log: {
     readonly TenantId: "String";
@@ -301,6 +406,22 @@ export interface LwqlClickHouseRows {
     readonly EventOccurredAt: "UInt64";
     readonly _retention_days: "UInt16";
     readonly _size_bytes: "UInt32";
+  };
+  readonly event_log_id_index: {
+    readonly TenantId: "String";
+    readonly AggregateType: "LowCardinality(String)";
+    readonly AggregateId: "String";
+    readonly FromAt: "SimpleAggregateFunction(min, UInt64)";
+    readonly ToAt: "SimpleAggregateFunction(max, UInt64)";
+    readonly _retention_days: "SimpleAggregateFunction(max, UInt16)";
+  };
+  readonly event_log_id_index_mv: {
+    readonly TenantId: "String";
+    readonly AggregateType: "LowCardinality(String)";
+    readonly AggregateId: "String";
+    readonly FromAt: "UInt64";
+    readonly ToAt: "UInt64";
+    readonly _retention_days: "UInt16";
   };
   readonly experiment_run_items: {
     readonly ProjectionId: "String";
@@ -366,6 +487,34 @@ export interface LwqlClickHouseRows {
     readonly ExpectedEvaluatorResults: "Nullable(UInt32)";
     readonly Concurrency: "Nullable(UInt16)";
   };
+  readonly experiment_runs_by_experiment_id_index: {
+    readonly TenantId: "String";
+    readonly ExperimentId: "String";
+    readonly FromAt: "SimpleAggregateFunction(min, DateTime64(3))";
+    readonly ToAt: "SimpleAggregateFunction(max, DateTime64(3))";
+    readonly _retention_days: "SimpleAggregateFunction(max, UInt16)";
+  };
+  readonly experiment_runs_by_experiment_id_index_mv: {
+    readonly TenantId: "String";
+    readonly ExperimentId: "String";
+    readonly FromAt: "DateTime64(3)";
+    readonly ToAt: "DateTime64(3)";
+    readonly _retention_days: "UInt16";
+  };
+  readonly experiment_runs_id_index: {
+    readonly TenantId: "String";
+    readonly RunId: "String";
+    readonly FromAt: "SimpleAggregateFunction(min, DateTime64(3))";
+    readonly ToAt: "SimpleAggregateFunction(max, DateTime64(3))";
+    readonly _retention_days: "SimpleAggregateFunction(max, UInt16)";
+  };
+  readonly experiment_runs_id_index_mv: {
+    readonly TenantId: "String";
+    readonly RunId: "String";
+    readonly FromAt: "DateTime64(3)";
+    readonly ToAt: "DateTime64(3)";
+    readonly _retention_days: "UInt16";
+  };
   readonly gateway_budget_ledger_events: {
     readonly TenantId: "String";
     readonly BudgetId: "String";
@@ -389,6 +538,20 @@ export interface LwqlClickHouseRows {
     readonly EventTimestamp: "UInt64";
     readonly ProviderKey: "String";
     readonly AmountNanoUSD: "Int64";
+  };
+  readonly gateway_budget_ledger_events_id_index: {
+    readonly TenantId: "String";
+    readonly GatewayRequestId: "String";
+    readonly FromAt: "SimpleAggregateFunction(min, DateTime64(3))";
+    readonly ToAt: "SimpleAggregateFunction(max, DateTime64(3))";
+    readonly _retention_days: "SimpleAggregateFunction(max, UInt16)";
+  };
+  readonly gateway_budget_ledger_events_id_index_mv: {
+    readonly TenantId: "String";
+    readonly GatewayRequestId: "String";
+    readonly FromAt: "DateTime64(3)";
+    readonly ToAt: "DateTime64(3)";
+    readonly _retention_days: "UInt16";
   };
   readonly gateway_budget_scope_totals: {
     readonly TenantId: "String";
@@ -464,6 +627,20 @@ export interface LwqlClickHouseRows {
     readonly TokensOutputImage: "UInt64";
     readonly ImageCount: "UInt64";
     readonly WebSearchRequests: "UInt64";
+  };
+  readonly gateway_spend_id_index: {
+    readonly TenantId: "String";
+    readonly GatewayRequestId: "String";
+    readonly FromAt: "SimpleAggregateFunction(min, DateTime64(3))";
+    readonly ToAt: "SimpleAggregateFunction(max, DateTime64(3))";
+    readonly _retention_days: "SimpleAggregateFunction(max, UInt16)";
+  };
+  readonly gateway_spend_id_index_mv: {
+    readonly TenantId: "String";
+    readonly GatewayRequestId: "String";
+    readonly FromAt: "DateTime64(3)";
+    readonly ToAt: "DateTime64(3)";
+    readonly _retention_days: "UInt16";
   };
   readonly goose_db_version: {
     readonly version_id: "Int64";
@@ -926,6 +1103,48 @@ export interface LwqlClickHouseRows {
     readonly "Criteria.Status": "Array(LowCardinality(String))";
     readonly "Criteria.Reasoning": "Array(String)";
   };
+  readonly simulation_runs_by_batch_run_id_index: {
+    readonly TenantId: "String";
+    readonly BatchRunId: "String";
+    readonly FromAt: "SimpleAggregateFunction(min, DateTime64(3))";
+    readonly ToAt: "SimpleAggregateFunction(max, DateTime64(3))";
+    readonly _retention_days: "SimpleAggregateFunction(max, UInt16)";
+  };
+  readonly simulation_runs_by_batch_run_id_index_mv: {
+    readonly TenantId: "String";
+    readonly BatchRunId: "String";
+    readonly FromAt: "DateTime64(3)";
+    readonly ToAt: "DateTime64(3)";
+    readonly _retention_days: "UInt16";
+  };
+  readonly simulation_runs_by_scenario_set_id_index: {
+    readonly TenantId: "String";
+    readonly ScenarioSetId: "String";
+    readonly FromAt: "SimpleAggregateFunction(min, DateTime64(3))";
+    readonly ToAt: "SimpleAggregateFunction(max, DateTime64(3))";
+    readonly _retention_days: "SimpleAggregateFunction(max, UInt16)";
+  };
+  readonly simulation_runs_by_scenario_set_id_index_mv: {
+    readonly TenantId: "String";
+    readonly ScenarioSetId: "String";
+    readonly FromAt: "DateTime64(3)";
+    readonly ToAt: "DateTime64(3)";
+    readonly _retention_days: "UInt16";
+  };
+  readonly simulation_runs_id_index: {
+    readonly TenantId: "String";
+    readonly ScenarioRunId: "String";
+    readonly FromAt: "SimpleAggregateFunction(min, DateTime64(3))";
+    readonly ToAt: "SimpleAggregateFunction(max, DateTime64(3))";
+    readonly _retention_days: "SimpleAggregateFunction(max, UInt16)";
+  };
+  readonly simulation_runs_id_index_mv: {
+    readonly TenantId: "String";
+    readonly ScenarioRunId: "String";
+    readonly FromAt: "DateTime64(3)";
+    readonly ToAt: "DateTime64(3)";
+    readonly _retention_days: "UInt16";
+  };
   readonly span_analytics: {
     readonly TenantId: "String";
     readonly TraceId: "String";
@@ -1031,6 +1250,21 @@ export interface LwqlClickHouseRows {
     readonly UpdatedAt: "DateTime64(3)";
     readonly _retention_days: "UInt16";
     readonly _size_bytes: "UInt32";
+    readonly IdLayout: "LowCardinality(Nullable(String))";
+  };
+  readonly stored_spans_id_index: {
+    readonly TenantId: "String";
+    readonly TraceId: "String";
+    readonly FromAt: "SimpleAggregateFunction(min, DateTime64(3))";
+    readonly ToAt: "SimpleAggregateFunction(max, DateTime64(3))";
+    readonly _retention_days: "SimpleAggregateFunction(max, UInt16)";
+  };
+  readonly stored_spans_id_index_mv: {
+    readonly TenantId: "String";
+    readonly TraceId: "String";
+    readonly FromAt: "DateTime64(3)";
+    readonly ToAt: "DateTime64(3)";
+    readonly _retention_days: "UInt16";
   };
   readonly suite_runs: {
     readonly ProjectionId: "String";
@@ -1056,6 +1290,20 @@ export interface LwqlClickHouseRows {
     readonly LastEventOccurredAt: "DateTime64(3)";
     readonly _retention_days: "UInt16";
     readonly _size_bytes: "UInt32";
+  };
+  readonly suite_runs_id_index: {
+    readonly TenantId: "String";
+    readonly BatchRunId: "String";
+    readonly FromAt: "SimpleAggregateFunction(min, DateTime64(3))";
+    readonly ToAt: "SimpleAggregateFunction(max, DateTime64(3))";
+    readonly _retention_days: "SimpleAggregateFunction(max, UInt16)";
+  };
+  readonly suite_runs_id_index_mv: {
+    readonly TenantId: "String";
+    readonly BatchRunId: "String";
+    readonly FromAt: "DateTime64(3)";
+    readonly ToAt: "DateTime64(3)";
+    readonly _retention_days: "UInt16";
   };
   readonly trace_analytics: {
     readonly TenantId: "String";
@@ -1112,6 +1360,20 @@ export interface LwqlClickHouseRows {
     readonly MetadataEnvironment: "String";
     readonly EvaluationOutcomes: "String";
     readonly EvaluationRowsDigest: "String";
+  };
+  readonly trace_analytics_id_index: {
+    readonly TenantId: "String";
+    readonly TraceId: "String";
+    readonly FromAt: "SimpleAggregateFunction(min, DateTime64(3))";
+    readonly ToAt: "SimpleAggregateFunction(max, DateTime64(3))";
+    readonly _retention_days: "SimpleAggregateFunction(max, UInt16)";
+  };
+  readonly trace_analytics_id_index_mv: {
+    readonly TenantId: "String";
+    readonly TraceId: "String";
+    readonly FromAt: "DateTime64(3)";
+    readonly ToAt: "DateTime64(3)";
+    readonly _retention_days: "UInt16";
   };
   readonly trace_analytics_rollup: {
     readonly TenantId: "String";
@@ -1211,6 +1473,21 @@ export interface LwqlClickHouseRows {
     readonly _retention_days: "UInt16";
     readonly _size_bytes: "UInt32";
     readonly EarliestSpanStartMs: "UInt64";
+    readonly IdLayout: "LowCardinality(Nullable(String))";
+  };
+  readonly trace_summaries_id_index: {
+    readonly TenantId: "String";
+    readonly TraceId: "String";
+    readonly FromAt: "SimpleAggregateFunction(min, DateTime64(3))";
+    readonly ToAt: "SimpleAggregateFunction(max, DateTime64(3))";
+    readonly _retention_days: "SimpleAggregateFunction(max, UInt16)";
+  };
+  readonly trace_summaries_id_index_mv: {
+    readonly TenantId: "String";
+    readonly TraceId: "String";
+    readonly FromAt: "DateTime64(3)";
+    readonly ToAt: "DateTime64(3)";
+    readonly _retention_days: "UInt16";
   };
   readonly usage_trace_meter: {
     readonly OrganizationId: "String";

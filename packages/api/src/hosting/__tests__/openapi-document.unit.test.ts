@@ -45,6 +45,28 @@ describe("given a REST app with one documented route", () => {
   });
 });
 
+describe("given a route whose last path segment has a dot", () => {
+  const restApp = new Hono();
+  restApp.get(
+    "/api/registry/ard.json",
+    describeRoute({
+      summary: "Get the manifest",
+      operationId: "getManifest",
+      responses: { 200: { description: "ok" } },
+    }),
+    (context) => context.json({ entries: [] }),
+  );
+
+  const root = new Hono();
+  root.get("/api/openapi.json", openapiDocumentRoute(restApp));
+
+  it("documents it like any other route rather than skipping it as a static file", async () => {
+    const document = await (await root.request("/api/openapi.json")).json();
+
+    expect(document.paths["/api/registry/ard.json"]?.get?.operationId).toBe("getManifest");
+  });
+});
+
 describe("given a route whose schema carries a recursive definition", () => {
   const restApp = new Hono();
   restApp.get(
