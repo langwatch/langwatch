@@ -89,6 +89,73 @@ describe("given a statement that calls no app function", () => {
   });
 });
 
+/** As ClickHouse refuses a FROM naming a parameterised view that does not exist. */
+const unknownTableFunction = (name: string) =>
+  Object.assign(
+    new Error(`Code: 46. DB::Exception: Unknown table function ${name}. (UNKNOWN_FUNCTION)`),
+    { code: "46", type: "UNKNOWN_FUNCTION" },
+  );
+
+const FLOORED_READ =
+  "SELECT count() AS n FROM analytics.trace_metrics__floor(lwql_floor = " +
+  "toTimeZone(toDateTime64((subtractDays(now(), 7)), 3), timezone())) AS trace_metrics " +
+  "WHERE OccurredAt >= subtractDays(now(), 7)";
+
+describe("given a floored statement on a deployment whose twin is not provisioned yet", () => {
+  describe("when the server reports the twin as an unknown table function", () => {
+    /** @scenario "A twin the server reports as an unknown table function is unavailable" */
+    it("refuses with lwql_unavailable, so the floor sends the statement as written", async () => {
+      queryMock.mockRejectedValueOnce(unknownTableFunction("analytics.trace_metrics__floor"));
+
+      expect((await refusalOf(FLOORED_READ)).code).toBe("lwql_unavailable");
+    });
+  });
+});
+
+/** The driver's error passed through untranslated, as an unmapped code 46 always was. */
+const UNMAPPED_UNKNOWN_FUNCTION = { code: "46", fault: undefined, httpStatus: undefined };
+
+describe("given an unknown function that is not a floored twin", () => {
+  describe("when a statement reading no twin names an unknown table function", () => {
+    /** @scenario "A twin the server reports as an unknown table function is unavailable" */
+    it("passes the driver's error through, as before", async () => {
+      queryMock.mockRejectedValueOnce(unknownTableFunction("nosuchtf"));
+
+      expect(await refusalOf("SELECT 1 FROM nosuchtf(1)")).toEqual(UNMAPPED_UNKNOWN_FUNCTION);
+    });
+  });
+
+  describe("when a floored statement calls a native function the server lacks", () => {
+    /** @scenario "A twin the server reports as an unknown table function is unavailable" */
+    it("passes the driver's error through, though the quoted statement names the twin", async () => {
+      const sql = FLOORED_READ.replace("count() AS n", "nosuchfn(1) AS n");
+      queryMock.mockRejectedValueOnce(
+        Object.assign(
+          new Error(
+            `Code: 46. DB::Exception: Function with name \`nosuchfn\` does not exist. In scope ${sql}. (UNKNOWN_FUNCTION)`,
+          ),
+          { code: "46", type: "UNKNOWN_FUNCTION" },
+        ),
+      );
+
+      expect(await refusalOf(sql)).toEqual(UNMAPPED_UNKNOWN_FUNCTION);
+    });
+  });
+
+  describe("when an app function is unknown in a statement that also reads a twin", () => {
+    /** @scenario "A twin the server reports as an unknown table function is unavailable" */
+    it("still refuses with lwql_app_function_unavailable", async () => {
+      queryMock.mockRejectedValueOnce(unknownFunction());
+
+      const refusal = await refusalOf(
+        FLOORED_READ.replace("count() AS n", "conversation(ConversationId) AS transcript"),
+      );
+
+      expect(refusal.code).toBe("lwql_app_function_unavailable");
+    });
+  });
+});
+
 describe("given the LangWatchQL identity is running as many statements as it may", () => {
   describe("when the server refuses one more", () => {
     /** @scenario "A busy query service is a named, retryable refusal" */

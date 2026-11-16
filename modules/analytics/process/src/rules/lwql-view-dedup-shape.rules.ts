@@ -38,8 +38,9 @@ export interface LangWatchQLViewDedup {
    */
   readonly tieBreakColumns?: readonly string[];
   /**
-   * Under `latest-in-order`: source columns no version of a row changes, grouped beside the sort
-   * key so a caller's range on them reaches the table's partition and primary key (ADR-006).
+   * Under `latest-in-order`: source columns no version of a row changes, kept beside the sort key
+   * in the subquery's order and `LIMIT 1 BY`. A caller's range on them does not prune through
+   * `LIMIT 1 BY`; only a floored twin's bound, read inside the subquery, does (ADR-006).
    */
   readonly stableColumns?: readonly string[];
   /**

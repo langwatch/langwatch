@@ -19,9 +19,14 @@ export function flooredViewName(view: string): string {
   return `${view}${FLOOR_SUFFIX}`;
 }
 
+/** Whether `relation`, bare or database-qualified, names a floored twin. */
+export function isFlooredViewName(relation: string): boolean {
+  return relation.endsWith(FLOOR_SUFFIX);
+}
+
 /** The view a floored twin is cut from (whose columns it carries), else `relation` itself. */
 export function baseViewName(relation: string): string {
-  return relation.endsWith(FLOOR_SUFFIX) ? relation.slice(0, -FLOOR_SUFFIX.length) : relation;
+  return isFlooredViewName(relation) ? relation.slice(0, -FLOOR_SUFFIX.length) : relation;
 }
 
 /** The views whose twin is provisioned: those of a floored strategy that declare a floor column. */

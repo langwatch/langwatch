@@ -66,9 +66,27 @@ Feature: A read bounded below on evaluation_metrics.OccurredAt deduplicates only
   @unit
   Scenario: A read the twin cannot answer yet is sent as written
     Given a deployment where evaluation_metrics__floor is not provisioned yet
-    When the floored statement is refused as unavailable
+    When the floored statement is refused as unavailable, which a missing twin maps to
     Then the executor sends the statement as written and returns its rows
     And a deployment missing the view itself still refuses as unavailable
+
+  @unit
+  Scenario: A twin the server reports as an unknown table function is unavailable
+    Given a floored statement on a deployment where the twin is not provisioned yet
+    When ClickHouse refuses it with UNKNOWN_FUNCTION naming the twin as an unknown table function
+    Then the executor refuses it as unavailable, so the floor sends the statement as written
+    And an unknown table function that is not a twin the statement reads keeps its old refusal
+    And an unknown native function in a floored statement keeps its old refusal
+    And an unknown app function in a floored statement still refuses as app function unavailable
+
+  @integration
+  Scenario: A dated widget read on a deployment missing its floored twin answers as written
+    Given the stock spend widget, which reads trace_metrics bounded to the board's period
+    And a deployment where trace_metrics__floor exists, and then one where it was never provisioned
+    When the widget is read through the shipped executor on each
+    Then the first reads the twin, the second is sent as written after the twin is refused
+    And both return the rows and completeness total the statement returns as written
+    And the floored read on its own is refused as unavailable over ClickHouse's UNKNOWN_FUNCTION (46)
 
   @unit
   Scenario: A read the twin's grant does not cover yet is sent as written
@@ -100,6 +118,14 @@ Feature: A read bounded below on evaluation_metrics.OccurredAt deduplicates only
     When their floored twins are provisioned
     Then each twin reads its source table from the bound before it keeps one version per key
     And a latest-in-order view that declares no floor column, such as traces or simulations, gets no twin
+
+  @unit
+  Scenario: A completeness report on a floored view reads its floored twin
+    Given a windowed statement over trace_metrics, which declares a floor column
+    When the completeness report beside it is read
+    Then it reads trace_metrics__floor from the window's start, and keeps the range from start to end
+    And when the twin is not provisioned yet it is read as written and still reports
+    And a report over traces, which has no floored twin, is read as written
 
   @unit
   Scenario: Every trace_metrics read of the changes and capability-gap stock queries reads its floored twin
