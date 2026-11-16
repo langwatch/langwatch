@@ -78591,6 +78591,9 @@
                                         "string",
                                         "null"
                                       ]
+                                    },
+                                    "alreadyStopped": {
+                                      "type": "boolean"
                                     }
                                   },
                                   "required": [
@@ -79800,6 +79803,9 @@
                                         "string",
                                         "null"
                                       ]
+                                    },
+                                    "alreadyStopped": {
+                                      "type": "boolean"
                                     }
                                   },
                                   "required": [
@@ -83996,6 +84002,9 @@
                                   "string",
                                   "null"
                                 ]
+                              },
+                              "alreadyStopped": {
+                                "type": "boolean"
                               }
                             },
                             "required": [
@@ -84840,6 +84849,9 @@
                                   "string",
                                   "null"
                                 ]
+                              },
+                              "alreadyStopped": {
+                                "type": "boolean"
                               }
                             },
                             "required": [
@@ -85654,6 +85666,9 @@
                                     "string",
                                     "null"
                                   ]
+                                },
+                                "alreadyStopped": {
+                                  "type": "boolean"
                                 }
                               },
                               "required": [
@@ -86393,6 +86408,9 @@
                                   "string",
                                   "null"
                                 ]
+                              },
+                              "alreadyStopped": {
+                                "type": "boolean"
                               }
                             },
                             "required": [
@@ -87225,6 +87243,9 @@
                                   "string",
                                   "null"
                                 ]
+                              },
+                              "alreadyStopped": {
+                                "type": "boolean"
                               }
                             },
                             "required": [
@@ -88057,6 +88078,9 @@
                                   "string",
                                   "null"
                                 ]
+                              },
+                              "alreadyStopped": {
+                                "type": "boolean"
                               }
                             },
                             "required": [

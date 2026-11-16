@@ -99,6 +99,13 @@ Feature: Agent kill switch: stop a misbehaving agent where it runs, with approva
     When another stop of "support-bot" is requested
     Then the request is refused with code "agent_stop_already_open"
 
+  @integration
+  Scenario: Two stop requests at the same moment open one stop
+    Given "support-bot" has no open stop
+    When three stop requests for "support-bot" arrive at the same moment
+    Then exactly one stop is opened
+    And the other requests are refused with code "agent_stop_already_open"
+
   @unit
   Scenario: A stop of an agent with no stop plan is refused
     Given "support-bot" has no stop plan
@@ -154,6 +161,14 @@ Feature: Agent kill switch: stop a misbehaving agent where it runs, with approva
     Then the target's applied event is recorded once
 
   # Restore
+
+  @unit
+  Scenario: A target already stopped before the stop is left as it was on restore
+    Given the virtual key of "support-bot" is already disabled and its Bedrock alias already rejects invocations
+    When a person stops "support-bot" and later restores it
+    Then the stop records both targets applied without changing them
+    And the restore leaves the virtual key disabled and the Bedrock alias rejecting invocations
+    And the serving endpoint is stopped and started again
 
   @unit
   Scenario: Restore reverts only the targets the stop applied
@@ -217,6 +232,12 @@ Feature: Agent kill switch: stop a misbehaving agent where it runs, with approva
     Given an automation whose webhook action posts to the stop route with an API key header and severity "critical"
     When the stop route receives the automation's body
     Then the stop is recorded with trigger "api_key" and the automation's reason
+
+  @unit
+  Scenario: The documented trace rule template keeps the body valid JSON for any trigger name
+    Given the trigger's name holds double quotes and a backslash
+    When the automation renders the documented webhook template and posts it to the stop route
+    Then the body is valid JSON and the stop's reason holds the name as written
 
   # Inventory
 

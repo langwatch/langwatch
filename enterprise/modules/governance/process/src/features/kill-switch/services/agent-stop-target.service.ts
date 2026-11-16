@@ -35,7 +35,7 @@ interface AgentStopTargetDependencies {
   servingEndpoints: DatabricksServingEndpointChannel;
   awsConnections: Pick<GovernanceAwsConnectionRepository, "getCredentials">;
   bedrock: BedrockAgentAliasChannel;
-  virtualKeys: Pick<GatewayApi, "disableVirtualKey" | "enableVirtualKey">;
+  virtualKeys: Pick<GatewayApi, "findVirtualKeyById" | "disableVirtualKey" | "enableVirtualKey">;
   registry: Pick<AgentRegistryService, "announceStop">;
   auditLog: Pick<AuditLogApi, "record">;
   maxAttempts: number;
@@ -72,6 +72,7 @@ export class AgentStopTargetService implements AgentStopIntentExecutors {
       organizationId: intent.organizationId,
       targetId: intent.target.id,
       errorCode: outcome.errorCode,
+      ...(outcome.ok && !outcome.changed ? { alreadyStopped: true } : {}),
     };
     await this.deps.send(outcome.ok ? "recordTargetApplied" : "recordTargetFailed", settled);
   }
@@ -131,14 +132,39 @@ export class AgentStopTargetService implements AgentStopIntentExecutors {
     intent: AgentStopApplyIntent;
     direction: Direction;
     context: IntentContext;
-  }): Promise<{ ok: boolean; errorCode: string | null }> {
+  }): Promise<{ ok: boolean; changed: boolean; errorCode: string | null }> {
     try {
-      await this.call({ intent, target: intent.target.target, direction });
-      return { ok: true, errorCode: null };
+      const { changed } = await this.call({ intent, target: intent.target.target, direction });
+      return { ok: true, changed, errorCode: null };
     } catch (error) {
       if (context.attempt < this.deps.maxAttempts) throw error;
-      return { ok: false, errorCode: errorCodeOf(error) };
+      return { ok: false, changed: false, errorCode: errorCodeOf(error) };
     }
+  }
+
+  /** A key that is not active when the stop arrives is left alone, so a restore leaves it too. */
+  private async callVirtualKey({
+    intent,
+    virtualKeyId,
+    direction,
+  }: {
+    intent: AgentStopApplyIntent;
+    virtualKeyId: string;
+    direction: Direction;
+  }): Promise<{ changed: boolean }> {
+    const { organizationId } = intent;
+    const command = { id: virtualKeyId, organizationId, actorUserId: intent.actorUserId };
+    if (direction === "restore") {
+      await this.deps.virtualKeys.enableVirtualKey(command);
+      return { changed: true };
+    }
+    const key = await this.deps.virtualKeys.findVirtualKeyById(virtualKeyId, organizationId);
+    if (key && key.status !== "ACTIVE") return { changed: false };
+    await this.deps.virtualKeys.disableVirtualKey({
+      ...command,
+      reason: `kill switch stop ${intent.stopId}: ${intent.reason}`,
+    });
+    return { changed: true };
   }
 
   private async call({
@@ -149,7 +175,7 @@ export class AgentStopTargetService implements AgentStopIntentExecutors {
     intent: AgentStopApplyIntent;
     target: AgentStopTarget;
     direction: Direction;
-  }): Promise<void> {
+  }): Promise<{ changed: boolean }> {
     const { organizationId } = intent;
     switch (target.kind) {
       case "databricks_serving_endpoint":
@@ -172,6 +198,7 @@ export class AgentStopTargetService implements AgentStopIntentExecutors {
             const call = { workspaceUrl, token, endpointName: target.endpointName };
             if (direction === "stop") await this.deps.servingEndpoints.stopEndpoint(call);
             else await this.deps.servingEndpoints.startEndpoint(call);
+            return { changed: true };
           },
         });
       case "bedrock_agent_alias": {
@@ -187,22 +214,8 @@ export class AgentStopTargetService implements AgentStopIntentExecutors {
           state: BEDROCK_INVOCATION_STATES[direction],
         });
       }
-      case "gateway_virtual_key": {
-        const command = {
-          id: target.virtualKeyId,
-          organizationId,
-          actorUserId: intent.actorUserId,
-        };
-        if (direction === "stop") {
-          await this.deps.virtualKeys.disableVirtualKey({
-            ...command,
-            reason: `kill switch stop ${intent.stopId}: ${intent.reason}`,
-          });
-        } else {
-          await this.deps.virtualKeys.enableVirtualKey(command);
-        }
-        return;
-      }
+      case "gateway_virtual_key":
+        return this.callVirtualKey({ intent, virtualKeyId: target.virtualKeyId, direction });
     }
   }
 }

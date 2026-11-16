@@ -3545,6 +3545,9 @@ importers:
       '@clickhouse/client':
         specifier: 'catalog:'
         version: 1.23.0
+      '@langwatch/automation-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/automation/contract
       '@langwatch/clickhouse-client':
         specifier: workspace:*
         version: link:../../../../packages/clickhouse-client

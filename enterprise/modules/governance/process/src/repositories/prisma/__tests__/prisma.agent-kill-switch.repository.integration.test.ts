@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * @vitest-environment node
- * The kill switch tables in Postgres: stop plans, sealed AWS connections and the AgentStop
- * projection. Spec: enterprise/modules/governance/specs/agent-kill-switch.feature
+ * The kill switch tables in Postgres: stop plans, sealed AWS connections, open-stop claims and
+ * the AgentStop projection. Spec: enterprise/modules/governance/specs/agent-kill-switch.feature
  */
 import { randomBytes } from "node:crypto";
 
+import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import { createTenantId } from "@langwatch/eventing";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import { createLogger } from "@langwatch/observability";
@@ -20,11 +21,16 @@ import { Temporal } from "@langwatch/time";
 import { nanoid } from "nanoid";
 import { afterAll, describe, expect, it } from "vitest";
 
-import { requestedStop } from "../../../features/kill-switch/rules/agent-stop.rules.ts";
+import {
+  type AgentStopRecord,
+  requestedStop,
+} from "../../../features/kill-switch/rules/agent-stop.rules.ts";
 import { virtualKey } from "../../../features/kill-switch/services/__tests__/kill-switch.fixtures.ts";
 import { AgentStopPlanService } from "../../../features/kill-switch/services/agent-stop-plan.service.ts";
+import { AgentStopService } from "../../../features/kill-switch/services/agent-stop.service.ts";
 import { planRegistryChanges } from "../../../features/registry/rules/registry-reconcile.rules.ts";
 import { MemoryGovernanceRepositories } from "../../memory/memory.governance.repositories.ts";
+import { PrismaAgentStopClaimRepository } from "../prisma.agent-stop-claim.repository.ts";
 import { PrismaAgentStopPlanRepository } from "../prisma.agent-stop-plan.repository.ts";
 import { PrismaAgentStopRepository } from "../prisma.agent-stop.repository.ts";
 import { PrismaGovernanceAwsConnectionRepository } from "../prisma.governance-aws-connection.repository.ts";
@@ -37,6 +43,49 @@ const connection = DB_URL
       logger: createLogger("langwatch:governance:test:kill-switch"),
     }).connect(PrismaConfigService.create().resolve({ databaseUrl: DB_URL, log: ["error"] }))
   : undefined;
+
+const AGENT_ID = "agent-support-bot";
+
+async function seedRegistry({
+  memory,
+  organizationId,
+}: {
+  memory: ReturnType<typeof MemoryGovernanceRepositories.create>;
+  organizationId: string;
+}): Promise<void> {
+  await memory.agentRegistry.applyChanges({
+    organizationId,
+    plan: (stored) =>
+      planRegistryChanges({
+        stored,
+        drafts: [
+          {
+            sourceKey: "langwatch:support-bot",
+            source: "langwatch",
+            management: "managed",
+            shadow: false,
+            kind: "signature",
+            name: "support-bot",
+            description: null,
+            source_version: null,
+            project_id: "project-1",
+            environment: null,
+            owner: null,
+            endpoints: [],
+            model: null,
+            instructions: null,
+            capabilities: ["signature"],
+            tools: [],
+            firstSeenAt: Temporal.Instant.from("2026-11-01T00:00:00Z"),
+            lastSeenAt: null,
+          },
+        ],
+        now: Temporal.Instant.from("2026-11-01T00:00:00Z"),
+        newId: () => AGENT_ID,
+      }),
+    baselineAt: Temporal.Instant.from("2026-11-01T00:00:00Z"),
+  });
+}
 
 describe.skipIf(!connection)("the kill switch Prisma repositories", () => {
   const ns = `kill-switch-${nanoid(8)}`;
@@ -59,6 +108,139 @@ describe.skipIf(!connection)("the kill switch Prisma repositories", () => {
     await prisma().agentStopPlanTarget.deleteMany({ where });
     await prisma().governanceAwsConnection.deleteMany({ where });
     await prisma().agentStop.deleteMany({ where });
+    await prisma().agentStopClaim.deleteMany({ where });
+  });
+
+  /** The api side of a stop over Postgres; `send` records the commands and runs no worker. */
+  async function stopServiceOf(organizationId: string) {
+    const memory = MemoryGovernanceRepositories.create();
+    await seedRegistry({ memory, organizationId });
+    await memory.agentStopPlans.replaceTargets({
+      organizationId,
+      agentId: AGENT_ID,
+      targets: [
+        {
+          id: "target-vk",
+          label: "Virtual key vk-support-bot",
+          target: { kind: "gateway_virtual_key", virtualKeyId: "vk-support-bot" },
+        },
+      ],
+    });
+    const sent: string[] = [];
+    let ids = 0;
+    const service = AgentStopService.create({
+      stops: PrismaAgentStopRepository.create(prisma()),
+      claims: PrismaAgentStopClaimRepository.create(prisma()),
+      plans: AgentStopPlanService.create({
+        plans: memory.agentStopPlans,
+        registry: memory.agentRegistry,
+        sources: memory.ingestionSources,
+        awsConnections: awsConnections(),
+        virtualKeys: createApiFixture<GatewayApi>(),
+      }),
+      registry: memory.agentRegistry,
+      auditLog: createApiFixture<AuditLogApi>({
+        record: async () => ({ id: "audit", occurredAt: 0 }),
+      }),
+      send: async (name) => {
+        sent.push(name);
+      },
+      newId: () => `agentstop-${ns}-${organizationId.slice(-2)}-${++ids}`,
+    });
+    const request = () =>
+      service.requestStop({
+        organizationId,
+        agentId: AGENT_ID,
+        reason: "data exfiltration attempt",
+        severity: "critical",
+        caller: { userId: "user-ops", apiKeyId: null },
+      });
+    return { service, sent, request };
+  }
+
+  /** Writes the stop's row as the worker's projection would, in `status`. */
+  async function projectStop({
+    organizationId,
+    stopId,
+    status,
+  }: {
+    organizationId: string;
+    stopId: string;
+    status: AgentStopRecord["status"];
+  }): Promise<void> {
+    const at = Date.parse("2026-11-16T10:00:00Z");
+    const stop = requestedStop({
+      data: {
+        stopId,
+        organizationId,
+        agentId: AGENT_ID,
+        agentName: "support-bot",
+        severity: "critical",
+        approval: "immediate",
+        trigger: "user",
+        reason: "data exfiltration attempt",
+        requestedByUserId: "user-ops",
+        requestedByApiKeyId: null,
+        targets: [
+          {
+            id: "target-vk",
+            label: "Virtual key vk-support-bot",
+            target: { kind: "gateway_virtual_key", virtualKeyId: "vk-support-bot" },
+          },
+        ],
+      },
+      at,
+    });
+    await PrismaAgentStopRepository.create(prisma()).store(
+      {
+        state: { ...stop, status },
+        cursor: { acceptedAt: at, eventId: `event-${stopId}` },
+        occurredAt: at,
+        createdAt: at,
+        updatedAt: at,
+        version: "2026-11-16",
+      },
+      { tenantId: createTenantId(organizationId), aggregateId: stopId },
+    );
+  }
+
+  describe("when two stop requests for one agent arrive at the same moment", () => {
+    /** @scenario "Two stop requests at the same moment open one stop" */
+    it("opens exactly one stop and refuses the other with agent_stop_already_open", async () => {
+      const organizationId = newOrganization();
+      const { sent, request } = await stopServiceOf(organizationId);
+
+      const outcomes = await Promise.allSettled([request(), request(), request()]);
+
+      const opened = outcomes.filter((outcome) => outcome.status === "fulfilled");
+      const refused = outcomes.flatMap((outcome) =>
+        outcome.status === "rejected" ? [(outcome.reason as { code?: string }).code] : [],
+      );
+      expect(opened).toHaveLength(1);
+      expect(refused).toEqual(["agent_stop_already_open", "agent_stop_already_open"]);
+      expect(sent).toEqual(["request"]);
+      const claims = await prisma().agentStopClaim.findMany({ where: { organizationId } });
+      expect(claims.map((claim) => claim.stopId)).toEqual([
+        opened[0]?.status === "fulfilled" ? opened[0].value.id : "none",
+      ]);
+    });
+  });
+
+  describe("when the agent's open stop has closed", () => {
+    it("lets the next request take the claim over", async () => {
+      const organizationId = newOrganization();
+      const { request } = await stopServiceOf(organizationId);
+      const first = await request();
+      await projectStop({ organizationId, stopId: first.id, status: "quarantined" });
+      await expect(request()).rejects.toMatchObject({ code: "agent_stop_already_open" });
+
+      await projectStop({ organizationId, stopId: first.id, status: "restored" });
+      const second = await request();
+
+      expect(second.id).not.toBe(first.id);
+      const claims = await prisma().agentStopClaim.findMany({ where: { organizationId } });
+      expect(claims.map((claim) => claim.stopId)).toEqual([second.id]);
+    });
   });
 
   describe("given a Databricks governance source and an AWS connection in the organisation", () => {
@@ -66,38 +248,7 @@ describe.skipIf(!connection)("the kill switch Prisma repositories", () => {
     it("stores the three targets in order and reads them back", async () => {
       const organizationId = newOrganization();
       const memory = MemoryGovernanceRepositories.create();
-      await memory.agentRegistry.applyChanges({
-        organizationId,
-        plan: (stored) =>
-          planRegistryChanges({
-            stored,
-            drafts: [
-              {
-                sourceKey: "langwatch:support-bot",
-                source: "langwatch",
-                management: "managed",
-                shadow: false,
-                kind: "signature",
-                name: "support-bot",
-                description: null,
-                source_version: null,
-                project_id: "project-1",
-                environment: null,
-                owner: null,
-                endpoints: [],
-                model: null,
-                instructions: null,
-                capabilities: ["signature"],
-                tools: [],
-                firstSeenAt: Temporal.Instant.from("2026-11-01T00:00:00Z"),
-                lastSeenAt: null,
-              },
-            ],
-            now: Temporal.Instant.from("2026-11-01T00:00:00Z"),
-            newId: () => "agent-support-bot",
-          }),
-        baselineAt: Temporal.Instant.from("2026-11-01T00:00:00Z"),
-      });
+      await seedRegistry({ memory, organizationId });
       const source = await memory.ingestionSources.create({
         organizationId,
         teamId: null,

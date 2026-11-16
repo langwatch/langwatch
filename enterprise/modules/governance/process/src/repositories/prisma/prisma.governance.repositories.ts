@@ -5,6 +5,7 @@ import type { Encryption } from "@langwatch/process-stores";
 
 import type { GovernanceRepositories } from "../governance.repositories.ts";
 import { PrismaAgentRegistryRepository } from "./prisma.agent-registry.repository.ts";
+import { PrismaAgentStopClaimRepository } from "./prisma.agent-stop-claim.repository.ts";
 import { PrismaAgentStopPlanRepository } from "./prisma.agent-stop-plan.repository.ts";
 import { PrismaAgentStopRepository } from "./prisma.agent-stop.repository.ts";
 import { PrismaAggregateReconcileLockRepository } from "./prisma.aggregate-reconcile-lock.repository.ts";
@@ -51,6 +52,7 @@ export class PostgresGovernanceRepositories {
     return {
       agentRegistry: PrismaAgentRegistryRepository.create(prisma),
       agentStopPlans: PrismaAgentStopPlanRepository.create(prisma),
+      agentStopClaims: PrismaAgentStopClaimRepository.create(prisma),
       agentStops: PrismaAgentStopRepository.create(prisma),
       awsConnections: PrismaGovernanceAwsConnectionRepository.create({
         database: prisma,

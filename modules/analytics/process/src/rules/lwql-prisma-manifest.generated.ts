@@ -2712,6 +2712,12 @@ export interface LwqlPrismaRows {
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
   };
+  readonly AgentStopClaim: {
+    readonly organizationId: "String";
+    readonly agentId: "String";
+    readonly stopId: "String";
+    readonly claimedAt: "DateTime";
+  };
   readonly IdentityMatch: {
     readonly id: "String";
     readonly organizationId: "String";

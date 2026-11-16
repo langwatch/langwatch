@@ -255,6 +255,7 @@ export function targetAppliedStop({
       state: "applied",
       errorCode: null,
       appliedAt: stopTimestamp(at),
+      ...(data.alreadyStopped ? { alreadyStopped: true } : {}),
     }),
   });
   return settleStop({ stop: changed, at });
@@ -299,13 +300,26 @@ export function restoreRequestedStop({
     restoredByUserId: data.requestedByUserId,
     restoreRequestedAt: stopTimestamp(at),
     restoreRound: data.restoreRound,
-    targets: stop.targets.map((target) =>
-      target.state === "applied" || target.state === "revert_failed"
-        ? { ...target, state: "reverting", errorCode: null }
-        : target,
-    ),
+    targets: stop.targets.map((target) => restoringOutcome({ target, at })),
   };
   return settleRestore({ stop: restoring, at });
+}
+
+/** A target the stop changed is reverted; one that was already stopped is left as it was. */
+function restoringOutcome({
+  target,
+  at,
+}: {
+  target: AgentStopTargetOutcome;
+  at: number;
+}): AgentStopTargetOutcome {
+  if (target.state === "applied" && target.alreadyStopped) {
+    return { ...target, state: "reverted", errorCode: null, revertedAt: stopTimestamp(at) };
+  }
+  if (target.state === "applied" || target.state === "revert_failed") {
+    return { ...target, state: "reverting", errorCode: null };
+  }
+  return target;
 }
 
 /** A revert outcome from an earlier restore says nothing about the one in flight. */

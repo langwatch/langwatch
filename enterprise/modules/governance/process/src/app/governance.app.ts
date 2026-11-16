@@ -957,6 +957,7 @@ export class GovernanceModule implements GovernanceRestApi {
     };
     this.agentStops = AgentStopService.create({
       stops: repositories.agentStops,
+      claims: repositories.agentStopClaims,
       plans: this.agentStopPlans,
       registry: repositories.agentRegistry,
       auditLog: dependencies.auditLog,

@@ -182,6 +182,8 @@ const agentStopTargetOutcomeSchemaDefinition = z.object({
   errorCode: z.string().nullable(),
   appliedAt: z.string().nullable(),
   revertedAt: z.string().nullable(),
+  /** True when the platform was already stopped before this stop; a restore leaves it as it was. */
+  alreadyStopped: z.boolean().optional(),
 });
 export interface AgentStopTargetOutcomeSchema extends Named<
   typeof agentStopTargetOutcomeSchemaDefinition
@@ -344,6 +346,8 @@ const agentStopTargetSettledEventDataSchemaDefinition = z.object({
   ...stopRef,
   targetId: z.string().min(1),
   errorCode: z.string().nullable(),
+  /** On an applied outcome: the platform was already stopped, so nothing was changed. */
+  alreadyStopped: z.boolean().optional(),
   /** On a revert outcome: the restore it answers, so a second restore records its own outcome. */
   restoreRound: z.number().int().positive().optional(),
 });

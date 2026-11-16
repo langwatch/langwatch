@@ -400,6 +400,50 @@ describe("AgentStopService", () => {
     });
   });
 
+  describe("given a virtual key already disabled and a Bedrock alias already rejecting calls", () => {
+    /** @scenario "A target already stopped before the stop is left as it was on restore" */
+    it("records both applied without changing them and leaves them stopped on restore", async () => {
+      const harness = await killSwitchHarness();
+      await harness.setFullPlan();
+      harness.keyStatuses.set(VIRTUAL_KEY_ID, "DISABLED");
+      harness.bedrock.seed({
+        agentId: "AGENT00001",
+        agentAliasId: "ALIAS00001",
+        alias: {
+          agentAliasName: "live",
+          description: "support-bot live alias",
+          routingConfiguration: [{ agentVersion: "7" }],
+          aliasInvocationState: "REJECT_INVOCATIONS",
+        },
+      });
+
+      const view = await request(harness);
+      const stopped = await settled(harness, view.id, "quarantined");
+      expect(
+        stopped.targets.map((target) => [target.state, target.alreadyStopped ?? false]),
+      ).toEqual([
+        ["applied", false],
+        ["applied", true],
+        ["applied", true],
+      ]);
+      await harness.stops.restore({ organizationId: ORG, stopId: view.id, caller: PERSON });
+      const restored = await settled(harness, view.id, "restored");
+
+      expect(restored.targets.map((target) => target.state)).toEqual([
+        "reverted",
+        "reverted",
+        "reverted",
+      ]);
+      expect(harness.virtualKeyCalls).toEqual([]);
+      expect(harness.bedrock.updates).toEqual([]);
+      expect(harness.servingEndpoints.calls.map((call) => call.path)).toEqual([
+        "/api/2.0/serving-endpoints/support-bot-prod/config:stop",
+        "/api/2.0/serving-endpoints/support-bot-prod/config:start",
+      ]);
+      await harness.eventing.close();
+    });
+  });
+
   describe("when a stop is requested, approved and later restored", () => {
     /** @scenario "Request, approval, denial and restore each write an audit row" */
     it("audits every step with the agent as target", async () => {

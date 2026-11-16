@@ -162,6 +162,8 @@ export async function killSwitchHarness({ maxAttempts = 3 }: { maxAttempts?: num
   });
   const virtualKeyCalls: VirtualKeyCall[] = [];
   const keyRefusals = new Map<string, string>();
+  /** A key's status before any stop; absent means ACTIVE. */
+  const keyStatuses = new Map<string, GatewayVirtualKeyRecord["status"]>();
   const refuseKey = (code: string) => {
     const error = new Error(code);
     Object.assign(error, { code });
@@ -169,7 +171,9 @@ export async function killSwitchHarness({ maxAttempts = 3 }: { maxAttempts?: num
   };
   const gateway = createApiFixture<GatewayApi>({
     findVirtualKeyById: async (id, organizationId) =>
-      id === VIRTUAL_KEY_ID && organizationId === ORG ? virtualKey(id) : null,
+      id === VIRTUAL_KEY_ID && organizationId === ORG
+        ? { ...virtualKey(id), status: keyStatuses.get(id) ?? "ACTIVE" }
+        : null,
     disableVirtualKey: async (input) => {
       virtualKeyCalls.push({ action: "disable", input });
       const code = keyRefusals.get("disable");
@@ -233,6 +237,7 @@ export async function killSwitchHarness({ maxAttempts = 3 }: { maxAttempts?: num
   });
   const stops = AgentStopService.create({
     stops: repositories.agentStops,
+    claims: repositories.agentStopClaims,
     plans,
     registry: repositories.agentRegistry,
     auditLog,
@@ -304,6 +309,7 @@ export async function killSwitchHarness({ maxAttempts = 3 }: { maxAttempts?: num
     announced,
     virtualKeyCalls,
     keyRefusals,
+    keyStatuses,
     fullPlan,
     setFullPlan,
     stopOf,

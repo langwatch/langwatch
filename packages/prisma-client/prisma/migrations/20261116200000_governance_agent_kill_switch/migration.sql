@@ -58,6 +58,15 @@ CREATE TABLE IF NOT EXISTS "AgentStop" (
     CONSTRAINT "AgentStop_pkey" PRIMARY KEY ("id")
 );
 
+CREATE TABLE IF NOT EXISTS "AgentStopClaim" (
+    "organizationId" TEXT NOT NULL,
+    "agentId" TEXT NOT NULL,
+    "stopId" TEXT NOT NULL,
+    "claimedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "AgentStopClaim_pkey" PRIMARY KEY ("organizationId","agentId")
+);
+
 CREATE INDEX IF NOT EXISTS "AgentStopPlanTarget_organizationId_agentId_idx" ON "AgentStopPlanTarget"("organizationId", "agentId");
 
 CREATE INDEX IF NOT EXISTS "GovernanceAwsConnection_organizationId_idx" ON "GovernanceAwsConnection"("organizationId");

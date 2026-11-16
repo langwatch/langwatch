@@ -73,10 +73,10 @@ A [trigger](/features/automations) can stop an agent. Add a **Webhook** action t
 ```text
 URL      https://app.langwatch.ai/api/governance/agents/<agentId>/stop
 Header   Authorization: Bearer <organization API key with governance:manage>
-Body     {"reason": "Trace rule {{ trigger.name }} matched {{ match.trace.url }}", "severity": "critical"}
+Body     {"reason": {{ "Trace rule " | append: trigger.name | append: " matched " | append: match.trace.url | json }}, "severity": "critical"}
 ```
 
-Use `critical` to stop at once, or `high` to page an approver first.
+The `json` filter quotes the reason, so a trigger name with quotes still sends valid JSON. Use `critical` to stop at once, or `high` to page an approver first.
 
 ## Audit log and webhooks
 

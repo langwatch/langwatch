@@ -5,6 +5,7 @@ import type { Instant } from "@langwatch/time";
 
 import type { ActivityMonitorRepository } from "./activity-monitor.repository.ts";
 import type { AgentRegistryRepository } from "./agent-registry.repository.ts";
+import type { AgentStopClaimRepository } from "./agent-stop-claim.repository.ts";
 import type { AgentStopPlanRepository } from "./agent-stop-plan.repository.ts";
 import type { AgentStopRepository } from "./agent-stop.repository.ts";
 import type { AggregateReconcileLockRepository } from "./aggregate-reconcile-lock.repository.ts";
@@ -141,8 +142,9 @@ export interface GovernanceOcsfEventWriter {
 export interface GovernanceRepositories {
   readonly activityMonitor: ActivityMonitorRepository;
   readonly agentRegistry: AgentRegistryRepository;
-  /** The kill switch: each agent's stop plan, the AWS connections and the AgentStop projection. */
+  /** The kill switch: stop plans, open-stop claims, AWS connections and the AgentStop projection. */
   readonly agentStopPlans: AgentStopPlanRepository;
+  readonly agentStopClaims: AgentStopClaimRepository;
   readonly agentStops: AgentStopRepository;
   readonly awsConnections: GovernanceAwsConnectionRepository;
   readonly aggregateReconcileLock: AggregateReconcileLockRepository;

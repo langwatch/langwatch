@@ -177513,13 +177513,14 @@ type GetApiGovernanceAgentStopsResponse struct {
 			Severity           GetApiGovernanceAgentStops200JSONResponseBodyDataSeverity `json:"severity"`
 			Status             GetApiGovernanceAgentStops200JSONResponseBodyDataStatus   `json:"status"`
 			Targets            []struct {
-				AppliedAt  *string                                                           `json:"appliedAt"`
-				ErrorCode  *string                                                           `json:"errorCode"`
-				Id         string                                                            `json:"id"`
-				Label      string                                                            `json:"label"`
-				RevertedAt *string                                                           `json:"revertedAt"`
-				State      GetApiGovernanceAgentStops200JSONResponseBodyDataTargetsState     `json:"state"`
-				Target     GetApiGovernanceAgentStops200JSONResponseBody_Data_Targets_Target `json:"target"`
+				AlreadyStopped *bool                                                             `json:"alreadyStopped,omitempty"`
+				AppliedAt      *string                                                           `json:"appliedAt"`
+				ErrorCode      *string                                                           `json:"errorCode"`
+				Id             string                                                            `json:"id"`
+				Label          string                                                            `json:"label"`
+				RevertedAt     *string                                                           `json:"revertedAt"`
+				State          GetApiGovernanceAgentStops200JSONResponseBodyDataTargetsState     `json:"state"`
+				Target         GetApiGovernanceAgentStops200JSONResponseBody_Data_Targets_Target `json:"target"`
 			} `json:"targets"`
 			Trigger GetApiGovernanceAgentStops200JSONResponseBodyDataTrigger `json:"trigger"`
 		} `json:"data"`
@@ -177669,13 +177670,14 @@ type PostApiGovernanceAgentStopsByIdApproveResponse struct {
 			Severity           PostApiGovernanceAgentStopsByIdApprove200JSONResponseBodyDataSeverity `json:"severity"`
 			Status             PostApiGovernanceAgentStopsByIdApprove200JSONResponseBodyDataStatus   `json:"status"`
 			Targets            []struct {
-				AppliedAt  *string                                                                       `json:"appliedAt"`
-				ErrorCode  *string                                                                       `json:"errorCode"`
-				Id         string                                                                        `json:"id"`
-				Label      string                                                                        `json:"label"`
-				RevertedAt *string                                                                       `json:"revertedAt"`
-				State      PostApiGovernanceAgentStopsByIdApprove200JSONResponseBodyDataTargetsState     `json:"state"`
-				Target     PostApiGovernanceAgentStopsByIdApprove200JSONResponseBody_Data_Targets_Target `json:"target"`
+				AlreadyStopped *bool                                                                         `json:"alreadyStopped,omitempty"`
+				AppliedAt      *string                                                                       `json:"appliedAt"`
+				ErrorCode      *string                                                                       `json:"errorCode"`
+				Id             string                                                                        `json:"id"`
+				Label          string                                                                        `json:"label"`
+				RevertedAt     *string                                                                       `json:"revertedAt"`
+				State          PostApiGovernanceAgentStopsByIdApprove200JSONResponseBodyDataTargetsState     `json:"state"`
+				Target         PostApiGovernanceAgentStopsByIdApprove200JSONResponseBody_Data_Targets_Target `json:"target"`
 			} `json:"targets"`
 			Trigger PostApiGovernanceAgentStopsByIdApprove200JSONResponseBodyDataTrigger `json:"trigger"`
 		} `json:"data"`
@@ -177844,13 +177846,14 @@ type PostApiGovernanceAgentStopsByIdDenyResponse struct {
 			Severity           PostApiGovernanceAgentStopsByIdDeny200JSONResponseBodyDataSeverity `json:"severity"`
 			Status             PostApiGovernanceAgentStopsByIdDeny200JSONResponseBodyDataStatus   `json:"status"`
 			Targets            []struct {
-				AppliedAt  *string                                                                    `json:"appliedAt"`
-				ErrorCode  *string                                                                    `json:"errorCode"`
-				Id         string                                                                     `json:"id"`
-				Label      string                                                                     `json:"label"`
-				RevertedAt *string                                                                    `json:"revertedAt"`
-				State      PostApiGovernanceAgentStopsByIdDeny200JSONResponseBodyDataTargetsState     `json:"state"`
-				Target     PostApiGovernanceAgentStopsByIdDeny200JSONResponseBody_Data_Targets_Target `json:"target"`
+				AlreadyStopped *bool                                                                      `json:"alreadyStopped,omitempty"`
+				AppliedAt      *string                                                                    `json:"appliedAt"`
+				ErrorCode      *string                                                                    `json:"errorCode"`
+				Id             string                                                                     `json:"id"`
+				Label          string                                                                     `json:"label"`
+				RevertedAt     *string                                                                    `json:"revertedAt"`
+				State          PostApiGovernanceAgentStopsByIdDeny200JSONResponseBodyDataTargetsState     `json:"state"`
+				Target         PostApiGovernanceAgentStopsByIdDeny200JSONResponseBody_Data_Targets_Target `json:"target"`
 			} `json:"targets"`
 			Trigger PostApiGovernanceAgentStopsByIdDeny200JSONResponseBodyDataTrigger `json:"trigger"`
 		} `json:"data"`
@@ -178019,13 +178022,14 @@ type PostApiGovernanceAgentStopsByIdRestoreResponse struct {
 			Severity           PostApiGovernanceAgentStopsByIdRestore202JSONResponseBodyDataSeverity `json:"severity"`
 			Status             PostApiGovernanceAgentStopsByIdRestore202JSONResponseBodyDataStatus   `json:"status"`
 			Targets            []struct {
-				AppliedAt  *string                                                                       `json:"appliedAt"`
-				ErrorCode  *string                                                                       `json:"errorCode"`
-				Id         string                                                                        `json:"id"`
-				Label      string                                                                        `json:"label"`
-				RevertedAt *string                                                                       `json:"revertedAt"`
-				State      PostApiGovernanceAgentStopsByIdRestore202JSONResponseBodyDataTargetsState     `json:"state"`
-				Target     PostApiGovernanceAgentStopsByIdRestore202JSONResponseBody_Data_Targets_Target `json:"target"`
+				AlreadyStopped *bool                                                                         `json:"alreadyStopped,omitempty"`
+				AppliedAt      *string                                                                       `json:"appliedAt"`
+				ErrorCode      *string                                                                       `json:"errorCode"`
+				Id             string                                                                        `json:"id"`
+				Label          string                                                                        `json:"label"`
+				RevertedAt     *string                                                                       `json:"revertedAt"`
+				State          PostApiGovernanceAgentStopsByIdRestore202JSONResponseBodyDataTargetsState     `json:"state"`
+				Target         PostApiGovernanceAgentStopsByIdRestore202JSONResponseBody_Data_Targets_Target `json:"target"`
 			} `json:"targets"`
 			Trigger PostApiGovernanceAgentStopsByIdRestore202JSONResponseBodyDataTrigger `json:"trigger"`
 		} `json:"data"`
@@ -178194,13 +178198,14 @@ type GetApiGovernanceAgentsByIdStopResponse struct {
 			Severity           GetApiGovernanceAgentsByIdStop200JSONResponseBodyDataSeverity `json:"severity"`
 			Status             GetApiGovernanceAgentsByIdStop200JSONResponseBodyDataStatus   `json:"status"`
 			Targets            []struct {
-				AppliedAt  *string                                                               `json:"appliedAt"`
-				ErrorCode  *string                                                               `json:"errorCode"`
-				Id         string                                                                `json:"id"`
-				Label      string                                                                `json:"label"`
-				RevertedAt *string                                                               `json:"revertedAt"`
-				State      GetApiGovernanceAgentsByIdStop200JSONResponseBodyDataTargetsState     `json:"state"`
-				Target     GetApiGovernanceAgentsByIdStop200JSONResponseBody_Data_Targets_Target `json:"target"`
+				AlreadyStopped *bool                                                                 `json:"alreadyStopped,omitempty"`
+				AppliedAt      *string                                                               `json:"appliedAt"`
+				ErrorCode      *string                                                               `json:"errorCode"`
+				Id             string                                                                `json:"id"`
+				Label          string                                                                `json:"label"`
+				RevertedAt     *string                                                               `json:"revertedAt"`
+				State          GetApiGovernanceAgentsByIdStop200JSONResponseBodyDataTargetsState     `json:"state"`
+				Target         GetApiGovernanceAgentsByIdStop200JSONResponseBody_Data_Targets_Target `json:"target"`
 			} `json:"targets"`
 			Trigger GetApiGovernanceAgentsByIdStop200JSONResponseBodyDataTrigger `json:"trigger"`
 		} `json:"data"`
@@ -178369,13 +178374,14 @@ type PostApiGovernanceAgentsByIdStopResponse struct {
 			Severity           PostApiGovernanceAgentsByIdStop202JSONResponseBodyDataSeverity `json:"severity"`
 			Status             PostApiGovernanceAgentsByIdStop202JSONResponseBodyDataStatus   `json:"status"`
 			Targets            []struct {
-				AppliedAt  *string                                                                `json:"appliedAt"`
-				ErrorCode  *string                                                                `json:"errorCode"`
-				Id         string                                                                 `json:"id"`
-				Label      string                                                                 `json:"label"`
-				RevertedAt *string                                                                `json:"revertedAt"`
-				State      PostApiGovernanceAgentsByIdStop202JSONResponseBodyDataTargetsState     `json:"state"`
-				Target     PostApiGovernanceAgentsByIdStop202JSONResponseBody_Data_Targets_Target `json:"target"`
+				AlreadyStopped *bool                                                                  `json:"alreadyStopped,omitempty"`
+				AppliedAt      *string                                                                `json:"appliedAt"`
+				ErrorCode      *string                                                                `json:"errorCode"`
+				Id             string                                                                 `json:"id"`
+				Label          string                                                                 `json:"label"`
+				RevertedAt     *string                                                                `json:"revertedAt"`
+				State          PostApiGovernanceAgentsByIdStop202JSONResponseBodyDataTargetsState     `json:"state"`
+				Target         PostApiGovernanceAgentsByIdStop202JSONResponseBody_Data_Targets_Target `json:"target"`
 			} `json:"targets"`
 			Trigger PostApiGovernanceAgentsByIdStop202JSONResponseBodyDataTrigger `json:"trigger"`
 		} `json:"data"`
@@ -179668,13 +179674,14 @@ type GetApiGovernanceRegistryAgentsByIdVersionsResponse struct {
 				Severity           GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopSeverity `json:"severity"`
 				Status             GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopStatus   `json:"status"`
 				Targets            []struct {
-					AppliedAt  *string                                                                                `json:"appliedAt"`
-					ErrorCode  *string                                                                                `json:"errorCode"`
-					Id         string                                                                                 `json:"id"`
-					Label      string                                                                                 `json:"label"`
-					RevertedAt *string                                                                                `json:"revertedAt"`
-					State      GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsState      `json:"state"`
-					Target     GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBody_Data_Stop_Targets_Target `json:"target"`
+					AlreadyStopped *bool                                                                                  `json:"alreadyStopped,omitempty"`
+					AppliedAt      *string                                                                                `json:"appliedAt"`
+					ErrorCode      *string                                                                                `json:"errorCode"`
+					Id             string                                                                                 `json:"id"`
+					Label          string                                                                                 `json:"label"`
+					RevertedAt     *string                                                                                `json:"revertedAt"`
+					State          GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsState      `json:"state"`
+					Target         GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBody_Data_Stop_Targets_Target `json:"target"`
 				} `json:"targets"`
 				Trigger GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTrigger `json:"trigger"`
 			} `json:"stop,omitempty"`
@@ -180247,13 +180254,14 @@ type GetApiGovernanceRegistryEventsResponse struct {
 				Severity           GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopSeverity `json:"severity"`
 				Status             GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopStatus   `json:"status"`
 				Targets            []struct {
-					AppliedAt  *string                                                                    `json:"appliedAt"`
-					ErrorCode  *string                                                                    `json:"errorCode"`
-					Id         string                                                                     `json:"id"`
-					Label      string                                                                     `json:"label"`
-					RevertedAt *string                                                                    `json:"revertedAt"`
-					State      GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsState      `json:"state"`
-					Target     GetApiGovernanceRegistryEvents200JSONResponseBody_Data_Stop_Targets_Target `json:"target"`
+					AlreadyStopped *bool                                                                      `json:"alreadyStopped,omitempty"`
+					AppliedAt      *string                                                                    `json:"appliedAt"`
+					ErrorCode      *string                                                                    `json:"errorCode"`
+					Id             string                                                                     `json:"id"`
+					Label          string                                                                     `json:"label"`
+					RevertedAt     *string                                                                    `json:"revertedAt"`
+					State          GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsState      `json:"state"`
+					Target         GetApiGovernanceRegistryEvents200JSONResponseBody_Data_Stop_Targets_Target `json:"target"`
 				} `json:"targets"`
 				Trigger GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTrigger `json:"trigger"`
 			} `json:"stop,omitempty"`
@@ -213446,13 +213454,14 @@ func ParseGetApiGovernanceAgentStopsResponse(rsp *http.Response) (*GetApiGoverna
 				Severity           GetApiGovernanceAgentStops200JSONResponseBodyDataSeverity `json:"severity"`
 				Status             GetApiGovernanceAgentStops200JSONResponseBodyDataStatus   `json:"status"`
 				Targets            []struct {
-					AppliedAt  *string                                                           `json:"appliedAt"`
-					ErrorCode  *string                                                           `json:"errorCode"`
-					Id         string                                                            `json:"id"`
-					Label      string                                                            `json:"label"`
-					RevertedAt *string                                                           `json:"revertedAt"`
-					State      GetApiGovernanceAgentStops200JSONResponseBodyDataTargetsState     `json:"state"`
-					Target     GetApiGovernanceAgentStops200JSONResponseBody_Data_Targets_Target `json:"target"`
+					AlreadyStopped *bool                                                             `json:"alreadyStopped,omitempty"`
+					AppliedAt      *string                                                           `json:"appliedAt"`
+					ErrorCode      *string                                                           `json:"errorCode"`
+					Id             string                                                            `json:"id"`
+					Label          string                                                            `json:"label"`
+					RevertedAt     *string                                                           `json:"revertedAt"`
+					State          GetApiGovernanceAgentStops200JSONResponseBodyDataTargetsState     `json:"state"`
+					Target         GetApiGovernanceAgentStops200JSONResponseBody_Data_Targets_Target `json:"target"`
 				} `json:"targets"`
 				Trigger GetApiGovernanceAgentStops200JSONResponseBodyDataTrigger `json:"trigger"`
 			} `json:"data"`
@@ -213628,13 +213637,14 @@ func ParsePostApiGovernanceAgentStopsByIdApproveResponse(rsp *http.Response) (*P
 				Severity           PostApiGovernanceAgentStopsByIdApprove200JSONResponseBodyDataSeverity `json:"severity"`
 				Status             PostApiGovernanceAgentStopsByIdApprove200JSONResponseBodyDataStatus   `json:"status"`
 				Targets            []struct {
-					AppliedAt  *string                                                                       `json:"appliedAt"`
-					ErrorCode  *string                                                                       `json:"errorCode"`
-					Id         string                                                                        `json:"id"`
-					Label      string                                                                        `json:"label"`
-					RevertedAt *string                                                                       `json:"revertedAt"`
-					State      PostApiGovernanceAgentStopsByIdApprove200JSONResponseBodyDataTargetsState     `json:"state"`
-					Target     PostApiGovernanceAgentStopsByIdApprove200JSONResponseBody_Data_Targets_Target `json:"target"`
+					AlreadyStopped *bool                                                                         `json:"alreadyStopped,omitempty"`
+					AppliedAt      *string                                                                       `json:"appliedAt"`
+					ErrorCode      *string                                                                       `json:"errorCode"`
+					Id             string                                                                        `json:"id"`
+					Label          string                                                                        `json:"label"`
+					RevertedAt     *string                                                                       `json:"revertedAt"`
+					State          PostApiGovernanceAgentStopsByIdApprove200JSONResponseBodyDataTargetsState     `json:"state"`
+					Target         PostApiGovernanceAgentStopsByIdApprove200JSONResponseBody_Data_Targets_Target `json:"target"`
 				} `json:"targets"`
 				Trigger PostApiGovernanceAgentStopsByIdApprove200JSONResponseBodyDataTrigger `json:"trigger"`
 			} `json:"data"`
@@ -213835,13 +213845,14 @@ func ParsePostApiGovernanceAgentStopsByIdDenyResponse(rsp *http.Response) (*Post
 				Severity           PostApiGovernanceAgentStopsByIdDeny200JSONResponseBodyDataSeverity `json:"severity"`
 				Status             PostApiGovernanceAgentStopsByIdDeny200JSONResponseBodyDataStatus   `json:"status"`
 				Targets            []struct {
-					AppliedAt  *string                                                                    `json:"appliedAt"`
-					ErrorCode  *string                                                                    `json:"errorCode"`
-					Id         string                                                                     `json:"id"`
-					Label      string                                                                     `json:"label"`
-					RevertedAt *string                                                                    `json:"revertedAt"`
-					State      PostApiGovernanceAgentStopsByIdDeny200JSONResponseBodyDataTargetsState     `json:"state"`
-					Target     PostApiGovernanceAgentStopsByIdDeny200JSONResponseBody_Data_Targets_Target `json:"target"`
+					AlreadyStopped *bool                                                                      `json:"alreadyStopped,omitempty"`
+					AppliedAt      *string                                                                    `json:"appliedAt"`
+					ErrorCode      *string                                                                    `json:"errorCode"`
+					Id             string                                                                     `json:"id"`
+					Label          string                                                                     `json:"label"`
+					RevertedAt     *string                                                                    `json:"revertedAt"`
+					State          PostApiGovernanceAgentStopsByIdDeny200JSONResponseBodyDataTargetsState     `json:"state"`
+					Target         PostApiGovernanceAgentStopsByIdDeny200JSONResponseBody_Data_Targets_Target `json:"target"`
 				} `json:"targets"`
 				Trigger PostApiGovernanceAgentStopsByIdDeny200JSONResponseBodyDataTrigger `json:"trigger"`
 			} `json:"data"`
@@ -214042,13 +214053,14 @@ func ParsePostApiGovernanceAgentStopsByIdRestoreResponse(rsp *http.Response) (*P
 				Severity           PostApiGovernanceAgentStopsByIdRestore202JSONResponseBodyDataSeverity `json:"severity"`
 				Status             PostApiGovernanceAgentStopsByIdRestore202JSONResponseBodyDataStatus   `json:"status"`
 				Targets            []struct {
-					AppliedAt  *string                                                                       `json:"appliedAt"`
-					ErrorCode  *string                                                                       `json:"errorCode"`
-					Id         string                                                                        `json:"id"`
-					Label      string                                                                        `json:"label"`
-					RevertedAt *string                                                                       `json:"revertedAt"`
-					State      PostApiGovernanceAgentStopsByIdRestore202JSONResponseBodyDataTargetsState     `json:"state"`
-					Target     PostApiGovernanceAgentStopsByIdRestore202JSONResponseBody_Data_Targets_Target `json:"target"`
+					AlreadyStopped *bool                                                                         `json:"alreadyStopped,omitempty"`
+					AppliedAt      *string                                                                       `json:"appliedAt"`
+					ErrorCode      *string                                                                       `json:"errorCode"`
+					Id             string                                                                        `json:"id"`
+					Label          string                                                                        `json:"label"`
+					RevertedAt     *string                                                                       `json:"revertedAt"`
+					State          PostApiGovernanceAgentStopsByIdRestore202JSONResponseBodyDataTargetsState     `json:"state"`
+					Target         PostApiGovernanceAgentStopsByIdRestore202JSONResponseBody_Data_Targets_Target `json:"target"`
 				} `json:"targets"`
 				Trigger PostApiGovernanceAgentStopsByIdRestore202JSONResponseBodyDataTrigger `json:"trigger"`
 			} `json:"data"`
@@ -214249,13 +214261,14 @@ func ParseGetApiGovernanceAgentsByIdStopResponse(rsp *http.Response) (*GetApiGov
 				Severity           GetApiGovernanceAgentsByIdStop200JSONResponseBodyDataSeverity `json:"severity"`
 				Status             GetApiGovernanceAgentsByIdStop200JSONResponseBodyDataStatus   `json:"status"`
 				Targets            []struct {
-					AppliedAt  *string                                                               `json:"appliedAt"`
-					ErrorCode  *string                                                               `json:"errorCode"`
-					Id         string                                                                `json:"id"`
-					Label      string                                                                `json:"label"`
-					RevertedAt *string                                                               `json:"revertedAt"`
-					State      GetApiGovernanceAgentsByIdStop200JSONResponseBodyDataTargetsState     `json:"state"`
-					Target     GetApiGovernanceAgentsByIdStop200JSONResponseBody_Data_Targets_Target `json:"target"`
+					AlreadyStopped *bool                                                                 `json:"alreadyStopped,omitempty"`
+					AppliedAt      *string                                                               `json:"appliedAt"`
+					ErrorCode      *string                                                               `json:"errorCode"`
+					Id             string                                                                `json:"id"`
+					Label          string                                                                `json:"label"`
+					RevertedAt     *string                                                               `json:"revertedAt"`
+					State          GetApiGovernanceAgentsByIdStop200JSONResponseBodyDataTargetsState     `json:"state"`
+					Target         GetApiGovernanceAgentsByIdStop200JSONResponseBody_Data_Targets_Target `json:"target"`
 				} `json:"targets"`
 				Trigger GetApiGovernanceAgentsByIdStop200JSONResponseBodyDataTrigger `json:"trigger"`
 			} `json:"data"`
@@ -214456,13 +214469,14 @@ func ParsePostApiGovernanceAgentsByIdStopResponse(rsp *http.Response) (*PostApiG
 				Severity           PostApiGovernanceAgentsByIdStop202JSONResponseBodyDataSeverity `json:"severity"`
 				Status             PostApiGovernanceAgentsByIdStop202JSONResponseBodyDataStatus   `json:"status"`
 				Targets            []struct {
-					AppliedAt  *string                                                                `json:"appliedAt"`
-					ErrorCode  *string                                                                `json:"errorCode"`
-					Id         string                                                                 `json:"id"`
-					Label      string                                                                 `json:"label"`
-					RevertedAt *string                                                                `json:"revertedAt"`
-					State      PostApiGovernanceAgentsByIdStop202JSONResponseBodyDataTargetsState     `json:"state"`
-					Target     PostApiGovernanceAgentsByIdStop202JSONResponseBody_Data_Targets_Target `json:"target"`
+					AlreadyStopped *bool                                                                  `json:"alreadyStopped,omitempty"`
+					AppliedAt      *string                                                                `json:"appliedAt"`
+					ErrorCode      *string                                                                `json:"errorCode"`
+					Id             string                                                                 `json:"id"`
+					Label          string                                                                 `json:"label"`
+					RevertedAt     *string                                                                `json:"revertedAt"`
+					State          PostApiGovernanceAgentsByIdStop202JSONResponseBodyDataTargetsState     `json:"state"`
+					Target         PostApiGovernanceAgentsByIdStop202JSONResponseBody_Data_Targets_Target `json:"target"`
 				} `json:"targets"`
 				Trigger PostApiGovernanceAgentsByIdStop202JSONResponseBodyDataTrigger `json:"trigger"`
 			} `json:"data"`
@@ -216049,13 +216063,14 @@ func ParseGetApiGovernanceRegistryAgentsByIdVersionsResponse(rsp *http.Response)
 					Severity           GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopSeverity `json:"severity"`
 					Status             GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopStatus   `json:"status"`
 					Targets            []struct {
-						AppliedAt  *string                                                                                `json:"appliedAt"`
-						ErrorCode  *string                                                                                `json:"errorCode"`
-						Id         string                                                                                 `json:"id"`
-						Label      string                                                                                 `json:"label"`
-						RevertedAt *string                                                                                `json:"revertedAt"`
-						State      GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsState      `json:"state"`
-						Target     GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBody_Data_Stop_Targets_Target `json:"target"`
+						AlreadyStopped *bool                                                                                  `json:"alreadyStopped,omitempty"`
+						AppliedAt      *string                                                                                `json:"appliedAt"`
+						ErrorCode      *string                                                                                `json:"errorCode"`
+						Id             string                                                                                 `json:"id"`
+						Label          string                                                                                 `json:"label"`
+						RevertedAt     *string                                                                                `json:"revertedAt"`
+						State          GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTargetsState      `json:"state"`
+						Target         GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBody_Data_Stop_Targets_Target `json:"target"`
 					} `json:"targets"`
 					Trigger GetApiGovernanceRegistryAgentsByIdVersions200JSONResponseBodyDataStopTrigger `json:"trigger"`
 				} `json:"stop,omitempty"`
@@ -216706,13 +216721,14 @@ func ParseGetApiGovernanceRegistryEventsResponse(rsp *http.Response) (*GetApiGov
 					Severity           GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopSeverity `json:"severity"`
 					Status             GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopStatus   `json:"status"`
 					Targets            []struct {
-						AppliedAt  *string                                                                    `json:"appliedAt"`
-						ErrorCode  *string                                                                    `json:"errorCode"`
-						Id         string                                                                     `json:"id"`
-						Label      string                                                                     `json:"label"`
-						RevertedAt *string                                                                    `json:"revertedAt"`
-						State      GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsState      `json:"state"`
-						Target     GetApiGovernanceRegistryEvents200JSONResponseBody_Data_Stop_Targets_Target `json:"target"`
+						AlreadyStopped *bool                                                                      `json:"alreadyStopped,omitempty"`
+						AppliedAt      *string                                                                    `json:"appliedAt"`
+						ErrorCode      *string                                                                    `json:"errorCode"`
+						Id             string                                                                     `json:"id"`
+						Label          string                                                                     `json:"label"`
+						RevertedAt     *string                                                                    `json:"revertedAt"`
+						State          GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTargetsState      `json:"state"`
+						Target         GetApiGovernanceRegistryEvents200JSONResponseBody_Data_Stop_Targets_Target `json:"target"`
 					} `json:"targets"`
 					Trigger GetApiGovernanceRegistryEvents200JSONResponseBodyDataStopTrigger `json:"trigger"`
 				} `json:"stop,omitempty"`

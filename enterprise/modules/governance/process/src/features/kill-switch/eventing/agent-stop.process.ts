@@ -93,13 +93,7 @@ export interface AgentStopIntentExecutors {
  * A person's id when one decided or requested; a machine credential with no owner acts as a
  * stable service principal named after the key, as the gateway does for an ownerless key.
  */
-function actorUserIdOf({
-  stop,
-  restoring,
-}: {
-  stop: AgentStopRecord;
-  restoring: boolean;
-}): string {
+function actorUserIdOf({ stop, restoring }: { stop: AgentStopRecord; restoring: boolean }): string {
   const person =
     (restoring ? stop.restoredByUserId : null) ?? stop.decidedByUserId ?? stop.requestedByUserId;
   if (person) return person;

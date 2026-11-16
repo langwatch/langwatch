@@ -7483,6 +7483,18 @@ model AgentStop {
   @@index([organizationId, status])
 }
 
+/// The one open stop an agent may have: the api takes this row before it sends a stop's request,
+/// so two requests at once cannot both open one. A later request takes it over once the stop it
+/// names has closed.
+model AgentStopClaim {
+  organizationId String
+  agentId        String
+  stopId         String
+  claimedAt      DateTime
+
+  @@id([organizationId, agentId])
+}
+
 /// The dated match table: "`user_abc123` on Anthropic is platform user #42,
 /// valid from March 3", closed when it stops being true.
 ///

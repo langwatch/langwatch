@@ -8,6 +8,7 @@ from attrs import define as _attrs_define
 from ..models.post_api_governance_agent_stops_by_id_restore_response_202_data_targets_item_state import (
     PostApiGovernanceAgentStopsByIdRestoreResponse202DataTargetsItemState,
 )
+from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
     from ..models.post_api_governance_agent_stops_by_id_restore_response_202_data_targets_item_target_type_0 import (
@@ -37,6 +38,7 @@ class PostApiGovernanceAgentStopsByIdRestoreResponse202DataTargetsItem:
         error_code (None | str):
         applied_at (None | str):
         reverted_at (None | str):
+        already_stopped (bool | Unset):
     """
 
     id: str
@@ -50,6 +52,7 @@ class PostApiGovernanceAgentStopsByIdRestoreResponse202DataTargetsItem:
     error_code: None | str
     applied_at: None | str
     reverted_at: None | str
+    already_stopped: bool | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         from ..models.post_api_governance_agent_stops_by_id_restore_response_202_data_targets_item_target_type_0 import (
@@ -82,6 +85,8 @@ class PostApiGovernanceAgentStopsByIdRestoreResponse202DataTargetsItem:
         reverted_at: None | str
         reverted_at = self.reverted_at
 
+        already_stopped = self.already_stopped
+
         field_dict: dict[str, Any] = {}
 
         field_dict.update(
@@ -95,6 +100,8 @@ class PostApiGovernanceAgentStopsByIdRestoreResponse202DataTargetsItem:
                 "revertedAt": reverted_at,
             }
         )
+        if already_stopped is not UNSET:
+            field_dict["alreadyStopped"] = already_stopped
 
         return field_dict
 
@@ -173,6 +180,8 @@ class PostApiGovernanceAgentStopsByIdRestoreResponse202DataTargetsItem:
 
         reverted_at = _parse_reverted_at(d.pop("revertedAt"))
 
+        already_stopped = d.pop("alreadyStopped", UNSET)
+
         post_api_governance_agent_stops_by_id_restore_response_202_data_targets_item = cls(
             id=id,
             label=label,
@@ -181,6 +190,7 @@ class PostApiGovernanceAgentStopsByIdRestoreResponse202DataTargetsItem:
             error_code=error_code,
             applied_at=applied_at,
             reverted_at=reverted_at,
+            already_stopped=already_stopped,
         )
 
         return post_api_governance_agent_stops_by_id_restore_response_202_data_targets_item

@@ -8,6 +8,7 @@ from attrs import define as _attrs_define
 from ..models.get_api_governance_registry_agents_by_id_versions_response_200_data_item_stop_targets_item_state import (
     GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemStopTargetsItemState,
 )
+from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
     from ..models.get_api_governance_registry_agents_by_id_versions_response_200_data_item_stop_targets_item_target_type_0 import (
@@ -37,6 +38,7 @@ class GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemStopTargetsIt
         error_code (None | str):
         applied_at (None | str):
         reverted_at (None | str):
+        already_stopped (bool | Unset):
     """
 
     id: str
@@ -50,6 +52,7 @@ class GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemStopTargetsIt
     error_code: None | str
     applied_at: None | str
     reverted_at: None | str
+    already_stopped: bool | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         from ..models.get_api_governance_registry_agents_by_id_versions_response_200_data_item_stop_targets_item_target_type_0 import (
@@ -86,6 +89,8 @@ class GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemStopTargetsIt
         reverted_at: None | str
         reverted_at = self.reverted_at
 
+        already_stopped = self.already_stopped
+
         field_dict: dict[str, Any] = {}
 
         field_dict.update(
@@ -99,6 +104,8 @@ class GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemStopTargetsIt
                 "revertedAt": reverted_at,
             }
         )
+        if already_stopped is not UNSET:
+            field_dict["alreadyStopped"] = already_stopped
 
         return field_dict
 
@@ -183,6 +190,8 @@ class GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemStopTargetsIt
 
         reverted_at = _parse_reverted_at(d.pop("revertedAt"))
 
+        already_stopped = d.pop("alreadyStopped", UNSET)
+
         get_api_governance_registry_agents_by_id_versions_response_200_data_item_stop_targets_item = cls(
             id=id,
             label=label,
@@ -191,6 +200,7 @@ class GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemStopTargetsIt
             error_code=error_code,
             applied_at=applied_at,
             reverted_at=reverted_at,
+            already_stopped=already_stopped,
         )
 
         return get_api_governance_registry_agents_by_id_versions_response_200_data_item_stop_targets_item

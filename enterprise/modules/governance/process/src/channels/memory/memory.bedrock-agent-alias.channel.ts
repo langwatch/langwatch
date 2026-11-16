@@ -63,7 +63,7 @@ export class MemoryBedrockAgentAliasChannel implements BedrockAgentAliasChannel 
     agentId,
     agentAliasId,
     state,
-  }: BedrockAliasTarget & { state: BedrockInvocationState }): Promise<void> {
+  }: BedrockAliasTarget & { state: BedrockInvocationState }): Promise<{ changed: boolean }> {
     if (this.refusal) {
       const error = new Error(`seeded ${this.refusal}`);
       error.name = this.refusal;
@@ -77,6 +77,7 @@ export class MemoryBedrockAgentAliasChannel implements BedrockAgentAliasChannel 
         message: `no alias ${agentId}/${agentAliasId}`,
       });
     }
+    if (alias.aliasInvocationState === state) return { changed: false };
     alias.aliasInvocationState = state;
     this.updates.push({
       region,
@@ -87,5 +88,6 @@ export class MemoryBedrockAgentAliasChannel implements BedrockAgentAliasChannel 
       routingConfiguration: structuredClone(alias.routingConfiguration),
       aliasInvocationState: state,
     });
+    return { changed: true };
   }
 }

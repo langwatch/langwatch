@@ -39,7 +39,10 @@ export class HttpBedrockAgentAliasChannel implements BedrockAgentAliasChannel {
     agentAliasId,
     state,
     signal,
-  }: BedrockAliasTarget & { state: BedrockInvocationState; signal?: AbortSignal }): Promise<void> {
+  }: BedrockAliasTarget & {
+    state: BedrockInvocationState;
+    signal?: AbortSignal;
+  }): Promise<{ changed: boolean }> {
     // With neither a key pair nor a role, the SDK would sign as the deployment itself.
     const hasKeyPair = Boolean(credentials.accessKeyId && credentials.secretAccessKey);
     if (!hasKeyPair && !credentials.roleArn) {
@@ -81,6 +84,7 @@ export class HttpBedrockAgentAliasChannel implements BedrockAgentAliasChannel {
           message: `Bedrock answered no alias name for ${agentId}/${agentAliasId}`,
         });
       }
+      if (agentAlias.aliasInvocationState === state) return { changed: false };
       await client.send(
         new UpdateAgentAliasCommand({
           agentId,
@@ -92,6 +96,7 @@ export class HttpBedrockAgentAliasChannel implements BedrockAgentAliasChannel {
         }),
         { abortSignal: signal },
       );
+      return { changed: true };
     } finally {
       client.destroy();
     }

@@ -21,6 +21,7 @@ import { generate } from "@langwatch/ksuid";
 import { nowInstant } from "@langwatch/time";
 
 import type { AgentRegistryRepository } from "../../../repositories/agent-registry.repository.ts";
+import type { AgentStopClaimRepository } from "../../../repositories/agent-stop-claim.repository.ts";
 import type { AgentStopRepository } from "../../../repositories/agent-stop.repository.ts";
 import type { AgentStopCommandName } from "../eventing/agent-stop.commands.ts";
 import {
@@ -51,8 +52,12 @@ export const AGENT_STOP_AUDIT_TARGET_KIND = "governance_agent";
 
 const READ_LIMIT = 200;
 
+/** A claim whose stop never reached the projection this long after it was taken is abandoned. */
+const ABANDONED_CLAIM_MS = 15 * 60 * 1000;
+
 interface AgentStopDependencies {
   stops: Pick<AgentStopRepository, "getStop" | "findByAgent" | "findByStatuses">;
+  claims: AgentStopClaimRepository;
   plans: Pick<AgentStopPlanService, "findTargets" | "findPlanCounts">;
   registry: Pick<AgentRegistryRepository, "getEntry" | "findSourceKeys">;
   auditLog: Pick<AuditLogApi, "record">;
@@ -97,14 +102,13 @@ export class AgentStopService {
     const entry = await this.deps.registry.getEntry({ organizationId, id: agentId });
     const targets = await this.deps.plans.findTargets({ organizationId, agentId });
     if (targets.length === 0) throw new AgentStopPlanEmptyError(agentId);
-    const open = (await this.deps.stops.findByAgent({ organizationId, agentId, limit: 20 })).find(
-      (stop) => isOpenStatus(stop.status),
-    );
-    if (open) throw new AgentStopAlreadyOpenError({ agentId, stopId: open.id });
+    const stopId = this.deps.newId();
+    const at = this.deps.now();
+    await this.claimAgent({ organizationId, agentId, stopId, at });
 
     const trigger = caller.apiKeyId ? "api_key" : "user";
     const data: AgentStopRequestedEventData = {
-      stopId: this.deps.newId(),
+      stopId,
       organizationId,
       agentId,
       agentName: entry.name,
@@ -116,11 +120,66 @@ export class AgentStopService {
       requestedByApiKeyId: caller.apiKeyId,
       targets,
     };
-    const at = this.deps.now();
-    await this.deps.send("request", { tenantId: organizationId, occurredAt: at, ...data });
+    try {
+      await this.deps.send("request", { tenantId: organizationId, occurredAt: at, ...data });
+    } catch (error) {
+      await this.deps.claims.release({ organizationId, agentId, stopId });
+      throw error;
+    }
     const stop = requestedStop({ data, at });
     await this.audit({ action: "governance.agent.stop_requested", stop, caller });
     return viewOfStop(stop);
+  }
+
+  /**
+   * Takes the agent's one open-stop claim, or refuses `agent_stop_already_open`. A claim passes to
+   * the new stop only once the stop holding it has closed, or never reached the projection.
+   */
+  private async claimAgent({
+    organizationId,
+    agentId,
+    stopId,
+    at,
+  }: {
+    organizationId: string;
+    agentId: string;
+    stopId: string;
+    at: number;
+  }): Promise<void> {
+    const claim = { organizationId, agentId, claimedAt: at };
+    if (await this.deps.claims.create({ ...claim, stopId })) return;
+    const [held] = await this.deps.claims.findClaims({ organizationId, agentId });
+    if (!held) {
+      if (await this.deps.claims.create({ ...claim, stopId })) return;
+      throw new AgentStopAlreadyOpenError({ agentId, stopId: "unknown" });
+    }
+    if (!(await this.isClaimReleased({ organizationId, held, at }))) {
+      throw new AgentStopAlreadyOpenError({ agentId, stopId: held.stopId });
+    }
+    const swapped = await this.deps.claims.swap({
+      ...claim,
+      fromStopId: held.stopId,
+      toStopId: stopId,
+    });
+    if (!swapped) throw new AgentStopAlreadyOpenError({ agentId, stopId: held.stopId });
+  }
+
+  private async isClaimReleased({
+    organizationId,
+    held,
+    at,
+  }: {
+    organizationId: string;
+    held: { stopId: string; claimedAt: number };
+    at: number;
+  }): Promise<boolean> {
+    try {
+      const stop = await this.deps.stops.getStop({ organizationId, stopId: held.stopId });
+      return !isOpenStatus(stop.status);
+    } catch (error) {
+      if (!(error instanceof AgentStopNotFoundError)) throw error;
+      return at - held.claimedAt > ABANDONED_CLAIM_MS;
+    }
   }
 
   approveStop(input: {
