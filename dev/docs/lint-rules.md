@@ -1586,7 +1586,7 @@ Messages:
   - why: One clock: every moment in the product is a Temporal.Instant.
 - `mintNowMilliseconds`
   - what: {{name}} reads the current moment as Date epoch milliseconds.
-  - fix: Call `nowInstant().epochMilliseconds` from @langwatch/time.
+  - fix: Call `nowEpochMs()` from @langwatch/time when you only need the count; call `nowInstant()` when you need an Instant.
   - why: One clock: every moment in the product is a Temporal.Instant.
 - `parseInstant`
   - what: {{name}} parses a moment through Date.

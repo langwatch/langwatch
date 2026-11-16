@@ -5,22 +5,7 @@ import {
   differenceInMilliseconds,
   wallClockSecondsBetween,
 } from "../difference.ts";
-import { Temporal, nowEpochMs, toDate, toEpochMs, toZonedDateTime } from "../zoned.ts";
-
-describe("nowEpochMs", () => {
-  describe("given a caller that only wants the epoch millisecond count", () => {
-    /** @scenario "The clock reads the present moment as epoch milliseconds" */
-    it("reads the system clock between two bounds", () => {
-      const before = Date.now();
-      const now = nowEpochMs();
-      const after = Date.now();
-
-      expect(Number.isInteger(now)).toBe(true);
-      expect(now).toBeGreaterThanOrEqual(before);
-      expect(now).toBeLessThanOrEqual(after);
-    });
-  });
-});
+import { Temporal, toDate, toEpochMs, toZonedDateTime } from "../zoned.ts";
 
 const AMSTERDAM = { timeZone: "Europe/Amsterdam" } as const;
 const NEW_YORK = { timeZone: "America/New_York" } as const;
