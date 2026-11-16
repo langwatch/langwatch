@@ -19,11 +19,11 @@ Feature: Default models offer only what the picked scopes can run
     Then no OpenAI or Anthropic model is offered
 
   @unit
-  Scenario: Scopes that each offer chat models but share none are told apart from none
+  Scenario: Scopes that share no model are told apart from scopes that offer none
     Given one picked project runs OpenAI and another runs only Anthropic
     When the models for both projects are listed
     Then the answer says the scopes share no chat model
-    And it does not say so for embeddings, which only one of them offers
+    And it says they share no embedding model, which only one of them offers
 
   @unit
   Scenario: An organization config is not offered a model only one project's provider lists
@@ -138,7 +138,7 @@ Feature: Default models offer only what the picked scopes can run
 
   @integration
   Scenario: Scopes that share no chat model are told so
-    Given every picked scope offers chat models but they share none
+    Given the picked scopes offer chat models but share none
     When the drawer opens
     Then a note says no chat model is offered by every picked scope
     And it does not say that no provider offers one

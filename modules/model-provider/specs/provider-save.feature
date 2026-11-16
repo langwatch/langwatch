@@ -63,3 +63,10 @@ Feature: Saving a provider keeps what the operator set and where it lives
     Given a provider attached to a project of another organization
     When it is saved while the page is on project B
     Then the save is refused as model_provider_not_found
+
+  @unit
+  Scenario: A provider attached to no scope is not found, so a save cannot claim it
+    Given a stored provider attached to no scope
+    When someone who can write project B saves it from project B, naming project B
+    Then the save is refused as model_provider_not_found
+    And the provider stays attached to no scope

@@ -41,11 +41,11 @@ export function noProviderCopy({ kind }: { kind: Kind }): string {
   return "No provider at these scopes offers a chat model. Add a model provider to pick one here.";
 }
 
-/** Every picked scope offers models of this kind, but no one model is offered by all of them. */
+/** A picked scope offers models of this kind, but no one model is offered by all of them. */
 export function sharesNoneCopy({ kind }: { kind: Kind }): string {
   return (
-    `No ${kind} model is offered by every picked scope. Each offers some, but a config runs ` +
-    `only a model all of its scopes offer: pick fewer scopes or give them a provider in common.`
+    `No ${kind} model is offered by every picked scope. A config runs only a model all of its ` +
+    `scopes offer: pick fewer scopes or give them a provider in common.`
   );
 }
 

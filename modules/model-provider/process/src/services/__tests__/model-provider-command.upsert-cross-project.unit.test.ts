@@ -259,4 +259,30 @@ describe("ModelProviderCommandService.upsert — a provider of another project",
       });
     });
   });
+
+  describe("given a stored provider attached to no scope", () => {
+    describe("when someone who can write the page's project saves it, naming that project", () => {
+      /** @scenario "A provider attached to no scope is not found, so a save cannot claim it" */
+      it("refuses the save as not found and leaves the row attached nowhere", async () => {
+        const { service, database } = serviceWith({
+          stored: storedProvider({ scopes: [] }),
+          writable: ["project-b"],
+        });
+
+        const code = await codeOf(
+          service.upsert({
+            id: "provider-a",
+            projectId: "project-b",
+            provider: "openai",
+            enabled: true,
+            scopes: [PROJECT_B],
+            actorId: "user-1",
+          }),
+        );
+
+        expect(code).toBe("model_provider_not_found");
+        expect(database.providers.get("provider-a")?.scopes).toEqual([]);
+      });
+    });
+  });
 });

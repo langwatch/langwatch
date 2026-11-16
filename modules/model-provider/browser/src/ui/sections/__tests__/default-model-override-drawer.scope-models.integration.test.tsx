@@ -279,7 +279,7 @@ describe("<DefaultModelOverrideDrawer/> scope models", () => {
     });
   });
 
-  describe("given every picked scope offers chat models but they share none", () => {
+  describe("given the picked scopes offer chat models but share none", () => {
     beforeEach(() =>
       answer({
         embedding: ["openai/text-embedding-3-small"],

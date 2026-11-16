@@ -48,9 +48,9 @@ function runByEvery(lists: readonly string[][]): string[] {
   return first.filter((model) => others.every((list) => list.has(model)));
 }
 
-/** Every scope offers some model, yet none is offered by all: the scopes share nothing. */
+/** Some scope offers a model, yet none is offered by all: the scopes share nothing. */
 function sharesNoneOf(lists: readonly string[][]): boolean {
-  return lists.length > 1 && lists.every((list) => list.length > 0) && !runByEvery(lists).length;
+  return lists.length > 1 && lists.some((list) => list.length > 0) && !runByEvery(lists).length;
 }
 
 function emptyProvidersOf({ rows, mode }: { rows: readonly ScopeProviderRow[]; mode: Mode }) {

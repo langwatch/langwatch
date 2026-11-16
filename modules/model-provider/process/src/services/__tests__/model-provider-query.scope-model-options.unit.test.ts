@@ -151,13 +151,24 @@ describe("ModelProviderQueryService.getModelOptionsForScopes", () => {
       expect(options.embedding).toEqual([]);
     });
 
-    /** @scenario "Scopes that each offer chat models but share none are told apart from none" */
-    it("says they share no chat model, and not for embeddings only one of them offers", async () => {
+    /** @scenario "Scopes that share no model are told apart from scopes that offer none" */
+    it("says they share no chat model, nor an embedding model only one of them offers", async () => {
       const options = await queryFor({
         saved: [OPENAI_ON_A, ANTHROPIC_ON_B],
       }).getModelOptionsForScopes({ projectId: "proj_a", scopes: [PROJECT_A, PROJECT_B] });
 
-      expect(options.sharesNone).toEqual({ chat: true, embedding: false });
+      expect(options.sharesNone).toEqual({ chat: true, embedding: true });
+    });
+  });
+
+  describe("given two picked projects that both run only Anthropic", () => {
+    it("does not say they share no embedding model, as neither offers one", async () => {
+      const anthropicOnA = { ...ANTHROPIC_ON_B, id: "anthropic_a", scopes: [PROJECT_A] };
+      const options = await queryFor({
+        saved: [anthropicOnA, ANTHROPIC_ON_B],
+      }).getModelOptionsForScopes({ projectId: "proj_a", scopes: [PROJECT_A, PROJECT_B] });
+
+      expect(options.sharesNone).toEqual({ chat: false, embedding: false });
     });
   });
 

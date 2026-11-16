@@ -32,7 +32,7 @@ const scopeModelOptionsSchemaDefinition = z.object({
     chat: z.array(emptyScopeProviderSchema),
     embedding: z.array(emptyScopeProviderSchema),
   }),
-  /** Every picked scope offers a model of this kind, but no model is offered by all of them. */
+  /** A picked scope offers a model of this kind, but no model is offered by all of them. */
   sharesNone: z.object({ chat: z.boolean(), embedding: z.boolean() }),
 });
 export interface ScopeModelOptionsSchema extends Named<typeof scopeModelOptionsSchemaDefinition> {}
