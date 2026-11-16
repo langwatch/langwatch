@@ -340,16 +340,19 @@ function spansRead<Ctes extends Record<string, unknown>>({
 
 /**
  * The filters as one condition for a fenced read's `where`; the side-table reads hold the proof's
- * windows and `spanWindow` prunes span subqueries. No filter at all is `1 = 1`, as main wrote it.
+ * windows. No filter is `1 = 1`, as main wrote it. `negated` (the negate toggle) is `NOT a OR
+ * NOT b`, a side-table term `NOT IN`, so a subquery's own scope predicate is never inverted.
  */
 export function analyticsFilterCondition<Name extends string>({
   filters,
   ts,
   spanWindow,
+  negated = false,
 }: {
   filters: AnalyticsFilterInput;
   ts: FilteredSummaries<Name>;
   spanWindow?: SpanWindow;
+  negated?: boolean;
 }) {
   const translations = filterTranslations({ filters, ts: ts as FilteredSummaries<string> });
 
@@ -361,14 +364,20 @@ export function analyticsFilterCondition<Name extends string>({
     const terms = translations.map((translation): Term => {
       switch (translation.kind) {
         case "row":
-          return translation.condition;
+          return negated ? cond.not(translation.condition) : translation.condition;
         case "evaluations":
-          return ops.within(key, (sub) => evaluationsRead({ sub, where: translation.where }));
+          return ops.within(key, (sub) => evaluationsRead({ sub, where: translation.where }), {
+            negated,
+          });
         case "spans":
-          return ops.within(key, (sub) => spansRead({ sub, where: translation.where, spanWindow }));
+          return ops.within(
+            key,
+            (sub) => spansRead({ sub, where: translation.where, spanWindow }),
+            { negated },
+          );
       }
     });
     // Every term reads the summaries alias or a subquery of its own, so it reads only `Name`.
-    return allOf(terms) as Condition<Tables | Name>;
+    return (negated ? anyOf(terms) : allOf(terms)) as Condition<Tables | Name>;
   };
 }

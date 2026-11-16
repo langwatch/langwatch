@@ -3,11 +3,10 @@ import type { EvaluationAnalyticsClickHouseClient } from "../clickhouse/clickhou
 
 /**
  * The memory tier holds no analytics rows (as its recency twin says): a tenant's session takes
- * a write and keeps none, and answers every read with no rows rather than refusing it.
+ * a write and keeps none. Reads go through the routed client, not the session.
  */
 const emptySession: EvaluationAnalyticsClickHouseClient = {
   insert: () => Promise.resolve(),
-  query: () => Promise.resolve({ json: () => Promise.resolve([]) }),
 };
 
 export class MemoryAnalyticsSessionsRepository extends AnalyticsSessionsRepository {

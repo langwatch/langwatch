@@ -52,7 +52,7 @@ function memoryTier() {
 
 describe("the analytics memory tier", () => {
   describe("when a tenant's session is resolved", () => {
-    it("takes a write and answers a read with no rows, never refusing", async () => {
+    it("takes a write without refusing it", async () => {
       const session = await memoryTier().sessions.resolve("project-1");
 
       await expect(
@@ -62,12 +62,6 @@ describe("the analytics memory tier", () => {
           format: "JSONEachRow",
         }),
       ).resolves.toBeUndefined();
-      const result = await session.query({
-        query: "SELECT * FROM evaluation_analytics WHERE TenantId = {tenantId:String}",
-        query_params: { tenantId: "project-1" },
-        format: "JSONEachRow",
-      });
-      await expect(result.json()).resolves.toEqual([]);
     });
   });
 

@@ -181,9 +181,11 @@ const pairs = (rows: PairRow[]) =>
 async function mainRows({
   authorization,
   filters,
+  negated = false,
 }: {
   authorization: Authorization;
   filters: AnalyticsFilterInput;
+  negated?: boolean;
 }): Promise<string[]> {
   resetParamCounter();
   const translation = translateAllFilters(filters, {
@@ -191,12 +193,16 @@ async function mainRows({
       "AND StartTime >= {startDate:DateTime64(3)} - INTERVAL 2 DAY " +
       "AND StartTime < {endDate:DateTime64(3)} + INTERVAL 2 DAY",
   });
+  // Main's negate toggle (aggregation-builder buildScopedFilterWhere).
+  const clause = negated
+    ? (translation.negatedWhereClause ?? `NOT (${translation.whereClause})`)
+    : translation.whereClause;
   const reader = new AuthorizedClickHouse({
     resolveClient: () => Promise.resolve(clickHouseQueryClientOver(client)),
   }).as(authorization, { reads: "analytics" });
   const result = await reader.query({
     query: `SELECT ts.TenantId AS tenant, ts.TraceId AS trace FROM trace_summaries ts
-      WHERE ${textScope("OccurredAt")} AND (${translation.whereClause})`,
+      WHERE ${textScope("OccurredAt")} AND (${clause})`,
     query_params: { startDate: START, endDate: END, ...translation.params },
   });
   return pairs((await result.json()) as PairRow[]);
@@ -206,9 +212,11 @@ async function mainRows({
 async function builtRows({
   authorization,
   filters,
+  negated = false,
 }: {
   authorization: Authorization;
   filters: AnalyticsFilterInput;
+  negated?: boolean;
 }): Promise<string[]> {
   const scope = tenantScope.fromProof({ authorization, reads: "analytics" });
   const statement = clickhouseRead({ scope })
@@ -220,6 +228,7 @@ async function builtRows({
         filters,
         ts: traceSummaries,
         spanWindow: { startMs: START.getTime(), endMs: END.getTime() },
+        negated,
       }),
     )
     .build();
@@ -277,5 +286,28 @@ describe("analytics filters built on the typed builder", () => {
       expect(main.some((pair) => pair.startsWith(`${TENANT_B}/`))).toBe(true);
       expect(await builtRows({ authorization, filters })).toEqual(main);
     });
+  });
+
+  describe("given the negate toggle", () => {
+    it.each(CASES)(
+      "%s negated keeps main's rows under one tenant's proof",
+      async (_name, filters) => {
+        const authorization = ownProof();
+        const main = await mainRows({ authorization, filters, negated: true });
+
+        expect(main.every((pair) => pair.startsWith(`${TENANT_A}/`))).toBe(true);
+        expect(await builtRows({ authorization, filters, negated: true })).toEqual(main);
+      },
+    );
+
+    it.each(CASES)(
+      "%s negated keeps main's rows under a proof reading both",
+      async (_name, filters) => {
+        const authorization = bothProof();
+        const main = await mainRows({ authorization, filters, negated: true });
+
+        expect(await builtRows({ authorization, filters, negated: true })).toEqual(main);
+      },
+    );
   });
 });

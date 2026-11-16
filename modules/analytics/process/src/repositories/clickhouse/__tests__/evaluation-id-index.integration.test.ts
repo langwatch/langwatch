@@ -78,6 +78,10 @@ function recordingQueryClient({
     : Promise.resolve(idIndexedClientDouble({ indexes: ANALYTICS_ID_INDEXES, driver }));
 }
 
+/** A read of the evaluation rows themselves, not of their id index. */
+const isSourceRead = (statement: QueryRequest) =>
+  statement.sql.includes("FROM evaluation_analytics WHERE");
+
 /** One query on the test server, its rows as JSONEachRow parses them. */
 async function queryRows(query: string, params?: Record<string, unknown>): Promise<unknown[]> {
   const result = await clickHouse.query({
@@ -171,9 +175,7 @@ describe.skipIf(!clickHouseUrl)("a lookup of an evaluation's analytics row by id
       const [found] = await repository.findLatest({ tenantId, evaluationId: targetId });
 
       expect(found?.row.evaluationId).toBe(targetId);
-      const read = statements.find((statement) =>
-        statement.sql.includes("SELECT * FROM evaluation_analytics"),
-      );
+      const read = statements.find((statement) => isSourceRead(statement));
       expect(read?.params).toMatchObject({
         idBound_fromMs: eightWeeksAgoMs - DAY_MS,
         idBound_toMs: eightWeeksAgoMs + DAY_MS,
@@ -183,9 +185,7 @@ describe.skipIf(!clickHouseUrl)("a lookup of an evaluation's analytics row by id
       if (read === undefined) throw new Error("no source read of evaluation_analytics was sent");
       statements = [];
       await unflagged.findLatest({ tenantId, evaluationId: targetId });
-      const unbounded = statements.find((statement) =>
-        statement.sql.includes("SELECT * FROM evaluation_analytics"),
-      );
+      const unbounded = statements.find((statement) => isSourceRead(statement));
       if (unbounded === undefined) throw new Error("no unbounded read was sent");
       expect(await partsAfterPartitionPruning({ query: queryRows, request: read })).toBeLessThan(
         await partsAfterPartitionPruning({ query: queryRows, request: unbounded }),
@@ -202,11 +202,11 @@ describe.skipIf(!clickHouseUrl)("a lookup of an evaluation's analytics row by id
       });
 
       expect(found?.row.evaluationId).toBe(targetId);
-      const reads = statements.filter((statement) =>
-        statement.sql.includes("SELECT * FROM evaluation_analytics"),
-      );
+      const reads = statements.filter((statement) => isSourceRead(statement));
       expect(reads).toHaveLength(1);
-      expect(reads[0]?.sql.match(/\{fromMs:Int64\}/g)).toHaveLength(1);
+      // The window bounds the outer read alone; the inner dedup subquery stays unbounded.
+      expect(reads[0]?.sql.match(/OccurredAt >= /g)).toHaveLength(1);
+      expect(reads[0]?.sql).not.toContain("idBound_fromMs");
     });
   });
 });

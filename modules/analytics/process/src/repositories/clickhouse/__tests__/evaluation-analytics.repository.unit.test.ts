@@ -51,7 +51,20 @@ const row: AnalyticsEvaluationRow = {
   completedAtMs: 1_750_000_000_020,
 };
 
-function clientReturning(rows: Record<string, unknown>[]): EvaluationAnalyticsClickHouseClient {
+/** The session's inserts, and the scripted answer every routed read is given. */
+type ScriptedClient = EvaluationAnalyticsClickHouseClient & {
+  query: ReturnType<
+    typeof vi.fn<
+      (input: {
+        query: string;
+        query_params: Record<string, unknown>;
+        format: "JSONEachRow";
+      }) => Promise<{ json(): Promise<Record<string, unknown>[]> }>
+    >
+  >;
+};
+
+function clientReturning(rows: Record<string, unknown>[]): ScriptedClient {
   return {
     query: vi.fn(async () => ({ json: async () => rows })),
     insert: vi.fn(async () => void 0),
@@ -59,7 +72,7 @@ function clientReturning(rows: Record<string, unknown>[]): EvaluationAnalyticsCl
 }
 
 function repository(
-  client: EvaluationAnalyticsClickHouseClient,
+  client: ScriptedClient,
   metrics: AnalyticsEvaluationReadMetrics = { record: () => {} },
 ): ClickHouseAnalyticsEvaluationRepository {
   return ClickHouseAnalyticsEvaluationRepository.create({

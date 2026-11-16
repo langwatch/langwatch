@@ -45,14 +45,6 @@ export type EvaluationAnalyticsClickHouseClient = {
     format: "JSONEachRow";
     clickhouse_settings?: ClickHouseSettings;
   }) => Promise<unknown>;
-  query: (input: {
-    query: string;
-    query_params: Record<string, unknown>;
-    format: "JSONEachRow";
-    clickhouse_settings?: ClickHouseSettings;
-  }) => Promise<{
-    json(): Promise<Record<string, unknown>[]>;
-  }>;
 };
 
 /** A windowed read distinguishes a miss from an unwindowed read that cannot miss. */
