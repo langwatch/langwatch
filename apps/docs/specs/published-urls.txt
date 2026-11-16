@@ -347,6 +347,15 @@
 /api-reference/governance-agent-registry/overview
 /api-reference/governance-agent-registry/read-the-registry-change-feed
 /api-reference/governance-agent-registry/search-the-registry-ard-search
+/api-reference/governance-kill-switch/approve-a-pending-stop
+/api-reference/governance-kill-switch/deny-a-pending-stop
+/api-reference/governance-kill-switch/get-an-agent-s-latest-stop
+/api-reference/governance-kill-switch/get-an-agent-s-stop-plan
+/api-reference/governance-kill-switch/list-the-organisation-s-agent-stops
+/api-reference/governance-kill-switch/overview
+/api-reference/governance-kill-switch/replace-an-agent-s-stop-plan
+/api-reference/governance-kill-switch/restore-a-stopped-agent
+/api-reference/governance-kill-switch/stop-an-agent
 /api-reference/grants
 /api-reference/grants/change-a-grant-s-role
 /api-reference/grants/get-a-grant
@@ -703,6 +712,7 @@
 /features/topic-clustering
 /features/webhooks
 /governance/agent-registry
+/governance/kill-switch
 /guardrails/overview
 /guardrails/setting-up-guardrails
 /hybrid-setup
