@@ -21,6 +21,7 @@ import {
   type OrganizationUsageCount,
   type PricingModel,
   type SignInSecurityPolicy,
+  type DocsPlaygroundPolicy,
   type OrganizationCurrency,
   ORGANIZATION_KIND,
 } from "@langwatch/organization-contract";
@@ -37,6 +38,8 @@ import {
   type StoredOrganizationSettings,
   type OrganizationTeamProject,
   type OrganizationPresenceSettingRow,
+  type OrganizationOperatorQuery,
+  type OrganizationOperatorRow,
 } from "../organization.repository.ts";
 import { PrismaOrganizationAuditStore } from "./prisma.organization-audit.store.ts";
 
@@ -88,6 +91,37 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
     if (limit === undefined || ids.length <= limit) return { ids, next: null };
     const page = ids.slice(0, limit);
     return { ids: page, next: page[page.length - 1] ?? null };
+  }
+
+  async findOperatorRows(input: OrganizationOperatorQuery): Promise<OrganizationOperatorRow[]> {
+    const matching =
+      "organizationIds" in input
+        ? { id: { in: [...input.organizationIds] } }
+        : {
+            OR: (["id", "name", "slug"] as const).map((field) => ({
+              [field]: { contains: literalSubstring(input.query), mode: "insensitive" as const },
+            })),
+          };
+    const rows = await this.database.organization.findMany({
+      where: { kind: { not: ORGANIZATION_KIND.SYSTEM }, ...matching },
+      select: { id: true, name: true, slug: true, createdAt: true },
+      orderBy: [{ name: "asc" }, { createdAt: "asc" }],
+      ...("limit" in input ? { take: input.limit } : {}),
+    });
+    if (rows.length === 0) return [];
+    const counts = await this.database.organizationUser.groupBy({
+      by: ["organizationId"],
+      where: { organizationId: { in: rows.map((row) => row.id) } },
+      _count: { _all: true },
+    });
+    const members = new Map(counts.map((count) => [count.organizationId, count._count._all]));
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      slug: row.slug,
+      createdAt: fromDate(row.createdAt),
+      memberCount: members.get(row.id) ?? 0,
+    }));
   }
 
   async findPresenceSettingPage({
@@ -190,6 +224,38 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
     await this.database.organization.update({
       where: { id: organizationId },
       data: { maxSessionDurationDays },
+    });
+  }
+
+  async getDocsPlaygroundPolicy({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<DocsPlaygroundPolicy> {
+    const row = await this.database.organization.findUnique({
+      where: { id: organizationId },
+      select: { docsPlaygroundSessionsEnabled: true, docsPlaygroundSessionsDisabledAt: true },
+    });
+    return {
+      docsPlaygroundSessionsEnabled: row?.docsPlaygroundSessionsEnabled ?? false,
+      docsPlaygroundSessionsDisabledAt: row?.docsPlaygroundSessionsDisabledAt ?? null,
+    };
+  }
+
+  async saveDocsPlaygroundPolicy({
+    organizationId,
+    docsPlaygroundSessionsEnabled,
+    changedAt,
+  }: {
+    organizationId: string;
+    docsPlaygroundSessionsEnabled: boolean;
+    changedAt: Instant;
+  }): Promise<void> {
+    await this.database.organization.update({
+      where: { id: organizationId },
+      data: docsPlaygroundSessionsEnabled
+        ? { docsPlaygroundSessionsEnabled }
+        : { docsPlaygroundSessionsEnabled, docsPlaygroundSessionsDisabledAt: toDate(changedAt) },
     });
   }
 
@@ -863,4 +929,9 @@ function mapPersonalWorkspace(
       createdAtMs: project.createdAt.getTime(),
     },
   };
+}
+
+/** The query as a literal substring: LIKE reads `%`, `_` and `\\` as patterns otherwise. */
+function literalSubstring(query: string): string {
+  return query.replace(/[\\%_]/g, (character) => `\\${character}`);
 }

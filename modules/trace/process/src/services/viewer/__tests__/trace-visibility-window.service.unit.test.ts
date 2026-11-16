@@ -11,7 +11,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   redactSpanContent,
   redactTraceContent,
-} from "../../../rules/trace-visibility-teaser.rules.ts";
+} from "../../../features/read/rules/trace-visibility-teaser.rules.ts";
 import { VisibilityWindowService } from "../../trace-visibility-window.service.ts";
 
 const DAY_MS = 24 * 60 * 60 * 1000;

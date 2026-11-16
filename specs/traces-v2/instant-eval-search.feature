@@ -411,11 +411,12 @@ Feature: Instant Evals inside the Trace Explorer
       And the sentence and the terms typed beside it are routed again with Instant Evals unavailable
       And the router's answer is applied: a filter, a phrase or a question for the assistant, never an eval chip
 
-    # Instant Evals off for the organization: the popover offers the switch or a word
-    # with us, depending on the plan. Both are specified in
-    # modules/instant-eval/specs/instant-eval-opt-in.feature ("Instant Evals off for a
-    # self-serve organization open the enable popover", "Instant Evals off for an
-    # enterprise organization open the contact-us popover"). Either way no estimate
+    # Instant Evals off for the organization: the popover offers the switch, the
+    # project's own decision model, or a word with us, depending on the plan. All are
+    # specified in modules/instant-eval/specs/instant-eval-opt-in.feature ("Instant
+    # Evals off for a self-serve organization open the enable popover", "Instant Evals
+    # off for an enterprise organization ask for a decision model of its own", "Instant
+    # Evals off for an enterprise organization open the contact-us popover"). Either way no estimate
     # is requested, the typed query stays in the bar, and a chip typed alongside
     # other words is refused the same way, before any request.
 

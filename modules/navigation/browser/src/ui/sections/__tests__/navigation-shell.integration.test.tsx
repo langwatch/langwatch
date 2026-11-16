@@ -4,7 +4,7 @@
  */
 
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
-import { CreateProjectDrawerToken } from "@langwatch/organization-client";
+import { CreateProjectDrawerToken, CreateTeamDrawerToken } from "@langwatch/organization-client";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -616,6 +616,84 @@ describe("the product-switcher top bar", () => {
       const trigger = screen.getByRole("button", { name: "Switch organization" });
       expect(trigger).toBeDisabled();
       expect(trigger).toHaveAttribute("aria-busy", "true");
+    });
+  });
+
+  describe("when the user picks New organization", () => {
+    const openNewOrganizationDialog = async ({
+      organizationPermissions = [],
+    }: { organizationPermissions?: string[] } = {}) => {
+      renderShell({
+        readings: {
+          organizations: [orgA, orgB],
+          pathname: "/gateway/virtual-keys",
+          organizationPermissions,
+        },
+      });
+      const user = userEvent.setup();
+      await user.click(screen.getByRole("button", { name: "Switch organization" }));
+      await user.click(await screen.findByRole("menuitem", { name: "New organization" }));
+      await screen.findByRole("dialog", { name: "New organization" });
+      return user;
+    };
+
+    /** @scenario The organization menu ends with a New organization entry */
+    it("lists New organization last, after the organizations, with a plus mark", async () => {
+      renderShell({ readings: { organizations: [orgA, orgB] } });
+      const user = userEvent.setup();
+      await user.click(screen.getByRole("button", { name: "Switch organization" }));
+
+      const items = await screen.findAllByRole("menuitem");
+      const last = items[items.length - 1];
+      expect(last).toHaveTextContent("New organization");
+      expect(last?.querySelector("svg.lucide-plus")).not.toBeNull();
+    });
+
+    /** @scenario New organization asks first whether a team would do */
+    it("explains a new organization is a separate account and offers a team instead", async () => {
+      await openNewOrganizationDialog();
+
+      const dialog = screen.getByRole("dialog", { name: "New organization" });
+      expect(dialog).toHaveTextContent(
+        "A new organization is a completely separate LangWatch account, separate billing, separate team members, separate access. If you want to create a different grouping for projects, you can create a new team instead.",
+      );
+      expect(
+        screen.getByRole("button", { name: "Proceed with New Organization" }),
+      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Create New Team" })).toBeInTheDocument();
+    });
+
+    /** @scenario Create New Team opens the create-team drawer of the current organization */
+    it("closes the dialog and opens the create-team drawer by the organization's token", async () => {
+      const user = await openNewOrganizationDialog({
+        organizationPermissions: ["organization:manage"],
+      });
+
+      await user.click(screen.getByRole("button", { name: "Create New Team" }));
+
+      expect(openDrawerByTokenMock).toHaveBeenCalledWith(CreateTeamDrawerToken, undefined);
+      await waitFor(() => {
+        expect(screen.queryByRole("dialog", { name: "New organization" })).not.toBeInTheDocument();
+      });
+      expect(navigateMock).not.toHaveBeenCalled();
+    });
+
+    /** @scenario Create New Team is unavailable to someone who cannot manage the organization */
+    it("disables Create New Team for a member who cannot manage the organization", async () => {
+      await openNewOrganizationDialog();
+
+      expect(screen.getByRole("button", { name: "Create New Team" })).toBeDisabled();
+    });
+
+    /** @scenario Proceed with New Organization opens organization creation */
+    it("sends the member to the welcome screen asking for a new organization", async () => {
+      const user = await openNewOrganizationDialog();
+
+      await user.click(screen.getByRole("button", { name: "Proceed with New Organization" }));
+
+      expect(navigateMock).toHaveBeenCalledWith("/onboarding/welcome?new_organization=1");
+      expect(rememberScopeMock).not.toHaveBeenCalled();
+      expect(openDrawerByTokenMock).not.toHaveBeenCalled();
     });
   });
 

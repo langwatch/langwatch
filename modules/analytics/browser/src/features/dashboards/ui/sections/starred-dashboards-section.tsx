@@ -7,18 +7,21 @@
 
 import type { StarredDashboardsProps } from "@langwatch/analytics-client";
 import { SidebarSectionLabel } from "@langwatch/design-system/app-shell";
+import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Box, Link as ChakraLink, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { LayoutDashboard, Plus } from "lucide-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import { opensElsewhere } from "../../../../ui/elements/analytics-link.tsx";
-import { useBoardReader } from "../../behavior/use-board-access.ts";
+import { useBoardAccess, useBoardReader } from "../../behavior/use-board-access.ts";
+import { useBoardFromTemplate } from "../../behavior/use-board-from-template.ts";
 import { useFavourites } from "../../behavior/use-favourites.ts";
 import { useSavedDashboards } from "../../behavior/use-saved-dashboards.ts";
-import { dashboardsPath } from "../../model/boards.ts";
+import { dashboardsPath, myDashboardId } from "../../model/boards.ts";
 import { CURATED_BOARDS } from "../../model/curated-boards.ts";
-import { type StarredLink, starredLinks } from "../../model/sidebar-boards.ts";
+import { type SidebarBoard, type StarredLink, starredLinks } from "../../model/sidebar-boards.ts";
+import { SavedDashboardRow } from "../blocks/saved-dashboard-row.tsx";
 import { NewDashboardButton } from "../elements/new-dashboard-button.tsx";
 
 /** Rows shown before the rest sit behind "All pinned (N)": the sidebar stays short. */
@@ -79,17 +82,17 @@ function SectionFrame({
         {create && isLoaded && links.length === 0 && (
           <AddDashboardRow isCreating={create.isCreating} onAdd={create.onAdd} />
         )}
-        {shown.map((link) => (
-          <PinnedRow key={link.key} link={link} />
-        ))}
+        {shown.map((link) =>
+          link.board ? (
+            <PinnedBoardRow key={link.key} link={link} board={link.board} />
+          ) : (
+            <PinnedStarRow key={link.key} link={link} />
+          ),
+        )}
         {links.length > PINNED_SHOWN_MAX && (
-          <PinnedRow
-            link={{
-              key: "all-pinned",
-              name: `All pinned (${links.length})`,
-              href: dashboardsPath({ projectSlug }),
-            }}
-            isAll
+          <AllPinnedRow
+            name={`All pinned (${links.length})`}
+            href={dashboardsPath({ projectSlug })}
           />
         )}
       </VStack>
@@ -129,12 +132,121 @@ function AddDashboardRow({ isCreating, onAdd }: { isCreating: boolean; onAdd: ()
   );
 }
 
-function PinnedRow({ link, isAll = false }: { link: StarredLink; isAll?: boolean }) {
+/** A pinned board; one the member may edit, delete or copy also loads the board list. */
+function PinnedBoardRow({ link, board }: { link: StarredLink; board: SidebarBoard }) {
+  const { access } = useBoardAccess(board);
+  const isManaged = access.canEdit || access.canDelete || access.canDuplicate;
+  return isManaged ? (
+    <ManagedBoardRow link={link} board={board} access={access} />
+  ) : (
+    <PinnedStarRow link={link} />
+  );
+}
+
+/** The "⋮" menu with only Unpin: a From LangWatch board, or one the member only reads. */
+function PinnedStarRow({ link }: { link: StarredLink }) {
+  const favourites = useFavourites();
+  return (
+    <SavedDashboardRow
+      name={link.name}
+      href={link.href}
+      isActive={false}
+      icon={<PinnedIcon />}
+      actions={{
+        isStarred: favourites.isStarred(link.star),
+        onToggleStar: () => favourites.toggleStar(link.star),
+        isRenaming: false,
+        onRenameCommit: () => {},
+        onRenameCancel: () => {},
+      }}
+    />
+  );
+}
+
+function PinnedIcon() {
+  return <LayoutDashboard size={14} strokeWidth={1.9} aria-hidden />;
+}
+
+/** The saved-dashboards row menu on a pinned board: what this member may do with it. */
+function ManagedBoardRow({
+  link,
+  board,
+  access,
+}: {
+  link: StarredLink;
+  board: SidebarBoard;
+  access: ReturnType<typeof useBoardAccess>["access"];
+}) {
+  const host = useAnalyticsHost();
+  const saved = useSavedDashboards();
+  const favourites = useFavourites();
+  const fromTemplate = useBoardFromTemplate();
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+  // My dashboard keeps its name and cannot be deleted.
+  const isMine = myDashboardId({ boards: [board], userId: host.userId() }) === board.id;
+  return (
+    <>
+      <SavedDashboardRow
+        name={link.name}
+        href={link.href}
+        isActive={false}
+        icon={<PinnedIcon />}
+        actions={{
+          isStarred: favourites.isStarred(link.star),
+          onToggleStar: () => favourites.toggleStar(link.star),
+          isRenaming,
+          ...(access.canEdit
+            ? { rename: isMine ? {} : { onStart: () => setIsRenaming(true) } }
+            : {}),
+          ...(access.canDuplicate
+            ? {
+                duplicate: {
+                  label: access.canEdit ? "Duplicate" : "Duplicate to edit",
+                  onDuplicate: () =>
+                    void fromTemplate.duplicateBoard({
+                      board,
+                      existingNames: saved.boards.map(({ name }) => name),
+                    }),
+                },
+              }
+            : {}),
+          ...(access.canDelete
+            ? { remove: isMine ? {} : { onDelete: () => setIsConfirmingDelete(true) } }
+            : {}),
+          onRenameCommit: (name) => {
+            setIsRenaming(false);
+            saved.renameBoard({ dashboardId: board.id, name });
+          },
+          onRenameCancel: () => setIsRenaming(false),
+        }}
+      />
+      <ConfirmDialog
+        open={isConfirmingDelete}
+        onOpenChange={setIsConfirmingDelete}
+        title="Delete dashboard"
+        message={`Delete "${board.name}" and every widget on it? This cannot be undone.`}
+        confirmLabel="Delete"
+        tone="danger"
+        loading={saved.isDeleting}
+        onConfirm={() =>
+          saved.deleteBoard({
+            dashboardId: board.id,
+            onDeleted: () => setIsConfirmingDelete(false),
+          })
+        }
+      />
+    </>
+  );
+}
+
+/** The "All pinned (N)" row: a plain link into Dashboards, with no board behind it. */
+function AllPinnedRow({ name, href }: { name: string; href: string }) {
   const host = useAnalyticsHost();
   return (
     <Box as="li" listStyleType="none" width="full">
       <ChakraLink
-        href={link.href}
+        href={href}
         display="flex"
         alignItems="center"
         gap={2}
@@ -149,16 +261,11 @@ function PinnedRow({ link, isAll = false }: { link: StarredLink; isAll?: boolean
         onClick={(event) => {
           if (opensElsewhere(event)) return;
           event.preventDefault();
-          host.navigate(link.href);
+          host.navigate(href);
         }}
       >
-        {!isAll && (
-          <Box as="span" display="flex" flexShrink={0}>
-            <LayoutDashboard size={14} strokeWidth={1.9} aria-hidden />
-          </Box>
-        )}
         <Text as="span" truncate minWidth={0}>
-          {link.name}
+          {name}
         </Text>
       </ChakraLink>
     </Box>

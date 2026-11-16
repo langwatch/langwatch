@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { PermissionDeniedError } from "@langwatch/authorization";
+import { ImpersonationCannotMintCredentialError } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
 import {
   type CreateRoutingPolicyInput,
@@ -186,11 +186,7 @@ export class EnterpriseGatewayModule implements EnterpriseGatewayApiContract {
     const { impersonatorId, ...issue } = input;
     // An operator acting as a member holds no grant to issue credentials as them (F05).
     if (impersonatorId) {
-      throw new PermissionDeniedError({
-        permission: "virtualKeys:create",
-        scope: { type: "organization", id: issue.organizationId },
-        denialReason: "no-grant",
-      });
+      throw new ImpersonationCannotMintCredentialError();
     }
     return this.#personalKeyDoors.issue(issue);
   }

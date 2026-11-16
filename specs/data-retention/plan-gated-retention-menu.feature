@@ -47,7 +47,7 @@ Feature: Plan-gated data-retention menu
   Scenario: A self-hosted deployment gets the full retention range on any paid plan
     Given a self-hosted deployment whose organization is on a paid, non-enterprise plan
     When a manager sets a custom retention of one year
-    Then the plan does not cap the value to the fixed pair
+    Then the plan does not cap the value to the fixed presets
 
   @unit
   Scenario: Keep-forever stays a platform-admin capability on every plan

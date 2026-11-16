@@ -221,6 +221,11 @@ const RESOURCE_COPY = {
     blurb: "The in-product assistant and its conversations.",
     area: "Building",
   },
+  braids: {
+    label: "Braids",
+    blurb: "Create, change and remove braids, and manage signing keys.",
+    area: "Data and analysis",
+  },
   sso: {
     label: "Single sign-on and directory",
     blurb: "How people sign in, and the directory that provisions them.",
@@ -255,6 +260,12 @@ const RESOURCE_COPY = {
     label: "Feature flag experiments",
     blurb: "Which experiments a project or organization is enrolled in.",
     area: "Organization",
+  },
+  // Never offered or held: a braid's own grant carries it when a trace is read (ADR-201 §3).
+  spans: {
+    label: "Braided spans",
+    blurb: "What a braid shows in a trace. Nobody is granted this; braids carry it themselves.",
+    area: "Data and analysis",
   },
 } as const satisfies Record<AuthzResource, ResourceCopy>;
 
@@ -410,6 +421,11 @@ export function levelOf({
 export function isReadOnlyResource(resource: OfferedResource): boolean {
   const actions = offeredActions(resource);
   return actions.length === 1 && actions[0] === "view";
+}
+
+/** False for a resource with no `view` to hold, so the picker offers no "Read" level for it. */
+export function offersReadLevel(resource: OfferedResource): boolean {
+  return readLevelPermissions(resource).length > 0;
 }
 
 /** Full access covers every action on its resource; changing what you cannot see is incoherent. */

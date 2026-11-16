@@ -74,6 +74,7 @@ function setUp({
     endDate: null,
     maxMembers: 5,
     maxMembersLite: null,
+    maxMembersDeveloper: null,
     maxMessagesPerMonth: null,
     lastPaymentFailedDate: null,
     seatsKept: null,

@@ -8,6 +8,8 @@ import type {
 export interface LwqlCollectionState {
   readonly available: readonly string[];
   readonly bound: Readonly<Record<string, string>>;
+  /** The `available` ones a config file defines (`source = 'CONFIG'`): no statement writes them. */
+  readonly configDefined?: readonly string[];
 }
 
 /** One key-map row: a project's key hash and the project it resolves to. */

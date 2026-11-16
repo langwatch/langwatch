@@ -56,6 +56,7 @@ import type {
   BindingPrincipalWhere,
 } from "../repositories/authz-grant.repository.ts";
 import type { AuthzManagedGrantRepository } from "../repositories/authz-managed-grant.repository.ts";
+import type { AuthzOrganizationPolicyRepository } from "../repositories/authz-organization-policy.repository.ts";
 import {
   RESOURCE_SCOPE_REJECTION,
   SCOPE_TYPE_FOR_REF,
@@ -91,6 +92,8 @@ type AuthzGrantsServiceOptions = {
   permissions: AuthzGrantWriterPermissions;
   /** Absent where nothing offboards; an unconnected notice refuses loudly when one does. */
   offboarded?: AuthzMemberOffboardedNotice;
+  /** The organisation's settings the offboarding proof's collector reads (ADR-201 §2). */
+  policies: Pick<AuthzOrganizationPolicyRepository, "getPolicy">;
 };
 
 type AuthzAttachGrantRequest = Omit<AuthzAttachGrantInput, "actor" | "where"> & {
@@ -127,6 +130,7 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
       offboarding: AuthzOffboardingService.create({
         repository: options.repository,
         offboarded: options.offboarded ?? AuthzMemberOffboardedNoticeService.create(),
+        policies: options.policies,
       }),
       guards: AuthzGrantGuardsService.create({ repository: options.repository }),
     });

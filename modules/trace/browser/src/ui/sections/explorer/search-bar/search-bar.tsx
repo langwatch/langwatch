@@ -10,6 +10,8 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { useFeatureFlag } from "@langwatch/feature-flag-client";
+import { FrontendFlags, NOT_TARGETED } from "@langwatch/feature-flag-contract";
 import type { AiActionError } from "@langwatch/trace-contract";
 import { SEARCH_FIELDS } from "@langwatch/trace-contract";
 import { AlertCircle, ChevronDown, ChevronUp, Search, X } from "lucide-react";
@@ -62,6 +64,7 @@ import { TokenValuePicker, type TokenValuePickerAnchor } from "./token-value-pic
 import { useAskLangyFromSearch } from "./use-ask-langy-from-search.ts";
 import type { ValueResolver } from "./use-filter-editor.ts";
 import { useInstantEvalRoute } from "./use-instant-eval-route.ts";
+import { useOwnDecisionModels } from "./use-own-decision-models.ts";
 import { useSubmitSearch } from "./use-submit-search.ts";
 
 /**
@@ -163,7 +166,7 @@ export const SearchBar: React.FC = () => {
   // Gate the inline Ask AI composer on having at least one model provider configured.
   // The AI mode submits requests against the user's own keys; with none enabled the
   // request would 4xx.
-  const { project } = useOrganizationTeamProject();
+  const { organization, project } = useOrganizationTeamProject();
   const { hasEnabledProviders, isLoading: isLoadingProviders } = useModelProvidersSettings({
     projectId: project?.id,
   });
@@ -280,11 +283,24 @@ export const SearchBar: React.FC = () => {
   // slow read never hides a feature the project actually has. The server's read also names a
   // refused reader's offer.
   const instantEvalAccess = useInstantEvalAccess({ projectId: project?.id });
-  const canActivateLicense = useOptionalTraceHost()?.hasPermission("organization:manage") ?? false;
+  const traceHost = useOptionalTraceHost();
+  const canActivateLicense = traceHost?.hasPermission("organization:manage") ?? false;
+  // The in-place pick writes the project's default models, so only a project admin gets it.
+  const canPickDecisionModel = traceHost?.hasPermission("project:manage") ?? false;
+  // Asked of the organization only, as Default models asks it (ADR-182 decision 4).
+  const { enabled: offersOwnModel } = useFeatureFlag(
+    FrontendFlags.release_instant_evals_own_decision_model,
+    { projectId: NOT_TARGETED, organizationId: organization?.id, enabled: !!organization?.id },
+  );
   const isInstantEvalAvailable = instantEvalAccess.isAvailable;
   const instantEval = useInstantEvalRoute({
     isInstantEvalAvailable,
     optInOffer: instantEvalAccess.optInOffer,
+  });
+  // The in-place picker lists what the project would run on; asked only while it shows.
+  const decisionModels = useOwnDecisionModels({
+    projectId: project?.id,
+    enabled: offersOwnModel && canPickDecisionModel && instantEval.refusal?.kind === "unreleased",
   });
   // Langy's explorer.runInstantEval reaches the same route, and so the same cost rule.
   const { onInstantEvalRoute } = instantEval;
@@ -372,6 +388,11 @@ export const SearchBar: React.FC = () => {
         isEnabling={instantEval.isEnabling}
         viaConnect={instantEvalAccess.viaConnect}
         canActivateLicense={canActivateLicense}
+        offersOwnModel={offersOwnModel}
+        canPickDecisionModel={canPickDecisionModel}
+        decisionModels={decisionModels}
+        onPickDecisionModel={instantEval.pickDecisionModel}
+        pickingDecisionModel={instantEval.pickingDecisionModel}
       >
         <Box position="absolute" left={3} bottom={0} width="1px" height="1px" aria-hidden="true" />
       </InstantEvalRefusalPopover>

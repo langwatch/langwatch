@@ -12,11 +12,16 @@ import { isPlanPausedForRecovery } from "../rules/payment-recovery.rules.ts";
 import { effectiveMaxMembers } from "../rules/seat-kept.rules.ts";
 
 // Fields that exist on both PlanInfo (as number) and Subscription (as Int?)
-type NumericOverrideField = "maxMembers" | "maxMembersLite" | "maxMessagesPerMonth";
+type NumericOverrideField =
+  | "maxMembers"
+  | "maxMembersLite"
+  | "maxMembersDeveloper"
+  | "maxMessagesPerMonth";
 
 export const NUMERIC_OVERRIDE_FIELDS: NumericOverrideField[] = [
   "maxMembers",
   "maxMembersLite",
+  "maxMembersDeveloper",
   "maxMessagesPerMonth",
 ];
 

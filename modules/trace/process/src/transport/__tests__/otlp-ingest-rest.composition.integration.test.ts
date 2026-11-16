@@ -28,6 +28,7 @@ import { TraceApi, type RecordSpanCommandData } from "@langwatch/trace-contract"
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { fakeTraceProcessingCommands } from "../../__tests__/support/trace-processing-commands.fake.ts";
+import { braidTwins } from "../../app/__tests__/support/trace-app.harness.ts";
 import { TraceModule } from "../../app/trace.app.ts";
 import { S3TraceLegacySpoolChannel } from "../../channels/s3/s3.trace-legacy-spool.channel.ts";
 import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
@@ -165,6 +166,7 @@ function deployment(
   const canonicalisation = TraceCanonicalisationService.create();
   const app = TraceModule.fromDependencies(
     TraceModule.composeDependencies({
+      ...braidTwins(),
       repositories: MemoryTraceRepositories.create(),
       storedObjects: createApiFixture<StoredObjectApi>(),
       canonicalisation,
@@ -355,12 +357,13 @@ describe("given the trace module as a process composes it", () => {
 
   describe("when the pipeline handoff fails for every span of the batch", () => {
     /** @scenario "A failed pipeline handoff answers the OTLP export as retryable" */
-    it("answers 503 without a partial success, so the exporter retries", async () => {
+    it("answers 503 with Retry-After and no partial success, so the exporter retries", async () => {
       const { post, recordedSpans } = deployment({}, { fails: true });
 
       const response = await post("/api/otel/v1/traces", otlpTraceBody());
 
       expect(response.status).toBe(503);
+      expect(response.headers.get("retry-after")).toBe("5");
       expect(await response.json()).not.toHaveProperty("partialSuccess");
       expect(recordedSpans).toHaveLength(0);
     });

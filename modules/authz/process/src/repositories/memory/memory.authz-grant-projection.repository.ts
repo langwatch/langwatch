@@ -1,3 +1,4 @@
+import { Ksuid } from "@langwatch/ksuid";
 import { type Instant, nowInstant, Temporal } from "@langwatch/time";
 
 import { isMigrationOwnedSource } from "../../rules/authz-migration-ownership.rules.ts";
@@ -79,8 +80,11 @@ export class MemoryAuthzGrantProjectionRepository extends AuthzGrantProjectionRe
 
   private statementFor(write: GrantProjectionWrite): number {
     switch (write.kind) {
-      case "grant.upsert":
-        return this.upsertGrant(write);
+      case "grant.upsert": {
+        const affected = this.upsertGrant(write);
+        this.insertLegacyTwin(write);
+        return affected;
+      }
       case "grant.setRole":
         return this.updateGrants(
           (row) => row.id === write.grantId && msOf(row.occurredAt) <= msOf(write.occurredAt),
@@ -155,6 +159,28 @@ export class MemoryAuthzGrantProjectionRepository extends AuthzGrantProjectionRe
     if (msOf(existing.occurredAt) >= msOf(row.occurredAt)) return 0;
     Object.assign(existing, stored, { updatedAt: now() });
     return 1;
+  }
+
+  /** The Prisma append's legacy twin: a revoked copy under the v1-legacy id, kept if one exists. */
+  private insertLegacyTwin({ row }: Extract<GrantProjectionWrite, { kind: "grant.upsert" }>) {
+    if (row.source !== "read-through-mint" || row.scopeType === "RESOURCE") return;
+    const parsed = parseGrantId(row.id);
+    if (parsed?.layout !== "v2") return;
+    const twinId = parsed.withLayout("v1-legacy").toString();
+    const grants = this.memory.grants;
+    if (twinId === row.id || grants.some((stored) => stored.id === twinId)) return;
+    const source = grants.find(
+      (stored) => stored.id === row.id && stored.organizationId === row.organizationId,
+    );
+    if (!source) return;
+    grants.push({
+      ...source,
+      id: twinId,
+      token: null,
+      updatedAt: now(),
+      revokedAt: source.occurredAt,
+      revokedReason: "superseded by its v2 id",
+    });
   }
 
   /** The identity guard the Prisma insert carries for a skipping attach. */
@@ -444,5 +470,13 @@ function removeWhere<Row>(rows: Row[], matches: (row: Row) => boolean): void {
   for (let index = rows.length - 1; index >= 0; index -= 1) {
     const row = rows[index];
     if (row !== undefined && matches(row)) rows.splice(index, 1);
+  }
+}
+
+function parseGrantId(grantId: string): Ksuid | undefined {
+  try {
+    return Ksuid.parse(grantId);
+  } catch {
+    return undefined;
   }
 }

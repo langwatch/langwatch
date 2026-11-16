@@ -122,6 +122,14 @@ Whether the account behind an id holds the platform-operator grant.
 isOperator(input: { userId: string }): Promise<boolean>;
 ```
 
+#### `searchForOperators`
+
+Accounts whose id, name or address holds the query, for a platform operator's search.
+
+```typescript
+searchForOperators(input: { query: string; limit: number }): Promise<UserProfile[]>;
+```
+
 #### `findByEmail`
 
 The account holding an address, matched on its stored lower-cased form, however typed.
@@ -136,6 +144,14 @@ Mints a directory account with no sign-in method of its own.
 
 ```typescript
 create(input: CreateUserInput): Promise<UserProfile>;
+```
+
+#### `recordCreated`
+
+Commits the created fact for an account Better Auth wrote itself (social and single sign-on sign-up), which never passes a mint here. Keyed by the user, so a repeat records nothing new.
+
+```typescript
+recordCreated(input: UserIdInput): Promise<void>;
 ```
 
 #### `createPasskeyUser`

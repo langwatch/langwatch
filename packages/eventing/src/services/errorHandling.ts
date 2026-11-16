@@ -688,3 +688,55 @@ function projectGoneAt({ error, depth }: { error: unknown; depth: number }): boo
   if (Reflect.get(error, "code") === PROJECT_GONE_CODE) return true;
   return projectGoneAt({ error: Reflect.get(error, "cause"), depth: depth + 1 });
 }
+
+/** ClickHouse's per-query memory limit, in both its older and newer wording. */
+const QUERY_MEMORY_LIMIT_FRAGMENTS = [
+  "Query memory limit exceeded",
+  "Memory limit (for query) exceeded",
+] as const;
+
+/**
+ * Whether one statement outgrew its own memory limit, read through causes and handled
+ * reasons. The server-wide `(total)` limit and the client's own shedding are load, not size.
+ */
+export function isQueryMemoryLimitExceeded(error: unknown): boolean {
+  return memoryLimitAt({ error, fragments: QUERY_MEMORY_LIMIT_FRAGMENTS, depth: 0 });
+}
+
+/** Any ClickHouse memory limit, in every wording the server uses, the `(total)` one included. */
+const ANY_MEMORY_LIMIT_FRAGMENTS = [
+  "memory limit exceeded",
+  "Memory limit (for query) exceeded",
+  "Memory limit (total) exceeded",
+] as const;
+
+/**
+ * Whether a statement stopped on any memory limit, the server-wide one included: what a reader
+ * that sent nothing on yet may answer by reading less at a time.
+ */
+export function isAnyMemoryLimitExceeded(error: unknown): boolean {
+  return memoryLimitAt({ error, fragments: ANY_MEMORY_LIMIT_FRAGMENTS, depth: 0 });
+}
+
+function memoryLimitAt({
+  error,
+  fragments,
+  depth,
+}: {
+  error: unknown;
+  fragments: readonly string[];
+  depth: number;
+}): boolean {
+  if (depth > MAX_CAUSE_DEPTH || error === null || typeof error !== "object") return false;
+  const message = Reflect.get(error, "message");
+  if (typeof message === "string" && fragments.some((fragment) => message.includes(fragment))) {
+    return true;
+  }
+  const reasons: unknown = HandledError.isHandled(error) ? error.reasons : undefined;
+  if (Array.isArray(reasons)) {
+    for (const reason of reasons) {
+      if (memoryLimitAt({ error: reason, fragments, depth: depth + 1 })) return true;
+    }
+  }
+  return memoryLimitAt({ error: Reflect.get(error, "cause"), fragments, depth: depth + 1 });
+}

@@ -117,8 +117,12 @@ export type FoldStateRead<State> = { kind: "folded"; state: State } | { kind: "e
  * Handles persistence and retrieval of fold state.
  */
 export interface FoldProjectionStore<State> {
-  /** Persists the current fold state for an aggregate. */
-  store: (state: State, context: ProjectionStoreContext) => Promise<void>;
+  /**
+   * Persists the current fold state for an aggregate. A store that stamps columns of its own
+   * onto the state answers the state as persisted, so a cache in front holds what a read-back
+   * would decode; answering nothing means the state handed in was persisted as is.
+   */
+  store: (state: State, context: ProjectionStoreContext) => Promise<State | void>;
 
   /** Optional batch store for persisting multiple fold states at once. */
   storeBatch?: (entries: { state: State; context: ProjectionStoreContext }[]) => Promise<void>;

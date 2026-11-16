@@ -5,7 +5,7 @@
  */
 
 import type { AnalyticsAggregation, BuiltAnalyticsQuery } from "@langwatch/analytics-contract";
-import { tenantScope } from "@langwatch/clickhouse-client";
+import { tenantScope, tenantSet } from "@langwatch/clickhouse-client";
 
 import type { TimeseriesQueryInput } from "./clickhouse.aggregation-builder.mapper.ts";
 import { latestVersionSubquery } from "./clickhouse.latest-version-dedup.mapper.ts";
@@ -177,12 +177,12 @@ export function buildEvalSlimTimeseriesQuery(input: TimeseriesQueryInput): Built
   const selectExprs: string[] = [];
   selectExprs.push(
     `CASE
-      WHEN ${ea}.OccurredAt >= {currentStart:DateTime64(3)} AND ${ea}.OccurredAt < {currentEnd:DateTime64(3)} THEN 'current'
-      WHEN ${ea}.OccurredAt >= {previousStart:DateTime64(3)} AND ${ea}.OccurredAt < {previousEnd:DateTime64(3)} THEN 'previous'
+      WHEN ${ea}.LatestOccurredAt >= {currentStart:DateTime64(3)} AND ${ea}.LatestOccurredAt < {currentEnd:DateTime64(3)} THEN 'current'
+      WHEN ${ea}.LatestOccurredAt >= {previousStart:DateTime64(3)} AND ${ea}.LatestOccurredAt < {previousEnd:DateTime64(3)} THEN 'previous'
     END AS period`,
   );
   if (typeof input.timeScale === "number") {
-    selectExprs.push(`${dateTrunc(`${ea}.OccurredAt`, input.timeScale, timeZone)} AS date`);
+    selectExprs.push(`${dateTrunc(`${ea}.LatestOccurredAt`, input.timeScale, timeZone)} AS date`);
   }
 
   const groupByColumn = buildEvalSlimGroupByExpression(input.groupBy);
@@ -230,8 +230,8 @@ export function buildEvalSlimTimeseriesQuery(input: TimeseriesQueryInput): Built
 
   const havingClause = groupByColumn ? `HAVING group_key != ''` : "";
 
-  // The fence leads the outer WHERE as one bracket; every OR after it nests deeper, so the
-  // tenant guard never sees a disjunction beside the tenant set.
+  // The windowed fence sits inside dedupedSlim; the outer read takes the tenant set alone, since
+  // its time leaves the dedup as LatestOccurredAt (ADR-201 §3). Every OR nests below the fence.
   const sql = `
     SELECT
       ${selectExprs.join(",\n      ")}
@@ -240,11 +240,11 @@ export function buildEvalSlimTimeseriesQuery(input: TimeseriesQueryInput): Built
       dateClause: SLIM_DATE_FILTER_BOTH_PERIODS,
       expressions: selectExprs,
     })}
-    WHERE ${tenantScope("OccurredAt")}
+    WHERE ${tenantSet()}
       AND (
-        (${ea}.OccurredAt >= {currentStart:DateTime64(3)} AND ${ea}.OccurredAt < {currentEnd:DateTime64(3)})
+        (${ea}.LatestOccurredAt >= {currentStart:DateTime64(3)} AND ${ea}.LatestOccurredAt < {currentEnd:DateTime64(3)})
         OR
-        (${ea}.OccurredAt >= {previousStart:DateTime64(3)} AND ${ea}.OccurredAt < {previousEnd:DateTime64(3)})
+        (${ea}.LatestOccurredAt >= {previousStart:DateTime64(3)} AND ${ea}.LatestOccurredAt < {previousEnd:DateTime64(3)})
       )
       ${filterWhere}
     GROUP BY ${groupByExprs.join(", ")}

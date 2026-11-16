@@ -100,7 +100,13 @@ export class OrganizationMemberSeatService {
       actingUser: actingUser ?? undefined,
     });
     await lease.assertHeld();
-    await this.repo.setMemberDisabled({ organizationId, userId, disabled: false, seat });
+    await this.repo.setMemberDisabled({
+      organizationId,
+      userId,
+      disabled: false,
+      seat,
+      actorUserId: actingUser?.id ?? null,
+    });
     return false;
   }
 
@@ -240,6 +246,7 @@ export class OrganizationMemberSeatService {
       userId,
       pendingAdmissionId: grantId,
       seat: await seatHolds.takeOf({ organizationId, userId }),
+      actorUserId: actingUserId,
     });
     if (!enabled) return false;
     try {

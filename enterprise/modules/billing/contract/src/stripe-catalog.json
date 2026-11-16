@@ -120,6 +120,9 @@
     },
     "RETENTION_STORAGE_USD_ANNUAL": {
       "test": "price_1UZwpUIMsTw08cudTk8giE9U"
+    },
+    "GROWTH_PII_REDACTION_USD": {
+      "test": "price_1Uat9tIMsTw08cudpWWrZG4a"
     }
   },
   "meters": {
@@ -130,6 +133,9 @@
     "RETENTION_STORAGE_GB": {
       "test": "mtr_test_61VjKmnOYgbfwXOun41IMsTw08cudHtw",
       "live": ""
+    },
+    "PII_REDACTION_USD": {
+      "test": "mtr_test_61VkH7EXYKEdkxaxI41IMsTw08cudVay"
     }
   },
   "prices": {
@@ -1882,6 +1888,24 @@
       "lookupKey": "RETENTION_STORAGE_USD_ANNUAL",
       "metadata": {
         "langwatch_key": "RETENTION_STORAGE_USD_ANNUAL"
+      }
+    },
+    "price_1Uat9tIMsTw08cudpWWrZG4a": {
+      "id": "price_1Uat9tIMsTw08cudpWWrZG4a",
+      "active": true,
+      "livemode": false,
+      "product": "prod_Vc7O05LokHhFyy",
+      "unitAmount": 100,
+      "currency": "usd",
+      "type": "recurring",
+      "recurring": {
+        "interval": "month",
+        "intervalCount": 1
+      },
+      "nickname": "Growth PII Redaction, 1.00 USD per USD redacted",
+      "lookupKey": "GROWTH_PII_REDACTION_USD",
+      "metadata": {
+        "langwatch_key": "GROWTH_PII_REDACTION_USD"
       }
     }
   }

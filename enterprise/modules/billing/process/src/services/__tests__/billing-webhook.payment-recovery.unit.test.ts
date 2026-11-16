@@ -101,6 +101,7 @@ describe("given the Stripe callback with payment recovery composed", () => {
       endDate: null,
       maxMembers: 5,
       maxMembersLite: null,
+      maxMembersDeveloper: null,
       maxMessagesPerMonth: null,
       lastPaymentFailedDate: null,
       seatsKept: null,

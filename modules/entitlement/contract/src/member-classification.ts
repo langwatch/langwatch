@@ -90,6 +90,31 @@ export function countMemberSeats(
 }> {
   const count = (type: MemberType) =>
     holders.filter((holder) => classifyMemberType(holder.role, holder.permissions) === type).length;
+  const heldFullMembers = new Set(countedSeatHolds({ holders, holds }).map((hold) => hold.userId))
+    .size;
+  return {
+    fullMembers: count("FullMember") + heldFullMembers,
+    liteMembers: count("LiteMember"),
+    developers: count("Developer"),
+  };
+}
+
+/**
+ * The live seat holds that count as a full seat: those whose person holds no full seat again, as
+ * a member (by user id) or through a live full invitation (by address). seat-rotation.feature.
+ */
+export function countedSeatHolds<Hold extends Readonly<{ userId: string; email?: string | null }>>({
+  holders,
+  holds,
+}: {
+  holders: readonly Readonly<{
+    role: OrganizationUserRole;
+    permissions: string[] | undefined;
+    userId?: string;
+    email?: string | null;
+  }>[];
+  holds: readonly Hold[];
+}): Hold[] {
   const fullHolders = holders.filter(
     (holder) => classifyMemberType(holder.role, holder.permissions) === "FullMember",
   );
@@ -97,18 +122,8 @@ export function countMemberSeats(
   const fullEmails = new Set(
     fullHolders.flatMap((holder) => (holder.email ? [holder.email.toLowerCase()] : [])),
   );
-  const heldFullMembers = new Set(
-    holds
-      .filter(
-        (hold) =>
-          !fullUserIds.has(hold.userId) &&
-          !(hold.email && fullEmails.has(hold.email.toLowerCase())),
-      )
-      .map((hold) => hold.userId),
-  ).size;
-  return {
-    fullMembers: count("FullMember") + heldFullMembers,
-    liteMembers: count("LiteMember"),
-    developers: count("Developer"),
-  };
+  return holds.filter(
+    (hold) =>
+      !fullUserIds.has(hold.userId) && !(hold.email && fullEmails.has(hold.email.toLowerCase())),
+  );
 }
