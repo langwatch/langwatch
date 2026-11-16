@@ -17,6 +17,7 @@ import {
   classifyClickHouseError,
   ErrorCategory,
   isOutOfStatementSlots,
+  isPermanentClickHouseError,
   isProjectGone,
   isQueryMemoryLimitExceeded,
   UndeclaredQueuedEventTypeError,
@@ -51,6 +52,36 @@ export async function refuseInvalidValueOnce<T>({
     if (!(error instanceof Error && "issues" in error && Array.isArray(error.issues))) throw error;
     throw new NonRetryableGroupQueueError(
       `Queue ${queueName} refused a value that fails its schema: ${error.message}`,
+      { cause: error },
+    );
+  }
+}
+
+/**
+ * The attempts a single job gets once ClickHouse refuses its data, instead of the full budget.
+ * Not one: a coalesced insert or a shared async flush returns another caller's parse error to
+ * every member (ADR-187), and a member that was not the culprit succeeds on its own retry.
+ */
+const REFUSED_DATA_ATTEMPTS = 3;
+
+/** A ClickHouse parse or type refusal fails the same way every time: stop retrying it soon. */
+export async function stopRetryingRefusedData<T>({
+  queueName,
+  attempt,
+  run,
+}: {
+  queueName: string;
+  attempt: number;
+  run: () => Promise<T>;
+}): Promise<T> {
+  try {
+    return await run();
+  } catch (error) {
+    if (attempt < REFUSED_DATA_ATTEMPTS) throw error;
+    if (!isPermanentClickHouseError(error)) throw error;
+    // The refusal's own message may quote the row it could not parse, so it stays in the cause.
+    throw new NonRetryableGroupQueueError(
+      `Queue ${queueName} stopped retrying a job whose data ClickHouse refused as unparseable or of the wrong type, on attempt ${attempt}`,
       { cause: error },
     );
   }
@@ -278,18 +309,24 @@ export function createEventingGroupQueueFactory({
       consumerDependencies: GroupQueueDependencies<Record<string, unknown>>,
     ): RunningGroupQueueConsumer<Record<string, unknown>> => {
       const configuredConsumer = new GroupQueueConsumer(queueDefinition, consumerDependencies);
+      // Only a single job is refused for its data: a coalesced batch bisects to find the culprit.
       const one = (payload: Record<string, unknown>, context: JobDelivery | undefined) =>
         backOffWhenOverloaded({
           queueName: eventingDefinition.name,
           unit: "job",
           run: () =>
-            refuse(() =>
-              completeWhenProjectGone({
-                queueName: eventingDefinition.name,
-                payloads: [payload],
-                run: () => eventingDefinition.process(payload, context),
-              }),
-            ),
+            stopRetryingRefusedData({
+              queueName: eventingDefinition.name,
+              attempt: context?.attempt ?? 1,
+              run: () =>
+                refuse(() =>
+                  completeWhenProjectGone({
+                    queueName: eventingDefinition.name,
+                    payloads: [payload],
+                    run: () => eventingDefinition.process(payload, context),
+                  }),
+                ),
+            }),
         });
       return eventingDefinition.processBatch
         ? configuredConsumer.handleBatch({

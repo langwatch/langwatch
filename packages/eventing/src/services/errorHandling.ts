@@ -688,6 +688,65 @@ function isTransientClickHouseError(error: unknown): boolean {
   return false;
 }
 
+/**
+ * ClickHouse's refusals of the data itself, by error name and code: a value that does not parse
+ * or does not fit its column fails the same way on every attempt. A missing column or table is
+ * left out, as a rolling deploy may add it moments later.
+ */
+const CLICKHOUSE_PERMANENT_DATA_ERRORS: ReadonlyMap<string, string> = new Map([
+  ["CANNOT_PARSE_TEXT", "6"],
+  ["CANNOT_PARSE_ESCAPE_SEQUENCE", "25"],
+  ["CANNOT_PARSE_QUOTED_STRING", "26"],
+  ["CANNOT_PARSE_INPUT_ASSERTION_FAILED", "27"],
+  ["CANNOT_PARSE_DATE", "38"],
+  ["CANNOT_PARSE_DATETIME", "41"],
+  ["ILLEGAL_TYPE_OF_ARGUMENT", "43"],
+  ["TYPE_MISMATCH", "53"],
+  ["CANNOT_CONVERT_TYPE", "70"],
+  ["CANNOT_PARSE_NUMBER", "72"],
+  ["INCORRECT_DATA", "117"],
+  ["CANNOT_INSERT_NULL_IN_ORDINARY_COLUMN", "349"],
+]);
+
+const CLICKHOUSE_PERMANENT_DATA_CODES: ReadonlySet<string> = new Set(
+  CLICKHOUSE_PERMANENT_DATA_ERRORS.values(),
+);
+
+/**
+ * Whether ClickHouse refused the data itself (a parse or type error), read through causes and
+ * handled reasons, with no transient failure among them. A code counts only on an error that
+ * also carries ClickHouse's error name, so another library's numeric code is never read as one.
+ */
+export function isPermanentClickHouseError(error: unknown): boolean {
+  return permanentDataErrorAt({ error, depth: 0 });
+}
+
+function permanentDataErrorAt({ error, depth }: { error: unknown; depth: number }): boolean {
+  if (depth > MAX_CAUSE_DEPTH || error === null || typeof error !== "object") return false;
+  if (classifyClickHouseError(error) === ErrorCategory.RECOVERABLE) return false;
+  if (refusesTheData(error)) return true;
+  if (HandledError.isHandled(error)) {
+    const reasons: readonly unknown[] = error.reasons ?? [];
+    if (reasons.some((reason) => permanentDataErrorAt({ error: reason, depth: depth + 1 }))) {
+      return true;
+    }
+  }
+  return permanentDataErrorAt({ error: Reflect.get(error, "cause"), depth: depth + 1 });
+}
+
+function refusesTheData(error: object): boolean {
+  const type = Reflect.get(error, "type");
+  if (typeof type === "string") {
+    if (CLICKHOUSE_PERMANENT_DATA_ERRORS.has(type)) return true;
+    if (CLICKHOUSE_PERMANENT_DATA_CODES.has(String(Reflect.get(error, "code")))) return true;
+  }
+  const message = error instanceof Error ? error.message : "";
+  for (const name of CLICKHOUSE_PERMANENT_DATA_ERRORS.keys()) {
+    if (message.includes(name)) return true;
+  }
+  return false;
+}
+
 const PROJECT_GONE_NAME = "ProjectNotFoundError";
 const PROJECT_GONE_CODE = "project_not_found";
 const MAX_CAUSE_DEPTH = 8;

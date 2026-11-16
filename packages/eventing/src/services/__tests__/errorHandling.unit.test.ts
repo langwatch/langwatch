@@ -11,6 +11,7 @@ import {
   HandlerError,
   handleError,
   isOutOfStatementSlots,
+  isPermanentClickHouseError,
   ProjectionError,
   QueueError,
   SecurityError,
@@ -701,6 +702,79 @@ describe("isOutOfStatementSlots", () => {
       ["a lost connection", new Error("socket hang up")],
     ])("does not call %s a missing slot", (_, error) => {
       expect(isOutOfStatementSlots(error)).toBe(false);
+    });
+  });
+});
+
+/** A ClickHouse server error as @clickhouse/client raises it: its code and its name apart. */
+const clickHouseServerError = ({
+  code,
+  type,
+  message,
+}: {
+  code: string;
+  type: string;
+  message: string;
+}) => Object.assign(new Error(message), { code, type });
+
+describe("isPermanentClickHouseError", () => {
+  describe("when ClickHouse refused the data itself", () => {
+    it.each([
+      ["27", "CANNOT_PARSE_INPUT_ASSERTION_FAILED", "Cannot parse input: expected '\"' before"],
+      ["6", "CANNOT_PARSE_TEXT", "Cannot parse string 'abc' as UInt64"],
+      ["53", "TYPE_MISMATCH", "Type mismatch in IN or VALUES section"],
+      ["43", "ILLEGAL_TYPE_OF_ARGUMENT", "Illegal type String of argument of function plus"],
+    ])("refuses retrying code %s (%s)", (code, type, message) => {
+      expect(isPermanentClickHouseError(clickHouseServerError({ code, type, message }))).toBe(true);
+    });
+
+    it("recognises the name in a message that crossed a serialisation boundary", () => {
+      const error = new Error(
+        "Code: 27. DB::Exception: Cannot parse input: expected '\"' before: 'x': (at row 1). (CANNOT_PARSE_INPUT_ASSERTION_FAILED)",
+      );
+
+      expect(isPermanentClickHouseError(error)).toBe(true);
+    });
+
+    it("finds it under a wrapping error and among a handled error's reasons", () => {
+      const parse = clickHouseServerError({
+        code: "6",
+        type: "CANNOT_PARSE_TEXT",
+        message: "Cannot parse string",
+      });
+
+      expect(isPermanentClickHouseError(new Error("append failed", { cause: parse }))).toBe(true);
+      expect(isPermanentClickHouseError(new ClickHouseUnavailableError({ reasons: [parse] }))).toBe(
+        true,
+      );
+    });
+  });
+
+  describe("when the failure may pass on its own", () => {
+    it("retries a missing column, which a rolling deploy may add moments later", () => {
+      const error = clickHouseServerError({
+        code: "16",
+        type: "NO_SUCH_COLUMN_IN_TABLE",
+        message: "No such column Cost in table stored_spans",
+      });
+
+      expect(isPermanentClickHouseError(error)).toBe(false);
+    });
+
+    it("retries an overload even when a parse error rides beside it", () => {
+      const shed = new ClickHouseOverloadedError({
+        reasons: [
+          clickHouseServerError({ code: "6", type: "CANNOT_PARSE_TEXT", message: "bad row" }),
+        ],
+      });
+
+      expect(isPermanentClickHouseError(shed)).toBe(false);
+    });
+
+    it("never reads another library's bare numeric code as ClickHouse's", () => {
+      const grpcAlreadyExists = Object.assign(new Error("entity already exists"), { code: 6 });
+
+      expect(isPermanentClickHouseError(grpcAlreadyExists)).toBe(false);
     });
   });
 });
