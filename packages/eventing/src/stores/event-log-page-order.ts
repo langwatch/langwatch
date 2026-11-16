@@ -1,5 +1,4 @@
 import type { Event } from "../domain/types.ts";
-import { compareOrdinal } from "../utils/compareOrdinal.ts";
 
 /**
  * Where a paged history read resumes. Pages follow event_log's sort key so each one seeks
@@ -21,7 +20,7 @@ export function compareEventLogPagePositions(
   const byKey = compareCodePoints(left.idempotencyKey, right.idempotencyKey);
   if (byKey !== 0) return byKey;
   if (left.timestamp !== right.timestamp) return left.timestamp - right.timestamp;
-  return compareOrdinal(left.eventId, right.eventId);
+  return compareCodePoints(left.eventId, right.eventId);
 }
 
 /**

@@ -55,6 +55,17 @@ describe("event log page order", () => {
     });
   });
 
+  describe("given equal keys and times whose ids differ in UTF-16 and byte order", () => {
+    it("breaks the tie by id in byte order too", () => {
+      const events = [ev("\u{10000}", 1, "k"), ev("\uE000", 1, "k")];
+
+      expect(events.toSorted(compareEventLogPageOrder).map((e) => e.id)).toEqual([
+        "\uE000",
+        "\u{10000}",
+      ]);
+    });
+  });
+
   describe("given a page a store handed back in arrival order", () => {
     it("resumes after its furthest event in page order, not its last element", () => {
       const page = [ev("e4", 4, "k1"), ev("e5", 5, "k0")];
