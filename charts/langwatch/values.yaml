@@ -1552,19 +1552,26 @@ piiRedactionModel:
   enabled: false
 
   # A model run outside this release (another namespace, another cluster, or
-  # Cloud's Lambda alias ARN for an install on AWS). Used only while enabled
-  # is false; enabled always points at the chart's own Service.
-  ## @param piiRedactionModel.externalEndpoint [string] PII_REDACTION_MODEL_ENDPOINT for a model this release does not deploy (an http(s) address or a Lambda alias ARN). Ignored when enabled.
+  # a Lambda alias ARN for an install on AWS). Used only while enabled is
+  # false; enabled always points at the chart's own Service.
+  # Setting it has the same effect on the app as enabled: by default it also
+  # forces release_pii_redaction_model_enabled (every Strict organization is
+  # routed to the model) and release_pii_redaction_model_free (calls recorded
+  # at zero price). Opt out of each with enableForAllOrganizations: false and
+  # recordAtZeroPrice: false below.
+  ## @param piiRedactionModel.externalEndpoint [string] PII_REDACTION_MODEL_ENDPOINT for a model this release does not deploy (an http(s) address or a Lambda alias ARN). Ignored when enabled. Also forces release_pii_redaction_model_enabled and release_pii_redaction_model_free unless enableForAllOrganizations / recordAtZeroPrice are false.
   externalEndpoint: ""
 
-  # Deploying the model is the decision to use it: force
-  # release_pii_redaction_model_enabled for every organization. False leaves
-  # the choice per organization to the flag store (/ops/feature-flags).
+  # Configuring a model (enabled or externalEndpoint) is the decision to use
+  # it: force release_pii_redaction_model_enabled for every organization.
+  # False leaves the choice per organization to the flag store
+  # (/ops/feature-flags).
   ## @param piiRedactionModel.enableForAllOrganizations [default: true] Route every Strict organization to the model as soon as it is configured. False keeps release_pii_redaction_model_enabled authoritative.
   enableForAllOrganizations: true
-  # A self-hosted install runs the model on its own nodes, so its calls are
-  # recorded at a price of zero (release_pii_redaction_model_free), never at
-  # Cloud's per-character price.
+  # A self-hosted install runs the model on its own nodes, so whenever a model
+  # is configured (enabled or externalEndpoint) its calls are recorded at a
+  # price of zero (release_pii_redaction_model_free), never at Cloud's
+  # per-character price. False leaves that flag to the flag store.
   ## @param piiRedactionModel.recordAtZeroPrice [default: true] Record model calls at zero (release_pii_redaction_model_free). False records them at the Cloud price.
   recordAtZeroPrice: true
 

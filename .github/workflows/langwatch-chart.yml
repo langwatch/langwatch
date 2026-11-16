@@ -234,9 +234,9 @@ jobs:
       - name: "assert the redis-valkey overlay swaps only the image"
         if: "!cancelled()"
         run: ./tests/redis-valkey.sh
+
       # The PII redaction model: off in every profile, sized in prod/HA, and
       # PII_REDACTION_MODEL_ENDPOINT on the app and workers only when enabled.
-      # prod/HA, and PII_REDACTION_MODEL_ENDPOINT on the app and workers only.
       - name: "assert the PII redaction model wiring"
         if: "!cancelled()"
         run: ./tests/pii-redaction-model.sh

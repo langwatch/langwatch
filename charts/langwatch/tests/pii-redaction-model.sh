@@ -174,6 +174,40 @@ test_external_endpoint() {
   ok "external endpoint passed through, no model deployed"
 }
 
+# The forced flags on one workload of a render, as a comma-wrapped list.
+flags_of() {
+  printf ',%s,' "$(env_value "$(only "$(render "$1")" "$2/deployment")" FEATURE_FLAG_FORCE_ENABLE)"
+}
+
+# @scenario "An external model also releases it for every organization, at zero price"
+test_external_endpoint_forces_flags() {
+  local ext="$BASE --set piiRedactionModel.externalEndpoint=http://pii.example:8080" kind flags
+  for kind in app workers; do
+    flags=$(flags_of "$ext" "$kind")
+    case "$flags" in
+      *,release_pii_redaction_model_enabled,*) ;;
+      *) fail "external flags $kind" "no release_pii_redaction_model_enabled in '$flags'"; return ;;
+    esac
+    case "$flags" in
+      *,release_pii_redaction_model_free,*) ;;
+      *) fail "external flags $kind" "no release_pii_redaction_model_free in '$flags'"; return ;;
+    esac
+  done
+  ok "external endpoint forces both flags on app and workers"
+  flags=$(flags_of "$ext --set piiRedactionModel.enableForAllOrganizations=false" workers)
+  if [[ "$flags" == *,release_pii_redaction_model_enabled,* || "$flags" != *,release_pii_redaction_model_free,* ]]; then
+    fail "external opt-out routing" "flags are '$flags'"
+    return
+  fi
+  ok "external, enableForAllOrganizations=false: only the free flag"
+  flags=$(flags_of "$ext --set piiRedactionModel.recordAtZeroPrice=false" workers)
+  if [[ "$flags" == *,release_pii_redaction_model_free,* || "$flags" != *,release_pii_redaction_model_enabled,* ]]; then
+    fail "external opt-out price" "flags are '$flags'"
+    return
+  fi
+  ok "external, recordAtZeroPrice=false: only the routing flag"
+}
+
 # @scenario "The image, pull secrets and probes come from values and the image's contract"
 test_image_secrets_probes() {
   local deploy probes
@@ -201,6 +235,10 @@ test_image_secrets_probes() {
     fail "probes" "$probes probes on /healthz, expected 3"
     return
   fi
+  if [ "$(printf '%s\n' "$deploy" | awk '/startupProbe:/ { s=1 } s && /failureThreshold:/ { print $2; exit }')" != "36" ]; then
+    fail "startup probe" "failureThreshold is not 36 (180 s at 5 s)"
+    return
+  fi
   if ! printf '%s\n' "$deploy" | grep -q 'terminationGracePeriodSeconds: 100'; then
     fail "grace" "terminationGracePeriodSeconds is not 100"
     return
@@ -209,7 +247,7 @@ test_image_secrets_probes() {
     fail "threads" "THREADS is '$(env_value "$deploy" THREADS)', expected 3 for a 3-CPU limit"
     return
   fi
-  ok "image, pull secret, /healthz probes, 100 s grace, THREADS=3"
+  ok "image, pull secret, /healthz probes, 180 s startup, 100 s grace, THREADS=3"
 }
 
 # @scenario "Without an image the chart refuses to render"
@@ -231,6 +269,7 @@ test_prod_and_ha_profiles_when_enabled
 test_enabled_wires_app_and_workers_only
 test_flags_follow_the_toggles
 test_external_endpoint
+test_external_endpoint_forces_flags
 test_image_secrets_probes
 test_refuses_without_image
 

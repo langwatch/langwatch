@@ -126,15 +126,16 @@ spec:
           resources:
             {{- toYaml .Values.piiRedactionModel.resources | nindent 12 }}
           # The models load and warm up before the port answers: 3 to 6 s with
-          # the image already on the node. 120 s (24 x 5 s) leaves room for a
-          # slow node; liveness waits for it, so a slow load is never killed.
+          # the image already on the node on k3s, up to 136 s for a cold load on
+          # Lambda. 180 s (36 x 5 s) covers that; liveness waits for it, so a
+          # slow load is never killed.
           startupProbe:
             httpGet:
               path: /healthz
               port: http
             periodSeconds: 5
             timeoutSeconds: 3
-            failureThreshold: 24
+            failureThreshold: 36
           readinessProbe:
             httpGet:
               path: /healthz

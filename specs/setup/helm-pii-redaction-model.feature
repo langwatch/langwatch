@@ -61,6 +61,13 @@ Feature: The chart can run the PII redaction model for strict PII analysis
       Then the app and workers have PII_REDACTION_MODEL_ENDPOINT set to that address
       And the chart deploys no model
 
+    @e2e
+    Scenario: An external model also releases it for every organization, at zero price
+      Given piiRedactionModel.enabled is false and piiRedactionModel.externalEndpoint is set
+      When the chart renders
+      Then FEATURE_FLAG_FORCE_ENABLE on the app and workers includes release_pii_redaction_model_enabled and release_pii_redaction_model_free
+      And enableForAllOrganizations false drops only the first, recordAtZeroPrice false drops only the second
+
   Rule: The model pod runs the image the operator names, the way Cloud runs it
 
     @e2e
@@ -69,7 +76,7 @@ Feature: The chart can run the PII redaction model for strict PII analysis
       When the chart renders
       Then the container runs the public langwatch/pii-redaction-model image at the chart's release with no pull secret
       And a repository, a tag and an optional imagePullSecret from values replace it
-      And its startup, readiness and liveness probes are on /healthz
+      And its startup, readiness and liveness probes are on /healthz, the startup probe allowing 180 s
       And it has 100 s to drain and THREADS follows its CPU limit
 
     @e2e
