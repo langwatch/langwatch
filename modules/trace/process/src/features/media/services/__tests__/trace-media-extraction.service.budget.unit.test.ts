@@ -7,9 +7,9 @@ import { describe, expect, it, vi } from "vitest";
  * Tests BUDGET and MARKER GATE; production code with a faked media store.
  */
 import {
-  TraceValueMediaExtractionService,
   MAX_MEDIA_PARTS_PER_SPAN,
-} from "../trace-value-media-extraction.service.ts";
+  TraceMediaExtractionService,
+} from "../trace-media-extraction.service.ts";
 
 vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
@@ -20,7 +20,7 @@ vi.mock("@langwatch/observability", () => ({
   }),
 }));
 
-import type { TraceMediaStore } from "../trace-stored-media-store.service.ts";
+import type { TraceMediaStore } from "../trace-media-store.service.ts";
 
 interface StoredCall {
   mediaType: string;
@@ -29,21 +29,26 @@ interface StoredCall {
 
 function makeFakeService(): { service: TraceMediaStore; calls: StoredCall[] } {
   const calls: StoredCall[] = [];
-  const service = {
+  const service: TraceMediaStore = {
+    purpose: "trace_content",
+    ownerKind: "trace",
     storeFromBytes: async ({ mediaType, bytes }: { mediaType: string; bytes: Buffer }) => {
       calls.push({ mediaType, bytes });
-      return { id: `so-${calls.length}`, mediaType, isDuplicate: false };
+      return { id: `so-${calls.length}`, isDuplicate: false };
     },
   };
   return { service, calls };
 }
 
-const PARAMS = {
-  projectId: "proj-1",
-  purpose: "trace_content",
-  ownerKind: "trace",
-  ownerId: "trace-1",
-} as const;
+const PARAMS = { projectId: "proj-1", ownerId: "trace-1" } as const;
+
+function extractionOver(store: TraceMediaStore): TraceMediaExtractionService {
+  return TraceMediaExtractionService.create({
+    store,
+    telemetry: { failOpen: vi.fn() },
+    logger: { info: vi.fn(), warn: vi.fn() },
+  });
+}
 
 describe("extraction budget", () => {
   const imagePart = (i: number) => ({
@@ -61,15 +66,14 @@ describe("extraction budget", () => {
     /** @scenario Extraction cost inside the collector request is bounded */
     it("externalizes at most the cap and leaves the rest inline, counted", async () => {
       const { service, calls } = makeFakeService();
-      const budget = TraceValueMediaExtractionService.create().createExtractionBudget();
+      const budget = extractionOver(service).createExtractionBudget();
       const value = contentWith(MAX_MEDIA_PARTS_PER_SPAN + 4);
 
-      const result = await TraceValueMediaExtractionService.create().extractInlineMediaFromValue({
+      const result = await extractionOver(service).extractFromValue({
         value,
-        service,
         budget,
         ...PARAMS,
-      } as never);
+      });
 
       expect(calls).toHaveLength(MAX_MEDIA_PARTS_PER_SPAN);
       expect(result.refs).toHaveLength(MAX_MEDIA_PARTS_PER_SPAN);
@@ -93,11 +97,10 @@ describe("the marker gate", () => {
 
       expect(containsMediaMarkers(serialized)).toBe(false);
 
-      const result = await TraceValueMediaExtractionService.create().extractInlineMediaFromValue({
+      const result = await extractionOver(service).extractFromValue({
         value: plain,
-        service,
         ...PARAMS,
-      } as never);
+      });
 
       expect(calls).toHaveLength(0);
       expect(result.refs).toEqual([]);

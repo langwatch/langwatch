@@ -320,8 +320,11 @@ import {
 import { TraceBlobStoreService } from "../features/media/services/trace-blob-store.service.ts";
 import { TraceEdgeMediaPayloadService } from "../features/media/services/trace-edge-media-payload.service.ts";
 import { TraceEdgeMediaTelemetryService } from "../features/media/services/trace-edge-media-telemetry.service.ts";
+import {
+  TRACE_CONTENT_MEDIA,
+  TraceMediaStoreService,
+} from "../features/media/services/trace-media-store.service.ts";
 import { TraceScenarioEventMediaService } from "../features/media/services/trace-scenario-event-media.service.ts";
-import { TraceStoredMediaStoreService } from "../features/media/services/trace-stored-media-store.service.ts";
 import {
   IO_PREVIEW_BYTES,
   utf8Preview,
@@ -1167,7 +1170,10 @@ export class TraceModule implements TraceApi, CollectorApp {
             hasContentDropRules: (projectId) =>
               options.protections.dataPrivacy.dropsAnyContent({ projectId }),
             telemetry: TraceEdgeMediaTelemetryService.create(),
-            service: TraceStoredMediaStoreService.create(options.storedObjects),
+            store: TraceMediaStoreService.create({
+              storedObjects: options.storedObjects,
+              purpose: TRACE_CONTENT_MEDIA,
+            }),
           },
           logger: createLogger("langwatch:traces:edge-media-extraction"),
           next: edgeSpool,

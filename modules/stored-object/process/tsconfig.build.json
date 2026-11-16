@@ -69,6 +69,12 @@
       "path": "../../dataset/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/eventing/tsconfig.build.json"
+    },
+    {
+      "path": "../../data-retention/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/clickhouse-client/tsconfig.build.json"
     },
     {

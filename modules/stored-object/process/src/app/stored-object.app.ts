@@ -4,6 +4,7 @@
  * an async iterable, the byte surface needs the ROW. Each has its own name.
  */
 import { AuthzApi } from "@langwatch/authz-contract";
+import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import {
   StoredObjectApi,
@@ -36,6 +37,10 @@ import { nowInstant } from "@langwatch/time";
 
 import type { ExternalImageChannel } from "../channels/external-image.channel.ts";
 import type { StoredObjectChannels } from "../channels/stored-object.channels.ts";
+import {
+  buildStoredObjectRetentionPipeline,
+  type StoredObjectRetentionPipeline,
+} from "../eventing/stored-object-retention.pipeline.ts";
 import type { StoredObjectBytesRepository } from "../repositories/stored-object-bytes.repository.ts";
 import type { StoredObjectRateLimitRepository } from "../repositories/stored-object-rate-limit.repository.ts";
 import type { StoredObjectRepositories } from "../repositories/stored-object.repositories.ts";
@@ -45,6 +50,7 @@ import type {
   StoredObjectFileStreamRead,
 } from "../rules/stored-object-file-access.rules.ts";
 import { ImageProxyService } from "../services/image-proxy.service.ts";
+import { StoredObjectCleanupService } from "../services/stored-object-cleanup.service.ts";
 import {
   type StoredObjectDelivery,
   UnavailableStoredObjectDeliveryService,
@@ -54,7 +60,9 @@ import {
   type StoredObjectFileAllowance,
 } from "../services/stored-object-file-read.service.ts";
 import { StoredObjectOwnerUnresolvedService } from "../services/stored-object-owner-unresolved.service.ts";
+import { StoredObjectRetentionService } from "../services/stored-object-retention.service.ts";
 import { StoredObjectUploadSignerService } from "../services/stored-object-upload-signer.service.ts";
+import type { StoredObjectRetention } from "../services/stored-object-upload.service.ts";
 import { StoredObjectService } from "../services/stored-object.service.ts";
 import { StoredObjectsTelemetryService } from "../services/stored-objects-telemetry.service.ts";
 import {
@@ -83,6 +91,8 @@ export type StoredObjectInfrastructure = Readonly<{
 type StoredObjectDependencies = Readonly<{
   /** Holds a probe to the permission the object's purpose names, once the row is read. */
   authz: typeof AuthzApi;
+  /** How long a purpose's retention category keeps the project's data (ADR-002 §3). */
+  dataRetention: typeof DataRetentionApi;
 }>;
 
 type StoredObjectSetup = FeatureSetup<
@@ -94,7 +104,10 @@ type StoredObjectSetup = FeatureSetup<
 
 export class StoredObjectModule implements StoredObjectApi, StoredObjectFileApi {
   static readonly contract = StoredObjectApi;
-  static readonly dependencies: StoredObjectDependencies = { authz: AuthzApi };
+  static readonly dependencies: StoredObjectDependencies = {
+    authz: AuthzApi,
+    dataRetention: DataRetentionApi,
+  };
   static readonly config = storedObjectConfig;
 
   /**
@@ -124,6 +137,7 @@ export class StoredObjectModule implements StoredObjectApi, StoredObjectFileApi 
       },
       repositories,
       permissions: setup.dependencies.authz,
+      retention: setup.dependencies.dataRetention,
       images: setup.channels.images,
     });
   }
@@ -137,20 +151,36 @@ export class StoredObjectModule implements StoredObjectApi, StoredObjectFileApi 
     infrastructure: StoredObjectInfrastructure;
     repositories: StoredObjectRepositories;
     permissions: AuthzApi;
+    retention: StoredObjectRetention;
     images: ExternalImageChannel;
   }): StoredObjectModule {
     const { infrastructure: parts, repositories } = setup;
+    const storage = StoredObjectService.create({
+      records: repositories.records,
+      ownerLinks: repositories.ownerLinks,
+      retention: setup.retention,
+      storage: parts.storage,
+      delivery: parts.delivery,
+      signer: parts.signer,
+      legacy: parts.files,
+      permissions: setup.permissions,
+      maximumUploadBytes: parts.maximumUploadBytes,
+      uploadExpiryMs: parts.uploadExpiryMs,
+    });
 
     return new StoredObjectModule({
-      storage: StoredObjectService.create({
+      storage,
+      retention: StoredObjectRetentionService.create({
         records: repositories.records,
-        storage: parts.storage,
-        delivery: parts.delivery,
-        signer: parts.signer,
-        legacy: parts.files,
-        permissions: setup.permissions,
-        maximumUploadBytes: parts.maximumUploadBytes,
-        uploadExpiryMs: parts.uploadExpiryMs,
+        ownerLinks: repositories.ownerLinks,
+        cleanup: StoredObjectCleanupService.create({
+          records: repositories.records,
+          ownerLinks: repositories.ownerLinks,
+          storage: parts.storage,
+          deleteObject: (input) => storage.delete(input),
+          now: nowInstant,
+        }),
+        now: nowInstant,
       }),
       owners: parts.owners,
       permissions: setup.permissions,
@@ -160,6 +190,7 @@ export class StoredObjectModule implements StoredObjectApi, StoredObjectFileApi 
   }
 
   readonly #storage: StoredObjectService;
+  readonly #retention: StoredObjectRetentionService;
   readonly #owners: StoredObjectOwnerResolver;
   readonly #permissions: AuthzApi;
   readonly #rateLimits: StoredObjectRateLimitRepository;
@@ -168,12 +199,14 @@ export class StoredObjectModule implements StoredObjectApi, StoredObjectFileApi 
 
   private constructor(parts: {
     storage: StoredObjectService;
+    retention: StoredObjectRetentionService;
     owners: StoredObjectOwnerResolver;
     permissions: AuthzApi;
     rateLimits: StoredObjectRateLimitRepository;
     images: ImageProxyService;
   }) {
     this.#storage = parts.storage;
+    this.#retention = parts.retention;
     this.#owners = parts.owners;
     this.#permissions = parts.permissions;
     this.#rateLimits = parts.rateLimits;
@@ -188,6 +221,16 @@ export class StoredObjectModule implements StoredObjectApi, StoredObjectFileApi 
   }
 
   /** `GET /api/files/...`: one object's bytes, counted and authorized in the door's order. */
+  /** The pipeline `stored_object_retention` registers: the sweep and the retention follower. */
+  retentionPipeline(input: {
+    deleteDispatchedBefore: (params: { processName: string; before: number }) => Promise<number>;
+  }): StoredObjectRetentionPipeline {
+    return buildStoredObjectRetentionPipeline({
+      retention: this.#retention,
+      deleteDispatchedBefore: input.deleteDispatchedBefore,
+    });
+  }
+
   readFile(input: StoredObjectFileReadInput): Promise<StoredObjectFileBytes> {
     return this.#files.read(input);
   }

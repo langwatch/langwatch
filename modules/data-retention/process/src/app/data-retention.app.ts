@@ -37,7 +37,10 @@ import {
   type RetentionActor,
 } from "../services/data-retention-policy.service.ts";
 import { DataRetentionSnapshotService } from "../services/data-retention-snapshot.service.ts";
-import { DataRetentionService } from "../services/data-retention.service.ts";
+import {
+  type DataRetentionFactSenders,
+  DataRetentionService,
+} from "../services/data-retention.service.ts";
 import { RetentionPermissionsService } from "../services/retention-permissions.service.ts";
 import { RetentionPlanService } from "../services/retention-plan.service.ts";
 import { SeatRetentionPolicyService } from "../services/seat-retention-policy.service.ts";
@@ -175,6 +178,11 @@ export class DataRetentionModule implements DataRetentionApiContract {
   /** The pipeline `data_retention_seat_policy` registers, over billing's activation fact. */
   seatPolicyPipeline(): DataRetentionSeatPolicyPipeline {
     return buildDataRetentionSeatPolicyPipeline({ seatPolicies: this.#seatPolicies });
+  }
+
+  /** Binds `data_retention_facts`' senders once the pipeline registers in this process. */
+  connectFacts(senders: DataRetentionFactSenders): void {
+    this.#retention.connectFacts(senders);
   }
 
   getResolvedForProject(input: { projectId: string }): Promise<ResolvedRetention> {
@@ -345,7 +353,7 @@ export class DataRetentionModule implements DataRetentionApiContract {
     await this.#policy.assertPlanForProject({ actor, projectId: input.projectId });
     const effective = await this.#retention.getResolvedForProject({ projectId: input.projectId });
     const appliedRetentionDays = effective[input.category];
-    const result = await this.#retention.triggerRetroactiveUpdate({
+    const result = await this.#retention.applyToExistingData({
       projectId: input.projectId,
       category: input.category,
       newRetentionDays: appliedRetentionDays,

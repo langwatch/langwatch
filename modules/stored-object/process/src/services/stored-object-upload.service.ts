@@ -1,8 +1,14 @@
 /**
  * The write half of the stored-object lifecycle (ADR-158 §4): bytes arriving
- * in-process, and create, PUT to a signed URL, confirm. Every id is a fresh
- * KSUID and every digest is taken as the bytes stream.
+ * in-process, and create, PUT to a signed URL, confirm. In-process bytes reuse
+ * an available object holding the same content (ADR-002); every new id is a KSUID.
  */
+import { createHash } from "node:crypto";
+
+import {
+  type DataRetentionApi,
+  INDEFINITE_RETENTION_DAYS,
+} from "@langwatch/data-retention-contract";
 import { HandledError, ValidationError } from "@langwatch/handled-error";
 import { ObjectBodyShortError, ObjectBodyTooLargeError } from "@langwatch/process-stores";
 import {
@@ -36,14 +42,26 @@ import type {
   StoredObjectStorageAddress,
 } from "../repositories/stored-object-bytes.repository.ts";
 import type {
+  StoredObjectOwnerLink,
+  StoredObjectOwnerLinkRepository,
+} from "../repositories/stored-object-owner-link.repository.ts";
+import type {
   StoredObjectRecord,
   StoredObjectRecordRepository,
 } from "../repositories/stored-object-record.repository.ts";
 import { storedObjectReferenceOf } from "../rules/stored-object-view.rules.ts";
 import type { StoredObjectUploadSignerService } from "./stored-object-upload-signer.service.ts";
 
+/** The one retention question a store asks: how long its category keeps the project's data. */
+export type StoredObjectRetention = Pick<DataRetentionApi, "getRetentionDays">;
+
+/** An owner link before it names its object. */
+type StoredObjectOwnerClaim = Omit<StoredObjectOwnerLink, "objectId">;
+
 type StoredObjectUploadServiceOptions = Readonly<{
   records: StoredObjectRecordRepository;
+  ownerLinks: StoredObjectOwnerLinkRepository;
+  retention: StoredObjectRetention;
   storage: StoredObjectBytesRepository;
   signer: StoredObjectUploadSignerService;
   maximumUploadBytes: number;
@@ -102,6 +120,44 @@ export class StoredObjectUploadService {
         ? this.options.maximumUploadBytes
         : purposeByteLimitOf(purposePolicyOf(input.purpose), input.maxBytes);
     const { chunks, byteLength } = await this.measured(input.bytes, ceiling);
+    const owners = await this.ownerClaimsOf(input);
+    const reusable = await this.options.records.findReusable({
+      tenantId: input.projectId,
+      purpose: input.purpose,
+      sha256: sha256Of(chunks),
+      mediaType: input.mediaType,
+    });
+    for (const candidate of reusable) {
+      if (candidate.byteLength !== byteLength) continue;
+      if (owners.length > 0 && !(await this.isLinked(candidate))) continue;
+      await this.link({ objectId: candidate.id, owners });
+      // A delete may win between the read and the link (ADR-002 §4): never answer it.
+      const current =
+        owners.length > 0
+          ? await this.options.records.findById({ tenantId: candidate.tenantId, id: candidate.id })
+          : candidate;
+      if (current?.status !== "available") continue;
+      const reused = await this.withAudience({ value: current, audience: input.audience });
+
+      return { reference: storedObjectReferenceOf(reused), isDuplicate: true };
+    }
+
+    const record = await this.storeNew({ input, chunks, byteLength });
+    await this.link({ objectId: record.id, owners });
+
+    return { reference: storedObjectReferenceOf(record), isDuplicate: false };
+  }
+
+  /** Writes the bytes under a fresh id, then the row; the bytes go if the row cannot be written. */
+  private async storeNew({
+    input,
+    chunks,
+    byteLength,
+  }: {
+    input: StoreStoredObjectFromBytesInput;
+    chunks: readonly Uint8Array[];
+    byteLength: number;
+  }): Promise<StoredObjectRecord> {
     const id = this.options.newId();
     const { address } = await StoredObjectUploadService.storageCall(() =>
       this.options.storage.place({ projectId: input.projectId, objectId: id }),
@@ -141,7 +197,77 @@ export class StoredObjectUploadService {
     };
     await this.recordOrDiscard(record, address);
 
-    return { reference: storedObjectReferenceOf(record), isDuplicate: false };
+    return record;
+  }
+
+  /** The caller's link if its purpose declares a retention category (ADR-002 §3), else none. */
+  private async ownerClaimsOf(
+    input: StoreStoredObjectFromBytesInput,
+  ): Promise<StoredObjectOwnerClaim[]> {
+    const category = purposePolicyOf(input.purpose).retentionCategory;
+    if (category === undefined) return [];
+
+    const days = await this.options.retention.getRetentionDays({
+      projectId: input.projectId,
+      category,
+    });
+    const now = this.options.now();
+
+    return [
+      {
+        tenantId: input.projectId,
+        ownerKind: input.ownerKind,
+        ownerId: input.ownerId,
+        // Indefinite retention holds with no end; `now + 0` would end it at once.
+        retainUntil: days === INDEFINITE_RETENTION_DAYS ? null : now.add({ hours: days * 24 }),
+        createdAt: now,
+        updatedAt: now,
+      },
+    ];
+  }
+
+  /**
+   * An object stored before owner links holds none, and its older owners hold it unrecorded:
+   * linking it would let the sweep delete it under them, so it is never reused (ADR-002).
+   */
+  private async isLinked(candidate: StoredObjectRecord): Promise<boolean> {
+    const links = await this.options.ownerLinks.countAll({
+      tenantId: candidate.tenantId,
+      objectId: candidate.id,
+    });
+
+    return links > 0;
+  }
+
+  private async link({
+    objectId,
+    owners,
+  }: {
+    objectId: StoredObjectRecord["id"];
+    owners: readonly StoredObjectOwnerClaim[];
+  }): Promise<void> {
+    for (const owner of owners) await this.options.ownerLinks.raise({ ...owner, objectId });
+  }
+
+  /** The row with the caller's audience added; the write changes only a row still available. */
+  private async withAudience({
+    value,
+    audience,
+  }: {
+    value: StoredObjectRecord;
+    audience: StoreStoredObjectFromBytesInput["audience"];
+  }): Promise<StoredObjectRecord> {
+    if (value.audiences.includes(audience)) return value;
+
+    const at = this.options.now();
+    await this.options.records.addAudience({
+      tenantId: value.tenantId,
+      id: value.id,
+      audience,
+      at,
+    });
+
+    return { ...value, audiences: [...value.audiences, audience], updatedAt: at };
   }
 
   async createUpload(
@@ -308,6 +434,13 @@ export class StoredObjectUploadService {
       throw error;
     }
   }
+}
+
+function sha256Of(chunks: readonly Uint8Array[]): string {
+  const hash = createHash("sha256");
+  for (const chunk of chunks) hash.update(chunk);
+
+  return hash.digest("hex");
 }
 
 function assertWithinCeiling(byteLength: number, ceiling: number): void {

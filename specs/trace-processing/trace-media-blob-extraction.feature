@@ -1,14 +1,15 @@
 # Stored Objects persistence and accounting: ../../modules/stored-object/adrs/001-package-boundary.md
+# Reuse and retention: ../../modules/stored-object/adrs/002-content-addressed-reuse-and-owner-retention.md
 Feature: Trace media blob extraction at the ingestion edge
   As the LangWatch trace ingestion pipeline receiving spans whose message
   content embeds inline media bytes (base64 audio turns, data-URI images,
   file attachments)
   I want those bytes externalized to the content-addressed stored-objects
   store at the earliest edge point, before the command is staged on the queue
-  So that the queue, event_log, fold state, and ClickHouse carry lightweight
-  durable StoredObjectReferences instead of megabytes of base64, the same recording
-  captured by a scenario run and by its trace is stored exactly once, and the
-  trace UIs can render players and previews instead of raw base64 dumps.
+  So that the queue, event_log, fold state, and ClickHouse carry short
+  stored-object references instead of megabytes of base64, the same media in a
+  project's traces is stored once, it expires with the traces that reference
+  it, and the trace UIs can render players and previews instead of raw base64 dumps.
 
   # Placement decision (balances "earliest" against the receiving guarantee):
   #   The extraction runs inside the ADR-022 processCommandData edge hook
@@ -21,20 +22,17 @@ Feature: Trace media blob extraction at the ingestion edge
   #   The receiving guarantee is preserved the same way the spool preserves
   #   it: the hook is fail-open (any storage/parse error returns the command
   #   data unchanged and ingestion proceeds inline), the HTTP response is only
-  #   sent after the command is durably staged, and content-addressed PUTs are
-  #   idempotent so SDK retries and queue re-stages never double-store.
+  #   sent after the command is durably staged, and storage reuses an object
+  #   with the same bytes, so SDK retries and queue re-stages never double-store.
   #
   # Reuse:
-  #   - Shape detection and part rewriting reuse the stored-objects visitor
-  #     (visit-content-part.ts) and content-extractor walkers that already
-  #     externalize scenario-event media — one vocabulary, one rewrite.
-  #   - Storage is StoredObjectsService.storeFromBytes: SHA-256
-  #     content-addressing namespaced by project. A scenario run's audio turn
-  #     and the same turn observed on a trace resolve to the same stored
-  #     object id — stored once, referenced twice.
-  #   - Persisted trace shapes carry StoredObjectReference values. Trace read
-  #     and rendering adapters resolve fresh service-delivery capabilities at
-  #     the presentation boundary; `/api/files/...` is not persisted authority.
+  #   - Shape detection and part rewriting use the trace contract's content-part
+  #     visitor, and one value walker serves span attributes and scenario events.
+  #   - Storage is StoredObjectApi.storeFromBytes, which reuses an available
+  #     object of the same project, purpose, SHA-256 and media type.
+  #   - A rewritten part carries the reference string "/api/files/{projectId}/{id}",
+  #     built and parsed only by the trace contract. Readers exchange it for a
+  #     short-lived signed URL; no delivery URL is ever persisted.
   #
   # Privacy interlock: the data-privacy content drop runs later, at the
   #   RecordSpanCommand choke point. Extracting at the edge for a project
@@ -43,11 +41,10 @@ Feature: Trace media blob extraction at the ingestion edge
   #   skips extraction entirely when any drop rule is configured — those
   #   projects keep today's behavior end to end.
   #
-  # Retention: Stored Objects is content-addressed and currently GC-free, so
-  #   extracted media outlives the trace's retention TTL. It is still counted
-  #   once in the project byte ledger. Until trace-owned retention cleanup lands,
-  #   the feature flag ships default OFF and enabling it is an explicit
-  #   per-project / per-deployment opt-in.
+  # Retention: each extracted object is linked to the trace that stored it until
+  #   that trace's retention ends, and deleted once no linked trace still holds
+  #   it (stored-object ADR-002). Retroactive retention changes re-time the
+  #   links; pins do not, as they do not change a trace's retention either.
   #
   # Related: specs/features/scenarios/externalize-event-byte-content.feature
   #   (scenario edge extraction), specs/trace-processing/large-trace-blob-offload.feature
@@ -68,8 +65,8 @@ Feature: Trace media blob extraction at the ingestion edge
       with a part {type:"file", mediaType:"audio/pcm16", data:"<base64 pcm>"}
     When the span is ingested through the collector
     Then the staged command's "langwatch.input" carries an input_audio part
-      carrying a durable StoredObjectReference with no inline base64 data
-    And the decoded bytes are stored once under the project, addressed by their SHA-256
+      referencing "/api/files/{projectId}/{id}" with no inline base64 data
+    And the decoded bytes are stored once under the project
 
   @integration
   Scenario: Raw realtime audio is wrapped into a playable container at store time
@@ -84,14 +81,14 @@ Feature: Trace media blob extraction at the ingestion edge
   Scenario: A data-URI image inside an image_url part is externalized
     Given a span input message with a part {type:"image_url", image_url:{url:"data:image/png;base64,..."}}
     When the span is ingested
-    Then the staged part carries a durable StoredObjectReference instead of a delivery URL
-    And the PNG bytes are stored content-addressed under the project
+    Then the staged part references "/api/files/{projectId}/{id}" instead of the data URI
+    And the PNG bytes are stored under the project
 
   @integration
   Scenario: A PDF file part is externalized to a binary reference preserving the filename
     Given a span output message with a part {type:"file", file:{filename:"report.pdf", file_data:"data:application/pdf;base64,..."}}
     When the span is ingested
-    Then the staged part is a StoredObjectReference with filename "report.pdf"
+    Then the staged part is a binary part referencing the stored object, with filename "report.pdf"
     And no base64 remains in the staged command
 
   @integration
@@ -176,12 +173,25 @@ Feature: Trace media blob extraction at the ingestion edge
   # ===========================================================================
 
   @integration
-  Scenario: The same recording on a scenario event and on a trace is stored once
-    Given a scenario run already externalized an audio turn to the project's store
-    When a trace span carrying the byte-identical recording is ingested
+  Scenario: The same recording on two traces is stored once
+    Given a trace already externalized an audio turn to the project's store
+    When a span of another trace carrying the byte-identical recording is ingested
     Then the span's reference resolves to the same stored object id
     And no second copy is written to storage
+    And both traces are recorded as owners of the object
 
+  @integration
+  Scenario: A re-exported span reuses the media it stored the first time
+    Given a span whose media was externalized, and whose export the SDK retries
+    When the retried span is ingested
+    Then its reference resolves to the same stored object id
+    And no second copy is written to storage
+
+  @integration
+  Scenario: Extracted media is stored on behalf of the span's trace
+    When a span with inline media is ingested
+    Then the bytes are stored for the "trace_content" purpose with the span's trace as owner
+    So that Stored Objects keeps them until that trace's retention ends
   @integration
   Scenario: The same bytes in two attributes of one span are stored once
     Given a span that carries the same image both in its chat content and in a
@@ -230,7 +240,7 @@ Feature: Trace media blob extraction at the ingestion edge
     Given a span whose media was externalized at the edge
     When the staged command is retried by the group queue
     Then the command still carries only the stored-object references
-    And re-running extraction over it is a no-op because parts already carry durable references
+    And re-running extraction over it is a no-op because parts carry no inline bytes
 
   @unit
   Scenario: Redacted trace content never leaks its media references

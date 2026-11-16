@@ -1,5 +1,6 @@
 import type { AuthzDenialReason, PermissionDecision } from "@langwatch/authorization";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { memoryObjectStorage } from "@langwatch/process-stores";
 import {
   StoredObjectNotFoundError,
@@ -30,6 +31,7 @@ import type {
 } from "../../rules/stored-object-file-access.rules.ts";
 import { StoredObjectDelivery } from "../../services/stored-object-delivery.service.ts";
 import { StoredObjectUploadSignerService } from "../../services/stored-object-upload-signer.service.ts";
+import type { StoredObjectRetention } from "../../services/stored-object-upload.service.ts";
 import type { StoredObjectPermissions } from "../../services/stored-object.service.ts";
 import type { StoredObjectFileReader } from "../../services/stored-objects.service.ts";
 import { StoredObjectModule, type StoredObjectInfrastructure } from "../stored-object.app.ts";
@@ -189,6 +191,7 @@ export function createStoredObjectTestApp(
     parts?: Partial<StoredObjectInfrastructure>;
     permissions?: StoredObjectPermissions;
     images?: ExternalImageChannel;
+    retention?: StoredObjectRetention;
   }> = {},
 ): StoredObjectModule {
   const permissions = input.permissions ?? new GrantedStoredObjectPermissions();
@@ -197,6 +200,8 @@ export function createStoredObjectTestApp(
     permissions: createApiFixture<AuthzApi>({
       getDecision: (args) => permissions.getDecision(args),
     }),
+    retention:
+      input.retention ?? createApiFixture<DataRetentionApi>({ getRetentionDays: async () => 30 }),
     repositories:
       input.repositories ??
       MemoryStoredObjectRepositories.create({ objectStorage: memoryObjectStorage() }),

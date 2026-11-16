@@ -191,6 +191,7 @@ export const prismaTableCatalogue = {
   "SystemMigrationTenantState": "SystemMigrationTenantState",
   "SystemMigrationEnrollment": "SystemMigrationEnrollment",
   "StoredObject": "StoredObject",
+  "StoredObjectOwner": "StoredObjectOwner",
   "DiscoveredPerson": "DiscoveredPerson",
   "DiscoveredAgent": "DiscoveredAgent",
   "AgentRegistryEntry": "AgentRegistryEntry",
@@ -3134,6 +3135,15 @@ export const prismaModelFieldCatalogue = {
     "createdAt",
     "updatedAt"
   ],
+  "StoredObjectOwner": [
+    "tenantId",
+    "objectId",
+    "ownerKind",
+    "ownerId",
+    "retainUntil",
+    "createdAt",
+    "updatedAt"
+  ],
   "DiscoveredPerson": [
     "id",
     "organizationId",
@@ -3960,6 +3970,7 @@ export const prismaRelationCatalogue = {
   "SystemMigrationTenantState": {},
   "SystemMigrationEnrollment": {},
   "StoredObject": {},
+  "StoredObjectOwner": {},
   "DiscoveredPerson": {},
   "DiscoveredAgent": {},
   "AgentRegistryEntry": {},

@@ -35,6 +35,7 @@ import type {
   StoredObjectBytesRepository,
   StoredObjectStorageAddress,
 } from "../repositories/stored-object-bytes.repository.ts";
+import type { StoredObjectOwnerLinkRepository } from "../repositories/stored-object-owner-link.repository.ts";
 import type {
   StoredObjectRecord,
   StoredObjectRecordRepository,
@@ -50,7 +51,10 @@ import { StoredObjectCleanupService } from "./stored-object-cleanup.service.ts";
 import type { StoredObjectDelivery } from "./stored-object-delivery.service.ts";
 import { StoredObjectFileReadService } from "./stored-object-file-read.service.ts";
 import type { StoredObjectUploadSignerService } from "./stored-object-upload-signer.service.ts";
-import { StoredObjectUploadService } from "./stored-object-upload.service.ts";
+import {
+  type StoredObjectRetention,
+  StoredObjectUploadService,
+} from "./stored-object-upload.service.ts";
 import type { StoredObjectFileReader } from "./stored-objects.service.ts";
 
 /** The peer decision a probe asks once the row names its purpose. */
@@ -61,7 +65,9 @@ const READ_URL_EXPIRY_MS = 15 * 60 * 1000;
 
 type StoredObjectServiceOptions = Readonly<{
   records: StoredObjectRecordRepository;
+  ownerLinks: StoredObjectOwnerLinkRepository;
   permissions: StoredObjectPermissions;
+  retention: StoredObjectRetention;
   storage: StoredObjectBytesRepository;
   delivery: StoredObjectDelivery;
   signer: StoredObjectUploadSignerService;
@@ -96,6 +102,7 @@ export class StoredObjectService {
     this.now = options.now ?? nowInstant;
     this.cleanup = StoredObjectCleanupService.create({
       records: options.records,
+      ownerLinks: options.ownerLinks,
       storage: options.storage,
       deleteObject: (input) => this.delete(input),
       cleanupBatchSize: options.cleanupBatchSize,
@@ -103,6 +110,8 @@ export class StoredObjectService {
     });
     this.uploads = StoredObjectUploadService.create({
       records: options.records,
+      ownerLinks: options.ownerLinks,
+      retention: options.retention,
       storage: options.storage,
       signer: options.signer,
       maximumUploadBytes: options.maximumUploadBytes,

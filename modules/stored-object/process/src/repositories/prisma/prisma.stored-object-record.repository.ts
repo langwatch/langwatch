@@ -1,4 +1,5 @@
-import { PrismaRepository } from "@langwatch/prisma-client";
+import { type PrismaModelClient, prismaTables } from "@langwatch/prisma-client";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type {
   StoredObjectDeliveryAudience,
   StoredObjectId,
@@ -14,11 +15,23 @@ import type {
   StoredObjectSource,
 } from "../stored-object-record.repository.ts";
 
-export class PrismaStoredObjectRecordRepository
-  extends PrismaRepository.for("StoredObject")
-  implements StoredObjectRecordRepository
-{
-  static readonly create = this.factory((prisma) => new PrismaStoredObjectRecordRepository(prisma));
+/** The object rows, plus the raw SQL the conditional delete and the audience append need. */
+type PrismaStoredObjectRecordDatabase = PrismaModelClient<"StoredObject"> &
+  Pick<PrismaClient, "$executeRaw">;
+
+export class PrismaStoredObjectRecordRepository implements StoredObjectRecordRepository {
+  /** Declared, not inherited: the model-scoped client carries no `$executeRaw`. */
+  static readonly tables = prismaTables("StoredObject", "StoredObjectOwner");
+
+  static create({
+    prisma,
+  }: {
+    prisma: PrismaStoredObjectRecordDatabase;
+  }): PrismaStoredObjectRecordRepository {
+    return new PrismaStoredObjectRecordRepository(prisma);
+  }
+
+  private constructor(private readonly prisma: PrismaStoredObjectRecordDatabase) {}
 
   async findById(input: {
     tenantId: StoredObjectProjectId;
@@ -67,10 +80,31 @@ export class PrismaStoredObjectRecordRepository
         tenantId: input.tenantId,
         ...(input.afterId ? { id: { gt: input.afterId } } : {}),
         ...(input.status ? { status: input.status } : {}),
+        ...(input.purpose ? { purpose: input.purpose } : {}),
         ...(input.expiresBefore ? { expiresAt: { lte: toDate(input.expiresBefore) } } : {}),
       },
       orderBy: { id: "asc" },
       take: input.limit,
+    });
+
+    return rows.map((row) => fromRow(row));
+  }
+
+  async findReusable(input: {
+    tenantId: StoredObjectProjectId;
+    purpose: string;
+    sha256: string;
+    mediaType: string;
+  }): Promise<StoredObjectRecord[]> {
+    const rows = await this.prisma.storedObject.findMany({
+      where: {
+        tenantId: input.tenantId,
+        purpose: input.purpose,
+        sha256: input.sha256,
+        mediaType: input.mediaType,
+        status: "available",
+      },
+      orderBy: { id: "asc" },
     });
 
     return rows.map((row) => fromRow(row));
@@ -105,6 +139,53 @@ export class PrismaStoredObjectRecordRepository
     await this.prisma.storedObject.deleteMany({
       where: { tenantId: input.tenantId, id: input.id },
     });
+  }
+
+  /** One UPDATE whose NOT EXISTS reads the owner links, so no live link is missed between them. */
+  async markDeletedIfUnheld(input: {
+    tenantId: StoredObjectProjectId;
+    id: StoredObjectId;
+    now: Instant;
+  }): Promise<boolean> {
+    const now = toDate(input.now);
+    const count = await this.prisma.$executeRaw`
+      UPDATE "StoredObject" AS o
+         SET "status" = 'deleted',
+             "generation" = o."generation" + 1,
+             "deletedAt" = ${now},
+             "updatedAt" = ${now}
+       WHERE o."tenantId" = ${input.tenantId}
+         AND o."id" = ${input.id}
+         AND o."status" = 'available'
+         AND NOT EXISTS (
+           SELECT 1
+             FROM "StoredObjectOwner" AS l
+            WHERE l."tenantId" = o."tenantId"
+              AND l."objectId" = o."id"
+              AND (l."retainUntil" IS NULL OR l."retainUntil" > ${now})
+         )
+    `;
+
+    return count > 0;
+  }
+
+  /** A jsonb append conditional on the row: no read-modify-write a delete could overtake. */
+  async addAudience(input: {
+    tenantId: StoredObjectProjectId;
+    id: StoredObjectId;
+    audience: StoredObjectDeliveryAudience;
+    at: Instant;
+  }): Promise<void> {
+    const audience = JSON.stringify([input.audience]);
+    await this.prisma.$executeRaw`
+      UPDATE "StoredObject"
+         SET "audiences" = "audiences" || ${audience}::jsonb,
+             "updatedAt" = ${toDate(input.at)}
+       WHERE "tenantId" = ${input.tenantId}
+         AND "id" = ${input.id}
+         AND "status" = 'available'
+         AND NOT ("audiences" @> ${audience}::jsonb)
+    `;
   }
 }
 

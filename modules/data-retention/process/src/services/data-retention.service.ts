@@ -21,17 +21,28 @@ import {
   type UnpinTraceInput,
   unpinTraceInputSchema,
 } from "@langwatch/data-retention-contract";
+import type { EventingCommandSender } from "@langwatch/eventing";
 import {
   AggregateProjectIsReadOnlyError,
   isAggregateProjectKind,
 } from "@langwatch/project-contract";
+import { nowInstant } from "@langwatch/time";
 
+import type { RecordRetentionAppliedToExistingDataCommandData } from "../eventing/data-retention-facts.commands.ts";
 import type { DataRetentionCacheRepository } from "../repositories/data-retention-cache.repository.ts";
 import type { DataRetentionProjectScopeRepository } from "../repositories/data-retention-project-scope.repository.ts";
 import type { DataRetentionRepository } from "../repositories/data-retention.repository.ts";
 import type { PinnedTraceRepository } from "../repositories/pinned-trace.repository.ts";
 import type { RetroactiveRetentionRepository } from "../repositories/retroactive-retention.repository.ts";
 import type { StorageMeterService } from "./storage-meter.service.ts";
+
+/** data_retention_facts' senders, bound once the pipeline registers in this process. */
+export type DataRetentionFactSenders = Readonly<{
+  recordRetentionAppliedToExistingData: Pick<
+    EventingCommandSender<RecordRetentionAppliedToExistingDataCommandData>,
+    "send"
+  >;
+}>;
 
 type DataRetentionServiceOptions = Readonly<{
   policies: DataRetentionRepository;
@@ -60,7 +71,13 @@ export class DataRetentionService {
     });
   }
 
+  #facts: DataRetentionFactSenders | undefined;
+
   private constructor(private readonly options: DataRetentionServiceOptions) {}
+
+  connectFacts(senders: DataRetentionFactSenders): void {
+    this.#facts = senders;
+  }
 
   /** The days a row with no override in its cascade is kept for. */
   getPlatformDefaultRetentionDays(): number {
@@ -244,6 +261,25 @@ export class DataRetentionService {
   ): Promise<{ tables: string[] }> {
     const parsed = retroactiveRetentionUpdateInputSchema.parse(input);
     return this.options.retroactive.triggerUpdate(parsed);
+  }
+
+  /**
+   * Rewrites the project's existing rows, then records the fact peers follow (stored-object
+   * ADR-002 §5). A refused rewrite records nothing; an unregistered pipeline throws.
+   */
+  async applyToExistingData(input: RetroactiveRetentionUpdateInput): Promise<{ tables: string[] }> {
+    const facts = this.#facts;
+    if (!facts) throw new Error("data_retention_facts is not registered in this process");
+    const result = await this.triggerRetroactiveUpdate(input);
+    await facts.recordRetentionAppliedToExistingData.send({
+      tenantId: input.projectId,
+      projectId: input.projectId,
+      category: input.category,
+      retentionDays: input.newRetentionDays,
+      occurredAt: nowInstant().epochMilliseconds,
+    });
+
+    return result;
   }
 
   async getRetroactiveMutationProgress(

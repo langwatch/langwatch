@@ -7259,6 +7259,24 @@ model StoredObject {
   @@index([tenantId, status, id])
   @@index([ownerKind, ownerId, status])
   @@index([status, expiresAt])
+  @@index([tenantId, purpose, sha256])
+}
+
+// Who holds a stored object and until when (stored-object ADR-002). A null
+// retainUntil holds it with no end. Keyed by tenant like StoredObject; no
+// relation to it (no new foreign keys).
+model StoredObjectOwner {
+  tenantId    String
+  objectId    String
+  ownerKind   String
+  ownerId     String
+  retainUntil DateTime?
+  createdAt   DateTime
+  updatedAt   DateTime  @default(now()) @updatedAt
+
+  @@id([tenantId, objectId, ownerKind, ownerId])
+  @@index([retainUntil])
+  @@index([tenantId, objectId])
 }
 
 // ---------------------------------------------------------------------------
