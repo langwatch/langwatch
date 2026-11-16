@@ -7,8 +7,8 @@ Feature: Python SDK dependency ranges admit only versions it imports under
     pip ignores our uv.lock and takes the newest version each declared range
     admits. python-liquid 3.0.0 removed `liquid.exceptions.UndefinedError`,
     which the prompts module imports, so an uncapped range broke every fresh
-    install of 1.4.0. A range is capped below the first untested major and floored at
-    the first release without a known advisory.
+    install of 1.4.0. The python-liquid range is capped below that untested
+    major and floored at the first release without a known advisory.
 
   @unit
   Scenario: The python-liquid range stops below the untested major 3
