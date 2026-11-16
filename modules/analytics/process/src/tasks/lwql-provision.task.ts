@@ -538,7 +538,11 @@ function postgresStatements({
       readerRole,
       views: views(absent),
     }),
-    ...lwqlProvisioning.postgresReaderGrantStatements({ schema, role: readerRole, views: gapViews }),
+    ...lwqlProvisioning.postgresReaderGrantStatements({
+      schema,
+      role: readerRole,
+      views: gapViews,
+    }),
     ...lwqlProvisioning.postgresScopedReaderGrantStatements({ schema, views: gapViews }),
   ];
 }
