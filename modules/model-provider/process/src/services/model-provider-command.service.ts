@@ -6,7 +6,6 @@ import {
   ModelProviderNotFoundError,
   ModelProviderRoutingHandleInvalidError,
   ModelProviderRoutingHandleTakenError,
-  ModelProviderScopesRequiredError,
   ModelProviderSkipPermissionsPatternInvalidError,
   detectInvalidSkipPattern,
   modelProviderApiKeyValidationInputSchema,
@@ -31,10 +30,12 @@ import type { ModelProviderOnboardingDefaultsService } from "../features/default
 import type { ModelDefaultRepository } from "../repositories/model-default.repository.ts";
 import type { ModelProviderRepository } from "../repositories/model-provider.repository.ts";
 import {
+  defaultScopeForWrite,
   deriveSkipPermissionsForWrite,
   humanize,
   modelsForWrite,
   rateLimitsForWrite,
+  scopesForWrite,
 } from "../rules/model-provider-write.rules.ts";
 import type { ModelProviderCredentialPolicy } from "./model-provider-keys.service.ts";
 import type { ModelProviderScopeService } from "./model-provider-scope.service.ts";
@@ -70,7 +71,7 @@ export class ModelProviderCommandService {
     const routingHandle = this.normalizeRoutingHandle(parsed.routingHandle);
     this.assertValidSkipPermissionsPatterns(parsed.langySkipPermissionsModels);
     const existing = await this.getExistingProvider(parsed);
-    const scopes = this.scopesForWrite(parsed, existing);
+    const scopes = scopesForWrite(parsed, existing);
     await this.authorizeWrite(parsed, existing?.scopes, scopes);
     const organizationId = await this.resolveOrganizationId(parsed, existing, scopes);
     const provider = await this.providerValue({
@@ -122,16 +123,7 @@ export class ModelProviderCommandService {
     this.assertTenantAnchor(input);
 
     const parsed = modelProviderDeleteInputSchema.parse(input);
-    const organizationId = await this.options.scopes
-      .getAnchorOrganizationId({
-        projectId: parsed.projectId,
-        organizationId: parsed.organizationId,
-      })
-      .catch((error: unknown) => {
-        if (HandledError.isHandled(error) && error.code === "project_not_found")
-          throw new ModelProviderNotFoundError();
-        throw error;
-      });
+    const organizationId = await this.getAnchorOrganizationId(parsed);
     const existingByProvider = async () => {
       if (!parsed.projectId) throw new ModelProviderNotFoundError();
       const projectScopes = await this.options.scopes
@@ -174,16 +166,7 @@ export class ModelProviderCommandService {
     input: ModelProviderTestConnectionInput,
   ): Promise<ModelProviderCredentialVerdict> {
     const parsed = modelProviderTestConnectionInputSchema.parse(input);
-    const organizationId = await this.options.scopes
-      .getAnchorOrganizationId({
-        projectId: parsed.projectId,
-        organizationId: parsed.organizationId,
-      })
-      .catch((error: unknown) => {
-        if (HandledError.isHandled(error) && error.code === "project_not_found")
-          throw new ModelProviderNotFoundError();
-        throw error;
-      });
+    const organizationId = await this.getAnchorOrganizationId(parsed);
 
     const provider = await this.options.repository.getById({
       id: parsed.modelProviderId,
@@ -208,6 +191,20 @@ export class ModelProviderCommandService {
       projectId: parsed.projectId,
       credential,
     });
+  }
+
+  /** An anchor project that is gone reads as the provider not being there. */
+  private getAnchorOrganizationId(input: {
+    projectId?: string;
+    organizationId?: string;
+  }): Promise<string> {
+    return this.options.scopes
+      .getAnchorOrganizationId({ projectId: input.projectId, organizationId: input.organizationId })
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "project_not_found")
+          throw new ModelProviderNotFoundError();
+        throw error;
+      });
   }
 
   private assertTenantAnchor(input: { projectId?: string; organizationId?: string }): void {
@@ -287,13 +284,7 @@ export class ModelProviderCommandService {
   private async getOrganizationProvider(
     input: ModelProviderWriteInput & { id: string },
   ): Promise<ModelProvider> {
-    const organizationId = await this.options.scopes
-      .getAnchorOrganizationId({ projectId: input.projectId, organizationId: input.organizationId })
-      .catch((error: unknown) => {
-        if (HandledError.isHandled(error) && error.code === "project_not_found")
-          throw new ModelProviderNotFoundError();
-        throw error;
-      });
+    const organizationId = await this.getAnchorOrganizationId(input);
     const existing = await this.options.repository.getById({ id: input.id, organizationId });
     // A row attached nowhere has no scopes to authorize against, so it is no one's to save.
     if (existing.scopes.length === 0) throw new ModelProviderNotFoundError();
@@ -319,27 +310,6 @@ export class ModelProviderCommandService {
     });
   }
 
-  /** A save naming no scopes never moves a stored row; the page project only seeds a new row. */
-  private scopesForWrite(
-    input: ModelProviderWriteInput,
-    existing: ModelProvider | null,
-  ): ModelDefaultScope[] {
-    if (input.scopes) {
-      return input.scopes;
-    }
-
-    if (existing) {
-      return existing.scopes;
-    }
-
-    if (input.projectId) {
-      return [{ scopeType: "PROJECT", scopeId: input.projectId }];
-    }
-
-    throw new ModelProviderScopesRequiredError();
-  }
-
-  /** The page project's default is written too when one is sent, so its scope is asked as well. */
   private async authorizeWrite(
     input: ModelProviderWriteInput,
     oldScopes: ModelDefaultScope[] | undefined,
@@ -349,14 +319,10 @@ export class ModelProviderCommandService {
       return;
     }
 
-    const defaultScope: ModelDefaultScope[] =
-      input.defaultModel !== undefined && input.projectId
-        ? [{ scopeType: "PROJECT", scopeId: input.projectId }]
-        : [];
     await this.options.writeAuthorization.assertCanWrite(input.actorId, [
       ...(oldScopes ?? []),
       ...scopes,
-      ...defaultScope,
+      ...defaultScopeForWrite(input),
     ]);
   }
 
