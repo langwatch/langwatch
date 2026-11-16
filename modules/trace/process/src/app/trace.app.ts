@@ -406,12 +406,12 @@ import {
 import { generateAsciiTree } from "../rules/trace-formatting.rules.ts";
 import { tracePath, tracePlatformUrl } from "../rules/trace-platform-url.rules.ts";
 import { formatSpansDigest, formatSpansDigestBounded } from "../rules/trace-readable-span.rules.ts";
+import { spanAnalyticsFloorOf } from "../rules/trace-widget-columns.rules.ts";
 import {
   clampToWithheld,
   refuseWithheldTrace,
   withheldEndDate,
 } from "../rules/trace-withholding.rules.ts";
-import { spanAnalyticsFloorOf } from "../rules/trace-widget-columns.rules.ts";
 import { buildTrackedEventSpan } from "../rules/tracked-event-span.rules.ts";
 import { PreconditionTraceDataService } from "../services/precondition-trace-data.service.ts";
 import { ScenarioRoleMetricsDerivationService } from "../services/scenario-role-metrics-derivation.service.ts";

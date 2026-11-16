@@ -57,6 +57,7 @@ function drawer({ reader = readerSees, owner = ownerHides } = {}) {
     resolveViewerProtections: vi.fn<TraceApi["resolveViewerProtections"]>(async ({ projectId }) =>
       projectId === OWNER ? owner : reader,
     ),
+    assertTraceNotWithheld: vi.fn<TraceApi["assertTraceNotWithheld"]>(async () => {}),
     readSpanTreePage: vi.fn<TraceApi["readSpanTreePage"]>(async () => ({
       nodes: treeNodes,
       nextCursor: null,
@@ -208,6 +209,19 @@ describe("the drawer's views of a braided trace", () => {
       });
       expect(reads.readTraceEvents).toHaveBeenCalledWith(
         expect.objectContaining({ authorization: narrowed }),
+      );
+    });
+
+    it("refuses a trace the plan withholds before reading any span", async () => {
+      const { reads, service, view } = drawer();
+      const withheld = Object.assign(new Error("withheld"), { code: "trace_withheld_over_plan" });
+      reads.assertTraceNotWithheld.mockRejectedValueOnce(withheld);
+
+      await expect(service.spanTree(view)).rejects.toMatchObject({
+        code: "trace_withheld_over_plan",
+      });
+      expect(reads.assertTraceNotWithheld).toHaveBeenCalledWith(
+        expect.objectContaining({ traceId: "trace-1", protections: readerSees }),
       );
     });
   });
