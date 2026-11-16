@@ -22,6 +22,10 @@ import { evalSlimTimeseriesRead } from "../clickhouse.eval-slim-timeseries-query
 import { topDocumentsRead } from "../clickhouse.feedback-document-reads.mapper.ts";
 import { resetParamCounter } from "../clickhouse.filter-translator.mapper.ts";
 import { slimTimeseriesRead } from "../clickhouse.slim-timeseries-query.mapper.ts";
+import {
+  servesSpanGrouped,
+  spanGroupedTimeseriesRead,
+} from "../clickhouse.span-grouped-timeseries-query.mapper.ts";
 import { ownProjectReaderOver } from "./support/clickhouse-query-client.support.ts";
 
 const TENANT_ID = `acme-dashboard-memory-${nanoid(8)}`;
@@ -138,6 +142,19 @@ function buildPanelQuery(input: AnalyticsTimeseriesInput) {
     case "evaluation_analytics":
       return built(evalSlimTimeseriesRead(read));
     case "trace_summaries":
+      // The model-grouped panel is a built read; its spilling join scaled down as below.
+      if (servesSpanGrouped(builderInput)) {
+        return built(
+          spanGroupedTimeseriesRead({
+            ...read,
+            settings: {
+              max_bytes_in_join: SCALED_JOIN_BYTES,
+              max_threads: CAPPED_SETTINGS.max_threads,
+            },
+          }),
+        );
+      }
+      return { table, fenced: true, ...buildTimeseriesQuery(builderInput) };
     case "evaluation_runs":
       return { table, fenced: true, ...buildTimeseriesQuery(builderInput) };
     default:

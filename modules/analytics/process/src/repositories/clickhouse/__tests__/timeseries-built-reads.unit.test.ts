@@ -593,6 +593,8 @@ describe("the trace_summaries read grouped by a key a trace holds several of", (
     ["aggregate", "metadata.labels", "full"],
     ["own", "metadata.span_type", "full"],
     ["aggregate", "sentiment.thumbs_up_down", 60],
+    ["own", "metadata.model", 60],
+    ["aggregate", "metadata.model", "full"],
   ] as const)(
     "is a reader statement whose tenants are the %s proof's, grouped by %s at scale %s",
     (proof, groupBy, timeScale) => {
@@ -631,6 +633,23 @@ describe("the trace_summaries read grouped by a key a trace holds several of", (
     expect(statement).toMatch(/HAVING .+ != ''/s);
   });
 
+  it("splits each member's trace across its span models, with main's join settings", () => {
+    const sql = inlined(
+      read(spanGroupedTimeseriesRead, { series: trace, groupBy: "metadata.model", timeScale: 60 }),
+    );
+
+    expect(sql.match(/LEFT JOIN/g)).toHaveLength(1);
+    expect(sql).not.toContain("INNER JOIN");
+    expect(sql).toMatch(/smd\.TenantId = trace_summaries\.TenantId/);
+    expect(sql).toMatch(/GROUP BY TenantId, TraceId, SpanId, multiIf\(/);
+    expect(sql).toMatch(/GROUP BY trace_summaries\.TenantId, trace_summaries\.TraceId/);
+    expect(sql).toContain("arrayJoin(");
+    expect(sql).not.toMatch(/HAVING/);
+    expect(sql).toContain(
+      "join_algorithm = 'grace_hash', max_bytes_in_join = 200000000, max_threads = 4",
+    );
+  });
+
   it("keeps only the filtered labels when it filters and groups by labels", () => {
     const statement = inlined(
       read(spanGroupedTimeseriesRead, {
@@ -645,7 +664,7 @@ describe("the trace_summaries read grouped by a key a trace holds several of", (
     expect(statement).toContain('WHERE group_key IN (["a-label-0"])');
   });
 
-  it("serves trace-row metrics under the four groupings, and leaves the rest to their shapes", () => {
+  it("serves trace-row metrics under the five groupings, and leaves the rest to their shapes", () => {
     const serves = (input: Partial<Omit<TimeseriesQueryInput, keyof typeof dates>>) =>
       servesSpanGrouped({
         ...dates,
@@ -659,7 +678,7 @@ describe("the trace_summaries read grouped by a key a trace holds several of", (
     expect(serves({ groupBy: "metadata.span_type", timeScale: "full" })).toBe(true);
     expect(serves({ groupBy: "events.event_type" })).toBe(true);
     expect(serves({ groupBy: "sentiment.thumbs_up_down" })).toBe(true);
-    expect(serves({ groupBy: "metadata.model" })).toBe(false);
+    expect(serves({ groupBy: "metadata.model", timeScale: "full" })).toBe(true);
     expect(serves({ groupBy: "topics.topics" })).toBe(false);
     expect(serves({ groupBy: undefined })).toBe(false);
     expect(serves({ series: [series("sentiment.thumbs_up_down", "avg")] })).toBe(false);

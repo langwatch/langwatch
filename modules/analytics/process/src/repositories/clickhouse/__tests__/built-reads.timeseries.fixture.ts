@@ -101,7 +101,8 @@ export const SUMMARY_TABLES = ["trace_summaries", "stored_spans", "evaluation_ru
 
 /**
  * A trace_summaries version of a trace seed, with one span and one evaluation run for the first
- * version of each trace. Trace 1 has no NonBilledCost and the legacy non-billable flag.
+ * version of each trace. Trace 1 has no NonBilledCost and the legacy non-billable flag. Trace 2's
+ * span names no model and costs nothing, so a model grouping falls back to its `Models`.
  */
 export function summaryRows(tenantId: string, seed: TraceSeed) {
   const tag = tagOf(tenantId);
@@ -147,7 +148,7 @@ export function summaryRows(tenantId: string, seed: TraceSeed) {
     SpanCount: seed.spanCount ?? 1,
     ContainsErrorStatus: odd ? 1 : 0,
     ContainsOKStatus: 1,
-    Models: [],
+    Models: i === 2 ? ["model-z"] : [],
     TokensEstimated: false,
     OutputFromRootSpan: 0,
     OutputSpanEndTimeMs: 0,
@@ -171,7 +172,12 @@ export function summaryRows(tenantId: string, seed: TraceSeed) {
     SpanKind: 1,
     ServiceName: "test-service",
     ResourceAttributes: {},
-    SpanAttributes: { "langwatch.span.type": odd ? "tool" : "llm" },
+    SpanAttributes: {
+      "langwatch.span.type": odd ? "tool" : "llm",
+      ...(i === 2 ? {} : { "gen_ai.response.model": odd ? "model-b" : "model-a" }),
+    },
+    Cost: i === 2 ? null : (i + 1) * 0.5 * scale,
+    NonBilledCost: i === 1 || i === 2 ? null : (i + 1) * 0.125 * scale,
     ScopeName: "",
     "Events.Timestamp": [at],
     "Events.Name": ["other"],
@@ -206,6 +212,7 @@ export function summaryRows(tenantId: string, seed: TraceSeed) {
 /**
  * A second span for traces 0, 1, 3 and 4 (first version), the same type as the first so no span
  * filter changes its traces: token usage, a thumbs vote (down on odd traces) and a scored event.
+ * Its model is "model-c" on 0 and 3, unknown otherwise; trace 4's skips token accumulation.
  */
 export function extraSpan(tenantId: string, seed: TraceSeed) {
   const i = seed.index;
@@ -229,7 +236,12 @@ export function extraSpan(tenantId: string, seed: TraceSeed) {
       "langwatch.span.type": i % 2 === 1 ? "tool" : "llm",
       "gen_ai.usage.input_tokens": String((i + 1) * 7 * scale),
       "gen_ai.usage.output_tokens": String((i + 1) * 11 * scale),
+      "gen_ai.usage.cache_read.input_tokens": String(i * 3 * scale),
+      ...(i === 0 || i === 3 ? { "gen_ai.request.model": "model-c" } : {}),
+      ...(i === 4 ? { "langwatch.reserved.skip_token_accumulation": "true" } : {}),
     },
+    Cost: 0.25 * scale,
+    NonBilledCost: 0,
     ScopeName: "",
     "Events.Timestamp": [at, at],
     "Events.Name": ["thumbs_up_down", "graded"],
@@ -884,6 +896,7 @@ const SPAN_GROUPINGS = [
   "metadata.span_type",
   "events.event_type",
   "sentiment.thumbs_up_down",
+  "metadata.model",
 ];
 
 /** Per-trace pipelines, which main read as their inner metric under these groupings. */
@@ -923,7 +936,7 @@ export const SPAN_GROUPED_SHAPES: Shape[] = [
       timeZone: "Europe/Amsterdam",
     },
   ]),
-  ...["metadata.labels", "metadata.span_type"].map((groupBy): Shape => ({
+  ...["metadata.labels", "metadata.span_type", "metadata.model"].map((groupBy): Shape => ({
     name: `span-grouped per-trace pipelines by ${groupBy}, hourly`,
     table: "trace_summaries",
     series: PER_TRACE_PIPELINES,

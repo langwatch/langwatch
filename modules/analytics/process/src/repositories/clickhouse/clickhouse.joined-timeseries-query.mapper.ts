@@ -158,10 +158,15 @@ export function servesJoinedTraceSummaries(input: TimeseriesQueryInput): boolean
   return planOf(input).kind === "joined";
 }
 
-/** Spans within main's StartTime envelope and the proof's windows; main elected no version. */
-function spansRead(scope: ProofScope, input: TimeseriesQueryInput) {
+/** Main's StartTime envelope on a spans read: two days either side of both periods. */
+export function inSpanEnvelope(input: TimeseriesQueryInput): Condition<"stored_spans"> {
   const from = param.epochMs(input.previousPeriodStartDate.getTime() - SPAN_MARGIN_MS);
   const until = param.epochMs(input.endDate.getTime() + SPAN_MARGIN_MS);
+  return cond.and(cond.gte(ss.StartTime, from), cond.lt(ss.StartTime, until));
+}
+
+/** Spans within main's StartTime envelope and the proof's windows; main elected no version. */
+function spansRead(scope: ProofScope, input: TimeseriesQueryInput) {
   return clickhouseRead({ scope })
     .from(ss)
     .withinWindows()
@@ -172,7 +177,7 @@ function spansRead(scope: ProofScope, input: TimeseriesQueryInput) {
       eventNames: ss["Events.Name"],
       eventAttributes: ss["Events.Attributes"],
     })
-    .where(({ and, gte, lt }) => and(gte(ss.StartTime, from), lt(ss.StartTime, until)))
+    .where(() => inSpanEnvelope(input))
     .as("spans");
 }
 

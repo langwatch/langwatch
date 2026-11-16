@@ -17,6 +17,7 @@ const columns = {
   HasAnnotation: column.nullable(column.bool()),
   TraceName: column.string(),
   Models: column.array(column.string()),
+  SpanCount: column.uint32(),
   CreatedAt: column.dateTime64({ precision: 3 }),
   TotalDurationMs: column.int64(),
   TimeToFirstTokenMs: column.nullable(column.uint32()),

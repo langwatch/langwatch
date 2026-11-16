@@ -1,7 +1,7 @@
 /**
  * Trace metrics grouped by a key a trace holds several of (its labels, its spans' types, events
- * and votes) on the typed builder (ADR-202), as main's buildArrayJoinTimeseriesQuery: one row per
- * member's trace and key first, so a trace counts once in each of its keys, never once per span.
+ * votes and span models) on the typed builder (ADR-202), as main's buildArrayJoinTimeseriesQuery:
+ * one row per member's trace and key first, so a trace counts once in each key, never per span.
  */
 
 import type { AnalyticsSeries } from "@langwatch/analytics-contract";
@@ -25,6 +25,13 @@ import { type JoinedSpans, spansOf } from "./clickhouse.joined-timeseries-query.
 import type { MetricSource } from "./clickhouse.metric-spec.mapper.ts";
 import { carriedPerTrace, measuresOver } from "./clickhouse.mixed-eval-timeseries-query.mapper.ts";
 import {
+  type ModelBuckets,
+  modelBucketsOf,
+  modelKeyOf,
+  partitionedSource,
+  SPAN_MODEL_PARTITION_SETTINGS,
+} from "./clickhouse.span-model-partition.mapper.ts";
+import {
   allOf,
   dateBucket,
   groupKeyOf,
@@ -36,23 +43,31 @@ import {
 import { filtersOf, specOf } from "./clickhouse.trace-summaries-timeseries-query.mapper.ts";
 import { traceSummaries as ts } from "./clickhouse.trace-summaries.table.ts";
 
-type Grouped = "trace_summaries" | "spans";
+type Grouped = "trace_summaries" | "spans" | "smd";
+
+/** What a grouping joins to the trace: nothing, its spans, or its span-model buckets. */
+type Joined = { spans?: JoinedSpans; models?: ModelBuckets };
 
 /**
  * A grouping main sent to its span-dedup path (aggregation-builder:706-794): its key over the
- * trace and its joined spans, whether it expands an array (so a filter on the field also keeps
+ * trace and what it joins, whether it expands an array (so a filter on the field also keeps
  * only the filtered keys), and whether it answers for its own empty value.
  */
 type SpanGrouping = {
-  spans: boolean;
+  joins: "none" | "spans" | "models";
   expands: boolean;
   handlesUnknown: boolean;
-  key: (spans: JoinedSpans | undefined) => Measure<Grouped>;
+  key: (joined: Joined) => Measure<Grouped>;
 };
 
-const joinedSpans = (spans: JoinedSpans | undefined): JoinedSpans => {
+const joinedSpans = ({ spans }: Joined): JoinedSpans => {
   if (!spans) throw new Error("This span-grouped read joins no stored_spans.");
   return spans;
+};
+
+const joinedModels = ({ models }: Joined): ModelBuckets => {
+  if (!models) throw new Error("This span-grouped read joins no span-model buckets.");
+  return models;
 };
 
 type Votes = Expression<readonly Readonly<Record<string, string>>[], string>;
@@ -60,7 +75,7 @@ type Names = Expression<readonly string[], string>;
 
 const SPAN_GROUP_BYS: Record<string, SpanGrouping> = {
   "metadata.labels": {
-    spans: false,
+    joins: "none",
     expands: true,
     handlesUnknown: false,
     key: () =>
@@ -74,7 +89,7 @@ const SPAN_GROUP_BYS: Record<string, SpanGrouping> = {
       ),
   },
   "metadata.span_type": {
-    spans: true,
+    joins: "spans",
     expands: false,
     handlesUnknown: true,
     key: (spans) => {
@@ -87,13 +102,13 @@ const SPAN_GROUP_BYS: Record<string, SpanGrouping> = {
     },
   },
   "events.event_type": {
-    spans: true,
+    joins: "spans",
     expands: true,
     handlesUnknown: false,
     key: (spans) => groupKeyOf(fn.arrayJoin(joinedSpans(spans).eventNames)) as Measure<Grouped>,
   },
   "sentiment.thumbs_up_down": {
-    spans: true,
+    joins: "spans",
     expands: true,
     handlesUnknown: false,
     key: (spans) => {
@@ -116,6 +131,12 @@ const SPAN_GROUP_BYS: Record<string, SpanGrouping> = {
       }, voted);
       return groupKeyOf(fn.arrayJoin(vote)) as Measure<Grouped>;
     },
+  },
+  "metadata.model": {
+    joins: "models",
+    expands: false,
+    handlesUnknown: true,
+    key: (joined) => modelKeyOf(joinedModels(joined)) as Measure<Grouped>,
   },
 };
 
@@ -157,18 +178,24 @@ function perTraceRead({
   input: TimeseriesQueryInput;
   grouping: SpanGrouping;
 }) {
-  const spans = grouping.spans ? spansOf(scope, input) : undefined;
-  const source: MetricSource<Grouped> = {
-    trace: (name) => ts[name],
-    attribute: (key) => fn.mapGet(ts.Attributes, key),
-    span: () => {
-      throw new Error("The span-grouped read carries trace-row metrics only.");
-    },
-    evaluation: () => {
-      throw new Error("The span-grouped read carries trace-row metrics only.");
-    },
+  const joined: Joined = {
+    spans: grouping.joins === "spans" ? spansOf(scope, input) : undefined,
+    models: grouping.joins === "models" ? modelBucketsOf(scope, input) : undefined,
   };
-  const groupKey = grouping.key(spans);
+  const { spans, models } = joined;
+  const source: MetricSource<Grouped> = models
+    ? (partitionedSource(models) as MetricSource<Grouped>)
+    : {
+        trace: (name) => ts[name],
+        attribute: (key) => fn.mapGet(ts.Attributes, key),
+        span: () => {
+          throw new Error("The span-grouped read carries trace-row metrics only.");
+        },
+        evaluation: () => {
+          throw new Error("The span-grouped read carries trace-row metrics only.");
+        },
+      };
+  const groupKey = grouping.key(joined);
   const selection: Record<string, Measure<Grouped>> = {
     TenantId: ts.TenantId,
     trace_id: ts.TraceId,
@@ -185,12 +212,17 @@ function perTraceRead({
 
   const { filters, restrictions } = filtersOf(input);
   const base = clickhouseRead({ scope }).from(ts).withinWindows();
-  const joined = spans
+  const withSpans = spans
     ? base.innerJoin(spans, ({ and, eq }) =>
         and(eq(spans.TenantId, ts.TenantId), eq(spans.TraceId, ts.TraceId)),
       )
     : base;
-  return (joined as typeof base)
+  const withModels = models
+    ? withSpans.leftJoin(models, ({ and, eq }) =>
+        and(eq(models.TenantId!, ts.TenantId), eq(models.TraceId!, ts.TraceId)),
+      )
+    : withSpans;
+  return (withModels as typeof base)
     .select(selection as Record<string, Measure<"trace_summaries">>)
     .where(() => inEitherPeriod(ts.OccurredAt, input))
     .where((ops) => allOf([filters(ops), ...restrictions]), { inElection: false })
@@ -234,6 +266,10 @@ export function spanGroupedTimeseriesRead({
     : grouped.having(() => cond.ne(groupKey, param.string("")));
   const ordered = having.orderBy("period");
   return (dated ? ordered.orderBy("date") : ordered)
-    .settings({ ...settings, log_comment: "analytics:timeseries:trace_summaries:span_grouped" })
+    .settings({
+      ...(grouping.joins === "models" ? SPAN_MODEL_PARTITION_SETTINGS : {}),
+      ...settings,
+      log_comment: "analytics:timeseries:trace_summaries:span_grouped",
+    })
     .build() as ReaderReadStatement;
 }

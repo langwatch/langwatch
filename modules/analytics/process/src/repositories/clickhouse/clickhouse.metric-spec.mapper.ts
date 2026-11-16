@@ -69,6 +69,11 @@ export type MetricSource<T extends string> = {
   attribute: (key: string) => Measure<T>;
   span: (column: SpanMetricColumn) => Measure<T>;
   evaluation: (column: EvaluationMetricColumn) => Measure<T>;
+  /** Set where a shape splits each trace (by span model): its share of the composite reads. */
+  split?: {
+    nonBilledCost: () => Measure<T>;
+    reservedTokens: (key: string) => Measure<T>;
+  };
 };
 
 export type MetricOperand = <T extends string>(source: MetricSource<T>) => Measure<T>;
@@ -128,6 +133,7 @@ const memberScopedAttribute =
 
 /** The bundled (non-billed) cost; rows folded before NonBilledCost read the legacy flag. */
 export function nonBilledCost<T extends string>(source: MetricSource<T>): Measure<T> {
+  if (source.split) return source.split.nonBilledCost();
   return fn.coalesce(
     source.trace("NonBilledCost"),
     fn.if(
@@ -142,6 +148,7 @@ export function nonBilledCost<T extends string>(source: MetricSource<T>): Measur
 const reservedTokens =
   (key: string): MetricOperand =>
   (source) =>
+    source.split?.reservedTokens(key) ??
     fn.toUInt64OrZero(source.attribute(`langwatch.reserved.${key}`));
 
 const traceColumn =

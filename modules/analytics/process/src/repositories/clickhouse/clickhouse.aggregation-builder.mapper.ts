@@ -42,6 +42,7 @@ import {
   translateMetric,
   translatePipelineAggregation,
 } from "./clickhouse.metric-translator.mapper.ts";
+import { SPAN_MODEL_PARTITION_SETTINGS } from "./clickhouse.span-model-partition.mapper.ts";
 
 /**
  * The `group_key` projection, or null when the query has no grouping. A column
@@ -842,17 +843,6 @@ interface BuiltQuery {
    */
   settings?: Record<string, string | number>;
 }
-
-/**
- * Settings for a model-grouped query joining deduped traces to the span-model partition. A grace
- * hash join spills the per-trace-and-model side to disk past `max_bytes_in_join`, and fewer
- * threads bound the spilled merge: the panel runs slower (5s to 9s at 3M traces), not failing.
- */
-const SPAN_MODEL_PARTITION_SETTINGS = {
-  join_algorithm: "grace_hash",
-  max_bytes_in_join: 200_000_000,
-  max_threads: 4,
-} as const;
 
 /**
  * Build the HAVING clause for group_key filtering.
