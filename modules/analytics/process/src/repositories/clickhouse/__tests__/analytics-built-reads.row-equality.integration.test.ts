@@ -32,6 +32,7 @@ import {
   analyticsFilterCondition,
 } from "../clickhouse.filter-conditions.mapper.ts";
 import { FilterOptionsClickHouseRepository } from "../clickhouse.filter-options.repository.ts";
+import { servesJoinedTraceSummaries } from "../clickhouse.joined-timeseries-query.mapper.ts";
 import { servesMixedEval } from "../clickhouse.mixed-eval-timeseries-query.mapper.ts";
 import { servesStandardTraceSummaries } from "../clickhouse.trace-summaries-timeseries-query.mapper.ts";
 import { traceSummaries } from "../clickhouse.trace-summaries.table.ts";
@@ -150,10 +151,10 @@ beforeAll(async () => {
       "trace_summaries",
       summaries.map((row) => row.summary),
     );
-    await insert(
-      "stored_spans",
-      summaries.flatMap((row) => (row.span ? [row.span] : [])),
-    );
+    await insert("stored_spans", [
+      ...summaries.flatMap((row) => (row.span ? [row.span] : [])),
+      ...timeseries.TRACE_SEEDS.flatMap((seed) => timeseries.extraSpan(tenantId, seed) ?? []),
+    ]);
     await insert(
       "evaluation_runs",
       summaries.flatMap((row) => (row.run ? [row.run] : [])),
@@ -256,6 +257,7 @@ const timeseriesInput = (shape: timeseries.Shape, projectId: string) =>
     series: shape.series,
     filters: shape.filters ?? {},
     groupBy: shape.groupBy,
+    groupByKey: shape.groupByKey,
     negateFilters: shape.negateFilters,
     traceIds: shape.traceIds,
     excludeOrigins: shape.excludeOrigins,
@@ -534,6 +536,61 @@ describe("timeseries reads built on the typed builder", () => {
         }),
       ).toBe(true);
     });
+  });
+
+  describe("given trace summaries joined to their spans or runs", () => {
+    describe.each(timeseries.PROOFS)("given $name", ({ projectId, proof }) => {
+      it.each(timeseries.JOINED_SHAPES)("$name answers main's buckets", async (shape) => {
+        const want = expected.timeseries[`${literal(projectId, timeseries.RUN)}|${shape.name}`];
+        const got = await builtTimeseries({ shape, projectId, proof: proof() });
+
+        expect(want).toBeDefined();
+        expect(toTwelveDigits(got)).toEqual(toTwelveDigits(want));
+      });
+    });
+
+    /*
+     * Main summed the token attribute's string and failed (code 43), so these are derived by hand:
+     * each trace's extra span carries (i + 1) * 7 prompt and (i + 1) * 11 completion tokens, B's
+     * scaled by 100 and shared from 04:00 until 11:30, its traces joined to its own spans only.
+     */
+    it.each([
+      [timeseries.PROOFS[0]!, { "05": [28, 44], "09": [7, 11], "10": [14, 22], "13": [35, 55] }],
+      [
+        timeseries.PROOFS[1]!,
+        { "05": [2828, 2222], "09": [707, 555.5], "10": [1414, 1111], "13": [35, 55] },
+      ],
+    ] as const)("sums each member's span tokens under $0.name", async (proof, hours) => {
+      const result = await builtTimeseries({
+        shape: timeseries.SPAN_TOKEN_SHAPE,
+        projectId: proof.projectId,
+        proof: proof.proof(),
+      });
+      const buckets = [...result.previousPeriod, ...result.currentPeriod];
+
+      for (const [hour, [prompt, completion]] of Object.entries(hours)) {
+        expect(buckets.find((row) => row.date === `${timeseries.DAY} ${hour}:00:00`)).toMatchObject(
+          {
+            "0/spans.metrics.prompt_tokens/sum": prompt,
+            "1/spans.metrics.completion_tokens/avg": completion,
+          },
+        );
+      }
+    });
+
+    it.each([...timeseries.JOINED_SHAPES, timeseries.SPAN_TOKEN_SHAPE])(
+      "$name is a built read",
+      (shape) => {
+        expect(
+          servesJoinedTraceSummaries({
+            ...timeseriesInput(shape, timeseries.TENANT_A),
+            startDate: new Date(timeseries.START),
+            endDate: new Date(timeseries.END),
+            previousPeriodStartDate: new Date(timeseries.PREVIOUS_START),
+          }),
+        ).toBe(true);
+      },
+    );
   });
 
   describe("given the aggregate reads B inside its window", () => {

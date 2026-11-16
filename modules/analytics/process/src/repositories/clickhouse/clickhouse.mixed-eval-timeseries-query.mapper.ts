@@ -80,7 +80,7 @@ export function servesMixedEval(input: TimeseriesQueryInput): boolean {
 }
 
 /** The latest version of each run since main's lookback, in the proof's windows. */
-function runsOf(scope: ProofScope, input: TimeseriesQueryInput) {
+function runsRead(scope: ProofScope, input: TimeseriesQueryInput) {
   const since = param.epochMs(input.previousPeriodStartDate.getTime() - RUN_LOOKBACK_MS);
   return clickhouseRead({ scope })
     .from(er)
@@ -93,10 +93,18 @@ function runsOf(scope: ProofScope, input: TimeseriesQueryInput) {
       Score: er.Score,
       Passed: er.Passed,
       Status: er.Status,
+      Label: er.Label,
     })
     .where(({ and, gte }) => and(gte(er.ScheduledAt, since), gte(er.UpdatedAt, since)))
     .latestVersion()
     .as("runs");
+}
+
+/** The runs as a derived table, for the mixed read and the joined read. */
+export type JoinedRuns = ReturnType<typeof runsRead>;
+
+export function runsOf(scope: ProofScope, input: TimeseriesQueryInput): JoinedRuns {
+  return runsRead(scope, input);
 }
 
 type PerTraceKeys = { period: boolean; date: boolean; groupKey: boolean };

@@ -48,6 +48,8 @@ function makeQuery(overrides: Partial<AnalyticsTimeseriesInput> = {}): Analytics
           key: "monitor_123",
         },
       ],
+      // A labels grouping stays on the text path (arrayJoin), which this suite covers.
+      groupBy: "metadata.labels",
       timeScale: 1440,
       timeZone: "UTC",
       ...overrides,

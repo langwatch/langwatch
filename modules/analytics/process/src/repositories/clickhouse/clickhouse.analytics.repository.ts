@@ -44,6 +44,10 @@ import {
   topDocumentsRead,
 } from "./clickhouse.feedback-document-reads.mapper.ts";
 import {
+  joinedTimeseriesRead,
+  servesJoinedTraceSummaries,
+} from "./clickhouse.joined-timeseries-query.mapper.ts";
+import {
   mixedEvalTimeseriesRead,
   servesMixedEval,
 } from "./clickhouse.mixed-eval-timeseries-query.mapper.ts";
@@ -91,6 +95,7 @@ function routeOf({
   if (table !== "trace_summaries") return built(BUILT_READS[table]);
   if (servesStandardTraceSummaries(input)) return built(traceSummariesTimeseriesRead);
   if (servesMixedEval(input)) return built(mixedEvalTimeseriesRead);
+  if (servesJoinedTraceSummaries(input)) return built(joinedTimeseriesRead);
   return { kind: "text" };
 }
 

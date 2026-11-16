@@ -203,6 +203,49 @@ export function summaryRows(tenantId: string, seed: TraceSeed) {
   return { summary, span, run };
 }
 
+/**
+ * A second span for traces 0, 1, 3 and 4 (first version), the same type as the first so no span
+ * filter changes its traces: token usage, a thumbs vote (down on odd traces) and a scored event.
+ */
+export function extraSpan(tenantId: string, seed: TraceSeed) {
+  const i = seed.index;
+  if (i === 2 || (seed.updated !== undefined && seed.updated !== seed.time)) return undefined;
+  const scale = scaleOf(tenantId);
+  const at = stamp(seed.time);
+  return {
+    ProjectionId: `proj-span-${randomUUID()}`,
+    TenantId: tenantId,
+    TraceId: `trace-${RUN}-${i}`,
+    SpanId: `span-${RUN}-${i}-extra`,
+    Sampled: 1,
+    StartTime: at,
+    EndTime: at,
+    DurationMs: 1,
+    SpanName: "extra",
+    SpanKind: 1,
+    ServiceName: "test-service",
+    ResourceAttributes: {},
+    SpanAttributes: {
+      "langwatch.span.type": i % 2 === 1 ? "tool" : "llm",
+      "gen_ai.usage.input_tokens": String((i + 1) * 7 * scale),
+      "gen_ai.usage.output_tokens": String((i + 1) * 11 * scale),
+    },
+    ScopeName: "",
+    "Events.Timestamp": [at, at],
+    "Events.Name": ["thumbs_up_down", "graded"],
+    "Events.Attributes": [
+      { "event.metrics.vote": i % 2 === 1 ? "-1" : "1" },
+      { "event.metrics.score": String(i * 0.25 * scale) },
+    ],
+    "Links.TraceId": [],
+    "Links.SpanId": [],
+    "Links.Attributes": [],
+    DroppedAttributesCount: 0,
+    DroppedEventsCount: 0,
+    DroppedLinksCount: 0,
+  };
+}
+
 export const ROLLUP_SEEDS = [
   { minute: "05:00:00", model: "m-1", n: 1 },
   { minute: "09:00:00", model: "m-1", n: 2 },
@@ -392,6 +435,7 @@ export type Shape = {
   negateFilters?: boolean;
   traceIds?: string[];
   excludeOrigins?: string[];
+  groupByKey?: string;
   timeScale: number | "full";
   timeZone?: string;
 };
@@ -701,6 +745,136 @@ export const MIXED_SHAPES: Shape[] = [
     series: MIXED_SHORT,
     traceIds: [`trace-${RUN}-0`, `trace-${RUN}-1`, `trace-${RUN}-4`],
     excludeOrigins: ["evaluation"],
+    timeScale: 60,
+  },
+];
+
+const graded = (aggregation: string, extra: Record<string, unknown> = {}) =>
+  mixed("events.event_score", aggregation, {
+    key: "graded",
+    subkey: "event.metrics.score",
+    ...extra,
+  });
+/** Span metrics on the joined spans: tokens, events, votes, and a trace metric fanned out. */
+export const JOINED_SPAN_SERIES: AnalyticsSeries[] = [
+  mixed("events.event_type", "cardinality", { key: "thumbs_up_down" }),
+  mixed("events.event_type", "cardinality"),
+  ...(["avg", "sum", "min", "max", "median", "p90"] as const).map((aggregation) =>
+    graded(aggregation),
+  ),
+  mixed("sentiment.thumbs_up_down", "cardinality"),
+  mixed("sentiment.thumbs_up_down", "sum"),
+  mixed("sentiment.thumbs_up_down", "avg"),
+  mixed("performance.total_cost", "sum"),
+  mixed("metadata.trace_id", "cardinality"),
+];
+const JOINED_FILTERED_SERIES: AnalyticsSeries[] = [
+  graded("sum", { filters: clean }),
+  graded("median", { filters: clean }),
+  mixed("sentiment.thumbs_up_down", "sum", { filters: clean, asPercent: true }),
+  mixed("events.event_type", "cardinality", { filters: clean }),
+];
+/** Span token usage: main summed the attribute's string and failed, so no main answer exists. */
+export const SPAN_TOKEN_SHAPE: Shape = {
+  name: "joined span tokens, hourly",
+  table: "trace_summaries",
+  series: [
+    mixed("spans.metrics.prompt_tokens", "sum"),
+    mixed("spans.metrics.completion_tokens", "avg"),
+  ],
+  timeScale: 60,
+};
+const RUN_SERIES: AnalyticsSeries[] = [
+  mixed("evaluations.evaluation_score", "avg", { key: "ev" }),
+  mixed("evaluations.evaluation_runs", "cardinality"),
+  mixed("evaluations.evaluation_pass_rate", "avg"),
+];
+const TRACE_SHORT: AnalyticsSeries[] = [
+  mixed("performance.total_cost", "sum"),
+  mixed("metadata.trace_id", "cardinality"),
+];
+const RUN_GROUPINGS: [string, string | undefined][] = [
+  ["evaluations.evaluation_passed", undefined],
+  ["evaluations.evaluation_passed", "ev"],
+  ["evaluations.evaluation_label", undefined],
+  ["evaluations.evaluation_label", "ev"],
+  ["evaluations.evaluation_processing_state", undefined],
+];
+
+/** Path A, joined: trace_summaries joined to its spans or runs, every joined row counted. */
+export const JOINED_SHAPES: Shape[] = [
+  {
+    name: "joined spans, every metric, hourly",
+    table: "trace_summaries",
+    series: JOINED_SPAN_SERIES,
+    timeScale: 60,
+  },
+  {
+    name: "joined spans, every metric, daily in Amsterdam",
+    table: "trace_summaries",
+    series: JOINED_SPAN_SERIES,
+    timeScale: 1440,
+    timeZone: "Europe/Amsterdam",
+  },
+  {
+    name: "joined spans by metadata.user_id, both periods",
+    table: "trace_summaries",
+    series: JOINED_SPAN_SERIES,
+    groupBy: "metadata.user_id",
+    timeScale: "full",
+  },
+  {
+    name: "joined spans with series filters, hourly",
+    table: "trace_summaries",
+    series: JOINED_FILTERED_SERIES,
+    timeScale: 60,
+  },
+  {
+    name: "joined spans filtered on spans.type, negated",
+    table: "trace_summaries",
+    series: JOINED_FILTERED_SERIES,
+    filters: { "spans.type": ["tool"] } as AnalyticsFilters,
+    negateFilters: true,
+    timeScale: 60,
+  },
+  {
+    name: "joined spans for two traces, excluding evaluation origins",
+    table: "trace_summaries",
+    series: JOINED_SPAN_SERIES,
+    traceIds: [`trace-${RUN}-0`, `trace-${RUN}-1`, `trace-${RUN}-4`],
+    excludeOrigins: ["evaluation"],
+    timeScale: 60,
+  },
+  {
+    name: "joined runs by topics.topics, hourly",
+    table: "trace_summaries",
+    series: RUN_SERIES,
+    groupBy: "topics.topics",
+    timeScale: 60,
+  },
+  ...RUN_GROUPINGS.flatMap(([groupBy, groupByKey]): Shape[] => [
+    {
+      name: `joined runs by ${groupBy}${groupByKey ? ` of ${groupByKey}` : ""}, both periods`,
+      table: "trace_summaries",
+      series: RUN_SERIES,
+      groupBy,
+      groupByKey,
+      timeScale: "full",
+    },
+    {
+      name: `joined traces by ${groupBy}${groupByKey ? ` of ${groupByKey}` : ""}, hourly`,
+      table: "trace_summaries",
+      series: TRACE_SHORT,
+      groupBy,
+      groupByKey,
+      timeScale: 60,
+    },
+  ]),
+  {
+    name: "joined spans and runs by evaluations.evaluation_passed, hourly",
+    table: "trace_summaries",
+    series: [mixed("sentiment.thumbs_up_down", "cardinality"), graded("max")],
+    groupBy: "evaluations.evaluation_passed",
     timeScale: 60,
   },
 ];
