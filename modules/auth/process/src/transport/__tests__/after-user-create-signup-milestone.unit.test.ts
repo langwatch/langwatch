@@ -49,6 +49,7 @@ import type { SignedUpEvent } from "../../eventing/auth-lifecycle.events.ts";
 import type { BetterAuthHooksRepository } from "../../repositories/better-auth-hooks.repository.ts";
 import { AuthLifecycleNoticeService } from "../../services/auth-lifecycle-notice.service.ts";
 import { SignupAnnouncementService } from "../../services/signup-announcement.service.ts";
+import { recordingUsers } from "./better-auth-transport.test-helpers.ts";
 
 class StubFederation implements BetterAuthFederation {
   constructor(private readonly ssoAllowed: boolean) {}
@@ -149,15 +150,6 @@ function domainOrganizations(organization: SsoDomainOrganization | null): SsoDom
       .fn<SsoDomainOrganizations["createMembership"]>()
       .mockResolvedValue({ outcome: "created", seat: "MEMBER", pending: false }),
   });
-}
-
-/** user's created-fact door, noting each account it was asked to record. */
-function recordingUsers() {
-  const recorded: string[] = [];
-  const users = createApiFixture<Pick<UserApi, "recordCreated">>({
-    recordCreated: async ({ id }) => void recorded.push(id),
-  });
-  return { users, recorded };
 }
 
 describe("afterUserCreate", () => {

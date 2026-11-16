@@ -31,6 +31,7 @@ import type {
   BetterAuthHookUser,
   BetterAuthHooksRepository,
 } from "../../repositories/better-auth-hooks.repository.ts";
+import { recordingUsers } from "./better-auth-transport.test-helpers.ts";
 
 /** The Google account row better-auth hands the hook, for one user. */
 function googleAccountFor(userId: string) {
@@ -123,15 +124,6 @@ function signupRepo(
       .mockResolvedValue(admission),
   };
   return { double: hooksRepo({}), mocks, organizations: organizationsOver(mocks) };
-}
-
-/** user's created-fact door, noting each account it was asked to record. */
-function recordingUsers() {
-  const recorded: string[] = [];
-  const users = createApiFixture<Pick<UserApi, "recordCreated">>({
-    recordCreated: async ({ id }) => void recorded.push(id),
-  });
-  return { users, recorded };
 }
 
 /** Everything a sign-up's auto-join reaches. */
@@ -324,7 +316,7 @@ describe("signing in through a domain-matched organization's identity provider",
     });
   });
 
-  describe("given a credential signup whose email nobody has verified", () => {
+  describe("given a new single sign-on user", () => {
     /** @scenario "A new single sign-on user records the new account's created fact" */
     it.each([
       { case: "auto-added to the domain-matched organization", organization: ACME },
@@ -340,7 +332,9 @@ describe("signing in through a domain-matched organization's identity provider",
 
       expect(recorded).toEqual([NEW_ACME_USER.id]);
     });
+  });
 
+  describe("given a credential signup whose email nobody has verified", () => {
     /** @scenario Unverified signup with a matching ssoDomain does not auto-join the SSO org */
     it("creates no membership and no grant at the domain-matched organization", async () => {
       const { mocks, organizations } = signupRepo(ACME);
