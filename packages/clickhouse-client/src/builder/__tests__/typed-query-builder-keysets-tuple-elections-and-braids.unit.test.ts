@@ -1,6 +1,6 @@
 import type { CompiledWhere } from "@langwatch/authorization";
 /**
- * ADR-202, "The typed builder": trace's remaining reads (handoff rp-port-trace-1 section 11). A
+ * ADR-202, "The typed builder": the shapes trace's reads need. A
  * several-argument uniqExact, a keyset over aggregates in HAVING, a tuple looked up in CTEs, an
  * election on a tuple version with LIMIT 1 BY, and a day window off `now()`.
  * @see specs/clickhouse/typed-query-builder.feature

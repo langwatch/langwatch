@@ -123,7 +123,7 @@ function signalsOf({ scope }: { scope: ReaderScope }) {
     .build();
 }
 
-describe("typed query builder gaps, seventh census", () => {
+describe("typed query builder conditions and array literals", () => {
   describe("given an array literal of typed expressions", () => {
     /** @scenario "An array literal of typed expressions shares one element type" */
     it("renders array(…) of its elements, a lambda over it binding values as its elements do", () => {

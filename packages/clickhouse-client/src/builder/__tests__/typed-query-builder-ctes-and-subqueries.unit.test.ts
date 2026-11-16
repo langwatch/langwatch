@@ -1,6 +1,5 @@
 /**
- * ADR-202, "The typed builder": the shapes the evaluation and scenario ports stopped on (rp-b4
- * handoff): nullable and listed ids, shared id parameters, derived join sides, zoned day starts,
+ * ADR-202, "The typed builder": the shapes evaluation's and scenario's reads need: nullable and listed ids, shared id parameters, derived join sides, zoned day starts,
  * CTEs reading earlier CTEs and scalar subqueries, each carrying the tenant predicate.
  * @see specs/clickhouse/typed-query-builder.feature
  */
@@ -102,7 +101,7 @@ function refusalOf(build: () => unknown): { code: unknown; kind: unknown } {
 /** How many times the text applies the single scope's tenant predicate. */
 const predicates = (sql: string) => sql.split("TenantId = {tenantId:String}").length - 1;
 
-describe("given the typed builder and the third census's shapes", () => {
+describe("given the typed builder and CTE, subquery and id-bound shapes", () => {
   describe("when a read bounds a nullable id column or a list of ids", () => {
     /** @scenario "A read bounds a nullable id or a list of ids by the id index marker" */
     it("renders the equality or the IN list with the marker the client reads", () => {

@@ -1,5 +1,5 @@
 /**
- * ADR-202, "The typed builder": the shapes the repository census needs (rp-b2 handoff) and the
+ * ADR-202, "The typed builder": the shapes the repositories issue and the
  * server-metadata scope, rendered as text and refused by code.
  * @see specs/clickhouse/typed-query-builder.feature
  */

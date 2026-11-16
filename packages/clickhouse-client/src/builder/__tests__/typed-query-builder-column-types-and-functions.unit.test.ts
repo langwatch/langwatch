@@ -1,6 +1,6 @@
 /**
  * ADR-202, "The typed builder": the column types, nested columns, functions, lambdas, casts and
- * per-target select lists the second census found (rp-b3 handoff), rendered and refused by code.
+ * per-target select lists the repositories read, rendered and refused by code.
  * @see specs/clickhouse/typed-query-builder.feature
  */
 import { describe, expect, expectTypeOf, it } from "vitest";
@@ -115,7 +115,7 @@ function refusalOf(build: () => unknown): { code: unknown; kind: unknown } {
   throw new Error("expected a refusal; the build succeeded");
 }
 
-describe("the typed read builder, for the second census", () => {
+describe("the typed read builder, for column types, aggregate states, lambdas and casts", () => {
   describe("when a descriptor declares the column types the migrations declare", () => {
     /** @scenario "A descriptor declares nested columns and every column type the migrations declare" */
     it("writes each type's ClickHouse text as the migration does", () => {
@@ -431,7 +431,7 @@ describe("the typed read builder, for the second census", () => {
     });
   });
 
-  describe("when a read calls the census functions", () => {
+  describe("when a read calls the catalogue functions", () => {
     /** @scenario "The census functions render with every value bound" */
     it("binds JSON paths, patterns, formats, units and time zones as values", () => {
       const built = clickhouseRead({ scope: single })

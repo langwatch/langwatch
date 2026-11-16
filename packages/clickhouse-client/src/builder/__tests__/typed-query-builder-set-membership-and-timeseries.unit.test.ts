@@ -1,7 +1,7 @@
 /**
- * ADR-202, "The typed builder": the shapes analytics' census and trace's filter compiler stopped on
- * (rp-analytics-census G1-G7, rp-trace-filter-compiler D2): a set subquery, FULL OUTER JOIN, zoned
- * interval buckets, quantile variants, addDays, Array(JSON) paths and a `:` in a log comment.
+ * ADR-202, "The typed builder": the shapes analytics' reads and trace's filter compiler need: a
+ * set subquery, FULL OUTER JOIN, zoned interval buckets, quantile variants, addDays, Array(JSON)
+ * paths and a `:` in a log comment.
  * @see specs/clickhouse/typed-query-builder.feature
  */
 import { describe, expect, it } from "vitest";

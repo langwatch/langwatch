@@ -1,7 +1,7 @@
 /**
  * ADR-202, "The typed builder": a scope-generic caller's start takes a tenant table uncast, and a
- * negated set subquery writes `NOT IN`, leaving the inner tenant predicate unnegated (handoffs
- * rp-trace-filter-compiler and rp-analytics-port, shared-file requests).
+ * negated set subquery writes `NOT IN`, leaving the inner tenant predicate unnegated, as
+ * trace's filter compiler and analytics' negated filters need.
  * @see specs/clickhouse/typed-query-builder.feature
  */
 import { type AuthorizationInput, sealAuthorization } from "@langwatch/authorization";
