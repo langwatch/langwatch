@@ -159,6 +159,8 @@ export interface ReadOnlyEventStore<EventType extends Event = Event> {
     context: EventStoreReadContext<EventType>;
     aggregateType: AggregateType;
     event: EventType;
+    /** Events the caller already holds, never counted as earlier. */
+    ignoreEventIds?: readonly string[];
   }): Promise<EventLogProbe>;
 }
 

@@ -522,11 +522,13 @@ export abstract class AbstractEventStore<
     context,
     aggregateType,
     event,
+    ignoreEventIds,
   }: {
     aggregateId: string;
     context: EventStoreReadContext<EventType>;
     aggregateType: AggregateType;
     event: EventType;
+    ignoreEventIds?: readonly string[];
   }): Promise<EventLogProbe> {
     EventUtils.validateTenantId(context, `${this.constructor.name}.probeEventsBefore`);
 
@@ -558,6 +560,7 @@ export abstract class AbstractEventStore<
             eventId: event.id,
             // The same partition-pruning anchor the store-miss re-fold's history read takes.
             occurredAtFromMs: rehydrationLowerBoundMs(aggregateType, event.occurredAt),
+            ignoreEventIds,
           });
         } catch (error) {
           this.logError(

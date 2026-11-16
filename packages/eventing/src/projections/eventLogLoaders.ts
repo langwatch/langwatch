@@ -61,6 +61,7 @@ export function wireFoldEventLoaders<Stored extends Event>({
         context: { tenantId: createTenantId(ctx.tenantId) },
         aggregateType,
         event: ctx.event as Stored,
+        ignoreEventIds: ctx.ignoreEventIds,
       });
   }
 }

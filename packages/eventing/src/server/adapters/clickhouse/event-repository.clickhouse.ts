@@ -739,8 +739,11 @@ export class EventingClickHouseEventRepository implements EventRepository {
     eventTimestamp: number;
     eventId: string;
     occurredAtFromMs?: number;
+    ignoreEventIds?: readonly string[];
   }): Promise<EventLogProbe> {
     const { tenantId, aggregateType, aggregateId, eventTimestamp, eventId } = request;
+    const ignoreEventIds = [...(request.ignoreEventIds ?? [])];
+    const hasIgnored = ignoreEventIds.length > 0;
     try {
       const occurredAtFromMs = await this.occurredAtFloor({
         tenantId,
@@ -773,6 +776,7 @@ export class EventingClickHouseEventRepository implements EventRepository {
                   OR (EventTimestamp = {eventTimestamp:UInt64} AND EventId < {eventId:String})
                 )
                 AND EventId != {eventId:String}
+                ${hasIgnored ? "AND EventId NOT IN {ignoreEventIds:Array(String)}" : ""}
               LIMIT 1
             )) AS hasEarlierEvents
         `,
@@ -783,6 +787,7 @@ export class EventingClickHouseEventRepository implements EventRepository {
           eventTimestamp,
           eventId,
           ...(hasLowerBound ? { occurredAtFromMs } : {}),
+          ...(hasIgnored ? { ignoreEventIds } : {}),
         },
         format: "JSONEachRow",
         ...(hasLowerBound ? {} : { SKIP_COLD_SCAN_CHECK: true as const }),

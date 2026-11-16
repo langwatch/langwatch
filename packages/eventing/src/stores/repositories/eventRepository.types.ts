@@ -127,6 +127,7 @@ export interface EventRepository {
     eventTimestamp: number;
     eventId: string;
     occurredAtFromMs?: number;
+    ignoreEventIds?: readonly string[];
   }): Promise<EventLogProbe>;
 
   /**

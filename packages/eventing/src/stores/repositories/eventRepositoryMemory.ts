@@ -262,6 +262,7 @@ export class EventRepositoryMemory implements EventRepository {
     aggregateId,
     eventTimestamp,
     eventId,
+    ignoreEventIds = [],
   }: {
     tenantId: string;
     aggregateType: string;
@@ -269,6 +270,7 @@ export class EventRepositoryMemory implements EventRepository {
     eventTimestamp: number;
     eventId: string;
     occurredAtFromMs?: number;
+    ignoreEventIds?: readonly string[];
   }): Promise<EventLogProbe> {
     const key = `${tenantId}:${aggregateType}:${String(aggregateId)}`;
     const records = this.eventsByKey.get(key) ?? [];
@@ -277,6 +279,7 @@ export class EventRepositoryMemory implements EventRepository {
       hasEarlierEvents: records.some(
         (record) =>
           record.EventId !== eventId &&
+          !ignoreEventIds.includes(record.EventId) &&
           (record.EventTimestamp < eventTimestamp ||
             (record.EventTimestamp === eventTimestamp && record.EventId < eventId)),
       ),

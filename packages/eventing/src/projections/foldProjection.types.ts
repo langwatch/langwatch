@@ -83,6 +83,7 @@ export interface FoldProjectionDefinition<State, E extends Event = Event> {
     tenantId: string;
     aggregateId: string;
     event: Event;
+    ignoreEventIds?: readonly string[];
   }) => Promise<EventLogProbe>;
 }
 

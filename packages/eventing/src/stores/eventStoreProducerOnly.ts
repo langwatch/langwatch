@@ -78,6 +78,7 @@ export class EventStoreProducerOnly<
     context: EventStoreReadContext<EventType>;
     aggregateType: AggregateType;
     event: EventType;
+    ignoreEventIds?: readonly string[];
   }): Promise<EventLogProbe> {
     return Promise.reject(this.refuse("probeEventsBefore"));
   }

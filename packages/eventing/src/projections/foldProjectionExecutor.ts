@@ -665,9 +665,9 @@ export class FoldProjectionExecutor {
   }
 
   /**
-   * Before a store-miss re-fold, asks the event log whether the aggregate is new. Otherwise the
-   * saved state likely sits on a lagging replica: the job waits, up to `storeMissRetries`
-   * deliveries, and only then re-folds. Undecodable rows re-fold at once.
+   * Before a store-miss re-fold: `new` when the log shows the latest delivered event and nothing
+   * else before it. Otherwise the state likely sits on a lagging replica, so the job retries up to
+   * `storeMissRetries` deliveries, then re-folds. Undecodable rows re-fold at once.
    */
   private async probeBeforeRefold<State, E extends Event>({
     projection,
@@ -694,12 +694,15 @@ export class FoldProjectionExecutor {
     const probe = projection.eventLogProbe;
     if (!probe) return "refold";
 
-    // Callers deliver at least one event; the earliest by arrival is where the log's order starts.
-    const first = delivered.toSorted(compareArrival)[0]!;
+    // New only if nothing outside this delivery precedes its latest event: probing the earliest
+    // would miss an event a past job folded between this delivery's first and last.
+    const byArrival = delivered.toSorted(compareArrival);
+    const latest = byArrival.at(-1)!;
     const shown = await probe({
       tenantId: context.tenantId,
       aggregateId: context.aggregateId,
-      event: first,
+      event: latest,
+      ignoreEventIds: byArrival.slice(0, -1).map((event) => event.id),
     });
     if (shown.hasEvent && !shown.hasEarlierEvents) {
       incrementEsFoldStoreMissProbeTotal(projection.name, "new_aggregate");

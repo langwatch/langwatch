@@ -102,6 +102,7 @@ describe("FoldProjectionExecutor store-miss probe", () => {
         tenantId,
         aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
         event: e1,
+        ignoreEventIds: [],
       });
       expect(eventLoaderUpTo).not.toHaveBeenCalled();
       expect(store.store).toHaveBeenCalledWith(
@@ -248,7 +249,7 @@ describe("FoldProjectionExecutor store-miss probe", () => {
 
   describe("given a coalesced batch misses its state", () => {
     /** @scenario a coalesced batch takes the same path as a single event */
-    it("probes from the batch's earliest event and folds a new aggregate from init", async () => {
+    it("probes from the batch's latest event and folds a new aggregate from init", async () => {
       const executor = new FoldProjectionExecutor();
       const e1 = makeEvent("e1", 1000);
       const e2 = makeEvent("e2", 2000);
@@ -257,7 +258,9 @@ describe("FoldProjectionExecutor store-miss probe", () => {
       const result = (await executor.executeBatch(fold, [e2, e1], queued(1))) as CountState;
 
       expect(result.ids).toEqual(["e1", "e2"]);
-      expect(eventLogProbe).toHaveBeenCalledWith(expect.objectContaining({ event: e1 }));
+      expect(eventLogProbe).toHaveBeenCalledWith(
+        expect.objectContaining({ event: e2, ignoreEventIds: ["e1"] }),
+      );
       expect(eventLoaderUpTo).not.toHaveBeenCalled();
       expect(store.store).toHaveBeenCalledWith(
         result,
@@ -272,6 +275,26 @@ describe("FoldProjectionExecutor store-miss probe", () => {
       const batch = [makeEvent("e2", 2000), makeEvent("e3", 3000)];
 
       const failure = await executor.executeBatch(fold, batch, queued(1)).catch((error) => error);
+
+      expect(failure).toBeInstanceOf(FoldStateNotVisibleError);
+      expect(store.store).not.toHaveBeenCalled();
+    });
+
+    it("waits when a past job folded an event between the batch's first and last", async () => {
+      const executor = new FoldProjectionExecutor();
+      const e1 = makeEvent("e1", 1000);
+      const e2 = makeEvent("e2", 2000);
+      const e3 = makeEvent("e3", 3000);
+      const log = [e1, e2, e3];
+      const { fold, store } = missingFold("probe-batch-gap", NEW);
+      fold.eventLogProbe = vi.fn(async ({ event, ignoreEventIds = [] }) => ({
+        hasEvent: log.includes(event),
+        hasEarlierEvents: log.some(
+          (each) => each.createdAt < event.createdAt && !ignoreEventIds.includes(each.id),
+        ),
+      }));
+
+      const failure = await executor.executeBatch(fold, [e1, e3], queued(1)).catch((e) => e);
 
       expect(failure).toBeInstanceOf(FoldStateNotVisibleError);
       expect(store.store).not.toHaveBeenCalled();
