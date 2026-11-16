@@ -210,13 +210,13 @@ import {
   type RouteSearchResult,
   TraceAiQueryUnavailableError,
   type TraceRef,
-  type TraceWithholding,
-  traceWithholdingOf,
   type TraceHeader,
   type TraceDrawerReadInput,
   type TraceResourceInfoDto,
   type OwnedSpan,
   type TraceAgentSeen,
+  type TraceWithholding,
+  traceWithholdingOf,
 } from "@langwatch/trace-contract";
 import type { ConversationView } from "@langwatch/trace-contract/conversation";
 import type { z } from "zod";

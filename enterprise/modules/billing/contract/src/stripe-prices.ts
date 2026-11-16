@@ -109,7 +109,7 @@ export type StripeMeterMapping = Record<
 >;
 export type StripeMeterMap = Partial<Record<StripeMeterName, string>> &
   Record<
-    Exclude<StripeMeterName, "INSTANT_EVAL_USD" | "RETENTION_STORAGE_GB" | "PII_REDACTION_USD">,
+    Exclude<StripeMeterName, "INSTANT_EVAL_USD" | "PII_REDACTION_USD" | "RETENTION_STORAGE_GB">,
     string
   >;
 

@@ -176,9 +176,9 @@ export const pickGrowthPiiRedactionPriceId = ({
 }): string | undefined => (currency === "USD" ? prices.GROWTH_PII_REDACTION_USD : undefined);
 
 /**
- * Stripe checkout line items for Growth: a seat item (quantity = coreMembers),
- * metered events, metered Instant Evals and PII redaction where provisioned,
- * and metered storage above 90 days of retention. No metered item carries a quantity.
+ * Stripe checkout line items for Growth: a seat item (quantity = coreMembers), metered events,
+ * metered Instant Evals and PII redaction where provisioned, and metered storage above 90 days
+ * of retention. No metered item carries a quantity.
  */
 export const createCheckoutLineItems = ({
   coreMembers,
@@ -211,8 +211,8 @@ export const createCheckoutLineItems = ({
       price: resolveGrowthEventsPriceId({ currency, interval, prices }),
     },
     ...(instantEvalPriceId ? [{ price: instantEvalPriceId }] : []),
-    ...(storagePriceId ? [{ price: storagePriceId }] : []),
     ...(piiRedactionPriceId ? [{ price: piiRedactionPriceId }] : []),
+    ...(storagePriceId ? [{ price: storagePriceId }] : []),
   ];
 };
 

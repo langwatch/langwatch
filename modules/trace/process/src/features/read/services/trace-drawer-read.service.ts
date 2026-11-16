@@ -5,6 +5,7 @@ import {
 } from "@langwatch/authorization";
 import {
   traceSummaryReadSchema,
+  traceWithholdingOf,
   type DerivedTraceEvent,
   type Protections,
   type OwnedSpan,
@@ -18,7 +19,6 @@ import {
   type TraceDrawerReadInput,
   type TraceHeader,
   type TraceResourceInfoDto,
-  traceWithholdingOf,
 } from "@langwatch/trace-contract";
 
 import {
