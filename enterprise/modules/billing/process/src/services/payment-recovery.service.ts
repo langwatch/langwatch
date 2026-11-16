@@ -7,6 +7,7 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
 import {
   PlanTypes,
+  SeatsHeldForPaymentError,
   SubscriptionStatus,
   type PaymentRecoveryDetails,
   type PaymentRecoveryPayLink,
@@ -185,6 +186,21 @@ export class PaymentRecoveryService {
       }
     }
     return outcome;
+  }
+
+  /**
+   * Refuses a seat purchase while the organization has an open case: it would charge the card
+   * that failed. `adding` answers whether the change raises seats; it is asked only then.
+   */
+  async assertSeatsNotHeld({
+    organizationId,
+    adding,
+  }: {
+    organizationId: string;
+    adding: () => Promise<boolean>;
+  }): Promise<void> {
+    const [open] = await this.options.recoveries.findOpenForOrganization(organizationId);
+    if (open && (await adding())) throw new SeatsHeldForPaymentError();
   }
 
   /** What every member may read. */

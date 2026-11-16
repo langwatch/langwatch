@@ -8,7 +8,7 @@ import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import { nowInstant } from "@langwatch/time";
 
 import type { BillingSubscriptionRepository } from "../repositories/subscription.repository.ts";
-import { isPlanPausedForRecovery } from "../rules/payment-recovery.rules.ts";
+import { isPlanHeldForRecovery, isPlanPausedForRecovery } from "../rules/payment-recovery.rules.ts";
 import { effectiveMaxMembers } from "../rules/seat-kept.rules.ts";
 
 // Fields that exist on both PlanInfo (as number) and Subscription (as Int?)
@@ -99,11 +99,20 @@ export class SaaSPlanProviderService extends BillingService {
 
     const subscriptionPlan = activeSubscription.plan as string | undefined;
     const isKnownPlan = subscriptionPlan != null && subscriptionPlan in PLAN_LIMITS;
+    // Before the pause, an unpaid invoice holds new members and seats on every non-Enterprise plan.
+    const held = isPlanHeldForRecovery({
+      startedAt: activeSubscription.paymentRecoveryStartedAt,
+      plan: activeSubscription.plan,
+      now: nowInstant(),
+    })
+      ? { additionsHeldForPayment: true }
+      : {};
 
     if (isKnownPlan) {
       return {
         ...PLAN_LIMITS[subscriptionPlan as PlanTypes],
         ...customLimits,
+        ...held,
         overrideAddingLimitations,
       };
     }
@@ -111,6 +120,7 @@ export class SaaSPlanProviderService extends BillingService {
     return {
       ...getFreePlanLimits(),
       ...customLimits,
+      ...held,
       overrideAddingLimitations,
     };
   }

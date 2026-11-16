@@ -14,6 +14,7 @@ import type {
   OrganizationSeatRepository,
   SeatLease,
 } from "../repositories/organization-seat.repository.ts";
+import { assertAdditionsNotHeldForPayment } from "../rules/payment-hold.rules.ts";
 import type { SeatLimitNoticeService } from "./seat-limit-notice.service.ts";
 
 /**
@@ -46,7 +47,8 @@ export interface OrganizationSeatLicense {
   }): Promise<T>;
 
   /** Whether one more of `resource` fits inside the organization's plan. Answers rather than
-   * throws, since only the caller knows how to turn a refusal into a named error. */
+   * throws, since only the caller knows how to turn a refusal into a named error; an unpaid
+   * invoice's hold throws `member_additions_held_for_payment`. */
   checkLimit(input: {
     organizationId: string;
     resource: LimitType;
@@ -101,6 +103,7 @@ export class OrganizationSeatLicenseService implements OrganizationSeatLicense {
     user?: OrganizationPlanUser | undefined;
   }): Promise<LimitCheckResult> {
     const plan = await this.activePlan(input.organizationId, input.user);
+    assertAdditionsNotHeldForPayment(plan);
     const max = this.allowance(plan, input.resource);
     if (plan.overrideAddingLimitations) {
       return { allowed: true, limitType: input.resource, current: 0, max };
@@ -161,6 +164,7 @@ export class OrganizationSeatLicenseService implements OrganizationSeatLicense {
       input.change === "to-developer" ||
       (input.change === "full-to-lite" && input.wasFull);
     if (freesOrSkipsCappedSeat || input.plan.overrideAddingLimitations) return;
+    assertAdditionsNotHeldForPayment(input.plan);
 
     const resource = input.change === "lite-to-full" ? "members" : "membersLite";
     const max = this.allowance(input.plan, resource);

@@ -2247,6 +2247,18 @@ const presentations = {
     title: "All member seats are in use",
     describe: () => "Free a seat by disabling a membership, or upgrade the plan to add more.",
   },
+  member_additions_held_for_payment: {
+    // fault: customer. A renewal charge failed and is unpaid; members already in keep working.
+    title: "A payment failed, so new members can't be added",
+    describe: () =>
+      "Update the card on the billing page to pay the open invoice, then add them. Ask an admin if you can't.",
+  },
+  seats_held_for_payment: {
+    // fault: customer. Buying seats while an invoice is unpaid would charge the same failing card.
+    title: "A payment failed, so seats can't be added",
+    describe: () =>
+      "Update the card on the billing page to pay the open invoice, then add seats. Nothing was charged.",
+  },
   membership_disabled: {
     // The person IS a member, so nothing here may suggest they are not, and
     // nothing may suggest a role they could ask for instead — the seat is the

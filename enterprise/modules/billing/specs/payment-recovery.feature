@@ -152,6 +152,59 @@ Feature: A paid organization whose card fails is told, reminded, paused and rest
     When the recovery sweep runs
     Then the reminder is recorded as having no recipients and the sweep goes on
 
+  # Adding members while a payment is unpaid
+
+  @unit
+  Scenario: While a payment is unpaid, the plan holds new members and seats
+    Given an organization on a Growth subscription with an open recovery case on day 5
+    When its plan is resolved
+    Then the plan holds new members and seats for payment
+    And its seat limits and custom limits are unchanged
+
+  @unit
+  Scenario: The hold applies to tiered and other paid plans, not only Growth
+    Given an organization on a tiered paid plan with free seats and an open recovery case
+    When its plan is resolved
+    Then the plan holds new members and seats for payment
+
+  @unit
+  Scenario: While a payment is unpaid, inviting a new member is refused with a call to update the card
+    Given an organization whose plan holds new members for payment, with seats free
+    When an admin invites a new member
+    Then the invite is refused with "member_additions_held_for_payment", which asks to update the card
+
+  @unit
+  Scenario: While a payment is unpaid, a membership change that takes a seat is refused
+    Given an organization whose plan holds new members for payment, with seats free
+    When an admin enables a member or moves a Lite Member onto a full seat
+    Then the change is refused with "member_additions_held_for_payment"
+
+  @unit
+  Scenario: While a payment is unpaid, existing members keep their seats and can leave one
+    Given an organization whose plan holds new members for payment
+    When an admin moves a full member to a Lite Member
+    Then the change goes through, since it takes no seat
+
+  @unit
+  Scenario: While a payment is unpaid, buying more seats is refused before the card is charged
+    Given an organization with an open recovery case
+    When an admin buys more member seats or Developer seats
+    Then the purchase is refused with "seats_held_for_payment"
+    And lowering the Developer seats still goes through
+
+  @unit
+  Scenario: Paying the invoice lifts the hold on new members
+    Given an organization with an open recovery case on day 5
+    When the invoice is paid and the case closes
+    Then its plan no longer holds new members
+
+  @unit
+  Scenario: After the pause, new members are checked against the Free plan's member limit
+    Given an organization paused for an unpaid invoice with more members than Free allows
+    When an admin invites a new member
+    Then the invite is refused with the member seat limit of the Free plan
+    And the plan no longer reports the payment hold
+
   # Day 21: paused to Free limits
 
   @unit

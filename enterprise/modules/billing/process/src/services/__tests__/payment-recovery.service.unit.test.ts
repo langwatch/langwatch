@@ -487,6 +487,40 @@ describe("given an open recovery case", () => {
   });
 });
 
+describe("given an organization buying seats", () => {
+  describe("when a recovery case is open", () => {
+    /** @scenario "While a payment is unpaid, buying more seats is refused before the card is charged" */
+    it("refuses a seat increase and still lets a decrease through", async () => {
+      const world = setUp();
+      await world.service.paymentFailed({ invoice: RENEWAL });
+
+      await expect(
+        world.service.assertSeatsNotHeld({ organizationId: "org_1", adding: async () => true }),
+      ).rejects.toMatchObject({ code: "seats_held_for_payment" });
+      await expect(
+        world.service.assertSeatsNotHeld({ organizationId: "org_1", adding: async () => false }),
+      ).resolves.toBeUndefined();
+    });
+  });
+
+  describe("when no recovery case is open", () => {
+    it("lets a seat increase through without asking whether it adds seats", async () => {
+      const world = setUp();
+      let asked = false;
+
+      await world.service.assertSeatsNotHeld({
+        organizationId: "org_1",
+        adding: async () => {
+          asked = true;
+          return true;
+        },
+      });
+
+      expect(asked).toBe(false);
+    });
+  });
+});
+
 describe("given an organization on the Enterprise plan", () => {
   /** @scenario "An enterprise organization's failed payment never pauses it" */
   it("opens no case, sends no email and alerts the account team", async () => {

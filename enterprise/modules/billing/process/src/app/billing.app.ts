@@ -670,6 +670,10 @@ export class BillingModule
     totalTraces: number;
     quotedAt?: number;
   }): Promise<{ success: boolean }> {
+    await this.#paymentRecovery?.assertSeatsNotHeld({
+      organizationId: input.organizationId,
+      adding: async () => input.upgradeMembers,
+    });
     return this.#subscriptionDoor.subscriptions.updateSubscriptionItems(input);
   }
 
@@ -725,7 +729,12 @@ export class BillingModule
     quantity: number;
     quotedAt?: number;
   }): Promise<{ success: boolean }> {
-    return this.#subscriptionDoor.developerSeats.setDeveloperSeats(input);
+    const developerSeats = this.#subscriptionDoor.developerSeats;
+    await this.#paymentRecovery?.assertSeatsNotHeld({
+      organizationId: input.organizationId,
+      adding: async () => input.quantity > (await developerSeats.developerSeats(input)).quantity,
+    });
+    return developerSeats.setDeveloperSeats(input);
   }
 
   async notifyProspective(input: {

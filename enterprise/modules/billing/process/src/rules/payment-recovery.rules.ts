@@ -60,6 +60,20 @@ export function isPlanPausedForRecovery({
   return isRecoveryPaused({ startedAt, now });
 }
 
+/** Whether an open case holds new members and seats now: from day 0 until the pause. */
+export function isPlanHeldForRecovery({
+  startedAt,
+  plan,
+  now,
+}: {
+  startedAt: Instant | null | undefined;
+  plan: string;
+  now: Instant;
+}): boolean {
+  if (!startedAt || plan === PlanTypes.ENTERPRISE) return false;
+  return !isRecoveryPaused({ startedAt, now });
+}
+
 /** The latest notice day reached and not yet sent; a missed day sends only the latest. */
 export function dueNotice({
   startedAt,

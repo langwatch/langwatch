@@ -214,13 +214,64 @@ describe("Failed payment recovery and the plan", () => {
     });
   });
 
+  describe("given an open recovery case on day 5", () => {
+    const openOnDay5 = async (plan: string) => {
+      seed(plan);
+      await recoveries.open({ subscriptionId: "sub_db_1", invoiceId: "in_1", startedAt: DAY_0 });
+      at(5 * 24);
+    };
+
+    /** @scenario "While a payment is unpaid, the plan holds new members and seats" */
+    it("holds additions on a Growth plan and keeps its limits", async () => {
+      await openOnDay5(PlanTypes.GROWTH_SEAT_EUR_MONTHLY);
+
+      const plan = await plans.getActivePlan("org_1");
+
+      expect(plan.additionsHeldForPayment).toBe(true);
+      expect(plan.maxMembers).toBe(12);
+      expect(plan.maxMessagesPerMonth).toBe(2_000_000);
+    });
+
+    /** @scenario "The hold applies to tiered and other paid plans, not only Growth" */
+    it("holds additions on a tiered plan too", async () => {
+      await openOnDay5(PlanTypes.LAUNCH);
+
+      const plan = await plans.getActivePlan("org_1");
+
+      expect(plan.additionsHeldForPayment).toBe(true);
+      expect(plan.maxMembers).toBe(12);
+    });
+
+    /** @scenario "Paying the invoice lifts the hold on new members" */
+    it("drops the hold the moment the case closes", async () => {
+      await openOnDay5(PlanTypes.LAUNCH);
+
+      await recoveries.close({ subscriptionId: "sub_db_1", invoiceId: "in_1" });
+
+      expect((await plans.getActivePlan("org_1")).additionsHeldForPayment).toBeUndefined();
+    });
+
+    /** @scenario "After the pause, new members are checked against the Free plan's member limit" */
+    it("answers the Free member limit and no hold once paused on day 21", async () => {
+      await openOnDay5(PlanTypes.LAUNCH);
+      at(21 * 24);
+
+      const plan = await plans.getActivePlan("org_1");
+
+      expect(plan.maxMembers).toBe(getFreePlanLimits().maxMembers);
+      expect(plan.additionsHeldForPayment).toBeUndefined();
+    });
+  });
+
   describe("given an Enterprise subscription with a recovery clock past day 21", () => {
     it("never answers Free limits", async () => {
       seed(PlanTypes.ENTERPRISE);
       await recoveries.open({ subscriptionId: "sub_db_1", invoiceId: "in_1", startedAt: DAY_0 });
       at(40 * 24);
 
-      expect((await plans.getActivePlan("org_1")).maxMembers).toBe(12);
+      const plan = await plans.getActivePlan("org_1");
+      expect(plan.maxMembers).toBe(12);
+      expect(plan.additionsHeldForPayment).toBeUndefined();
       expect(PLAN_LIMITS[PlanTypes.ENTERPRISE]).toBeDefined();
     });
   });

@@ -36,6 +36,8 @@ const planSchemaDefinition = z.object({
   visibilityDays: z.number().nullable().optional(),
   /** Set while over plan (specs/billing/over-plan-trace-withholding.feature). */
   overPlan: overPlanSchema.nullable().optional(),
+  /** True while a failed payment is unpaid and before the pause: no new members or seats. */
+  additionsHeldForPayment: z.boolean().optional(),
   trialDays: z.number().optional(),
   daysSinceCreation: z.number().optional(),
   overrideAddingLimitations: z.boolean().optional(),

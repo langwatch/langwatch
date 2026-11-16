@@ -7,6 +7,7 @@ import { newAuthzGrantId, type AuthzGrantCaller } from "@langwatch/authz-contrac
 import { getRoleChangeType, isFullMember } from "@langwatch/entitlement-contract";
 import { createLogger } from "@langwatch/observability";
 import {
+  MemberAdditionsHeldForPaymentError,
   MemberSeatLimitReachedError,
   type OrganizationUserRole,
 } from "@langwatch/organization-contract";
@@ -234,7 +235,13 @@ export class OrganizationMemberSeatService {
     const { seatHolds, seats, seatNotices, grantCache } = this.dependencies;
     if (!(await seatHolds.isWaiting({ organizationId, userId }))) return false;
     if (!(await seatHolds.hasLiveHold({ organizationId, userId }))) {
-      const fit = await seats.checkLimit({ organizationId, resource: "members" });
+      // An unpaid invoice's hold leaves them waiting, as a full plan does.
+      const fit = await seats
+        .checkLimit({ organizationId, resource: "members" })
+        .catch((error: unknown) => {
+          if (error instanceof MemberAdditionsHeldForPaymentError) return { allowed: false };
+          throw error;
+        });
       if (!fit.allowed) return false;
     }
     // One write turns the waiting row into an enabled MEMBER carrying its grant intent; the grant
