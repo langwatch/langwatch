@@ -384,7 +384,12 @@ describe("the stop plan of an agent", () => {
   /** @scenario "The stop plan dialog offers the organisation's Databricks Genie sources" */
   it("offers a Databricks Genie source in the serving endpoint target's picker", async () => {
     harness.reads["governanceAgents.syncSources"] = [
-      { id: "src-genie", name: "Databricks prod", sourceType: "databricks_genie", lastListing: null },
+      {
+        id: "src-genie",
+        name: "Databricks prod",
+        sourceType: "databricks_genie",
+        lastListing: null,
+      },
     ];
     const dialog = await openPlan();
 
