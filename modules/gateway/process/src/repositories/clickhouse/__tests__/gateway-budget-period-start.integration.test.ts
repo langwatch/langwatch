@@ -6,18 +6,21 @@
 
 import type { GatewayBudget, GatewayBudgetWindow } from "@langwatch/gateway-contract";
 import { Prisma } from "@langwatch/prisma-client/generated";
+import type { TestAppReader } from "@langwatch/test-harness/clickhouse-app-reader";
 import { nowInstant, toDate } from "@langwatch/time";
 import { nanoid } from "nanoid";
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { GatewayBudgetClickHouseRepository } from "../clickhouse.gateway-budget.repository.ts";
 import {
   createTestClickHouseClient,
-  gatewayClickHouseOver,
+  gatewayClickHouseReading,
+  openGatewayAppReader,
   testClickHouseUrl,
 } from "./support/clickhouse-endpoint.support.ts";
 
 const chUrl = testClickHouseUrl();
+let appReader: TestAppReader | undefined;
 
 const suffix = nanoid(8);
 const TENANT_ID = `proj-periodstart-${suffix}`;
@@ -64,9 +67,8 @@ describe.skipIf(!chUrl)("given a debit recorded against a budget in ClickHouse",
   let spendByBudgetId: Map<string, string>;
 
   beforeAll(async () => {
-    repo = new GatewayBudgetClickHouseRepository(
-      gatewayClickHouseOver(createTestClickHouseClient(chUrl!)),
-    );
+    appReader = await openGatewayAppReader(chUrl!);
+    repo = new GatewayBudgetClickHouseRepository(gatewayClickHouseReading(appReader.worker));
 
     // One pinned instant for every debit and for the read below. The
     // reader computes the current period from the instant it is handed;
@@ -99,6 +101,10 @@ describe.skipIf(!chUrl)("given a debit recorded against a budget in ClickHouse",
     const spend = await repo.findSpendForBudgets(TENANT_ID, budgets, occurredAt);
     spendByBudgetId = new Map(spend.map((s) => [s.budgetId, s.spentUsd]));
   }, 120_000);
+
+  afterAll(async () => {
+    await appReader?.close();
+  });
 
   describe("when the spend is read back on each window", () => {
     /** @scenario "Spend recorded against a budget is visible on that budget" */

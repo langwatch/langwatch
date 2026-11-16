@@ -7,9 +7,10 @@ import type {
   GatewayResolvedBudget,
   RecordBudgetCrossingCommandData,
 } from "@langwatch/gateway-contract";
+import type { TestAppReader } from "@langwatch/test-harness/clickhouse-app-reader";
 import { nowInstant } from "@langwatch/time";
 import { nanoid } from "nanoid";
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { writeGatewayDebitsSchema } from "../../../eventing/gateway-debit.intent.ts";
 import { GatewayBudgetChangeDedupeService } from "../../../features/budget/services/gateway-budget-change-dedupe.service.ts";
@@ -20,11 +21,13 @@ import type { AppendGatewayChangeEventInput } from "../../gateway-change-event.r
 import { GatewayBudgetClickHouseRepository } from "../clickhouse.gateway-budget.repository.ts";
 import {
   createTestClickHouseClient,
-  gatewayClickHouseOver,
+  gatewayClickHouseReading,
+  openGatewayAppReader,
   testClickHouseUrl,
 } from "./support/clickhouse-endpoint.support.ts";
 
 const chUrl = testClickHouseUrl();
+let appReader: TestAppReader | undefined;
 const suffix = nanoid(8);
 const TENANT_ID = `proj-replay-${suffix}`;
 const REQUEST_ID = `grq-replay-${suffix}`;
@@ -86,9 +89,8 @@ describe.skipIf(!chUrl)("given a debit whose crossing could not be recorded", ()
   let firstAttempt: unknown;
 
   beforeAll(async () => {
-    repo = new GatewayBudgetClickHouseRepository(
-      gatewayClickHouseOver(createTestClickHouseClient(chUrl!)),
-    );
+    appReader = await openGatewayAppReader(chUrl!);
+    repo = new GatewayBudgetClickHouseRepository(gatewayClickHouseReading(appReader.worker));
     const debits = GatewaySpendDebitService.create({
       budgets: { resolveApplicableBudgets: async () => [resolved] },
       spend: repo,
@@ -121,6 +123,10 @@ describe.skipIf(!chUrl)("given a debit whose crossing could not be recorded", ()
     firstAttempt = await debits.write(payload).catch((error: unknown) => error);
     await debits.write(payload);
   }, 120_000);
+
+  afterAll(async () => {
+    await appReader?.close();
+  });
 
   describe("when the outbox re-drives it", () => {
     /** @scenario "A re-driven debit writes nothing new" */

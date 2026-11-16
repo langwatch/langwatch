@@ -91,6 +91,19 @@ export async function provisionTestAppReader(options: AppReaderOptions): Promise
   }
 }
 
+/**
+ * The app reader on a server a suite is handed by URL (a CI job's server, `TEST_CLICKHOUSE_URL`),
+ * whose path names the migrated database. Held and refused as `provisionTestAppReader`.
+ */
+export function provisionTestAppReaderAt({
+  url,
+  ...options
+}: Omit<AppReaderOptions, "endpoint"> & { url: string | URL }): Promise<TestAppReader> {
+  const parsed = new URL(url);
+  const database = decodeURIComponent(parsed.pathname.replace(/^\/+/, "")) || "default";
+  return provisionTestAppReader({ ...options, endpoint: { url: parsed.toString(), database } });
+}
+
 /** The provisioning itself, on a server this file already holds; `release` frees it on close. */
 async function provisionHeldServer({
   endpoint,

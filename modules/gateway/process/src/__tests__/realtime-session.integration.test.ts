@@ -9,6 +9,7 @@ import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { TestAppReader } from "@langwatch/test-harness/clickhouse-app-reader";
 import { raceOnOneRow } from "@langwatch/test-harness/row-lock-race";
 import { fromDate, nowInstant, toDate } from "@langwatch/time";
 import { nanoid } from "nanoid";
@@ -37,7 +38,8 @@ import { GatewaySpendDebitService } from "../features/spend/services/gateway-spe
 import { ModelCatalogGatewaySpendRatingService } from "../features/spend/services/model-catalog-gateway-spend-rating.service.ts";
 import {
   createTestClickHouseClient,
-  gatewayClickHouseOver,
+  gatewayClickHouseReading,
+  openGatewayAppReader,
   testClickHouseUrl,
 } from "../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
 import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
@@ -67,6 +69,7 @@ const metering = GatewayRealtimeSessionMeteringService.create();
 
 const databaseUrl = process.env.DATABASE_URL;
 const chUrl = testClickHouseUrl();
+let appReader: TestAppReader | undefined;
 const connection = databaseUrl ? createGatewayTestPrismaConnection(databaseUrl) : null;
 const prisma = connection?.client as PrismaClient;
 
@@ -944,9 +947,8 @@ describe.skipIf(!databaseUrl || !chUrl)(
   "given a key with a 5 USD blocking budget on a project with a 50 USD one",
   () => {
     beforeAll(async () => {
-      chRepo = new GatewayBudgetClickHouseRepository(
-        gatewayClickHouseOver(createTestClickHouseClient(chUrl!)),
-      );
+      appReader = await openGatewayAppReader(chUrl!);
+      chRepo = new GatewayBudgetClickHouseRepository(gatewayClickHouseReading(appReader.worker));
       await prisma.organization.create({
         data: { id: METERED_ORG_ID, name: `Org ${suffix}`, slug: METERED_ORG_ID },
       });
@@ -977,6 +979,7 @@ describe.skipIf(!databaseUrl || !chUrl)(
     }, 120_000);
 
     afterAll(async () => {
+      await appReader?.close();
       const client = createTestClickHouseClient(chUrl!);
       for (const tenantId of meteredProjectIds) {
         for (const table of ["gateway_budget_ledger_events", "gateway_budget_scope_totals"]) {

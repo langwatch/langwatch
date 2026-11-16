@@ -6,6 +6,10 @@
 import { createClient, type ClickHouseClient } from "@clickhouse/client";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { vendorQueryClient } from "@langwatch/clickhouse-client/testing";
+import {
+  provisionTestAppReaderAt,
+  type TestAppReader,
+} from "@langwatch/test-harness/clickhouse-app-reader";
 
 import { GATEWAY_ID_INDEXES } from "../../clickhouse.gateway-id-indexes.database.ts";
 import {
@@ -40,6 +44,14 @@ export function createTestClickHouseClient(url: URL): ClickHouseClient {
 export function gatewayClickHouseOver(vendor: ClickHouseClient): GatewayClickHouseResolver {
   const clickhouse = vendorQueryClient({ vendor, indexes: GATEWAY_ID_INDEXES });
   return async (tenantId) => ClickHouseGatewaySession.create({ clickhouse, tenantId });
+}
+
+/**
+ * This file's app reader on the server `testClickHouseUrl()` names (ADR-202): its `worker` reads
+ * as langwatch_app_reader and inserts as the system. Held until `close`, which `afterAll` owes.
+ */
+export function openGatewayAppReader(url: URL): Promise<TestAppReader> {
+  return provisionTestAppReaderAt({ url, environment: process.env, indexes: GATEWAY_ID_INDEXES });
 }
 
 /** The same session resolver over a client that reads as the app reader (ADR-202). */

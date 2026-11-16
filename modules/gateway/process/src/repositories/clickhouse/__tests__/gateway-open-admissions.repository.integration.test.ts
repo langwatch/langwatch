@@ -13,6 +13,7 @@
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
+import type { TestAppReader } from "@langwatch/test-harness/clickhouse-app-reader";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -23,7 +24,8 @@ import { ClickHouseGatewayOpenAdmissionsRepository } from "../clickhouse.gateway
 import { ClickHouseGatewaySpendEventsRepository } from "../clickhouse.gateway-spend-events.repository.ts";
 import {
   createTestClickHouseClient,
-  gatewayClickHouseOver,
+  gatewayClickHouseReading,
+  openGatewayAppReader,
   testClickHouseUrl,
 } from "./support/clickhouse-endpoint.support.ts";
 
@@ -46,6 +48,7 @@ const HOUR = 60 * MINUTE;
 const SWEEP = { now: BASE + 2 * HOUR, graceMs: HOUR, lookbackMs: 3 * HOUR };
 
 let client: ClickHouseClient;
+let appReader: TestAppReader | undefined;
 let repo: ClickHouseGatewaySpendEventsRepository;
 let finder: ClickHouseGatewayOpenAdmissionsRepository;
 
@@ -109,9 +112,10 @@ const ALREADY_SETTLED = id("already-settled");
 describe.skipIf(!chUrl)("open admissions on the spend record (real ClickHouse)", () => {
   beforeAll(async () => {
     client = createTestClickHouseClient(chUrl!);
-    repo = new ClickHouseGatewaySpendEventsRepository(gatewayClickHouseOver(client));
+    appReader = await openGatewayAppReader(chUrl!);
+    repo = new ClickHouseGatewaySpendEventsRepository(gatewayClickHouseReading(appReader.worker));
     finder = ClickHouseGatewayOpenAdmissionsRepository.create(
-      await gatewayClickHouseOver(client)(""),
+      await gatewayClickHouseReading(appReader.worker)(""),
     );
     // The superseded versions are the whole point of the dedup scenarios, and
     // a background merge collapses them on its own schedule — which would
@@ -122,6 +126,7 @@ describe.skipIf(!chUrl)("open admissions on the spend record (real ClickHouse)",
   }, 120_000);
 
   afterAll(async () => {
+    await appReader?.close();
     if (client) {
       await client.command({ query: "SYSTEM START MERGES gateway_spend" });
       await client.command({

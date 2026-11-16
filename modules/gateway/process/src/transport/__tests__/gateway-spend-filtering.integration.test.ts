@@ -6,6 +6,7 @@
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { TestAppReader } from "@langwatch/test-harness/clickhouse-app-reader";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -14,7 +15,8 @@ import { createGatewayTestPrismaConnection } from "../../app/__tests__/gateway-p
 import { GatewaySpendScopeService } from "../../features/spend/services/gateway-spend-scope.service.ts";
 import {
   createTestClickHouseClient,
-  gatewayClickHouseOver,
+  gatewayClickHouseReading,
+  openGatewayAppReader,
   testClickHouseUrl,
 } from "../../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
 import { ClickHouseGatewaySpendEventsRepository } from "../../repositories/clickhouse/clickhouse.gateway-spend-events.repository.ts";
@@ -51,6 +53,7 @@ const WINDOW_FROM = OCCURRED_AT.getTime() - 24 * 60 * 60 * 1000;
 const WINDOW_TO = OCCURRED_AT.getTime() + 24 * 60 * 60 * 1000;
 
 let client: ClickHouseClient;
+let appReader: TestAppReader | undefined;
 let scope: GatewaySpendScopeService;
 
 function ch(): ClickHouseClient {
@@ -60,7 +63,7 @@ function ch(): ClickHouseClient {
 
 function repository(): ClickHouseGatewaySpendEventsRepository {
   return new ClickHouseGatewaySpendEventsRepository((tenantId) =>
-    gatewayClickHouseOver(ch())(tenantId),
+    gatewayClickHouseReading(appReader!.worker)(tenantId),
   );
 }
 
@@ -146,6 +149,7 @@ async function summariseBy(
 describe.skipIf(!databaseUrl || !chUrl)("gateway spend filtering (real PG + real CH)", () => {
   beforeAll(async () => {
     client = createTestClickHouseClient(chUrl!);
+    appReader = await openGatewayAppReader(chUrl!);
     scope = GatewaySpendScopeService.create({
       projects: createTraceDestinationProjects(prisma),
       virtualKeys: PrismaGatewaySpendScopeRepository.create({ database: prisma }),
@@ -271,6 +275,7 @@ describe.skipIf(!databaseUrl || !chUrl)("gateway spend filtering (real PG + real
 
   afterAll(async () => {
     if (!databaseUrl || !chUrl) return;
+    await appReader?.close();
     for (const tenantId of [PROJECT_A_ID, PROJECT_B_ID, PROJECT_C_ID]) {
       await ch().command({
         query: `ALTER TABLE gateway_spend DELETE WHERE TenantId = '${tenantId}'`,

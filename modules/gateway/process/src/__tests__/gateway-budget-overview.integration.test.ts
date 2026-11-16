@@ -2,19 +2,21 @@ import { type OrganizationApi, TeamNotFoundError } from "@langwatch/organization
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { TraceApi } from "@langwatch/trace-contract";
 /**
  * @vitest-environment node
  * Real Postgres + ClickHouse: what a member sees about budgets binding their key.
  * Spec: specs/ai-gateway/budget-overview.feature
  */
+import type { TestAppReader } from "@langwatch/test-harness/clickhouse-app-reader";
+import type { TraceApi } from "@langwatch/trace-contract";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-prisma.fixture.ts";
 import { BudgetOverviewService } from "../features/budget/services/gateway-budget-overview.service.ts";
 import {
   createTestClickHouseClient,
-  gatewayClickHouseOver,
+  gatewayClickHouseReading,
+  openGatewayAppReader,
   testClickHouseUrl,
 } from "../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
 import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
@@ -42,6 +44,7 @@ import { TestFeatureFlags } from "./support/test-feature-flag-service.ts";
 
 const databaseUrl = process.env.DATABASE_URL;
 const chUrl = testClickHouseUrl();
+let appReader: TestAppReader | undefined;
 const connection = databaseUrl ? createGatewayTestPrismaConnection(databaseUrl) : null;
 const prisma = connection?.client as PrismaClient;
 
@@ -150,9 +153,8 @@ const overviewService = (): BudgetOverviewService =>
 
 describe.skipIf(!databaseUrl || !chUrl)("budget overview (real PG + real CH)", () => {
   beforeAll(async () => {
-    chRepo = new GatewayBudgetClickHouseRepository(
-      gatewayClickHouseOver(createTestClickHouseClient(chUrl!)),
-    );
+    appReader = await openGatewayAppReader(chUrl!);
+    chRepo = new GatewayBudgetClickHouseRepository(gatewayClickHouseReading(appReader.worker));
     budgetDecisions = PrismaGatewayAdapter.create({
       database: prisma,
       organizations: organizationApiOver(prisma),
@@ -167,6 +169,7 @@ describe.skipIf(!databaseUrl || !chUrl)("budget overview (real PG + real CH)", (
   }, 120_000);
 
   afterAll(async () => {
+    await appReader?.close();
     await teardownBudgetOverviewFixture(prisma, createTestClickHouseClient(chUrl!));
   }, 120_000);
 

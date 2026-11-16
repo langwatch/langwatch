@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { TestAppReader } from "@langwatch/test-harness/clickhouse-app-reader";
 /**
  * @vitest-environment node
  * Real Postgres + real ClickHouse. Month total and budget standing are different
@@ -13,7 +14,8 @@ import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-pris
 import { VirtualKeyDirectBudgetService } from "../features/virtual-key/services/virtual-key-direct-budget.service.ts";
 import {
   createTestClickHouseClient,
-  gatewayClickHouseOver,
+  gatewayClickHouseReading,
+  openGatewayAppReader,
   testClickHouseUrl,
 } from "../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
 import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
@@ -40,6 +42,7 @@ import {
 
 const databaseUrl = process.env.DATABASE_URL;
 const chUrl = testClickHouseUrl();
+let appReader: TestAppReader | undefined;
 const connection = databaseUrl ? createGatewayTestPrismaConnection(databaseUrl) : null;
 const prisma = connection?.client as PrismaClient;
 
@@ -65,13 +68,13 @@ const load = () =>
 
 describe.skipIf(!databaseUrl || !chUrl)("direct budget per virtual key (real PG + real CH)", () => {
   beforeAll(async () => {
-    chRepo = new GatewayBudgetClickHouseRepository(
-      gatewayClickHouseOver(createTestClickHouseClient(chUrl!)),
-    );
+    appReader = await openGatewayAppReader(chUrl!);
+    chRepo = new GatewayBudgetClickHouseRepository(gatewayClickHouseReading(appReader.worker));
     await seedFixture(prisma, chRepo);
   }, 120_000);
 
   afterAll(async () => {
+    await appReader?.close();
     await teardownFixture(prisma, createTestClickHouseClient(chUrl!));
   }, 120_000);
 

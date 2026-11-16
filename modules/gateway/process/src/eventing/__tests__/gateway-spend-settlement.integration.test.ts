@@ -10,12 +10,14 @@ import {
   GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
   GATEWAY_SPEND_SETTLED_EVENT_TYPE,
 } from "@langwatch/gateway-contract";
+import type { TestAppReader } from "@langwatch/test-harness/clickhouse-app-reader";
 import { nanoid } from "nanoid";
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
   createTestClickHouseClient,
-  gatewayClickHouseOver,
+  gatewayClickHouseReading,
+  openGatewayAppReader,
   testClickHouseUrl,
 } from "../../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
 import { ClickHouseGatewaySpendEventsRepository } from "../../repositories/clickhouse/clickhouse.gateway-spend-events.repository.ts";
@@ -35,6 +37,7 @@ const T0 = Date.UTC(2026, 6, 21, 9, 0, 0);
 const GRACE_MS = 60_000;
 
 const client = chUrl ? createTestClickHouseClient(chUrl) : null;
+let appReader: TestAppReader | undefined;
 
 function makeEvent(type: string, data: Record<string, unknown>, at: number) {
   return EventUtils.createEvent({
@@ -51,7 +54,12 @@ function makeEvent(type: string, data: Record<string, unknown>, at: number) {
 }
 
 describe.skipIf(!chUrl)("settlement on the spend record (real ClickHouse)", () => {
+  beforeAll(async () => {
+    appReader = await openGatewayAppReader(chUrl!);
+  }, 120_000);
+
   afterAll(async () => {
+    await appReader?.close();
     if (!client) return;
     await client.command({
       query: `ALTER TABLE gateway_spend DELETE WHERE TenantId = '${TENANT}'`,
@@ -62,7 +70,7 @@ describe.skipIf(!chUrl)("settlement on the spend record (real ClickHouse)", () =
   /** @scenario "The full settlement sequence: silent admission settles, a late confirmation supersedes" */
   it("folds admit, settle, then a late confirm superseding the settled row", async () => {
     const repo = new ClickHouseGatewaySpendEventsRepository((tenantId) =>
-      gatewayClickHouseOver(client!)(tenantId),
+      gatewayClickHouseReading(appReader!.worker)(tenantId),
     );
     const foldStore = GatewaySpendStore.create(repo);
     const projection = new GatewaySpendFoldProjection({ store: foldStore });

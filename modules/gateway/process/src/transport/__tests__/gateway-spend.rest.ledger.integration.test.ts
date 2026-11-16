@@ -2,6 +2,7 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { createRestRuntime } from "@langwatch/api/rest";
 import type { SpendEventRow } from "@langwatch/gateway-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { TestAppReader } from "@langwatch/test-harness/clickhouse-app-reader";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 /**
  * @vitest-environment node
@@ -24,7 +25,8 @@ import {
 import { GatewaySpendScopeService } from "../../features/spend/services/gateway-spend-scope.service.ts";
 import {
   createTestClickHouseClient,
-  gatewayClickHouseOver,
+  gatewayClickHouseReading,
+  openGatewayAppReader,
   testClickHouseUrl,
 } from "../../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
 import { GatewayBudgetClickHouseRepository } from "../../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
@@ -48,6 +50,7 @@ const USER_ID = `usr-${ns}`;
 const baseTime = Date.UTC(2026, 0, 10, 12, 0, 0);
 
 let client: ClickHouseClient;
+let appReader: TestAppReader | undefined;
 let repo: ClickHouseGatewaySpendEventsRepository;
 let budgets: GatewayBudgetClickHouseRepository;
 let app: ReturnType<typeof mountSpendFamily>;
@@ -114,8 +117,8 @@ function mountSpendFamily(spend: GatewaySpendApp) {
 }
 
 function buildApp(): void {
-  repo = new ClickHouseGatewaySpendEventsRepository(gatewayClickHouseOver(client));
-  budgets = new GatewayBudgetClickHouseRepository(gatewayClickHouseOver(client));
+  repo = new ClickHouseGatewaySpendEventsRepository(gatewayClickHouseReading(appReader!.worker));
+  budgets = new GatewayBudgetClickHouseRepository(gatewayClickHouseReading(appReader!.worker));
   const scope = GatewaySpendScopeService.create({
     projects: createTraceDestinationProjects(prisma),
     virtualKeys: PrismaGatewaySpendScopeRepository.create({ database: prisma }),
@@ -246,6 +249,7 @@ describe.skipIf(!databaseUrl || !chUrl)(
   () => {
     beforeAll(async () => {
       client = createTestClickHouseClient(chUrl!);
+      appReader = await openGatewayAppReader(chUrl!);
       buildApp();
 
       for (const tenant of [
@@ -287,6 +291,7 @@ describe.skipIf(!databaseUrl || !chUrl)(
 
     afterAll(async () => {
       if (!databaseUrl || !chUrl) return;
+      await appReader?.close();
       for (const tenantId of [PROJECT_ID, FOREIGN_PROJECT_ID]) {
         await client.command({
           query: `ALTER TABLE gateway_spend DELETE WHERE TenantId = '${tenantId}'`,

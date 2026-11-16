@@ -32,13 +32,15 @@ import { budgetAppliesToProvider, NANO_USD_PER_USD } from "@langwatch/gateway-co
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { TestAppReader } from "@langwatch/test-harness/clickhouse-app-reader";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-prisma.fixture.ts";
 import {
   createTestClickHouseClient,
-  gatewayClickHouseOver,
+  gatewayClickHouseReading,
+  openGatewayAppReader,
   testClickHouseUrl,
 } from "../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
 import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
@@ -54,6 +56,7 @@ import { organizationApiOver } from "./support/prisma-organization-api.ts";
 
 const databaseUrl = process.env.DATABASE_URL;
 const chUrl = testClickHouseUrl();
+let appReader: TestAppReader | undefined;
 const connection = databaseUrl ? createGatewayTestPrismaConnection(databaseUrl) : null;
 const prisma = connection?.client as PrismaClient;
 
@@ -221,9 +224,8 @@ async function listedSpentUsdFor(budgetIds: string[]): Promise<string[]> {
 
 describe.skipIf(!databaseUrl || !chUrl)("sibling budgets on one virtual key", () => {
   beforeAll(async () => {
-    chRepo = new GatewayBudgetClickHouseRepository(
-      gatewayClickHouseOver(createTestClickHouseClient(chUrl!)),
-    );
+    appReader = await openGatewayAppReader(chUrl!);
+    chRepo = new GatewayBudgetClickHouseRepository(gatewayClickHouseReading(appReader.worker));
     service = PrismaGatewayAdapter.create({
       database: prisma,
       organizations: organizationApiOver(prisma),
@@ -349,6 +351,7 @@ describe.skipIf(!databaseUrl || !chUrl)("sibling budgets on one virtual key", ()
   }, 180_000);
 
   afterAll(async () => {
+    await appReader?.close();
     const ch = createTestClickHouseClient(chUrl!);
     for (const table of ["gateway_budget_ledger_events", "gateway_budget_scope_totals"]) {
       await ch.command({
