@@ -22,6 +22,7 @@ import {
   type SlimTraceMetricKey,
 } from "./clickhouse.analytics-route-table.mapper.ts";
 import { storedMetadataKeys } from "./clickhouse.filter-conditions.mapper.ts";
+import { distinctTraces } from "./clickhouse.metric-spec.mapper.ts";
 import { buildMetricAlias } from "./clickhouse.metric-translator.mapper.ts";
 import {
   allOf,
@@ -345,11 +346,16 @@ function slimShape<T extends string>(
       key: s.key,
       subkey: s.subkey,
     });
-    metrics[alias] = slimAggregate({
-      aggregation: s.aggregation,
-      of: slimColumnFor(s.metric, latest),
-      table: "slim",
-    });
+    const countsTraces =
+      s.metric === "metadata.trace_id" &&
+      (s.aggregation === "cardinality" || s.aggregation === "terms");
+    metrics[alias] = countsTraces
+      ? distinctTraces({ tenantId: latest.tenantId, traceId: latest.traceId })
+      : slimAggregate({
+          aggregation: s.aggregation,
+          of: slimColumnFor(s.metric, latest),
+          table: "slim",
+        });
   });
   return { metrics, groupKey: grouping ? groupKeyOf(grouping) : undefined };
 }

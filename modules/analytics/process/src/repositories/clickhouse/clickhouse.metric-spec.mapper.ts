@@ -609,6 +609,20 @@ export function countsTraces(spec: MetricSpec): boolean {
   return spec.operand?.(PROBE) === TRACE_ID_PROBE;
 }
 
+/** Distinct traces, exactly, each member's counted apart (ruling 1a; `uniq` collides past ~10k). */
+export function distinctTraces<T extends string>({
+  tenantId,
+  traceId,
+  when,
+}: {
+  tenantId: Measure<T>;
+  traceId: Measure<T>;
+  when?: Condition<T>;
+}): Measure<T> {
+  const member = fn.tuple(tenantId, traceId);
+  return (when ? fn.uniqExactIf(member, when) : fn.uniqExact(member)) as Measure<T>;
+}
+
 /**
  * A spec's aggregate over `source`, with the series' own condition ANDed into the metric's.
  * A sum with no condition of the metric's own reads 0, never NULL, over no rows (main's coalesce).
@@ -624,6 +638,13 @@ export function renderMetric<T extends string>({
 }): Measure<T> {
   if (spec.outer) {
     throw new Error("A re-aggregated metric is rendered by its query shape, not on one scan.");
+  }
+  if (countsTraces(spec)) {
+    return distinctTraces({
+      tenantId: source.trace("TenantId"),
+      traceId: source.trace("TraceId"),
+      when,
+    });
   }
   const own = spec.condition?.(source);
   const condition = own && when ? cond.and(own, when) : (own ?? when);

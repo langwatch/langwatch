@@ -61,7 +61,16 @@ const expected = JSON.parse(
   mixedPerMember: Record<string, AnalyticsTimeseriesResult>;
   /** Pipeline reads under the aggregate where a per-trace step counts each member's trace. */
   pipelinePerMember: Record<string, AnalyticsTimeseriesResult>;
+  /**
+   * Answers under the aggregate whose trace counts differ from main's: a trace count counts each
+   * member's trace (ruling 1a), so two members' traces sharing an id are two; main counted one.
+   */
+  traceCountPerMember: Record<string, AnalyticsTimeseriesResult>;
 };
+
+/** The expected answer: each member's trace counted apart where that differs from main's. */
+const answerFor = (key: string): AnalyticsTimeseriesResult | undefined =>
+  expected.traceCountPerMember[key] ?? expected.timeseries[key];
 
 /** A read's answer with its suite's run id written as the literals write it. */
 const literal = <T>(value: T, run: string): T =>
@@ -442,7 +451,7 @@ function toTwelveDigits(value: unknown): unknown {
 describe("timeseries reads built on the typed builder", () => {
   describe.each(timeseries.PROOFS)("given $name", ({ projectId, proof }) => {
     it.each(timeseries.SHAPES)("$name answers the expected buckets", async (shape) => {
-      const want = expected.timeseries[`${literal(projectId, timeseries.RUN)}|${shape.name}`];
+      const want = answerFor(`${literal(projectId, timeseries.RUN)}|${shape.name}`);
 
       expect(want).toBeDefined();
       expect(
@@ -520,11 +529,12 @@ describe("timeseries reads built on the typed builder", () => {
       });
       const [previous] = result.previousPeriod;
 
-      // A's trace 3 costs 4 over 400 ms; B's, scaled by 100, 400 over 40,000 ms; one run each.
+      // A's trace 3 costs 4 over 400 ms; B's, scaled by 100, 400 over 40,000 ms; one run each,
+      // so two traces, one per member.
       expect(previous).toMatchObject({
         "0/performance.total_cost/sum": 404,
         "1/performance.completion_time/avg": 20200,
-        "4/metadata.trace_id/cardinality": 1,
+        "4/metadata.trace_id/cardinality": 2,
         "5/metadata.user_id/cardinality": 2,
         "13/evaluations.evaluation_runs/cardinality/ev": 2,
       });
@@ -544,8 +554,8 @@ describe("timeseries reads built on the typed builder", () => {
 
   describe("given trace summaries joined to their spans or runs", () => {
     describe.each(timeseries.PROOFS)("given $name", ({ projectId, proof }) => {
-      it.each(timeseries.JOINED_SHAPES)("$name answers main's buckets", async (shape) => {
-        const want = expected.timeseries[`${literal(projectId, timeseries.RUN)}|${shape.name}`];
+      it.each(timeseries.JOINED_SHAPES)("$name answers the expected buckets", async (shape) => {
+        const want = answerFor(`${literal(projectId, timeseries.RUN)}|${shape.name}`);
         const got = await builtTimeseries({ shape, projectId, proof: proof() });
 
         expect(want).toBeDefined();
@@ -599,13 +609,16 @@ describe("timeseries reads built on the typed builder", () => {
 
   describe("given trace metrics grouped by a key a trace holds several of", () => {
     describe.each(timeseries.PROOFS)("given $name", ({ projectId, proof }) => {
-      it.each(timeseries.SPAN_GROUPED_SHAPES)("$name answers main's buckets", async (shape) => {
-        const want = expected.timeseries[`${literal(projectId, timeseries.RUN)}|${shape.name}`];
-        const got = await builtTimeseries({ shape, projectId, proof: proof() });
+      it.each(timeseries.SPAN_GROUPED_SHAPES)(
+        "$name answers the expected buckets",
+        async (shape) => {
+          const want = answerFor(`${literal(projectId, timeseries.RUN)}|${shape.name}`);
+          const got = await builtTimeseries({ shape, projectId, proof: proof() });
 
-        expect(want).toBeDefined();
-        expect(toTwelveDigits(got)).toEqual(toTwelveDigits(want));
-      });
+          expect(want).toBeDefined();
+          expect(toTwelveDigits(got)).toEqual(toTwelveDigits(want));
+        },
+      );
     });
 
     it.each(timeseries.SPAN_GROUPED_SHAPES)("$name is a built read", (shape) => {
@@ -651,7 +664,7 @@ describe("timeseries reads built on the typed builder", () => {
       "$name counts each member's entities under an aggregate",
       async (shape) => {
         const key = `${literal(aggregate!.projectId, timeseries.RUN)}|${shape.name}`;
-        const want = expected.pipelinePerMember[key] ?? expected.timeseries[key];
+        const want = expected.pipelinePerMember[key] ?? answerFor(key);
         const got = await builtTimeseries({
           shape,
           projectId: aggregate!.projectId,
@@ -719,7 +732,7 @@ describe("timeseries reads built on the typed builder", () => {
       "$name answers the expected buckets under an aggregate",
       async (shape) => {
         const key = `${literal(aggregate!.projectId, timeseries.RUN)}|${shape.name}`;
-        const want = expected.mixedPerMember[key] ?? expected.timeseries[key];
+        const want = expected.mixedPerMember[key] ?? answerFor(key);
         const got = await builtTimeseries({
           shape,
           projectId: aggregate!.projectId,

@@ -20,6 +20,7 @@ import type { TimeseriesQueryInput } from "./clickhouse.aggregation-builder.mapp
 import { evaluationRuns as er } from "./clickhouse.evaluation-runs.table.ts";
 import {
   countsTraces,
+  distinctTraces,
   type MetricAggregate,
   type MetricOperand,
   type MetricPredicate,
@@ -246,13 +247,12 @@ function seriesAcrossTraces({
       render: (filter) => acrossTraces(spec.aggregate, carried("m"), filter),
     });
   }
-  // Distinct trace ids, exactly: `uniq` estimates and collides past ~10k ids a bucket.
   if (countsTraces(spec)) {
-    const traceId = carried("v");
+    const ids = { tenantId: perTrace.TenantId!, traceId: carried("v") };
     return shapeSeries({
       series,
       when,
-      render: (filter) => (filter ? fn.uniqExactIf(traceId, filter) : fn.uniqExact(traceId)),
+      render: (filter) => distinctTraces({ ...ids, when: filter }),
     });
   }
   const overTraces: MetricSpec = {

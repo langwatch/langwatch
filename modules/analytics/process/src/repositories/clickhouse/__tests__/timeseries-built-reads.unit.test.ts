@@ -508,7 +508,7 @@ describe("the mixed trace and evaluation read", () => {
     expect(statement).toMatch(/coalesce\(sum\(v0\), 0\)/);
   });
 
-  it("counts traces exactly across the per-trace rows, never by the uniq estimate", () => {
+  it("counts each member's traces exactly across the per-trace rows, never by the uniq estimate", () => {
     const statement = inlined(
       read(mixedEvalTimeseriesRead, {
         series: [series("metadata.trace_id", "cardinality"), mix[1]!],
@@ -516,7 +516,7 @@ describe("the mixed trace and evaluation read", () => {
       }),
     );
 
-    expect(statement).toMatch(/uniqExact\(v0\) AS m0__/);
+    expect(statement).toMatch(/uniqExact\(tuple\(TenantId, v0\)\) AS m0__/);
     expect(statement).not.toMatch(/\buniq\(/);
   });
 
@@ -702,7 +702,7 @@ describe("the trace_summaries read grouped by a key a trace holds several of", (
   it.each([
     ["metadata.trace_id", "metadata.model"],
     ["metadata.span_type", "metadata.span_type"],
-  ])("counts %s exactly under %s, never by the uniq estimate", (metric, groupBy) => {
+  ])("counts each member's %s exactly under %s, never by the uniq estimate", (metric, groupBy) => {
     const sql = inlined(
       read(spanGroupedTimeseriesRead, {
         series: [series(metric, "cardinality")],
@@ -711,7 +711,7 @@ describe("the trace_summaries read grouped by a key a trace holds several of", (
       }),
     );
 
-    expect(sql).toMatch(/uniqExact\(v0\) AS m0__/);
+    expect(sql).toMatch(/uniqExact\(tuple\(TenantId, v0\)\) AS m0__/);
     expect(sql).not.toMatch(/\buniq\(/);
   });
 
@@ -913,5 +913,23 @@ describe("which queries the standard trace_summaries read serves", () => {
         ],
       }),
     ).toBe(false);
+  });
+});
+
+describe("a trace count under an aggregate proof (ruling 1a)", () => {
+  it.each([
+    ["standard", traceSummariesTimeseriesRead],
+    ["slim", slimTimeseriesRead],
+  ] as const)("counts each member's traces exactly on the %s read", (_, build) => {
+    const sql = inlined(
+      read(
+        build,
+        { series: [series("metadata.trace_id", "cardinality")], timeScale: 60 },
+        "aggregate",
+      ),
+    );
+
+    expect(sql).toMatch(/uniqExact\(tuple\([\w.]*TenantId, [\w.]*TraceId\)\)/);
+    expect(sql).not.toMatch(/\buniq\(/);
   });
 });
