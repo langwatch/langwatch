@@ -77481,6 +77481,55 @@ openapi: "POST /api/v1/governance/registry/ard/search"
 
 ---
 
+# FILE: ./api-reference/governance-ocsf/export-governance-events-as-ocsf-1-9-0.mdx
+
+---
+title: "Export governance events as OCSF 1.9.0"
+openapi: "GET /api/v1/governance/ocsf/events"
+---
+
+---
+
+# FILE: ./api-reference/governance-ocsf/export-project-traces-as-ocsf-1-9-0.mdx
+
+---
+title: "Export project traces as OCSF 1.9.0"
+openapi: "GET /api/v1/governance/ocsf/traces"
+---
+
+---
+
+# FILE: ./api-reference/governance-ocsf/export-the-audit-log-as-ocsf-1-9-0.mdx
+
+---
+title: "Export the audit log as OCSF 1.9.0"
+openapi: "GET /api/v1/governance/ocsf/audit"
+---
+
+---
+
+# FILE: ./api-reference/governance-ocsf/overview.mdx
+
+---
+title: "Overview"
+description: "Pull governance events, project traces and the audit log as OCSF 1.9.0 API Activity events with an organisation API key, and push OCSF events from your other tools into LangWatch. Each stream pages with a cursor, so a SIEM polls by passing next_cursor back."
+---
+
+## Intro
+
+Pull governance events, project traces and the audit log as OCSF 1.9.0 API Activity events with an organisation API key, and push OCSF events from your other tools into LangWatch. Each stream pages with a cursor, so a SIEM polls by passing next_cursor back.
+
+---
+
+# FILE: ./api-reference/governance-ocsf/push-ocsf-events-in-from-another-source.mdx
+
+---
+title: "Push OCSF events in from another source"
+openapi: "POST /api/v1/governance/ocsf/ingest"
+---
+
+---
+
 # FILE: ./api-reference/grants/change-a-grant-s-role.mdx
 
 ---
