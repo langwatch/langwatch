@@ -112,7 +112,7 @@ function createBlockingConnection({
   }
   return redisConnection;
 }
-import { nowInstant, Temporal } from "@langwatch/time";
+import { nowEpochMs, nowInstant, Temporal } from "@langwatch/time";
 
 import { fallbackReadyScore, isPlausibleReadyScore, resolveReadyScore } from "./readyScore.ts";
 import { ScriptCallBatcher } from "./scriptCallBatcher.ts";
@@ -698,7 +698,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
           ? `${this.dispatchGroupAllowListKey}:candidates`
           : undefined,
         listedGroupsKeys: this.dispatchListed
-          ? () => this.scripts.findOpenGroupLists(nowInstant().epochMilliseconds)
+          ? () => this.scripts.findOpenGroupLists(nowEpochMs())
           : undefined,
         groupBatch: () => this.groupBatching(),
         claimGuardWorkerId: () => this.claimGuardWorkerId(),
@@ -762,7 +762,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
    * writes one goes through here, since scanning the ready set later can't work
    * once the bad value has replaced it. `delay` is excluded: a queue decision.
    */
-  private resolveScore(rawScore: unknown, nowMs: number = nowInstant().epochMilliseconds): number {
+  private resolveScore(rawScore: unknown, nowMs: number = nowEpochMs()): number {
     const { score, isRejected } = resolveReadyScore({
       score: rawScore,
       nowMs,
@@ -1080,7 +1080,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       ...capturedContext,
       queueDispatchScopeKey: scopeKeyOf(capturedContext) ?? this.dispatchGroupAllowListKey,
     };
-    const now = nowInstant().epochMilliseconds;
+    const now = nowEpochMs();
 
     const shouldExtend = dedup ? dedup.extend !== false : true;
     const shouldReplace = dedup ? dedup.replace !== false : true;
@@ -1792,7 +1792,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     try {
       drainedSiblings = await this.scripts.drainGroupReady({
         groupId,
-        nowMs: nowInstant().epochMilliseconds,
+        nowMs: nowEpochMs(),
         maxJobs: maxBatch - 1,
         maxBytes,
         initialBytes,
@@ -2152,7 +2152,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     if (err instanceof HandBackGroupQueueError) {
       const outcome = handBackOutcome({
         handedBackSince: job.handedBackSince,
-        now: nowInstant().epochMilliseconds,
+        now: nowEpochMs(),
       });
       if (outcome.kind === "hand-back") {
         await this.handBackClaimedJob({ job, error, since: outcome.since, stopHeartbeat });
@@ -2344,7 +2344,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       groupId,
       stagedJobId,
       newStagedJobId,
-      dispatchAfterMs: nowInstant().epochMilliseconds + backoffMs,
+      dispatchAfterMs: nowEpochMs() + backoffMs,
       jobDataJson: retryJobData,
       backoffMs,
       // Written inside the same script as the re-stage: the chain is the only
@@ -2462,7 +2462,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       groupId,
       stagedJobId,
       newStagedJobId: stagedJobId,
-      dispatchAfterMs: nowInstant().epochMilliseconds + HAND_BACK_CONFIG.delayMs,
+      dispatchAfterMs: nowEpochMs() + HAND_BACK_CONFIG.delayMs,
       jobDataJson: handBackJobData,
       backoffMs: HAND_BACK_CONFIG.delayMs,
       attempt,
@@ -3426,7 +3426,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       groupId,
       stagedJobId,
       newStagedJobId: stagedJobId,
-      dispatchAfterMs: nowInstant().epochMilliseconds + backoffMs,
+      dispatchAfterMs: nowEpochMs() + backoffMs,
       jobDataJson: withJobAttempt({ value: jobDataJson, attempt }),
       backoffMs,
       attempt,
@@ -3616,7 +3616,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     work: (list?: ListedRun) => Promise<Result>;
   }): Promise<Result> {
     const listKey = `${this.queueName}:gq:listed:${name}`;
-    await this.scripts.openGroupList({ listKey, nowMs: nowInstant().epochMilliseconds });
+    await this.scripts.openGroupList({ listKey, nowMs: nowEpochMs() });
     try {
       const scope = { ...this.captureContext(), queueDispatchScopeKey: listKey };
       const fault = { operation: "runListedWork", work: `Queue work of ${name}` };
@@ -3658,13 +3658,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     maxOutstanding: number;
     signal?: AbortSignal;
   }): Promise<void> {
-    let deadline = nowInstant().epochMilliseconds + timeoutMs;
+    let deadline = nowEpochMs() + timeoutMs;
     let lastLook: number | undefined;
     while (!signal?.aborted) {
-      const lookStartedMs = nowInstant().epochMilliseconds;
+      const lookStartedMs = nowEpochMs();
       const outstanding = await this.scripts.countListedOutstanding(listKey);
       if (outstanding <= maxOutstanding) return;
-      const nowMs = nowInstant().epochMilliseconds;
+      const nowMs = nowEpochMs();
       if (outstanding !== lastLook) {
         lastLook = outstanding;
         deadline = nowMs + timeoutMs;
@@ -3696,16 +3696,16 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     onHeld?: (state: PreflightTargetsState) => void;
     whileDraining?: boolean;
   }): Promise<PreflightTargetsState | undefined> {
-    let deadline = nowInstant().epochMilliseconds + timeoutMs;
+    let deadline = nowEpochMs() + timeoutMs;
     let reportedHeld = false;
     let lastLook = "";
     while (true) {
-      const lookStartedMs = nowInstant().epochMilliseconds;
+      const lookStartedMs = nowEpochMs();
       const state = await this.scripts.inspectPreflightTargets(key);
-      const lookMs = nowInstant().epochMilliseconds - lookStartedMs;
+      const lookMs = nowEpochMs() - lookStartedMs;
       const look = [state.pending, state.active, state.pendingGroups, ...state.pendingGroupIds];
       if (whileDraining && look.join("\n") !== lastLook) {
-        deadline = nowInstant().epochMilliseconds + timeoutMs;
+        deadline = nowEpochMs() + timeoutMs;
         lastLook = look.join("\n");
       }
       if (!reportedHeld && state.heldFromBefore > 0) {
@@ -3715,7 +3715,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       // A blocked group stays blocked until an operator acts: no point waiting it out.
       if (state.blocked > 0) this.assertTargetsSucceeded({ state, fault });
       if (this.targetsHaveSettled({ state, fault })) return undefined;
-      if (nowInstant().epochMilliseconds >= deadline) return state;
+      if (nowEpochMs() >= deadline) return state;
       // Rest at least as long as the look took, so a paged look holds at most half of Redis.
       await new Promise<void>((resolve) => setTimeout(resolve, Math.max(100, lookMs)));
     }
