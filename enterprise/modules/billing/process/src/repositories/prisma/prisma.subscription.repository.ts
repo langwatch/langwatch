@@ -264,6 +264,8 @@ export class PrismaBillingSubscriptionRepository extends BillingSubscriptionRepo
           data: {
             status: SubscriptionStatus.CANCELLED as PrismaSubscriptionStatus,
             endDate: toDate(nowInstant()),
+            // The superseded row's open case would otherwise keep the banner and emails going.
+            ...RECOVERY_CLEARED,
           },
         });
       }

@@ -39,6 +39,14 @@ Feature: Traces withheld while an organization is over its plan
     Then the organization is over its plan from day 21 of the case
 
   @unit
+  Scenario: A day 21 over-plan mark that fails to save is retried on the next sweep
+    Given an organization on Growth with 4 members and a renewal that failed 21 days ago
+    And saving the over-plan mark fails once
+    When the payment recovery sweep runs twice
+    Then the first sweep sends no day 21 email and leaves the notice due
+    And the second sweep marks the organization over its plan and sends it
+
+  @unit
   Scenario: An organization over its member count without a recorded downgrade is never affected
     Given an organization on the Free plan with 6 members
     And no downgrade was recorded for it

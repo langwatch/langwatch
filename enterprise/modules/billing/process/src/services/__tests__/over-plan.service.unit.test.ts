@@ -6,7 +6,7 @@
  * @see ../../../../../../specs/billing/over-plan-trace-withholding.feature
  */
 import { nowInstant, Temporal, type Instant } from "@langwatch/time";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { MemoryPaymentRecoveryEmailChannel } from "../../channels/memory/memory.billing.channels.ts";
 import { MemoryStripeInvoicesChannel } from "../../channels/memory/memory.stripe-invoices.channel.ts";
@@ -192,10 +192,13 @@ describe("OverPlanService", () => {
   });
 
   describe("when an unpaid renewal reaches day 21 with 4 members", () => {
-    /** @scenario "An unpaid renewal reaching day 21 with too many members starts the state at day 21" */
-    it("marks the organization from day 21 of the case", async () => {
-      const day0 = NOW.subtract({ hours: 24 * 21 + 3 });
-      const world = setUp({ members: 4, paymentRecoveryStartedAt: day0 });
+    const day0 = NOW.subtract({ hours: 24 * 21 + 3 });
+    let world: ReturnType<typeof setUp>;
+    let emails: MemoryPaymentRecoveryEmailChannel;
+    let recovery: PaymentRecoveryService;
+
+    beforeEach(() => {
+      world = setUp({ members: 4, paymentRecoveryStartedAt: day0 });
       const invoices = MemoryStripeInvoicesChannel.create();
       invoices.seed({
         invoice: {
@@ -211,7 +214,8 @@ describe("OverPlanService", () => {
         },
         card: { brand: "Visa", last4: "4242" },
       });
-      const recovery = PaymentRecoveryService.create({
+      emails = MemoryPaymentRecoveryEmailChannel.create();
+      recovery = PaymentRecoveryService.create({
         recoveries: MemoryPaymentRecoveryRepository.create(world.store),
         subscriptions: MemoryBillingWebhookSubscriptionRepository.create({
           subscriptions: world.subscriptions,
@@ -219,13 +223,16 @@ describe("OverPlanService", () => {
         }),
         organizations: world.organizations,
         invoices,
-        emails: MemoryPaymentRecoveryEmailChannel.create(),
+        emails,
         alerts: { sendSlackAccountPaymentFailed: async () => {} },
         publicBaseUrl: "https://app.langwatch.test",
         overPlan: world.overPlan,
         now: () => NOW,
       });
+    });
 
+    /** @scenario "An unpaid renewal reaching day 21 with too many members starts the state at day 21" */
+    it("marks the organization from day 21 of the case", async () => {
       await recovery.sweep();
 
       expect(await world.overPlan.getState({ organizationId: ORG })).toEqual({
@@ -239,6 +246,20 @@ describe("OverPlanService", () => {
       expect(world.facts).toEqual([
         expect.objectContaining({ state: "started", reason: "payment_recovery" }),
       ]);
+    });
+
+    /** @scenario "A day 21 over-plan mark that fails to save is retried on the next sweep" */
+    it("keeps day 21 due when the mark fails, and marks on the next sweep", async () => {
+      vi.spyOn(world.marks, "mark").mockRejectedValueOnce(new Error("database unreachable"));
+
+      expect(await recovery.sweep()).toMatchObject({ notified: 0, failed: 1 });
+      expect(world.store.subscriptions[0]?.paymentRecoveryNoticeDay).toBe(14);
+      expect(emails.sent).toEqual([]);
+
+      expect(await recovery.sweep()).toMatchObject({ notified: 1, failed: 0 });
+      expect(await world.overPlan.getState({ organizationId: ORG })).toMatchObject({
+        kind: "over_plan",
+      });
     });
   });
 

@@ -292,36 +292,27 @@ export class PaymentRecoveryService {
   }): Promise<boolean> {
     const kind = noticeKindOf(day);
     const mail = await this.mail.prepare({ kind, open, invoice });
+    // Marked before the notice day moves, so a failed mark leaves day 21 due for the next sweep.
+    if (kind === "paused") await this.markIfOverPlan(open);
     const advanced = await this.options.recoveries.advanceNotice({
       subscriptionId: open.subscriptionId,
       from: open.noticeDay,
       to: day,
     });
     if (!advanced) return false;
-    if (kind === "paused") await this.markIfOverPlan(open);
     await this.mail.deliver(mail);
     logger.info({ organizationId: open.organizationId, day, kind }, "Payment recovery notice sent");
     return true;
   }
 
-  /** Day 21 into Free with too many members withholds traces from day 21; a failure only logs. */
+  /** Day 21 into Free with too many members withholds traces from day 21; a failure throws. */
   private async markIfOverPlan(open: PaymentRecoveryCase): Promise<void> {
-    try {
-      await this.options.overPlan?.downgraded({
-        organizationId: open.organizationId,
-        subscriptionId: open.subscriptionId,
-        since: accessStopsAt({ startedAt: open.startedAt }),
-        reason: "payment_recovery",
-      });
-    } catch (error) {
-      logger.error(
-        {
-          organizationId: open.organizationId,
-          error: error instanceof Error ? error.message : String(error),
-        },
-        "Could not record the over-plan mark at day 21; new traces stay visible",
-      );
-    }
+    await this.options.overPlan?.downgraded({
+      organizationId: open.organizationId,
+      subscriptionId: open.subscriptionId,
+      since: accessStopsAt({ startedAt: open.startedAt }),
+      reason: "payment_recovery",
+    });
   }
 
   /**
