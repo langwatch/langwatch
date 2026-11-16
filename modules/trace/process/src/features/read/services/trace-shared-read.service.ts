@@ -17,6 +17,7 @@ import {
   SHARE_MAX_FULL_SPANS,
   sharedTraceDtoSchema,
   TraceNotFoundError,
+  TraceWithheldOverPlanError,
   traceSummaryDataSchema,
   traceWithholdingOf,
   type Protections,
@@ -182,7 +183,10 @@ export class TraceSharedReadService {
         }),
       );
     } catch (error) {
-      if (error instanceof TraceNotFoundError) throw new ShareLinkNotFoundError();
+      // A withheld trace reads as a missing link: its plan counts are not for a public viewer.
+      if (error instanceof TraceNotFoundError || error instanceof TraceWithheldOverPlanError) {
+        throw new ShareLinkNotFoundError();
+      }
       throw error;
     }
     const at = { authorization, traceId, occurredAtMs: summary.occurredAt };
