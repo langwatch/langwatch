@@ -205,7 +205,7 @@ export function TraceDrawerEmptyState({
             paddingX={0}
             color="fg"
             truncate
-            maxWidth="220px"
+            minWidth={0}
           >
             {traceId}
           </Code>

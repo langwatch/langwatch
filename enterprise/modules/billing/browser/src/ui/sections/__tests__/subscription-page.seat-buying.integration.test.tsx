@@ -961,7 +961,7 @@ describe("<SubscriptionPage/> buying seats", () => {
 
       fireEvent.click(screen.getByTestId("drawer-seats-stepper-plus"));
 
-      const confirm = lastButton("Add 1 seat · €29/mo");
+      const confirm = lastButton("Add 1 seat");
       expect(confirm).toBeDisabled();
       expect(screen.getByTestId("seat-drawer-price-failed")).toHaveTextContent(
         "The price for this change did not load.",
@@ -982,7 +982,8 @@ describe("<SubscriptionPage/> buying seats", () => {
 
       fireEvent.click(screen.getByTestId("drawer-seats-stepper-plus"));
 
-      expect(lastButton("Add 1 seat · €29/mo")).toBeDisabled();
+      expect(lastButton("Add 1 seat")).toBeDisabled();
+      expect(screen.queryByTestId("seat-change-summary")).toBeNull();
       const note = screen.getByTestId("seat-drawer-price-failed");
       expect(note).toHaveTextContent("A payment failed, so seats can't be added.");
       expect(note).toHaveTextContent("Update the card on the billing page");

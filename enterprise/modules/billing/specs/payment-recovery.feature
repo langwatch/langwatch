@@ -210,7 +210,8 @@ Feature: A paid organization whose card fails is told, reminded, paused and rest
     Given an organization with an open recovery case
     When an admin adds a seat in Manage seats
     Then the drawer says "A payment failed, so seats can't be added" and asks to update the card
-    And the confirm stays disabled
+    And the confirm stays disabled, naming the seats without a price
+    And the drawer shows no price summary
 
   @integration
   Scenario: Inviting any kind of member while a payment is unpaid names the failed payment
