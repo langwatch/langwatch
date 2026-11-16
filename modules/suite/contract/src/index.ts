@@ -17,3 +17,4 @@ export * from "./suite-evaluators.ts";
 export * from "./suite-rest.schemas.ts";
 export * from "./suite-run-history-slice.ts";
 export * from "./suite.config.ts";
+export * from "./suite-template.ts";
