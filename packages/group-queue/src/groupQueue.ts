@@ -64,6 +64,7 @@ import {
   readJobOverloadAttempts,
   readJobPayloadBytes,
   readJobRoutingMeta,
+  readJobStagedAt,
   withJobAttempt,
 } from "./jobEnvelope.ts";
 import { JobLatencyStats } from "./jobLatencyStats.ts";
@@ -180,7 +181,7 @@ async function withActiveSpan<T>(
 
 export const JOB_RETRY_CONFIG = {
   maxAttempts: 25,
-  /** An overloaded server is not the job's fault: about six more hours at the backoff cap. */
+  /** An overloaded server is not the job's fault: about three more hours, jittered, at the cap. */
   maxOverloadedAttempts: 61,
   backoffBaseMs: 500,
   maxBackoffMs: 600_000,
@@ -209,11 +210,17 @@ function overloadAttemptsField(count: number): { __overloadAttempts?: number } {
   return count > 0 ? { __overloadAttempts: count } : {};
 }
 
-export function getBackoffMs(attempt: number): number {
-  return Math.min(
+/**
+ * The wait before the retry after `attempt`, with full jitter: anywhere from zero to the
+ * exponential rung, so the jobs of one failed batch or one overloaded server spread out instead
+ * of retrying in the same instant.
+ */
+export function getBackoffMs(attempt: number, random: () => number = Math.random): number {
+  const rung = Math.min(
     JOB_RETRY_CONFIG.backoffBaseMs * Math.pow(2, attempt - 1),
     JOB_RETRY_CONFIG.maxBackoffMs,
   );
+  return Math.floor(random() * rung);
 }
 
 /**
@@ -821,7 +828,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     const stagedJobId = this.generateStagedJobId(payload);
     // Not `?? Date.now()`: a score function returning 0 or NaN (a payload with
     // no usable occurrence time) survives `??` and stages the job at the epoch.
-    const score = this.resolveScore(this.score?.(payload));
+    const nowMs = nowInstant().epochMilliseconds;
+    const score = this.resolveScore(this.score?.(payload), nowMs);
 
     const span = trace.getActiveSpan();
     if (span) {
@@ -831,6 +839,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     const jobDataJson = await this.blobLifecycle.encode({
       jobData: { ...(payload as Record<string, unknown>), __context: contextMetadata },
       groupId,
+      stagedAtMs: nowMs,
     });
     return {
       stagedJobId,
@@ -1118,6 +1127,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
           jobDataJson: await this.blobLifecycle.encode({
             jobData: payloadWithContext,
             groupId,
+            stagedAtMs: now,
           }),
           shouldExtend,
           shouldReplace,
@@ -2302,6 +2312,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
           ),
         },
         groupId,
+        stagedAtMs: readJobStagedAt(jobDataJson) ?? undefined,
       });
     } catch (encodeErr) {
       this.recordDrop({
@@ -2434,6 +2445,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
           ...overloadAttemptsField(job.overloadAttempts),
         },
         groupId,
+        stagedAtMs: readJobStagedAt(jobDataJson) ?? undefined,
       });
     } catch (encodeErr) {
       this.recordDrop({
@@ -2567,6 +2579,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       groupId: job.groupId,
       stagedJobId: job.stagedJobId,
       payload: job.payload,
+      claimedJobDataJson: job.jobDataJson,
       originalScore: job.originalScore,
       claimToken: job.claimToken,
       lastError,
@@ -2601,6 +2614,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     const freshValue = await this.blobLifecycle.encode({
       jobData: { ...payload, __context: contextMetadata },
       groupId,
+      stagedAtMs: readJobStagedAt(job.jobDataJson) ?? undefined,
     });
     const handlerError = lastError.cause instanceof Error ? lastError.cause : lastError;
     const refusedJobIds: string[] = [];
@@ -3108,6 +3122,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     groupId,
     stagedJobId,
     payload,
+    claimedJobDataJson,
     originalScore,
     claimToken,
     lastError,
@@ -3117,6 +3132,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     groupId: string;
     stagedJobId: string;
     payload: Payload;
+    /** The value as claimed, whose header holds when the job was first staged. */
+    claimedJobDataJson: string;
     originalScore: number;
     claimToken: string;
     lastError: Error | undefined;
@@ -3138,6 +3155,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
         __context: contextMetadata,
       },
       groupId,
+      stagedAtMs: readJobStagedAt(claimedJobDataJson) ?? undefined,
     });
 
     // The quarantine breaker wraps the handler error to explain WHY the group
@@ -3403,7 +3421,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     if (attempt >= budget) {
       // The retry ladder is out of rungs — a discard like any other, not
       // recoverable via replay (#5538). Reaching here means every read failed
-      // (~2h27m of sustained unreachability), which says the STORE is down, not
+      // (~1h15m on average of sustained unreachability), which says the STORE is down, not
       // that the blob is gone — so the drop keeps the shared bytes for lazy
       // reclaim while retiring this job's lease.
       await this.dropStagedJob({

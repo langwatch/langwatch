@@ -28,6 +28,7 @@ import {
   FIRST_TRACE_RECORDED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_TYPE,
   TRACE_FAILED_EVENT_TYPE,
+  TRACE_RECEIVED_EVENT_TYPE,
 } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
@@ -367,6 +368,34 @@ describe("the trace syncs", () => {
       ["group", "admin-1"],
       ["identify", "member-1"],
     ]);
+  });
+
+  /** @scenario "Traces sync an organization at most once per 15 minutes" */
+  it("queues two traces of one organization inside the window as one job", () => {
+    const { firstTrace, laterTrace } = nurturingTraceUsageSyncSubscribers(() => Promise.resolve());
+    const traceOf = (traceId: string): Event => ({
+      ...envelope(TRACE_RECEIVED_EVENT_TYPE),
+      id: `received-${traceId}`,
+      aggregateId: traceId,
+      tenantId: createTenantId("project-1"),
+      type: TRACE_RECEIVED_EVENT_TYPE,
+      data: { projectId: "project-1", organizationId: "org-1" },
+    });
+
+    for (const sync of [firstTrace, laterTrace]) {
+      const group = sync.options?.groupKeyFn;
+      const dedup = sync.options?.deduplication;
+      if (!group || !dedup || dedup === "aggregate") throw new Error("the sync throttles on a key");
+      // The queue squashes a staged job only under the same dedup id in the same group.
+      const jobs = new Set(
+        [traceOf("trace-1"), traceOf("trace-2")].map((event) =>
+          JSON.stringify([group(event), dedup.makeId(event)]),
+        ),
+      );
+
+      expect(jobs.size).toBe(1);
+      expect(group(traceOf("trace-1"))).toBe("subscriber:traceUsageSync:organization:org-1");
+    }
   });
 
   /** @scenario "A project's first trace syncs its organization too" */
