@@ -19,6 +19,7 @@ const failedOnAttempt = (attempt: number, error: unknown) =>
 
 describe("stopRetryingRefusedData", () => {
   describe("given a single job whose data ClickHouse refuses", () => {
+    /** @scenario "A job whose data ClickHouse refuses stops retrying from its eighth attempt" */
     it("leaves early attempts retryable, as a flush-mate's bad row fails them all", async () => {
       const cause = unparseable();
 
@@ -32,6 +33,7 @@ describe("stopRetryingRefusedData", () => {
       expect(await failedOnAttempt(7, cause)).toBe(cause);
     });
 
+    /** @scenario "A job whose data ClickHouse refuses stops retrying from its eighth attempt" */
     it("refuses it from the eighth attempt, not the end of the retry budget", async () => {
       const cause = unparseable();
 

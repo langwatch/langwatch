@@ -770,6 +770,7 @@ describe("isPermanentClickHouseError", () => {
       expect(isPermanentClickHouseError(error)).toBe(false);
     });
 
+    /** @scenario "A type error on a read is never refused as bad data" */
     it.each([
       ["53", "TYPE_MISMATCH", "Type mismatch in IN or VALUES section"],
       ["43", "ILLEGAL_TYPE_OF_ARGUMENT", "Illegal type String of argument of function plus"],

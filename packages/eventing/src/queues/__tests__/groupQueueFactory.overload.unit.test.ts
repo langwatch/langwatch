@@ -51,6 +51,7 @@ describe("backOffWhenOverloaded", () => {
   });
 
   describe("when ClickHouse has no statement slot for the batch (code 202)", () => {
+    /** @scenario "A job refused for want of a statement slot waits a jittered 2 to 5 seconds" */
     it("names a wait of 2 to 5 seconds, so the refused jobs do not take the slots back at once", async () => {
       const cause = clickHouseError("202", "Too many simultaneous queries");
 
@@ -62,6 +63,7 @@ describe("backOffWhenOverloaded", () => {
       expect(error).toMatchObject({ cause: { code: "202" } });
     });
 
+    /** @scenario "A job refused for want of a statement slot waits a jittered 2 to 5 seconds" */
     it("spreads the waits of jobs refused together", async () => {
       const cause = clickHouseError("202", "Too many simultaneous queries");
 

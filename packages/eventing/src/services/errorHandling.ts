@@ -606,6 +606,9 @@ const CLICKHOUSE_TRANSIENT_CODES = new Set([
  */
 const TRANSIENT_HANDLED_CODES = new Set<string>(["clickhouse_overloaded"]);
 
+/** Handled codes meaning a statement was shed for want of a slot, not transience at large. */
+const SLOT_SHED_HANDLED_CODES: ReadonlySet<string> = new Set(["clickhouse_overloaded"]);
+
 /**
  * Message-fragment matchers for the same conditions as
  * CLICKHOUSE_TRANSIENT_CODES, used when the code is embedded in
@@ -686,7 +689,7 @@ const SIMULTANEOUS_QUERIES_FRAGMENTS = [
  */
 export function isOutOfStatementSlots(error: unknown): boolean {
   if (HandledError.isHandled(error)) {
-    if (TRANSIENT_HANDLED_CODES.has(error.code)) return true;
+    if (SLOT_SHED_HANDLED_CODES.has(error.code)) return true;
     return (error.reasons ?? []).some(isTooManySimultaneousQueries);
   }
   return isTooManySimultaneousQueries(error);
