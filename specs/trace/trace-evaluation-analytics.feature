@@ -19,17 +19,31 @@ Feature: Each evaluation's outcome is kept beside its trace's columns
     Then the recorded outcome carries the run's evaluator name and guardrail flag
 
   @unit
+  Scenario: The trace subscriber waits for the trace to settle before its first attempt
+    Given evaluation's completed and reported events
+    When the trace subscribers on them are registered
+    Then each first delivery is delayed by the 30-second trace settle window
+
+  @unit
   Scenario: An evaluation of a trace not stored yet is retried within the wait
     Given an evaluation whose trace is not stored, appended at most an hour ago
     When the trace subscriber handles it
     Then no outcome is recorded
-    And the delivery fails so the queue retries it
+    And the delivery fails so the queue retries it no sooner than five minutes later
+
+  @unit
+  Scenario: A completed evaluation whose run is not readable yet is retried later
+    Given a completed evaluation whose run evaluation has not written yet
+    When the trace subscriber handles the completion
+    Then no outcome is recorded
+    And the delivery fails so the queue retries it no sooner than five minutes later
 
   @unit
   Scenario: An evaluation of a trace still not stored after the wait records nothing
     Given an evaluation whose trace is not stored, appended over an hour ago
     When the trace subscriber handles it
     Then no outcome is recorded and the skip is logged
+    And the delivery completes, so the queue retries it no further
 
   @unit
   Scenario: The fresher outcome of an evaluation wins

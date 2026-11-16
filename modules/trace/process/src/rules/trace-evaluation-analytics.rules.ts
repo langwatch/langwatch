@@ -25,9 +25,15 @@ export const LIVE_ROW_LOOKBACK_MS = 24 * 60 * 60 * 1000;
 
 /**
  * How long after an evaluation its trace may still arrive: a younger evaluation of a trace not
- * stored yet is retried, an older one skipped. The queue's 25 attempts span over two hours.
+ * stored yet is retried, an older one skipped.
  */
 export const EVALUATED_TRACE_WAIT_MS = 60 * 60 * 1000;
+
+/** The quiet window before an outcome's first attempt, as automation's TRACE_MATCH_SETTLE_MS. */
+export const EVALUATED_TRACE_SETTLE_MS = 30_000;
+
+/** The least wait between attempts while the trace or run is not readable yet (trace ADR-003). */
+export const EVALUATED_TRACE_RETRY_AFTER_MS = 5 * 60 * 1000;
 
 /** Evaluator clocks may run ahead of ours; a time further ahead is a bad or hostile clock. */
 export const EVALUATION_CLOCK_SKEW_MS = 5 * 60 * 1000;

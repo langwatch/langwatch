@@ -22,7 +22,11 @@ projections are the architecture, and no read uses `FINAL`.
    identity, so the subscriber reads it with `EvaluationApi.findRunByEvaluationId`; a run not yet
    readable throws and the delivery retries. An evaluation with no trace is skipped. One whose
    trace is not stored yet throws while its event is at most an hour old, so the delivery retries
-   as a late trace arrives (main joined at read time); past that hour it is skipped. The event's
+   as a late trace arrives (main joined at read time); past that hour it is skipped. Both
+   subscribers first wait the 30-second trace settle, and both misses name a five-minute retry
+   floor (`GroupQueueError.retryAfterMs`) over the queue's sub-second backoff, so an absent trace
+   costs about a dozen reads in its hour rather than ten in its first eight minutes; the floor
+   gives the job the queue's 61-attempt overload budget, which the hour ends first. The event's
    `occurredAt` is the trace's `OccurredAt`, read from `trace_analytics` no further than 62 days
    before the evaluation, because the fold reads back in a window around the event's time. The
    idempotency key is `${tenantId}:${traceId}:evaluation-outcome:${eventId}`. The recorder and the

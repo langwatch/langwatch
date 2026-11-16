@@ -40,6 +40,7 @@ import {
 } from "../features/ingestion/rules/trace-span-command-shard.rules.ts";
 import type { TraceMediaReferenceResolver } from "../features/media/services/trace-media-reference.service.ts";
 import type { TraceSpanNormalization } from "../features/span/services/span-normalization.service.ts";
+import { EVALUATED_TRACE_SETTLE_MS } from "../rules/trace-evaluation-analytics.rules.ts";
 import type { TraceEvaluationOutcomeService } from "../services/trace-evaluation-outcome.service.ts";
 import { TraceProjectionRuntimeService } from "../services/trace-projection-runtime.service.ts";
 import { EventingRecordSpanAdapter, RECORD_SPAN_DEDUPLICATION } from "./record-span.commands.ts";
@@ -213,6 +214,7 @@ function buildTracePipeline(options: EventingTracePipelineAdapterOptions) {
       // A deliberate exception to "a peer subscriber writes its own row": the outcome is a trace
       // fact the trace fold reacts to, ordered with the trace's own events (trace ADR-003).
       .withPeerSubscriber("evaluationCompletedOutcome", {
+        options: { delay: EVALUATED_TRACE_SETTLE_MS },
         eventType: EVALUATION_COMPLETED_EVENT_TYPE,
         data: evaluationCompletedEventDataSchema.pick({
           evaluationId: true,
@@ -233,6 +235,7 @@ function buildTracePipeline(options: EventingTracePipelineAdapterOptions) {
           }),
       })
       .withPeerSubscriber("evaluationReportedOutcome", {
+        options: { delay: EVALUATED_TRACE_SETTLE_MS },
         eventType: EVALUATION_REPORTED_EVENT_TYPE,
         data: evaluationReportedEventDataSchema.pick({
           evaluationId: true,

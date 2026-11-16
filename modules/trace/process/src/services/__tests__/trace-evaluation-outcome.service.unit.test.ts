@@ -17,6 +17,7 @@ import {
 import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
 import { MemoryTraceAnalyticsRepository } from "../../repositories/memory/memory.trace-analytics-projection.repository.ts";
 import {
+  EVALUATED_TRACE_RETRY_AFTER_MS,
   EVALUATED_TRACE_WAIT_MS,
   EVALUATION_CLOCK_SKEW_MS,
   LIVE_ROW_LOOKBACK_MS,
@@ -24,6 +25,7 @@ import {
 import { TraceAnchorService } from "../trace-anchor.service.ts";
 import {
   EvaluatedTraceNotYetStoredError,
+  EvaluationRunNotYetReadableError,
   TraceEvaluationOutcomeService,
 } from "../trace-evaluation-outcome.service.ts";
 import {
@@ -238,10 +240,10 @@ describe("TraceEvaluationOutcomeService", () => {
           now: () => EVALUATED_AT + EVALUATED_TRACE_WAIT_MS,
         });
 
-        await expect(outcomes.recordReported(unstored)).rejects.toThrow(
-          EvaluatedTraceNotYetStoredError,
-        );
+        const failure = await outcomes.recordReported(unstored).catch((error: unknown) => error);
 
+        expect(failure).toBeInstanceOf(EvaluatedTraceNotYetStoredError);
+        expect(failure).toMatchObject({ retryable: true, retryAfterMs: 5 * 60 * 1000 });
         expect(recorded).toEqual([]);
         expect(logger.warn).not.toHaveBeenCalled();
       });
@@ -254,11 +256,32 @@ describe("TraceEvaluationOutcomeService", () => {
           now: () => EVALUATED_AT + EVALUATED_TRACE_WAIT_MS + 1,
         });
 
-        await outcomes.recordReported(unstored);
+        await expect(outcomes.recordReported(unstored)).resolves.toBeUndefined();
 
         expect(recorded).toEqual([]);
         expect(logger.warn).toHaveBeenCalledTimes(1);
       });
+    });
+  });
+
+  describe("given a completed evaluation whose run evaluation has not written yet", () => {
+    /** @scenario "A completed evaluation whose run is not readable yet is retried later" */
+    it("records nothing and fails the delivery for a retry minutes later", async () => {
+      const { outcomes, recorded } = await compose();
+
+      const failure = await outcomes
+        .recordCompleted({
+          data: { evaluationId: "evaluation-9", status: "processed", passed: true, label: null },
+          context: event("evaluation-event-9"),
+        })
+        .catch((error: unknown) => error);
+
+      expect(failure).toBeInstanceOf(EvaluationRunNotYetReadableError);
+      expect(failure).toMatchObject({
+        retryable: true,
+        retryAfterMs: EVALUATED_TRACE_RETRY_AFTER_MS,
+      });
+      expect(recorded).toEqual([]);
     });
   });
 });

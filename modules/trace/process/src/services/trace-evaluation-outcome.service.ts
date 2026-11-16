@@ -3,12 +3,14 @@ import {
   type EvaluationCompletedEventData,
   type EvaluationReportedEventData,
 } from "@langwatch/evaluation-contract";
+import { GroupQueueError } from "@langwatch/group-queue";
 import { nowInstant } from "@langwatch/time";
 import type { RecordEvaluationOutcomeCommandData } from "@langwatch/trace-contract";
 
 import type { TraceEvaluationRuns } from "../channels/trace-evaluation-runs.channel.ts";
 import {
   boundedOutcomeCommand,
+  EVALUATED_TRACE_RETRY_AFTER_MS,
   EVALUATED_TRACE_WAIT_MS,
 } from "../rules/trace-evaluation-analytics.rules.ts";
 import type { TraceAnchorService } from "./trace-anchor.service.ts";
@@ -30,18 +32,30 @@ export type PendingEvaluationOutcome = Omit<
   "tenantId" | "occurredAt" | "idempotencyKey"
 >;
 
+/** The queue's own retry floor, so a miss waits minutes, not its sub-second backoff (ADR-003). */
+function spacedRetry(message: string): ConstructorParameters<typeof GroupQueueError>[0] {
+  return {
+    queueName: "trace_processing",
+    operation: "process",
+    message,
+    retryAfterMs: EVALUATED_TRACE_RETRY_AFTER_MS,
+  };
+}
+
 /** A run the COMPLETED event names that evaluation has not written yet; the delivery retries. */
-export class EvaluationRunNotYetReadableError extends Error {
+export class EvaluationRunNotYetReadableError extends GroupQueueError {
   constructor(evaluationId: string) {
-    super(`evaluation run ${evaluationId} is not readable yet; its outcome is retried`);
+    super(
+      spacedRetry(`evaluation run ${evaluationId} is not readable yet; its outcome is retried`),
+    );
     this.name = "EvaluationRunNotYetReadableError";
   }
 }
 
 /** A trace an evaluation names that trace analytics has not stored yet; the delivery retries. */
-export class EvaluatedTraceNotYetStoredError extends Error {
+export class EvaluatedTraceNotYetStoredError extends GroupQueueError {
   constructor(traceId: string) {
-    super(`trace ${traceId} is not stored yet; its evaluation outcome is retried`);
+    super(spacedRetry(`trace ${traceId} is not stored yet; its evaluation outcome is retried`));
     this.name = "EvaluatedTraceNotYetStoredError";
   }
 }
