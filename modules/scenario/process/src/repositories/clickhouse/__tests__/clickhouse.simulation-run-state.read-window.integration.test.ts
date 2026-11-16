@@ -5,7 +5,7 @@
  * @see modules/scenario/specs/simulation-run-state-read-window.feature
  */
 
-import { createClient, type ClickHouseClient } from "@clickhouse/client";
+import type { ClickHouseClient } from "@clickhouse/client";
 import { createTenantId, FoldProjectionExecutor, readWindowAround } from "@langwatch/eventing";
 import {
   SIMULATION_EVENT_VERSIONS,
@@ -23,13 +23,10 @@ import {
 } from "../../../eventing/simulation-run-state.projection.ts";
 import { ClickHouseSimulationRunStateRepository } from "../clickhouse.simulation-run-state.repository.ts";
 import type { SimulationEventingClickHouseResolver } from "../clickhouse.simulation-session.store.ts";
-import { scenarioClickHouseOver } from "./simulation-clickhouse-rows.fixture.ts";
-
-const configuredClickHouseUrl = process.env.TEST_CLICKHOUSE_URL ?? process.env.CI_CLICKHOUSE_URL;
-const databaseUrl = configuredClickHouseUrl ? new URL(configuredClickHouseUrl) : null;
-if (databaseUrl && !process.env.TEST_CLICKHOUSE_URL) {
-  databaseUrl.pathname = "/test_langwatch";
-}
+import {
+  scenarioClickHouseOver,
+  startScenarioReaderClickHouse,
+} from "./simulation-clickhouse-rows.fixture.ts";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const tenantId = `test-sim-read-window-${nanoid()}`;
@@ -46,12 +43,8 @@ let nextQueryId: string | undefined;
 let resolveClient: SimulationEventingClickHouseResolver;
 let repo: ClickHouseSimulationRunStateRepository<SimulationRunState>;
 
-beforeAll(() => {
-  if (!databaseUrl) return;
-  const client = createClient({
-    url: databaseUrl,
-    clickhouse_settings: { date_time_input_format: "best_effort" },
-  });
+beforeAll(async () => {
+  const client = (await startScenarioReaderClickHouse()).admin;
   ch = client;
   resolveClient = scenarioClickHouseOver({
     query: (input) => client.query({ ...input, query_id: nextQueryId }),
@@ -70,7 +63,6 @@ afterAll(async () => {
     query: `ALTER TABLE simulation_runs DELETE WHERE TenantId = {tenantId:String}`,
     query_params: { tenantId },
   });
-  await ch.close();
   ch = undefined;
 });
 
@@ -194,7 +186,7 @@ async function partsSearched(queryId: string): Promise<number> {
   return Number(rows[0]?.parts ?? Number.NaN);
 }
 
-describe.skipIf(databaseUrl === null)("the scenario-run state read window", () => {
+describe("the scenario-run state read window", () => {
   describe("when a run started inside the read window", () => {
     /** @scenario "A run that started inside the window is found by the bounded read" */
     it("returns the run's latest state from the bounded read", async () => {

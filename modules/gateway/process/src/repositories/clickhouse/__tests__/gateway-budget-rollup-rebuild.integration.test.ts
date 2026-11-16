@@ -11,7 +11,7 @@ import { nanoid } from "nanoid";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { GatewayBudgetClickHouseRepository } from "../clickhouse.gateway-budget.repository.ts";
-import { gatewayClickHouseOver } from "./support/clickhouse-endpoint.support.ts";
+import { gatewayClickHouseReading } from "./support/clickhouse-endpoint.support.ts";
 import { replayGooseMigrationUp, replayRollupRebuild } from "./support/goose-migration-replay.ts";
 import {
   startMigratedGatewayClickHouse,
@@ -58,13 +58,7 @@ function budgetFor(window: GatewayBudgetWindow): GatewayBudget {
   };
 }
 
-const enabled = Boolean(
-  process.env.LANGWATCH_TEST_CLICKHOUSE_URL ??
-  process.env.TEST_CLICKHOUSE_URL ??
-  process.env.CI_CLICKHOUSE_URL,
-);
-
-describe.skipIf(!enabled)("given spend recorded before the rollup rebuild", () => {
+describe("given spend recorded before the rollup rebuild", () => {
   const preBudgets = PRE_WINDOWS.map(budgetFor);
   const preOccurredAt = nowInstant();
 
@@ -75,7 +69,7 @@ describe.skipIf(!enabled)("given spend recorded before the rollup rebuild", () =
 
   beforeAll(async () => {
     endpoint = await startMigratedGatewayClickHouse();
-    repo = new GatewayBudgetClickHouseRepository(gatewayClickHouseOver(endpoint.client));
+    repo = new GatewayBudgetClickHouseRepository(gatewayClickHouseReading(endpoint.reading));
 
     // Pre-upgrade state: the 00055 view truncates periods in the server
     // session timezone.

@@ -8,6 +8,7 @@
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import {
   buildProcessDefinition,
   buildProcessManager,
@@ -48,14 +49,8 @@ import type { BucketBoundaryRow } from "../../gateway-budget.repository.ts";
 import type { AppendGatewayChangeEventInput } from "../../gateway-change-event.repository.ts";
 import { GatewayBudgetClickHouseRepository } from "../clickhouse.gateway-budget.repository.ts";
 import { ClickHouseGatewaySpendEventsRepository } from "../clickhouse.gateway-spend-events.repository.ts";
-import { gatewayClickHouseOver } from "./support/clickhouse-endpoint.support.ts";
+import { gatewayClickHouseReading } from "./support/clickhouse-endpoint.support.ts";
 import { startMigratedGatewayClickHouse } from "./support/migrated-clickhouse.harness.ts";
-
-const enabled = Boolean(
-  process.env.LANGWATCH_TEST_CLICKHOUSE_URL ??
-  process.env.TEST_CLICKHOUSE_URL ??
-  process.env.CI_CLICKHOUSE_URL,
-);
 
 const run = nanoid(8);
 const TENANT = `platform-usage-${run}`;
@@ -102,6 +97,7 @@ function organizationBudget(): GatewayResolvedBudget {
 }
 
 let client: ClickHouseClient;
+let reading: ClickHouseQueryClient;
 let store: GatewaySpendStore;
 let debits: GatewaySpendDebitService;
 let protocol: GatewayInternalProtocolService;
@@ -181,10 +177,10 @@ async function rows<Row>(query: string, requestId: string): Promise<Row[]> {
   return result.json<Row>();
 }
 
-describe.skipIf(!enabled)("platform provider usage on the ledger (real ClickHouse)", () => {
+describe("platform provider usage on the ledger (real ClickHouse)", () => {
   beforeAll(async () => {
-    ({ client } = await startMigratedGatewayClickHouse());
-    const resolver = gatewayClickHouseOver(client);
+    ({ client, reading } = await startMigratedGatewayClickHouse());
+    const resolver = gatewayClickHouseReading(reading);
     store = GatewaySpendStore.create(new ClickHouseGatewaySpendEventsRepository(resolver));
     const budgets = new GatewayBudgetClickHouseRepository(resolver);
     debits = GatewaySpendDebitService.create({

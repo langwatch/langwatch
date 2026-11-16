@@ -7,19 +7,14 @@
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { GatewaySpendState } from "../../../eventing/gateway-spend.projection.ts";
 import { ClickHouseGatewaySpendEventsRepository } from "../clickhouse.gateway-spend-events.repository.ts";
-import { gatewayClickHouseOver } from "./support/clickhouse-endpoint.support.ts";
+import { gatewayClickHouseReading } from "./support/clickhouse-endpoint.support.ts";
 import { startMigratedGatewayClickHouse } from "./support/migrated-clickhouse.harness.ts";
-
-const enabled = Boolean(
-  process.env.LANGWATCH_TEST_CLICKHOUSE_URL ??
-  process.env.TEST_CLICKHOUSE_URL ??
-  process.env.CI_CLICKHOUSE_URL,
-);
 
 const run = nanoid(8);
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -27,6 +22,7 @@ const NANO_PER_USD = 1_000_000_000;
 const now = Date.now();
 
 let client: ClickHouseClient;
+let reading: ClickHouseQueryClient;
 let repo: ClickHouseGatewaySpendEventsRepository;
 
 function state({
@@ -82,14 +78,14 @@ async function fold({
   await repo.upsertFromFold([{ tenantId, gatewayRequestId: requestId, state: at }]);
 }
 
-describe.skipIf(!enabled)("the gateway figures of the usage report (real ClickHouse)", () => {
+describe("the gateway figures of the usage report (real ClickHouse)", () => {
   const tenants = { install: `usage-gateway-${run}`, empty: `usage-gateway-empty-${run}` };
   const recentMs = now - 3 * DAY_MS;
   const oldMs = now - 40 * DAY_MS;
 
   beforeAll(async () => {
-    ({ client } = await startMigratedGatewayClickHouse());
-    repo = new ClickHouseGatewaySpendEventsRepository(gatewayClickHouseOver(client));
+    ({ client, reading } = await startMigratedGatewayClickHouse());
+    repo = new ClickHouseGatewaySpendEventsRepository(gatewayClickHouseReading(reading));
     // Both versions of the settled request stay on disk until the query has read them.
     await client.command({ query: "SYSTEM STOP MERGES gateway_spend" });
     const requestId = `req-settled-${run}`;

@@ -5,20 +5,17 @@
  * @see specs/scenarios/scenario-run-parameters.feature
  */
 
-import { createClient, type ClickHouseClient } from "@clickhouse/client";
+import type { ClickHouseClient } from "@clickhouse/client";
 import type { SimulationQueueRun } from "@langwatch/scenario-contract";
 import { targetKeyOf, type SuiteTarget } from "@langwatch/suite-contract";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { SimulationClickHouseRepository } from "../simulation-clickhouse.repository.ts";
-import { simulationRepositoryOver } from "./simulation-clickhouse-rows.fixture.ts";
-
-const configuredClickHouseUrl = process.env.TEST_CLICKHOUSE_URL ?? process.env.CI_CLICKHOUSE_URL;
-const databaseUrl = configuredClickHouseUrl ? new URL(configuredClickHouseUrl) : null;
-if (databaseUrl && !process.env.TEST_CLICKHOUSE_URL) {
-  databaseUrl.pathname = "/test_langwatch";
-}
+import {
+  simulationRepositoryOver,
+  startScenarioReaderClickHouse,
+} from "./simulation-clickhouse-rows.fixture.ts";
 
 const tenantId = `test-run-parameters-${nanoid()}`;
 const scenarioId = `scenario-${nanoid()}`;
@@ -99,12 +96,8 @@ async function storeRun(command: SimulationQueueRun): Promise<void> {
   });
 }
 
-beforeAll(() => {
-  if (!databaseUrl) return;
-  client = createClient({
-    url: databaseUrl,
-    clickhouse_settings: { date_time_input_format: "best_effort" },
-  });
+beforeAll(async () => {
+  client = (await startScenarioReaderClickHouse()).admin;
   repository = simulationRepositoryOver(client);
 });
 
@@ -114,35 +107,31 @@ afterAll(async () => {
     query: `ALTER TABLE simulation_runs DELETE WHERE TenantId = {tenantId:String}`,
     query_params: { tenantId },
   });
-  await client.close();
   client = undefined;
 });
 
-describe.skipIf(databaseUrl === null)(
-  "given a run queued against a target carrying an override",
-  () => {
-    describe("when the run is stored and read back", () => {
-      /** @scenario The target key and its parameters read back off the stored run */
-      it("reads the target key and the override back under the reserved langwatch namespace", async () => {
-        const command = queueRunAgainstTarget();
-        await storeRun(command);
+describe("given a run queued against a target carrying an override", () => {
+  describe("when the run is stored and read back", () => {
+    /** @scenario The target key and its parameters read back off the stored run */
+    it("reads the target key and the override back under the reserved langwatch namespace", async () => {
+      const command = queueRunAgainstTarget();
+      await storeRun(command);
 
-        const run = await repository.findScenarioRunData({
-          projectId: tenantId,
-          scenarioRunId: command.scenarioRunId,
-        });
+      const run = await repository.findScenarioRunData({
+        projectId: tenantId,
+        scenarioRunId: command.scenarioRunId,
+      });
 
-        const targetKey = targetKeyOf(target);
-        expect(targetKey).not.toBe("prod-agent");
-        expect(run?.metadata).toMatchObject({
-          langwatch: {
-            targetReferenceId: "prod-agent",
-            targetKey,
-            targetParameters: { model: "gpt-5-mini" },
-          },
-          parameters: { model: "gpt-5-mini", region: "eu-central" },
-        });
+      const targetKey = targetKeyOf(target);
+      expect(targetKey).not.toBe("prod-agent");
+      expect(run?.metadata).toMatchObject({
+        langwatch: {
+          targetReferenceId: "prod-agent",
+          targetKey,
+          targetParameters: { model: "gpt-5-mini" },
+        },
+        parameters: { model: "gpt-5-mini", region: "eu-central" },
       });
     });
-  },
-);
+  });
+});

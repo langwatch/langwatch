@@ -4,7 +4,7 @@
  * @see specs/features/agent-testing/results-atoms.feature
  */
 
-import { createClient, type ClickHouseClient } from "@clickhouse/client";
+import type { ClickHouseClient } from "@clickhouse/client";
 import { type ResultsFilter, type ScenarioEvaluationResult } from "@langwatch/scenario-contract";
 import { MAX_TREND_POINTS } from "@langwatch/scenario-contract";
 import { targetKeyOf } from "@langwatch/suite-contract";
@@ -16,13 +16,10 @@ import {
   MAX_RUN_TARGETS,
   ResultAtomsClickHouseRepository,
 } from "../clickhouse.result-atoms.repository.ts";
-import { scenarioClickHouseOver } from "./simulation-clickhouse-rows.fixture.ts";
-
-const configuredClickHouseUrl = process.env.TEST_CLICKHOUSE_URL ?? process.env.CI_CLICKHOUSE_URL;
-const databaseUrl = configuredClickHouseUrl ? new URL(configuredClickHouseUrl) : null;
-if (databaseUrl && !process.env.TEST_CLICKHOUSE_URL) {
-  databaseUrl.pathname = "/test_langwatch";
-}
+import {
+  scenarioClickHouseOver,
+  startScenarioReaderClickHouse,
+} from "./simulation-clickhouse-rows.fixture.ts";
 
 const tenantId = `test-atoms-${nanoid()}`;
 const otherTenantId = `${tenantId}-other`;
@@ -141,12 +138,8 @@ const baseFilter = (over: Partial<ResultsFilter> = {}): ResultsFilter => ({
   ...over,
 });
 
-beforeAll(() => {
-  if (!databaseUrl) return;
-  ch = createClient({
-    url: databaseUrl,
-    clickhouse_settings: { date_time_input_format: "best_effort" },
-  });
+beforeAll(async () => {
+  ch = (await startScenarioReaderClickHouse()).admin;
   const client = ch;
   repo = ResultAtomsClickHouseRepository.create(
     scenarioClickHouseOver({
@@ -165,11 +158,10 @@ afterAll(async () => {
       query_params: { tenantId: tenant },
     });
   }
-  await ch.close();
   ch = undefined;
 });
 
-describe.skipIf(databaseUrl === null)("listAtoms", () => {
+describe("listAtoms", () => {
   describe("given one run of one scenario against one target", () => {
     /** @scenario "An atom names its plan, its run and its scenario" */
     /** @scenario "An atom carries the target the run was pointed at" */
@@ -444,7 +436,7 @@ describe.skipIf(databaseUrl === null)("listAtoms", () => {
   });
 });
 
-describe.skipIf(databaseUrl === null)("the evaluator results of an atom", () => {
+describe("the evaluator results of an atom", () => {
   const sqlCheck = (over: Partial<ScenarioEvaluationResult> = {}): ScenarioEvaluationResult => ({
     evaluatorId: "ragas/sql_query_equivalence",
     name: "SQL Query Equivalence",
@@ -552,7 +544,7 @@ describe.skipIf(databaseUrl === null)("the evaluator results of an atom", () => 
   });
 });
 
-describe.skipIf(databaseUrl === null)("the cost of an atom", () => {
+describe("the cost of an atom", () => {
   describe("given a run with a stored total", () => {
     /** @scenario "An atom takes its cost from the stored total of its run" */
     it("takes the stored total and names the run as its source", async () => {
@@ -739,7 +731,7 @@ describe.skipIf(databaseUrl === null)("the cost of an atom", () => {
   });
 });
 
-describe.skipIf(databaseUrl === null)("filters", () => {
+describe("filters", () => {
   describe("when a run started before the period", () => {
     /** @scenario "The period keeps out runs outside it" */
     it("is left out", async () => {
@@ -911,7 +903,7 @@ describe.skipIf(databaseUrl === null)("filters", () => {
   });
 });
 
-describe.skipIf(databaseUrl === null)("the target of a run that reports its agents", () => {
+describe("the target of a run that reports its agents", () => {
   const reported = [
     { name: "AcmeSupportAgent", role: "agent" as const },
     { name: "UserSimulatorAgent", role: "user" as const },
@@ -1017,7 +1009,7 @@ describe.skipIf(databaseUrl === null)("the target of a run that reports its agen
   });
 });
 
-describe.skipIf(databaseUrl === null)("the target of a run whose target carries parameters", () => {
+describe("the target of a run whose target carries parameters", () => {
   const overrides = { model: "gpt-5-mini" };
   const variantKey = targetKeyOf({
     referenceId: "prod-agent",
@@ -1146,7 +1138,7 @@ describe.skipIf(databaseUrl === null)("the target of a run whose target carries 
   });
 });
 
-describe.skipIf(databaseUrl === null)("findRunTargets", () => {
+describe("findRunTargets", () => {
   describe("given a variant of a stored target, a plain run of it, and a run from code", () => {
     /** @scenario "The run targets list carries parameter variants" */
     it("lists the variant with its reference id and overrides, the code target, and not the plain run", async () => {
@@ -1241,7 +1233,7 @@ describe.skipIf(databaseUrl === null)("findRunTargets", () => {
   });
 });
 
-describe.skipIf(databaseUrl === null)("findCodeScenarios", () => {
+describe("findCodeScenarios", () => {
   describe("given runs from code and a run started on the platform", () => {
     /** @scenario "The scenarios that ran from code are listed for the filter" */
     it("lists the code scenarios under their keys and leaves the platform run out", async () => {
@@ -1280,7 +1272,7 @@ describe.skipIf(databaseUrl === null)("findCodeScenarios", () => {
   });
 });
 
-describe.skipIf(databaseUrl === null)("findRunOrdinals", () => {
+describe("findRunOrdinals", () => {
   describe("given a plan with three runs inside the period", () => {
     /** @scenario "The number of a run counts the runs of its plan, oldest first" */
     it("numbers them from one, oldest first", async () => {
@@ -1308,7 +1300,7 @@ describe.skipIf(databaseUrl === null)("findRunOrdinals", () => {
   });
 });
 
-describe.skipIf(databaseUrl === null)("aggregateGroups", () => {
+describe("aggregateGroups", () => {
   describe("when grouped by scenario over runs pushed from code", () => {
     /** @scenario "A run pushed from code folds under its set and its name" */
     it("folds runs of one name in one set together, and keeps sets apart", async () => {
@@ -1451,7 +1443,7 @@ describe.skipIf(databaseUrl === null)("aggregateGroups", () => {
   });
 });
 
-describe.skipIf(databaseUrl === null)("aggregateTrend", () => {
+describe("aggregateTrend", () => {
   describe("given a plan with more runs in the period than a sparkline draws", () => {
     /** @scenario "A sparkline asks the database only for the points it draws" */
     it("returns only the points drawn, and the most recent of them", async () => {

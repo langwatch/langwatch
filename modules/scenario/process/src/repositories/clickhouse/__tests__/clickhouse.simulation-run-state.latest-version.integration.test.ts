@@ -2,19 +2,17 @@
  * The run-state read's latest-version election on a run of many unmerged versions: the built
  * scalar subquery against the hand-written one it replaced, on 26.8.
  */
-import { type ClickHouseSettings, createClient, type ClickHouseClient } from "@clickhouse/client";
-import {
-  migrateTestClickHouseOnce,
-  startTestClickHouseEndpoints,
-} from "@langwatch/clickhouse-client/testing";
-import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
+import type { ClickHouseClient, ClickHouseSettings } from "@clickhouse/client";
 import { createTenantId } from "@langwatch/eventing";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { SimulationRunState } from "../../../eventing/simulation-run-state.projection.ts";
 import { ClickHouseSimulationRunStateRepository } from "../clickhouse.simulation-run-state.repository.ts";
-import { scenarioClickHouseOver } from "./simulation-clickhouse-rows.fixture.ts";
+import {
+  scenarioClickHouseOver,
+  startScenarioReaderClickHouse,
+} from "./simulation-clickhouse-rows.fixture.ts";
 
 const tenantId = `test-sim-latest-version-${nanoid()}`;
 const context = { tenantId: createTenantId(tenantId) };
@@ -27,30 +25,7 @@ let ch: ClickHouseClient | undefined;
 let repo: ClickHouseSimulationRunStateRepository<SimulationRunState>;
 
 beforeAll(async () => {
-  const [endpoint] = await startTestClickHouseEndpoints({
-    suite: "simulation-run-state-latest-version",
-    names: ["schema"],
-    environment: process.env,
-  });
-  if (!endpoint) throw new Error("No ClickHouse endpoint was provisioned for the run-state suite");
-  await migrateTestClickHouseOnce({
-    url: endpoint.url,
-    migrate: async () => {
-      const previousCluster = process.env.CLICKHOUSE_CLUSTER;
-      delete process.env.CLICKHOUSE_CLUSTER;
-      try {
-        await ClickHouseMigrateTask.createFromConfig({
-          config: { buildTime: false, sharedUrl: endpoint.url, privateEndpoints: [] },
-        }).execute();
-      } finally {
-        if (previousCluster !== undefined) process.env.CLICKHOUSE_CLUSTER = previousCluster;
-      }
-    },
-  });
-  const client = createClient({
-    url: endpoint.url,
-    clickhouse_settings: { date_time_input_format: "best_effort" },
-  });
+  const client = (await startScenarioReaderClickHouse()).admin;
   ch = client;
   repo = ClickHouseSimulationRunStateRepository.create<SimulationRunState>({
     resolveClient: scenarioClickHouseOver(client),
@@ -61,7 +36,6 @@ beforeAll(async () => {
 afterAll(async () => {
   if (!ch) return;
   await ch.command({ query: "SYSTEM START MERGES simulation_runs" });
-  await ch.close();
 });
 
 /** One stored version of the run, with twenty messages of content as a real snapshot carries. */

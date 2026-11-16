@@ -8,17 +8,13 @@ import { getSuiteSetId } from "@langwatch/suite-contract";
 import { nanoid } from "nanoid";
 import { describe, expect, it } from "vitest";
 
-import {
-  databaseUrl,
-  simulationRunRow,
-  useSimulationClickHouse,
-} from "./simulation-clickhouse-rows.fixture.ts";
+import { simulationRunRow, useSimulationClickHouse } from "./simulation-clickhouse-rows.fixture.ts";
 
 const tenantId = `test-suite-results-${nanoid()}`;
 
 const ch = useSimulationClickHouse({ tenantId });
 
-describe.skipIf(databaseUrl === null)("a test suite's runs in the results view", () => {
+describe("a test suite's runs in the results view", () => {
   describe("when a test suite's internal run set holds a finished batch", () => {
     /** @scenario "A test suite run appears in the results view under the test suite's name" */
     it("lists the run plan that run resolved among the internal suite sets", async () => {

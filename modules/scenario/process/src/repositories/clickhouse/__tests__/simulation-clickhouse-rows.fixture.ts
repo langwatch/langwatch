@@ -1,7 +1,9 @@
 /** One simulation_runs row builder, insert and per-tenant cleanup for the ClickHouse suites. */
 
-import { createClient, type ClickHouseClient } from "@clickhouse/client";
-import { type VendorStatements, vendorQueryClient } from "@langwatch/clickhouse-client/testing";
+import type { ClickHouseClient } from "@clickhouse/client";
+import { ClickHouseQueryClient, TenantGuard } from "@langwatch/clickhouse-client";
+import { type VendorStatements, vendorQueryDriver } from "@langwatch/clickhouse-client/testing";
+import { startMigratedAppReaderClickHouse } from "@langwatch/test-harness/clickhouse-app-reader";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll } from "vitest";
 
@@ -15,10 +17,26 @@ import {
 } from "../clickhouse.simulation-session.store.ts";
 import { SimulationClickHouseRepository } from "../simulation-clickhouse.repository.ts";
 
-const configuredClickHouseUrl = process.env.TEST_CLICKHOUSE_URL ?? process.env.CI_CLICKHOUSE_URL;
-export const databaseUrl = configuredClickHouseUrl ? new URL(configuredClickHouseUrl) : null;
-if (databaseUrl && !process.env.TEST_CLICKHOUSE_URL) {
-  databaseUrl.pathname = "/test_langwatch";
+/** The app reader's credentials once a suite has opened the endpoint; reads then go out as it. */
+let readerAuth: { username: string; password: string } | undefined;
+
+/**
+ * Scenario's migrated container with the app reader provisioned (ADR-202): its id indexes are
+ * declared, `admin` seeds and cleans as the system, and every read built over a suite's
+ * connection afterwards is sent as the reader.
+ */
+export async function startScenarioReaderClickHouse() {
+  const opened = await startMigratedAppReaderClickHouse({
+    suite: "scenario-migrated",
+    indexes: [...SCENARIO_ID_INDEXES, ...SCENARIO_SECOND_ID_INDEXES],
+    environment: process.env,
+  });
+  const url = new URL(opened.readerUrl);
+  readerAuth = {
+    username: decodeURIComponent(url.username),
+    password: decodeURIComponent(url.password),
+  };
+  return opened;
 }
 
 export function simulationRunRow({
@@ -72,12 +90,8 @@ export function useSimulationClickHouse({ tenantId }: { tenantId: string }) {
   let client: ClickHouseClient | undefined;
   let repo: SimulationClickHouseRepository | undefined;
 
-  beforeAll(() => {
-    if (!databaseUrl) return;
-    const opened = createClient({
-      url: databaseUrl,
-      clickhouse_settings: { date_time_input_format: "best_effort" },
-    });
+  beforeAll(async () => {
+    const opened = (await startScenarioReaderClickHouse()).admin;
     client = opened;
     repo = simulationRepositoryOver(opened);
   });
@@ -88,7 +102,6 @@ export function useSimulationClickHouse({ tenantId }: { tenantId: string }) {
       query: `ALTER TABLE simulation_runs DELETE WHERE TenantId = {tenantId:String}`,
       query_params: { tenantId },
     });
-    await client.close();
     client = undefined;
   });
 
@@ -132,9 +145,32 @@ export function simulationRepositoryOver(vendor: VendorStatements): SimulationCl
   });
 }
 
+/** A connection whose reads carry the reader's credentials; the rest stays as it is. */
+function asReader({
+  vendor,
+  auth,
+}: {
+  vendor: VendorStatements;
+  auth: { username: string; password: string };
+}): VendorStatements {
+  return {
+    query: (params) => {
+      const asTheReader = { ...params, auth };
+      return vendor.query(asTheReader);
+    },
+    insert: (params) => vendor.insert(params),
+    command: (params) => vendor.command(params),
+  };
+}
+
 function scenarioQueryClientOver(vendor: VendorStatements) {
-  return vendorQueryClient({
-    vendor,
-    indexes: [...SCENARIO_ID_INDEXES, ...SCENARIO_SECOND_ID_INDEXES],
+  const clickhouse = new ClickHouseQueryClient({
+    driver: vendorQueryDriver({ vendor }),
+    ...(readerAuth === undefined
+      ? {}
+      : { readerDriver: vendorQueryDriver({ vendor: asReader({ vendor, auth: readerAuth }) }) }),
+    tenantGuard: new TenantGuard(),
   });
+  clickhouse.declareIdIndexes({ indexes: [...SCENARIO_ID_INDEXES, ...SCENARIO_SECOND_ID_INDEXES] });
+  return clickhouse;
 }

@@ -9,7 +9,6 @@
 import { randomUUID } from "node:crypto";
 
 import type { ClickHouseClient } from "@clickhouse/client";
-import { ClickHouseQueryClient, type QueryDriver, TenantGuard } from "@langwatch/clickhouse-client";
 import { Temporal } from "@langwatch/time";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -19,12 +18,8 @@ import {
   ClickHouseInstantEvalSession,
   type InstantEvalClickHouseResolver,
 } from "../clickhouse.instant-eval-session.store.ts";
-import {
-  createTestClickHouseClient,
-  testClickHouseUrl,
-} from "./support/clickhouse-endpoint.support.ts";
+import { startInstantEvalReaderClickHouse } from "./support/clickhouse-endpoint.support.ts";
 
-const clickHouseUrl = testClickHouseUrl();
 const DAY_MS = 24 * 60 * 60 * 1000;
 const tag = randomUUID();
 const install = `${tag}-install`;
@@ -35,36 +30,6 @@ const ago = (days: number): number => now - days * DAY_MS;
 let ch: ClickHouseClient;
 let resolveClient: InstantEvalClickHouseResolver;
 
-/** The routed member over the migrated test server, as the process hands it to the module. */
-function queryClientOver(client: ClickHouseClient): ClickHouseQueryClient {
-  const driver: QueryDriver = {
-    async execute(request) {
-      const result = await client.query({
-        query: request.sql,
-        format: "JSONEachRow",
-        ...(request.params === undefined ? {} : { query_params: request.params }),
-        ...(request.settings === undefined ? {} : { clickhouse_settings: request.settings }),
-      });
-      return { rows: await result.json() };
-    },
-    async insert(request) {
-      await client.insert({
-        table: request.table,
-        values: request.rows,
-        format: "JSONEachRow",
-        ...(request.settings === undefined ? {} : { clickhouse_settings: request.settings }),
-      });
-    },
-    async command(request) {
-      await client.command({
-        query: request.sql,
-        ...(request.params === undefined ? {} : { query_params: request.params }),
-        ...(request.settings === undefined ? {} : { clickhouse_settings: request.settings }),
-      });
-    },
-  };
-  return new ClickHouseQueryClient({ tenantGuard: new TenantGuard(), driver });
-}
 let runs: ClickHouseInstantEvalRunRepository;
 let judgments: ClickHouseInstantEvalJudgmentsRepository;
 
@@ -108,72 +73,69 @@ function judgmentCreatedAt({ runId, atMs, index }: { runId: string; atMs: number
   };
 }
 
-describe.skipIf(!clickHouseUrl)(
-  "the Instant Eval figures of the usage report (real ClickHouse)",
-  () => {
-    beforeAll(async () => {
-      ch = createTestClickHouseClient(clickHouseUrl as URL);
-      const member = queryClientOver(ch);
-      resolveClient = async (tenantId) => new ClickHouseInstantEvalSession(member, tenantId);
-      runs = ClickHouseInstantEvalRunRepository.create({ resolveClient });
-      judgments = ClickHouseInstantEvalJudgmentsRepository.create({ resolveClient });
-      await runCreatedAt({ id: `${tag}-recent`, atMs: ago(3) });
-      await runCreatedAt({ id: `${tag}-middle`, atMs: ago(20) });
-      await runCreatedAt({ id: `${tag}-old`, atMs: ago(40) });
-      await judgments.insert([
-        judgmentCreatedAt({ runId: `${tag}-recent`, atMs: ago(3), index: 1 }),
-        judgmentCreatedAt({ runId: `${tag}-recent`, atMs: ago(3), index: 2 }),
-        judgmentCreatedAt({ runId: `${tag}-middle`, atMs: ago(20), index: 1 }),
-        judgmentCreatedAt({ runId: `${tag}-old`, atMs: ago(40), index: 1 }),
-      ]);
-    }, 120_000);
+describe("the Instant Eval figures of the usage report (real ClickHouse)", () => {
+  beforeAll(async () => {
+    const opened = await startInstantEvalReaderClickHouse();
+    ch = opened.admin;
+    const member = opened.worker;
+    resolveClient = async (tenantId) => new ClickHouseInstantEvalSession(member, tenantId);
+    runs = ClickHouseInstantEvalRunRepository.create({ resolveClient });
+    judgments = ClickHouseInstantEvalJudgmentsRepository.create({ resolveClient });
+    await runCreatedAt({ id: `${tag}-recent`, atMs: ago(3) });
+    await runCreatedAt({ id: `${tag}-middle`, atMs: ago(20) });
+    await runCreatedAt({ id: `${tag}-old`, atMs: ago(40) });
+    await judgments.insert([
+      judgmentCreatedAt({ runId: `${tag}-recent`, atMs: ago(3), index: 1 }),
+      judgmentCreatedAt({ runId: `${tag}-recent`, atMs: ago(3), index: 2 }),
+      judgmentCreatedAt({ runId: `${tag}-middle`, atMs: ago(20), index: 1 }),
+      judgmentCreatedAt({ runId: `${tag}-old`, atMs: ago(40), index: 1 }),
+    ]);
+  }, 120_000);
 
-    afterAll(async () => {
-      if (!ch) return;
-      for (const table of ["instant_eval_runs", "instant_eval_judgments"]) {
-        await ch.exec({
-          query: `ALTER TABLE ${table} DELETE WHERE TenantId = {install:String}`,
-          query_params: { install },
+  afterAll(async () => {
+    if (!ch) return;
+    for (const table of ["instant_eval_runs", "instant_eval_judgments"]) {
+      await ch.exec({
+        query: `ALTER TABLE ${table} DELETE WHERE TenantId = {install:String}`,
+        query_params: { install },
+      });
+    }
+  });
+
+  describe("given an Instant Eval run three days ago with two judgments, one twenty days ago, and one forty days ago", () => {
+    describe("when runs and judgments are counted", () => {
+      /** @scenario Instant Eval runs and judgments are counted */
+      it("counts each lifetime and over both windows, and dates the first run from the oldest row", async () => {
+        const projectIds = [install];
+        const count = async (since?: number) => ({
+          ...(await runs.countUsage({ projectIds, ...(since === undefined ? {} : { since }) })),
+          judgments: await judgments.countUsage({
+            projectIds,
+            ...(since === undefined ? {} : { since }),
+          }),
         });
-      }
-      await ch.close();
-    });
 
-    describe("given an Instant Eval run three days ago with two judgments, one twenty days ago, and one forty days ago", () => {
-      describe("when runs and judgments are counted", () => {
-        /** @scenario Instant Eval runs and judgments are counted */
-        it("counts each lifetime and over both windows, and dates the first run from the oldest row", async () => {
-          const projectIds = [install];
-          const count = async (since?: number) => ({
-            ...(await runs.countUsage({ projectIds, ...(since === undefined ? {} : { since }) })),
-            judgments: await judgments.countUsage({
-              projectIds,
-              ...(since === undefined ? {} : { since }),
-            }),
-          });
+        const lifetime = await count();
+        const sevenDays = await count(ago(7));
+        const twentyEightDays = await count(ago(28));
 
-          const lifetime = await count();
-          const sevenDays = await count(ago(7));
-          const twentyEightDays = await count(ago(28));
-
-          expect(lifetime).toMatchObject({ runs: 3, judgments: 4, firstRunAt: ago(40) });
-          expect(sevenDays).toMatchObject({ runs: 1, judgments: 2 });
-          expect(twentyEightDays).toMatchObject({ runs: 2, judgments: 3 });
-        });
+        expect(lifetime).toMatchObject({ runs: 3, judgments: 4, firstRunAt: ago(40) });
+        expect(sevenDays).toMatchObject({ runs: 1, judgments: 2 });
+        expect(twentyEightDays).toMatchObject({ runs: 2, judgments: 3 });
       });
     });
+  });
 
-    describe("given an install that never ran an Instant Eval", () => {
-      describe("when the first run is read", () => {
-        /** @scenario The ladder gains the first gateway request, Instant Eval run and coding agent session */
-        it("dates the rung from the oldest row where there is one, and leaves it out where none", async () => {
-          const reached = await runs.countUsage({ projectIds: [install] });
-          const unreached = await runs.countUsage({ projectIds: [never] });
+  describe("given an install that never ran an Instant Eval", () => {
+    describe("when the first run is read", () => {
+      /** @scenario The ladder gains the first gateway request, Instant Eval run and coding agent session */
+      it("dates the rung from the oldest row where there is one, and leaves it out where none", async () => {
+        const reached = await runs.countUsage({ projectIds: [install] });
+        const unreached = await runs.countUsage({ projectIds: [never] });
 
-          expect(reached.firstRunAt).toBe(ago(40));
-          expect(unreached).toEqual({ runs: 0 });
-        });
+        expect(reached.firstRunAt).toBe(ago(40));
+        expect(unreached).toEqual({ runs: 0 });
       });
     });
-  },
-);
+  });
+});

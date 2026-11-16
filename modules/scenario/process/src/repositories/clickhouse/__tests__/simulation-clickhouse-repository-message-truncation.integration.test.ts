@@ -4,18 +4,15 @@
  * @see specs/scenarios/simulation-runs-api.feature
  */
 
-import { createClient, type ClickHouseClient } from "@clickhouse/client";
+import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { SimulationClickHouseRepository } from "../simulation-clickhouse.repository.ts";
-import { simulationRepositoryOver } from "./simulation-clickhouse-rows.fixture.ts";
-
-const configuredClickHouseUrl = process.env.TEST_CLICKHOUSE_URL ?? process.env.CI_CLICKHOUSE_URL;
-const databaseUrl = configuredClickHouseUrl ? new URL(configuredClickHouseUrl) : null;
-if (databaseUrl && !process.env.TEST_CLICKHOUSE_URL) {
-  databaseUrl.pathname = "/test_langwatch";
-}
+import {
+  simulationRepositoryOver,
+  startScenarioReaderClickHouse,
+} from "./simulation-clickhouse-rows.fixture.ts";
 
 const tenantId = `test-sim-trunc-${nanoid()}`;
 const now = Date.now();
@@ -80,12 +77,8 @@ async function insertRow(row: ReturnType<typeof makeInsertRow>) {
   });
 }
 
-beforeAll(() => {
-  if (!databaseUrl) return;
-  client = createClient({
-    url: databaseUrl,
-    clickhouse_settings: { date_time_input_format: "best_effort" },
-  });
+beforeAll(async () => {
+  client = (await startScenarioReaderClickHouse()).admin;
   repo = simulationRepositoryOver(client);
 });
 
@@ -95,11 +88,10 @@ afterAll(async () => {
     query: `ALTER TABLE simulation_runs DELETE WHERE TenantId = {tenantId:String}`,
     query_params: { tenantId },
   });
-  await client.close();
   client = undefined;
 });
 
-describe.skipIf(databaseUrl === null)("getRunDataForScenarioSet() message truncation", () => {
+describe("getRunDataForScenarioSet() message truncation", () => {
   describe("when a run holds more messages than the list keeps", () => {
     /** @scenario "A set-level list marks a run whose messages were trimmed" */
     it("returns the first 6 and reports the trim", async () => {

@@ -1,73 +1,34 @@
 /**
- * A ClickHouse endpoint of this suite's own, carrying the *shipped*
- * migrations: the rollup-rebuild suite replays an old view, which may never
- * touch the shared test database other suites read concurrently.
+ * A ClickHouse endpoint of this suite's own, carrying the *shipped* migrations and the app reader
+ * (ADR-202): the rollup-rebuild suite replays an old view, which may never touch the shared test
+ * database other suites read concurrently. Suites read as the reader and seed as the system.
  */
-import { type ClickHouseClient, createClient } from "@clickhouse/client";
-import { DEFAULT_CLICKHOUSE_SETTINGS } from "@langwatch/clickhouse-client";
-import {
-  migrateTestClickHouseOnce,
-  startTestClickHouseEndpoints,
-} from "@langwatch/clickhouse-client/testing";
-import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
+import type { ClickHouseClient } from "@clickhouse/client";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import { startMigratedAppReaderClickHouse } from "@langwatch/test-harness/clickhouse-app-reader";
 
-/** The one endpoint name the gateway's migrated-schema suites ask for. */
-const MIGRATED_ENDPOINT_SUITE = "gateway-migrated";
+import { GATEWAY_ID_INDEXES } from "../../clickhouse.gateway-id-indexes.database.ts";
 
 export interface MigratedClickHouse {
+  /** The system identity's client bound to the migrated database: seeds, cleanup and DDL. */
   client: ClickHouseClient;
+  /** The process's client with gateway's id indexes: tenant reads go out as the app reader. */
+  reading: ClickHouseQueryClient;
   url: string;
   database: string;
 }
 
-let endpoint: MigratedClickHouse | undefined;
-
-/**
- * Starts (or reuses) the migrated endpoint and returns a client bound to it.
- * `CLICKHOUSE_CLUSTER` is unset for the migration: it switches every engine
- * to its `Replicated` form, which needs a Keeper no test server has.
- */
+/** Starts (or reuses) the gateway's migrated endpoint with the reader provisioned. */
 export async function startMigratedGatewayClickHouse(): Promise<MigratedClickHouse> {
-  if (endpoint) return endpoint;
-
-  const [provisioned] = await startTestClickHouseEndpoints({
-    suite: MIGRATED_ENDPOINT_SUITE,
-    names: ["schema"],
+  const opened = await startMigratedAppReaderClickHouse({
+    suite: "gateway-migrated",
+    indexes: GATEWAY_ID_INDEXES,
     environment: process.env,
   });
-  if (!provisioned) throw new Error("No ClickHouse endpoint was provisioned for the gateway suite");
-
-  await migrateTestClickHouseOnce({
-    url: provisioned.url,
-    migrate: async () => {
-      const previousCluster = process.env.CLICKHOUSE_CLUSTER;
-      delete process.env.CLICKHOUSE_CLUSTER;
-      try {
-        await ClickHouseMigrateTask.createFromConfig({
-          config: {
-            buildTime: false,
-            sharedUrl: provisioned.url,
-            privateEndpoints: [],
-          },
-        }).execute();
-      } finally {
-        if (previousCluster !== undefined) process.env.CLICKHOUSE_CLUSTER = previousCluster;
-      }
-    },
-  });
-
-  endpoint = {
-    client: createClient({
-      url: provisioned.url,
-      request_timeout: 180_000,
-      clickhouse_settings: {
-        ...DEFAULT_CLICKHOUSE_SETTINGS,
-        date_time_input_format: "best_effort",
-      },
-    }),
-    url: provisioned.url,
-    database: provisioned.database,
+  return {
+    client: opened.admin,
+    reading: opened.worker,
+    url: opened.endpoint.url,
+    database: opened.endpoint.database,
   };
-
-  return endpoint;
 }

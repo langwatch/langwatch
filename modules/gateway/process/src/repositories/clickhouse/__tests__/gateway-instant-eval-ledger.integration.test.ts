@@ -8,6 +8,7 @@
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { createTenantId } from "@langwatch/eventing";
 import type { GatewayPricedSpend } from "@langwatch/gateway-contract";
 import {
@@ -30,14 +31,8 @@ import {
   type GatewayInternalProtocolMembers,
 } from "../../../services/gateway-internal-protocol.service.ts";
 import { ClickHouseGatewaySpendEventsRepository } from "../clickhouse.gateway-spend-events.repository.ts";
-import { gatewayClickHouseOver } from "./support/clickhouse-endpoint.support.ts";
+import { gatewayClickHouseReading } from "./support/clickhouse-endpoint.support.ts";
 import { startMigratedGatewayClickHouse } from "./support/migrated-clickhouse.harness.ts";
-
-const enabled = Boolean(
-  process.env.LANGWATCH_TEST_CLICKHOUSE_URL ??
-  process.env.TEST_CLICKHOUSE_URL ??
-  process.env.CI_CLICKHOUSE_URL,
-);
 
 const run = nanoid(8);
 const TENANT = `instant-eval-ledger-${run}`;
@@ -46,6 +41,7 @@ const INPUT_TOKENS = 12_000;
 const CUSTOMER_PRICE_NANO_USD = 13_000_000;
 
 let client: ClickHouseClient;
+let reading: ClickHouseQueryClient;
 let store: GatewaySpendStore;
 let protocol: GatewayInternalProtocolService;
 let ledger: ClickHouseGatewaySpendEventsRepository;
@@ -129,10 +125,10 @@ async function ledgerRowsFor(requestId: string) {
   }>();
 }
 
-describe.skipIf(!enabled)("the spend record of an Instant Eval outcome (real ClickHouse)", () => {
+describe("the spend record of an Instant Eval outcome (real ClickHouse)", () => {
   beforeAll(async () => {
-    ({ client } = await startMigratedGatewayClickHouse());
-    ledger = new ClickHouseGatewaySpendEventsRepository(gatewayClickHouseOver(client));
+    ({ client, reading } = await startMigratedGatewayClickHouse());
+    ledger = new ClickHouseGatewaySpendEventsRepository(gatewayClickHouseReading(reading));
     store = GatewaySpendStore.create(ledger);
     protocol = GatewayInternalProtocolService.create(
       suppliedMembers({

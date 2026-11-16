@@ -3,20 +3,17 @@
  * Archived exclusion is handled in the mapper. See scenario-run-export.feature.
  */
 
-import { createClient, type ClickHouseClient } from "@clickhouse/client";
+import type { ClickHouseClient } from "@clickhouse/client";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { STALL_THRESHOLD_MS } from "../../../eventing/simulation-run-execution-evolution.process.ts";
 import type { SimulationClickHouseRepository } from "../simulation-clickhouse.repository.ts";
-import { simulationRepositoryOver } from "./simulation-clickhouse-rows.fixture.ts";
-
-const configuredClickHouseUrl = process.env.TEST_CLICKHOUSE_URL ?? process.env.CI_CLICKHOUSE_URL;
-const databaseUrl = configuredClickHouseUrl ? new URL(configuredClickHouseUrl) : null;
-if (databaseUrl && !process.env.TEST_CLICKHOUSE_URL) {
-  databaseUrl.pathname = "/test_langwatch";
-}
+import {
+  simulationRepositoryOver,
+  startScenarioReaderClickHouse,
+} from "./simulation-clickhouse-rows.fixture.ts";
 
 const tenantId = `test-export-sweep-${nanoid()}`;
 const otherTenantId = `test-export-sweep-other-${nanoid()}`;
@@ -87,12 +84,8 @@ async function sweep(params: Parameters<SimulationClickHouseRepository["listRuns
   return collected;
 }
 
-beforeAll(() => {
-  if (!databaseUrl) return;
-  client = createClient({
-    url: databaseUrl,
-    clickhouse_settings: { date_time_input_format: "best_effort" },
-  });
+beforeAll(async () => {
+  client = (await startScenarioReaderClickHouse()).admin;
   repo = simulationRepositoryOver(client);
 });
 
@@ -103,11 +96,10 @@ afterAll(async () => {
     query_params: { tenantId, otherTenantId },
     clickhouse_settings: { mutations_sync: "2" },
   });
-  await client.close();
   client = undefined;
 });
 
-describe.skipIf(databaseUrl === null)("scenario run export sweep (integration)", () => {
+describe("scenario run export sweep (integration)", () => {
   describe("given runs spread across projects, sets, scenarios and dates", () => {
     const recentScenarioId = `scenario-recent-${nanoid()}`;
     const oldScenarioId = `scenario-old-${nanoid()}`;

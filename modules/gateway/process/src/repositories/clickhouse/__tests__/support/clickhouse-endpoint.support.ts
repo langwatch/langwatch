@@ -4,6 +4,7 @@
  * when none — the same shape every other datastore-needing suite uses.
  */
 import { createClient, type ClickHouseClient } from "@clickhouse/client";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { vendorQueryClient } from "@langwatch/clickhouse-client/testing";
 
 import { GATEWAY_ID_INDEXES } from "../../clickhouse.gateway-id-indexes.database.ts";
@@ -38,5 +39,12 @@ export function createTestClickHouseClient(url: URL): ClickHouseClient {
  */
 export function gatewayClickHouseOver(vendor: ClickHouseClient): GatewayClickHouseResolver {
   const clickhouse = vendorQueryClient({ vendor, indexes: GATEWAY_ID_INDEXES });
+  return async (tenantId) => ClickHouseGatewaySession.create({ clickhouse, tenantId });
+}
+
+/** The same session resolver over a client that reads as the app reader (ADR-202). */
+export function gatewayClickHouseReading(
+  clickhouse: ClickHouseQueryClient,
+): GatewayClickHouseResolver {
   return async (tenantId) => ClickHouseGatewaySession.create({ clickhouse, tenantId });
 }

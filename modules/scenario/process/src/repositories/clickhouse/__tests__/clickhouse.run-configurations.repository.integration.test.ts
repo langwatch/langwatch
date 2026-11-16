@@ -4,7 +4,7 @@
  * @see specs/features/agent-testing/run-configuration-history.feature
  */
 
-import { createClient, type ClickHouseClient } from "@clickhouse/client";
+import type { ClickHouseClient } from "@clickhouse/client";
 import { createTenantId, type FoldProjectionStore } from "@langwatch/eventing";
 import {
   withNote,
@@ -30,13 +30,10 @@ import { RunConfigurationsService } from "../../../services/run-configurations.s
 import type { ScenarioPlanRecord, ScenarioRepository } from "../../scenario.repository.ts";
 import { RunConfigurationsClickHouseRepository } from "../clickhouse.run-configurations.repository.ts";
 import { SimulationRunStateRepositoryClickHouse } from "../clickhouse.simulation-run-state.repository.ts";
-import { scenarioClickHouseOver } from "./simulation-clickhouse-rows.fixture.ts";
-
-const configuredClickHouseUrl = process.env.TEST_CLICKHOUSE_URL ?? process.env.CI_CLICKHOUSE_URL;
-const databaseUrl = configuredClickHouseUrl ? new URL(configuredClickHouseUrl) : null;
-if (databaseUrl && !process.env.TEST_CLICKHOUSE_URL) {
-  databaseUrl.pathname = "/test_langwatch";
-}
+import {
+  scenarioClickHouseOver,
+  startScenarioReaderClickHouse,
+} from "./simulation-clickhouse-rows.fixture.ts";
 
 const tenantId = `test-run-configs-${nanoid()}`;
 
@@ -56,12 +53,8 @@ let ch: ClickHouseClient | undefined;
 let repository: RunConfigurationsClickHouseRepository;
 let stateRepository: SimulationRunStateRepositoryClickHouse;
 
-beforeAll(() => {
-  if (!databaseUrl) return;
-  ch = createClient({
-    url: databaseUrl,
-    clickhouse_settings: { date_time_input_format: "best_effort" },
-  });
+beforeAll(async () => {
+  ch = (await startScenarioReaderClickHouse()).admin;
   const client = ch;
   const resolveClient = scenarioClickHouseOver({
     query: (input) => client.query(input),
@@ -81,7 +74,6 @@ afterAll(async () => {
     query: `ALTER TABLE simulation_runs DELETE WHERE TenantId = {tenantId:String}`,
     query_params: { tenantId },
   });
-  await ch.close();
   ch = undefined;
 });
 
@@ -222,7 +214,7 @@ async function readConfigurations(plans: ScenarioPlanRecord[]) {
   return service.getEntries({ projectId: tenantId, startDate: WINDOW_START });
 }
 
-describe.skipIf(databaseUrl === null)("the previous configurations of a scope", () => {
+describe("the previous configurations of a scope", () => {
   describe("given one plan run twice with different parameters", () => {
     /** @scenario "One plan run with two parameter sets is two configurations" */
     it("lists both, under one plan name, with different keys", async () => {

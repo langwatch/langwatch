@@ -9,7 +9,6 @@ import { nanoid } from "nanoid";
 import { describe, expect, it } from "vitest";
 
 import {
-  databaseUrl,
   simulationRepositoryOver,
   simulationRunRow,
   useSimulationClickHouse,
@@ -31,7 +30,7 @@ function startedBy(id: string, label: string) {
 
 const ch = useSimulationClickHouse({ tenantId });
 
-describe.skipIf(databaseUrl === null)("who started a batch", () => {
+describe("who started a batch", () => {
   describe("when every run of the batch names the same person", () => {
     /** @scenario "The batch history reports who started each batch" */
     it("reports that person on the batch in the history page", async () => {
@@ -176,7 +175,7 @@ describe.skipIf(databaseUrl === null)("who started a batch", () => {
   });
 });
 
-describe.skipIf(databaseUrl === null)("the cost of reading who started a batch", () => {
+describe("the cost of reading who started a batch", () => {
   describe("when a page of batch history is read", () => {
     /** @scenario "Reading the actor keeps the run set query bounded to the page" */
     it("reads the actor only in the query already bounded to the page", async () => {

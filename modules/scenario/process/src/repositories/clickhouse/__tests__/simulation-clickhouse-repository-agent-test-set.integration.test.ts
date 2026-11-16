@@ -8,18 +8,14 @@ import { getAgentTestSetId } from "@langwatch/scenario-contract";
 import { nanoid } from "nanoid";
 import { describe, expect, it } from "vitest";
 
-import {
-  databaseUrl,
-  simulationRunRow,
-  useSimulationClickHouse,
-} from "./simulation-clickhouse-rows.fixture.ts";
+import { simulationRunRow, useSimulationClickHouse } from "./simulation-clickhouse-rows.fixture.ts";
 
 const tenantId = `test-agent-test-set-${nanoid()}`;
 const now = Date.now();
 
 const ch = useSimulationClickHouse({ tenantId });
 
-describe.skipIf(databaseUrl === null)("the results page's change check", () => {
+describe("the results page's change check", () => {
   describe("when a batch in the agent test set is newer than every other run", () => {
     /** @scenario "A test run does not make the results page look stale" */
     it("answers that nothing changed since the last read", async () => {
@@ -50,7 +46,7 @@ describe.skipIf(databaseUrl === null)("the results page's change check", () => {
   });
 });
 
-describe.skipIf(databaseUrl === null)("the run drawer of a test run", () => {
+describe("the run drawer of a test run", () => {
   describe("when it is opened with the scenario run id of a run in the agent test set", () => {
     /** @scenario "The run drawer opens a test run by its id" */
     it("reads the run's state like any other run", async () => {

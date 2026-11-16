@@ -5,7 +5,7 @@
  * @see specs/scenarios/served-agent-instance-on-runs.feature
  */
 
-import { createClient, type ClickHouseClient } from "@clickhouse/client";
+import type { ClickHouseClient } from "@clickhouse/client";
 import { createTenantId } from "@langwatch/eventing";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -19,13 +19,8 @@ import type { SimulationClickHouseRepository } from "../simulation-clickhouse.re
 import {
   scenarioClickHouseOver,
   simulationRepositoryOver,
+  startScenarioReaderClickHouse,
 } from "./simulation-clickhouse-rows.fixture.ts";
-
-const configuredClickHouseUrl = process.env.TEST_CLICKHOUSE_URL ?? process.env.CI_CLICKHOUSE_URL;
-const databaseUrl = configuredClickHouseUrl ? new URL(configuredClickHouseUrl) : null;
-if (databaseUrl && !process.env.TEST_CLICKHOUSE_URL) {
-  databaseUrl.pathname = "/test_langwatch";
-}
 
 const tenantId = `test-served-instance-${nanoid()}`;
 const now = Date.now();
@@ -78,12 +73,8 @@ function finishedRunWithInstance(scenarioRunId: string): SimulationRunState["dat
   } as SimulationRunState["data"];
 }
 
-beforeAll(() => {
-  if (!databaseUrl) return;
-  ch = createClient({
-    url: databaseUrl,
-    clickhouse_settings: { date_time_input_format: "best_effort" },
-  });
+beforeAll(async () => {
+  ch = (await startScenarioReaderClickHouse()).admin;
   stateRepository = ClickHouseSimulationRunStateRepository.create<SimulationRunState>({
     resolveClient: scenarioClickHouseOver(ch),
     defaultRetentionDays: () => 30,
@@ -97,42 +88,38 @@ afterAll(async () => {
     query: `ALTER TABLE simulation_runs DELETE WHERE TenantId = {tenantId:String}`,
     query_params: { tenantId },
   });
-  await ch.close();
   ch = undefined;
 });
 
-describe.skipIf(databaseUrl === null)(
-  "given a run that was queued, finished and had its instance recorded",
-  () => {
-    describe("when the run is stored and read back", () => {
-      /** @scenario A finished run stores the instance that served it */
-      it("carries the instance under the reserved langwatch namespace, beside what was already there", async () => {
-        const scenarioRunId = `run-served-${nanoid()}`;
-        await stateRepository.storeProjection(
-          {
-            id: `proj-${nanoid()}`,
-            aggregateId: scenarioRunId,
-            tenantId: createTenantId(tenantId),
-            version: new Date(now).toISOString().slice(0, 10),
-            data: finishedRunWithInstance(scenarioRunId),
-          },
-          { tenantId: createTenantId(tenantId) },
-        );
+describe("given a run that was queued, finished and had its instance recorded", () => {
+  describe("when the run is stored and read back", () => {
+    /** @scenario A finished run stores the instance that served it */
+    it("carries the instance under the reserved langwatch namespace, beside what was already there", async () => {
+      const scenarioRunId = `run-served-${nanoid()}`;
+      await stateRepository.storeProjection(
+        {
+          id: `proj-${nanoid()}`,
+          aggregateId: scenarioRunId,
+          tenantId: createTenantId(tenantId),
+          version: new Date(now).toISOString().slice(0, 10),
+          data: finishedRunWithInstance(scenarioRunId),
+        },
+        { tenantId: createTenantId(tenantId) },
+      );
 
-        const run = await runs.findScenarioRunData({
-          projectId: tenantId,
-          scenarioRunId,
-        });
+      const run = await runs.findScenarioRunData({
+        projectId: tenantId,
+        scenarioRunId,
+      });
 
-        expect(run?.status).toBe("SUCCESS");
-        expect(run?.metadata).toMatchObject({
-          langwatch: {
-            targetReferenceId: "prod-agent",
-            targetType: "connected",
-            agentInstance: AGENT_INSTANCE,
-          },
-        });
+      expect(run?.status).toBe("SUCCESS");
+      expect(run?.metadata).toMatchObject({
+        langwatch: {
+          targetReferenceId: "prod-agent",
+          targetType: "connected",
+          agentInstance: AGENT_INSTANCE,
+        },
       });
     });
-  },
-);
+  });
+});

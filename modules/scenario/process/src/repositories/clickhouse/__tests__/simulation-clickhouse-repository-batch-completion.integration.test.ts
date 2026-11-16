@@ -7,11 +7,7 @@
 import { nanoid } from "nanoid";
 import { describe, expect, it } from "vitest";
 
-import {
-  databaseUrl,
-  simulationRunRow,
-  useSimulationClickHouse,
-} from "./simulation-clickhouse-rows.fixture.ts";
+import { simulationRunRow, useSimulationClickHouse } from "./simulation-clickhouse-rows.fixture.ts";
 
 const tenantId = `test-batch-completion-${nanoid()}`;
 
@@ -50,7 +46,7 @@ async function seedBatch(statuses: string[]) {
   return { scenarioSetId, batchRunId };
 }
 
-describe.skipIf(databaseUrl === null)("the completion of a batch", () => {
+describe("the completion of a batch", () => {
   describe("given the batch still holds a queued run", () => {
     describe("when the batch aggregate is read", () => {
       /** @scenario "A batch with queued runs is not complete" */
@@ -91,7 +87,7 @@ describe.skipIf(databaseUrl === null)("the completion of a batch", () => {
   });
 });
 
-describe.skipIf(databaseUrl === null)("a batch with a run whose setup failed", () => {
+describe("a batch with a run whose setup failed", () => {
   /** @scenario "Server-side pass rates leave out a run whose setup failed" */
   it("leaves that run out of the batch's failures and the set's pass-rate denominator", async () => {
     const scenarioSetId = `set-hooks-${nanoid()}`;
@@ -120,7 +116,7 @@ describe.skipIf(databaseUrl === null)("a batch with a run whose setup failed", (
   });
 });
 
-describe.skipIf(databaseUrl === null)("the batch-scoped run list", () => {
+describe("the batch-scoped run list", () => {
   describe("given runs exist in two different batches", () => {
     describe("when the list is requested with only a batch run id", () => {
       /** @scenario "A batch id alone filters the list" */

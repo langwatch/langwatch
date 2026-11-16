@@ -8,7 +8,6 @@
 import { randomUUID } from "node:crypto";
 
 import type { ClickHouseClient } from "@clickhouse/client";
-import { ClickHouseQueryClient, type QueryDriver, TenantGuard } from "@langwatch/clickhouse-client";
 import { Temporal } from "@langwatch/time";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -20,12 +19,8 @@ import {
   ClickHouseInstantEvalSession,
   type InstantEvalClickHouseResolver,
 } from "../clickhouse.instant-eval-session.store.ts";
-import {
-  createTestClickHouseClient,
-  testClickHouseUrl,
-} from "./support/clickhouse-endpoint.support.ts";
+import { startInstantEvalReaderClickHouse } from "./support/clickhouse-endpoint.support.ts";
 
-const clickHouseUrl = testClickHouseUrl();
 const tag = randomUUID();
 const ours = `${tag}-ours`;
 const theirs = `${tag}-theirs`;
@@ -35,37 +30,6 @@ const at = (ms: number) => Temporal.Instant.fromEpochMilliseconds(ms);
 
 let ch: ClickHouseClient;
 let resolveClient: InstantEvalClickHouseResolver;
-
-/** The routed member over the migrated test server, as the process hands it to the module. */
-function queryClientOver(client: ClickHouseClient): ClickHouseQueryClient {
-  const driver: QueryDriver = {
-    async execute(request) {
-      const result = await client.query({
-        query: request.sql,
-        format: "JSONEachRow",
-        ...(request.params === undefined ? {} : { query_params: request.params }),
-        ...(request.settings === undefined ? {} : { clickhouse_settings: request.settings }),
-      });
-      return { rows: await result.json() };
-    },
-    async insert(request) {
-      await client.insert({
-        table: request.table,
-        values: request.rows,
-        format: "JSONEachRow",
-        ...(request.settings === undefined ? {} : { clickhouse_settings: request.settings }),
-      });
-    },
-    async command(request) {
-      await client.command({
-        query: request.sql,
-        ...(request.params === undefined ? {} : { query_params: request.params }),
-        ...(request.settings === undefined ? {} : { clickhouse_settings: request.settings }),
-      });
-    },
-  };
-  return new ClickHouseQueryClient({ tenantGuard: new TenantGuard(), driver });
-}
 
 function verdict(overrides: Partial<InstantEvalJudgmentRecord>): InstantEvalJudgmentRecord {
   return {
@@ -92,10 +56,11 @@ function verdict(overrides: Partial<InstantEvalJudgmentRecord>): InstantEvalJudg
 
 const window = { writtenFrom: at(T0 - 60_000), writtenUntil: at(T0 + 60_000) };
 
-describe.skipIf(!clickHouseUrl)("instant-eval's built reads (real ClickHouse)", () => {
+describe("instant-eval's built reads (real ClickHouse)", () => {
   beforeAll(async () => {
-    ch = createTestClickHouseClient(clickHouseUrl as URL);
-    const member = queryClientOver(ch);
+    const opened = await startInstantEvalReaderClickHouse();
+    ch = opened.admin;
+    const member = opened.worker;
     resolveClient = async (tenantId) => new ClickHouseInstantEvalSession(member, tenantId);
     const writer = (ms: number) =>
       ClickHouseInstantEvalRunRepository.create({ resolveClient, now: () => at(ms) });
@@ -127,7 +92,6 @@ describe.skipIf(!clickHouseUrl)("instant-eval's built reads (real ClickHouse)", 
         query_params: { tenants: [ours, theirs] },
       });
     }
-    await ch.close();
   });
 
   describe("given a run written twice and another tenant's run of the same id", () => {

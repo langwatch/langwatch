@@ -7,19 +7,14 @@
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { GatewaySpendState } from "../../../eventing/gateway-spend.projection.ts";
 import { ClickHouseGatewaySpendEventsRepository } from "../clickhouse.gateway-spend-events.repository.ts";
-import { gatewayClickHouseOver } from "./support/clickhouse-endpoint.support.ts";
+import { gatewayClickHouseReading } from "./support/clickhouse-endpoint.support.ts";
 import { startMigratedGatewayClickHouse } from "./support/migrated-clickhouse.harness.ts";
-
-const enabled = Boolean(
-  process.env.LANGWATCH_TEST_CLICKHOUSE_URL ??
-  process.env.TEST_CLICKHOUSE_URL ??
-  process.env.CI_CLICKHOUSE_URL,
-);
 
 const run = nanoid(8);
 const MINUTE = 60_000;
@@ -27,6 +22,7 @@ const MINUTE = 60_000;
 const NANO_PER_USD = 1_000_000_000;
 
 let client: ClickHouseClient;
+let reading: ClickHouseQueryClient;
 let repo: ClickHouseGatewaySpendEventsRepository;
 
 function state({
@@ -88,7 +84,7 @@ async function fold({
   await repo.upsertFromFold([{ tenantId, gatewayRequestId: requestId, state: at }]);
 }
 
-describe.skipIf(!enabled)("the metered day read on the spend record (real ClickHouse)", () => {
+describe("the metered day read on the spend record (real ClickHouse)", () => {
   const tenants = {
     charged: `metered-charged-${run}`,
     twoMonths: `metered-two-months-${run}`,
@@ -98,8 +94,8 @@ describe.skipIf(!enabled)("the metered day read on the spend record (real ClickH
   };
 
   beforeAll(async () => {
-    ({ client } = await startMigratedGatewayClickHouse());
-    repo = new ClickHouseGatewaySpendEventsRepository(gatewayClickHouseOver(client));
+    ({ client, reading } = await startMigratedGatewayClickHouse());
+    repo = new ClickHouseGatewaySpendEventsRepository(gatewayClickHouseReading(reading));
     // Both versions of a request stay on disk until the query has read them.
     await client.command({ query: "SYSTEM STOP MERGES gateway_spend" });
   }, 120_000);

@@ -6,11 +6,11 @@
  * the settlement sweep as the system identity across every tenant.
  */
 import { nanoid } from "nanoid";
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { ClickHouseGatewayOpenAdmissionsRepository } from "../clickhouse.gateway-open-admissions.repository.ts";
 import { ClickHouseGatewayPrincipalSpendRepository } from "../clickhouse.gateway-principal-spend.repository.ts";
-import { gatewayClickHouseOver } from "./support/clickhouse-endpoint.support.ts";
+import { gatewayClickHouseReading } from "./support/clickhouse-endpoint.support.ts";
 import {
   type MigratedClickHouse,
   startMigratedGatewayClickHouse,
@@ -78,9 +78,20 @@ describe("gateway's built reads on the migrated schema", () => {
     });
   }, 240_000);
 
+  afterAll(async () => {
+    if (!migrated) return;
+    for (const table of ["gateway_spend", "gateway_budget_ledger_events"]) {
+      await migrated.client.command({
+        query: `ALTER TABLE ${table} DELETE WHERE TenantId IN ({tenants:Array(String)})`,
+        query_params: { tenants: [tenantId, otherTenantId] },
+        clickhouse_settings: { mutations_sync: "1" },
+      });
+    }
+  });
+
   it("collapses a principal's budgets to one row per request on the reader", async () => {
     const repository = ClickHouseGatewayPrincipalSpendRepository.create(
-      gatewayClickHouseOver(migrated.client),
+      gatewayClickHouseReading(migrated.reading),
     );
     const input = {
       tenantId,
@@ -105,7 +116,7 @@ describe("gateway's built reads on the migrated schema", () => {
   }, 60_000);
 
   it("finds every tenant's still-admitted request past grace, never a resolved one", async () => {
-    const session = await gatewayClickHouseOver(migrated.client)("");
+    const session = await gatewayClickHouseReading(migrated.reading)("");
     const found = await ClickHouseGatewayOpenAdmissionsRepository.create(
       session,
     ).findOpenAdmissions({ now: BASE + 2 * HOUR, graceMs: HOUR, lookbackMs: 3 * HOUR });
