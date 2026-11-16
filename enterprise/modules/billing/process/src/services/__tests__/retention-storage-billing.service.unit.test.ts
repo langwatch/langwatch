@@ -153,6 +153,7 @@ describe("RetentionStorageBillingService", () => {
       const outcome = await service.record({
         organizationId: ORGANIZATION_ID,
         longestRetentionDays: 182,
+        addLine: true,
       });
 
       expect(outcome).toEqual({ line: "added", reportedGbMonths: null });
@@ -162,6 +163,24 @@ describe("RetentionStorageBillingService", () => {
           change: { items: [{ price: "price_storage_eur_annual" }], prorationBehavior: "none" },
         },
       ]);
+    });
+  });
+
+  describe("when a long retention predates storage billing and nobody opted in", () => {
+    /** @scenario "A long retention nobody chose to pay for is not billed" */
+    it("adds no line and reports nothing", async () => {
+      const { service, stripeSubscriptions, meters } = setup({ held: subscription({}) });
+
+      const outcome = await service.record({
+        organizationId: ORGANIZATION_ID,
+        longestRetentionDays: 0,
+        bytesAboveIncluded: 5_000_000_000,
+        measuredAt: Date.UTC(2026, 10, 16),
+      });
+
+      expect(outcome).toEqual({ line: "absent", reportedGbMonths: null });
+      expect(stripeSubscriptions.updates).toEqual([]);
+      expect(meters.events).toEqual([]);
     });
   });
 
@@ -196,6 +215,7 @@ describe("RetentionStorageBillingService", () => {
       const outcome = await service.record({
         organizationId: ORGANIZATION_ID,
         longestRetentionDays: 0,
+        addLine: true,
       });
 
       expect(outcome.line).toBe("added");
@@ -213,6 +233,7 @@ describe("RetentionStorageBillingService", () => {
         organizationId: ORGANIZATION_ID,
         longestRetentionDays: 182,
         bytesAboveIncluded: 30e9,
+        addLine: true,
       });
 
       expect(outcome).toEqual({ line: "skipped", reportedGbMonths: null });
@@ -248,6 +269,7 @@ describe("RetentionStorageBillingService", () => {
         organizationId: ORGANIZATION_ID,
         longestRetentionDays: 182,
         bytesAboveIncluded: 30e9,
+        addLine: true,
       });
 
       expect(outcome).toEqual({ line: "skipped", reportedGbMonths: null });

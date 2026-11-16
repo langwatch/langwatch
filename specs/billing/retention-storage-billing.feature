@@ -43,8 +43,15 @@ Feature: Billing storage kept past the 90 days Growth includes
   @unit
   Scenario: A longer retention adds the storage line to a running subscription
     Given a Growth subscription without the storage line
-    When the organization keeps traces for 182 days
+    When someone who manages the subscription sets traces to be kept for 182 days
     Then the storage line is added in the subscription's currency and interval
+
+  @unit
+  Scenario: A long retention nobody chose to pay for is not billed
+    Given a Growth subscription without the storage line
+    And the organization already keeps traces for 182 days from a rule set before storage was billed
+    When the daily report runs
+    Then no storage line is added and nothing is measured or reported
 
   @unit
   Scenario: Going back to 90 days removes the storage line

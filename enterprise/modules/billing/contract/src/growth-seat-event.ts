@@ -259,6 +259,11 @@ const retentionStorageReportSchemaDefinition = z
     bytesAboveIncluded: z.number().finite().nonnegative().optional(),
     /** When the bytes were measured, in epoch milliseconds; it names the day the share covers. */
     measuredAt: z.number().int().nonnegative().optional(),
+    /**
+     * Set only when someone who manages the subscription chose a billed retention: the one way
+     * the storage line is added outside checkout. Without it a missing line stays missing.
+     */
+    addLine: z.literal(true).optional(),
   })
   .strict();
 export interface RetentionStorageReportSchema extends Named<

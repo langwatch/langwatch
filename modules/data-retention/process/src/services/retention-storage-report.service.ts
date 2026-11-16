@@ -36,11 +36,21 @@ export class RetentionStorageReportService {
     return this.options.policies.findOrganizationIdsWithRules();
   }
 
-  /** Aligns the storage line with the organization's rules, without measuring. */
-  async syncLine({ organizationId }: { organizationId: string }): Promise<RetentionStorageOutcome> {
+  /**
+   * Aligns the storage line with the organization's rules, without measuring. `addLine` only
+   * where a subscription manager chose a billed retention; otherwise a line is kept or removed.
+   */
+  async syncLine({
+    organizationId,
+    addLine,
+  }: {
+    organizationId: string;
+    addLine: boolean;
+  }): Promise<RetentionStorageOutcome> {
     return this.options.billing.recordRetentionStorage({
       organizationId,
       longestRetentionDays: await this.longest(organizationId),
+      ...(addLine ? { addLine: true as const } : {}),
     });
   }
 

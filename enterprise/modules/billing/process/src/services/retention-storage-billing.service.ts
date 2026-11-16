@@ -70,6 +70,8 @@ export class RetentionStorageBillingService {
       return { line: "removed", reportedGbMonths: null };
     }
 
+    // Billed only by opt-in: checkout or a subscription manager's choice adds the line, never a report.
+    if (!storageItem && report.addLine !== true) return { line: "absent", reportedGbMonths: null };
     const line = storageItem ? "kept" : await this.addStorageLine(stripeSubscription);
     if (line === "skipped") return SKIPPED;
     return { line, reportedGbMonths: await this.report({ report, stripeSubscription }) };
