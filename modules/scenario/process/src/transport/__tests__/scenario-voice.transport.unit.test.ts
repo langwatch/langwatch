@@ -104,7 +104,7 @@ describe("the voice-session procedures", () => {
 
       expect(finished).toEqual(finishResult);
       expect(finishVoiceSession).toHaveBeenCalledWith(
-        expect.objectContaining({ sessionToken: "token", transcript: [], isCutAtLimit: false }),
+        expect.objectContaining({ sessionToken: "token", transcript: [] }),
       );
     });
   });
@@ -327,7 +327,6 @@ describe("POST /api/voice/session/:sessionId/finish", () => {
         startedAt: 1,
         endedAt: 2,
         transcript: [],
-        isCutAtLimit: false,
         userId: "user_1",
       });
     });

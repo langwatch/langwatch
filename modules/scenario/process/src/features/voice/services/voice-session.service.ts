@@ -214,7 +214,8 @@ export class VoiceSessionService {
       transcript: input.transcript,
       startedAt: input.startedAt,
       endedAt: input.endedAt,
-      isCutAtLimit: input.isCutAtLimit,
+      // The cutoff marker is derived from the span against the maximum the mint handed out.
+      maxCallSeconds: this.options.maxDurationSeconds,
       ...(input.name === undefined ? {} : { name: input.name }),
       ...(input.conversationId === undefined ? {} : { conversationId: input.conversationId }),
       ...(input.scenarioId === undefined ? {} : { scenarioId: input.scenarioId }),
