@@ -566,10 +566,10 @@ describe("the seat price BillingModule quotes", () => {
       expect(fewer).not.toMatchObject({ code: "seats_held_for_payment" });
     });
 
-    /** @scenario "While a payment is unpaid, lowering member seats still goes through" */
-    it("refuses a seat change that raises the seats and lets one that lowers them through", async () => {
+    /** @scenario "While a payment is unpaid, buying more seats is refused before the card is charged" */
+    it("refuses saving more seats from the drawer, and lets fewer through", async () => {
       const { app } = await unpaidGrowth();
-      const change = (totalMembers: number) =>
+      const save = (totalMembers: number) =>
         app
           .updateSubscriptionItems({
             organizationId: ACME,
@@ -581,8 +581,8 @@ describe("the seat price BillingModule quotes", () => {
           })
           .catch((error: unknown) => error);
 
-      expect(await change(6)).toMatchObject({ code: "seats_held_for_payment" });
-      expect(await change(4)).not.toMatchObject({ code: "seats_held_for_payment" });
+      expect(await save(6)).toMatchObject({ code: "seats_held_for_payment" });
+      expect(await save(4)).not.toMatchObject({ code: "seats_held_for_payment" });
     });
   });
 });
