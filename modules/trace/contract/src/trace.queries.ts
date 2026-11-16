@@ -98,3 +98,12 @@ export const traceDerivedEventsInputSchema: TraceDerivedEventsInputSchema =
   traceDerivedEventsInputSchemaDefinition;
 
 export type TraceDerivedEventsInput = z.infer<typeof traceDerivedEventsInputSchema>;
+
+const traceStoredBytesInputSchemaDefinition = z.object({ projectId: z.string().min(1) }).strict();
+export interface TraceStoredBytesInputSchema extends Named<
+  typeof traceStoredBytesInputSchemaDefinition
+> {}
+/** One project's question to the storage meter (ADR-202 Decided 20). */
+export const traceStoredBytesInputSchema: TraceStoredBytesInputSchema =
+  traceStoredBytesInputSchemaDefinition;
+export type TraceStoredBytesInput = z.infer<typeof traceStoredBytesInputSchema>;

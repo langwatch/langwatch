@@ -7,9 +7,17 @@ import {
   PLATFORM_DEFAULT_RETENTION_DAYS,
 } from "@langwatch/data-retention-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
+import { EvaluationApi } from "@langwatch/evaluation-contract";
+import { ExperimentApi } from "@langwatch/experiment-contract";
+import { LangyApi } from "@langwatch/langy-contract";
+import { LogApi } from "@langwatch/log-contract";
 import { bootInstalledProcess } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import { testPeer } from "@langwatch/process/testing";
+import { ScenarioApi } from "@langwatch/scenario-contract";
+import { SuiteApi } from "@langwatch/suite-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { TraceApi } from "@langwatch/trace-contract";
 import { isMigrationStep } from "@langwatch/upgrade/step";
 import { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
@@ -41,6 +49,14 @@ function process(
       testPeer({ token: AuthzApi, instance: createDataRetentionTestAuthz() }),
       testPeer({ token: UserApi, instance: createDataRetentionTestUsers() }),
       testPeer({ token: EntitlementApi, instance: createDataRetentionTestEntitlement() }),
+      // The storage meter's bound owners: no case here meters.
+      testPeer({ token: TraceApi, instance: createApiFixture<TraceApi>() }),
+      testPeer({ token: LogApi, instance: createApiFixture<LogApi>() }),
+      testPeer({ token: EvaluationApi, instance: createApiFixture<EvaluationApi>() }),
+      testPeer({ token: ExperimentApi, instance: createApiFixture<ExperimentApi>() }),
+      testPeer({ token: ScenarioApi, instance: createApiFixture<ScenarioApi>() }),
+      testPeer({ token: SuiteApi, instance: createApiFixture<SuiteApi>() }),
+      testPeer({ token: LangyApi, instance: createApiFixture<LangyApi>() }),
     ],
   });
 }

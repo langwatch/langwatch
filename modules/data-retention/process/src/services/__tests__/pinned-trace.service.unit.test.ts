@@ -1,13 +1,13 @@
-import { ClickHouseQueryClient, TenantGuard } from "@langwatch/clickhouse-client";
 import { describe, expect, it } from "vitest";
 
+import { emptyStoredBytesOwners } from "../../__tests__/support/stored-bytes-owners.fixture.ts";
 import {
   createDataRetentionTestProjectScopes,
   retentionTestGraph,
 } from "../../app/__tests__/data-retention.fixture.ts";
-import { ClickHouseStorageMeterRepository } from "../../repositories/clickhouse/clickhouse.storage-meter.repository.ts";
 import { MemoryDataRetentionRepository } from "../../repositories/memory/memory.data-retention.repository.ts";
 import { MemoryPinnedTraceRepository } from "../../repositories/memory/memory.pinned-trace.repository.ts";
+import { MemoryStorageMeterRepository } from "../../repositories/memory/memory.storage-meter.repository.ts";
 import { RedisDataRetentionCacheRepository } from "../../repositories/redis/redis.data-retention-cache.repository.ts";
 import { RedisStorageMeterCacheRepository } from "../../repositories/redis/redis.storage-meter-cache.repository.ts";
 import type {
@@ -93,16 +93,6 @@ class RecordingRetroactive implements RetroactiveRetentionRepository {
   }
 }
 
-/** No statement this suite issues ever reaches a server. */
-const noopClickHouse = new ClickHouseQueryClient({
-  tenantGuard: new TenantGuard(),
-  driver: {
-    execute: async () => ({ rows: [] }),
-    insert: async () => {},
-    command: async () => {},
-  },
-});
-
 function createService(retroactive: RetroactiveRetentionRepository = new RecordingRetroactive()) {
   return DataRetentionService.create({
     policies: MemoryDataRetentionRepository.create(),
@@ -112,7 +102,8 @@ function createService(retroactive: RetroactiveRetentionRepository = new Recordi
     retroactive,
     cache: RedisDataRetentionCacheRepository.create({ redis: null, ttlMs: 1_000 }),
     storageMeter: StorageMeterService.create({
-      meter: ClickHouseStorageMeterRepository.create({ clickhouse: noopClickHouse }),
+      owners: emptyStoredBytesOwners(),
+      eventLog: MemoryStorageMeterRepository.create(),
       cache: RedisStorageMeterCacheRepository.create({ ttlMs: STORAGE_METER_CACHE_TTL_MS }),
     }),
   });

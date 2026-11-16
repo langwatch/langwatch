@@ -182,7 +182,6 @@ var (
 		"specs/claude/telemetry-turn-bounding.feature",
 		"specs/coding-agent/personal-usage.feature",
 		"specs/components/code-block-editor.feature",
-		"specs/data-retention/data-size-metering.feature",
 		"specs/data-retention/monitoring.feature",
 		"specs/data-retention/trace-pinning.feature",
 		"specs/data-retention/ttl-activation.feature",
@@ -392,6 +391,10 @@ var (
 		"specs/workflows/studio-usage-limits.feature",
 	}
 	legacyPartial = []string{
+		// Reason: ADR-202 Decided 20 tagged and bound the storage meter's owner scenarios and the
+		// Redis cache, and retired its legacyInert entry. The five untagged scenarios describe
+		// ingestion-time sizing, TTL shrinkage, INCRBY, the Stripe meter and the settings card.
+		"specs/data-retention/data-size-metering.feature",
 		// Reason: left legacyInert when the not-found scenarios were bound: a tool
 		// that cannot start exits 127 with a docs link and no setup written. The
 		// login, env and routing scenarios stay untagged.

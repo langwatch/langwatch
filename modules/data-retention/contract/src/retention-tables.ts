@@ -100,24 +100,5 @@ export const RETENTION_TTL_MANAGED_TABLES: readonly string[] = [
   ...INDEFINITE_DEFAULT_RETENTION_TABLES,
 ];
 
-const SHADOW_METER_TABLES = new Set<RetentionManagedTable>([
-  "metric_data_points",
-  "metric_series",
-  "metric_time_rollups",
-]);
-
-const TABLES_WITHOUT_SIZE_COLUMN = new Set<RetentionManagedTable>([
-  "span_analytics",
-  "trace_analytics",
-  "trace_analytics_rollup",
-  "trace_evaluation_analytics",
-  "evaluation_analytics",
-  "evaluation_analytics_rollup",
-]);
-
-export const PRODUCTION_STORAGE_METER_TABLES = RETENTION_MANAGED_TABLES.filter(
-  (table) => !SHADOW_METER_TABLES.has(table) && !TABLES_WITHOUT_SIZE_COLUMN.has(table),
-);
-
 /** The settings each owner's stored-bytes read sends (ADR-202 Decided 20): two threads, 45 s. */
 export const STORAGE_METER_READ_SETTINGS = { max_threads: 2, max_execution_time: 45 } as const;

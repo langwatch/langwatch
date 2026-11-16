@@ -31,6 +31,7 @@ import type { EventingCommandSender } from "@langwatch/eventing";
 import type { FeatureSetup } from "@langwatch/process";
 import { UserApi } from "@langwatch/user-contract";
 
+import type { DataRetentionChannels } from "../channels/data-retention.channels.ts";
 import {
   buildDataRetentionSeatPolicyPipeline,
   type DataRetentionSeatPolicyPipeline,
@@ -104,7 +105,8 @@ export interface DataRetentionDirectoryReader {
 type DataRetentionSetup = FeatureSetup<
   typeof DataRetentionModule.dependencies,
   DataRetentionServerConfig,
-  DataRetentionRepositories
+  DataRetentionRepositories,
+  DataRetentionChannels
 >;
 
 export class DataRetentionModule implements DataRetentionApiContract {
@@ -142,9 +144,15 @@ export class DataRetentionModule implements DataRetentionApiContract {
     this.#users = services.users;
   }
 
-  static create({ repositories, dependencies, config }: DataRetentionSetup): DataRetentionModule {
+  static create({
+    repositories,
+    channels,
+    dependencies,
+    config,
+  }: DataRetentionSetup): DataRetentionModule {
     const storageMeter = StorageMeterService.create({
-      meter: repositories.storageMeter,
+      owners: channels.storedBytesOwners,
+      eventLog: repositories.storageMeter,
       cache: repositories.storageMeterCache,
     });
     const retention = DataRetentionService.create({

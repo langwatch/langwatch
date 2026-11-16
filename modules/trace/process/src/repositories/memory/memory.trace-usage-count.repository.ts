@@ -86,6 +86,13 @@ export class MemoryTraceUsageCountRepository extends TraceUsageCountRepository {
       .toSorted((a, b) => b.count - a.count);
   }
 
+  /** The JSON byte length of the tenant's recorded traces, the twin's stored bytes. */
+  async getStoredBytes(input: { tenantId: string }): Promise<number> {
+    return this.#traces
+      .filter((trace) => trace.tenantId === input.tenantId)
+      .reduce((bytes, trace) => bytes + Buffer.byteLength(JSON.stringify(trace)), 0);
+  }
+
   #since(input: { tenantId: string; sinceMs: number }): CountedTrace[] {
     return this.#traces.filter(
       (trace) => trace.tenantId === input.tenantId && (trace.occurredAtMs ?? -1) >= input.sinceMs,

@@ -12,10 +12,29 @@ Feature: Data size metering for storage billing
     Then the stored_spans record has _size_bytes approximately 5120
     And the estimate includes attribute maps, events, and links
 
-  Scenario: Per-tenant storage query sums across all tables
-    Given the project has data in stored_spans, trace_summaries, and event_log
+  # ADR-202 Decided 20 and 22: each owning module answers for its own tables through its *Api,
+  # eventing answers for event_log, and stored_log_records no longer counts.
+  @unit
+  Scenario: The storage figure is the sum each owning module reports for its own tables
+    Given trace, log, evaluation, experiment, scenario, suite and langy each hold data for the project
+    And the event log holds data for the project
     When the storage size is queried for this tenant
-    Then the result is the sum of _size_bytes across all 11 retention-managed tables
+    Then each owning module is asked for the project's stored bytes
+    And the result is the sum of their answers and the event log's bytes
+
+  @unit
+  Scenario: An owner that cannot answer is left out of the total and logged
+    Given one owning module cannot report its stored bytes
+    When the storage size is queried for this tenant
+    Then the result is the sum of the owners that answered
+    And the owner that failed is logged by name
+
+  @unit
+  Scenario: When no owner answers, the figure degrades to 0 and refreshes on the next read
+    Given no owning module and not the event log can report stored bytes
+    When the storage size is first queried for this tenant
+    Then the result is 0, cached as already stale
+    And the next read refreshes it in the background once the owners answer again
 
   Scenario: Storage decreases as TTL deletes rows
     Given the tenant has 10GB of stored data
@@ -23,6 +42,7 @@ Feature: Data size metering for storage billing
     When the storage size is recalculated
     Then the result is approximately 7GB
 
+  @unit
   Scenario: Storage size is cached in Redis
     When the storage size is queried for a tenant
     Then the result is cached with a 5-minute TTL

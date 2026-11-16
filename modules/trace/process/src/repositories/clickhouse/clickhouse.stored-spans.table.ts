@@ -49,5 +49,6 @@ export const storedSpans = defineClickHouseTable({
     ),
     CreatedAt: column.dateTime64({ precision: 3 }),
     UpdatedAt: column.dateTime64({ precision: 3 }),
+    _size_bytes: column.uint32(),
   },
 });

@@ -6,6 +6,7 @@ import { defineProcessModule, type PublishedProcessModule } from "@langwatch/pro
 import { defineMigrationStep } from "@langwatch/upgrade/step";
 
 import { DataRetentionModule } from "./app/data-retention.app.ts";
+import { dataRetentionChannels } from "./channels/data-retention-channels.registry.ts";
 import { dataRetentionSeatPolicyEventing } from "./eventing/data-retention-seat-policy.pipeline.ts";
 import { retroactiveRetentionEventing } from "./eventing/retroactive-retention.pipeline.ts";
 import { dataRetentionRepositories } from "./repositories/data-retention-repositories.registry.ts";
@@ -18,6 +19,7 @@ export const dataRetentionProcessModule: PublishedProcessModule<
   DataRetentionServerConfig
 > = defineProcessModule("data-retention")
   .withRepositories(dataRetentionRepositories)
+  .withChannels(dataRetentionChannels)
   .withApi(DataRetentionModule)
   .withTransports(dataRetentionTrpcTransport)
   .withEventing(dataRetentionSeatPolicyEventing)

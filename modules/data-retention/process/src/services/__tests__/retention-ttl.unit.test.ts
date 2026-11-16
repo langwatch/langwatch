@@ -9,7 +9,6 @@ import {
 } from "@langwatch/clickhouse-migrations";
 import {
   INDEFINITE_DEFAULT_RETENTION_TABLES,
-  PRODUCTION_STORAGE_METER_TABLES,
   RETENTION_MANAGED_TABLES,
   RETENTION_TABLE_CATEGORY_MAP,
   RETENTION_TTL_MANAGED_TABLES,
@@ -206,7 +205,6 @@ describe("governance cost tables keep data indefinitely by default", () => {
     (table) => {
       expect(RETENTION_MANAGED_TABLES).not.toContain(table);
       expect(RETENTION_TABLE_CATEGORY_MAP).not.toHaveProperty(table);
-      expect(PRODUCTION_STORAGE_METER_TABLES).not.toContain(table);
     },
   );
 

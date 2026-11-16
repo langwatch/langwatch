@@ -156,6 +156,7 @@ import {
   type TraceModelSpend,
   type TraceModelSpendWindow,
   type TraceSpendSummary,
+  type TraceStoredBytesInput,
   type TraceUsageCount,
   type EvaluationTraceEvent,
   type EvaluationTraceSpan,
@@ -3600,6 +3601,10 @@ export class TraceModule implements TraceApi, CollectorApp {
 
   countTracesInLastDay(input: { projectId: string }): Promise<number> {
     return this.#usageCountRead().countTracesInLastDay({ tenantId: input.projectId });
+  }
+
+  getStoredBytes(input: TraceStoredBytesInput): Promise<number> {
+    return this.#usageCountRead().getStoredBytes({ tenantId: input.projectId });
   }
 
   hasTraceWithAttribute(input: {

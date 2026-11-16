@@ -1,12 +1,8 @@
-import type { PRODUCTION_STORAGE_METER_TABLES } from "@langwatch/data-retention-contract/retention-tables";
-
-/** One table the storage meter measures. */
-export type StorageMeterTable = (typeof PRODUCTION_STORAGE_METER_TABLES)[number];
-
-/** The bytes a tenant holds on disk; a store that cannot answer throws. */
+/**
+ * The event log's bytes for a tenant, read through eventing's retention surface: the framework
+ * owns that table, so no module's `*Api` answers for it (ADR-202 Decided 22). A store that
+ * cannot answer throws.
+ */
 export interface StorageMeterRepository {
-  /** Every metered table's bytes for the tenant, summed in one read. */
-  getTenantBytes(input: { tenantId: string }): Promise<number>;
-  /** One metered table's bytes for the tenant. */
-  getTableBytes(input: { tenantId: string; table: StorageMeterTable }): Promise<number>;
+  getEventLogBytes(input: { tenantId: string }): Promise<number>;
 }

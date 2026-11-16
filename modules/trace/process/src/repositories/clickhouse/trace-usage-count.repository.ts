@@ -1,9 +1,16 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
-import { clickhouseRead, fn, tenantScope } from "@langwatch/clickhouse-client/builder";
+import {
+  clickhouseRead,
+  fn,
+  tenantScope,
+  type ReaderReadStatement,
+} from "@langwatch/clickhouse-client/builder";
+import { STORAGE_METER_READ_SETTINGS } from "@langwatch/data-retention-contract/retention-tables";
 import { nowInstant } from "@langwatch/time";
 import type { TraceAttributeMatch } from "@langwatch/trace-contract";
 
 import { TraceUsageCountRepository } from "../trace-usage-count.repository.ts";
+import { storedSpans as spans } from "./clickhouse.stored-spans.table.ts";
 import { traceSummaries as summaries } from "./clickhouse.trace-summaries.table.ts";
 
 /** How far before a window a counted trace may have started, and been seen first. */
@@ -114,5 +121,33 @@ export class TraceUsageCountClickHouseRepository extends TraceUsageCountReposito
     const result = await this.#clickhouse.read({ statement, table: summaries.$table.name });
 
     return result.rows.map((row) => ({ value: row.value, count: Number(row.count ?? 0) }));
+  }
+
+  /** One project's `_size_bytes` over spans and trace summaries, every stored version counted. */
+  async getStoredBytes({ tenantId }: { tenantId: string }): Promise<number> {
+    const { rows } = await this.#clickhouse.read({
+      statement: TraceUsageCountClickHouseRepository.storedBytesRead({ tenantId }),
+      declaresFullScan: true,
+    });
+    return Number(rows[0]?.bytes ?? 0);
+  }
+
+  /** The two tables' sums in one union, then summed, under the meter's caps. */
+  static storedBytesRead({
+    tenantId,
+  }: {
+    tenantId: string;
+  }): ReaderReadStatement<{ bytes: number | string }> {
+    const scope = tenantScope.single({ tenantId });
+    const parts = clickhouseRead({ scope })
+      .from(spans)
+      .select({ bytes: fn.sum(spans._size_bytes) })
+      .unionAll((arm) => arm.from(summaries).select({ bytes: fn.sum(summaries._size_bytes) }))
+      .as("parts");
+    return clickhouseRead({ scope })
+      .from(parts)
+      .select({ bytes: fn.sum(parts.bytes) })
+      .settings(STORAGE_METER_READ_SETTINGS)
+      .build();
   }
 }

@@ -1,8 +1,6 @@
-import { PRODUCTION_STORAGE_METER_TABLES } from "@langwatch/data-retention-contract/retention-tables";
+import type { StorageMeterRepository } from "../storage-meter.repository.ts";
 
-import type { StorageMeterRepository, StorageMeterTable } from "../storage-meter.repository.ts";
-
-/** The memory tier's meter: bytes a test records per tenant and table, zero where none were. */
+/** The memory tier's event-log meter: bytes a test records per tenant, zero where none were. */
 export class MemoryStorageMeterRepository implements StorageMeterRepository {
   static create(): MemoryStorageMeterRepository {
     return new MemoryStorageMeterRepository();
@@ -12,23 +10,12 @@ export class MemoryStorageMeterRepository implements StorageMeterRepository {
 
   private constructor() {}
 
-  /** Records what one table holds for a tenant, as a write to that table would. */
-  record(input: { tenantId: string; table: StorageMeterTable; bytes: number }): void {
-    this.#bytes.set(keyOf(input), input.bytes);
+  /** Records what the event log holds for a tenant, as an append to it would. */
+  record(input: { tenantId: string; bytes: number }): void {
+    this.#bytes.set(input.tenantId, input.bytes);
   }
 
-  async getTenantBytes({ tenantId }: { tenantId: string }): Promise<number> {
-    return PRODUCTION_STORAGE_METER_TABLES.reduce(
-      (sum, table) => sum + (this.#bytes.get(keyOf({ tenantId, table })) ?? 0),
-      0,
-    );
+  async getEventLogBytes({ tenantId }: { tenantId: string }): Promise<number> {
+    return this.#bytes.get(tenantId) ?? 0;
   }
-
-  async getTableBytes(input: { tenantId: string; table: StorageMeterTable }): Promise<number> {
-    return this.#bytes.get(keyOf(input)) ?? 0;
-  }
-}
-
-function keyOf({ tenantId, table }: { tenantId: string; table: string }): string {
-  return `${tenantId}\u0000${table}`;
 }

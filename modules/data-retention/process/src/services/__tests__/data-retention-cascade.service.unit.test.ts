@@ -5,6 +5,7 @@
 import type { RetentionCategory } from "@langwatch/data-retention-contract";
 import { describe, expect, it } from "vitest";
 
+import { emptyStoredBytesOwners } from "../../__tests__/support/stored-bytes-owners.fixture.ts";
 import {
   createDataRetentionTestProjectScopes,
   retentionTestGraph,
@@ -36,7 +37,8 @@ function acme() {
     retroactive: MemoryRetroactiveRetentionRepository.create(),
     cache: MemoryDataRetentionCacheRepository.create(),
     storageMeter: StorageMeterService.create({
-      meter: MemoryStorageMeterRepository.create(),
+      owners: emptyStoredBytesOwners(),
+      eventLog: MemoryStorageMeterRepository.create(),
       cache: MemoryStorageMeterCacheRepository.create(),
     }),
   });

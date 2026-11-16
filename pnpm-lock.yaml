@@ -7477,12 +7477,24 @@ importers:
       '@langwatch/entitlement-contract':
         specifier: workspace:*
         version: link:../../entitlement/contract
+      '@langwatch/evaluation-contract':
+        specifier: workspace:*
+        version: link:../../evaluation/contract
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../../packages/eventing
+      '@langwatch/experiment-contract':
+        specifier: workspace:*
+        version: link:../../experiment/contract
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
+      '@langwatch/langy-contract':
+        specifier: workspace:*
+        version: link:../../langy/contract
+      '@langwatch/log-contract':
+        specifier: workspace:*
+        version: link:../../log/contract
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../packages/module
@@ -7501,9 +7513,18 @@ importers:
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../project/contract
+      '@langwatch/scenario-contract':
+        specifier: workspace:*
+        version: link:../../scenario/contract
+      '@langwatch/suite-contract':
+        specifier: workspace:*
+        version: link:../../suite/contract
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
+      '@langwatch/trace-contract':
+        specifier: workspace:*
+        version: link:../../trace/contract
       '@langwatch/upgrade':
         specifier: workspace:*
         version: link:../../../packages/upgrade

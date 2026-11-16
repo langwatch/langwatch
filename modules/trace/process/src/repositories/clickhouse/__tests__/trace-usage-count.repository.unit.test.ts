@@ -77,6 +77,33 @@ describe("TraceUsageCountClickHouseRepository", () => {
   });
 });
 
+describe("TraceUsageCountClickHouseRepository stored bytes", () => {
+  /** @scenario "The stored-bytes read is one tenant's built sum over spans and summaries" */
+  it("sums spans and summaries for one tenant in a union, under the meter's caps", async () => {
+    const { statements, repository } = createRepository([{ bytes: "1234" }]);
+
+    await expect(repository.getStoredBytes({ tenantId: "project-1" })).resolves.toBe(1234);
+    expectSingleTenant(statements[0]);
+    for (const table of ["stored_spans", "trace_summaries"]) {
+      expect(statements[0]?.sql).toContain(`FROM ${table}`);
+    }
+    expect(statements[0]?.sql.match(/UNION ALL/g)).toHaveLength(1);
+    expect(statements[0]?.sql).toContain(") AS parts");
+    expect(statements[0]?.sql).toMatch(/SETTINGS max_threads = 2, max_execution_time = 45$/);
+  });
+
+  it("answers the JSON byte length of the tenant's recorded traces in the memory twin", async () => {
+    const memory = MemoryTraceUsageCountRepository.create();
+    const trace = { tenantId: "project-1", traceId: "t1", createdAt: "2026-11-01 00:00:00.000" };
+    memory.record(trace);
+    memory.record({ ...trace, tenantId: "project-2" });
+
+    await expect(memory.getStoredBytes({ tenantId: "project-1" })).resolves.toBe(
+      Buffer.byteLength(JSON.stringify(trace)),
+    );
+  });
+});
+
 describe("TraceUsageCountClickHouseRepository trace ids first seen", () => {
   /** @scenario "The upgrade sends each project's trace ids for the month in pages" */
   it("pages trace ids by their earliest summary write inside the window, in id order", async () => {

@@ -1,68 +1,24 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
-import { PRODUCTION_STORAGE_METER_TABLES } from "@langwatch/data-retention-contract/retention-tables";
-import { z } from "zod";
+import { STORAGE_METER_READ_SETTINGS } from "@langwatch/data-retention-contract/retention-tables";
+import { EventLogRetention } from "@langwatch/eventing/server";
 
-import type { StorageMeterRepository, StorageMeterTable } from "../storage-meter.repository.ts";
+import { EVENT_LOG_RETENTION_CLASSIFICATION } from "../../rules/event-log-retention.rules.ts";
+import type { StorageMeterRepository } from "../storage-meter.repository.ts";
 
-const METERING_MAX_EXECUTION_SECONDS = 45;
-const METERING_CLICKHOUSE_SETTINGS = {
-  max_threads: 2,
-  max_execution_time: METERING_MAX_EXECUTION_SECONDS,
-} as const;
-
-const storageMeterRowSchema = z
-  .object({ total: z.union([z.string(), z.number()]).nullable().optional() })
-  .strict();
-
-const storageMeterRowsSchema = z.array(storageMeterRowSchema);
-
-/** `_size_bytes` sums over the process's one ClickHouse client, which routes each read itself. */
+/** The event log's bytes through eventing's own built read, under the meter's caps. */
 export class ClickHouseStorageMeterRepository implements StorageMeterRepository {
   static create(options: { clickhouse: ClickHouseQueryClient }): ClickHouseStorageMeterRepository {
-    return new ClickHouseStorageMeterRepository(options.clickhouse);
+    return new ClickHouseStorageMeterRepository(
+      EventLogRetention.create({
+        client: options.clickhouse,
+        classification: EVENT_LOG_RETENTION_CLASSIFICATION,
+      }),
+    );
   }
 
-  private constructor(private readonly clickhouse: ClickHouseQueryClient) {}
+  private constructor(private readonly eventLog: EventLogRetention) {}
 
-  async getTenantBytes({ tenantId }: { tenantId: string }): Promise<number> {
-    const unions = PRODUCTION_STORAGE_METER_TABLES.map(
-      (table) => `SELECT sum(_size_bytes) AS t FROM ${table} WHERE TenantId = {tenantId:String}`,
-    ).join("\n  UNION ALL\n  ");
-    const { rows } = await this.clickhouse.query<unknown>({
-      tenantId,
-      kind: "read",
-      sql: `SELECT sum(t) AS total FROM (\n  ${unions}\n)`,
-      params: { tenantId },
-      settings: METERING_CLICKHOUSE_SETTINGS,
-    });
-
-    return parseTotal(rows);
+  getEventLogBytes({ tenantId }: { tenantId: string }): Promise<number> {
+    return this.eventLog.getStoredBytes({ tenantId, settings: STORAGE_METER_READ_SETTINGS });
   }
-
-  async getTableBytes({
-    tenantId,
-    table,
-  }: {
-    tenantId: string;
-    table: StorageMeterTable;
-  }): Promise<number> {
-    const { rows } = await this.clickhouse.query<unknown>({
-      tenantId,
-      table,
-      kind: "read",
-      sql: `SELECT sum(_size_bytes) AS total FROM ${table} WHERE TenantId = {tenantId:String}`,
-      params: { tenantId },
-      settings: METERING_CLICKHOUSE_SETTINGS,
-    });
-
-    return parseTotal(rows);
-  }
-}
-
-function parseTotal(rows: unknown): number {
-  const parsed = storageMeterRowsSchema.parse(rows);
-  const value = parsed[0]?.total ?? 0;
-  const total = typeof value === "number" ? value : Number(value);
-
-  return z.number().finite().nonnegative().parse(total);
 }

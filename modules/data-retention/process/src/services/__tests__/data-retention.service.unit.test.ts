@@ -1,17 +1,16 @@
 import type { ResolvedRetention } from "@langwatch/data-retention-contract";
-import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { describe, expect, it } from "vitest";
 
 import {
   DECLARED_ID_INDEXES,
   EXPERIMENT_RUNS_BY_EXPERIMENT,
 } from "../../__tests__/support/declared-id-indexes.fixture.ts";
+import { emptyStoredBytesOwners } from "../../__tests__/support/stored-bytes-owners.fixture.ts";
 import {
   createDataRetentionTestProjectScopes,
   retentionTestGraph,
   retentionTestScopeRow,
 } from "../../app/__tests__/data-retention.fixture.ts";
-import { ClickHouseStorageMeterRepository } from "../../repositories/clickhouse/clickhouse.storage-meter.repository.ts";
 import {
   type CachedRetentionLookup,
   DataRetentionCacheRepository,
@@ -21,19 +20,11 @@ import { MemoryDataRetentionProjectScopeRepository } from "../../repositories/me
 import { MemoryDataRetentionRepository } from "../../repositories/memory/memory.data-retention.repository.ts";
 import { MemoryPinnedTraceRepository } from "../../repositories/memory/memory.pinned-trace.repository.ts";
 import { MemoryRetroactiveRetentionRepository } from "../../repositories/memory/memory.retroactive-retention.repository.ts";
+import { MemoryStorageMeterRepository } from "../../repositories/memory/memory.storage-meter.repository.ts";
 import { RedisStorageMeterCacheRepository } from "../../repositories/redis/redis.storage-meter-cache.repository.ts";
 import { STORAGE_METER_CACHE_TTL_MS } from "../../repositories/storage-meter-cache.repository.ts";
 import { DataRetentionService } from "../data-retention.service.ts";
 import { StorageMeterService } from "../storage-meter.service.ts";
-
-/** These cases never meter: a read reaching ClickHouse is the test failing. */
-function refusingClickHouse() {
-  return clickHouseQueryClientDouble({
-    query: async () => {
-      throw new Error("storage metering is not part of this case");
-    },
-  });
-}
 
 const DEFAULT_DAYS = 49;
 const PROJECT = retentionTestGraph.projectId;
@@ -102,7 +93,8 @@ function createService(
     retroactive: input.retroactive ?? MemoryRetroactiveRetentionRepository.create(),
     cache: input.cache ?? new RecordingCache(),
     storageMeter: StorageMeterService.create({
-      meter: ClickHouseStorageMeterRepository.create({ clickhouse: refusingClickHouse() }),
+      owners: emptyStoredBytesOwners(),
+      eventLog: MemoryStorageMeterRepository.create(),
       cache: RedisStorageMeterCacheRepository.create({ ttlMs: STORAGE_METER_CACHE_TTL_MS }),
     }),
   });

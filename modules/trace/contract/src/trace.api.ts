@@ -128,6 +128,7 @@ import type {
   TraceIngestWaitInput,
   TraceByIdInput,
   TraceDerivedEventsInput,
+  TraceStoredBytesInput,
   TraceSummaryLookupInput,
 } from "./trace.queries.ts";
 import type {
@@ -1029,6 +1030,8 @@ export interface TraceApi extends TraceOtlpIngestApi {
   readTopicClusteringPage(input: TraceTopicClusteringPageInput): Promise<TraceTopicClusteringPage>;
   /** The project's distinct traces over the last 24 hours. */
   countTracesInLastDay(input: { projectId: string }): Promise<number>;
+  /** The project's stored bytes over spans and trace summaries, as the storage meter counts. */
+  getStoredBytes(input: TraceStoredBytesInput): Promise<number>;
   /** Whether any trace carrying `attribute` landed for the project at or after `sinceMs`. */
   hasTraceWithAttribute(input: {
     projectId: string;

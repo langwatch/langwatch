@@ -7,6 +7,8 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi, UserProfile } from "@langwatch/user-contract";
 import { vi } from "vitest";
 
+import { emptyStoredBytesOwners } from "../../__tests__/support/stored-bytes-owners.fixture.ts";
+import type { StoredBytesOwners } from "../../channels/data-retention.channels.ts";
 import type { DataRetentionProjectPlacement } from "../../repositories/data-retention-project-scope.repository.ts";
 import type { DataRetentionRepositories } from "../../repositories/data-retention.repositories.ts";
 import { MemoryDataRetentionProjectScopeRepository } from "../../repositories/memory/memory.data-retention-project-scope.repository.ts";
@@ -183,6 +185,7 @@ export function createDataRetentionTestApp(
       entitlement: EntitlementApi;
     }>;
     platformDefaultRetentionDays?: number;
+    storedBytesOwners?: StoredBytesOwners;
   }> = {},
 ): DataRetentionModule {
   return DataRetentionModule.create({
@@ -191,6 +194,7 @@ export function createDataRetentionTestApp(
       directory: input.directory ?? MemoryRetentionDirectory.create(),
       projectScopes: createDataRetentionTestProjectScopes(),
     },
+    channels: { storedBytesOwners: input.storedBytesOwners ?? emptyStoredBytesOwners() },
     dependencies: {
       permissions: input.dependencies?.permissions ?? createDataRetentionTestAuthz(),
       users: input.dependencies?.users ?? createDataRetentionTestUsers(),
