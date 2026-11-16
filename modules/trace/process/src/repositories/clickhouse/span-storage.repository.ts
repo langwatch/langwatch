@@ -91,11 +91,14 @@ import {
 const TABLE_NAME = "stored_spans" as const;
 
 /**
- * Settings for every `stored_spans` insert.
+ * Settings for every `stored_spans` insert. Async deduplication is off, as the pinned server
+ * profile has it: the table replaces a repeated span by its key triple, and an insert with it
+ * off may share a statement with others waiting for a slot (ADR-187).
  */
 const SPAN_INSERT_SETTINGS = {
   async_insert: 1,
   wait_for_async_insert: 1,
+  async_insert_deduplicate: 0,
   input_format_json_throw_on_bad_escape_sequence: 0,
 } as const;
 
