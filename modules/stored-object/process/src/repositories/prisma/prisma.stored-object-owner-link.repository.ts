@@ -57,7 +57,16 @@ export class PrismaStoredObjectOwnerLinkRepository implements StoredObjectOwnerL
         ownerId: link.ownerId,
         retainUntil: retainUntil === null ? { not: null } : { lt: retainUntil },
       },
-      data: { retainUntil, updatedAt: toDate(link.updatedAt) },
+      data: { retainUntil, createdAt: toDate(link.createdAt), updatedAt: toDate(link.updatedAt) },
+    });
+  }
+
+  async countAll(input: {
+    tenantId: StoredObjectProjectId;
+    objectId: StoredObjectId;
+  }): Promise<number> {
+    return this.prisma.storedObjectOwner.count({
+      where: { tenantId: input.tenantId, objectId: input.objectId },
     });
   }
 

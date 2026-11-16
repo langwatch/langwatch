@@ -63,7 +63,12 @@ function fixture(input: { retentionDays?: number } = {}) {
       await memoryLinks.raise(link);
     },
     countLive: (query) => memoryLinks.countLive(query),
+    countAll: (query) => memoryLinks.countAll(query),
     deleteForTenant: (query) => memoryLinks.deleteForTenant(query),
+    findTenantsWithExpired: (query) => memoryLinks.findTenantsWithExpired(query),
+    findExpired: (query) => memoryLinks.findExpired(query),
+    deleteExpired: (query) => memoryLinks.deleteExpired(query),
+    retime: (query) => memoryLinks.retime(query),
   };
   const service = StoredObjectService.create({
     records,
@@ -107,7 +112,7 @@ function fixture(input: { retentionDays?: number } = {}) {
     });
   }
 
-  return { service, records, writes, retention, race, store, liveOn };
+  return { service, records, memoryLinks, writes, retention, race, store, liveOn };
 }
 
 describe("StoredObjectService.storeFromBytes reuse", () => {
@@ -174,6 +179,25 @@ describe("StoredObjectService.storeFromBytes reuse", () => {
       expect(second.isDuplicate).toBe(true);
       const row = await records.findById({ tenantId: PROJECT, id: first.reference.id });
       expect(row?.audiences).toEqual(["project:view", "traces:view"]);
+    });
+  });
+
+  describe("given an available trace_content object stored before owner links", () => {
+    /** @scenario "An object stored before owner links is never reused for a retained purpose" */
+    it("writes a new object for t2 and leaves the older one unlinked", async () => {
+      const { store, memoryLinks, writes, liveOn } = fixture();
+      const legacy = await store();
+      await memoryLinks.deleteForTenant({ tenantId: PROJECT });
+
+      const again = await store({ ownerId: "t2" });
+
+      expect(again.isDuplicate).toBe(false);
+      expect(again.reference.id).not.toBe(legacy.reference.id);
+      expect(writes).toHaveLength(2);
+      await expect(liveOn({ id: again.reference.id, day: 1 })).resolves.toBe(1);
+      await expect(
+        memoryLinks.countAll({ tenantId: PROJECT, objectId: legacy.reference.id }),
+      ).resolves.toBe(0);
     });
   });
 

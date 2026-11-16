@@ -109,6 +109,32 @@ describe.each(backends)(
         ).resolves.toBe(1);
       });
 
+      /** @scenario "A re-time counts from the owner's latest store" */
+      it("moves its start with its end, so a re-time counts from the latest store", async () => {
+        const repository = create();
+        await repository.raise(link({ retainUntil: day(30) }));
+        await repository.raise(link({ retainUntil: day(50), createdAt: day(20) }));
+
+        await repository.retime({ tenantId: ACME, objectIds: [OBJECT], days: 7, at: day(21) });
+
+        await expect(
+          repository.countLive({ tenantId: ACME, objectId: OBJECT, now: day(26) }),
+        ).resolves.toBe(1);
+        await expect(
+          repository.countLive({ tenantId: ACME, objectId: OBJECT, now: day(27) }),
+        ).resolves.toBe(0);
+      });
+
+      /** @scenario "An object stored before owner links is never reused for a retained purpose" */
+      it("counts every link ever written, ended or not, and none for another tenant", async () => {
+        const repository = create();
+        await repository.raise(link({ ownerId: "t1", retainUntil: day(1) }));
+        await repository.raise(link({ ownerId: "t2", retainUntil: day(30) }));
+
+        await expect(repository.countAll({ tenantId: ACME, objectId: OBJECT })).resolves.toBe(2);
+        await expect(repository.countAll({ tenantId: OTHER, objectId: OBJECT })).resolves.toBe(0);
+      });
+
       /** @scenario "The memory and Postgres owner-link repositories answer alike" */
       it("never moves its end earlier", async () => {
         const repository = create();

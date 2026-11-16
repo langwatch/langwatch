@@ -26,9 +26,19 @@ export class MemoryStoredObjectOwnerLinkRepository implements StoredObjectOwnerL
       this.#links.set(key(link), {
         ...existing,
         retainUntil: link.retainUntil,
+        createdAt: link.createdAt,
         updatedAt: link.updatedAt,
       });
     }
+  }
+
+  async countAll(input: {
+    tenantId: StoredObjectProjectId;
+    objectId: StoredObjectId;
+  }): Promise<number> {
+    return [...this.#links.values()].filter(
+      (link) => link.tenantId === input.tenantId && link.objectId === input.objectId,
+    ).length;
   }
 
   async countLive(input: {

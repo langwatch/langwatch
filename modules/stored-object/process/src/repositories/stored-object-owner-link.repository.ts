@@ -18,8 +18,14 @@ export type StoredObjectOwnerLink = Readonly<{
 }>;
 
 export interface StoredObjectOwnerLinkRepository {
-  /** Writes the link, or moves an existing link's `retainUntil` later; never earlier. */
+  /**
+   * Writes the link, or moves an existing link's `retainUntil` later, never earlier, and its
+   * `createdAt` with it, so a re-time counts from the owner's latest store (ADR-002 §5).
+   */
   raise(link: StoredObjectOwnerLink): Promise<void>;
+
+  /** How many owners have ever linked the object, ended or not; none means it predates links. */
+  countAll(input: { tenantId: StoredObjectProjectId; objectId: StoredObjectId }): Promise<number>;
 
   /** How many owners still hold the object at `now`. */
   countLive(input: {

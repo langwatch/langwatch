@@ -36,7 +36,7 @@ function dayOf(day: number): Instant {
   return DAY_0.add({ hours: day * 24 });
 }
 
-function fixture(input: { sweepPageSize?: number } = {}) {
+function fixture(input: { sweepPageSize?: number; sweepBudgetMs?: number } = {}) {
   const memoryLinks = MemoryStoredObjectOwnerLinkRepository.create();
   const records = MemoryStoredObjectRecordRepository.create([], memoryLinks);
   const clock = { now: DAY_0 };
@@ -46,6 +46,7 @@ function fixture(input: { sweepPageSize?: number } = {}) {
     objectStorage: memoryObjectStorage(),
   });
   const cleanup = { refuses: false };
+  const sweepPages = { msEach: 0, refuseTenant: undefined as StoredObjectProjectId | undefined };
   const ownerLinks: StoredObjectOwnerLinkRepository = {
     raise: async (link) => {
       const before = race.beforeRaise;
@@ -57,10 +58,17 @@ function fixture(input: { sweepPageSize?: number } = {}) {
       await after?.();
     },
     countLive: (query) => memoryLinks.countLive(query),
+    countAll: (query) => memoryLinks.countAll(query),
     deleteForTenant: (query) => memoryLinks.deleteForTenant(query),
     findTenantsWithExpired: (query) => memoryLinks.findTenantsWithExpired(query),
-    findExpired: (query) => memoryLinks.findExpired(query),
-    deleteExpired: (query) => memoryLinks.deleteExpired(query),
+    findExpired: async (query) => {
+      clock.now = clock.now.add({ milliseconds: sweepPages.msEach });
+      return memoryLinks.findExpired(query);
+    },
+    deleteExpired: async (query) => {
+      if (query.tenantId === sweepPages.refuseTenant) throw new Error("interrupted");
+      return memoryLinks.deleteExpired(query);
+    },
     retime: (query) => memoryLinks.retime(query),
   };
   const service = StoredObjectService.create({
@@ -90,6 +98,7 @@ function fixture(input: { sweepPageSize?: number } = {}) {
     },
     now: () => clock.now,
     ...(input.sweepPageSize ? { sweepPageSize: input.sweepPageSize } : {}),
+    ...(input.sweepBudgetMs ? { sweepBudgetMs: input.sweepBudgetMs } : {}),
   });
 
   function store(overrides: Partial<StoreStoredObjectFromBytesInput> = {}) {
@@ -128,6 +137,7 @@ function fixture(input: { sweepPageSize?: number } = {}) {
     retention,
     race,
     cleanup,
+    sweepPages,
     store,
     rowOf,
     linksOf,
@@ -222,53 +232,69 @@ describe("StoredObjectRetentionService.sweep", () => {
     });
   });
 
-  describe("given more ended links than one sweep page", () => {
-    /** @scenario "The sweep is bounded and resumable" */
-    it("handles at most one page per tenant per run, and later runs finish", async () => {
-      const f = fixture({ sweepPageSize: 2 });
+  describe("given more ended links than one sweep page, across two tenants", () => {
+    async function threeEachSide(f: ReturnType<typeof fixture>) {
       for (const byte of [1, 2, 3]) {
         await f.store({ bytes: new Uint8Array([byte]), ownerId: `t${byte}` });
         await f.store({ bytes: new Uint8Array([byte]), projectId: OTHER_PROJECT });
       }
       f.clock.now = dayOf(31);
+    }
 
-      const first = await f.sweeper.sweep();
-      expect(first).toEqual({ tenants: 2, removedLinks: 4, deletedObjects: 4 });
+    /** @scenario "The sweep is bounded and resumable" */
+    it("takes a page from each tenant in turn until none is left", async () => {
+      const f = fixture({ sweepPageSize: 2 });
+      await threeEachSide(f);
 
-      const second = await f.sweeper.sweep();
-      expect(second).toEqual({ tenants: 2, removedLinks: 2, deletedObjects: 2 });
-      expect(await f.sweeper.sweep()).toEqual({ tenants: 0, removedLinks: 0, deletedObjects: 0 });
+      await expect(f.sweeper.sweep()).resolves.toEqual({
+        tenants: 2,
+        removedLinks: 6,
+        deletedObjects: 6,
+      });
+      await expect(f.sweeper.sweep()).resolves.toEqual({
+        tenants: 0,
+        removedLinks: 0,
+        deletedObjects: 0,
+      });
     });
 
     /** @scenario "The sweep is bounded and resumable" */
-    it("finishes on a later run what an interrupted run left", async () => {
-      const f = fixture();
-      const { reference } = await f.store();
-      f.clock.now = dayOf(31);
-      const failing = StoredObjectRetentionService.create({
-        records: f.records,
-        ownerLinks: {
-          findTenantsWithExpired: (query) => f.memoryLinks.findTenantsWithExpired(query),
-          findExpired: (query) => f.memoryLinks.findExpired(query),
-          deleteExpired: async () => {
-            throw new Error("interrupted");
-          },
-          raise: (link) => f.memoryLinks.raise(link),
-          countLive: (query) => f.memoryLinks.countLive(query),
-          deleteForTenant: (query) => f.memoryLinks.deleteForTenant(query),
-          retime: (query) => f.memoryLinks.retime(query),
-        },
-        cleanup: { deleteStorageBestEffort: async () => true },
-        now: () => f.clock.now,
+    it("stops when its budget ends, after both tenants had a page, and the next run finishes", async () => {
+      const f = fixture({ sweepPageSize: 2, sweepBudgetMs: 1_000 });
+      await threeEachSide(f);
+      f.sweepPages.msEach = 600;
+
+      await expect(f.sweeper.sweep()).resolves.toEqual({
+        tenants: 2,
+        removedLinks: 4,
+        deletedObjects: 4,
       });
+      await expect(f.sweeper.sweep()).resolves.toEqual({
+        tenants: 2,
+        removedLinks: 2,
+        deletedObjects: 2,
+      });
+    });
+  });
 
-      await expect(failing.sweep()).rejects.toThrow("interrupted");
-      expect((await f.rowOf(reference.id))?.status).toBe("deleted");
-      expect(await f.linksOf(reference.id)).toHaveLength(1);
+  describe("given two tenants with ended links, the first of which cannot be swept", () => {
+    /** @scenario "One tenant's failure does not stop the sweep for the others" */
+    it("sweeps the second, fails the run, and a later run finishes the first", async () => {
+      const f = fixture();
+      const failing = await f.store({ projectId: OTHER_PROJECT });
+      const swept = await f.store();
+      f.clock.now = dayOf(31);
+      f.sweepPages.refuseTenant = OTHER_PROJECT;
 
+      await expect(f.sweeper.sweep()).rejects.toBeInstanceOf(AggregateError);
+      expect((await f.rowOf(swept.reference.id))?.status).toBe("deleted");
+      expect(await f.linksOf(swept.reference.id)).toEqual([]);
+      expect(await f.linksOf(failing.reference.id, OTHER_PROJECT)).toHaveLength(1);
+
+      f.sweepPages.refuseTenant = undefined;
       await f.sweeper.sweep();
 
-      expect(await f.linksOf(reference.id)).toEqual([]);
+      expect(await f.linksOf(failing.reference.id, OTHER_PROJECT)).toEqual([]);
     });
   });
 
@@ -332,6 +358,20 @@ describe("StoredObjectRetentionService.followRetention", () => {
       await f.sweeper.followRetention({ projectId: PROJECT, category: "traces", retentionDays: 7 });
 
       expect((await f.linksOf(reference.id)).map((link) => link.retainUntil)).toEqual([dayOf(7)]);
+    });
+  });
+
+  describe("given trace t1 stored media on day 0 and the same media again on day 20", () => {
+    /** @scenario "A re-time counts from the owner's latest store" */
+    it("ends the link of t1 on day 27 under a 7-day retention", async () => {
+      const f = fixture();
+      const { reference } = await f.store({ ownerId: "t1" });
+      f.clock.now = dayOf(20);
+      await f.store({ ownerId: "t1" });
+
+      await f.sweeper.followRetention({ projectId: PROJECT, category: "traces", retentionDays: 7 });
+
+      expect((await f.linksOf(reference.id)).map((link) => link.retainUntil)).toEqual([dayOf(27)]);
     });
   });
 

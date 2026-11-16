@@ -15,6 +15,8 @@ import type { StoredObjectCleanupService } from "./stored-object-cleanup.service
 
 const SWEEP_TENANT_LIMIT = 100;
 const SWEEP_PAGE_SIZE = 500;
+/** Below the sweep intent's 30-minute lease, so a run ends before another may start. */
+const SWEEP_BUDGET_MS = 20 * 60 * 1000;
 const RETIME_PAGE_SIZE = 500;
 
 type StoredObjectRetentionServiceOptions = Readonly<{
@@ -25,6 +27,7 @@ type StoredObjectRetentionServiceOptions = Readonly<{
   now: () => Instant;
   sweepTenantLimit?: number;
   sweepPageSize?: number;
+  sweepBudgetMs?: number;
   retimePageSize?: number;
 }>;
 
@@ -47,32 +50,26 @@ export class StoredObjectRetentionService {
   private constructor(private readonly options: StoredObjectRetentionServiceOptions) {}
 
   /**
-   * At most one page of ended links per tenant. Objects go before their links, so a run cut
-   * short leaves the ended links for the next run to finish.
+   * One page from each tenant in turn until none is left or the budget ends. Objects go
+   * before their links, so a run cut short leaves the ended links for the next run. A
+   * failing tenant leaves the turn; the run throws its failures once the others are done.
    */
   async sweep(): Promise<StoredObjectSweepReport> {
-    const now = this.options.now();
+    const startedAt = this.options.now();
+    const budgetMs = this.options.sweepBudgetMs ?? SWEEP_BUDGET_MS;
+    const pageSize = this.options.sweepPageSize ?? SWEEP_PAGE_SIZE;
     const tenants = await this.options.ownerLinks.findTenantsWithExpired({
-      before: now,
+      before: startedAt,
       limit: this.options.sweepTenantLimit ?? SWEEP_TENANT_LIMIT,
     });
-    let removedLinks = 0;
-    let deletedObjects = 0;
-    for (const tenantId of tenants) {
-      const page = await this.options.ownerLinks.findExpired({
-        tenantId,
-        before: now,
-        limit: this.options.sweepPageSize ?? SWEEP_PAGE_SIZE,
-      });
-      const objectIds = [...new Set(page.map((link) => link.objectId))];
-      for (const id of objectIds) {
-        if (await this.#deleteIfUnheld({ tenantId, id, now })) deletedObjects += 1;
-      }
-      removedLinks += await this.options.ownerLinks.deleteExpired({
-        tenantId,
-        objectIds,
-        before: now,
-      });
+    const tally = { removedLinks: 0, deletedObjects: 0, failures: [] as unknown[] };
+    let turn = tenants;
+    while (turn.length > 0) {
+      turn = await this.#sweepTurn({ tenants: turn, startedAt, budgetMs, pageSize, tally });
+    }
+    const { removedLinks, deletedObjects, failures } = tally;
+    if (failures.length > 0) {
+      throw new AggregateError(failures, `The sweep failed for ${failures.length} tenant(s)`);
     }
 
     return { tenants: tenants.length, removedLinks, deletedObjects };
@@ -112,6 +109,61 @@ export class StoredObjectRetentionService {
         afterId = page.at(-1)?.id;
       } while (isFullPage && afterId);
     }
+  }
+
+  /** One page from each tenant; answers the tenants with more to take, none once over budget. */
+  async #sweepTurn(input: {
+    tenants: readonly StoredObjectProjectId[];
+    startedAt: Instant;
+    budgetMs: number;
+    pageSize: number;
+    tally: { removedLinks: number; deletedObjects: number; failures: unknown[] };
+  }): Promise<StoredObjectProjectId[]> {
+    const { startedAt, budgetMs, pageSize, tally } = input;
+    const next: StoredObjectProjectId[] = [];
+    for (const tenantId of input.tenants) {
+      if (this.#elapsedMs(startedAt) >= budgetMs) return [];
+      try {
+        const page = await this.#sweepPage({ tenantId, now: startedAt, pageSize });
+        tally.removedLinks += page.removedLinks;
+        tally.deletedObjects += page.deletedObjects;
+        if (page.isFull && page.removedLinks > 0) next.push(tenantId);
+      } catch (error) {
+        tally.failures.push(error);
+      }
+    }
+
+    return this.#elapsedMs(startedAt) >= budgetMs ? [] : next;
+  }
+
+  async #sweepPage(input: {
+    tenantId: StoredObjectProjectId;
+    now: Instant;
+    pageSize: number;
+  }): Promise<{ removedLinks: number; deletedObjects: number; isFull: boolean }> {
+    const page = await this.options.ownerLinks.findExpired({
+      tenantId: input.tenantId,
+      before: input.now,
+      limit: input.pageSize,
+    });
+    const objectIds = [...new Set(page.map((link) => link.objectId))];
+    let deletedObjects = 0;
+    for (const id of objectIds) {
+      if (await this.#deleteIfUnheld({ tenantId: input.tenantId, id, now: input.now })) {
+        deletedObjects += 1;
+      }
+    }
+    const removedLinks = await this.options.ownerLinks.deleteExpired({
+      tenantId: input.tenantId,
+      objectIds,
+      before: input.now,
+    });
+
+    return { removedLinks, deletedObjects, isFull: page.length >= input.pageSize };
+  }
+
+  #elapsedMs(startedAt: Instant): number {
+    return this.options.now().epochMilliseconds - startedAt.epochMilliseconds;
   }
 
   /** The conditional logical delete, then the delete path's provider cleanup. */

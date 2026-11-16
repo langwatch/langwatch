@@ -129,6 +129,7 @@ export class StoredObjectUploadService {
     });
     for (const candidate of reusable) {
       if (candidate.byteLength !== byteLength) continue;
+      if (owners.length > 0 && !(await this.isLinked(candidate))) continue;
       await this.link({ objectId: candidate.id, owners });
       // A delete may win between the read and the link (ADR-002 §4): never answer it.
       const current =
@@ -223,6 +224,19 @@ export class StoredObjectUploadService {
         updatedAt: now,
       },
     ];
+  }
+
+  /**
+   * An object stored before owner links holds none, and its older owners hold it unrecorded:
+   * linking it would let the sweep delete it under them, so it is never reused (ADR-002).
+   */
+  private async isLinked(candidate: StoredObjectRecord): Promise<boolean> {
+    const links = await this.options.ownerLinks.countAll({
+      tenantId: candidate.tenantId,
+      objectId: candidate.id,
+    });
+
+    return links > 0;
   }
 
   private async link({

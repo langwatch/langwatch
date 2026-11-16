@@ -38,6 +38,13 @@ Feature: Stored-object reuse by content and owner-linked retention
     When the caller stores the same bytes for the same purpose
     Then the object's audiences include the caller's audience
 
+  @unit
+  Scenario: An object stored before owner links is never reused for a retained purpose
+    Given an available "trace_content" object that holds no owner link
+    When trace "t2" stores the same bytes for the same purpose
+    Then a new object is written and linked to trace "t2"
+    And the older object keeps no link, so the sweep never deletes it
+
   # ===========================================================================
   # Owner links
   # ===========================================================================
@@ -101,10 +108,17 @@ Feature: Stored-object reuse by content and owner-linked retention
 
   @unit
   Scenario: The sweep is bounded and resumable
-    Given more expired links than one sweep page
-    When the sweep runs repeatedly
-    Then each run handles at most one page per tenant
-    And a run interrupted part way leaves nothing a later run cannot finish
+    Given more expired links than one sweep page, across two tenants
+    When the sweep runs
+    Then it takes one page from each tenant in turn until none is left or its time budget ends
+    And a run stopped by its budget leaves the rest for the next run
+
+  @unit
+  Scenario: One tenant's failure does not stop the sweep for the others
+    Given two tenants with expired links, and the first tenant's links cannot be removed
+    When the sweep runs
+    Then the second tenant's expired objects are deleted
+    And the run fails naming the failure, and a later run finishes the first tenant
 
   # ===========================================================================
   # Retention changes
@@ -115,6 +129,12 @@ Feature: Stored-object reuse by content and owner-linked retention
     Given trace media linked on day 0 under a 30-day trace retention
     When the project applies a 7-day trace retention to its existing data
     Then every "trace_content" link of the project ends 7 days after it was created
+
+  @unit
+  Scenario: A re-time counts from the owner's latest store
+    Given trace "t1" stored media on day 0 and the same media again on day 20
+    When the project applies a 7-day trace retention to its existing data
+    Then the link of trace "t1" ends on day 27
 
   @unit
   Scenario: Applying a longer retention to existing traces lengthens their media's links

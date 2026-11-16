@@ -43,18 +43,21 @@ spec), so a pinned trace's rows still expire.
 ownerKind, ownerId, retainUntil, createdAt, updatedAt)`, records who holds
    an object and until when. Each `storeFromBytes` for a purpose that declares
    a retention category writes the caller's link, or raises its `retainUntil`
-   when the link exists. A reuse adds a link; it never shortens another's.
+   when the link exists, moving its `createdAt` to the latest store with it. A
+   reuse adds a link; it never shortens another's.
 3. **The purpose declares its retention category.** `trace_content` follows
    `traces`. `retainUntil` is now plus the project's resolved days for that
    category, asked of `DataRetentionApi`. Purposes with no category write no
    links and are never swept, so every object stored before this change, and
    every other purpose, keeps today's behaviour.
-4. **Sweep by link.** A scheduled process manager in the worker pages links
-   past `retainUntil`, deletes them, and logically deletes each object left
+4. **Sweep by link.** A scheduled process manager in the worker takes one page
+   of links past `retainUntil` from each tenant in turn, within a time budget
+   below its lease, deletes them, and logically deletes each object left
    with no live link through the existing delete path, whose provider cleanup
    then follows. The object delete is conditional on "no live link" in one
    statement, so a reuse racing the sweep either lands its link first (the
-   object survives) or finds the object deleted and writes fresh bytes.
+   object survives) or finds the object deleted and writes fresh bytes. A
+   tenant that fails leaves the run; the others finish, then the run fails.
 5. **Follow retroactive retention.** data-retention records a fact,
    `retention_applied_to_existing_data` (project, category, days), when it
    rewrites existing rows. A Stored Objects peer subscriber recomputes the
@@ -76,7 +79,10 @@ ownerKind, ownerId, retainUntil, createdAt, updatedAt)`, records who holds
   references it, and follows retroactive retention changes in both
   directions.
 - Objects extracted before this change carry no link and are never swept;
-  they are the few projects that opted into the flag early.
+  they are the few projects that opted into the flag early. They are never
+  reused for a retained purpose either: a link on one would let the sweep
+  delete it under the older traces that hold it unrecorded. Their bytes are
+  written once more.
 - Stored Objects gains `DataRetentionApi` as a peer. data-retention gains no
   peer: it only records a fact.
 - The pending-upload and deleted-object cleanups remain uncalled; scheduling
