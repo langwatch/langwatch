@@ -247,6 +247,74 @@ describe("toLegacyCompatibleCustomModels", () => {
     });
   });
 
+  describe("when entries are stored in the saved id, label and type shape", () => {
+    /** @scenario "The gateway reads a custom model's settings from either stored shape" */
+    it("reads each as a custom model with its settings", () => {
+      const result = toLegacyCompatibleCustomModels(
+        [
+          {
+            id: "acme-gpt",
+            label: "ACME GPT",
+            type: "chat",
+            maxTokens: 4096,
+            supportedParameters: ["temperature"],
+            multimodalInputs: ["image"],
+          },
+          { id: "acme-mini", label: "ACME Mini", type: "chat" },
+        ],
+        "chat",
+      );
+
+      expect(result.entries).toEqual([
+        {
+          modelId: "acme-gpt",
+          displayName: "ACME GPT",
+          mode: "chat",
+          maxTokens: 4096,
+          supportedParameters: ["temperature"],
+          multimodalInputs: ["image"],
+        },
+        { modelId: "acme-mini", displayName: "ACME Mini", mode: "chat" },
+      ]);
+      expect(result.rejected).toEqual([]);
+    });
+
+    it("takes the mode from the list it was read from, not the entry", () => {
+      const result = toLegacyCompatibleCustomModels(
+        [{ id: "acme-embed", label: "ACME Embed", type: "other" }],
+        "embedding",
+      );
+
+      expect(result.entries).toEqual([
+        { modelId: "acme-embed", displayName: "ACME Embed", mode: "embedding" },
+      ]);
+    });
+
+    it("reads a list mixing plain ids, the model id shape and the saved shape", () => {
+      const result = toLegacyCompatibleCustomModels(
+        [
+          { id: "a", label: "A", type: "chat" },
+          "b",
+          { modelId: "c", displayName: "C", mode: "chat" },
+        ],
+        "chat",
+      );
+
+      expect(result.entries.map((entry) => entry.modelId)).toEqual(["a", "b", "c"]);
+      expect(result.rejected).toEqual([]);
+    });
+
+    it("still drops a saved entry carrying an unrecognised key, naming it by id", () => {
+      const result = toLegacyCompatibleCustomModels(
+        [{ id: "a", label: "A", type: "chat", extra: "nope" }],
+        "chat",
+      );
+
+      expect(result.entries).toEqual([]);
+      expect(result.rejected).toEqual([{ name: "a" }]);
+    });
+  });
+
   describe("when input is null or undefined", () => {
     it("returns empty array for null", () => {
       expect(toLegacyCompatibleCustomModels(null, "chat").entries).toEqual([]);

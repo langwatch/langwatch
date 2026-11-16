@@ -1,6 +1,8 @@
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
+import { modelSchema } from "./model-provider.ts";
+
 /** Parameters exposed by the custom-model configuration UI. */
 export const supportedParameterValues = [
   "temperature",
@@ -61,9 +63,37 @@ export type ParsedCustomModels = {
 
 /** Best-effort name for a log line — never the raw (possibly huge) entry. */
 function nameOfRejectedEntry(entry: unknown): string {
-  const modelId =
-    entry && typeof entry === "object" ? (entry as Record<string, unknown>).modelId : void 0;
-  return typeof modelId === "string" && modelId.length > 0 ? modelId : "<unnamed>";
+  const record = entry && typeof entry === "object" ? (entry as Record<string, unknown>) : {};
+  const name = record.modelId ?? record.id;
+  return typeof name === "string" && name.length > 0 ? name : "<unnamed>";
+}
+
+type StoredCustomModelRead = { kind: "read"; entry: CustomModelEntry } | { kind: "rejected" };
+
+/**
+ * One stored entry in any shape the column holds: a bare id, the older `modelId` shape, or the
+ * `id`/`label`/`type` shape a save writes today. The list it came from decides the mode.
+ */
+function readStoredCustomModel(entry: unknown, mode: "chat" | "embedding"): StoredCustomModelRead {
+  if (typeof entry === "string") {
+    return entry.length > 0
+      ? { kind: "read", entry: { modelId: entry, displayName: entry, mode } }
+      : { kind: "rejected" };
+  }
+  const legacy = customModelEntrySchema.safeParse(entry);
+  if (legacy.success) return { kind: "read", entry: legacy.data };
+  const saved = modelSchema.safeParse(entry);
+  if (!saved.success) return { kind: "rejected" };
+  const { id, label, maxTokens, supportedParameters, multimodalInputs } = saved.data;
+  const mapped = customModelEntrySchema.safeParse({
+    modelId: id,
+    displayName: label,
+    mode,
+    ...(maxTokens === undefined ? {} : { maxTokens }),
+    ...(supportedParameters === undefined ? {} : { supportedParameters }),
+    ...(multimodalInputs === undefined ? {} : { multimodalInputs }),
+  });
+  return mapped.success ? { kind: "read", entry: mapped.data } : { kind: "rejected" };
 }
 
 export function toLegacyCompatibleCustomModels(
@@ -80,8 +110,8 @@ export function toLegacyCompatibleCustomModels(
   const entries: CustomModelEntry[] = [];
   const rejected: RejectedCustomModelEntry[] = [];
   for (const entry of value) {
-    const parsed = customModelEntrySchema.safeParse(entry);
-    if (parsed.success) entries.push(parsed.data);
+    const read = readStoredCustomModel(entry, mode);
+    if (read.kind === "read") entries.push(read.entry);
     else rejected.push({ name: nameOfRejectedEntry(entry) });
   }
   return { entries, rejected };
