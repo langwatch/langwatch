@@ -52,7 +52,10 @@ export function buildAgentInventory({
   const bySourceKey = new Map(registry.map(({ sourceKey, entry }) => [sourceKey, entry]));
   const withPosture = (row: GovernanceAgentRow, sourceKey: string): GovernanceAgentRow => {
     const entry = bySourceKey.get(sourceKey);
-    return entry ? { ...row, posture: entry.posture, platform: entry.platform } : row;
+    if (!entry) return row;
+    // A listed agent's model comes from its source's listing, which only the registry entry holds.
+    const models = row.models.length === 0 && entry.model ? [entry.model.model] : row.models;
+    return { ...row, posture: entry.posture, platform: entry.platform, models };
   };
 
   const registeredRows = registered.map((agent) =>

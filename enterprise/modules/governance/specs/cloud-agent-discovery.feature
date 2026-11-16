@@ -255,6 +255,7 @@ Feature: Cloud agent discovery with shadow and dormant agents
     Given a governed, a shadow and a dormant agent in the registry
     When the Agents page is read
     Then each row carries posture "governed", "shadow" or "dormant"
+    And a listed agent's row names the model its source lists
 
   @unit
   Scenario: The inventory filters by posture and by cloud source

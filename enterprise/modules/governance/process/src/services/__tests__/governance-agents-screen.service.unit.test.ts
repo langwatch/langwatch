@@ -167,6 +167,7 @@ describe("GovernanceAgentsScreenService", () => {
           project_id: null,
           dormant: true,
           platform: "aws_bedrock",
+          model: { provider: null, model: "anthropic.claude-sonnet-5", parameters: {} },
         }),
         registryDraft({
           sourceKey: "traffic:project-1:pricing-bot",
@@ -185,6 +186,7 @@ describe("GovernanceAgentsScreenService", () => {
         ["revenue-analyst", "databricks", "dormant", "aws_bedrock"],
         ["pricing-bot", "traffic", "shadow", null],
       ]);
+      expect(rows[1]).toMatchObject({ models: ["anthropic.claude-sonnet-5"] });
       expect(rows[2]).toMatchObject({ models: ["gpt-5"], lastActiveMinutesAgo: 0 });
     });
   });
