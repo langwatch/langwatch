@@ -304,6 +304,19 @@ describe("toLegacyCompatibleCustomModels", () => {
       expect(result.rejected).toEqual([]);
     });
 
+    it("reads a mixed list whose first entry is a plain id", () => {
+      const result = toLegacyCompatibleCustomModels(
+        ["a", { id: "b", label: "B", type: "chat", maxTokens: 4096 }],
+        "chat",
+      );
+
+      expect(result.entries).toEqual([
+        { modelId: "a", displayName: "a", mode: "chat" },
+        { modelId: "b", displayName: "B", mode: "chat", maxTokens: 4096 },
+      ]);
+      expect(result.rejected).toEqual([]);
+    });
+
     it("still drops a saved entry carrying an unrecognised key, naming it by id", () => {
       const result = toLegacyCompatibleCustomModels(
         [{ id: "a", label: "A", type: "chat", extra: "nope" }],

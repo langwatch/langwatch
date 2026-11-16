@@ -101,12 +101,6 @@ export function toLegacyCompatibleCustomModels(
   mode: "chat" | "embedding",
 ): ParsedCustomModels {
   if (value == null || !Array.isArray(value)) return { entries: [], rejected: [] };
-  if (isLegacyCustomModels(value)) {
-    return {
-      entries: value.map((modelId) => ({ modelId, displayName: modelId, mode })),
-      rejected: [],
-    };
-  }
   const entries: CustomModelEntry[] = [];
   const rejected: RejectedCustomModelEntry[] = [];
   for (const entry of value) {

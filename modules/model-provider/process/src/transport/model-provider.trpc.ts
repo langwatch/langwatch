@@ -10,7 +10,10 @@ import {
   type ModelProviderListEntry,
 } from "@langwatch/model-provider-contract";
 
-import { toCanonicalCustomModelList } from "../rules/custom-model-list.rules.ts";
+import {
+  toCanonicalCustomModelList,
+  toCustomModelEntry,
+} from "../rules/custom-model-list.rules.ts";
 
 /** Which permissions the application enforces on a provider write, scope by scope. */
 const PROVIDER_WRITE_PERMISSIONS = [
@@ -288,8 +291,8 @@ type CanonicalProvider = {
   /** Last known reachability, rendered by the routing-policy credential picker. */
   healthStatus?: "UNKNOWN" | "HEALTHY" | "DEGRADED" | "CIRCUIT_OPEN";
   customKeys: Record<string, unknown> | null;
-  customModels: { id: string; label: string; type: string }[];
-  customEmbeddingsModels: { id: string; label: string; type: string }[];
+  customModels: CanonicalCustomModel[];
+  customEmbeddingsModels: CanonicalCustomModel[];
   models?: string[] | null;
   embeddingsModels?: string[] | null;
   /** Where the provider is attached; `filterProvidersByScope` reads it directly. */
@@ -302,6 +305,16 @@ type CanonicalProvider = {
   rateLimitRpd?: number | null;
   fallbackPriorityGlobal?: number | null;
   providerConfig?: Record<string, unknown> | null;
+};
+
+/** A stored custom model with the per-model settings the drawer reopens. */
+type CanonicalCustomModel = {
+  id: string;
+  label: string;
+  type: string;
+  maxTokens?: number | null;
+  supportedParameters?: string[];
+  multimodalInputs?: ("image" | "file" | "audio")[];
 };
 
 /**
@@ -321,16 +334,10 @@ function toListEntry(provider: CanonicalProvider): ModelProviderListEntry {
     scopes: provider.scopes,
     models: provider.models ?? null,
     embeddingsModels: provider.embeddingsModels ?? null,
-    customModels: provider.customModels.map((model) => ({
-      modelId: model.id,
-      displayName: model.label,
-      mode: "chat" as const,
-    })),
-    customEmbeddingsModels: provider.customEmbeddingsModels.map((model) => ({
-      modelId: model.id,
-      displayName: model.label,
-      mode: "embedding" as const,
-    })),
+    customModels: provider.customModels.map((model) => toCustomModelEntry(model, "chat")),
+    customEmbeddingsModels: provider.customEmbeddingsModels.map((model) =>
+      toCustomModelEntry(model, "embedding"),
+    ),
     langySkipPermissionsModels: provider.langySkipPermissionsModels ?? null,
     rateLimitRpm: provider.rateLimitRpm ?? null,
     rateLimitTpm: provider.rateLimitTpm ?? null,

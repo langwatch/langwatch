@@ -3,6 +3,7 @@
  * The `modelProvider.*` procedures over the real runtime and application.
  * @see specs/model-providers/provider-configuration.feature
  * @see specs/settings/model-provider-skip-permissions.feature
+ * @see modules/model-provider/specs/provider-save.feature
  */
 import { createTrpcRuntime } from "@langwatch/api/trpc";
 import {
@@ -399,6 +400,46 @@ describe("the modelProvider tRPC namespace", () => {
       expect(map.openai?.rateLimitTpm).toBeNull();
       expect(map.openai?.providerConfig).toEqual({ region: "us-east-1" });
       expect(list[0]?.fallbackPriorityGlobal).toBe(1);
+    });
+  });
+
+  describe("when a custom model stored with its settings is listed back", () => {
+    /** @scenario "A saved custom model reopens with its max tokens, parameters and inputs" */
+    it("carries its max tokens, parameters and inputs so the next save keeps them", async () => {
+      const saved = storedProvider({
+        customModels: [
+          {
+            id: "acme-chat",
+            label: "ACME Chat",
+            type: "chat",
+            maxTokens: 8192,
+            supportedParameters: ["temperature", "seed"],
+            multimodalInputs: ["image"],
+          },
+        ],
+        customEmbeddingsModels: [
+          { id: "acme-embed", label: "ACME Embed", type: "embedding", maxTokens: null },
+        ],
+      });
+      const { caller } = mount({
+        modelProviders: { listForProject: (async () => [saved]) as never },
+      });
+
+      const [listed] = await caller.listAllForProjectForFrontend({ projectId: PROJECT_A });
+
+      expect(listed?.customModels).toEqual([
+        {
+          modelId: "acme-chat",
+          displayName: "ACME Chat",
+          mode: "chat",
+          maxTokens: 8192,
+          supportedParameters: ["temperature", "seed"],
+          multimodalInputs: ["image"],
+        },
+      ]);
+      expect(listed?.customEmbeddingsModels).toEqual([
+        { modelId: "acme-embed", displayName: "ACME Embed", mode: "embedding", maxTokens: null },
+      ]);
     });
   });
 

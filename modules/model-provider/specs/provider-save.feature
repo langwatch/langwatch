@@ -11,6 +11,12 @@ Feature: Saving a provider keeps what the operator set and where it lives
     Then the stored custom model carries the same max tokens, parameters and inputs
 
   @unit
+  Scenario: A saved custom model reopens with its max tokens, parameters and inputs
+    Given a stored custom model with a max tokens limit, supported parameters and multimodal inputs
+    When the provider is listed for the drawer
+    Then the listed custom model carries the same max tokens, parameters and inputs
+
+  @unit
   Scenario: A custom model list without settings stores none
     Given a custom model list sent as plain ids
     When the provider is saved

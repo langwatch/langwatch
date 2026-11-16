@@ -1,6 +1,7 @@
 import {
   multimodalInputValues,
   supportedParameterValues,
+  type CustomModelEntry,
   type Model,
 } from "@langwatch/model-provider-contract";
 import { z } from "zod";
@@ -40,9 +41,17 @@ export function toCanonicalCustomModelList(
   });
 }
 
+/** A stored custom model as the drawer reads it back, settings included so a save keeps them. */
+export function toCustomModelEntry(
+  model: Pick<Model, "id" | "label" | "maxTokens" | "supportedParameters" | "multimodalInputs">,
+  mode: CustomModelEntry["mode"],
+): CustomModelEntry {
+  return { modelId: model.id, displayName: model.label, mode, ...settingsOf(model) };
+}
+
 function settingsOf(
-  item: Record<string, unknown>,
-): Pick<Model, "maxTokens" | "supportedParameters" | "multimodalInputs"> {
+  item: Partial<Record<"maxTokens" | "supportedParameters" | "multimodalInputs", unknown>>,
+): Pick<CustomModelEntry, "maxTokens" | "supportedParameters" | "multimodalInputs"> {
   const maxTokens = settingSchemas.maxTokens.safeParse(item.maxTokens);
   const supportedParameters = settingSchemas.supportedParameters.safeParse(
     item.supportedParameters,
