@@ -41,16 +41,20 @@ const { reader, payLink, leaveTo, failed } = vi.hoisted(() => ({
   failed: vi.fn(),
 }));
 
-vi.mock("@langwatch/browser-host/capabilities", async (importOriginal) => ({
-  ...(await importOriginal<object>()),
-  useUiHostServices: () => ({
+vi.mock("@langwatch/browser-host/capabilities", async (importOriginal) => {
+  const services = () => ({
     session: {
       hasOrganizationPermission: (permission: string) =>
         reader.canPay && permission === "subscription:manage",
     },
     feedback: { failed },
-  }),
-}));
+  });
+  return {
+    ...(await importOriginal<object>()),
+    useUiHostServices: services,
+    useOptionalUiHostServices: services,
+  };
+});
 vi.mock("@langwatch/browser-host/navigation", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   uiLeaveTo: leaveTo,
@@ -343,6 +347,28 @@ describe("<SubscriptionPage/> while a payment recovery case is open", () => {
       const card = await screen.findByTestId("current-plan-block");
       expect(within(card).queryByRole("button", { name: "Pay now" })).toBeNull();
       expect(within(card).queryByRole("button", { name: "Upgrade to Growth" })).toBeNull();
+      expect(within(card).queryByTestId("current-plan-pay-invoice-button")).toBeNull();
+    });
+
+    /** @scenario "A paused organization over its seats is asked to pay, not to upgrade" */
+    it("asks in the seat note to pay the open invoice, with no upgrade or add seats action", async () => {
+      mockGetUsage.mockReturnValue({
+        data: {
+          seatLimitInfo: {
+            status: "exceeded",
+            message: "Your organization uses 3 member seats and your plan includes 1 member seat.",
+          },
+          membersCount: 3,
+        },
+        isLoading: false,
+        refetch: vi.fn(),
+      });
+      renderSubscriptionPage();
+
+      const note = await screen.findByTestId("seat-limit-callout");
+      expect(note).toHaveTextContent("Pay the open invoice to get your plan back.");
+      expect(note).not.toHaveTextContent("Upgrade to the Growth plan");
+      expect(within(note).queryByRole("button", { name: "Add seats" })).toBeNull();
     });
   });
 

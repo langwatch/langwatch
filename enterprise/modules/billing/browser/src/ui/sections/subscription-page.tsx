@@ -1,3 +1,4 @@
+import { useOptionalUiHostServices } from "@langwatch/browser-host/capabilities";
 import { Link } from "@langwatch/browser-host/link";
 import type { OrganizationStorageEstimate } from "@langwatch/data-retention-contract";
 /**
@@ -266,6 +267,7 @@ function recoveryAwareActionsFor({
   onManageSeats,
   organizationId,
   isFree,
+  canPay,
 }: {
   isPaymentRecoveryOpen: boolean;
   isDeveloperPlan: boolean;
@@ -274,6 +276,8 @@ function recoveryAwareActionsFor({
   onManageSeats: (() => void) | undefined;
   organizationId: string;
   isFree: boolean;
+  /** Holds subscription:manage; anyone else gets no action, so the card shows no footer. */
+  canPay: boolean;
 }): {
   cardCarriesUpgrade: boolean;
   onUserCountClick: (() => void) | undefined;
@@ -289,12 +293,12 @@ function recoveryAwareActionsFor({
   return {
     cardCarriesUpgrade: false,
     onUserCountClick: drawerKind === "free" ? undefined : onManageSeats,
-    paymentAction: (
+    paymentAction: canPay ? (
       <PayOpenInvoiceButton
         organizationId={organizationId}
         label={isFree ? "Pay now" : "Update card"}
       />
-    ),
+    ) : undefined,
   };
 }
 
@@ -308,6 +312,7 @@ function pageDataSettled({ waiting, hasPlan }: { waiting: boolean[]; hasPlan: bo
  */
 export function SubscriptionPage() {
   const host = useBillingHost();
+  const session = useOptionalUiHostServices()?.session;
   const organization = host.organization();
   const activeTeamId = host.activeTeamId();
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -525,6 +530,7 @@ export function SubscriptionPage() {
     onManageSeats,
     organizationId: organization.id,
     isFree: plan.free,
+    canPay: session?.hasOrganizationPermission("subscription:manage") ?? false,
   });
   const eventUsage = currentPlanEventUsage({
     usage: usage.data,
