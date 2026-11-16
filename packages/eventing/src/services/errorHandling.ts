@@ -640,6 +640,32 @@ export function classifyClickHouseError(error: unknown): ErrorCategory {
   return ErrorCategory.CRITICAL;
 }
 
+/** ClickHouse's TOO_MANY_SIMULTANEOUS_QUERIES, by code or by the message an HTTP answer carries. */
+const SIMULTANEOUS_QUERIES_FRAGMENTS = [
+  "Too many simultaneous queries",
+  "TOO_MANY_SIMULTANEOUS_QUERIES",
+] as const;
+
+/**
+ * Whether a failure says ClickHouse had no statement slot for it: the server's
+ * TOO_MANY_SIMULTANEOUS_QUERIES (202), or a statement the client shed for want of a slot.
+ * Retrying such work at once only takes a slot back from the work that is draining.
+ */
+export function isOutOfStatementSlots(error: unknown): boolean {
+  if (HandledError.isHandled(error)) {
+    if (TRANSIENT_HANDLED_CODES.has(error.code)) return true;
+    return (error.reasons ?? []).some(isTooManySimultaneousQueries);
+  }
+  return isTooManySimultaneousQueries(error);
+}
+
+function isTooManySimultaneousQueries(error: unknown): boolean {
+  if (error === null || error === undefined) return false;
+  if (typeof error === "object" && "code" in error && String(error.code) === "202") return true;
+  const message = error instanceof Error ? error.message : String(error);
+  return SIMULTANEOUS_QUERIES_FRAGMENTS.some((fragment) => message.includes(fragment));
+}
+
 function isTransientClickHouseError(error: unknown): boolean {
   if (error != null && typeof error === "object" && "code" in error) {
     const code = String((error as { code: unknown }).code);

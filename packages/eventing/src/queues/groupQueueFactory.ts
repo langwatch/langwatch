@@ -16,6 +16,7 @@ import { incrementEsJobsProjectGone } from "../metrics.ts";
 import {
   classifyClickHouseError,
   ErrorCategory,
+  isOutOfStatementSlots,
   isProjectGone,
   isQueryMemoryLimitExceeded,
   UndeclaredQueuedEventTypeError,
@@ -119,6 +120,21 @@ function overloadedClickHouseError(error: unknown): unknown {
   return undefined;
 }
 
+/** The least wait before work refused a statement slot runs again, and the spread above it. */
+const NO_STATEMENT_SLOT_RETRY = { minMs: 2_000, spreadMs: 3_000 } as const;
+
+/**
+ * The retry delay an overload names. Out of statement slots, the work waits a randomised 2 to
+ * 5 seconds, so the jobs one burst refused do not take the slots back together; any other
+ * overload leaves the wait to the queue's own backoff.
+ */
+function overloadRetryAfterMs(overloaded: unknown): number {
+  if (!isOutOfStatementSlots(overloaded)) return 0;
+  return (
+    NO_STATEMENT_SLOT_RETRY.minMs + Math.floor(Math.random() * NO_STATEMENT_SLOT_RETRY.spreadMs)
+  );
+}
+
 function codeOf(error: unknown): string {
   return error !== null && typeof error === "object" && "code" in error
     ? String(error.code)
@@ -177,7 +193,7 @@ function overloadFailureOf({
     operation,
     message: `ClickHouse overloaded (code ${code}); ${next}: ${detail}`,
     cause: error,
-    retryAfterMs: 0,
+    retryAfterMs: overloadRetryAfterMs(overloaded),
   });
 }
 

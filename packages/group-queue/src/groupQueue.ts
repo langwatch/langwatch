@@ -180,7 +180,7 @@ async function withActiveSpan<T>(
 
 export const JOB_RETRY_CONFIG = {
   maxAttempts: 25,
-  /** An overloaded server is not the job's fault: about six more hours at the backoff cap. */
+  /** An overloaded server is not the job's fault: about three more hours, jittered, at the cap. */
   maxOverloadedAttempts: 61,
   backoffBaseMs: 500,
   maxBackoffMs: 600_000,
@@ -209,11 +209,17 @@ function overloadAttemptsField(count: number): { __overloadAttempts?: number } {
   return count > 0 ? { __overloadAttempts: count } : {};
 }
 
-export function getBackoffMs(attempt: number): number {
-  return Math.min(
+/**
+ * The wait before the retry after `attempt`, with full jitter: anywhere from zero to the
+ * exponential rung, so the jobs of one failed batch or one overloaded server spread out instead
+ * of retrying in the same instant.
+ */
+export function getBackoffMs(attempt: number, random: () => number = Math.random): number {
+  const rung = Math.min(
     JOB_RETRY_CONFIG.backoffBaseMs * Math.pow(2, attempt - 1),
     JOB_RETRY_CONFIG.maxBackoffMs,
   );
+  return Math.floor(random() * rung);
 }
 
 /**
@@ -3403,7 +3409,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     if (attempt >= budget) {
       // The retry ladder is out of rungs — a discard like any other, not
       // recoverable via replay (#5538). Reaching here means every read failed
-      // (~2h27m of sustained unreachability), which says the STORE is down, not
+      // (~1h15m on average of sustained unreachability), which says the STORE is down, not
       // that the blob is gone — so the drop keeps the shared bytes for lazy
       // reclaim while retiring this job's lease.
       await this.dropStagedJob({

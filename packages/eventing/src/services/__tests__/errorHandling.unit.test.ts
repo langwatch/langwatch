@@ -10,6 +10,7 @@ import {
   ErrorCategory,
   HandlerError,
   handleError,
+  isOutOfStatementSlots,
   ProjectionError,
   QueueError,
   SecurityError,
@@ -659,6 +660,47 @@ describe("classifyClickHouseError", () => {
         reasons: [new Error("Syntax error in SQL")],
       });
       expect(classifyClickHouseError(translated)).toBe(ErrorCategory.CRITICAL);
+    });
+  });
+});
+
+describe("isOutOfStatementSlots", () => {
+  describe("when ClickHouse had no statement slot", () => {
+    it.each([
+      ["its code", Object.assign(new Error("query refused"), { code: "202" })],
+      ["its numeric code", Object.assign(new Error("query refused"), { code: 202 })],
+      ["the HTTP message", new Error("Code: 202. Too many simultaneous queries. Maximum: 100.")],
+      ["the code's name", new Error("DB::Exception: TOO_MANY_SIMULTANEOUS_QUERIES")],
+    ])("recognises it by %s", (_, error) => {
+      expect(isOutOfStatementSlots(error)).toBe(true);
+    });
+
+    it("recognises it among a handled error's reasons", () => {
+      const handled = new ClickHouseUnavailableError({
+        reasons: [Object.assign(new Error("query refused"), { code: "202" })],
+      });
+
+      expect(isOutOfStatementSlots(handled)).toBe(true);
+    });
+  });
+
+  describe("when the client shed the statement for want of a slot", () => {
+    it("recognises the shed itself, whatever its reasons say", () => {
+      const shed = new ClickHouseOverloadedError({
+        reasons: [new Error("Aborted while waiting for a ClickHouse concurrency slot.")],
+      });
+
+      expect(isOutOfStatementSlots(shed)).toBe(true);
+    });
+  });
+
+  describe("when the server is overloaded some other way", () => {
+    it.each([
+      ["memory", Object.assign(new Error("MEMORY_LIMIT_EXCEEDED"), { code: "241" })],
+      ["a timeout", Object.assign(new Error("TIMEOUT_EXCEEDED"), { code: "159" })],
+      ["a lost connection", new Error("socket hang up")],
+    ])("does not call %s a missing slot", (_, error) => {
+      expect(isOutOfStatementSlots(error)).toBe(false);
     });
   });
 });
