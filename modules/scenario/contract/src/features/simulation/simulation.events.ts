@@ -436,6 +436,40 @@ export type SimulationRunCutAtLimitRecordedEvent = z.infer<
 >;
 
 /**
+ * MetadataRefreshed: a later attempt's metadata merged over the run's, since the started
+ * event is first-wins. `attemptId` is the idempotency identity; `occurredAt` cannot be, as every
+ * re-drive of one call shares the same end time.
+ */
+const simulationRunMetadataRefreshedEventDataSchemaDefinition = z.object({
+  scenarioRunId: z.string(),
+  attemptId: z.string().min(1),
+  metadata: z.record(z.string(), z.unknown()),
+});
+export interface SimulationRunMetadataRefreshedEventDataSchema extends Named<
+  typeof simulationRunMetadataRefreshedEventDataSchemaDefinition
+> {}
+export const simulationRunMetadataRefreshedEventDataSchema: SimulationRunMetadataRefreshedEventDataSchema =
+  simulationRunMetadataRefreshedEventDataSchemaDefinition;
+export type SimulationRunMetadataRefreshedEventData = z.infer<
+  typeof simulationRunMetadataRefreshedEventDataSchema
+>;
+
+const SimulationRunMetadataRefreshedEventSchemaDefinition = z.object({
+  ...simulationEventSchema.shape,
+  type: z.literal(SIMULATION_RUN_EVENT_TYPES.METADATA_REFRESHED),
+  version: z.literal(SIMULATION_EVENT_VERSIONS.METADATA_REFRESHED),
+  data: simulationRunMetadataRefreshedEventDataSchema,
+});
+export interface SimulationRunMetadataRefreshedEventSchema extends Named<
+  typeof SimulationRunMetadataRefreshedEventSchemaDefinition
+> {}
+export const SimulationRunMetadataRefreshedEventSchema: SimulationRunMetadataRefreshedEventSchema =
+  SimulationRunMetadataRefreshedEventSchemaDefinition;
+export type SimulationRunMetadataRefreshedEvent = z.infer<
+  typeof SimulationRunMetadataRefreshedEventSchema
+>;
+
+/**
  * HooksRecorded: the setup and teardown results the child reported, folded
  * into the run's metadata under `langwatch.hooks`. Arrives after the run
  * finished, like AgentInstanceRecorded, and changes nothing else on the run.
@@ -539,6 +573,7 @@ export type SimulationProcessingEvent =
   | SimulationRunCancelRequestedEvent
   | SimulationRunAgentInstanceRecordedEvent
   | SimulationRunCutAtLimitRecordedEvent
+  | SimulationRunMetadataRefreshedEvent
   | SimulationRunHooksRecordedEvent
   | SimulationRunDeletedEvent
   | SimulationSetArchivedEvent;
@@ -552,6 +587,7 @@ export {
   isSimulationRunDeletedEvent,
   isSimulationRunEvaluatedEvent,
   isSimulationRunFinishedEvent,
+  isSimulationRunMetadataRefreshedEvent,
   isSimulationRunMetricsComputedEvent,
   isSimulationRunQueuedEvent,
   isSimulationRunStartedEvent,
