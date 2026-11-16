@@ -337,14 +337,10 @@ interface Output {
 
 // dataRetention.getStoredPastRetention
 type Input = z.infer<typeof retentionScopeTargetInputSchema>; // ../contract/src/data-retention.trpc.ts:56
-// Output: storedPastRetentionSchema, ../contract/src/data-retention.snapshot.ts:111
+// Output: storedPastRetentionSchema, ../contract/src/data-retention.snapshot.ts:105
 interface Output {
-  categories: {
-    category: "traces" | "scenarios" | "experiments";
-    rows: number;
-    retentionDays: number | null;
-  }[];
-  projectCount: number;
+  rows: number;
+  retentionDays: number | null;
 }
 
 // dataRetention.applyScopeRetentionToStoredData
@@ -355,7 +351,7 @@ type Input = z.infer<typeof retentionScopeWriteInputSchema>; // ../contract/src/
 interface Input {
   organizationId: string;
 }
-// Output: organizationStorageEstimateSchema, ../contract/src/data-retention.snapshot.ts:127
+// Output: organizationStorageEstimateSchema, ../contract/src/data-retention.snapshot.ts:121
 interface Output {
   totalBytes: number;
   coveredDays: number;
@@ -366,7 +362,7 @@ interface Output {
 interface Input {
   organizationId: string;
 }
-// Output: organizationRetentionSchema, ../contract/src/data-retention.snapshot.ts:138
+// Output: organizationRetentionSchema, ../contract/src/data-retention.snapshot.ts:132
 interface Output {
   retentionDays: number;
 }
