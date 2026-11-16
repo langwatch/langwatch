@@ -15,7 +15,7 @@ import {
 } from "@langwatch/model-provider-contract";
 
 import type { ModelProviderRepository } from "../repositories/model-provider.repository.ts";
-import { scopeModelOptionsOf } from "../rules/scope-model-options.rules.ts";
+import { scopeModelOptionsOf, servingRowsOf } from "../rules/scope-model-options.rules.ts";
 import type { ModelProviderCredentialPolicy } from "./model-provider-keys.service.ts";
 import type { ModelProviderScopeService } from "./model-provider-scope.service.ts";
 import type { ModelProviderCatalog } from "./registry-model-provider-catalog.service.ts";
@@ -199,14 +199,17 @@ export class ModelProviderQueryService {
     return scopeModelOptionsOf({ rowsByScope });
   }
 
-  /** The row a Default models scope runs on per provider key, environment-fed ones included. */
+  /** The rows a Default models scope runs its models on, environment-fed ones included. */
   private async findProvidersForScope({
     scope,
   }: {
     scope: ModelDefaultScope;
   }): Promise<ModelProviderSummary[]> {
     const { chain, saved, system } = await this.getScopeCandidates(scope);
-    return this.selectProjectProviders(this.storedThenSystem({ saved, system }), chain);
+    return servingRowsOf({
+      rows: this.storedThenSystem({ saved, system }),
+      compare: (left, right) => this.compareProjectProviders(left, right, chain),
+    });
   }
 
   /** Kept stored rows, then each environment-fed provider no stored row already covers. */

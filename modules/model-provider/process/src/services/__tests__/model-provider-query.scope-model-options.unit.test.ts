@@ -209,6 +209,36 @@ describe("ModelProviderQueryService.getModelOptionsForScopes", () => {
     });
   });
 
+  describe("given an organization Azure provider and a project Azure provider", () => {
+    const orgAzure = (customModels: Model[]) =>
+      rowOf({ ...EMPTY_AZURE_ON_A, id: "azure_org", scope: ORGANIZATION, customModels });
+
+    /** @scenario "A deployment the organization's provider lists is offered beside the project's" */
+    it("offers the deployments of both, as execution runs both", async () => {
+      const projectAzure = rowOf({
+        ...EMPTY_AZURE_ON_A,
+        scope: PROJECT_A,
+        customModels: [{ id: "local" }],
+      });
+
+      const options = await queryFor({
+        saved: [orgAzure([{ id: "shared", label: "Shared GPT" }]), projectAzure],
+      }).getModelOptionsForScopes({ projectId: "proj_a", scopes: [PROJECT_A] });
+
+      expect(options.chat.toSorted()).toEqual(["azure/local", "azure/shared"]);
+      expect(options.displayNames["azure/shared"]).toBe("Shared GPT");
+    });
+
+    it("does not name the project's empty Azure while the organization's offers one", async () => {
+      const options = await queryFor({
+        saved: [orgAzure([{ id: "shared" }]), EMPTY_AZURE_ON_A],
+      }).getModelOptionsForScopes({ projectId: "proj_a", scopes: [PROJECT_A] });
+
+      expect(options.chat).toEqual(["azure/shared"]);
+      expect(options.emptyProviders.chat).toEqual([]);
+    });
+  });
+
   describe("given the picked project runs Anthropic", () => {
     /** @scenario "A provider with catalogue models is never named for a kind it does not offer" */
     it("does not name Anthropic as holding no embedding model", async () => {

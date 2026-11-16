@@ -57,6 +57,13 @@ Feature: Default models offer only what the picked scopes can run
     Then the read is refused before any provider of project A is read
 
   @unit
+  Scenario: A deployment the organization's provider lists is offered beside the project's
+    Given the organization's Azure OpenAI provider lists a deployment
+    And the picked project's own Azure OpenAI provider lists another
+    When the models for the picked project are listed
+    Then both deployments are offered, as either one runs from the project
+
+  @unit
   Scenario: Listing models with no scope picked offers nothing
     When the models for no scope are listed
     Then no model is offered and no provider is named

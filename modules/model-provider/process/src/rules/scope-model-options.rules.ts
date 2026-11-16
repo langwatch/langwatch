@@ -63,7 +63,41 @@ function emptyProvidersOf({ rows, mode }: { rows: readonly ScopeProviderRow[]; m
   return [...named.values()];
 }
 
-/** One list of provider rows per picked scope, each the row that scope runs per provider key. */
+/**
+ * The rows a scope runs, chosen per model as execution resolves one: each added model's best
+ * enabled row, then the best row of each provider key that serves no added model.
+ */
+export function servingRowsOf<Row extends ScopeProviderRow>({
+  rows,
+  compare,
+}: {
+  rows: readonly Row[];
+  compare: (left: Row, right: Row) => number;
+}): Row[] {
+  const ranked = rows.toSorted(compare);
+  const serving = new Set<Row>();
+  const served = new Set<string>();
+  for (const row of ranked.filter((candidate) => candidate.enabled)) {
+    for (const mode of ["chat", "embedding"] as const) {
+      for (const model of customModelsOf({ row, mode })) {
+        const key = `${mode}:${row.provider}/${model.id}`;
+        if (served.has(key)) continue;
+        served.add(key);
+        serving.add(row);
+      }
+    }
+  }
+  const servingKeys = new Set([...serving].map((row) => row.provider));
+  const unserved = new Map<string, Row>();
+  for (const row of ranked) {
+    if (!servingKeys.has(row.provider) && !unserved.has(row.provider)) {
+      unserved.set(row.provider, row);
+    }
+  }
+  return [...serving, ...unserved.values()];
+}
+
+/** One list of provider rows per picked scope, each the rows that scope runs its models on. */
 export function scopeModelOptionsOf({
   rowsByScope,
 }: {
