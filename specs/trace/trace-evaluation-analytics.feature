@@ -33,10 +33,17 @@ Feature: Each evaluation's outcome is kept beside its trace's columns
 
   @unit
   Scenario: A completed evaluation whose run is not readable yet is retried later
-    Given a completed evaluation whose run evaluation has not written yet
+    Given a completed evaluation whose run evaluation has not written yet, appended at most an hour ago
     When the trace subscriber handles the completion
     Then no outcome is recorded
     And the delivery fails so the queue retries it no sooner than five minutes later
+
+  @unit
+  Scenario: A completed evaluation whose run is still not readable after the wait records nothing
+    Given a completed evaluation whose run evaluation has not written, appended over an hour ago
+    When the trace subscriber handles the completion
+    Then no outcome is recorded and the skip is logged
+    And the delivery completes, so the queue retries it no further
 
   @unit
   Scenario: An evaluation of a trace still not stored after the wait records nothing

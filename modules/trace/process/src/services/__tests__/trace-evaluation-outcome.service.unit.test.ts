@@ -265,16 +265,23 @@ describe("TraceEvaluationOutcomeService", () => {
   });
 
   describe("given a completed evaluation whose run evaluation has not written yet", () => {
+    const unreadable = {
+      data: {
+        evaluationId: "evaluation-9",
+        status: "processed" as const,
+        passed: true,
+        label: null,
+      },
+      context: event("evaluation-event-9"),
+    };
+
     /** @scenario "A completed evaluation whose run is not readable yet is retried later" */
     it("records nothing and fails the delivery for a retry minutes later", async () => {
-      const { outcomes, recorded } = await compose();
+      const { outcomes, recorded } = await compose({
+        now: () => EVALUATED_AT + EVALUATED_TRACE_WAIT_MS,
+      });
 
-      const failure = await outcomes
-        .recordCompleted({
-          data: { evaluationId: "evaluation-9", status: "processed", passed: true, label: null },
-          context: event("evaluation-event-9"),
-        })
-        .catch((error: unknown) => error);
+      const failure = await outcomes.recordCompleted(unreadable).catch((error: unknown) => error);
 
       expect(failure).toBeInstanceOf(EvaluationRunNotYetReadableError);
       expect(failure).toMatchObject({
@@ -282,6 +289,18 @@ describe("TraceEvaluationOutcomeService", () => {
         retryAfterMs: EVALUATED_TRACE_RETRY_AFTER_MS,
       });
       expect(recorded).toEqual([]);
+    });
+
+    /** @scenario "A completed evaluation whose run is still not readable after the wait records nothing" */
+    it("records nothing past the wait and says so", async () => {
+      const { outcomes, recorded, logger } = await compose({
+        now: () => EVALUATED_AT + EVALUATED_TRACE_WAIT_MS + 1,
+      });
+
+      await expect(outcomes.recordCompleted(unreadable)).resolves.toBeUndefined();
+
+      expect(recorded).toEqual([]);
+      expect(logger.warn).toHaveBeenCalledTimes(1);
     });
   });
 });

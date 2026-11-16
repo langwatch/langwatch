@@ -26,7 +26,8 @@ projections are the architecture, and no read uses `FINAL`.
    subscribers first wait the 30-second trace settle, and both misses name a five-minute retry
    floor (`GroupQueueError.retryAfterMs`) over the queue's sub-second backoff, so an absent trace
    costs about a dozen reads in its hour rather than ten in its first eight minutes; the floor
-   gives the job the queue's 61-attempt overload budget, which the hour ends first. The event's
+   gives the job the queue's 61-attempt overload budget, which the hour ends first. A run still
+   not readable an hour after its event is skipped the same way, never blocking its group. The event's
    `occurredAt` is the trace's `OccurredAt`, read from `trace_analytics` no further than 62 days
    before the evaluation, because the fold reads back in a window around the event's time. The
    idempotency key is `${tenantId}:${traceId}:evaluation-outcome:${eventId}`. The recorder and the

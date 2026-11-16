@@ -97,7 +97,14 @@ export class TraceEvaluationOutcomeService {
       tenantId: context.tenantId,
       evaluationId: data.evaluationId,
     });
-    if (!run) throw new EvaluationRunNotYetReadableError(data.evaluationId);
+    if (!run) {
+      if (this.isWithinWait(context)) throw new EvaluationRunNotYetReadableError(data.evaluationId);
+      this.deps.logger.warn(
+        { tenantId: context.tenantId, evaluationId: data.evaluationId },
+        "skipped an evaluation outcome whose run was not readable within the wait",
+      );
+      return;
+    }
     if (!run.traceId) return;
     await this.recordFromEvent({
       context,
@@ -139,6 +146,11 @@ export class TraceEvaluationOutcomeService {
     });
   }
 
+  /** Whether the event is young enough that what it names may still become readable. */
+  private isWithinWait(context: EvaluationEventContext): boolean {
+    return this.now() - context.createdAt <= EVALUATED_TRACE_WAIT_MS;
+  }
+
   private async recordFromEvent({
     context,
     traceId,
@@ -157,7 +169,7 @@ export class TraceEvaluationOutcomeService {
     const nowMs = this.now();
     if (occurredAt === undefined) {
       // Main joined at read time, so a late trace still matched: wait for it while it may come.
-      if (nowMs - context.createdAt <= EVALUATED_TRACE_WAIT_MS) {
+      if (this.isWithinWait(context)) {
         throw new EvaluatedTraceNotYetStoredError(traceId);
       }
       this.deps.logger.warn(
