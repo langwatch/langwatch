@@ -14,7 +14,10 @@ import type {
   OrganizationSeatRepository,
   SeatLease,
 } from "../repositories/organization-seat.repository.ts";
-import { assertAdditionsNotHeldForPayment } from "../rules/payment-hold.rules.ts";
+import {
+  assertAdditionsNotHeldForPayment,
+  isAdditionsHeldForPayment,
+} from "../rules/payment-hold.rules.ts";
 import type { SeatLimitNoticeService } from "./seat-limit-notice.service.ts";
 
 /**
@@ -103,13 +106,16 @@ export class OrganizationSeatLicenseService implements OrganizationSeatLicense {
     user?: OrganizationPlanUser | undefined;
   }): Promise<LimitCheckResult> {
     const plan = await this.activePlan(input.organizationId, input.user);
-    assertAdditionsNotHeldForPayment(plan);
     const max = this.allowance(plan, input.resource);
     if (plan.overrideAddingLimitations) {
       return { allowed: true, limitType: input.resource, current: 0, max };
     }
 
     const { current, free } = await this.seatsFor({ plan, ...input });
+    // A read answers the hold instead of throwing it; seat-taking writes refuse via assertSeatFree.
+    if (isAdditionsHeldForPayment(plan)) {
+      return { allowed: false, limitType: input.resource, current, max, heldForPayment: true };
+    }
     return { allowed: free, limitType: input.resource, current, max };
   }
 

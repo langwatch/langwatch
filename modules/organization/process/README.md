@@ -2055,12 +2055,13 @@ interface Input {
   organizationId: string;
   limitType: "members" | "membersLite";
 }
-// Output: limitCheckResultSchema, ../contract/src/license-limit-type.ts:30
+// Output: limitCheckResultSchema, ../contract/src/license-limit-type.ts:32
 interface Output {
   allowed: boolean;
   current: number;
   max: number;
   limitType: "members" | "membersLite";
+  heldForPayment?: boolean;
 }
 
 // licenseEnforcement.checkAllLimits
@@ -2068,7 +2069,7 @@ interface Output {
 interface Input {
   organizationId: string;
 }
-// Output: allLimitChecksSchema, ../contract/src/license-limit-type.ts:36
+// Output: allLimitChecksSchema, ../contract/src/license-limit-type.ts:38
 type Output = Record<
   string,
   {
@@ -2076,6 +2077,7 @@ type Output = Record<
     current: number;
     max: number;
     limitType: "members" | "membersLite";
+    heldForPayment?: boolean;
   }
 >;
 

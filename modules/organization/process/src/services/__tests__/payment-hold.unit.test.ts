@@ -11,6 +11,7 @@ import { describe, expect, it, vi } from "vitest";
 import { InviteService } from "../../features/invite/services/invite.service.ts";
 import type { OrganizationSeatRepository } from "../../repositories/organization-seat.repository.ts";
 import { PrismaOrganizationInviteRepository } from "../../repositories/prisma/prisma.organization-invite.repository.ts";
+import { assertSeatFree } from "../../rules/payment-hold.rules.ts";
 import { OrganizationSeatLicenseService } from "../organization-seat-license.service.ts";
 
 type PlanFacts = Pick<
@@ -92,9 +93,10 @@ describe("given a plan that holds new members for payment, with seats free", () 
   describe("when an admin enables a member or moves a Lite Member onto a full seat", () => {
     /** @scenario "While a payment is unpaid, a membership change that takes a seat is refused" */
     it("refuses both with member_additions_held_for_payment", async () => {
-      await expect(
-        seats(HELD).checkLimit({ organizationId: "org-1", resource: "members" }),
-      ).rejects.toMatchObject({ code: "member_additions_held_for_payment" });
+      const enable = await seats(HELD).checkLimit({ organizationId: "org-1", resource: "members" });
+      expect(() => assertSeatFree(enable)).toThrow(
+        expect.objectContaining({ code: "member_additions_held_for_payment" }),
+      );
       await expect(
         seats(HELD).assertRoleChangeAllowed({
           organizationId: "org-1",
@@ -103,6 +105,14 @@ describe("given a plan that holds new members for payment, with seats free", () 
           role: "MEMBER",
         }),
       ).rejects.toMatchObject({ code: "member_additions_held_for_payment" });
+    });
+  });
+
+  describe("when a read asks whether a seat is free", () => {
+    it("answers not allowed and names the hold instead of throwing", async () => {
+      const result = await seats(HELD).checkLimit({ organizationId: "org-1", resource: "members" });
+
+      expect(result).toMatchObject({ allowed: false, heldForPayment: true, current: 2, max: 10 });
     });
   });
 

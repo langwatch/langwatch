@@ -6,16 +6,13 @@ import { SYSTEM_ACTORS } from "@langwatch/authorization";
 import { newAuthzGrantId, type AuthzGrantCaller } from "@langwatch/authz-contract";
 import { getRoleChangeType, isFullMember } from "@langwatch/entitlement-contract";
 import { createLogger } from "@langwatch/observability";
-import {
-  MemberAdditionsHeldForPaymentError,
-  MemberSeatLimitReachedError,
-  type OrganizationUserRole,
-} from "@langwatch/organization-contract";
+import type { OrganizationUserRole } from "@langwatch/organization-contract";
 
 import type { OrganizationMembershipRepository } from "../repositories/organization-membership.repository.ts";
 import type { SeatLease } from "../repositories/organization-seat.repository.ts";
 import type { SeatTransition } from "../repositories/seat-hold.repository.ts";
 import type { SeatRequestRepository } from "../repositories/seat-request.repository.ts";
+import { assertSeatFree } from "../rules/payment-hold.rules.ts";
 import type {
   OrganizationAdmissions,
   OrganizationMemberAdmissionService,
@@ -91,9 +88,7 @@ export class OrganizationMemberSeatService {
         resource: "members",
         user: actingUser ?? undefined,
       });
-      throw new MemberSeatLimitReachedError({
-        meta: { limitType: limit.limitType, current: limit.current, max: limit.max },
-      });
+      assertSeatFree({ ...limit, allowed: false });
     }
     const seat = await this.seatOnEnable({
       organizationId,
@@ -138,11 +133,7 @@ export class OrganizationMemberSeatService {
         resource: type === "FullMember" ? "members" : "membersLite",
         user: actingUser,
       });
-      if (!result.allowed) {
-        throw new MemberSeatLimitReachedError({
-          meta: { limitType: result.limitType, current: result.current, max: result.max },
-        });
-      }
+      assertSeatFree(result);
     }
     if (!standing || standing.disabledAt === null || type !== "FullMember") {
       return { kind: "unchanged" };
@@ -236,12 +227,7 @@ export class OrganizationMemberSeatService {
     if (!(await seatHolds.isWaiting({ organizationId, userId }))) return false;
     if (!(await seatHolds.hasLiveHold({ organizationId, userId }))) {
       // An unpaid invoice's hold leaves them waiting, as a full plan does.
-      const fit = await seats
-        .checkLimit({ organizationId, resource: "members" })
-        .catch((error: unknown) => {
-          if (error instanceof MemberAdditionsHeldForPaymentError) return { allowed: false };
-          throw error;
-        });
+      const fit = await seats.checkLimit({ organizationId, resource: "members" });
       if (!fit.allowed) return false;
     }
     // One write turns the waiting row into an enabled MEMBER carrying its grant intent; the grant
