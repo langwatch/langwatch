@@ -109,6 +109,17 @@ Feature: Billing storage kept past the 90 days Growth includes
     When the daily report wakes
     Then one measure command is sent for each organization, for that UTC day
 
+  @unit
+  Scenario: The daily sweep prunes both processes' sent outbox rows
+    When the daily sweep runs
+    Then the report and billing processes each drop sent outbox rows older than a week
+
+  @unit
+  Scenario: A failed outbox prune does not fail the daily sweep
+    Given pruning the outbox fails
+    When the daily sweep runs
+    Then both processes are still tried and the sweep finishes
+
   @integration
   Scenario: Each organization is measured once a day as one event
     Given an organization with a Growth subscription and the storage line
