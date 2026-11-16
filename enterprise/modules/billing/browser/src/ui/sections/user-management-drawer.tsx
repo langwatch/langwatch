@@ -3,6 +3,7 @@
  * the confirm invites into Free or is the upgrade; on Growth it changes the seats in place.
  * @see specs/licensing/seat-buying.feature
  */
+import { describeError } from "@langwatch/browser-host/errors";
 import { Banner } from "@langwatch/design-system/banner";
 import { Drawer } from "@langwatch/design-system/drawer";
 import {
@@ -263,7 +264,11 @@ export function UserManagementDrawer({
               chip={view?.rowChip ?? ""}
             />
             {growth && <OtherSeatTypes growth={growth} price={price} />}
-            <SeatDrawerNote priceFailed={growth?.priceFailed ?? false} note={view?.note} />
+            <SeatDrawerNote
+              priceFailed={growth?.priceFailed ?? false}
+              priceError={growth?.priceError}
+              note={view?.note}
+            />
           </VStack>
         )}
       </Drawer>
@@ -280,11 +285,22 @@ export function UserManagementDrawer({
   );
 }
 
-function SeatDrawerNote({ priceFailed, note }: { priceFailed: boolean; note: string | undefined }) {
+function SeatDrawerNote({
+  priceFailed,
+  priceError,
+  note,
+}: {
+  priceFailed: boolean;
+  priceError: unknown;
+  note: string | undefined;
+}) {
   if (priceFailed) {
     return (
       <Banner status="error" data-testid="seat-drawer-price-failed">
-        The price for this change did not load. Close Manage seats and try again.
+        {describeError({
+          error: priceError,
+          fallbackTitle: "The price for this change did not load",
+        })}
       </Banner>
     );
   }
@@ -607,6 +623,7 @@ function useGrowthSeats({
     view: growthSeatPlan(plan),
     pendingReason,
     priceFailed: pendingReason === PRICE_FAILED,
+    priceError: seatQuote.error ?? developerQuote.error,
     confirmOpen,
     openConfirm: () => setConfirmOpen(true),
     closeConfirm: () => setConfirmOpen(false),

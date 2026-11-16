@@ -710,6 +710,15 @@ export class BillingModule
     organizationId: string;
     newTotalSeats: number;
   }): Promise<unknown> {
+    await this.#paymentRecovery?.assertSeatsNotHeld({
+      organizationId: input.organizationId,
+      adding: async () => {
+        const current = await this.#subscriptionDoor.subscriptions.findLastNonCancelledSubscription(
+          input.organizationId,
+        );
+        return input.newTotalSeats > (current?.maxMembers ?? 0);
+      },
+    });
     return this.#subscriptionDoor.subscriptions.previewProration(input);
   }
 

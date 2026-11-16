@@ -193,6 +193,33 @@ Feature: A paid organization whose card fails is told, reminded, paused and rest
     And lowering the Developer seats still goes through
 
   @unit
+  Scenario: While a payment is unpaid, pricing more seats names the failed payment
+    Given an organization with an open recovery case
+    When an admin asks the price of more member seats
+    Then the price is refused with "seats_held_for_payment" before the payment provider is asked
+    And asking the price of fewer seats still goes through
+
+  @unit
+  Scenario: A past due subscription can still change its seats
+    Given a subscription the payment provider marks past due
+    When an admin prices or lowers its member seats
+    Then the change reaches the payment provider instead of failing as no active subscription
+
+  @integration
+  Scenario: The seat drawer explains a held price with the failed payment
+    Given an organization with an open recovery case
+    When an admin adds a seat in Manage seats
+    Then the drawer says "A payment failed, so seats can't be added" and asks to update the card
+    And the confirm stays disabled
+
+  @integration
+  Scenario: Inviting any kind of member while a payment is unpaid names the failed payment
+    Given an organization whose plan holds new members for payment
+    When an admin invites a full member, a Lite Member or a Developer
+    Then the invite goes to the server, which refuses it with "member_additions_held_for_payment"
+    And no upgrade prompt opens
+
+  @unit
   Scenario: Paying the invoice lifts the hold on new members
     Given an organization with an open recovery case on day 5
     When the invoice is paid and the case closes

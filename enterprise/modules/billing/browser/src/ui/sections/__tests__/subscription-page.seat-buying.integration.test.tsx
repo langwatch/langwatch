@@ -968,6 +968,26 @@ describe("<SubscriptionPage/> buying seats", () => {
       );
     });
 
+    /** @scenario "The seat drawer explains a held price with the failed payment" */
+    it("names the failed payment when the price is held for it", async () => {
+      givenGrowth({ paid: 3, inUse: 3 });
+      mockPreviewProration.mockImplementation(() => ({
+        data: undefined,
+        isLoading: false,
+        isError: true,
+        error: { code: "seats_held_for_payment", httpStatus: 409 },
+      }));
+      renderPage();
+      await openManageSeats();
+
+      fireEvent.click(screen.getByTestId("drawer-seats-stepper-plus"));
+
+      expect(lastButton("Add 1 seat · €29/mo")).toBeDisabled();
+      const note = screen.getByTestId("seat-drawer-price-failed");
+      expect(note).toHaveTextContent("A payment failed, so seats can't be added.");
+      expect(note).toHaveTextContent("Update the card on the billing page");
+    });
+
     /** @scenario "A charge the payment provider refuses keeps the confirm open and invites nobody" */
     it("reports a refused charge, invites nobody and keeps the confirm open", async () => {
       givenGrowth({ paid: 3, inUse: 3 });

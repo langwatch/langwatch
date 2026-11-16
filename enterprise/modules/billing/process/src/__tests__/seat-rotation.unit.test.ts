@@ -269,6 +269,21 @@ describe("Growth seat changes", () => {
     });
   });
 
+  describe("when the payment provider marks the subscription past due", () => {
+    /** @scenario "A past due subscription can still change its seats" */
+    it("prices and lowers the seats instead of failing as no active subscription", async () => {
+      seedProvider(5, "past_due");
+
+      const quote = await seats.previewProration({ organizationId: "org_1", newTotalSeats: 3 });
+      await seats.updateSeatEventItems({ organizationId: "org_1", totalMembers: 3 });
+
+      expect(quote).toMatchObject({ amountDueCents: 0, formattedRecurringTotal: "€87" });
+      expect(stripeSubscriptions.updates.map((update) => update.change.items)).toEqual([
+        [{ id: "si_seat", quantity: 3 }],
+      ]);
+    });
+  });
+
   describe("when an administrator raises the seats again before the kept seats run out", () => {
     beforeEach(async () => {
       await seats.updateSeatEventItems({ organizationId: "org_1", totalMembers: 3 });

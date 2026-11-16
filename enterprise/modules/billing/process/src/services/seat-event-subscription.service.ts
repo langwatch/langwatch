@@ -155,8 +155,9 @@ export class SeatEventSubscriptionService {
       subscriptionId: subscription.stripeSubscriptionId,
     });
 
-    // Must still be live at the provider, even if scheduled for cancellation.
-    if (stripeSubscription.status !== "active") {
+    // Must still be live at the provider, even if scheduled for cancellation or behind on a
+    // payment: a past due subscription can still drop seats, and adding them is held upstream.
+    if (stripeSubscription.status !== "active" && stripeSubscription.status !== "past_due") {
       throw new NoActiveSubscriptionError();
     }
 
