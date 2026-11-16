@@ -206,4 +206,28 @@ describe.each(backends)("given the $name stored-object record repository", ({ cr
       });
     });
   });
+
+  describe("when rows hold the same bytes", () => {
+    it("finds only available rows of the same purpose, digest and media type, oldest first", async () => {
+      const repository = create();
+      const later = record({ id: "so_bbbbbbbb" as StoredObjectId });
+      await repository.upsert(later);
+      await repository.upsert(record());
+      await repository.upsert(record({ id: "so_deleted" as StoredObjectId, status: "deleted" }));
+      await repository.upsert(
+        record({ id: "so_scenario" as StoredObjectId, purpose: "scenario_event" }),
+      );
+      await repository.upsert(record({ id: "so_octet" as StoredObjectId, mediaType: "image/png" }));
+      await repository.upsert(record({ id: "so_other" as StoredObjectId, tenantId: OTHER }));
+
+      const found = await repository.findReusable({
+        tenantId: ACME,
+        purpose: "trace_content",
+        sha256: "a".repeat(64),
+        mediaType: "application/octet-stream",
+      });
+
+      expect(found.map((value) => value.id)).toEqual(["so_aaaaaaaa", "so_bbbbbbbb"]);
+    });
+  });
 });

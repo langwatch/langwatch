@@ -76,6 +76,26 @@ export class PrismaStoredObjectRecordRepository
     return rows.map((row) => fromRow(row));
   }
 
+  async findReusable(input: {
+    tenantId: StoredObjectProjectId;
+    purpose: string;
+    sha256: string;
+    mediaType: string;
+  }): Promise<StoredObjectRecord[]> {
+    const rows = await this.prisma.storedObject.findMany({
+      where: {
+        tenantId: input.tenantId,
+        purpose: input.purpose,
+        sha256: input.sha256,
+        mediaType: input.mediaType,
+        status: "available",
+      },
+      orderBy: { id: "asc" },
+    });
+
+    return rows.map((row) => fromRow(row));
+  }
+
   async findPageByPurpose(input: {
     purpose: string;
     after?: Readonly<{ tenantId: StoredObjectProjectId; id: StoredObjectId }>;

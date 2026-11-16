@@ -2,6 +2,7 @@
  * What each stored-object purpose allows: whether a caller may upload it, its
  * byte limit, and the permission its files are read behind (ADR-158 §3, §5).
  */
+import type { RetentionCategory } from "@langwatch/data-retention-contract";
 import {
   DATASET_ATTACHMENT_DEFAULT_MAX_BYTES,
   DATASET_ATTACHMENT_OVERRIDE_CEILING_BYTES,
@@ -30,6 +31,11 @@ export interface StoredObjectPurposePolicy {
    */
   readonly ceilingBytes?: number;
   readonly readPermission: StoredObjectFileViewPermission;
+  /**
+   * The data its objects live as long as (ADR-002 §3): each store links its
+   * owner until that category's retention ends. Absent, no link is written.
+   */
+  readonly retentionCategory?: RetentionCategory;
 }
 
 /** The dataset attachment limit an organization answers when it sets nothing. */
@@ -56,7 +62,12 @@ export const STORED_OBJECT_PURPOSES: Readonly<Record<string, StoredObjectPurpose
     maxBytes: 5 * 1024 * MIB,
     readPermission: "datasets:view",
   },
-  trace_content: { uploadable: false, maxBytes: 100 * MIB, readPermission: "traces:view" },
+  trace_content: {
+    uploadable: false,
+    maxBytes: 100 * MIB,
+    readPermission: "traces:view",
+    retentionCategory: "traces",
+  },
   scenario_event: { uploadable: false, maxBytes: 100 * MIB, readPermission: "scenarios:view" },
 };
 

@@ -4,6 +4,7 @@
  * an async iterable, the byte surface needs the ROW. Each has its own name.
  */
 import { AuthzApi } from "@langwatch/authz-contract";
+import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import {
   StoredObjectApi,
@@ -55,6 +56,7 @@ import {
 } from "../services/stored-object-file-read.service.ts";
 import { StoredObjectOwnerUnresolvedService } from "../services/stored-object-owner-unresolved.service.ts";
 import { StoredObjectUploadSignerService } from "../services/stored-object-upload-signer.service.ts";
+import type { StoredObjectRetention } from "../services/stored-object-upload.service.ts";
 import { StoredObjectService } from "../services/stored-object.service.ts";
 import { StoredObjectsTelemetryService } from "../services/stored-objects-telemetry.service.ts";
 import {
@@ -83,6 +85,8 @@ export type StoredObjectInfrastructure = Readonly<{
 type StoredObjectDependencies = Readonly<{
   /** Holds a probe to the permission the object's purpose names, once the row is read. */
   authz: typeof AuthzApi;
+  /** How long a purpose's retention category keeps the project's data (ADR-002 §3). */
+  dataRetention: typeof DataRetentionApi;
 }>;
 
 type StoredObjectSetup = FeatureSetup<
@@ -94,7 +98,10 @@ type StoredObjectSetup = FeatureSetup<
 
 export class StoredObjectModule implements StoredObjectApi, StoredObjectFileApi {
   static readonly contract = StoredObjectApi;
-  static readonly dependencies: StoredObjectDependencies = { authz: AuthzApi };
+  static readonly dependencies: StoredObjectDependencies = {
+    authz: AuthzApi,
+    dataRetention: DataRetentionApi,
+  };
   static readonly config = storedObjectConfig;
 
   /**
@@ -124,6 +131,7 @@ export class StoredObjectModule implements StoredObjectApi, StoredObjectFileApi 
       },
       repositories,
       permissions: setup.dependencies.authz,
+      retention: setup.dependencies.dataRetention,
       images: setup.channels.images,
     });
   }
@@ -137,6 +145,7 @@ export class StoredObjectModule implements StoredObjectApi, StoredObjectFileApi 
     infrastructure: StoredObjectInfrastructure;
     repositories: StoredObjectRepositories;
     permissions: AuthzApi;
+    retention: StoredObjectRetention;
     images: ExternalImageChannel;
   }): StoredObjectModule {
     const { infrastructure: parts, repositories } = setup;
@@ -144,6 +153,8 @@ export class StoredObjectModule implements StoredObjectApi, StoredObjectFileApi 
     return new StoredObjectModule({
       storage: StoredObjectService.create({
         records: repositories.records,
+        ownerLinks: repositories.ownerLinks,
+        retention: setup.retention,
         storage: parts.storage,
         delivery: parts.delivery,
         signer: parts.signer,

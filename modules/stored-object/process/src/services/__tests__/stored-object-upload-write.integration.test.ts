@@ -1,3 +1,4 @@
+import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 /**
  * @vitest-environment node
  * The one place the process accepts upload bytes: the seal, the object it
@@ -6,6 +7,7 @@
  */
 import { memoryObjectStorage, type ObjectStorage } from "@langwatch/process-stores";
 import type { StoredObjectUploadBody } from "@langwatch/stored-object-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { type Instant, Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
@@ -15,6 +17,7 @@ import {
   MemoryStoredObjectFiles,
   createStoredObjectTestSigner,
 } from "../../app/__tests__/stored-object.fixture.ts";
+import { MemoryStoredObjectOwnerLinkRepository } from "../../repositories/memory/memory.stored-object-owner-link.repository.ts";
 import { MemoryStoredObjectRecordRepository } from "../../repositories/memory/memory.stored-object-record.repository.ts";
 import { ObjectStorageStoredObjectBytesRepository } from "../../repositories/object-storage/object-storage.stored-object-bytes.repository.ts";
 import { StoredObjectService } from "../stored-object.service.ts";
@@ -55,6 +58,8 @@ function fixture() {
   };
   const service = StoredObjectService.create({
     records: MemoryStoredObjectRecordRepository.create(),
+    ownerLinks: MemoryStoredObjectOwnerLinkRepository.create(),
+    retention: createApiFixture<DataRetentionApi>({ getRetentionDays: async () => 30 }),
     permissions: new GrantedStoredObjectPermissions(),
     storage: ObjectStorageStoredObjectBytesRepository.create({ objectStorage }),
     signer: createStoredObjectTestSigner(),

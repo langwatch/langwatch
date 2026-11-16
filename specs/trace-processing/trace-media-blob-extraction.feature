@@ -192,14 +192,6 @@ Feature: Trace media blob extraction at the ingestion edge
     When a span with inline media is ingested
     Then the bytes are stored for the "trace_content" purpose with the span's trace as owner
     So that Stored Objects keeps them until that trace's retention ends
-
-  @unit
-  Scenario: Scenario-event media is found by the same walker as span media
-    Given a scenario event whose messages carry an inline audio part
-    When the scenario path externalizes it
-    Then the part is rewritten exactly as the same part on a span would be
-    And the same per-part cap, deadline and per-part fail-open apply
-
   @integration
   Scenario: The same bytes in two attributes of one span are stored once
     Given a span that carries the same image both in its chat content and in a

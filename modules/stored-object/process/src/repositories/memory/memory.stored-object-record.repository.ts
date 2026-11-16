@@ -62,6 +62,24 @@ export class MemoryStoredObjectRecordRepository implements StoredObjectRecordRep
       .slice(0, input.limit);
   }
 
+  async findReusable(input: {
+    tenantId: StoredObjectProjectId;
+    purpose: string;
+    sha256: string;
+    mediaType: string;
+  }): Promise<StoredObjectRecord[]> {
+    return [...this.#values.values()]
+      .filter(
+        (value) =>
+          value.tenantId === input.tenantId &&
+          value.status === "available" &&
+          value.purpose === input.purpose &&
+          value.sha256 === input.sha256 &&
+          value.mediaType === input.mediaType,
+      )
+      .toSorted((left, right) => left.id.localeCompare(right.id));
+  }
+
   async findPageByPurpose(input: {
     purpose: string;
     after?: Readonly<{ tenantId: StoredObjectProjectId; id: StoredObjectId }>;
