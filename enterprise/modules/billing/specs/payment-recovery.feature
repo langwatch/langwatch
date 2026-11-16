@@ -200,6 +200,13 @@ Feature: A paid organization whose card fails is told, reminded, paused and rest
     And asking the price of fewer seats still goes through
 
   @unit
+  Scenario: While a payment is unpaid, lowering member seats still goes through
+    Given an organization with an open recovery case and five member seats
+    When an admin lowers the member seats to four
+    Then the change reaches the payment provider instead of failing with "seats_held_for_payment"
+    And raising them to six is refused with "seats_held_for_payment"
+
+  @unit
   Scenario: A past due subscription can still change its seats
     Given a subscription the payment provider marks past due
     When an admin prices or lowers its member seats

@@ -672,7 +672,7 @@ export class BillingModule
   }): Promise<{ success: boolean }> {
     await this.#paymentRecovery?.assertSeatsNotHeld({
       organizationId: input.organizationId,
-      adding: async () => input.upgradeMembers,
+      adding: async () => input.upgradeMembers && (await this.#raisesSeats(input)),
     });
     return this.#subscriptionDoor.subscriptions.updateSubscriptionItems(input);
   }
@@ -712,14 +712,21 @@ export class BillingModule
   }): Promise<unknown> {
     await this.#paymentRecovery?.assertSeatsNotHeld({
       organizationId: input.organizationId,
-      adding: async () => {
-        const current = await this.#subscriptionDoor.subscriptions.findLastNonCancelledSubscription(
-          input.organizationId,
-        );
-        return input.newTotalSeats > (current?.maxMembers ?? 0);
-      },
+      adding: () =>
+        this.#raisesSeats({
+          organizationId: input.organizationId,
+          totalMembers: input.newTotalSeats,
+        }),
     });
     return this.#subscriptionDoor.subscriptions.previewProration(input);
+  }
+
+  /** Whether `totalMembers` is above the seats the subscription bills now. */
+  async #raisesSeats(input: { organizationId: string; totalMembers: number }): Promise<boolean> {
+    const current = await this.#subscriptionDoor.subscriptions.findLastNonCancelledSubscription(
+      input.organizationId,
+    );
+    return input.totalMembers > (current?.maxMembers ?? 0);
   }
 
   async developerSeats(input: { organizationId: string }): Promise<DeveloperSeats> {

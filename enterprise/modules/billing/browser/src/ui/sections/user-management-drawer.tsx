@@ -242,7 +242,7 @@ export function UserManagementDrawer({
           summary: view && !priceFailed ? <SeatSummaryLines lines={view.summary} /> : undefined,
           cancel: { label: "Cancel", onClick: onClose },
           primaryAction: {
-            label: priceFailed ? withoutPrice(action.label) : action.label,
+            label: action.label,
             onClick: () => void choose(),
             loading: isInviting || isUpgradeLoading,
             disabledReason,
@@ -285,11 +285,6 @@ export function UserManagementDrawer({
       )}
     </>
   );
-}
-
-/** "Add 2 seats · €58/mo" as "Add 2 seats": the price part is not known. */
-function withoutPrice(label: string): string {
-  return label.split(" · ")[0] ?? label;
 }
 
 function SeatDrawerNote({
@@ -627,7 +622,7 @@ function useGrowthSeats({
     developerHint: developer
       ? developerMinimumHint({ ...developerFloor, target: developer.target })
       : undefined,
-    view: growthSeatPlan(plan),
+    view: growthSeatPlan({ ...plan, priceFailed: pendingReason === PRICE_FAILED }),
     pendingReason,
     priceFailed: pendingReason === PRICE_FAILED,
     priceError: seatQuote.error ?? developerQuote.error,
