@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -17,7 +18,7 @@ import (
 	"github.com/langwatch/langwatch/tools/waitforchecks"
 )
 
-type run = map[string]string
+type run = map[string]any
 
 // fakeAPI answers each request with the next scripted response; the last one
 // repeats. A response is a status code and, for 200, the check runs.
@@ -27,6 +28,10 @@ type fakeAPI struct {
 	calls     int
 	// errHeaders ride on every non-200 answer (Retry-After, X-RateLimit-Remaining).
 	errHeaders map[string]string
+	// workflowRuns are the /actions/runs pages, served in order (the last
+	// repeats); none means no workflow runs. They do not count in calls.
+	workflowRuns  [][]run
+	workflowCalls int
 }
 
 type response struct {
@@ -35,6 +40,18 @@ type response struct {
 }
 
 func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if strings.HasSuffix(r.URL.Path, "/actions/runs") {
+		f.mu.Lock()
+		var page []run
+		if len(f.workflowRuns) > 0 {
+			page = f.workflowRuns[min(f.workflowCalls, len(f.workflowRuns)-1)]
+		}
+		f.workflowCalls++
+		f.mu.Unlock()
+		_ = json.NewEncoder(w).Encode(map[string]any{"total_count": len(page), "workflow_runs": page})
+
+		return
+	}
 	f.mu.Lock()
 	idx := min(f.calls, len(f.responses)-1)
 	f.calls++
@@ -67,6 +84,22 @@ func ok(name string) run      { return run{"name": name, "status": "completed", 
 func pending(name string) run { return run{"name": name, "status": "in_progress"} }
 func failed(name string) run {
 	return run{"name": name, "status": "completed", "conclusion": "failure"}
+}
+func cancelled(name string) run {
+	return run{"name": name, "status": "completed", "conclusion": "cancelled"}
+}
+
+// in places a check run in a GitHub Actions check suite, with its run id.
+func in(r run, id, suite int64) run {
+	r["id"] = id
+	r["app"] = map[string]any{"id": 15368}
+	r["check_suite"] = map[string]any{"id": suite}
+
+	return r
+}
+
+func workflowRun(workflow, suite int64) run {
+	return run{"workflow_id": workflow, "check_suite_id": suite}
 }
 
 // @scenario "The review waits for every other check on the head commit"
@@ -224,4 +257,71 @@ func TestWaitRefusesToStartWithoutEveryInput(t *testing.T) {
 			assert.Zero(t, api.calls)
 		})
 	}
+}
+
+// The f352a9d0bc8 shape: one workflow ran twice and its first run was cancelled.
+// @scenario "A check that ran twice counts only its newest run"
+func TestWaitIgnoresASupersededRunOfTheSameWorkflow(t *testing.T) {
+	api := &fakeAPI{
+		responses: []response{{200, []run{
+			in(cancelled("pr conventions"), 1, 10),
+			in(ok("pr conventions"), 2, 11),
+		}}},
+		workflowRuns: [][]run{{workflowRun(7, 10), workflowRun(7, 11)}},
+	}
+
+	require.NoError(t, waiter(t, api, time.Second).Wait(context.Background()))
+}
+
+// @scenario "Same-named checks from different workflows are counted separately"
+func TestWaitKeepsSameNamedChecksFromDifferentWorkflows(t *testing.T) {
+	api := &fakeAPI{
+		responses: []response{{200, []run{
+			in(failed("test"), 1, 10),
+			in(ok("test"), 2, 11),
+		}}},
+		workflowRuns: [][]run{{workflowRun(7, 10), workflowRun(8, 11)}},
+	}
+
+	err := waiter(t, api, time.Second).Wait(context.Background())
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "test (failure)")
+}
+
+// @scenario "A check whose workflow run is unknown is never merged with another"
+func TestWaitKeysACheckWithAnUnknownSuiteOnItsSuite(t *testing.T) {
+	api := &fakeAPI{
+		responses: []response{{200, []run{
+			in(failed("lint"), 1, 10),
+			in(ok("lint"), 2, 11),
+		}}},
+		// Neither suite is in the workflow runs, so both fall back to their suite.
+		workflowRuns: [][]run{{workflowRun(7, 99)}},
+	}
+
+	err := waiter(t, api, time.Second).Wait(context.Background())
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "lint (failure)")
+}
+
+// A full first page of workflow runs means more may follow; the run that ties
+// the cancelled check to its newer run is only on page 2.
+// @scenario "A check that ran twice counts only its newest run"
+func TestWaitReadsEveryPageOfWorkflowRuns(t *testing.T) {
+	full := make([]run, 100)
+	for i := range full {
+		full[i] = workflowRun(int64(1000+i), int64(1000+i))
+	}
+	api := &fakeAPI{
+		responses: []response{{200, []run{
+			in(cancelled("pr conventions"), 1, 10),
+			in(ok("pr conventions"), 2, 11),
+		}}},
+		workflowRuns: [][]run{full, {workflowRun(7, 10), workflowRun(7, 11)}},
+	}
+
+	require.NoError(t, waiter(t, api, time.Second).Wait(context.Background()))
+	assert.Equal(t, 2, api.workflowCalls)
 }

@@ -15,6 +15,7 @@ import (
 
 // prReviewBotPermissionsBlock is the review job's `permissions:` block, kept as its own constant so it stays in sync with the tests that strip or replace it.
 const prReviewBotPermissionsBlock = `    permissions:
+      actions: read
       checks: read
       contents: write # so the default token can call resolveReviewThread; read would only lose thread auto-resolution
       pull-requests: write
@@ -27,6 +28,7 @@ const prWorkflowPermissionsBlock = `permissions:
 
 // prReviewBotWaitStep is the review job's wait step.
 const prReviewBotWaitStep = `      - run: go run ./cmd/waitforchecks
+        timeout-minutes: 50
 `
 
 // goodPRReviewBotWorkflow mirrors the review job of .github/workflows/pr.yml as
@@ -56,6 +58,7 @@ jobs:
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.draft == false
     runs-on: ubuntu-latest
+    timeout-minutes: 100
 ` + prReviewBotPermissionsBlock + `    steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -67,6 +70,7 @@ jobs:
 ` + prReviewBotWaitStep + `      - uses: langwatch/langwatch-pr-review-bot@7ff0638fa8cb21fb3f94f8a12b893c6d5446e521 # main 2026-09-22
         with:
           slack_notify: "false"
+          review_timeout_minutes: 20
           claude_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           langwatch_ingest_key: ${{ secrets.LANGWATCH_INGEST_KEY }}
 `
@@ -385,7 +389,7 @@ func TestPRReviewBotRequiresTheGroupToKeyOnThePR(t *testing.T) {
 	assert.Contains(t, strings.Join(problems, "\n"), "does not key on the PR number")
 }
 
-// @scenario "The review workflow grants exactly checks read, contents write and pull-requests write"
+// @scenario "The review workflow grants exactly actions read, checks read, contents write and pull-requests write"
 func TestPRReviewBotRequiresContentsWrite(t *testing.T) {
 	withRead := strings.Replace(goodPRReviewBotWorkflow,
 		"  contents: write",
@@ -459,7 +463,7 @@ func TestPRReviewBotRejectsExtraPermissions(t *testing.T) {
 	assert.Contains(t, strings.Join(problems, "\n"), "extra")
 }
 
-// @scenario "The review workflow grants exactly checks read, contents write and pull-requests write"
+// @scenario "The review workflow grants exactly actions read, checks read, contents write and pull-requests write"
 func TestPRReviewBotUsesJobLevelPermissionsWhenPresent(t *testing.T) {
 	overridden := strings.Replace(goodPRReviewBotWorkflow, prWorkflowPermissionsBlock,
 		"permissions:\n  contents: write\n  pull-requests: write\n", 1)
@@ -644,4 +648,58 @@ func TestPRReviewBotHoldsInTheLiveRepo(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Empty(t, problems)
+}
+
+// @scenario "A slow CI fails the wait with its own message, not the job timeout"
+func TestPRReviewBotRejectsAWaitStepWithoutTimeout(t *testing.T) {
+	broken := strings.Replace(goodPRReviewBotWorkflow, "        timeout-minutes: 50\n", "", 1)
+	require.NotEqual(t, goodPRReviewBotWorkflow, broken, "the mutation must apply")
+
+	problems, err := ciguard.PRReviewBot(writePRReviewBotWorkflow(t, broken))
+
+	require.NoError(t, err)
+	assert.Contains(t, strings.Join(problems, "\n"), "wait step has no whole-number timeout-minutes")
+}
+
+// @scenario "A slow CI fails the wait with its own message, not the job timeout"
+func TestPRReviewBotRejectsABotStepWithoutReviewTimeoutMinutes(t *testing.T) {
+	broken := strings.Replace(goodPRReviewBotWorkflow, "          review_timeout_minutes: 20\n", "", 1)
+	require.NotEqual(t, goodPRReviewBotWorkflow, broken, "the mutation must apply")
+
+	problems, err := ciguard.PRReviewBot(writePRReviewBotWorkflow(t, broken))
+
+	require.NoError(t, err)
+	assert.Contains(t, strings.Join(problems, "\n"), "no whole-number review_timeout_minutes")
+}
+
+// The job must cover the wait step plus both of the bot's claude calls plus 5.
+// @scenario "A slow CI fails the wait with its own message, not the job timeout"
+func TestPRReviewBotRejectsAJobTimeoutBelowTheWaitPlusTwiceTheReviewTimeout(t *testing.T) {
+	for limit, wantProblem := range map[string]bool{"94": true, "95": false, "60": true} {
+		t.Run(limit, func(t *testing.T) {
+			changed := strings.Replace(goodPRReviewBotWorkflow,
+				"    timeout-minutes: 100\n", "    timeout-minutes: "+limit+"\n", 1)
+			require.NotEqual(t, goodPRReviewBotWorkflow, changed, "the mutation must apply")
+
+			problems, err := ciguard.PRReviewBot(writePRReviewBotWorkflow(t, changed))
+
+			require.NoError(t, err)
+			if wantProblem {
+				assert.Contains(t, strings.Join(problems, "\n"), "leaves no room for the review: want at least 95")
+			} else {
+				assert.Empty(t, problems)
+			}
+		})
+	}
+}
+
+// @scenario "A slow CI fails the wait with its own message, not the job timeout"
+func TestPRReviewBotRejectsAReviewJobWithoutTimeout(t *testing.T) {
+	broken := strings.Replace(goodPRReviewBotWorkflow, "    timeout-minutes: 100\n", "", 1)
+	require.NotEqual(t, goodPRReviewBotWorkflow, broken, "the mutation must apply")
+
+	problems, err := ciguard.PRReviewBot(writePRReviewBotWorkflow(t, broken))
+
+	require.NoError(t, err)
+	assert.Contains(t, strings.Join(problems, "\n"), "review job has no whole-number timeout-minutes")
 }

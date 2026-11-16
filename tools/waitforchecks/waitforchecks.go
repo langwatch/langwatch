@@ -38,13 +38,71 @@ type Waiter struct {
 }
 
 type checkRun struct {
+	ID         int64  `json:"id"`
 	Name       string `json:"name"`
 	Status     string `json:"status"`
 	Conclusion string `json:"conclusion"`
+	App        struct {
+		ID int64 `json:"id"`
+	} `json:"app"`
+	CheckSuite struct {
+		ID int64 `json:"id"`
+	} `json:"check_suite"`
 }
 
 type checkRunsPage struct {
 	CheckRuns []checkRun `json:"check_runs"`
+}
+
+type workflowRun struct {
+	WorkflowID   int64 `json:"workflow_id"`
+	CheckSuiteID int64 `json:"check_suite_id"`
+}
+
+type workflowRunsPage struct {
+	WorkflowRuns []workflowRun `json:"workflow_runs"`
+}
+
+// checkKey names one check across reruns: the same app, the same workflow
+// (or, when the workflow is unknown, the same check suite) and the same name.
+// Names like "changes", "build" and "test" repeat across workflows, so the
+// name alone would merge distinct checks and could hide a red one.
+type checkKey struct {
+	app      int64
+	workflow int64
+	suite    int64
+	name     string
+}
+
+// latest keeps only the newest run (highest check run id) of each check. A
+// newer run of the same workflow supersedes an older one (concurrency cancels
+// it, or a re-run replaces it), so the older run must not fail the wait. A run
+// whose suite is not in suiteWorkflow keys on its suite and is never merged
+// with another suite's run.
+func latest(runs []checkRun, suiteWorkflow map[int64]int64) []checkRun {
+	newest := map[checkKey]checkRun{}
+	var order []checkKey
+	for _, run := range runs {
+		key := checkKey{app: run.App.ID, name: run.Name}
+		if workflow, ok := suiteWorkflow[run.CheckSuite.ID]; ok {
+			key.workflow = workflow
+		} else {
+			key.suite = run.CheckSuite.ID
+		}
+		have, seen := newest[key]
+		if !seen {
+			order = append(order, key)
+		}
+		if !seen || run.ID > have.ID {
+			newest[key] = run
+		}
+	}
+	kept := make([]checkRun, 0, len(order))
+	for _, key := range order {
+		kept = append(kept, newest[key])
+	}
+
+	return kept
 }
 
 // statusError is a non-2xx answer from the API.
@@ -154,7 +212,7 @@ type pollState struct {
 // poll reads the check runs once and returns how long to sleep before the
 // next read, or the final verdict.
 func (w Waiter) poll(ctx context.Context, p *pollState) (delay time.Duration, done bool, verdict error) {
-	runs, err := w.list(ctx)
+	runs, err := w.current(ctx)
 	if err == nil {
 		p.failures = 0
 		p.lastErr = nil // a recovered error must not be blamed at the deadline
@@ -201,6 +259,40 @@ func timeoutError(timeout time.Duration, last summary, lastErr error) error {
 	return errors.New(msg)
 }
 
+// current reads the commit's check runs and keeps the newest run of each check.
+func (w Waiter) current(ctx context.Context) ([]checkRun, error) {
+	runs, err := w.list(ctx)
+	if err != nil || len(runs) == 0 {
+		return runs, err
+	}
+	suiteWorkflow, err := w.workflows(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return latest(runs, suiteWorkflow), nil
+}
+
+// workflows reads every page of the commit's workflow runs and maps each
+// check suite to its workflow.
+func (w Waiter) workflows(ctx context.Context) (map[int64]int64, error) {
+	suiteWorkflow := map[int64]int64{}
+	for page := 1; ; page++ {
+		var got workflowRunsPage
+		endpoint := fmt.Sprintf("%s/repos/%s/actions/runs?head_sha=%s&per_page=%d&page=%d",
+			w.API, w.Repository, url.QueryEscape(w.SHA), pageSize, page)
+		if err := w.get(ctx, endpoint, &got); err != nil {
+			return nil, err
+		}
+		for _, run := range got.WorkflowRuns {
+			suiteWorkflow[run.CheckSuiteID] = run.WorkflowID
+		}
+		if len(got.WorkflowRuns) < pageSize {
+			return suiteWorkflow, nil
+		}
+	}
+}
+
 // list reads every page of the commit's check runs, minus Exclude.
 func (w Waiter) list(ctx context.Context) ([]checkRun, error) {
 	var runs []checkRun
@@ -224,30 +316,35 @@ func (w Waiter) fetch(ctx context.Context, page int) (checkRunsPage, error) {
 	var got checkRunsPage
 	endpoint := fmt.Sprintf("%s/repos/%s/commits/%s/check-runs?per_page=%d&page=%d",
 		w.API, w.Repository, url.PathEscape(w.SHA), pageSize, page)
+	err := w.get(ctx, endpoint, &got)
+
+	return got, err
+}
+
+// get reads one GitHub API page into into.
+func (w Waiter) get(ctx context.Context, endpoint string, into any) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
-		return got, err
+		return err
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
 	req.Header.Set("Authorization", "Bearer "+w.Token)
 
 	resp, err := w.HTTP.Do(req)
 	if err != nil {
-		return got, err
+		return err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
 
-		return got, &statusError{
+		return &statusError{
 			Code:        resp.StatusCode,
 			Body:        strings.TrimSpace(string(body)),
 			RateLimited: resp.Header.Get("Retry-After") != "" || resp.Header.Get("X-RateLimit-Remaining") == "0",
 		}
 	}
 
-	err = json.NewDecoder(resp.Body).Decode(&got)
-
-	return got, err
+	return json.NewDecoder(resp.Body).Decode(into)
 }

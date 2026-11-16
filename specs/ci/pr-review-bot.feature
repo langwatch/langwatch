@@ -84,6 +84,36 @@ Feature: PR Review Bot workflow
     And the wait step exits non-zero
     And the review job ends red, never green-skipped
 
+  @unit
+  Scenario: A check that ran twice counts only its newest run
+    Given a workflow's check on the head commit was cancelled by a newer run of the same workflow
+    And the newer run passed
+    When the wait step reads the check runs
+    Then only the newest run of that check counts
+    And the review is not blocked by the cancelled run
+
+  @unit
+  Scenario: Same-named checks from different workflows are counted separately
+    Given two workflows each have a check named "test" on the head commit
+    And one passed and the other failed
+    When the wait step reads the check runs
+    Then the wait step names "test (failure)" as a failed check
+
+  @unit
+  Scenario: A check whose workflow run is unknown is never merged with another
+    Given a check run whose check suite is not in the head commit's workflow runs
+    When the wait step reads the check runs
+    Then that check run is keyed on its own check suite
+    And it is never merged with a same-named check from another suite
+
+  @unit
+  Scenario: A slow CI fails the wait with its own message, not the job timeout
+    Given the wait step has a timeout-minutes above the wait's own 45-minute deadline
+    And the bot step passes review_timeout_minutes
+    When the review job's timeout-minutes is checked
+    Then it is at least the wait step's limit plus twice review_timeout_minutes plus 5
+    And a slow CI ends with the wait step's message naming the pending checks
+
   # ============================================================================
   # Gating: Dependabot PRs
   # ============================================================================
@@ -190,9 +220,9 @@ Feature: PR Review Bot workflow
   # contents: write is required so the default GITHUB_TOKEN can call
   # resolveReviewThread; anything less only loses thread auto-resolution.
   @unit
-  Scenario: The review workflow grants exactly checks read, contents write and pull-requests write
+  Scenario: The review workflow grants exactly actions read, checks read, contents write and pull-requests write
     When the workflow runs
-    Then the workflow grants permissions: checks: read, contents: write, pull-requests: write
+    Then the workflow grants permissions: actions: read, checks: read, contents: write, pull-requests: write
     And the workflow does not grant any extra permissions
 
   # ============================================================================

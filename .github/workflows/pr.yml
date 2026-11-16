@@ -218,8 +218,11 @@ jobs:
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.draft == false
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    # The wait step's 50 + the bot's two claude calls at 20 each + 10 spare.
+    # ciguard requires at least wait + 2 × review_timeout_minutes + 5.
+    timeout-minutes: 100
     permissions:
+      actions: read # to map each check run's suite to its workflow, so a superseded run is not counted
       checks: read # to list the head commit's check runs while waiting for them
       contents: write # so the default token can call resolveReviewThread; read would only lose thread auto-resolution
       pull-requests: write
@@ -242,8 +245,14 @@ jobs:
           # This job's own check run would wait on itself.
           EXCLUDE_CHECK: review
         run: go run ./cmd/waitforchecks
+        # Above cmd/waitforchecks' own 45-minute deadline, so a slow CI ends
+        # with the wait's message naming the pending checks.
+        timeout-minutes: 50
       - uses: langwatch/langwatch-pr-review-bot@05d6c298cb28b0f67e2e7fda075b916a0294af5b # main 2026-10-24
         with:
           slack_notify: "false"
+          # Bounds each of the bot's two claude calls (review and brief); the
+          # bot's default of 60 would outlast the job timeout above.
+          review_timeout_minutes: 20
           claude_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           langwatch_ingest_key: ${{ secrets.LANGWATCH_INGEST_KEY }}

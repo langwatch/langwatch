@@ -33,6 +33,9 @@ type Step struct {
 	// step to fail the job treats anything but a literal false as set.
 	ContinueOnError any `yaml:"continue-on-error"`
 
+	// TimeoutMinutes is a number or an expression string; nil when unset.
+	TimeoutMinutes any `yaml:"timeout-minutes"`
+
 	// UsesComment is the trailing `# <version>` comment on the `uses:` line.
 	// yaml keeps it on the node but drops it from Uses, and the pin guard needs
 	// it to assert every SHA pin documents the version it points at. Empty when
@@ -130,12 +133,14 @@ func usesLineComment(mapping *yaml.Node) string {
 // replace (not merge with) the workflow-level block when present. Needs stays
 // a yaml.Node because GitHub accepts a scalar or a list.
 type Job struct {
-	Name        string            `yaml:"name"`
-	Needs       yaml.Node         `yaml:"needs"`
-	If          string            `yaml:"if"`
-	Permissions Permissions       `yaml:"permissions"`
-	Env         map[string]string `yaml:"env"`
-	Steps       []Step            `yaml:"steps"`
+	Name  string    `yaml:"name"`
+	Needs yaml.Node `yaml:"needs"`
+	If    string    `yaml:"if"`
+	// TimeoutMinutes is a number or an expression string; nil when unset.
+	TimeoutMinutes any               `yaml:"timeout-minutes"`
+	Permissions    Permissions       `yaml:"permissions"`
+	Env            map[string]string `yaml:"env"`
+	Steps          []Step            `yaml:"steps"`
 }
 
 // PullRequest is the `on.pull_request` trigger and the event types that fire

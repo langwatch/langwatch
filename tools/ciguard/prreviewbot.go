@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/langwatch/langwatch/pkg/ciscan"
@@ -48,9 +49,11 @@ func prReviewBotEventTypeClause() string {
 
 // prReviewBotRequiredPermissions are the exact permissions the review job must grant:
 // contents: write (for resolveReviewThread), pull-requests: write (for posting
-// reviews) and checks: read (for listing the head commit's check runs while
-// waiting for them).
+// reviews), checks: read (for listing the head commit's check runs while
+// waiting for them) and actions: read (for mapping each check run's suite to
+// its workflow, so a superseded run of the same workflow is not counted).
 var prReviewBotRequiredPermissions = map[string]string{
+	"actions":       "read",
 	"checks":        "read",
 	"contents":      "write",
 	"pull-requests": "write",
@@ -162,8 +165,71 @@ func prReviewBotWaitsForChecks(workflow *ciscan.Workflow) []string {
 	}
 
 	problems := waitStepProblems(job.Steps[waits])
+	problems = append(problems, botOrderProblems(job.Steps, waits)...)
 
-	return append(problems, botOrderProblems(job.Steps, waits)...)
+	return append(problems, timeoutProblems(job, job.Steps[waits])...)
+}
+
+// prReviewBotJobTimeoutSpare is the minutes the review job's timeout must
+// leave beyond the wait step's limit and the bot's two claude calls.
+const prReviewBotJobTimeoutSpare = 5
+
+// timeoutProblems requires limits that let each step fail with its own
+// message before GitHub kills the job: a timeout-minutes on the wait step, a
+// review_timeout_minutes on the bot step (it bounds each of the bot's two
+// claude calls), and a job timeout-minutes of at least the wait's limit plus
+// twice the bot's plus prReviewBotJobTimeoutSpare.
+func timeoutProblems(job ciscan.Job, wait ciscan.Step) []string {
+	var problems []string
+	waitLimit, waitOK := minutes(wait.TimeoutMinutes)
+	if !waitOK {
+		problems = append(problems, fmt.Sprintf(
+			"%s review job's wait step has no whole-number timeout-minutes, so a slow CI ends in the job timeout instead of the wait's message", PRReviewBotWorkflow))
+	}
+	reviewLimit, reviewOK := 0, false
+	if bot := slices.IndexFunc(job.Steps, func(step ciscan.Step) bool {
+		return strings.HasPrefix(step.Uses, prReviewBotBotAction)
+	}); bot >= 0 {
+		reviewLimit, reviewOK = minutes(job.Steps[bot].With["review_timeout_minutes"])
+		if !reviewOK {
+			problems = append(problems, fmt.Sprintf(
+				"%s review job's bot step has no whole-number review_timeout_minutes, so the bot's default (60 per call) outlasts the job", PRReviewBotWorkflow))
+		}
+	}
+	jobLimit, jobOK := minutes(job.TimeoutMinutes)
+	if !jobOK {
+		return append(problems, fmt.Sprintf(
+			"%s review job has no whole-number timeout-minutes", PRReviewBotWorkflow))
+	}
+	if waitOK && reviewOK {
+		if want := waitLimit + 2*reviewLimit + prReviewBotJobTimeoutSpare; jobLimit < want {
+			problems = append(problems, fmt.Sprintf(
+				"%s review job's timeout-minutes %d leaves no room for the review: want at least %d (wait %d + 2×review_timeout_minutes %d + %d)",
+				PRReviewBotWorkflow, jobLimit, want, waitLimit, reviewLimit, prReviewBotJobTimeoutSpare))
+		}
+	}
+
+	return problems
+}
+
+// minutes reads a positive whole number of minutes from a YAML int or a
+// numeric string; an expression or anything else is not a number.
+func minutes(value any) (int, bool) {
+	var n int
+	switch v := value.(type) {
+	case int:
+		n = v
+	case string:
+		parsed, err := strconv.Atoi(strings.TrimSpace(v))
+		if err != nil {
+			return 0, false
+		}
+		n = parsed
+	default:
+		return 0, false
+	}
+
+	return n, n > 0
 }
 
 // waitStepProblems reports every way the wait step can pass while the checks
@@ -250,7 +316,7 @@ func prReviewBotConcurrency(workflow *ciscan.Workflow) []string {
 }
 
 // prReviewBotPermissions checks the review job's effective permissions block
-// grants exactly checks: read, contents: write and pull-requests: write, with
+// grants exactly actions: read, checks: read, contents: write and pull-requests: write, with
 // no extra permissions. contents: write is required for resolveReviewThread
 // and checks: read for listing the head commit's check runs. GitHub
 // permissions blocks do not merge: a job-level `permissions:` completely
@@ -261,7 +327,7 @@ func prReviewBotPermissions(workflow *ciscan.Workflow) []string {
 
 	if perms.Shorthand != "" {
 		return []string{fmt.Sprintf(
-			"%s permissions block uses shorthand %q, want an explicit checks/contents/pull-requests mapping",
+			"%s permissions block uses shorthand %q, want an explicit actions/checks/contents/pull-requests mapping",
 			PRReviewBotWorkflow, perms.Shorthand)}
 	}
 
