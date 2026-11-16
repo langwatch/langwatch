@@ -349,26 +349,32 @@ describe("<SubscriptionPage/> while a payment recovery case is open", () => {
       expect(within(card).queryByRole("button", { name: "Upgrade to Growth" })).toBeNull();
       expect(within(card).queryByTestId("current-plan-pay-invoice-button")).toBeNull();
     });
+  });
 
-    /** @scenario "A paused organization over its seats is asked to pay, not to upgrade" */
-    it("asks in the seat note to pay the open invoice, with no upgrade or add seats action", async () => {
+  describe("when the paused organization has more members than Free includes", () => {
+    beforeEach(() => {
+      givenPausedOnFree();
       mockGetUsage.mockReturnValue({
         data: {
           seatLimitInfo: {
             status: "exceeded",
-            message: "Your organization uses 3 member seats and your plan includes 1 member seat.",
+            message: "Your organization uses 3 member seats and your plan includes 2 member seats.",
           },
           membersCount: 3,
         },
         isLoading: false,
         refetch: vi.fn(),
       });
+    });
+
+    /** @scenario "A paused organization over its seats is told to pay the invoice, not to add seats" */
+    it("says to pay the open invoice and offers no add-seats or upgrade action", async () => {
       renderSubscriptionPage();
 
       const note = await screen.findByTestId("seat-limit-callout");
       expect(note).toHaveTextContent("Pay the open invoice to get your plan back.");
-      expect(note).not.toHaveTextContent("Upgrade to the Growth plan");
       expect(within(note).queryByRole("button", { name: "Add seats" })).toBeNull();
+      expect(note).not.toHaveTextContent("Upgrade to the Growth plan");
     });
   });
 
