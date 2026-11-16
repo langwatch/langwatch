@@ -13,12 +13,16 @@ import {
   PrismaTopicClusteringRepository,
   type TopicClusteringDatabase,
 } from "./prisma.topic-clustering.repository.ts";
-import { PrismaTopicModelProjectionRepository } from "./prisma.topic-model-projection.repository.ts";
+import {
+  PrismaTopicModelProjectionRepository,
+  type TopicModelProjectionDatabase,
+} from "./prisma.topic-model-projection.repository.ts";
 import { PrismaTopicRepository } from "./prisma.topic.repository.ts";
 
 export type TopicRepositoriesDatabase = TopicClusteringDatabase &
   RunProjectionPrismaClient &
-  RunHistoryPrismaClient;
+  RunHistoryPrismaClient &
+  TopicModelProjectionDatabase;
 
 /**
  * The live tier. Both rows live in the process's Prisma connection, and

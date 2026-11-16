@@ -29,6 +29,7 @@ export const STRIPE_PRICE_NAMES = [
   "GROWTH_EVENTS_USD_MONTHLY_UNTIL_MAR_2026",
   "GROWTH_EVENTS_USD_ANNUAL_UNTIL_MAR_2026",
   "GROWTH_INSTANT_EVAL_USD",
+  "GROWTH_PII_REDACTION_USD",
   "CONNECTED_HOSTED_USAGE_QUARTERLY",
   "DEVELOPER_SEAT_EUR_MONTHLY",
   "DEVELOPER_SEAT_EUR_ANNUAL",
@@ -42,6 +43,10 @@ export const STRIPE_PRICE_NAMES = [
 
 export type StripePriceName = (typeof STRIPE_PRICE_NAMES)[number];
 
+/** The seat kinds a subscription bills as a line of their own; each has a floor. */
+export const BILLED_SEAT_KINDS = ["full", "developer"] as const;
+export type BilledSeatKind = (typeof BILLED_SEAT_KINDS)[number];
+
 /**
  * Names that may be absent from the catalog in a given Stripe mode. They are
  * provisioned per mode by hand, so the feature stays off rather than the whole
@@ -49,6 +54,7 @@ export type StripePriceName = (typeof STRIPE_PRICE_NAMES)[number];
  */
 export const OPTIONAL_STRIPE_PRICE_NAMES: readonly StripePriceName[] = [
   "GROWTH_INSTANT_EVAL_USD",
+  "GROWTH_PII_REDACTION_USD",
   "CONNECTED_HOSTED_USAGE_QUARTERLY",
   "DEVELOPER_SEAT_EUR_MONTHLY",
   "DEVELOPER_SEAT_EUR_ANNUAL",
@@ -63,6 +69,7 @@ export const OPTIONAL_STRIPE_PRICE_NAMES: readonly StripePriceName[] = [
 /** Prices that are optional: absent until an operator provisions them in a mode. */
 type OptionalStripePriceName =
   | "GROWTH_INSTANT_EVAL_USD"
+  | "GROWTH_PII_REDACTION_USD"
   | "CONNECTED_HOSTED_USAGE_QUARTERLY"
   | "DEVELOPER_SEAT_EUR_MONTHLY"
   | "DEVELOPER_SEAT_EUR_ANNUAL"
@@ -84,6 +91,7 @@ export const STRIPE_METER_NAMES = [
   "BILLABLE_EVENTS",
   "INSTANT_EVAL_USD",
   "RETENTION_STORAGE_GB",
+  "PII_REDACTION_USD",
 ] as const;
 export type StripeMeterName = (typeof STRIPE_METER_NAMES)[number];
 
@@ -91,14 +99,19 @@ export type StripeMeterName = (typeof STRIPE_METER_NAMES)[number];
 export const OPTIONAL_STRIPE_METER_NAMES: readonly StripeMeterName[] = [
   "INSTANT_EVAL_USD",
   "RETENTION_STORAGE_GB",
+  "PII_REDACTION_USD",
 ];
 
+/** An optional meter may be mapped in one mode and not the other. */
 export type StripeMeterMapping = Record<
   StripeMeterName,
-  Record<StripeEnvironment, string> | undefined
+  Partial<Record<StripeEnvironment, string>> | undefined
 >;
 export type StripeMeterMap = Partial<Record<StripeMeterName, string>> &
-  Record<Exclude<StripeMeterName, "INSTANT_EVAL_USD" | "RETENTION_STORAGE_GB">, string>;
+  Record<
+    Exclude<StripeMeterName, "INSTANT_EVAL_USD" | "PII_REDACTION_USD" | "RETENTION_STORAGE_GB">,
+    string
+  >;
 
 export type StripePricesFile = {
   schemaVersion: number;
@@ -172,7 +185,7 @@ const stripeMeterMappingSchemaDefinition = z.object(
     STRIPE_METER_NAMES.map((key) => [
       key,
       OPTIONAL_STRIPE_METER_NAMES.includes(key)
-        ? stripeEnvironmentMappingSchema.optional()
+        ? stripeOptionalEnvironmentMappingSchema.optional()
         : stripeEnvironmentMappingSchema,
     ]),
   ) as Record<StripeMeterName, typeof stripeEnvironmentMappingSchema>,

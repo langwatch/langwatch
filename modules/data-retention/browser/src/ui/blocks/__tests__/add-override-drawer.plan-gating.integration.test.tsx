@@ -84,4 +84,28 @@ describe("AddOverrideDrawer plan-gated behavior", () => {
       expect(screen.getByText(/isn't available on your plan/)).toBeTruthy();
     });
   });
+
+  describe("when a paid org edits a stored 91-day value", () => {
+    const threeMonthsTarget: RetentionEditTarget = {
+      scope: { scopeType: "ORGANIZATION", scopeId: "org-1" },
+      scopeName: "Acme",
+      retentionDays: 91,
+    };
+
+    /** @scenario "A paid organization sees only the fixed Growth options" */
+    it("shows it as the 90 days preset and saves it instead of refusing it as legacy", () => {
+      const onSave = vi.fn();
+      renderDrawer({ isEnterprise: false, editTarget: threeMonthsTarget, onSave });
+
+      expect(screen.queryByText(/\(legacy\)/)).toBeNull();
+      expect(screen.getAllByText("90 days").length).toBeGreaterThan(0);
+
+      fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+      expect(onSave).toHaveBeenCalledTimes(1);
+      expect(onSave.mock.calls[0]?.[0]).toMatchObject({
+        retentionDays: 91,
+      });
+    });
+  });
 });

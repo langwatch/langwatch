@@ -110,6 +110,12 @@ describe("the LangWatchQL function allowlist", () => {
         "JSON read out of a string column",
         "SELECT JSONExtractString(TraceName, 'k'), JSONHas(TraceName, 'k') FROM traces",
       ],
+      // A set of traces held as hashed ids, not id strings.
+      [
+        "a 128-bit and a 64-bit id hash",
+        "SELECT sipHash128(TraceId) AS trace FROM traces " +
+          "WHERE cityHash64(TraceId) NOT IN (SELECT cityHash64(TraceId) FROM spans)",
+      ],
       [
         "the standard DISTINCT aggregate spelling",
         "SELECT COUNT(DISTINCT TraceId), uniqExact(TraceId) FROM traces",

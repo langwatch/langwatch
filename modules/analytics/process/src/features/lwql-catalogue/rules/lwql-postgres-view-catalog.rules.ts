@@ -925,7 +925,8 @@ export const LWQL_POSTGRES_CATALOGUE = defineLwqlCatalog({
       Description: { source: "description", content: "output" },
       IconAsset: { source: "iconAsset", content: "output" },
       credentialSchema: "omit", // secret
-      OttlRules: { source: "ottlRules", content: "output" },
+      // Organization configuration: the console and the API serve it only to aiTools:manage.
+      OttlRules: { source: "ottlRules", content: "output", access: { allOf: ["aiTools:manage"] } },
       PlatformPublished: { source: "platformPublished" },
       Enabled: { source: "enabled" },
       ArchivedAt: { source: "archivedAt" },

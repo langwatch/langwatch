@@ -55,6 +55,7 @@ describe("Failed payment recovery and the plan", () => {
       endDate: null,
       maxMembers: 12,
       maxMembersLite: null,
+      maxMembersDeveloper: null,
       maxMessagesPerMonth: 2_000_000,
       lastPaymentFailedDate: null,
       seatsKept: null,

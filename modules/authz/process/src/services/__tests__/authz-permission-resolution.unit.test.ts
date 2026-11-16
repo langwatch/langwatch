@@ -10,6 +10,7 @@ import type {
   AuthzReadRepository,
   OrganizationRole,
 } from "../../repositories/authz-read.repository.ts";
+import { MemoryAuthzOrganizationPolicyRepository } from "../../repositories/memory/memory.authz-organization-policy.repository.ts";
 import { AuthzService } from "../authz.service.ts";
 
 const ORG = "org-1";
@@ -52,6 +53,7 @@ function authzFor({
     findTeamOrganization: vi.fn().mockResolvedValue({ organizationId: ORG }),
   };
   return AuthzService.create({
+    policies: MemoryAuthzOrganizationPolicyRepository.create(),
     isOnEngine: async () => true,
     repository: makeReader(overrides),
     listing: new StubAuthzListingRepository(),

@@ -136,10 +136,10 @@ export function AgentQuickStart({ prompt }: { prompt: string }) {
               <Button
                 size="sm"
                 minHeight="40px"
-                bg="docs.primary"
-                color="docs.primaryText"
+                bg="docs.primaryFill"
+                color="docs.onPrimary"
                 fontWeight="600"
-                _hover={{ bg: "docs.primary", opacity: 0.9 }}
+                _hover={{ bg: "docs.primaryFillHover" }}
                 disabled={!ready}
                 data-docs-prompt=""
                 onClick={() => copy({ text: prompt })}

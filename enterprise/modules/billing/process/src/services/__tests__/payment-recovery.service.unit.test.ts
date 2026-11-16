@@ -74,6 +74,7 @@ function setUp({ plan = "GROWTH_SEAT_EUR_MONTHLY" }: { plan?: string } = {}) {
     endDate: null,
     maxMembers: 5,
     maxMembersLite: null,
+    maxMembersDeveloper: null,
     maxMessagesPerMonth: null,
     lastPaymentFailedDate: null,
     seatsKept: null,

@@ -8,7 +8,6 @@ import {
   type PlanTypes as PlanType,
   PlanTypes,
   SeatBillingUnavailableError,
-  SeatQuantityBelowInUseError,
   stripePricesFile,
   type StripePriceName,
   SubscriptionAlreadyActiveError,
@@ -30,6 +29,7 @@ import type {
 } from "../repositories/subscription.repository.ts";
 import type { SubscriptionItemUpdate } from "../rules/billing-stripe-shapes.rules.ts";
 import type { SeatEventProrationQuote } from "../rules/seat-event-quote.rules.ts";
+import { assertSeatsCoverUse } from "../rules/seat-floor.rules.ts";
 import { BillingInvoicesService } from "./billing-invoices.service.ts";
 import type { SeatEventSubscriptionService } from "./seat-event-subscription.service.ts";
 import type { StripeErrorTranslator } from "./stripe-error-translator.service.ts";
@@ -143,7 +143,7 @@ export class BillingSubscriptionService {
   }): Promise<{ success: boolean }> {
     const effectiveMembers = upgradeMembers ? totalMembers : 0;
     const effectiveTraces = upgradeTraces ? totalTraces : 0;
-    await this.assertSeatsCoverUse({ organizationId, requested: effectiveMembers });
+    await this.assertFullSeatsCoverUse({ organizationId, requested: effectiveMembers });
 
     if (this.seatEventService) {
       const pricingModel = await this.organizationRepository.findPricingModel(organizationId);
@@ -187,7 +187,7 @@ export class BillingSubscriptionService {
   }
 
   /** Refuses a seat count below the full seats in use, and below one, before any charge. */
-  private async assertSeatsCoverUse({
+  private async assertFullSeatsCoverUse({
     organizationId,
     requested,
   }: {
@@ -195,10 +195,7 @@ export class BillingSubscriptionService {
     requested: number;
   }): Promise<void> {
     const inUse = await this.seatsInUse.countFullSeatsInUse({ organizationId });
-    const minimum = Math.max(1, inUse);
-    if (requested < minimum) {
-      throw new SeatQuantityBelowInUseError({ requested, minimum });
-    }
+    assertSeatsCoverUse({ seat: "full", requested, inUse });
   }
 
   async createOrUpdateSubscription({

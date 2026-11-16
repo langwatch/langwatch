@@ -201,6 +201,8 @@ const organizationCreatedEventDataSchemaDefinition = z.object({
   tenantId: z.string().min(1),
   organizationId: z.string().min(1),
   organizationName: z.string(),
+  /** Its founder, made its admin; none when instance provisioning created it before any user. */
+  userId: z.string().min(1).optional(),
   occurredAt: z.number().int().nonnegative(),
 });
 export interface OrganizationCreatedEventDataSchema extends Named<

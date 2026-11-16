@@ -8,16 +8,23 @@ import {
   type RequestBoundKey,
 } from "@langwatch/plans";
 import { ResourceScope } from "@langwatch/process";
+import { memoryObjectStorage } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 import { vi } from "vitest";
 
+import type { DatasetChunkRepository } from "../../repositories/dataset-chunk.repository.ts";
+import type { DatasetContentRepository } from "../../repositories/dataset-content.repository.ts";
 import type { DatasetRepositories } from "../../repositories/dataset.repositories.ts";
+import { MemoryDatasetContentRepository } from "../../repositories/memory/memory.dataset-content.repository.ts";
+import { MemoryDatasetDatabase } from "../../repositories/memory/memory.dataset.database.ts";
 import { MemoryDatasetRepositories } from "../../repositories/memory/memory.dataset.repositories.ts";
+import { ObjectStorageDatasetChunkRepository } from "../../repositories/object-storage/object-storage.dataset-chunk.repository.ts";
 import { DatasetAttachmentReferenceService } from "../../services/dataset-attachment-reference.service.ts";
 import { DatasetAttachmentUploadService } from "../../services/dataset-attachment-upload.service.ts";
+import { DatasetContentService } from "../../services/dataset-content.service.ts";
 import { DatasetInlineAttachmentService } from "../../services/dataset-inline-attachment.service.ts";
 import { DatasetRequestBoundsService } from "../../services/dataset-request-bounds.service.ts";
 import { DatasetModule } from "../dataset.app.ts";
@@ -139,6 +146,29 @@ export function createDatasetTestInlineAttachments(
 ): DatasetInlineAttachmentService {
   return DatasetInlineAttachmentService.create({
     uploads: DatasetAttachmentUploadService.create({ storedObjects, requestBounds }),
+  });
+}
+
+/**
+ * The real content service over in-memory chunks. Pass the test's own `database`
+ * when its repository has to see the datasets this creates.
+ */
+export function createDatasetTestContent(
+  input: Readonly<{
+    database?: MemoryDatasetDatabase;
+    datasets?: DatasetContentRepository;
+    storage?: DatasetChunkRepository;
+  }> = {},
+): DatasetContentService {
+  return DatasetContentService.create({
+    datasets:
+      input.datasets ??
+      MemoryDatasetContentRepository.create({
+        database: input.database ?? MemoryDatasetDatabase.create(),
+      }),
+    storage:
+      input.storage ??
+      ObjectStorageDatasetChunkRepository.create({ objectStorage: memoryObjectStorage() }),
   });
 }
 

@@ -141,6 +141,11 @@ export const { publicBaseUrl } = Config.define((c) => ({
   ),
 }));
 
+/** The replicated ClickHouse's cluster: analytics probes and ops reads backups on each replica. */
+export const { clickhouseCluster } = Config.define((c) => ({
+  clickhouseCluster: c.env("CLICKHOUSE_CLUSTER", z.string().optional()),
+}));
+
 /**
  * How long a code block may run inside the NLP engine, raw as the engine reads it. Workflow
  * pushes it to the studio engine and scenario clamps by it; each holds this one leaf.

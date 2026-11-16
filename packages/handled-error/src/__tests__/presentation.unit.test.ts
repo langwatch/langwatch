@@ -87,6 +87,27 @@ describe("explainHandledError", () => {
       expect(description).toBe("Slack no longer accepts this webhook.");
     });
 
+    /** @scenario "The refusal names the Developer seats and the minimum" */
+    it("names Developer seats when a Developer seat change is refused", () => {
+      const { title, description } = explainHandledError(
+        shape({
+          code: "seat_quantity_below_in_use",
+          meta: { seat: "developer", requested: 1, minimum: 2 },
+        }),
+      );
+
+      expect(title).toBe("That's too few seats");
+      expect(description).toBe("Nothing changed. Choose at least 2 developer seats.");
+    });
+
+    it("keeps the full-seat wording when the refusal names no seat kind", () => {
+      const { description } = explainHandledError(
+        shape({ code: "seat_quantity_below_in_use", meta: { requested: 0, minimum: 1 } }),
+      );
+
+      expect(description).toBe("Nothing changed. Choose at least 1 seat.");
+    });
+
     /** @scenario "meta is read only where the client knows its shape" */
     it("falls back cleanly when the declared meta is absent", () => {
       const { title, description } = explainHandledError(
@@ -1140,6 +1161,25 @@ describe("instant_eval_opt_in_not_offered", () => {
       expect(description).toBe(
         "LangWatch switches Instant Evals on for an enterprise plan. Contact us to get them.",
       );
+    });
+  });
+
+  describe("when LangWatch's hosted model is switched off for the organization", () => {
+    /** @scenario "A hosted-off refusal never sends the reader to the enterprise plan" */
+    it("says the hosted model is off and names the own decision model, never the plan", () => {
+      const { title, description } = explainHandledError(
+        shape({
+          code: "instant_eval_opt_in_not_offered",
+          httpStatus: 403,
+          meta: { deployment: "hosted_off" },
+        }),
+      );
+
+      expect(title).toBe("LangWatch's hosted model is off for this organization");
+      expect(description).toBe(
+        "Run Instant Evals on your own decision model: pick one in the Instant Evals column of Default models.",
+      );
+      expect(description).not.toMatch(/enterprise/i);
     });
   });
 });

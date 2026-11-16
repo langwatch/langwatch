@@ -1,7 +1,7 @@
 import { Banner } from "@langwatch/design-system/banner";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Spacer, Text, VStack } from "@langwatch/design-system/primitives";
+import { Spacer, VStack } from "@langwatch/design-system/primitives";
 import type { ScopeTriadEntry } from "@langwatch/design-system/scope-chip-picker";
 import { HandledErrorAlert } from "@langwatch/error-views";
 import { docsUrl } from "@langwatch/handled-error/docs-url";
@@ -85,8 +85,6 @@ export function RoutingPoliciesPage() {
 
       <PageLayout.Container>
         <VStack align="stretch" gap={6} width="full">
-          <PageDescription />
-
           {policiesQuery.isLoading && <ListSkeleton />}
 
           {policiesQuery.error ? <PolicyListFailure error={policiesQuery.error} /> : null}
@@ -171,15 +169,6 @@ function DeletePolicyDialog({
       loading={isDeleting}
       onConfirm={onConfirm}
     />
-  );
-}
-
-function PageDescription() {
-  return (
-    <Text color="fg.muted">
-      Decide which providers and models your keys reach, and what the model tiers mean here. A
-      project policy wins over a team policy, which wins over the organization policy.
-    </Text>
   );
 }
 

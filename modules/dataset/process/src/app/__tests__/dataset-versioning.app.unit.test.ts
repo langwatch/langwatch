@@ -624,7 +624,11 @@ describe("when a version is restored", () => {
   it("refuses a legacy single-file dataset", async () => {
     const datasetId = await createDataset();
     await save(datasetId);
-    await repositories.content.update({ id: datasetId, projectId: PROJECT, data: { useS3: true } });
+    await repositories.content.update({
+      id: datasetId,
+      projectId: PROJECT,
+      data: { useS3: true, contentLayout: "postgres" },
+    });
 
     await expect(
       app.restoreVersion({ projectId: PROJECT, datasetId, version: 1 }),
@@ -973,13 +977,22 @@ describe("given datasets created before versioning", () => {
 
   /** @scenario "The first-version step retries a dataset whose rows it could not read" */
   it("fails and saves no checkpoint when a dataset's rows fail to read", async () => {
-    await app.upsertDataset({
+    // A dataset from before versioning keeps its rows in the Postgres records table.
+    const legacy = await repositories.content.create({
       projectId: "project-0",
       name: "unreadable-once",
+      slug: "unreadable-once",
       columnTypes: [{ name: "input", type: "string" }],
-      datasetRecords: [{ id: "a", input: "x" }],
+      contentLayout: "postgres",
     });
-    vi.spyOn(repositories.records, "findPage").mockRejectedValueOnce(new Error("connection reset"));
+    await repositories.records.createMany({
+      datasetId: legacy.id,
+      projectId: "project-0",
+      entries: [{ id: "a", input: "x" }],
+    });
+    const findPage = vi
+      .spyOn(repositories.records, "findPage")
+      .mockRejectedValueOnce(new Error("connection reset"));
 
     const { saved, checkpoint } = checkpointOf(null);
     await expect(
@@ -991,6 +1004,7 @@ describe("given datasets created before versioning", () => {
       }),
     ).rejects.toThrow("datasets got no first version");
 
+    expect(findPage).toHaveBeenCalled();
     expect(saved).toEqual([]);
   });
 

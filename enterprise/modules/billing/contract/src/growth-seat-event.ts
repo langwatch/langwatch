@@ -163,9 +163,22 @@ export const retentionBillsStorage = (retentionDays: number | undefined): boolea
   retentionDays !== undefined && retentionDays > GROWTH_INCLUDED_RETENTION_DAYS;
 
 /**
+ * The PII redaction price on a Growth subscription, when the mode has one.
+ * Dollars only, since its meter counts dollars (ADR-201), and absent until
+ * provisioned, so a checkout never fails over it.
+ */
+export const pickGrowthPiiRedactionPriceId = ({
+  currency,
+  prices,
+}: {
+  currency: Currency;
+  prices: StripePriceMap;
+}): string | undefined => (currency === "USD" ? prices.GROWTH_PII_REDACTION_USD : undefined);
+
+/**
  * Stripe checkout line items for Growth: a seat item (quantity = coreMembers), metered events,
- * metered Instant Evals where provisioned, and metered storage above 90 days of retention.
- * No metered item carries a quantity.
+ * metered Instant Evals and PII redaction where provisioned, and metered storage above 90 days
+ * of retention. No metered item carries a quantity.
  */
 export const createCheckoutLineItems = ({
   coreMembers,
@@ -187,6 +200,7 @@ export const createCheckoutLineItems = ({
   const storagePriceId = retentionBillsStorage(retentionDays)
     ? pickRetentionStoragePriceId({ currency, interval, prices })
     : undefined;
+  const piiRedactionPriceId = pickGrowthPiiRedactionPriceId({ currency, prices });
 
   return [
     {
@@ -197,6 +211,7 @@ export const createCheckoutLineItems = ({
       price: resolveGrowthEventsPriceId({ currency, interval, prices }),
     },
     ...(instantEvalPriceId ? [{ price: instantEvalPriceId }] : []),
+    ...(piiRedactionPriceId ? [{ price: piiRedactionPriceId }] : []),
     ...(storagePriceId ? [{ price: storagePriceId }] : []),
   ];
 };

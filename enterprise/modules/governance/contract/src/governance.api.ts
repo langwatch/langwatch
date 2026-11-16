@@ -117,6 +117,17 @@ import type {
   PersonalUsageWindow,
 } from "./features/personal/personal-usage.ts";
 import type {
+  ArdManifest,
+  ArdSearchRequest,
+  ArdSearchResponse,
+} from "./features/registry/agent-registry-ard.ts";
+import type {
+  AgentRegistryEntry,
+  AgentRegistryEventPage,
+  AgentRegistryPage,
+  AgentRegistryStatus,
+} from "./features/registry/agent-registry.ts";
+import type {
   AgentListingRequestResult,
   AgentSyncSourceListing,
   GovernanceAgentRow,
@@ -127,7 +138,7 @@ import type {
   PeopleScreenPerson,
   PeopleScreenSuggestion,
 } from "./governance-people.ts";
-import type { GovernanceActorWorkspace } from "./governance.responses.ts";
+import type { GovernanceActorWorkspaceLookup } from "./governance.responses.ts";
 import type { GovernanceSetupState } from "./governance.ts";
 import type { GovernanceOcsfExportInput, GovernanceOcsfExportPage } from "./ocsf-export.ts";
 import type { OrganizationSessionPolicyShape, SessionCeilingApplied } from "./session-policy.ts";
@@ -299,7 +310,11 @@ export interface GovernanceRestApi {
   aiToolReorder(input: ReorderAiToolEntriesInput): Promise<void>;
   templateListForUser(input: { organizationId: string }): Promise<IngestionTemplate[]>;
   templateListForOrgAdmin(input: { organizationId: string }): Promise<IngestionTemplate[]>;
-  templateGetByIdForOrg(input: { id: string; organizationId: string }): Promise<IngestionTemplate>;
+  /** The member shape, at `aiTools:view`: `ottlRules` is empty, as in `templateListForUser`. */
+  templateGetByIdForMember(input: {
+    id: string;
+    organizationId: string;
+  }): Promise<IngestionTemplate>;
   templateCreateOrg(input: CreateIngestionTemplateInput): Promise<IngestionTemplate>;
   templateUpdateOttlRules(input: UpdateIngestionTemplateOttlInput): Promise<IngestionTemplate>;
   templateArchiveOrg(input: ArchiveIngestionTemplateInput): Promise<void>;
@@ -405,10 +420,10 @@ export interface GovernanceRestApi {
   governanceRecordWorkspaceView(
     input: RecordWorkspaceViewInput,
   ): Promise<RecordWorkspaceViewResult>;
-  findActorWorkspace(input: {
+  getActorWorkspace(input: {
     organizationId: string;
     actor: string;
-  }): Promise<GovernanceActorWorkspace | null>;
+  }): Promise<GovernanceActorWorkspaceLookup>;
   departmentList(input: { organizationId: string }): Promise<Department[]>;
   departmentAssignments(input: {
     organizationId: string;
@@ -461,6 +476,34 @@ export interface GovernanceRestApi {
     input: { organizationId: string },
     by: GovernanceCaller,
   ): Promise<CliBootstrapResult>;
+  /** The organisation's agent registry, a page at a time (specs/agent-registry.feature). */
+  listRegistryAgents(input: {
+    organizationId: string;
+    limit: number;
+    cursor?: string;
+    updatedSince?: string;
+    status?: AgentRegistryStatus;
+  }): Promise<AgentRegistryPage>;
+  /** Throws `agent_registry_entry_not_found` for an id outside the organisation. */
+  getRegistryAgent(input: { organizationId: string; id: string }): Promise<AgentRegistryEntry>;
+  /** One agent's changes after a sequence, oldest first; each carries the entry at its version. */
+  listRegistryAgentVersions(input: {
+    organizationId: string;
+    id: string;
+    cursor?: string;
+    limit: number;
+  }): Promise<AgentRegistryEventPage>;
+  /** The organisation's change feed after a sequence, in order. */
+  listRegistryEvents(input: {
+    organizationId: string;
+    after?: string;
+    limit: number;
+  }): Promise<AgentRegistryEventPage>;
+  getRegistryArdManifest(input: { organizationId: string }): Promise<ArdManifest>;
+  searchRegistryArd(input: {
+    organizationId: string;
+    request: ArdSearchRequest;
+  }): Promise<ArdSearchResponse>;
 }
 
 export const GovernanceRestApi = moduleApi<GovernanceRestApi>()("governance");

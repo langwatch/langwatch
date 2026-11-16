@@ -149,12 +149,18 @@ type OtlpAnswer = Readonly<{
   status: ContentfulStatusCode;
   mediaType: typeof PRODUCES_JSON;
   body: string;
+  headers?: Readonly<Record<string, string>>;
 }>;
 
-const jsonAnswer = (body: unknown, status: ContentfulStatusCode): OtlpAnswer => ({
+const jsonAnswer = (
+  body: unknown,
+  status: ContentfulStatusCode,
+  headers?: Readonly<Record<string, string>>,
+): OtlpAnswer => ({
   status,
   mediaType: PRODUCES_JSON,
   body: JSON.stringify(body),
+  ...(headers ? { headers } : {}),
 });
 
 /** The door's credential refusals and the plan limit, each in the receiver's own body. */
@@ -249,7 +255,7 @@ async function handleTracesRequest({
       result: { outcome: "unavailable", errorMessage: result.ingestionFailureMessage ?? "" },
       signal: "traces",
     });
-    return jsonAnswer(failure.body, failure.status);
+    return jsonAnswer(failure.body, failure.status, failure.headers);
   }
 
   return jsonAnswer(

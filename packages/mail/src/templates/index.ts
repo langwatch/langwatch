@@ -21,6 +21,7 @@ import { licenseEmailTemplate } from "./license-email.tsx";
 import { monitorAutoPausedEmailTemplate } from "./monitor-auto-paused-email.tsx";
 import { organizationMfaRequirementEmailTemplate } from "./organization-mfa-requirement-email.tsx";
 import { paymentRecoveryEmailTemplate } from "./payment-recovery-email.tsx";
+import { platformOperatorChangeEmailTemplate } from "./platform-operator-change-email.tsx";
 import type { MailTemplate } from "./registry.ts";
 import { resetPasswordEmailTemplate } from "./reset-password-email.tsx";
 import { idpRefusedSignInTemplate, seatRequestTemplate } from "./seat-request-emails.tsx";
@@ -56,6 +57,7 @@ export const mailTemplates: readonly MailTemplate[] = [
   organizationMfaRequirementEmailTemplate,
   licenseEmailTemplate,
   upgradeAlertEmailTemplate,
+  platformOperatorChangeEmailTemplate,
   connectedStatementEmailTemplate,
   paymentRecoveryEmailTemplate,
   budgetIncreaseRequestEmailTemplate,

@@ -35,8 +35,8 @@ const row = {
   Details: "details",
   Error: null,
   Inputs: '{"query":"hello"}',
-  ScheduledAt: "1700000000000",
-  StartedAt: "1700000000100",
+  ScheduledAtMs: "1700000000000",
+  StartedAtMs: "1700000000100",
   CompletedAt: null,
 };
 

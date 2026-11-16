@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The complete callable Evaluation capability shared by process peers.
 
-Peers call these through the token, declared at `../contract/src/evaluation.api.ts:52`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/evaluation.api.ts:54`; nothing else in this package is public.
 
 #### `listEvaluators`
 
@@ -82,6 +82,14 @@ findRunByEvaluationId(input: EvaluationRunLookup): Promise<EvaluationRunData | n
 
 ```typescript
 findRunsByTraceId(input: EvaluationRunsByTraceQuery): Promise<EvaluationRunData[]>;
+```
+
+#### `listEvaluationOutcomes`
+
+A page of one project's finished evaluations on a trace, oldest first; for backfills.
+
+```typescript
+listEvaluationOutcomes(input: EvaluationOutcomesQuery): Promise<EvaluationOutcomePage>;
 ```
 
 #### `findInputs`
@@ -310,7 +318,7 @@ Contract `../contract/src/evaluation.trpc.ts:26`, router `src/transport/evaluati
 interface Input {
   projectId: string;
 }
-type Output = z.infer<typeof evaluatorCatalogueSchema>; // ../contract/src/evaluation.responses.ts:49
+type Output = z.infer<typeof evaluatorCatalogueSchema>; // ../contract/src/evaluation.responses.ts:51
 
 // evaluations.availableCustomEvaluators
 type Input = z.infer<typeof evaluationProjectScopeSchema>; // ../contract/src/evaluation-trpc.schemas.ts:15
@@ -324,7 +332,7 @@ type Output = {
 
 // evaluations.runEvaluation
 type Input = z.infer<typeof runTraceEvaluationInputSchema>; // ../contract/src/evaluation-trpc.schemas.ts:76
-type Output = z.infer<typeof evaluationRunOutcomeSchema>; // ../contract/src/evaluation.responses.ts:66
+type Output = z.infer<typeof evaluationRunOutcomeSchema>; // ../contract/src/evaluation.responses.ts:68
 
 // evaluations.warmupLambda
 // Input: warmupEvaluatorsInputSchema, ../contract/src/evaluation-trpc.schemas.ts:87
@@ -332,7 +340,7 @@ interface Input {
   projectId: string;
   count?: number;
 }
-// Output: evaluationWarmupSchema, ../contract/src/evaluation.responses.ts:72
+// Output: evaluationWarmupSchema, ../contract/src/evaluation.responses.ts:74
 interface Output {
   success: boolean;
   count: number;

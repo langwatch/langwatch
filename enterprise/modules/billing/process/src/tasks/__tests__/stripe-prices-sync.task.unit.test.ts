@@ -335,6 +335,7 @@ describe("syncStripePrices", () => {
           BILLABLE_EVENTS: undefined,
           INSTANT_EVAL_USD: undefined,
           RETENTION_STORAGE_GB: undefined,
+          PII_REDACTION_USD: undefined,
         },
       };
 

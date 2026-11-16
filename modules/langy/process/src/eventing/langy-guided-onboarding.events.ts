@@ -3,6 +3,9 @@ import {
   GUIDED_ONBOARDING_TURN_FAILED_EVENT_TYPE,
   GUIDED_ONBOARDING_TURN_FAILED_EVENT_VERSION,
   guidedOnboardingTurnFailedEventDataSchema,
+  LANGY_FIRST_MESSAGE_SEEN_EVENT_TYPE,
+  LANGY_FIRST_MESSAGE_SEEN_EVENT_VERSION,
+  langyFirstMessageSeenEventDataSchema,
 } from "@langwatch/langy-contract";
 import { z } from "zod";
 
@@ -22,3 +25,19 @@ export const guidedOnboardingTurnFailedEventSchema = z.object({
   data: guidedOnboardingTurnFailedEventDataSchema,
 });
 export type GuidedOnboardingTurnFailedEvent = z.infer<typeof guidedOnboardingTurnFailedEventSchema>;
+
+export const RECORD_LANGY_FIRST_MESSAGE_SEEN_COMMAND_TYPE =
+  "lw.langy_guided_onboarding.record_first_message_seen" as const;
+
+export const recordLangyFirstMessageSeenCommandDataSchema = langyFirstMessageSeenEventDataSchema;
+export type RecordLangyFirstMessageSeenCommandData = z.infer<
+  typeof recordLangyFirstMessageSeenCommandDataSchema
+>;
+
+export const langyFirstMessageSeenEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(LANGY_FIRST_MESSAGE_SEEN_EVENT_TYPE),
+  version: z.literal(LANGY_FIRST_MESSAGE_SEEN_EVENT_VERSION),
+  data: langyFirstMessageSeenEventDataSchema,
+});
+export type LangyFirstMessageSeenEvent = z.infer<typeof langyFirstMessageSeenEventSchema>;
