@@ -422,14 +422,15 @@ describe("given the retention policies page", () => {
     }
 
     /** @scenario "A shorter period asks to apply it with a count" */
-    it("asks to apply it, naming every category it would remove from and how many projects", async () => {
+    it("asks to apply it, naming each category with something to delete and how many projects", async () => {
       await saveTeamPolicy(new TestRetentionHost());
 
       expect(
         await screen.findByText(
-          /1,234 traces older than 90 days, 5 scenario runs older than 90 days and 0 experiment runs older than 90 days will be deleted within a day, across 3 projects\./,
+          /1,234 traces older than 90 days and 5 scenario runs older than 90 days will be deleted within a day, across 3 projects\./,
         ),
       ).toBeInTheDocument();
+      expect(screen.queryByText(/0 experiment runs/)).not.toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Apply now" })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Not now" })).toBeInTheDocument();
       // A fresh read: the cached count is still the old period's.
@@ -489,9 +490,10 @@ describe("given the retention policies page", () => {
       await user.click(screen.getByRole("button", { name: "Apply" }));
       expect(
         await screen.findByText(
-          /1,234 traces older than 90 days, 0 scenario runs older than 90 days and 2 experiment runs older than 90 days will be deleted within a day, across 2 projects\./,
+          /1,234 traces older than 90 days and 2 experiment runs older than 90 days will be deleted within a day, across 2 projects\./,
         ),
       ).toBeInTheDocument();
+      expect(screen.queryByText(/scenario runs older than/)).not.toBeInTheDocument();
       expect(applyScope).not.toHaveBeenCalled();
       await user.click(screen.getByRole("button", { name: "Apply now" }));
 

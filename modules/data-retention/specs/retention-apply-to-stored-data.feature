@@ -31,7 +31,8 @@ Feature: A saved retention period reaches the data already stored
     Given 1,234 stored traces older than the new period
     When an admin saves the shorter period
     And 5 stored scenario runs and no experiment runs older than it, across 3 projects
-    Then a prompt says "1,234 traces older than 90 days, 5 scenario runs older than 90 days and 0 experiment runs older than 90 days will be deleted within a day, across 3 projects."
+    Then a prompt says "1,234 traces older than 90 days and 5 scenario runs older than 90 days will be deleted within a day, across 3 projects."
+    And it names no category with nothing to delete
     And it offers "Apply now" as a destructive action and "Not now"
 
   @integration
@@ -47,6 +48,7 @@ Feature: A saved retention period reaches the data already stored
     When the settings page shows that scope
     Then it shows "1,234 traces and 2 experiment runs still use the old period" with an Apply button
     And Apply asks first with the same prompt before any stored data is rewritten
+    And that prompt names only the traces and experiment runs, not the scenario runs it holds none of
 
   @integration
   Scenario: A count that fails still offers the choice

@@ -139,3 +139,32 @@ Feature: Traces withheld while an organization is over its plan
     And it offers "Compare plans" linking to the subscription page
     And it offers "Manage members" linking to the members page
     And it does not ask to update the card
+
+  @integration
+  Scenario: The plan page's seat note says new traces are held
+    Given an organization over its plan that uses more member seats than the Free plan includes
+    When an admin opens the subscription page
+    Then the seat note says "New traces are saved and will show once you upgrade your plan or remove members."
+
+  @integration
+  Scenario: The plan page's seat note says nothing about held traces when no trace is held
+    Given an organization on the Free plan that uses more member seats than it includes, with no over-plan state
+    When an admin opens the subscription page
+    Then the seat note does not mention held traces
+
+  # Opening a withheld trace
+
+  @integration
+  Scenario: Opening a withheld trace in the drawer offers the plan's way out, not a retry
+    Given an organization over its plan
+    When a member opens a trace recorded after the cutoff in the trace drawer
+    Then the drawer says the trace is held until the plan is sorted
+    And it offers "Compare plans" linking to the subscription page and "Manage members" linking to the members page
+    And it offers no "Try again"
+
+  @integration
+  Scenario: A trace that failed to load for another reason still offers a retry
+    Given the trace read fails for a reason other than the plan
+    When a member opens the trace in the trace drawer
+    Then the drawer offers "Try again"
+    And it offers neither "Compare plans" nor "Manage members"

@@ -10,7 +10,7 @@ import { StatusChip } from "@langwatch/design-system/settings-card";
 import { CONTACT_SALES_URL, type PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import { planSeatsAndVolume } from "@langwatch/plans";
 import { nowInstant } from "@langwatch/time";
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 
 import { billingApi, type UsageRead } from "../../behavior/billing-api.ts";
 import { useBillingPricingService } from "../../behavior/use-billing-pricing-service.ts";
@@ -53,6 +53,7 @@ import { SeatLimitCallout } from "../../ui/elements/seat-limit-callout.tsx";
 import { ContactSalesBlock } from "./contact-sales/index.ts";
 import { CurrentPlanBlock } from "./current-plan-block.tsx";
 import { InvoicesBlock } from "./invoices-block.tsx";
+import { PayOpenInvoiceButton } from "./pay-open-invoice-button.tsx";
 import { SubscriptionPageHeader } from "./subscription-page-header.tsx";
 import { useCheckoutIntent } from "./use-checkout-intent.ts";
 import { useSeatPurchase } from "./use-seat-purchase.ts";
@@ -253,6 +254,50 @@ function seatDrawerModeFor({
   return { kind: "free", includedSeats: includedSeats ?? 1 };
 }
 
+/**
+ * What the plan card may offer while a payment recovery case is open: the open invoice's
+ * page instead of the upgrade, and no seat drawer on Free, where it plans a Growth checkout.
+ */
+function recoveryAwareActionsFor({
+  isPaymentRecoveryOpen,
+  isDeveloperPlan,
+  isEnterprisePlan,
+  drawerKind,
+  onManageSeats,
+  organizationId,
+  isFree,
+}: {
+  isPaymentRecoveryOpen: boolean;
+  isDeveloperPlan: boolean;
+  isEnterprisePlan: boolean;
+  drawerKind: SeatDrawerMode["kind"];
+  onManageSeats: (() => void) | undefined;
+  organizationId: string;
+  isFree: boolean;
+}): {
+  cardCarriesUpgrade: boolean;
+  onUserCountClick: (() => void) | undefined;
+  paymentAction: ReactNode;
+} {
+  if (!isPaymentRecoveryOpen) {
+    return {
+      cardCarriesUpgrade: isDeveloperPlan && !isEnterprisePlan,
+      onUserCountClick: onManageSeats,
+      paymentAction: undefined,
+    };
+  }
+  return {
+    cardCarriesUpgrade: false,
+    onUserCountClick: drawerKind === "free" ? undefined : onManageSeats,
+    paymentAction: (
+      <PayOpenInvoiceButton
+        organizationId={organizationId}
+        label={isFree ? "Pay now" : "Update card"}
+      />
+    ),
+  };
+}
+
 /** The plan, seat usage and members have all answered. */
 function pageDataSettled({ waiting, hasPlan }: { waiting: boolean[]; hasPlan: boolean }) {
   return hasPlan && !waiting.some(Boolean);
@@ -330,6 +375,9 @@ export function SubscriptionPage() {
     countDevelopers(users) + countDevelopers(pendingInvitesWithMemberType);
   const seatUsageM = plan?.maxMembers;
   const isOverPlanSeats = usage.data?.seatLimitInfo?.status === "exceeded";
+  // An open payment recovery case: paying the open invoice brings the plan back, so the page
+  // starts no new checkout (enterprise/modules/billing/specs/payment-recovery.feature).
+  const isPaymentRecoveryOpen = plan?.paymentFailed === true;
 
   const { seatPricePerPeriodCents, periodSuffix, totalFullMembers, monthlyEquivalent } =
     useBillingPricing({
@@ -397,12 +445,13 @@ export function SubscriptionPage() {
     hasSeatChanges: false,
     isOverPlanSeats,
   });
+  const offersGrowth = isUpgradePlanRequired && !isPaymentRecoveryOpen;
   useCheckoutIntent({
     isReady: pageDataSettled({
       waiting: [isPlanLoading, usage.isLoading, organizationWithMembers.isLoading],
       hasPlan: !!plan,
     }),
-    isUpgradeAvailable: isUpgradePlanRequired,
+    isUpgradeAvailable: offersGrowth,
     billingPeriod,
     currency,
     setBillingPeriod,
@@ -468,7 +517,15 @@ export function SubscriptionPage() {
     periodSuffix,
   };
   const drawerMode = seatDrawerModeFor({ drawerSeatChange, includedSeats: seatUsageM });
-  const cardCarriesUpgrade = isDeveloperPlan && !isEnterprisePlan;
+  const { cardCarriesUpgrade, onUserCountClick, paymentAction } = recoveryAwareActionsFor({
+    isPaymentRecoveryOpen,
+    isDeveloperPlan,
+    isEnterprisePlan,
+    drawerKind: drawerMode.kind,
+    onManageSeats,
+    organizationId: organization.id,
+    isFree: plan.free,
+  });
   const eventUsage = currentPlanEventUsage({
     usage: usage.data,
     flags,
@@ -502,6 +559,8 @@ export function SubscriptionPage() {
           isUpgradePlanRequired={isUpgradePlanRequired}
           isEnterprisePlan={isEnterprisePlan}
           onAddSeats={() => setIsDrawerOpen(true)}
+          isOverPlan={!!usage.data?.activePlan?.overPlan}
+          isPaymentRecoveryOpen={isPaymentRecoveryOpen}
         />
 
         <CurrentPlanBlock
@@ -513,7 +572,8 @@ export function SubscriptionPage() {
           maxSeats={isTieredPricingModel ? undefined : seatUsageM}
           upgradeRequired={updateRequired}
           isOverPlanSeats={isOverPlanSeats}
-          onUserCountClick={onManageSeats}
+          onUserCountClick={onUserCountClick}
+          paymentAction={paymentAction}
           onUpgrade={cardCarriesUpgrade ? openUpgrade : undefined}
           isUpgradeLoading={isUpgradeLoading}
           onManageSubscription={isSelfManagedPaidPlan ? handleManageSubscription : undefined}
@@ -526,7 +586,7 @@ export function SubscriptionPage() {
           fixedSeatsContactUrl={CONTACT_SALES_URL}
         />
 
-        {isUpgradePlanRequired && (
+        {offersGrowth && (
           <UpgradePlanBlock
             planName={
               <>

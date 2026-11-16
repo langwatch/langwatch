@@ -34,8 +34,8 @@ export function storedPastRetentionTotal(counted: StoredPastRetention): number {
 }
 
 /**
- * "1,234 traces older than 90 days, 0 scenario runs older than 90 days and 3 experiment runs
- * older than 90 days will be deleted within a day, across 2 projects."
+ * "1,234 traces older than 90 days and 3 experiment runs older than 90 days will be deleted
+ * within a day, across 2 projects." A category with nothing to delete is left out.
  */
 export function storedRetentionPrompt({
   counted,
@@ -45,12 +45,14 @@ export function storedRetentionPrompt({
   if (counted === null) {
     return "We couldn't count the stored data. Traces, scenario runs and experiment runs older than their new period will be deleted within a day.";
   }
-  const parts = retentionCategories.map((category) => {
-    const { rows, retentionDays } = counted[category];
-    // A preset is stored a week long (91 for 90 days); the prompt names the preset.
-    const age = retentionDays === null ? "their new period" : formatDays(retentionDays);
-    return `${itemsOf({ category, rows })} older than ${age}`;
-  });
+  const parts = retentionCategories
+    .filter((category) => counted[category].rows > 0)
+    .map((category) => {
+      const { rows, retentionDays } = counted[category];
+      // A preset is stored a week long (91 for 90 days); the prompt names the preset.
+      const age = retentionDays === null ? "their new period" : formatDays(retentionDays);
+      return `${itemsOf({ category, rows })} older than ${age}`;
+    });
   const projects = `${count.format(counted.projectCount)} ${counted.projectCount === 1 ? "project" : "projects"}`;
   return `${listed(parts)} will be deleted within a day, across ${projects}.`;
 }

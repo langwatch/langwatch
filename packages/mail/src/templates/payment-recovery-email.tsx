@@ -186,7 +186,7 @@ const Body = (props: PaymentRecoveryEmailProps) => {
 const ACTION_LABEL: Record<PaymentRecoveryEmailProps["kind"], string> = {
   failed: "Update card",
   reminder: "Update card",
-  final: "Pay now",
+  final: "Update card",
   paused: "Pay now",
   restored: "Open LangWatch",
 };
