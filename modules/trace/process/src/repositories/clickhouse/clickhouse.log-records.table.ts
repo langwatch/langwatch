@@ -2,13 +2,14 @@ import { column, defineClickHouseTable } from "@langwatch/clickhouse-client/buil
 
 /**
  * Log's records, a declared share trace reads (clickhouse-table-ownership.ts, log_records: owner
- * log, reader trace). Only the columns trace's log read and session groups select; `TimeUnixMs`
- * partitions it but is no tenant-scope time column, so the descriptor names none.
+ * log, reader trace). Only the columns trace's log read and session groups select; a share's
+ * windows apply on `TimeUnixMs` (ADR-202 Decided 28).
  */
 export const logRecords = defineClickHouseTable({
   name: "log_records",
   tenantColumn: "TenantId",
   sortKey: ["TenantId", "CorrelationTraceId", "TimeUnixMs", "RecordId"],
+  timeColumn: "TimeUnixMs",
   columns: {
     TenantId: column.string(),
     RecordId: column.fixedString({ length: 64 }),

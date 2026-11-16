@@ -861,7 +861,7 @@ export function conversationTraceFilter({
   return () => ({ kind: "compiled", where, readsSpans: false });
 }
 
-/** The Explorer's hidden origins left out, as `findHiddenOriginConditions` writes it. */
+/** The Explorer's hidden origins left out; an unstamped trace reads as "application" and stays. */
 export function findHiddenOriginFilters({
   hiddenOrigins,
 }: {

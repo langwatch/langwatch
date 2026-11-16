@@ -399,10 +399,6 @@ import type { TraceUsageCountRepository } from "../repositories/trace-usage-coun
 import type { TraceRepositories } from "../repositories/trace.repositories.ts";
 import { gateEvaluationContent } from "../rules/evaluation-content-gate.rules.ts";
 import { mapTraceEvaluationsToLegacyEvaluations } from "../rules/trace-evaluation-mapping.rules.ts";
-import {
-  andFilterConditions,
-  findHiddenOriginConditions,
-} from "../rules/trace-filter-hidden-origins.rules.ts";
 import { generateAsciiTree } from "../rules/trace-formatting.rules.ts";
 import { tracePath, tracePlatformUrl } from "../rules/trace-platform-url.rules.ts";
 import { formatSpansDigest, formatSpansDigestBounded } from "../rules/trace-readable-span.rules.ts";
@@ -597,7 +593,7 @@ type TraceSessionGroupsReadParams = {
   sort?: { columnId: string; direction: "asc" | "desc" };
   pageSize: number;
   cursor?: string;
-  filterWhere?: { sql: string; params: Record<string, unknown> };
+  compileFilter?: TraceFilterCompile;
   contentTerms?: string[];
   visibilityCutoffMs?: number | null;
 };
@@ -2850,40 +2846,6 @@ export class TraceModule implements TraceApi, CollectorApp {
   }
 
   /**
-   * The Explorer's own filter: the query compiled, hidden origins left out
-   * unless the query (or `originNamed`) names one. `dateField` refuses a
-   * span/event clause on the `updated` axis rather than dropping rows silently.
-   */
-  async #compileExplorerTraceFilter(input: {
-    query: string;
-    tenantId: string;
-    timeRange: { from: number; to: number };
-    evalRuns?: readonly ResolvedInstantEvalRun[];
-    originNamed?: boolean;
-    dateField?: TraceDateField;
-    protections?: Protections;
-  }): Promise<{ sql: string; params: Record<string, unknown> }> {
-    const compiled = this.#translateTraceFilter(input);
-
-    if (input.dateField === "updated" && compiled?.sql.includes("stored_spans")) {
-      throw new FilterParseError(
-        "A span, event or free-text clause matches spans by when they started, and dateField " +
-          '"updated" selects traces by when they were last modified — the two together would ' +
-          "drop traces silently. Filter on trace-level fields instead, or pull on the occurred axis.",
-      );
-    }
-
-    const hiddenOrigins = input.originNamed
-      ? []
-      : await this.#explorerHiddenOrigins({ projectId: input.tenantId, query: input.query });
-
-    return andFilterConditions([
-      ...(compiled ? [compiled] : []),
-      ...findHiddenOriginConditions({ hiddenOrigins }),
-    ]);
-  }
-
-  /**
    * The Explorer's filter for the legacy list and export, compiled inside each read for its scope
    * (Decided 25); checked here, so a span clause on the `updated` axis is refused before a read.
    */
@@ -3036,15 +2998,18 @@ export class TraceModule implements TraceApi, CollectorApp {
     input: TraceSessionGroupsInput & { protections: Protections; authorization: Authorization },
   ): Promise<TracesSessionsPage> {
     const { protections } = input;
-    const filterWhere = await this.#compileExplorerTraceFilter({
-      query: input.query ?? "",
-      tenantId: input.projectId,
+    const compileFilter = await this.#compileListFilter({
+      filter: {
+        query: input.query ?? "",
+        tenantId: input.projectId,
+        hideExplorerOrigins: true,
+        protections,
+        evalRuns: await this.findExplorerEvalRuns({
+          projectId: input.projectId,
+          evalRuns: input.evalRuns,
+        }),
+      },
       timeRange: input.timeRange,
-      protections,
-      evalRuns: await this.findExplorerEvalRuns({
-        projectId: input.projectId,
-        evalRuns: input.evalRuns,
-      }),
     });
     const result = await this.#dependencies.traces.sessionGroups.getSessionGroups({
       authorization: input.authorization,
@@ -3052,7 +3017,7 @@ export class TraceModule implements TraceApi, CollectorApp {
       sort: input.sort,
       pageSize: input.pageSize,
       cursor: input.cursor,
-      filterWhere,
+      compileFilter,
       contentTerms: contentSearchTermsForViewer({
         terms: this.extractTraceFreeTextTerms(input.query ?? ""),
         protections,

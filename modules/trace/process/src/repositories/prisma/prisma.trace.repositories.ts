@@ -112,10 +112,7 @@ export class PostgresTraceRepositories {
         annotations: { rows: annotations, scores: annotationScores },
       }),
       list: TraceListClickHouseRepository.create({ reader: members.clickhouse }),
-      sessionGroups: SessionGroupsClickHouseRepository.create({
-        clickhouse,
-        reader: members.clickhouse,
-      }),
+      sessionGroups: SessionGroupsClickHouseRepository.create({ reader: members.clickhouse }),
       clusteringSample: ClickHouseTraceClusteringSampleRepository.create(members.clickhouse),
       fullRecordRows: ClickHouseTraceFullRecordRowsRepository.create({
         reader: members.clickhouse,

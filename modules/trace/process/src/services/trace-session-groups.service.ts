@@ -7,6 +7,7 @@ import { z } from "zod";
 import type {
   SessionGroupRow,
   SessionGroupSortColumn,
+  SessionGroupsQuery,
   SessionGroupsRepository,
   SessionGroupCursor,
 } from "../repositories/session-groups.repository.ts";
@@ -148,7 +149,7 @@ interface SessionGroupsParams {
   sort?: { columnId: string; direction: "asc" | "desc" };
   pageSize: number;
   cursor?: string;
-  filterWhere?: { sql: string; params: Record<string, unknown> };
+  compileFilter?: SessionGroupsQuery["compileFilter"];
   contentTerms?: string[];
   /**
    * Visibility gate: sessions whose last activity is older than this cutoff
@@ -186,7 +187,7 @@ export class SessionGroupsService {
         sortColumn,
         sortDirection,
       }),
-      filterWhere: params.filterWhere,
+      compileFilter: params.compileFilter,
       contentTerms: params.contentTerms,
     });
 

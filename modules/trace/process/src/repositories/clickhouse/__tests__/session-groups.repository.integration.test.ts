@@ -2,6 +2,7 @@
 // over trace_summaries with IN-tuple dedup, transcript search via log_records
 
 import type { ClickHouseClient } from "@clickhouse/client";
+import { fn } from "@langwatch/clickhouse-client/builder";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -9,18 +10,26 @@ import {
   aggregateProof,
   ownProof,
 } from "../../../__tests__/support/authorization-proofs.fixture.ts";
+import type { TraceFilterCompile } from "../../../features/query/repositories/clickhouse/clickhouse.trace-filter-condition.mapper.ts";
 import type { SessionGroupsQuery } from "../../session-groups.repository.ts";
+import { traceSummaries } from "../clickhouse.trace-summaries.table.ts";
 import { SessionGroupsClickHouseRepository } from "../session-groups.repository.ts";
-import {
-  authorizedClickHouseFor,
-  traceQueryClientFor,
-} from "./support/authorized-clickhouse.support.ts";
+import { traceQueryClientFor } from "./support/authorized-clickhouse.support.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
 } from "./support/clickhouse-endpoint.support.ts";
 
 const clickHouseConfigured = testClickHouseConfigured();
+
+/** A filter on the trace's captured input, compiled the way a read compiles any filter. */
+const inputMatching =
+  (pattern: string): TraceFilterCompile =>
+  () => ({
+    kind: "compiled",
+    where: () => fn.ilike(traceSummaries.ComputedInput, pattern),
+    readsSpans: false,
+  });
 
 let ch: ClickHouseClient;
 let repository: SessionGroupsClickHouseRepository;
@@ -141,10 +150,12 @@ async function insertSessionLog({
   sessionId,
   body,
   timeMs,
+  tenant = tenantId,
 }: {
   sessionId: string;
   body: string;
   timeMs: number;
+  tenant?: string;
 }) {
   const recordId = `${tag}-${nanoid()}`
     .padEnd(64, "0")
@@ -155,7 +166,7 @@ async function insertSessionLog({
     table: "log_records",
     values: [
       {
-        TenantId: tenantId,
+        TenantId: tenant,
         RecordId: recordId,
         ResourceSchemaUrl: "",
         ResourceAttributesJson: "{}",
@@ -220,10 +231,7 @@ function query(overrides: Partial<SessionGroupsQuery> = {}): SessionGroupsQuery 
 describe.skipIf(!clickHouseConfigured)("given two sessions with several traces each", () => {
   beforeAll(async () => {
     ch = await startMigratedTraceClickHouse();
-    repository = SessionGroupsClickHouseRepository.create({
-      clickhouse: authorizedClickHouseFor(ch),
-      reader: traceQueryClientFor(ch),
-    });
+    repository = SessionGroupsClickHouseRepository.create({ reader: traceQueryClientFor(ch) });
 
     await insertTraceSummaries([
       // Session alpha: three traces whose rollup the small-page read must
@@ -427,10 +435,7 @@ describe.skipIf(!clickHouseConfigured)("given two sessions with several traces e
       const page = await repository.listSessionGroups(
         query({
           contentTerms: ["#6418"],
-          filterWhere: {
-            sql: "ComputedInput ILIKE {ft0:String}",
-            params: { ft0: "%latest alpha prompt%" },
-          },
+          compileFilter: inputMatching("%latest alpha prompt%"),
         }),
       );
 
@@ -466,20 +471,14 @@ describe.skipIf(!clickHouseConfigured)("given two sessions with several traces e
 
     const stale = await repository.listSessionGroups(
       query({
-        filterWhere: {
-          sql: "ComputedInput ILIKE {supersededTerm:String}",
-          params: { supersededTerm: "%superseded prompt text%" },
-        },
+        compileFilter: inputMatching("%superseded prompt text%"),
       }),
     );
     expect(stale.rows.map((row) => row.conversationId)).not.toContain(sessionId);
 
     const current = await repository.listSessionGroups(
       query({
-        filterWhere: {
-          sql: "ComputedInput ILIKE {currentTerm:String}",
-          params: { currentTerm: "%current prompt text%" },
-        },
+        compileFilter: inputMatching("%current prompt text%"),
       }),
     );
     expect(current.rows.map((row) => row.conversationId)).toContain(sessionId);
@@ -630,6 +629,98 @@ describe.skipIf(!clickHouseConfigured)("given two sessions with several traces e
       expect(new Set([firstRow.tenantId, second.rows[0]?.tenantId])).toEqual(
         new Set([sharedX, sharedY]),
       );
+    });
+  });
+
+  describe("given a member sharing into an aggregate and another tenant reusing its ids", () => {
+    const member = `${tag}-share-member`;
+    const other = `${tag}-share-other`;
+    const aggregate = `${tag}-share-aggregate`;
+    const shareFrom = baseMs - 10 * 60_000;
+    const early = `${tag}-share-early`;
+    const late = `${tag}-share-late`;
+    const filtered = `${tag}-share-filtered`;
+    const term = `${tag}-share-term`;
+    const windowedShare = () =>
+      aggregateProof({
+        projectId: aggregate,
+        members: [{ projectId: member, from: shareFrom }],
+        now: baseMs,
+      });
+    const listed = async (overrides: Partial<SessionGroupsQuery>) =>
+      (await repository.listSessionGroups(query(overrides))).rows
+        .map((row) => `${row.tenantId}:${row.conversationId}`)
+        .toSorted();
+
+    beforeAll(async () => {
+      if (!clickHouseConfigured) return;
+      await insertTraceSummaries(
+        [member, other].flatMap((tenant) =>
+          [early, late, filtered].map((sessionId) => ({
+            ...sessionTrace({
+              sessionId,
+              traceId: `${tag}-share-trace-${sessionId}`,
+              occurredAtMs: baseMs - 60_000,
+              cost: 1,
+              promptTokens: 1,
+              completionTokens: 1,
+              computedInput: sessionId === filtered ? `${tenant} filtered prompt` : "plain prompt",
+            }),
+            TenantId: tenant,
+          })),
+        ),
+      );
+      // The early session's only matching line predates the share; the late one's follows it.
+      await insertSessionLog({
+        tenant: member,
+        sessionId: early,
+        body: term,
+        timeMs: shareFrom - 20 * 60_000,
+      });
+      await insertSessionLog({
+        tenant: member,
+        sessionId: late,
+        body: term,
+        timeMs: baseMs - 60_000,
+      });
+      for (const sessionId of [early, late, filtered]) {
+        await insertSessionLog({ tenant: other, sessionId, body: term, timeMs: baseMs - 60_000 });
+      }
+    });
+
+    /** @scenario "Session groups keep main's sessions under an own and an aggregate proof" */
+    it("lists main's sessions under a filter, a content term or both, never the other tenant's", async () => {
+      const own = ownProof({ projectId: member });
+      const tenantSet = aggregateProof({
+        projectId: aggregate,
+        members: [{ projectId: member, from: 0 }],
+        now: baseMs,
+      });
+      const byFilter = { compileFilter: inputMatching("%filtered prompt%") };
+      const byTerm = { contentTerms: [term] };
+      for (const authorization of [own, tenantSet]) {
+        expect(await listed({ authorization, ...byFilter })).toEqual([`${member}:${filtered}`]);
+        expect(await listed({ authorization, ...byTerm })).toEqual([
+          `${member}:${early}`,
+          `${member}:${late}`,
+        ]);
+        expect(await listed({ authorization, ...byFilter, ...byTerm })).toEqual(
+          [`${member}:${early}`, `${member}:${filtered}`, `${member}:${late}`].toSorted(),
+        );
+      }
+    });
+
+    /** @scenario "A transcript line outside a share's window no longer admits a session" */
+    it("drops the session whose only matching line predates the share (ADR-202 Decided 28)", async () => {
+      const own = await listed({
+        authorization: ownProof({ projectId: member }),
+        contentTerms: [term],
+      });
+      const shared = await listed({ authorization: windowedShare(), contentTerms: [term] });
+
+      // Main listed the early session under the share too: its log search read every line.
+      expect(own).toContain(`${member}:${early}`);
+      expect(shared).toEqual([`${member}:${late}`]);
     });
   });
 });

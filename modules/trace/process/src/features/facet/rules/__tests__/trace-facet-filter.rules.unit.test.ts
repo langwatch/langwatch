@@ -7,8 +7,10 @@
 
 import { describe, expect, it, vi } from "vitest";
 
-import type { TraceFilterWhere } from "../../../../rules/trace-filter-hidden-origins.rules.ts";
 import { createFacetFilterResolver } from "../trace-facet-filter.rules.ts";
+
+/** Any compiled shape: the resolver is generic over what a filter compiles to. */
+type TraceFilterWhere = { sql: string; params: Record<string, unknown> };
 
 const HIDDEN: TraceFilterWhere = {
   sql: "origin NOT IN ({hiddenOrigins:Array(String)})",

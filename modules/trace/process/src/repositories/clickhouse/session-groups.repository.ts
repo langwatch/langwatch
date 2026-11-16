@@ -1,60 +1,104 @@
 import type { Authorization } from "@langwatch/authorization";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import {
-  type AuthorizedClickHouse,
-  type ClickHouseQueryClient,
-  tenantScope,
-  tenantSet,
-} from "@langwatch/clickhouse-client";
-import {
+  type ClickHouseReadStart,
   clickhouseRead,
+  type Condition,
+  cond,
+  type Expression,
+  fn,
+  param,
+  type ProofScope,
   tenantScope as builtTenantScope,
 } from "@langwatch/clickhouse-client/builder";
+import {
+  RESERVED_CACHE_CREATION_TOKENS,
+  RESERVED_CACHE_READ_TOKENS,
+} from "@langwatch/trace-contract";
 import { z } from "zod";
 
-import { TRACE_SUMMARY_TOTAL_TOKENS_SQL } from "../../rules/trace-token-total.rules.ts";
+import type { TraceFilterCompilation } from "../../features/query/repositories/clickhouse/clickhouse.trace-filter-condition.mapper.ts";
 import type {
+  SessionGroupCursor,
   SessionGroupRow,
   SessionGroupSortColumn,
   SessionGroupsPage,
   SessionGroupsQuery,
   SessionGroupsRepository,
 } from "../session-groups.repository.ts";
-import { traceSummaries } from "./clickhouse.trace-summaries.table.ts";
+import { logRecords } from "./clickhouse.log-records.table.ts";
+import { traceSummaries as ts } from "./clickhouse.trace-summaries.table.ts";
+import { electedSummaries, isLiveUpperBound } from "./clickhouse.trace-summary-election.mapper.ts";
 import { chString } from "./stored-span-row.mapper.ts";
 
-const TABLE_NAME = "trace_summaries" as const;
+const attribute = (key: string) => fn.mapGet(ts.Attributes, key);
 
 /**
  * The grouping key. Session id == conversation id: coding agents stamp their
  * provider session id on `gen_ai.conversation.id`, and chat apps stamp their
  * thread id, either way this expression IS the session identity.
  */
-const CONVERSATION_ID_EXPR = "Attributes['gen_ai.conversation.id']" as const;
+const CONVERSATION_ID = attribute("gen_ai.conversation.id");
 
-/**
- * Buffer for content-search subquery pruning around the trace time range.
- */
+/** Buffer for content-search pruning around the trace time range. */
 const LOG_WINDOW_BUFFER_MS = 2 * 24 * 60 * 60 * 1000;
 
 /** Bound on the distinct models kept per session row. */
 const MODELS_PER_SESSION_LIMIT = 20;
 
-/**
- * Aggregate expressions per sortable dimension, rounded for keyset pagination.
- */
-const SORT_EXPRESSIONS: Record<SessionGroupSortColumn, string> = {
-  lastActivity: "toFloat64(max(toUnixTimestamp64Milli(OccurredAt)))",
-  started: "toFloat64(min(toUnixTimestamp64Milli(OccurredAt)))",
-  cost: "round(sum(coalesce(TotalCost, 0)), 9)",
-  tokens: `toFloat64(sum(${TRACE_SUMMARY_TOTAL_TOKENS_SQL}))`,
-  duration: "round(sum(coalesce(TotalDurationMs, 0)), 6)",
-  traces: "toFloat64(count())",
+/** A trace's tokens: input, output and both cache buckets (`traceTotalTokensOf`). */
+const TOTAL_TOKENS = fn.plus(
+  fn.plus(
+    fn.plus(fn.ifNull(ts.TotalPromptTokenCount, 0), fn.ifNull(ts.TotalCompletionTokenCount, 0)),
+    fn.toUInt64OrZero(attribute(RESERVED_CACHE_READ_TOKENS)),
+  ),
+  fn.toUInt64OrZero(attribute(RESERVED_CACHE_CREATION_TOKENS)),
+);
+
+const OCCURRED_MS = fn.toUnixTimestamp64Milli(ts.OccurredAt);
+
+/** Aggregate expressions per sortable dimension, rounded for keyset pagination. */
+const SORT_EXPRESSIONS: Record<SessionGroupSortColumn, Expression<number, "trace_summaries">> = {
+  lastActivity: fn.toFloat64(fn.max(OCCURRED_MS)),
+  started: fn.toFloat64(fn.min(OCCURRED_MS)),
+  cost: fn.round(fn.sum(fn.ifNull(ts.TotalCost, 0)), 9),
+  tokens: fn.toFloat64(fn.sum(TOTAL_TOKENS)),
+  duration: fn.round(fn.sum(fn.ifNull(ts.TotalDurationMs, 0)), 6),
+  traces: fn.toFloat64(fn.count()),
 };
 
-// Aggregate aliases deliberately avoid every source column name (Models,
-// TotalCost, TotalDurationMs, ...): ClickHouse resolves a same-named alias
-// INSTEAD of the column inside sibling aggregates, which reads as an
-// aggregate nested in an aggregate and fails the whole query.
+// Aggregate aliases avoid every source column name: ClickHouse resolves a same-named alias
+// INSTEAD of the column inside sibling aggregates (and the builder refuses one).
+const SESSION_SELECTION = {
+  TenantId: ts.TenantId,
+  ConversationId: CONVERSATION_ID,
+  TraceCount: fn.count(),
+  SessionCost: SORT_EXPRESSIONS.cost,
+  SessionTokens: fn.sum(TOTAL_TOKENS),
+  SessionCacheReadTokens: fn.sum(fn.toUInt64OrZero(attribute(RESERVED_CACHE_READ_TOKENS))),
+  SessionCacheCreationTokens: fn.sum(fn.toUInt64OrZero(attribute(RESERVED_CACHE_CREATION_TOKENS))),
+  MaxContextSizeTokens: fn.max(
+    fn.toUInt64OrZero(attribute("langwatch.reserved.context_size_tokens")),
+  ),
+  SessionDurationMs: SORT_EXPRESSIONS.duration,
+  StartedAtMs: fn.min(OCCURRED_MS),
+  LastActivityMs: fn.max(OCCURRED_MS),
+  SessionModels: fn.groupUniqArrayArray(ts.Models, { max: MODELS_PER_SESSION_LIMIT }),
+  PrimaryModels: fn.topKArray(1, ts.Models),
+  SessionServices: fn.groupUniqArrayIf(
+    attribute("service.name"),
+    cond.ne(attribute("service.name"), ""),
+    { max: 2 },
+  ),
+  SessionErrorCount: fn.countIf(cond.eq(ts.ContainsErrorStatus, true)),
+  SessionWarningCount: fn.countIf(
+    cond.and(cond.eq(ts.BlockedByGuardrail, true), cond.eq(ts.ContainsErrorStatus, false)),
+  ),
+  SessionSpans: fn.sum(ts.SpanCount),
+  /** The session's latest trace, in the session's own tenant (`TenantId`, a grouping key). */
+  LastTraceId: fn.argMax(ts.TraceId, fn.tuple(ts.OccurredAt, ts.UpdatedAt)),
+};
+
 const numeric = z.union([z.number(), z.string()]);
 
 const sessionGroupRowSchema = z.looseObject({
@@ -75,7 +119,6 @@ const sessionGroupRowSchema = z.looseObject({
   SessionErrorCount: numeric,
   SessionWarningCount: numeric,
   SessionSpans: numeric,
-  /** The session's latest trace, in the session's own tenant (`TenantId`, a grouping key). */
   LastTraceId: chString,
 });
 
@@ -83,9 +126,7 @@ const sessionGroupRowsSchema = z.array(sessionGroupRowSchema);
 
 type ClickHouseSessionGroupRow = z.infer<typeof sessionGroupRowSchema>;
 
-const totalHitsRowSchema = z.looseObject({ totalHits: numeric });
-
-const totalHitsRowsSchema = z.array(totalHitsRowSchema);
+const totalHitsRowsSchema = z.array(z.looseObject({ totalHits: numeric }));
 
 const previewRowSchema = z.looseObject({
   TenantId: chString,
@@ -101,26 +142,138 @@ function previewKey({ TenantId, TraceId }: { TenantId: string; TraceId: string }
   return `${TenantId}:${TraceId}`;
 }
 
-function isLiveUpperBound(timeRange: { to: number; live?: boolean }): boolean {
-  return timeRange.live === true;
+const NO_FILTER: TraceFilterCompilation = { kind: "empty" };
+
+/**
+ * The window's latest traces that carry a conversation id. The empty-id check sits outside the
+ * election, as main's did, so the election sees every version in the window.
+ */
+function sessionTraces({
+  start,
+  timeRange,
+  filter,
+}: {
+  start: ClickHouseReadStart<ProofScope>;
+  timeRange: SessionGroupsQuery["timeRange"];
+  filter: TraceFilterCompilation;
+}) {
+  return electedSummaries({ start, timeRange, filter }).where(() => cond.ne(CONVERSATION_ID, ""), {
+    inElection: false,
+  });
 }
 
-function buildBaseWhere(timeRange: { from: number; to: number; live?: boolean }): {
-  sql: string;
-  params: Record<string, unknown>;
-} {
-  const parts = [
-    tenantScope("OccurredAt"),
-    "OccurredAt >= fromUnixTimestamp64Milli({timeFrom:Int64})",
-  ];
-  const params: Record<string, unknown> = {
-    timeFrom: timeRange.from,
-  };
-  if (!isLiveUpperBound(timeRange)) {
-    parts.push("OccurredAt <= fromUnixTimestamp64Milli({timeTo:Int64})");
-    params.timeTo = timeRange.to;
-  }
-  return { sql: parts.join(" AND "), params };
+/** Log lines inside the buffered range holding every term; a share reads only its windows. */
+function logMatchCondition({
+  timeRange,
+  terms,
+}: {
+  timeRange: SessionGroupsQuery["timeRange"];
+  terms: readonly string[];
+}): Condition<"log_records"> {
+  const lr = logRecords;
+  // TimeUnixMs bounds prune log_records' weekly partitions; a live range keeps the lower one.
+  const from = cond.gte(lr.TimeUnixMs, timeRange.from - LOG_WINDOW_BUFFER_MS);
+  const range = isLiveUpperBound(timeRange)
+    ? from
+    : cond.and(from, cond.lte(lr.TimeUnixMs, timeRange.to + LOG_WINDOW_BUFFER_MS));
+  const matches = terms.map((term) =>
+    cond.or(
+      cond.gt(fn.positionCaseInsensitive(fn.ifNull(lr.BodyText, ""), param.string(term)), 0),
+      cond.gt(fn.positionCaseInsensitive(lr.AttributesFlatJson, param.string(term)), 0),
+    ),
+  );
+  return cond.and(range, cond.ne(lr.ProviderSessionId, ""), ...matches);
+}
+
+/** Sessions past the cursor; (conversation, tenant) breaks ties, older cursors the id alone. */
+function pastCursor({
+  sort,
+  ascending,
+  cursor,
+}: {
+  sort: Expression<number, "trace_summaries">;
+  ascending: boolean;
+  cursor: SessionGroupCursor;
+}): Condition<"trace_summaries"> {
+  const value = param.float64(cursor.sortValue);
+  const beyond = ascending ? cond.gt(sort, value) : cond.lt(sort, value);
+  const tie =
+    cursor.tenantId === undefined
+      ? cond.gt(CONVERSATION_ID, param.string(cursor.conversationId))
+      : cond.gt(
+          fn.tuple(CONVERSATION_ID, ts.TenantId),
+          fn.tuple(param.string(cursor.conversationId), param.string(cursor.tenantId)),
+        );
+  return cond.or(beyond, cond.and(cond.eq(sort, value), tie));
+}
+
+/**
+ * The window's sessions as the read's proof scope sees them. A session is in when any of its
+ * latest traces matches the filter or a log line holds every content term (either branch).
+ */
+function sessionsOf(query: SessionGroupsQuery) {
+  const scope = builtTenantScope.fromProof({ authorization: query.authorization, reads: "traces" });
+  const filter = query.compileFilter?.({ scope }) ?? NO_FILTER;
+  const terms = (query.contentTerms ?? []).filter((term) => term.length > 0);
+  const read = sessionTraces({
+    start: clickhouseRead({ scope }),
+    timeRange: query.timeRange,
+    filter: NO_FILTER,
+  });
+  if (filter.kind === "empty" && terms.length === 0) return read;
+  const session = fn.tuple(ts.TenantId, CONVERSATION_ID);
+  return read.where(
+    ({ within }) => {
+      const byFilter =
+        filter.kind === "compiled"
+          ? within(session, (sub) =>
+              sessionTraces({ start: sub, timeRange: query.timeRange, filter })
+                .select({ TenantId: ts.TenantId, SessionId: CONVERSATION_ID })
+                .latestVersion(),
+            )
+          : undefined;
+      const byLog =
+        terms.length > 0
+          ? within(session, (sub) =>
+              sub
+                .from(logRecords)
+                .withinWindows()
+                .select({ TenantId: logRecords.TenantId, SessionId: logRecords.ProviderSessionId })
+                .where(() => logMatchCondition({ timeRange: query.timeRange, terms })),
+            )
+          : undefined;
+      if (byFilter && byLog) return cond.or(byFilter, byLog);
+      return byFilter ?? byLog ?? cond.always();
+    },
+    { inElection: false },
+  );
+}
+
+/** One page of sessions, sorted and keyset-paged over the grouped rows. */
+function sessionPageStatement(query: SessionGroupsQuery) {
+  const sort = SORT_EXPRESSIONS[query.sort.column];
+  const ascending = query.sort.direction === "asc";
+  const grouped = sessionsOf(query)
+    .select(SESSION_SELECTION)
+    .latestVersion()
+    .groupBy(ts.TenantId, CONVERSATION_ID);
+  const { cursor } = query;
+  const paged =
+    cursor === undefined ? grouped : grouped.having(() => pastCursor({ sort, ascending, cursor }));
+  return paged
+    .orderBy(sort, ascending ? "ASC" : "DESC")
+    .orderBy(CONVERSATION_ID, "ASC")
+    .orderBy(ts.TenantId, "ASC")
+    .limit(query.limit)
+    .build();
+}
+
+/** The sessions the page is drawn from, counted. */
+function sessionCountStatement(query: SessionGroupsQuery) {
+  return sessionsOf(query)
+    .select({ totalHits: fn.uniqExact(ts.TenantId, CONVERSATION_ID) })
+    .latestVersion()
+    .build();
 }
 
 /**
@@ -139,24 +292,21 @@ function previewsStatement({
   return clickhouseRead({
     scope: builtTenantScope.fromProof({ authorization, reads: "traces" }),
   })
-    .from(traceSummaries)
+    .from(ts)
     .withinWindows()
     .select({
-      TenantId: traceSummaries.TenantId,
-      TraceId: traceSummaries.TraceId,
-      ComputedInput: traceSummaries.ComputedInput,
-      ComputedOutput: traceSummaries.ComputedOutput,
+      TenantId: ts.TenantId,
+      TraceId: ts.TraceId,
+      ComputedInput: ts.ComputedInput,
+      ComputedOutput: ts.ComputedOutput,
     })
     .where(({ and, gte, lte, oneOf }) =>
       isLiveUpperBound(timeRange)
-        ? and(
-            gte(traceSummaries.OccurredAt, timeRange.from),
-            oneOf(traceSummaries.TraceId, traceIds),
-          )
+        ? and(gte(ts.OccurredAt, timeRange.from), oneOf(ts.TraceId, traceIds))
         : and(
-            gte(traceSummaries.OccurredAt, timeRange.from),
-            lte(traceSummaries.OccurredAt, timeRange.to),
-            oneOf(traceSummaries.TraceId, traceIds),
+            gte(ts.OccurredAt, timeRange.from),
+            lte(ts.OccurredAt, timeRange.to),
+            oneOf(ts.TraceId, traceIds),
           ),
     )
     .latestVersion()
@@ -165,7 +315,6 @@ function previewsStatement({
 
 export class SessionGroupsClickHouseRepository implements SessionGroupsRepository {
   static create(deps: {
-    clickhouse: AuthorizedClickHouse;
     reader: Pick<ClickHouseQueryClient, "read">;
   }): SessionGroupsClickHouseRepository {
     return new SessionGroupsClickHouseRepository(deps);
@@ -173,116 +322,28 @@ export class SessionGroupsClickHouseRepository implements SessionGroupsRepositor
 
   private constructor(
     private readonly deps: {
-      clickhouse: AuthorizedClickHouse;
       reader: Pick<ClickHouseQueryClient, "read">;
     },
   ) {}
 
   async listSessionGroups(query: SessionGroupsQuery): Promise<SessionGroupsPage> {
-    const { sql: baseWhere, params } = buildBaseWhere(query.timeRange);
-
-    // Latest-version dedup, the rollup must sum each logical trace exactly
-    // once even while ReplacingMergeTree merges lag. Same IN-tuple shape as
-    // every other `trace_summaries` read.
-    const dedupFilter = `(TenantId, TraceId, UpdatedAt) IN (
-          SELECT TenantId, TraceId, max(UpdatedAt)
-          FROM ${TABLE_NAME}
-          WHERE ${baseWhere}
-          GROUP BY TenantId, TraceId
-        )`;
-
-    const { sql: sessionMatchClause, params: matchParams } = this.buildSessionMatchClause(
-      query,
-      baseWhere,
-      dedupFilter,
-    );
-    Object.assign(params, matchParams);
-
-    const sortExpression = SORT_EXPRESSIONS[query.sort.column];
-    const sortDir = query.sort.direction === "asc" ? "ASC" : "DESC";
-    const cursorComparison = query.sort.direction === "asc" ? ">" : "<";
-    // Keyset over the GROUP BY output lives in HAVING: the sort value is an
-    // aggregate, so it does not exist before grouping. (ConversationId,
-    // TenantId) ASC is the unique tie-breaker regardless of sort direction,
-    // matching the trace list's (tenant, trace) convention (ADR-177 block F);
-    // a cursor minted before the tenant was carried pages on the id alone.
-    const tieBreak =
-      query.cursor?.tenantId !== undefined
-        ? "(ConversationId, TenantId) > ({cursorConversationId:String}, {cursorTenantId:String})"
-        : "ConversationId > {cursorConversationId:String}";
-    const havingClause = query.cursor
-      ? `HAVING (
-              ${sortExpression} ${cursorComparison} {cursorSortValue:Float64}
-              OR (
-                ${sortExpression} = {cursorSortValue:Float64}
-                AND ${tieBreak}
-              )
-            )`
-      : "";
-    if (query.cursor) {
-      params.cursorSortValue = query.cursor.sortValue;
-      params.cursorConversationId = query.cursor.conversationId;
-      if (query.cursor.tenantId !== undefined) {
-        params.cursorTenantId = query.cursor.tenantId;
-      }
-    }
-
-    const client = this.deps.clickhouse.as(query.authorization, { reads: "traces" });
-
-    // Phase 1: the rollup itself, light columns only. Heavy previews
-    // (ComputedInput/ComputedOutput) are read in phase 2 for the page's
-    // latest trace ids alone, mirroring the trace list's two-step read.
+    // Phase 1: the rollup itself, light columns only. Heavy previews are read in phase 2 for
+    // the page's latest trace ids alone, mirroring the trace list's two-step read.
     const [result, countResult] = await Promise.all([
-      client.query({
-        query: `
-        SELECT
-          TenantId,
-          ${CONVERSATION_ID_EXPR} AS ConversationId,
-          count() AS TraceCount,
-          ${SORT_EXPRESSIONS.cost} AS SessionCost,
-          sum(${TRACE_SUMMARY_TOTAL_TOKENS_SQL}) AS SessionTokens,
-          sum(toUInt64OrZero(Attributes['langwatch.reserved.cache_read_tokens'])) AS SessionCacheReadTokens,
-          sum(toUInt64OrZero(Attributes['langwatch.reserved.cache_creation_tokens'])) AS SessionCacheCreationTokens,
-          max(toUInt64OrZero(Attributes['langwatch.reserved.context_size_tokens'])) AS MaxContextSizeTokens,
-          ${SORT_EXPRESSIONS.duration} AS SessionDurationMs,
-          min(toUnixTimestamp64Milli(OccurredAt)) AS StartedAtMs,
-          max(toUnixTimestamp64Milli(OccurredAt)) AS LastActivityMs,
-          groupUniqArrayArray(${MODELS_PER_SESSION_LIMIT})(Models) AS SessionModels,
-          topKArray(1)(Models) AS PrimaryModels,
-          groupUniqArrayIf(2)(Attributes['service.name'], Attributes['service.name'] != '') AS SessionServices,
-          countIf(ContainsErrorStatus) AS SessionErrorCount,
-          countIf(BlockedByGuardrail AND NOT ContainsErrorStatus) AS SessionWarningCount,
-          sum(SpanCount) AS SessionSpans,
-          argMax(TraceId, (OccurredAt, UpdatedAt)) AS LastTraceId
-        FROM ${TABLE_NAME}
-        WHERE ${baseWhere}
-          AND ${CONVERSATION_ID_EXPR} != ''
-          AND ${dedupFilter}
-          ${sessionMatchClause}
-        GROUP BY TenantId, ConversationId
-        ${havingClause}
-        ORDER BY ${sortExpression} ${sortDir}, ConversationId ASC, TenantId ASC
-        LIMIT {limit:UInt32}
-      `,
-        query_params: { ...params, limit: query.limit },
-        format: "JSONEachRow",
+      this.deps.reader.read({
+        // ID_BOUND_SKIP: one page of the window's sessions, bounded by OccurredAt.
+        statement: sessionPageStatement(query),
+        table: ts.$table.name,
       }),
-      client.query({
-        query: `
-        SELECT uniqExact(TenantId, ${CONVERSATION_ID_EXPR}) AS totalHits
-        FROM ${TABLE_NAME}
-        WHERE ${baseWhere}
-          AND ${CONVERSATION_ID_EXPR} != ''
-          AND ${dedupFilter}
-          ${sessionMatchClause}
-      `,
-        query_params: { ...params },
-        format: "JSONEachRow",
+      this.deps.reader.read({
+        // ID_BOUND_SKIP: the window's session count, bounded by OccurredAt.
+        statement: sessionCountStatement(query),
+        table: ts.$table.name,
       }),
     ]);
 
-    const rows = sessionGroupRowsSchema.parse(await result.json());
-    const countRows = totalHitsRowsSchema.parse(await countResult.json());
+    const rows = sessionGroupRowsSchema.parse(result.rows);
+    const countRows = totalHitsRowsSchema.parse(countResult.rows);
     const totalHits = countRows.length > 0 ? Number(countRows[0]!.totalHits) : 0;
 
     const previews = await this.findPreviewsByTraceIds({
@@ -294,73 +355,6 @@ export class SessionGroupsClickHouseRepository implements SessionGroupsRepositor
     return {
       rows: rows.map((row) => this.toSessionGroupRow(row, previews)),
       totalHits,
-    };
-  }
-
-  /**
-   * Session membership predicate: any trace matches filter OR log contains all terms.
-   */
-  private buildSessionMatchClause(
-    query: SessionGroupsQuery,
-    baseWhere: string,
-    dedupFilter: string,
-  ): { sql: string; params: Record<string, unknown> } {
-    const branches: string[] = [];
-    const params: Record<string, unknown> = {};
-
-    if (query.filterWhere) {
-      // Membership is decided on the LATEST version of each trace, same
-      // dedup the rollup applies. Without it an obsolete row version left
-      // behind by a pending ReplacingMergeTree merge still satisfies the
-      // filter and drags its session into the page, even when the current
-      // version no longer matches.
-      branches.push(`
-            SELECT DISTINCT TenantId, ${CONVERSATION_ID_EXPR} AS SessionId
-            FROM ${TABLE_NAME}
-            WHERE ${baseWhere}
-              AND ${CONVERSATION_ID_EXPR} != ''
-              AND ${dedupFilter}
-              AND (${query.filterWhere.sql})`);
-      Object.assign(params, query.filterWhere.params);
-    }
-
-    const contentTerms = (query.contentTerms ?? []).filter((term) => term.length > 0);
-    if (contentTerms.length > 0) {
-      const termPredicates = contentTerms
-        .map((term, index) => {
-          const param = `contentTerm${index}`;
-          params[param] = term;
-          return `(positionCaseInsensitive(ifNull(BodyText, ''), {${param}:String}) > 0
-                   OR positionCaseInsensitive(AttributesFlatJson, {${param}:String}) > 0)`;
-        })
-        .join(" AND ");
-      // TimeUnixMs bounds are REQUIRED: log_records partitions weekly on it,
-      // and without the range this subquery scans every partition including
-      // cold storage. Live ranges keep only the lower bound, like the trace
-      // scan itself.
-      const upperBound = isLiveUpperBound(query.timeRange)
-        ? ""
-        : "AND TimeUnixMs <= fromUnixTimestamp64Milli({logTimeTo:Int64})";
-      params.logTimeFrom = query.timeRange.from - LOG_WINDOW_BUFFER_MS;
-      if (!isLiveUpperBound(query.timeRange)) {
-        params.logTimeTo = query.timeRange.to + LOG_WINDOW_BUFFER_MS;
-      }
-      branches.push(`
-            SELECT DISTINCT TenantId, ProviderSessionId AS SessionId
-            FROM log_records
-            WHERE ${tenantSet()}
-              AND TimeUnixMs >= fromUnixTimestamp64Milli({logTimeFrom:Int64})
-              ${upperBound}
-              AND ProviderSessionId != ''
-              AND ${termPredicates}`);
-    }
-
-    if (branches.length === 0) return { sql: "", params };
-
-    return {
-      sql: `AND (TenantId, ${CONVERSATION_ID_EXPR}) IN (${branches.join("\n            UNION DISTINCT\n")}
-          )`,
-      params,
     };
   }
 
@@ -382,7 +376,7 @@ export class SessionGroupsClickHouseRepository implements SessionGroupsRepositor
     const result = await this.deps.reader.read({
       // ID_BOUND_SKIP: a page's previews, bounded by the page's time range.
       statement: previewsStatement(args),
-      table: traceSummaries.$table.name,
+      table: ts.$table.name,
     });
 
     const rows = previewRowsSchema.parse(result.rows);

@@ -163,7 +163,7 @@ const attribute = (key: string) => fn.mapGet(ts.Attributes, key);
 const numericSort = (of: Expression<number | null, "trace_summaries">) =>
   fn.toFloat64(fn.ifNull(of, 0));
 
-/** `TRACE_SUMMARY_TOTAL_TOKENS_SQL` built: input, output and both cache buckets. */
+/** A trace's tokens (`traceTotalTokensOf`): input, output and both cache buckets. */
 const TOTAL_TOKENS = fn.plus(
   fn.plus(
     fn.plus(fn.ifNull(ts.TotalPromptTokenCount, 0), fn.ifNull(ts.TotalCompletionTokenCount, 0)),

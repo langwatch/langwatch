@@ -107,3 +107,16 @@ Feature: Trace filters compile to built conditions
     Given a member shares its traces into an aggregate from a time onwards
     When the aggregate's list and its trace attribute keys facet are read under the same span filter
     Then the facet counts each key on exactly the traces the list returns
+
+  @integration
+  Scenario: Session groups keep main's sessions under an own and an aggregate proof
+    Given another tenant shares a member's conversation ids, trace ids and transcript terms
+    When the session groups are read under a filter, a content term or both
+    Then each lists the sessions main lists for the read's tenants, and none of the other tenant's
+
+  @integration
+  Scenario: A transcript line outside a share's window no longer admits a session
+    Given a member shares its traces into an aggregate from a time onwards
+    And a session's only transcript line naming a term was written before that time
+    When the aggregate's session groups are searched for that term
+    Then the session is not listed, though the member's own session groups still list it

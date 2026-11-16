@@ -1,4 +1,7 @@
 import type { Authorization } from "@langwatch/authorization";
+
+import type { TraceFilterCompile } from "../features/query/repositories/clickhouse/clickhouse.trace-filter-condition.mapper.ts";
+
 /**
  * Read side of the Sessions lens (specs/traces-v2/sessions-lens.feature):
  * one row per `gen_ai.conversation.id`, rolled up in ClickHouse over EVERY
@@ -42,11 +45,10 @@ export interface SessionGroupsQuery {
   limit: number;
   cursor?: SessionGroupCursor;
   /**
-   * Trace-level WHERE fragment from the filter translator. A session matches
-   * when ANY of its traces matches; the rollup still sums ALL of the
-   * session's traces in range.
+   * The trace filter, compiled inside the read for its scope (ADR-202 Decided 25). A session
+   * matches when ANY of its traces matches; the rollup still sums ALL its traces in range.
    */
-  filterWhere?: { sql: string; params: Record<string, unknown> };
+  compileFilter?: TraceFilterCompile;
   /**
    * Free-text terms that must ALL appear in the session's transcript content
    * (`log_records.BodyText` / `AttributesFlatJson`). A session matching the
