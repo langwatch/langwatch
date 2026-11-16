@@ -436,7 +436,7 @@ const presentations = {
   trace_withheld_over_plan: {
     title: "Trace held until your plan is sorted",
     describe: () =>
-      "This trace was recorded while your organization has more members than its plan covers. It is saved and will show once you update your card or remove members.",
+      "This trace was recorded while your organization has more members than its plan covers. It is saved and will show once you upgrade your plan or remove members.",
   },
   trace_id_ambiguous: {
     title: "Trace ID is ambiguous",
@@ -4157,6 +4157,11 @@ const presentations = {
     title: "This retention length is billed",
     describe: () =>
       "Keeping data longer than 90 days adds storage to the organization's bill, so it needs subscription:manage. Ask a billing administrator, or pick 90 days or less.",
+  },
+  data_retention_not_billed: {
+    title: "This retention length isn't billed",
+    describe: () =>
+      "Only a length that adds storage to the bill is set through billing. Save this length from the data retention settings instead.",
   },
   data_retention_disable_forbidden: {
     title: "Keeping data forever isn't available",

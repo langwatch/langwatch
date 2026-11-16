@@ -6,7 +6,11 @@ import type { BillingApi, RetentionStorageReport } from "@langwatch/enterprise-b
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
-import { createDataRetentionTestApp, retentionTestGraph } from "./data-retention.fixture.ts";
+import {
+  createDataRetentionTestApp,
+  createDataRetentionTestEntitlement,
+  retentionTestGraph,
+} from "./data-retention.fixture.ts";
 
 const organizationId = retentionTestGraph.organizationId ?? "";
 
@@ -72,11 +76,15 @@ describe("DataRetentionModule storage line", () => {
     });
   });
 
-  describe("when the same length is saved through each write", () => {
+  describe("when a Growth organization saves an included length, then a billed one", () => {
     it("lets only the billed write add the storage line", async () => {
       const calls: RetentionStorageReport[] = [];
       const app = createDataRetentionTestApp({
         dependencies: {
+          entitlement: createDataRetentionTestEntitlement({
+            free: false,
+            type: "GROWTH_SEAT_EUR_MONTHLY",
+          }),
           billing: createApiFixture<BillingApi>({
             recordRetentionStorage: async (input: RetentionStorageReport) => {
               calls.push(input);
@@ -86,7 +94,7 @@ describe("DataRetentionModule storage line", () => {
         },
       });
 
-      await app.changeScopeRetention(change());
+      await app.changeScopeRetention({ ...change(), retentionDays: 91 });
       await app.changeBilledScopeRetention({ ...change(), organizationId });
 
       expect(calls.map((call) => "addLine" in call && call.addLine === true)).toEqual([

@@ -9,6 +9,7 @@ import {
   INDEFINITE_RETENTION_DAYS,
   PAID_RETENTION_PRESET_DAYS,
   RetentionBilledThroughBillingError,
+  RetentionNotBilledError,
   RetentionDisableForbiddenError,
   RetentionLengthBelowPlanMinimumError,
   RetentionLengthNotOnPlanError,
@@ -174,7 +175,7 @@ export class DataRetentionPolicyService {
 
   /**
    * The full write gate for a NEW value: the plan once, then the free gate and the value gate. A
-   * `scope` write refuses a length that bills storage; only the `billing` write may set one.
+   * `scope` write refuses a length that bills storage; the `billing` write sets only such a length.
    */
   async assertWriteAllowed(input: {
     actor: RetentionActor;
@@ -193,6 +194,12 @@ export class DataRetentionPolicyService {
       DataRetentionPolicyService.billsStorage(plan, input.retentionDays)
     ) {
       throw new RetentionBilledThroughBillingError(input.retentionDays);
+    }
+    if (
+      input.through === "billing" &&
+      !DataRetentionPolicyService.billsStorage(plan, input.retentionDays)
+    ) {
+      throw new RetentionNotBilledError(input.retentionDays);
     }
   }
 

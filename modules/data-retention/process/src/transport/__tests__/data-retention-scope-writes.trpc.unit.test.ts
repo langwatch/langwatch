@@ -400,6 +400,23 @@ describe("given acme on a Growth seat plan, which bills storage above 90 days", 
     });
   });
 
+  describe("when a billing administrator saves 30 days through the billed write", () => {
+    /** @scenario "The billed write refuses a length the plan includes" */
+    it("refuses it as not billed and writes nothing", async () => {
+      const { call, app } = door({ app: growthApp() });
+
+      const failure = await call
+        .setBilledForScope({
+          ...write({ scopeType: "PROJECT", scopeId: WEB_APP }),
+          retentionDays: 35,
+        })
+        .catch((error: unknown) => error);
+
+      expect(codeOf(failure)).toBe("data_retention_not_billed");
+      await expect(app.listOrganizationRules({ organizationId: ACME })).resolves.toEqual([]);
+    });
+  });
+
   describe("when the billed write names a project of globex", () => {
     /** @scenario "A billed write for a scope outside the named organisation is refused as not found" */
     it("is refused as not found and writes nothing", async () => {

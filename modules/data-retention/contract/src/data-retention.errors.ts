@@ -108,6 +108,23 @@ export class RetentionBilledThroughBillingError extends HandledError {
   }
 }
 
+/**
+ * The billing write sets only a length that bills storage; any other length goes through the
+ * scope write, which asks the scope's own permission.
+ */
+export class RetentionNotBilledError extends HandledError {
+  declare readonly code: "data_retention_not_billed";
+
+  constructor(readonly retentionDays: number) {
+    super(
+      "data_retention_not_billed",
+      "This retention length does not bill storage; set it on the scope instead.",
+      { httpStatus: 422 },
+    );
+    this.name = "RetentionNotBilledError";
+  }
+}
+
 /** Keeping data forever is a platform capability, not a customer tier. */
 export class RetentionDisableForbiddenError extends HandledError {
   declare readonly code: "data_retention_disable_forbidden";

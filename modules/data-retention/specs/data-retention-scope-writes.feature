@@ -120,6 +120,14 @@ Feature: A retention scope write is authorised at the door, inside the organisat
     And the override is written, anchored to "acme"
 
   @unit
+  Scenario: The billed write refuses a length the plan includes
+    Given "acme" is on a Growth seat plan
+    And a caller who holds subscription:manage on "acme"
+    When that caller sets 30 days for "web-app" through the billed write naming "acme"
+    Then the request is refused as a length that does not bill storage
+    And no retention policy is written, so a length the plan includes still needs the scope's own permission
+
+  @unit
   Scenario: A billed write for a scope outside the named organisation is refused as not found
     Given "acme" is on a Growth seat plan
     When a billing administrator of "acme" sets 1 year for project "billing" of "globex" through the billed write naming "acme"
