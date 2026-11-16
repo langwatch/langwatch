@@ -319,35 +319,7 @@ describe("LwqlProvisionTask", () => {
   });
 });
 
-describe("convergeLwqlAccessModel", () => {
-  describe("when PostgreSQL refuses the reader role, as a managed server without CREATEROLE does", () => {
-    /** @scenario "A PostgreSQL failure does not stop the ClickHouse objects converging" */
-    it("logs its own message, still converges ClickHouse, then fails the run", async () => {
-      const postgres = postgresThat({ refuses: true });
-      const clickHouse = clickHouseThat();
-
-      await expect(
-        convergeLwqlAccessModel({
-          database: postgres.database,
-          plan: clickHouse.plan,
-          failOnError: true,
-        }),
-      ).rejects.toMatchObject({ code: "P2010" });
-
-      expect(clickHouse.ran.some((statement) => statement.includes("ENGINE = PostgreSQL"))).toBe(
-        true,
-      );
-      expect(logCalls).toContainEqual(
-        expect.objectContaining({
-          level: "error",
-          fields: expect.objectContaining({ code: "P2010", sqlState: "42501" }),
-          message: "lwql provisioning failed creating PostgreSQL objects",
-        }),
-      );
-      expect(JSON.stringify(logCalls)).not.toContain(READER_PASSWORD);
-    });
-  });
-
+function describeReconvergenceCheck() {
   describe("when the reconvergence check names only the drift it found", () => {
     const only = (drift: Partial<LwqlAppOwnedDrift>): LwqlAppOwnedDrift => ({
       clickHouse: [],
@@ -520,7 +492,9 @@ describe("convergeLwqlAccessModel", () => {
       expect(errors).toEqual(expect.arrayContaining(alerts));
     });
   });
+}
 
+function describeEngineTableRebuild() {
   describe("when engine tables are to be rebuilt on the app's collection values", () => {
     const engineTables = selfProvisioning.engineTablesIn({ only: undefined });
     const [staleTable, absentTable] = engineTables;
@@ -715,6 +689,39 @@ describe("convergeLwqlAccessModel", () => {
       expect(rebuilt(clickHouse, stale)).toEqual([]);
     });
   });
+}
+
+describe("convergeLwqlAccessModel", () => {
+  describe("when PostgreSQL refuses the reader role, as a managed server without CREATEROLE does", () => {
+    /** @scenario "A PostgreSQL failure does not stop the ClickHouse objects converging" */
+    it("logs its own message, still converges ClickHouse, then fails the run", async () => {
+      const postgres = postgresThat({ refuses: true });
+      const clickHouse = clickHouseThat();
+
+      await expect(
+        convergeLwqlAccessModel({
+          database: postgres.database,
+          plan: clickHouse.plan,
+          failOnError: true,
+        }),
+      ).rejects.toMatchObject({ code: "P2010" });
+
+      expect(clickHouse.ran.some((statement) => statement.includes("ENGINE = PostgreSQL"))).toBe(
+        true,
+      );
+      expect(logCalls).toContainEqual(
+        expect.objectContaining({
+          level: "error",
+          fields: expect.objectContaining({ code: "P2010", sqlState: "42501" }),
+          message: "lwql provisioning failed creating PostgreSQL objects",
+        }),
+      );
+      expect(JSON.stringify(logCalls)).not.toContain(READER_PASSWORD);
+    });
+  });
+
+  describeReconvergenceCheck();
+  describeEngineTableRebuild();
 });
 
 describe("convergeLwqlAccessModel across the named collections a server holds", () => {
