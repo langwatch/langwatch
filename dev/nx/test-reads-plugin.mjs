@@ -20,6 +20,7 @@ export const reads = {
     "docs/self-hosting/data-and-telemetry.mdx",
     "docs/workflows/overview.mdx",
     "docs/governance/agent-registry.mdx",
+    "docs/governance/kill-switch.mdx",
     "docs/ai-governance/ingestion-sources/index.mdx",
   ],
   "@langwatch/agent-process": [
