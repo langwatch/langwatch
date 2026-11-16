@@ -5,6 +5,7 @@ import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import {
   AGENT_STOP_PLAN_TARGETS_MAX,
   type AgentStopTarget,
+  DATABRICKS_GENIE_ADAPTER_ID,
 } from "@langwatch/enterprise-governance-contract";
 import { Trash2 } from "lucide-react";
 import { useState } from "react";
@@ -71,7 +72,7 @@ export function StopPlanDialog({
   };
 
   const databricksSources = (sources.data ?? [])
-    .filter((source) => source.sourceType === "databricks")
+    .filter((source) => source.sourceType === DATABRICKS_GENIE_ADAPTER_ID)
     .map((source) => ({ value: source.id, label: source.name }));
   const awsConnections = connections.data ?? [];
   const full = targets.length >= AGENT_STOP_PLAN_TARGETS_MAX;

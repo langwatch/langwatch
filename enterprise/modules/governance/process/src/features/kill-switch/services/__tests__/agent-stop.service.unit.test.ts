@@ -190,6 +190,23 @@ describe("AgentStopService", () => {
   });
 
   describe("when the agent has no stop plan", () => {
+    /** @scenario "An agent with no stop plan yet still offers its kill switch actions" */
+    it("still answers a summary for it, so its first plan can be set", async () => {
+      const harness = await killSwitchHarness();
+
+      const summaries = await harness.stops.findSummaries({ organizationId: ORG });
+
+      expect(summaries).toEqual([
+        {
+          agentId: AGENT_ID,
+          inventoryRowId: "registered:support-bot",
+          planTargetCount: 0,
+          openStop: null,
+        },
+      ]);
+      await harness.eventing.close();
+    });
+
     /** @scenario "A stop of an agent with no stop plan is refused" */
     it("refuses the request", async () => {
       const harness = await killSwitchHarness();
@@ -474,8 +491,17 @@ describe("AgentStopService", () => {
       await settled(other, denied.id, "pending_approval");
       await other.stops.denyStop({ organizationId: ORG, stopId: denied.id, caller: PERSON });
       expect(other.audit.map((row) => row.action)).toContain("governance.agent.stop_denied");
+
+      const service = await killSwitchHarness();
+      await service.setFullPlan();
+      await request(service, { userId: null, apiKeyId: "key-service" }, "high");
+      expect(service.audit[0]).toMatchObject({
+        action: "governance.agent.stop_requested",
+        userId: "apikey:key-service",
+      });
       await harness.eventing.close();
       await other.eventing.close();
+      await service.eventing.close();
     });
   });
 });

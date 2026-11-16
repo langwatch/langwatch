@@ -1,5 +1,5 @@
 import { ListTable } from "@langwatch/design-system/list-table";
-import { Badge, HStack, Text, VisuallyHidden } from "@langwatch/design-system/primitives";
+import { Badge, HStack, Text } from "@langwatch/design-system/primitives";
 import { type GovernanceAgentRow } from "@langwatch/enterprise-governance-contract";
 
 import {
@@ -44,22 +44,15 @@ export function AgentsTable({
   extras?: AgentRowExtras;
 }) {
   return (
-    <ListTable
-      size="sm"
-      data-testid="governance-agents-table"
-      containerProps={{ overflowX: "auto", width: "full" }}
-    >
+    <ListTable size="sm" data-testid="governance-agents-table">
       <ListTable.Header>
         <ListTable.Row>
           <ListTable.ColumnHeader>Agent</ListTable.ColumnHeader>
           {AGENT_TABLE_COLUMNS.map((column) => (
             <ListTable.ColumnHeader key={column}>{column}</ListTable.ColumnHeader>
           ))}
-          {extras ? (
-            <ListTable.ColumnHeader>
-              <VisuallyHidden>Actions</VisuallyHidden>
-            </ListTable.ColumnHeader>
-          ) : null}
+          {/* Pinned right, so the row menu stays in view while the wide table scrolls. */}
+          {extras ? <ListTable.ActionHeader /> : null}
         </ListTable.Row>
       </ListTable.Header>
       <ListTable.Body>
@@ -157,7 +150,9 @@ export function AgentsTable({
                 <AgentValue label="Registered" value={formatRegistered(agent.registeredDaysAgo)} />
               </ListTable.Cell>
 
-              {extras ? <ListTable.Cell nowrap>{added?.actions}</ListTable.Cell> : null}
+              {extras ? (
+                <ListTable.ActionCell>{added?.actions ?? null}</ListTable.ActionCell>
+              ) : null}
             </ListTable.Row>
           );
         })}

@@ -25,6 +25,13 @@ describe("given a recorded action slug", () => {
     ["gateway.budget.created", "Created budget"],
     ["gateway.virtual_key.guardrail_attached", "Attached guardrail"],
     ["routingPolicy.personalContext", "Routing policy personal context"],
+    ["governance.agent.stop_requested", "Stop requested"],
+    ["governance.agent.stop_approved", "Stop approved"],
+    ["governance.agent.stop_plan_set", "Stop plan set"],
+    ["governance.agent.restore_requested", "Restore requested"],
+    ["governance.agent.restore_failed", "Restore failed"],
+    ["governance.agent.quarantined", "Quarantined agent"],
+    ["governance.agent.restored", "Restored agent"],
   ])("reads %s as %s", (action, phrase) => {
     expect(auditActionPhrase(action)).toBe(phrase);
   });

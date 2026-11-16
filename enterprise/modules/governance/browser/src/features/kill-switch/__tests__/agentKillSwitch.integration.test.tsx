@@ -381,6 +381,18 @@ describe("the stop plan of an agent", () => {
     expect(harness.invalidated).toContain("governanceKillSwitch.plan");
   });
 
+  /** @scenario "The stop plan dialog offers the organisation's Databricks Genie sources" */
+  it("offers a Databricks Genie source in the serving endpoint target's picker", async () => {
+    harness.reads["governanceAgents.syncSources"] = [
+      { id: "src-genie", name: "Databricks prod", sourceType: "databricks_genie", lastListing: null },
+    ];
+    const dialog = await openPlan();
+
+    await userEvent.click(within(dialog).getByRole("combobox", { name: "Databricks source" }));
+
+    expect(await screen.findByRole("option", { name: "Databricks prod" })).toBeInTheDocument();
+  });
+
   it("refuses a target with an empty field and says why", async () => {
     const dialog = await openPlan();
 

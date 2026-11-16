@@ -59,7 +59,7 @@ interface AgentStopDependencies {
   stops: Pick<AgentStopRepository, "getStop" | "findByAgent" | "findByStatuses">;
   claims: AgentStopClaimRepository;
   plans: Pick<AgentStopPlanService, "findTargets" | "findPlanCounts">;
-  registry: Pick<AgentRegistryRepository, "getEntry" | "findSourceKeys">;
+  registry: Pick<AgentRegistryRepository, "getEntry" | "findEntries" | "findSourceKeys">;
   auditLog: Pick<AuditLogApi, "record">;
   send: AgentStopCommandSend;
   newId: () => string;
@@ -260,25 +260,35 @@ export class AgentStopService {
     return this.findStops({ organizationId, statuses: ["pending_approval"] });
   }
 
-  /** One row per agent that holds a plan or an open stop, keyed to its Agents-page row. */
+  /**
+   * One row per active registry agent, plus any other agent holding a plan or an open stop, keyed
+   * to its Agents-page row. An agent with no plan yet still gets a row, so its first plan can be set.
+   */
   async findSummaries({
     organizationId,
   }: {
     organizationId: string;
   }): Promise<AgentKillSwitchSummary[]> {
-    const [counts, open] = await Promise.all([
+    const [counts, open, active] = await Promise.all([
       this.deps.plans.findPlanCounts({ organizationId }),
       this.deps.stops.findByStatuses({
         organizationId,
         statuses: AGENT_STOP_OPEN_STATUSES,
         limit: READ_LIMIT,
       }),
+      this.deps.registry.findEntries({ organizationId, status: "active", limit: READ_LIMIT }),
     ]);
     const openByAgent = new Map<string, AgentStopRecord>();
     for (const stop of open)
       if (!openByAgent.has(stop.agentId)) openByAgent.set(stop.agentId, stop);
     const countByAgent = new Map(counts.map((count) => [count.agentId, count.targetCount]));
-    const agentIds = [...new Set([...countByAgent.keys(), ...openByAgent.keys()])];
+    const agentIds = [
+      ...new Set([
+        ...active.map((entry) => entry.id),
+        ...countByAgent.keys(),
+        ...openByAgent.keys(),
+      ]),
+    ];
     if (agentIds.length === 0) return [];
     const sourceKeys = new Map(
       (await this.deps.registry.findSourceKeys({ organizationId, ids: agentIds })).map((row) => [
@@ -354,8 +364,10 @@ export class AgentStopService {
     caller: AgentStopCaller;
     note?: string;
   }): Promise<void> {
+    // A service key has no user: the row names the key, as the door's own audit rows do.
+    const actor = caller.userId ?? (caller.apiKeyId ? `apikey:${caller.apiKeyId}` : null);
     await this.deps.auditLog.record({
-      ...(caller.userId ? { userId: caller.userId } : {}),
+      ...(actor ? { userId: actor } : {}),
       organizationId: stop.organizationId,
       action,
       targetKind: AGENT_STOP_AUDIT_TARGET_KIND,

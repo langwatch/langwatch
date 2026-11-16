@@ -26,6 +26,12 @@ Feature: Agent kill switch: stop a misbehaving agent where it runs, with approva
     Then the plan of "support-bot" lists the three targets
 
   @unit
+  Scenario: An agent with no stop plan yet still offers its kill switch actions
+    Given "support-bot" has no stop plan and no stop
+    When the Agents page reads the kill switch summaries
+    Then "support-bot" has a summary with no plan targets and no open stop
+
+  @unit
   Scenario: A stop plan naming a virtual key of another organisation is refused
     When the plan of "support-bot" names a virtual key the organisation does not hold
     Then the write is refused with code "agent_stop_target_invalid"
@@ -254,3 +260,9 @@ Feature: Agent kill switch: stop a misbehaving agent where it runs, with approva
     When a person with governance:manage presses Stop on the agent
     Then a dialog names the plan's targets and asks for a reason
     And confirming requests the stop
+
+  @integration
+  Scenario: The stop plan dialog offers the organisation's Databricks Genie sources
+    Given a Databricks AI/BI Genie governance source in the organisation
+    When a person opens the stop plan of "support-bot"
+    Then the Databricks source picker of a serving endpoint target offers that source
