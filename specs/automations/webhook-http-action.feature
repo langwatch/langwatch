@@ -268,3 +268,10 @@ Feature: Webhook (generic HTTP) automation action
       Given a graph alert webhook that has already delivered for this fire
       When the same fire is retried
       Then the endpoint is not contacted a second time
+
+    @unit
+    Scenario: A trace automation's receiver refusing is the customer's, not ours
+      Given a trace automation whose own webhook receiver answers 404, or 503
+      When its digest is dispatched
+      Then a warning names the trigger and the status, never the response body
+      And nothing is reported as our error, and only the 503 is retried

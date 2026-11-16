@@ -1,4 +1,4 @@
-import { DispatchError, isDispatchError } from "@langwatch/eventing";
+import { isDispatchError } from "@langwatch/eventing";
 import { generate } from "@langwatch/ksuid";
 import { nowInstant } from "@langwatch/time";
 import {
@@ -13,6 +13,7 @@ import {
   WEBHOOK_DELIVERY_ATTEMPT_HEADER,
   WEBHOOK_EVENT_ID_HEADER,
   WEBHOOK_TEST_FIRE_HEADER,
+  WebhookReceiverError,
   type WebhookSendResult,
 } from "../rules/webhook-delivery-classification.rules.ts";
 import {
@@ -185,10 +186,11 @@ export class WebhookEgressService {
     const admission = judgeWebhookUrl({ url, allowInsecureLocal });
     if (!admission.admitted) {
       // The author typed this URL, so the refusal is theirs to read (a test fire answers it).
-      throw new DispatchError({
+      throw new WebhookReceiverError({
         message: `${label}: ${admission.reason}`,
         retryable: false,
         customerMessage: `${admission.reason.charAt(0).toUpperCase()}${admission.reason.slice(1)}`,
+        status: null,
       });
     }
     // A real fire only; a test fire is counted on its own door instead — the
@@ -230,14 +232,15 @@ export class WebhookEgressService {
   }
 }
 
-/** The author supplied this endpoint, so a failure to reach it is named. */
+/** The author supplied this endpoint, so a failure to reach it is theirs and is named. */
 function withTransportFailureNamed({ error }: { error: unknown }): unknown {
-  if (!isDispatchError(error) || error.customerMessage) return error;
-  return new DispatchError({
+  if (!isDispatchError(error)) return error;
+  return new WebhookReceiverError({
     message: error.message,
     retryable: error.retryable,
     cause: error.cause,
     retryAfterMs: error.retryAfterMs,
-    customerMessage: describeTransportFailure({ error: error.cause }),
+    customerMessage: error.customerMessage ?? describeTransportFailure({ error: error.cause }),
+    status: null,
   });
 }

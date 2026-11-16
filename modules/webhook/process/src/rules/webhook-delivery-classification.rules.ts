@@ -3,6 +3,11 @@
  * by. FROZEN TWIN of `platform/app/src/server/webhooks/sendWebhook.ts`'s
  * classification half — a header rename is invisible until retries double.
  */
+import { DispatchError } from "@langwatch/eventing";
+import {
+  WEBHOOK_RECEIVER_FAILURE,
+  type WebhookReceiverFailure,
+} from "@langwatch/webhook-contract";
 
 /**
  * The automations channel's published dispatch-identity header. One dispatch
@@ -62,6 +67,23 @@ type WebhookDeliveryVerdict =
       /** The receiver's back-off on a retryable answer; the queue folds it in as a floor. */
       retryAfterMs: number | undefined;
     };
+
+/**
+ * A refusal the customer's own receiver caused: a non-2xx answer, or no answer at all.
+ * Its name stays `DispatchError`, which the outbox reads; callers tell it apart by
+ * {@link WEBHOOK_RECEIVER_FAILURE} (`findWebhookReceiverFailure` in the contract).
+ */
+export class WebhookReceiverError extends DispatchError {
+  readonly [WEBHOOK_RECEIVER_FAILURE]: WebhookReceiverFailure;
+
+  constructor({
+    status,
+    ...refusal
+  }: ConstructorParameters<typeof DispatchError>[0] & { status: number | null }) {
+    super(refusal);
+    this[WEBHOOK_RECEIVER_FAILURE] = { status, retryable: refusal.retryable };
+  }
+}
 
 /** {@link classifyWebhookStatus} with the failure's message and back-off attached. */
 export function judgeWebhookDelivery({

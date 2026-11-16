@@ -1,4 +1,4 @@
-import { DispatchError, isDispatchError } from "@langwatch/eventing";
+import { isDispatchError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant, toDate } from "@langwatch/time";
 import type {
@@ -15,6 +15,7 @@ import type {
 } from "../repositories/webhook-endpoint.repository.ts";
 import {
   judgeWebhookDelivery,
+  WebhookReceiverError,
   type WebhookSendResult,
 } from "../rules/webhook-delivery-classification.rules.ts";
 import type { WebhookEgressService } from "./webhook-egress.service.ts";
@@ -90,11 +91,12 @@ export class WebhookRequestService {
       });
       const verdict = judgeWebhookDelivery({ result, label: request.label });
       if (!verdict.delivered) {
-        throw new DispatchError({
+        throw new WebhookReceiverError({
           message: verdict.message,
           customerMessage: verdict.customerMessage,
           retryable: verdict.retryable,
           retryAfterMs: verdict.retryAfterMs,
+          status: result.status,
         });
       }
       await record({

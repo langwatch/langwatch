@@ -8,6 +8,7 @@ import {
   settlementTrace,
   settlementTrigger,
 } from "../../__tests__/fixtures/settlement.fixtures.ts";
+import { webhookReceiverRefusal } from "../../__tests__/fixtures/webhook-receiver.fixture.ts";
 import { AutomationTraceRecordUnavailableError } from "../../repositories/automation-settlement-read.repository.ts";
 
 const loggerWarn = vi.hoisted(() => vi.fn());
@@ -484,5 +485,47 @@ describe("AutomationSettlementDispatchService", () => {
 
     expect(fixture.delivery.webhooks).toHaveLength(2);
     expect(fixture.delivery.webhooks[0]?.eventId).toBe(fixture.delivery.webhooks[1]?.eventId);
+  });
+
+  describe("given a webhook automation whose own receiver refuses", () => {
+    const digest = { triggerId: "trigger-1", traceIds: ["trace-1"], boundary: 1_000 };
+    const where = { projectId: "project-1", triggerId: "trigger-1", intent: "notifyDigest" };
+
+    function refusedBy(refusal: Error) {
+      const fixture = createSettlementFixture(
+        settlementTrigger("SEND_WEBHOOK", {
+          actionParams: { url: "https://example.com/hook", method: "POST", bodyTemplate: "{}" },
+        }),
+      );
+      fixture.delivery.webhookFailure = refusal;
+      return fixture;
+    }
+
+    /** @scenario "A trace automation's receiver refusing is the customer's, not ours" */
+    it("warns with a 404's status, reports no error of ours and does not retry", async () => {
+      const fixture = refusedBy(webhookReceiverRefusal({ status: 404, retryable: false }));
+
+      await fixture.service.notifyDigest(digest, settlementContext());
+
+      expect(fixture.observability.captures).toEqual([]);
+      expect(loggerWarn).toHaveBeenCalledWith(
+        { ...where, attempt: 1, status: 404, retryable: false, suppressedRefusals: 0 },
+        "Settlement dispatch refused by the automation's own webhook receiver",
+      );
+    });
+
+    it("warns with a 503's status and rethrows it for the outbox to retry", async () => {
+      const refusal = webhookReceiverRefusal({ status: 503, retryable: true });
+      const fixture = refusedBy(refusal);
+
+      await expect(fixture.service.notifyDigest(digest, settlementContext())).rejects.toBe(
+        refusal,
+      );
+      expect(fixture.observability.captures).toEqual([]);
+      expect(loggerWarn).toHaveBeenCalledWith(
+        { ...where, attempt: 1, status: 503, retryable: true, suppressedRefusals: 0 },
+        "Settlement dispatch refused by the automation's own webhook receiver",
+      );
+    });
   });
 });

@@ -297,6 +297,13 @@ Feature: The fence a customer-supplied webhook leaves through
       And the receiver's side of the failure is filed, never the request
 
     @unit
+    Scenario: A webhook request names a failure its receiver caused
+      Given a receiver that answers a non-2xx status, or cannot be reached
+      When the webhook module sends the attempt
+      Then the refusal carries the receiver's status and whether a retry may pass
+      And a refusal of our own, such as the hourly cap, carries neither
+
+    @unit
     Scenario: A webhook request to a private address is refused before any connection
       Given an automation's webhook action pointing at a private, loopback or metadata address
       When the webhook module is asked to send it
