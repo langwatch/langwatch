@@ -109,10 +109,9 @@ export class LangWatchQLViewDedupService {
   }
 
   /**
-   * The `latest-in-order` relation (analytics ADR-006): the table read in sort-key order, newest
-   * version first within each key, keeping one row per sort key and stable column. `LIMIT 1 BY`
-   * streams over the read-in-order merge of the parts. A floored twin reads only the versions
-   * from its bound, which the caller's own `WHERE` cannot reach through `LIMIT 1 BY`.
+   * The `latest-in-order` relation (analytics ADR-006): sort-key order, newest version first, one
+   * row per sort key and stable column via `LIMIT 1 BY` over the read-in-order merge. A floored
+   * twin reads only versions from its bound: the caller's `WHERE` can't reach through `LIMIT 1 BY`.
    */
   private latestInOrderRelation({
     view,
