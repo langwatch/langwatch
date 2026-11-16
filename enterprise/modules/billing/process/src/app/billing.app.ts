@@ -51,6 +51,7 @@ import type { BillingChannels } from "../channels/billing.channels.ts";
 import type { ConnectedStatementMailChannel } from "../channels/connected-statement-mail.channel.ts";
 import { SlackBillingSubscriptionNotifierChannel } from "../channels/slack/slack.billing-subscription-notifier.channel.ts";
 import { SlackBillingWebhookHostChannel } from "../channels/slack/slack.billing-webhook-host.channel.ts";
+import type { StripeSubscriptionsChannel } from "../channels/stripe-subscriptions.channel.ts";
 import type { BillingLifecyclePipeline } from "../eventing/billing-lifecycle.pipeline.ts";
 import {
   type BillingReportingDefinition,
@@ -69,6 +70,7 @@ import { LicensePurchaseService } from "../features/license-purchase/services/li
 import { LicenseRenewalService } from "../features/license-purchase/services/license-renewal.service.ts";
 import { LicensingLicenseGeneratorService } from "../features/license-purchase/services/licensing-license-generator.service.ts";
 import type { BillingRepositories } from "../repositories/billing.repositories.ts";
+import { carriesPiiRedactionPrice } from "../rules/pii-redaction-meter.rules.ts";
 import { isStripeTestModeKey } from "../rules/stripe-mode.rules.ts";
 import {
   planLimitCooldown,
@@ -86,9 +88,13 @@ import {
 import { NotificationService as BillingUsageNoticeService } from "../services/billing-usage-notice.service.ts";
 import { CurrencyService } from "../services/currency.service.ts";
 import { CustomerService } from "../services/customer.service.ts";
-import { DeveloperSeatService } from "../services/developer-seat.service.ts";
+import {
+  DeveloperSeatService,
+  type DevelopersInUseCounter,
+} from "../services/developer-seat.service.ts";
 import { InstantEvalSpendQueryService } from "../services/instant-eval-spend-query.service.ts";
 import { OrganizationPricingService } from "../services/organization-pricing.service.ts";
+import { PiiRedactionSpendQueryService } from "../services/pii-redaction-spend-query.service.ts";
 import { PlanLimitAlertService } from "../services/plan-limit-alert.service.ts";
 import { SaaSPlanProviderService } from "../services/plan-provider.service.ts";
 import { ResourceLimitAlertService } from "../services/resource-limit-alert.service.ts";
@@ -132,6 +138,7 @@ type ConnectedLicensing = Pick<
   | "getConnectedSeats"
   | "findSeatChanges"
   | "countFullSeatsInUse"
+  | "countDevelopersInUse"
 >;
 
 /** The peers connected billing reads and gates through, each only as wide as it is used. */
@@ -427,6 +434,7 @@ export class BillingModule
         usageWarnings,
         nodeEnvironment,
         usageReporting: isSaas ? usageReporting : void 0,
+        stripeSubscriptions: stripe?.channels.subscriptions,
       }),
     };
     if (!stripe) {
@@ -524,7 +532,7 @@ export class BillingModule
     subscription: SubscriptionComposition;
     stripe: Pick<BillingStripe, "channels">;
     nodeEnvironment: string | undefined;
-    seatsInUse: SeatsInUseCounter;
+    seatsInUse: SeatsInUseCounter & DevelopersInUseCounter;
     repositories: Pick<
       BillingRepositories,
       "subscriptions" | "organizations" | "seatEventSubscriptions"
@@ -564,6 +572,7 @@ export class BillingModule
         subscriptions: repositories.seatEventSubscriptions,
         prices,
         unitAmountOf: (priceId) => stripePricesFile.prices[priceId]?.unitAmount ?? null,
+        seatsInUse,
       }),
     };
   }
@@ -906,6 +915,7 @@ export class BillingModule
     usageWarnings,
     usageReporting,
     nodeEnvironment,
+    stripeSubscriptions,
   }: {
     repositories: Pick<
       BillingRepositories,
@@ -916,6 +926,8 @@ export class BillingModule
     usageWarnings: UsageWarningService;
     usageReporting: (() => UsageReportingService) | undefined;
     nodeEnvironment: string | undefined;
+    /** Absent where no Stripe key is held: nothing reports there, so the PII month waits. */
+    stripeSubscriptions: StripeSubscriptionsChannel | undefined;
   }): BillingReportingPipeline {
     const projects = {
       findProjectIds: (organizationId: string) => facts.findProjectIds(organizationId),
@@ -926,6 +938,15 @@ export class BillingModule
       sumSpendNanoUsdByRequestType: (input) =>
         repositories.gatewaySpend.sumSpendNanoUsdByRequestType(input),
     });
+    const piiRedactionSpend = PiiRedactionSpendQueryService.create({
+      isSpendSourceAvailable: () => repositories.gatewaySpend.isSpendSourceAvailable(),
+      listProjectIds: ({ organizationId }) => projects.findProjectIds(organizationId),
+      sumSpendNanoUsdByRequestType: (input) =>
+        repositories.gatewaySpend.sumSpendNanoUsdByRequestType(input),
+    });
+    const catalogue = () =>
+      BillingPriceCatalogue.create(getStripeEnvironmentFromNodeEnv(nodeEnvironment));
+    const meters = () => catalogue().meters;
     const ceiling = ConnectedUsageCeilingService.create({
       licensing: peers.licensing,
       gateway: repositories.gatewaySpend,
@@ -939,9 +960,17 @@ export class BillingModule
       billingCheckpoints: repositories.checkpoints,
       getUsageReportingService: () => (reporter ??= usageReporting?.()),
       queryInstantEvalSpendTotal: (input) => instantEvalSpend.queryInstantEvalSpendTotal(input),
-      isInstantEvalMeterProvisioned: () =>
-        BillingPriceCatalogue.create(getStripeEnvironmentFromNodeEnv(nodeEnvironment)).meters
-          .INSTANT_EVAL_USD !== undefined,
+      isInstantEvalMeterProvisioned: () => meters().INSTANT_EVAL_USD !== undefined,
+      queryPiiRedactionSpendTotal: (input) => piiRedactionSpend.queryPiiRedactionSpendTotal(input),
+      isPiiRedactionMeterProvisioned: () => meters().PII_REDACTION_USD !== undefined,
+      hasPiiRedactionPrice: async ({ stripeCustomerId }) =>
+        stripeSubscriptions !== void 0 &&
+        carriesPiiRedactionPrice({
+          subscriptions: await stripeSubscriptions.listCustomerSubscriptions({
+            customerId: stripeCustomerId,
+          }),
+          priceId: catalogue().prices.GROWTH_PII_REDACTION_USD,
+        }),
       organizationCache: repositories.organizationCache,
       errorReporter: BillingErrorReporterService.create(),
       connectedUsageCeiling: async (input) => {

@@ -29,7 +29,7 @@ export const scimTokenTrpcTransport: TrpcRouterDeclaration<ScimApi, typeof scimT
     .handle(({ app, input }) => app.findConnections({ organizationId: input.organizationId }))
 
     .procedure("generate")
-    .mintsCredential("sso:manage")
+    .mintsCredential()
     .withEntitlement("enterprise", { feature: "SCIM" })
     .withPermission("sso:manage")
     .handle(({ app, input, actor }) =>

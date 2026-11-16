@@ -1457,9 +1457,6 @@ jobs:
       - name: Test notify-slack-release.sh
         run: bash .github/scripts/__tests__/notify-slack-release.test.sh
 
-      - name: Test release-docs.sh
-        run: bash .github/scripts/__tests__/release-docs.test.sh
-
       - name: Test run-package-suites.ts
         run: node --test --experimental-strip-types .github/scripts/run-package-suites.test.ts
 

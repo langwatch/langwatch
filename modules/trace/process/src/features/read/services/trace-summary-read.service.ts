@@ -1,7 +1,11 @@
 import {
+  AccessNotGrantedError,
   type Authorization,
   narrowAuthorization,
+  narrowAuthorizationOrNotFound,
+  ownProjectIdReadBy,
   projectIdsReadBy,
+  withoutSpanBraids,
 } from "@langwatch/authorization";
 import { createLogger } from "@langwatch/observability";
 import { deriveTraceTimestamp, teaserOf, TraceNotFoundError } from "@langwatch/trace-contract";
@@ -13,6 +17,7 @@ import type {
   TraceSummaryRepository,
 } from "../../../repositories/trace-summary.repository.ts";
 import { TraceOffloadResolutionService } from "../../../services/trace-offload-resolution.service.ts";
+import { readsBraidedSpans } from "../../braid/rules/braided-span-owner.rules.ts";
 import type { TraceIOExtractionService } from "../../derivation/services/trace-io-extraction.service.ts";
 import type { TraceBlobStoreService } from "../../media/services/trace-blob-store.service.ts";
 
@@ -33,6 +38,22 @@ type GetByTraceIdParams = FindByTraceIdParams & {
   /** Resolve offloaded (ADR-022) input/output back to the full value; single-trace reads only. */
   full?: boolean;
 };
+
+/** The reader's own project; a proof with none answers as the trace not found. */
+function ownProjectIdOrNotFound({
+  authorization,
+  traceId,
+}: {
+  authorization: Authorization;
+  traceId: string;
+}): string {
+  try {
+    return ownProjectIdReadBy(authorization);
+  } catch (error) {
+    if (error instanceof AccessNotGrantedError) throw new TraceNotFoundError(traceId);
+    throw error;
+  }
+}
 
 export class TraceSummaryService {
   static create({
@@ -55,32 +76,54 @@ export class TraceSummaryService {
   /**
    * The proof one trace's detail reads are fenced by (ADR-177): an aggregate's is narrowed to the
    * member holding the trace (named, else found by a light seek). A named project the proof does
-   * not read is not found; a trace no member holds keeps the proof as it is.
+   * not read is not found; a trace no member holds narrows to the reader's own project.
    */
-  async getTraceAuthorization({
+  async getTraceAuthorization(input: {
+    authorization: Authorization;
+    traceId: string;
+    /** The project that owns the trace, as the list row or header named it. */
+    tenantId?: string;
+  }): Promise<Authorization> {
+    const authorization = await this.memberAuthorization(input);
+    return this.braidsIntoHeldTrace({ authorization, traceId: input.traceId });
+  }
+
+  /** Braids read only into a trace the reader holds (ADR-201 §5): an owner-only trace drops
+   *  them, so opening one from the reader reads none of the owner's spans. */
+  private async braidsIntoHeldTrace({
+    authorization,
+    traceId,
+  }: {
+    authorization: Authorization;
+    traceId: string;
+  }): Promise<Authorization> {
+    if (!readsBraidedSpans(authorization)) return authorization;
+    const holders = await this.repository.findTenantIdsByTraceId({ authorization, traceId });
+    return holders.includes(ownProjectIdReadBy(authorization))
+      ? authorization
+      : withoutSpanBraids(authorization);
+  }
+
+  private async memberAuthorization({
     authorization,
     traceId,
     tenantId,
   }: {
     authorization: Authorization;
     traceId: string;
-    /** The project that owns the trace, as the list row or header named it. */
     tenantId?: string;
   }): Promise<Authorization> {
     if (tenantId === undefined && projectIdsReadBy(authorization).length === 1) {
       return authorization;
     }
-    const projectId =
+    const holder =
       tenantId ?? (await this.repository.findTenantIdsByTraceId({ authorization, traceId }))[0];
-    if (projectId === undefined) {
-      return authorization;
-    }
-    const narrowed = narrowAuthorization({ authorization, projectId });
-    if (narrowed === null) {
-      throw new TraceNotFoundError(traceId);
-    }
-
-    return narrowed;
+    // A trace no member holds narrows to the reader's own project, never the whole proof.
+    return narrowAuthorizationOrNotFound({
+      authorization,
+      tenantId: holder ?? ownProjectIdOrNotFound({ authorization, traceId }),
+      notFound: () => new TraceNotFoundError(traceId),
+    });
   }
 
   async getByTraceId({
@@ -139,9 +182,6 @@ export class TraceSummaryService {
 
     try {
       const narrowed = narrowAuthorization({ authorization, projectId: summary.tenantId });
-      if (narrowed === null) {
-        return summary;
-      }
       const normalizedSpans = await deps.spanStorageRepository.findNormalizedSpansByTraceId({
         authorization: narrowed,
         traceId: summary.traceId,

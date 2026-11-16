@@ -1006,11 +1006,11 @@ describe("<SubscriptionPage/> buying seats", () => {
   });
 
   describe("given Other seat types on Growth", () => {
-    const givenDeveloperPrice = () => {
+    const givenDeveloperPrice = (quantity = 0) => {
       mockDeveloperSeats.mockReturnValue({
         data: {
           available: true,
-          quantity: 0,
+          quantity,
           unitAmountCents: 500,
           currency: "EUR",
           billingInterval: "month",
@@ -1037,6 +1037,62 @@ describe("<SubscriptionPage/> buying seats", () => {
           name: /Other seat types/,
         }),
       );
+
+    /** `developers` Developers in use beside `members` full members, as the server counts them. */
+    const givenDevelopersInUse = ({
+      members,
+      developers,
+    }: {
+      members: number;
+      developers: number;
+    }) =>
+      mockGetUsage.mockReturnValue({
+        data: {
+          seatLimitInfo: { status: "ok", message: "" },
+          membersCount: members,
+          membersDeveloperCount: developers,
+        },
+        isLoading: false,
+        refetch: vi.fn(),
+      } as ReturnType<typeof mockGetUsage>);
+
+    /** @scenario "The Developer seat stepper stops at the Developers in use" */
+    it("stops lowering Developer seats at the Developers in use and says why", async () => {
+      givenGrowth({ paid: 3, inUse: 3 });
+      givenDevelopersInUse({ members: 3, developers: 2 });
+      givenDeveloperPrice(3);
+      renderPage();
+      await openManageSeats();
+
+      unfold();
+      fireEvent.click(await screen.findByTestId("developer-seats-stepper-minus"));
+      fireEvent.click(screen.getByTestId("developer-seats-stepper-minus"));
+
+      expect(screen.getByTestId("developer-seats-stepper-value")).toHaveTextContent("2");
+      expect(screen.getByTestId("developer-seats-stepper-minus")).toBeDisabled();
+      expect(screen.getByTestId("developer-seats-minimum")).toHaveTextContent(
+        "2 people use Developer seats. Remove someone in Users to go lower.",
+      );
+    });
+
+    /** @scenario "Raising Developer seats skips the counts below the Developers in use" */
+    it("raises Developer seats straight to the Developers in use", async () => {
+      givenGrowth({ paid: 3, inUse: 3 });
+      givenDevelopersInUse({ members: 3, developers: 2 });
+      givenDeveloperPrice(0);
+      renderPage();
+      await openManageSeats();
+
+      unfold();
+      fireEvent.click(await screen.findByTestId("developer-seats-stepper-plus"));
+
+      expect(screen.getByTestId("developer-seats-stepper-value")).toHaveTextContent("2");
+      expect(screen.getByTestId("developer-seats-minimum")).toHaveTextContent(
+        "2 people use Developer seats, so you need at least 2.",
+      );
+      fireEvent.click(screen.getByTestId("developer-seats-stepper-minus"));
+      expect(screen.getByTestId("developer-seats-stepper-value")).toHaveTextContent("0");
+    });
 
     /** @scenario "Other seat types are folded at the bottom of Manage seats on Growth" */
     it("folds Lite members under Other seat types", async () => {

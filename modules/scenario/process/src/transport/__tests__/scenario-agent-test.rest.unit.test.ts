@@ -60,14 +60,17 @@ describe("POST /api/v1/agents/:id/test", () => {
   });
 
   /** @scenario "The REST route starts the run as the caller's person and the key they called with" */
-  it("starts the run with no person for a key that acts as nobody", async () => {
+  /** @scenario "A scenario run started with a service key is minted under that key" */
+  it("starts the run with no person for a key that acts as nobody, naming that key", async () => {
     const { response, testAgentRun } = await startTestRun({
       viewerUserId: null,
       callerKey: "service_key_1",
     });
 
     expect(response.status).toBe(200);
-    expect(testAgentRun).toHaveBeenCalledWith(expect.objectContaining({ actor: undefined }));
+    expect(testAgentRun).toHaveBeenCalledWith(
+      expect.objectContaining({ actor: { label: "api", apiKeyId: "service_key_1" } }),
+    );
   });
 
   it("is registered as agent's path, served by scenario until it moves", async () => {

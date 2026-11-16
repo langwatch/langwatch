@@ -26,6 +26,7 @@ const current: IssuedLicenseRecord = {
   maxMembers: 10,
   maxMembersLite: 5,
   liteSeatsUnlimited: false,
+  maxMembersDeveloper: null,
   issuedAt: at,
   expiresAt: at,
   source: "BACKOFFICE",

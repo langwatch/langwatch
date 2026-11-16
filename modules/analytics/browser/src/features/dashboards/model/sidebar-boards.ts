@@ -134,6 +134,9 @@ export interface StarredLink {
   readonly key: string;
   readonly name: string;
   readonly href: string;
+  readonly star: DashboardStar;
+  /** The stored board behind a board star; absent for a From LangWatch board. */
+  readonly board?: SidebarBoard;
 }
 
 /**
@@ -153,11 +156,12 @@ export function starredLinks({
   return stars.flatMap((star): StarredLink[] => {
     if (star.kind === "board") {
       const { id, name } = star.board;
-      return [{ key: `board-${id}`, name, href: dashboardsPath({ projectSlug, dashboardId: id }) }];
+      const href = dashboardsPath({ projectSlug, dashboardId: id });
+      return [{ key: `board-${id}`, name, href, star: starRefOf(star), board: star.board }];
     }
     const board = curatedById.get(star.templateId);
     if (!board) return [];
     const href = curatedBoardPath({ projectSlug, templateId: board.templateId });
-    return [{ key: `template-${board.templateId}`, name: board.name, href }];
+    return [{ key: `template-${board.templateId}`, name: board.name, href, star: starRefOf(star) }];
   });
 }

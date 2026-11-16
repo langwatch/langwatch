@@ -6,7 +6,7 @@ The server half of [data-privacy](../README.md). Data privacy: per-scope rules a
 
 ## Installation
 
-`defineProcessModule("data-privacy").withRepositories(dataPrivacyRepositories).withChannels(dataPrivacyChannels).withApi(DataPrivacyModule).withTransports(dataPrivacyTrpcTransport)`, `src/data-privacy.module.ts:13`.
+`defineProcessModule("data-privacy").withRepositories(dataPrivacyRepositories).withChannels(dataPrivacyChannels).withApi(DataPrivacyModule).withTransports(dataPrivacyTrpcTransport).withEventing(piiRedactionSpendEventing)`, `src/data-privacy.module.ts:14`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Callable data-privacy operations shared by process peers after composition.
 
-Peers call these through the token, declared at `../contract/src/data-privacy.api.ts:50`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/data-privacy.api.ts:60`; nothing else in this package is public.
 
 #### `getResolvedForProject`
 
@@ -176,13 +176,22 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ## Workers
 
-None: data-privacy declares no pipeline, process manager, subscriber or task.
+### Pipeline `data_privacy_pii_redaction_spend` (aggregate `pii_redaction_spend`)
+
+Declared at `src/eventing/pii-redaction-spend.pipeline.ts:35`. Events: `piiRedactionSpendPricedEventSchema`.
+
+| Kind    | Name                | Handles | Declared at                                       |
+| ------- | ------------------- | ------- | ------------------------------------------------- |
+| command | `recordSpendPriced` | –       | `src/eventing/pii-redaction-spend.pipeline.ts:40` |
 
 ## Configuration
 
 | Kind   | Leaf                           | Environment variable                 | Declared at                                 |
 | ------ | ------------------------------ | ------------------------------------ | ------------------------------------------- |
-| secret | `googleApplicationCredentials` | `GOOGLE_APPLICATION_CREDENTIALS`     | `src/app/data-privacy.app.ts:104`           |
+| secret | `googleApplicationCredentials` | `GOOGLE_APPLICATION_CREDENTIALS`     | `src/app/data-privacy.app.ts:140`           |
+| secret | `requestIdKey`                 | `API_KEY_PEPPER`                     | `src/app/data-privacy.app.ts:142`           |
+| secret | `requestIdKeyFallback`         | `CREDENTIALS_SECRET`                 | `src/app/data-privacy.app.ts:143`           |
+| secret | `requestIdKeyLastFallback`     | `NEXTAUTH_SECRET`                    | `src/app/data-privacy.app.ts:144`           |
 | config | `googleDlpDisabled`            | `LANGWATCH_DISABLE_GOOGLE_DLP`       | `../contract/src/data-privacy.config.ts:11` |
 | config | `enforcement`                  | `LANGWATCH_DATA_PRIVACY_ENFORCEMENT` | `../contract/src/data-privacy.config.ts:16` |
 | config | `nodeEnvironment`              | `NODE_ENV`                           | `../contract/src/data-privacy.config.ts:18` |

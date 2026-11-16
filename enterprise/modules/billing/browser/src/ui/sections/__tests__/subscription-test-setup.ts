@@ -36,6 +36,7 @@ export const createMockPlan = (overrides: Partial<PlanInfo> = {}): PlanInfo => (
   free: true,
   maxMembers: 2,
   maxMembersLite: 0,
+  maxMembersDeveloper: 0,
   maxMessagesPerMonth: 50000,
   canPublish: false,
   prices: { USD: 0, EUR: 0 },
@@ -167,6 +168,7 @@ export const mockGetUsage = vi.fn(
       | {
           seatLimitInfo: MockSeatLimitInfo;
           membersCount: number;
+          membersDeveloperCount?: number;
           currentMonthMessagesCount?: number | null;
           messageLimitInfo?: MockMessageLimitInfo;
           usageUnit?: "traces" | "events";

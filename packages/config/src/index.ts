@@ -23,6 +23,7 @@ export {
   allowInsecureLocalUrls,
   allowLoopbackVoiceProviders,
   blockLocalHttpCalls,
+  clickhouseCluster,
   foldCacheTtlSeconds,
   gatewayAddressOf,
   gatewayInternalUrl,

@@ -1,8 +1,8 @@
 import { Box, Combobox, HStack, Portal } from "@langwatch/design-system/primitives";
+import { AggregateProjectAvatar, ProjectAvatar } from "@langwatch/design-system/project-avatar";
 import { Check, Plus, Search } from "lucide-react";
 
 import type { ProjectPickGroup, ProjectPickItem } from "../../model/project-pick-items.ts";
-import { AggregateProjectAvatar, ProjectAvatar } from "../elements/project-avatar.tsx";
 
 /**
  * The portaled popup of the project switcher combobox: the search field,

@@ -798,6 +798,9 @@ function buildMigrationEnvVars({
     CLICKHOUSE_ENGINE_AGGREGATING: config.clusterName
       ? "ReplicatedAggregatingMergeTree()"
       : "AggregatingMergeTree()",
+    CLICKHOUSE_ENGINE_VERSIONED_COLLAPSING_PREFIX: config.clusterName
+      ? "ReplicatedVersionedCollapsingMergeTree("
+      : "VersionedCollapsingMergeTree(",
     // "1" when table data must go through Replicated engines to reach every
     // replica. Migrations use this to gate statements that are only correct
     // when a single node holds the complete dataset (e.g. carrying rows over

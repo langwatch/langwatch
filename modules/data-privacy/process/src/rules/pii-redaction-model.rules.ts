@@ -1,6 +1,9 @@
 /** The per-organization switch that routes strict PII analysis to the model. */
 export const PII_REDACTION_MODEL_FLAG = "release_pii_redaction_model_enabled";
 
+/** The organizations whose model calls are recorded at a price of zero (ADR-201 decision 7). */
+export const PII_REDACTION_MODEL_FREE_FLAG = "release_pii_redaction_model_free";
+
 /**
  * When a model call is aborted and its batch goes to Presidio. The two calls share no budget:
  * Presidio then gets its own 60 s timer, so a batch can wait up to 110 s before Google DLP.

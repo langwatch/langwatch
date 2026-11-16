@@ -123,15 +123,8 @@ export class ObjectStorageDatasetChunkRepository implements DatasetChunkReposito
     });
   }
 
-  private async exists(at: StoredObjectAddress): Promise<boolean> {
-    try {
-      const body = await this.objects.read(at);
-      await body[Symbol.asyncIterator]().return?.();
-      return true;
-    } catch (error) {
-      if (isAbsent(error)) return false;
-      throw error;
-    }
+  private exists(at: StoredObjectAddress): Promise<boolean> {
+    return this.objects.exists(at);
   }
 }
 

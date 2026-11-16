@@ -80,11 +80,13 @@ describe("given the trace_metrics view", () => {
     }
   });
 
-  /** @scenario "trace_metrics keeps its FINAL dedup" */
-  it("keeps deduplicating on its sort key by the latest UpdatedAt", () => {
+  /** @scenario "trace_metrics keeps its latest-version dedup without FINAL" */
+  it("keeps deduplicating on its sort key by the latest UpdatedAt, ties broken by Version", () => {
     expect(view?.dedup).toEqual({
       keyColumns: ["TenantId", "OccurredAt", "TraceId"],
       versionColumn: "UpdatedAt",
+      strategy: "latest-in-order",
+      tieBreakColumns: ["Version"],
     });
   });
 
