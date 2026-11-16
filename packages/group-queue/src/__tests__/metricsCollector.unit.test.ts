@@ -55,11 +55,8 @@ function zrangebyscoreModel({
 }
 
 /**
- * Minimal Redis stub exposing only the reads collect() performs. `readyZset`
- * backs both zrangebyscore calls through the model above; `headJobScores`
- * maps a group's jobs key to the [member, score] pair of its head job and
- * `headStagedAt` a group to its head job's staged time, both of which the
- * head-ages script returns.
+ * Minimal Redis stub exposing only the reads collect() performs. `readyZset` backs both
+ * zrangebyscore calls; `headJobScores` and `headStagedAt` feed the head-ages script.
  */
 function makeRedis(
   opts: {

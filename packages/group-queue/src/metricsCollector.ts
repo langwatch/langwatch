@@ -123,7 +123,7 @@ end
 return out
 `);
 
-/** A group's head job: its score and when it was staged, each null when unknown or not a timestamp. */
+/** A group's head job: its score and staged time, each null when unknown or not a timestamp. */
 type HeadAge = { scoreMs: number | null; stagedAtMs: number | null };
 
 /**
@@ -237,12 +237,9 @@ export class GroupQueueMetricsCollector {
   }
 
   /**
-   * Collects two age gauges: eligible-waiting and backlog-regardless-of-eligibility
-   * (nearest-deferred groups + eligible heads). Validates scores against MIN_PLAUSIBLE_EPOCH_MS.
-   *
-   * A score is the event's own time, which can be up to a day old for a job staged a moment
-   * ago, so a group counts as waiting only from the later of its score and its head job's
-   * staged time. A job staged by a release that did not record that time falls back to the score.
+   * Collects the eligible-waiting and whole-backlog age gauges. A group waits from the later of
+   * its score and its head job's staged time (the score alone when none was recorded), since
+   * a score is the event's own time. Scores are checked against MIN_PLAUSIBLE_EPOCH_MS.
    */
   private async collectOldestAges({
     readyKey,

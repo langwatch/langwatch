@@ -501,7 +501,7 @@ describe("GroupQueueProcessor — a staged job id is identity, not state (ADR-08
         expect(await stagedIds(name, groupId)).toEqual([expectedStagedId(payload)]);
 
         // Then jump the chain to the end of the budget rather than sitting
-        // through 25 exponential rungs (~2h27m of real backoff).
+        // through 25 exponential rungs (up to ~2h27m of real backoff).
         await redis.set(attemptKey(name, groupId), String(JOB_RETRY_CONFIG.maxAttempts));
 
         await vi.waitFor(

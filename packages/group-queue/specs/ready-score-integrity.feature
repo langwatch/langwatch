@@ -176,3 +176,9 @@ Feature: GroupQueue ready-score integrity
       Given a job staged with its staging time
       When a retry rewrites its attempt
       Then its staged time is unchanged
+
+    @unit
+    Scenario: a job re-staged into its blocked group keeps the time it was first staged
+      Given a job staged with its staging time
+      When it fails for good and blocks its group
+      Then the re-staged job keeps its staged time

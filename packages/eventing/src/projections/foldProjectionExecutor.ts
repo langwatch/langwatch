@@ -213,7 +213,7 @@ function foldIntoRebuildPass<State, E extends Event>({
   }
 }
 
-/** The newest MAX_APPLIED_EVENT_IDS events by arrival, oldest first, as the applied set keeps them. */
+/** The newest MAX_APPLIED_EVENT_IDS events by arrival, oldest first, as the applied set holds. */
 function newestApplied(applied: readonly AppliedArrival[]): AppliedArrival[] {
   return applied
     .toSorted((a, b) => a.createdAt - b.createdAt || compareOrdinal(a.id, b.id))
@@ -611,10 +611,9 @@ export class FoldProjectionExecutor {
   }
 
   /**
-   * The absent-miss re-fold branch of `execute`: when nothing is loaded, the miss isn't trusted
-   * absent, and the projection opts in, it folds a new aggregate from init or waits for the
-   * saved state (`probeBeforeRefold`), else re-folds from scratch and commits.
-   * Extracted so its branching is counted apart from `execute`'s complexity.
+   * The absent-miss branch of `execute`: when nothing loaded and the miss isn't trusted absent,
+   * it folds a new aggregate from init or waits for the saved state (`probeBeforeRefold`),
+   * else re-folds from scratch and commits.
    */
   private async handleAbsentMiss<State, E extends Event>({
     projection,
@@ -666,11 +665,9 @@ export class FoldProjectionExecutor {
   }
 
   /**
-   * Asks the event log, before a store-miss re-fold replays it, whether the aggregate is new.
-   * Answers `new` when the log shows the first delivered event and nothing before it. When it
-   * shows earlier events, or not even the delivered one, the saved state most likely sits on a
-   * replica that has not caught up: the job goes back to the queue for a short wait, up to
-   * `storeMissRetries` deliveries, and only then re-folds. Undecodable rows re-fold at once.
+   * Before a store-miss re-fold, asks the event log whether the aggregate is new. Otherwise the
+   * saved state likely sits on a lagging replica: the job waits, up to `storeMissRetries`
+   * deliveries, and only then re-folds. Undecodable rows re-fold at once.
    */
   private async probeBeforeRefold<State, E extends Event>({
     projection,
@@ -1173,9 +1170,8 @@ export class FoldProjectionExecutor {
 
   /**
    * The aggregate's history up to `upToEvent`, one `refoldPageSize` page at a time, in page
-   * order (event_log's key order, not time order; see `EventLogPageCursor`).
-   * The page bound is a safety net for a non-advancing cursor: 100k pages of the
-   * default 1000 covers a 100M-event aggregate. Callers guard `eventLoaderUpToPaged`.
+   * order (see `EventLogPageCursor`). The page bound only stops a cursor that never advances.
+   * Callers guard `eventLoaderUpToPaged`.
    */
   private async *historyPages<State, E extends Event>({
     projection,

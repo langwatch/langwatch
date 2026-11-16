@@ -2579,6 +2579,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       groupId: job.groupId,
       stagedJobId: job.stagedJobId,
       payload: job.payload,
+      claimedJobDataJson: job.jobDataJson,
       originalScore: job.originalScore,
       claimToken: job.claimToken,
       lastError,
@@ -3121,6 +3122,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     groupId,
     stagedJobId,
     payload,
+    claimedJobDataJson,
     originalScore,
     claimToken,
     lastError,
@@ -3130,6 +3132,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     groupId: string;
     stagedJobId: string;
     payload: Payload;
+    /** The value as claimed, whose header holds when the job was first staged. */
+    claimedJobDataJson: string;
     originalScore: number;
     claimToken: string;
     lastError: Error | undefined;
@@ -3151,6 +3155,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
         __context: contextMetadata,
       },
       groupId,
+      stagedAtMs: readJobStagedAt(claimedJobDataJson) ?? undefined,
     });
 
     // The quarantine breaker wraps the handler error to explain WHY the group

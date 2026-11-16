@@ -533,10 +533,9 @@ export class EventingClickHouseEventRepository implements EventRepository {
   }
 
   /**
-   * Cursor-paginated `getEventRecordsUpTo`: the same upper bound, in page order (see
-   * {@link EventLogPageCursor}) with a strict `after` cursor and `LIMIT`, so a re-fold of a
-   * huge aggregate streams history a page at a time instead of OOMing on every EventPayload
-   * blob at once.
+   * Cursor-paginated `getEventRecordsUpTo` in page order (see {@link EventLogPageCursor}), so
+   * a re-fold of a huge aggregate streams history a page at a time instead of running out of
+   * memory on every EventPayload blob at once.
    */
   async getEventRecordsUpToPaged(request: {
     tenantId: string;

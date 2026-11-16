@@ -19,24 +19,30 @@ const failedOnAttempt = (attempt: number, error: unknown) =>
 
 describe("stopRetryingRefusedData", () => {
   describe("given a single job whose data ClickHouse refuses", () => {
-    it("leaves its first attempts retryable, as a batch-mate's bad row fails every member", async () => {
+    it("leaves early attempts retryable, as a flush-mate's bad row fails them all", async () => {
       const cause = unparseable();
 
       expect(await failedOnAttempt(1, cause)).toBe(cause);
-      expect(await failedOnAttempt(2, cause)).toBe(cause);
+      expect(await failedOnAttempt(3, cause)).toBe(cause);
     });
 
-    it("refuses it from the third attempt, instead of spending the whole retry budget", async () => {
+    it("keeps it retryable until its jittered waits outlast a shared flush", async () => {
       const cause = unparseable();
 
-      const error = await failedOnAttempt(3, cause);
+      expect(await failedOnAttempt(7, cause)).toBe(cause);
+    });
+
+    it("refuses it from the eighth attempt, not the end of the retry budget", async () => {
+      const cause = unparseable();
+
+      const error = await failedOnAttempt(8, cause);
 
       expect(error).toBeInstanceOf(NonRetryableGroupQueueError);
       expect(error).toMatchObject({ cause });
     });
 
     it("keeps the unparsed row out of its own message", async () => {
-      const error = await failedOnAttempt(3, unparseable());
+      const error = await failedOnAttempt(8, unparseable());
 
       expect(error).toBeInstanceOf(NonRetryableGroupQueueError);
       expect(error).not.toMatchObject({ message: expect.stringContaining("secret row") });

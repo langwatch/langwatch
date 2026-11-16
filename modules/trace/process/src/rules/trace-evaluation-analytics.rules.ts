@@ -35,7 +35,7 @@ export const EVALUATED_TRACE_FIRST_RETRY_MS = 60 * 1000;
 /** Each later wait, so the rest of the hour takes four more looks, not a dozen backoff rungs. */
 export const EVALUATED_TRACE_LATER_RETRY_MS = 15 * 60 * 1000;
 
-/** How long to wait before looking for the trace again, once the evaluation has waited this long. */
+/** How long to wait before looking for the trace again, given how long the evaluation waited. */
 export function evaluatedTraceRetryAfterMs(waitedMs: number): number {
   return waitedMs < EVALUATED_TRACE_FIRST_RETRY_MS
     ? EVALUATED_TRACE_FIRST_RETRY_MS

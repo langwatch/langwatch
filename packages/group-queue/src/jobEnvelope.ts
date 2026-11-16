@@ -140,10 +140,9 @@ export interface EnvelopeHeader {
   t?: string;
   n?: string;
   /**
-   * When the job was first staged, in epoch ms. The ready score is the event's own time and
-   * can lie up to a day in the past for a job staged a moment ago, so the queue-lag gauges
-   * measure waiting from the later of the two. A header field, not a `__*` key: machinery
-   * reaches handler payloads on a worker that does not strip it, and this one has no reader there.
+   * When the job was first staged, in epoch ms; queue lag counts from the later of this and the
+   * ready score, which can be a day old. A header field, not a `__*` key, so it never reaches
+   * handler payloads on a worker that does not strip machinery.
    */
   a?: number;
   /**

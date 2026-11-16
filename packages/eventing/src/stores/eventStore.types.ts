@@ -124,9 +124,9 @@ export interface ReadOnlyEventStore<EventType extends Event = Event> {
   }): Promise<readonly EventType[]>;
 
   /**
-   * Cursor-paginated variant of getEventsUpTo; enables paging large histories without
-   * materializing all events. Optional: callers must check presence and fall back to getEventsUpTo.
-   * Pages come in key order, not time order (see EventLogPageCursor): for order-insensitive folds only.
+   * Cursor-paginated getEventsUpTo for large histories; callers fall back to getEventsUpTo
+   * when it is absent. Pages come in key order, not time order (see EventLogPageCursor), so
+   * only order-insensitive folds may use it.
    */
   getEventsUpToPaged?(request: {
     aggregateId: string;

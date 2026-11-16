@@ -2,13 +2,9 @@ import type { Event } from "../domain/types.ts";
 import { compareOrdinal } from "../utils/compareOrdinal.ts";
 
 /**
- * Where a paged history read resumes: the furthest event of the page before, in page order.
- *
- * Pages follow event_log's sort key, which ends in `IdempotencyKey` once the WHERE clause fixes
- * the tenant, aggregate type and aggregate id, so each page seeks through the primary index
- * instead of re-reading the aggregate from its start. Arrival time and id only break ties
- * between copies of one key that ClickHouse has not merged yet. Page order is not time order:
- * only a fold that ignores event order (`refoldOnOutOfOrder: false`) may read pages.
+ * Where a paged history read resumes. Pages follow event_log's sort key so each one seeks
+ * through the primary index; time and id only break ties between unmerged copies of a key.
+ * Page order is not time order: only a fold with `refoldOnOutOfOrder: false` may read pages.
  */
 export interface EventLogPageCursor {
   /** The stored key; a row stored without one sorts as "", as event_log holds it. */

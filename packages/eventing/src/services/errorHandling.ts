@@ -695,8 +695,13 @@ export function isOutOfStatementSlots(error: unknown): boolean {
 function isTooManySimultaneousQueries(error: unknown): boolean {
   if (error === null || error === undefined) return false;
   if (typeof error === "object" && "code" in error && String(error.code) === "202") return true;
-  const message = error instanceof Error ? error.message : String(error);
+  const message = messageOf(error);
   return SIMULTANEOUS_QUERIES_FRAGMENTS.some((fragment) => message.includes(fragment));
+}
+
+function messageOf(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return typeof error === "string" ? error : "";
 }
 
 function isTransientClickHouseError(error: unknown): boolean {
@@ -771,7 +776,8 @@ function refusesTheData(error: object): boolean {
   const type = Reflect.get(error, "type");
   if (typeof type === "string") {
     if (CLICKHOUSE_PERMANENT_DATA_ERRORS.has(type)) return true;
-    if (CLICKHOUSE_PERMANENT_DATA_CODES.has(String(Reflect.get(error, "code")))) return true;
+    const code = String(Reflect.get(error, "code"));
+    if (CLICKHOUSE_PERMANENT_DATA_CODES.has(code)) return true;
   }
   const message = error instanceof Error ? error.message : "";
   for (const name of CLICKHOUSE_PERMANENT_DATA_ERRORS.keys()) {

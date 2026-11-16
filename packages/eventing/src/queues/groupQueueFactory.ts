@@ -59,11 +59,11 @@ export async function refuseInvalidValueOnce<T>({
 }
 
 /**
- * The attempts a single job gets once ClickHouse refuses its data, instead of the full budget.
- * Not one: a coalesced insert or a shared async flush returns another caller's parse error to
- * every member (ADR-187), and a member that was not the culprit succeeds on its own retry.
+ * A shared flush hands one caller's parse error to every member (ADR-187). Before the eighth
+ * attempt a job has waited up to 16 s and then 32 s, so an innocent flush-mate has long since run
+ * in a clean sub-second flush; with jitter, attempts 1 to 3 can all land within 1.5 s.
  */
-const REFUSED_DATA_ATTEMPTS = 3;
+const REFUSED_DATA_ATTEMPTS = 8;
 
 /** A ClickHouse parse or type refusal fails the same way every time: stop retrying it soon. */
 export async function stopRetryingRefusedData<T>({
