@@ -7,7 +7,6 @@ from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.dataset_post_entries import DatasetPostEntries
 from ...models.post_api_dataset_by_slug_entries_response_200 import PostApiDatasetBySlugEntriesResponse200
-from ...models.post_api_dataset_by_slug_entries_response_400 import PostApiDatasetBySlugEntriesResponse400
 from ...types import Response, safe_http_status
 
 
@@ -35,16 +34,11 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> PostApiDatasetBySlugEntriesResponse200 | PostApiDatasetBySlugEntriesResponse400 | None:
+) -> PostApiDatasetBySlugEntriesResponse200 | None:
     if response.status_code == 200:
         response_200 = PostApiDatasetBySlugEntriesResponse200.from_dict(response.json())
 
         return response_200
-
-    if response.status_code == 400:
-        response_400 = PostApiDatasetBySlugEntriesResponse400.from_dict(response.json())
-
-        return response_400
 
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
@@ -54,7 +48,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[PostApiDatasetBySlugEntriesResponse200 | PostApiDatasetBySlugEntriesResponse400]:
+) -> Response[PostApiDatasetBySlugEntriesResponse200]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -71,7 +65,7 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     body: DatasetPostEntries,
-) -> Response[PostApiDatasetBySlugEntriesResponse200 | PostApiDatasetBySlugEntriesResponse400]:
+) -> Response[PostApiDatasetBySlugEntriesResponse200]:
     """Add entries to a dataset
 
     Args:
@@ -83,7 +77,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PostApiDatasetBySlugEntriesResponse200 | PostApiDatasetBySlugEntriesResponse400]
+        Response[PostApiDatasetBySlugEntriesResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -103,7 +97,7 @@ def sync(
     *,
     client: AuthenticatedClient,
     body: DatasetPostEntries,
-) -> PostApiDatasetBySlugEntriesResponse200 | PostApiDatasetBySlugEntriesResponse400 | None:
+) -> PostApiDatasetBySlugEntriesResponse200 | None:
     """Add entries to a dataset
 
     Args:
@@ -115,7 +109,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PostApiDatasetBySlugEntriesResponse200 | PostApiDatasetBySlugEntriesResponse400
+        PostApiDatasetBySlugEntriesResponse200
     """
 
     return sync_detailed(
@@ -130,7 +124,7 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
     body: DatasetPostEntries,
-) -> Response[PostApiDatasetBySlugEntriesResponse200 | PostApiDatasetBySlugEntriesResponse400]:
+) -> Response[PostApiDatasetBySlugEntriesResponse200]:
     """Add entries to a dataset
 
     Args:
@@ -142,7 +136,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PostApiDatasetBySlugEntriesResponse200 | PostApiDatasetBySlugEntriesResponse400]
+        Response[PostApiDatasetBySlugEntriesResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -160,7 +154,7 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     body: DatasetPostEntries,
-) -> PostApiDatasetBySlugEntriesResponse200 | PostApiDatasetBySlugEntriesResponse400 | None:
+) -> PostApiDatasetBySlugEntriesResponse200 | None:
     """Add entries to a dataset
 
     Args:
@@ -172,7 +166,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PostApiDatasetBySlugEntriesResponse200 | PostApiDatasetBySlugEntriesResponse400
+        PostApiDatasetBySlugEntriesResponse200
     """
 
     return (

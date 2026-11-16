@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mock } from "vitest-mock-extended";
 
-import type { InternalConfig } from "@/client-sdk/types";
 import type { LangwatchApiClient } from "@/internal/api/client";
 
 import { promptResponseFactory } from "../../../../../__tests__/factories/prompt.factory";
@@ -19,7 +18,6 @@ describe("PromptsApiService.renameTag", () => {
     } as unknown as LangwatchApiClient;
     service = new PromptsApiService({
       langwatchApiClient: apiClient,
-      logger: mock(),
     });
   });
 
@@ -57,7 +55,6 @@ describe("PromptsApiService.get", () => {
     } as unknown as LangwatchApiClient;
     service = new PromptsApiService({
       langwatchApiClient: apiClient,
-      logger: mock(),
     });
   });
 
@@ -110,7 +107,6 @@ describe("PromptsApiService.sync", () => {
     } as unknown as LangwatchApiClient;
     service = new PromptsApiService({
       langwatchApiClient: apiClient,
-      logger: mock(),
     });
   });
 
@@ -169,7 +165,6 @@ describe("PromptsApiService.handleApiError", () => {
   beforeEach(() => {
     service = new PromptsApiService({
       langwatchApiClient: mock(),
-      logger: mock(),
     });
     // @ts-expect-error - handleApiError is private but we need to bind it to the service
     handleApiError = service.handleApiError.bind(service);

@@ -5,7 +5,6 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.get_api_simulation_runs_response_200 import GetApiSimulationRunsResponse200
-from ...models.get_api_simulation_runs_response_400 import GetApiSimulationRunsResponse400
 from ...types import UNSET, Response, Unset, safe_http_status
 
 
@@ -43,16 +42,11 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> GetApiSimulationRunsResponse200 | GetApiSimulationRunsResponse400 | None:
+) -> GetApiSimulationRunsResponse200 | None:
     if response.status_code == 200:
         response_200 = GetApiSimulationRunsResponse200.from_dict(response.json())
 
         return response_200
-
-    if response.status_code == 400:
-        response_400 = GetApiSimulationRunsResponse400.from_dict(response.json())
-
-        return response_400
 
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
@@ -62,7 +56,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[GetApiSimulationRunsResponse200 | GetApiSimulationRunsResponse400]:
+) -> Response[GetApiSimulationRunsResponse200]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -82,7 +76,7 @@ def sync_detailed(
     limit: int | Unset = 20,
     cursor: str | Unset = UNSET,
     include: Literal["messages"] | Unset = UNSET,
-) -> Response[GetApiSimulationRunsResponse200 | GetApiSimulationRunsResponse400]:
+) -> Response[GetApiSimulationRunsResponse200]:
     """List simulation runs, optionally filtered by scenarioSetId or batchRunId. Set-level and unfiltered
     listings trim each run to its first few messages and report the trim as `messagesTruncated`; pass
     `include=messages` to read whole conversations, which caps the page at 20 runs, ending on a batch
@@ -100,7 +94,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetApiSimulationRunsResponse200 | GetApiSimulationRunsResponse400]
+        Response[GetApiSimulationRunsResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -126,7 +120,7 @@ def sync(
     limit: int | Unset = 20,
     cursor: str | Unset = UNSET,
     include: Literal["messages"] | Unset = UNSET,
-) -> GetApiSimulationRunsResponse200 | GetApiSimulationRunsResponse400 | None:
+) -> GetApiSimulationRunsResponse200 | None:
     """List simulation runs, optionally filtered by scenarioSetId or batchRunId. Set-level and unfiltered
     listings trim each run to its first few messages and report the trim as `messagesTruncated`; pass
     `include=messages` to read whole conversations, which caps the page at 20 runs, ending on a batch
@@ -144,7 +138,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetApiSimulationRunsResponse200 | GetApiSimulationRunsResponse400
+        GetApiSimulationRunsResponse200
     """
 
     return sync_detailed(
@@ -165,7 +159,7 @@ async def asyncio_detailed(
     limit: int | Unset = 20,
     cursor: str | Unset = UNSET,
     include: Literal["messages"] | Unset = UNSET,
-) -> Response[GetApiSimulationRunsResponse200 | GetApiSimulationRunsResponse400]:
+) -> Response[GetApiSimulationRunsResponse200]:
     """List simulation runs, optionally filtered by scenarioSetId or batchRunId. Set-level and unfiltered
     listings trim each run to its first few messages and report the trim as `messagesTruncated`; pass
     `include=messages` to read whole conversations, which caps the page at 20 runs, ending on a batch
@@ -183,7 +177,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetApiSimulationRunsResponse200 | GetApiSimulationRunsResponse400]
+        Response[GetApiSimulationRunsResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -207,7 +201,7 @@ async def asyncio(
     limit: int | Unset = 20,
     cursor: str | Unset = UNSET,
     include: Literal["messages"] | Unset = UNSET,
-) -> GetApiSimulationRunsResponse200 | GetApiSimulationRunsResponse400 | None:
+) -> GetApiSimulationRunsResponse200 | None:
     """List simulation runs, optionally filtered by scenarioSetId or batchRunId. Set-level and unfiltered
     listings trim each run to its first few messages and report the trim as `messagesTruncated`; pass
     `include=messages` to read whole conversations, which caps the page at 20 runs, ending on a batch
@@ -225,7 +219,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetApiSimulationRunsResponse200 | GetApiSimulationRunsResponse400
+        GetApiSimulationRunsResponse200
     """
 
     return (

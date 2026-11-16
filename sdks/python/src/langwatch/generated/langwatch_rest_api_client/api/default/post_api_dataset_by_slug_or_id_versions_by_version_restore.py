@@ -8,9 +8,6 @@ from ...client import AuthenticatedClient, Client
 from ...models.post_api_dataset_by_slug_or_id_versions_by_version_restore_response_200 import (
     PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse200,
 )
-from ...models.post_api_dataset_by_slug_or_id_versions_by_version_restore_response_400 import (
-    PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse400,
-)
 from ...types import Response, safe_http_status
 
 
@@ -32,21 +29,11 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> (
-    Any
-    | PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse200
-    | PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse400
-    | None
-):
+) -> Any | PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse200 | None:
     if response.status_code == 200:
         response_200 = PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse200.from_dict(response.json())
 
         return response_200
-
-    if response.status_code == 400:
-        response_400 = PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse400.from_dict(response.json())
-
-        return response_400
 
     if response.status_code == 404:
         response_404 = cast(Any, None)
@@ -60,11 +47,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[
-    Any
-    | PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse200
-    | PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse400
-]:
+) -> Response[Any | PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse200]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -81,11 +64,7 @@ def sync_detailed(
     version: int,
     *,
     client: AuthenticatedClient,
-) -> Response[
-    Any
-    | PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse200
-    | PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse400
-]:
+) -> Response[Any | PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse200]:
     """Restore a dataset version
 
      Restore a version: the dataset's columns and rows become the version's, and the result is saved as a
@@ -100,7 +79,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Any | PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse200 | PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse400]
+        Response[Any | PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -120,12 +99,7 @@ def sync(
     version: int,
     *,
     client: AuthenticatedClient,
-) -> (
-    Any
-    | PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse200
-    | PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse400
-    | None
-):
+) -> Any | PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse200 | None:
     """Restore a dataset version
 
      Restore a version: the dataset's columns and rows become the version's, and the result is saved as a
@@ -140,7 +114,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Any | PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse200 | PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse400
+        Any | PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse200
     """
 
     return sync_detailed(
@@ -155,11 +129,7 @@ async def asyncio_detailed(
     version: int,
     *,
     client: AuthenticatedClient,
-) -> Response[
-    Any
-    | PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse200
-    | PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse400
-]:
+) -> Response[Any | PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse200]:
     """Restore a dataset version
 
      Restore a version: the dataset's columns and rows become the version's, and the result is saved as a
@@ -174,7 +144,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Any | PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse200 | PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse400]
+        Response[Any | PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -192,12 +162,7 @@ async def asyncio(
     version: int,
     *,
     client: AuthenticatedClient,
-) -> (
-    Any
-    | PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse200
-    | PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse400
-    | None
-):
+) -> Any | PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse200 | None:
     """Restore a dataset version
 
      Restore a version: the dataset's columns and rows become the version's, and the result is saved as a
@@ -212,7 +177,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Any | PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse200 | PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse400
+        Any | PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse200
     """
 
     return (

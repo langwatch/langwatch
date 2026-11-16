@@ -39,11 +39,13 @@ import {
   setOutputFormat,
 } from "../errorOutput";
 
+const DEFAULT_META: Record<string, unknown> = { id: "sales-q3" };
+
 const handledError = ({
   code = "dataset_not_found",
   message = "Dataset not found: sales-q3",
   httpStatus = 404,
-  meta = { id: "sales-q3" },
+  meta = DEFAULT_META,
   traceId = "4bf92f3577b34da6a3ce929d0e0e4736",
   traceUrl = undefined as string | undefined,
   reasons = undefined as

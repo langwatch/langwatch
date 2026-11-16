@@ -272,7 +272,12 @@ func (t tsType) inline() doc {
 	if t.members == nil {
 		return t.doc
 	}
-	return &group{body: concat{ifBreak{broken: text("| "), flat: text("")}, joinDocs(t.members, concat{line{lineSpace}, text("| ")})}}
+	return &group{body: t.bars()}
+}
+
+// bars is the union's members with a leading bar when broken, breaking with whatever group holds it.
+func (t tsType) bars() doc {
+	return concat{ifBreak{broken: text("| "), flat: text("")}, joinDocs(t.members, concat{line{lineSpace}, text("| ")})}
 }
 
 // defName names a shared definition after the declaration it serves: `__schema0` of Input is InputSchema0.
@@ -354,6 +359,9 @@ func (p *tsPrinter) array(schema *jsonObject) tsType {
 	item := p.typeOf(schema.get("items"))
 	if item.needsParens && item.multiline {
 		return plain(concat{text("("), item.inline(), text(")[]")})
+	}
+	if item.needsParens && item.members != nil {
+		return plain(&group{body: concat{text("("), indent{concat{line{lineSoft}, item.bars()}}, line{lineSoft}, text(")[]")}})
 	}
 	if item.needsParens {
 		return plain(&group{body: concat{text("("), indent{concat{line{lineSoft}, item.inline()}}, line{lineSoft}, text(")[]")}})

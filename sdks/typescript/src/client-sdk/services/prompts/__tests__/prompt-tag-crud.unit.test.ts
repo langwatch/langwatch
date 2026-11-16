@@ -28,7 +28,6 @@ describe("Tag CRUD", () => {
       } as unknown as LangwatchApiClient;
       service = new PromptsApiService({
         langwatchApiClient: apiClient,
-        logger: mock(),
       });
     });
 

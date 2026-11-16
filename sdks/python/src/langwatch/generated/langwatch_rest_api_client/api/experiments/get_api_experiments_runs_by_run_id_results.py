@@ -8,9 +8,6 @@ from ...client import AuthenticatedClient, Client
 from ...models.get_api_experiments_runs_by_run_id_results_response_200 import (
     GetApiExperimentsRunsByRunIdResultsResponse200,
 )
-from ...models.get_api_experiments_runs_by_run_id_results_response_400 import (
-    GetApiExperimentsRunsByRunIdResultsResponse400,
-)
 from ...types import UNSET, Response, Unset, safe_http_status
 
 
@@ -39,16 +36,11 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Any | GetApiExperimentsRunsByRunIdResultsResponse200 | GetApiExperimentsRunsByRunIdResultsResponse400 | None:
+) -> Any | GetApiExperimentsRunsByRunIdResultsResponse200 | None:
     if response.status_code == 200:
         response_200 = GetApiExperimentsRunsByRunIdResultsResponse200.from_dict(response.json())
 
         return response_200
-
-    if response.status_code == 400:
-        response_400 = GetApiExperimentsRunsByRunIdResultsResponse400.from_dict(response.json())
-
-        return response_400
 
     if response.status_code == 401:
         response_401 = cast(Any, None)
@@ -66,7 +58,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[Any | GetApiExperimentsRunsByRunIdResultsResponse200 | GetApiExperimentsRunsByRunIdResultsResponse400]:
+) -> Response[Any | GetApiExperimentsRunsByRunIdResultsResponse200]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -83,7 +75,7 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     experiment_slug: str | Unset = UNSET,
-) -> Response[Any | GetApiExperimentsRunsByRunIdResultsResponse200 | GetApiExperimentsRunsByRunIdResultsResponse400]:
+) -> Response[Any | GetApiExperimentsRunsByRunIdResultsResponse200]:
     """Read run results
 
      Every dataset row of a run with what the target predicted, plus one entry per evaluator per row.
@@ -99,7 +91,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Any | GetApiExperimentsRunsByRunIdResultsResponse200 | GetApiExperimentsRunsByRunIdResultsResponse400]
+        Response[Any | GetApiExperimentsRunsByRunIdResultsResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -119,7 +111,7 @@ def sync(
     *,
     client: AuthenticatedClient,
     experiment_slug: str | Unset = UNSET,
-) -> Any | GetApiExperimentsRunsByRunIdResultsResponse200 | GetApiExperimentsRunsByRunIdResultsResponse400 | None:
+) -> Any | GetApiExperimentsRunsByRunIdResultsResponse200 | None:
     """Read run results
 
      Every dataset row of a run with what the target predicted, plus one entry per evaluator per row.
@@ -135,7 +127,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Any | GetApiExperimentsRunsByRunIdResultsResponse200 | GetApiExperimentsRunsByRunIdResultsResponse400
+        Any | GetApiExperimentsRunsByRunIdResultsResponse200
     """
 
     return sync_detailed(
@@ -150,7 +142,7 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
     experiment_slug: str | Unset = UNSET,
-) -> Response[Any | GetApiExperimentsRunsByRunIdResultsResponse200 | GetApiExperimentsRunsByRunIdResultsResponse400]:
+) -> Response[Any | GetApiExperimentsRunsByRunIdResultsResponse200]:
     """Read run results
 
      Every dataset row of a run with what the target predicted, plus one entry per evaluator per row.
@@ -166,7 +158,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Any | GetApiExperimentsRunsByRunIdResultsResponse200 | GetApiExperimentsRunsByRunIdResultsResponse400]
+        Response[Any | GetApiExperimentsRunsByRunIdResultsResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -184,7 +176,7 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     experiment_slug: str | Unset = UNSET,
-) -> Any | GetApiExperimentsRunsByRunIdResultsResponse200 | GetApiExperimentsRunsByRunIdResultsResponse400 | None:
+) -> Any | GetApiExperimentsRunsByRunIdResultsResponse200 | None:
     """Read run results
 
      Every dataset row of a run with what the target predicted, plus one entry per evaluator per row.
@@ -200,7 +192,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Any | GetApiExperimentsRunsByRunIdResultsResponse200 | GetApiExperimentsRunsByRunIdResultsResponse400
+        Any | GetApiExperimentsRunsByRunIdResultsResponse200
     """
 
     return (

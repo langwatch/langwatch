@@ -269,7 +269,12 @@ describe("given the browser process transport", () => {
 
     beforeEach(() => {
       wiring = transport();
-      watch = wiring.client.subscription("traces.onTraceUpdate", { projectId: "project_1" }, {});
+      // A watch with no callbacks is an async iterator since tRPC 11.25; a screen passes one.
+      watch = wiring.client.subscription(
+        "traces.onTraceUpdate",
+        { projectId: "project_1" },
+        { onData: () => undefined },
+      );
       wiring.channels[0]!.accept();
     });
 

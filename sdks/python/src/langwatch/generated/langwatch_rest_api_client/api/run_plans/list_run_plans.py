@@ -5,7 +5,6 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.list_run_plans_response_200_item import ListRunPlansResponse200Item
-from ...models.list_run_plans_response_400 import ListRunPlansResponse400
 from ...types import UNSET, Response, Unset, safe_http_status
 
 
@@ -31,7 +30,7 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> ListRunPlansResponse400 | list[ListRunPlansResponse200Item] | None:
+) -> list[ListRunPlansResponse200Item] | None:
     if response.status_code == 200:
         response_200 = []
         _response_200 = response.json()
@@ -42,11 +41,6 @@ def _parse_response(
 
         return response_200
 
-    if response.status_code == 400:
-        response_400 = ListRunPlansResponse400.from_dict(response.json())
-
-        return response_400
-
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
     else:
@@ -55,7 +49,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[ListRunPlansResponse400 | list[ListRunPlansResponse200Item]]:
+) -> Response[list[ListRunPlansResponse200Item]]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -71,7 +65,7 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     include_archived: str | Unset = "false",
-) -> Response[ListRunPlansResponse400 | list[ListRunPlansResponse200Item]]:
+) -> Response[list[ListRunPlansResponse200Item]]:
     """List the project's run plans. Archived plans are left out unless includeArchived is set. Test suites
     are not run plans and are listed by the test suites family.
 
@@ -83,7 +77,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ListRunPlansResponse400 | list[ListRunPlansResponse200Item]]
+        Response[list[ListRunPlansResponse200Item]]
     """
 
     kwargs = _get_kwargs(
@@ -101,7 +95,7 @@ def sync(
     *,
     client: AuthenticatedClient,
     include_archived: str | Unset = "false",
-) -> ListRunPlansResponse400 | list[ListRunPlansResponse200Item] | None:
+) -> list[ListRunPlansResponse200Item] | None:
     """List the project's run plans. Archived plans are left out unless includeArchived is set. Test suites
     are not run plans and are listed by the test suites family.
 
@@ -113,7 +107,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ListRunPlansResponse400 | list[ListRunPlansResponse200Item]
+        list[ListRunPlansResponse200Item]
     """
 
     return sync_detailed(
@@ -126,7 +120,7 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
     include_archived: str | Unset = "false",
-) -> Response[ListRunPlansResponse400 | list[ListRunPlansResponse200Item]]:
+) -> Response[list[ListRunPlansResponse200Item]]:
     """List the project's run plans. Archived plans are left out unless includeArchived is set. Test suites
     are not run plans and are listed by the test suites family.
 
@@ -138,7 +132,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ListRunPlansResponse400 | list[ListRunPlansResponse200Item]]
+        Response[list[ListRunPlansResponse200Item]]
     """
 
     kwargs = _get_kwargs(
@@ -154,7 +148,7 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     include_archived: str | Unset = "false",
-) -> ListRunPlansResponse400 | list[ListRunPlansResponse200Item] | None:
+) -> list[ListRunPlansResponse200Item] | None:
     """List the project's run plans. Archived plans are left out unless includeArchived is set. Test suites
     are not run plans and are listed by the test suites family.
 
@@ -166,7 +160,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ListRunPlansResponse400 | list[ListRunPlansResponse200Item]
+        list[ListRunPlansResponse200Item]
     """
 
     return (

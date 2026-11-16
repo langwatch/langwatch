@@ -7,7 +7,6 @@ from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.patch_api_graphs_by_id_body import PatchApiGraphsByIdBody
 from ...models.patch_api_graphs_by_id_response_200 import PatchApiGraphsByIdResponse200
-from ...models.patch_api_graphs_by_id_response_400 import PatchApiGraphsByIdResponse400
 from ...types import UNSET, Response, Unset, safe_http_status
 
 
@@ -36,16 +35,11 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> PatchApiGraphsByIdResponse200 | PatchApiGraphsByIdResponse400 | None:
+) -> PatchApiGraphsByIdResponse200 | None:
     if response.status_code == 200:
         response_200 = PatchApiGraphsByIdResponse200.from_dict(response.json())
 
         return response_200
-
-    if response.status_code == 400:
-        response_400 = PatchApiGraphsByIdResponse400.from_dict(response.json())
-
-        return response_400
 
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
@@ -55,7 +49,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[PatchApiGraphsByIdResponse200 | PatchApiGraphsByIdResponse400]:
+) -> Response[PatchApiGraphsByIdResponse200]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -72,7 +66,7 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     body: PatchApiGraphsByIdBody | Unset = UNSET,
-) -> Response[PatchApiGraphsByIdResponse200 | PatchApiGraphsByIdResponse400]:
+) -> Response[PatchApiGraphsByIdResponse200]:
     """Update a custom graph's name, definition, or filters
 
     Args:
@@ -84,7 +78,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PatchApiGraphsByIdResponse200 | PatchApiGraphsByIdResponse400]
+        Response[PatchApiGraphsByIdResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -104,7 +98,7 @@ def sync(
     *,
     client: AuthenticatedClient,
     body: PatchApiGraphsByIdBody | Unset = UNSET,
-) -> PatchApiGraphsByIdResponse200 | PatchApiGraphsByIdResponse400 | None:
+) -> PatchApiGraphsByIdResponse200 | None:
     """Update a custom graph's name, definition, or filters
 
     Args:
@@ -116,7 +110,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PatchApiGraphsByIdResponse200 | PatchApiGraphsByIdResponse400
+        PatchApiGraphsByIdResponse200
     """
 
     return sync_detailed(
@@ -131,7 +125,7 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
     body: PatchApiGraphsByIdBody | Unset = UNSET,
-) -> Response[PatchApiGraphsByIdResponse200 | PatchApiGraphsByIdResponse400]:
+) -> Response[PatchApiGraphsByIdResponse200]:
     """Update a custom graph's name, definition, or filters
 
     Args:
@@ -143,7 +137,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PatchApiGraphsByIdResponse200 | PatchApiGraphsByIdResponse400]
+        Response[PatchApiGraphsByIdResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -161,7 +155,7 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     body: PatchApiGraphsByIdBody | Unset = UNSET,
-) -> PatchApiGraphsByIdResponse200 | PatchApiGraphsByIdResponse400 | None:
+) -> PatchApiGraphsByIdResponse200 | None:
     """Update a custom graph's name, definition, or filters
 
     Args:
@@ -173,7 +167,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PatchApiGraphsByIdResponse200 | PatchApiGraphsByIdResponse400
+        PatchApiGraphsByIdResponse200
     """
 
     return (

@@ -5,8 +5,8 @@
  * @see specs/analytics-widget-editor.feature
  */
 
-import { libFileMap } from "monaco-editor/esm/vs/language/typescript/lib/lib.js";
-import { typescript as ts } from "monaco-editor/esm/vs/language/typescript/lib/typescriptServices.js";
+import { libFileMap } from "monaco-editor/languages/features/typescript/lib/lib.js";
+import { typescript as ts } from "monaco-editor/languages/features/typescript/lib/typescriptServices.js";
 import { describe, expect, it } from "vitest";
 
 import { lwQueryRowTypesDts } from "../../model/dashboard-widget/lw-query-row-types.ts";

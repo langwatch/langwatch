@@ -6,7 +6,6 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.get_api_triggers_by_id_fires_response_200 import GetApiTriggersByIdFiresResponse200
-from ...models.get_api_triggers_by_id_fires_response_400 import GetApiTriggersByIdFiresResponse400
 from ...models.get_api_triggers_by_id_fires_response_404 import GetApiTriggersByIdFiresResponse404
 from ...types import UNSET, Response, Unset, safe_http_status
 
@@ -39,18 +38,11 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> (
-    GetApiTriggersByIdFiresResponse200 | GetApiTriggersByIdFiresResponse400 | GetApiTriggersByIdFiresResponse404 | None
-):
+) -> GetApiTriggersByIdFiresResponse200 | GetApiTriggersByIdFiresResponse404 | None:
     if response.status_code == 200:
         response_200 = GetApiTriggersByIdFiresResponse200.from_dict(response.json())
 
         return response_200
-
-    if response.status_code == 400:
-        response_400 = GetApiTriggersByIdFiresResponse400.from_dict(response.json())
-
-        return response_400
 
     if response.status_code == 404:
         response_404 = GetApiTriggersByIdFiresResponse404.from_dict(response.json())
@@ -65,9 +57,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[
-    GetApiTriggersByIdFiresResponse200 | GetApiTriggersByIdFiresResponse400 | GetApiTriggersByIdFiresResponse404
-]:
+) -> Response[GetApiTriggersByIdFiresResponse200 | GetApiTriggersByIdFiresResponse404]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -85,9 +75,7 @@ def sync_detailed(
     client: AuthenticatedClient,
     limit: int | Unset = 20,
     cursor: str | Unset = UNSET,
-) -> Response[
-    GetApiTriggersByIdFiresResponse200 | GetApiTriggersByIdFiresResponse400 | GetApiTriggersByIdFiresResponse404
-]:
+) -> Response[GetApiTriggersByIdFiresResponse200 | GetApiTriggersByIdFiresResponse404]:
     """What this automation has done: its fires, newest first. Metadata only (no trace ids and no trace
     content). Send `nextCursor` back as `cursor` to read the page after this one.
 
@@ -101,7 +89,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetApiTriggersByIdFiresResponse200 | GetApiTriggersByIdFiresResponse400 | GetApiTriggersByIdFiresResponse404]
+        Response[GetApiTriggersByIdFiresResponse200 | GetApiTriggersByIdFiresResponse404]
     """
 
     kwargs = _get_kwargs(
@@ -123,9 +111,7 @@ def sync(
     client: AuthenticatedClient,
     limit: int | Unset = 20,
     cursor: str | Unset = UNSET,
-) -> (
-    GetApiTriggersByIdFiresResponse200 | GetApiTriggersByIdFiresResponse400 | GetApiTriggersByIdFiresResponse404 | None
-):
+) -> GetApiTriggersByIdFiresResponse200 | GetApiTriggersByIdFiresResponse404 | None:
     """What this automation has done: its fires, newest first. Metadata only (no trace ids and no trace
     content). Send `nextCursor` back as `cursor` to read the page after this one.
 
@@ -139,7 +125,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetApiTriggersByIdFiresResponse200 | GetApiTriggersByIdFiresResponse400 | GetApiTriggersByIdFiresResponse404
+        GetApiTriggersByIdFiresResponse200 | GetApiTriggersByIdFiresResponse404
     """
 
     return sync_detailed(
@@ -156,9 +142,7 @@ async def asyncio_detailed(
     client: AuthenticatedClient,
     limit: int | Unset = 20,
     cursor: str | Unset = UNSET,
-) -> Response[
-    GetApiTriggersByIdFiresResponse200 | GetApiTriggersByIdFiresResponse400 | GetApiTriggersByIdFiresResponse404
-]:
+) -> Response[GetApiTriggersByIdFiresResponse200 | GetApiTriggersByIdFiresResponse404]:
     """What this automation has done: its fires, newest first. Metadata only (no trace ids and no trace
     content). Send `nextCursor` back as `cursor` to read the page after this one.
 
@@ -172,7 +156,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetApiTriggersByIdFiresResponse200 | GetApiTriggersByIdFiresResponse400 | GetApiTriggersByIdFiresResponse404]
+        Response[GetApiTriggersByIdFiresResponse200 | GetApiTriggersByIdFiresResponse404]
     """
 
     kwargs = _get_kwargs(
@@ -192,9 +176,7 @@ async def asyncio(
     client: AuthenticatedClient,
     limit: int | Unset = 20,
     cursor: str | Unset = UNSET,
-) -> (
-    GetApiTriggersByIdFiresResponse200 | GetApiTriggersByIdFiresResponse400 | GetApiTriggersByIdFiresResponse404 | None
-):
+) -> GetApiTriggersByIdFiresResponse200 | GetApiTriggersByIdFiresResponse404 | None:
     """What this automation has done: its fires, newest first. Metadata only (no trace ids and no trace
     content). Send `nextCursor` back as `cursor` to read the page after this one.
 
@@ -208,7 +190,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetApiTriggersByIdFiresResponse200 | GetApiTriggersByIdFiresResponse400 | GetApiTriggersByIdFiresResponse404
+        GetApiTriggersByIdFiresResponse200 | GetApiTriggersByIdFiresResponse404
     """
 
     return (

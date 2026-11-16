@@ -7,7 +7,6 @@ from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.patch_api_monitors_by_id_body import PatchApiMonitorsByIdBody
 from ...models.patch_api_monitors_by_id_response_200 import PatchApiMonitorsByIdResponse200
-from ...models.patch_api_monitors_by_id_response_400 import PatchApiMonitorsByIdResponse400
 from ...models.patch_api_monitors_by_id_response_404 import PatchApiMonitorsByIdResponse404
 from ...types import UNSET, Response, Unset, safe_http_status
 
@@ -37,16 +36,11 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> PatchApiMonitorsByIdResponse200 | PatchApiMonitorsByIdResponse400 | PatchApiMonitorsByIdResponse404 | None:
+) -> PatchApiMonitorsByIdResponse200 | PatchApiMonitorsByIdResponse404 | None:
     if response.status_code == 200:
         response_200 = PatchApiMonitorsByIdResponse200.from_dict(response.json())
 
         return response_200
-
-    if response.status_code == 400:
-        response_400 = PatchApiMonitorsByIdResponse400.from_dict(response.json())
-
-        return response_400
 
     if response.status_code == 404:
         response_404 = PatchApiMonitorsByIdResponse404.from_dict(response.json())
@@ -61,7 +55,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[PatchApiMonitorsByIdResponse200 | PatchApiMonitorsByIdResponse400 | PatchApiMonitorsByIdResponse404]:
+) -> Response[PatchApiMonitorsByIdResponse200 | PatchApiMonitorsByIdResponse404]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -78,7 +72,7 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     body: PatchApiMonitorsByIdBody | Unset = UNSET,
-) -> Response[PatchApiMonitorsByIdResponse200 | PatchApiMonitorsByIdResponse400 | PatchApiMonitorsByIdResponse404]:
+) -> Response[PatchApiMonitorsByIdResponse200 | PatchApiMonitorsByIdResponse404]:
     """Update a monitor (name, enabled state, settings, etc.)
 
     Args:
@@ -90,7 +84,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PatchApiMonitorsByIdResponse200 | PatchApiMonitorsByIdResponse400 | PatchApiMonitorsByIdResponse404]
+        Response[PatchApiMonitorsByIdResponse200 | PatchApiMonitorsByIdResponse404]
     """
 
     kwargs = _get_kwargs(
@@ -110,7 +104,7 @@ def sync(
     *,
     client: AuthenticatedClient,
     body: PatchApiMonitorsByIdBody | Unset = UNSET,
-) -> PatchApiMonitorsByIdResponse200 | PatchApiMonitorsByIdResponse400 | PatchApiMonitorsByIdResponse404 | None:
+) -> PatchApiMonitorsByIdResponse200 | PatchApiMonitorsByIdResponse404 | None:
     """Update a monitor (name, enabled state, settings, etc.)
 
     Args:
@@ -122,7 +116,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PatchApiMonitorsByIdResponse200 | PatchApiMonitorsByIdResponse400 | PatchApiMonitorsByIdResponse404
+        PatchApiMonitorsByIdResponse200 | PatchApiMonitorsByIdResponse404
     """
 
     return sync_detailed(
@@ -137,7 +131,7 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
     body: PatchApiMonitorsByIdBody | Unset = UNSET,
-) -> Response[PatchApiMonitorsByIdResponse200 | PatchApiMonitorsByIdResponse400 | PatchApiMonitorsByIdResponse404]:
+) -> Response[PatchApiMonitorsByIdResponse200 | PatchApiMonitorsByIdResponse404]:
     """Update a monitor (name, enabled state, settings, etc.)
 
     Args:
@@ -149,7 +143,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PatchApiMonitorsByIdResponse200 | PatchApiMonitorsByIdResponse400 | PatchApiMonitorsByIdResponse404]
+        Response[PatchApiMonitorsByIdResponse200 | PatchApiMonitorsByIdResponse404]
     """
 
     kwargs = _get_kwargs(
@@ -167,7 +161,7 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     body: PatchApiMonitorsByIdBody | Unset = UNSET,
-) -> PatchApiMonitorsByIdResponse200 | PatchApiMonitorsByIdResponse400 | PatchApiMonitorsByIdResponse404 | None:
+) -> PatchApiMonitorsByIdResponse200 | PatchApiMonitorsByIdResponse404 | None:
     """Update a monitor (name, enabled state, settings, etc.)
 
     Args:
@@ -179,7 +173,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PatchApiMonitorsByIdResponse200 | PatchApiMonitorsByIdResponse400 | PatchApiMonitorsByIdResponse404
+        PatchApiMonitorsByIdResponse200 | PatchApiMonitorsByIdResponse404
     """
 
     return (

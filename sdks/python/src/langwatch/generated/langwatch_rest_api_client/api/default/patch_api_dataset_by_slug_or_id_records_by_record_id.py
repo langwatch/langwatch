@@ -14,9 +14,6 @@ from ...models.patch_api_dataset_by_slug_or_id_records_by_record_id_response_200
 from ...models.patch_api_dataset_by_slug_or_id_records_by_record_id_response_201 import (
     PatchApiDatasetBySlugOrIdRecordsByRecordIdResponse201,
 )
-from ...models.patch_api_dataset_by_slug_or_id_records_by_record_id_response_400 import (
-    PatchApiDatasetBySlugOrIdRecordsByRecordIdResponse400,
-)
 from ...types import Response, safe_http_status
 
 
@@ -47,10 +44,7 @@ def _get_kwargs(
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
 ) -> (
-    PatchApiDatasetBySlugOrIdRecordsByRecordIdResponse200
-    | PatchApiDatasetBySlugOrIdRecordsByRecordIdResponse201
-    | PatchApiDatasetBySlugOrIdRecordsByRecordIdResponse400
-    | None
+    PatchApiDatasetBySlugOrIdRecordsByRecordIdResponse200 | PatchApiDatasetBySlugOrIdRecordsByRecordIdResponse201 | None
 ):
     if response.status_code == 200:
         response_200 = PatchApiDatasetBySlugOrIdRecordsByRecordIdResponse200.from_dict(response.json())
@@ -62,11 +56,6 @@ def _parse_response(
 
         return response_201
 
-    if response.status_code == 400:
-        response_400 = PatchApiDatasetBySlugOrIdRecordsByRecordIdResponse400.from_dict(response.json())
-
-        return response_400
-
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
     else:
@@ -76,9 +65,7 @@ def _parse_response(
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
 ) -> Response[
-    PatchApiDatasetBySlugOrIdRecordsByRecordIdResponse200
-    | PatchApiDatasetBySlugOrIdRecordsByRecordIdResponse201
-    | PatchApiDatasetBySlugOrIdRecordsByRecordIdResponse400
+    PatchApiDatasetBySlugOrIdRecordsByRecordIdResponse200 | PatchApiDatasetBySlugOrIdRecordsByRecordIdResponse201
 ]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
@@ -98,9 +85,7 @@ def sync_detailed(
     client: AuthenticatedClient,
     body: PatchApiDatasetBySlugOrIdRecordsByRecordIdBody,
 ) -> Response[
-    PatchApiDatasetBySlugOrIdRecordsByRecordIdResponse200
-    | PatchApiDatasetBySlugOrIdRecordsByRecordIdResponse201
-    | PatchApiDatasetBySlugOrIdRecordsByRecordIdResponse400
+    PatchApiDatasetBySlugOrIdRecordsByRecordIdResponse200 | PatchApiDatasetBySlugOrIdRecordsByRecordIdResponse201
 ]:
     """Update or create a record in a dataset
 
@@ -114,7 +99,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PatchApiDatasetBySlugOrIdRecordsByRecordIdResponse200 | PatchApiDatasetBySlugOrIdRecordsByRecordIdResponse201 | PatchApiDatasetBySlugOrIdRecordsByRecordIdResponse400]
+        Response[PatchApiDatasetBySlugOrIdRecordsByRecordIdResponse200 | PatchApiDatasetBySlugOrIdRecordsByRecordIdResponse201]
     """
 
     kwargs = _get_kwargs(
@@ -137,10 +122,7 @@ def sync(
     client: AuthenticatedClient,
     body: PatchApiDatasetBySlugOrIdRecordsByRecordIdBody,
 ) -> (
-    PatchApiDatasetBySlugOrIdRecordsByRecordIdResponse200
-    | PatchApiDatasetBySlugOrIdRecordsByRecordIdResponse201
-    | PatchApiDatasetBySlugOrIdRecordsByRecordIdResponse400
-    | None
+    PatchApiDatasetBySlugOrIdRecordsByRecordIdResponse200 | PatchApiDatasetBySlugOrIdRecordsByRecordIdResponse201 | None
 ):
     """Update or create a record in a dataset
 
@@ -154,7 +136,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PatchApiDatasetBySlugOrIdRecordsByRecordIdResponse200 | PatchApiDatasetBySlugOrIdRecordsByRecordIdResponse201 | PatchApiDatasetBySlugOrIdRecordsByRecordIdResponse400
+        PatchApiDatasetBySlugOrIdRecordsByRecordIdResponse200 | PatchApiDatasetBySlugOrIdRecordsByRecordIdResponse201
     """
 
     return sync_detailed(
@@ -172,9 +154,7 @@ async def asyncio_detailed(
     client: AuthenticatedClient,
     body: PatchApiDatasetBySlugOrIdRecordsByRecordIdBody,
 ) -> Response[
-    PatchApiDatasetBySlugOrIdRecordsByRecordIdResponse200
-    | PatchApiDatasetBySlugOrIdRecordsByRecordIdResponse201
-    | PatchApiDatasetBySlugOrIdRecordsByRecordIdResponse400
+    PatchApiDatasetBySlugOrIdRecordsByRecordIdResponse200 | PatchApiDatasetBySlugOrIdRecordsByRecordIdResponse201
 ]:
     """Update or create a record in a dataset
 
@@ -188,7 +168,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PatchApiDatasetBySlugOrIdRecordsByRecordIdResponse200 | PatchApiDatasetBySlugOrIdRecordsByRecordIdResponse201 | PatchApiDatasetBySlugOrIdRecordsByRecordIdResponse400]
+        Response[PatchApiDatasetBySlugOrIdRecordsByRecordIdResponse200 | PatchApiDatasetBySlugOrIdRecordsByRecordIdResponse201]
     """
 
     kwargs = _get_kwargs(
@@ -209,10 +189,7 @@ async def asyncio(
     client: AuthenticatedClient,
     body: PatchApiDatasetBySlugOrIdRecordsByRecordIdBody,
 ) -> (
-    PatchApiDatasetBySlugOrIdRecordsByRecordIdResponse200
-    | PatchApiDatasetBySlugOrIdRecordsByRecordIdResponse201
-    | PatchApiDatasetBySlugOrIdRecordsByRecordIdResponse400
-    | None
+    PatchApiDatasetBySlugOrIdRecordsByRecordIdResponse200 | PatchApiDatasetBySlugOrIdRecordsByRecordIdResponse201 | None
 ):
     """Update or create a record in a dataset
 
@@ -226,7 +203,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PatchApiDatasetBySlugOrIdRecordsByRecordIdResponse200 | PatchApiDatasetBySlugOrIdRecordsByRecordIdResponse201 | PatchApiDatasetBySlugOrIdRecordsByRecordIdResponse400
+        PatchApiDatasetBySlugOrIdRecordsByRecordIdResponse200 | PatchApiDatasetBySlugOrIdRecordsByRecordIdResponse201
     """
 
     return (

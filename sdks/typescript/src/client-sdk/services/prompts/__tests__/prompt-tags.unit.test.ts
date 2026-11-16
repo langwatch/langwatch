@@ -25,7 +25,6 @@ describe("Prompt Tags", () => {
         } as unknown as LangwatchApiClient;
         service = new PromptsApiService({
           langwatchApiClient: apiClient,
-          logger: mock(),
         });
       });
 
@@ -92,7 +91,6 @@ describe("Prompt Tags", () => {
         } as unknown as LangwatchApiClient;
         service = new PromptsApiService({
           langwatchApiClient: apiClient,
-          logger: mock(),
         });
       });
 

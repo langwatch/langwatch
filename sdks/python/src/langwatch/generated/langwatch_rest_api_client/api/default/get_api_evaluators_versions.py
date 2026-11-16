@@ -6,7 +6,6 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.get_api_evaluators_versions_response_200 import GetApiEvaluatorsVersionsResponse200
-from ...models.get_api_evaluators_versions_response_400 import GetApiEvaluatorsVersionsResponse400
 from ...models.get_api_evaluators_versions_response_404 import GetApiEvaluatorsVersionsResponse404
 from ...types import Response, safe_http_status
 
@@ -27,21 +26,11 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> (
-    GetApiEvaluatorsVersionsResponse200
-    | GetApiEvaluatorsVersionsResponse400
-    | GetApiEvaluatorsVersionsResponse404
-    | None
-):
+) -> GetApiEvaluatorsVersionsResponse200 | GetApiEvaluatorsVersionsResponse404 | None:
     if response.status_code == 200:
         response_200 = GetApiEvaluatorsVersionsResponse200.from_dict(response.json())
 
         return response_200
-
-    if response.status_code == 400:
-        response_400 = GetApiEvaluatorsVersionsResponse400.from_dict(response.json())
-
-        return response_400
 
     if response.status_code == 404:
         response_404 = GetApiEvaluatorsVersionsResponse404.from_dict(response.json())
@@ -56,9 +45,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[
-    GetApiEvaluatorsVersionsResponse200 | GetApiEvaluatorsVersionsResponse400 | GetApiEvaluatorsVersionsResponse404
-]:
+) -> Response[GetApiEvaluatorsVersionsResponse200 | GetApiEvaluatorsVersionsResponse404]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -74,9 +61,7 @@ def sync_detailed(
     evaluator_id: str,
     *,
     client: AuthenticatedClient,
-) -> Response[
-    GetApiEvaluatorsVersionsResponse200 | GetApiEvaluatorsVersionsResponse400 | GetApiEvaluatorsVersionsResponse404
-]:
+) -> Response[GetApiEvaluatorsVersionsResponse200 | GetApiEvaluatorsVersionsResponse404]:
     """List an evaluator's versions, newest first, with the labels on each
 
     Args:
@@ -87,7 +72,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetApiEvaluatorsVersionsResponse200 | GetApiEvaluatorsVersionsResponse400 | GetApiEvaluatorsVersionsResponse404]
+        Response[GetApiEvaluatorsVersionsResponse200 | GetApiEvaluatorsVersionsResponse404]
     """
 
     kwargs = _get_kwargs(
@@ -105,12 +90,7 @@ def sync(
     evaluator_id: str,
     *,
     client: AuthenticatedClient,
-) -> (
-    GetApiEvaluatorsVersionsResponse200
-    | GetApiEvaluatorsVersionsResponse400
-    | GetApiEvaluatorsVersionsResponse404
-    | None
-):
+) -> GetApiEvaluatorsVersionsResponse200 | GetApiEvaluatorsVersionsResponse404 | None:
     """List an evaluator's versions, newest first, with the labels on each
 
     Args:
@@ -121,7 +101,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetApiEvaluatorsVersionsResponse200 | GetApiEvaluatorsVersionsResponse400 | GetApiEvaluatorsVersionsResponse404
+        GetApiEvaluatorsVersionsResponse200 | GetApiEvaluatorsVersionsResponse404
     """
 
     return sync_detailed(
@@ -134,9 +114,7 @@ async def asyncio_detailed(
     evaluator_id: str,
     *,
     client: AuthenticatedClient,
-) -> Response[
-    GetApiEvaluatorsVersionsResponse200 | GetApiEvaluatorsVersionsResponse400 | GetApiEvaluatorsVersionsResponse404
-]:
+) -> Response[GetApiEvaluatorsVersionsResponse200 | GetApiEvaluatorsVersionsResponse404]:
     """List an evaluator's versions, newest first, with the labels on each
 
     Args:
@@ -147,7 +125,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetApiEvaluatorsVersionsResponse200 | GetApiEvaluatorsVersionsResponse400 | GetApiEvaluatorsVersionsResponse404]
+        Response[GetApiEvaluatorsVersionsResponse200 | GetApiEvaluatorsVersionsResponse404]
     """
 
     kwargs = _get_kwargs(
@@ -163,12 +141,7 @@ async def asyncio(
     evaluator_id: str,
     *,
     client: AuthenticatedClient,
-) -> (
-    GetApiEvaluatorsVersionsResponse200
-    | GetApiEvaluatorsVersionsResponse400
-    | GetApiEvaluatorsVersionsResponse404
-    | None
-):
+) -> GetApiEvaluatorsVersionsResponse200 | GetApiEvaluatorsVersionsResponse404 | None:
     """List an evaluator's versions, newest first, with the labels on each
 
     Args:
@@ -179,7 +152,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetApiEvaluatorsVersionsResponse200 | GetApiEvaluatorsVersionsResponse400 | GetApiEvaluatorsVersionsResponse404
+        GetApiEvaluatorsVersionsResponse200 | GetApiEvaluatorsVersionsResponse404
     """
 
     return (

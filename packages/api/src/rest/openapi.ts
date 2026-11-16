@@ -634,6 +634,9 @@ export function publishEnumRecordKeys(document: unknown): void {
   document.properties = Object.fromEntries(keys.map((key) => [key, value]));
 }
 
+/** Each route documents the refusals it answers (validation is a 422): hono-openapi adds no 400. */
+export const SPEC_GENERATION_OPTIONS = { defaultValidationErrorResponse: false } as const;
+
 // zod's OpenAPI adapter leaves a recursive schema's definition in a local
 // `$defs`, and newer hono-openapi puts it in components under the same
 // anonymous `__schema0`. Either way each anonymous name is replaced by one

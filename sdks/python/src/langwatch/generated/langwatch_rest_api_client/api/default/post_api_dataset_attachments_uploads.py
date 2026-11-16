@@ -6,7 +6,6 @@ from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.post_api_dataset_attachments_uploads_body import PostApiDatasetAttachmentsUploadsBody
 from ...models.post_api_dataset_attachments_uploads_response_201 import PostApiDatasetAttachmentsUploadsResponse201
-from ...models.post_api_dataset_attachments_uploads_response_400 import PostApiDatasetAttachmentsUploadsResponse400
 from ...types import Response, safe_http_status
 
 
@@ -31,16 +30,11 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Any | PostApiDatasetAttachmentsUploadsResponse201 | PostApiDatasetAttachmentsUploadsResponse400 | None:
+) -> Any | PostApiDatasetAttachmentsUploadsResponse201 | None:
     if response.status_code == 201:
         response_201 = PostApiDatasetAttachmentsUploadsResponse201.from_dict(response.json())
 
         return response_201
-
-    if response.status_code == 400:
-        response_400 = PostApiDatasetAttachmentsUploadsResponse400.from_dict(response.json())
-
-        return response_400
 
     if response.status_code == 413:
         response_413 = cast(Any, None)
@@ -62,7 +56,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[Any | PostApiDatasetAttachmentsUploadsResponse201 | PostApiDatasetAttachmentsUploadsResponse400]:
+) -> Response[Any | PostApiDatasetAttachmentsUploadsResponse201]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -78,7 +72,7 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     body: PostApiDatasetAttachmentsUploadsBody,
-) -> Response[Any | PostApiDatasetAttachmentsUploadsResponse201 | PostApiDatasetAttachmentsUploadsResponse400]:
+) -> Response[Any | PostApiDatasetAttachmentsUploadsResponse201]:
     """Create an upload for an image or file cell
 
      Answers the address to PUT the file to. After the PUT, confirm the upload at `POST /api/v1/stored-
@@ -93,7 +87,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Any | PostApiDatasetAttachmentsUploadsResponse201 | PostApiDatasetAttachmentsUploadsResponse400]
+        Response[Any | PostApiDatasetAttachmentsUploadsResponse201]
     """
 
     kwargs = _get_kwargs(
@@ -111,7 +105,7 @@ def sync(
     *,
     client: AuthenticatedClient,
     body: PostApiDatasetAttachmentsUploadsBody,
-) -> Any | PostApiDatasetAttachmentsUploadsResponse201 | PostApiDatasetAttachmentsUploadsResponse400 | None:
+) -> Any | PostApiDatasetAttachmentsUploadsResponse201 | None:
     """Create an upload for an image or file cell
 
      Answers the address to PUT the file to. After the PUT, confirm the upload at `POST /api/v1/stored-
@@ -126,7 +120,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Any | PostApiDatasetAttachmentsUploadsResponse201 | PostApiDatasetAttachmentsUploadsResponse400
+        Any | PostApiDatasetAttachmentsUploadsResponse201
     """
 
     return sync_detailed(
@@ -139,7 +133,7 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
     body: PostApiDatasetAttachmentsUploadsBody,
-) -> Response[Any | PostApiDatasetAttachmentsUploadsResponse201 | PostApiDatasetAttachmentsUploadsResponse400]:
+) -> Response[Any | PostApiDatasetAttachmentsUploadsResponse201]:
     """Create an upload for an image or file cell
 
      Answers the address to PUT the file to. After the PUT, confirm the upload at `POST /api/v1/stored-
@@ -154,7 +148,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Any | PostApiDatasetAttachmentsUploadsResponse201 | PostApiDatasetAttachmentsUploadsResponse400]
+        Response[Any | PostApiDatasetAttachmentsUploadsResponse201]
     """
 
     kwargs = _get_kwargs(
@@ -170,7 +164,7 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     body: PostApiDatasetAttachmentsUploadsBody,
-) -> Any | PostApiDatasetAttachmentsUploadsResponse201 | PostApiDatasetAttachmentsUploadsResponse400 | None:
+) -> Any | PostApiDatasetAttachmentsUploadsResponse201 | None:
     """Create an upload for an image or file cell
 
      Answers the address to PUT the file to. After the PUT, confirm the upload at `POST /api/v1/stored-
@@ -185,7 +179,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Any | PostApiDatasetAttachmentsUploadsResponse201 | PostApiDatasetAttachmentsUploadsResponse400
+        Any | PostApiDatasetAttachmentsUploadsResponse201
     """
 
     return (

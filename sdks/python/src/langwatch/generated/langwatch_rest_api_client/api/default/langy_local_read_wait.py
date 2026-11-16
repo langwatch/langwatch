@@ -6,7 +6,6 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.langy_local_read_wait_response_200 import LangyLocalReadWaitResponse200
-from ...models.langy_local_read_wait_response_400 import LangyLocalReadWaitResponse400
 from ...types import Response, safe_http_status
 
 
@@ -26,16 +25,11 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> LangyLocalReadWaitResponse200 | LangyLocalReadWaitResponse400 | None:
+) -> LangyLocalReadWaitResponse200 | None:
     if response.status_code == 200:
         response_200 = LangyLocalReadWaitResponse200.from_dict(response.json())
 
         return response_200
-
-    if response.status_code == 400:
-        response_400 = LangyLocalReadWaitResponse400.from_dict(response.json())
-
-        return response_400
 
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
@@ -45,7 +39,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[LangyLocalReadWaitResponse200 | LangyLocalReadWaitResponse400]:
+) -> Response[LangyLocalReadWaitResponse200]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -61,7 +55,7 @@ def sync_detailed(
     wait_id: str,
     *,
     client: AuthenticatedClient,
-) -> Response[LangyLocalReadWaitResponse200 | LangyLocalReadWaitResponse400]:
+) -> Response[LangyLocalReadWaitResponse200]:
     """The answered question, or not found while it is still waiting.
 
     Args:
@@ -72,7 +66,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[LangyLocalReadWaitResponse200 | LangyLocalReadWaitResponse400]
+        Response[LangyLocalReadWaitResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -90,7 +84,7 @@ def sync(
     wait_id: str,
     *,
     client: AuthenticatedClient,
-) -> LangyLocalReadWaitResponse200 | LangyLocalReadWaitResponse400 | None:
+) -> LangyLocalReadWaitResponse200 | None:
     """The answered question, or not found while it is still waiting.
 
     Args:
@@ -101,7 +95,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        LangyLocalReadWaitResponse200 | LangyLocalReadWaitResponse400
+        LangyLocalReadWaitResponse200
     """
 
     return sync_detailed(
@@ -114,7 +108,7 @@ async def asyncio_detailed(
     wait_id: str,
     *,
     client: AuthenticatedClient,
-) -> Response[LangyLocalReadWaitResponse200 | LangyLocalReadWaitResponse400]:
+) -> Response[LangyLocalReadWaitResponse200]:
     """The answered question, or not found while it is still waiting.
 
     Args:
@@ -125,7 +119,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[LangyLocalReadWaitResponse200 | LangyLocalReadWaitResponse400]
+        Response[LangyLocalReadWaitResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -141,7 +135,7 @@ async def asyncio(
     wait_id: str,
     *,
     client: AuthenticatedClient,
-) -> LangyLocalReadWaitResponse200 | LangyLocalReadWaitResponse400 | None:
+) -> LangyLocalReadWaitResponse200 | None:
     """The answered question, or not found while it is still waiting.
 
     Args:
@@ -152,7 +146,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        LangyLocalReadWaitResponse200 | LangyLocalReadWaitResponse400
+        LangyLocalReadWaitResponse200
     """
 
     return (

@@ -6,7 +6,6 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.get_api_teams_by_id_projects_response_200 import GetApiTeamsByIdProjectsResponse200
-from ...models.get_api_teams_by_id_projects_response_400 import GetApiTeamsByIdProjectsResponse400
 from ...types import Response, safe_http_status
 
 
@@ -26,16 +25,11 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> GetApiTeamsByIdProjectsResponse200 | GetApiTeamsByIdProjectsResponse400 | None:
+) -> GetApiTeamsByIdProjectsResponse200 | None:
     if response.status_code == 200:
         response_200 = GetApiTeamsByIdProjectsResponse200.from_dict(response.json())
 
         return response_200
-
-    if response.status_code == 400:
-        response_400 = GetApiTeamsByIdProjectsResponse400.from_dict(response.json())
-
-        return response_400
 
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
@@ -45,7 +39,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[GetApiTeamsByIdProjectsResponse200 | GetApiTeamsByIdProjectsResponse400]:
+) -> Response[GetApiTeamsByIdProjectsResponse200]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -61,7 +55,7 @@ def sync_detailed(
     team_id: str,
     *,
     client: AuthenticatedClient,
-) -> Response[GetApiTeamsByIdProjectsResponse200 | GetApiTeamsByIdProjectsResponse400]:
+) -> Response[GetApiTeamsByIdProjectsResponse200]:
     """List projects in a team
 
     Args:
@@ -72,7 +66,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetApiTeamsByIdProjectsResponse200 | GetApiTeamsByIdProjectsResponse400]
+        Response[GetApiTeamsByIdProjectsResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -90,7 +84,7 @@ def sync(
     team_id: str,
     *,
     client: AuthenticatedClient,
-) -> GetApiTeamsByIdProjectsResponse200 | GetApiTeamsByIdProjectsResponse400 | None:
+) -> GetApiTeamsByIdProjectsResponse200 | None:
     """List projects in a team
 
     Args:
@@ -101,7 +95,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetApiTeamsByIdProjectsResponse200 | GetApiTeamsByIdProjectsResponse400
+        GetApiTeamsByIdProjectsResponse200
     """
 
     return sync_detailed(
@@ -114,7 +108,7 @@ async def asyncio_detailed(
     team_id: str,
     *,
     client: AuthenticatedClient,
-) -> Response[GetApiTeamsByIdProjectsResponse200 | GetApiTeamsByIdProjectsResponse400]:
+) -> Response[GetApiTeamsByIdProjectsResponse200]:
     """List projects in a team
 
     Args:
@@ -125,7 +119,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetApiTeamsByIdProjectsResponse200 | GetApiTeamsByIdProjectsResponse400]
+        Response[GetApiTeamsByIdProjectsResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -141,7 +135,7 @@ async def asyncio(
     team_id: str,
     *,
     client: AuthenticatedClient,
-) -> GetApiTeamsByIdProjectsResponse200 | GetApiTeamsByIdProjectsResponse400 | None:
+) -> GetApiTeamsByIdProjectsResponse200 | None:
     """List projects in a team
 
     Args:
@@ -152,7 +146,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetApiTeamsByIdProjectsResponse200 | GetApiTeamsByIdProjectsResponse400
+        GetApiTeamsByIdProjectsResponse200
     """
 
     return (

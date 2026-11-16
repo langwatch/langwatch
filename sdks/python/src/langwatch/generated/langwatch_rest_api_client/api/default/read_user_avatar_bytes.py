@@ -5,7 +5,6 @@ import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
-from ...models.read_user_avatar_bytes_response_400 import ReadUserAvatarBytesResponse400
 from ...types import Response, safe_http_status
 
 
@@ -25,23 +24,14 @@ def _get_kwargs(
     return _kwargs
 
 
-def _parse_response(
-    *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> ReadUserAvatarBytesResponse400 | None:
-    if response.status_code == 400:
-        response_400 = ReadUserAvatarBytesResponse400.from_dict(response.json())
-
-        return response_400
-
+def _parse_response(*, client: AuthenticatedClient | Client, response: httpx.Response) -> Any | None:
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
     else:
         return None
 
 
-def _build_response(
-    *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[ReadUserAvatarBytesResponse400]:
+def _build_response(*, client: AuthenticatedClient | Client, response: httpx.Response) -> Response[Any]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -58,7 +48,7 @@ def sync_detailed(
     user_avatar_id: str,
     *,
     client: AuthenticatedClient,
-) -> Response[ReadUserAvatarBytesResponse400]:
+) -> Response[Any]:
     """
     Args:
         project_id (str):
@@ -69,7 +59,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ReadUserAvatarBytesResponse400]
+        Response[Any]
     """
 
     kwargs = _get_kwargs(
@@ -84,38 +74,12 @@ def sync_detailed(
     return _build_response(client=client, response=response)
 
 
-def sync(
-    project_id: str,
-    user_avatar_id: str,
-    *,
-    client: AuthenticatedClient,
-) -> ReadUserAvatarBytesResponse400 | None:
-    """
-    Args:
-        project_id (str):
-        user_avatar_id (str):
-
-    Raises:
-        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
-        httpx.TimeoutException: If the request takes longer than Client.timeout.
-
-    Returns:
-        ReadUserAvatarBytesResponse400
-    """
-
-    return sync_detailed(
-        project_id=project_id,
-        user_avatar_id=user_avatar_id,
-        client=client,
-    ).parsed
-
-
 async def asyncio_detailed(
     project_id: str,
     user_avatar_id: str,
     *,
     client: AuthenticatedClient,
-) -> Response[ReadUserAvatarBytesResponse400]:
+) -> Response[Any]:
     """
     Args:
         project_id (str):
@@ -126,7 +90,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ReadUserAvatarBytesResponse400]
+        Response[Any]
     """
 
     kwargs = _get_kwargs(
@@ -137,31 +101,3 @@ async def asyncio_detailed(
     response = await client.get_async_httpx_client().request(**kwargs)
 
     return _build_response(client=client, response=response)
-
-
-async def asyncio(
-    project_id: str,
-    user_avatar_id: str,
-    *,
-    client: AuthenticatedClient,
-) -> ReadUserAvatarBytesResponse400 | None:
-    """
-    Args:
-        project_id (str):
-        user_avatar_id (str):
-
-    Raises:
-        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
-        httpx.TimeoutException: If the request takes longer than Client.timeout.
-
-    Returns:
-        ReadUserAvatarBytesResponse400
-    """
-
-    return (
-        await asyncio_detailed(
-            project_id=project_id,
-            user_avatar_id=user_avatar_id,
-            client=client,
-        )
-    ).parsed

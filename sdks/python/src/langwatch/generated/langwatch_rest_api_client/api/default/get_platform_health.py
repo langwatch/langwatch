@@ -5,7 +5,6 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.get_platform_health_response_200 import GetPlatformHealthResponse200
-from ...models.get_platform_health_response_400 import GetPlatformHealthResponse400
 from ...models.get_platform_health_response_503 import GetPlatformHealthResponse503
 from ...types import UNSET, Response, Unset, safe_http_status
 
@@ -35,16 +34,11 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> GetPlatformHealthResponse200 | GetPlatformHealthResponse400 | GetPlatformHealthResponse503 | None:
+) -> GetPlatformHealthResponse200 | GetPlatformHealthResponse503 | None:
     if response.status_code == 200:
         response_200 = GetPlatformHealthResponse200.from_dict(response.json())
 
         return response_200
-
-    if response.status_code == 400:
-        response_400 = GetPlatformHealthResponse400.from_dict(response.json())
-
-        return response_400
 
     if response.status_code == 503:
         response_503 = GetPlatformHealthResponse503.from_dict(response.json())
@@ -59,7 +53,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[GetPlatformHealthResponse200 | GetPlatformHealthResponse400 | GetPlatformHealthResponse503]:
+) -> Response[GetPlatformHealthResponse200 | GetPlatformHealthResponse503]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -76,7 +70,7 @@ def sync_detailed(
     client: AuthenticatedClient,
     trigger_id: str | Unset = UNSET,
     workflow_id: str | Unset = UNSET,
-) -> Response[GetPlatformHealthResponse200 | GetPlatformHealthResponse400 | GetPlatformHealthResponse503]:
+) -> Response[GetPlatformHealthResponse200 | GetPlatformHealthResponse503]:
     """Report whether the platform is working
 
      An external monitor reads a status and a report: 200 healthy or degraded, 503 unhealthy, 401
@@ -91,7 +85,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetPlatformHealthResponse200 | GetPlatformHealthResponse400 | GetPlatformHealthResponse503]
+        Response[GetPlatformHealthResponse200 | GetPlatformHealthResponse503]
     """
 
     kwargs = _get_kwargs(
@@ -111,7 +105,7 @@ def sync(
     client: AuthenticatedClient,
     trigger_id: str | Unset = UNSET,
     workflow_id: str | Unset = UNSET,
-) -> GetPlatformHealthResponse200 | GetPlatformHealthResponse400 | GetPlatformHealthResponse503 | None:
+) -> GetPlatformHealthResponse200 | GetPlatformHealthResponse503 | None:
     """Report whether the platform is working
 
      An external monitor reads a status and a report: 200 healthy or degraded, 503 unhealthy, 401
@@ -126,7 +120,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetPlatformHealthResponse200 | GetPlatformHealthResponse400 | GetPlatformHealthResponse503
+        GetPlatformHealthResponse200 | GetPlatformHealthResponse503
     """
 
     return sync_detailed(
@@ -141,7 +135,7 @@ async def asyncio_detailed(
     client: AuthenticatedClient,
     trigger_id: str | Unset = UNSET,
     workflow_id: str | Unset = UNSET,
-) -> Response[GetPlatformHealthResponse200 | GetPlatformHealthResponse400 | GetPlatformHealthResponse503]:
+) -> Response[GetPlatformHealthResponse200 | GetPlatformHealthResponse503]:
     """Report whether the platform is working
 
      An external monitor reads a status and a report: 200 healthy or degraded, 503 unhealthy, 401
@@ -156,7 +150,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetPlatformHealthResponse200 | GetPlatformHealthResponse400 | GetPlatformHealthResponse503]
+        Response[GetPlatformHealthResponse200 | GetPlatformHealthResponse503]
     """
 
     kwargs = _get_kwargs(
@@ -174,7 +168,7 @@ async def asyncio(
     client: AuthenticatedClient,
     trigger_id: str | Unset = UNSET,
     workflow_id: str | Unset = UNSET,
-) -> GetPlatformHealthResponse200 | GetPlatformHealthResponse400 | GetPlatformHealthResponse503 | None:
+) -> GetPlatformHealthResponse200 | GetPlatformHealthResponse503 | None:
     """Report whether the platform is working
 
      An external monitor reads a status and a report: 200 healthy or degraded, 503 unhealthy, 401
@@ -189,7 +183,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetPlatformHealthResponse200 | GetPlatformHealthResponse400 | GetPlatformHealthResponse503
+        GetPlatformHealthResponse200 | GetPlatformHealthResponse503
     """
 
     return (

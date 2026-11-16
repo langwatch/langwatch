@@ -75,7 +75,6 @@ import {
 import {
   removeVscodeTerminalOtelEnv,
   VSCODE_TELEMETRY_ENV_KEYS,
-  type VscodePlatform,
   vscodeTerminalEnvHasAnyClear,
   vscodeUserSettingsPath,
 } from "./vscode-settings";

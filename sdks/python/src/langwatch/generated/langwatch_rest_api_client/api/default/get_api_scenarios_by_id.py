@@ -6,7 +6,6 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.get_api_scenarios_by_id_response_200 import GetApiScenariosByIdResponse200
-from ...models.get_api_scenarios_by_id_response_400 import GetApiScenariosByIdResponse400
 from ...models.get_api_scenarios_by_id_response_404 import GetApiScenariosByIdResponse404
 from ...types import Response, safe_http_status
 
@@ -27,16 +26,11 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> GetApiScenariosByIdResponse200 | GetApiScenariosByIdResponse400 | GetApiScenariosByIdResponse404 | None:
+) -> GetApiScenariosByIdResponse200 | GetApiScenariosByIdResponse404 | None:
     if response.status_code == 200:
         response_200 = GetApiScenariosByIdResponse200.from_dict(response.json())
 
         return response_200
-
-    if response.status_code == 400:
-        response_400 = GetApiScenariosByIdResponse400.from_dict(response.json())
-
-        return response_400
 
     if response.status_code == 404:
         response_404 = GetApiScenariosByIdResponse404.from_dict(response.json())
@@ -51,7 +45,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[GetApiScenariosByIdResponse200 | GetApiScenariosByIdResponse400 | GetApiScenariosByIdResponse404]:
+) -> Response[GetApiScenariosByIdResponse200 | GetApiScenariosByIdResponse404]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -67,7 +61,7 @@ def sync_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
-) -> Response[GetApiScenariosByIdResponse200 | GetApiScenariosByIdResponse400 | GetApiScenariosByIdResponse404]:
+) -> Response[GetApiScenariosByIdResponse200 | GetApiScenariosByIdResponse404]:
     """Get a specific scenario by ID
 
     Args:
@@ -78,7 +72,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetApiScenariosByIdResponse200 | GetApiScenariosByIdResponse400 | GetApiScenariosByIdResponse404]
+        Response[GetApiScenariosByIdResponse200 | GetApiScenariosByIdResponse404]
     """
 
     kwargs = _get_kwargs(
@@ -96,7 +90,7 @@ def sync(
     id: str,
     *,
     client: AuthenticatedClient,
-) -> GetApiScenariosByIdResponse200 | GetApiScenariosByIdResponse400 | GetApiScenariosByIdResponse404 | None:
+) -> GetApiScenariosByIdResponse200 | GetApiScenariosByIdResponse404 | None:
     """Get a specific scenario by ID
 
     Args:
@@ -107,7 +101,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetApiScenariosByIdResponse200 | GetApiScenariosByIdResponse400 | GetApiScenariosByIdResponse404
+        GetApiScenariosByIdResponse200 | GetApiScenariosByIdResponse404
     """
 
     return sync_detailed(
@@ -120,7 +114,7 @@ async def asyncio_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
-) -> Response[GetApiScenariosByIdResponse200 | GetApiScenariosByIdResponse400 | GetApiScenariosByIdResponse404]:
+) -> Response[GetApiScenariosByIdResponse200 | GetApiScenariosByIdResponse404]:
     """Get a specific scenario by ID
 
     Args:
@@ -131,7 +125,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetApiScenariosByIdResponse200 | GetApiScenariosByIdResponse400 | GetApiScenariosByIdResponse404]
+        Response[GetApiScenariosByIdResponse200 | GetApiScenariosByIdResponse404]
     """
 
     kwargs = _get_kwargs(
@@ -147,7 +141,7 @@ async def asyncio(
     id: str,
     *,
     client: AuthenticatedClient,
-) -> GetApiScenariosByIdResponse200 | GetApiScenariosByIdResponse400 | GetApiScenariosByIdResponse404 | None:
+) -> GetApiScenariosByIdResponse200 | GetApiScenariosByIdResponse404 | None:
     """Get a specific scenario by ID
 
     Args:
@@ -158,7 +152,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetApiScenariosByIdResponse200 | GetApiScenariosByIdResponse400 | GetApiScenariosByIdResponse404
+        GetApiScenariosByIdResponse200 | GetApiScenariosByIdResponse404
     """
 
     return (

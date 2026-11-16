@@ -46,6 +46,9 @@ describe("VirtualizedTableRows", () => {
   beforeEach(() => {
     vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(400);
     vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(800);
+    // virtual-core 3.19 sizes the scroller by its client box, which jsdom leaves at zero.
+    vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(400);
+    vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(800);
   });
 
   afterEach(() => {

@@ -5,7 +5,6 @@ import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
-from ...models.read_named_project_stored_object_bytes_response_400 import ReadNamedProjectStoredObjectBytesResponse400
 from ...types import Response, safe_http_status
 
 
@@ -27,23 +26,14 @@ def _get_kwargs(
     return _kwargs
 
 
-def _parse_response(
-    *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> ReadNamedProjectStoredObjectBytesResponse400 | None:
-    if response.status_code == 400:
-        response_400 = ReadNamedProjectStoredObjectBytesResponse400.from_dict(response.json())
-
-        return response_400
-
+def _parse_response(*, client: AuthenticatedClient | Client, response: httpx.Response) -> Any | None:
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
     else:
         return None
 
 
-def _build_response(
-    *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[ReadNamedProjectStoredObjectBytesResponse400]:
+def _build_response(*, client: AuthenticatedClient | Client, response: httpx.Response) -> Response[Any]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -61,7 +51,7 @@ def sync_detailed(
     filename: str,
     *,
     client: AuthenticatedClient,
-) -> Response[ReadNamedProjectStoredObjectBytesResponse400]:
+) -> Response[Any]:
     """
     Args:
         project_id (str):
@@ -73,7 +63,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ReadNamedProjectStoredObjectBytesResponse400]
+        Response[Any]
     """
 
     kwargs = _get_kwargs(
@@ -89,42 +79,13 @@ def sync_detailed(
     return _build_response(client=client, response=response)
 
 
-def sync(
-    project_id: str,
-    stored_object_id: str,
-    filename: str,
-    *,
-    client: AuthenticatedClient,
-) -> ReadNamedProjectStoredObjectBytesResponse400 | None:
-    """
-    Args:
-        project_id (str):
-        stored_object_id (str):
-        filename (str):
-
-    Raises:
-        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
-        httpx.TimeoutException: If the request takes longer than Client.timeout.
-
-    Returns:
-        ReadNamedProjectStoredObjectBytesResponse400
-    """
-
-    return sync_detailed(
-        project_id=project_id,
-        stored_object_id=stored_object_id,
-        filename=filename,
-        client=client,
-    ).parsed
-
-
 async def asyncio_detailed(
     project_id: str,
     stored_object_id: str,
     filename: str,
     *,
     client: AuthenticatedClient,
-) -> Response[ReadNamedProjectStoredObjectBytesResponse400]:
+) -> Response[Any]:
     """
     Args:
         project_id (str):
@@ -136,7 +97,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ReadNamedProjectStoredObjectBytesResponse400]
+        Response[Any]
     """
 
     kwargs = _get_kwargs(
@@ -148,34 +109,3 @@ async def asyncio_detailed(
     response = await client.get_async_httpx_client().request(**kwargs)
 
     return _build_response(client=client, response=response)
-
-
-async def asyncio(
-    project_id: str,
-    stored_object_id: str,
-    filename: str,
-    *,
-    client: AuthenticatedClient,
-) -> ReadNamedProjectStoredObjectBytesResponse400 | None:
-    """
-    Args:
-        project_id (str):
-        stored_object_id (str):
-        filename (str):
-
-    Raises:
-        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
-        httpx.TimeoutException: If the request takes longer than Client.timeout.
-
-    Returns:
-        ReadNamedProjectStoredObjectBytesResponse400
-    """
-
-    return (
-        await asyncio_detailed(
-            project_id=project_id,
-            stored_object_id=stored_object_id,
-            filename=filename,
-            client=client,
-        )
-    ).parsed

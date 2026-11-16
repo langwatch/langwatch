@@ -7,7 +7,6 @@ from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.put_api_scenarios_by_id_body import PutApiScenariosByIdBody
 from ...models.put_api_scenarios_by_id_response_200 import PutApiScenariosByIdResponse200
-from ...models.put_api_scenarios_by_id_response_400 import PutApiScenariosByIdResponse400
 from ...models.put_api_scenarios_by_id_response_404 import PutApiScenariosByIdResponse404
 from ...types import UNSET, Response, Unset, safe_http_status
 
@@ -37,16 +36,11 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> PutApiScenariosByIdResponse200 | PutApiScenariosByIdResponse400 | PutApiScenariosByIdResponse404 | None:
+) -> PutApiScenariosByIdResponse200 | PutApiScenariosByIdResponse404 | None:
     if response.status_code == 200:
         response_200 = PutApiScenariosByIdResponse200.from_dict(response.json())
 
         return response_200
-
-    if response.status_code == 400:
-        response_400 = PutApiScenariosByIdResponse400.from_dict(response.json())
-
-        return response_400
 
     if response.status_code == 404:
         response_404 = PutApiScenariosByIdResponse404.from_dict(response.json())
@@ -61,7 +55,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[PutApiScenariosByIdResponse200 | PutApiScenariosByIdResponse400 | PutApiScenariosByIdResponse404]:
+) -> Response[PutApiScenariosByIdResponse200 | PutApiScenariosByIdResponse404]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -78,7 +72,7 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     body: PutApiScenariosByIdBody | Unset = UNSET,
-) -> Response[PutApiScenariosByIdResponse200 | PutApiScenariosByIdResponse400 | PutApiScenariosByIdResponse404]:
+) -> Response[PutApiScenariosByIdResponse200 | PutApiScenariosByIdResponse404]:
     """Update an existing scenario
 
     Args:
@@ -90,7 +84,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PutApiScenariosByIdResponse200 | PutApiScenariosByIdResponse400 | PutApiScenariosByIdResponse404]
+        Response[PutApiScenariosByIdResponse200 | PutApiScenariosByIdResponse404]
     """
 
     kwargs = _get_kwargs(
@@ -110,7 +104,7 @@ def sync(
     *,
     client: AuthenticatedClient,
     body: PutApiScenariosByIdBody | Unset = UNSET,
-) -> PutApiScenariosByIdResponse200 | PutApiScenariosByIdResponse400 | PutApiScenariosByIdResponse404 | None:
+) -> PutApiScenariosByIdResponse200 | PutApiScenariosByIdResponse404 | None:
     """Update an existing scenario
 
     Args:
@@ -122,7 +116,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PutApiScenariosByIdResponse200 | PutApiScenariosByIdResponse400 | PutApiScenariosByIdResponse404
+        PutApiScenariosByIdResponse200 | PutApiScenariosByIdResponse404
     """
 
     return sync_detailed(
@@ -137,7 +131,7 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
     body: PutApiScenariosByIdBody | Unset = UNSET,
-) -> Response[PutApiScenariosByIdResponse200 | PutApiScenariosByIdResponse400 | PutApiScenariosByIdResponse404]:
+) -> Response[PutApiScenariosByIdResponse200 | PutApiScenariosByIdResponse404]:
     """Update an existing scenario
 
     Args:
@@ -149,7 +143,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PutApiScenariosByIdResponse200 | PutApiScenariosByIdResponse400 | PutApiScenariosByIdResponse404]
+        Response[PutApiScenariosByIdResponse200 | PutApiScenariosByIdResponse404]
     """
 
     kwargs = _get_kwargs(
@@ -167,7 +161,7 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     body: PutApiScenariosByIdBody | Unset = UNSET,
-) -> PutApiScenariosByIdResponse200 | PutApiScenariosByIdResponse400 | PutApiScenariosByIdResponse404 | None:
+) -> PutApiScenariosByIdResponse200 | PutApiScenariosByIdResponse404 | None:
     """Update an existing scenario
 
     Args:
@@ -179,7 +173,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PutApiScenariosByIdResponse200 | PutApiScenariosByIdResponse400 | PutApiScenariosByIdResponse404
+        PutApiScenariosByIdResponse200 | PutApiScenariosByIdResponse404
     """
 
     return (

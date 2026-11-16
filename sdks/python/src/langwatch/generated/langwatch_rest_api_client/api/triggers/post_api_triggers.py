@@ -10,7 +10,6 @@ from ...models.post_api_triggers_body_type_2 import PostApiTriggersBodyType2
 from ...models.post_api_triggers_body_type_3 import PostApiTriggersBodyType3
 from ...models.post_api_triggers_body_type_4 import PostApiTriggersBodyType4
 from ...models.post_api_triggers_response_201 import PostApiTriggersResponse201
-from ...models.post_api_triggers_response_400 import PostApiTriggersResponse400
 from ...types import Response, safe_http_status
 
 
@@ -48,16 +47,11 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> PostApiTriggersResponse201 | PostApiTriggersResponse400 | None:
+) -> PostApiTriggersResponse201 | None:
     if response.status_code == 201:
         response_201 = PostApiTriggersResponse201.from_dict(response.json())
 
         return response_201
-
-    if response.status_code == 400:
-        response_400 = PostApiTriggersResponse400.from_dict(response.json())
-
-        return response_400
 
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
@@ -67,7 +61,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[PostApiTriggersResponse201 | PostApiTriggersResponse400]:
+) -> Response[PostApiTriggersResponse201]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -87,7 +81,7 @@ def sync_detailed(
     | PostApiTriggersBodyType2
     | PostApiTriggersBodyType3
     | PostApiTriggersBodyType4,
-) -> Response[PostApiTriggersResponse201 | PostApiTriggersResponse400]:
+) -> Response[PostApiTriggersResponse201]:
     """Create an automation. Send `customGraphId` + `graphAlert` for an alert on a metric, `report` for a
     scheduled report, or conditions for a trace automation. The delivery channel is fixed at creation.
 
@@ -100,7 +94,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PostApiTriggersResponse201 | PostApiTriggersResponse400]
+        Response[PostApiTriggersResponse201]
     """
 
     kwargs = _get_kwargs(
@@ -122,7 +116,7 @@ def sync(
     | PostApiTriggersBodyType2
     | PostApiTriggersBodyType3
     | PostApiTriggersBodyType4,
-) -> PostApiTriggersResponse201 | PostApiTriggersResponse400 | None:
+) -> PostApiTriggersResponse201 | None:
     """Create an automation. Send `customGraphId` + `graphAlert` for an alert on a metric, `report` for a
     scheduled report, or conditions for a trace automation. The delivery channel is fixed at creation.
 
@@ -135,7 +129,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PostApiTriggersResponse201 | PostApiTriggersResponse400
+        PostApiTriggersResponse201
     """
 
     return sync_detailed(
@@ -152,7 +146,7 @@ async def asyncio_detailed(
     | PostApiTriggersBodyType2
     | PostApiTriggersBodyType3
     | PostApiTriggersBodyType4,
-) -> Response[PostApiTriggersResponse201 | PostApiTriggersResponse400]:
+) -> Response[PostApiTriggersResponse201]:
     """Create an automation. Send `customGraphId` + `graphAlert` for an alert on a metric, `report` for a
     scheduled report, or conditions for a trace automation. The delivery channel is fixed at creation.
 
@@ -165,7 +159,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PostApiTriggersResponse201 | PostApiTriggersResponse400]
+        Response[PostApiTriggersResponse201]
     """
 
     kwargs = _get_kwargs(
@@ -185,7 +179,7 @@ async def asyncio(
     | PostApiTriggersBodyType2
     | PostApiTriggersBodyType3
     | PostApiTriggersBodyType4,
-) -> PostApiTriggersResponse201 | PostApiTriggersResponse400 | None:
+) -> PostApiTriggersResponse201 | None:
     """Create an automation. Send `customGraphId` + `graphAlert` for an alert on a metric, `report` for a
     scheduled report, or conditions for a trace automation. The delivery channel is fixed at creation.
 
@@ -198,7 +192,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PostApiTriggersResponse201 | PostApiTriggersResponse400
+        PostApiTriggersResponse201
     """
 
     return (

@@ -6,7 +6,6 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.delete_role_response_200 import DeleteRoleResponse200
-from ...models.delete_role_response_400 import DeleteRoleResponse400
 from ...types import Response, safe_http_status
 
 
@@ -24,18 +23,11 @@ def _get_kwargs(
     return _kwargs
 
 
-def _parse_response(
-    *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> DeleteRoleResponse200 | DeleteRoleResponse400 | None:
+def _parse_response(*, client: AuthenticatedClient | Client, response: httpx.Response) -> DeleteRoleResponse200 | None:
     if response.status_code == 200:
         response_200 = DeleteRoleResponse200.from_dict(response.json())
 
         return response_200
-
-    if response.status_code == 400:
-        response_400 = DeleteRoleResponse400.from_dict(response.json())
-
-        return response_400
 
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
@@ -45,7 +37,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[DeleteRoleResponse200 | DeleteRoleResponse400]:
+) -> Response[DeleteRoleResponse200]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -61,7 +53,7 @@ def sync_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
-) -> Response[DeleteRoleResponse200 | DeleteRoleResponse400]:
+) -> Response[DeleteRoleResponse200]:
     """Delete a custom role. A role that anything still holds, a legacy team assignment or a role binding,
     answers 409 custom_role_in_use with the counts in meta. A built-in role answers 409
     role_is_built_in.
@@ -74,7 +66,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[DeleteRoleResponse200 | DeleteRoleResponse400]
+        Response[DeleteRoleResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -92,7 +84,7 @@ def sync(
     id: str,
     *,
     client: AuthenticatedClient,
-) -> DeleteRoleResponse200 | DeleteRoleResponse400 | None:
+) -> DeleteRoleResponse200 | None:
     """Delete a custom role. A role that anything still holds, a legacy team assignment or a role binding,
     answers 409 custom_role_in_use with the counts in meta. A built-in role answers 409
     role_is_built_in.
@@ -105,7 +97,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        DeleteRoleResponse200 | DeleteRoleResponse400
+        DeleteRoleResponse200
     """
 
     return sync_detailed(
@@ -118,7 +110,7 @@ async def asyncio_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
-) -> Response[DeleteRoleResponse200 | DeleteRoleResponse400]:
+) -> Response[DeleteRoleResponse200]:
     """Delete a custom role. A role that anything still holds, a legacy team assignment or a role binding,
     answers 409 custom_role_in_use with the counts in meta. A built-in role answers 409
     role_is_built_in.
@@ -131,7 +123,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[DeleteRoleResponse200 | DeleteRoleResponse400]
+        Response[DeleteRoleResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -147,7 +139,7 @@ async def asyncio(
     id: str,
     *,
     client: AuthenticatedClient,
-) -> DeleteRoleResponse200 | DeleteRoleResponse400 | None:
+) -> DeleteRoleResponse200 | None:
     """Delete a custom role. A role that anything still holds, a legacy team assignment or a role binding,
     answers 409 custom_role_in_use with the counts in meta. A built-in role answers 409
     role_is_built_in.
@@ -160,7 +152,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        DeleteRoleResponse200 | DeleteRoleResponse400
+        DeleteRoleResponse200
     """
 
     return (

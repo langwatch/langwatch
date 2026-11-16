@@ -456,7 +456,8 @@ describe("LensTabs through the tab machine", () => {
       expect(tabs.filter((tab) => tab.tabIndex === 0)).toHaveLength(1);
       expect(screen.getByRole("tab", { selected: true })).toHaveAttribute("tabindex", "0");
       for (const tab of tabs) {
-        expect(tab.getAttribute("data-ownedby")).toBe(tablist.id);
+        // An owner list since zag 1.47: the context-menu trigger adds its own owner.
+        expect(tab.getAttribute("data-ownedby")?.split(" ")).toContain(tablist.id);
         expect(tab.getAttribute("data-value")).toBe(tab.getAttribute("data-lens-slot"));
       }
     });

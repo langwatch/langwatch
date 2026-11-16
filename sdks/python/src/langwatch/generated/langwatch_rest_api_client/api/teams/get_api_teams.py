@@ -5,7 +5,6 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.get_api_teams_response_200 import GetApiTeamsResponse200
-from ...models.get_api_teams_response_400 import GetApiTeamsResponse400
 from ...types import UNSET, Response, Unset, safe_http_status
 
 
@@ -32,18 +31,11 @@ def _get_kwargs(
     return _kwargs
 
 
-def _parse_response(
-    *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> GetApiTeamsResponse200 | GetApiTeamsResponse400 | None:
+def _parse_response(*, client: AuthenticatedClient | Client, response: httpx.Response) -> GetApiTeamsResponse200 | None:
     if response.status_code == 200:
         response_200 = GetApiTeamsResponse200.from_dict(response.json())
 
         return response_200
-
-    if response.status_code == 400:
-        response_400 = GetApiTeamsResponse400.from_dict(response.json())
-
-        return response_400
 
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
@@ -53,7 +45,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[GetApiTeamsResponse200 | GetApiTeamsResponse400]:
+) -> Response[GetApiTeamsResponse200]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -70,7 +62,7 @@ def sync_detailed(
     client: AuthenticatedClient,
     page: int | Unset = 1,
     limit: int | Unset = 50,
-) -> Response[GetApiTeamsResponse200 | GetApiTeamsResponse400]:
+) -> Response[GetApiTeamsResponse200]:
     """List all non-archived teams for the organization (paginated)
 
     Args:
@@ -82,7 +74,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetApiTeamsResponse200 | GetApiTeamsResponse400]
+        Response[GetApiTeamsResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -102,7 +94,7 @@ def sync(
     client: AuthenticatedClient,
     page: int | Unset = 1,
     limit: int | Unset = 50,
-) -> GetApiTeamsResponse200 | GetApiTeamsResponse400 | None:
+) -> GetApiTeamsResponse200 | None:
     """List all non-archived teams for the organization (paginated)
 
     Args:
@@ -114,7 +106,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetApiTeamsResponse200 | GetApiTeamsResponse400
+        GetApiTeamsResponse200
     """
 
     return sync_detailed(
@@ -129,7 +121,7 @@ async def asyncio_detailed(
     client: AuthenticatedClient,
     page: int | Unset = 1,
     limit: int | Unset = 50,
-) -> Response[GetApiTeamsResponse200 | GetApiTeamsResponse400]:
+) -> Response[GetApiTeamsResponse200]:
     """List all non-archived teams for the organization (paginated)
 
     Args:
@@ -141,7 +133,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetApiTeamsResponse200 | GetApiTeamsResponse400]
+        Response[GetApiTeamsResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -159,7 +151,7 @@ async def asyncio(
     client: AuthenticatedClient,
     page: int | Unset = 1,
     limit: int | Unset = 50,
-) -> GetApiTeamsResponse200 | GetApiTeamsResponse400 | None:
+) -> GetApiTeamsResponse200 | None:
     """List all non-archived teams for the organization (paginated)
 
     Args:
@@ -171,7 +163,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetApiTeamsResponse200 | GetApiTeamsResponse400
+        GetApiTeamsResponse200
     """
 
     return (

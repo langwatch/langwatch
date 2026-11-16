@@ -11,7 +11,6 @@ import {
   type LocalCallErrorCode,
   type LocalControlConversation,
   type LocalRegisteredFrame,
-  type LocalToolCall,
   type PermissionDecision,
   type TerminalPermissionDecision,
   type WorkspaceInfo,

@@ -1,10 +1,9 @@
-from typing import Any, cast
+from typing import Any
 
 import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
-from ...models.watch_cli_device_approval_response_400 import WatchCliDeviceApprovalResponse400
 from ...types import UNSET, Response, safe_http_status
 
 
@@ -28,17 +27,9 @@ def _get_kwargs(
     return _kwargs
 
 
-def _parse_response(
-    *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Any | WatchCliDeviceApprovalResponse400 | None:
+def _parse_response(*, client: AuthenticatedClient | Client, response: httpx.Response) -> Any | None:
     if response.status_code == 200:
-        response_200 = cast(Any, None)
-        return response_200
-
-    if response.status_code == 400:
-        response_400 = WatchCliDeviceApprovalResponse400.from_dict(response.json())
-
-        return response_400
+        return None
 
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
@@ -46,9 +37,7 @@ def _parse_response(
         return None
 
 
-def _build_response(
-    *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[Any | WatchCliDeviceApprovalResponse400]:
+def _build_response(*, client: AuthenticatedClient | Client, response: httpx.Response) -> Response[Any]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -64,7 +53,7 @@ def sync_detailed(
     *,
     client: AuthenticatedClient | Client,
     device_code: str,
-) -> Response[Any | WatchCliDeviceApprovalResponse400]:
+) -> Response[Any]:
     """
     Args:
         device_code (str):
@@ -74,7 +63,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Any | WatchCliDeviceApprovalResponse400]
+        Response[Any]
     """
 
     kwargs = _get_kwargs(
@@ -88,34 +77,11 @@ def sync_detailed(
     return _build_response(client=client, response=response)
 
 
-def sync(
-    *,
-    client: AuthenticatedClient | Client,
-    device_code: str,
-) -> Any | WatchCliDeviceApprovalResponse400 | None:
-    """
-    Args:
-        device_code (str):
-
-    Raises:
-        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
-        httpx.TimeoutException: If the request takes longer than Client.timeout.
-
-    Returns:
-        Any | WatchCliDeviceApprovalResponse400
-    """
-
-    return sync_detailed(
-        client=client,
-        device_code=device_code,
-    ).parsed
-
-
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient | Client,
     device_code: str,
-) -> Response[Any | WatchCliDeviceApprovalResponse400]:
+) -> Response[Any]:
     """
     Args:
         device_code (str):
@@ -125,7 +91,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Any | WatchCliDeviceApprovalResponse400]
+        Response[Any]
     """
 
     kwargs = _get_kwargs(
@@ -135,28 +101,3 @@ async def asyncio_detailed(
     response = await client.get_async_httpx_client().request(**kwargs)
 
     return _build_response(client=client, response=response)
-
-
-async def asyncio(
-    *,
-    client: AuthenticatedClient | Client,
-    device_code: str,
-) -> Any | WatchCliDeviceApprovalResponse400 | None:
-    """
-    Args:
-        device_code (str):
-
-    Raises:
-        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
-        httpx.TimeoutException: If the request takes longer than Client.timeout.
-
-    Returns:
-        Any | WatchCliDeviceApprovalResponse400
-    """
-
-    return (
-        await asyncio_detailed(
-            client=client,
-            device_code=device_code,
-        )
-    ).parsed

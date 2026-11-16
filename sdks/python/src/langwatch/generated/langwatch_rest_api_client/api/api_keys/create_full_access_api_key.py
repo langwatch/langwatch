@@ -6,7 +6,6 @@ from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.create_full_access_api_key_body import CreateFullAccessApiKeyBody
 from ...models.create_full_access_api_key_response_201 import CreateFullAccessApiKeyResponse201
-from ...models.create_full_access_api_key_response_400 import CreateFullAccessApiKeyResponse400
 from ...types import Response, safe_http_status
 
 
@@ -31,16 +30,11 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Any | CreateFullAccessApiKeyResponse201 | CreateFullAccessApiKeyResponse400 | None:
+) -> Any | CreateFullAccessApiKeyResponse201 | None:
     if response.status_code == 201:
         response_201 = CreateFullAccessApiKeyResponse201.from_dict(response.json())
 
         return response_201
-
-    if response.status_code == 400:
-        response_400 = CreateFullAccessApiKeyResponse400.from_dict(response.json())
-
-        return response_400
 
     if response.status_code == 401:
         response_401 = cast(Any, None)
@@ -62,7 +56,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[Any | CreateFullAccessApiKeyResponse201 | CreateFullAccessApiKeyResponse400]:
+) -> Response[Any | CreateFullAccessApiKeyResponse201]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -78,7 +72,7 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     body: CreateFullAccessApiKeyBody,
-) -> Response[Any | CreateFullAccessApiKeyResponse201 | CreateFullAccessApiKeyResponse400]:
+) -> Response[Any | CreateFullAccessApiKeyResponse201]:
     r"""Create a full-access API key
 
      Mint the caller's own API key for the project their sign-in session is bound to, as `langwatch login
@@ -96,7 +90,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Any | CreateFullAccessApiKeyResponse201 | CreateFullAccessApiKeyResponse400]
+        Response[Any | CreateFullAccessApiKeyResponse201]
     """
 
     kwargs = _get_kwargs(
@@ -114,7 +108,7 @@ def sync(
     *,
     client: AuthenticatedClient,
     body: CreateFullAccessApiKeyBody,
-) -> Any | CreateFullAccessApiKeyResponse201 | CreateFullAccessApiKeyResponse400 | None:
+) -> Any | CreateFullAccessApiKeyResponse201 | None:
     r"""Create a full-access API key
 
      Mint the caller's own API key for the project their sign-in session is bound to, as `langwatch login
@@ -132,7 +126,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Any | CreateFullAccessApiKeyResponse201 | CreateFullAccessApiKeyResponse400
+        Any | CreateFullAccessApiKeyResponse201
     """
 
     return sync_detailed(
@@ -145,7 +139,7 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
     body: CreateFullAccessApiKeyBody,
-) -> Response[Any | CreateFullAccessApiKeyResponse201 | CreateFullAccessApiKeyResponse400]:
+) -> Response[Any | CreateFullAccessApiKeyResponse201]:
     r"""Create a full-access API key
 
      Mint the caller's own API key for the project their sign-in session is bound to, as `langwatch login
@@ -163,7 +157,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Any | CreateFullAccessApiKeyResponse201 | CreateFullAccessApiKeyResponse400]
+        Response[Any | CreateFullAccessApiKeyResponse201]
     """
 
     kwargs = _get_kwargs(
@@ -179,7 +173,7 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     body: CreateFullAccessApiKeyBody,
-) -> Any | CreateFullAccessApiKeyResponse201 | CreateFullAccessApiKeyResponse400 | None:
+) -> Any | CreateFullAccessApiKeyResponse201 | None:
     r"""Create a full-access API key
 
      Mint the caller's own API key for the project their sign-in session is bound to, as `langwatch login
@@ -197,7 +191,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Any | CreateFullAccessApiKeyResponse201 | CreateFullAccessApiKeyResponse400
+        Any | CreateFullAccessApiKeyResponse201
     """
 
     return (
