@@ -463,6 +463,21 @@ func TestPRReviewBotRejectsExtraPermissions(t *testing.T) {
 	assert.Contains(t, strings.Join(problems, "\n"), "extra")
 }
 
+// The extra-key message lists every required key, so it never tells a reader
+// to drop a grant the guard then reports as missing.
+// @scenario "The review workflow grants exactly actions read, checks read, contents write and pull-requests write"
+func TestPRReviewBotExtraPermissionMessageNamesEveryRequiredKey(t *testing.T) {
+	withExtra := strings.Replace(goodPRReviewBotWorkflow,
+		"      pull-requests: write",
+		"      pull-requests: write\n      issues: write", 1)
+	require.NotEqual(t, goodPRReviewBotWorkflow, withExtra, "the mutation must apply")
+
+	problems, err := ciguard.PRReviewBot(writePRReviewBotWorkflow(t, withExtra))
+
+	require.NoError(t, err)
+	assert.Contains(t, strings.Join(problems, "\n"), "only actions, checks, contents, pull-requests are needed")
+}
+
 // @scenario "The review workflow grants exactly actions read, checks read, contents write and pull-requests write"
 func TestPRReviewBotUsesJobLevelPermissionsWhenPresent(t *testing.T) {
 	overridden := strings.Replace(goodPRReviewBotWorkflow, prWorkflowPermissionsBlock,

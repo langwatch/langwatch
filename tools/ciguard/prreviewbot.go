@@ -369,10 +369,12 @@ func comparePRReviewBotPermissionScopes(scopes map[string]string) []string {
 	}
 	sort.Strings(grantedKeys)
 
+	// Named from requiredKeys, so the message cannot drift from the map.
 	for _, key := range grantedKeys {
 		if _, required := prReviewBotRequiredPermissions[key]; !required {
 			problems = append(problems, fmt.Sprintf(
-				"%s permissions block has extra key %q (only checks, contents and pull-requests are needed)", PRReviewBotWorkflow, key))
+				"%s permissions block has extra key %q (only %s are needed)",
+				PRReviewBotWorkflow, key, strings.Join(requiredKeys, ", ")))
 		}
 	}
 
