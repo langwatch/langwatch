@@ -1,6 +1,16 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { Temporal } from "@langwatch/time";
+import type { ReactNode } from "react";
+
+/** Draws a `control: "custom"` field; the value stays one string in the form's state. */
+export type CustomControlRenderer = (args: {
+  field: FieldDef;
+  value: string;
+  onChange: (next: string) => void;
+  isInvalid: boolean;
+  readOnly: boolean;
+}) => ReactNode;
 
 export interface FieldDef {
   key: string;
@@ -74,7 +84,13 @@ export interface FieldDef {
    * almost everyone: a two-entry select asks the admin to read both lines to
    * find out it was already decided for them.
    */
-  control?: "select" | "date" | "switch";
+  control?: "select" | "date" | "switch" | "custom";
+  /**
+   * True for a pasted multi-line value (a JSON key file), rendered as a textarea. A `custom`
+   * control is drawn by the caller's `renderCustomControl`; the form still owns its label,
+   * required marker, hint and the complaint under it.
+   */
+  multiline?: boolean;
   /**
    * Where a `control: "switch"` sits before anyone touches it.
    *
@@ -167,6 +183,7 @@ export interface FieldOption {
 export type FieldControl =
   | { kind: "text"; hint?: string }
   | { kind: "date"; hint?: string }
+  | { kind: "custom"; hint?: string }
   | { kind: "select"; options: readonly FieldOption[]; hint?: string }
   | {
       kind: "switch";
@@ -189,6 +206,7 @@ export function fieldControl({
 }): FieldControl {
   const hint = field.contextHint?.(values);
   if (field.control === "date") return { kind: "date", hint };
+  if (field.control === "custom") return { kind: "custom", hint };
   if (field.control === "switch") {
     return {
       kind: "switch",

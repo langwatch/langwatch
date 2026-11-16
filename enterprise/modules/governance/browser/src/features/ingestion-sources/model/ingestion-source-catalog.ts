@@ -211,6 +211,27 @@ export const SOURCE_TYPE_OPTIONS = [
     routesConversations: true,
   },
   {
+    value: "aws_bedrock_agents",
+    label: "AWS Bedrock agents",
+    mode: "pull",
+    blurb:
+      "Lists the Bedrock Agents and Bedrock AgentCore runtimes in the regions you name, signing in with an AWS connection.",
+  },
+  {
+    value: "gcp_vertex_agent_engine",
+    label: "Google Cloud Vertex AI agents",
+    mode: "pull",
+    blurb:
+      "Lists the Vertex AI Agent Engine reasoning engines in the projects and locations you name, signing in with a service account key.",
+  },
+  {
+    value: "ard_registry",
+    label: "ARD agent registry",
+    mode: "pull",
+    blurb:
+      "Lists the agents an Agent Registry Discovery registry publishes in its manifest and, if it has one, its search endpoint.",
+  },
+  {
     value: "s3_custom",
     label: "Custom S3 audit log",
     mode: "s3",

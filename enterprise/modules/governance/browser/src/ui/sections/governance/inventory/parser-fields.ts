@@ -154,7 +154,7 @@ export function parserFieldPresentation({
   const keepsStoredSecret = isSecret && mode === "edit";
   return {
     isSecret,
-    isMultiline: field.key === "parserDsl" || field.key === "eventMappingDsl",
+    isMultiline: !!field.multiline || field.key === "parserDsl" || field.key === "eventMappingDsl",
     isRequired: !!field.required && !keepsStoredSecret,
     // Create's hint tells them where to generate a key, which read on the edit
     // form would suggest they have to — and re-typing a key they do not have

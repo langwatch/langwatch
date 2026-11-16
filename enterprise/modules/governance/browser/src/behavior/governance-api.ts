@@ -6,7 +6,9 @@ import type {
   activityMonitorTrpc,
   aiToolsTrpc,
   governanceAgentsTrpc,
+  governanceRegistryTrpc,
   governanceCostTrpc,
+  governanceKillSwitchTrpc,
   governancePeopleTrpc,
   sessionPolicyTrpc,
   AnomalyRule,
@@ -21,6 +23,7 @@ import type {
   OttlStarterTemplate,
   OttlValidationResult,
   QuarantineFillStats,
+  TestAgentListingResult,
 } from "@langwatch/enterprise-governance-contract";
 import type * as enterpriseGovernanceContractModule from "@langwatch/enterprise-governance-contract";
 
@@ -94,8 +97,10 @@ export type GovernanceApiMap = ContractApiMap<typeof activityMonitorTrpc> &
   ContractApiMap<typeof sessionPolicyTrpc> &
   ContractApiMap<typeof governancePeopleTrpc> &
   ContractApiMap<typeof governanceAgentsTrpc> &
+  ContractApiMap<typeof governanceRegistryTrpc> &
   ContractApiMap<typeof aiToolsTrpc> &
-  ContractApiMap<typeof governanceCostTrpc> & {
+  ContractApiMap<typeof governanceCostTrpc> &
+  ContractApiMap<typeof governanceKillSwitchTrpc> & {
     modelProvider: {
       getResolvedDefault: {
         query: {
@@ -286,6 +291,23 @@ export type GovernanceApiMap = ContractApiMap<typeof activityMonitorTrpc> &
         mutation: {
           input: { organizationId: string; statements: string[] };
           output: OttlValidationResult;
+        };
+      };
+      testAgentListing: {
+        mutation: {
+          input: {
+            organizationId: string;
+            sourceType: GovernanceIngestionSourceType;
+            config: Record<string, unknown>;
+            credentials?: Record<string, string>;
+          };
+          output: TestAgentListingResult;
+        };
+      };
+      testAgentListingForSource: {
+        mutation: {
+          input: { organizationId: string; sourceId: string };
+          output: TestAgentListingResult;
         };
       };
     };
