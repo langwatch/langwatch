@@ -63,8 +63,8 @@ const REGION_RETRY_AFTER_MS = 30_000;
 
 /**
  * The region for an S3 client that knows its bucket: the shared rule's answer when it has one,
- * else a provider that tries AWS_REGION or the profile, then asks AWS where the bucket lives
- * (tasks#1192). One lookup is shared by concurrent calls and kept; a failure is retried later.
+ * else a provider that tries AWS_REGION or the profile, then asks AWS where the bucket lives,
+ * then the EC2 host's region (tasks#1192). One lookup is shared and kept; a failure is retried.
  */
 export function s3RegionFor({
   region,
@@ -72,6 +72,7 @@ export function s3RegionFor({
   bucket,
   askBucket,
   configured = configuredRegion,
+  hostRegion = instanceRegion,
   now = Date.now,
 }: {
   region?: string;
@@ -79,6 +80,7 @@ export function s3RegionFor({
   bucket: string;
   askBucket: () => Promise<S3BucketRegionAnswer>;
   configured?: () => Promise<string | undefined>;
+  hostRegion?: () => Promise<string | undefined>;
   now?: () => number;
 }): string | (() => Promise<string>) {
   const named = s3RegionOf({ region, endpoint });
@@ -93,9 +95,10 @@ export function s3RegionFor({
     if (fromSetting) return fromSetting;
     const answer = await askBucket().catch((): S3BucketRegionAnswer => ({ kind: "unknown" }));
     if (answer.kind === "found") return answer.region;
-    throw answer.kind === "missing"
-      ? new S3BucketNotFoundError(bucket)
-      : new S3RegionNotFoundError(bucket);
+    if (answer.kind === "missing") throw new S3BucketNotFoundError(bucket);
+    const fromHost = await hostRegion();
+    if (fromHost) return fromHost;
+    throw new S3RegionNotFoundError(bucket);
   };
 
   return async () => {
@@ -129,6 +132,17 @@ async function configuredRegion(): Promise<string | undefined> {
       { ...NODE_REGION_CONFIG_OPTIONS, default: () => undefined },
       NODE_REGION_CONFIG_FILE_OPTIONS,
     )();
+    return region?.trim() || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** The EC2 host's region from instance metadata: the last resort, as the SDK used it before. */
+async function instanceRegion(): Promise<string | undefined> {
+  try {
+    const fallback = NODE_REGION_CONFIG_OPTIONS.default;
+    const region = typeof fallback === "function" ? await fallback() : fallback;
     return region?.trim() || undefined;
   } catch {
     return undefined;

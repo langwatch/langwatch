@@ -31,4 +31,27 @@ describe("s3RegionFor() on a host whose metadata names another region", () => {
     await expect(region()).resolves.toBe("eu-west-1");
     expect(askBucket).toHaveBeenCalledTimes(1);
   });
+
+  describe("when the bucket cannot be asked, as from a subnet with no route to AWS's global endpoint", () => {
+    /** @scenario "The host's region is the last resort when the bucket cannot be asked" */
+    it("falls back to the host's region, as releases before 3.24 did", async () => {
+      const askBucket = vi.fn(async () => ({ kind: "unknown" as const }));
+
+      const region = s3RegionFor({ bucket: "objects", askBucket });
+
+      if (typeof region === "string") throw new Error("No region is named, so it is looked up.");
+      await expect(region()).resolves.toBe("us-east-1");
+    });
+  });
+
+  describe("when AWS says the bucket does not exist", () => {
+    it("says so rather than guessing the host's region", async () => {
+      const askBucket = vi.fn(async () => ({ kind: "missing" as const }));
+
+      const region = s3RegionFor({ bucket: "objects", askBucket });
+
+      if (typeof region === "string") throw new Error("No region is named, so it is looked up.");
+      await expect(region()).rejects.toMatchObject({ code: "s3_bucket_not_found" });
+    });
+  });
 });

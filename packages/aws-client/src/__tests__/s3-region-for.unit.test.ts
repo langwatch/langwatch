@@ -76,6 +76,7 @@ describe("s3RegionFor()", () => {
         bucket: "objects",
         askBucket,
         configured: unset,
+        hostRegion: unset,
         now: () => now,
       });
 
@@ -93,7 +94,12 @@ describe("s3RegionFor()", () => {
       const askBucket = vi.fn(async (): Promise<S3BucketRegionAnswer> => {
         throw new Error("connect ETIMEDOUT");
       });
-      const region = s3RegionFor({ bucket: "objects", askBucket, configured: unset });
+      const region = s3RegionFor({
+        bucket: "objects",
+        askBucket,
+        configured: unset,
+        hostRegion: unset,
+      });
 
       await expect(resolve(region)).rejects.toMatchObject({ code: "s3_region_not_found" });
     });

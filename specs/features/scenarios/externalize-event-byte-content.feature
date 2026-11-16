@@ -526,8 +526,14 @@ Feature: Externalize event byte content to stored_objects
     Then AWS is asked where the bucket lives only once
 
   @unit
+  Scenario: The host's region is the last resort when the bucket cannot be asked
+    Given no region is set, AWS's global endpoint cannot be reached, and the EC2 host names its region
+    When the stored-objects client first talks to S3
+    Then it uses the host's region, as releases before 3.24 did
+
+  @unit
   Scenario: A region that cannot be found names the setting that fixes it
-    Given AWS cannot be reached or names no region for the bucket
+    Given AWS cannot be reached or names no region for the bucket, and the host names none either
     When the stored-objects client talks to S3
     Then the call fails with an error naming S3_REGION and the Helm value app.dataplane.providers.awsS3.region
     And the lookup is tried again on a later call, after a short pause
