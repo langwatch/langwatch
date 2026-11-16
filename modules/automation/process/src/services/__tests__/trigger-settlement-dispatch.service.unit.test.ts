@@ -518,9 +518,7 @@ describe("AutomationSettlementDispatchService", () => {
       const refusal = webhookReceiverRefusal({ status: 503, retryable: true });
       const fixture = refusedBy(refusal);
 
-      await expect(fixture.service.notifyDigest(digest, settlementContext())).rejects.toBe(
-        refusal,
-      );
+      await expect(fixture.service.notifyDigest(digest, settlementContext())).rejects.toBe(refusal);
       expect(fixture.observability.captures).toEqual([]);
       expect(loggerWarn).toHaveBeenCalledWith(
         { ...where, attempt: 1, status: 503, retryable: true, suppressedRefusals: 0 },

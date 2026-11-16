@@ -15,10 +15,9 @@ import type {
 } from "../repositories/webhook-endpoint.repository.ts";
 import {
   judgeWebhookDelivery,
-  WebhookReceiverError,
   type WebhookSendResult,
 } from "../rules/webhook-delivery-classification.rules.ts";
-import type { WebhookEgressService } from "./webhook-egress.service.ts";
+import { type WebhookEgressService, WebhookReceiverError } from "./webhook-egress.service.ts";
 
 const logger = createLogger("langwatch:webhook-delivery");
 

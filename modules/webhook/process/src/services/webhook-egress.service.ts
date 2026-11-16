@@ -1,10 +1,12 @@
-import { isDispatchError } from "@langwatch/eventing";
+import { DispatchError, isDispatchError } from "@langwatch/eventing";
 import { generate } from "@langwatch/ksuid";
 import { nowInstant } from "@langwatch/time";
 import {
   sanitizeWebhookHeaders,
   WEBHOOK_HEADER_VALUE_KEPT,
+  WEBHOOK_RECEIVER_FAILURE,
   type WebhookMethod,
+  type WebhookReceiverFailure,
   type WebhookSignatureScheme,
 } from "@langwatch/webhook-contract";
 
@@ -13,7 +15,6 @@ import {
   WEBHOOK_DELIVERY_ATTEMPT_HEADER,
   WEBHOOK_EVENT_ID_HEADER,
   WEBHOOK_TEST_FIRE_HEADER,
-  WebhookReceiverError,
   type WebhookSendResult,
 } from "../rules/webhook-delivery-classification.rules.ts";
 import {
@@ -24,6 +25,23 @@ import {
 import { describeTransportFailure } from "../rules/webhook-transport-failure.rules.ts";
 import { judgeWebhookUrl, webhookUrlValidator } from "../rules/webhook-url-policy.rules.ts";
 import type { WebhookDispatchCapService } from "./webhook-dispatch-cap.service.ts";
+
+/**
+ * A refusal the customer's own receiver caused: a non-2xx answer, or no answer at all.
+ * Its name stays `DispatchError`, which the outbox reads; callers tell it apart by
+ * {@link WEBHOOK_RECEIVER_FAILURE} (`findWebhookReceiverFailure` in the contract).
+ */
+export class WebhookReceiverError extends DispatchError {
+  readonly [WEBHOOK_RECEIVER_FAILURE]: WebhookReceiverFailure;
+
+  constructor({
+    status,
+    ...refusal
+  }: ConstructorParameters<typeof DispatchError>[0] & { status: number | null }) {
+    super(refusal);
+    this[WEBHOOK_RECEIVER_FAILURE] = { status, retryable: refusal.retryable };
+  }
+}
 
 export interface WebhookSendInput {
   url: string;

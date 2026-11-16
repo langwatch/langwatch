@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  findWebhookReceiverFailure,
-  WEBHOOK_RECEIVER_FAILURE,
-} from "../webhook-receiver-failure.ts";
+import { findWebhookReceiverFailure, WEBHOOK_RECEIVER_FAILURE } from "../webhook-request.ts";
 
 function marked(failure: unknown): Error {
   return Object.assign(new Error("Webhook received HTTP 404"), {
