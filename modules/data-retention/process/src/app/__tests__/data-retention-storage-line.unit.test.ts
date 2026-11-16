@@ -71,4 +71,28 @@ describe("DataRetentionModule storage line", () => {
       });
     });
   });
+
+  describe("when the same length is saved through each write", () => {
+    it("lets only the billed write add the storage line", async () => {
+      const calls: RetentionStorageReport[] = [];
+      const app = createDataRetentionTestApp({
+        dependencies: {
+          billing: createApiFixture<BillingApi>({
+            recordRetentionStorage: async (input: RetentionStorageReport) => {
+              calls.push(input);
+              return { line: "absent", reportedGbMonths: null };
+            },
+          }),
+        },
+      });
+
+      await app.changeScopeRetention(change());
+      await app.changeBilledScopeRetention({ ...change(), organizationId });
+
+      expect(calls.map((call) => "addLine" in call && call.addLine === true)).toEqual([
+        false,
+        true,
+      ]);
+    });
+  });
 });

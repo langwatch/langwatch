@@ -4153,6 +4153,11 @@ const presentations = {
       return `${need} Ask an administrator, or set the length on a scope you manage.`.trim();
     },
   },
+  data_retention_billed_through_billing: {
+    title: "This retention length is billed",
+    describe: () =>
+      "Keeping data longer than 90 days adds storage to the organization's bill, so it needs subscription:manage. Ask a billing administrator, or pick 90 days or less.",
+  },
   data_retention_disable_forbidden: {
     title: "Keeping data forever isn't available",
     describe: () =>

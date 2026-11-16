@@ -25,26 +25,47 @@ import {
 } from "../../../model/data-retention-host.ts";
 import DataRetentionScreen from "../data-retention.screen.tsx";
 
+type StoredPastRetention = {
+  projectCount: number;
+  traces: { rows: number; retentionDays: number | null };
+  scenarios: { rows: number; retentionDays: number | null };
+  experiments: { rows: number; retentionDays: number | null };
+};
+
+/** A count answer with every category at 90 days; a category left out holds nothing. */
+function storedPast({
+  traces = 0,
+  scenarios = 0,
+  experiments = 0,
+  projectCount = 1,
+}: Partial<Record<"traces" | "scenarios" | "experiments" | "projectCount", number>>) {
+  return {
+    projectCount,
+    traces: { rows: traces, retentionDays: 91 },
+    scenarios: { rows: scenarios, retentionDays: 91 },
+    experiments: { rows: experiments, retentionDays: 91 },
+  };
+}
+
 const {
   snapshotRef,
   invalidate,
   previewScopeRemoval,
   removeForScope,
   setForScope,
+  setBilledForScope,
   killMutation,
   storedPastRef,
   fetchStoredPast,
   applyScope,
 } = vi.hoisted(() => ({
   storedPastRef: {
-    current: { rows: 0, retentionDays: null as number | null },
+    current: storedPast({ traces: 0 }),
   },
-  fetchStoredPast: vi.fn(
-    async (input: unknown): Promise<{ rows: number; retentionDays: number | null }> => {
-      void input;
-      return { rows: 1234, retentionDays: 91 };
-    },
-  ),
+  fetchStoredPast: vi.fn(async (input: unknown): Promise<StoredPastRetention> => {
+    void input;
+    return storedPast({ traces: 1234, scenarios: 5, experiments: 0, projectCount: 3 });
+  }),
   applyScope: vi.fn(async (input: unknown) => {
     void input;
   }),
@@ -56,13 +77,19 @@ const {
   removeForScope: vi.fn(async (request: unknown) => {
     void request;
   }),
-  setForScope: vi.fn(async () => undefined),
+  setForScope: vi.fn(async (input: unknown) => {
+    void input;
+  }),
+  setBilledForScope: vi.fn(async (input: unknown) => {
+    void input;
+  }),
   killMutation: vi.fn(),
   snapshotRef: {
     current: {
       projectId: "proj-1",
       effective: { traces: 49, scenarios: 49, experiments: 49 },
       canConfigureRetention: true,
+      storageBilled: false,
       available: {
         organization: { id: "org-1", name: "Acme" },
         teams: [{ id: "team-1", name: "Platform" }],
@@ -112,6 +139,9 @@ vi.mock("../../../behavior/data-retention-api.ts", () => ({
         useQuery: () => ({ data: [], refetch: vi.fn() }),
       },
       setForScope: { useMutation: () => ({ mutateAsync: setForScope, isPending: false }) },
+      setBilledForScope: {
+        useMutation: () => ({ mutateAsync: setBilledForScope, isPending: false }),
+      },
       removeForScope: {
         useMutation: () => ({ mutateAsync: removeForScope, isPending: false }),
       },
@@ -223,8 +253,9 @@ function renderScreen(host: TestRetentionHost, { isSaaS }: { isSaaS?: boolean } 
 describe("given the retention policies page", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    storedPastRef.current = { rows: 0, retentionDays: null };
+    storedPastRef.current = storedPast({ traces: 0 });
     snapshotRef.current.canConfigureRetention = true;
+    snapshotRef.current.storageBilled = false;
     snapshotRef.current.effective = { traces: 49, scenarios: 49, experiments: 49 };
     snapshotRef.current.rules = [
       {
@@ -391,11 +422,13 @@ describe("given the retention policies page", () => {
     }
 
     /** @scenario "A shorter period asks to apply it with a count" */
-    it("asks to apply it, naming how many stored traces it would remove", async () => {
+    it("asks to apply it, naming every category it would remove from and how many projects", async () => {
       await saveTeamPolicy(new TestRetentionHost());
 
       expect(
-        await screen.findByText(/1,234 traces older than 90 days will be deleted within a day\./),
+        await screen.findByText(
+          /1,234 traces older than 90 days, 5 scenario runs older than 90 days and 0 experiment runs older than 90 days will be deleted within a day, across 3 projects\./,
+        ),
       ).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Apply now" })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Not now" })).toBeInTheDocument();
@@ -419,12 +452,12 @@ describe("given the retention policies page", () => {
         scope: { scopeType: "TEAM", scopeId: "team-1" },
       });
       expect(host.successes.at(-1)?.title).toBe(
-        "Traces past the new period will be deleted within a day",
+        "Stored data past the new period will be deleted within a day",
       );
     });
 
     it("asks nothing when no stored data is past the new period", async () => {
-      fetchStoredPast.mockResolvedValueOnce({ rows: 0, retentionDays: null });
+      fetchStoredPast.mockResolvedValueOnce(storedPast({}));
       await saveTeamPolicy(new TestRetentionHost());
 
       await waitFor(() => expect(fetchStoredPast).toHaveBeenCalled());
@@ -436,7 +469,7 @@ describe("given the retention policies page", () => {
       fetchStoredPast.mockRejectedValueOnce(new Error("clickhouse down"));
       await saveTeamPolicy(new TestRetentionHost());
 
-      expect(await screen.findByText(/We couldn't count the stored traces/)).toBeInTheDocument();
+      expect(await screen.findByText(/We couldn't count the stored data/)).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Apply now" })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Not now" })).toBeInTheDocument();
       expect(applyScope).not.toHaveBeenCalled();
@@ -446,17 +479,18 @@ describe("given the retention policies page", () => {
   describe("when stored data under the scope in view is past its period", () => {
     /** @scenario "Not now leaves a note with an Apply button" */
     it("notes how many traces still use the old period and applies it after the prompt", async () => {
-      storedPastRef.current = {
-        rows: 1234,
-        retentionDays: 91,
-      };
+      storedPastRef.current = storedPast({ traces: 1234, experiments: 2, projectCount: 2 });
       const user = userEvent.setup();
       renderScreen(new TestRetentionHost());
 
-      expect(screen.getByText("1,234 traces still use the old period")).toBeInTheDocument();
+      expect(
+        screen.getByText("1,234 traces and 2 experiment runs still use the old period"),
+      ).toBeInTheDocument();
       await user.click(screen.getByRole("button", { name: "Apply" }));
       expect(
-        await screen.findByText(/1,234 traces older than 90 days will be deleted within a day\./),
+        await screen.findByText(
+          /1,234 traces older than 90 days, 0 scenario runs older than 90 days and 2 experiment runs older than 90 days will be deleted within a day, across 2 projects\./,
+        ),
       ).toBeInTheDocument();
       expect(applyScope).not.toHaveBeenCalled();
       await user.click(screen.getByRole("button", { name: "Apply now" }));
@@ -467,6 +501,70 @@ describe("given the retention policies page", () => {
         organizationId: "org-1",
         scope: { scopeType: "ORGANIZATION", scopeId: "org-1" },
       });
+    });
+  });
+});
+
+describe("given a plan that bills storage above 90 days", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    storedPastRef.current = storedPast({});
+    fetchStoredPast.mockResolvedValue(storedPast({}));
+    snapshotRef.current.canConfigureRetention = true;
+    snapshotRef.current.storageBilled = true;
+  });
+
+  async function pickAndSave({ host, label }: { host: TestRetentionHost; label: string }) {
+    const user = userEvent.setup();
+    renderScreen(host);
+    await user.click(screen.getByRole("button", { name: "Actions for Platform" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Edit" }));
+    await user.click(await screen.findByRole("combobox", { name: "Retention" }));
+    await user.click(await screen.findByRole("option", { name: label }));
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+  }
+
+  describe("when a reader with subscription:manage saves 1 year and then 90 days", () => {
+    /** @scenario "The settings page saves a billed length through the billed write" */
+    it("saves 1 year through the billed write and 90 days through the scope write", async () => {
+      const host = new TestRetentionHost({}, new Set(["project:view", "subscription:manage"]));
+      await pickAndSave({ host, label: "1 year" });
+
+      await waitFor(() => expect(setBilledForScope).toHaveBeenCalledTimes(3));
+      expect(setBilledForScope).toHaveBeenCalledWith(
+        expect.objectContaining({ organizationId: "org-1", retentionDays: 371 }),
+      );
+      expect(setForScope).not.toHaveBeenCalled();
+    });
+
+    it("saves 90 days through the scope write", async () => {
+      const host = new TestRetentionHost({}, new Set(["project:view", "subscription:manage"]));
+      await pickAndSave({ host, label: "90 days" });
+
+      await waitFor(() => expect(setForScope).toHaveBeenCalledTimes(3));
+      expect(setBilledForScope).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a reader without subscription:manage opens the retention menu", () => {
+    /** @scenario "A reader without subscription:manage is not offered a billed length" */
+    it("disables 180 days and 1 year, saying they need billing access", async () => {
+      const user = userEvent.setup();
+      renderScreen(new TestRetentionHost());
+      await user.click(screen.getByRole("button", { name: "Actions for Platform" }));
+      await user.click(await screen.findByRole("menuitem", { name: "Edit" }));
+      await user.click(await screen.findByRole("combobox", { name: "Retention" }));
+
+      for (const label of ["180 days (needs billing access)", "1 year (needs billing access)"]) {
+        expect(await screen.findByRole("option", { name: label })).toHaveAttribute(
+          "aria-disabled",
+          "true",
+        );
+      }
+      expect(screen.getByRole("option", { name: "90 days" })).not.toHaveAttribute(
+        "aria-disabled",
+        "true",
+      );
     });
   });
 });

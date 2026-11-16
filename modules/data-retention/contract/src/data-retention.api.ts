@@ -103,6 +103,15 @@ export interface DataRetentionApi {
       retentionDays: number;
     } & RetentionCallerInput,
   ): Promise<RetentionPolicy>;
+  /** Asked `subscription:manage` at the door: any length, a billed one included. */
+  changeBilledScopeRetention(
+    input: {
+      organizationId: string;
+      scope: ScopeAssignment;
+      category: RetentionCategory;
+      retentionDays: number;
+    } & RetentionCallerInput,
+  ): Promise<RetentionPolicy>;
   removeForScope(
     input: {
       organizationId?: string;

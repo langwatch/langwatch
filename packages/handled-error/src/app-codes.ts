@@ -221,6 +221,7 @@ export const APP_ERROR_CODES = [
   "data_privacy_scope_outside_organization",
   "data_privacy_scope_target_not_found",
   "data_privacy_scope_write_forbidden",
+  "data_retention_billed_through_billing",
   "data_retention_disable_forbidden",
   "data_retention_length_below_plan_minimum",
   "data_retention_length_not_on_plan",

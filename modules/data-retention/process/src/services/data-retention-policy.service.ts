@@ -5,8 +5,10 @@
  */
 import {
   ENTERPRISE_CUSTOM_MIN_RETENTION_DAYS,
+  GROWTH_INCLUDED_RETENTION_DAYS,
   INDEFINITE_RETENTION_DAYS,
   PAID_RETENTION_PRESET_DAYS,
+  RetentionBilledThroughBillingError,
   RetentionDisableForbiddenError,
   RetentionLengthBelowPlanMinimumError,
   RetentionLengthNotOnPlanError,
@@ -90,6 +92,14 @@ export class DataRetentionPolicyService {
     }
   }
 
+  /** Whether `retentionDays` adds storage to the bill of an organization on `plan`. */
+  static billsStorage(plan: DataRetentionPlan, retentionDays: number): boolean {
+    if (!plan.billsStorage) return false;
+    return (
+      retentionDays === INDEFINITE_RETENTION_DAYS || retentionDays > GROWTH_INCLUDED_RETENTION_DAYS
+    );
+  }
+
   static create(options: DataRetentionPolicyServiceOptions): DataRetentionPolicyService {
     return new DataRetentionPolicyService(options);
   }
@@ -162,11 +172,15 @@ export class DataRetentionPolicyService {
     DataRetentionPolicyService.assertPlanConfigurable(plan);
   }
 
-  /** The full write gate for a NEW value: the plan once, then the free gate and the value gate. */
+  /**
+   * The full write gate for a NEW value: the plan once, then the free gate and the value gate. A
+   * `scope` write refuses a length that bills storage; only the `billing` write may set one.
+   */
   async assertWriteAllowed(input: {
     actor: RetentionActor;
     organizationId: string;
     retentionDays: number;
+    through: "scope" | "billing";
   }): Promise<void> {
     const plan = await this.options.plans.getPlan({
       organizationId: input.organizationId,
@@ -174,5 +188,24 @@ export class DataRetentionPolicyService {
     });
     DataRetentionPolicyService.assertPlanConfigurable(plan);
     DataRetentionPolicyService.assertPlanAllowsRetentionValue(plan, input.retentionDays);
+    if (
+      input.through === "scope" &&
+      DataRetentionPolicyService.billsStorage(plan, input.retentionDays)
+    ) {
+      throw new RetentionBilledThroughBillingError(input.retentionDays);
+    }
+  }
+
+  /** Whether a billed length on this organization's plan is set through the billing write. */
+  async storageBilled(input: {
+    organizationId: string | null;
+    actor: RetentionActor;
+  }): Promise<boolean> {
+    if (!input.organizationId) return false;
+    const plan = await this.options.plans.getPlan({
+      organizationId: input.organizationId,
+      userId: input.actor.userId,
+    });
+    return plan.billsStorage;
   }
 }

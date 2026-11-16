@@ -1,6 +1,6 @@
 /**
- * The server half of `dataRetention.*`: a permission and a handler per procedure the contract
- * already named. A scope write asks the permission its target needs, on the target, at the door.
+ * The server half of `dataRetention.*`. A scope write asks its target's permission at the door;
+ * a length that bills storage asks `subscription:manage` on the organization instead.
  * Spec: modules/data-retention/specs/data-retention-scope-writes.feature
  */
 
@@ -36,6 +36,18 @@ export const dataRetentionTrpcTransport: TrpcRouterDeclaration<
   .withPermission(WRITE_ON_SCOPE)
   .handle(async ({ app, input, actor }) =>
     app.changeScopeRetention({
+      organizationId: input.organizationId,
+      scope: input.scope,
+      category: input.category,
+      retentionDays: input.retentionDays,
+      userId: actor.id,
+    }),
+  )
+
+  .procedure("setBilledForScope")
+  .withPermission("subscription:manage")
+  .handle(async ({ app, input, actor }) =>
+    app.changeBilledScopeRetention({
       organizationId: input.organizationId,
       scope: input.scope,
       category: input.category,
@@ -102,7 +114,7 @@ export const dataRetentionTrpcTransport: TrpcRouterDeclaration<
   )
 
   .procedure("getStoredPastRetention")
-  .withPermission("traces:view")
+  .withPermission(WRITE_ON_SCOPE)
   .handle(async ({ app, input, actor }) =>
     app.getStoredPastRetention({
       projectId: input.projectId,

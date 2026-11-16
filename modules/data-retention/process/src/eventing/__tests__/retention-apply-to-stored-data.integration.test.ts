@@ -143,8 +143,10 @@ describe.skipIf(!scratchClickHouseUrl)("a shorter period applied to stored data"
     });
 
     expect(counted).toEqual({
-      rows: 2,
-      retentionDays: NEW_PERIOD,
+      projectCount: 2,
+      traces: { rows: 2, retentionDays: NEW_PERIOD },
+      scenarios: { rows: 0, retentionDays: NEW_PERIOD },
+      experiments: { rows: 0, retentionDays: NEW_PERIOD },
     });
   });
 

@@ -85,6 +85,15 @@ const registry = {
     ],
   },
 
+  // ---- data retention ----
+  data_retention_billed_through_billing: {
+    tips: [
+      "Ask someone with subscription:manage in the organization to set this length; it adds a storage line to the subscription",
+      "Or pick 90 days or less, which the plan includes",
+    ],
+    docsPath: "/platform/data-retention",
+  },
+
   // ---- automations ----
   automation_dataset_unavailable: {
     tips: [

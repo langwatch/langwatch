@@ -105,6 +105,21 @@ export const dataRetentionTrpc = defineTrpcContract("dataRetention")
   .withOutput(retentionPolicySchema)
 
   /**
+   * Set a length that bills storage on this plan (above 90 days, or forever). The door asks
+   * `subscription:manage` on `organizationId`, which is required here; the scope must sit there.
+   */
+  .mutation("setBilledForScope")
+  .withInput(
+    z.object({
+      ...retentionScopeTargetInputSchema.shape,
+      organizationId: z.string().min(1),
+      category: retentionCategorySchema,
+      retentionDays: retentionDaysInputSchema,
+    }),
+  )
+  .withOutput(retentionPolicySchema)
+
+  /**
    * What each category would fall back to if the scope's override were removed
    * — the cascade value the data would land on, so the remove-confirmation
    * dialog names the real number rather than a guessed one.
@@ -140,7 +155,7 @@ export const dataRetentionTrpc = defineTrpcContract("dataRetention")
   .withInput(retentionScopeTargetInputSchema)
   .withOutput(retentionStorageUsageSchema)
 
-  /** Stored rows the scope's readable projects keep past their period, per category. */
+  /** Stored items every project under the scope keeps past its period, per category, aggregated. */
   .query("getStoredPastRetention")
   .withInput(retentionScopeTargetInputSchema)
   .withOutput(storedPastRetentionSchema)

@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
  * A saved period reaching stored data: a longer one raises every project's rows at once, and the
- * count of stored items past a period covers the readable projects under the scope.
+ * count of stored items past a period covers, per category, every project the apply rewrites.
  * @see modules/data-retention/specs/retention-apply-to-stored-data.feature
  */
 import type { AuthzApi, AuthzCanBatchByIdsInput } from "@langwatch/authz-contract";
@@ -24,7 +24,7 @@ const organizationId = retentionTestGraph.organizationId ?? "";
 const organization = { scopeType: "ORGANIZATION" as const, scopeId: organizationId };
 const projectIds = [retentionTestGraph.projectId, "project-2", "project-hidden"];
 
-/** The organization's three projects; `project-hidden` is one the admin cannot read. */
+/** The organization's three projects; the admin cannot read `project-hidden`, or it is archived. */
 function directory(): DataRetentionDirectoryReader {
   const base = MemoryRetentionDirectory.create();
   return {
@@ -134,8 +134,8 @@ describe("given an organization with three projects and stored data", () => {
   });
 
   describe("when the stored data past the organization's period is counted", () => {
-    /** @scenario "The count covers every project the admin can read under the scope" */
-    it("sums the readable projects, each at its own period, and leaves the hidden one out", async () => {
+    /** @scenario "The count covers every category in every project the apply rewrites" */
+    it("sums every project per category, each at its own period, the hidden one included", async () => {
       const { app, eventing, retroactive } = harness();
       try {
         await app.setForScope({
@@ -159,6 +159,10 @@ describe("given an organization with three projects and stored data", () => {
           { ageDays: 200, retentionDays: 0 },
         ]);
         retroactive.storedItems.set("project-hidden/traces", [{ ageDays: 400, retentionDays: 0 }]);
+        retroactive.storedItems.set("project-hidden/scenarios", [
+          { ageDays: 400, retentionDays: 0 },
+        ]);
+        retroactive.storedItems.set("project-2/experiments", [{ ageDays: 10, retentionDays: 0 }]);
 
         const counted = await app.getStoredPastRetention({
           projectId: retentionTestGraph.projectId,
@@ -167,8 +171,10 @@ describe("given an organization with three projects and stored data", () => {
         });
 
         expect(counted).toEqual({
-          rows: 2,
-          retentionDays: null,
+          projectCount: 3,
+          traces: { rows: 3, retentionDays: null },
+          scenarios: { rows: 1, retentionDays: 49 },
+          experiments: { rows: 0, retentionDays: 49 },
         });
       } finally {
         await eventing.close();

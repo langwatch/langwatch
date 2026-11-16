@@ -1,4 +1,4 @@
-import { HandledError } from "@langwatch/handled-error";
+import { HandledError, remediation } from "@langwatch/handled-error";
 
 import type { RetroactiveMutationProgress } from "./data-retention.ts";
 
@@ -88,6 +88,23 @@ export class ScopeWriteForbiddenError extends HandledError {
       { httpStatus: 403, meta: { scopeType, requiredPermission } },
     );
     this.name = "ScopeWriteForbiddenError";
+  }
+}
+
+/**
+ * A length that bills storage on this plan is set through `setBilledForScope`, which asks
+ * `subscription:manage`: a scope admin may not add a charge to the organization's subscription.
+ */
+export class RetentionBilledThroughBillingError extends HandledError {
+  declare readonly code: "data_retention_billed_through_billing";
+
+  constructor(readonly retentionDays: number) {
+    super(
+      "data_retention_billed_through_billing",
+      "Retention that bills storage needs subscription:manage on the organization.",
+      { httpStatus: 403, ...remediation("data_retention_billed_through_billing") },
+    );
+    this.name = "RetentionBilledThroughBillingError";
   }
 }
 

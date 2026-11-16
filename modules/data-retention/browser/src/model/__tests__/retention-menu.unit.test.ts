@@ -5,6 +5,7 @@ import {
   CUSTOM_PRESET_VALUE,
   INDEFINITE_PRESET_VALUE,
   LEGACY_PRESET_VALUE,
+  retentionLengthBillsStorage,
 } from "../retention-constants.ts";
 
 const labels = (items: { label: string }[]) => items.map((i) => i.label);
@@ -97,5 +98,36 @@ describe("buildRetentionMenuItems", () => {
       });
       expect(items[0]?.label).toBe("Current: keep forever (legacy)");
     });
+  });
+});
+
+describe("given a plan that bills storage and a reader without subscription:manage", () => {
+  const items = buildRetentionMenuItems({
+    isEnterprise: false,
+    isPlatformAdmin: true,
+    legacyDays: null,
+    billedLocked: true,
+  });
+
+  it("disables every length above 90 days and keeping forever, naming why", () => {
+    expect(items.filter((item) => item.disabled).map((item) => item.label)).toEqual([
+      "180 days (needs billing access)",
+      "1 year (needs billing access)",
+      "No retention (keep forever) (needs billing access)",
+    ]);
+  });
+});
+
+describe("retentionLengthBillsStorage", () => {
+  it("bills above 90 days and forever only on a plan that bills storage", () => {
+    const bills = (storageBilled: boolean, retentionDays: number) =>
+      retentionLengthBillsStorage({ storageBilled, retentionDays });
+
+    expect([bills(true, 91), bills(true, 182), bills(true, 0), bills(false, 371)]).toEqual([
+      false,
+      true,
+      true,
+      false,
+    ]);
   });
 });

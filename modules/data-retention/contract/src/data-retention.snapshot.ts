@@ -67,6 +67,11 @@ const retentionPolicySnapshotSchemaDefinition = z.object({
    * see the snapshot but must not be offered the add, edit or delete controls.
    */
   canConfigureRetention: z.boolean(),
+  /**
+   * Whether a length above 90 days, or keeping forever, adds storage to this organization's bill.
+   * Such a length is saved through `setBilledForScope`, which asks `subscription:manage`.
+   */
+  storageBilled: z.boolean(),
 });
 export interface RetentionPolicySnapshotSchema extends Named<
   typeof retentionPolicySnapshotSchemaDefinition
@@ -90,13 +95,27 @@ export const retentionStorageUsageSchema: RetentionStorageUsageSchema =
   retentionStorageUsageSchemaDefinition;
 export type RetentionStorageUsage = z.infer<typeof retentionStorageUsageSchema>;
 
-/**
- * Stored traces a scope's projects keep past their resolved traces retention: what applying the
- * period to stored data would delete. `retentionDays` is null when the projects differ.
- */
-const storedPastRetentionSchemaDefinition = z.object({
+/** One category's stored items past its projects' period; null days when the projects differ. */
+const storedPastRetentionCountSchemaDefinition = z.object({
   rows: z.number().int().nonnegative(),
   retentionDays: z.number().int().nonnegative().nullable(),
+});
+export interface StoredPastRetentionCountSchema extends Named<
+  typeof storedPastRetentionCountSchemaDefinition
+> {}
+export const storedPastRetentionCountSchema: StoredPastRetentionCountSchema =
+  storedPastRetentionCountSchemaDefinition;
+export type StoredPastRetentionCount = z.infer<typeof storedPastRetentionCountSchema>;
+
+/**
+ * What applying the scope's periods to stored data would delete, per category, over every
+ * project the apply rewrites (archived included). Aggregate only: no project is named.
+ */
+const storedPastRetentionSchemaDefinition = z.object({
+  projectCount: z.number().int().nonnegative(),
+  traces: storedPastRetentionCountSchema,
+  scenarios: storedPastRetentionCountSchema,
+  experiments: storedPastRetentionCountSchema,
 });
 export interface StoredPastRetentionSchema extends Named<
   typeof storedPastRetentionSchemaDefinition

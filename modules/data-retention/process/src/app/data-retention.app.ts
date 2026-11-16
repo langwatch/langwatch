@@ -226,7 +226,6 @@ export class DataRetentionModule implements DataRetentionApiContract {
         retention,
         retroactive: repositories.retroactive,
         directory: repositories.directory,
-        permissions,
       }),
       storageEstimates: OrganizationStorageEstimateService.create({
         meter: storageMeter,
@@ -413,6 +412,7 @@ export class DataRetentionModule implements DataRetentionApiContract {
     return this.#retention.previewScopeRemoval(target);
   }
 
+  /** A length that bills storage on this plan is refused by name: it is set through billing. */
   async changeScopeRetention(
     input: {
       organizationId?: string;
@@ -421,18 +421,38 @@ export class DataRetentionModule implements DataRetentionApiContract {
       retentionDays: number;
     } & RetentionCallerInput,
   ): Promise<RetentionPolicy> {
+    const target = await this.#scopeTarget(input);
+    return this.#saveScopeRetention({ ...input, ...target, through: "scope" });
+  }
+
+  /** The door asked `subscription:manage` on the organization; this may add the storage line. */
+  async changeBilledScopeRetention(
+    input: {
+      organizationId: string;
+      scope: ScopeAssignment;
+      category: RetentionCategory;
+      retentionDays: number;
+    } & RetentionCallerInput,
+  ): Promise<RetentionPolicy> {
+    return this.#saveScopeRetention({ ...input, through: "billing" });
+  }
+
+  async #saveScopeRetention(input: {
+    organizationId: string;
+    scope: ScopeAssignment;
+    category: RetentionCategory;
+    retentionDays: number;
+    userId: string;
+    through: "scope" | "billing";
+  }): Promise<RetentionPolicy> {
+    const { organizationId, scope, retentionDays, through } = input;
     const actor = await this.#actor(input.userId);
-    const { organizationId, scope } = await this.#scopeTarget(input);
     await this.#retention.assertScopeInOrganization({ organizationId, scope });
     // Paid plans may persist only their fixed presets, enterprise and self-hosted the full
     // range above the custom floor. The indefinite sentinel is a no-op here so the
     // platform-operator check below still runs.
-    await this.#policy.assertWriteAllowed({
-      actor,
-      organizationId,
-      retentionDays: input.retentionDays,
-    });
-    if (input.retentionDays === INDEFINITE_RETENTION_DAYS) {
+    await this.#policy.assertWriteAllowed({ actor, organizationId, retentionDays, through });
+    if (retentionDays === INDEFINITE_RETENTION_DAYS) {
       await this.#policy.assertCanDisableRetention({ actor });
     }
 
@@ -440,21 +460,20 @@ export class DataRetentionModule implements DataRetentionApiContract {
       organizationId,
       scope,
       category: input.category,
-      retentionDays: input.retentionDays,
+      retentionDays,
     });
-    await this.#syncStorageLine(organizationId);
+    await this.#syncStorageLine({ organizationId, addLine: through === "billing" });
     if (lengthens) await this.#extendFromSave({ organizationId, scope, policy });
     return policy;
   }
 
-  /** Stored items the scope's readable projects keep past their period, per category. */
+  /** Per category, the stored items an Apply on the scope would delete, over every project. */
   async getStoredPastRetention(
     input: { projectId: string; scope: ScopeAssignment } & RetentionCallerInput,
   ): Promise<StoredPastRetention> {
     return this.#storedPastRetention.getForScope({
       projectId: input.projectId,
       scope: input.scope,
-      actor: await this.#actor(input.userId),
       nowMs: nowInstant().epochMilliseconds,
     });
   }
@@ -523,7 +542,7 @@ export class DataRetentionModule implements DataRetentionApiContract {
       scope,
       category: input.category,
     });
-    await this.#syncStorageLine(organizationId);
+    await this.#syncStorageLine({ organizationId, addLine: false });
   }
 
   /**
@@ -559,12 +578,18 @@ export class DataRetentionModule implements DataRetentionApiContract {
   }
 
   /**
-   * Adds or removes the storage line after a rule change. The rule is already saved, so a billing
-   * failure is logged rather than undoing it; the daily report aligns the line again.
+   * Aligns the storage line after a rule change; only the billed write may add one. The rule is
+   * already saved, so a billing failure is logged rather than undoing it.
    */
-  async #syncStorageLine(organizationId: string): Promise<void> {
+  async #syncStorageLine({
+    organizationId,
+    addLine,
+  }: {
+    organizationId: string;
+    addLine: boolean;
+  }): Promise<void> {
     try {
-      await this.#storageReport.syncLine({ organizationId });
+      await this.#storageReport.syncLine({ organizationId, addLine });
     } catch (error) {
       logger.error(
         { organizationId, error: error instanceof Error ? error.message : String(error) },

@@ -47,7 +47,11 @@ import {
   useDataRetentionHost,
   type DataRetentionHostApi,
 } from "../../model/data-retention-host.ts";
-import { BINDING_SCOPE_TIERS, SCOPE_ICON } from "../../model/retention-constants.ts";
+import {
+  BINDING_SCOPE_TIERS,
+  retentionLengthBillsStorage,
+  SCOPE_ICON,
+} from "../../model/retention-constants.ts";
 import {
   groupRulesByScope,
   renderPolicyValue,
@@ -196,6 +200,8 @@ function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; pr
   // column with identical "saved" messages. The drawer's onSave emits a
   // single aggregated notice after the batch resolves.
   const setForScope = dataRetentionApi.dataRetention.setForScope.useMutation();
+  // A length that bills storage asks subscription:manage on the organization: its own write.
+  const setBilledForScope = dataRetentionApi.dataRetention.setBilledForScope.useMutation();
 
   // Removing a scope's policy fans out one removeForScope call per category,
   // so we mirror the save-flow pattern: aggregate the result and emit a
@@ -237,6 +243,8 @@ function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; pr
   const available = snapshot?.available;
   const canConfigureRetention = !!snapshot?.canConfigureRetention;
   const canWrite = canConfigureRetention && hasWritableScope(available);
+  const storageBilled = !!snapshot?.storageBilled;
+  const billedLocked = storageBilled && !host.hasPermission("subscription:manage");
 
   // Open the Add drawer in edit mode for a scope group. The drawer edits one
   // retention value applied to all categories, so we seed it with the group's
@@ -262,14 +270,18 @@ function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; pr
 
   const savePolicy = retentionPolicySaver({
     notices: host,
-    write: ({ scope, category, retentionDays }) =>
-      setForScope.mutateAsync({
+    write: ({ scope, category, retentionDays }) => {
+      const input = {
         projectId,
         organizationId: organizationOf(organizationId),
         scope,
         category,
         retentionDays,
-      }),
+      };
+      return retentionLengthBillsStorage({ storageBilled, retentionDays })
+        ? setBilledForScope.mutateAsync(input)
+        : setForScope.mutateAsync(input);
+    },
     afterWrite: () => void invalidate(),
     afterSave: (saved) => void storedApply.offer(saved.scopes),
     close: closeDrawer,
@@ -344,7 +356,7 @@ function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; pr
 
         {snapshot && storedApply.viewed && (
           <StoredRetentionNote
-            rows={storedApply.viewed.rows}
+            counted={storedApply.viewed}
             canApply={canWrite}
             onApply={storedApply.offerViewed}
           />
@@ -377,7 +389,8 @@ function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; pr
             currentProjectId={projectId}
             isPlatformAdmin={isPlatformAdmin}
             isEnterprise={isEnterprise}
-            isSaving={setForScope.isPending}
+            billedLocked={billedLocked}
+            isSaving={setForScope.isPending || setBilledForScope.isPending}
             scopePicker={({ value, onChange }) => (
               <ScopeChipPicker
                 value={value}

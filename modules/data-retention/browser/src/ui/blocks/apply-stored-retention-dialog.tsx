@@ -1,16 +1,17 @@
+import type { StoredPastRetention } from "@langwatch/data-retention-contract";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Text } from "@langwatch/design-system/primitives";
 
 import { storedRetentionPrompt } from "../../model/stored-retention-copy.ts";
 
-/** Offers to apply a just-saved shorter period to stored data; `rows` null when it can't count. */
+/** Offers to apply a just-saved shorter period to stored data; `counted` null if it can't count. */
 export function ApplyStoredRetentionDialog({
   pending,
   isApplying,
   onApply,
   onDismiss,
 }: {
-  pending: { rows: number | null; retentionDays: number | null } | null;
+  pending: { counted: StoredPastRetention | null } | null;
   isApplying: boolean;
   onApply: () => void | Promise<void>;
   onDismiss: () => void;

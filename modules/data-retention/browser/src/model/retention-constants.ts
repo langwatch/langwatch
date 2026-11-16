@@ -1,4 +1,5 @@
 import {
+  GROWTH_INCLUDED_RETENTION_DAYS,
   GROWTH_RETENTION_OPTIONS,
   INDEFINITE_RETENTION_DAYS,
   type RetentionCategory,
@@ -77,35 +78,70 @@ export function legacyLabel(days: number): string {
     : `Current: ${days} days (legacy)`;
 }
 
-export type RetentionMenuItem = { value: string; label: string };
+export type RetentionMenuItem = { value: string; label: string; disabled?: boolean };
+
+/** Whether saving `retentionDays` adds storage to the bill, so it goes through the billed write. */
+export function retentionLengthBillsStorage({
+  storageBilled,
+  retentionDays,
+}: {
+  storageBilled: boolean;
+  retentionDays: number;
+}): boolean {
+  if (!storageBilled) return false;
+  return (
+    retentionDays === INDEFINITE_RETENTION_DAYS || retentionDays > GROWTH_INCLUDED_RETENTION_DAYS
+  );
+}
+
+/** Why a billed length is greyed out for a reader who cannot change the subscription. */
+export const BILLED_LENGTH_LOCKED_NOTE = "needs billing access";
+
+function lockedWhenBilled({
+  item,
+  days,
+  billedLocked,
+}: {
+  item: RetentionMenuItem;
+  days: number;
+  billedLocked: boolean;
+}): RetentionMenuItem {
+  if (!billedLocked || !retentionLengthBillsStorage({ storageBilled: true, retentionDays: days })) {
+    return item;
+  }
+  return { ...item, label: `${item.label} (${BILLED_LENGTH_LOCKED_NOTE})`, disabled: true };
+}
 
 /**
  * Builds the plan-gated retention menu (legacy, presets, keep-forever for
- * admins, custom for enterprise). Pure function for unit-testability.
+ * admins, custom for enterprise). `billedLocked` disables the lengths that
+ * bill storage, for a reader without `subscription:manage`.
  */
 export function buildRetentionMenuItems({
   isEnterprise,
   isPlatformAdmin,
   legacyDays,
+  billedLocked = false,
 }: {
   isEnterprise: boolean;
   isPlatformAdmin: boolean;
   legacyDays: number | null;
+  billedLocked?: boolean;
 }): RetentionMenuItem[] {
   return [
     ...(legacyDays !== null
       ? [{ value: LEGACY_PRESET_VALUE, label: legacyLabel(legacyDays) }]
       : []),
-    ...retentionPresetsForTier(isEnterprise).map((p) => ({
-      value: p.value,
-      label: p.label,
-    })),
+    ...retentionPresetsForTier(isEnterprise).map((p) =>
+      lockedWhenBilled({ item: { value: p.value, label: p.label }, days: p.days, billedLocked }),
+    ),
     ...(isPlatformAdmin
       ? [
-          {
-            value: INDEFINITE_PRESET_VALUE,
-            label: "No retention (keep forever)",
-          },
+          lockedWhenBilled({
+            item: { value: INDEFINITE_PRESET_VALUE, label: "No retention (keep forever)" },
+            days: INDEFINITE_RETENTION_DAYS,
+            billedLocked,
+          }),
         ]
       : []),
     ...(isEnterprise ? [{ value: CUSTOM_PRESET_VALUE, label: "Custom…" }] : []),

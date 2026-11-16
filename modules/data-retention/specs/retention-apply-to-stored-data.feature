@@ -3,7 +3,8 @@ Feature: A saved retention period reaches the data already stored
   Retention is stamped on every stored row when it is written, so a new
   period changes nothing already stored until it is applied. Saving a longer
   period applies it at once, since nothing is deleted. Saving a shorter one
-  asks first, naming how many stored traces the new period would delete.
+  asks first, naming how many stored traces, scenario runs and experiment runs
+  the new period would delete and how many projects that covers.
   ClickHouse deletes them on its next TTL merge, so the prompt says within a
   day. Either way the work fans out as one command per project under the
   scope: an organization or team save reaches every project in it.
@@ -19,17 +20,18 @@ Feature: A saved retention period reaches the data already stored
     And no prompt is shown
 
   @unit
-  Scenario: The count covers every project the admin can read under the scope
-    Given traces older than the new period in both projects
+  Scenario: The count covers every category in every project the apply rewrites
+    Given stored items older than the new period in every project, archived or unreadable ones included
     When the stored data past the organization's period is counted
-    Then the count sums both projects, each at its own resolved period
-    And a project the admin cannot read is left out of the count
+    Then traces, scenario runs and experiment runs are each counted over every project, each at its own resolved period
+    And the answer names how many projects the apply covers, but no project by name
 
   @integration
   Scenario: A shorter period asks to apply it with a count
     Given 1,234 stored traces older than the new period
     When an admin saves the shorter period
-    Then a prompt says "1,234 traces older than 90 days will be deleted within a day."
+    And 5 stored scenario runs and no experiment runs older than it, across 3 projects
+    Then a prompt says "1,234 traces older than 90 days, 5 scenario runs older than 90 days and 0 experiment runs older than 90 days will be deleted within a day, across 3 projects."
     And it offers "Apply now" as a destructive action and "Not now"
 
   @integration
@@ -43,7 +45,7 @@ Feature: A saved retention period reaches the data already stored
   Scenario: Not now leaves a note with an Apply button
     Given stored traces still on the old period under the scope in view
     When the settings page shows that scope
-    Then it shows "1,234 traces still use the old period" with an Apply button
+    Then it shows "1,234 traces and 2 experiment runs still use the old period" with an Apply button
     And Apply asks first with the same prompt before any stored data is rewritten
 
   @integration

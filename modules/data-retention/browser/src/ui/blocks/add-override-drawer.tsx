@@ -18,7 +18,7 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
-import { type Ref, type RefObject, useEffect, useMemo, useRef, useState } from "react";
+import { type Ref, type RefObject, useEffect, useRef, useState } from "react";
 
 import {
   buildRetentionMenuItems,
@@ -91,6 +91,7 @@ export function AddOverrideDrawer({
   currentProjectId,
   isPlatformAdmin,
   isEnterprise,
+  billedLocked = false,
   isSaving,
   onSave,
   editTarget,
@@ -104,6 +105,8 @@ export function AddOverrideDrawer({
   /** True for enterprise (and self-hosted, which resolves to enterprise). Paid
    *  non-enterprise orgs get the fixed short menu with no custom field. */
   isEnterprise: boolean;
+  /** The plan bills storage above 90 days and the reader lacks `subscription:manage`. */
+  billedLocked?: boolean;
   isSaving: boolean;
   /** Saves the rule only; the page then offers to apply it to stored data. */
   onSave: (params: { scopes: ScopeAssignment[]; retentionDays: number }) => void;
@@ -121,7 +124,7 @@ export function AddOverrideDrawer({
 }) {
   // The retention menu is plan-gated: paid orgs get a fixed short pair, while
   // enterprise/self-hosted get the full list plus a custom field.
-  const presets = useMemo(() => retentionPresetsForTier(isEnterprise), [isEnterprise]);
+  const presets = retentionPresetsForTier(isEnterprise);
   const defaultPreset = presets[0]?.value ?? CUSTOM_PRESET_VALUE;
 
   const [scopes, setScopes] = useState<ScopeAssignment[]>([]);
@@ -142,17 +145,9 @@ export function AddOverrideDrawer({
   // (enterprise/self-hosted only)]. Paid orgs get neither custom nor
   // keep-forever, so their entire menu is the fixed short pair. Built by a pure
   // helper (unit-tested) so the plan gating doesn't depend on rendering.
-  const presetCollection = useMemo(
-    () =>
-      createListCollection({
-        items: buildRetentionMenuItems({
-          isEnterprise,
-          isPlatformAdmin,
-          legacyDays,
-        }),
-      }),
-    [isEnterprise, isPlatformAdmin, legacyDays],
-  );
+  const presetCollection = createListCollection({
+    items: buildRetentionMenuItems({ isEnterprise, isPlatformAdmin, legacyDays, billedLocked }),
+  });
 
   useEffect(() => {
     if (!open) return;

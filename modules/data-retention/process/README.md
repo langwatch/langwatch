@@ -180,6 +180,14 @@ previewScopeRemoval(input: { organizationId?: string; scope: ScopeAssignment } &
 changeScopeRetention(input: { organizationId?: string; scope: ScopeAssignment; category: RetentionCategory; retentionDays: number; } & RetentionCallerInput): Promise<RetentionPolicy>;
 ```
 
+#### `changeBilledScopeRetention`
+
+Asked `subscription:manage` at the door: any length, a billed one included.
+
+```typescript
+changeBilledScopeRetention(input: { organizationId: string; scope: ScopeAssignment; category: RetentionCategory; retentionDays: number; } & RetentionCallerInput): Promise<RetentionPolicy>;
+```
+
 #### `removeForScope`
 
 ```typescript
@@ -214,13 +222,14 @@ Contract `../contract/src/data-retention.trpc.ts:82`, router `src/transport/data
 | ----------------------------------------------- | -------- | --------------------------------- | ---------------------------------------- | ---------------------------------------- |
 | `dataRetention.getRules`                        | query    | Permission `project:view`         | `retentionProjectScopeSchema`            | `retentionPolicySnapshotSchema`          |
 | `dataRetention.setForScope`                     | mutation | Gate ≈ `WRITE_ON_SCOPE`           | inline                                   | `retentionPolicySchema`                  |
+| `dataRetention.setBilledForScope`               | mutation | Permission `subscription:manage`  | inline                                   | `retentionPolicySchema`                  |
 | `dataRetention.previewScopeRemoval`             | query    | Gate ≈ `WRITE_ON_SCOPE`           | `retentionScopeWriteInputSchema`         | `resolvedRetentionSchema`                |
 | `dataRetention.removeForScope`                  | mutation | Gate ≈ `WRITE_ON_SCOPE`           | inline                                   | –                                        |
 | `dataRetention.triggerRetroactiveUpdate`        | mutation | Permission `project:update`       | `retentionTriggerRetroactiveInputSchema` | `retroactiveRetentionUpdateResultSchema` |
 | `dataRetention.getMutationProgress`             | query    | Permission `traces:view`          | `retroactiveMutationProjectInputSchema`  | inline                                   |
 | `dataRetention.killMutation`                    | mutation | Permission `project:update`       | `killRetroactiveMutationInputSchema`     | –                                        |
 | `dataRetention.getScopeStorageUsage`            | query    | Permission `traces:view`          | `retentionScopeTargetInputSchema`        | `retentionStorageUsageSchema`            |
-| `dataRetention.getStoredPastRetention`          | query    | Permission `traces:view`          | `retentionScopeTargetInputSchema`        | `storedPastRetentionSchema`              |
+| `dataRetention.getStoredPastRetention`          | query    | Gate ≈ `WRITE_ON_SCOPE`           | `retentionScopeTargetInputSchema`        | `storedPastRetentionSchema`              |
 | `dataRetention.applyScopeRetentionToStoredData` | mutation | Gate ≈ `WRITE_ON_SCOPE`           | `retentionScopeWriteInputSchema`         | –                                        |
 | `dataRetention.getOrganizationStorageEstimate`  | query    | Permission `subscription:upgrade` | inline                                   | `organizationStorageEstimateSchema`      |
 | `dataRetention.getOrganizationRetention`        | query    | Permission `organization:view`    | inline                                   | `organizationRetentionSchema`            |
@@ -231,7 +240,7 @@ Contract `../contract/src/data-retention.trpc.ts:82`, router `src/transport/data
 interface Input {
   projectId: string;
 }
-type Output = z.infer<typeof retentionPolicySnapshotSchema>; // ../contract/src/data-retention.snapshot.ts:75
+type Output = z.infer<typeof retentionPolicySnapshotSchema>; // ../contract/src/data-retention.snapshot.ts:80
 
 // dataRetention.setForScope
 // Input: inline, ../contract/src/data-retention.trpc.ts:99
@@ -257,6 +266,20 @@ interface Output {
   updatedAt: unknown;
 }
 
+// dataRetention.setBilledForScope
+// Input: inline, ../contract/src/data-retention.trpc.ts:113
+interface Input {
+  projectId: string;
+  scope: {
+    scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+    scopeId: string;
+  };
+  organizationId: string;
+  category: "traces" | "scenarios" | "experiments";
+  retentionDays: 0 | number;
+}
+type Output = z.infer<typeof retentionPolicySchema>; // ../contract/src/data-retention.ts:282
+
 // dataRetention.previewScopeRemoval
 // Input: retentionScopeWriteInputSchema, ../contract/src/data-retention.trpc.ts:70
 interface Input {
@@ -275,7 +298,7 @@ interface Output {
 }
 
 // dataRetention.removeForScope
-// Input: inline, ../contract/src/data-retention.trpc.ts:119
+// Input: inline, ../contract/src/data-retention.trpc.ts:134
 interface Input {
   projectId: string;
   scope: {
@@ -303,7 +326,7 @@ interface Output {
 interface Input {
   projectId: string;
 }
-// Output: inline, ../contract/src/data-retention.trpc.ts:129
+// Output: inline, ../contract/src/data-retention.trpc.ts:144
 type Output = {
   mutationId: string;
   table: string;
@@ -329,7 +352,7 @@ interface Input {
     scopeId: string;
   };
 }
-// Output: retentionStorageUsageSchema, ../contract/src/data-retention.snapshot.ts:90
+// Output: retentionStorageUsageSchema, ../contract/src/data-retention.snapshot.ts:95
 interface Output {
   totalBytes: number;
   projectCount: number;
@@ -337,32 +360,28 @@ interface Output {
 
 // dataRetention.getStoredPastRetention
 type Input = z.infer<typeof retentionScopeTargetInputSchema>; // ../contract/src/data-retention.trpc.ts:56
-// Output: storedPastRetentionSchema, ../contract/src/data-retention.snapshot.ts:105
-interface Output {
-  rows: number;
-  retentionDays: number | null;
-}
+type Output = z.infer<typeof storedPastRetentionSchema>; // ../contract/src/data-retention.snapshot.ts:124
 
 // dataRetention.applyScopeRetentionToStoredData
 type Input = z.infer<typeof retentionScopeWriteInputSchema>; // ../contract/src/data-retention.trpc.ts:70
 
 // dataRetention.getOrganizationStorageEstimate
-// Input: inline, ../contract/src/data-retention.trpc.ts:154
+// Input: inline, ../contract/src/data-retention.trpc.ts:169
 interface Input {
   organizationId: string;
 }
-// Output: organizationStorageEstimateSchema, ../contract/src/data-retention.snapshot.ts:121
+// Output: organizationStorageEstimateSchema, ../contract/src/data-retention.snapshot.ts:140
 interface Output {
   totalBytes: number;
   coveredDays: number;
 }
 
 // dataRetention.getOrganizationRetention
-// Input: inline, ../contract/src/data-retention.trpc.ts:159
+// Input: inline, ../contract/src/data-retention.trpc.ts:174
 interface Input {
   organizationId: string;
 }
-// Output: organizationRetentionSchema, ../contract/src/data-retention.snapshot.ts:132
+// Output: organizationRetentionSchema, ../contract/src/data-retention.snapshot.ts:151
 interface Output {
   retentionDays: number;
 }

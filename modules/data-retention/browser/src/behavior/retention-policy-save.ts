@@ -116,9 +116,25 @@ export function retentionPolicySaver({
   };
 }
 
+/** One category summed over several scopes' answers; null days when they differ. */
+function sumCategory({
+  answers,
+  category,
+}: {
+  answers: StoredPastRetention[];
+  category: RetentionCategory;
+}): StoredPastRetention[RetentionCategory] {
+  const days = new Set(answers.map((each) => each[category].retentionDays));
+  const [only] = [...days];
+  return {
+    rows: answers.reduce((sum, each) => sum + each[category].rows, 0),
+    retentionDays: days.size === 1 && only !== undefined ? only : null,
+  };
+}
+
 /**
- * Stored traces past the new period summed over the saved scopes, for the apply prompt; null
- * when any count failed, so the prompt says it could not count rather than "0".
+ * Stored items past the new period per category, summed over the saved scopes, for the apply
+ * prompt; null when any count failed, so the prompt says it could not count rather than "0".
  */
 export async function countStoredPastRetention({
   scopes,
@@ -126,14 +142,14 @@ export async function countStoredPastRetention({
 }: {
   scopes: ScopeAssignment[];
   count: (scope: ScopeAssignment) => Promise<StoredPastRetention>;
-}): Promise<{ rows: number; retentionDays: number | null } | null> {
+}): Promise<StoredPastRetention | null> {
   try {
     const answers = await Promise.all(scopes.map((scope) => count(scope)));
-    const days = new Set(answers.map((each) => each.retentionDays));
-    const [only] = [...days];
     return {
-      rows: answers.reduce((sum, each) => sum + each.rows, 0),
-      retentionDays: days.size === 1 && only !== undefined ? only : null,
+      projectCount: answers.reduce((sum, each) => sum + each.projectCount, 0),
+      traces: sumCategory({ answers, category: "traces" }),
+      scenarios: sumCategory({ answers, category: "scenarios" }),
+      experiments: sumCategory({ answers, category: "experiments" }),
     };
   } catch {
     return null;
@@ -163,7 +179,7 @@ export async function applyStoredRetention({
     notices.failed({ error: failure.error, fallbackTitle: "Couldn't apply the new period" });
     return { success: false };
   }
-  notices.succeeded({ title: "Traces past the new period will be deleted within a day" });
+  notices.succeeded({ title: "Stored data past the new period will be deleted within a day" });
   return { success: true };
 }
 
