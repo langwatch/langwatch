@@ -23,7 +23,8 @@ projections are the architecture, and no read uses `FINAL`.
    readable throws and the delivery retries. An evaluation with no trace is skipped. One whose
    trace is not stored yet throws while its event is at most an hour old, so the delivery retries
    as a late trace arrives (main joined at read time); past that hour it is skipped. Both
-   subscribers first wait the 30-second trace settle, and both misses name a five-minute retry
+   subscribers first wait the 30-second trace settle, counted from the event's time (its
+   `occurredAt`, so a reported span that ended long ago gets no extra wait), and both misses name a five-minute retry
    floor (`GroupQueueError.retryAfterMs`) over the queue's sub-second backoff, so an absent trace
    costs about a dozen reads in its hour rather than ten in its first eight minutes; the floor
    gives the job the queue's 61-attempt overload budget, which the hour ends first. A run still

@@ -243,7 +243,10 @@ describe("TraceEvaluationOutcomeService", () => {
         const failure = await outcomes.recordReported(unstored).catch((error: unknown) => error);
 
         expect(failure).toBeInstanceOf(EvaluatedTraceNotYetStoredError);
-        expect(failure).toMatchObject({ retryable: true, retryAfterMs: 5 * 60 * 1000 });
+        expect(failure).toMatchObject({
+          retryable: true,
+          retryAfterMs: EVALUATED_TRACE_RETRY_AFTER_MS,
+        });
         expect(recorded).toEqual([]);
         expect(logger.warn).not.toHaveBeenCalled();
       });

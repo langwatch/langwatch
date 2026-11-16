@@ -22,7 +22,9 @@ Feature: Each evaluation's outcome is kept beside its trace's columns
   Scenario: The trace subscriber waits for the trace to settle before its first attempt
     Given evaluation's completed and reported events
     When the trace subscribers on them are registered
-    Then each first delivery is delayed by the 30-second trace settle window
+    Then each first delivery is due 30 seconds after the event's time, the trace settle window
+    # The queue scores an event by its occurredAt (a reported span's end), so a span that
+    # ended long before ingestion gets no extra wait; the retry floor covers that case.
 
   @unit
   Scenario: An evaluation of a trace not stored yet is retried within the wait
