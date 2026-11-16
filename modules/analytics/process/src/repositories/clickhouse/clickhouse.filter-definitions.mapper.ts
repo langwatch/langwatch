@@ -69,7 +69,8 @@ function summaryValuePicker({
 
 /**
  * A trace_summaries picker over the values of a JSON array attribute, each element unquoted. The
- * empty and `null` tests read the raw element, as main's did on 26.8 (filter-options proof).
+ * empty and `null` tests read the raw element, as main's did on 26.8 (analytics-built-reads
+ * row-equality suite).
  */
 function summaryJsonArrayPicker(attribute: string): ClickHouseFilterDefinition {
   return {

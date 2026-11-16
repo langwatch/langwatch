@@ -113,7 +113,7 @@ function rollupAggExpression({
 }): Rollup {
   switch (agg) {
     case "sum":
-      return fn.coalesce(fn.sum(column), param.float64(0));
+      return fn.coalesce(fn.sum(column), param.uint32(0));
     case "avg": {
       if (!isRollupAvgMetricKey(metric)) {
         throw new Error(

@@ -108,7 +108,8 @@ export function slimAggregate<T extends string>({
   if (isPercentile(aggregation)) return fn.quantileTDigest(percentileFor(aggregation), of);
   switch (aggregation) {
     case "sum":
-      return fn.coalesce(fn.sum(of), param.float64(0));
+      // An unsigned zero widens to sum's own type (UInt64, Int64 or Float64), as main's literal 0.
+      return fn.coalesce(fn.sum(of), param.uint32(0));
     case "avg":
       return fn.avg(of);
     case "min":
