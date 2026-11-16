@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.1](https://github.com/langwatch/langwatch/compare/python-sdk@v1.4.0...python-sdk@v1.4.1) (2026-11-16)
+
+
+### Bug Fixes
+
+* **python-sdk:** cap python-liquid below 3 so a fresh install imports; python-liquid 3.0.0 removed `UndefinedError`
+
 ## [1.4.0](https://github.com/langwatch/langwatch/compare/python-sdk@v1.3.1...python-sdk@v1.4.0) (2026-09-06)
 
 
