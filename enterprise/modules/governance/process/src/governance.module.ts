@@ -31,7 +31,9 @@ import { governanceAgentsTrpcTransport } from "./transport/governance-agents.trp
 import { governanceCliRest } from "./transport/governance-cli.rest.ts";
 import { governanceCostTrpcTransport } from "./transport/governance-cost.trpc.ts";
 import { governanceIngestRest } from "./transport/governance-ingest.rest.ts";
+import { governanceKillSwitchTrpcTransport } from "./transport/governance-kill-switch.trpc.ts";
 import { governancePeopleTrpcTransport } from "./transport/governance-people.trpc.ts";
+import { governanceRegistryTrpcTransport } from "./transport/governance-registry.trpc.ts";
 import { governanceRest } from "./transport/governance.rest.ts";
 import { governanceTrpcTransport } from "./transport/governance.trpc.ts";
 import { ingestionKeyTrpcTransport } from "./transport/ingestion-key.trpc.ts";
@@ -90,7 +92,9 @@ export const governanceProcessModule: PublishedProcessModule<"governance", Gover
       sessionPolicyTrpcTransport,
       governancePeopleTrpcTransport,
       governanceAgentsTrpcTransport,
+      governanceRegistryTrpcTransport,
       governanceCostTrpcTransport,
+      governanceKillSwitchTrpcTransport,
     )
     // The member behind the project credential, which surface asked, and the CLI token door. A
     // legacy project key names no member, which is what the admin routes refuse.

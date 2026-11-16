@@ -19,7 +19,12 @@ function recordingPrisma({
   existing,
 }: {
   createdCount: number;
-  existing: { displayText: string; metadata: unknown } | null;
+  existing: {
+    displayText: string;
+    metadata: unknown;
+    ingestionSourceId?: string | null;
+    goneAt?: Date | null;
+  } | null;
 }) {
   const createMany = vi.fn(async () => ({ count: createdCount }));
   const updateMany = vi.fn(async (_args: Prisma.DiscoveredAgentUpdateManyArgs) => ({ count: 1 }));
@@ -192,6 +197,56 @@ describe("PrismaDiscoveredAgentRepository.recordAgentSighting", () => {
         expect.objectContaining({ where: expect.objectContaining({ organizationId }) }),
       );
       for (const update of world.updates()) expect(update?.where).toMatchObject({ organizationId });
+    });
+  });
+});
+
+describe("PrismaDiscoveredAgentRepository source and gone marks", () => {
+  describe("given a row marked gone that a source lists again", () => {
+    it("clears the gone mark and names the source in the merge write", async () => {
+      const world = recordingPrisma({
+        createdCount: 0,
+        existing: {
+          displayText: "Revenue Analyst",
+          metadata: { workspaceHost: "adb-1.azuredatabricks.net" },
+          ingestionSourceId: "source_old",
+          goneAt: SEPT_1,
+        },
+      });
+
+      await world.repository.recordAgentSighting({
+        ...sighting(),
+        ingestionSourceId: "source_new",
+      });
+
+      expect(world.updates().at(-1)).toEqual({
+        where: { organizationId, provider, rawAgentId },
+        data: { ingestionSourceId: "source_new", goneAt: null },
+      });
+    });
+  });
+
+  describe("when a listing finishes", () => {
+    it("marks only that source's rows it did not see, at the listing's instant", async () => {
+      const world = recordingPrisma({ createdCount: 0, existing: null });
+
+      await world.repository.markUnlistedGone({
+        organizationId,
+        ingestionSourceId: "source_1",
+        listedAt: Temporal.Instant.fromEpochMilliseconds(SEPT_5.getTime()),
+      });
+
+      expect(world.updates()).toEqual([
+        {
+          where: {
+            organizationId,
+            ingestionSourceId: "source_1",
+            goneAt: null,
+            lastSeenAt: { lt: SEPT_5 },
+          },
+          data: { goneAt: SEPT_5 },
+        },
+      ]);
     });
   });
 });

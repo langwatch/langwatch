@@ -30,7 +30,7 @@ export class PrismaDiscoveredAgentRepository extends DiscoveredAgentRepository {
     organizationId: string;
   }): Promise<DiscoveredAgentRow[]> {
     const rows = await this.prisma.discoveredAgent.findMany({
-      where: { organizationId },
+      where: { organizationId, goneAt: null },
       select: { id: true, provider: true, displayText: true, firstSeenAt: true, lastSeenAt: true },
       orderBy: { lastSeenAt: "desc" },
     });
@@ -47,7 +47,7 @@ export class PrismaDiscoveredAgentRepository extends DiscoveredAgentRepository {
     organizationId: string;
   }): Promise<DiscoveredAgentRegistryRow[]> {
     const rows = await this.prisma.discoveredAgent.findMany({
-      where: { organizationId },
+      where: { organizationId, goneAt: null },
       select: {
         id: true,
         provider: true,
@@ -77,6 +77,7 @@ export class PrismaDiscoveredAgentRepository extends DiscoveredAgentRepository {
     displayText: string;
     metadata: Record<string, string>;
     seenAt: Instant;
+    ingestionSourceId?: string;
   }): Promise<void> {
     const key = {
       organizationId: input.organizationId,
@@ -92,6 +93,9 @@ export class PrismaDiscoveredAgentRepository extends DiscoveredAgentRepository {
           metadata: input.metadata,
           firstSeenAt: seenAt,
           lastSeenAt: seenAt,
+          ...(input.ingestionSourceId === undefined
+            ? {}
+            : { ingestionSourceId: input.ingestionSourceId }),
         },
       ],
       skipDuplicates: true,
@@ -109,18 +113,45 @@ export class PrismaDiscoveredAgentRepository extends DiscoveredAgentRepository {
 
     const existing = await this.prisma.discoveredAgent.findFirst({
       where: key,
-      select: { displayText: true, metadata: true },
+      select: { displayText: true, metadata: true, ingestionSourceId: true, goneAt: true },
     });
     if (!existing) return;
 
     const merged = mergeAgentMetadata({ stored: existing.metadata, incoming: input.metadata });
-    const data: { displayText?: string; metadata?: AgentMetadata } = {};
+    const data: {
+      displayText?: string;
+      metadata?: AgentMetadata;
+      ingestionSourceId?: string;
+      goneAt?: null;
+    } = {};
     if (input.displayText !== "" && input.displayText !== existing.displayText) {
       data.displayText = input.displayText;
     }
     if (merged.changed) data.metadata = merged.metadata;
+    const sourceMoved =
+      input.ingestionSourceId !== undefined &&
+      input.ingestionSourceId !== existing.ingestionSourceId;
+    if (sourceMoved) data.ingestionSourceId = input.ingestionSourceId;
+    if (existing.goneAt) data.goneAt = null;
     if (Object.keys(data).length === 0) return;
 
     await this.prisma.discoveredAgent.updateMany({ where: key, data });
+  }
+
+  async markUnlistedGone({
+    organizationId,
+    ingestionSourceId,
+    listedAt,
+  }: {
+    organizationId: string;
+    ingestionSourceId: string;
+    listedAt: Instant;
+  }): Promise<{ marked: number }> {
+    const at = toDate(listedAt);
+    const { count } = await this.prisma.discoveredAgent.updateMany({
+      where: { organizationId, ingestionSourceId, goneAt: null, lastSeenAt: { lt: at } },
+      data: { goneAt: at },
+    });
+    return { marked: count };
   }
 }

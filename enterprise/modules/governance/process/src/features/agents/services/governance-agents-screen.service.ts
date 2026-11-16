@@ -6,6 +6,7 @@ import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { type Instant, nowInstant } from "@langwatch/time";
 
+import type { AgentRegistryRepository } from "../../../repositories/agent-registry.repository.ts";
 import type { DiscoveredAgentRepository } from "../../../repositories/discovered-agent.repository.ts";
 import { memberNames } from "../../identity/rules/member-names.rules.ts";
 import { buildAgentInventory } from "../rules/agent-inventory.rules.ts";
@@ -15,8 +16,12 @@ type GovernanceAgentsScreenDependencies = {
   projects: Pick<ProjectApi, "findLiveNonGovernanceIdsByOrganization">;
   organizations: Pick<OrganizationApi, "findMembersWithDepartments">;
   discoveredAgents: DiscoveredAgentRepository;
+  registry: Pick<AgentRegistryRepository, "findActiveWithSourceKeys">;
   logger: Logger;
 };
+
+/** The registry entries one Agents page read joins, latest change first. */
+const REGISTRY_ENTRY_LIMIT = 2000;
 
 /** Main's `governanceAgentsScreen.service.ts`: the Agents screen's read, from both origins. */
 export class GovernanceAgentsScreenService {
@@ -38,15 +43,20 @@ export class GovernanceAgentsScreenService {
     organizationId: string;
     now?: Instant;
   }): Promise<GovernanceAgentRow[]> {
-    const [registered, discovered, members] = await Promise.all([
+    const [registered, discovered, members, registry] = await Promise.all([
       this.findRegistered({ organizationId }),
       this.deps.discoveredAgents.findByOrganization({ organizationId }),
       this.deps.organizations.findMembersWithDepartments({ organizationId }),
+      this.deps.registry.findActiveWithSourceKeys({
+        organizationId,
+        limit: REGISTRY_ENTRY_LIMIT,
+      }),
     ]);
 
     const inventory = buildAgentInventory({
       registered,
       discovered,
+      registry,
       memberNames: memberNames(members),
       now,
     });

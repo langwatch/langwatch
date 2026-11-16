@@ -3,6 +3,7 @@
 import type {
   AgentRegistryEntry,
   AgentRegistryEvent,
+  AgentRegistryPosture,
   AgentRegistryStatus,
 } from "@langwatch/enterprise-governance-contract";
 import type { Instant } from "@langwatch/time";
@@ -36,12 +37,18 @@ export abstract class AgentRegistryRepository {
     status?: AgentRegistryStatus;
     limit: number;
   }): Promise<AgentRegistryEntry[]>;
+  /** At most `limit` active entries with the source key that ties each to its origin's row. */
+  abstract findActiveWithSourceKeys(input: {
+    organizationId: string;
+    limit: number;
+  }): Promise<{ sourceKey: string; entry: AgentRegistryEntry }[]>;
   abstract listEntries(input: {
     organizationId: string;
     limit: number;
     after?: RegistryEntryPosition;
     updatedSince?: Instant;
     status?: AgentRegistryStatus;
+    posture?: AgentRegistryPosture;
   }): Promise<{ entries: AgentRegistryEntry[]; hasMore: boolean }>;
   /** Throws `agent_registry_entry_not_found` when the organisation holds no such entry. */
   abstract getEntry(input: { organizationId: string; id: string }): Promise<AgentRegistryEntry>;

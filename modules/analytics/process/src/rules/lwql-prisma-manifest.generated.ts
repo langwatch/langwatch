@@ -2629,6 +2629,8 @@ export interface LwqlPrismaRows {
     readonly metadata: "Json";
     readonly firstSeenAt: "DateTime";
     readonly lastSeenAt: "DateTime";
+    readonly ingestionSourceId: "String?";
+    readonly goneAt: "DateTime?";
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
   };
@@ -2662,6 +2664,22 @@ export interface LwqlPrismaRows {
   readonly AgentRegistryBaseline: {
     readonly organizationId: "String";
     readonly baselinedAt: "DateTime";
+  };
+  readonly AgentRegistrySettings: {
+    readonly organizationId: "String";
+    readonly dormantAfterDays: "Int";
+    readonly updatedAt: "DateTime";
+  };
+  readonly GovernanceAwsConnection: {
+    readonly id: "String";
+    readonly organizationId: "String";
+    readonly name: "String";
+    readonly accessKeyId: "String?";
+    readonly encryptedSecretAccessKey: "String?";
+    readonly roleArn: "String?";
+    readonly encryptedExternalId: "String?";
+    readonly createdAt: "DateTime";
+    readonly updatedAt: "DateTime";
   };
   readonly IdentityMatch: {
     readonly id: "String";

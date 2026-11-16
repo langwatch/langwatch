@@ -6,16 +6,26 @@ import { nowInstant, type Instant } from "@langwatch/time";
 import { eventMatches, type WebhookApi } from "@langwatch/webhook-contract";
 
 import type { AgentRegistryRepository } from "../../../repositories/agent-registry.repository.ts";
-import type { AgentRegistryDeliveryIntent } from "../eventing/agent-registry-delivery.process.ts";
+import type {
+  AgentRegistryAlertIntent,
+  AgentRegistryDeliveryIntent,
+} from "../eventing/agent-registry-delivery.process.ts";
 import { changedSince, planRegistryChanges } from "../rules/registry-reconcile.rules.ts";
 import {
   AgentRegistrySourcesService,
   type AgentRegistrySourcesDependencies,
 } from "./agent-registry-sources.service.ts";
 
-/** Where the registry records its webhook fan-out; governance's outbox in the worker. */
+/** One fan-out pass: webhook deliveries and shadow alerts to admins, recorded together. */
+export type AgentRegistryFanOut = {
+  organizationId: string;
+  deliveries: readonly AgentRegistryDeliveryIntent[];
+  alerts: readonly AgentRegistryAlertIntent[];
+};
+
+/** Where the registry records its fan-out; governance's outbox in the worker. */
 export interface AgentRegistryDeliveryOutbox {
-  record(intents: readonly AgentRegistryDeliveryIntent[]): Promise<void>;
+  record(fanOut: AgentRegistryFanOut): Promise<void>;
 }
 
 const FAN_OUT_BATCH = 500;
@@ -37,7 +47,7 @@ export type WalkPage = { afterOrganizationId: string; organizations: number };
 type AgentRegistryDependencies = {
   registry: AgentRegistryRepository;
   sources: AgentRegistrySourcesService;
-  organizations: Pick<OrganizationApi, "listAllIds">;
+  organizations: Pick<OrganizationApi, "listAllIds" | "findAdministrators">;
   webhooks: Pick<WebhookApi, "getAll">;
   /** The registry is an Enterprise feature: an organisation without the plan is never reconciled. */
   entitlements: { hasEnterprisePlan: (organizationId: string) => Promise<boolean> };
@@ -63,17 +73,21 @@ export class AgentRegistryService {
     ...deps
   }: Omit<AgentRegistryDependencies, "sources" | "organizations" | "logger" | "now" | "newId"> &
     Omit<AgentRegistrySourcesDependencies, "organizations" | "now"> & {
-      organizations: Pick<OrganizationApi, "findMembersWithDepartments" | "listAllIds">;
+      organizations: Pick<
+        OrganizationApi,
+        "findMembersWithDepartments" | "listAllIds" | "findAdministrators"
+      >;
       logger?: Logger;
       now?: () => Instant;
       newId?: () => string;
     }): AgentRegistryService {
-    const { discoveredAgents, agents, projects, traces, publicBaseUrl, ...own } = deps;
+    const { discoveredAgents, agents, projects, traces, settings, publicBaseUrl, ...own } = deps;
     const sources = AgentRegistrySourcesService.create({
       discoveredAgents,
       agents,
       projects,
       traces,
+      settings,
       organizations: own.organizations,
       publicBaseUrl,
       now,
@@ -186,7 +200,10 @@ export class AgentRegistryService {
     return { afterOrganizationId: cursor ?? null, organizations, complete: !hasMore };
   }
 
-  /** Records a delivery intent per pending event and subscribed endpoint, then marks them. */
+  /**
+   * Records a delivery intent per pending event and subscribed endpoint, and a push alert per new
+   * shadow agent and organisation admin, then marks the events. Baseline events are never pending.
+   */
   async fanOutPending({ organizationId }: { organizationId: string }): Promise<void> {
     const outbox = this.deps.outbox();
     if (!outbox) return;
@@ -209,7 +226,23 @@ export class AgentRegistryService {
           body: event,
         })),
     );
-    await outbox.record(intents);
+    const shadowEvents = pending.filter(
+      (event) => event.type === "governance.agent.flagged_shadow",
+    );
+    const administrators =
+      shadowEvents.length > 0
+        ? await this.deps.organizations.findAdministrators({ organizationId })
+        : [];
+    const alerts = shadowEvents.flatMap((event) =>
+      administrators.map((administrator) => ({
+        organizationId,
+        eventId: event.id,
+        userId: administrator.userId,
+        agentId: event.agent_id,
+        agentName: event.agent.name,
+      })),
+    );
+    await outbox.record({ organizationId, deliveries: intents, alerts });
     await this.deps.registry.markDeliveryRecorded({
       organizationId,
       eventIds: pending.map((event) => event.id),

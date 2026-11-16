@@ -17,6 +17,8 @@ type MemoryDiscoveredAgent = {
   metadata: AgentMetadata;
   firstSeenAt: Instant;
   lastSeenAt: Instant;
+  ingestionSourceId?: string | null;
+  goneAt?: Instant | null;
 };
 
 type MemoryGovernanceTenant = {

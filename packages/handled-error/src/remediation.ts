@@ -563,6 +563,10 @@ const registry = {
     ],
     docsPath: "/agent-testing/connect-your-agent",
   },
+  governance_aws_connection_not_found: {
+    tips: ["List the organisation's AWS connections and use an id from that list"],
+    docsPath: "/ai-governance/cloud-agent-discovery",
+  },
   agent_registry_entry_not_found: {
     tips: [
       "List the registry with GET /api/governance/registry/agents and use an `id` from that list",

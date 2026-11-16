@@ -870,7 +870,8 @@
               "ai-governance/ingestion-sources/s3-custom",
               "ai-governance/ingestion-sources/copilot-studio",
               "ai-governance/ingestion-sources/openai-compliance",
-              "ai-governance/ingestion-sources/claude-compliance"
+              "ai-governance/ingestion-sources/claude-compliance",
+              "ai-governance/cloud-agent-discovery"
             ]
           },
           {

@@ -114,6 +114,7 @@
 /ai-governance/api
 /ai-governance/cli
 /ai-governance/cli-debug
+/ai-governance/cloud-agent-discovery
 /ai-governance/compliance-architecture
 /ai-governance/control-plane
 /ai-governance/getting-started-admin

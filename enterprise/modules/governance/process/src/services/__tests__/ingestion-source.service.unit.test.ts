@@ -1034,4 +1034,34 @@ describe("IngestionSourceService", () => {
       }
     });
   });
+
+  describe("given a Google Cloud source holding a service account key", () => {
+    describe("when an admin reads it back", () => {
+      /** @scenario "The service account key is sealed and never read back" */
+      it("shows the source without the key's value", async () => {
+        const { service, repository, projects } = harness();
+        repository.row = source({
+          sourceType: "gcp_vertex_agent_engine",
+          parserConfig: {
+            adapter: "gcp_vertex_agent_engine",
+            targets: [{ projectId: "acme-ml", location: "europe-west4" }],
+            credentials: { serviceAccountJson: '{"private_key":"-----BEGIN KEY-----"}' },
+          },
+        });
+        const reads = IngestionSourceReadService.create({
+          sources: service,
+          pullRuns: MemoryIngestionPullRunRepository.create(),
+          projects,
+        });
+
+        const [listed] = await reads.list("org-1");
+
+        expect(listed?.parserConfig).toEqual({
+          adapter: "gcp_vertex_agent_engine",
+          targets: [{ projectId: "acme-ml", location: "europe-west4" }],
+        });
+        expect(JSON.stringify(listed)).not.toContain("BEGIN KEY");
+      });
+    });
+  });
 });
