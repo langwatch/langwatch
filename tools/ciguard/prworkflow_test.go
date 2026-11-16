@@ -15,8 +15,7 @@ import (
 const calledWorkflow = `name: %[1]s
 on:
   workflow_call:
-  push:
-    branches: [main]
+  workflow_dispatch:
 concurrency:
   group: %[1]s-${{ github.ref }}
 jobs:
@@ -41,17 +40,29 @@ func prTree(t *testing.T, edit func(name, content string) string) string {
 		require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o750))
 		require.NoError(t, os.WriteFile(path, []byte(edit(rel, content)), 0o600))
 	}
-	var outputs, calls, results, skips strings.Builder
+	var outputs, calls, results strings.Builder
+	skips := strings.Builder{}
+	skips.WriteString("settle, checks, ")
 	for _, call := range PRCalls {
-		write(filepath.Join(ciscan.WorkflowDir, call.File), fmt.Sprintf(calledWorkflow, call.Key))
+		called := fmt.Sprintf(calledWorkflow, call.Key)
+		if call.OnMainPush {
+			called = strings.Replace(called, "  workflow_dispatch:\n", "  push:\n    branches: [main]\n  workflow_dispatch:\n", 1)
+		}
+		write(filepath.Join(ciscan.WorkflowDir, call.File), called)
 		fmt.Fprintf(&outputs, "      %[1]s: ${{ steps.filter.outputs.%[1]s || steps.force.outputs.all }}\n", call.Key)
-		fmt.Fprintf(&calls, "  %[1]s:\n    needs: changes\n    if: needs.changes.outputs.%[1]s == 'true'\n    uses: ./.github/workflows/%[2]s\n", call.Key, call.File)
+		fmt.Fprintf(&calls, "  %[1]s:\n    needs: [changes, settle]\n    if: ${{ !cancelled() && needs.changes.outputs.%[1]s == 'true' && needs.settle.result != 'failure' }}\n    uses: ./.github/workflows/%[2]s\n", call.Key, call.File)
 		fmt.Fprintf(&skips, "%s, ", call.Key)
 	}
 	for _, context := range PRRequired {
 		fmt.Fprintf(&results, "            %s=${{ needs.app.result }}\n", context)
 	}
-	write(PRWorkflowFile, "name: pr\non:\n  pull_request:\njobs:\n  changes:\n    outputs:\n"+outputs.String()+calls.String()+
+	write(NightlyWorkflowFile, "name: nightly\njobs:\n  main-checks:\n    uses: ./.github/workflows/pr.yml\n")
+	write(PRWorkflowFile, "name: pr\non:\n  pull_request:\njobs:\n  changes:\n    outputs:\n"+outputs.String()+
+		"    steps:\n      - run: gh api labels | grep -qxE 'ci:now|firefighting'\n"+
+		"  settle:\n    needs: changes\n    if: needs.changes.outputs.wait == 'true'\n    environment: settle\n"+
+		"  checks:\n    runs-on: ubuntu-latest\n    steps:\n"+
+		"      - run: ./.github/scripts/check-added-images.sh\n      - run: go run ./cmd/linkcheck README.md\n"+
+		"      - run: node .github/scripts/pr-token-usage.ts\n"+calls.String()+
 		"  ci-complete:\n    steps:\n      - env:\n          RESULTS: >-\n"+results.String()+
 		"          CHANGES: ${{ needs.changes.result }}\n"+
 		"        run: case \"$result\" in success | skipped) state=success ;; esac; [ \"$CHANGES\" = success ] || state=failure\n"+
@@ -102,7 +113,7 @@ func TestPRWorkflowReportsACheckThatStartsItself(t *testing.T) {
 			return strings.Replace(content, "  workflow_call:\n", "  pull_request:\n", 1)
 		}
 		if name == PRWorkflowFile {
-			return strings.Replace(content, "    if: needs.changes.outputs.nlp == 'true'\n", "", 1)
+			return strings.Replace(content, "needs.changes.outputs.nlp == 'true'", "true", 1)
 		}
 
 		return content
@@ -166,4 +177,125 @@ func TestPRWorkflowReportsACheckTheMergeQueueSkips(t *testing.T) {
 	}))
 	require.NoError(t, err)
 	require.Contains(t, problems, PRWorkflowFile+": changes output mcp is not forced true in the merge queue")
+}
+
+// @scenario "Heavy checks wait until the branch has been quiet"
+func TestPRWorkflowReportsACheckThatDoesNotWait(t *testing.T) {
+	problems, err := PRWorkflow(prTree(t, func(name, content string) string {
+		if name == PRWorkflowFile {
+			return strings.Replace(content, "  e2e:\n    needs: [changes, settle]\n", "  e2e:\n    needs: changes\n", 1)
+		}
+
+		return content
+	}))
+	require.NoError(t, err)
+	require.Contains(t, problems, PRWorkflowFile+": job e2e does not wait for a quiet branch (settle)")
+}
+
+// @scenario "Heavy checks wait until the branch has been quiet"
+func TestPRWorkflowReportsASettleJobThatHoldsNothing(t *testing.T) {
+	problems, err := PRWorkflow(prTree(t, func(name, content string) string {
+		if name == PRWorkflowFile {
+			return strings.Replace(content, "    environment: settle\n", "", 1)
+		}
+
+		return content
+	}))
+	require.NoError(t, err)
+	require.Contains(t, problems, PRWorkflowFile+": settle does not declare environment: settle, so nothing waits")
+}
+
+// @scenario "The ci:now label skips the wait"
+func TestPRWorkflowReportsAWaitTheLabelCannotSkip(t *testing.T) {
+	problems, err := PRWorkflow(prTree(t, func(name, content string) string {
+		if name == PRWorkflowFile {
+			return strings.Replace(content, "ci:now|", "ci:full|", 1)
+		}
+
+		return content
+	}))
+	require.NoError(t, err)
+	require.Contains(t, problems, PRWorkflowFile+": the changes job does not read the ci:now label")
+}
+
+// @scenario "The cheap checks run at once"
+func TestPRWorkflowReportsCheapChecksThatWait(t *testing.T) {
+	problems, err := PRWorkflow(prTree(t, func(name, content string) string {
+		if name == PRWorkflowFile {
+			return strings.Replace(content, "  checks:\n", "  checks:\n    needs: [changes, settle]\n", 1)
+		}
+
+		return content
+	}))
+	require.NoError(t, err)
+	require.Contains(t, problems, PRWorkflowFile+": the cheap checks wait for a quiet branch")
+}
+
+// @scenario "A merge to main runs only the app checks"
+func TestPRWorkflowReportsACheckStillOnMain(t *testing.T) {
+	problems, err := PRWorkflow(prTree(t, func(name, content string) string {
+		if strings.HasSuffix(name, "e2e-ci.yml") {
+			return strings.Replace(content, "  workflow_dispatch:\n", "  push:\n    branches: [main]\n", 1)
+		}
+		if name == NightlyWorkflowFile {
+			return strings.Replace(content, "main-checks", "other", 1)
+		}
+
+		return content
+	}))
+	require.NoError(t, err)
+	require.Contains(t, problems, ".github/workflows/e2e-ci.yml: runs on a push to main; the nightly suite runs it")
+	require.Contains(t, problems, NightlyWorkflowFile+": no main-checks job calls "+PRWorkflowFile)
+}
+
+// @scenario "A merge to main runs only the app checks"
+func TestPRWorkflowReportsAppChecksOffMain(t *testing.T) {
+	problems, err := PRWorkflow(prTree(t, func(name, content string) string {
+		if strings.HasSuffix(name, "langwatch-app-ci.yml") {
+			return strings.Replace(content, "  push:\n    branches: [main]\n", "", 1)
+		}
+
+		return content
+	}))
+	require.NoError(t, err)
+	require.Contains(t, problems, ".github/workflows/langwatch-app-ci.yml: does not run on a push to main")
+}
+
+// @scenario "A merge to main runs only the app checks"
+func TestPRWorkflowReportsAppChecksPushedOnAnotherBranch(t *testing.T) {
+	problems, err := PRWorkflow(prTree(t, func(name, content string) string {
+		if strings.HasSuffix(name, "langwatch-app-ci.yml") {
+			return strings.Replace(content, "branches: [main]", "branches: [develop]", 1)
+		}
+
+		return content
+	}))
+	require.NoError(t, err)
+	require.Contains(t, problems, ".github/workflows/langwatch-app-ci.yml: does not run on a push to main")
+}
+
+// @scenario "The ci:now label skips the wait"
+func TestPRWorkflowReportsAWaitTheFirefightingLabelCannotSkip(t *testing.T) {
+	problems, err := PRWorkflow(prTree(t, func(name, content string) string {
+		if name == PRWorkflowFile {
+			return strings.Replace(content, "|firefighting", "", 1)
+		}
+
+		return content
+	}))
+	require.NoError(t, err)
+	require.Contains(t, problems, PRWorkflowFile+": the changes job does not read the firefighting label")
+}
+
+// @scenario "The cheap checks run at once"
+func TestPRWorkflowReportsACheapCheckDropped(t *testing.T) {
+	problems, err := PRWorkflow(prTree(t, func(name, content string) string {
+		if name == PRWorkflowFile {
+			return strings.Replace(content, "      - run: go run ./cmd/linkcheck README.md\n", "", 1)
+		}
+
+		return content
+	}))
+	require.NoError(t, err)
+	require.Contains(t, problems, PRWorkflowFile+": the checks job does not run cmd/linkcheck")
 }

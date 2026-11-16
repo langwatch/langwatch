@@ -1,19 +1,10 @@
-# Always-run workflow with internal path gating + aggregator. See #3223.
-# Branch protection requires `go-ci-complete`. Upstream jobs skip when paths
-# don't match, and `alls-green` reports the final consolidated status.
+# Called by pr.yml and the nightly suite; no check here is required, pr.yml's
+# ci-complete is. `changes` gates the jobs and `go-ci-complete` sums them up.
 name: go-ci
 
 on:
-  push:
-    branches: [main]
-  # ready_for_review is not a default activity type; without it, taking a PR
-  # out of draft fires no event and the heavy jobs below never get their run.
-  pull_request:
-    # No `labeled`: a label starts no run, and `ci:full` counts from the next push.
-    types: [opened, synchronize, reopened, ready_for_review]
-  # Evaluate against the queued merge commit too, so the generated-code drift
-  # check can gate the queue rather than only the PR head.
-  merge_group:
+  # Pull requests reach this through pr.yml; main through the nightly suite.
+  workflow_call:
   workflow_dispatch:
 
 permissions:
@@ -193,7 +184,7 @@ jobs:
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: true
-          save-cache: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          save-cache: ${{ github.event_name != 'pull_request' && github.event_name != 'pull_request_target' && github.ref == 'refs/heads/main' }}
           cache-dependency-glob: "uv.lock"
       - name: Install the code-block sandbox packages
         run: |
@@ -350,9 +341,8 @@ jobs:
       - name: Generated READMEs are current
         run: pnpm check:readmes
 
-  # The single required status check. Every job above is `if:`-gated and so
-  # cannot be required directly — a skipped job never reports, and branch
-  # protection would wait forever. This one always runs and consolidates them.
+  # Consolidates every `if:`-gated job above into one result for pr.yml's
+  # ci-complete, which is the required verdict.
   go-ci-complete:
     needs: [changes, build, test, lint, vet, generated, ci-guards]
     if: always()

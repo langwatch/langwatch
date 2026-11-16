@@ -3,12 +3,9 @@
 name: docs-ci
 
 on:
-  # Pull requests and the merge queue reach this through pr.yml.
+  # Pull requests reach this through pr.yml; main through the nightly suite.
   workflow_call:
-  push:
-    branches:
-      - main
-
+  workflow_dispatch:
 # No job here writes anything. Declared explicitly rather than inherited,
 # because this workflow installs an npm dependency tree and runs it: if the
 # repository default is ever flipped to write, that would silently hand those

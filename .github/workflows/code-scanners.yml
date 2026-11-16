@@ -20,17 +20,9 @@ name: code-scanners
 # behaviour is version-sensitive. Bump them together.
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-  merge_group:
+  # Pull requests reach this through pr.yml; main through the nightly suite.
+  workflow_call:
   workflow_dispatch:
-  schedule:
-    # The dependency scanners below are report-only on a PR because they fail
-    # on upstream advisories nobody in the PR caused. This is where they get
-    # looked at on their own schedule instead.
-    - cron: "17 6 * * 1"
 
 permissions:
   contents: read
@@ -52,8 +44,8 @@ jobs:
   #
   # Non-PR events force both filters true, the same rule
   # .github/actions/detect-changes and go-services.yaml already use. That
-  # keeps the weekly cron (where the report-only scanners are actually
-  # actioned), merge_group, push and workflow_dispatch running everything.
+  # keeps the nightly suite (where the report-only scanners are actioned),
+  # merge_group and workflow_dispatch running everything.
   changes:
     runs-on: ubuntu-latest
     outputs:
@@ -299,7 +291,7 @@ jobs:
       # reachability analysis: it flags an advisory against anything in the
       # resolved set whether or not a line of our code can reach it. Blocking
       # on that stops unrelated work for a reason its author cannot fix. The
-      # weekly cron at the top of this file is where these get actioned.
+      # nightly suite's run is where these get actioned.
       #
       # `continue-on-error` sits on the step, not the job, so every requirements
       # file is still audited and the whole report lands in the log.

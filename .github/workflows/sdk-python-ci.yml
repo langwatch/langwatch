@@ -1,31 +1,18 @@
-# Always-run workflow with internal path gating + aggregator. See #3223.
-#
-# Why: branch protection on `main` requires specific checks to pass on
-# every PR. A top-level `paths:` filter would make this workflow silently
-# absent on unrelated PRs, leaving any required check stuck pending. So
-# the workflow always runs; `changes` decides whether jobs do real work
-# or skip; `sdk-python-complete` aggregates and reports one final status
-# that branch protection requires.
+# Called by pr.yml and the nightly suite, and run for forks through
+# pull_request_target once labelled approved-ci. No check here is required;
+# pr.yml's ci-complete is. `changes` gates the jobs, `sdk-python-complete` sums them up.
 name: sdk-python-ci
 
 on:
-  push:
-    branches:
-      - main
-  pull_request:
-    # ready_for_review is NOT a default pull_request activity type. Without
-    # it, taking a PR out of draft fires no event at all, so the jobs gated
-    # on `heavy` below would never get their first non-draft run.
-    # No `labeled`: a label starts no run, and `ci:full` counts from the next push.
-    types: [opened, synchronize, reopened, ready_for_review]
+  # Pull requests reach this through pr.yml; main through the nightly suite.
+  workflow_call:
   pull_request_target:
     types: [labeled]
-  merge_group:
   workflow_dispatch:
 
 concurrency:
   # A pull_request_target label other than `approved-ci` gets its own group.
-  group: ${{ github.workflow }}-${{ github.event_name }}-${{ (github.event_name == 'pull_request_target' && github.event.label.name != 'approved-ci') && format('label-{0}', github.run_id) || github.event.pull_request.number || github.ref }}
+  group: sdk-python-ci-${{ github.event_name }}-${{ (github.event_name == 'pull_request_target' && github.event.label.name != 'approved-ci') && format('label-{0}', github.run_id) || github.event.pull_request.number || github.ref }}
   # A newer commit supersedes an older run, on main too: the newest verdict
   # covers the commits before it. Image and release builds keep their own rule.
   cancel-in-progress: true
@@ -157,7 +144,7 @@ jobs:
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: true
-          save-cache: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          save-cache: ${{ github.event_name != 'pull_request' && github.event_name != 'pull_request_target' && github.ref == 'refs/heads/main' }}
           cache-dependency-glob: "uv.lock"
 
       - name: Setup Python UV
@@ -339,7 +326,7 @@ jobs:
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: true
-          save-cache: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          save-cache: ${{ github.event_name != 'pull_request' && github.event_name != 'pull_request_target' && github.ref == 'refs/heads/main' }}
           cache-dependency-glob: "uv.lock"
 
       - name: Install the package on Python ${{ matrix.python-version }}
@@ -376,7 +363,7 @@ jobs:
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: true
-          save-cache: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          save-cache: ${{ github.event_name != 'pull_request' && github.event_name != 'pull_request_target' && github.ref == 'refs/heads/main' }}
           cache-dependency-glob: "uv.lock"
 
       - name: Setup Python UV
@@ -387,7 +374,7 @@ jobs:
         working-directory: sdks/python
         run: uv run python -m build
 
-  # One required check for the whole workflow. Reports success if every
+  # One result for pr.yml's ci-complete, the required verdict. Reports success if every
   # upstream job either passed or was legitimately skipped (paths didn't
   # match). Reports failure if any upstream job failed. Uses `alls-green`
   # because GitHub's default `needs:` semantics treat skipped needs as

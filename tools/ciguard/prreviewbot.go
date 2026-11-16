@@ -51,9 +51,18 @@ func PRReviewBot(repoRoot string) ([]string, error) {
 		return nil, err
 	}
 
+	// pr.yml calls the bot: its pull_request types are the ones that start a review.
+	triggers, triggersPath := workflow, PRReviewBotWorkflow
+	if len(workflow.On.PullRequest.Types) == 0 {
+		triggersPath = PRWorkflowFile
+		if triggers, err = ciscan.Load(repoRoot, PRWorkflowFile); err != nil {
+			return nil, err
+		}
+	}
+
 	var problems []string
 	problems = append(problems, prReviewBotGates(workflow)...)
-	problems = append(problems, prReviewBotTriggers(workflow)...)
+	problems = append(problems, prReviewBotTriggers(triggers, triggersPath)...)
 	problems = append(problems, prReviewBotConcurrency(workflow)...)
 	problems = append(problems, prReviewBotPermissions(workflow)...)
 	problems = append(problems, prReviewBotPinning(workflow)...)
@@ -97,10 +106,10 @@ func prReviewBotGates(workflow *ciscan.Workflow) []string {
 // event types the review job's scenarios describe — no fewer (a dropped type
 // silently stops reviewing that event) and no more (an added type runs
 // against an event the gate above was never proven against).
-func prReviewBotTriggers(workflow *ciscan.Workflow) []string {
+func prReviewBotTriggers(workflow *ciscan.Workflow, path string) []string {
 	got := slices.Clone(workflow.On.PullRequest.Types)
 	if len(got) == 0 {
-		return []string{fmt.Sprintf("%s declares no pull_request `types:` list", PRReviewBotWorkflow)}
+		return []string{fmt.Sprintf("%s declares no pull_request `types:` list", path)}
 	}
 	sort.Strings(got)
 
@@ -113,7 +122,7 @@ func prReviewBotTriggers(workflow *ciscan.Workflow) []string {
 
 	return []string{fmt.Sprintf(
 		"%s pull_request types are %v, want %v",
-		PRReviewBotWorkflow, workflow.On.PullRequest.Types, prReviewBotTriggerTypes)}
+		path, workflow.On.PullRequest.Types, prReviewBotTriggerTypes)}
 }
 
 // prReviewBotConcurrency checks the workflow cancels a superseded run for the
