@@ -754,3 +754,25 @@ Feature: Redacting personal data from traces
     When a trace is ingested whose input carries version numbers and counts but
       no run of digits long enough to be a phone number
     Then the stored input is unchanged
+
+  # Six digits in a row still let most timestamps, ids and dates through, so the
+  # phone scan is narrowed further to the shapes a number can take: a "+" and
+  # six digits, ten digits, "011" and six, or Canada's seven-digit "310" numbers,
+  # each joined only by the separators a number uses. The narrowing may only
+  # skip text in which no phone number is found; anything else is a leak.
+  #
+  # Bindings: packages/redaction/src/__tests__/essentialPii.phoneGate.unit.test.ts
+  @unit
+  Scenario: The phone check skips nothing the digit check let through
+    Given texts holding phone numbers from many countries, written with every
+      separator, prefix and extension a number takes, and numeric text that is no number
+    When each is redacted
+    Then every text the six-digit check let through and that holds a number is scanned
+    And every text is redacted byte for byte as it was under the six-digit check
+
+  @unit
+  Scenario: Numeric text that cannot hold a phone number skips the phone scan
+    Given timestamps, dates, ids, versions, token counts, money and durations
+      that the six-digit check let through
+    When each is redacted
+    Then fewer than half of them reach the phone scan
