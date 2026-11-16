@@ -124,7 +124,7 @@ export interface EventingConfig {
 /** Where one S3 account's objects are written, and under whose credentials. */
 export interface ObjectStorageAccount {
   readonly bucket: string;
-  /** Absent leaves AWS endpoints on the SDK's own chain and names `auto` for any other. */
+  /** Absent: `auto` off AWS; on AWS, AWS_REGION or the profile, else the bucket's own region. */
   readonly region?: string;
   /** A non-AWS endpoint (MinIO, R2, a dev container). Absent uses AWS itself. */
   readonly endpoint?: string;

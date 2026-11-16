@@ -16,7 +16,7 @@ import {
 } from "@aws-sdk/client-s3";
 import { fromTokenFile } from "@aws-sdk/credential-providers";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { s3RegionOf } from "@langwatch/aws-client";
+import { s3RegionFor, s3RegionOf, type S3BucketRegionAnswer } from "@langwatch/aws-client";
 
 import type { ObjectStorageAccount } from "./config.ts";
 import type {
@@ -59,19 +59,31 @@ interface S3Place {
   readonly bodyIdleMs: number;
 }
 
+/** What a client may be handed instead of asking AWS, so a test can answer for it. */
+export interface S3RegionSeams {
+  readonly askBucket?: () => Promise<S3BucketRegionAnswer>;
+  readonly configured?: () => Promise<string | undefined>;
+}
+
 /**
  * One client per account. Checksums only when an operation requires one: a
  * default trailer checksum breaks presigned PUTs and most non-AWS endpoints.
+ * With no region named anywhere, the bucket's own region is asked once (tasks#1192).
  */
-export function s3Client(account: ObjectStorageAccount): S3Client {
+export function s3Client(account: ObjectStorageAccount, seams: S3RegionSeams = {}): S3Client {
   const endpoint = account.endpoint?.trim() || undefined;
-  const roleArn = account.roleArn;
-  const credentials = roleArn
-    ? fromTokenFile({ roleArn })
-    : account.credentials && { ...account.credentials };
+  const credentials = credentialsOf(account);
 
   return new S3Client({
-    region: s3RegionOf({ region: account.region, endpoint }),
+    region: s3RegionFor({
+      region: account.region,
+      endpoint,
+      bucket: account.bucket,
+      askBucket:
+        seams.askBucket ??
+        (() => bucketRegionOf({ client: bucketRegionClient(account), bucket: account.bucket })),
+      configured: seams.configured,
+    }),
     ...(endpoint === undefined ? {} : { endpoint }),
     ...(credentials === undefined ? {} : { credentials }),
     forcePathStyle: account.forcePathStyle ?? true,
@@ -79,6 +91,44 @@ export function s3Client(account: ObjectStorageAccount): S3Client {
     requestChecksumCalculation: "WHEN_REQUIRED",
     responseChecksumValidation: "WHEN_REQUIRED",
   });
+}
+
+function credentialsOf(account: ObjectStorageAccount) {
+  return account.roleArn
+    ? fromTokenFile({ roleArn: account.roleArn })
+    : account.credentials && { ...account.credentials };
+}
+
+/** AWS's global endpoint, one attempt, the store's timeouts: it only asks where a bucket lives. */
+function bucketRegionClient(account: ObjectStorageAccount): S3Client {
+  const credentials = credentialsOf(account);
+  return new S3Client({
+    region: s3RegionOf({ region: "us-east-1" }),
+    ...(credentials === undefined ? {} : { credentials }),
+    forcePathStyle: true,
+    maxAttempts: 1,
+    requestHandler: S3_REQUEST_HANDLER,
+  });
+}
+
+/** AWS names a bucket's region on success, a redirect and a refusal alike; 404 is no bucket. */
+export async function bucketRegionOf({
+  client,
+  bucket,
+}: {
+  client: S3Client;
+  bucket: string;
+}): Promise<S3BucketRegionAnswer> {
+  try {
+    const answer = await client.send(new HeadBucketCommand({ Bucket: bucket }));
+    const region = answer.BucketRegion ?? (await client.config.region());
+    return { kind: "found", region };
+  } catch (error) {
+    if (!(error instanceof S3ServiceException)) return { kind: "unknown" };
+    const named = error.$response?.headers?.["x-amz-bucket-region"]?.trim();
+    if (named) return { kind: "found", region: named };
+    return error.$metadata.httpStatusCode === 404 ? { kind: "missing" } : { kind: "unknown" };
+  }
 }
 
 function isMissing(error: unknown): boolean {

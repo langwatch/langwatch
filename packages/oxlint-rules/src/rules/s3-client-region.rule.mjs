@@ -4,14 +4,15 @@ import { defineRule } from "../define-rule.mjs";
 // a client that picks its own region once sent "auto" to AWS, which refuses it.
 
 const AWS_CLIENT_PACKAGE = "packages/aws-client/";
-const SHARED_RULE = "s3RegionOf";
+/** `s3RegionFor` applies `s3RegionOf` first, then asks the bucket (tasks#1192). */
+const SHARED_RULES = new Set(["s3RegionOf", "s3RegionFor"]);
 const MAX_DEPTH = 8;
 
 function isSharedRuleCall(node) {
   return (
     node?.type === "CallExpression" &&
     node.callee.type === "Identifier" &&
-    node.callee.name === SHARED_RULE
+    SHARED_RULES.has(node.callee.name)
   );
 }
 
