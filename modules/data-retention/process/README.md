@@ -6,7 +6,7 @@ The server half of [data-retention](../README.md). Data retention: the retention
 
 ## Installation
 
-`defineProcessModule("data-retention").withRepositories(dataRetentionRepositories).withApi(DataRetentionModule).withTransports(dataRetentionTrpcTransport).withEventing(dataRetentionSeatPolicyEventing).withMigrations(…)`, `src/data-retention.module.ts:18`.
+`defineProcessModule("data-retention").withRepositories(dataRetentionRepositories).withApi(DataRetentionModule).withTransports(dataRetentionTrpcTransport).withEventing(dataRetentionSeatPolicyEventing).withEventing(dataRetentionFactsEventing).withMigrations(…)`, `src/data-retention.module.ts:19`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -307,6 +307,14 @@ interface Output {
 None: this module declares no websocket, rawsocket or rawhttp door.
 
 ## Workers
+
+### Pipeline `data_retention_facts` (aggregate `data_retention_project`)
+
+Declared at `src/eventing/data-retention-facts.pipeline.ts:25`. Events: `retentionAppliedToExistingDataEventSchema`.
+
+| Kind    | Name                                   | Handles | Declared at                                        |
+| ------- | -------------------------------------- | ------- | -------------------------------------------------- |
+| command | `recordRetentionAppliedToExistingData` | –       | `src/eventing/data-retention-facts.pipeline.ts:30` |
 
 ### Pipeline `data_retention_seat_policy` (aggregate `global`)
 
