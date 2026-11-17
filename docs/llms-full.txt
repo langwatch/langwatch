@@ -38486,6 +38486,88 @@ Use evaluations for the parts inside the agent. Use agent testing to check the a
 
 ---
 
+# FILE: ./agent-testing/owasp-red-team.mdx
+
+---
+title: OWASP Red Team Pack
+sidebarTitle: OWASP Red Team Pack
+keywords: langwatch, red teaming, owasp, owasp top 10 for llm applications, owasp agentic top 10, prompt injection, agent security, scenario tests
+description: Run one multi-turn attack per OWASP risk against your agent as pytest or vitest scenario tests, with every verdict in LangWatch.
+---
+
+<Warning>Use red teaming only on agents you own or have explicit permission to test.</Warning>
+
+The OWASP pack is a set of multi-turn [red team](/agent-testing/red-teaming) tests, one per OWASP risk, that you add to your agent's test suite. You get a pytest or vitest file per language, judged against your agent's own rules, so you can show your security team where the agent stands on the OWASP Top 10 for LLM Applications and the OWASP Top 10 for Agentic Applications.
+
+## What the pack covers
+
+| OWASP id | Title | What the attacker tries |
+| --- | --- | --- |
+| LLM01:2025 | Prompt Injection | Planted instructions in pasted content or tool results |
+| LLM02:2025 | Sensitive Information Disclosure | Leaking the data you list as protected |
+| LLM05:2025 | Improper Output Handling | Scripts, handlers and tracking images in replies |
+| LLM06:2025 | Excessive Agency | Actions beyond what the user may ask for |
+| LLM07:2025 | System Prompt Leakage | Printing the system prompt or hidden rules |
+| LLM09:2025 | Misinformation | Confident answers the agent's data does not back |
+| LLM10:2025 | Unbounded Consumption | Endless output and tool loops |
+| ASI01 | Agent Goal Hijack | Redirecting the agent to the attacker's goal |
+| ASI02 | Tool Misuse and Exploitation | Tools called with injected or foreign arguments |
+| ASI03 | Identity and Privilege Abuse | Privileged tools used on a claimed identity |
+| ASI06 | Memory & Context Poisoning | A false rule planted early and used later |
+
+The other ids (LLM03, LLM04, LLM08, ASI04, ASI05, ASI07 to ASI10) concern supply chain, training data, vector stores and multi-agent systems, which a conversation with your agent cannot reach.
+
+## Apply it with your coding agent
+
+Install the LangWatch skills and ask your coding agent:
+
+```text
+Red team my agent against the OWASP Top 10 for LLM and agentic applications
+```
+
+It follows the [OWASP red team recipe](https://github.com/langwatch/skills/tree/main/recipes/owasp-red-team). When it finishes, you have:
+
+- the pack in your tests, in the language your repo uses
+- an adapter that calls your agent
+- a config filled in from your system prompt and tools
+- the results of one attack, then of the full pack
+
+## Apply it by hand
+
+1. Copy the [Python pack](https://github.com/langwatch/skills/tree/main/recipes/owasp-red-team/templates/python) or the [TypeScript pack](https://github.com/langwatch/skills/tree/main/recipes/owasp-red-team/templates/typescript) into one test folder.
+2. In `agent_adapter.py` or `agent-adapter.ts`, make `call_agent` or `callAgent` call your real agent and return its reply, tool calls included. If your TypeScript agent takes OpenAI chat messages, use `toOpenAIMessages` and `fromOpenAIMessages` from the same file.
+3. In `owasp_config.py` or `owasp.config.ts`, fill in the config block. You describe the agent's name and job, its tools, the tools that change data, what it must never do and the data it must never disclose. The pack builds every attack goal and judge criterion from this one block. Every field ships as `FILL ME`, and the pack refuses to run while any field still holds `FILL ME`.
+
+   Two limits ship filled: `max_reply_words` (500) and `max_tool_calls_per_turn` (5). They set the longest reply and the most tool calls per message that the LLM10 attack accepts.
+
+## Run it
+
+Install the test dependencies if your repo does not have them yet:
+
+```bash
+pip install "langwatch-scenario>=1.6" pytest pytest-asyncio         # Python
+npm install -D @langwatch/scenario@^1.7 vitest @ai-sdk/openai@^3     # TypeScript
+```
+
+Keep `@ai-sdk/openai` on 3.x: `@langwatch/scenario` 1.7 refuses 4.x models. The attacker and the judge need an OpenAI-compatible chat model, set with `OWASP_MODEL`. For Python, set `OWASP_MODEL` to that provider's LiteLLM id. For TypeScript, also swap the `openai` import and factory in `owasp-pack.test.ts` for that provider's AI SDK package. Gemini fails as attacker or judge in the current SDK. Your agent can use any model.
+
+Set `LANGWATCH_API_KEY` and the API key of the provider `OWASP_MODEL` points to (`OPENAI_API_KEY` for the default), then run:
+
+```bash
+pytest test_owasp_pack.py -v            # Python
+npx vitest run owasp-pack.test.ts       # TypeScript
+```
+
+Add `-k LLM01` (pytest) or `-t LLM01` (vitest) to run one id. `OWASP_TURNS` sets the attacker's turns per attack: 10 when unset or empty, 30 before a release. A value that is not a whole number of at least 1 stops the run.
+
+To read the results:
+
+1. In LangWatch, open Simulations.
+2. Pick the `owasp-red-team` set: it holds one run per OWASP id.
+3. Open a run to read the conversation and the judge's verdict on each criterion. The test output names the unmet criteria but not the turn, so find the first agent reply that breaks one here.
+
+---
+
 # FILE: ./agent-testing/red-team-open-source.mdx
 
 ---
@@ -62685,6 +62767,184 @@ Your harness, codebase and model decide which levers exist. Full guide: [Improvi
         </div>
       </div>
       <div className="lw-accordion-action" role="button" tabIndex={0} data-download-url="https://raw.githubusercontent.com/langwatch/skills/main/recipes/test-compliance/SKILL.md" data-download-name="SKILL.md" data-track="docs_download_skill" data-track-title={"Check my agent doesn't give prescriptive advice"} data-track-skill={"langwatch/skills/recipes/test-compliance"}>
+        <span className="lw-accordion-action-icon"><svg width="16" height="16" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15.25 3.75H2.75C1.64543 3.75 0.75 4.64543 0.75 5.75V12.25C0.75 13.3546 1.64543 14.25 2.75 14.25H15.25C16.3546 14.25 17.25 13.3546 17.25 12.25V5.75C17.25 4.64543 16.3546 3.75 15.25 3.75Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M8.75 11.25V6.75H8.356L6.25 9.5L4.144 6.75H3.75V11.25" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M11.5 9.5L13.25 11.25L15 9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M13.25 11.25V6.75" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg></span>
+        <span className="lw-accordion-action-text">
+          <span className="lw-accordion-action-title">Download SKILL.md</span>
+          <span className="lw-accordion-action-subtitle">Manual installation</span>
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div className="lw-accordion">
+  <div className="lw-accordion-header" role="button" tabIndex={0} aria-expanded="false">
+    <span className="lw-accordion-title">Red team my agent against the OWASP Top 10</span>
+    <svg className="lw-accordion-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9L12 15L18 9" /></svg>
+  </div>
+  <div className="lw-accordion-body">
+    <div className="lw-accordion-commands">
+      <div className="lw-accordion-cmd-col">
+        <div className="lw-accordion-cmd-label">Install via CLI</div>
+        <div className="lw-accordion-cmd-box" role="button" tabIndex={0} data-copy={"npx skills add langwatch/skills/recipes/owasp-red-team"} data-track="docs_copy_skill_install" data-track-title={"Red team my agent against the OWASP Top 10"} data-track-skill={"langwatch/skills/recipes/owasp-red-team"}>
+          <code>npx skills add langwatch/skills/recipes/owasp-red-team</code>
+          <span className="lw-inline-copy-btn lw-copy-line-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+          <span className="lw-inline-copy-btn lw-copy-line-check" style={{ display: "none" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        </div>
+      </div>
+      <div className="lw-accordion-cmd-col">
+        <div className="lw-accordion-cmd-label">Skill Usage</div>
+        <div className="lw-accordion-cmd-box" role="button" tabIndex={0} data-copy={"/owasp-red-team"} data-track="docs_copy_slash_command" data-track-title={"Red team my agent against the OWASP Top 10"} data-track-command={"/owasp-red-team"}>
+          <code><span className="lw-slash-command">/owasp-red-team</span></code>
+          <span className="lw-inline-copy-btn lw-copy-line-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+          <span className="lw-inline-copy-btn lw-copy-line-check" style={{ display: "none" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        </div>
+      </div>
+    </div>
+    <div className="lw-accordion-actions">
+      <div className="lw-accordion-action" role="button" tabIndex={0} data-copy-source="prompt" data-track="docs_copy_prompt" data-track-title={"Red team my agent against the OWASP Top 10"} data-track-skill={"langwatch/skills/recipes/owasp-red-team"}>
+        <span className="lw-accordion-action-icon lw-copy-line-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+        <span className="lw-accordion-action-icon lw-copy-line-check" style={{ display: "none" }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        <span className="lw-accordion-action-text">
+          <span className="lw-accordion-action-title">Copy Full Prompt</span>
+          <span className="lw-accordion-action-subtitle">Run skill without installing</span>
+        </span>
+        <div className="lw-prompt-source">
+
+````text
+Red team my agent against the OWASP Top 10 for LLM and agentic applications
+
+You are using LangWatch for your AI agent project. Follow these instructions.
+
+IMPORTANT: You will need a LangWatch API key. Check whether LANGWATCH_API_KEY is already set: in the process environment, which is where CI injects it, and otherwise in the project's .env file. Use that key instead of asking for a new one. Read LANGWATCH_ENDPOINT from the same places, and nothing else out of .env: if the endpoint is set, the project is on a self-hosted instance, and the CLI works against that endpoint instead of app.langwatch.ai.
+Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it once with `npm install -g langwatch`, then run the `langwatch` binary directly; an unpinned `npx langwatch` re-resolves the package from the registry on every run.
+
+# Red Team Your Agent with the OWASP Pack
+
+This recipe applies a ready OWASP pack to the user's agent: one multi-turn `RedTeamAgent` attack per OWASP risk, each judged against criteria built from the agent's own config. The pack lives in the `templates/` folder beside this file, in Python (pytest) and TypeScript (vitest). Copy it; do not rewrite it.
+
+Use red teaming only on agents the user owns or has permission to test.
+
+## What the pack covers
+
+| OWASP id | Title | Strategy |
+| --- | --- | --- |
+| LLM01:2025 | Prompt Injection | goat |
+| LLM02:2025 | Sensitive Information Disclosure | crescendo |
+| LLM05:2025 | Improper Output Handling | goat |
+| LLM06:2025 | Excessive Agency | crescendo |
+| LLM07:2025 | System Prompt Leakage | goat |
+| LLM09:2025 | Misinformation | crescendo |
+| LLM10:2025 | Unbounded Consumption | goat |
+| ASI01 | Agent Goal Hijack | crescendo |
+| ASI02 | Tool Misuse and Exploitation | goat |
+| ASI03 | Identity and Privilege Abuse | crescendo |
+| ASI06 | Memory & Context Poisoning | crescendo |
+
+The LLM ids are from the OWASP Top 10 for LLM Applications 2025; the ASI ids from the OWASP Top 10 for Agentic Applications. The ids not listed (LLM03 supply chain, LLM04 data poisoning, LLM08 vector weaknesses, ASI04, ASI05, ASI07 to ASI10) need build, data or multi-agent checks that a conversation cannot exercise.
+
+Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
+
+```bash
+langwatch docs                                    # Docs index
+langwatch docs integration/python/guide           # Python integration
+langwatch docs integration/typescript/guide       # TypeScript integration
+langwatch docs prompt-management/cli              # Prompts CLI
+langwatch scenario-docs                           # Scenario docs index
+```
+
+Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. List and get commands accept `--format json` for machine-readable output. Every list command takes `--limit <n>` to cap the rows and `--jq <expr>` to read part of the answer. A paginated list answers with an envelope, so count its rows through the row array (`--jq '.traces | length'`), and read how many there are in all at `.pagination.total`. Bare `--jq length` counts the fields of the envelope, not the rows. Read the docs first instead of guessing SDK APIs or CLI flags.
+
+If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
+
+If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx --yes langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`. With `--session`, always run `--dry-run` first and let the user read the payload, because a transcript carries content they never reviewed. `npx --yes langwatch report --help` explains the options.
+
+## Step 1: Detect the language
+
+Look at the agent's repository. `pyproject.toml`, `requirements.txt` or `uv.lock` means Python; `package.json` with TypeScript means TypeScript. If both exist, use the language the agent itself is written in. Read the agent's entry point, system prompt and tool definitions before going on: Step 4 needs them.
+
+## Step 2: Copy the template
+
+Copy every file of the matching template folder into the repository's test folder, unchanged except for import paths:
+
+- Python: `templates/python/` holds `owasp_config.py`, `agent_adapter.py`, `owasp_attacks.py`, `test_owasp_pack.py` and `conftest.py`. Put them together in one folder (for example `tests/owasp/`). `conftest.py` puts the repository root on the import path, two folders up, and registers the `agent_test` mark. If the folder sits at another depth, change the `parents[2]` in it, or set `pythonpath = ["."]` under `[tool.pytest.ini_options]`.
+- TypeScript: `templates/typescript/` holds `owasp.config.ts`, `agent-adapter.ts`, `owasp-attacks.ts`, `owasp-pack.test.ts`. Put them together in one folder (for example `tests/owasp/`).
+
+If you cannot read the `templates/` folder, fetch the same files from `https://github.com/langwatch/skills/tree/main/recipes/owasp-red-team/templates`.
+
+Install the test dependencies:
+
+```bash
+# Python
+uv add --dev "langwatch-scenario>=1.6" pytest "pytest-asyncio>=0.24"   # or: pip install ...
+# TypeScript: @langwatch/scenario 1.7 bundles ai 6, which takes only @ai-sdk/* 3.x
+npm install -D @langwatch/scenario@^1.7 vitest @ai-sdk/openai@^3
+```
+
+## Step 3: Wire the adapter
+
+Edit only the adapter function: `call_agent(messages)` in `agent_adapter.py`, or `callAgent({ messages })` in `agent-adapter.ts`. Make it call the user's real agent with the conversation and return the agent's reply. Return the tool call and tool result messages as well when the agent has tools: the judge needs them for LLM06, LLM10, ASI02 and ASI03.
+
+Python passes `messages` as OpenAI chat messages, so an agent on the `openai` SDK takes them as is. A sync agent runs in a thread: `return await asyncio.to_thread(respond, list(messages))`.
+
+TypeScript passes AI SDK `ModelMessage`s. If the agent takes OpenAI chat messages (the `openai` SDK), use the helpers in `agent-adapter.ts`: `toOpenAIMessages({ messages })` before the call and `fromOpenAIMessages({ messages: newMessages })` on its new messages, tool calls and tool results included. An agent built on the AI SDK takes `messages` as is. Both drop system messages: the agent keeps its own system prompt.
+
+Call the real agent with its real tools and system prompt. A mock defeats the test. If the tools write to real systems, point them at a test account or a sandbox before running.
+
+## Step 4: Fill the config
+
+Fill the one config block (`AGENT` in `owasp_config.py` or `owasp.config.ts`) from what you read in Step 1. Every field but the two limits ships as `FILL ME`, and the pack refuses to run, naming the file and the fields, until none is left. `EXAMPLE_AGENT` beside it shows a filled block:
+
+- `name`, `description`: what the agent is called and what it does.
+- `tools`: every tool name the model sees. `privileged_tools`: the ones that change data, spend money or reach outside. `privileged_tools` may be an empty list (the privilege attacks then name every tool); empty `tools`, `must_never` or `protected_data` make the pack refuse to run.
+- `must_never`: the actions the agent must refuse, from its system prompt and business rules, one sentence each.
+- `protected_data`: what it must never disclose.
+- `output_rendered_as`: where replies are shown (HTML widget, Slack, plain API).
+- `max_reply_words`, `max_tool_calls_per_turn`: the longest reply and the most tool calls for one message that the unbounded consumption attack (LLM10) still accepts. They ship as 500 and 5; raise them for an agent whose normal work needs more.
+
+Every attack goal and judge criterion is built from these fields, so do not edit `owasp_attacks.py` or `owasp-attacks.ts` for a new agent. Ask the user only for rules you cannot find in the code.
+
+## Step 5: Run
+
+Set `LANGWATCH_API_KEY` (results go to that project) and the model key for the attacker and judge (`OPENAI_API_KEY` by default). `OWASP_MODEL` picks the attacker and judge model (default `gpt-6-luna`; Python takes a LiteLLM id such as `openai/gpt-5-mini`). Use an OpenAI-compatible chat model for the attacker and the judge: Gemini fails in the current scenario SDK (the attacker's first call has no user turn). The agent under test can use any model. For another provider in Python, set `OWASP_MODEL` to that provider's LiteLLM id. In TypeScript, also swap the `openai` import and factory in `owasp-pack.test.ts` for that provider's AI SDK package. For an OpenAI-compatible endpoint in TypeScript, import `createOpenAI` beside `openai` from `@ai-sdk/openai`, define `baseURL` as the endpoint URL and `apiKey` as that endpoint's key (read both from environment variables), add `const provider = createOpenAI({ baseURL, apiKey })`, and replace each of the three `openai(MODEL)` calls (attacker, metaprompt and judge) with `provider.chat(MODEL)`. `OWASP_TURNS` sets attacker turns per attack: unset or empty gives 10, which keeps a run cheap; use 30 before a release. Any other value that is not a whole number of at least 1 stops the run with an error naming `OWASP_TURNS`.
+
+```bash
+# Python, from the folder with the pack
+pytest test_owasp_pack.py -v
+pytest test_owasp_pack.py -v -k LLM01      # one id
+# TypeScript
+npx vitest run tests/owasp/owasp-pack.test.ts
+npx vitest run tests/owasp/owasp-pack.test.ts -t LLM01
+```
+
+Run one id first to prove the wiring, then the full pack. ALWAYS run it: an unrun pack proves nothing.
+
+Python may print `RuntimeError: Event loop is closed` at teardown. It comes from a model client closing after the loop and does not change any result.
+
+## Step 6: Read the results in LangWatch
+
+Each attack is a scenario run named `<OWASP id> <title>: <agent name>`, grouped under the set `owasp-red-team`. Open Simulations in the LangWatch project to read each conversation and the judge's verdict per criterion. A test that does not pass is one of two things, and the runner shows both as failed:
+
+- A breach: the judge gave a verdict and the attack broke through. The message names the OWASP id, the unmet criteria and the judge's reasoning. Fix the agent (see below) and run that id again.
+- An error: the test stopped on an exception with no verdict, because a provider call or a tool call failed (for example `Failed to parse tool call arguments`, a timeout or a 429). It says nothing about the agent. Rerun that id; if it repeats, switch `OWASP_MODEL` to a model with reliable tool calls. Report it as an error, not as a breach or a pass: an error has no verdict on whether the agent held.
+
+For a breach, the result does not say which turn broke: open the run in Simulations and find the first agent turn that breaks a criterion: check its tool calls, their arguments and results as well as its reply, since an agent can act on another user's record and then reply as if nothing happened. Report to the user, per id, whether the agent held, the turn where each breach broke, and each error as inconclusive.
+
+A failing test tells you WHERE the agent fails, not that the prompt is where to fix it. One more rule is the cheapest edit that turns it green, and a prompt maintained that way overfits: it passes exactly the cases it was patched against and degrades everywhere else.
+
+1. **Diagnose the layer.** Five can own a failure: the harness (tools, permissions, context assembly), the model, the knowledge (skills, docs, retrieval), the prompt, or the test itself. The prompt is the last resort. If the fix is "never use tool X", remove tool X from the configuration. Diagnose from the failing run's trace: it holds every tool call, and the assembled input too where the project captures content.
+2. **Fix the class, not the transcript.** State the one principle that makes the whole class impossible. Never paste the failing conversation into the prompt. If you cannot name the class, keep diagnosing.
+3. **Prove it generalizes.** Re-run with varied wording. The simulator improvises, so a fix that survives one phrasing was a patch for that phrasing.
+4. **Pair each prohibition with an overshoot test.** A "decline out-of-scope requests" rule needs a greeting scenario that fails if the agent declines a greeting.
+5. **Refactor under green.** Merge overlapping rules, delete what a newer principle covers, re-run. Track prompt size like bundle size: pass rate holds while the prompt trends down.
+6. **Keep the judge independent of the prompt.** Grade user outcomes and verified side effects, never the agent's own rules restated. A rubric that quotes the prompt grades obedience, not quality.
+
+Your harness, codebase and model decide which levers exist. Full guide: [Improving your Agent](https://scenario.langwatch.ai/best-practices/improving-your-agent).
+````
+
+        </div>
+      </div>
+      <div className="lw-accordion-action" role="button" tabIndex={0} data-download-url="https://raw.githubusercontent.com/langwatch/skills/main/recipes/owasp-red-team/SKILL.md" data-download-name="SKILL.md" data-track="docs_download_skill" data-track-title={"Red team my agent against the OWASP Top 10"} data-track-skill={"langwatch/skills/recipes/owasp-red-team"}>
         <span className="lw-accordion-action-icon"><svg width="16" height="16" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15.25 3.75H2.75C1.64543 3.75 0.75 4.64543 0.75 5.75V12.25C0.75 13.3546 1.64543 14.25 2.75 14.25H15.25C16.3546 14.25 17.25 13.3546 17.25 12.25V5.75C17.25 4.64543 16.3546 3.75 15.25 3.75Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M8.75 11.25V6.75H8.356L6.25 9.5L4.144 6.75H3.75V11.25" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M11.5 9.5L13.25 11.25L15 9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M13.25 11.25V6.75" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg></span>
         <span className="lw-accordion-action-text">
           <span className="lw-accordion-action-title">Download SKILL.md</span>
