@@ -198,7 +198,7 @@ export class AgentStopService {
       organizationId,
       requestedByUserId: caller.userId,
       requestedByApiKeyId: caller.apiKeyId,
-      restoreRound: current.restoreRound + 1,
+      requestId: this.deps.newId(),
     };
     const at = this.deps.now();
     await this.deps.send("requestRestore", { tenantId: organizationId, occurredAt: at, ...data });
@@ -235,7 +235,7 @@ export class AgentStopService {
       organizationId,
       requestedByUserId: caller.userId,
       requestedByApiKeyId: caller.apiKeyId,
-      retryRound: current.retryRound + 1,
+      requestId: this.deps.newId(),
       targets: plan.filter((target) => !held.has(targetKeyOf(target.target))),
     };
     const at = this.deps.now();

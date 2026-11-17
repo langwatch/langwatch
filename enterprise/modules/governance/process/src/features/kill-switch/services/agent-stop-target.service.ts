@@ -5,7 +5,9 @@ import { createHash } from "node:crypto";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import {
   AGENT_STOP_OPEN_STATUSES,
+  AGENT_STOP_STATUSES,
   type AgentStopTarget,
+  type AgentStopTargetOutcome,
   type AgentStopView,
   type AgentStopWebhookEventType,
   databricksGeniePullConfigSchema,
@@ -14,7 +16,7 @@ import type { IntentContext } from "@langwatch/eventing";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import { getEnvironment, Instance, Ksuid } from "@langwatch/ksuid";
 import { createLogger, type Logger } from "@langwatch/observability";
-import { nowInstant, Temporal } from "@langwatch/time";
+import { type Instant, nowInstant, Temporal } from "@langwatch/time";
 
 import type { BedrockAgentAliasChannel } from "../../../channels/bedrock-agent-alias.channel.ts";
 import type { DatabricksServingEndpointChannel } from "../../../channels/databricks-serving-endpoint.channel.ts";
@@ -109,6 +111,27 @@ interface AgentStopTargetDependencies {
 }
 
 type Direction = "stop" | "restore";
+
+const AGENT_STOP_CLOSED_STATUSES = AGENT_STOP_STATUSES.filter(
+  (status) => !AGENT_STOP_OPEN_STATUSES.includes(status),
+);
+
+function isOnKey({
+  outcome,
+  virtualKeyId,
+}: {
+  outcome: AgentStopTargetOutcome;
+  virtualKeyId: string;
+}): boolean {
+  return (
+    outcome.target.kind === "gateway_virtual_key" && outcome.target.virtualKeyId === virtualKeyId
+  );
+}
+
+/** Applied, mid-restore, or an apply that may already have run; never failed or reverted. */
+function isHolding(outcome: AgentStopTargetOutcome): boolean {
+  return ["applied", "reverting", "revert_failed", "pending"].includes(outcome.state);
+}
 
 /** What every platform call reads off its intent, an apply or a revert. */
 type AgentStopTargetWork = Omit<AgentStopApplyIntent, "retryRound">;
@@ -328,7 +351,7 @@ export class AgentStopTargetService implements AgentStopIntentExecutors {
     const { organizationId } = intent;
     const command = { id: virtualKeyId, organizationId, actorUserId: intent.actorUserId };
     if (direction === "restore") {
-      if (await this.isKeyHeldByAnotherStop({ intent, virtualKeyId, direction })) {
+      if (await this.isKeyHeldByAnotherStop({ intent, virtualKeyId })) {
         return { changed: false, keptDisabled: true };
       }
       await this.deps.virtualKeys.enableVirtualKey(command);
@@ -336,11 +359,16 @@ export class AgentStopTargetService implements AgentStopIntentExecutors {
     }
     return this.stopUnlessAlreadyStopped({
       intent,
-      // A key another stop disabled itself counts as this stop's change too, so the last restore enables it.
+      // A key another stop holds, or a closed stop's restore left disabled, is this stop's change too.
       isStopped: async () => {
         const key = await this.deps.virtualKeys.findVirtualKeyById(virtualKeyId, organizationId);
         if (key === null || key.status === "ACTIVE") return false;
-        return !(await this.isKeyHeldByAnotherStop({ intent, virtualKeyId, direction }));
+        if (await this.isKeyHeldByAnotherStop({ intent, virtualKeyId })) return false;
+        return !(await this.isKeptDisabledByClosedStop({
+          intent,
+          virtualKeyId,
+          disabledAt: key.disabledAt,
+        }));
       },
       stop: () =>
         this.deps.virtualKeys.disableVirtualKey({
@@ -385,35 +413,63 @@ export class AgentStopTargetService implements AgentStopIntentExecutors {
   }
 
   /**
-   * Restoring: another open stop holds the key applied, or an approved stop is about to apply it.
-   * Stopping: another stop disabled the key itself; one that found it already disabled owns nothing.
+   * Another open stop holds the key once its apply ran: it recorded the key as not stopped before
+   * disabling it, and the target is not failed or reverted. A stop waiting for approval holds nothing.
    */
   private async isKeyHeldByAnotherStop({
     intent,
     virtualKeyId,
-    direction,
   }: {
     intent: AgentStopTargetWork;
     virtualKeyId: string;
-    direction: Direction;
   }): Promise<boolean> {
     const open = await this.deps.stops.findAllByStatuses({
       organizationId: intent.organizationId,
       statuses: AGENT_STOP_OPEN_STATUSES,
     });
-    return open.some(
-      (stop) =>
-        stop.id !== intent.stopId &&
-        stop.targets.some(
-          (outcome) =>
-            outcome.target.kind === "gateway_virtual_key" &&
-            outcome.target.virtualKeyId === virtualKeyId &&
-            (outcome.state === "applied"
-              ? direction === "restore" || !outcome.alreadyStopped
-              : direction === "restore" &&
-                outcome.state === "pending" &&
-                stop.status === "stopping"),
-        ),
+    const candidates = open.flatMap((stop) =>
+      stop.id === intent.stopId
+        ? []
+        : stop.targets
+            .filter((outcome) => isOnKey({ outcome, virtualKeyId }) && isHolding(outcome))
+            .map((outcome) => ({ stopId: stop.id, targetId: outcome.id })),
+    );
+    for (const candidate of candidates) {
+      const [wasStopped] = await this.deps.priorStates.findPriorStates({
+        organizationId: intent.organizationId,
+        ...candidate,
+      });
+      if (wasStopped === false) return true;
+    }
+    return false;
+  }
+
+  /**
+   * A closed stop's restore kept this disable for a holder that let it go, so nobody owns it now.
+   * A key disabled after that restore was disabled by someone else and stays theirs.
+   */
+  private async isKeptDisabledByClosedStop({
+    intent,
+    virtualKeyId,
+    disabledAt,
+  }: {
+    intent: AgentStopTargetWork;
+    virtualKeyId: string;
+    disabledAt: Instant | null;
+  }): Promise<boolean> {
+    if (disabledAt === null) return false;
+    const closed = await this.deps.stops.findAllByStatuses({
+      organizationId: intent.organizationId,
+      statuses: AGENT_STOP_CLOSED_STATUSES,
+    });
+    return closed.some((stop) =>
+      stop.targets.some(
+        (outcome) =>
+          isOnKey({ outcome, virtualKeyId }) &&
+          outcome.keptDisabled === true &&
+          outcome.revertedAt !== null &&
+          Temporal.Instant.compare(disabledAt, Temporal.Instant.from(outcome.revertedAt)) <= 0,
+      ),
     );
   }
 

@@ -190,6 +190,7 @@ export async function killSwitchHarness({
   const keyRefusals = new Map<string, string>();
   /** A key's current status; absent means ACTIVE. A disable or enable that succeeds changes it. */
   const keyStatuses = new Map<string, GatewayVirtualKeyRecord["status"]>();
+  const keyDisabledAt = new Map<string, GatewayVirtualKeyRecord["disabledAt"]>();
   const refuseKey = (code: string) => {
     const error = new Error(code);
     Object.assign(error, { code });
@@ -198,13 +199,18 @@ export async function killSwitchHarness({
   const gateway = createApiFixture<GatewayApi>({
     findVirtualKeyById: async (id, organizationId) =>
       id === VIRTUAL_KEY_ID && organizationId === ORG
-        ? { ...virtualKey(id), status: keyStatuses.get(id) ?? "ACTIVE" }
+        ? {
+            ...virtualKey(id),
+            status: keyStatuses.get(id) ?? "ACTIVE",
+            disabledAt: keyDisabledAt.get(id) ?? null,
+          }
         : null,
     disableVirtualKey: async (input) => {
       virtualKeyCalls.push({ action: "disable", input });
       const code = keyRefusals.get("disable");
       if (code) throw refuseKey(code);
       keyStatuses.set(input.id, "DISABLED");
+      keyDisabledAt.set(input.id, Temporal.Now.instant());
       return virtualKey(input.id);
     },
     enableVirtualKey: async (input) => {
@@ -212,6 +218,7 @@ export async function killSwitchHarness({
       const code = keyRefusals.get("enable");
       if (code) throw refuseKey(code);
       keyStatuses.set(input.id, "ACTIVE");
+      keyDisabledAt.delete(input.id);
       return virtualKey(input.id);
     },
   });

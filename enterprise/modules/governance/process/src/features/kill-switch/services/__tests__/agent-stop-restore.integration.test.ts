@@ -202,6 +202,115 @@ describe("AgentStopService restore", () => {
     });
   });
 
+  describe("given a shared virtual key and the other agent's stop waiting for approval", () => {
+    async function sharedWithPendingStop() {
+      const other = "agent-sales-bot";
+      const harness = await killSwitchHarness({ otherAgents: ["sales-bot"] });
+      for (const agentId of [AGENT_ID, other]) {
+        await harness.plans.setPlan({
+          organizationId: ORG,
+          agentId,
+          targets: [{ kind: "gateway_virtual_key", virtualKeyId: VIRTUAL_KEY_ID }],
+        });
+      }
+      const first = await harness.stops.requestStop({
+        organizationId: ORG,
+        agentId: AGENT_ID,
+        reason: "prompt injection in production",
+        severity: "high",
+        caller: PERSON,
+      });
+      await settled(harness, first.id, "quarantined");
+      const second = await harness.stops.requestStop({
+        organizationId: ORG,
+        agentId: other,
+        reason: "prompt injection in production",
+        severity: "high",
+        caller: MACHINE,
+      });
+      await settled(harness, second.id, "pending_approval");
+      await harness.stops.restore({ organizationId: ORG, stopId: first.id, caller: PERSON });
+      const restored = await settled(harness, first.id, "restored");
+      return { harness, restored, secondId: second.id };
+    }
+
+    /** @scenario "A stop waiting for approval does not keep a shared virtual key disabled" */
+    it("enables the key on restore, and a denial leaves it enabled", async () => {
+      const { harness, restored, secondId } = await sharedWithPendingStop();
+
+      expect(restored.targets[0]?.keptDisabled).toBeUndefined();
+      await harness.stops.denyStop({ organizationId: ORG, stopId: secondId, caller: PERSON });
+      await settled(harness, secondId, "denied");
+
+      expect(harness.keyStatuses.get(VIRTUAL_KEY_ID)).toBe("ACTIVE");
+      expect(harness.virtualKeyCalls.map((call) => call.action)).toEqual(["disable", "enable"]);
+      await harness.eventing.close();
+    });
+
+    /** @scenario "A stop waiting for approval does not keep a shared virtual key disabled" */
+    it("disables the key again on approval and enables it on that stop's restore", async () => {
+      const { harness, secondId } = await sharedWithPendingStop();
+
+      await harness.stops.approveStop({ organizationId: ORG, stopId: secondId, caller: PERSON });
+      const approved = await settled(harness, secondId, "quarantined");
+      expect(approved.targets[0]?.alreadyStopped).toBeUndefined();
+      await harness.stops.restore({ organizationId: ORG, stopId: secondId, caller: PERSON });
+      await settled(harness, secondId, "restored");
+
+      expect(harness.keyStatuses.get(VIRTUAL_KEY_ID)).toBe("ACTIVE");
+      expect(harness.virtualKeyCalls.map((call) => call.action)).toEqual([
+        "disable",
+        "enable",
+        "disable",
+        "enable",
+      ]);
+      await harness.eventing.close();
+    });
+  });
+
+  describe("given a shared key a restore kept disabled for a stop that later let it go", () => {
+    /** @scenario "A stop that finds a shared key left disabled by a closed stop owns it" */
+    it("takes the key over, so its restore enables it", async () => {
+      const other = "agent-sales-bot";
+      const harness = await killSwitchHarness({ otherAgents: ["sales-bot"] });
+      const keyOnly = [{ kind: "gateway_virtual_key" as const, virtualKeyId: VIRTUAL_KEY_ID }];
+      const stopIds: string[] = [];
+      for (const agentId of [AGENT_ID, other]) {
+        await harness.plans.setPlan({ organizationId: ORG, agentId, targets: keyOnly });
+        const view = await harness.stops.requestStop({
+          organizationId: ORG,
+          agentId,
+          reason: "prompt injection in production",
+          severity: "high",
+          caller: PERSON,
+        });
+        stopIds.push(view.id);
+        await settled(harness, view.id, "quarantined");
+      }
+      const [first = "", second = ""] = stopIds;
+      await harness.stops.restore({ organizationId: ORG, stopId: first, caller: PERSON });
+      const kept = await settled(harness, first, "restored");
+      expect(kept.targets[0]?.keptDisabled).toBe(true);
+      await harness.stops.setPlan({ organizationId: ORG, agentId: other, targets: [] });
+      await vi.waitFor(async () => expect((await harness.stopOf(second)).targets).toEqual([]));
+
+      const again = await harness.stops.requestStop({
+        organizationId: ORG,
+        agentId: AGENT_ID,
+        reason: "prompt injection in production",
+        severity: "high",
+        caller: PERSON,
+      });
+      const owned = await settled(harness, again.id, "quarantined");
+      expect(owned.targets[0]?.alreadyStopped).toBeUndefined();
+      await harness.stops.restore({ organizationId: ORG, stopId: again.id, caller: PERSON });
+      await settled(harness, again.id, "restored");
+
+      expect(harness.keyStatuses.get(VIRTUAL_KEY_ID)).toBe("ACTIVE");
+      await harness.eventing.close();
+    });
+  });
+
   describe("when the serving endpoint was deleted", () => {
     /** @scenario "A target whose cloud resource is gone counts as stopped and as restored" */
     it("quarantines and restores the stop, recording the endpoint as gone", async () => {

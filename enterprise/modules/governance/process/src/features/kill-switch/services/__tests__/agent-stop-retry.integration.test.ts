@@ -2,10 +2,21 @@
  * Retrying a stop, and a plan change reaching the agent's open stop, through the real
  * `agent_stop` pipeline. Spec: enterprise/modules/governance/specs/agent-kill-switch.feature
  */
+import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
 
+import {
+  type AgentStopProjectionState,
+  foldAgentStop,
+} from "../../eventing/agent-stop.projection.ts";
 import { codeOf, request, settled } from "./kill-switch-steps.fixtures.ts";
-import { AGENT_ID, killSwitchHarness, ORG, PERSON } from "./kill-switch.fixtures.ts";
+import {
+  AGENT_ID,
+  killSwitchHarness,
+  ORG,
+  PERSON,
+  VIRTUAL_KEY_ID,
+} from "./kill-switch.fixtures.ts";
 
 const STOP_PATH = "/api/2.0/serving-endpoints/support-bot-prod/config:stop";
 const START_PATH = "/api/2.0/serving-endpoints/support-bot-prod/config:start";
@@ -173,6 +184,51 @@ describe("AgentStopService retry", () => {
           harness.stops.retryStop({ organizationId: ORG, stopId: view.id, caller: PERSON }),
         ),
       ).toBe("agent_stop_not_retryable");
+      await harness.eventing.close();
+    });
+  });
+  describe("when a retry and a restore of a failed stop race", () => {
+    /** @scenario "A restore that races a retry is refused by the stop and the next restore reverts" */
+    it("keeps the stop reachable and a later restore reverts, live and rebuilt alike", async () => {
+      const harness = await killSwitchHarness({ maxAttempts: 2 });
+      await harness.setFullPlan();
+      harness.servingEndpoints.refuse({ path: STOP_PATH, code: "http_503" });
+      const view = await request(harness);
+      await settled(harness, view.id, "stop_failed");
+      harness.servingEndpoints.allow({ path: STOP_PATH });
+
+      await Promise.all([
+        harness.stops.retryStop({ organizationId: ORG, stopId: view.id, caller: PERSON }),
+        harness.stops.restore({ organizationId: ORG, stopId: view.id, caller: PERSON }),
+      ]);
+      const raced = await vi.waitFor(
+        async () => {
+          const stop = await harness.stopOf(view.id);
+          expect(["quarantined", "restored", "restore_failed"]).toContain(stop.status);
+          return stop;
+        },
+        { timeout: 5_000 },
+      );
+      if (raced.status === "quarantined") {
+        await harness.stops.restore({ organizationId: ORG, stopId: view.id, caller: PERSON });
+      }
+      const restored = await settled(harness, view.id, "restored");
+
+      expect(restored.restoreRound).toBe(1);
+      expect(harness.keyStatuses.get(VIRTUAL_KEY_ID)).toBe("ACTIVE");
+      const events = await harness.eventStore.getEvents({
+        aggregateId: view.id,
+        context: { tenantId: createTenantId(ORG) },
+        aggregateType: "agent_stop",
+      });
+      const rebuilt = events.reduce<AgentStopProjectionState>(
+        (stop, event) =>
+          foldAgentStop({ stop, type: event.type, data: event.data, at: event.occurredAt }),
+        null,
+      );
+      expect(rebuilt?.status).toBe(restored.status);
+      expect(rebuilt?.restoreRound).toBe(restored.restoreRound);
+      expect(rebuilt?.retryRound).toBe(restored.retryRound);
       await harness.eventing.close();
     });
   });

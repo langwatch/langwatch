@@ -61,9 +61,9 @@ export const agentStopRecordSchema = z.object({
   quarantinedAt: z.string().nullable(),
   restoreRequestedAt: z.string().nullable(),
   restoredAt: z.string().nullable(),
-  /** One more on every restore request, so a second restore's intents get keys of their own. */
+  /** One more on every restore the fold accepts, so each accepted restore's intents get keys of their own. */
   restoreRound: z.number().int().nonnegative(),
-  /** One more on every retry, so a retry's applies and milestones get keys of their own. */
+  /** One more on every retry the fold accepts, so each retry's applies and milestones get keys of their own. */
   retryRound: z.number().int().nonnegative().default(0),
   retriedByUserId: z.string().nullable().default(null),
   retriedByApiKeyId: z.string().nullable().default(null),
@@ -336,7 +336,7 @@ export function restoreRequestedStop({
     restoredByUserId: data.requestedByUserId,
     restoredByApiKeyId: data.requestedByApiKeyId,
     restoreRequestedAt: stopTimestamp(at),
-    restoreRound: data.restoreRound,
+    restoreRound: stop.restoreRound + 1,
     targets: stop.targets.map((target) => restoringOutcome({ target, at })),
   };
   return settleRestore({ stop: restoring, at });
@@ -438,7 +438,7 @@ export function retriedStop({
   ];
   const retried: AgentStopRecord = {
     ...stop,
-    retryRound: data.retryRound,
+    retryRound: stop.retryRound + 1,
     retriedByUserId: data.requestedByUserId,
     retriedByApiKeyId: data.requestedByApiKeyId,
     targets,

@@ -113,9 +113,9 @@ const RequestAgentStopRestoreCommand = defineCommand({
   aggregateType: AGENT_STOP_AGGREGATE_TYPE,
   schema: agentStopRestoreRequestedEventDataSchema,
   aggregateId: (data) => data.stopId,
-  idempotencyKey: (data) => `${data.stopId}:restore:${data.restoreRound}`,
+  idempotencyKey: (data) => `${data.stopId}:restore:${data.requestId}`,
   spanAttributes: stopAttributes,
-  makeJobId: (data) => `${data.stopId}:restore:${data.restoreRound}`,
+  makeJobId: (data) => `${data.stopId}:restore:${data.requestId}`,
 });
 
 const RecordAgentStopTargetRevertedCommand = defineCommand({
@@ -149,9 +149,9 @@ const RetryAgentStopCommand = defineCommand({
   aggregateType: AGENT_STOP_AGGREGATE_TYPE,
   schema: agentStopRetryRequestedEventDataSchema,
   aggregateId: (data) => data.stopId,
-  idempotencyKey: (data) => `${data.stopId}:retry:${data.retryRound}`,
+  idempotencyKey: (data) => `${data.stopId}:retry:${data.requestId}`,
   spanAttributes: stopAttributes,
-  makeJobId: (data) => `${data.stopId}:retry:${data.retryRound}`,
+  makeJobId: (data) => `${data.stopId}:retry:${data.requestId}`,
 });
 
 const DropAgentStopTargetsCommand = defineCommand({

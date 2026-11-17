@@ -306,6 +306,29 @@ Feature: Agent kill switch: stop a misbehaving agent where it runs, with approva
     When "sales-bot" is restored
     Then the key is enabled again
 
+  @integration
+  Scenario: A stop waiting for approval does not keep a shared virtual key disabled
+    Given "support-bot" is quarantined and a machine credential's stop of "sales-bot" waits for approval
+    And their plans share one virtual key
+    When "support-bot" is restored
+    Then the key is enabled again
+    When the "sales-bot" stop is denied, the key stays enabled
+    When the "sales-bot" stop is approved instead, the key is disabled and its restore enables it
+
+  @integration
+  Scenario: A stop that finds a shared key left disabled by a closed stop owns it
+    Given a restore kept a shared virtual key disabled for a stop that then dropped the key
+    When the agent is stopped again
+    Then the stop records the key as its own change, not as already stopped
+    And restoring it enables the key
+
+  @unit @integration
+  Scenario: A restore that races a retry is refused by the stop and the next restore reverts
+    Given a stop in "stop_failed"
+    When a retry and a restore are asked at the same time
+    Then the stop accepts the first, refuses the other, and numbers only accepted requests
+    And a later restore reverts the targets, and a rebuilt stop matches the live one
+
   @unit
   Scenario: The restore dialog names the stopped agents that keep a shared key disabled
     Given "Finance close" and "Sales pipeline" are stopped and share one virtual key

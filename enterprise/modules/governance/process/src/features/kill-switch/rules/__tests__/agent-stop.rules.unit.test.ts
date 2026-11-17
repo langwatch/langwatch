@@ -59,7 +59,7 @@ function restoreFailedStop() {
         organizationId: ORG,
         requestedByUserId: "user-ops",
         requestedByApiKeyId: null,
-        restoreRound,
+        requestId: `restore-${restoreRound}`,
       },
       at,
     });
@@ -145,7 +145,7 @@ describe("retriedStop", () => {
           organizationId: ORG,
           requestedByUserId: "user-oncall",
           requestedByApiKeyId: null,
-          retryRound: 1,
+          requestId: "retry-1",
           targets: [],
         },
         at: 5_000,
@@ -198,7 +198,7 @@ describe("retriedStop", () => {
           organizationId: ORG,
           requestedByUserId: "user-ops",
           requestedByApiKeyId: null,
-          retryRound: 1,
+          requestId: "retry-1",
           targets: [],
         },
         at: 3_000,
@@ -235,6 +235,51 @@ describe("targetsDroppedStop", () => {
       });
 
       expect(dropped).toMatchObject({ status: "restored", targets: [] });
+    });
+  });
+  describe("when a restore arrives while the stop is still stopping", () => {
+    /** @scenario "A restore that races a retry is refused by the stop and the next restore reverts" */
+    it("leaves the round unchanged, and numbers the next accepted restore 1", () => {
+      const target = {
+        id: TARGET_ID,
+        label: "Virtual key",
+        target: { kind: "gateway_virtual_key" as const, virtualKeyId: "vk-1" },
+      };
+      const stopping = requestedStop({
+        data: {
+          stopId: STOP_ID,
+          organizationId: ORG,
+          agentId: "agent-1",
+          agentName: "support-bot",
+          severity: "high",
+          approval: "immediate",
+          trigger: "user",
+          reason: "prompt injection in production",
+          requestedByUserId: "user-ops",
+          requestedByApiKeyId: null,
+          targets: [target],
+        },
+        at: 1_000,
+      });
+      const ask = (requestId: string) => ({
+        stopId: STOP_ID,
+        organizationId: ORG,
+        requestedByUserId: "user-ops",
+        requestedByApiKeyId: null,
+        requestId,
+      });
+
+      const refused = restoreRequestedStop({ stop: stopping, data: ask("r-1"), at: 1_500 });
+      expect(refused).toBe(stopping);
+      const quarantined = targetAppliedStop({
+        stop: refused,
+        data: { stopId: STOP_ID, organizationId: ORG, targetId: TARGET_ID, errorCode: null },
+        at: 2_000,
+      });
+      const restoring = restoreRequestedStop({ stop: quarantined, data: ask("r-2"), at: 3_000 });
+
+      expect(restoring).toMatchObject({ status: "restoring", restoreRound: 1 });
+      expect(restoring.targets[0]?.state).toBe("reverting");
     });
   });
 });
