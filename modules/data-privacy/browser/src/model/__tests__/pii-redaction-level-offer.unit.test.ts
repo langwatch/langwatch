@@ -32,7 +32,7 @@ describe("given the deployment and the PII redaction model flags", () => {
       mayManageLicence = true,
     }: {
       licence: Licence;
-      modelFlag: boolean;
+      modelFlag: boolean | undefined;
       mayManageLicence?: boolean;
     }) =>
       piiRedactionModelOfferOf({
@@ -83,6 +83,10 @@ describe("given the deployment and the PII redaction model flags", () => {
     it("offers nothing while the plan is not answered yet or cannot be read", () => {
       expect(selfHosted({ licence: "loading", modelFlag: true })).toBeNull();
       expect(selfHosted({ licence: "unknown", modelFlag: true })).toBeNull();
+    });
+
+    it("offers nothing with the licence while the model flag is not answered yet", () => {
+      expect(selfHosted({ licence: "enterprise", modelFlag: undefined })).toBeNull();
     });
 
     it("never names LangWatch Cloud in a self-hosted note, and spells license as the app does", () => {

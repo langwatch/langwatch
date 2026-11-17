@@ -109,7 +109,7 @@ Feature: A PII redaction model call is priced per character, written to the spen
       Then the batch's redacted texts are returned as usual
       And the failure is logged at error with the organization, the project, the request id and the price
 
-  Rule: An organization on the free list is recorded at no charge
+  Rule: A self-hosted install is recorded at no charge
 
     @unit
     Scenario: A self-hosted install's call is recorded at a price of zero without reading the free list
@@ -117,6 +117,8 @@ Feature: A PII redaction model call is priced per character, written to the spen
       When the model answers a strict batch of 1,000 characters
       Then one priced fact is recorded with a price of zero
       And the free list is not read, so no flag has to be set for it
+
+  Rule: An organization on the free list is recorded at no charge
 
     @unit
     Scenario: A free organization's call is recorded at a price of zero

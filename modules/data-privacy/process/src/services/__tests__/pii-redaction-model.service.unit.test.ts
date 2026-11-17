@@ -222,6 +222,7 @@ function setup({
   const usage: { level: "info" | "warn"; fields: PiiRedactionModelUsage; message: string }[] = [];
   const priced: PiiRedactionSpendPricedEventData[] = [];
   const spend = PiiRedactionSpendService.create({
+    selfHosted: false,
     requestIdKey: piiRedactionRequestIdKey("test-key-pepper"),
     featureFlags: createApiFixture<FeatureFlagApi>({ isEnabled: async () => false }),
     recordSpendPriced: async (fact) => {

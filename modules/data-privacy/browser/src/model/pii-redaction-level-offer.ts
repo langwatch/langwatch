@@ -96,13 +96,14 @@ export function piiRedactionModelOfferOf({
   mayManageLicence,
 }: {
   isSaaS: boolean;
-  modelFlag: boolean;
+  /** `undefined` while the flags are not answered yet: no offer then, so nothing flashes. */
+  modelFlag: boolean | undefined;
   freeFlag: boolean;
   licence: PrivacyLicence;
   mayManageLicence: boolean;
 }): PiiRedactionModelOffer {
-  if (isSaaS) return modelFlag ? { kind: "model", free: freeFlag } : null;
-  if (licence === "loading" || licence === "unknown") return null;
+  if (isSaaS) return modelFlag === true ? { kind: "model", free: freeFlag } : null;
+  if (licence === "loading" || licence === "unknown" || modelFlag === undefined) return null;
   if (licence === "none")
     return { kind: "rule-based", note: "licence", activate: mayManageLicence };
   return modelFlag

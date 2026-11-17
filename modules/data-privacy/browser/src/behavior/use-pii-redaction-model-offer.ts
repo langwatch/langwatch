@@ -21,7 +21,7 @@ export function usePiiRedactionModelOffer(): PiiRedactionModelOffer {
     licence: host.licence(),
     mayManageLicence: host.mayManageLicence(),
     isSaaS,
-    modelFlag: flags.flag(FrontendFlags.release_pii_redaction_model_enabled) === true,
+    modelFlag: flags.flag(FrontendFlags.release_pii_redaction_model_enabled),
     freeFlag: flags.flag(FrontendFlags.release_pii_redaction_model_free) === true,
   });
 }

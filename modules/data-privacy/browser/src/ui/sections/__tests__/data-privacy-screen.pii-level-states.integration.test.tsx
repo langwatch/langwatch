@@ -171,13 +171,21 @@ describe("given the Data Privacy page", () => {
 
   describe("when the deployment is self-hosted, licensed, and runs the model", () => {
     /** @scenario A licensed self-hosted deployment that runs the model offers Strict on it, included */
-    it("shows the picker with Strict included and no rule-based note", () => {
-      page({ flagOn: true, isSaaS: false, licence: "enterprise" });
+    it("shows the picker with Strict included and no rule-based note", async () => {
+      api.snapshot = snapshotWith({ rules: [projectRuleWith({ pii: { level: "strict" } })] });
+      page({
+        flagOn: true,
+        isSaaS: false,
+        licence: "enterprise",
+        query: { rule: "PROJECT:proj-1:false" },
+      });
 
-      expect(screen.getByTestId("pii-redaction-model-price").textContent).toBe(
+      expect(screen.getAllByTestId("pii-redaction-model-price")[0]?.textContent).toBe(
         "Includedwith your Enterprise license",
       );
       expect(screen.queryByText(/\$0\.50/)).toBeNull();
+      // The drawer is open on the Strict rule, where a rule-based note would show.
+      expect(await screen.findByTestId("pii-example-strict")).toBeInTheDocument();
       expect(screen.queryByText(/Strict here uses the rule-based detector/)).toBeNull();
     });
   });

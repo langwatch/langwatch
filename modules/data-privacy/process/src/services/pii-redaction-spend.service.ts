@@ -53,7 +53,7 @@ type PiiRedactionSpendDeps = Readonly<{
 
 export class PiiRedactionSpendService {
   static create(input: {
-    selfHosted?: boolean;
+    selfHosted: boolean;
     requestIdKey: Uint8Array | undefined;
     featureFlags: FeatureFlagApi;
     recordSpendPriced: (fact: PiiRedactionSpendPricedEventData) => Promise<void>;
@@ -62,7 +62,6 @@ export class PiiRedactionSpendService {
   }): PiiRedactionSpendService {
     return new PiiRedactionSpendService({
       ...input,
-      selfHosted: input.selfHosted ?? false,
       log: input.log ?? logger,
       now: input.now ?? (() => nowInstant().epochMilliseconds),
     });

@@ -141,7 +141,7 @@ The PII redaction model does the Strict PII level's analysis instead of Presidio
 | Peak memory, one request at a time (measured) | 4.4 to 4.9 GB; 5.3 GB on a 100,000-character text |
 | Throughput (measured on AWS Lambda at about 4 vCPU, not on a pod) | about 250 to 300 characters per second |
 
-- Each replica analyzes one batch at a time. Another batch waits for it; the model refuses one it cannot finish within 45 s, and that batch falls back to Presidio without pausing the model for other batches.
+- Each replica analyzes one batch at a time. Another batch waits for it; the model gives each batch 45 s, waiting included, and fails one it cannot finish in that time; that batch falls back to Presidio without pausing the model for other batches.
 - At that rate a 1,000-character span takes 3 to 4 seconds, so one replica handles roughly 15 such spans a minute. Add replicas for more Strict traffic.
 - A batch over 8,000 characters, or one the model does not answer within 50 s, goes to Presidio instead. After a timeout, that process sends every Strict batch to Presidio for 2 minutes.
 - The model needs an Enterprise license: an organization without one stays on Presidio, whatever the chart sets.

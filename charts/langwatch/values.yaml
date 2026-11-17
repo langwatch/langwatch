@@ -39,7 +39,7 @@ global:
       drop:
         - ALL
     readOnlyRootFilesystem: true
-  ## @param global.automountServiceAccountToken [default: false] Mount the ServiceAccount token into first-party workload pods (app, workers, nlp, langevals, cronjobs, postgresql, redis). Defaults to false — none of these call the Kubernetes API, and many clusters deny pods that automount the token. Set true only if a sidecar needs in-cluster API access.
+  ## @param global.automountServiceAccountToken [default: false] Mount the ServiceAccount token into first-party workload pods (app, workers, nlp, langevals, PII redaction model, cronjobs, postgresql, redis). Defaults to false — none of these call the Kubernetes API, and many clusters deny pods that automount the token. Set true only if a sidecar needs in-cluster API access.
   automountServiceAccountToken: false
   ## @param global.nodeHeapCeiling.enabled [default: true] Give the app and workers containers a JavaScript heap of three quarters of their memory limit (NODE_OPTIONS=--max-old-space-size-percentage=75). Rendered only for a container with a memory limit and no NODE_OPTIONS in its extraEnvs. Set false when NODE_OPTIONS reaches the containers another way, such as extraEnvFrom: the chart's entry would replace it.
   nodeHeapCeiling:
@@ -72,7 +72,7 @@ global:
   ## @param global.scheduling.nodeSelector [object] Node selector labels for all pods.
   ## @param global.scheduling.affinity [object] Affinity rules for all pods.
   ## @param global.scheduling.tolerations [array] Tolerations applied to all pods.
-  ## @param global.scheduling.priorityClassName [string] PriorityClass for every pod this chart renders (app, workers, nlp, langevals, cronjobs, and the bundled postgresql/redis). Set a per-component priorityClassName to override. Bundled SUBCHARTS (gateway, langyagent, clickhouse) manage their own scheduling and are not covered.
+  ## @param global.scheduling.priorityClassName [string] PriorityClass for every pod this chart renders (app, workers, nlp, langevals, PII redaction model, cronjobs, and the bundled postgresql/redis). Set a per-component priorityClassName to override. Bundled SUBCHARTS (gateway, langyagent, clickhouse) manage their own scheduling and are not covered.
   scheduling:
     nodeSelector: {}
     affinity: {}
@@ -1533,7 +1533,7 @@ langevals:
 # The model the app and workers call for Strict PII analysis instead of
 # Presidio; any failure falls back to Presidio. Off by default; see the chart
 # README. Sizing and measured memory: docs/self-hosting/configuration/sizing-and-scaling.mdx
-## @section PII redaction model
+## @section PII redaction model service
 piiRedactionModel:
   ## @param piiRedactionModel.enabled [default: false] Deploy the PII redaction model (Deployment, Service and PDB) and point the app and workers at it.
   enabled: false
