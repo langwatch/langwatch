@@ -334,3 +334,16 @@ Feature: Token Created modal command snippets
   Scenario: Reopening starts from the new key alone
     Given a second key is minted after the first dialog closed
     Then no earlier token, selection, reveal or copy tick is shown
+
+  @integration
+  Scenario: An inline copy button that unmounts does not reset after it is gone
+    # Fake timers, not sleeps: the 2 second reset must be cleared on unmount.
+    Given a copy button that has just copied successfully
+    When it unmounts and 2 seconds pass
+    Then nothing throws and React logs no state-update warning
+
+  @integration
+  Scenario: An inline copy button returns to its copy icon after 2 seconds
+    Given a copy button that has just copied successfully
+    When 2 seconds pass while it stays mounted
+    Then its check icon goes back to the copy icon

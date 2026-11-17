@@ -47,3 +47,16 @@ Feature: Code, money and dates read the one way
     Given a date's hover
     Then it lists the age, the zones, ISO 8601 and Unix milliseconds
     And each row is a button that copies its value
+
+  @integration
+  Scenario: A snippet copy button that unmounts does not reset after it is gone
+    # Fake timers, not sleeps: the 2 second reset must be cleared on unmount.
+    Given a copy button that has just copied successfully
+    When it unmounts and 2 seconds pass
+    Then nothing throws and React logs no state-update warning
+
+  @integration
+  Scenario: A snippet copy button returns to its copy icon after 2 seconds
+    Given a copy button that has just copied successfully
+    When 2 seconds pass while it stays mounted
+    Then its check icon goes back to the copy icon
