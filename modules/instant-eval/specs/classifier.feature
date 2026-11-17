@@ -177,6 +177,19 @@ Feature: The Instant Evals classifier interface — one judged question, priced 
     Then the next text is sent and its verdict comes back
 
   @unit
+  Scenario: A probe refused as too large lets every text be sent again
+    Given a classifier that has stopped being sent to after sixteen failed sends
+    When ten seconds have passed and the one probe sent is refused as too large
+    Then the cut text is sent and its verdict comes back
+    And the next text is sent and its verdict comes back
+
+  @unit
+  Scenario: Rate limits and permanent refusals never stop sends
+    Given a classifier answering 429, 529 or 401 to every send
+    When more than sixteen sends in a row have been refused
+    Then every later text is still sent
+
+  @unit
   Scenario: One text failing on every attempt does not stop the others
     Given a classifier answering 500 to all five attempts for one text
     When the next text is classified

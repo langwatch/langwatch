@@ -79,7 +79,7 @@ describe("the classifier breaker", () => {
     expect(allows(reopened, 12_000 + probeEveryMs)).toBe(true);
   });
 
-  /** @scenario "One text failing on every attempt does not stop the others" */
+  /** @scenario "Rate limits and permanent refusals never stop sends" */
   it("neither opens nor resets on rate limits and permanent refusals", () => {
     expect(allows(after(Array.from({ length: 100 }, () => "neutral")), 0)).toBe(true);
     expect(after([...downs(openAfterFailures - 1), "neutral"]).consecutiveFailures).toBe(
