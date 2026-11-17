@@ -1178,7 +1178,7 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     Given two logins in the scoped-reader group, each holding one organization's role
     And the shared reader login
     When the shared reader reads every shared view and each organization login every scoped copy
-    Then the shared reader sees exactly the rows the base tables hold for each view
+    Then the shared reader sees exactly the TenantIds the base tables hold for each view
     And each organization login sees only its organization's projects
     And its rows equal the shared reader's rows filtered to that organization
 
@@ -1187,7 +1187,7 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     Given a project belongs to org_a and an org_b login reads every scoped copy
     When the project moves to a team of org_b
     Then the org_a login no longer sees the moved project
-    And the org_b login sees the moved project's rows and every row it saw before
+    And the org_b login keeps every row it saw before and sees the moved project's rows through a project-path view
 
   @integration
   Scenario: A Postgres reader login with no organization role sees no rows
@@ -1210,7 +1210,7 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
   # lookup, the pg_auth_members join and the rolname = current_user tie.
   @integration
   Scenario: The scoped-reader group is granted only a live view that is provably row-scoped
-    Given a live copy in lwql_scoped that is unscoped, or carries the org-role lookup without the membership join or the session-user tie
+    Given a live copy in lwql_scoped that is unscoped, or carries the org-role lookup without the membership join or the current-user tie
     And the scoped-reader group holds a stale SELECT on it
     When the app grants the scoped copies
     Then the group's SELECT on that copy is revoked
@@ -1229,7 +1229,7 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     Given live copies, and a group name that may or may not exist
     When the converge reads the scoped-reader group's reach
     Then a group that does not exist yields no copy, no shared grant and no error
-    And a copy passes only when it is a security barrier carrying the row scope tied to the session user
+    And a copy passes only when it is a security barrier carrying the row scope tied to the current user
     And a copy is granted only when the group holds USAGE on lwql_scoped and SELECT on the copy
     And the scoped schema is this installation's only when its comment names this app schema
 

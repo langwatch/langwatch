@@ -21,10 +21,7 @@ import {
   scopedSchemaStatement,
   scopedViewGuardCondition,
 } from "../rules/lwql-scoped-view.rules.ts";
-import {
-  LWQL_SCOPED_READER_GROUP,
-  LWQL_SHARED_READER_ROLE,
-} from "./langwatch-ql-postgres-mapping.service.ts";
+import { LWQL_SCOPED_READER_GROUP } from "./langwatch-ql-postgres-mapping.service.ts";
 import { LangWatchQLPostgresViewsService } from "./langwatch-ql-postgres-views.service.ts";
 
 const postgresViews = LangWatchQLPostgresViewsService.create();
@@ -45,11 +42,11 @@ const LWQL_KEY_MAP_TABLE = "lwql_api_key_tenant_map";
 const LWQL_POSTGRES_SCHEMA = "public";
 
 /**
- * The PostgreSQL role the ClickHouse named collection dials as. Provisioned
- * out of band (terraform in the cloud, self-provisioning elsewhere); this
- * module only ever grants it read access to views it just created.
+ * The shared PostgreSQL reader the ClickHouse named collection dials as, whose reads keep every
+ * row. Provisioned out of band (terraform in the cloud, self-provisioning elsewhere); this module
+ * only ever grants it read access to views it just created.
  */
-export const LWQL_POSTGRES_READER_ROLE = LWQL_SHARED_READER_ROLE;
+export const LWQL_POSTGRES_READER_ROLE = "lwql_ro";
 
 const QUOTED_GROUP = sqlText.postgresQuoted(LWQL_SCOPED_READER_GROUP);
 

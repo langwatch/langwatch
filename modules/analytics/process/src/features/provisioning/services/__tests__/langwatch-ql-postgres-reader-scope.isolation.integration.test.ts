@@ -49,6 +49,7 @@ describe("given per-reader row scoping over every generated Postgres view", () =
   });
 
   describe("when each approved view is read by each kind of login", () => {
+    /** @scenario "Each Postgres reader login sees only its own organizations' projects" */
     it.each(VIEW_NAMES)("%s: the shared reader keeps exactly its pre-change TenantIds", (view) => {
       expect(tenantsOf(shared[view] as Row[])).toEqual(baseline[view]);
     });
@@ -62,6 +63,7 @@ describe("given per-reader row scoping over every generated Postgres view", () =
       expect(foreign).toEqual([]);
     });
 
+    /** @scenario "Each Postgres reader login sees only its own organizations' projects" */
     it.each(VIEW_NAMES)("%s: an org_b login sees only org_b projects", (view) => {
       const foreign = (readerB[view] as Row[]).filter(
         (row) => organizations[row.TenantId] !== ORG_B,
@@ -70,6 +72,7 @@ describe("given per-reader row scoping over every generated Postgres view", () =
       expect(foreign).toEqual([]);
     });
 
+    /** @scenario "Each Postgres reader login sees only its own organizations' projects" */
     it.each(VIEW_NAMES)(
       "%s: the org_a login's rows equal the shared rows filtered to org_a",
       (view) => {
@@ -79,6 +82,7 @@ describe("given per-reader row scoping over every generated Postgres view", () =
       },
     );
 
+    /** @scenario "Each Postgres reader login sees only its own organizations' projects" */
     it.each(VIEW_NAMES)(
       "%s: the org_b login's rows equal the shared rows filtered to org_b",
       (view) => {

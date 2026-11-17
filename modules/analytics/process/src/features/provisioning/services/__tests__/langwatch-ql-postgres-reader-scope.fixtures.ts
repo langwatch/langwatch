@@ -30,12 +30,12 @@ import {
   scopedViewGuardCondition,
 } from "../../rules/lwql-scoped-view.rules.ts";
 import type { LwqlPostgresGap } from "../langwatch-ql-postgres-gaps.service.ts";
-import {
-  LWQL_SCOPED_READER_GROUP,
-  LWQL_SHARED_READER_ROLE,
-} from "../langwatch-ql-postgres-mapping.service.ts";
+import { LWQL_SCOPED_READER_GROUP } from "../langwatch-ql-postgres-mapping.service.ts";
 import { LangWatchQLPostgresViewsService } from "../langwatch-ql-postgres-views.service.ts";
-import { LangWatchQLProductionProvisioningService } from "../langwatch-ql-production-provisioning.service.ts";
+import {
+  LangWatchQLProductionProvisioningService,
+  LWQL_POSTGRES_READER_ROLE,
+} from "../langwatch-ql-production-provisioning.service.ts";
 import { LangWatchQLSelfProvisioningService } from "../langwatch-ql-self-provisioning.service.ts";
 
 export const provisioning = LangWatchQLProductionProvisioningService.create();
@@ -43,7 +43,7 @@ const selfProvisioning = LangWatchQLSelfProvisioningService.create();
 
 export const SCHEMA = "public";
 export const SCOPED = LWQL_SCOPED_SCHEMA;
-export const SHARED_READER = LWQL_SHARED_READER_ROLE;
+export const SHARED_READER = LWQL_POSTGRES_READER_ROLE;
 export const GROUP = LWQL_SCOPED_READER_GROUP;
 const DATABASE = "lwtest";
 /** The container's superuser: the app's statements run as it unless a suite says otherwise. */

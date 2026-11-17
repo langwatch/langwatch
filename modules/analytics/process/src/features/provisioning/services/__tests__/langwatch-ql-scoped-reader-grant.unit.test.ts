@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 import {
   LWQL_ORG_MEMBERSHIP_FRAGMENT,
   LWQL_ORG_SCOPE_FRAGMENT,
-  LWQL_SESSION_USER_FRAGMENT,
+  LWQL_CURRENT_USER_FRAGMENT,
   scopedSchemaMarker,
 } from "../../rules/lwql-scoped-view.rules.ts";
 import { LWQL_SCOPED_READER_GROUP } from "../langwatch-ql-postgres-mapping.service.ts";
@@ -52,7 +52,7 @@ describe("given the scoped-reader group's grant statements", () => {
         `position('${LWQL_ORG_MEMBERSHIP_FRAGMENT}' in lower(pg_get_viewdef(c.oid)))`,
       );
       expect(grants).toContain(
-        `position('${LWQL_SESSION_USER_FRAGMENT}' in lower(pg_get_viewdef(c.oid)))`,
+        `position('${LWQL_CURRENT_USER_FRAGMENT}' in lower(pg_get_viewdef(c.oid)))`,
       );
       expect(grants).not.toContain("position('current_user' in");
     });

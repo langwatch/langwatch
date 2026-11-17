@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 import {
   LWQL_ORG_MEMBERSHIP_FRAGMENT,
   LWQL_ORG_SCOPE_FRAGMENT,
-  LWQL_SESSION_USER_FRAGMENT,
+  LWQL_CURRENT_USER_FRAGMENT,
   scopedCopiesWritableCondition,
 } from "../../rules/lwql-scoped-view.rules.ts";
 import { LWQL_SCOPED_READER_GROUP } from "../langwatch-ql-postgres-mapping.service.ts";
@@ -73,11 +73,11 @@ describe("given the generated approved Postgres views", () => {
       expect(copies.filter((s) => !s.includes(LWQL_ORG_SCOPE_FRAGMENT))).toEqual([]);
     });
 
-    it("ties the org-role membership to the session user in every copy", () => {
+    it("ties the org-role membership to the current user in every copy", () => {
       const lowered = copies.map((s) => s.toLowerCase());
 
       expect(lowered.filter((s) => !s.includes(LWQL_ORG_MEMBERSHIP_FRAGMENT))).toEqual([]);
-      expect(lowered.filter((s) => !s.includes(LWQL_SESSION_USER_FRAGMENT))).toEqual([]);
+      expect(lowered.filter((s) => !s.includes(LWQL_CURRENT_USER_FRAGMENT))).toEqual([]);
     });
 
     it("exempts no login, the shared reader included", () => {

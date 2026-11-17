@@ -146,9 +146,9 @@ describe("given the scoped-reader group and the app's view provisioning", () => 
     });
   });
 
-  describe("when look-alike copies carry the org-role lookup but no membership tie to the session user", () => {
+  describe("when look-alike copies carry the org-role lookup but no membership tie to the current user", () => {
     const withoutMembership = VIEW_NAMES[2] as string;
-    const withoutSessionTie = VIEW_NAMES[3] as string;
+    const withoutCurrentUserTie = VIEW_NAMES[3] as string;
     const lookup = "g.rolname = 'lwql_org_'::text || md5('x')";
 
     beforeAll(async () => {
@@ -157,7 +157,7 @@ describe("given the scoped-reader group and the app's view provisioning", () => 
       // Security barrier and the org-role fragment, but nothing ties the lookup to who is asking.
       const decoys: Record<string, string> = {
         [withoutMembership]: `EXISTS (SELECT 1 FROM pg_roles g WHERE ${lookup})`,
-        [withoutSessionTie]: `EXISTS (SELECT 1 FROM pg_roles g JOIN pg_auth_members m ON m.roleid = g.oid WHERE ${lookup})`,
+        [withoutCurrentUserTie]: `EXISTS (SELECT 1 FROM pg_roles g JOIN pg_auth_members m ON m.roleid = g.oid WHERE ${lookup})`,
       };
       for (const [view, predicate] of Object.entries(decoys)) {
         await admin(`DROP VIEW ${copy(view)}`);
@@ -174,8 +174,8 @@ describe("given the scoped-reader group and the app's view provisioning", () => 
       expect(await canSelect(withoutMembership)).toBe("f");
     });
 
-    it("the group has no SELECT on a copy with a membership join but no session-user comparison", async () => {
-      expect(await canSelect(withoutSessionTie)).toBe("f");
+    it("the group has no SELECT on a copy with a membership join but no current-user comparison", async () => {
+      expect(await canSelect(withoutCurrentUserTie)).toBe("f");
     });
 
     it("the group still has SELECT on a scoped copy", async () => {

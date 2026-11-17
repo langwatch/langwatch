@@ -25,11 +25,11 @@ export const LWQL_ORG_SCOPE_FRAGMENT = `${postgresLiteral(ORG_ROLE_PREFIX)}::tex
 
 /**
  * Lower-cased fragments a scoped copy's stored definition must also carry: the membership catalog
- * and the session-user comparison (deparsed upper-case, hence lower-cased matching). Without
+ * and the current-user comparison (deparsed upper-case, hence lower-cased matching). Without
  * both, the org-role lookup is not row-scoped to the reader.
  */
 export const LWQL_ORG_MEMBERSHIP_FRAGMENT = "pg_auth_members";
-export const LWQL_SESSION_USER_FRAGMENT = "rolname = current_user";
+export const LWQL_CURRENT_USER_FRAGMENT = "rolname = current_user";
 
 /** Starts the scoped schema's comment; the rest names the app schema that owns it. */
 const SCOPED_SCHEMA_MARKER_PREFIX = "langwatch-lwql-scoped:";
@@ -74,7 +74,7 @@ export function scopedViewGuardCondition({ relation }: { relation: string }): st
     `AND 'security_barrier=true' = ANY(coalesce(${relation}.reloptions, '{}')) ` +
     `AND position(${postgresLiteral(LWQL_ORG_SCOPE_FRAGMENT)} in ${definition}) > 0 ` +
     `AND position(${postgresLiteral(LWQL_ORG_MEMBERSHIP_FRAGMENT)} in lower(${definition})) > 0 ` +
-    `AND position(${postgresLiteral(LWQL_SESSION_USER_FRAGMENT)} in lower(${definition})) > 0)`
+    `AND position(${postgresLiteral(LWQL_CURRENT_USER_FRAGMENT)} in lower(${definition})) > 0)`
   );
 }
 

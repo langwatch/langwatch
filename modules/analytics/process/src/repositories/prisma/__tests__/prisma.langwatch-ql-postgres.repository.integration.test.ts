@@ -41,7 +41,7 @@ const UNGRANTED = "copy_ungranted";
 const MISSING = "copy_missing";
 const VIEWS = [LOOK_ALIKE, MISSING, SCOPED_OK, SHARED_GRANTED, UNGRANTED];
 
-/** A body carrying the org-role lookup tied to the session user, as the scoped-view check asks. */
+/** A body carrying the org-role lookup tied to the current user, as the scoped-view check asks. */
 const SCOPED_BODY =
   `SELECT b.id FROM "${APP_SCHEMA}".base b WHERE EXISTS (SELECT 1 FROM pg_roles g ` +
   `JOIN pg_auth_members m ON m.roleid = g.oid ` +

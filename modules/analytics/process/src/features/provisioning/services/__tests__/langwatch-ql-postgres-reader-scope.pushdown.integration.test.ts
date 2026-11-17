@@ -116,6 +116,7 @@ describe("given the generated Postgres views", () => {
       },
     );
 
+    /** @scenario "Every scoped copy is a security barrier and keeps the tenant filter pushed down" */
     it.each(widest.map((view) => view.postgres.approvedView))(
       "%s: pushdown guard: no node above the barrier carries the TenantId filter",
       async (view) => {

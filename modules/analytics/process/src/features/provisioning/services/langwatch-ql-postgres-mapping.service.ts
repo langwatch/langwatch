@@ -81,12 +81,6 @@ function assertNoDollarTagCollision({ view, body }: { view: string; body: string
  */
 export const LWQL_SCOPED_READER_GROUP = "lwql_scoped_reader";
 
-/**
- * The shared reader login: the one role whose reads keep every row. One source for the
- * collection binding and self-provisioning.
- */
-export const LWQL_SHARED_READER_ROLE = "lwql_ro";
-
 /** Where the per-reader row scope reads each row's owning project. */
 export interface PostgresReaderRowScope {
   /** Alias and column carrying the row's project id. */

@@ -96,6 +96,7 @@ describe("given per-reader row scoping over every generated Postgres view", () =
       expect(tenantsOf(movedA[view] as Row[])).not.toContain(PROJECT_A);
     });
 
+    /** @scenario "A Postgres reader's row scope follows a project moved to another organization" */
     it.each(VIEW_NAMES)("%s: the org_b login sees every row it saw before", (view) => {
       const after = new Set(canon(movedB[view] as Row[]));
       const missing = canon(readerB[view] as Row[]).filter((row) => !after.has(row));
@@ -103,6 +104,7 @@ describe("given per-reader row scoping over every generated Postgres view", () =
       expect(missing).toEqual([]);
     });
 
+    /** @scenario "A Postgres reader's row scope follows a project moved to another organization" */
     it("an annotation-style project-path view moves the project's rows to the org_b login", () => {
       const projectPathView = VIEWS.find(
         (view) =>
