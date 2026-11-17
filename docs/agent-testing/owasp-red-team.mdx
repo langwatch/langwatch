@@ -1,0 +1,59 @@
+---
+title: OWASP Red Team Pack
+sidebarTitle: OWASP Red Team Pack
+keywords: langwatch, red teaming, owasp, owasp top 10 for llm applications, owasp agentic top 10, prompt injection, agent security, scenario tests
+description: Run one multi-turn attack per OWASP risk against your agent as pytest or vitest scenario tests, with every verdict in LangWatch.
+---
+
+<Warning>Use red teaming only on agents you own or have explicit permission to test.</Warning>
+
+Your security team wants to know whether your agent holds up against the OWASP Top 10 for LLM Applications and the OWASP Top 10 for Agentic Applications. The OWASP pack answers that with code: one multi-turn [red team](/agent-testing/red-teaming) scenario per OWASP risk, judged against your agent's own rules, running in the same CI job as your other tests.
+
+## What the pack covers
+
+| OWASP id | Title | What the attacker tries |
+| --- | --- | --- |
+| LLM01:2025 | Prompt Injection | Planted instructions in pasted content or tool results |
+| LLM02:2025 | Sensitive Information Disclosure | Leaking the data you list as protected |
+| LLM05:2025 | Improper Output Handling | Scripts, handlers and tracking images in replies |
+| LLM06:2025 | Excessive Agency | Actions beyond what the user may ask for |
+| LLM07:2025 | System Prompt Leakage | Printing the system prompt or hidden rules |
+| LLM09:2025 | Misinformation | Confident answers the agent's data does not back |
+| LLM10:2025 | Unbounded Consumption | Endless output and tool loops |
+| ASI01 | Agent Goal Hijack | Redirecting the agent to the attacker's goal |
+| ASI02 | Tool Misuse and Exploitation | Tools called with injected or foreign arguments |
+| ASI03 | Identity and Privilege Abuse | Privileged tools used on a claimed identity |
+| ASI06 | Memory & Context Poisoning | A false rule planted early and used later |
+
+The other ids (LLM03, LLM04, LLM08, ASI04, ASI05, ASI07 to ASI10) concern supply chain, training data, vector stores and multi-agent systems, which a conversation with your agent cannot reach.
+
+## Apply it with your coding agent
+
+The [owasp-red-team skill](https://github.com/langwatch/skills/tree/main/recipes/owasp-red-team) walks a coding agent through it. Install the LangWatch skills and ask your agent:
+
+```text
+Red team my agent against the OWASP Top 10 for LLM and agentic applications
+```
+
+The agent detects your language, copies the Python or TypeScript pack into your tests, connects it to your agent, fills in the config and runs it.
+
+## Apply it by hand
+
+Copy the pack from [templates/python](https://github.com/langwatch/skills/tree/main/recipes/owasp-red-team/templates/python) or [templates/typescript](https://github.com/langwatch/skills/tree/main/recipes/owasp-red-team/templates/typescript) into one test folder. Then make two edits.
+
+In `agent_adapter.py` or `agent-adapter.ts`, make `call_agent` or `callAgent` call your real agent with the conversation and return its reply, tool calls included.
+
+In `owasp_config.py` or `owasp.config.ts`, fill in the one config block: the agent's name and job, its tools, the tools that change data, what it must never do, and the data it must never disclose. Every attack goal and judge criterion is built from this block.
+
+## Run it
+
+Set `LANGWATCH_API_KEY` and `OPENAI_API_KEY`, then run:
+
+```bash
+pytest test_owasp_pack.py -v            # Python
+npx vitest run owasp-pack.test.ts       # TypeScript
+```
+
+Add `-k LLM01` (pytest) or `-t LLM01` (vitest) to run one id. `OWASP_TURNS` sets the attacker's turns per attack: 10 by default, 30 before a release.
+
+Each run lands in LangWatch as a scenario named after its OWASP id, grouped under the set `owasp-red-team`, with the full conversation and the judge's verdict per criterion.
