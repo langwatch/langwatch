@@ -146,9 +146,8 @@ Feature: Cloud Free plan caps scenarios, simulations and custom evaluators
   @unit
   Scenario: A scenario create request cannot mark itself as template-made
     Given a create request that names a source template
-    When the tRPC input is read
-    Then it is refused
-    And the REST body is read without it
+    When the tRPC input or the REST body is read
+    Then both refuse it
 
   @unit
   Scenario: A scenario created inside a template's suite counts against the scenario cap

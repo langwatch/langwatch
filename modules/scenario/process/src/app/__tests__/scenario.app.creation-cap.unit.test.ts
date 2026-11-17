@@ -294,7 +294,7 @@ describe("ScenarioModule on the cloud Free scenario cap", () => {
 
   describe("given a create request that names a source template", () => {
     /** @scenario A scenario create request cannot mark itself as template-made */
-    it("refuses it on the tRPC input and drops it from the REST body", () => {
+    it("refuses it on both the tRPC input and the REST body", () => {
       const request = {
         projectId: "project-1",
         name: "Sneaky",
@@ -303,7 +303,7 @@ describe("ScenarioModule on the cloud Free scenario cap", () => {
       };
 
       expect(scenarioCreateInputSchema.validate(request)).toBe(false);
-      expect(scenarioRestCreateSchema.parse(request)).not.toHaveProperty("sourceTemplateId");
+      expect(scenarioRestCreateSchema.safeParse(request).success).toBe(false);
     });
   });
 });
