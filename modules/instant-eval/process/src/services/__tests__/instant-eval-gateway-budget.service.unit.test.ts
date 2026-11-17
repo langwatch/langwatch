@@ -135,6 +135,39 @@ describe("given a project budget set to block", () => {
   });
 });
 
+describe("given a per-end-user budget on the project set to block", () => {
+  describe("when the run's spend so far would take one end user's share past it", () => {
+    it("lets the run go on, as it has no end user to charge", async () => {
+      const service = InstantEvalGatewayBudgetService.create({
+        peers: {
+          findSpendAttribution: async () => ({ organizationId: "org-1", teamId: "team-1" }),
+          checkBudget: async () => ({
+            decision: "hard_block",
+            warnings: [],
+            blockReason: "Budget exceeded for scope=attributed_user window=day",
+            blockedBy: [
+              {
+                budgetId: "budget-2",
+                scope: "attributed_user",
+                scopeId: "project-1",
+                window: "day",
+                limitUsd: "0.100000",
+                spentUsd: "0.000000",
+              },
+            ],
+            scopes: [],
+          }),
+          isOwnDecisionModel: async () => false,
+        },
+      });
+
+      await expect(
+        service.assertWithinGatewayBudget({ projectId: "project-1", inFlightUsd: 0.2 }),
+      ).resolves.toBeUndefined();
+    });
+  });
+});
+
 describe("given a project budget set to warn", () => {
   describe("when its spend is past its limit", () => {
     /** @scenario "A budget set to warn never refuses a run" */

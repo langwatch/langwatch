@@ -22,6 +22,13 @@ interface InstantEvalGatewayBudgetPeers {
   isOwnDecisionModel(input: { projectId: string }): Promise<boolean>;
 }
 
+/** The scopes an Instant Eval answers to; it has no key, person or end user of its own. */
+const INSTANT_EVAL_BUDGET_SCOPES: ReadonlySet<string> = new Set([
+  "organization",
+  "team",
+  "project",
+]);
+
 /** A key id no key budget names, so only organization, team and project budgets apply. */
 function instantEvalBudgetKeyId({ projectId }: { projectId: string }): string {
   return `_instant_eval_:project:${projectId}`;
@@ -63,7 +70,8 @@ export class InstantEvalGatewayBudgetService {
       providerKey: null,
       projectedCostUsd: inFlightUsd,
     });
-    const blocked = result.blockedBy[0];
+    // A per-end-user budget on the project resolves too, but there is no end user to charge.
+    const blocked = result.blockedBy.find((line) => INSTANT_EVAL_BUDGET_SCOPES.has(line.scope));
     if (result.decision !== "hard_block" || !blocked) return;
 
     throw new InstantEvalGatewayBudgetExceededError({
