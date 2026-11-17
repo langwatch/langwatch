@@ -24,6 +24,12 @@ export type VirtualKeyCreatedSignal = NurturingSignalOf<"virtual_key_created">;
 export type KeyBudgetThresholdSignal = NurturingSignalOf<"key_budget_threshold">;
 export type GatewayKeySignal = VirtualKeyCreatedSignal | KeyBudgetThresholdSignal;
 
+/** Who hears a key fact, and the holders before them whom the member copy holds no row for. */
+export type KeyRecipient = Readonly<{
+  recipient: string | null;
+  passedOverWithoutRow: readonly string[];
+}>;
+
 /**
  * The first of the key's holder, its creator and the organization's admin who is a current member
  * of its organization, else no one. Membership is read from nurturing's own copy, disabled rows
@@ -40,19 +46,20 @@ export function pickKeyRecipient({
   holders: readonly (string | null)[];
   memberships: readonly NurturingMembership[];
   admin: NurturingOrganizationAdmin;
-}>): string | null {
-  const isCurrentMember = (userId: string) =>
-    memberships.some(
-      (membership) =>
-        membership.organizationId === organizationId &&
-        membership.userId === userId &&
-        isCurrentMembership(membership),
+}>): KeyRecipient {
+  const rowsOf = (userId: string) =>
+    memberships.filter(
+      (membership) => membership.organizationId === organizationId && membership.userId === userId,
     );
-  const candidates = [...holders, admin.kind === "admin" ? admin.userId : null];
-  const recipient = candidates.find(
-    (userId): userId is string => userId !== null && isCurrentMember(userId),
-  );
-  return recipient ?? null;
+  const passedOverWithoutRow: string[] = [];
+  for (const userId of holders) {
+    if (userId === null) continue;
+    const rows = rowsOf(userId);
+    if (rows.some(isCurrentMembership)) return { recipient: userId, passedOverWithoutRow };
+    if (rows.length === 0) passedOverWithoutRow.push(userId);
+  }
+  const adminIsCurrent = admin.kind === "admin" && rowsOf(admin.userId).some(isCurrentMembership);
+  return { recipient: adminIsCurrent ? admin.userId : null, passedOverWithoutRow };
 }
 
 /** When a crossing's period ends as Customer.io is told it; missing when gateway named none. */

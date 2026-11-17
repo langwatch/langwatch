@@ -15,6 +15,8 @@ import {
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
+import { MemoryNurturingClaimRepository } from "../../repositories/memory/memory.nurturing.repositories.ts";
+import type { NurturingClaimRepository } from "../../repositories/nurturing-claim.repository.ts";
 import {
   ADMIN_USER_ID,
   crossingFact,
@@ -310,6 +312,18 @@ describe("gateway's key facts in nurturing", () => {
     });
   });
 
+  describe("when the key's holder is chosen and its creator has no row in the member copy", () => {
+    it("tells the holder and warns of no one passed over", async () => {
+      const facts = await gatewayFactsOver();
+      await facts.joined("user-holder");
+
+      await facts.deliverFact(created());
+
+      expect(callsOf(facts.sent)).toContainEqual(["track", "user-holder", "virtual_key_created"]);
+      expect(facts.logLines.findLine("warn", "no row in nurturing's member copy")).toBeUndefined();
+    });
+  });
+
   describe("when no one matches and the organization has no copied admin", () => {
     /** @scenario "The key's holder hears it first, then its creator, then the organization's admin" */
     it("sends nothing and logs the dropped fact at debug level", async () => {
@@ -386,7 +400,16 @@ describe("gateway's key facts in nurturing", () => {
   describe("when the holder's identify went and the track was refused, and the retry finds the holder disabled", () => {
     /** @scenario "A retry that picks another recipient identifies them too" */
     it("identifies and tracks the creator on the retry, the holder's identify not standing in", async () => {
-      const facts = await gatewayFactsOver();
+      const memory = MemoryNurturingClaimRepository.create();
+      const claimed: string[] = [];
+      const claims: NurturingClaimRepository = {
+        claim: (key, ttlSeconds) => {
+          claimed.push(key);
+          return memory.claim(key, ttlSeconds);
+        },
+        release: (key) => memory.release(key),
+      };
+      const facts = await gatewayFactsOver({ claims });
       await facts.joined("user-holder");
       await facts.joined("user-creator");
       facts.refusing.add("track");
@@ -403,6 +426,9 @@ describe("gateway's key facts in nurturing", () => {
         ["identify", "user-creator", null],
         ["track", "user-creator", "virtual_key_created"],
       ]);
+      const callClaims = claimed.filter((key) => /:(identify|track):/.test(key));
+      expect(new Set(callClaims.filter((key) => key.includes(":identify:"))).size).toBe(2);
+      expect(callClaims.join("\n")).not.toMatch(/user-/);
     });
   });
 

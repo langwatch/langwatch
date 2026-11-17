@@ -111,18 +111,19 @@ export class NurturingGatewayFactsService {
     const people = [...holders, admin.kind === "admin" ? admin.userId : null];
     const userIds = people.filter((userId): userId is string => userId !== null);
     const memberships = await this.dependencies.members.findMembershipsOfUsers({ userIds });
-    const hasRow = (userId: string) =>
-      memberships.some(
-        (membership) =>
-          membership.organizationId === organizationId && membership.userId === userId,
-      );
-    if (holders.some((userId) => userId !== null && !hasRow(userId))) {
+    const { recipient, passedOverWithoutRow } = pickKeyRecipient({
+      organizationId,
+      holders,
+      memberships,
+      admin,
+    });
+    if (passedOverWithoutRow.length > 0) {
       this.dependencies.logger.warn(
         { organizationId, virtualKeyId, reason: "holder_not_in_member_copy" },
-        "a key holder has no row in nurturing's member copy; the fact may pass them over",
+        "a key holder with no row in nurturing's member copy was passed over",
       );
     }
-    return pickKeyRecipient({ organizationId, holders, memberships, admin });
+    return recipient;
   }
 
   private noRecipient({

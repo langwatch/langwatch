@@ -14,6 +14,7 @@ import {
   fireVirtualKeyCreated,
   isKeyOwnBudget,
   keyBudgetPeriodEndOf,
+  type KeyRecipient,
   pickKeyRecipient,
   virtualKeyCreatedSignal,
 } from "../nurturing-gateway-facts.rules.ts";
@@ -36,16 +37,20 @@ const disabled = (userId: string): NurturingMembership => ({
 });
 
 describe("pickKeyRecipient", () => {
-  const recipient = (
+  const picked = (
     memberships: readonly NurturingMembership[],
     admin: NurturingOrganizationAdmin = ADMIN,
-  ): string | null =>
+  ): KeyRecipient =>
     pickKeyRecipient({
       organizationId: "org-1",
       holders: ["user-holder", "user-creator"],
       memberships,
       admin,
     });
+  const recipient = (
+    memberships: readonly NurturingMembership[],
+    admin: NurturingOrganizationAdmin = ADMIN,
+  ): string | null => picked(memberships, admin).recipient;
 
   describe("given the holder and the creator are both current members", () => {
     /** @scenario "The key's holder hears it first, then its creator, then the organization's admin" */
@@ -100,8 +105,35 @@ describe("pickKeyRecipient", () => {
           holders: ["svc_project_1", "system:connect-license"],
           memberships: [current("user-admin")],
           admin: ADMIN,
-        }),
+        }).recipient,
       ).toBe("user-admin");
+    });
+  });
+
+  describe("given the holder has no row of the organization and the admin is chosen", () => {
+    it("lists the holder and the creator as passed over without a row", () => {
+      expect(picked([current("user-admin")])).toEqual({
+        recipient: "user-admin",
+        passedOverWithoutRow: ["user-holder", "user-creator"],
+      });
+    });
+  });
+
+  describe("given the holder is chosen and the creator after them has no row", () => {
+    it("lists no one, since no one without a row came before the holder", () => {
+      expect(picked([current("user-holder")])).toEqual({
+        recipient: "user-holder",
+        passedOverWithoutRow: [],
+      });
+    });
+  });
+
+  describe("given the holder is disabled and the creator is chosen", () => {
+    it("lists no one, since a disabled member has a row", () => {
+      expect(picked([disabled("user-holder"), current("user-creator")])).toEqual({
+        recipient: "user-creator",
+        passedOverWithoutRow: [],
+      });
     });
   });
 });

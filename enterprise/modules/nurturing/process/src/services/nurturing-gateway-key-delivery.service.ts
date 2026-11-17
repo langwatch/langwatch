@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import { createHash } from "node:crypto";
+
 import type { CioBatchCall } from "@langwatch/enterprise-nurturing-contract";
 
 import type { NurturingClaimRepository } from "../repositories/nurturing-claim.repository.ts";
@@ -16,6 +18,11 @@ type GatewayKeyDeliveryDependencies = Readonly<{
   /** How long a sent call is remembered, the signal's own delivered window. */
   windowSeconds: number;
 }>;
+
+/** The recipient as a claim key carries them: a digest, so the claim store holds no person's id. */
+function recipientDigestOf(userId: string): string {
+  return createHash("sha256").update(userId).digest("hex").slice(0, 16);
+}
 
 /**
  * Sends a gateway key signal's calls in order, each claimed by type and recipient inside the
@@ -43,7 +50,7 @@ export class NurturingGatewayKeyDeliveryService {
     deliveredClaim,
   }: Readonly<{ call: CioBatchCall; deliveredClaim: string }>): Promise<void> {
     const { claims, customerIo, windowSeconds } = this.dependencies;
-    const callClaim = `${deliveredClaim}:${call.type}:${call.userId}`;
+    const callClaim = `${deliveredClaim}:${call.type}:${recipientDigestOf(call.userId)}`;
     let claimed = false;
     try {
       claimed = await claims.claim(callClaim, windowSeconds);
