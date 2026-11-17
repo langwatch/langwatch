@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * The refusals on the Explorer's `instant_eval` route: a popover over the chip, or a phrase.
  * @see specs/traces-v2/instant-eval-search.feature ("A refusal is a popover, never an error state")
  */
-import { useFilterStore } from "../../../../../behavior/explorer.store.ts";
+import { useFilterStore, useViewStore } from "../../../../../behavior/explorer.store.ts";
 import type { InstantEvalRoutePayload } from "../../../../../model/instant-eval-route.ts";
 import { useInstantEvalRoute } from "../use-instant-eval-route.ts";
 
@@ -290,6 +290,22 @@ describe("given a chip typed by hand under NOT", () => {
 
     expect(result.current.refusal).toEqual({ kind: "model" });
     expect(useFilterStore.getState().queryText).toBe('NOT eval:"the user is annoyed"');
+  });
+
+  /** @scenario "A chip typed by hand starts its run on Enter" */
+  it("re-spells the chip for its target when the lens changed before the run started", () => {
+    const lensId = useViewStore.getState().activeLensId;
+    const { result } = renderHook(() => useInstantEvalRoute({ isInstantEvalAvailable: true }));
+    act(() => result.current.onInstantEvalRoute(typed));
+    act(() => estimateCallbacks().onSuccess?.({ rows: 120, isRowsCapped: false, priceUsd: 0.1 }));
+    try {
+      act(() => useViewStore.setState({ activeLensId: "conversations" }));
+      act(() => startCallbacks().onSuccess?.({ id: "run-1" }));
+
+      expect(useFilterStore.getState().queryText).toBe('eval.trace:"the user is annoyed"');
+    } finally {
+      useViewStore.setState({ activeLensId: lensId });
+    }
   });
 });
 

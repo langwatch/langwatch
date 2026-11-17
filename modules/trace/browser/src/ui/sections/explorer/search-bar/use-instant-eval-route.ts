@@ -12,6 +12,7 @@ import {
   type ExplorerInstantEvalOptInAccess,
   combineQueries,
   instantEvalChipText,
+  instantEvalChipsOf,
   instantEvalRunKey,
   queryWithoutInstantEvalChips,
 } from "@langwatch/trace-contract";
@@ -120,6 +121,24 @@ function routeRunKey({
       ...(presetId ? { presetId } : {}),
     },
   });
+}
+
+/** The typed text, when its chip still reads as the run's target under `lensId`. */
+function typedQueryForLens({
+  payload,
+  lensId,
+}: {
+  payload: InstantEvalRoutePayload;
+  lensId: string | undefined;
+}): string | undefined {
+  const { typedQuery } = payload;
+  if (typedQuery === undefined) return undefined;
+  const wanted = payload.question.instructions.replace(/\s+/g, " ").trim();
+  const matches = instantEvalChipsOf({ queryText: typedQuery, lensId }).some(
+    (chip) =>
+      chip.target === payload.target && chip.question.replace(/\s+/g, " ").trim() === wanted,
+  );
+  return matches ? typedQuery : undefined;
 }
 
 /** The bar's query with the route's eval chip in it: what a refusal leaves for the reader. */
@@ -255,9 +274,10 @@ function useInstantEvalStarter({
     ({ payload, key, runId }: PendingRoute & { runId: string }) => {
       const lensId = useViewStore.getState().activeLensId;
       registerEvalRun({ key, runId });
-      // A chip typed by hand goes back as typed, so a `NOT` in front of it stays.
+      // A chip typed by hand goes back as typed, so a `NOT` in front of it stays,
+      // unless a lens switch since Enter would now read it as another target.
       applyQueryText(
-        payload.typedQuery ??
+        typedQueryForLens({ payload, lensId }) ??
           combineQueries({
             base: payload.otherQuery,
             addition: instantEvalChipText({
