@@ -108,7 +108,7 @@ Why this shape:
 - **The partition and TTL anchor on `OccurredAt`**, the trace's time. `trace_summaries` uses the same anchor (`ttl.reconciler.ts:147-153`) and the same `toYearWeek` partition (00002 line 179). So a result expires with its trace.
 - **The TTL clause** is what `buildRetentionTTLExpression` emits for a `TABLE_TTL_CONFIG` entry with `retentionTTLColumn: "OccurredAt"` (`ttl.reconciler.ts:352-356`). With cold storage off, the reconciler finds it correct and issues no ALTER. With `CLICKHOUSE_COLD_STORAGE_ENABLED` on, `planTieredTTL` (`ttl.reconciler.ts:463-494`) adds `TO VOLUME 'cold'`, as for every tiered table.
 - **The bloom filter on `SourceId`** serves provenance reads, such as "what did this monitor or widget write". It does not serve the run results page: a recall adds no row, so a rerun's recalled traces have no row with its id. The run page keeps reading `instant_eval_judgments` (section 3). The pattern is the `idx_trace_id` bloom filter on `evaluation_runs` (00002).
-- **No judged text is stored**, as in 00097. `InputHash` is a hash of the judged text, not the text.
+- **No judged text is stored**, as in 00097. `InputHash` is a hash of the judged column name and its text (for a monitor, of `{input, output, contexts}` as canonical JSON), not the text.
 - **A judgment of free text with no trace is not stored.** It has no trace to link to.
 - **`Question` is customer text.** The question is free text the customer wrote, so it is tenant data: it lives under `TenantId`, is read only through `InstantEvalApi` like every other column, and expires with the row by the trace's retention. The judged trace text is the part that is never stored.
 
