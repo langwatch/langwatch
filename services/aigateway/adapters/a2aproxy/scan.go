@@ -3,8 +3,12 @@ package a2aproxy
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
+	"errors"
+	"io"
 	"strings"
+	"unicode/utf8"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -81,99 +85,233 @@ func (s GuardrailScanner) Scan(ctx context.Context, in ScanInput) (domain.Guardr
 	return s.Evaluator.EvaluatePost(ctx, bundle, &domain.Request{}, &domain.Response{Body: body})
 }
 
-// payload is what the scanner sees of one body: its text parts, and whether
-// the body could be read at all.
+// payload is what the scanner sees of one body: its text, and whether the
+// body could be read at all.
 type payload struct {
 	texts []string
 	// parsed is false for a non-empty body that is not JSON.
 	parsed bool
 }
 
-// collectTexts returns the text of every part found anywhere in an A2A
-// payload: message parts, task history and artifacts, in v1.0 and v0.3 shapes.
-// An empty body is parsed and has no text.
+// maxJSONDepth bounds how deep the scan walks one body.
+const maxJSONDepth = 64
+
+var errTooDeep = errors.New("the JSON nests too deeply")
+
+// protocolValueKeys hold ids and enum values, never content the guardrail needs.
+var protocolValueKeys = map[string]bool{
+	"jsonrpc": true, "method": true, "id": true, "messageId": true, "contextId": true,
+	"taskId": true, "artifactId": true, "role": true, "kind": true, "mediaType": true,
+	"mimeType": true, "state": true, "timestamp": true,
+}
+
+// protocolKeys are A2A field names. Any other object key is content (a data
+// part's own fields) and is scanned as text.
+var protocolKeys = map[string]bool{
+	"params": true, "message": true, "parts": true, "text": true, "data": true, "file": true,
+	"raw": true, "bytes": true, "url": true, "uri": true, "name": true, "filename": true,
+	"metadata": true, "extensions": true, "referenceTaskIds": true, "configuration": true,
+	"acceptedOutputModes": true, "historyLength": true, "blocking": true, "result": true,
+	"task": true, "status": true, "history": true, "artifacts": true, "artifact": true,
+	"description": true, "append": true, "lastChunk": true, "final": true, "statusUpdate": true,
+	"artifactUpdate": true, "error": true, "code": true, "tenant": true, "returnImmediately": true,
+	"pushNotificationConfig": true, "reason": true,
+}
+
+// collectTexts returns every piece of text in an A2A payload, wherever it sits:
+// text parts, data parts, metadata, artifact names, error messages and the
+// decoded bytes of text files. The guardrail sees the whole payload, as the
+// LLM routes send it the whole messages array. The body is read token by
+// token, so no tree of it is ever held. An empty body is parsed and has no text.
 func collectTexts(body []byte) payload {
 	if len(bytes.TrimSpace(body)) == 0 {
 		return payload{parsed: true}
 	}
-	var v any
-	if json.Unmarshal(body, &v) != nil {
+	dec := json.NewDecoder(bytes.NewReader(body))
+	dec.UseNumber()
+	var texts []string
+	if walkTokens(dec, &texts) != nil {
 		return payload{}
 	}
-	p := payload{parsed: true}
-	walkTexts(v, false, &p.texts)
-	return p
+	if _, err := dec.Token(); !errors.Is(err, io.EOF) {
+		return payload{}
+	}
+	return payload{parsed: true, texts: texts}
 }
 
-func walkTexts(node any, inParts bool, out *[]string) {
-	switch n := node.(type) {
-	case map[string]any:
-		if t, ok := n["text"].(string); inParts && ok && t != "" {
-			*out = append(*out, t)
+type jsonFrame struct {
+	object, wantKey bool
+	key             string
+}
+
+// tokenWalker collects the text of one JSON value, one token at a time.
+type tokenWalker struct {
+	stack []jsonFrame
+	out   *[]string
+}
+
+// walkTokens reads one JSON value and appends its text.
+func walkTokens(dec *json.Decoder, out *[]string) error {
+	w := tokenWalker{out: out}
+	for {
+		tok, err := dec.Token()
+		if err != nil {
+			return err
 		}
-		for k, child := range n {
-			walkTexts(child, k == "parts", out)
-		}
-	case []any:
-		for _, child := range n {
-			walkTexts(child, inParts, out)
+		done, err := w.step(tok)
+		if err != nil || done {
+			return err
 		}
 	}
 }
 
-func lookup(v any, path ...string) any {
-	for _, p := range path {
-		m, ok := v.(map[string]any)
-		if !ok {
-			return nil
+// step takes one token and reports whether the top-level value is complete.
+func (w *tokenWalker) step(tok json.Token) (bool, error) {
+	top := len(w.stack) - 1
+	if top >= 0 && w.stack[top].wantKey {
+		if k, ok := tok.(string); ok {
+			w.key(k)
+			return false, nil
 		}
-		v = m[p]
+		w.stack = w.stack[:top] // the object's closing brace
+		return w.valueDone(), nil
 	}
-	return v
+	d, isDelim := tok.(json.Delim)
+	switch {
+	case isDelim && (d == '{' || d == '['):
+		return false, w.open(d)
+	case isDelim:
+		w.stack = w.stack[:top] // an array's closing bracket
+	default:
+		if s, ok := tok.(string); ok {
+			appendValue(frameKey(w.stack), s, w.out)
+		}
+	}
+	return w.valueDone(), nil
 }
 
-func setString(span trace.Span, key string, v any) {
-	if s, ok := v.(string); ok && s != "" {
-		span.SetAttributes(attribute.String(key, s))
+func (w *tokenWalker) key(k string) {
+	top := &w.stack[len(w.stack)-1]
+	top.key, top.wantKey = k, false
+	if !protocolKeys[k] && !protocolValueKeys[k] {
+		*w.out = append(*w.out, k)
 	}
 }
 
-// setMessageAttrs records the ids of the outgoing message.
-func setMessageAttrs(span trace.Span, body []byte) {
-	var v any
-	if json.Unmarshal(body, &v) != nil {
+func (w *tokenWalker) open(d json.Delim) error {
+	if len(w.stack) >= maxJSONDepth {
+		return errTooDeep
+	}
+	w.stack = append(w.stack, jsonFrame{object: d == '{', wantKey: d == '{', key: frameKey(w.stack)})
+	return nil
+}
+
+// valueDone marks a finished value: the enclosing object now wants a key.
+func (w *tokenWalker) valueDone() bool {
+	if len(w.stack) == 0 {
+		return true
+	}
+	if last := &w.stack[len(w.stack)-1]; last.object {
+		last.wantKey = true
+	}
+	return false
+}
+
+func frameKey(stack []jsonFrame) string {
+	if len(stack) == 0 {
+		return ""
+	}
+	return stack[len(stack)-1].key
+}
+
+// appendValue keeps a string value as text. File bytes count as the text
+// they decode to when that is valid UTF-8.
+func appendValue(key, s string, out *[]string) {
+	if s == "" || protocolValueKeys[key] {
 		return
 	}
-	msg := lookup(v, "params", "message")
-	if msg == nil {
-		msg = lookup(v, "message")
+	if key == "bytes" || key == "raw" {
+		if b, err := base64.StdEncoding.DecodeString(s); err == nil && utf8.Valid(b) {
+			s = string(b)
+		}
 	}
-	setString(span, attrMessageID, lookup(msg, "messageId"))
-	setString(span, attrContextID, lookup(msg, "contextId"))
-	setString(span, attrTaskID, lookup(msg, "taskId"))
+	*out = append(*out, s)
+}
+
+func setString(span trace.Span, key, v string) {
+	if v != "" {
+		span.SetAttributes(attribute.String(key, v))
+	}
+}
+
+type messageIDs struct {
+	MessageID string `json:"messageId"`
+	ContextID string `json:"contextId"`
+	TaskID    string `json:"taskId"`
+}
+
+// setMessageAttrs records the ids of the outgoing message. The typed decode
+// skips every other field without building it.
+func setMessageAttrs(span trace.Span, body []byte) {
+	var v struct {
+		Params struct {
+			Message *messageIDs `json:"message"`
+		} `json:"params"`
+		Message *messageIDs `json:"message"`
+	}
+	_ = json.Unmarshal(body, &v)
+	msg := v.Params.Message
+	if msg == nil {
+		msg = v.Message
+	}
+	if msg == nil {
+		return
+	}
+	setString(span, attrMessageID, msg.MessageID)
+	setString(span, attrContextID, msg.ContextID)
+	setString(span, attrTaskID, msg.TaskID)
+}
+
+type taskIDs struct {
+	ID        any    `json:"id"`
+	TaskID    string `json:"taskId"`
+	ContextID string `json:"contextId"`
+	Status    struct {
+		State string `json:"state"`
+	} `json:"status"`
+}
+
+type resultShape struct {
+	taskIDs
+	Task           *taskIDs `json:"task"`
+	StatusUpdate   *taskIDs `json:"statusUpdate"`
+	ArtifactUpdate *taskIDs `json:"artifactUpdate"`
 }
 
 // setResultAttrs records the task the reply names, for JSON-RPC and
 // HTTP+JSON replies and stream events alike.
 func setResultAttrs(span trace.Span, body []byte) {
-	var v any
-	if json.Unmarshal(body, &v) != nil {
-		return
+	var v struct {
+		Result *resultShape `json:"result"`
+		resultShape
 	}
-	if r := lookup(v, "result"); r != nil {
-		v = r
+	_ = json.Unmarshal(body, &v)
+	r := v.Result
+	if r == nil {
+		r = &v.resultShape
 	}
-	for _, key := range []string{"task", "statusUpdate", "artifactUpdate"} {
-		if inner := lookup(v, key); inner != nil {
-			v = inner
+	t := &r.taskIDs
+	for _, inner := range []*taskIDs{r.Task, r.StatusUpdate, r.ArtifactUpdate} {
+		if inner != nil {
+			t = inner
 			break
 		}
 	}
-	id := lookup(v, "taskId")
-	if id == nil {
-		id = lookup(v, "id")
+	id := t.TaskID
+	if s, ok := t.ID.(string); ok && id == "" {
+		id = s
 	}
 	setString(span, attrTaskID, id)
-	setString(span, attrContextID, lookup(v, "contextId"))
-	setString(span, attrTaskState, lookup(v, "status", "state"))
+	setString(span, attrContextID, t.ContextID)
+	setString(span, attrTaskState, t.Status.State)
 }

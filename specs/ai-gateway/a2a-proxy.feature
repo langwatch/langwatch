@@ -114,13 +114,38 @@ Feature: A2A proxy on the gateway
 
   @unit
   Scenario: a request body over the size limit is refused, not cut
-    When the caller sends POST /a2a/billing/message:send with a body over 16 MiB
+    When the caller sends POST /a2a/billing/message:send with a body over 1 MiB
     Then the upstream is not called
     And the caller receives HTTP 413 with reason "a2a_payload_too_large"
 
   @unit
+  Scenario: the outgoing scan covers every part of the payload, not only text parts
+    Given the caller's virtual key has a request guardrail that blocks "wire the money"
+    When the caller sends the phrase in a data part, a text file part, message metadata, params metadata or under "Parts" and "Text" keys
+    Then the upstream is not called
+    And the caller receives a JSON-RPC error with reason "a2a_content_blocked"
+
+  @unit
+  Scenario: the reply scan covers error messages and data parts
+    Given the caller's virtual key has a response guardrail that blocks "card number"
+    When the upstream replies with the phrase in error.message, error.data or a data part
+    Then the caller receives a JSON-RPC error with reason "a2a_content_blocked"
+
+  @unit
+  Scenario: a payload is read without building a tree, and only when a guardrail applies
+    When the caller sends a 1 MiB body made of many small parts
+    Then serving it allocates a small multiple of the body size, with or without a guardrail
+
+  @unit
+  Scenario: a virtual key with too many calls in flight is refused
+    Given the caller's virtual key already has 8 A2A calls in flight
+    When it sends another call
+    Then the caller receives HTTP 429 with reason "a2a_too_many_requests"
+    And the upstream is not called
+
+  @unit
   Scenario: a reply over the size limit is refused, not cut
-    When the upstream replies with a body over 16 MiB
+    When the upstream replies with a body over 1 MiB
     Then the caller receives HTTP 502 with reason "a2a_payload_too_large"
 
   @unit

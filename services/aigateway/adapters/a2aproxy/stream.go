@@ -27,7 +27,7 @@ func (h *Handler) stream(c *call, resp *http.Response) {
 	err := readEvents(resp.Body, func(event []byte) bool {
 		data := eventData(event)
 		setResultAttrs(c.span, data)
-		if r := h.check(c, DirectionResponse, collectTexts(data)); r != nil {
+		if r := h.check(c, DirectionResponse, data); r != nil {
 			c.markRefused(*r)
 			event = c.errorEvent(*r)
 		}
