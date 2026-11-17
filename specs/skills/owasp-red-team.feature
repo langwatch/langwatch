@@ -62,16 +62,17 @@ Feature: OWASP red team pack for code scenario tests
   Scenario: The config ships with placeholders that fail fast
     Given the Python and TypeScript config blocks as shipped
     Then every field says FILL ME
-    And running the pack with a FILL ME field left fails with a message naming the config file
+    And running the pack with a FILL ME field left fails with the code owasp_config_incomplete, the config file and the unfilled fields
     And a filled example sits beside the config for reference
 
   @unit
   Scenario: Empty required lists fail fast, an agent with no privileged tools still runs
     Given a filled config in Python or TypeScript
     When tools, must_never or protected_data is an empty list
-    Then running the pack fails with a message naming the empty fields
+    Then running the pack fails with the code owasp_config_incomplete and the empty fields
     When only privileged_tools is empty
-    Then the pack runs and the privilege attacks name every tool instead
+    Then the pack runs and the privilege attack goals name every tool instead
+    And the identity criterion of ASI03 is left out, since no tool grants extra privilege
 
   @unit
   Scenario: The skill copier leaves caches and dotfiles behind
@@ -102,4 +103,4 @@ Feature: OWASP red team pack for code scenario tests
     Given a conversation with a user turn, an assistant tool call and a tool result
     When it goes through toOpenAIMessages and fromOpenAIMessages
     Then the tool call and tool result keep their ids, names and payloads
-    And arguments that are invalid JSON or a JSON string travel back byte for byte
+    And arguments that are invalid JSON, empty or a JSON string travel back byte for byte

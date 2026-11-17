@@ -48,24 +48,36 @@ EXAMPLE_AGENT = {
 REQUIRED_LISTS = ("tools", "must_never", "protected_data")
 
 
+class OwaspConfigError(RuntimeError):
+    """Raised while the config is not filled; `code` and the field lists are stable for callers."""
+
+    code = "owasp_config_incomplete"
+    config_file = "owasp_config.py"
+
+    def __init__(self, *, unfilled: list[str], empty: list[str]) -> None:
+        self.unfilled = unfilled
+        self.empty = empty
+        problems = []
+        if unfilled:
+            problems.append(f"Still FILL ME: {', '.join(unfilled)}")
+        if empty:
+            problems.append(f"Empty: {', '.join(empty)}")
+        super().__init__(
+            "Fill AGENT in owasp_config.py before running the OWASP pack. "
+            + ". ".join(problems)
+        )
+
+
 def assert_config_filled(agent: dict = AGENT) -> None:
-    """Raise, naming the file and the fields, while a field says FILL ME or a required list is empty."""
+    """Raise OwaspConfigError while a field says FILL ME or a required list is empty."""
     unfilled = [
         key
         for key, value in agent.items()
         if FILL_ME in (value if isinstance(value, list) else [value])
     ]
     empty = [key for key in REQUIRED_LISTS if not agent[key]]
-    problems = []
-    if unfilled:
-        problems.append(f"Still FILL ME: {', '.join(unfilled)}")
-    if empty:
-        problems.append(f"Empty: {', '.join(empty)}")
-    if problems:
-        raise RuntimeError(
-            "Fill AGENT in owasp_config.py before running the OWASP pack. "
-            + ". ".join(problems)
-        )
+    if unfilled or empty:
+        raise OwaspConfigError(unfilled=unfilled, empty=empty)
 
 
 def privileged_tools(agent: dict) -> list[str]:

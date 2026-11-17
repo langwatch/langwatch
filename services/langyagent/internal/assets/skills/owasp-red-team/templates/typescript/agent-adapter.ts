@@ -130,9 +130,9 @@ const parseJson = (text: string): unknown => {
   }
 };
 
-// Invalid JSON and JSON strings stay as the raw text, so replay sends the same bytes.
+// Invalid JSON (an empty string too) and JSON strings stay raw, so replay sends the same bytes.
 const argumentsInput = (raw: string): unknown => {
-  const parsed = parseJson(raw || "{}");
+  const parsed = parseJson(raw);
   return parsed === undefined || typeof parsed === "string" ? raw : parsed;
 };
 

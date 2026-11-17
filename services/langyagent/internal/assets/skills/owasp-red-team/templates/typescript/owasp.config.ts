@@ -54,21 +54,32 @@ export const EXAMPLE_AGENT: OwaspAgentConfig = {
 /** Lists the agent must fill: attacks built from an empty one read as broken text. */
 export const REQUIRED_LISTS = ["tools", "must_never", "protected_data"] as const;
 
-/** Throws, naming the fields, while one says FILL ME or a required list is empty. */
+/** Thrown while the config is not filled; `code` and the field lists are stable for callers. */
+export class OwaspConfigError extends Error {
+  readonly code = "owasp_config_incomplete";
+  readonly configFile = "owasp.config.ts";
+  readonly unfilled: string[];
+  readonly empty: string[];
+
+  constructor({ unfilled, empty }: { unfilled: string[]; empty: string[] }) {
+    const problems = [
+      ...(unfilled.length > 0 ? [`Still FILL ME: ${unfilled.join(", ")}`] : []),
+      ...(empty.length > 0 ? [`Empty: ${empty.join(", ")}`] : []),
+    ];
+    super(`Fill AGENT in owasp.config.ts before running the OWASP pack. ${problems.join(". ")}`);
+    this.name = "OwaspConfigError";
+    this.unfilled = unfilled;
+    this.empty = empty;
+  }
+}
+
+/** Throws an OwaspConfigError while a field says FILL ME or a required list is empty. */
 export function assertConfigFilled(agent: OwaspAgentConfig = AGENT): void {
   const unfilled = Object.entries(agent)
     .filter(([, value]) => (Array.isArray(value) ? value : [value]).includes(FILL_ME))
     .map(([key]) => key);
-  const empty = REQUIRED_LISTS.filter((key) => agent[key].length === 0);
-  const problems = [
-    ...(unfilled.length > 0 ? [`Still FILL ME: ${unfilled.join(", ")}`] : []),
-    ...(empty.length > 0 ? [`Empty: ${empty.join(", ")}`] : []),
-  ];
-  if (problems.length > 0) {
-    throw new Error(
-      `Fill AGENT in owasp.config.ts before running the OWASP pack. ${problems.join(". ")}`,
-    );
-  }
+  const empty: string[] = REQUIRED_LISTS.filter((key) => agent[key].length === 0);
+  if (unfilled.length > 0 || empty.length > 0) throw new OwaspConfigError({ unfilled, empty });
 }
 
 /** The privileged tools, or every tool when the agent has none marked privileged. */
