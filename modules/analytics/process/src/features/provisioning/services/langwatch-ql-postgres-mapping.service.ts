@@ -17,8 +17,8 @@ import {
 import { LangWatchQLSqlTextService } from "../../../services/langwatch-ql-sql-text.service.ts";
 import type { PostgresApprovedViewJoin } from "../../lwql-catalogue/rules/lwql-tenant-paths.rules.ts";
 import {
-  LWQL_ORG_SCOPE_FRAGMENT,
   LWQL_SCOPED_READER_GROUP,
+  lwqlOrgRoleName,
 } from "../rules/lwql-scoped-view.rules.ts";
 
 const accessModel = LangWatchQLAccessModelService.create();
@@ -79,7 +79,7 @@ function assertNoDollarTagCollision({ view, body }: { view: string; body: string
 }
 
 /** Where the per-reader row scope reads each row's owning project. */
-export interface PostgresReaderRowScope {
+interface PostgresReaderRowScope {
   /** Alias and column carrying the row's project id. */
   tenant: { alias: string; column: string };
 }
@@ -97,12 +97,13 @@ function readerRowScopePredicate({
   quotedSchema: string;
 }): string {
   const tenant = `${sqlText.postgresQuoted(scope.tenant.alias)}.${sqlText.postgresQuoted(scope.tenant.column)}`;
+  const orgRole = lwqlOrgRoleName({ organizationId: 'lwql_t."organizationId"' });
 
   return (
     `EXISTS (SELECT 1 ` +
     `FROM ${quotedSchema}."Project" lwql_p ` +
     `JOIN ${quotedSchema}."Team" lwql_t ON lwql_t.id = lwql_p."teamId" ` +
-    `JOIN pg_roles lwql_g ON lwql_g.rolname = ${LWQL_ORG_SCOPE_FRAGMENT}lwql_t."organizationId") ` +
+    `JOIN pg_roles lwql_g ON lwql_g.rolname = ${orgRole} ` +
     `JOIN pg_auth_members lwql_m ON lwql_m.roleid = lwql_g.oid ` +
     `JOIN pg_roles lwql_u ON lwql_u.oid = lwql_m.member AND lwql_u.rolname = current_user ` +
     `WHERE lwql_p.id = ${tenant})`

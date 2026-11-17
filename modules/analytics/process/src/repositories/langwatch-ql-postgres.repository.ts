@@ -15,7 +15,7 @@ export interface LwqlPostgresViewFound {
 }
 
 /** One copy in the scoped schema, as the scoped-reader group finds it. */
-export interface LwqlScopedCopyFound {
+interface LwqlScopedCopyFound {
   readonly view: string;
   readonly exists: boolean;
   /** A security barrier carrying the row scope, by the scoped-view check. */

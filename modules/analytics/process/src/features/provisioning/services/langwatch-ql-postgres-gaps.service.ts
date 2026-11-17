@@ -27,7 +27,7 @@ export type LwqlPostgresGap =
     };
 
 /** A gap on a shared approved view, which the shared reader reads. */
-export type LwqlSharedPostgresGap = Extract<LwqlPostgresGap, { kind: "shared" }>;
+type LwqlSharedPostgresGap = Extract<LwqlPostgresGap, { kind: "shared" }>;
 
 /** How a copy falls short, checked in order; none when the group can read it. */
 function copyRepair({ copy }: { copy: LwqlScopedViewState["copies"][number] }) {
