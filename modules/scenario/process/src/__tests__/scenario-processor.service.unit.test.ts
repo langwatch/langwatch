@@ -208,10 +208,31 @@ describe("ScenarioProcessorService", () => {
       });
     });
 
-    /** @scenario "A red team report that cannot be written is logged and never fails the job" */
-    it("logs a warning and never fails the job when the record write is refused", async () => {
+    /** @scenario "A red team report write that fails once is retried" */
+    it("records the report on a later attempt when the first write is refused", async () => {
       const fixture = processorFixture();
-      fixture.execution.recordRedTeamReport = () => Promise.reject(new Error("store down"));
+      const recordRedTeamReport = vi
+        .fn()
+        .mockRejectedValueOnce(new Error("store down"))
+        .mockResolvedValue(undefined);
+      fixture.execution.recordRedTeamReport = recordRedTeamReport;
+      const { logger, lines } = createTestLogger();
+
+      await fixture.processor.handleSucceeded({
+        jobData: job("run-1"),
+        result: { success: true, redTeam: report },
+        jobLogger: logger,
+      });
+
+      expect(recordRedTeamReport).toHaveBeenCalledTimes(2);
+      expect(lines.findLine("error", "Could not record the red team run's report")).toBeUndefined();
+    });
+
+    /** @scenario "A red team report that cannot be written is logged and never fails the job" */
+    it("logs an error after every attempt is refused and never fails the job", async () => {
+      const fixture = processorFixture();
+      const recordRedTeamReport = vi.fn(() => Promise.reject(new Error("store down")));
+      fixture.execution.recordRedTeamReport = recordRedTeamReport;
       const { logger, lines } = createTestLogger();
 
       await expect(
@@ -222,8 +243,10 @@ describe("ScenarioProcessorService", () => {
         }),
       ).resolves.toBeUndefined();
 
-      expect(lines.findLine("warn", "Could not record the red team run's report")).toMatchObject({
+      expect(recordRedTeamReport).toHaveBeenCalledTimes(3);
+      expect(lines.findLine("error", "Could not record the red team run's report")).toMatchObject({
         scenarioRunId: "run-1",
+        attempts: 3,
       });
     });
   });

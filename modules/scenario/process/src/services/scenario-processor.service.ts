@@ -27,6 +27,9 @@ import type {
   ScenarioExecutionPoolService,
 } from "./scenario-execution-pool.service.ts";
 
+const RED_TEAM_REPORT_WRITE_ATTEMPTS = 3;
+const RED_TEAM_REPORT_RETRY_DELAY_MS = 200;
+
 const logger = createLogger("langwatch:scenarios:processor");
 
 export class ScenarioProcessorService implements ScenarioExecutionRunner {
@@ -449,15 +452,12 @@ export class ScenarioProcessorService implements ScenarioExecutionRunner {
     }
 
     if (input.result.redTeam) {
-      try {
-        await this.options.execution.recordRedTeamReport({
-          projectId,
-          scenarioRunId,
-          report: input.result.redTeam,
-        });
-      } catch (error) {
-        jobLogger.warn({ err: error, scenarioRunId }, "Could not record the red team run's report");
-      }
+      await this.recordRedTeamReportWithRetry({
+        projectId,
+        scenarioRunId,
+        report: input.result.redTeam,
+        jobLogger,
+      });
     }
 
     if (input.result.isCutAtLimit) {
@@ -467,6 +467,33 @@ export class ScenarioProcessorService implements ScenarioExecutionRunner {
         jobLogger.warn(
           { err: error, scenarioRunId },
           "Could not record that the run was cut at the call limit",
+        );
+      }
+    }
+  }
+
+  /** The report is the only record of a break, so its write is retried before it is given up. */
+  private async recordRedTeamReportWithRetry(input: {
+    projectId: string;
+    scenarioRunId: string;
+    report: NonNullable<ScenarioExecutionResult["redTeam"]>;
+    jobLogger: Logger;
+  }): Promise<void> {
+    const { jobLogger, ...record } = input;
+    for (let attempt = 1; attempt <= RED_TEAM_REPORT_WRITE_ATTEMPTS; attempt++) {
+      try {
+        await this.options.execution.recordRedTeamReport(record);
+        return;
+      } catch (error) {
+        if (attempt === RED_TEAM_REPORT_WRITE_ATTEMPTS) {
+          jobLogger.error(
+            { err: error, scenarioRunId: record.scenarioRunId, attempts: attempt },
+            "Could not record the red team run's report",
+          );
+          return;
+        }
+        await new Promise((resolve) =>
+          setTimeout(resolve, RED_TEAM_REPORT_RETRY_DELAY_MS * attempt),
         );
       }
     }

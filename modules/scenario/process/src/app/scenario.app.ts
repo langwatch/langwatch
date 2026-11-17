@@ -652,11 +652,10 @@ export class ScenarioModule implements ScenarioApi {
 
   /** A suite a template apply makes passes the Free suite cap before anything is written. */
   async createTestSuite(input: ScenarioTestSuiteCreateInput): Promise<ScenarioTestSuite> {
-    if (input.templateId) {
-      await this.#dependencies.creationCaps.assertTemplateSuiteCreationAllowed({
-        projectId: input.projectId,
-      });
-    }
+    await this.#dependencies.creationCaps.assertTestSuiteCreationAllowed({
+      projectId: input.projectId,
+      templateId: input.templateId,
+    });
     return this.#dependencies.scenarios.createTestSuite(input);
   }
 
@@ -709,12 +708,11 @@ export class ScenarioModule implements ScenarioApi {
     by: ScenarioCaller,
     options: { sourceTemplateId?: string } = {},
   ): Promise<Scenario> {
-    if (!options.sourceTemplateId) {
-      await this.#dependencies.creationCaps.assertScenarioCreationAllowed({
-        projectId: input.projectId,
-        operatorId: by.label === "user" ? by.id : undefined,
-      });
-    }
+    await this.#dependencies.creationCaps.assertScenarioCreationAllowed({
+      projectId: input.projectId,
+      operatorId: by.label === "user" ? by.id : undefined,
+      sourceTemplateId: options.sourceTemplateId,
+    });
     const scenario = await this.#dependencies.scenarios.create(
       {
         ...input,

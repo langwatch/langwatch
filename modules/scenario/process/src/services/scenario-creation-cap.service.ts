@@ -38,7 +38,9 @@ export class ScenarioCreationCapService {
   async assertScenarioCreationAllowed(input: {
     projectId: string;
     operatorId?: string | undefined;
+    sourceTemplateId?: string | undefined;
   }): Promise<void> {
+    if (input.sourceTemplateId) return;
     const organizationId = await this.deps.projects.getOrganizationId(input.projectId);
     const plan = await this.deps.plans.getActivePlan({
       organizationId,
@@ -57,6 +59,15 @@ export class ScenarioCreationCapService {
    * bounds: the organization's live suites against the simulations cap.
    * @throws LimitExceededError (`scenarioSets`) once the organization's suites reach the cap.
    */
+  /** Only a suite a template apply makes counts against the suite cap. */
+  async assertTestSuiteCreationAllowed(input: {
+    projectId: string;
+    templateId?: string | undefined;
+  }): Promise<void> {
+    if (!input.templateId) return;
+    await this.assertTemplateSuiteCreationAllowed({ projectId: input.projectId });
+  }
+
   async assertTemplateSuiteCreationAllowed(input: { projectId: string }): Promise<void> {
     const organizationId = await this.deps.projects.getOrganizationId(input.projectId);
     const plan = await this.deps.plans.getActivePlan({ organizationId });

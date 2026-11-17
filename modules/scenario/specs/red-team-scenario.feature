@@ -103,11 +103,19 @@ Feature: A red team scenario runs an attacker against the agent
     Then the report is recorded on the run
 
   @unit
+  Scenario: A red team report write that fails once is retried
+    Given a red team run whose child returned a report
+    And the first record write is refused
+    When the job finishes
+    Then the report is recorded on a later attempt
+
+  @unit
   Scenario: A red team report that cannot be written is logged and never fails the job
     Given a red team run whose child returned a report
-    And the record write is refused
+    And every record write is refused
     When the job finishes
-    Then a warning names the run
+    Then the write was tried 3 times
+    And an error names the run
     And the job does not fail
 
   @unit

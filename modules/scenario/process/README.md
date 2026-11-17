@@ -144,6 +144,8 @@ findTestSuite(input: ScenarioTestSuiteIdInput): Promise<ScenarioTestSuite | null
 
 #### `createTestSuite`
 
+With a `templateId`, refused with `LimitExceededError` once the Free suite cap is reached.
+
 ```typescript
 createTestSuite(input: ScenarioTestSuiteCreateInput): Promise<ScenarioTestSuite>;
 ```
