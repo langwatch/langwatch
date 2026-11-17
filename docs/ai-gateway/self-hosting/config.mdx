@@ -56,7 +56,7 @@ A change-feed event (a budget debit, a provider or routing edit) also evicts the
 
 ### Revocation latency
 
-Revoking, disabling or rotating a key reaches every gateway replica through the change feed, a long poll per organization, usually within a second or two. Each replica records the key in a revocation list kept apart from the key cache. The list is never expired by the stale-serve window, so a revoked key is refused even if the control plane goes down right after.
+Revoking or disabling a key reaches every gateway replica through the change feed, a long poll per organization, usually within a second or two. Each replica records the key in a revocation list kept apart from the key cache. The list is never expired by the stale-serve window, so a revoked key is refused even if the control plane goes down right after. Rotating a key is not a revocation: the old secret keeps working through its grace period, and the gateway asks the control plane about it.
 
 A replica that cannot reach the control plane cannot learn about a revocation made during that outage. Set `LW_GATEWAY_AUTH_CACHE_FAIL_CLOSED_AFTER_SECONDS` to bound that window: once a key's last check and its organization's change feed are both older than the limit, the key gets a retryable `auth_upstream_unavailable` error. It is off by default so an outage does not stop traffic.
 

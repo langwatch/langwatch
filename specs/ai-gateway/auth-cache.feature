@@ -337,9 +337,11 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
 
   Rule: A revoked key is refused from every cache tier, even with the control plane down
 
-    # The change feed delivers VK_REVOKED, VK_DISABLED and VK_ROTATED in one
-    # long poll. The gateway records each in a revocation list kept apart from
-    # the key cache, so no stale-serve window or cache eviction expires it.
+    # The change feed delivers VK_REVOKED and VK_DISABLED in one long poll. The
+    # gateway records each in a revocation list kept apart from the key cache,
+    # so no stale-serve window or cache eviction expires it. VK_ENABLED lifts a
+    # denial. VK_ROTATED is not a denial: the old secret stays valid through its
+    # grace period, so the control plane decides.
 
     @unit
     Scenario: a revoked key is refused while the control plane is down

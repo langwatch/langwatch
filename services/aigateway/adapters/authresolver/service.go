@@ -646,25 +646,43 @@ func New(opts Options) (*Service, error) {
 // foreground refresh; on transport-class failure serves the stale bundle
 // and bumps soft expiry. On auth-class failure evicts and rejects.
 func (s *Service) Resolve(ctx context.Context, key domain.PresentedKey) (*domain.Bundle, error) {
-	start := time.Now()
 	h := hashKey(key)
-	bundle, err := s.resolveUngated(ctx, key)
+	answer, err := s.resolveUngated(ctx, key)
 	if err != nil {
-		return nil, s.deniedAnswer(ctx, h, err)
+		if classifyRefreshError(err) == classTransportFailure {
+			if denied := s.refuseDenied(ctx, h); denied != nil {
+				return nil, denied
+			}
+		}
+		return nil, err
 	}
-	return s.admit(ctx, admitInput{hash: h, bundle: bundle, requestStart: start})
+	bundle, err := s.admit(ctx, h, answer)
+	if err != nil {
+		return nil, err
+	}
+	if answer.stale != "" {
+		s.recordStaleServe(answer.stale)
+	}
+	return bundle, nil
 }
 
 // resolveUngated is the cache and control-plane walk; Resolve gates its answer.
-func (s *Service) resolveUngated(ctx context.Context, key domain.PresentedKey) (*domain.Bundle, error) {
+func (s *Service) resolveUngated(ctx context.Context, key domain.PresentedKey) (served, error) {
 	if key.Token == "" {
-		return nil, herr.New(ctx, domain.ErrInvalidAPIKey, nil)
+		return served{}, herr.New(ctx, domain.ErrInvalidAPIKey, nil)
 	}
 
 	h := hashKey(key)
 	if key.IsLicenseToken() {
 		if err := s.admitLicenseToken(ctx, key, h); err != nil {
-			return nil, err
+			return served{}, err
+		}
+	}
+	if !key.IsLicenseToken() {
+		// A license token's own refusal (connect_license_revoked) comes from
+		// the control plane and the license refusal cache, not this list.
+		if err := s.refuseDenied(ctx, h); err != nil {
+			return served{}, err
 		}
 	}
 	s.recordLookup()
@@ -686,7 +704,7 @@ type lookup struct {
 
 // resolveCached serves an L1 entry according to its age: fresh entries serve
 // at once, stale ones after a foreground refresh, and the rest are evicted.
-func (s *Service) resolveCached(ctx context.Context, lk lookup, e *entry) (*domain.Bundle, error) {
+func (s *Service) resolveCached(ctx context.Context, lk lookup, e *entry) (served, error) {
 	switch classifyEntry(e) {
 	case entryFresh:
 		// Serve, maybe trigger background refresh on near-expiry.
@@ -701,7 +719,7 @@ func (s *Service) resolveCached(ctx context.Context, lk lookup, e *entry) (*doma
 		} else if e.configStale(s.configTTL) && e.tryBeginConfigRefresh() {
 			go s.refreshConfigBackground(lk.hash, e) //nolint:gosec // G118: intentional fire-and-forget refresh detached from request
 		}
-		return e.bundle, nil
+		return served{bundle: e.bundle, authStart: e.authStart()}, nil
 
 	case entryStale:
 		// Soft-expired but within hard grace. A foreground refresh is
@@ -717,7 +735,7 @@ func (s *Service) resolveCached(ctx context.Context, lk lookup, e *entry) (*doma
 		// a retryable upstream failure that grace keeps serving through.
 		s.recordMiss()
 		s.evictOnLookup(lk.hash, e, "virtual_key_expired")
-		return nil, herr.New(ctx, domain.ErrKeyExpired, herr.M{
+		return served{}, herr.New(ctx, domain.ErrKeyExpired, herr.M{
 			"message": domain.KeyExpiredMessage,
 		})
 
@@ -769,7 +787,7 @@ func (s *Service) recordMiss() {
 // resolveFresh calls the upstream resolver and caches the result.
 // Used for cold misses; not on stale-entry refresh paths (those use
 // refreshOrServeStale for the served-stale fallback).
-func (s *Service) resolveFresh(ctx context.Context, key domain.PresentedKey, h [64]byte) (*domain.Bundle, error) {
+func (s *Service) resolveFresh(ctx context.Context, key domain.PresentedKey, h [64]byte) (served, error) {
 	start := time.Now()
 	fallback := s.lastKnownFor(h)
 	fetchCtx := ctx
@@ -781,35 +799,50 @@ func (s *Service) resolveFresh(ctx context.Context, key domain.PresentedKey, h [
 	bundle, err := s.resolver.ResolveKey(fetchCtx, key)
 	if err != nil {
 		if fallback != nil && classifyRefreshError(err) == classTransportFailure {
-			if served := s.serveLastKnown(h, lastKnownServe{old: fallback, cause: err}); served != nil {
-				return served, nil
+			if answer := s.serveLastKnown(h, lastKnownServe{old: fallback, cause: err}); answer != nil {
+				return *answer, nil
 			}
 		}
 		s.lastKnown.Remove(h)
 		s.rememberLicenseRefusal(key, h, err)
-		return nil, err
+		return served{}, err
 	}
 	etag, cfgErr := s.populateConfig(fetchCtx, bundle)
 	if cfgErr == nil {
 		s.publishL1(h, s.newEntry(bundle, etag).authFrom(start))
-		return bundle, nil
+		return served{bundle: bundle, authStart: start}, nil
 	}
+	return s.resolveFreshWithoutConfig(ctx, freshWithoutConfig{h: h, fallback: fallback, bundle: bundle, cfgErr: cfgErr})
+}
+
+// freshWithoutConfig is a resolve-key answer whose config fetch failed.
+type freshWithoutConfig struct {
+	h        [64]byte
+	fallback *entry
+	bundle   *domain.Bundle
+	cfgErr   error
+}
+
+// resolveFreshWithoutConfig is the tail of resolveFresh when resolve-key
+// answered but the config fetch failed: reject, fall back, or fail.
+func (s *Service) resolveFreshWithoutConfig(ctx context.Context, in freshWithoutConfig) (served, error) {
+	h, fallback, bundle, cfgErr := in.h, in.fallback, in.bundle, in.cfgErr
 	if classifyRefreshError(cfgErr) == classAuthRejection {
 		// The key was deleted between resolve-key and the config fetch.
 		s.lastKnown.Remove(h)
-		return nil, cfgErr
+		return served{}, cfgErr
 	}
 	if fallback != nil {
-		if served := s.serveLastKnown(h, lastKnownServe{old: fallback, fresh: bundle, cause: cfgErr}); served != nil {
-			return served, nil
+		if answer := s.serveLastKnown(h, lastKnownServe{old: fallback, fresh: bundle, cause: cfgErr}); answer != nil {
+			return *answer, nil
 		}
 		if bundle.KeyExpired(time.Now()) {
-			return nil, herr.New(ctx, domain.ErrKeyExpired, herr.M{"message": domain.KeyExpiredMessage})
+			return served{}, herr.New(ctx, domain.ErrKeyExpired, herr.M{"message": domain.KeyExpiredMessage})
 		}
 	}
 	// Nothing to fall back on. Cache nothing: a bundle without its config is
 	// not a resolution result.
-	return nil, errConfigUnavailable(ctx, cfgErr)
+	return served{}, errConfigUnavailable(ctx, cfgErr)
 }
 
 // lastKnownFor returns the entry the change feed evicted for h when it may
@@ -853,13 +886,14 @@ type lastKnownServe struct {
 // new entry carries no ETag, so the next refresh asks for the config
 // outright, and its hard cap never passes lastKnownMaxAge after the last
 // confirmation.
-func (s *Service) serveLastKnown(h [64]byte, in lastKnownServe) *domain.Bundle {
+func (s *Service) serveLastKnown(h [64]byte, in lastKnownServe) *served {
 	old, fresh, cause := in.old, in.fresh, in.cause
 	now := time.Now()
 	if !s.lastKnownUsable(old, now) {
 		s.lastKnown.Remove(h)
 		return nil
 	}
+	authStart := old.authStart()
 	old.mu.Lock()
 	bundle, hard := old.bundle, old.hardExpiresAt
 	confirmedAt, acked := old.configConfirmedAt, old.budgetRollAckedFor
@@ -891,23 +925,22 @@ func (s *Service) serveLastKnown(h [64]byte, in lastKnownServe) *domain.Bundle {
 		configFetchedAt:    confirmedAt,
 		configConfirmedAt:  confirmedAt,
 		budgetRollAckedFor: acked,
-		authStartedAt:      old.authStart(),
+		authStartedAt:      authStart,
 	})
-	s.recordStaleServe("last_known")
 	s.logger.Warn("auth_cache_serve_last_known",
 		zap.String("vk_id", bundle.VirtualKeyID),
 		zap.Duration("config_age", now.Sub(confirmedAt)),
 		zap.Time("serve_until", hard),
 		zap.Error(cause),
 	)
-	return bundle
+	return &served{bundle: bundle, authStart: authStart, stale: "last_known"}
 }
 
 // refreshOrServeStale tries to resolve fresh against the control plane.
 // On success replaces the L1 entry. On transport-class failure bumps the
 // stale entry's soft expiry by SoftBump and serves the stale bundle. On
 // auth-class failure evicts the entry and returns the rejection.
-func (s *Service) refreshOrServeStale(ctx context.Context, lk lookup, stale *entry) (*domain.Bundle, error) {
+func (s *Service) refreshOrServeStale(ctx context.Context, lk lookup, stale *entry) (served, error) {
 	start := time.Now()
 	h := lk.hash
 	bundle, err := s.resolver.ResolveKey(ctx, lk.key)
@@ -920,7 +953,7 @@ func (s *Service) refreshOrServeStale(ctx context.Context, lk lookup, stale *ent
 	case classNone:
 		etag, cfgErr := s.populateConfig(ctx, bundle)
 		if classifyRefreshError(cfgErr) == classAuthRejection {
-			return nil, s.evictOnConfigRejection(h, vkID, cfgErr)
+			return served{}, s.evictOnConfigRejection(h, vkID, cfgErr)
 		}
 		if cfgErr != nil {
 			// The control plane authenticated the key but could not hand
@@ -928,10 +961,10 @@ func (s *Service) refreshOrServeStale(ctx context.Context, lk lookup, stale *ent
 			// bundle would surface as no_provider_configured for an org
 			// whose keys are fine — treat it as a transport failure and
 			// serve the stale entry's known-good credentials instead.
-			return s.serveStaleAfterFailure(ctx, h, stale, staleBundle, vkID, hardExpiresAt, cls, cfgErr)
+			return s.serveStaleAfterFailure(ctx, staleFailure{h: h, stale: stale, staleBundle: staleBundle, hardExpiresAt: hardExpiresAt, cls: cls, cause: cfgErr})
 		}
 		s.publishL1(h, s.newEntry(bundle, etag).authFrom(start))
-		return bundle, nil
+		return served{bundle: bundle, authStart: start}, nil
 
 	case classAuthRejection:
 		s.l1.Remove(h)
@@ -941,10 +974,10 @@ func (s *Service) refreshOrServeStale(ctx context.Context, lk lookup, stale *ent
 			zap.String("reason", "auth_rejection"),
 			zap.Error(err),
 		)
-		return nil, err
+		return served{}, err
 
 	default:
-		return s.serveStaleAfterFailure(ctx, h, stale, staleBundle, vkID, hardExpiresAt, cls, err)
+		return s.serveStaleAfterFailure(ctx, staleFailure{h: h, stale: stale, staleBundle: staleBundle, hardExpiresAt: hardExpiresAt, cls: cls, cause: err})
 	}
 }
 
@@ -961,11 +994,23 @@ func (s *Service) evictOnConfigRejection(h [64]byte, vkID string, err error) err
 	return err
 }
 
+// staleFailure is a stale entry whose foreground refresh failed with cause.
+type staleFailure struct {
+	h             [64]byte
+	stale         *entry
+	staleBundle   *domain.Bundle
+	hardExpiresAt time.Time
+	cls           refreshErrorClass
+	cause         error
+}
+
 // serveStaleAfterFailure is the transport-failure tail of refreshOrServeStale:
 // bump the stale entry's soft expiry and keep serving it, or evict and fail
 // once the hard grace cap is exhausted. `cause` is what stopped the refresh —
 // a ResolveKey transport error or a config fetch failure after a good auth.
-func (s *Service) serveStaleAfterFailure(ctx context.Context, h [64]byte, stale *entry, staleBundle *domain.Bundle, vkID string, hardExpiresAt time.Time, cls refreshErrorClass, cause error) (*domain.Bundle, error) {
+func (s *Service) serveStaleAfterFailure(ctx context.Context, f staleFailure) (served, error) {
+	h, stale, staleBundle, hardExpiresAt, cls, cause := f.h, f.stale, f.staleBundle, f.hardExpiresAt, f.cls, f.cause
+	vkID := staleBundle.VirtualKeyID
 	newSoft, bumped := stale.bumpSoft(s.softBump)
 	if !bumped {
 		s.l1.Remove(h)
@@ -975,9 +1020,9 @@ func (s *Service) serveStaleAfterFailure(ctx context.Context, h [64]byte, stale 
 			zap.Error(cause),
 		)
 		if cls == classNone {
-			return nil, errConfigUnavailable(ctx, cause)
+			return served{}, errConfigUnavailable(ctx, cause)
 		}
-		return nil, cause
+		return served{}, cause
 	}
 	// classNone here means the auth succeeded and the CONFIG fetch failed;
 	// log that instead of a misleading "none" error class.
@@ -991,14 +1036,13 @@ func (s *Service) serveStaleAfterFailure(ctx context.Context, h [64]byte, stale 
 		zap.Duration("hard_grace_remaining", time.Until(hardExpiresAt)),
 		zap.Error(cause),
 	)
-	s.recordStaleServe("stale_while_error")
 	s.logger.Info("auth_cache_serve_stale",
 		zap.String("vk_id", vkID),
 		zap.Duration("stale_for", time.Since(staleBundle.ExpiresAt)),
 		zap.Duration("hard_grace_remaining", time.Until(hardExpiresAt)),
 		zap.String("refresh_error_class", classLabel),
 	)
-	return staleBundle, nil
+	return served{bundle: staleBundle, authStart: stale.authStart(), stale: "stale_while_error"}, nil
 }
 
 // populateConfig eagerly fetches the bundle's config and merges it into the
@@ -1245,7 +1289,10 @@ func (s *Service) waitUnlessStopping(ctx context.Context, d time.Duration) bool 
 // that logs "updated" is worse than no label at all.
 func (s *Service) applyChange(organizationID string, ch CacheChange) {
 	keepLastKnown := !revokesKey(ch.Kind)
-	if !keepLastKnown && ch.VirtualKeyID != "" {
+	if ch.Kind == ChangeKindVirtualKeyEnabled && ch.VirtualKeyID != "" {
+		s.denied.Remove(ch.VirtualKeyID)
+	}
+	if deniesKey(ch.Kind) && ch.VirtualKeyID != "" {
 		// Deny before evicting: a refresh racing this event either finds the
 		// denial when its answer is gated, or is evicted below.
 		s.deny(ch.VirtualKeyID, ch.Kind)
@@ -1370,6 +1417,13 @@ func revokesKey(kind string) bool {
 	default:
 		return false
 	}
+}
+
+// deniesKey reports whether a change kind refuses the key id outright. A
+// rotation keeps the old secret valid through its grace period, so it only
+// drops the fallback (revokesKey) and leaves the decision to the control plane.
+func deniesKey(kind string) bool {
+	return kind == ChangeKindVirtualKeyRevoked || kind == ChangeKindVirtualKeyDisabled
 }
 
 // evictReason turns a change kind into the label its eviction is logged

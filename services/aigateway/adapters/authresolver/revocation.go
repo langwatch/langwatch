@@ -78,34 +78,37 @@ func (s *Service) deny(vkID, kind string) {
 			s.deniedKeys.Add(h, vkID)
 		}
 	}
+	for _, h := range s.lastKnown.Keys() {
+		if e, ok := s.lastKnown.Peek(h); ok && e.bundle != nil && e.bundle.VirtualKeyID == vkID {
+			s.deniedKeys.Add(h, vkID)
+		}
+	}
 	s.logger.Info("auth_cache_key_denied", zap.String("vk_id", vkID), zap.String("reason", evictReason(kind)))
 }
 
-// admitInput is one resolved answer waiting for the gate.
-type admitInput struct {
-	hash         [64]byte
-	bundle       *domain.Bundle
-	requestStart time.Time
+// served is one resolved answer waiting for the gate: the bundle, when the
+// control-plane call that confirmed it began, and the stale tier it came from
+// ("" when fresh). It travels with the answer, never read back from L1.
+type served struct {
+	bundle    *domain.Bundle
+	authStart time.Time
+	stale     string
 }
 
 // admit is the last check before a resolved bundle serves. It refuses a key the
 // change feed revoked after its confirmation began, and, when FailClosedAfter
 // is set, a key nothing confirmed recently while its org's feed is silent.
-func (s *Service) admit(ctx context.Context, in admitInput) (*domain.Bundle, error) {
-	b := in.bundle
-	authStart := in.requestStart
-	if e, ok := s.l1.Peek(in.hash); ok && e.bundle.VirtualKeyID == b.VirtualKeyID {
-		authStart = e.authStart()
-	}
+func (s *Service) admit(ctx context.Context, h [64]byte, in served) (*domain.Bundle, error) {
+	b, authStart := in.bundle, in.authStart
 	if b.VirtualKeyID != "" {
 		if d, ok := s.denied.Peek(b.VirtualKeyID); ok && d.at.After(authStart) {
-			s.refuse(in.hash, b.VirtualKeyID, "denied_"+evictReason(d.kind))
+			s.refuse(h, b.VirtualKeyID, "denied_"+evictReason(d.kind))
 			return nil, denialError(ctx, d.kind)
 		}
 	}
 	if s.failClosedAfter > 0 && b.OrganizationID != "" && s.feedSilent(b.OrganizationID) &&
 		time.Since(authStart) > s.failClosedAfter {
-		s.refuse(in.hash, b.VirtualKeyID, "fail_closed")
+		s.refuse(h, b.VirtualKeyID, "fail_closed")
 		return nil, herr.New(ctx, domain.ErrAuthUpstream, herr.M{
 			"message": "control plane unreachable and this gateway refuses keys it cannot re-check; retry shortly",
 		}).WithRetryable(true)
@@ -124,21 +127,19 @@ func (s *Service) feedSilent(orgID string) bool {
 	return time.Since(time.Unix(0, c.polledAt.Load())) > s.failClosedAfter
 }
 
-// deniedAnswer turns a transport failure for a credential the change feed
-// denied into that denial's error. Any other error passes through unchanged.
-func (s *Service) deniedAnswer(ctx context.Context, h [64]byte, err error) error {
-	if classifyRefreshError(err) != classTransportFailure {
-		return err
-	}
+// refuseDenied answers a credential the change feed denied with that denial's
+// error, without a control-plane call. It returns nil for any other credential.
+func (s *Service) refuseDenied(ctx context.Context, h [64]byte) error {
 	vkID, ok := s.deniedKeys.Peek(h)
 	if !ok {
-		return err
+		return nil
 	}
-	if d, ok := s.denied.Peek(vkID); ok {
-		s.logger.Warn("auth_cache_refused", zap.String("vk_id", vkID), zap.String("reason", "denied_"+evictReason(d.kind)))
-		return denialError(ctx, d.kind)
+	d, ok := s.denied.Peek(vkID)
+	if !ok {
+		return nil
 	}
-	return err
+	s.refuse(h, vkID, "denied_"+evictReason(d.kind))
+	return denialError(ctx, d.kind)
 }
 
 func (s *Service) refuse(h [64]byte, vkID, reason string) {
