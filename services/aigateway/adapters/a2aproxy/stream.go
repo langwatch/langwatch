@@ -55,24 +55,38 @@ func (c *call) errorEvent(r refusal) []byte {
 // breaks, may hold at most maxEventBytes. One leading UTF-8 BOM is dropped,
 // as SSE decoding does.
 func readEvents(r io.Reader, fn func(event []byte) bool) error {
-	lr := &lineReader{br: bufio.NewReaderSize(r, 64<<10)}
-	if head, err := lr.br.Peek(len(utf8BOM)); err == nil && bytes.Equal(head, utf8BOM) {
-		_, _ = lr.br.Discard(len(utf8BOM))
-	}
+	lr := newLineReader(r)
 	var event bytes.Buffer
 	for {
 		blank, err := lr.readLine(&event)
 		if err != nil {
 			return finishEvents(err)
 		}
-		if blank && event.Len() > 0 {
-			event.WriteByte('\n')
-			if !fn(append([]byte(nil), event.Bytes()...)) {
-				return nil
-			}
-			event.Reset()
+		if blank && !emitEvent(&event, fn) {
+			return nil
 		}
 	}
+}
+
+// newLineReader wraps r and drops one leading UTF-8 BOM.
+func newLineReader(r io.Reader) *lineReader {
+	lr := &lineReader{br: bufio.NewReaderSize(r, 64<<10)}
+	if head, err := lr.br.Peek(len(utf8BOM)); err == nil && bytes.Equal(head, utf8BOM) {
+		_, _ = lr.br.Discard(len(utf8BOM))
+	}
+	return lr
+}
+
+// emitEvent hands a finished event to fn and resets the buffer. An empty
+// buffer is no event. It reports whether reading should go on.
+func emitEvent(event *bytes.Buffer, fn func(event []byte) bool) bool {
+	if event.Len() == 0 {
+		return true
+	}
+	event.WriteByte('\n')
+	keepGoing := fn(append([]byte(nil), event.Bytes()...))
+	event.Reset()
+	return keepGoing
 }
 
 var utf8BOM = []byte{0xEF, 0xBB, 0xBF}
