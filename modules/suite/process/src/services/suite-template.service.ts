@@ -42,10 +42,8 @@ export class SuiteTemplateService {
   }
 
   /**
-   * Validates every filled scenario before writing anything, then creates the test suite and
-   * files each scenario in it, marked with the template so the Free scenario cap skips them.
-   * A failed scenario write archives the suite and what it already holds, then rethrows. `author`
-   * names the person each scenario is written by; a key with no person names none.
+   * Validates every filled scenario, then creates the suite and files each scenario in it, marked
+   * with the template so the Free cap skips them; a failed write archives the suite and rethrows.
    * @throws SuiteTemplateNotFoundError
    */
   async applyTemplate(

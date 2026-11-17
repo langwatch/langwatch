@@ -303,7 +303,7 @@ describe("ScenarioModule on the cloud Free scenario cap", () => {
       };
 
       expect(scenarioCreateInputSchema.validate(request)).toBe(false);
-      expect(scenarioRestCreateSchema.safeParse(request).success).toBe(false);
+      expect(scenarioRestCreateSchema.validate(request)).toBe(false);
     });
   });
 });
