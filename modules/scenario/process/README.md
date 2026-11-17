@@ -204,10 +204,10 @@ readByIdIncludingArchived(input: ScenarioIdInput): Promise<ScenarioLookup>;
 
 #### `create`
 
-`countsTowardScenarioCap: false` is for scenarios a suite template creates: the Free plan counts a template as one suite, never its scenarios.
+A scenario filed in a test suite (a template's included) is never counted against the Free scenario cap: the plan caps suites, not the scenarios inside them.
 
 ```typescript
-create(input: Omit<ScenarioCreateInput, "lastUpdatedById">, by: ScenarioCaller, options?: { countsTowardScenarioCap?: boolean }): Promise<Scenario>;
+create(input: Omit<ScenarioCreateInput, "lastUpdatedById">, by: ScenarioCaller): Promise<Scenario>;
 ```
 
 #### `update`
