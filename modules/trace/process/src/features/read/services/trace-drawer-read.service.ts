@@ -297,7 +297,7 @@ export class TraceDrawerReadService {
       }),
       this.#resourceInfo({ input, protections: opened.protections, rows: read.resources }),
     ]);
-    const kindOf = new Map(read.spans.map((stored) => [stored.spanId, stored.kind]));
+    const kindOf = new Map(read.spans.map((stored) => [stored.span_id, stored.kind ?? null]));
     const withKinds = spans.map((span) => ({ ...span, kind: kindOf.get(span.spanId) ?? null }));
     return buildAgentCallGraph({
       spans: withKinds,

@@ -382,6 +382,11 @@ function ownerColumn(braided: boolean, indent: string): string {
 }
 
 /** Spans mapped from full rows; under braids each owner's span names its owner. */
+/** The stored row's span kind, carried beside the legacy span shape. */
+function kindOf(span: NormalizedSpan | undefined): Pick<OwnedSpan, "kind"> {
+  return span === undefined ? {} : { kind: span.kind };
+}
+
 function ownedSpansOf({
   rows,
   authorization,
@@ -392,7 +397,10 @@ function ownedSpansOf({
   braided: boolean;
 }): OwnedSpan[] {
   const normalized = rows.map(mapChRowToNormalized);
-  const spans = mapNormalizedSpansToSpans(normalized);
+  const spans = mapNormalizedSpansToSpans(normalized).map((span, index) => ({
+    ...span,
+    ...kindOf(normalized[index]),
+  }));
   if (!braided) return spans;
   return spans.map((span, index) => ({
     ...span,
