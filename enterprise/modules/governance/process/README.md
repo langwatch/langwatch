@@ -2722,20 +2722,21 @@ Declared at `src/features/kill-switch/eventing/agent-stop.pipeline.ts:68`. Event
 
 ### Pipeline `governance_agent_registry` (aggregate `global`)
 
-Declared at `src/features/registry/eventing/agent-registry.pipeline.ts:89`.
+Declared at `src/features/registry/eventing/agent-registry.pipeline.ts:105`.
 
 | Kind            | Name                                    | Handles                                                                                                                             | Declared at                                                     |
 | --------------- | --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| process manager | `agentRegistryDelivery`                 | every 1 d (`AGENT_REGISTRY_DELIVERY_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000`); intents `pruneDelivered`, `requestDelivery` (outbox) | `src/features/registry/eventing/agent-registry.pipeline.ts:107` |
-| process manager | `agentRegistryTraffic`                  | every 15 min (`AGENT_REGISTRY_TRAFFIC_INTERVAL_MS = 15 * 60 * 1000`); intents `pass` (outbox)                                       | `src/features/registry/eventing/agent-registry.pipeline.ts:124` |
-| peer subscriber | `reconcileAgentRegistryOnAgentChanged`  | `lw.agent.changed` from [agent](../../../../modules/agent/README.md)                                                                | `src/features/registry/eventing/agent-registry.pipeline.ts:95`  |
-| peer subscriber | `reconcileAgentRegistryOnAgentArchived` | `lw.agent.archived` from [agent](../../../../modules/agent/README.md)                                                               | `src/features/registry/eventing/agent-registry.pipeline.ts:101` |
+| process manager | `agentRegistryDelivery`                 | every 1 d (`AGENT_REGISTRY_DELIVERY_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000`); intents `pruneDelivered`, `requestDelivery` (outbox) | `src/features/registry/eventing/agent-registry.pipeline.ts:123` |
+| process manager | `killSwitchAudit`                       | every 1 d (`KILL_SWITCH_AUDIT_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000`); intents `pruneAudit`, `recordAudit` (outbox)               | `src/features/registry/eventing/agent-registry.pipeline.ts:140` |
+| process manager | `agentRegistryTraffic`                  | every 15 min (`AGENT_REGISTRY_TRAFFIC_INTERVAL_MS = 15 * 60 * 1000`); intents `pass` (outbox)                                       | `src/features/registry/eventing/agent-registry.pipeline.ts:155` |
+| peer subscriber | `reconcileAgentRegistryOnAgentChanged`  | `lw.agent.changed` from [agent](../../../../modules/agent/README.md)                                                                | `src/features/registry/eventing/agent-registry.pipeline.ts:111` |
+| peer subscriber | `reconcileAgentRegistryOnAgentArchived` | `lw.agent.archived` from [agent](../../../../modules/agent/README.md)                                                               | `src/features/registry/eventing/agent-registry.pipeline.ts:117` |
 
 ## Configuration
 
 | Kind   | Leaf                       | Environment variable                  | Declared at                               |
 | ------ | -------------------------- | ------------------------------------- | ----------------------------------------- |
-| secret | `–`                        | `GOVERNANCE_ERASURE_PSEUDONYM_SECRET` | `src/app/governance.app.ts:560`           |
+| secret | `–`                        | `GOVERNANCE_ERASURE_PSEUDONYM_SECRET` | `src/app/governance.app.ts:565`           |
 | config | `gatewayPublicUrl`         | `LW_GATEWAY_PUBLIC_URL`               | `../contract/src/governance.config.ts:41` |
 | config | `gatewayInternalUrl`       | `LW_GATEWAY_INTERNAL_URL`             | `../contract/src/governance.config.ts:42` |
 | config | `gatewayLegacyUrl`         | `LW_GATEWAY_BASE_URL`                 | `../contract/src/governance.config.ts:43` |

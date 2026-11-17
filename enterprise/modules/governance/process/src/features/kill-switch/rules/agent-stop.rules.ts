@@ -413,7 +413,19 @@ export function inventoryRowIdsOf(sourceKey: string): string[] {
   return [];
 }
 
-const stopCursorSchema = z.object({ r: z.string().min(1), i: z.string().min(1) });
+function isInstant(value: string): boolean {
+  try {
+    Temporal.Instant.from(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const stopCursorSchema = z.object({
+  r: z.string().refine(isInstant, "not a timestamp"),
+  i: z.string().min(1),
+});
 
 /** The page position after `stop`, as the opaque `next_cursor` the stop listing answers. */
 export function encodeStopCursor(stop: StopPosition): string {

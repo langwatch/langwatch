@@ -27,7 +27,7 @@ function DenyStopDialog({
   onCancel,
   onDeny,
 }: {
-  stop: AgentStopView | null;
+  stop: AgentStopView;
   isDenying: boolean;
   onCancel: () => void;
   onDeny: (note: string) => void;
@@ -35,10 +35,10 @@ function DenyStopDialog({
   const [note, setNote] = useState("");
   return (
     <Dialog
-      open={stop !== null}
+      open
       onClose={onCancel}
       placement="center"
-      title={`Deny the stop of ${stop?.agentName ?? "this agent"}?`}
+      title={`Deny the stop of ${stop.agentName}?`}
       description="The agent keeps running and nothing is turned off."
       busy={isDenying}
       primaryAction={{

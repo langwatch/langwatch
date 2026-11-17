@@ -196,6 +196,13 @@ Feature: Agent kill switch: stop a misbehaving agent where it runs, with approva
     When the next_cursor is passed back as cursor
     Then it answers the last stop and a null next_cursor
     And a cursor the listing never returned is refused with a validation error
+    And a cursor whose position is not a timestamp is refused with a validation error
+
+  @integration
+  Scenario: Every pending approval is answered, however many there are
+    Given more stops wait for a decision than the service reads at a time
+    When the pending approvals are read
+    Then every pending stop is answered
 
   @integration
   Scenario: A stop of an agent with no stop plan is refused
@@ -290,6 +297,34 @@ Feature: Agent kill switch: stop a misbehaving agent where it runs, with approva
     Given a stop in "stop_failed" whose serving endpoint answers an error on start
     When the agent is restored and the attempts are spent
     Then the stop's status is "restore_failed" and one "governance.agent.restore_failed" event is pushed
+
+  @integration
+  Scenario: A second restore retries the reverts the first one could not do
+    Given a stop in "restore_failed" whose serving endpoint start failed
+    And the serving endpoint starts again
+    When the agent is restored a second time
+    Then the restore is round 2, the endpoint is started again and the stop's status is "restored"
+    And one "governance.agent.restored" event is pushed and audited
+
+  @unit
+  Scenario: A late outcome of an earlier restore changes nothing
+    Given a stop in its second restore with a target reverting
+    When a revert outcome of the first restore arrives for that target
+    Then the stop is unchanged
+    And the second restore's own outcome still settles it
+
+  @unit
+  Scenario: A kill switch audit row is written through the outbox, once per key
+    Given the audit outbox is connected
+    When an AWS connection is deleted
+    Then its audit intent is appended to the outbox under a key minted at the request
+    And delivering that intent twice writes one audit row
+
+  @integration
+  Scenario: A redelivered milestone writes one audit row
+    Given a quarantined stop whose milestone was announced and audited
+    When the same milestone announcement is delivered again
+    Then the audit log holds one "governance.agent.quarantined" row
 
   @integration
   Scenario: Restoring a stop that is not quarantined is refused

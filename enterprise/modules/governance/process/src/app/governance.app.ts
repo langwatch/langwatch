@@ -4,7 +4,7 @@ import { AgentApi } from "@langwatch/agent-contract";
 import { OrganizationInvalidCredentialsError } from "@langwatch/api";
 import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { CliTokenIdentity } from "@langwatch/api/rest";
-import { AuditLogApi } from "@langwatch/audit-log-contract";
+import { AuditLogApi, type AuditLogIntent } from "@langwatch/audit-log-contract";
 import { AuthApi, type BrowserSessionInventoryEntry } from "@langwatch/auth-contract";
 /**
  * The governance feature's application: what all three of its doors call.
@@ -310,6 +310,10 @@ import {
   type AgentStopPipelineDefinition,
   buildAgentStopPipeline,
 } from "../features/kill-switch/eventing/agent-stop.pipeline.ts";
+import {
+  OutboxKillSwitchAudit,
+  recordKillSwitchAudit,
+} from "../features/kill-switch/eventing/kill-switch-audit.intent.ts";
 import { AgentStopClaimService } from "../features/kill-switch/services/agent-stop-claim.service.ts";
 import { AgentStopPlanService } from "../features/kill-switch/services/agent-stop-plan.service.ts";
 import { AgentStopTargetService } from "../features/kill-switch/services/agent-stop-target.service.ts";
@@ -318,6 +322,7 @@ import {
   AgentStopService,
 } from "../features/kill-switch/services/agent-stop.service.ts";
 import { GovernanceAwsConnectionService } from "../features/kill-switch/services/governance-aws-connection.service.ts";
+import { KillSwitchAuditService } from "../features/kill-switch/services/kill-switch-audit.service.ts";
 import { PersonaHomeService } from "../features/personal/services/persona-home.service.ts";
 import { PersonalIngestionKeyService } from "../features/personal/services/personal-ingestion-key.service.ts";
 import { PersonalUsageDashboardService } from "../features/personal/services/personal-usage-dashboard.service.ts";
@@ -951,11 +956,15 @@ export class GovernanceModule implements GovernanceRestApi {
       awsConnections: repositories.awsConnections,
       virtualKeys: dependencies.gateway,
     });
+    const killSwitchAudit = KillSwitchAuditService.create({
+      auditLog: dependencies.auditLog,
+      outbox: () => this.#killSwitchAuditOutbox,
+    });
     this.awsConnections = GovernanceAwsConnectionService.create({
       connections: repositories.awsConnections,
       plans: repositories.agentStopPlans,
       stops: repositories.agentStops,
-      auditLog: dependencies.auditLog,
+      audit: killSwitchAudit,
     });
     const sendAgentStop: AgentStopCommandSend = async (name, payload) => {
       await this.agentStopSender(name).send(payload);
@@ -968,7 +977,7 @@ export class GovernanceModule implements GovernanceRestApi {
       }),
       plans: this.agentStopPlans,
       registry: repositories.agentRegistry,
-      auditLog: dependencies.auditLog,
+      audit: killSwitchAudit,
       send: sendAgentStop,
     });
     this.agentStopTargets = AgentStopTargetService.create({
@@ -1219,6 +1228,7 @@ export class GovernanceModule implements GovernanceRestApi {
 
   #anomalyAlertOutbox: OutboxAnomalyAlertDelivery | undefined;
   #agentRegistryOutbox: OutboxAgentRegistryDelivery | undefined;
+  #killSwitchAuditOutbox: OutboxKillSwitchAudit | undefined;
 
   /** A built pipeline means an outbox: registry change events fan out through it from here on. */
   connectAgentRegistryOutbox({
@@ -1227,6 +1237,20 @@ export class GovernanceModule implements GovernanceRestApi {
     processStore: Pick<ProcessStore, "appendIntents">;
   }): void {
     this.#agentRegistryOutbox = OutboxAgentRegistryDelivery.create(processStore);
+  }
+
+  /** A built pipeline means an outbox: kill switch audit rows are recorded in it from here on. */
+  connectKillSwitchAuditOutbox({
+    processStore,
+  }: {
+    processStore: Pick<ProcessStore, "appendIntents">;
+  }): void {
+    this.#killSwitchAuditOutbox = OutboxKillSwitchAudit.create(processStore);
+  }
+
+  /** The kill switch audit intent's handler: one keyed AuditLogApi.record per intent. */
+  recordKillSwitchAudit(intent: AuditLogIntent): Promise<void> {
+    return recordKillSwitchAudit(this.dependencies.auditLog)(intent);
   }
 
   /** The registry delivery intent's handler: one WebhookApi.requestDelivery per intent. */

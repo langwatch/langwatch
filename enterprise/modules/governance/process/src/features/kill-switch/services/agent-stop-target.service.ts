@@ -1,14 +1,19 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { createHash } from "node:crypto";
+
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import {
   type AgentStopTarget,
+  type AgentStopView,
+  type AgentStopWebhookEventType,
   databricksGeniePullConfigSchema,
 } from "@langwatch/enterprise-governance-contract";
 import type { IntentContext } from "@langwatch/eventing";
 import type { GatewayApi } from "@langwatch/gateway-contract";
+import { getEnvironment, Instance, Ksuid } from "@langwatch/ksuid";
 import { createLogger, type Logger } from "@langwatch/observability";
-import { nowInstant } from "@langwatch/time";
+import { nowInstant, Temporal } from "@langwatch/time";
 
 import type { BedrockAgentAliasChannel } from "../../../channels/bedrock-agent-alias.channel.ts";
 import type { DatabricksServingEndpointChannel } from "../../../channels/databricks-serving-endpoint.channel.ts";
@@ -27,6 +32,41 @@ import {
 } from "../eventing/agent-stop.process.ts";
 import { BEDROCK_INVOCATION_STATES, errorCodeOf } from "../rules/agent-stop-target.rules.ts";
 import { AGENT_STOP_AUDIT_TARGET_KIND, type AgentStopCommandSend } from "./agent-stop.service.ts";
+
+/** The audit log takes an `audit` KSUID as a key, and reads the row's moment from it. */
+const AUDIT_KEY_RESOURCE = "audit";
+
+/**
+ * The audit key of one announced milestone: derived from the stop, milestone and restore round, so
+ * a redelivered announcement names one row. Its moment is the stop's latest recorded time.
+ */
+export function milestoneAuditKeyOf({
+  stop,
+  milestone,
+  restoreRound,
+}: {
+  stop: AgentStopView;
+  milestone: AgentStopWebhookEventType;
+  restoreRound: number;
+}): string {
+  const digest = createHash("sha256")
+    .update(`${stop.id}\u001f${milestone}\u001f${restoreRound}`)
+    .digest();
+  const moments = [
+    stop.requestedAt,
+    stop.decidedAt,
+    stop.quarantinedAt,
+    stop.restoreRequestedAt,
+    stop.restoredAt,
+  ].flatMap((at) => (at ? [Temporal.Instant.from(at).epochMilliseconds] : []));
+  return new Ksuid({
+    environment: getEnvironment(),
+    resource: AUDIT_KEY_RESOURCE,
+    timestamp: Math.floor(Math.max(...moments) / 1000),
+    instance: new Instance(Instance.schemes.RANDOM, new Uint8Array(digest.subarray(0, 8))),
+    sequenceId: digest.readUInt32BE(8) >>> 1,
+  }).toString();
+}
 
 interface AgentStopTargetDependencies {
   send: AgentStopCommandSend;
@@ -110,6 +150,7 @@ export class AgentStopTargetService implements AgentStopIntentExecutors {
     });
     if (milestone === "governance.agent.stop_requested") return;
     await this.deps.auditLog.record({
+      idempotencyKey: milestoneAuditKeyOf({ stop, milestone, restoreRound }),
       organizationId,
       action: milestone,
       targetKind: AGENT_STOP_AUDIT_TARGET_KIND,

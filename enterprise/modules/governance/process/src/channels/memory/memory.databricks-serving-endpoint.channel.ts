@@ -22,6 +22,11 @@ export class MemoryDatabricksServingEndpointChannel implements DatabricksServing
     this.refusals.set(path, code);
   }
 
+  /** Clears a seeded refusal: calls to `path` succeed again. */
+  allow({ path }: { path: string }): void {
+    this.refusals.delete(path);
+  }
+
   async stopEndpoint(args: {
     workspaceUrl: string;
     token: string;

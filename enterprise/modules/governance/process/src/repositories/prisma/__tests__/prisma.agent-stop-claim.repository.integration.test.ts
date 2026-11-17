@@ -12,6 +12,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { AgentStopClaimService } from "../../../features/kill-switch/services/agent-stop-claim.service.ts";
 import { AgentStopPlanService } from "../../../features/kill-switch/services/agent-stop-plan.service.ts";
 import { AgentStopService } from "../../../features/kill-switch/services/agent-stop.service.ts";
+import { KillSwitchAuditService } from "../../../features/kill-switch/services/kill-switch-audit.service.ts";
 import { MemoryGovernanceRepositories } from "../../memory/memory.governance.repositories.ts";
 import { PrismaAgentStopClaimRepository } from "../prisma.agent-stop-claim.repository.ts";
 import { PrismaAgentStopTargetPriorStateRepository } from "../prisma.agent-stop-target-prior-state.repository.ts";
@@ -62,8 +63,11 @@ describe.skipIf(!connection)("the kill switch claim and prior state repositories
         virtualKeys: createApiFixture<GatewayApi>(),
       }),
       registry: memory.agentRegistry,
-      auditLog: createApiFixture<AuditLogApi>({
-        record: async () => ({ id: "audit", occurredAt: 0 }),
+      audit: KillSwitchAuditService.create({
+        auditLog: createApiFixture<AuditLogApi>({
+          record: async () => ({ id: "audit", occurredAt: 0 }),
+        }),
+        outbox: () => undefined,
       }),
       send: async (name) => {
         sent.push(name);

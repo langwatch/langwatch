@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import {
   AGENT_STOP_OPEN_STATUSES,
   type AgentKillSwitchSummary,
@@ -43,6 +42,7 @@ import {
 } from "../rules/agent-stop.rules.ts";
 import type { AgentStopClaimService } from "./agent-stop-claim.service.ts";
 import type { AgentStopPlanService } from "./agent-stop-plan.service.ts";
+import type { KillSwitchAuditService } from "./kill-switch-audit.service.ts";
 
 /** Sends one `agent_stop` command; the payload is the event data with tenant and moment merged in. */
 export type AgentStopCommandSend = (
@@ -69,7 +69,7 @@ interface AgentStopDependencies {
   claims: Pick<AgentStopClaimService, "claim" | "markSent" | "release" | "withDecision">;
   plans: Pick<AgentStopPlanService, "findTargets" | "findPlanCounts">;
   registry: Pick<AgentRegistryRepository, "getEntry" | "listEntries" | "findSourceKeys">;
-  auditLog: Pick<AuditLogApi, "record">;
+  audit: Pick<KillSwitchAuditService, "record">;
   send: AgentStopCommandSend;
   newId: () => string;
   now: () => number;
@@ -211,21 +211,6 @@ export class AgentStopService {
     return viewOfStop(latest);
   }
 
-  async findStops({
-    organizationId,
-    statuses,
-  }: {
-    organizationId: string;
-    statuses?: readonly AgentStopStatus[];
-  }): Promise<AgentStopView[]> {
-    const stops = await this.deps.stops.findByStatuses({
-      organizationId,
-      ...(statuses && statuses.length > 0 ? { statuses } : {}),
-      limit: READ_LIMIT,
-    });
-    return stops.map(viewOfStop);
-  }
-
   /** One page of stops, latest request first; `next_cursor` is null on the last page. */
   async listStops({
     organizationId,
@@ -252,8 +237,18 @@ export class AgentStopService {
     };
   }
 
-  findPendingApprovals({ organizationId }: { organizationId: string }): Promise<AgentStopView[]> {
-    return this.findStops({ organizationId, statuses: ["pending_approval"] });
+  /** Every stop waiting for a decision, paged to the end. */
+  async findPendingApprovals({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<AgentStopView[]> {
+    const pending = await this.deps.stops.findAllByStatuses({
+      organizationId,
+      statuses: ["pending_approval"],
+      pageSize: this.deps.pageSize,
+    });
+    return pending.map(viewOfStop);
   }
 
   /**
@@ -388,7 +383,7 @@ export class AgentStopService {
   }): Promise<void> {
     // A service key has no user: the row names the key, as the door's own audit rows do.
     const actor = caller.userId ?? (caller.apiKeyId ? `apikey:${caller.apiKeyId}` : null);
-    await this.deps.auditLog.record({
+    await this.deps.audit.record({
       ...(actor ? { userId: actor } : {}),
       organizationId: stop.organizationId,
       action,

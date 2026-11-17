@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import {
   AGENT_STOP_OPEN_STATUSES,
   AGENT_STOP_RESTORABLE_STATUSES,
@@ -17,12 +16,13 @@ import type {
   GovernanceAwsConnectionRecord,
   GovernanceAwsConnectionRepository,
 } from "../../../repositories/governance-aws-connection.repository.ts";
+import type { KillSwitchAuditService } from "./kill-switch-audit.service.ts";
 
 interface GovernanceAwsConnectionDependencies {
   connections: GovernanceAwsConnectionRepository;
   plans: Pick<AgentStopPlanRepository, "findAgentIdsByAwsConnection">;
   stops: Pick<AgentStopRepository, "findAllByStatuses">;
-  auditLog: Pick<AuditLogApi, "record">;
+  audit: Pick<KillSwitchAuditService, "record">;
   newId: () => string;
 }
 
@@ -146,7 +146,7 @@ export class GovernanceAwsConnectionService {
     connectionId: string;
     metadata: Record<string, string | boolean | null>;
   }): Promise<void> {
-    await this.deps.auditLog.record({
+    await this.deps.audit.record({
       ...(userId ? { userId } : {}),
       organizationId,
       action,

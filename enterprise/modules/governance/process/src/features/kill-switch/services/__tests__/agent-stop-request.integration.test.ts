@@ -219,6 +219,36 @@ describe("AgentStopService", () => {
     });
   });
 
+  describe("when more stops wait for a decision than one read page", () => {
+    /** @scenario "Every pending approval is answered, however many there are" */
+    it("answers every pending stop", async () => {
+      const others = ["pricing-bot", "billing-bot"];
+      const harness = await killSwitchHarness({ otherAgents: others, pageSize: 2 });
+      const stopIds: string[] = [];
+      for (const agentId of [AGENT_ID, ...others.map((name) => `agent-${name}`)]) {
+        await harness.plans.setPlan({
+          organizationId: ORG,
+          agentId,
+          targets: [{ kind: "gateway_virtual_key", virtualKeyId: VIRTUAL_KEY_ID }],
+        });
+        const view = await harness.stops.requestStop({
+          organizationId: ORG,
+          agentId,
+          reason: "prompt injection in production",
+          severity: "high",
+          caller: MACHINE,
+        });
+        stopIds.push(view.id);
+        await settled(harness, view.id, "pending_approval");
+      }
+
+      const pending = await harness.stops.findPendingApprovals({ organizationId: ORG });
+
+      expect(pending.map((stop) => stop.id).toSorted()).toEqual(stopIds.toSorted());
+      await harness.eventing.close();
+    });
+  });
+
   describe("when the organisation holds more stops than one listing page", () => {
     /** @scenario "The stop listing pages through every stop with a cursor" */
     it("answers every stop once, latest first, across pages, and refuses a forged cursor", async () => {
@@ -256,9 +286,14 @@ describe("AgentStopService", () => {
       expect([...first.data, ...second.data].map((stop) => stop.id)).toEqual(
         expect.arrayContaining(stopIds),
       );
-      expect(
-        await codeOf(harness.stops.listStops({ organizationId: ORG, limit: 3, cursor: "forged" })),
-      ).toBe("validation_error");
+      const undated = Buffer.from(JSON.stringify({ r: "not-a-date", i: stopIds[0] })).toString(
+        "base64url",
+      );
+      for (const cursor of ["forged", undated]) {
+        expect(
+          await codeOf(harness.stops.listStops({ organizationId: ORG, limit: 3, cursor })),
+        ).toBe("validation_error");
+      }
       await harness.eventing.close();
     });
   });

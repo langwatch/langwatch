@@ -36,6 +36,7 @@ import { AgentStopPlanService } from "../agent-stop-plan.service.ts";
 import { AgentStopTargetService } from "../agent-stop-target.service.ts";
 import { AgentStopService } from "../agent-stop.service.ts";
 import { GovernanceAwsConnectionService } from "../governance-aws-connection.service.ts";
+import { KillSwitchAuditService } from "../kill-switch-audit.service.ts";
 
 export const ORG = "org-1";
 export const AGENT_ID = "agent-support-bot";
@@ -176,9 +177,13 @@ export async function killSwitchHarness({
 
   const audit: RecordAuditLogCommand[] = [];
   const auditLog = createApiFixture<AuditLogApi>({
+    // As the audit log does: a repeated idempotency key writes nothing and answers the first row.
     record: async (command) => {
-      audit.push(command);
-      return { id: `audit-${audit.length}`, occurredAt: 0 };
+      const first = command.idempotencyKey
+        ? audit.findIndex((row) => row.idempotencyKey === command.idempotencyKey)
+        : -1;
+      if (first < 0) audit.push(command);
+      return { id: `audit-${first < 0 ? audit.length : first + 1}`, occurredAt: 0 };
     },
   });
   const virtualKeyCalls: VirtualKeyCall[] = [];
@@ -228,11 +233,13 @@ export async function killSwitchHarness({
       aliasInvocationState: "ACCEPT_INVOCATIONS",
     },
   });
+  // No pipeline hosts the audit outbox here, so each row is written at once under its key.
+  const killSwitchAudit = KillSwitchAuditService.create({ auditLog, outbox: () => undefined });
   const connections = GovernanceAwsConnectionService.create({
     connections: repositories.awsConnections,
     plans: repositories.agentStopPlans,
     stops: repositories.agentStops,
-    auditLog,
+    audit: killSwitchAudit,
   });
   const connection = await connections.createConnection({
     organizationId: ORG,
@@ -280,7 +287,7 @@ export async function killSwitchHarness({
     }),
     plans,
     registry: repositories.agentRegistry,
-    auditLog,
+    audit: killSwitchAudit,
     send,
     ...(pageSize ? { pageSize } : {}),
   });

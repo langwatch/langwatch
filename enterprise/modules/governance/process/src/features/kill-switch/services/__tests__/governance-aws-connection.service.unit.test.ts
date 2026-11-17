@@ -10,6 +10,7 @@ import { MemoryAgentStopPlanRepository } from "../../../../repositories/memory/m
 import { MemoryAgentStopRepository } from "../../../../repositories/memory/memory.agent-stop.repository.ts";
 import { MemoryGovernanceAwsConnectionRepository } from "../../../../repositories/memory/memory.governance-aws-connection.repository.ts";
 import { GovernanceAwsConnectionService } from "../governance-aws-connection.service.ts";
+import { KillSwitchAuditService } from "../kill-switch-audit.service.ts";
 import { ORG } from "./kill-switch.fixtures.ts";
 
 function connectionService(
@@ -24,7 +25,12 @@ function connectionService(
       return { id: `audit-${audit.length}`, occurredAt: 0 };
     },
   });
-  return GovernanceAwsConnectionService.create({ connections: repository, plans, stops, auditLog });
+  return GovernanceAwsConnectionService.create({
+    connections: repository,
+    plans,
+    stops,
+    audit: KillSwitchAuditService.create({ auditLog, outbox: () => undefined }),
+  });
 }
 
 describe("GovernanceAwsConnectionService", () => {

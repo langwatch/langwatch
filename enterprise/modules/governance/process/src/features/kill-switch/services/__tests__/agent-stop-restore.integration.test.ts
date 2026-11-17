@@ -80,6 +80,43 @@ describe("AgentStopService restore", () => {
       );
       await harness.eventing.close();
     });
+
+    /** @scenario "A second restore retries the reverts the first one could not do" */
+    it("restores on a second try once the endpoint starts again", async () => {
+      const { harness, stopId } = await partlyStopped({ refuseStart: true });
+      await harness.stops.restore({ organizationId: ORG, stopId, caller: PERSON });
+      await settled(harness, stopId, "restore_failed");
+      const startPath = "/api/2.0/serving-endpoints/support-bot-prod/config:start";
+      harness.servingEndpoints.allow({ path: startPath });
+      const startsBefore = harness.servingEndpoints.calls.filter(
+        (call) => call.path === startPath,
+      ).length;
+
+      const second = await harness.stops.restore({ organizationId: ORG, stopId, caller: PERSON });
+
+      expect(second.status).toBe("restoring");
+      const stop = await settled(harness, stopId, "restored");
+      expect(stop.restoreRound).toBe(2);
+      expect(harness.servingEndpoints.calls.filter((call) => call.path === startPath)).toHaveLength(
+        startsBefore + 1,
+      );
+      await vi.waitFor(() =>
+        expect(harness.announced.map((event) => event.milestone)).toEqual([
+          "governance.agent.stop_failed",
+          "governance.agent.restore_failed",
+          "governance.agent.restored",
+        ]),
+      );
+      const actions = harness.audit.map((row) => row.action);
+      expect(
+        actions.filter((action) => action === "governance.agent.restore_requested"),
+      ).toHaveLength(2);
+      expect(actions.filter((action) => action === "governance.agent.restore_failed")).toHaveLength(
+        1,
+      );
+      expect(actions.filter((action) => action === "governance.agent.restored")).toHaveLength(1);
+      await harness.eventing.close();
+    });
   });
 
   describe("given a virtual key already disabled and a Bedrock alias already rejecting calls", () => {
@@ -122,6 +159,31 @@ describe("AgentStopService restore", () => {
         "/api/2.0/serving-endpoints/support-bot-prod/config:stop",
         "/api/2.0/serving-endpoints/support-bot-prod/config:start",
       ]);
+      await harness.eventing.close();
+    });
+  });
+
+  describe("when a milestone announcement is delivered again", () => {
+    /** @scenario "A redelivered milestone writes one audit row" */
+    it("writes the quarantined row once", async () => {
+      const harness = await killSwitchHarness();
+      await harness.setFullPlan();
+      const view = await request(harness);
+      await settled(harness, view.id, "quarantined");
+      await vi.waitFor(() => expect(harness.announced).toHaveLength(1));
+      const [announced] = harness.announced;
+      if (!announced) throw new Error("no announcement");
+
+      await harness.targets.announce({
+        organizationId: ORG,
+        milestone: announced.milestone,
+        restoreRound: 0,
+        stop: announced.stop,
+      });
+
+      expect(
+        harness.audit.filter((row) => row.action === "governance.agent.quarantined"),
+      ).toHaveLength(1);
       await harness.eventing.close();
     });
   });
