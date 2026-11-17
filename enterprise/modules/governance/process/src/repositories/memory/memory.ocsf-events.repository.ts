@@ -5,15 +5,14 @@ import {
 } from "@langwatch/enterprise-governance-contract";
 import { nowInstant } from "@langwatch/time";
 
-import {
-  ClickHouseOcsfEventsRepository,
-  type FindOcsfEventsByIngestInput,
-  type FindOcsfEventsInput,
-  type GovernanceOcsfIngestOrderedRow,
-  type GovernanceSeatReportRow,
-  type OcsfEventBatchWriter,
-  type OcsfIngestOrderedReader,
-  type OcsfSeatReportReader,
+import { type GovernanceSeatReportRow, seatReportsOf } from "../../rules/ocsf-seat-report.rules.ts";
+import type {
+  FindOcsfEventsByIngestInput,
+  FindOcsfEventsInput,
+  GovernanceOcsfIngestOrderedRow,
+  OcsfEventBatchWriter,
+  OcsfIngestOrderedReader,
+  OcsfSeatReportReader,
 } from "../clickhouse/clickhouse.ocsf-events.repository.ts";
 import {
   governanceOcsfExportRowOf,
@@ -59,11 +58,6 @@ export class MemoryOcsfEventsRepository
   async findAll(input: FindOcsfEventsInput): Promise<GovernanceOcsfExportRow[]> {
     return [...this.eventsByKey.values()]
       .filter((row) => row.tenantId === input.tenantId)
-      .filter(
-        (row) => input.untilMs === undefined || row.eventTime.epochMilliseconds < input.untilMs,
-      )
-      .filter((row) => input.sourceType === undefined || row.sourceType === input.sourceType)
-      .filter((row) => input.sourceId === undefined || row.sourceId === input.sourceId)
       .filter(
         (row) =>
           row.eventTime.epochMilliseconds > input.sinceMs ||
@@ -120,11 +114,11 @@ export class MemoryOcsfEventsRepository
     return [...latest.entries()]
       .toSorted(([a], [b]) => a.localeCompare(b))
       .flatMap(([, row]) =>
-        ClickHouseOcsfEventsRepository.seatReportsOf({
-          SourceId: row.sourceId,
-          SkuPartNumber: row.targetName,
-          Day: row.eventTime.toString().slice(0, 10),
-          LatestRawOcsfJson: row.rawOcsfJson,
+        seatReportsOf({
+          sourceId: row.sourceId,
+          skuPartNumber: row.targetName,
+          day: row.eventTime.toString().slice(0, 10),
+          rawOcsfJson: row.rawOcsfJson,
         }),
       );
   }

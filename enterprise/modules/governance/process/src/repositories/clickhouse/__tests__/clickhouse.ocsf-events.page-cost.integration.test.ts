@@ -333,38 +333,4 @@ describe.skipIf(!enabled)("the cost of one governance_ocsf_events page", () => {
       expect(copies.map((event) => event.rawPayload)).toEqual(['{"rewritten":true}']);
     });
   });
-
-  describe("given an event rewritten to a time after until, between two events before it", () => {
-    /** @scenario "A SIEM export page bounded by until fills from events whose newest version is before it" */
-    it("fills the page with the events before until", async () => {
-      const tenantId = `gov-until-${run}`;
-      const insert = async (eventId: string, eventTime: string, lastUpdatedAt: string) =>
-        client.command({
-          query: `
-            INSERT INTO governance_ocsf_events
-              (TenantId, EventId, TraceId, SourceId, SourceType, TypeUid, EventTime, ActorUserId,
-               ActorEmail, ActorEnduserId, ActionName, TargetName, AnomalyAlertId, RawOcsfJson,
-               LastUpdatedAt)
-            VALUES ({tenantId:String}, {eventId:String}, {eventId:String}, {sourceId:String},
-              'http_polling', 600306, {eventTime:String}, '', '', '', 'completion', 'gpt-5', '',
-              '{}', {lastUpdatedAt:String})
-          `,
-          query_params: { tenantId, eventId, eventTime, lastUpdatedAt, sourceId: SOURCE_ID },
-        });
-      await insert("event-a", "2026-10-01 00:00:01", "2026-10-01 00:00:01");
-      await insert("event-b", "2026-10-01 00:00:02", "2026-10-01 00:00:02");
-      await insert("event-b", "2026-10-03 00:00:00", "2026-10-03 00:00:00");
-      await insert("event-c", "2026-10-01 00:00:03", "2026-10-01 00:00:03");
-
-      const page = await ClickHouseOcsfEventsRepository.create(async () => client).findAll({
-        tenantId,
-        sinceMs: Date.parse("2026-09-30T00:00:00.000Z"),
-        sinceEventId: "",
-        untilMs: Date.parse("2026-10-02T00:00:00.000Z"),
-        limit: 2,
-      });
-
-      expect(page.map((row) => row.eventId)).toEqual(["event-a", "event-c"]);
-    });
-  });
 });

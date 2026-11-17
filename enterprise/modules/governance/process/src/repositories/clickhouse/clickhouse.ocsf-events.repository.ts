@@ -7,6 +7,7 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { toDate } from "@langwatch/time";
 
+import { type GovernanceSeatReportRow, seatReportsOf } from "../../rules/ocsf-seat-report.rules.ts";
 import { OCSF_STORED_SCHEMA_VERSION } from "../governance.repositories.ts";
 import type {
   GovernanceOcsfEvent,
@@ -58,10 +59,6 @@ export interface FindOcsfEventsInput {
   /** EventId watermark paired with sinceMs; disambiguates same-millisecond rows. */
   sinceEventId: string;
   limit: number;
-  /** Exclusive upper bound on EventTime. */
-  untilMs?: number;
-  sourceType?: string;
-  sourceId?: string;
 }
 
 /**
@@ -94,6 +91,8 @@ export interface OcsfIngestOrderedReader {
   findAllByIngest(input: FindOcsfEventsByIngestInput): Promise<GovernanceOcsfIngestOrderedRow[]>;
 }
 
+export type { GovernanceSeatReportRow };
+
 /** The licence-seat read `governanceCost.service.ts`'s seats screen needs. */
 export interface OcsfSeatReportReader {
   findLatestSeatReports(input: {
@@ -121,97 +120,6 @@ interface OcsfExportCHRow {
   TargetName: string;
   AnomalyAlertId: string;
   RawOcsfJson: string;
-}
-
-/**
- * One licence pool, as its newest seat report describes it.
- *
- * Counts, never money. A seat event states how many units the tenant holds and
- * how many a person is sitting in; what those seats cost is on the invoice the
- * cost lanes already read, and a figure invented from a unit count here would
- * be added to it.
- *
- * The four facts travel independently rather than as one label, exactly as the
- * licence read records them — a pool can be free AND company-wide AND
- * suspended at once, and a single label would have to choose which to say.
- * Which pools count as seats is the caller's decision, not the table's.
- */
-export interface GovernanceSeatReportRow {
-  sourceId: string;
-  skuPartNumber: string;
-  /** `YYYY-MM-DD`, the day the count belongs to. */
-  day: string;
-  seatsBought: number;
-  seatsAssigned: number;
-  perPerson: boolean;
-  live: boolean;
-  free: boolean;
-  seatStem: boolean;
-}
-
-export interface SeatReportCHRow {
-  SourceId: string;
-  SkuPartNumber: string;
-  Day: string;
-  LatestRawOcsfJson: string;
-}
-
-/** The `metadata.extension` bag a pull event's payload carries, or null when unreadable. */
-function findOcsfExtension(rawOcsfJson: string): Record<string, unknown> | null {
-  try {
-    const parsed = JSON.parse(rawOcsfJson) as {
-      metadata?: { extension?: Record<string, unknown> };
-    };
-    return parsed.metadata?.extension ?? null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * A count off the payload, or null when the payload holds no number there.
- *
- * `Number("")` and `Number(null)` are both 0, and a 0 here would say the
- * tenant bought no seats — a confident wrong answer where the honest one is
- * that this pool could not be read.
- */
-function findSeatCount(value: unknown): number | null {
-  if (value === null || value === undefined || value === "") return null;
-  const count = Number(value);
-  return Number.isFinite(count) ? count : null;
-}
-
-/**
- * One seat report row into the typed row, or null when it cannot be read.
- *
- * The counts ride inside the OCSF document rather than in a column, so a pool
- * whose payload is unreadable is stepped over here. Dropping it costs the
- * screen one pool; passing it through as zeros would report seats nobody
- * bought, and one bad pool must never cost the tenant the rest of its list.
- *
- * A missing classifying fact reads as false, which leaves the pool uncounted.
- * That is the conservative direction: an unclassifiable pool shown as seats is
- * the loud wrong finding the licence read exists to avoid.
- */
-function findSeatReport(row: SeatReportCHRow): GovernanceSeatReportRow | null {
-  const extension = findOcsfExtension(String(row.LatestRawOcsfJson ?? ""));
-  if (!extension) return null;
-
-  const seatsBought = findSeatCount(extension.seatsBought);
-  const seatsAssigned = findSeatCount(extension.seatsAssigned);
-  if (seatsBought === null || seatsAssigned === null) return null;
-
-  return {
-    sourceId: String(row.SourceId ?? ""),
-    skuPartNumber: String(row.SkuPartNumber ?? ""),
-    day: String(row.Day ?? ""),
-    seatsBought,
-    seatsAssigned,
-    perPerson: extension.perPerson === true,
-    live: extension.live === true,
-    free: extension.free === true,
-    seatStem: extension.seatStem === true,
-  };
 }
 
 function toExportRow(r: OcsfExportCHRow): GovernanceOcsfExportRow {
@@ -337,18 +245,6 @@ export class ClickHouseOcsfEventsRepository
    */
   async findAll(input: FindOcsfEventsInput): Promise<GovernanceOcsfExportRow[]> {
     const client = await this.resolveClient(input.tenantId);
-    const sourceFilters = [
-      input.sourceType === undefined ? "" : "AND SourceType = {sourceType:String}",
-      input.sourceId === undefined ? "" : "AND SourceId = {sourceId:String}",
-    ].join(" ");
-    const untilFilter =
-      input.untilMs === undefined
-        ? ""
-        : "AND EventTime < fromUnixTimestamp64Milli({untilMs:UInt64})";
-    const latestUntil =
-      input.untilMs === undefined
-        ? ""
-        : "HAVING LatestTime < fromUnixTimestamp64Milli({untilMs:UInt64})";
     const result = await client.query({
       query: `
         SELECT
@@ -374,16 +270,13 @@ export class ClickHouseOcsfEventsRepository
         WHERE TenantId = {tenantId:String}
           AND EventTime >= fromUnixTimestamp64Milli({sinceMs:UInt64})
           AND (EventTime, EventId) > (fromUnixTimestamp64Milli({sinceMs:UInt64}), {sinceEventId:String})
-          ${sourceFilters} ${untilFilter}
           AND (TenantId, EventId, LastUpdatedAt, EventTime) IN (
             SELECT TenantId, EventId, max(LastUpdatedAt), argMax(EventTime, LastUpdatedAt) AS LatestTime
             FROM ${TABLE_NAME}
             WHERE TenantId = {tenantId:String}
               AND EventTime >= fromUnixTimestamp64Milli({sinceMs:UInt64})
               AND (EventTime, EventId) > (fromUnixTimestamp64Milli({sinceMs:UInt64}), {sinceEventId:String})
-              ${sourceFilters}
             GROUP BY TenantId, EventId
-            ${latestUntil}
             ORDER BY LatestTime ASC, EventId ASC
             LIMIT {limit:UInt32}
           )
@@ -395,9 +288,6 @@ export class ClickHouseOcsfEventsRepository
         sinceMs: input.sinceMs,
         sinceEventId: input.sinceEventId,
         limit: input.limit,
-        ...(input.untilMs === undefined ? {} : { untilMs: input.untilMs }),
-        ...(input.sourceType === undefined ? {} : { sourceType: input.sourceType }),
-        ...(input.sourceId === undefined ? {} : { sourceId: input.sourceId }),
       },
       format: "JSONEachRow",
     });
@@ -406,15 +296,9 @@ export class ClickHouseOcsfEventsRepository
     return rows.map(toExportRow);
   }
 
-  /** The seat figure one stored seat report carries; the memory twin decodes with it too. */
-  static seatReportsOf(row: SeatReportCHRow): GovernanceSeatReportRow[] {
-    const report = findSeatReport(row);
-    return report === null ? [] : [report];
-  }
-
   /**
-   * The SIEM stream: the latest version of each (TenantId, EventId), ordered by the time it was
-   * stored. Paging by EventTime would skip an event that arrives with a time before the cursor.
+   * The SIEM stream: the latest version of each event, ordered by the time it was stored (paging
+   * by EventTime would skip a back-dated event); only versions from the watermark on are grouped.
    * Spec: enterprise/modules/governance/specs/ocsf-siem.feature
    */
   async findAllByIngest(
@@ -457,10 +341,15 @@ export class ClickHouseOcsfEventsRepository
         WHERE TenantId = {tenantId:String}
           AND LastUpdatedAt >= fromUnixTimestamp64Milli({afterIngestedMs:UInt64})
           ${filters}
-          AND (TenantId, EventId, LastUpdatedAt) IN (
-            SELECT TenantId, EventId, max(LastUpdatedAt) AS Latest
+          AND (TenantId, EventId, LastUpdatedAt, EventTime) IN (
+            SELECT
+              TenantId,
+              EventId,
+              max(LastUpdatedAt) AS Latest,
+              argMax(EventTime, LastUpdatedAt) AS LatestTime
             FROM ${TABLE_NAME}
             WHERE TenantId = {tenantId:String}
+              AND LastUpdatedAt >= fromUnixTimestamp64Milli({afterIngestedMs:UInt64})
               ${filters}
             GROUP BY TenantId, EventId
             HAVING (Latest, EventId) > (fromUnixTimestamp64Milli({afterIngestedMs:UInt64}), {afterEventId:String})
@@ -536,7 +425,19 @@ export class ClickHouseOcsfEventsRepository
       format: "JSONEachRow",
     });
 
-    const rows = (await result.json()) as SeatReportCHRow[];
-    return rows.flatMap((row) => findSeatReport(row) ?? []);
+    const rows = (await result.json()) as {
+      SourceId: string;
+      SkuPartNumber: string;
+      Day: string;
+      LatestRawOcsfJson: string;
+    }[];
+    return rows.flatMap((row) =>
+      seatReportsOf({
+        sourceId: String(row.SourceId ?? ""),
+        skuPartNumber: String(row.SkuPartNumber ?? ""),
+        day: String(row.Day ?? ""),
+        rawOcsfJson: String(row.LatestRawOcsfJson ?? ""),
+      }),
+    );
   }
 }

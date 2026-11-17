@@ -75,10 +75,6 @@ export interface GovernanceOcsfEventsReader {
     sinceMs: number;
     sinceEventId: string;
     limit: number;
-    /** Exclusive upper bound on EventTime. */
-    untilMs?: number;
-    sourceType?: string;
-    sourceId?: string;
   }): Promise<GovernanceOcsfExportRow[]>;
 }
 
