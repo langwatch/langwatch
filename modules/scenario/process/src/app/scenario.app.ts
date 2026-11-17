@@ -650,7 +650,13 @@ export class ScenarioModule implements ScenarioApi {
     return this.#dependencies.scenarios.findTestSuite(input);
   }
 
-  createTestSuite(input: ScenarioTestSuiteCreateInput): Promise<ScenarioTestSuite> {
+  /** A suite a template apply makes passes the Free suite cap before anything is written. */
+  async createTestSuite(input: ScenarioTestSuiteCreateInput): Promise<ScenarioTestSuite> {
+    if (input.templateId) {
+      await this.#dependencies.creationCaps.assertTemplateSuiteCreationAllowed({
+        projectId: input.projectId,
+      });
+    }
     return this.#dependencies.scenarios.createTestSuite(input);
   }
 

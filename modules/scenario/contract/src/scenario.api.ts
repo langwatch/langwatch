@@ -291,6 +291,7 @@ export interface ScenarioApi {
     projectId: string;
   }): Promise<{ id: string; name: string }[]>;
   findTestSuite(input: ScenarioTestSuiteIdInput): Promise<ScenarioTestSuite | null>;
+  /** With a `templateId`, refused with `LimitExceededError` once the Free suite cap is reached. */
   createTestSuite(input: ScenarioTestSuiteCreateInput): Promise<ScenarioTestSuite>;
   updateTestSuite(input: ScenarioTestSuiteUpdateInput): Promise<ScenarioTestSuite>;
   getTestSuiteRunDefinition(

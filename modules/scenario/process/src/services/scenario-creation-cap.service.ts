@@ -16,7 +16,7 @@ const SCENARIO_SET_CACHE_TTL_MS = 30_000;
 type ScenarioCreationCapDependencies = Readonly<{
   plans: Pick<EntitlementApi, "getActivePlan">;
   projects: Pick<ProjectApi, "getOrganizationId" | "listIdsByOrganization">;
-  scenarios: Pick<ScenarioRepository, "countActiveByProjects">;
+  scenarios: Pick<ScenarioRepository, "countActiveByProjects" | "countActiveTestSuitesByProjects">;
   simulations: Pick<SimulationService, "getDistinctExternalSetIds">;
 }>;
 
@@ -50,6 +50,22 @@ export class ScenarioCreationCapService {
     const projectIds = await this.deps.projects.listIdsByOrganization({ organizationId });
     const current = await this.deps.scenarios.countActiveByProjects({ projectIds });
     if (current >= cap.max) throw new LimitExceededError("scenarios", current, cap.max);
+  }
+
+  /**
+   * A suite template's scenarios skip the scenario cap, so the suite it makes is what the Free plan
+   * bounds: the organization's live suites against the simulations cap.
+   * @throws LimitExceededError (`scenarioSets`) once the organization's suites reach the cap.
+   */
+  async assertTemplateSuiteCreationAllowed(input: { projectId: string }): Promise<void> {
+    const organizationId = await this.deps.projects.getOrganizationId(input.projectId);
+    const plan = await this.deps.plans.getActivePlan({ organizationId });
+    const cap = planCreationCap({ plan, limitType: "scenarioSets" });
+    if (!cap.capped) return;
+
+    const projectIds = await this.deps.projects.listIdsByOrganization({ organizationId });
+    const current = await this.deps.scenarios.countActiveTestSuitesByProjects({ projectIds });
+    if (current >= cap.max) throw new LimitExceededError("scenarioSets", current, cap.max);
   }
 
   /**

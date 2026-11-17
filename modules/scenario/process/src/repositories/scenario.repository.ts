@@ -48,6 +48,8 @@ export abstract class ScenarioRepository {
   abstract count(input: { projectId: string }): Promise<number>;
   /** Live scenarios no template apply created: the ones the Free scenario cap counts. */
   abstract countActiveByProjects(input: { projectIds: string[] }): Promise<number>;
+  /** Live test suites across the projects: what the Free suite cap counts on a template apply. */
+  abstract countActiveTestSuitesByProjects(input: { projectIds: string[] }): Promise<number>;
   abstract update(input: ScenarioUpdateInput & { actor: ScenarioActor }): Promise<Scenario>;
   abstract findVersions(
     input: ScenarioVersionListInput & { take: number },

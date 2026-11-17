@@ -42,7 +42,7 @@ function capsWith({
       getOrganizationId: async () => "organization-1",
       listIdsByOrganization: async () => ["project-1", "project-2"],
     },
-    scenarios: { countActiveByProjects },
+    scenarios: { countActiveByProjects, countActiveTestSuitesByProjects: async () => 0 },
     simulations: { getDistinctExternalSetIds },
   });
   return { service, countActiveByProjects, getDistinctExternalSetIds };

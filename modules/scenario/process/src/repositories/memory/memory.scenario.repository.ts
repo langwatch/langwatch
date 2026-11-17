@@ -113,6 +113,15 @@ export class MemoryScenarioRepository extends ScenarioRepository {
     return (await this.findAll(input)).length;
   }
 
+  countActiveTestSuitesByProjects(input: { projectIds: string[] }): Promise<number> {
+    const projectIds = new Set(input.projectIds);
+    return Promise.resolve(
+      [...this.testSuites.values()].filter(
+        (testSuite) => projectIds.has(testSuite.projectId) && testSuite.archivedAt === null,
+      ).length,
+    );
+  }
+
   countActiveByProjects(input: { projectIds: string[] }): Promise<number> {
     const projectIds = new Set(input.projectIds);
     return Promise.resolve(

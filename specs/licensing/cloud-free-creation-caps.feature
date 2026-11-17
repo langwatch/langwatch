@@ -11,7 +11,10 @@ Feature: Cloud Free plan caps scenarios, simulations and custom evaluators
 
   The scenario cap counts every live scenario except those a suite template apply
   created. A scenario a member adds to a template's suite, and a copy of a
-  template scenario, count like any other.
+  template scenario, count like any other. A template's scenarios are bounded by
+  its suite instead: a template apply is refused once the organization's live
+  suites reach the simulations cap, before anything is written. Only the
+  template apply marks a scenario as template-made; a create request cannot.
 
   Only creating one more is refused. An organization already above a cap keeps
   everything it has and can still edit and run it. A refusal carries the limit
@@ -101,6 +104,20 @@ Feature: Cloud Free plan caps scenarios, simulations and custom evaluators
     Then every template scenario is created
     And a member's next scenario is created
     And the one after it is refused with the limit shape
+
+  @unit
+  Scenario: A fourth suite from a template is refused before anything is written
+    Given an organization on cloud Free with 3 live test suites
+    When it applies a suite template
+    Then the request fails with limit type "scenarioSets", current 3 and max 3
+    And no suite or scenario is written
+
+  @unit
+  Scenario: A scenario create request cannot mark itself as template-made
+    Given a create request that names a source template
+    When the tRPC input is read
+    Then it is refused
+    And the REST body is read without it
 
   @unit
   Scenario: A scenario created inside a template's suite counts against the scenario cap

@@ -206,6 +206,13 @@ export class PrismaScenarioRepository extends ScenarioRepository {
     });
   }
 
+  async countActiveTestSuitesByProjects(input: { projectIds: string[] }): Promise<number> {
+    if (input.projectIds.length === 0) return 0;
+    return this.database.simulationSuite.count({
+      where: { projectId: { in: input.projectIds }, kind: "test_suite", archivedAt: null },
+    });
+  }
+
   async update(input: ScenarioWriteInput): Promise<Scenario> {
     return this.database.$transaction(async (transaction) => {
       const current = await this.lockActiveScenario(transaction, input);

@@ -9,6 +9,7 @@ import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { PresenceApi } from "@langwatch/presence-contract";
 import type { ResourceOwnership } from "@langwatch/process";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { scenarioCreateInputSchema, scenarioRestCreateSchema } from "@langwatch/scenario-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
@@ -189,6 +190,52 @@ describe("ScenarioModule on the cloud Free scenario cap", () => {
       await app.duplicate(source, BY);
 
       await expect(app.duplicate(source, BY)).rejects.toMatchObject(LIMIT_SHAPE);
+    });
+  });
+
+  describe("given an organization with 3 live test suites", () => {
+    /** @scenario A fourth suite from a template is refused before anything is written */
+    it("refuses a template suite with the simulations limit shape and writes nothing", async () => {
+      const { app, repositories } = await organizationAtTheScenarioCap({ scenarios: 0 });
+      for (const name of ["One", "Two", "Three"]) {
+        await app.createTestSuite({ projectId: "project-1", name });
+      }
+
+      await expect(
+        app.createTestSuite({ projectId: "project-2", name: "OWASP", templateId: "owasp-llm" }),
+      ).rejects.toMatchObject({
+        code: "resource_limit_exceeded",
+        meta: { limitType: "scenarioSets", current: 3, max: 3 },
+      });
+      expect(
+        await repositories.scenarios.countActiveTestSuitesByProjects({
+          projectIds: ["project-1", "project-2"],
+        }),
+      ).toBe(3);
+    });
+
+    it("lets a template suite through while the organization is under the cap", async () => {
+      const { app } = await organizationAtTheScenarioCap({ scenarios: 0 });
+      await app.createTestSuite({ projectId: "project-1", name: "One" });
+
+      await expect(
+        app.createTestSuite({ projectId: "project-1", name: "OWASP", templateId: "owasp-llm" }),
+      ).resolves.toMatchObject({ templateId: "owasp-llm" });
+    });
+  });
+
+  describe("given a create request that names a source template", () => {
+    /** @scenario A scenario create request cannot mark itself as template-made */
+    it("refuses it on the tRPC input and drops it from the REST body", () => {
+      const request = {
+        projectId: "project-1",
+        name: "Sneaky",
+        situation: "A refund",
+        sourceTemplateId: "owasp-llm",
+      };
+
+      expect(scenarioCreateInputSchema.validate(request)).toBe(false);
+      expect(scenarioRestCreateSchema.parse(request)).not.toHaveProperty("sourceTemplateId");
     });
   });
 });
