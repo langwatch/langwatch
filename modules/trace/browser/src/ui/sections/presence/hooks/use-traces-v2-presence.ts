@@ -39,6 +39,7 @@ export function useTracesPresence(): void {
       viewMode === "conversation" ? "conversation" : "trace";
     const view: NonNullable<PresenceLocation["view"]> = {
       mode: wireMode,
+      // The shared panel enum predates the Agents tab; widening it is a presence wire change.
       panel: vizTab === "agents" ? undefined : vizTab,
       ...(section ? { section } : {}),
     };

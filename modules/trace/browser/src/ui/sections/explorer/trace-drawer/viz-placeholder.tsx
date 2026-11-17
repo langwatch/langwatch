@@ -16,7 +16,7 @@ import type {
   SpanTreeNode,
   TraceHeader,
 } from "@langwatch/trace-contract";
-import { lazy, Suspense, useMemo, useRef } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef } from "react";
 import {
   LuChartGantt,
   LuChevronDown,
@@ -419,7 +419,12 @@ export function VizPlaceholder({
 
   const agentCallGraph = useAgentCallGraph().data;
   const showsAgents = hasMultipleAgents({ graph: agentCallGraph });
-  const effectiveVizTab: VizTab = vizTab === "agents" && !showsAgents ? "waterfall" : vizTab;
+  const hidesAgentsTab = vizTab === "agents" && !showsAgents;
+  const effectiveVizTab: VizTab = hidesAgentsTab ? "waterfall" : vizTab;
+  const isAgentGraphSettled = agentCallGraph !== undefined;
+  useEffect(() => {
+    if (hidesAgentsTab && isAgentGraphSettled) onVizTabChange("waterfall");
+  }, [hidesAgentsTab, isAgentGraphSettled, onVizTabChange]);
   const a2aSpanIds = useMemo(
     () => new Set(agentCallGraph?.a2aSpans.map((mark) => mark.spanId) ?? []),
     [agentCallGraph],

@@ -31,6 +31,7 @@ function graphOf(ids: string[], edges: [string, string][]): AgentCallGraph {
 }
 
 describe("hasMultipleAgents", () => {
+  /** @scenario "The Agents tab shows only for a trace with more than one agent" */
   it("hides the graph for a single agent", () => {
     expect(hasMultipleAgents({ graph: graphOf(["a"], []) })).toBe(false);
     expect(hasMultipleAgents({ graph: undefined })).toBe(false);

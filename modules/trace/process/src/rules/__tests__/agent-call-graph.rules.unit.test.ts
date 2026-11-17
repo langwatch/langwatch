@@ -93,6 +93,36 @@ describe("buildAgentCallGraph", () => {
     expect(graph.edges).toEqual([]);
   });
 
+  /** @scenario "A single agent under an unnamed root span stays one node" */
+  it("folds an unnamed root in the same service into its only agent", () => {
+    const graph = buildAgentCallGraph({
+      spans: [
+        span({ spanId: "root" }),
+        span({ spanId: "agent", parentSpanId: "root", params: { "gen_ai.agent.name": "planner" } }),
+        span({ spanId: "llm", parentSpanId: "agent", type: "llm", metrics: { promptTokens: 3 } }),
+      ],
+      resources: resources({}),
+    });
+
+    expect(graph.nodes).toHaveLength(1);
+    expect(graph.nodes[0]).toMatchObject({ id: "agent:planner", spanCount: 3, promptTokens: 3 });
+    expect(graph.edges).toEqual([]);
+  });
+
+  it("keeps an edge's span ids to the first crossing call", () => {
+    const named = { "gen_ai.agent.name": "worker" };
+    const graph = buildAgentCallGraph({
+      spans: [
+        span({ spanId: "root", params: { "gen_ai.agent.name": "boss" } }),
+        span({ spanId: "w1", parentSpanId: "root", params: named }),
+        span({ spanId: "w2", parentSpanId: "root", params: named }),
+      ],
+      resources: resources({}),
+    });
+
+    expect(graph.edges).toMatchObject([{ callCount: 2, spanIds: ["w1"] }]);
+  });
+
   /** @scenario "A remote span whose parent is missing stays in the graph" */
   it("flags an orphan remote span and invents no edge", () => {
     const graph = buildAgentCallGraph({

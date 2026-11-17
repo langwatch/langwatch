@@ -175,12 +175,18 @@ export function buildAgentCallGraph({
   const context: OwnerContext = { byId, serviceOf, owners: new Map() };
   const ownerOf = (span: AgentCallGraphSpan) => ownerOfSpan({ span, context, seen: new Set() });
 
+  const folded = foldUnnamedServiceOwners({ spans, byId, serviceOf, ownerOf });
+  const ownerAfterFold = (span: AgentCallGraphSpan) => {
+    const owner = ownerOf(span);
+    return folded.get(owner.id) ?? owner;
+  };
+
   const nodes = new Map<string, AgentCallGraphNode>();
   const edges = new Map<string, AgentCallGraphEdge>();
   const a2aSpans: A2aSpanMark[] = [];
 
   for (const span of spans) {
-    const owner = ownerOf(span);
+    const owner = ownerAfterFold(span);
     addSpanToNode({
       nodes,
       owner,
@@ -190,10 +196,46 @@ export function buildAgentCallGraph({
     const a2a = classifyA2aSpan(span);
     if (a2a.isA2a) a2aSpans.push(a2a.mark);
     const parent = span.parentSpanId ? byId.get(span.parentSpanId) : undefined;
-    if (parent) addCall({ edges, from: ownerOf(parent), to: owner, span, isA2a: a2a.isA2a });
+    if (parent) {
+      addCall({ edges, from: ownerAfterFold(parent), to: owner, span, isA2a: a2a.isA2a });
+    }
   }
 
   return { nodes: [...nodes.values()], edges: [...edges.values()], a2aSpans };
+}
+
+/**
+ * An unnamed service owner whose same-service children name exactly one agent of
+ * their own is that agent; an A2A callee never folds its caller in.
+ */
+function foldUnnamedServiceOwners({
+  spans,
+  byId,
+  serviceOf,
+  ownerOf,
+}: {
+  spans: readonly AgentCallGraphSpan[];
+  byId: Map<string, AgentCallGraphSpan>;
+  serviceOf: (spanId: string) => string | null;
+  ownerOf: (span: AgentCallGraphSpan) => Owner;
+}): Map<string, Owner> {
+  const candidates = new Map<string, Map<string, Owner>>();
+  for (const span of spans) {
+    const parent = span.parentSpanId ? byId.get(span.parentSpanId) : undefined;
+    if (!parent || serviceOf(parent.spanId) !== serviceOf(span.spanId)) continue;
+    if (calleeOf(span) !== "") continue;
+    const [from, to] = [ownerOf(parent), ownerOf(span)];
+    if (from.kind === "agent" || to.kind !== "agent") continue;
+    const agents = candidates.get(from.id) ?? new Map<string, Owner>();
+    agents.set(to.id, to);
+    candidates.set(from.id, agents);
+  }
+  const folded = new Map<string, Owner>();
+  for (const [ownerId, agents] of candidates) {
+    const [only] = agents.values();
+    if (agents.size === 1 && only) folded.set(ownerId, only);
+  }
+  return folded;
 }
 
 function addSpanToNode({
@@ -260,7 +302,7 @@ function addCall({
   edge.totalDurationMs += span.durationMs;
   edge.maxDurationMs = Math.max(edge.maxDurationMs, span.durationMs);
   edge.a2a = edge.a2a || isA2a;
-  edge.spanIds.push(span.spanId);
+  if (edge.spanIds.length === 0) edge.spanIds.push(span.spanId);
   edges.set(key, edge);
 }
 

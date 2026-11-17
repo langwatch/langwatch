@@ -206,6 +206,17 @@ export class TraceDrawerReadService {
   }
 
   async spansFull(input: TraceDrawerReadInput): Promise<SpanDetail[]> {
+    return this.#protectedSpans({ input, joinsCodingAgentLogs: true });
+  }
+
+  /** Protected span details; the coding-agent log join only adds message bodies. */
+  async #protectedSpans({
+    input,
+    joinsCodingAgentLogs,
+  }: {
+    input: TraceDrawerReadInput;
+    joinsCodingAgentLogs: boolean;
+  }): Promise<SpanDetail[]> {
     const { reads, braids, mappers } = this.deps;
     const { authorization, protections } = await this.#open(input);
     const storedSpans = await reads.readSpans({
@@ -217,12 +228,14 @@ export class TraceDrawerReadService {
     });
     // Coding-agent message content lives in the trace's OTLP log records; joined on BEFORE
     // protections run, so it goes through the same redaction pass.
-    const spans = await reads.enrichSpansFromCodingAgentLogs({
-      projectId: input.projectId,
-      traceId: input.traceId,
-      spans: storedSpans,
-      ...(input.occurredAtMs !== undefined ? { occurredAtMs: input.occurredAtMs } : {}),
-    });
+    const spans = joinsCodingAgentLogs
+      ? await reads.enrichSpansFromCodingAgentLogs({
+          projectId: input.projectId,
+          traceId: input.traceId,
+          spans: storedSpans,
+          ...(input.occurredAtMs !== undefined ? { occurredAtMs: input.occurredAtMs } : {}),
+        })
+      : storedSpans;
     const [owners, spanBraids] = await Promise.all([
       this.ownerProtections({
         viewerUserId: input.viewerUserId,
@@ -249,7 +262,10 @@ export class TraceDrawerReadService {
 
   /** The agent call graph over the viewer's protected spans and their resources. */
   async agentCallGraph(input: TraceDrawerReadInput): Promise<AgentCallGraph> {
-    const [spans, resources] = await Promise.all([this.spansFull(input), this.resources(input)]);
+    const [spans, resources] = await Promise.all([
+      this.#protectedSpans({ input, joinsCodingAgentLogs: false }),
+      this.resources(input),
+    ]);
     return buildAgentCallGraph({ spans, resources: visibleResourcesOf({ resources, spans }) });
   }
 

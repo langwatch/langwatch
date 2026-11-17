@@ -7,6 +7,8 @@ import type { useTraceDrawerNavigation } from "./use-trace-drawer-navigation.ts"
 
 type ShortcutGroupTitle = "View" | "Visualisation" | "Navigation" | "Actions" | "Help";
 
+const AGENTS_SHORTCUT_LABEL = "Agents";
+
 export interface ShortcutContext {
   event: KeyboardEvent;
   store: TraceDrawerState;
@@ -19,6 +21,8 @@ export interface ShortcutContext {
   navigateToTrace: ReturnType<typeof useTraceDrawerNavigation>["navigateToTrace"];
   goBack: () => void;
   canGoBack: boolean;
+  /** The trace has more than one agent, so the Agents tab shows. */
+  showsAgents: boolean;
   refreshActiveTrace: () => Promise<void> | void;
   onClose: () => void;
 }
@@ -184,7 +188,8 @@ export const TRACE_DRAWER_SHORTCUTS: ShortcutEntry[] = [
     id: "agents",
     matchKeys: ["5"],
     group: "Visualisation",
-    description: "Agents",
+    description: AGENTS_SHORTCUT_LABEL,
+    guard: ({ showsAgents }) => showsAgents,
     run: ({ store }) => store.setVizTab("agents"),
   },
   {
@@ -337,3 +342,14 @@ export const TRACE_DRAWER_HELP_GROUPS: ShortcutHelpGroup[] = HELP_GROUP_ORDER.ma
       : g,
   )
   .filter((g) => g.items.length > 0);
+
+/** The help groups without the Agents entry, for a trace whose Agents tab is hidden. */
+export function helpGroupsWithoutAgents<T extends { title: string; items: { label: string }[] }>(
+  groups: readonly T[],
+): T[] {
+  return groups.map((group) =>
+    group.title === "Visualisation"
+      ? { ...group, items: group.items.filter((item) => item.label !== AGENTS_SHORTCUT_LABEL) }
+      : group,
+  );
+}

@@ -64,7 +64,28 @@ Feature: Agent call graph across A2A hops
       Then the remote service is its own node with its own LLM usage
       And the agent has an edge to it
 
+    @unit
+    Scenario: A single agent under an unnamed root span stays one node
+      Given a root span with no agent name
+      And one named agent under it in the same service
+      When the agent call graph is built
+      Then the graph has one node for that agent and no edges
+
   Rule: Agents view in the trace drawer
+
+    @unit
+    Scenario: The Agents tab shows only for a trace with more than one agent
+      Given a call graph with one node
+      Then the Agents tab is hidden
+      Given a call graph with two nodes
+      Then the Agents tab shows
+
+    @unit
+    Scenario: Shortcut 5 opens the Agents tab only when the tab shows
+      Given a trace whose Agents tab is hidden
+      Then pressing 5 does nothing and the shortcut help leaves Agents out
+      Given a trace whose Agents tab shows
+      Then pressing 5 opens the Agents tab
 
     @integration
     Scenario: Each agent shows its name and cost
