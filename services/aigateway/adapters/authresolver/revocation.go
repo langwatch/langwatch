@@ -9,6 +9,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/langwatch/langwatch/pkg/herr"
+	"github.com/langwatch/langwatch/services/aigateway/adapters/gatewaymetrics"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
@@ -31,8 +32,28 @@ type denial struct {
 // against the control plane when no re-enable event arrives.
 const DefaultDenialRecheckInterval = 30 * time.Second
 
-// denialRecheckTimeout bounds one background recheck call.
-const denialRecheckTimeout = 10 * time.Second
+// backgroundCheckTimeout bounds one background control-plane check.
+const backgroundCheckTimeout = 10 * time.Second
+
+// backgroundCheckContext is the context of a check no single request owns:
+// it ends on its timeout or when the service stops.
+func (s *Service) backgroundCheckContext() (context.Context, context.CancelFunc) {
+	ctx, cancel := context.WithTimeout(context.Background(), backgroundCheckTimeout)
+	go func() {
+		select {
+		case <-s.stopCh:
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
+	return ctx, cancel
+}
+
+// monoBase anchors monoStamp. Stamps are offsets on the monotonic clock, so a
+// wall clock step does not move fail closed.
+var monoBase = time.Now()
+
+func monoStamp(offset time.Duration) int64 { return int64(time.Since(monoBase) + offset) }
 
 // denialRechecks paces background rechecks of denied credentials: at most one
 // per credential per interval, and never two at once for the same credential.
@@ -91,23 +112,15 @@ func (s *Service) scheduleRecheck(key domain.PresentedKey, h [64]byte) {
 // the denial when the key is confirmed and no newer denial landed meanwhile.
 func (s *Service) recheckDenied(key domain.PresentedKey, h [64]byte, vkID string) {
 	defer s.rechecks.end(h)
-	ctx, cancel := context.WithTimeout(context.Background(), denialRecheckTimeout)
+	ctx, cancel := s.backgroundCheckContext()
 	defer cancel()
-	go func() {
-		select {
-		case <-s.stopCh:
-			cancel()
-		case <-ctx.Done():
-		}
-	}()
 	answer, err := s.resolveFresh(ctx, key, h)
 	if err != nil {
 		return
 	}
-	if d, ok := s.denied.Peek(vkID); ok && d.at.After(answer.authStart) {
+	if _, kept := s.liftDenialBefore(vkID, answer.authStart); kept {
 		return
 	}
-	s.clearDenial(vkID)
 	s.logger.Info("auth_cache_denial_cleared", zap.String("vk_id", vkID), zap.String("source", "recheck"))
 }
 
@@ -128,17 +141,21 @@ func (e *entry) authStart() time.Time {
 // which cached credentials carried it so an outage still answers them with the
 // key's own error rather than a retryable one.
 func (s *Service) deny(vkID, kind string) {
+	s.denyMu.Lock()
 	s.denied.Add(vkID, denial{at: time.Now(), kind: kind})
+	s.denyMu.Unlock()
+	var carried [][64]byte
 	for _, h := range s.l1.Keys() {
 		if e, ok := s.l1.Peek(h); ok && e.bundle.VirtualKeyID == vkID {
-			s.deniedKeys.Add(h, vkID)
+			carried = append(carried, h)
 		}
 	}
 	for _, h := range s.lastKnown.Keys() {
 		if e, ok := s.lastKnown.Peek(h); ok && e.bundle != nil && e.bundle.VirtualKeyID == vkID {
-			s.deniedKeys.Add(h, vkID)
+			carried = append(carried, h)
 		}
 	}
+	s.rememberDenied(vkID, carried...)
 	s.logger.Info("auth_cache_key_denied", zap.String("vk_id", vkID), zap.String("reason", evictReason(kind)))
 }
 
@@ -146,10 +163,52 @@ func (s *Service) deny(vkID, kind string) {
 // it. A re-enable, a confirmation that began after the denial, or a
 // background recheck calls it.
 func (s *Service) clearDenial(vkID string) {
+	s.denyMu.Lock()
+	defer s.denyMu.Unlock()
+	s.clearDenialLocked(vkID)
+}
+
+func (s *Service) clearDenialLocked(vkID string) {
 	s.denied.Remove(vkID)
-	for _, h := range s.deniedKeys.Keys() {
+	for _, h := range s.deniedByVK[vkID] {
 		if v, ok := s.deniedKeys.Peek(h); ok && v == vkID {
 			s.deniedKeys.Remove(h)
+		}
+	}
+	delete(s.deniedByVK, vkID)
+}
+
+// liftDenialBefore lifts vkID's denial when it is older than a confirmation
+// that began at start. A newer denial is kept and returned, checked and
+// cleared under one lock so a denial landing in between is never lost.
+func (s *Service) liftDenialBefore(vkID string, start time.Time) (denial, bool) {
+	s.denyMu.Lock()
+	defer s.denyMu.Unlock()
+	d, ok := s.denied.Peek(vkID)
+	if !ok {
+		return denial{}, false
+	}
+	if d.at.After(start) {
+		return d, true
+	}
+	s.clearDenialLocked(vkID)
+	return denial{}, false
+}
+
+// rememberDenied maps credentials to the denied key they carried. The index
+// drops keys that left the revocation list once it outgrows the list.
+func (s *Service) rememberDenied(vkID string, hashes ...[64]byte) {
+	s.denyMu.Lock()
+	defer s.denyMu.Unlock()
+	for _, h := range hashes {
+		s.deniedKeys.Add(h, vkID)
+	}
+	s.deniedByVK[vkID] = append(s.deniedByVK[vkID], hashes...)
+	if len(s.deniedByVK) > denySetSize {
+		for id := range s.deniedByVK {
+			if !s.denied.Contains(id) {
+				delete(s.deniedByVK, id)
+			}
 		}
 	}
 }
@@ -183,12 +242,11 @@ type served struct {
 func (s *Service) admit(ctx context.Context, h [64]byte, in served) (*domain.Bundle, error) {
 	b, authStart := in.bundle, in.authStart
 	if b.VirtualKeyID != "" {
-		if d, ok := s.denied.Peek(b.VirtualKeyID); ok {
-			if d.at.After(authStart) {
-				s.dropAndCountDenied(h, b.VirtualKeyID, "denied_"+evictReason(d.kind))
+		if _, ok := s.denied.Peek(b.VirtualKeyID); ok {
+			if d, kept := s.liftDenialBefore(b.VirtualKeyID, authStart); kept {
+				s.dropAndCountDenied(h, b.VirtualKeyID, denialReason(d.kind))
 				return nil, denialError(ctx, d.kind)
 			}
-			s.clearDenial(b.VirtualKeyID)
 		}
 	}
 	if s.failClosedAfter > 0 && s.feedSilent(b.OrganizationID) &&
@@ -209,11 +267,47 @@ func (s *Service) claimReconfirm(h [64]byte) bool {
 	if !ok {
 		return false
 	}
-	now, last := time.Now().UnixNano(), e.reconfirmAt.Load()
-	if now-last < int64(FailClosedReconfirmInterval) {
+	now, last := monoStamp(0), e.reconfirmAt.Load()
+	if last != 0 && now-last < int64(FailClosedReconfirmInterval) {
 		return false
 	}
 	return e.reconfirmAt.CompareAndSwap(last, now)
+}
+
+// reconfirmCall is one fail-closed key re-check. Requests for the same
+// credential wait on it rather than being refused while it runs.
+type reconfirmCall struct {
+	done   chan struct{}
+	answer served
+	err    error
+}
+
+// joinReconfirm returns the running re-check of h, or starts one when
+// claimReconfirm allows it; nil when neither. The check runs on a background
+// context, so a client that leaves does not cut it short.
+func (s *Service) joinReconfirm(key domain.PresentedKey, h [64]byte) *reconfirmCall {
+	s.reconfirmMu.Lock()
+	defer s.reconfirmMu.Unlock()
+	if c, ok := s.reconfirms[h]; ok {
+		return c
+	}
+	if !s.claimReconfirm(h) {
+		return nil
+	}
+	c := &reconfirmCall{done: make(chan struct{})}
+	s.reconfirms[h] = c
+	go s.runReconfirm(key, h, c)
+	return c
+}
+
+func (s *Service) runReconfirm(key domain.PresentedKey, h [64]byte, c *reconfirmCall) {
+	ctx, cancel := s.backgroundCheckContext()
+	defer cancel()
+	c.answer, c.err = s.reconfirm(ctx, key, h)
+	s.reconfirmMu.Lock()
+	delete(s.reconfirms, h)
+	s.reconfirmMu.Unlock()
+	close(c.done)
 }
 
 // reconfirm is the key re-check fail closed makes. A rejection evicts both
@@ -306,7 +400,8 @@ func (s *Service) feedSilent(orgID string) bool {
 		return true
 	}
 	c, _ := v.(*orgCursor)
-	return time.Since(time.Unix(0, c.polledAt.Load())) > s.failClosedAfter
+	polled := c.polledAt.Load()
+	return polled == 0 || time.Duration(monoStamp(0)-polled) > s.failClosedAfter
 }
 
 // refusalIfDenied answers a credential the change feed denied, and that nothing
@@ -321,7 +416,7 @@ func (s *Service) refusalIfDenied(ctx context.Context, h [64]byte) error {
 	if !ok || !d.at.After(s.confirmedAt(h)) {
 		return nil
 	}
-	s.dropAndCountDenied(h, vkID, "denied_"+evictReason(d.kind))
+	s.dropAndCountDenied(h, vkID, denialReason(d.kind))
 	return denialError(ctx, d.kind)
 }
 
@@ -330,7 +425,7 @@ func (s *Service) refusalIfDenied(ctx context.Context, h [64]byte) error {
 func (s *Service) dropAndCountDenied(h [64]byte, vkID, reason string) {
 	s.l1.Remove(h)
 	s.lastKnown.Remove(h)
-	s.deniedKeys.Add(h, vkID)
+	s.rememberDenied(vkID, h)
 	s.countRefusal(vkID, reason)
 }
 
@@ -343,6 +438,13 @@ func (s *Service) countRefusal(vkID, reason string) {
 	if s.metrics != nil {
 		s.metrics.RecordAuthCacheRefusal(reason)
 	}
+}
+
+func denialReason(kind string) string {
+	if kind == ChangeKindVirtualKeyDisabled {
+		return gatewaymetrics.AuthRefusalDeniedDisabled
+	}
+	return gatewaymetrics.AuthRefusalDeniedRevoked
 }
 
 func denialError(ctx context.Context, kind string) error {

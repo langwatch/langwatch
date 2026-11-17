@@ -347,6 +347,43 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
     # its grace period.
 
     @unit
+    Scenario: concurrent requests wait for the fail closed key re-check
+      Given fail closed is set and the change feed is silent past the limit
+      And the control plane answers resolve-key slowly
+      When many requests present the same cached key at once
+      Then one key re-check runs and every request waits for it and is served
+
+    @unit
+    Scenario: a fail closed key re-check outlives the request that started it
+      Given fail closed is set and the change feed is silent past the limit
+      When the client that started the key re-check disconnects
+      Then the re-check finishes on its own and the next request is served without a new check
+
+    @unit
+    Scenario: concurrent requests never serve a key after its revocation
+      Given many requests present a cached key at once
+      When the change feed revokes the key and the control plane goes down
+      Then no request that began after the revocation is served
+
+    @unit
+    Scenario: a held session ends on a denied key while the control plane is down
+      Given a voice session holds a key the change feed revoked
+      When its key watch re-reads the key during an outage
+      Then the key reads as revoked and the session ends
+
+    @unit
+    Scenario: a denial that lands during a confirmation is kept
+      Given a key denied once
+      When a second denial lands while a confirmation that began between them is checked
+      Then the second denial stays on the revocation list
+
+    @unit
+    Scenario: re-enabling a key forgets only its own denied credentials
+      Given two disabled keys with denied credentials
+      When one key is re-enabled
+      Then only that key's credentials leave the denied list
+
+    @unit
     Scenario: a rotation keeps the old secret valid
       Given a cached key whose old secret is still in its grace period
       When the change feed reports the key rotated

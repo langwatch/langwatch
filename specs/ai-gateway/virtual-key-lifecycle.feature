@@ -124,3 +124,10 @@ Feature: Virtual key disable, enable, and expiry
     # Saving a key that is dead on arrival is always a mistake, and the
     # form can say which field to fix while the person is still looking at
     # it.
+
+  @unit
+  Scenario: A token minted inside a rotation grace ends with the grace
+    Given the key was rotated and its previous secret is inside its grace window
+    When the gateway resolves the key
+    Then the gateway token expires no later than the grace end
+    And a gateway that cached the old secret stops serving it when the grace ends

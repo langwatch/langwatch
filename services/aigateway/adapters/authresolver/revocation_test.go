@@ -299,12 +299,12 @@ func TestRevocation_FailClosedRefusesUncheckedKey(t *testing.T) {
 	cur, _ := svc.activeOrgs.Load("org_1")
 	cursor, _ := cur.(*orgCursor)
 
-	cursor.polledAt.Store(time.Now().UnixNano())
+	cursor.polledAt.Store(monoStamp(0))
 	if _, err := svc.Resolve(context.Background(), key); err != nil {
 		t.Fatalf("a live change feed vouches for the key: %v", err)
 	}
 
-	cursor.polledAt.Store(time.Now().Add(-2 * time.Minute).UnixNano())
+	cursor.polledAt.Store(monoStamp(-2 * time.Minute))
 	_, err := svc.Resolve(context.Background(), key)
 	if !errors.Is(err, domain.ErrAuthUpstream) {
 		t.Fatalf("want auth_upstream_unavailable once feed and key are both stale, got %v", err)
@@ -323,7 +323,7 @@ func TestRevocation_FailClosedOffByDefault(t *testing.T) {
 	svc.publishL1(hashKey(key), svc.newEntry(orgBundle("vk_default", time.Now().Add(time.Hour)), "").authFrom(time.Now().Add(-3*time.Hour)))
 	cur, _ := svc.activeOrgs.Load("org_1")
 	cursor, _ := cur.(*orgCursor)
-	cursor.polledAt.Store(time.Now().Add(-3 * time.Hour).UnixNano())
+	cursor.polledAt.Store(monoStamp(-3 * time.Hour))
 
 	if _, err := svc.Resolve(context.Background(), key); err != nil {
 		t.Fatalf("with fail closed off the cached key serves: %v", err)
@@ -422,7 +422,7 @@ func TestRevocation_RefusedStaleAnswerIsNotCountedAsServed(t *testing.T) {
 	svc.publishL1(hashKey(key), svc.newEntry(orgBundle("vk_stale", time.Now().Add(-time.Minute)), "").authFrom(time.Now().Add(-2*time.Minute)))
 	cur, _ := svc.activeOrgs.Load("org_1")
 	cursor, _ := cur.(*orgCursor)
-	cursor.polledAt.Store(time.Now().Add(-2 * time.Minute).UnixNano())
+	cursor.polledAt.Store(monoStamp(-2 * time.Minute))
 
 	if _, err := svc.Resolve(context.Background(), key); !errors.Is(err, domain.ErrAuthUpstream) {
 		t.Fatalf("want auth_upstream_unavailable, got %v", err)
@@ -470,7 +470,7 @@ func TestRevocation_FailClosedRechecksKeyBeforeRefusing(t *testing.T) {
 	svc.publishL1(hashKey(key), svc.newEntry(orgBundle("vk_live", time.Now().Add(time.Hour)), "").authFrom(time.Now().Add(-2*time.Minute)))
 	cur, _ := svc.activeOrgs.Load("org_1")
 	cursor, _ := cur.(*orgCursor)
-	cursor.polledAt.Store(time.Now().Add(-2 * time.Minute).UnixNano())
+	cursor.polledAt.Store(monoStamp(-2 * time.Minute))
 
 	for i := 0; i < 3; i++ {
 		if _, err := svc.Resolve(context.Background(), key); err != nil {
@@ -490,7 +490,7 @@ func TestRevocation_FailClosedPacesRechecks(t *testing.T) {
 	svc.publishL1(hashKey(key), svc.newEntry(orgBundle("vk_down", time.Now().Add(time.Hour)), "").authFrom(time.Now().Add(-2*time.Minute)))
 	cur, _ := svc.activeOrgs.Load("org_1")
 	cursor, _ := cur.(*orgCursor)
-	cursor.polledAt.Store(time.Now().Add(-2 * time.Minute).UnixNano())
+	cursor.polledAt.Store(monoStamp(-2 * time.Minute))
 
 	for i := 0; i < 5; i++ {
 		if _, err := svc.Resolve(context.Background(), key); !errors.Is(err, domain.ErrAuthUpstream) {
@@ -521,7 +521,7 @@ func staleKeyCheck(t *testing.T, svc *Service, key domain.PresentedKey, vkID str
 	svc.publishL1(hashKey(key), svc.newEntry(orgBundle(vkID, time.Now().Add(time.Hour)), "").authFrom(time.Now().Add(-2*time.Minute)))
 	cur, _ := svc.activeOrgs.Load("org_1")
 	cursor, _ := cur.(*orgCursor)
-	cursor.polledAt.Store(time.Now().Add(-2 * time.Minute).UnixNano())
+	cursor.polledAt.Store(monoStamp(-2 * time.Minute))
 }
 
 // @scenario "fail closed keeps the cached config when only the config fetch fails"
@@ -638,7 +638,7 @@ func TestRevocation_ConfigFailureStaleServeKeepsFreshKeyCheck(t *testing.T) {
 	svc.publishL1(hashKey(key), svc.newEntry(orgBundle("vk_stalecfg", time.Now().Add(-time.Second)), "").authFrom(time.Now().Add(-2*time.Minute)))
 	cur, _ := svc.activeOrgs.Load("org_1")
 	cursor, _ := cur.(*orgCursor)
-	cursor.polledAt.Store(time.Now().Add(-2 * time.Minute).UnixNano())
+	cursor.polledAt.Store(monoStamp(-2 * time.Minute))
 
 	if _, err := svc.Resolve(context.Background(), key); err != nil {
 		t.Fatalf("a key the control plane just confirmed serves its stale config: %v", err)

@@ -171,7 +171,17 @@ export class GatewayInternalKeyResolutionService {
       return refuse(statusRejection.status, { ...statusRejection });
     }
 
-    return answer(await this.keyResolution({ vk, notAfter: vk.expiresAt }));
+    // A token minted inside a rotation grace ends with it, so a gateway that
+    // cached the old secret asks again when the grace ends.
+    const now = nowInstant().epochMilliseconds;
+    const graceEnd =
+      vk.previousSecretValidUntil && vk.previousSecretValidUntil.epochMilliseconds > now
+        ? vk.previousSecretValidUntil
+        : null;
+    const [notAfter] = [vk.expiresAt, graceEnd]
+      .filter((at): at is Instant => at !== null)
+      .toSorted((a, b) => a.epochMilliseconds - b.epochMilliseconds);
+    return answer(await this.keyResolution({ vk, notAfter: notAfter ?? null }));
   }
 
   /**

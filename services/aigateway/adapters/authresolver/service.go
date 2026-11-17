@@ -39,6 +39,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/langwatch/langwatch/pkg/herr"
+	"github.com/langwatch/langwatch/services/aigateway/adapters/gatewaymetrics"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
@@ -163,6 +164,13 @@ type Service struct {
 	deniedKeys      *lru.Cache[[64]byte, string]
 	failClosedAfter time.Duration
 	rechecks        denialRechecks
+	// denyMu orders denials against lifting them; deniedByVK lists the
+	// credentials each denied key carried, so a re-enable walks only those.
+	denyMu     sync.Mutex
+	deniedByVK map[string][][64]byte
+	// reconfirms holds the fail-closed key re-check running per credential.
+	reconfirmMu sync.Mutex
+	reconfirms  map[[64]byte]*reconfirmCall
 	// invalidations stamps change events per identity so a fetch in flight
 	// across one cannot publish what it read before it (invalidation.go).
 	invalidations *invalidationGuard
@@ -174,7 +182,7 @@ type Service struct {
 // for one organization. Mutated only inside the change-feed loop.
 type orgCursor struct {
 	since string
-	// polledAt is the unix nano time of the last poll the control plane
+	// polledAt is the monoStamp of the last poll the control plane
 	// answered (zero until the first one); the fail-closed rule reads it from
 	// request goroutines.
 	polledAt atomic.Int64
@@ -673,6 +681,8 @@ func New(opts Options) (*Service, error) {
 		hardGrace:        opts.HardGrace,
 		configTTL:        opts.ConfigTTL,
 		stopCh:           make(chan struct{}),
+		deniedByVK:       map[string][][64]byte{},
+		reconfirms:       map[[64]byte]*reconfirmCall{},
 	}, nil
 }
 
@@ -694,16 +704,22 @@ func (s *Service) Resolve(ctx context.Context, key domain.PresentedKey) (*domain
 		return nil, err
 	}
 	bundle, err := s.admit(ctx, h, answer)
-	if errors.Is(err, domain.ErrAuthUpstream) && s.claimReconfirm(h) {
-		if fresh, ferr := s.reconfirm(ctx, key, h); ferr == nil {
-			answer = fresh
-			bundle, err = s.admit(ctx, h, answer)
-		} else if classifyRefreshError(ferr) != classTransportFailure {
-			return nil, ferr
+	if errors.Is(err, domain.ErrAuthUpstream) {
+		if call := s.joinReconfirm(key, h); call != nil {
+			select {
+			case <-call.done:
+				if call.err == nil {
+					answer = call.answer
+					bundle, err = s.admit(ctx, h, answer)
+				} else if classifyRefreshError(call.err) != classTransportFailure {
+					return nil, call.err
+				}
+			case <-ctx.Done():
+			}
 		}
 	}
 	if errors.Is(err, domain.ErrAuthUpstream) {
-		s.countRefusal(answer.bundle.VirtualKeyID, "fail_closed")
+		s.countRefusal(answer.bundle.VirtualKeyID, gatewaymetrics.AuthRefusalFailClosed)
 	}
 	if err != nil {
 		return nil, err
@@ -997,7 +1013,7 @@ func (s *Service) serveLastKnown(h [64]byte, in lastKnownServe) *served {
 			zap.Bool("cached", false),
 			zap.Error(cause),
 		)
-		return &served{bundle: bundle, authStart: authStart, stale: "last_known"}
+		return &served{bundle: bundle, authStart: authStart, stale: gatewaymetrics.StaleServeLastKnown}
 	}
 	s.logger.Warn("auth_cache_serve_last_known",
 		zap.String("vk_id", bundle.VirtualKeyID),
@@ -1005,7 +1021,7 @@ func (s *Service) serveLastKnown(h [64]byte, in lastKnownServe) *served {
 		zap.Time("serve_until", hard),
 		zap.Error(cause),
 	)
-	return &served{bundle: bundle, authStart: authStart, stale: "last_known"}
+	return &served{bundle: bundle, authStart: authStart, stale: gatewaymetrics.StaleServeLastKnown}
 }
 
 // refreshOrServeStale tries to resolve fresh against the control plane.
@@ -1117,7 +1133,7 @@ func (s *Service) serveStaleAfterFailure(ctx context.Context, f staleFailure) (s
 		zap.Duration("hard_grace_remaining", time.Until(hardExpiresAt)),
 		zap.String("refresh_error_class", classLabel),
 	)
-	return served{bundle: staleBundle, authStart: f.authStart, stale: "stale_while_error"}, nil
+	return served{bundle: staleBundle, authStart: f.authStart, stale: gatewaymetrics.StaleServeWhileError}, nil
 }
 
 // populateConfig eagerly fetches the bundle's config and merges it into the
@@ -1317,7 +1333,7 @@ func (s *Service) pollOrgChanges(ctx context.Context, orgID string, cursor *orgC
 	if nextRev != "" {
 		cursor.since = nextRev
 	}
-	cursor.polledAt.Store(time.Now().UnixNano())
+	cursor.polledAt.Store(monoStamp(0))
 	return nil
 }
 

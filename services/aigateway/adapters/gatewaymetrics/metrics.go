@@ -59,6 +59,16 @@ const (
 	CacheOutcomeMiss = "miss"
 )
 
+// Reasons on gateway_auth_cache_refusals_total and sources on
+// gateway_auth_cache_stale_serves_total.
+const (
+	AuthRefusalDeniedRevoked  = "denied_vk_revoked"
+	AuthRefusalDeniedDisabled = "denied_vk_disabled"
+	AuthRefusalFailClosed     = "fail_closed"
+	StaleServeLastKnown       = "last_known"
+	StaleServeWhileError      = "stale_while_error"
+)
+
 // Drop reasons on gateway_spend_spool_dropped_total. Intake is a record the
 // spool's writer could not accept (queue full, or the spool already closed);
 // overflow is a sealed segment deleted to keep the spool inside its size

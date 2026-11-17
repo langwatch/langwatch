@@ -7722,6 +7722,7 @@ The config part of the entry (credentials, routing chain, budgets) has its own T
 | `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS` | `300` | Extension per failed refresh. |
 | `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` | `21600` (6 hours) | Cap on stale serving past the JWT expiry. A negative value disables stale serving. |
 | `LW_GATEWAY_AUTH_CACHE_CONFIG_TTL_SECONDS` | `60` | Config re-fetch interval. A negative value disables it. |
+| `LW_GATEWAY_AUTH_CACHE_FAIL_CLOSED_AFTER_SECONDS` | `0` (off) | Refuses a cached key that nothing re-checked for this long while its change feed is silent too. Minimum 30. |
 
 ## Budget enforcement
 
@@ -12371,6 +12372,7 @@ What you can tune is how long a cached key survives without the control plane, a
 | `LW_GATEWAY_AUTH_CACHE_CONFIG_TTL_SECONDS` | `60`    | Age at which a cached key's configuration is re-fetched in the background   |
 | `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS`  | `300`   | Extension granted per failed refresh while the control plane is unreachable |
 | `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` | `21600` | Cap on serving a key past its token expiry                                  |
+| `LW_GATEWAY_AUTH_CACHE_FAIL_CLOSED_AFTER_SECONDS` | `0` | Off by default. Refuses a cached key nothing re-checked for this long while the change feed is silent too (minimum 30) |
 
 Add them to the pod yourself; the chart does not render them. See [Config](/ai-gateway/self-hosting/config#auth-cache).
 
@@ -12796,6 +12798,10 @@ A `401`, `403` or `404` from the control plane about the key itself is not an ou
 | `auth_cache_serve_stale`                                | info  | The grace window is active and keys are still being served                            |
 | `auth_cache_refresh_transport_failure`                  | warn  | Each refresh is failing. This is the outage signal, and cached keys are still serving |
 | `auth_cache_hard_evict` with `reason=hard_cap_exceeded` | error | The grace window is spent and requests are now refused                                |
+| `auth_cache_key_denied`                                 | info  | The change feed revoked or disabled a key, and every cache tier now refuses it        |
+| `auth_cache_refused` with `reason=denied_vk_revoked` or `denied_vk_disabled` | info | A request presented a denied key and got its `403`, even with the control plane down |
+| `auth_cache_refused` with `reason=fail_closed`          | info  | `LW_GATEWAY_AUTH_CACHE_FAIL_CLOSED_AFTER_SECONDS` refused a key it could not re-check   |
+| `auth_cache_denial_cleared`                             | info  | A re-enable or a later key check lifted a denial                                      |
 
 **Fix:** restore the control plane. Raise `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` while an outage is still running if you would rather extend than refuse. Set it to a negative value to switch stale serving off entirely, which is what a strict revocation policy wants.
 

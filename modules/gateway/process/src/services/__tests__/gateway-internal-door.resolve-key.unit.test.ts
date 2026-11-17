@@ -77,4 +77,55 @@ describe("the internal door's resolve-key", () => {
       expect(resolveLicenseToken).not.toHaveBeenCalled();
     });
   });
+
+  describe("when the key is inside a rotation grace", () => {
+    /** @scenario A token minted inside a rotation grace ends with the grace */
+    it("ends the token at the grace end", async () => {
+      const graceEnd = Temporal.Now.instant().add({ seconds: 40 });
+      const signJwt = vi.fn(() => ({ jwt: "signed.jwt", expiresAt: 1 }));
+      const door = GatewayInternalDoorService.create({
+        protocol: createApiFixture<GatewayInternalProtocol>({
+          findVirtualKeyBySecret: vi.fn(async () => ({
+            ...customerKey,
+            previousHashedSecret: "old-hash",
+            previousSecretValidUntil: graceEnd,
+          })),
+          resolveLicenseToken: vi.fn(),
+          signJwt,
+          touchVirtualKeyUsage: async () => undefined,
+        }),
+      });
+
+      await door.answerResolveKey({
+        raw: JSON.stringify({ key_presented: VirtualKeyCryptoService.mintSecret() }),
+        node: undefined,
+      });
+
+      expect(signJwt).toHaveBeenCalledWith(expect.objectContaining({ notAfter: graceEnd }));
+    });
+
+    it("ignores a grace that already ended", async () => {
+      const signJwt = vi.fn(() => ({ jwt: "signed.jwt", expiresAt: 1 }));
+      const door = GatewayInternalDoorService.create({
+        protocol: createApiFixture<GatewayInternalProtocol>({
+          findVirtualKeyBySecret: vi.fn(async () => ({
+            ...customerKey,
+            previousSecretValidUntil: Temporal.Now.instant().subtract({ seconds: 40 }),
+          })),
+          resolveLicenseToken: vi.fn(),
+          signJwt,
+          touchVirtualKeyUsage: async () => undefined,
+        }),
+      });
+
+      await door.answerResolveKey({
+        raw: JSON.stringify({ key_presented: VirtualKeyCryptoService.mintSecret() }),
+        node: undefined,
+      });
+
+      expect(signJwt).toHaveBeenCalledWith(
+        expect.not.objectContaining({ notAfter: expect.anything() }),
+      );
+    });
+  });
 });

@@ -83,6 +83,7 @@ The config part of the entry (credentials, routing chain, budgets) has its own T
 | `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS` | `300` | Extension per failed refresh. |
 | `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` | `21600` (6 hours) | Cap on stale serving past the JWT expiry. A negative value disables stale serving. |
 | `LW_GATEWAY_AUTH_CACHE_CONFIG_TTL_SECONDS` | `60` | Config re-fetch interval. A negative value disables it. |
+| `LW_GATEWAY_AUTH_CACHE_FAIL_CLOSED_AFTER_SECONDS` | `0` (off) | Refuses a cached key that nothing re-checked for this long while its change feed is silent too. Minimum 30. |
 
 ## Budget enforcement
 
