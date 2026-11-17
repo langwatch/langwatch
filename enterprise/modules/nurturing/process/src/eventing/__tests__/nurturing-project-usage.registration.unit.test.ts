@@ -106,7 +106,12 @@ describe("the usage pipeline's registration", () => {
     const subscribers: EventSubscriberDefinition<Event>[] = [];
     const registry = createApiFixture<
       Parameters<NonNullable<typeof pipeline.globalProjections>[number]["register"]>[0]
-    >({ registerEventSubscriber: (subscriber) => void subscribers.push(subscriber) });
+    >({
+      registerEventSubscriber: (subscriber) => void subscribers.push(subscriber),
+      // The folds register too; this test reads only the event subscribers.
+      registerPeerFoldProjection: () => {},
+      registerSubscriber: () => {},
+    });
     for (const projection of pipeline.globalProjections ?? []) projection.register(registry);
     const data = {
       tenantId: "org-1",
