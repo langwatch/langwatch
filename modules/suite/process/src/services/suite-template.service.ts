@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 import {
   redTeamConfigSchema,
   type ScenarioApi,
@@ -15,6 +16,8 @@ import {
   fillTemplateScenario,
   SUITE_TEMPLATES,
 } from "../features/suite-templates/rules/suite-template-fill.rules.ts";
+
+const logger = createLogger("langwatch:suite:template-apply");
 
 export type SuiteTemplateServiceOptions = {
   scenarios: Pick<ScenarioApi, "createTestSuite" | "create" | "batchArchive" | "archiveTestSuite">;
@@ -83,20 +86,34 @@ export class SuiteTemplateService {
     return { suiteId: suite.id, slug: suite.slug, name: suite.name, scenarioIds };
   }
 
+  /**
+   * Runs both cleanups even when one rejects. Cleanup failures are logged, so the caller still
+   * sees the create error.
+   */
   private async discardPartialSuite(input: {
     projectId: string;
     suiteId: string;
     scenarioIds: string[];
   }): Promise<void> {
-    if (input.scenarioIds.length > 0) {
-      await this.options.scenarios.batchArchive({
+    const results = await Promise.allSettled([
+      input.scenarioIds.length > 0
+        ? this.options.scenarios.batchArchive({
+            projectId: input.projectId,
+            ids: input.scenarioIds,
+          })
+        : Promise.resolve(),
+      this.options.scenarios.archiveTestSuite({
         projectId: input.projectId,
-        ids: input.scenarioIds,
-      });
+        testSuiteId: input.suiteId,
+      }),
+    ]);
+    for (const result of results) {
+      if (result.status === "rejected") {
+        logger.warn(
+          { error: result.reason, projectId: input.projectId, suiteId: input.suiteId },
+          "suite template apply cleanup failed",
+        );
+      }
     }
-    await this.options.scenarios.archiveTestSuite({
-      projectId: input.projectId,
-      testSuiteId: input.suiteId,
-    });
   }
 }

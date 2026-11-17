@@ -174,6 +174,29 @@ describe("SuiteTemplateService", () => {
     });
   });
 
+  describe("when a scenario write fails and the scenario cleanup rejects too", () => {
+    /** @scenario "A failed scenario write archives the half-built suite" */
+    it("still archives the suite and rethrows the original create error", async () => {
+      const { service, create, batchArchive, archiveTestSuite } = setup();
+      create
+        .mockResolvedValueOnce({ id: "scenario_a" })
+        .mockRejectedValueOnce(new Error("store down"));
+      batchArchive.mockRejectedValueOnce(new Error("archive down"));
+
+      await expect(
+        service.applyTemplate(
+          { projectId: "project_1", templateId: "owasp-llm-top-10-2025", fit },
+          by,
+        ),
+      ).rejects.toThrow("store down");
+
+      expect(archiveTestSuite).toHaveBeenCalledWith({
+        projectId: "project_1",
+        testSuiteId: "suite_1",
+      });
+    });
+  });
+
   describe("when the template id is unknown", () => {
     /** @scenario "Applying an unknown template is refused as not found" */
     it("refuses with suite_template_not_found and writes nothing", async () => {
