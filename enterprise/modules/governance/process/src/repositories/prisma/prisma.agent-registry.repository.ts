@@ -237,14 +237,20 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`agent-registry:${organizationId
   async findActiveWithSourceKeys({
     organizationId,
     limit,
+    afterSourceKey,
   }: {
     organizationId: string;
     limit: number;
+    afterSourceKey?: string;
   }): Promise<{ sourceKey: string; entry: AgentRegistryEntry }[]> {
     const rows = await this.prisma.agentRegistryEntry.findMany({
-      where: { organizationId, status: "active" },
+      where: {
+        organizationId,
+        status: "active",
+        ...(afterSourceKey === undefined ? {} : { sourceKey: { gt: afterSourceKey } }),
+      },
       select: { sourceKey: true, entry: true },
-      orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+      orderBy: { sourceKey: "asc" },
       take: limit,
     });
     return rows.map((row) => ({ sourceKey: row.sourceKey, entry: entryOf(row.entry) }));

@@ -1,7 +1,6 @@
 import { Popover } from "@langwatch/design-system/popover";
 import { Button, HStack, Input, Text, VStack } from "@langwatch/design-system/primitives";
 import {
-  AGENT_REGISTRY_DORMANT_AFTER_DAYS_DEFAULT,
   AGENT_REGISTRY_DORMANT_AFTER_DAYS_MAX,
   AGENT_REGISTRY_DORMANT_AFTER_DAYS_MIN,
 } from "@langwatch/enterprise-governance-contract";
@@ -38,30 +37,42 @@ function useDormancyWindow({ organizationId }: { organizationId: string }) {
       showErrorToast({ error, fallbackTitle: "Couldn't save the dormancy window" }),
   });
   return {
-    days: settings.data?.dormant_after_days ?? AGENT_REGISTRY_DORMANT_AFTER_DAYS_DEFAULT,
+    // Only a successful read decides the window; the server answers its default when none is saved.
+    days: settings.data?.dormant_after_days ?? null,
     isLoading: settings.isPending,
+    isReadFailed: settings.isError,
+    retry: () => void settings.refetch(),
     save,
   };
 }
 
 export function AgentRegistrySettingsControl({ organizationId }: { organizationId: string }) {
-  const { days, isLoading, save } = useDormancyWindow({ organizationId });
+  const { days, isLoading, isReadFailed, retry, save } = useDormancyWindow({ organizationId });
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState("");
   const parsed = parseDormancyDays(draft);
 
   const openWith = (isOpen: boolean) => {
     setOpen(isOpen);
-    if (isOpen) setDraft(String(days));
+    if (isOpen) setDraft(days === null ? "" : String(days));
   };
 
   const submit = () => {
-    if (parsed === null) return;
+    if (parsed === null || save.isPending) return;
     save.mutate(
       { organizationId, dormant_after_days: parsed },
       { onSuccess: () => setOpen(false) },
     );
   };
+
+  if (isReadFailed) {
+    return (
+      <Button size="sm" variant="ghost" onClick={retry} data-testid="dormancy-window-retry">
+        <Clock size={14} />
+        Couldn't load the dormancy window. Retry
+      </Button>
+    );
+  }
 
   return (
     <Popover.Root
@@ -70,9 +81,16 @@ export function AgentRegistrySettingsControl({ organizationId }: { organizationI
       positioning={{ placement: "bottom-end" }}
     >
       <Popover.Trigger asChild>
-        <Button size="sm" variant="ghost" disabled={isLoading} data-testid="dormancy-window-button">
+        <Button
+          size="sm"
+          variant="ghost"
+          disabled={isLoading || days === null}
+          data-testid="dormancy-window-button"
+        >
           <Clock size={14} />
-          {`Dormant after ${days} ${days === 1 ? "day" : "days"}`}
+          {days === null
+            ? "Dormancy window"
+            : `Dormant after ${days} ${days === 1 ? "day" : "days"}`}
         </Button>
       </Popover.Trigger>
       <Popover.Content>
@@ -112,7 +130,7 @@ export function AgentRegistrySettingsControl({ organizationId }: { organizationI
                 variant="outline"
                 onClick={submit}
                 loading={save.isPending}
-                disabled={parsed === null}
+                disabled={parsed === null || save.isPending}
               >
                 Save
               </Button>

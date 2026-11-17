@@ -167,6 +167,7 @@ export function useAgentFilters(): {
   filters: AgentFilters;
   setFilter: <K extends keyof AgentFilters>(key: K, value: AgentFilters[K]) => void;
   clearFilters: () => void;
+  showOnlyPosture: (posture: AgentRegistryPosture) => void;
 } {
   const [searchParams, setSearchParams] = useSearchParams();
   const filters: AgentFilters = {
@@ -209,5 +210,19 @@ export function useAgentFilters(): {
     );
   }, [setSearchParams]);
 
-  return { filters, setFilter, clearFilters };
+  /** One posture across every source and owner: a source filter would hide traced-only agents. */
+  const showOnlyPosture = (posture: AgentRegistryPosture) => {
+    setSearchParams(
+      (previous) => {
+        const next = new URLSearchParams(previous);
+        next.delete("source");
+        next.delete("ownership");
+        next.set("posture", posture);
+        return next;
+      },
+      { replace: true },
+    );
+  };
+
+  return { filters, setFilter, clearFilters, showOnlyPosture };
 }

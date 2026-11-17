@@ -160,11 +160,18 @@ export class IngestionPullService {
   /** A list-only source's run is its agent listing: the run settles on the listing's outcome. */
   private async listInsteadOfPulling(input: IngestionPullExecution): Promise<boolean> {
     if (!this.scheduledListing) return false;
-    const listed = await this.scheduledListing.listAgentsOnSchedule({
-      tenantId: input.tenantId,
-      attempt: input.attempt,
-      run: input.pull,
-    });
+    let listed: Awaited<ReturnType<IngestionPullScheduledListing["listAgentsOnSchedule"]>>;
+    try {
+      listed = await this.scheduledListing.listAgentsOnSchedule({
+        tenantId: input.tenantId,
+        attempt: input.attempt,
+        run: input.pull,
+      });
+    } catch (error) {
+      // A thrown listing retries like a thrown pull and settles the run on the final attempt.
+      await this.settleFailedPull({ input, error });
+      return true;
+    }
     if (listed.outcome === "not_list_only") return false;
     if (listed.outcome === "refused") {
       this.metrics.count("failed_final");

@@ -19,21 +19,34 @@ function recordingPrisma({
   existing,
 }: {
   createdCount: number;
-  existing: {
-    displayText: string;
-    metadata: unknown;
-    ingestionSourceId?: string | null;
-    goneAt?: Date | null;
-  } | null;
+  existing: { id?: string; displayText: string; metadata: unknown } | null;
 }) {
   const createMany = vi.fn(async () => ({ count: createdCount }));
   const updateMany = vi.fn(async (_args: Prisma.DiscoveredAgentUpdateManyArgs) => ({ count: 1 }));
   const findFirst = vi.fn(async () => existing);
+  const listingCreateMany = vi.fn(async (_args?: Prisma.DiscoveredAgentListingCreateManyArgs) => ({
+    count: 0,
+  }));
+  const listingUpdateMany = vi.fn(async (_args: Prisma.DiscoveredAgentListingUpdateManyArgs) => ({
+    count: 1,
+  }));
   const repository = PrismaDiscoveredAgentRepository.create(
-    prismaDouble({ discoveredAgent: { createMany, updateMany, findFirst } }),
+    prismaDouble({
+      discoveredAgent: { createMany, updateMany, findFirst },
+      discoveredAgentListing: { createMany: listingCreateMany, updateMany: listingUpdateMany },
+    }),
   );
   const updates = () => updateMany.mock.calls.map(([args]) => args);
-  return { repository, createMany, updateMany, findFirst, updates };
+  const listingUpdates = () => listingUpdateMany.mock.calls.map(([args]) => args);
+  return {
+    repository,
+    createMany,
+    updateMany,
+    findFirst,
+    updates,
+    listingCreateMany,
+    listingUpdates,
+  };
 }
 
 function sighting(
@@ -201,33 +214,61 @@ describe("PrismaDiscoveredAgentRepository.recordAgentSighting", () => {
   });
 });
 
-describe("PrismaDiscoveredAgentRepository source and gone marks", () => {
-  describe("given a row marked gone that a source lists again", () => {
-    it("clears the gone mark and names the source in the merge write", async () => {
+describe("PrismaDiscoveredAgentRepository source presence", () => {
+  describe("given a source lists an agent it had marked gone", () => {
+    it("moves that source's presence forward and clears its gone mark, leaving the agent row's merge alone", async () => {
       const world = recordingPrisma({
         createdCount: 0,
         existing: {
+          id: "agent_1",
           displayText: "Revenue Analyst",
           metadata: { workspaceHost: "adb-1.azuredatabricks.net" },
-          ingestionSourceId: "source_old",
-          goneAt: SEPT_1,
         },
       });
 
-      await world.repository.recordAgentSighting({
-        ...sighting(),
-        ingestionSourceId: "source_new",
+      await world.repository.recordAgentSighting({ ...sighting(), ingestionSourceId: "source_1" });
+
+      expect(world.updates()).toHaveLength(2);
+      expect(world.listingCreateMany).toHaveBeenCalledWith({
+        data: [
+          {
+            organizationId,
+            ingestionSourceId: "source_1",
+            discoveredAgentId: "agent_1",
+            lastListedAt: SEPT_5,
+          },
+        ],
+        skipDuplicates: true,
+      });
+      expect(world.listingUpdates()).toEqual([
+        {
+          where: {
+            organizationId,
+            ingestionSourceId: "source_1",
+            discoveredAgentId: "agent_1",
+            lastListedAt: { lte: SEPT_5 },
+          },
+          data: { lastListedAt: SEPT_5, goneAt: null },
+        },
+      ]);
+    });
+  });
+
+  describe("given a sighting with no source", () => {
+    it("records no presence", async () => {
+      const world = recordingPrisma({
+        createdCount: 0,
+        existing: { id: "agent_1", displayText: "Revenue Analyst", metadata: {} },
       });
 
-      expect(world.updates().at(-1)).toEqual({
-        where: { organizationId, provider, rawAgentId },
-        data: { ingestionSourceId: "source_new", goneAt: null },
-      });
+      await world.repository.recordAgentSighting(sighting());
+
+      expect(world.listingCreateMany).not.toHaveBeenCalled();
     });
   });
 
   describe("when a listing finishes", () => {
-    it("marks only that source's rows it did not see, at the listing's instant", async () => {
+    it("marks only that source's presence it did not see, at the listing's instant", async () => {
       const world = recordingPrisma({ createdCount: 0, existing: null });
 
       await world.repository.markUnlistedGone({
@@ -236,17 +277,50 @@ describe("PrismaDiscoveredAgentRepository source and gone marks", () => {
         listedAt: Temporal.Instant.fromEpochMilliseconds(SEPT_5.getTime()),
       });
 
-      expect(world.updates()).toEqual([
+      expect(world.listingUpdates()).toEqual([
         {
           where: {
             organizationId,
             ingestionSourceId: "source_1",
             goneAt: null,
-            lastSeenAt: { lt: SEPT_5 },
+            lastListedAt: { lt: SEPT_5 },
           },
           data: { goneAt: SEPT_5 },
         },
       ]);
+    });
+  });
+
+  describe("when the registry reads the organisation's agents", () => {
+    it("leaves out only the agents every source that listed them marked gone", async () => {
+      const row = (id: string) => ({
+        id,
+        provider,
+        rawAgentId: id,
+        displayText: id,
+        metadata: {},
+        firstSeenAt: SEPT_1,
+        lastSeenAt: SEPT_1,
+      });
+      const repository = PrismaDiscoveredAgentRepository.create(
+        prismaDouble({
+          discoveredAgent: {
+            findMany: vi.fn(async () => [row("both"), row("one_left"), row("gone"), row("old")]),
+          },
+          discoveredAgentListing: {
+            findMany: vi.fn(async () => [
+              { discoveredAgentId: "both", goneAt: null },
+              { discoveredAgentId: "one_left", goneAt: SEPT_5 },
+              { discoveredAgentId: "one_left", goneAt: null },
+              { discoveredAgentId: "gone", goneAt: SEPT_5 },
+            ]),
+          },
+        }),
+      );
+
+      const rows = await repository.findForRegistry({ organizationId });
+
+      expect(rows.map((agent) => agent.id)).toEqual(["both", "one_left", "old"]);
     });
   });
 });

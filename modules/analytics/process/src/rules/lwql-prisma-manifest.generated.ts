@@ -2629,7 +2629,15 @@ export interface LwqlPrismaRows {
     readonly metadata: "Json";
     readonly firstSeenAt: "DateTime";
     readonly lastSeenAt: "DateTime";
-    readonly ingestionSourceId: "String?";
+    readonly createdAt: "DateTime";
+    readonly updatedAt: "DateTime";
+  };
+  readonly DiscoveredAgentListing: {
+    readonly id: "String";
+    readonly organizationId: "String";
+    readonly ingestionSourceId: "String";
+    readonly discoveredAgentId: "String";
+    readonly lastListedAt: "DateTime";
     readonly goneAt: "DateTime?";
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";

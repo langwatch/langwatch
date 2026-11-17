@@ -16,7 +16,8 @@ const POSTURE_TONES: Record<AgentRegistryPosture, string> = {
 };
 
 const POSTURE_MEANINGS: Record<AgentRegistryPosture, string> = {
-  governed: "Listed by a connected source and seen in traces.",
+  governed:
+    "Listed by a connected source. Traces are checked once it is older than the dormancy window.",
   shadow: "Seen in traces, but no connected source lists it.",
   dormant: "Listed by a connected source, with no traces in the dormancy window.",
 };

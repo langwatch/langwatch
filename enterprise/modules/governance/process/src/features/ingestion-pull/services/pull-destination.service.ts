@@ -70,7 +70,7 @@ export class PullDestinationService {
         await this.validateUrl(address);
       } catch {
         refuseListingAddress(
-          "This address is not reachable from LangWatch: private, loopback and cloud metadata addresses are refused.",
+          "This address is not reachable from LangWatch: it does not resolve, or it points at a private, loopback or cloud metadata address.",
         );
       }
     }

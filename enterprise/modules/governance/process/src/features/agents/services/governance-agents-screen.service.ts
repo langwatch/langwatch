@@ -18,10 +18,11 @@ type GovernanceAgentsScreenDependencies = {
   discoveredAgents: DiscoveredAgentRepository;
   registry: Pick<AgentRegistryRepository, "findActiveWithSourceKeys">;
   logger: Logger;
+  registryPageSize: number;
 };
 
-/** The registry entries one Agents page read joins, latest change first. */
-const REGISTRY_ENTRY_LIMIT = 2000;
+/** How many registry entries one read asks for; the screen pages until it holds every one. */
+const REGISTRY_PAGE_SIZE = 500;
 
 /** Main's `governanceAgentsScreen.service.ts`: the Agents screen's read, from both origins. */
 export class GovernanceAgentsScreenService {
@@ -29,11 +30,13 @@ export class GovernanceAgentsScreenService {
 
   static create({
     logger = createLogger("langwatch:governance:agents-screen"),
+    registryPageSize = REGISTRY_PAGE_SIZE,
     ...deps
-  }: Omit<GovernanceAgentsScreenDependencies, "logger"> & {
+  }: Omit<GovernanceAgentsScreenDependencies, "logger" | "registryPageSize"> & {
     logger?: Logger;
+    registryPageSize?: number;
   }): GovernanceAgentsScreenService {
-    return new GovernanceAgentsScreenService({ ...deps, logger });
+    return new GovernanceAgentsScreenService({ ...deps, logger, registryPageSize });
   }
 
   async listAgents({
@@ -47,10 +50,7 @@ export class GovernanceAgentsScreenService {
       this.findRegistered({ organizationId }),
       this.deps.discoveredAgents.findByOrganization({ organizationId }),
       this.deps.organizations.findMembersWithDepartments({ organizationId }),
-      this.deps.registry.findActiveWithSourceKeys({
-        organizationId,
-        limit: REGISTRY_ENTRY_LIMIT,
-      }),
+      this.findActiveRegistry({ organizationId }),
     ]);
 
     const inventory = buildAgentInventory({
@@ -68,6 +68,24 @@ export class GovernanceAgentsScreenService {
       );
     }
     return inventory.rows;
+  }
+
+  /** Every active registry entry: the inventory joins each listed row and adds each traced one. */
+  private async findActiveRegistry({ organizationId }: { organizationId: string }) {
+    const limit = this.deps.registryPageSize;
+    const entries: Awaited<ReturnType<AgentRegistryRepository["findActiveWithSourceKeys"]>> = [];
+    let afterSourceKey: string | undefined;
+    let page: typeof entries;
+    do {
+      page = await this.deps.registry.findActiveWithSourceKeys({
+        organizationId,
+        limit,
+        afterSourceKey,
+      });
+      entries.push(...page);
+      afterSourceKey = page.at(-1)?.sourceKey;
+    } while (page.length === limit);
+    return entries;
   }
 
   private async findRegistered({ organizationId }: { organizationId: string }) {

@@ -61,7 +61,8 @@ export function AgentListingTest({
   const isPending = testDraft.isPending || testSaved.isPending;
 
   const run = () => {
-    if (!key) return;
+    if (!key || isPending) return;
+    setAnswered(null);
     const onSuccess = (result: TestAgentListingResult) => setAnswered({ key, result });
     if (target.kind === "saved") {
       testSaved.mutate({ organizationId, sourceId: target.sourceId }, { onSuccess });

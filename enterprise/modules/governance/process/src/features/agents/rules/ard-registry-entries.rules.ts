@@ -32,11 +32,11 @@ export type ArdListedEntry = z.infer<typeof ardListedEntrySchema>;
 
 export const ardListedManifestSchema = z.object({
   specVersion: z.string(),
-  entries: ardListedEntrySchema.array().default([]),
+  entries: ardListedEntrySchema.array(),
 });
 
 export const ardListedSearchPageSchema = z.object({
-  results: ardListedEntrySchema.array().default([]),
+  results: ardListedEntrySchema.array(),
   pageToken: z.string().optional(),
 });
 

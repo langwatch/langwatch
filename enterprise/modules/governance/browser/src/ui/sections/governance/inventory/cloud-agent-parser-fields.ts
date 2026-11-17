@@ -43,7 +43,6 @@ export const GCP_VERTEX_AGENT_ENGINE_FIELDS: FieldDef[] = [
     editHint: "A key is saved. Leave blank to keep it, or paste a new key file to replace it.",
     required: true,
     secret: true,
-    multiline: true,
   },
 ];
 

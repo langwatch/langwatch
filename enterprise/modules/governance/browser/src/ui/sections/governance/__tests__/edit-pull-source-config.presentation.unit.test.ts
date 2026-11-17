@@ -217,6 +217,15 @@ describe("parserFieldPresentation", () => {
     expect(p.placeholder).toBe("Unchanged");
   });
 
+  it("renders a secret marked multi-line as a masked single-line input", () => {
+    const p = parserFieldPresentation({
+      field: { ...secretField, multiline: true },
+      mode: "create",
+    });
+
+    expect(p).toMatchObject({ isSecret: true, isMultiline: false });
+  });
+
   it("on edit, drops the required marker from a secret", () => {
     // A field that says "leave blank to keep the current key" while still
     // carrying a required marker is a form contradicting itself.

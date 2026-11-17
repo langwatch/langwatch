@@ -7,7 +7,7 @@ import {
   type AwsConnectionView,
   awsConnectionInputSchema,
 } from "@langwatch/enterprise-governance-contract";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { api } from "../../../behavior/governance-api.ts";
 import { useGovernanceToaster, useShowErrorToast } from "../../../behavior/governance-feedback.ts";
@@ -56,6 +56,10 @@ export function useAwsConnectionForm({
   const showErrorToast = useShowErrorToast();
   const refresh = useAwsConnectionsRefresh({ organizationId });
   const create = api.governanceKillSwitch.createAwsConnection.useMutation();
+  // Held from the first click until the list refresh and onDone finish, so a second submit
+  // cannot create a second connection and cancel cannot race a pending create.
+  const inFlight = useRef(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const field = (name: keyof ConnectionFields): ConnectionFieldBinding => ({
     value: form[name],
@@ -66,11 +70,14 @@ export function useAwsConnectionForm({
   });
 
   const submit = async () => {
+    if (inFlight.current) return;
     const parsed = connectionInput({ credential, form });
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message ?? "Check the connection's fields.");
       return;
     }
+    inFlight.current = true;
+    setIsSubmitting(true);
     try {
       const created = await create.mutateAsync({ organizationId, connection: parsed.data });
       toaster.create({ title: "AWS connection added", type: "success" });
@@ -78,6 +85,9 @@ export function useAwsConnectionForm({
       onDone(created);
     } catch (failure) {
       showErrorToast({ error: failure, fallbackTitle: "Couldn't add the AWS connection" });
+    } finally {
+      inFlight.current = false;
+      setIsSubmitting(false);
     }
   };
 
@@ -86,5 +96,5 @@ export function useAwsConnectionForm({
     setError(null);
   };
 
-  return { credential, pickCredential, field, error, submit, isSaving: create.isPending };
+  return { credential, pickCredential, field, error, submit, isSaving: isSubmitting };
 }

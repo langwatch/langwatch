@@ -111,13 +111,20 @@ export class MemoryAgentRegistryRepository extends AgentRegistryRepository {
   async findActiveWithSourceKeys({
     organizationId,
     limit,
+    afterSourceKey,
   }: {
     organizationId: string;
     limit: number;
+    afterSourceKey?: string;
   }): Promise<{ sourceKey: string; entry: AgentRegistryEntry }[]> {
     return this.rows
-      .filter((row) => row.organizationId === organizationId && row.entry.status === "active")
-      .toSorted((a, b) => byPosition(b.entry, a.entry))
+      .filter(
+        (row) =>
+          row.organizationId === organizationId &&
+          row.entry.status === "active" &&
+          (afterSourceKey === undefined || row.sourceKey > afterSourceKey),
+      )
+      .toSorted((a, b) => Number(a.sourceKey > b.sourceKey) - Number(a.sourceKey < b.sourceKey))
       .slice(0, limit)
       .map((row) => ({ sourceKey: row.sourceKey, entry: structuredClone(row.entry) }));
   }

@@ -36,9 +36,11 @@ const connectedAgent: Agent = {
 async function setup({
   projectIds,
   registry = MemoryAgentRegistryRepository.create(),
+  registryPageSize,
 }: {
   projectIds: string[];
   registry?: MemoryAgentRegistryRepository;
+  registryPageSize?: number;
 }) {
   const asked: { projectIds: string[] }[] = [];
   const discoveredAgents = MemoryDiscoveredAgentRepository.create(
@@ -76,6 +78,7 @@ async function setup({
     discoveredAgents,
     registry,
     logger,
+    registryPageSize,
   });
   return { service, asked, discoveredAgents };
 }
@@ -188,6 +191,35 @@ describe("GovernanceAgentsScreenService", () => {
       ]);
       expect(rows[1]).toMatchObject({ models: ["anthropic.claude-sonnet-5"] });
       expect(rows[2]).toMatchObject({ models: ["gpt-5"], lastActiveMinutesAgo: 0 });
+    });
+  });
+
+  describe("given more active registry entries than one registry page holds", () => {
+    it("reads every page, so no traced agent drops off the list", async () => {
+      const registry = MemoryAgentRegistryRepository.create();
+      const { service } = await setup({ projectIds: [], registry, registryPageSize: 2 });
+      await holdInRegistry(
+        registry,
+        ["a", "b", "c", "d", "e"].map((name) =>
+          registryDraft({
+            sourceKey: `traffic:project-1:${name}`,
+            source: "traffic",
+            management: "observed",
+            name,
+            shadow: true,
+          }),
+        ),
+      );
+
+      const rows = await service.listAgents({ organizationId: ORGANIZATION_ID, now: NOW });
+
+      expect(rows.filter((row) => row.source === "traffic").map((row) => row.name)).toEqual([
+        "a",
+        "b",
+        "c",
+        "d",
+        "e",
+      ]);
     });
   });
 });

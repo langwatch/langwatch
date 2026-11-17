@@ -149,6 +149,13 @@ Feature: Cloud agent discovery with shadow and dormant agents
     Then "B" is active and its registry entry is versioned back to active
 
   @unit
+  Scenario: An agent another source still lists stays when one source stops listing it
+    Given two sources that both listed agent "A"
+    When the first source's next listing names no agents
+    Then "A" stays active because the second source still lists it
+    And "A" is marked gone only once the second source stops listing it too
+
+  @unit
   Scenario: A refused listing marks nothing gone
     Given an AWS source that listed agents "A" and "B"
     When the next listing is refused

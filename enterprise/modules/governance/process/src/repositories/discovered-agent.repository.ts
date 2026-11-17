@@ -19,15 +19,15 @@ export interface DiscoveredAgentRegistryRow extends DiscoveredAgentRow {
 
 /** Provider-side agents a source listed; no kind, no match, no erasure state — not a person. */
 export abstract class DiscoveredAgentRepository {
-  /** The agents screen's read, newest-seen first; agents marked gone are left out. */
+  /** The agents screen's read, newest-seen first; agents gone from every source are left out. */
   abstract findByOrganization(input: { organizationId: string }): Promise<DiscoveredAgentRow[]>;
-  /** The agent registry's read: every row not marked gone, with its provider id and metadata. */
+  /** The agent registry's read: every agent a source still lists or no source ever listed. */
   abstract findForRegistry(input: {
     organizationId: string;
   }): Promise<DiscoveredAgentRegistryRow[]>;
   /**
-   * A listing is a presence fact: widens both dates; merges text and metadata, never blanks. It
-   * names the source that listed the agent and clears a gone mark.
+   * A listing is a presence fact: widens both dates; merges text and metadata, never blanks. With
+   * a source, it records that source's presence and clears that source's gone mark.
    */
   abstract recordAgentSighting(input: {
     organizationId: string;
@@ -38,7 +38,10 @@ export abstract class DiscoveredAgentRepository {
     seenAt: Instant;
     ingestionSourceId?: string;
   }): Promise<void>;
-  /** The source's agents its listing at `listedAt` did not name are marked gone at that instant. */
+  /**
+   * The source's presence for agents its listing at `listedAt` did not name is marked gone at that
+   * instant; an agent leaves the reads only once every source that listed it marked it gone.
+   */
   abstract markUnlistedGone(input: {
     organizationId: string;
     ingestionSourceId: string;

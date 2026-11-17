@@ -10,6 +10,7 @@ import {
 } from "@aws-sdk/client-bedrock-agent";
 import {
   BedrockAgentCoreControlClient,
+  GetAgentRuntimeCommand,
   ListAgentRuntimesCommand,
   ListTagsForResourceCommand as ListAgentCoreTagsCommand,
 } from "@aws-sdk/client-bedrock-agentcore-control";
@@ -37,6 +38,11 @@ const PAGE_SIZE = 100;
 
 class TooManyPagesError extends Error {
   override readonly name = "TooManyPagesError";
+}
+
+/** A 2xx answer missing a field the listing keys on: the listing refuses, nothing is marked gone. */
+class MalformedAwsAnswerError extends Error {
+  override readonly name = "MalformedAwsAnswerError";
 }
 
 /** Follows `nextToken` until the provider stops answering one, up to the page bound. */
@@ -102,6 +108,9 @@ export class HttpAwsAgentInventoryChannel implements AwsAgentInventoryChannel {
       if (error instanceof TooManyPagesError) {
         return agentsRefused({ reason: "too_many_pages", status: null });
       }
+      if (error instanceof MalformedAwsAnswerError) {
+        return agentsRefused({ reason: "malformed_response", status: null });
+      }
       return agentsRefused(refusalFromAwsError(error));
     }
   }
@@ -160,7 +169,7 @@ export class HttpAwsAgentInventoryChannel implements AwsAgentInventoryChannel {
     try {
       const { agent } = await client.send(new GetAgentCommand({ agentId }), options);
       const agentArn = agent?.agentArn;
-      if (!agentArn) return [];
+      if (!agentArn) throw new MalformedAwsAnswerError("GetAgent answered without an agentArn");
       const aliases = await allPages(async (nextToken) => {
         const page = await client.send(
           new ListAgentAliasesCommand({ agentId, maxResults: PAGE_SIZE, nextToken }),
@@ -228,6 +237,12 @@ export class HttpAwsAgentInventoryChannel implements AwsAgentInventoryChannel {
             new ListAgentCoreTagsCommand({ resourceArn: agentRuntimeArn }),
             options,
           );
+          const { createdAt } = runtime.agentRuntimeId
+            ? await client.send(
+                new GetAgentRuntimeCommand({ agentRuntimeId: runtime.agentRuntimeId }),
+                options,
+              )
+            : { createdAt: undefined };
           sightings.push(
             agentCoreRuntimeAsSighting({
               region,
@@ -235,6 +250,7 @@ export class HttpAwsAgentInventoryChannel implements AwsAgentInventoryChannel {
               agentRuntimeId: runtime.agentRuntimeId,
               agentRuntimeName: runtime.agentRuntimeName,
               status: runtime.status,
+              createdAt: createdAt?.toISOString(),
               lastUpdatedAt: runtime.lastUpdatedAt?.toISOString(),
               tags: tags ?? {},
             }),

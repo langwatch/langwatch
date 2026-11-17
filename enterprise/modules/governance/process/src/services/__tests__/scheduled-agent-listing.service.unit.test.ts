@@ -1,5 +1,6 @@
 import {
   type GovernanceIngestionSource,
+  PULL_FAILED_ERROR_CODE,
   PULL_REFUSED_ERROR_CODE,
 } from "@langwatch/enterprise-governance-contract";
 import { createTestLogger } from "@langwatch/test-harness";
@@ -82,16 +83,18 @@ function source({
 function scheduledWorld({
   sourceType = "aws_bedrock_agents",
   agents = async () => ({ outcome: "listed", recorded: 2 }),
+  findSource = async (id: string) => source({ id, sourceType }),
 }: {
   sourceType?: GovernanceIngestionSource["sourceType"];
   agents?: () => Promise<AgentSyncResult>;
+  findSource?: (id: string) => Promise<GovernanceIngestionSource>;
 } = {}) {
   const listingOutcomes = new RecordingListingOutcomes();
   const runOutcome = new RecordingRunOutcome();
   const pulls: string[] = [];
   const { logger } = createTestLogger();
   const listing = IngestionPullListingService.create({
-    sources: { findById: async (id: string) => source({ id, sourceType }) },
+    sources: { findById: findSource },
     agents: { syncFromSource: agents },
     people: { syncFromSource: () => Promise.reject(new Error("uncalled")) },
     outcomes: listingOutcomes,
@@ -108,12 +111,12 @@ function scheduledWorld({
     outcomePort: runOutcome,
     metrics: new NoMetrics(),
     scheduledListing: listing,
-    options: { clock: () => 9_000, logger },
+    options: { clock: () => 9_000, logger, maxAttempts: 3 },
   });
-  const wake = () =>
+  const wake = ({ attempt = 1 }: { attempt?: number } = {}) =>
     service.execute({
       tenantId: "project-1",
-      attempt: 1,
+      attempt,
       pull: { sourceId: "source-1", runId: "run-7", scheduledFor: 5_000, cursor: "cursor-1" },
     });
   return { wake, listingOutcomes, runOutcome, pulls };
@@ -166,6 +169,30 @@ describe("given an AWS source on an hourly schedule", () => {
         { runId: "run-7", errorCode: PULL_REFUSED_ERROR_CODE, retryable: false },
       ]);
     });
+  });
+});
+
+describe("given the source lookup fails while a list-only run wakes", () => {
+  const failingLookup = () => Promise.reject(new Error("database unavailable"));
+
+  it("throws on an early attempt so the run is retried", async () => {
+    const world = scheduledWorld({ findSource: failingLookup });
+
+    await expect(world.wake({ attempt: 1 })).rejects.toThrow("database unavailable");
+
+    expect(world.runOutcome.failedCalls).toEqual([]);
+    expect(world.pulls).toEqual([]);
+  });
+
+  it("settles the run as failed on the final attempt", async () => {
+    const world = scheduledWorld({ findSource: failingLookup });
+
+    await world.wake({ attempt: 3 });
+
+    expect(world.runOutcome.failedCalls).toMatchObject([
+      { runId: "run-7", errorCode: PULL_FAILED_ERROR_CODE, retryable: false },
+    ]);
+    expect(world.pulls).toEqual([]);
   });
 });
 

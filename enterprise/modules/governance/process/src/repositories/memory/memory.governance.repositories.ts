@@ -6,7 +6,6 @@ import type { GovernanceRepositories } from "../governance.repositories.ts";
 import { SuppressionSnapshotRepository } from "../suppression-snapshot.repository.ts";
 import { MemoryActivityMonitorRepository } from "./memory.activity-monitor.repository.ts";
 import { MemoryAgentRegistrySettingsRepository } from "./memory.agent-registry-settings.repository.ts";
-import { MemoryGovernanceAwsConnectionRepository } from "./memory.governance-aws-connection.repository.ts";
 import { MemoryAgentRegistryRepository } from "./memory.agent-registry.repository.ts";
 import { MemoryAggregateReconcileLockRepository } from "./memory.aggregate-reconcile-lock.repository.ts";
 import { MemoryAiToolCatalogRepository } from "./memory.ai-tool-catalog.repository.ts";
@@ -18,6 +17,7 @@ import { MemoryDiscoveredAgentRepository } from "./memory.discovered-agent.repos
 import { MemoryDiscoveredPeopleStore } from "./memory.discovered-people.store.ts";
 import { MemoryDiscoveredPersonRepository } from "./memory.discovered-person.repository.ts";
 import { MemoryErasedIdentifierSuppressionRepository } from "./memory.erased-identifier-suppression.repository.ts";
+import { MemoryGovernanceAwsConnectionRepository } from "./memory.governance-aws-connection.repository.ts";
 import { MemoryGovernanceCostChargeRepository } from "./memory.governance-cost-charge.repository.ts";
 import { MemoryGovernanceCostRollupRepository } from "./memory.governance-cost-rollup.repository.ts";
 import { MemoryGovernanceRateLimitRepository } from "./memory.governance-rate-limit.repository.ts";

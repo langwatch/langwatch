@@ -67,7 +67,17 @@ export function AwsConnectionForm({
   const form = useAwsConnectionForm({ organizationId, onDone });
 
   return (
-    <VStack align="stretch" gap={3} data-testid="aws-connection-form">
+    <VStack
+      align="stretch"
+      gap={3}
+      data-testid="aws-connection-form"
+      // It sits inside the source form, where a nested <form> is invalid: Enter submits here.
+      onKeyDown={(event) => {
+        if (event.key !== "Enter" || !(event.target instanceof HTMLInputElement)) return;
+        event.preventDefault();
+        void form.submit();
+      }}
+    >
       <Field.Root required>
         <Field.Label>Name</Field.Label>
         <Input aria-label="Connection name" {...form.field("name")} />
@@ -89,10 +99,17 @@ export function AwsConnectionForm({
         </Text>
       ) : null}
       <HStack justify="end" gap={2}>
-        <Button size="sm" variant="ghost" onClick={() => onDone()}>
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          disabled={form.isSaving}
+          onClick={() => onDone()}
+        >
           Cancel
         </Button>
         <Button
+          type="button"
           size="sm"
           variant="outline"
           loading={form.isSaving}

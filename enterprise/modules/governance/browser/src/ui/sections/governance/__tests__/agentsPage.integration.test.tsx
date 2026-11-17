@@ -850,4 +850,16 @@ describe("given agents that run without being registered", () => {
     expect(rowNames().toSorted(byName)).toEqual(["pricing-bot", "rogue-7"]);
     expect(screen.queryByTestId("shadow-agents-alert")).toBeNull();
   });
+
+  it("drops a source filter that would hide them when narrowing to shadow agents", async () => {
+    renderPage({ at: "/governance/agents?source=custom" });
+
+    const alert = screen.getByTestId("shadow-agents-alert");
+    await userEvent.click(within(alert).getByRole("button", { name: "Show shadow agents" }));
+
+    const written = new URLSearchParams(screen.getByTestId("address").textContent ?? "");
+    expect(written.get("source")).toBeNull();
+    expect(written.get("posture")).toBe("shadow");
+    expect(rowNames().toSorted(byName)).toEqual(["pricing-bot", "rogue-7"]);
+  });
 });

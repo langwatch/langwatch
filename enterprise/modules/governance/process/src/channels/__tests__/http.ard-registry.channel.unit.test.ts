@@ -150,6 +150,34 @@ describe("the ARD registry listing", () => {
     });
   });
 
+  it("refuses a manifest that omits its entries as malformed, so nothing is marked gone", async () => {
+    const { entries: _omitted, ...withoutEntries } = manifest([]);
+    const http = new ScriptedRegistry(() => ({ status: 200, body: withoutEntries }));
+    const listing = await HttpArdRegistryChannel.create({ http }).listAgents({
+      registryUrl: "registry.acme.test",
+    });
+    expect(listing).toEqual({
+      outcome: "refused",
+      refusal: { reason: "malformed_response", status: null },
+    });
+  });
+
+  it("refuses a search page that omits its results as malformed", async () => {
+    const http = new ScriptedRegistry((call) =>
+      call.method === "GET"
+        ? { status: 200, body: manifest([entry("triage")]) }
+        : { status: 200, body: {} },
+    );
+    const listing = await HttpArdRegistryChannel.create({ http }).listAgents({
+      registryUrl: "registry.acme.test",
+      searchUrl: "https://registry.acme.test/ard/search",
+    });
+    expect(listing).toEqual({
+      outcome: "refused",
+      refusal: { reason: "malformed_response", status: null },
+    });
+  });
+
   it("reads a registry status as the refusal it maps to", async () => {
     const http = new ScriptedRegistry(() => ({ status: 401, body: {} }));
     const listing = await HttpArdRegistryChannel.create({ http }).listAgents({

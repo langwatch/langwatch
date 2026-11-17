@@ -445,7 +445,7 @@ function AgentsPage() {
     canManage,
   });
   const { sample, rows, isLoading, error, retry } = useAgentsScreen();
-  const { filters, setFilter, clearFilters } = useAgentFilters();
+  const { filters, setFilter, clearFilters, showOnlyPosture } = useAgentFilters();
   // Gated on the unfiltered set, never the visible one: a reader who filters
   // down to nothing must still have the chip that gets them back. The layout
   // switch takes the same gate, because there is nothing to lay out either
@@ -529,7 +529,7 @@ function AgentsPage() {
             keys page pairs its scope filter with its create action above a
             table for the same reason. */}
           {shadowCount > 0 && filters.posture !== "shadow" && (
-            <ShadowAgentsAlert count={shadowCount} onShow={() => setFilter("posture", "shadow")} />
+            <ShadowAgentsAlert count={shadowCount} onShow={() => showOnlyPosture("shadow")} />
           )}
           {showControls && (
             <AgentFilterBar

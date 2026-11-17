@@ -4,8 +4,8 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { Encryption } from "@langwatch/process-stores";
 
 import type { GovernanceRepositories } from "../governance.repositories.ts";
-import { PrismaAgentRegistryRepository } from "./prisma.agent-registry.repository.ts";
 import { PrismaAgentRegistrySettingsRepository } from "./prisma.agent-registry-settings.repository.ts";
+import { PrismaAgentRegistryRepository } from "./prisma.agent-registry.repository.ts";
 import { PrismaAggregateReconcileLockRepository } from "./prisma.aggregate-reconcile-lock.repository.ts";
 import { PrismaAiToolCatalogRepository } from "./prisma.ai-tool-catalog.repository.ts";
 import { PrismaAnomalyRuleRepository } from "./prisma.anomaly-rule.repository.ts";

@@ -111,11 +111,11 @@ Each agent in the inventory has one posture:
 
 | Posture | Meaning |
 |---|---|
-| `governed` | A source lists the agent and its traces show recent traffic |
-| `shadow` | Traces show the agent, but no source lists it |
+| `governed` | A source lists the agent, and it is either younger than the dormancy window or its traces show traffic within it |
+| `shadow` | Traces from the last 30 days show the agent, but no source lists it |
 | `dormant` | A source lists the agent, but no trace has named it within the dormancy window |
 
-The dormancy window is 30 days by default. An organisation admin can set it from 1 to 365 days in the agent registry settings. An agent younger than the window is never dormant, and a dormant agent that sends traffic again is governed.
+The dormancy window is 30 days by default. An organisation admin can set it from 1 to 365 days in the agent registry settings. An agent younger than the window is never dormant, and a dormant agent that sends traffic again is governed. Shadow detection always reads the last 30 days of traces: a longer dormancy window does not extend it.
 
 Filter the Agents page by posture and by source to find the shadow and dormant agents. The REST list at `GET /api/governance/registry/agents` takes the same `posture` filter.
 
@@ -125,12 +125,12 @@ A traced agent matches a listed one when its `gen_ai.agent.id` equals one of the
 
 | Platform | Registry id | Ids a trace's `gen_ai.agent.id` may carry |
 |---|---|---|
-| Bedrock Agents | Agent ARN | Agent id, any alias id, any alias ARN, the agent ARN |
+| Bedrock Agents | Agent ARN | Agent id, any alias id except the shared test alias `TSTALIASID`, any alias ARN, the agent ARN |
 | Bedrock AgentCore | Runtime ARN | Runtime id, the runtime ARN |
 | Vertex AI Agent Engine | Resource name | The full resource name, or the trailing engine id such as `42` |
 | ARD registry | `urn:air:` identifier | The `urn:air:` identifier |
 
-A traced agent also matches when its `gen_ai.agent.name` equals the listed agent's name, ignoring case.
+A traced agent also matches when its `gen_ai.agent.name` equals the listed agent's name, ignoring case. A traced agent that only shares its name with a listed one therefore counts as that listed agent and is not flagged as shadow, even when their ids differ. Send `gen_ai.agent.id` on your traces to keep the two apart.
 
 ## Alerts
 

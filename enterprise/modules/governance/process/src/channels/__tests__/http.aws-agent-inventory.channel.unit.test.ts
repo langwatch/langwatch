@@ -6,174 +6,24 @@
  * Spec: enterprise/modules/governance/specs/cloud-agent-discovery.feature
  */
 
-import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
-import type { AddressInfo } from "node:net";
+import type { Server } from "node:http";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import type { GovernanceAwsCredentials } from "../../repositories/governance-aws-connection.repository.ts";
 import { HttpAwsAgentInventoryChannel } from "../http/http.aws-agent-inventory.channel.ts";
-
-const ACCOUNT = "111122223333";
-const KEY_PAIR: GovernanceAwsCredentials = {
-  accessKeyId: "AKIAEXAMPLE",
-  secretAccessKey: "example-secret",
-  roleArn: null,
-  externalId: null,
-};
-
-interface Call {
-  method: string;
-  path: string;
-  region: string;
-  service: string;
-  body: Record<string, unknown>;
-  query: URLSearchParams;
-}
-
-type Answer = { status: number; body: unknown; errorType?: string };
-type Route = (call: Call) => Answer | undefined;
-
-const agentArn = (region: string, id: string) => `arn:aws:bedrock:${region}:${ACCOUNT}:agent/${id}`;
-const runtimeArn = (region: string, id: string) =>
-  `arn:aws:bedrock-agentcore:${region}:${ACCOUNT}:runtime/${id}`;
-const ok = (body: unknown): Answer => ({ status: 200, body });
-
-/** Empty Bedrock and AgentCore answers for anything a test does not route itself. */
-const emptyAccount: Route = (call) => {
-  if (call.method === "POST" && call.path === "/agents/") return ok({ agentSummaries: [] });
-  if (call.method === "POST" && call.path === "/runtimes/") return ok({ agentRuntimes: [] });
-  if (call.method === "POST" && call.path.endsWith("/agentaliases/")) {
-    return ok({ agentAliasSummaries: [] });
-  }
-  if (call.method === "GET" && call.path.startsWith("/tags/")) return ok({ tags: {} });
-  return undefined;
-};
-
-function bedrockAgent({
-  region,
-  agentId,
-  agentName,
-  foundationModel = "anthropic.claude-sonnet-5",
-}: {
-  region: string;
-  agentId: string;
-  agentName: string;
-  foundationModel?: string;
-}): Route {
-  return (call) => {
-    if (call.region !== region) return undefined;
-    if (call.method === "GET" && call.path === `/agents/${agentId}/`) {
-      return ok({
-        agent: {
-          agentId,
-          agentName,
-          agentArn: agentArn(region, agentId),
-          agentVersion: "DRAFT",
-          agentStatus: "PREPARED",
-          foundationModel,
-          agentResourceRoleArn: `arn:aws:iam::${ACCOUNT}:role/agent`,
-          idleSessionTTLInSeconds: 600,
-          createdAt: "2026-07-01T10:00:00.000Z",
-          updatedAt: "2026-11-01T10:00:00.000Z",
-        },
-      });
-    }
-    return undefined;
-  };
-}
-
-function agentSummary(agentId: string, agentName: string) {
-  return {
-    agentId,
-    agentName,
-    agentStatus: "PREPARED",
-    updatedAt: "2026-11-01T10:00:00.000Z",
-  };
-}
-
-function runtimeSummary(region: string, id: string) {
-  return {
-    agentRuntimeArn: runtimeArn(region, id),
-    agentRuntimeId: id,
-    agentRuntimeName: id.split("-")[0],
-    agentRuntimeVersion: "1",
-    description: "ACME support",
-    lastUpdatedAt: "2026-11-02T10:00:00.000Z",
-    status: "READY",
-  };
-}
-
-function callOf(req: IncomingMessage, raw: string): Call {
-  const url = new URL(req.url ?? "/", "http://listener");
-  const scope = /Credential=[^/]+\/\d+\/([^/]+)\/([^/]+)\//.exec(req.headers.authorization ?? "");
-  return {
-    method: req.method ?? "GET",
-    path: decodeURIComponent(url.pathname),
-    region: scope?.[1] ?? "",
-    service: scope?.[2] ?? "",
-    body: raw ? (JSON.parse(raw) as Record<string, unknown>) : {},
-    query: url.searchParams,
-  };
-}
-
-const NO_ROUTE: Answer = {
-  status: 404,
-  body: { message: "no route" },
-  errorType: "ResourceNotFoundException",
-};
-
-function answerFor({ routes, call }: { routes: Route[]; call: Call }): Answer {
-  for (const route of [...routes, emptyAccount]) {
-    const reply = route(call);
-    if (reply) return reply;
-  }
-  return NO_ROUTE;
-}
-
-function reply(res: ServerResponse, answer: Answer) {
-  res.writeHead(answer.status, {
-    "content-type": "application/json",
-    ...(answer.errorType ? { "x-amzn-errortype": answer.errorType } : {}),
-  });
-  res.end(JSON.stringify(answer.body));
-}
-
-/** A listener answering each call from the first route that knows it, recording every call. */
-async function startListener(): Promise<{
-  server: Server;
-  endpoint: string;
-  routes: Route[];
-  calls: Call[];
-}> {
-  const routes: Route[] = [];
-  const calls: Call[] = [];
-  const server = createServer((req, res) => {
-    let raw = "";
-    req.on("data", (chunk: Buffer) => (raw += chunk.toString()));
-    req.on("end", () => {
-      const call = callOf(req, raw);
-      calls.push(call);
-      reply(res, answerFor({ routes, call }));
-    });
-  });
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
-  const endpoint = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
-  return { server, endpoint, routes, calls };
-}
-
-/** A route answering one method and path, optionally only for one region or signing service. */
-function on(
-  match: { method: string; path: string; region?: string; service?: string },
-  answer: Answer | ((call: Call) => Answer),
-): Route {
-  return (call) => {
-    if (call.method !== match.method || call.path !== match.path) return undefined;
-    if (match.region && call.region !== match.region) return undefined;
-    if (match.service && call.service !== match.service) return undefined;
-    return typeof answer === "function" ? answer(call) : answer;
-  };
-}
+import {
+  agentArn,
+  agentSummary,
+  bedrockAgent,
+  type Call,
+  KEY_PAIR,
+  ok,
+  on,
+  type Route,
+  runtimeArn,
+  runtimeSummary,
+  startListener,
+} from "./aws-agent-listener.fixtures.ts";
 
 describe("HttpAwsAgentInventoryChannel", () => {
   let server: Server;
@@ -253,6 +103,55 @@ describe("HttpAwsAgentInventoryChannel", () => {
     ]);
   });
 
+  it("keeps the shared test alias id out of the bare match ids, keeping its agent-scoped ARN", async () => {
+    const region = "eu-west-1";
+    routes.push(
+      on(
+        { method: "POST", path: "/agents/" },
+        ok({ agentSummaries: [agentSummary("AGENT12345", "refund-bot")] }),
+      ),
+      bedrockAgent({ region, agentId: "AGENT12345", agentName: "refund-bot" }),
+      on(
+        { method: "POST", path: "/agents/AGENT12345/agentaliases/" },
+        ok({
+          agentAliasSummaries: [
+            { agentAliasId: "TSTALIASID", agentAliasName: "AgentTestAlias" },
+            { agentAliasId: "PRODALIAS1", agentAliasName: "prod" },
+          ],
+        }),
+      ),
+    );
+
+    const listing = await channel.listAgents({ credentials: KEY_PAIR, regions: [region] });
+
+    expect(listing.outcome).toBe("listed");
+    if (listing.outcome !== "listed") return;
+    expect(JSON.parse(listing.items[0]?.metadata.matchIds ?? "[]")).toEqual([
+      "AGENT12345",
+      "PRODALIAS1",
+      "arn:aws:bedrock:eu-west-1:111122223333:agent-alias/AGENT12345/TSTALIASID",
+      "arn:aws:bedrock:eu-west-1:111122223333:agent-alias/AGENT12345/PRODALIAS1",
+      agentArn(region, "AGENT12345"),
+    ]);
+  });
+
+  it("refuses as malformed when GetAgent answers without an agent ARN, so nothing is marked gone", async () => {
+    routes.push(
+      on(
+        { method: "POST", path: "/agents/" },
+        ok({ agentSummaries: [agentSummary("AGENT12345", "refund-bot")] }),
+      ),
+      on({ method: "GET", path: "/agents/AGENT12345/" }, ok({ agent: { agentId: "AGENT12345" } })),
+    );
+
+    const listing = await channel.listAgents({ credentials: KEY_PAIR, regions: ["eu-west-1"] });
+
+    expect(listing).toEqual({
+      outcome: "refused",
+      refusal: { reason: "malformed_response", status: null },
+    });
+  });
+
   /** @scenario "A Bedrock AgentCore runtime becomes a sighting keyed by its ARN" */
   it("lists an AgentCore runtime as a sighting keyed by its runtime ARN", async () => {
     const region = "us-east-1";
@@ -279,6 +178,7 @@ describe("HttpAwsAgentInventoryChannel", () => {
       owner: "support",
       region,
       status: "READY",
+      createdAt: "2026-06-01T10:00:00.000Z",
       updatedAt: "2026-11-02T10:00:00.000Z",
     });
     expect(JSON.parse(listing.items[0]?.metadata.matchIds ?? "[]")).toEqual([

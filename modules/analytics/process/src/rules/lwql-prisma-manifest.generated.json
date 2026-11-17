@@ -27268,13 +27268,77 @@
           "documentation": ""
         },
         {
+          "name": "createdAt",
+          "columnName": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "updatedAt",
+          "columnName": "updatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "DiscoveredAgentListing",
+      "tableName": "DiscoveredAgentListing",
+      "documentation": "One source's presence fact for one discovered agent. An agent is gone only when every\nsource that listed it marked it gone; an agent no source listed (older sightings) never is.",
+      "primaryKey": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "columnName": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
           "name": "ingestionSourceId",
           "columnName": "ingestionSourceId",
           "type": "String",
           "kind": "scalar",
           "isList": false,
-          "isOptional": true,
-          "documentation": "The governance source whose listing last named this agent; null for older sightings."
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "discoveredAgentId",
+          "columnName": "discoveredAgentId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "lastListedAt",
+          "columnName": "lastListedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
         },
         {
           "name": "goneAt",
@@ -27283,7 +27347,7 @@
           "kind": "scalar",
           "isList": false,
           "isOptional": true,
-          "documentation": "Set when that source's listing stopped naming the agent; cleared when a listing names it again."
+          "documentation": "Set when this source's listing stopped naming the agent; cleared when it names it again."
         },
         {
           "name": "createdAt",

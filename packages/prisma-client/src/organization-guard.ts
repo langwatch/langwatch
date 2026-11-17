@@ -259,6 +259,7 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   // cost row, and there is no query shape that wants more than one tenant's.
   DiscoveredPerson: {},
   DiscoveredAgent: {},
+  DiscoveredAgentListing: {},
   // The governance agent registry and its feed: every read and write names one organization.
   AgentRegistryEntry: {},
   AgentRegistryEvent: {},

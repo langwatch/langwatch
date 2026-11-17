@@ -34,6 +34,8 @@ export interface AgentCoreRuntimeFacts {
   agentRuntimeId?: string | undefined;
   agentRuntimeName?: string | undefined;
   status?: string | undefined;
+  /** ISO text off the wire, from GetAgentRuntime: the listing summary carries none. */
+  createdAt?: string | undefined;
   lastUpdatedAt?: string | undefined;
   tags: Record<string, string>;
 }
@@ -64,13 +66,17 @@ export function bedrockAgentConsoleUrl({
   return `https://${region}.console.aws.amazon.com/bedrock/home?region=${region}#/agents/${agentId}`;
 }
 
+/** Every Bedrock agent's test alias carries this id, so the bare id names no single agent. */
+const BEDROCK_TEST_ALIAS_ID = "TSTALIASID";
+
 export function bedrockAgentAsSighting(agent: BedrockAgentFacts): DiscoveredAgentRecord {
   const aliasArns = bedrockAliasArns({
     agentArn: agent.agentArn,
     agentId: agent.agentId,
     aliasIds: agent.aliasIds,
   });
-  const matchIds = [...new Set([agent.agentId, ...agent.aliasIds, ...aliasArns, agent.agentArn])];
+  const scopedAliasIds = agent.aliasIds.filter((aliasId) => aliasId !== BEDROCK_TEST_ALIAS_ID);
+  const matchIds = [...new Set([agent.agentId, ...scopedAliasIds, ...aliasArns, agent.agentArn])];
   return {
     rawAgentId: agent.agentArn,
     displayText: agent.agentName || agent.agentId,
@@ -105,6 +111,7 @@ export function agentCoreRuntimeAsSighting(runtime: AgentCoreRuntimeFacts): Disc
       owner: ownerLabelOf({ labels: runtime.tags }),
       tags: JSON.stringify(runtime.tags),
       region: runtime.region,
+      createdAt: runtime.createdAt,
       updatedAt: runtime.lastUpdatedAt,
       status: runtime.status,
       matchIds: JSON.stringify(matchIds),

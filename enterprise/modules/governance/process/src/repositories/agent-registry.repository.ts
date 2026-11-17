@@ -37,10 +37,14 @@ export abstract class AgentRegistryRepository {
     status?: AgentRegistryStatus;
     limit: number;
   }): Promise<AgentRegistryEntry[]>;
-  /** At most `limit` active entries with the source key that ties each to its origin's row. */
+  /**
+   * One page of active entries with the source key that ties each to its origin's row, in source
+   * key order after `afterSourceKey`; a page shorter than `limit` is the last.
+   */
   abstract findActiveWithSourceKeys(input: {
     organizationId: string;
     limit: number;
+    afterSourceKey?: string;
   }): Promise<{ sourceKey: string; entry: AgentRegistryEntry }[]>;
   abstract listEntries(input: {
     organizationId: string;

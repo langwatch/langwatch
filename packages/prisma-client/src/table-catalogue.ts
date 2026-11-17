@@ -193,6 +193,7 @@ export const prismaTableCatalogue = {
   "StoredObject": "StoredObject",
   "DiscoveredPerson": "DiscoveredPerson",
   "DiscoveredAgent": "DiscoveredAgent",
+  "DiscoveredAgentListing": "DiscoveredAgentListing",
   "AgentRegistryEntry": "AgentRegistryEntry",
   "AgentRegistryEvent": "AgentRegistryEvent",
   "AgentRegistryBaseline": "AgentRegistryBaseline",
@@ -3163,7 +3164,15 @@ export const prismaModelFieldCatalogue = {
     "metadata",
     "firstSeenAt",
     "lastSeenAt",
+    "createdAt",
+    "updatedAt"
+  ],
+  "DiscoveredAgentListing": [
+    "id",
+    "organizationId",
     "ingestionSourceId",
+    "discoveredAgentId",
+    "lastListedAt",
     "goneAt",
     "createdAt",
     "updatedAt"
@@ -3982,6 +3991,7 @@ export const prismaRelationCatalogue = {
   "StoredObject": {},
   "DiscoveredPerson": {},
   "DiscoveredAgent": {},
+  "DiscoveredAgentListing": {},
   "AgentRegistryEntry": {},
   "AgentRegistryEvent": {},
   "AgentRegistryBaseline": {},

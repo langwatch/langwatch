@@ -7359,16 +7359,28 @@ model DiscoveredAgent {
   metadata          Json
   firstSeenAt       DateTime
   lastSeenAt        DateTime
-  /// The governance source whose listing last named this agent; null for older sightings.
-  ingestionSourceId String?
-  /// Set when that source's listing stopped naming the agent; cleared when a listing names it again.
-  goneAt            DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @default(now()) @updatedAt
 
   @@unique([organizationId, provider, rawAgentId])
   @@index([organizationId, lastSeenAt])
-  @@index([organizationId, ingestionSourceId])
+}
+
+/// One source's presence fact for one discovered agent. An agent is gone only when every
+/// source that listed it marked it gone; an agent no source listed (older sightings) never is.
+model DiscoveredAgentListing {
+  id                String    @id @default(nanoid())
+  organizationId    String
+  ingestionSourceId String
+  discoveredAgentId String
+  lastListedAt      DateTime
+  /// Set when this source's listing stopped naming the agent; cleared when it names it again.
+  goneAt            DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @default(now()) @updatedAt
+
+  @@unique([ingestionSourceId, discoveredAgentId])
+  @@index([organizationId, discoveredAgentId])
 }
 
 /// One agent in the organisation's governance registry, from any source governance reads
