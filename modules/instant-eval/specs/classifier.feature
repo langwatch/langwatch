@@ -162,7 +162,7 @@ Feature: The Instant Evals classifier interface — one judged question, priced 
     Then five attempts are made
     And the row is skipped with the rate-limited reason
 
-  @unit
+  @unit @regression
   Scenario: A classifier failing on every send stops being sent to until a probe is answered
     Given a classifier answering 500 to every send
     When sixteen sends in a row have failed
@@ -182,6 +182,13 @@ Feature: The Instant Evals classifier interface — one judged question, priced 
     When ten seconds have passed and the one probe sent is refused as too large
     Then the cut text is sent and its verdict comes back
     And the next text is sent and its verdict comes back
+
+  @unit
+  Scenario: A cancelled probe does not stop the next one
+    Given a classifier that has stopped being sent to after sixteen failed sends
+    When the one probe sent is cancelled before it is answered
+    Then another probe is sent once ten more seconds have passed
+    And a send that began before the probe never frees it early
 
   @unit
   Scenario: Rate limits and permanent refusals never stop sends

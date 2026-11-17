@@ -23,53 +23,69 @@ export interface ClassifierBreakerState {
   readonly consecutiveFailures: number;
   /** When it stopped sending, or last let a probe through; null while closed. */
   readonly openedAt: number | null;
-  readonly isProbeInFlight: boolean;
+  /** The number of the probe still unanswered, if any. */
+  readonly probeInFlight: number | null;
+  /** Probes let through so far; numbers each probe, so only its own send frees it. */
+  readonly probesSent: number;
 }
 
 export const CLOSED_CLASSIFIER_BREAKER: ClassifierBreakerState = {
   consecutiveFailures: 0,
   openedAt: null,
-  isProbeInFlight: false,
+  probeInFlight: null,
+  probesSent: 0,
 };
 
-/** Whether this send may go out, and the state once it does. */
+/** Whether this send may go out, the state once it does, and its probe number if it is one. */
 export function classifierBreakerAllowsSend({
   state,
   now,
-  breaker = INSTANT_EVAL_CLASSIFIER_BREAKER,
 }: {
   state: ClassifierBreakerState;
   now: number;
-  breaker?: typeof INSTANT_EVAL_CLASSIFIER_BREAKER;
-}): { readonly isAllowed: boolean; readonly state: ClassifierBreakerState } {
-  if (state.openedAt === null) return { isAllowed: true, state };
-  if (state.isProbeInFlight || now - state.openedAt < breaker.probeEveryMs) {
-    return { isAllowed: false, state };
+}): {
+  readonly isAllowed: boolean;
+  readonly state: ClassifierBreakerState;
+  readonly probe: number | null;
+} {
+  if (state.openedAt === null) return { isAllowed: true, state, probe: null };
+  const { probeEveryMs } = INSTANT_EVAL_CLASSIFIER_BREAKER;
+  if (state.probeInFlight !== null || now - state.openedAt < probeEveryMs) {
+    return { isAllowed: false, state, probe: null };
   }
-  return { isAllowed: true, state: { ...state, openedAt: now, isProbeInFlight: true } };
+  const probe = state.probesSent + 1;
+  return {
+    isAllowed: true,
+    state: { ...state, openedAt: now, probeInFlight: probe, probesSent: probe },
+    probe,
+  };
 }
 
-/** The state after a send that went out came back. */
+/** The state after a send that went out came back; `probe` is its number if it was one. */
 export function recordClassifierSend({
   state,
   health,
   now,
-  breaker = INSTANT_EVAL_CLASSIFIER_BREAKER,
+  probe,
 }: {
   state: ClassifierBreakerState;
   health: ClassifierSendHealth;
   now: number;
-  breaker?: typeof INSTANT_EVAL_CLASSIFIER_BREAKER;
+  probe: number | null;
 }): ClassifierBreakerState {
-  if (health === "up") return CLOSED_CLASSIFIER_BREAKER;
-  if (health === "neutral") return { ...state, isProbeInFlight: false };
+  if (health === "up") return { ...CLOSED_CLASSIFIER_BREAKER, probesSent: state.probesSent };
+  const probeInFlight =
+    probe !== null && probe === state.probeInFlight ? null : state.probeInFlight;
+  if (health === "neutral") return { ...state, probeInFlight };
   const consecutiveFailures = state.consecutiveFailures + 1;
   if (state.openedAt !== null) {
-    return { consecutiveFailures, openedAt: now, isProbeInFlight: false };
+    return { ...state, consecutiveFailures, openedAt: now, probeInFlight };
   }
+  const { openAfterFailures } = INSTANT_EVAL_CLASSIFIER_BREAKER;
   return {
+    ...state,
     consecutiveFailures,
-    openedAt: consecutiveFailures >= breaker.openAfterFailures ? now : null,
-    isProbeInFlight: false,
+    openedAt: consecutiveFailures >= openAfterFailures ? now : null,
+    probeInFlight,
   };
 }

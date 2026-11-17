@@ -22,7 +22,10 @@ function after(
   from: ClassifierBreakerState = CLOSED_CLASSIFIER_BREAKER,
   now = 0,
 ): ClassifierBreakerState {
-  return healths.reduce((state, health) => recordClassifierSend({ state, health, now }), from);
+  return healths.reduce(
+    (state, health) => recordClassifierSend({ state, health, now, probe: null }),
+    from,
+  );
 }
 
 const downs = (count: number): ClassifierSendHealth[] =>
@@ -61,9 +64,14 @@ describe("the classifier breaker", () => {
       state: after(downs(openAfterFailures)),
       now: probeEveryMs,
     });
-    const closed = recordClassifierSend({ state: probe.state, health: "up", now: probeEveryMs });
+    const closed = recordClassifierSend({
+      state: probe.state,
+      health: "up",
+      now: probeEveryMs,
+      probe: probe.probe,
+    });
 
-    expect(closed).toEqual(CLOSED_CLASSIFIER_BREAKER);
+    expect(closed).toEqual({ ...CLOSED_CLASSIFIER_BREAKER, probesSent: 1 });
     expect(allows(closed, probeEveryMs)).toBe(true);
   });
 
@@ -73,10 +81,44 @@ describe("the classifier breaker", () => {
       state: after(downs(openAfterFailures)),
       now: probeEveryMs,
     });
-    const reopened = recordClassifierSend({ state: probe.state, health: "down", now: 12_000 });
+    const reopened = recordClassifierSend({
+      state: probe.state,
+      health: "down",
+      now: 12_000,
+      probe: probe.probe,
+    });
 
     expect(allows(reopened, 12_000 + probeEveryMs - 1)).toBe(false);
     expect(allows(reopened, 12_000 + probeEveryMs)).toBe(true);
+  });
+
+  /** @scenario "A cancelled probe does not stop the next one" */
+  it("frees the probe when its own send comes back neutral", () => {
+    const probe = classifierBreakerAllowsSend({
+      state: after(downs(openAfterFailures)),
+      now: probeEveryMs,
+    });
+    const freed = recordClassifierSend({
+      state: probe.state,
+      health: "neutral",
+      now: probeEveryMs,
+      probe: probe.probe,
+    });
+
+    expect(freed.probeInFlight).toBeNull();
+    expect(allows(freed, probeEveryMs * 2)).toBe(true);
+  });
+
+  /** @scenario "A cancelled probe does not stop the next one" */
+  it("keeps the probe reserved when an older send comes back", () => {
+    const probe = classifierBreakerAllowsSend({
+      state: after(downs(openAfterFailures)),
+      now: probeEveryMs,
+    });
+    const older = after(["neutral", "down"], probe.state, probeEveryMs);
+
+    expect(older.probeInFlight).toBe(probe.probe);
+    expect(allows(older, probeEveryMs * 5)).toBe(false);
   });
 
   /** @scenario "Rate limits and permanent refusals never stop sends" */

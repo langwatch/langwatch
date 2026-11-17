@@ -165,7 +165,8 @@ export class HttpInstantEvalClassifierChannel implements InstantEvalClassifierCh
     let limiterWaitMs = 0;
 
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-      if (!this.breakerAllowsSend()) {
+      const gate = this.breakerAllowsSend();
+      if (!gate.isAllowed) {
         // Held back, not sent: the attempt fails as a 500 would, with the same wait.
         const held: Attempt = { kind: "retry", waitMs: backoffMs(attempt), isRateLimited: false };
         const settled = settle({ outcome: held, state, isLastAttempt: attempt === MAX_ATTEMPTS });
@@ -194,10 +195,10 @@ export class HttpInstantEvalClassifierChannel implements InstantEvalClassifierCh
         });
       } catch (error) {
         // A cancelled or broken send says nothing about the classifier, but frees the probe.
-        this.recordSend("neutral");
+        this.recordSend("neutral", gate.probe);
         throw error;
       }
-      this.recordSend(sendHealthOf(outcome));
+      this.recordSend(sendHealthOf(outcome), gate.probe);
 
       const settled = settle({ outcome, state, isLastAttempt: attempt === MAX_ATTEMPTS });
       if (settled.kind === "settled") return { ...settled.judgement, limiterWaitMs };
@@ -206,15 +207,15 @@ export class HttpInstantEvalClassifierChannel implements InstantEvalClassifierCh
     return { ...instantEvalSkipped("classifier_rate_limited"), limiterWaitMs };
   }
 
-  private breakerAllowsSend(): boolean {
+  private breakerAllowsSend(): { isAllowed: boolean; probe: number | null } {
     const decision = classifierBreakerAllowsSend({ state: this.breaker, now: this.now() });
     this.breaker = decision.state;
-    return decision.isAllowed;
+    return { isAllowed: decision.isAllowed, probe: decision.probe };
   }
 
-  private recordSend(health: ClassifierSendHealth): void {
+  private recordSend(health: ClassifierSendHealth, probe: number | null): void {
     const before = this.breaker;
-    this.breaker = recordClassifierSend({ state: before, health, now: this.now() });
+    this.breaker = recordClassifierSend({ state: before, health, now: this.now(), probe });
     if (before.openedAt === null && this.breaker.openedAt !== null) {
       logger.warn(
         { consecutiveFailures: this.breaker.consecutiveFailures },

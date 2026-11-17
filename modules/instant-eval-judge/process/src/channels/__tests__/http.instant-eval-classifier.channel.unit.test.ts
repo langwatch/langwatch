@@ -211,8 +211,8 @@ describe("given a judge that is down for every send", () => {
       },
       now: () => clock.now,
     });
-    return (text: string) =>
-      channel.classify({ projectId: "project-1", text, questions: [QUESTION], limiter });
+    return (text: string, signal?: AbortSignal) =>
+      channel.classify({ projectId: "project-1", text, questions: [QUESTION], limiter }, signal);
   }
 
   describe("when texts are classified one after another", () => {
@@ -304,6 +304,37 @@ describe("given a judge that is down for every send", () => {
 
       expect(sends).toBe(3);
       expect(probe.verdicts).toHaveLength(1);
+      expect(next.verdicts).toHaveLength(1);
+    });
+  });
+
+  describe("when the probe is cancelled", () => {
+    /** @scenario "A cancelled probe does not stop the next one" */
+    it("sends the next probe once the interval has passed again", async () => {
+      endpoint()
+        .intercept({ path: "/v1/systemone", method: "POST" })
+        .reply(500, "upstream down")
+        .times(16);
+      const clock = { now: 0 };
+      const classify = judgeAt(clock);
+      for (let i = 0; i < 4; i++) await classify(`text ${i}`);
+
+      clock.now = 10_000;
+      await expect(classify("probe", AbortSignal.abort())).rejects.toMatchObject({
+        name: "AbortError",
+      });
+
+      clock.now = 20_000;
+      let sends = 0;
+      endpoint()
+        .intercept({ path: "/v1/systemone", method: "POST" })
+        .reply(200, () => {
+          sends += 1;
+          return ANSWER;
+        });
+      const next = await classify("next probe");
+
+      expect(sends).toBe(1);
       expect(next.verdicts).toHaveLength(1);
     });
   });
