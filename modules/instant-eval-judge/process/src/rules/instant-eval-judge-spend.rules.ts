@@ -5,19 +5,21 @@
  */
 
 import {
+  INSTANT_EVAL_JUDGE_ROUTED_SPEND_MODEL,
   INSTANT_EVAL_PRICING,
   INSTANT_EVAL_SPEND_MODEL,
-  instantEvalCostUsd,
+  instantEvalJudgeRouteRateVersion,
   instantEvalPriceUsd,
   instantEvalRateVersion,
+  instantEvalSpentCostUsd,
+  NANO_USD_PER_USD,
+  type InstantEvalJudgeRoutePricing,
   type InstantEvalJudgeSpendPricedEventData,
   type InstantEvalPricing,
 } from "@langwatch/instant-eval-judge-contract";
 
 /** The prefix a keyed judge call's request id carries, so the id is the evaluation's own. */
 const KEYED_REQUEST_ID_PREFIX = "instantevaljudge_";
-
-const NANO_USD_PER_USD = 1_000_000_000;
 
 /**
  * A redelivered evaluation carries the same retry key, so it lands on the same request id and
@@ -43,6 +45,7 @@ export function instantEvalJudgeSpendPricedOf({
   requests,
   runId,
   pricing = INSTANT_EVAL_PRICING,
+  routed,
 }: {
   organizationId: string;
   projectId: string;
@@ -53,8 +56,24 @@ export function instantEvalJudgeSpendPricedOf({
   requests?: number | undefined;
   runId?: string | undefined;
   pricing?: InstantEvalPricing;
+  /**
+   * A routed spend: its summed cost for the routed tokens plus any other tokens at the published
+   * rate, at the one markup, under the router's model and rate.
+   */
+  routed?:
+    | Readonly<{
+        costNanoUsd: number;
+        routedInputTokens: number;
+        pricing: InstantEvalJudgeRoutePricing;
+      }>
+    | undefined;
 }): Readonly<{ priceUsd: number; fact: InstantEvalJudgeSpendPricedEventData }> {
-  const costUsd = instantEvalCostUsd({ inputTokens, pricing });
+  const costUsd = instantEvalSpentCostUsd({
+    inputTokens,
+    costNanoUsd: routed?.costNanoUsd,
+    routedInputTokens: routed?.routedInputTokens,
+    pricing,
+  });
   const priceUsd = instantEvalPriceUsd({ costUsd, pricing });
   return {
     priceUsd,
@@ -64,8 +83,10 @@ export function instantEvalJudgeSpendPricedOf({
       organizationId,
       projectId,
       requestId,
-      model: INSTANT_EVAL_SPEND_MODEL,
-      rateVersion: instantEvalRateVersion(pricing),
+      model: routed ? INSTANT_EVAL_JUDGE_ROUTED_SPEND_MODEL : INSTANT_EVAL_SPEND_MODEL,
+      rateVersion: routed
+        ? instantEvalJudgeRouteRateVersion({ routePricing: routed.pricing, pricing })
+        : instantEvalRateVersion(pricing),
       inputTokens,
       priceNanoUsd: Math.round(priceUsd * NANO_USD_PER_USD),
       costNanoUsd: Math.round(costUsd * NANO_USD_PER_USD),

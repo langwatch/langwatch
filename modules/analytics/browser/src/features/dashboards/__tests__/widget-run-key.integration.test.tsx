@@ -64,6 +64,7 @@ function EditedCard() {
         dashboardId="board-1"
         boardName="Weekly review"
         period={PERIOD}
+        periodKey="30d:auto"
         isWriting={false}
       />
     </>

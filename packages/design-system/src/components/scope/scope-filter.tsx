@@ -1,7 +1,8 @@
 import { Building2, ChevronDown, Folder, Users } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { Box, Button, HStack, Text } from "../../primitives.ts";
+import { SearchInput } from "../forms/search-input.tsx";
 import { Menu } from "../overlays/menu.tsx";
 
 // Read-side scope filter; read-only twin of picker; presentational only.
@@ -45,6 +46,7 @@ export function ScopeFilter({
   const [moreOpen, setMoreOpen] = useState(false);
 
   const label = filterLabel({ filter: value, available, currentTeamId, currentProjectId });
+  const otherProjects = available.projects.filter((project) => project.id !== currentProjectId);
 
   return (
     <Menu.Root>
@@ -69,7 +71,7 @@ export function ScopeFilter({
             This Team
           </Menu.Item>
         )}
-        {currentProjectId && (
+        {currentProjectId && otherProjects.length === 0 && (
           <Menu.Item
             value="this-project"
             onClick={() => onChange({ kind: "project-current" })}
@@ -77,6 +79,13 @@ export function ScopeFilter({
           >
             This Project
           </Menu.Item>
+        )}
+        {otherProjects.length > 0 && (
+          <ProjectSubmenu
+            hasCurrentProject={Boolean(currentProjectId)}
+            projects={otherProjects}
+            onChange={onChange}
+          />
         )}
         <Menu.Item
           value="more"
@@ -149,6 +158,124 @@ export function ScopeFilter({
       </Menu.Content>
     </Menu.Root>
   );
+}
+
+// Keys the menu itself handles; every other key edits the search text.
+const MENU_KEYS = new Set(["ArrowDown", "ArrowUp", "Enter", "Escape"]);
+
+/** Opens to the side: the current project first, then every other one, narrowed by name. */
+function ProjectSubmenu({
+  hasCurrentProject,
+  projects,
+  onChange,
+}: {
+  hasCurrentProject: boolean;
+  projects: AvailableScopes["projects"];
+  onChange: (next: ScopeFilterValue) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [highlighted, setHighlighted] = useState<string | null>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  const matchesOf = (text: string) => {
+    const wanted = text.trim().toLowerCase();
+    if (!wanted) return projects;
+    return projects.filter((project) => project.name.toLowerCase().includes(wanted));
+  };
+  const matching = matchesOf(query);
+
+  const changeQuery = (next: string) => {
+    setQuery(next);
+    const first = matchesOf(next)[0];
+    setHighlighted(next.trim() && first ? projectItemValue(first.id) : null);
+  };
+
+  return (
+    <Menu.Root
+      positioning={{ placement: "right-start", gutter: 2 }}
+      typeahead={false}
+      highlightedValue={highlighted}
+      onHighlightChange={({ highlightedValue }) => setHighlighted(highlightedValue)}
+      onOpenChange={({ open }) => {
+        if (!open) changeQuery("");
+      }}
+    >
+      <Menu.TriggerItem value="projects" data-testid="filter-project-submenu">
+        {hasCurrentProject ? "This Project" : "Projects"}
+      </Menu.TriggerItem>
+      <Menu.Content
+        minWidth="240px"
+        onKeyDown={(event) => {
+          // Typing anywhere in the submenu goes to the search box.
+          const typed = /^\S$/u.test(event.key) && !event.ctrlKey && !event.metaKey;
+          if (typed && event.target !== searchRef.current) searchRef.current?.focus();
+        }}
+      >
+        {hasCurrentProject && (
+          <Menu.Item
+            value="this-project"
+            onClick={() => onChange({ kind: "project-current" })}
+            data-testid="filter-this-project"
+          >
+            This Project
+          </Menu.Item>
+        )}
+        <Box paddingX={2} paddingY={1}>
+          <SearchInput
+            ref={searchRef}
+            size="sm"
+            variant="flushed"
+            placeholder="Search projects…"
+            aria-label="Search projects"
+            value={query}
+            onChange={(event) => changeQuery(event.target.value)}
+            onKeyDown={(event) => {
+              if (!MENU_KEYS.has(event.key)) event.stopPropagation();
+            }}
+            data-testid="filter-project-search"
+            containerProps={{ width: "full" }}
+          />
+        </Box>
+        <Box maxHeight="280px" overflowY="auto">
+          {matching.map((project) => (
+            <Menu.Item
+              key={project.id}
+              value={projectItemValue(project.id)}
+              onClick={() =>
+                onChange({
+                  kind: "specific",
+                  scopeType: "PROJECT",
+                  scopeId: project.id,
+                  name: project.name,
+                })
+              }
+              data-testid={`filter-project-option-${project.id}`}
+            >
+              <HStack gap={2}>
+                <Folder size={14} />
+                <Text>{project.name}</Text>
+              </HStack>
+            </Menu.Item>
+          ))}
+        </Box>
+        {matching.length === 0 && (
+          <Text
+            paddingX={2}
+            paddingY={1.5}
+            fontSize="sm"
+            color="fg.muted"
+            data-testid="filter-project-search-empty"
+          >
+            No projects match
+          </Text>
+        )}
+      </Menu.Content>
+    </Menu.Root>
+  );
+}
+
+function projectItemValue(projectId: string): string {
+  return `project:${projectId}`;
 }
 
 function ScopeOptionItem({

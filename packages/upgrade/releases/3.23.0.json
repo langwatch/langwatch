@@ -1,0 +1,35 @@
+{
+  "release": "3.23.0",
+  "previous": "3.22.0",
+  "cutAt": "2026-11-03T17:26:31+01:00",
+  "steps": [
+    {
+      "id": "prisma:20261027140000_agent_versions",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "agent",
+      "description": "Postgres schema: agent versions"
+    },
+    {
+      "id": "prisma:20261027140100_evaluator_versions",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "evaluator",
+      "description": "Postgres schema: evaluator versions"
+    },
+    {
+      "id": "prisma:20261027140200_monitor_created_by",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "monitor",
+      "description": "Postgres schema: monitor created by"
+    },
+    {
+      "id": "prisma:20261027160000_dataset_versions",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "dataset",
+      "description": "Postgres schema: dataset versions"
+    }
+  ]
+}

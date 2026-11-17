@@ -107,6 +107,7 @@ export class ExperimentsFacade {
     const body = toRunStartRequest({
       data: options.data,
       datasetId: options.datasetId,
+      datasetVersion: options.datasetVersion,
       parameters: options.parameters,
       rowIndices: options.rowIndices,
       concurrency: options.concurrency,
@@ -161,7 +162,10 @@ export class ExperimentsFacade {
     const timeout = options.timeout ?? DEFAULT_TIMEOUT;
 
     // Start the run
-    const startResponse = await this.startRun(slug, options.concurrency);
+    const startResponse = await this.startRun(slug, {
+      concurrency: options.concurrency,
+      datasetVersion: options.datasetVersion,
+    });
     const { runId } = startResponse;
 
     // Use the run URL from API but replace domain with configured endpoint
@@ -238,8 +242,11 @@ export class ExperimentsFacade {
   /**
    * Start an experiment run
    */
-  private async startRun(slug: string, concurrency?: number): Promise<ExperimentRunStartResponse> {
-    const body = toRunStartRequest({ concurrency });
+  private async startRun(
+    slug: string,
+    { concurrency, datasetVersion }: { concurrency?: number; datasetVersion?: number } = {},
+  ): Promise<ExperimentRunStartResponse> {
+    const body = toRunStartRequest({ concurrency, datasetVersion });
     let response;
     try {
       response = await this.config.langwatchApiClient.POST("/api/v1/experiments/{slug}/run", {

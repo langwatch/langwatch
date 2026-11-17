@@ -4,9 +4,16 @@ import type { RoutingDecision, SignInMethod } from "@langwatch/identity-contract
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { authApi as api } from "../../behavior/auth-api.ts";
-import { signIn } from "../../behavior/auth-client.tsx";
+import { signIn, useSession } from "../../behavior/auth-client.tsx";
+import { dropQueryParameter } from "../../behavior/browser-navigation.ts";
 import { confirmSignUpAddress } from "../../behavior/confirm-sign-up-address.ts";
 import { hardRedirect } from "../../behavior/hard-redirect.ts";
+import {
+  forgetHeldAddressProof,
+  type HeldAddressProof,
+  holdAddressProof,
+  takeHeldAddressProofOnReload,
+} from "../../behavior/held-address-proof.ts";
 import { usePasskeyCeremony } from "../../behavior/passkey-ceremony.store.ts";
 import { useSearchParams } from "../../behavior/use-route.ts";
 import { useSignInRouting } from "../../behavior/use-sign-in-routing.ts";
@@ -48,6 +55,7 @@ async function spendSignUpLink({
   callbackUrl,
   decide,
   resolveEnrollment,
+  onAnswered,
   onSignedIn,
   onAccountReady,
   onProofSpent,
@@ -56,12 +64,19 @@ async function spendSignUpLink({
   callbackUrl: string | undefined;
   decide: Decide;
   resolveEnrollment: ResolveEnrollment;
+  /** The server answered, so the token is spent or refused: nothing is left to ask again. */
+  onAnswered: () => void;
   onSignedIn: (email: string) => void;
   onAccountReady: (email: string) => void;
   onProofSpent: (email: string) => void;
 }): Promise<void> {
-  const { email, accountCreated, accountExists, addressProof, signedIn } =
-    await confirmSignUpAddress({ token });
+  const answer = await confirmSignUpAddress({ token }).catch((failure: unknown) => {
+    // A request that never reached the server spent nothing: a reload may ask again.
+    if (!(failure instanceof TypeError)) onAnswered();
+    throw failure;
+  });
+  onAnswered();
+  const { email, accountCreated, accountExists, addressProof, signedIn } = answer;
   // The link opened the session: a full navigation, so everything cached as signed out goes.
   if (signedIn) {
     onSignedIn(email);
@@ -160,6 +175,48 @@ async function resendLink({
 }
 
 /**
+ * The card's hand-off into the app, once the person is in: the link signed them in, or
+ * a dead link opened in a browser already signed in (the link worked, then the page
+ * loaded again), which is not a failure to show.
+ */
+function useSignedInHandOff({
+  signedInAs,
+  verifyToken,
+  linkError,
+  readyAccount,
+  callbackUrl,
+}: {
+  signedInAs: string | null;
+  verifyToken: string | null | undefined;
+  linkError: unknown;
+  /** The address a reopened link confirmed, and whether an account already stands behind it. */
+  readyAccount: { email: string | null; isReady: boolean };
+  callbackUrl: string | undefined;
+}): { email: string | null; message: string } | null {
+  const { data: session } = useSession();
+  const deadLinkSignedIn = Boolean(verifyToken && linkError && session);
+  const readyAccountSignedIn =
+    readyAccount.isReady &&
+    readyAccount.email !== null &&
+    session?.user.email === readyAccount.email;
+  const signedIn = deadLinkSignedIn || readyAccountSignedIn;
+  useEffect(() => {
+    if (signedIn) hardRedirect(callbackUrl ?? JOIN_BEFORE_CREATE_PATH);
+  }, [signedIn, callbackUrl]);
+  if (signedInAs) {
+    return { email: signedInAs, message: `${signedInAs} is confirmed. Taking you to LangWatch.` };
+  }
+  if (!signedIn) return null;
+  const email = session?.user.email || null;
+  return {
+    email,
+    message: email
+      ? `You're signed in as ${email}. Taking you to LangWatch.`
+      : "You're signed in. Taking you to LangWatch.",
+  };
+}
+
+/**
  * Sign-up (D13, ADR-117 §6): address, link, proof, then password. The account
  * is created only by spending the proof the link returned. An address with an
  * account already becomes the log-in step, pre-filled, not a wall.
@@ -211,21 +268,26 @@ export function VerificationFirstSignUp() {
     onEnrolled: (email, proof) => {
       setVerifiedEmail(email);
       setAddressProof(proof);
+      holdAddressProof({ email, addressProof: proof });
     },
   });
   const { enrollment, failedLink, resolveEnrollment } = proofEnrollment;
+  const isRestoring = useHeldProofRestore({
+    verifyToken,
+    restoreEnrollment: proofEnrollment.restoreEnrollment,
+  });
 
-  // The emailed link is spent once, on arrival. Guarded by a ref rather than
-  // by request state because the token is single-use: a second attempt would
-  // fail on a link that worked.
+  // The emailed link is spent once, on arrival: the spend is shared per token across
+  // remounts, and the token leaves the address bar so a reload cannot spend it again.
   useEffect(() => {
     if (!verifyToken || spent.current) return;
     spent.current = true;
-    spendSignUpLink({
+    void spendSignUpLink({
       token: verifyToken,
       callbackUrl,
       decide,
       resolveEnrollment,
+      onAnswered: () => dropQueryParameter("verify"),
       onSignedIn: setSignedInAs,
       onAccountReady: (email) => {
         setVerifiedEmail(email);
@@ -235,11 +297,19 @@ export function VerificationFirstSignUp() {
     }).catch(setLinkError);
   }, [verifyToken, callbackUrl, decide, resolveEnrollment]);
 
+  const handOff = useSignedInHandOff({
+    signedInAs,
+    verifyToken,
+    linkError,
+    readyAccount: { email: verifiedEmail, isReady: accountIsReady },
+    callbackUrl,
+  });
+
   const instanceMethods = useInstanceMethods({ decide, verifyToken });
 
   const dialFederated = (method: SignInMethod) => {
     rememberPendingMethod(method);
-    void signIn(method.id, {
+    return signIn(method.id, {
       callbackUrl: callbackUrl ?? JOIN_BEFORE_CREATE_PATH,
       // The routed address prefills the provider's screen as the OIDC login hint.
       loginHint: routedEmail?.trim() || undefined,
@@ -266,8 +336,9 @@ export function VerificationFirstSignUp() {
   usePublishFrontDoorStage({
     door: "signup",
     depth: signUpDepth({
-      verifiedEmail: signedInAs ?? verifiedEmail,
-      accountIsReady: accountIsReady || signedInAs !== null,
+      handOff,
+      verifiedEmail,
+      accountIsReady,
       addressProof,
       welcomeBackEmail,
       sentTo,
@@ -310,14 +381,12 @@ export function VerificationFirstSignUp() {
   }
 
   // The navigation is already under way; this is the card it leaves behind meanwhile.
-  if (signedInAs) {
+  if (handOff) {
     return (
       <AuthCard title="You're in">
         <HStack gap={3}>
           <SuccessPulse label="Signed in" />
-          <Text data-testid="signed-in-handoff">
-            {signedInAs} is confirmed. Taking you to LangWatch.
-          </Text>
+          <Text data-testid="signed-in-handoff">{handOff.message}</Text>
         </HStack>
       </AuthCard>
     );
@@ -411,6 +480,9 @@ export function VerificationFirstSignUp() {
       />
     );
   }
+
+  // The tab holds a confirmed address: its step comes back rather than the address step flashing.
+  if (isRestoring) return <AuthCard title="Create your account" />;
 
   return (
     <AuthCard title="Create your LangWatch account" finePrint={<FrontDoorFinePrint />}>
@@ -590,13 +662,16 @@ function LinkNoLongerWorks({
  * two can only ever agree.
  */
 function signUpDepth({
-  verifiedEmail,
-  accountIsReady,
+  handOff,
+  verifiedEmail: provenEmail,
+  accountIsReady: provenAccountIsReady,
   addressProof,
   welcomeBackEmail,
   sentTo,
   routedEmail,
 }: {
+  /** The hand-off into the app counts as a ready account for its address. */
+  handOff: { email: string | null } | null;
   verifiedEmail: string | null;
   accountIsReady: boolean;
   addressProof: string | null;
@@ -604,6 +679,8 @@ function signUpDepth({
   sentTo: string | null;
   routedEmail: string | null;
 }): FrontDoorDepth {
+  const verifiedEmail = handOff?.email ?? provenEmail;
+  const accountIsReady = provenAccountIsReady || handOff !== null;
   if (verifiedEmail && accountIsReady) return "settled";
   if (welcomeBackEmail !== null) return "credential";
   if (verifiedEmail !== null && addressProof !== null) return "credential";
@@ -674,7 +751,10 @@ function MethodChoice({
                 // This address arrived on a link that has just been spent, so
                 // there is no step behind this one to go back to. Changing it
                 // means starting a sign-up over, which is what this does.
-                onUseDifferentEmail={() => hardRedirect("/auth/signup")}
+                onUseDifferentEmail={() => {
+                  forgetHeldAddressProof();
+                  hardRedirect("/auth/signup");
+                }}
               />
             ) : null
           }
@@ -747,7 +827,48 @@ function useProofEnrollment({
     [decide, requestEnrollment, onWelcomeBack, onRouted, onEnrolled],
   );
 
-  return { enrollment, failedLink, resolveEnrollment, failure: error ?? routingError };
+  /** A held proof the server still enrols resumes its step; any other answer drops it quietly. */
+  const restoreEnrollment = useCallback(
+    async ({ email, addressProof: proof }: HeldAddressProof) => {
+      const answer = await requestEnrollment({ email, addressProof: proof }).catch(() => null);
+      if (answer?.outcome !== "enroll") {
+        forgetHeldAddressProof();
+        return;
+      }
+      setEnrollment(answer);
+      onEnrolled(email, proof);
+    },
+    [requestEnrollment, onEnrolled],
+  );
+
+  return {
+    enrollment,
+    failedLink,
+    resolveEnrollment,
+    restoreEnrollment,
+    failure: error ?? routingError,
+  };
+}
+
+/** Asks once, on arrival without a link, whether this tab's held proof still enrols. */
+function useHeldProofRestore({
+  verifyToken,
+  restoreEnrollment,
+}: {
+  verifyToken: string | null | undefined;
+  restoreEnrollment: (held: HeldAddressProof) => Promise<void>;
+}): boolean {
+  const [held] = useState(() => (verifyToken ? null : takeHeldAddressProofOnReload()));
+  const [isRestoring, setIsRestoring] = useState(held !== null);
+  const asked = useRef(false);
+
+  useEffect(() => {
+    if (!held || asked.current) return;
+    asked.current = true;
+    void restoreEnrollment(held).finally(() => setIsRestoring(false));
+  }, [held, restoreEnrollment]);
+
+  return isRestoring;
 }
 
 type ProofStep =

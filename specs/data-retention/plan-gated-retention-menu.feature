@@ -6,16 +6,16 @@ Feature: Plan-gated data-retention menu
 
   # Retention length is gated by plan:
   #   - Free      cannot configure retention at all (unchanged).
-  #   - Paid      may pick only "1 month" or "2 months" — a fixed pair, no custom.
+  #   - Paid      may pick only "1 month", "2 months" or "3 months" — fixed presets, no custom.
   #   - Enterprise (and self-hosted) get the full menu plus a custom value.
   # The server enforces the rule at the write boundary; the menu only mirrors it.
   # Existing out-of-menu values are grandfathered — never auto-changed or deleted.
 
   @unit
-  Scenario: A paid organization sees only the two fixed options
+  Scenario: A paid organization sees only the three fixed options
     Given an organization on a paid, non-enterprise plan
     When a manager opens the retention policy editor
-    Then the only retention choices are "1 month" and "2 months"
+    Then the only retention choices are "1 month", "2 months" and "3 months"
     And there is no custom option
     And there is no keep-forever option
 
@@ -39,7 +39,7 @@ Feature: Plan-gated data-retention menu
   Scenario: A self-hosted deployment gets the full retention range on any paid plan
     Given a self-hosted deployment whose organization is on a paid, non-enterprise plan
     When a manager sets a custom retention of one year
-    Then the plan does not cap the value to the fixed pair
+    Then the plan does not cap the value to the fixed presets
 
   @unit
   Scenario: Keep-forever stays a platform-admin capability on every plan

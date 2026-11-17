@@ -8,11 +8,16 @@ import type Stripe from "stripe";
 
 import type { BillingWebhookHost } from "../channels/billing-webhook-host.channel.ts";
 import type { StripeSubscriptionsChannel } from "../channels/stripe-subscriptions.channel.ts";
+import type {
+  LicenseRenewalOutcome,
+  RenewalInvoice,
+} from "../features/license-purchase/services/license-renewal.service.ts";
 import type { BillingWebhookOrganizationRepository } from "../repositories/billing-webhook-organization.repository.ts";
 import type { BillingWebhookSubscriptionRepository } from "../repositories/billing-webhook-subscription.repository.ts";
 import { BestEffortService } from "./best-effort.service.ts";
 import { BillingCheckoutCompletionService } from "./billing-checkout-completion.service.ts";
 import type { BillingLifecycleAnnouncerService } from "./billing-lifecycle-announcer.service.ts";
+import type { CheckoutBillingRoles } from "./billing-starter-role.service.ts";
 import {
   BillingSubscriptionLifecycleService,
   type LicenseClearer,
@@ -37,6 +42,11 @@ export interface LicensePurchaseHandler {
     checkoutSession: Stripe.Checkout.Session;
     stripeSubscriptions: Pick<StripeSubscriptionsChannel, "listCheckoutLineItems">;
   }): Promise<void>;
+}
+
+/** Mints the next term's licence for a renewed self-serve licence subscription. */
+export interface LicenseRenewalHandler {
+  handleInvoice(input: { invoice: RenewalInvoice }): Promise<LicenseRenewalOutcome>;
 }
 
 /** Stripe webhooks can arrive before subscription state is fully consistent. */
@@ -85,6 +95,7 @@ export class EEWebhookService implements WebhookService {
   private readonly itemCalculator: ItemCalculator;
   private readonly licensePurchaseHandler?: LicensePurchaseHandler;
   private readonly licensePaymentLinkId?: string;
+  private readonly licenseRenewal?: LicenseRenewalHandler;
   private readonly host: BillingWebhookHost;
   private readonly connectedBilling?: ConnectedBillingInvoiceEvents;
   private readonly bestEffort = BestEffortService.create();
@@ -99,9 +110,11 @@ export class EEWebhookService implements WebhookService {
     licenses,
     licensePurchaseHandler,
     licensePaymentLinkId,
+    licenseRenewal,
     host,
     connectedBilling,
     announcer,
+    billingRoles,
   }: {
     subscriptionRepository: BillingWebhookSubscriptionRepository;
     organizationRepository: BillingWebhookOrganizationRepository;
@@ -111,10 +124,13 @@ export class EEWebhookService implements WebhookService {
     licenses: LicenseClearer;
     licensePurchaseHandler?: LicensePurchaseHandler;
     licensePaymentLinkId?: string;
+    licenseRenewal?: LicenseRenewalHandler;
     host: BillingWebhookHost;
     connectedBilling?: ConnectedBillingInvoiceEvents;
     /** Records the checkout and subscription changes for peers; absent where none is composed. */
     announcer?: BillingLifecycleAnnouncerService;
+    /** Hands the Billing role to a checkout's starter; absent where no authz is composed. */
+    billingRoles?: CheckoutBillingRoles;
   }) {
     this.subscriptionRepository = subscriptionRepository;
     this.organizationRepository = organizationRepository;
@@ -122,6 +138,7 @@ export class EEWebhookService implements WebhookService {
     this.itemCalculator = itemCalculator;
     this.licensePurchaseHandler = licensePurchaseHandler;
     this.licensePaymentLinkId = licensePaymentLinkId;
+    this.licenseRenewal = licenseRenewal;
     this.host = host;
     this.connectedBilling = connectedBilling;
     this.checkout = BillingCheckoutCompletionService.create({
@@ -132,6 +149,7 @@ export class EEWebhookService implements WebhookService {
       licenses,
       host,
       ...(announcer ? { announcer } : {}),
+      ...(billingRoles ? { billingRoles } : {}),
     });
     this.lifecycle = BillingSubscriptionLifecycleService.create({
       subscriptionRepository,
@@ -152,9 +170,11 @@ export class EEWebhookService implements WebhookService {
     licenses: LicenseClearer;
     licensePurchaseHandler?: LicensePurchaseHandler;
     licensePaymentLinkId?: string;
+    licenseRenewal?: LicenseRenewalHandler;
     host: BillingWebhookHost;
     connectedBilling?: ConnectedBillingInvoiceEvents;
     announcer?: BillingLifecycleAnnouncerService;
+    billingRoles?: CheckoutBillingRoles;
   }): EEWebhookService {
     return new EEWebhookService(options);
   }
@@ -165,6 +185,13 @@ export class EEWebhookService implements WebhookService {
         const licenseResult = await this.tryRouteLicensePurchase(event);
         if (licenseResult) {
           return licenseResult;
+        }
+      }
+
+      if (event.type === "invoice.paid" || event.type === "invoice.payment_succeeded") {
+        const renewalResult = await this.tryRouteLicenseRenewal(event);
+        if (renewalResult) {
+          return renewalResult;
         }
       }
 
@@ -248,6 +275,27 @@ export class EEWebhookService implements WebhookService {
       stripeSubscriptions: this.stripeSubscriptions,
     });
 
+    return { status: "ok" };
+  }
+
+  /**
+   * A paid renewal of a licence subscription gets its next term's licence;
+   * anything else returns null and goes on. Both paid events of one invoice
+   * arrive: the per-invoice claim lets only the first mint.
+   */
+  private async tryRouteLicenseRenewal(
+    event: Stripe.Event & { type: "invoice.paid" | "invoice.payment_succeeded" },
+  ): Promise<HandleEventResult | null> {
+    if (!this.licenseRenewal) return null;
+    const outcome = await this.licenseRenewal.handleInvoice({ invoice: event.data.object });
+    if (outcome === "not_license_renewal") return null;
+    if (outcome === "in_flight") {
+      logger.warn(
+        { eventId: event.id, eventType: event.type },
+        "[stripeWebhook] License renewal for this invoice is in flight; asking Stripe to retry",
+      );
+      return { status: "error", httpStatus: 500, message: "License renewal in progress" };
+    }
     return { status: "ok" };
   }
 

@@ -19,7 +19,8 @@ describe("given the Where my agent breaks widgets", () => {
   it("splits errored traces by type or first failing step, with the rate and changes", () => {
     const { code, sql } = buildOf("up-errors");
     expect(sql.types).toContain("StatusCode = 2");
-    expect(sql.types).toContain("SpanAttributes['exception.type']");
+    expect(sql.types).toContain("coalesce(nullIf(ErrorType, ''), SpanName)");
+    expect(sql.types).not.toContain("SpanAttributes");
     expect(sql.types).toContain("argMin(");
     expect(sql.rate).toContain("countIf(HasError) / count()");
     expect(sql.changes).toContain("FROM prompt_versions");
@@ -31,8 +32,12 @@ describe("given the Where my agent breaks widgets", () => {
   /** @scenario "AC61 Where my agent breaks: failing steps show the failures that reached the user" */
   it("counts a failure as recovered when the span above it did not fail", () => {
     const { code, sql } = buildOf("up-where-fails");
-    expect(sql.main).toContain("p.SpanId = c.ParentSpanId");
-    expect(sql.main).toContain("c.StatusCode = 2 AND p.StatusCode != 2 AS recovered");
+    // Only failed calls look their parent up, so the joined side never holds every span.
+    expect(sql.main).toContain(
+      "AND StatusCode = 2\n  ) AS c ON c.TraceId = p.TraceId AND c.parent = p.SpanId",
+    );
+    expect(sql.main).toContain("AND p.StatusCode != 2");
+    expect(sql.main).toContain("count() AS recovered");
     expect(sql.main).toContain("ORDER BY failures - recovered DESC");
     expect(sql.main).not.toContain("'tool'");
     expect(code).toContain("reached the user");
@@ -42,12 +47,13 @@ describe("given the Where my agent breaks widgets", () => {
   it("counts a top-level span with no children as a step whose failure reached the user", () => {
     const { sql } = buildOf("up-where-fails");
     expect(sql.main).toContain("UNION ALL");
-    expect(sql.main).toContain("LEFT ANTI JOIN (");
-    expect(sql.main).toContain("ON k.TraceId = r.TraceId AND k.ParentSpanId = r.SpanId");
-    expect(sql.main).not.toContain("NOT IN");
-    expect(sql.main).toContain("StatusCode = 2 AS failed, false AS recovered");
+    // A top-level span with no child is found by grouping each span with its children under
+    // one hash, then keeping the groups that hold a top-level span and nothing below it.
+    expect(sql.main).toContain("GROUP BY sipHash128(TraceId, ifNull(ParentSpanId, SpanId))");
+    expect(sql.main).toContain("HAVING top_level > 0 AND countIf(ParentSpanId IS NOT NULL) = 0");
+    expect(sql.main).toContain("sum(failed) AS failures, 0 AS recovered");
     expect(buildOf("tools-error-rate").sql.main).toContain(
-      "AND r.ParentSpanId IS NULL\n    AND r.SpanAttributes['langwatch.span.type'] = 'tool'",
+      "AND SpanType = 'tool'\n    AND ifNull(ParentSpanId, '') != ''",
     );
   });
 
@@ -64,13 +70,24 @@ describe("given the Where my agent breaks widgets", () => {
   /** @scenario "AC62 Where my agent breaks: loops and retries are read from repeated spans" */
   it("finds loops by tool and input, retries by a later sibling after a failure", () => {
     const { code, sql } = buildOf("up-loops");
-    expect(sql.daily).toContain("GROUP BY TraceId, SpanName, CapturedInput");
+    expect(sql.daily).toContain("sipHash128(CapturedInput)");
+    expect(sql.daily).toContain("GROUP BY TraceId, SpanName, input");
     expect(sql.daily).toContain("HAVING count() >= 3");
     expect(sql.daily).toContain("max(StartTime) > minIf(StartTime, StatusCode = 2)");
-    expect(sql.daily).toContain("GROUP BY TraceId, ParentSpanId");
+    expect(sql.daily).toContain(
+      "GROUP BY sipHash128(TraceId, ifNull(ParentSpanId, ''), if(SpanType = 'llm', 'llm', SpanName))",
+    );
     expect(sql.totals).toContain("sum(CostSum)");
     expect(code).toContain("Cost of the repeats");
-    expect(sql.daily).toContain("countIf(Cost IS NULL) AS uncosted");
+    expect(sql.daily).toContain("countIf(unpriced) AS uncosted");
+    expect(sql.daily).toContain("countIf(Cost IS NULL AND StatusCode = 2) AS uncosted");
+    // Retry groups are looked up by a 64-bit hash; the HAVING drops any a collision lets in.
+    expect(sql.daily).toContain(
+      "cityHash64(TraceId, ifNull(ParentSpanId, ''), if(SpanType = 'llm'",
+    );
+    expect(sql.daily).toContain("HAVING countIf(StatusCode = 2) > 0");
+    // Main's LIMIT 10000 per kind kept an arbitrary 10000 repeats; every repeat now counts.
+    expect(sql.daily).not.toContain("LIMIT 10000");
     expect(sql.daily).toContain("sum(uncosted) AS uncosted_spans");
     expect(code).toContain('usd(repeatCost) + (lowerBound ? "+" : "")');
   });
@@ -78,7 +95,11 @@ describe("given the Where my agent breaks widgets", () => {
   /** @scenario "AC63 Where my agent breaks: tool error rate says how many tool errors the agent recovered" */
   it("reads tool spans only and shows the recovered share and the worst tool", () => {
     const { code, sql } = buildOf("tools-error-rate");
-    expect(sql.main).toContain("c.SpanAttributes['langwatch.span.type'] = 'tool'");
+    // The calls below a parent and the failed calls that look their parent up read tool spans
+    // only; a lone top-level span counts when it is a tool (step, calls, failures).
+    expect(sql.main?.match(/AND SpanType = 'tool'/g)).toHaveLength(5);
+    expect(sql.main).toContain("HAVING top_level > 0 AND countIf(ParentSpanId IS NOT NULL) = 0");
+    expect(sql.main).not.toContain("SpanAttributes");
     expect(code).toContain("Tool error rate");
     expect(code).toContain("Recovered, of ");
     expect(code).toContain("Worst tool");
@@ -159,7 +180,7 @@ describe("given the Release check widgets", () => {
   /** @scenario "AC70 Release check: the test set is weighted to the topic mix of real traffic" */
   it("weights each run's topic pass rates by production's topic shares", () => {
     const { code, sql } = buildOf("rag-dataset-versions");
-    expect(sql.main).toContain("Origin IN ('', 'application')");
+    expect(sql.main).not.toContain("Origin IN");
     expect(sql.main).toContain("weighted_rate");
     expect(code).toContain("weighted to real traffic");
   });

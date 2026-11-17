@@ -93,6 +93,10 @@ const (
 	// realtime voice socket the gateway does not carry (ADR-097). Its spend
 	// record is admitted here and closed later, by the vendor's own report.
 	RequestTypeRealtimeSession RequestType = "realtime_session"
+	// RequestTypeDecisions is POST /v1/decisions (OpenAI Decisions API):
+	// typed questions over an input, answered with probabilities.
+	// Non-streaming only.
+	RequestTypeDecisions RequestType = "decisions"
 )
 
 // Params holds data for a customer AI trace.

@@ -25,7 +25,13 @@ import {
 import { SAMPLE_CHOICE_KEY } from "../../../../ui/elements/governance-sample-mode.ts";
 
 const harness = vi.hoisted(() => ({
-  list: { data: undefined as unknown, isLoading: false, error: null as unknown },
+  list: {
+    data: undefined as unknown,
+    isPending: false,
+    isLoading: false,
+    error: null as unknown,
+  },
+  refetchList: vi.fn(),
   listInputs: [] as unknown[],
   sources: { data: undefined as unknown, isLoading: false },
   openDrawer: vi.fn(),
@@ -54,7 +60,7 @@ vi.mock("../../../../behavior/governance-api.ts", () => {
             if (full === "governanceAgents.list") {
               return (input: unknown) => {
                 harness.listInputs.push(input);
-                return harness.list;
+                return { ...harness.list, refetch: harness.refetchList };
               };
             }
             if (full === "governanceAgents.syncSources") return () => harness.sources;
@@ -115,7 +121,7 @@ function renderPage({
 
 const withSampleOn = () => window.sessionStorage.setItem(SAMPLE_CHOICE_KEY, "true");
 const withNoAgents = () => {
-  harness.list = { data: [], isLoading: false, error: null };
+  harness.list = { data: [], isPending: false, isLoading: false, error: null };
 };
 const chip = (label: string) => {
   const found = screen.getAllByRole("button").find((b) => b.textContent?.startsWith(label));
@@ -135,10 +141,11 @@ const emptyText = (testId: string) => screen.getByTestId(testId).textContent ?? 
 
 beforeEach(() => {
   window.sessionStorage.clear();
-  harness.list = { data: undefined, isLoading: false, error: null };
+  harness.list = { data: undefined, isPending: false, isLoading: false, error: null };
   harness.listInputs = [];
   harness.sources = { data: undefined, isLoading: false };
   harness.openDrawer.mockReset();
+  harness.refetchList.mockReset();
   harness.requested = 0;
 });
 
@@ -159,7 +166,18 @@ describe("the Agents page reading the organization's agents", () => {
   describe("given the agents read has not answered", () => {
     /** @scenario "A read still in flight shows neither agents nor an empty state" */
     it("shows that it is loading and does not claim nobody has registered", () => {
-      harness.list = { data: undefined, isLoading: true, error: null };
+      harness.list = { data: undefined, isPending: true, isLoading: true, error: null };
+      renderPage();
+
+      expect(screen.getByText("Loading agents")).toBeInTheDocument();
+      expect(screen.queryByText("No agents registered yet")).toBeNull();
+    });
+  });
+
+  describe("given the agents read is pending but not fetching, as when paused offline", () => {
+    /** @scenario "A read still in flight shows neither agents nor an empty state" */
+    it("still shows that it is loading rather than an empty organization", () => {
+      harness.list = { data: undefined, isPending: true, isLoading: false, error: null };
       renderPage();
 
       expect(screen.getByText("Loading agents")).toBeInTheDocument();
@@ -169,11 +187,52 @@ describe("the Agents page reading the organization's agents", () => {
 
   describe("given the agents read fails", () => {
     /** @scenario "A failed agents read says so instead of claiming there are no agents" */
-    it("shows an alert saying the agents could not be loaded", () => {
-      harness.list = { data: undefined, isLoading: false, error: new Error("read failed") };
+    it("shows only the alert, with no empty state and no register action in the pane", () => {
+      harness.list = {
+        data: undefined,
+        isPending: false,
+        isLoading: false,
+        error: new Error("read failed"),
+      };
       renderPage();
 
       expect(screen.getByRole("alert")).toHaveTextContent("Couldn't load agents");
+      expect(document.querySelector('[data-testid^="agents-empty"]')).toBeNull();
+      expect(document.querySelector('[data-testid="agents-no-match"]')).toBeNull();
+      expect(screen.queryByText("No agents registered yet")).toBeNull();
+      // The header's own Register agent stays; the pane must not add a second.
+      expect(screen.getAllByRole("button", { name: /Register agent/ })).toHaveLength(1);
+    });
+
+    /** @scenario "A failed agents read says so instead of claiming there are no agents" */
+    it("reads the agents again when Try again is pressed", async () => {
+      harness.list = {
+        data: undefined,
+        isPending: false,
+        isLoading: false,
+        error: new Error("read failed"),
+      };
+      renderPage();
+
+      await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+      expect(harness.refetchList).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("given agents were read and a later refresh fails", () => {
+    /** @scenario "A failed refresh keeps the agents already on screen beside the alert" */
+    it("keeps listing the agents it already had and shows the alert above them", () => {
+      harness.list = {
+        data: SAMPLE_AGENT_ROWS,
+        isPending: false,
+        isLoading: false,
+        error: new Error("refresh failed"),
+      };
+      renderPage();
+
+      expect(screen.getByRole("alert")).toHaveTextContent("Couldn't load agents");
+      expect(rowNames()).toHaveLength(SAMPLE_AGENT_ROWS.length);
+      expect(screen.queryByTestId("agents-empty")).toBeNull();
     });
   });
 });
@@ -740,6 +799,7 @@ describe("given an agent that ran and cost nothing", () => {
     const [template] = SAMPLE_AGENT_ROWS;
     harness.list = {
       data: [{ ...template, id: "zero", name: "quiet-agent", costUsd30d: 0, requests30d: 0 }],
+      isPending: false,
       isLoading: false,
       error: null,
     };

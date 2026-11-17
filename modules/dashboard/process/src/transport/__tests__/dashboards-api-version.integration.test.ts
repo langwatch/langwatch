@@ -13,7 +13,7 @@ import { describe, expect, it } from "vitest";
 
 import { createDashboardTestApp } from "../../app/__tests__/dashboard.fixture.ts";
 import { boardRest, boardsReleased, releasedOrRefused } from "../board.rest.ts";
-import { dashboardWidgetCallerSource, dashboardWidgetUrl } from "../dashboard-widget.rest.ts";
+import { dashboardWidgetCaller, dashboardWidgetUrl } from "../dashboard-widget.rest.ts";
 import { dashboardRest } from "../dashboard.rest.ts";
 
 const PROJECT = "project-1";
@@ -40,7 +40,7 @@ async function hostWithBothBoards({ released = true }: { released?: boolean } = 
   const middlewareBindings = [
     bindMiddlewareContext(boardsReleased, () => releasedOrRefused(released)),
     bindMiddlewareContext(dashboardWidgetUrl, () => "https://app.langwatch.test/dashboards"),
-    bindMiddlewareContext(dashboardWidgetCallerSource, () => ({ kind: "api" as const })),
+    bindMiddlewareContext(dashboardWidgetCaller, () => ({ source: { kind: "api" as const } })),
   ];
 
   for (const family of [dashboardRest, boardRest]) {

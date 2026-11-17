@@ -44,6 +44,7 @@ function planOfType(type: string): Plan {
     free: type === "FREE",
     maxMembers: 10,
     maxMembersLite: 10,
+    maxMembersDeveloper: 0,
     maxMessagesPerMonth: 1000,
     canPublish: true,
     prices: { USD: 0, EUR: 0 },

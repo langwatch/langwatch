@@ -6,11 +6,19 @@ Closes #
 
 ## What changed
 
-<!-- Plain-English summary of what you did. Focus on the approach and key decisions, not a line-by-line diff. A non-technical teammate should be able to follow this. -->
+<!-- Plain-English summary of what you did. Focus on the approach, not a line-by-line diff. Put each choice you made in the Decisions table below. A non-technical teammate should be able to follow this. -->
+
+## Decisions
+
+<!-- One row per real choice you made in this PR. Plain short words: a reader with no context should get each row in one read. "Other options considered" names what you did not pick. Add a row for every choice a reviewer might ask "why this way?" about. Example row: | Retry 3 times, then fail | The API drops about 1 in 100 calls; 3 tries covers it | Retry forever (can hang the job); no retry (users see errors) | -->
+
+| Decision | Why | Other options considered |
+| -------- | --- | ------------------------ |
+|          |     |                          |
 
 ## How it works
 
-<!-- Only if the "what" isn't obvious. Explain the mechanism, trade-offs, or why you chose this approach over alternatives. Skip this section for straightforward changes. -->
+<!-- Only if the "what" isn't obvious. Explain the mechanism. The choices and their alternatives go in the Decisions table above. Skip this section for straightforward changes. -->
 
 ## Acceptance criteria
 

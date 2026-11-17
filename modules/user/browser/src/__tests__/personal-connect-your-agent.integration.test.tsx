@@ -12,6 +12,8 @@ import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+const recordPageOpened = vi.hoisted(() => vi.fn());
+
 const { queryImpls, hasFirstMessageRef, hasFirstMessageInputs } = vi.hoisted(() => {
   const defaultQuery = () => ({
     data: undefined,
@@ -75,6 +77,10 @@ const { queryImpls, hasFirstMessageRef, hasFirstMessageInputs } = vi.hoisted(() 
     hasFirstMessageInputs,
   };
 });
+
+vi.mock("@langwatch/auth-client", () => ({
+  useRecordPageOpened: recordPageOpened,
+}));
 
 vi.mock("../behavior/personal-workspace-api.ts", () => {
   const defaultQuery = () => ({
@@ -168,6 +174,14 @@ beforeEach(() => {
 // away with it while every render threw on a stale fixture; with the page
 // rendering, the second case finds two of everything.
 afterEach(cleanup);
+
+describe("the /me usage home, when opened", () => {
+  /** @scenario "The personal overview announces its open as a usage page" */
+  it("records me_overview", () => {
+    renderPage();
+    expect(recordPageOpened).toHaveBeenCalledWith({ page: "me_overview" });
+  });
+});
 
 describe("the /me usage home's Connect your agent button, given a personal project with no traces yet", () => {
   /** @scenario the /me home hides Connect your agent before the first trace */

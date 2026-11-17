@@ -3,6 +3,7 @@ import {
   AUTHZ_RESOURCES,
   type AuthzPermission,
   type AuthzResource,
+  isGrantablePermission,
   permissionResource,
   permissionSatisfiedBy,
 } from "@langwatch/authorization";
@@ -137,7 +138,8 @@ export const PERMISSION_CATEGORIES: readonly PermissionCategory[] = [
     label: "Evaluations",
     accessLevels: ["read", "write"],
     readPermissions: viewsOf("evaluations"),
-    writePermissions: allActionsOf("evaluations"),
+    // Agents and evaluators are edited under evaluations, so their deploy labels move with it.
+    writePermissions: allActionsOf("evaluations", "agents", "evaluators"),
   },
   {
     key: "langy",
@@ -239,6 +241,29 @@ export const PERMISSION_CATEGORIES: readonly PermissionCategory[] = [
     writePermissions: allActionsOf("organization"),
   },
   {
+    // Write only: starting or changing a paid plan has nothing to read. Every member may start one.
+    key: "subscription",
+    label: "Subscription",
+    accessLevels: ["write"],
+    readPermissions: [],
+    writePermissions: allActionsOf("subscription"),
+  },
+  {
+    key: "seatRequests",
+    label: "Seat requests",
+    accessLevels: ["read", "write"],
+    readPermissions: viewsOf("seatRequests"),
+    writePermissions: allActionsOf("seatRequests"),
+  },
+  {
+    // Read only: the directory of members and their roles; changing them is Organization.
+    key: "members",
+    label: "Members",
+    accessLevels: ["read"],
+    readPermissions: viewsOf("members"),
+    writePermissions: [],
+  },
+  {
     key: "sso",
     label: "Single sign-on and directory sync",
     accessLevels: ["read", "write"],
@@ -273,15 +298,23 @@ export const PERMISSION_CATEGORIES: readonly PermissionCategory[] = [
   },
 ] as const;
 
+/** Never on a key in release 1: braiding is a person's decision in the screen (ADR-201 §2). */
+const RESOURCES_NEVER_ON_A_KEY: ReadonlySet<string> = new Set<AuthzResource>(["braids"]);
+
 /**
- * What the categories deliberately do NOT cover: the platform tier
- * (`scopes: ["platform"]`), grantable only to platform staff, never on an
- * API key. Enforced by permission-categories.unit.test.ts.
+ * What the categories deliberately do NOT cover: the platform tier (`scopes: ["platform"]`),
+ * grantable only to platform staff, a permission never granted at all (`spans:braided`), and
+ * the resources above. Enforced by permission-categories.unit.test.ts.
  */
 export function categorizablePermissions(): AuthzPermission[] {
   return [...ALL_PERMISSIONS].filter((permission) => {
-    const def = AUTHZ_RESOURCES[permissionResource(permission) as AuthzResource];
-    return !(def.scopes as readonly string[]).includes("platform");
+    const resource = permissionResource(permission);
+    const def = AUTHZ_RESOURCES[resource as AuthzResource];
+    return (
+      isGrantablePermission(permission) &&
+      !(def.scopes as readonly string[]).includes("platform") &&
+      !RESOURCES_NEVER_ON_A_KEY.has(resource)
+    );
   }) as AuthzPermission[];
 }
 
@@ -295,10 +328,17 @@ export const CLI_KEY_MANAGEMENT_PERMISSIONS = {
   "team:manage": "Create teams and manage their members",
 } as const satisfies Partial<Record<AuthzPermission, string>>;
 
-/** Never on a default CLI login key, not even with `--management`: too destructive. */
+/**
+ * Never on a CLI login key: not by default, not with `--management`, not when the
+ * approver customizes the key. Too destructive for a credential left on a machine.
+ */
 export const CLI_KEY_NEVER_DEFAULT_PERMISSIONS: readonly AuthzPermission[] = [
   "organization:delete",
 ];
+
+/** Whether a CLI login key may never carry this permission, whatever the approval picked. */
+export const isNeverOnCliKey = (permission: string): boolean =>
+  (CLI_KEY_NEVER_DEFAULT_PERMISSIONS as readonly string[]).includes(permission);
 
 export type CliKeyManagementPermission = keyof typeof CLI_KEY_MANAGEMENT_PERMISSIONS;
 
@@ -312,8 +352,7 @@ export const isCliKeyManagementPermission = (
 
 /** Whether a default CLI login key leaves this permission out. */
 export const isOffByDefaultOnCliKey = (permission: string): boolean =>
-  isCliKeyManagementPermission(permission) ||
-  (CLI_KEY_NEVER_DEFAULT_PERMISSIONS as readonly string[]).includes(permission);
+  isCliKeyManagementPermission(permission) || isNeverOnCliKey(permission);
 
 /** The permissions a CLI login key starts from; the management ones only when asked for. */
 export function defaultCliKeyPermissions({
@@ -326,32 +365,53 @@ export function defaultCliKeyPermissions({
   );
 }
 
+let cliCategories: readonly PermissionCategory[] | undefined;
+
+/**
+ * The categories as the CLI approval screen offers them: each "Write" without what a CLI
+ * key may never carry, so Organization Write is manage without delete. A manage-only
+ * caller can still pick it, and a `--management` default reads back as Write.
+ */
+export function cliPermissionCategories(): readonly PermissionCategory[] {
+  cliCategories ??= PERMISSION_CATEGORIES.map((category) => ({
+    ...category,
+    writePermissions: category.writePermissions.filter((p) => !isNeverOnCliKey(p)),
+  }));
+  return cliCategories;
+}
+
 export function categoryPermissions({
   key,
   level,
+  categories = PERMISSION_CATEGORIES,
 }: {
   key: string;
   level: AccessLevel;
+  categories?: readonly PermissionCategory[];
 }): AuthzPermission[] {
-  const category = PERMISSION_CATEGORIES.find((c) => c.key === key);
+  const category = categories.find((c) => c.key === key);
   if (!category) return [];
   return level === "write" ? category.writePermissions : category.readPermissions;
 }
 
 export function computePermissionsFromSelections(
   selections: Record<string, AccessLevel | "none">,
+  categories: readonly PermissionCategory[] = PERMISSION_CATEGORIES,
 ): AuthzPermission[] {
   const permSet = new Set<AuthzPermission>();
   for (const [key, level] of Object.entries(selections)) {
     if (level === "none") continue;
-    for (const perm of categoryPermissions({ key, level })) {
+    for (const perm of categoryPermissions({ key, level, categories })) {
       permSet.add(perm);
     }
   }
   return [...permSet].toSorted();
 }
 
-export function selectionsFromPermissions(permissions: string[]): Record<string, AccessLevel> {
+export function selectionsFromPermissions(
+  permissions: string[],
+  categories: readonly PermissionCategory[] = PERMISSION_CATEGORIES,
+): Record<string, AccessLevel> {
   const granted = new Set(permissions);
 
   // Hierarchy-aware so a stored list carrying `datasets:manage` still
@@ -372,7 +432,7 @@ export function selectionsFromPermissions(permissions: string[]): Record<string,
     );
 
   const selections: Record<string, AccessLevel> = {};
-  for (const category of PERMISSION_CATEGORIES) {
+  for (const category of categories) {
     const hasWrite =
       category.writePermissions.length > 0 &&
       category.writePermissions.every((p) => heldWithinCategory(category, p));

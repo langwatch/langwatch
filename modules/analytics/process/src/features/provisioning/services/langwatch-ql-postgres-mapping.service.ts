@@ -173,38 +173,20 @@ export class LangWatchQLPostgresMappingService {
   private constructor() {}
 
   /**
-   * Creates the named collection holding the PostgreSQL credentials server-side.
-   */
-  namedCollectionStatements({ connection }: { connection: PostgresNamedCollection }): string[] {
-    sqlText.assertIdentifier(connection.collection, "named collection");
-    if (!Number.isInteger(connection.port)) {
-      throw new Error(
-        `lwql provisioning: named collection port must be an integer, got ${connection.port}`,
-      );
-    }
-
-    return [
-      `DROP NAMED COLLECTION IF EXISTS ${connection.collection}`,
-      `CREATE NAMED COLLECTION ${connection.collection} AS ` +
-        `host=${clickHouseLiteral(connection.host)}, ` +
-        `port=${connection.port}, ` +
-        `database=${clickHouseLiteral(connection.database)}, ` +
-        `user=${clickHouseLiteral(connection.user)}, ` +
-        `password=${clickHouseLiteral(connection.password)}`,
-    ];
-  }
-
-  /**
-   * A short, one-way digest of every value the named collection holds, never the password itself.
-   * An engine table's pool keeps the values it was built with, so a changed digest means rebuild.
+   * A short, one-way digest of every value the named collection holds plus the schema the
+   * engine tables read, never the password itself. An engine table's pool keeps the values it
+   * was built with, so a changed digest means rebuild.
    */
   credentialFingerprint({
     connection,
+    schema,
   }: {
     connection: Omit<PostgresNamedCollection, "collection">;
+    /** Part of the digest: a table built before the schema was pinned reads as stale. */
+    schema: string;
   }): string {
     const { host, port, database, user, password } = connection;
-    const material = JSON.stringify([host, port, database, user, password]);
+    const material = JSON.stringify([host, port, database, user, password, schema]);
 
     return scryptSync(material, CREDENTIAL_FINGERPRINT_SALT, 8).toString("hex");
   }
@@ -225,6 +207,7 @@ export class LangWatchQLPostgresMappingService {
     columns,
     collection,
     postgresRelation,
+    schema,
     connectionPoolSize = DEFAULT_POSTGRES_ENGINE_POOL_SIZE,
     credentialFingerprint,
   }: {
@@ -233,6 +216,8 @@ export class LangWatchQLPostgresMappingService {
     columns: LangWatchQLColumn[];
     collection: string;
     postgresRelation: string;
+    /** The app PostgreSQL schema; the role's search_path is never set, so it may omit it. */
+    schema: string;
     /** Connections this one mapped table may hold open. See the constant. */
     connectionPoolSize?: number;
     /** Stamped once ClickHouse is shown to hold these values; absent reads as stale (#8858). */
@@ -263,7 +248,7 @@ export class LangWatchQLPostgresMappingService {
 
     return (
       `CREATE OR REPLACE TABLE ${accessModel.qualified(names, table)} (${columnList}) ` +
-      `ENGINE = PostgreSQL(${collection}, table=${clickHouseLiteral(postgresRelation)}) ` +
+      `ENGINE = PostgreSQL(${collection}, table=${clickHouseLiteral(postgresRelation)}, schema=${clickHouseLiteral(schema)}) ` +
       `SETTINGS postgresql_connection_pool_size = ${connectionPoolSize}` +
       comment
     );

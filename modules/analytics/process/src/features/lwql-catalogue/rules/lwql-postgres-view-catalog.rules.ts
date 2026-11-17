@@ -94,6 +94,8 @@ export const LWQL_POSTGRES_CATALOGUE = defineLwqlCatalog({
       identityKey: "omit", // secret
       LastSeenAt: { source: "lastSeenAt" },
       ArchivedAt: { source: "archivedAt" },
+      CreatedById: { source: "createdById" },
+      UpdatedById: { source: "updatedById" },
       CreatedAt: { source: "createdAt" },
       UpdatedAt: { source: "updatedAt" },
     },
@@ -551,6 +553,8 @@ export const LWQL_POSTGRES_CATALOGUE = defineLwqlCatalog({
       WorkflowId: { source: "workflowId" },
       CopiedFromEvaluatorId: { source: "copiedFromEvaluatorId" },
       ArchivedAt: { source: "archivedAt" },
+      CreatedById: { source: "createdById" },
+      UpdatedById: { source: "updatedById" },
       CreatedAt: { source: "createdAt" },
       UpdatedAt: { source: "updatedAt" },
     },
@@ -921,7 +925,8 @@ export const LWQL_POSTGRES_CATALOGUE = defineLwqlCatalog({
       Description: { source: "description", content: "output" },
       IconAsset: { source: "iconAsset", content: "output" },
       credentialSchema: "omit", // secret
-      OttlRules: { source: "ottlRules", content: "output" },
+      // Organization configuration: the console and the API serve it only to aiTools:manage.
+      OttlRules: { source: "ottlRules", content: "output", access: { allOf: ["aiTools:manage"] } },
       PlatformPublished: { source: "platformPublished" },
       Enabled: { source: "enabled" },
       ArchivedAt: { source: "archivedAt" },
@@ -1127,6 +1132,9 @@ export const LWQL_POSTGRES_CATALOGUE = defineLwqlCatalog({
       UpdatedAt: { source: "updatedAt" },
       AutoPausedAt: { source: "autoPausedAt" },
       AutoPausedReason: { source: "autoPausedReason", content: "output" },
+      EvaluatorLabel: { source: "evaluatorLabel" },
+      CreatedById: { source: "createdById" },
+      UpdatedById: { source: "updatedById" },
     },
   }),
   notifications: defineTableCatalogue({

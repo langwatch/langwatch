@@ -21,6 +21,7 @@ import {
   startConnectedAgentFixture,
 } from "./helpers/connected-agent-fixture.ts";
 import { archiveTestSuite } from "./helpers/test-suite-cleanup.ts";
+import { createTestSuite, getTestSuite } from "./helpers/test-suite-fixture.ts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1020,6 +1021,97 @@ describe("Scenarios Skill", () => {
           expect(result.success, result.reasoning).toBe(true);
         } finally {
           await running?.stop();
+          archiveTestSuite({ workingDirectory: tempFolder, name: suiteName });
+          removeSkillTestWorkDir(tempFolder);
+        }
+      },
+      3_600_000,
+    );
+  });
+
+  describe("when the project already has a test suite that fits", () => {
+    /** @scenario "Langy files a scenario into the test suite that fits without being told which" */
+    it.skipIf(isCI || !process.env.LANGWATCH_API_KEY || !process.env.OPENAI_API_KEY)(
+      "lists the test suites first and files the new scenario into the one that fits",
+      async () => {
+        const tempFolder = createSkillTestWorkDir("langwatch-skill-scenarios-suite-pick-");
+        console.log(`[scenarios suite-pick dogfood] working dir: ${tempFolder}`);
+        copySkillToWorkDir(tempFolder);
+
+        const apiKey = process.env.LANGWATCH_API_KEY!.trim();
+        const endpoint = process.env.LANGWATCH_ENDPOINT?.trim();
+        fs.writeFileSync(
+          path.join(tempFolder, ".env"),
+          `LANGWATCH_API_KEY=${apiKey}\n` + (endpoint ? `LANGWATCH_ENDPOINT=${endpoint}\n` : ""),
+        );
+
+        // A fresh suite per run, so a scenario an earlier run filed is never counted.
+        const suiteName = `Refund requests ${Date.now().toString(36)}`;
+
+        try {
+          createTestSuite({ workingDirectory: tempFolder, name: suiteName });
+
+          const result = await scenario.run({
+            setId: SKILL_TESTS_SET_ID,
+            name: "A new scenario goes into the test suite that fits",
+            description:
+              "The user's LangWatch project already has a test suite for refund requests. They ask for " +
+              "one platform scenario about an angry customer demanding a refund, without naming a test " +
+              "suite. When the agent asks which test suite to use, the user picks the refund requests " +
+              "one. The user does not want anything run yet and does not want test files.",
+            agents: [
+              createClaudeCodeAgent({ workingDirectory: tempFolder }),
+              scenario.userSimulatorAgent({ model: judgeModel }),
+              scenario.judgeAgent({
+                model: judgeModel,
+                criteria: [
+                  "Agent read the scenarios skill instructions before acting",
+                  `Agent filed the scenario in the existing "${suiteName}" test suite, or asked the user which test suite to use, instead of leaving it in Default or inventing a new suite`,
+                  "If creating the scenario on the platform failed, the agent reported that failure instead of claiming the scenario was created",
+                ],
+              }),
+            ],
+            script: [
+              scenario.user(
+                "Add one platform scenario: an angry customer whose order arrived broken demands a full " +
+                  "refund. Do not run it yet, and do not write test files.",
+              ),
+              scenario.agent(),
+              scenario.user(),
+              scenario.agent(),
+              (state) => {
+                assertSkillWasRead(state, "scenarios");
+
+                // Read from the commands that ran, so a command only talked about does not count.
+                const commands = bashCommands(state);
+                const listAt = commands.findIndex((c) => c.includes("langwatch test-suite list"));
+                const creates = commands.filter((c) => c.includes("langwatch scenario create"));
+                const firstCreateAt = commands.findIndex((c) =>
+                  c.includes("langwatch scenario create"),
+                );
+                expect(creates.length, "Expected a `langwatch scenario create`").toBeGreaterThan(0);
+                expect(
+                  listAt,
+                  "Expected `test-suite list` before the first create",
+                ).toBeGreaterThan(-1);
+                expect(listAt).toBeLessThan(firstCreateAt);
+                for (const create of creates) {
+                  expect(create, "Expected every create to name a test suite").toContain(
+                    "--test-suite",
+                  );
+                }
+                const suite = getTestSuite({ workingDirectory: tempFolder, reference: suiteName });
+                expect(
+                  suite.scenarioCount,
+                  "Expected the scenario filed in the fitting suite",
+                ).toBe(1);
+              },
+              scenario.judge(),
+            ],
+          });
+
+          expect(result.success, result.reasoning).toBe(true);
+        } finally {
           archiveTestSuite({ workingDirectory: tempFolder, name: suiteName });
           removeSkillTestWorkDir(tempFolder);
         }

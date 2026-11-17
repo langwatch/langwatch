@@ -1,0 +1,173 @@
+---
+title: Grok CLI Monitoring with OpenTelemetry
+sidebarTitle: Grok CLI
+description: Monitor the Grok CLI with OpenTelemetry. Send sessions, cost and prompts to LangWatch with the LangWatch command-line tool.
+keywords:
+  - grok cli monitoring
+  - grok usage tracking
+  - grok telemetry
+  - grok opentelemetry
+  - grok cost
+---
+
+The Grok CLI is xAI's terminal coding agent. It reports every session over OpenTelemetry once its export is switched on. The LangWatch command-line tool switches it on and connects it to your workspace, so you can read the cost of each session, the prompts and responses of each turn, and every tool call.
+
+There are two ways to set it up:
+
+- `langwatch grok` starts Grok and sets up the connection on the first run. Use it on a machine you work on.
+- `langwatch instrument grok` writes the same setup and exits. Use it on a machine where people start Grok from a terminal, or when the telemetry must go to a team project.
+
+## Before you start
+
+- Install the Grok CLI.
+- Install the LangWatch command-line tool: `npm install -g langwatch`
+- Create an account at [app.langwatch.ai](https://app.langwatch.ai), or run your own instance with `npx @langwatch/server`.
+
+## Run Grok through the wrapper
+
+```bash
+langwatch login --device
+langwatch grok
+```
+
+The first run asks no question. Grok sets its model endpoints in its own `config.toml`, not in the environment, so its model calls cannot go through the LangWatch AI Gateway: LangWatch receives telemetry only, and Grok keeps your own plan and keys.
+
+The wrapper also writes a hook file to `~/.grok/hooks/langwatch.json`, so every session reports the repository, branch and worktree it ran in. Grok runs global hooks only in a folder it trusts: accept its trust prompt at startup, or run `/hooks-trust`. A session in a folder you have not trusted still reaches LangWatch, without a repository or branch.
+
+Everything else is unchanged: `langwatch grok` accepts the same flags as `grok` and returns the same exit code.
+
+<Note>
+  If `GROK_HOME` is set, the hook file goes to the `hooks` folder inside that directory instead.
+</Note>
+
+## Set up a machine without starting Grok
+
+`langwatch instrument grok` writes the connection and exits. A plain `grok` run on that machine then sends its telemetry to LangWatch. This is the setup for a shared machine where people start Grok from a terminal, for a machine image, or for a configuration management run.
+
+```bash
+langwatch instrument grok
+```
+
+The command writes two things:
+
+- A `grok` function in your shell start file, which applies the LangWatch settings to `grok` runs and to no other command. The file is `~/.zshrc`, `~/.bashrc`, or `~/.config/fish/config.fish`. Grok reads its export settings from the environment only, so a plain `grok` run reports only through this function.
+- The hook file in `~/.grok/hooks/`.
+
+Open a new terminal after the command, or read the start file again, so the function is in place.
+
+Only a shell that reads the start file has the function. A service, a scheduled job or a script that starts `grok` without it gets no LangWatch settings and sends no telemetry. For those, set the variables from [Manual OpenTelemetry setup](#manual-opentelemetry-setup) in that process's environment.
+
+<Note>
+  The shell function needs zsh, bash or fish. On Windows, start Grok with `langwatch grok` each
+  time instead.
+</Note>
+
+### Choose where the telemetry goes
+
+Pass one scope flag, and one only:
+
+| Command                                            | Destination                                                                                                   |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `langwatch instrument grok`                        | Your personal workspace                                                                                       |
+| `langwatch instrument grok --project <id-or-slug>` | A team project. See [Team projects](/coding-agents/team-projects).                                            |
+| `langwatch instrument grok --key <ingest-key>`     | The project that owns the key, with no login. See [Headless machines and CI](/coding-agents/headless-and-ci). |
+| `langwatch instrument grok --personal`             | Back to your personal workspace                                                                               |
+
+The wrapper accepts the same flags: `langwatch grok --project acme-app` pins the project and then starts Grok. `--project` and `--personal` are LangWatch flags; LangWatch removes them from the command line before Grok reads it.
+
+### Remove the setup
+
+```bash
+langwatch logout
+```
+
+This deletes every connection the command-line tool wrote, for every tool, the Grok hook file included.
+
+## What you get in LangWatch
+
+Open your personal page at `/me`, or open the project you pinned Grok to.
+
+- **[Sessions](/coding-agents/sessions)**: one row per Grok session, with the repository, branch and worktree it ran in. A subagent gets a row of its own, linked to the session that started it.
+- **Turns**: each prompt, the response, and every tool call with its arguments and its result.
+- **[Cost](/coding-agents/usage-analytics)**: the amount per session, from the cost Grok reports.
+
+<Frame caption="Grok sessions in the sessions list. Each row is named after its first prompt and shows the repository and branch the hook file reported, the context it carried and its cost.">
+  ![Grok sessions list](/images/coding-agents/grok-sessions-list.png)
+</Frame>
+
+Grok exports logs and metrics, not spans, so a session has no per-call model trace, and the session header names Grok and its version but no model.
+
+If the LangWatch Claude Code hooks are installed on the same machine, Grok loads them too. They stay silent inside Grok, so a Grok session never shows up as a Claude Code row as well.
+
+Your agent can read all of this back. See [Explore your usage with your own agent](/coding-agents/explore-your-usage-with-your-own-agent).
+
+## Content and privacy
+
+The setup switches on Grok's four content settings: prompts, responses, tool details and tool content. That is what makes a turn readable. To keep content out of storage, set the content categories to **Drop** in the [data privacy policy](/platform/data-privacy): the strip happens at ingestion, before storage, and tokens, cost, model and timing survive. Who can open a stored session's content is covered on [Privacy](/coding-agents/privacy).
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="No telemetry arrives in LangWatch">
+    Open a new terminal. The `grok` function is read from the shell start file when a shell begins, so a terminal that was already open does not have it.
+
+    Grok exports no telemetry unless `GROK_EXTERNAL_OTEL=1` is set. The wrapper and the shell function both set it; a `grok` run outside either does not report.
+
+  </Accordion>
+
+  <Accordion title="Sessions arrive without a repository or branch">
+    Grok has not trusted the folder, so it skipped the LangWatch hook. Accept the trust prompt at startup, or run `/hooks-trust` in that folder.
+  </Accordion>
+
+  <Accordion title="The wrapper reports that the hook file is not a LangWatch file">
+    A file of your own named `langwatch.json` already sits in Grok's hook folder: `~/.grok/hooks/`, or `hooks` inside `GROK_HOME` when that is set. LangWatch never overwrites it, and sessions report no repository while it is there. Rename your file, then run `langwatch grok` again.
+  </Accordion>
+
+<Accordion title="The command reports that it could not write the shell start file">
+  The shell is not zsh, bash or fish. Start Grok with `langwatch grok` each time, which needs no
+  start file.
+</Accordion>
+
+  <Accordion title="The telemetry goes to the wrong workspace">
+    Run `langwatch instrument grok --project <id-or-slug>` to move it to a team project, or `langwatch instrument grok --personal` to move it back to your own.
+  </Accordion>
+
+  <Accordion title="Authentication errors">
+    Check that the key is live and that the header reads `Authorization=Bearer <key>`. An ingest key can write telemetry and no other requests, so a key that works for ingestion still fails on other endpoints.
+
+    On a machine with a login, run `langwatch login --device` again to refresh the session.
+
+  </Accordion>
+</AccordionGroup>
+
+For more failure modes see [CLI debug](/ai-governance/cli-debug).
+
+## Manual OpenTelemetry setup
+
+Use this when you cannot install the LangWatch command-line tool. Set the variables below before you start Grok. They are the ones `langwatch instrument grok` writes for you.
+
+```bash
+export GROK_EXTERNAL_OTEL=1
+export OTEL_LOGS_EXPORTER=otlp
+export OTEL_METRICS_EXPORTER=otlp
+export OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+export OTEL_LOG_USER_PROMPTS=1
+export OTEL_LOG_ASSISTANT_RESPONSES=1
+export OTEL_LOG_TOOL_DETAILS=1
+export OTEL_LOG_TOOL_CONTENT=1
+export OTEL_EXPORTER_OTLP_ENDPOINT=https://app.langwatch.ai/api/otel
+export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ik-lw-your-ingest-key"
+grok
+```
+
+The header takes an ingest key (`ik-lw-…`), which can create telemetry and no other requests. Keep a full project API key (`sk-lw-…`) out of the configuration of a coding agent: it can read and change your project data, and a coding agent has no use for that.
+
+For a self-hosted instance, replace the endpoint with the address of your instance followed by `/api/otel`. Set any of the four `OTEL_LOG_*` lines to `0` to keep that kind of content on your machine. Leaving `OTEL_LOG_ASSISTANT_RESPONSES` out is not enough: it then follows `OTEL_LOG_USER_PROMPTS`.
+
+The hook file runs the LangWatch command-line tool, so a manual setup reports no repository or branch.
+
+<Warning>
+  A plain `export` applies the key to every program the shell starts, not to Grok alone. To keep it
+  to Grok, use the shell function `langwatch instrument grok` writes, or put the variables in a
+  function of your own that ends with `command grok "$@"`.
+</Warning>

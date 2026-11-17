@@ -1,7 +1,9 @@
 import { createLogger } from "@langwatch/observability";
 
 import { ConfigurationError, EventNotFoundError } from "../../../services/errorHandling.ts";
+import type { EventLogPageCursor } from "../../../stores/event-log-page-order.ts";
 import type {
+  EventLogProbe,
   EventOccurredAtWindow,
   EventRecord,
   EventRepository,
@@ -293,7 +295,12 @@ export class EventingClickHouseEventRepository implements EventRepository {
       format: "JSONEachRow",
     });
     const rows = await result.json<EventLogRow>();
-    const records = mapEventLogRows({ rows, tenantId, aggregateType, aggregateId });
+    const records = mapEventLogRows({
+      rows,
+      tenantId,
+      aggregateType,
+      aggregateId,
+    });
 
     const record = records[0];
     if (!record) {
@@ -526,9 +533,9 @@ export class EventingClickHouseEventRepository implements EventRepository {
   }
 
   /**
-   * Cursor-paginated `getEventRecordsUpTo`. Same upper bound and order, plus a
-   * strict `after` cursor and `LIMIT`, so a re-fold of a huge aggregate streams
-   * history a page at a time instead of OOMing on every EventPayload blob at once.
+   * Cursor-paginated `getEventRecordsUpTo` in page order (see {@link EventLogPageCursor}), so
+   * a re-fold of a huge aggregate streams history a page at a time instead of running out of
+   * memory on every EventPayload blob at once.
    */
   async getEventRecordsUpToPaged(request: {
     tenantId: string;
@@ -536,7 +543,7 @@ export class EventingClickHouseEventRepository implements EventRepository {
     aggregateId: string;
     upToTimestamp: number;
     upToEventId: string;
-    after: { timestamp: number; eventId: string } | undefined;
+    after: EventLogPageCursor | undefined;
     limit: number;
     occurredAtFromMs?: number;
   }): Promise<EventRecord[]> {
@@ -578,10 +585,14 @@ export class EventingClickHouseEventRepository implements EventRepository {
     aggregateId: string;
     upToTimestamp: number;
     upToEventId: string;
-    after: { timestamp: number; eventId: string } | undefined;
+    after: EventLogPageCursor | undefined;
     limit: number;
     occurredAtFromMs?: number;
-  }): { query: string; query_params: Record<string, unknown>; declaresFullScan: boolean } {
+  }): {
+    query: string;
+    query_params: Record<string, unknown>;
+    declaresFullScan: boolean;
+  } {
     const {
       tenantId,
       aggregateType,
@@ -592,17 +603,24 @@ export class EventingClickHouseEventRepository implements EventRepository {
       limit,
       occurredAtFromMs,
     } = request;
+    // event_log is ORDER BY (TenantId, AggregateType, AggregateId, IdempotencyKey) and the WHERE
+    // fixes the first three, so a page ordered by IdempotencyKey reads in sort-key order from the
+    // cursor's key and stops at LIMIT. Ordered by EventTimestamp, every page read the whole
+    // aggregate to sort it. The `>=` conjunct is the one the primary index seeks on; arrival
+    // and id only order copies of one key that are not merged yet, so none is skipped.
     const afterClause = after
-      ? `AND (
-            EventTimestamp > {afterTimestamp:UInt64}
+      ? `AND IdempotencyKey >= {afterKey:String}
+          AND (
+            IdempotencyKey > {afterKey:String}
+            OR EventTimestamp > {afterTimestamp:UInt64}
             OR (
               EventTimestamp = {afterTimestamp:UInt64}
               AND EventId > {afterEventId:String}
             )
           )`
       : "";
-    // The cursor and the upper bound are both on EventTimestamp, which is NOT
-    // the partition key — so neither prunes. Only EventOccurredAt does.
+    // The upper bound is on EventTimestamp, which is NOT the partition key, so it
+    // only filters. Only EventOccurredAt prunes partitions.
     const hasLowerBound = typeof occurredAtFromMs === "number" && occurredAtFromMs > 0;
     const occurredAtFilter = hasLowerBound
       ? "AND (EventOccurredAt = 0 OR EventOccurredAt >= {occurredAtFromMs:UInt64})"
@@ -624,7 +642,7 @@ export class EventingClickHouseEventRepository implements EventRepository {
             )
           )
           ${afterClause}
-        ORDER BY EventTimestamp ASC, EventId ASC
+        ORDER BY IdempotencyKey ASC, EventTimestamp ASC, EventId ASC
         LIMIT {limit:UInt32}
       `,
       query_params: {
@@ -634,7 +652,13 @@ export class EventingClickHouseEventRepository implements EventRepository {
         upToTimestamp,
         upToEventId,
         ...(hasLowerBound ? { occurredAtFromMs } : {}),
-        ...(after ? { afterTimestamp: after.timestamp, afterEventId: after.eventId } : {}),
+        ...(after
+          ? {
+              afterKey: after.idempotencyKey,
+              afterTimestamp: after.timestamp,
+              afterEventId: after.eventId,
+            }
+          : {}),
         limit,
       },
       declaresFullScan: !hasLowerBound,
@@ -708,6 +732,91 @@ export class EventingClickHouseEventRepository implements EventRepository {
     }
   }
 
+  async probeEventRecordsBefore(request: {
+    tenantId: string;
+    aggregateType: string;
+    aggregateId: string;
+    eventTimestamp: number;
+    eventId: string;
+    occurredAtFromMs?: number;
+    ignoreEventIds?: readonly string[];
+  }): Promise<EventLogProbe> {
+    const { tenantId, aggregateType, aggregateId, eventTimestamp, eventId } = request;
+    const ignoreEventIds = [...(request.ignoreEventIds ?? [])];
+    const hasIgnored = ignoreEventIds.length > 0;
+    try {
+      const occurredAtFromMs = await this.occurredAtFloor({
+        tenantId,
+        aggregateType,
+        aggregateId,
+        occurredAtFromMs: request.occurredAtFromMs,
+      });
+      const hasLowerBound = typeof occurredAtFromMs === "number" && occurredAtFromMs > 0;
+      const aggregateRows = `
+        FROM event_log
+        WHERE TenantId = {tenantId:String}
+          AND AggregateType = {aggregateType:String}
+          AND AggregateId = {aggregateId:String}
+          ${hasLowerBound ? "AND (EventOccurredAt = 0 OR EventOccurredAt >= {occurredAtFromMs:UInt64})" : ""}`;
+      const client = await this.getClient(tenantId);
+      // Two existence checks in one statement, each stopping at its first row: the WHERE fixes
+      // the sort key's prefix, so neither reads past the aggregate's own granules.
+      const result = await client.query({
+        query: `
+          SELECT
+            (SELECT count() FROM (
+              SELECT 1 ${aggregateRows}
+                AND EventId = {eventId:String}
+              LIMIT 1
+            )) AS hasEvent,
+            (SELECT count() FROM (
+              SELECT 1 ${aggregateRows}
+                AND (
+                  EventTimestamp < {eventTimestamp:UInt64}
+                  OR (EventTimestamp = {eventTimestamp:UInt64} AND EventId < {eventId:String})
+                )
+                AND EventId != {eventId:String}
+                ${hasIgnored ? "AND EventId NOT IN {ignoreEventIds:Array(String)}" : ""}
+              LIMIT 1
+            )) AS hasEarlierEvents
+        `,
+        query_params: {
+          tenantId,
+          aggregateType,
+          aggregateId: String(aggregateId),
+          eventTimestamp,
+          eventId,
+          ...(hasLowerBound ? { occurredAtFromMs } : {}),
+          ...(hasIgnored ? { ignoreEventIds } : {}),
+        },
+        format: "JSONEachRow",
+        ...(hasLowerBound ? {} : { SKIP_COLD_SCAN_CHECK: true as const }),
+      });
+      const rows = await result.json<{
+        hasEvent: string | number;
+        hasEarlierEvents: string | number;
+      }>();
+      const row = rows[0];
+      return {
+        hasEvent: Number(row?.hasEvent ?? 0) > 0,
+        hasEarlierEvents: Number(row?.hasEarlierEvents ?? 0) > 0,
+      };
+    } catch (error) {
+      this.logger.warn(
+        {
+          tenantId,
+          aggregateType,
+          aggregateId: String(aggregateId),
+          eventTimestamp,
+          eventId,
+          error,
+        },
+        "Failed to probe event records from ClickHouse",
+      );
+      throw error;
+    }
+  }
+
   async insertEventRecords(records: EventRecord[]): Promise<void> {
     if (records.length === 0) {
       return;
@@ -734,7 +843,11 @@ export class EventingClickHouseEventRepository implements EventRepository {
       if (organizationId === undefined || organizationId === null) {
         await this.insertEventLog({ tenantId, rows: stampedRecords });
       } else {
-        await this.appendFold.append({ organizationId, tenantId, rows: stampedRecords });
+        await this.appendFold.append({
+          organizationId,
+          tenantId,
+          rows: stampedRecords,
+        });
       }
     } catch (error) {
       this.logger.debug(
@@ -750,14 +863,22 @@ export class EventingClickHouseEventRepository implements EventRepository {
     }
   }
 
-  /** One insert, flushed before it answers; a folded one declares its tenant set. */
+  /**
+   * One insert, flushed before it answers; a folded one declares its tenant set. Async
+   * deduplication is off, as the server's default before 26.2 has it: the log collapses repeats
+   * by IdempotencyKey itself, and an insert with it off may share a statement (ADR-187).
+   */
   private async insertEventLog({ tenantId, rows, tenantIds }: EventLogInsert): Promise<void> {
     const client = await this.getClient(tenantId);
     await client.insert({
       table: "event_log",
       values: rows,
       format: "JSONEachRow",
-      clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+      clickhouse_settings: {
+        async_insert: 1,
+        wait_for_async_insert: 1,
+        async_insert_deduplicate: 0,
+      },
       ...(tenantIds === undefined ? {} : { tenantIds }),
     });
   }

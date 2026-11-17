@@ -271,6 +271,67 @@ describe("given a peer's member fact reaches organization", () => {
     await eventing.close();
   });
 
+  /** @scenario "Offboarded and erased departures carry the seat type from the fact" */
+  it("passes the seat type an offboarding or an erasure read, and none from an older fact", async () => {
+    const { eventing, memberFacts, peer } = hearing();
+    const offboarded = {
+      ...stamp,
+      id: "event-offboarded-seat",
+      type: AUTHZ_MEMBER_OFFBOARDED_EVENT_TYPE,
+      createdAt: HEARD_LATER,
+      occurredAt: HEARD_LATER,
+      data: {
+        tenantId: "user_gone",
+        organizationId: "org_acme",
+        userId: "user_gone",
+        offboardedByUserId: null,
+        occurredAt: AT,
+        heldFullSeat: false,
+      },
+    };
+    const erased = {
+      ...stamp,
+      id: "event-erased-seat",
+      type: USER_ERASED_EVENT_TYPE,
+      createdAt: HEARD_LATER,
+      occurredAt: HEARD_LATER,
+      data: {
+        tenantId: "user_gone",
+        userId: "user_gone",
+        occurredAt: AT,
+        organizationIds: ["org_acme", "org_beta"],
+        fullSeatOrganizationIds: ["org_beta"],
+      },
+    };
+    const erasedBeforeSeatType = {
+      ...erased,
+      id: "event-erased-before-seat-type",
+      data: {
+        tenantId: "user_gone",
+        userId: "user_gone",
+        occurredAt: AT,
+        organizationIds: ["org_old"],
+      },
+    };
+    await peer.service.storeEvents([offboarded, erased, erasedBeforeSeatType], { tenantId });
+
+    await vi.waitFor(() => {
+      expect(memberFacts.recordMemberOffboarded).toHaveBeenCalledWith(
+        expect.objectContaining({ organizationId: "org_acme", heldFullSeat: false }),
+      );
+      expect(memberFacts.recordMemberErased).toHaveBeenCalledWith(
+        expect.objectContaining({ organizationId: "org_acme", heldFullSeat: false }),
+      );
+      expect(memberFacts.recordMemberErased).toHaveBeenCalledWith(
+        expect.objectContaining({ organizationId: "org_beta", heldFullSeat: true }),
+      );
+      expect(memberFacts.recordMemberErased).toHaveBeenCalledWith(
+        expect.objectContaining({ organizationId: "org_old", heldFullSeat: undefined }),
+      );
+    });
+    await eventing.close();
+  });
+
   /** @scenario "A member fact for a deleted organisation records nothing" */
   it("records nothing for a deleted organisation and still records the live ones", async () => {
     const { eventing, memberFacts, peer } = hearing();

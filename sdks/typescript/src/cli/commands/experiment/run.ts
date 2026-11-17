@@ -11,7 +11,7 @@ import { failSpinner } from "../../utils/spinnerError";
 
 export const runExperimentCommand = async (
   slug: string,
-  options: { wait?: boolean; param?: string[]; concurrency?: string },
+  options: { wait?: boolean; param?: string[]; concurrency?: string; datasetVersion?: number },
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
 
@@ -25,6 +25,7 @@ export const runExperimentCommand = async (
     const runResult = await service.startRun(slug, {
       parameters,
       ...(concurrency !== undefined ? { concurrency } : {}),
+      ...(options.datasetVersion !== undefined ? { datasetVersion: options.datasetVersion } : {}),
     });
 
     spinner.succeed(

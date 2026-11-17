@@ -31,6 +31,9 @@ class GetApiMonitorsResponse200Item:
         updated_at (str):
         auto_paused_at (None | str): When the monitor paused itself because its evaluations mostly failed.
         auto_paused_reason (None | str): Why the monitor paused itself.
+        evaluator_label (None | str): The evaluator deploy label the monitor runs; null runs the latest version.
+        created_by_id (None | str): The user who created the monitor, when recorded.
+        updated_by_id (None | str): The user who changed the monitor last.
         platform_url (str):
     """
 
@@ -51,6 +54,9 @@ class GetApiMonitorsResponse200Item:
     updated_at: str
     auto_paused_at: None | str
     auto_paused_reason: None | str
+    evaluator_label: None | str
+    created_by_id: None | str
+    updated_by_id: None | str
     platform_url: str
 
     def to_dict(self) -> dict[str, Any]:
@@ -93,6 +99,15 @@ class GetApiMonitorsResponse200Item:
         auto_paused_reason: None | str
         auto_paused_reason = self.auto_paused_reason
 
+        evaluator_label: None | str
+        evaluator_label = self.evaluator_label
+
+        created_by_id: None | str
+        created_by_id = self.created_by_id
+
+        updated_by_id: None | str
+        updated_by_id = self.updated_by_id
+
         platform_url = self.platform_url
 
         field_dict: dict[str, Any] = {}
@@ -116,6 +131,9 @@ class GetApiMonitorsResponse200Item:
                 "updatedAt": updated_at,
                 "autoPausedAt": auto_paused_at,
                 "autoPausedReason": auto_paused_reason,
+                "evaluatorLabel": evaluator_label,
+                "createdById": created_by_id,
+                "updatedById": updated_by_id,
                 "platformUrl": platform_url,
             }
         )
@@ -184,6 +202,27 @@ class GetApiMonitorsResponse200Item:
 
         auto_paused_reason = _parse_auto_paused_reason(d.pop("autoPausedReason"))
 
+        def _parse_evaluator_label(data: object) -> None | str:
+            if data is None:
+                return data
+            return cast(None | str, data)
+
+        evaluator_label = _parse_evaluator_label(d.pop("evaluatorLabel"))
+
+        def _parse_created_by_id(data: object) -> None | str:
+            if data is None:
+                return data
+            return cast(None | str, data)
+
+        created_by_id = _parse_created_by_id(d.pop("createdById"))
+
+        def _parse_updated_by_id(data: object) -> None | str:
+            if data is None:
+                return data
+            return cast(None | str, data)
+
+        updated_by_id = _parse_updated_by_id(d.pop("updatedById"))
+
         platform_url = d.pop("platformUrl")
 
         get_api_monitors_response_200_item = cls(
@@ -204,6 +243,9 @@ class GetApiMonitorsResponse200Item:
             updated_at=updated_at,
             auto_paused_at=auto_paused_at,
             auto_paused_reason=auto_paused_reason,
+            evaluator_label=evaluator_label,
+            created_by_id=created_by_id,
+            updated_by_id=updated_by_id,
             platform_url=platform_url,
         )
 

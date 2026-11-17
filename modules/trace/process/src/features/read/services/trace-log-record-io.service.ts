@@ -4,6 +4,7 @@
  * here and hands the result to `TraceIOAccumulationService` alongside what the spans said.
  */
 
+import { unwrapUserQuery } from "@langwatch/coding-agent-contract";
 import { CLAUDE_CODE_SCOPE_NAMES, SPRING_AI_SCOPE_NAMES } from "@langwatch/span-normalisation";
 import type {
   LogRecordReceivedEventData,
@@ -27,12 +28,18 @@ export class TraceLogRecordIOService {
   }
 
   /**
-   * Spring AI, Claude Code and Codex each report the conversation as logs rather than span
+   * Spring AI, Claude Code, Codex and Grok each report the conversation as logs rather than span
    * attributes, each in its own shape. A vendor returning `null` means not mine, or nothing here,
    * and the next one gets a look — Spring AI is the one exception, and says so.
    */
   extractIO(data: LogRecordReceivedEventData): TraceLogIO {
-    return this.fromSpringAI(data) ?? this.fromClaudeCode(data) ?? this.fromCodex(data) ?? NO_IO;
+    return (
+      this.fromSpringAI(data) ??
+      this.fromClaudeCode(data) ??
+      this.fromCodex(data) ??
+      this.fromGrok(data) ??
+      NO_IO
+    );
   }
 
   /**
@@ -129,5 +136,19 @@ export class TraceLogRecordIOService {
     const prompt = data.attributes.prompt;
 
     return typeof prompt === "string" && prompt.length > 0 ? { input: prompt, output: null } : null;
+  }
+
+  /** Grok wraps the prompt in `<user_query>` and sends the reply on its own event. */
+  private fromGrok(data: LogRecordReceivedEventData): TraceLogIO | null {
+    const eventName = data.attributes["event.name"];
+    if (eventName === "grok_code.user_prompt") {
+      const prompt = unwrapUserQuery(data.attributes.prompt ?? "");
+      return prompt.length > 0 ? { input: prompt, output: null } : null;
+    }
+    if (eventName === "grok_code.assistant_response") {
+      const response = data.attributes.response ?? "";
+      return response.length > 0 ? { input: null, output: response } : null;
+    }
+    return null;
   }
 }

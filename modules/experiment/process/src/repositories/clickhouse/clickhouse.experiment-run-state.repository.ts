@@ -45,6 +45,11 @@ const EXPECTED_RESULTS_COLUMNS = {
   ExpectedEvaluatorResults: "CAST(NULL AS Nullable(UInt32))",
 } as const;
 
+/** Goose 00125's column, with the default it reads as until it lands (NO-HOLDS). */
+const CONCURRENCY_COLUMNS = {
+  Concurrency: "CAST(NULL AS Nullable(UInt16))",
+} as const;
+
 const logger = createLogger("langwatch:experiment-run-processing:run-state-repository");
 
 type WithDateWrites<T, K extends keyof T> = {
@@ -80,6 +85,7 @@ interface ClickHouseExperimentRunRecord {
   StoppedAt: number | null;
   ExpectedTargetResults: number | null;
   ExpectedEvaluatorResults: number | null;
+  Concurrency: number | null;
   LastProcessedEventId: string;
   TotalScoreSum: number;
   ScoreCount: number;
@@ -135,6 +141,7 @@ export class ClickHouseExperimentRunStateRepository<
       StoppedAt: record.StoppedAt === null ? null : Number(record.StoppedAt),
       ExpectedTargetResults: record.ExpectedTargetResults ?? null,
       ExpectedEvaluatorResults: record.ExpectedEvaluatorResults ?? null,
+      Concurrency: record.Concurrency ?? null,
       TotalScoreSum: record.TotalScoreSum ?? 0,
       ScoreCount: record.ScoreCount ?? 0,
       PassedCount: record.PassedCount ?? 0,
@@ -182,6 +189,7 @@ export class ClickHouseExperimentRunStateRepository<
       StoppedAt: data.StoppedAt != null ? clickHouseDateTime(data.StoppedAt) : null,
       ExpectedTargetResults: data.ExpectedTargetResults ?? null,
       ExpectedEvaluatorResults: data.ExpectedEvaluatorResults ?? null,
+      Concurrency: data.Concurrency ?? null,
       LastProcessedEventId: lastProcessedEventId,
       TotalScoreSum: data.TotalScoreSum,
       ScoreCount: data.ScoreCount,
@@ -207,6 +215,9 @@ export class ClickHouseExperimentRunStateRepository<
       const client = await this.clickhouse.resolveClient(context.tenantId);
       const input = { table: TABLE_NAME, alias: "t", columns: EXPECTED_RESULTS_COLUMNS };
       const expected = (await client.select?.(input)) ?? ClickHouseColumns.named(input);
+      const concurrencyInput = { table: TABLE_NAME, alias: "t", columns: CONCURRENCY_COLUMNS };
+      const concurrency =
+        (await client.select?.(concurrencyInput)) ?? ClickHouseColumns.named(concurrencyInput);
       // IN-tuple dedup over the ReplacingMergeTree (see
       // dev/docs/best_practices/clickhouse-queries.md). UpdatedAt is referenced via
       // table alias because it's also projected as `toUnixTimestamp64Milli(...) AS
@@ -230,6 +241,7 @@ export class ClickHouseExperimentRunStateRepository<
             toUnixTimestamp64Milli(t.FinishedAt) AS FinishedAt,
             toUnixTimestamp64Milli(t.StoppedAt) AS StoppedAt,
             ${expected},
+            ${concurrency},
             t.LastProcessedEventId AS LastProcessedEventId,
             t.TotalScoreSum AS TotalScoreSum, t.ScoreCount AS ScoreCount,
             t.PassedCount AS PassedCount, t.GradedCount AS GradedCount,

@@ -3,11 +3,18 @@ import path from "node:path";
 
 import { Temporal } from "@langwatch/time";
 
+import { REPOSITORY_URL } from "../../../lib/repository.ts";
 import { releaseSchema, type Release } from "../model/release.ts";
 
 export const RELEASES_SLUG = "changelog";
 const PUBLISHED = 5;
 const WHATS_NEW = 3;
+const LEFT_OUT_HEADING = "## About this copy";
+const LEFT_OUT_NOTE =
+  "This copy leaves out releases, to keep it short. " +
+  `The [changelog page](/${RELEASES_SLUG}) lists the most recent releases, and the ` +
+  `[repository CHANGELOG](${REPOSITORY_URL}/blob/main/CHANGELOG.md) ` +
+  "holds every release.";
 const WHATS_NEW_TAG = /^<WhatsNew\s*\/>\s*$/m;
 const NOTES_TAG = /^<ReleaseNotes\s*\/>\s*$/m;
 const cache = new Map<string, { modified: number; entries: Release[] }>();
@@ -103,15 +110,21 @@ export function readReleases({ docsRoot }: { docsRoot: string }) {
   return entries;
 }
 
-/** Fills the changelog's `<ReleaseNotes />` tag (else its top) and any `<WhatsNew />` tag. */
+/**
+ * Fills the changelog's `<ReleaseNotes />` tag (else its top) and any `<WhatsNew />` tag.
+ * `releaseCount` keeps only the newest releases (possibly none) and notes that the rest are
+ * left out; the Markdown export passes it to fit the page token budget, the page never does.
+ */
 export function withReleaseNotes({
   source,
   slug,
   docsRoot,
+  releaseCount,
 }: {
   source: string;
   slug: string;
   docsRoot: string;
+  releaseCount?: number;
 }) {
   if (slug !== RELEASES_SLUG) {
     if (!WHATS_NEW_TAG.test(source)) return source;
@@ -119,12 +132,13 @@ export function withReleaseNotes({
   }
   const entries = readReleases({ docsRoot });
   if (!entries.length) return source.replace(NOTES_TAG, "");
-  const notes = entries
-    .map(
-      ({ version, label, body, compare }) =>
-        `## Release v${version}\n\nReleased ${label}. [Compare changes](${compare}).\n\n${escapeMdx({ text: body })}\n`,
-    )
-    .join("\n");
+  const kept = entries.slice(0, Math.max(0, releaseCount ?? entries.length));
+  const sections = kept.map(
+    ({ version, label, body, compare }) =>
+      `## Release v${version}\n\nReleased ${label}. [Compare changes](${compare}).\n\n${escapeMdx({ text: body })}\n`,
+  );
+  if (kept.length < entries.length) sections.push(`${LEFT_OUT_HEADING}\n\n${LEFT_OUT_NOTE}\n`);
+  const notes = sections.join("\n");
   if (NOTES_TAG.test(source)) return source.replace(NOTES_TAG, () => notes);
   const frontmatter = source.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n/)?.[0] ?? "";
   return `${frontmatter}\n${notes}\n${source.slice(frontmatter.length)}`;

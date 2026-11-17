@@ -184,8 +184,9 @@ export class BugReportRateLimitedError extends HandledError {
 }
 
 /**
- * The page and the task grant existing, active accounts with a verified address only, and on
- * the hosted cloud staff ones. Never echoes the address: logs and responses carry the account id.
+ * The page and the task grant existing, active accounts with a verified address, and on the
+ * hosted cloud staff ones; with no email configured the task also grants an unverified one.
+ * Never echoes the address: logs and responses carry the account id.
  */
 export class PlatformOperatorUserNotFoundError extends HandledError {
   declare readonly code: "platform_operator_user_not_found";

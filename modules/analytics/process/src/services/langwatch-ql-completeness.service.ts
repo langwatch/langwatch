@@ -10,7 +10,6 @@ import {
   type LangWatchQLTimeWindow,
   type QueryCompleteness,
   type QueryCompletenessState,
-  type RunSources,
 } from "@langwatch/analytics-contract";
 import { createLogger } from "@langwatch/observability";
 import { Temporal } from "@langwatch/time";
@@ -23,6 +22,9 @@ import type {
   LangWatchQLViewColumn,
   LangWatchQLViewDefinition,
 } from "./langwatch-ql-catalog-shapes.service.ts";
+import { LangWatchQLFlooredReadService } from "./langwatch-ql-floored-read.service.ts";
+
+const flooredRead = LangWatchQLFlooredReadService.create();
 
 const logger = createLogger("langwatch:analytics:lwql:completeness");
 
@@ -45,6 +47,8 @@ const TEMPORAL_TYPE = /^(?:Nullable\()?DateTime(?:64)?\b/;
 interface CompletenessPlan {
   readonly kind: "countable";
   readonly viewName: string;
+  /** The view's bare name, its alias in the report's FROM. */
+  readonly alias: string;
   readonly unit: string;
   readonly timeColumn: string;
   readonly fields: readonly LangWatchQLViewColumn[];
@@ -66,11 +70,11 @@ export interface LangWatchQLCompletenessInput {
   readonly executor: LangWatchQLExecutorRepository;
   /** The capability the main query ran with, so the report sees exactly its tenants. */
   readonly tenantCapability: string;
+  /** The projects that capability scopes, named in the query log's comment. */
+  readonly projectIds: readonly string[];
   readonly validation: AcceptedLangWatchQL;
   readonly database: string;
   readonly views: readonly LangWatchQLViewDefinition[];
-  /** The sources the main query counted, so the report counts the same rows. */
-  readonly sources?: RunSources | undefined;
   /** The members the main query read and from when, so the report counts the same rows. */
   readonly memberWindows?: readonly LangWatchQLMemberWindow[];
   /** The window the query was bound to. No window, no report: a whole history is not a period. */
@@ -95,23 +99,28 @@ export class LangWatchQLCompletenessService {
     if (plan.kind === "uncountable") return { kind: "skipped", reason: "uncountable_view" };
 
     try {
-      const execution = await input.executor.execute({
-        sql: scopeLangWatchQL({
-          sql: completenessSql({ plan, isBucketed: granularitySeconds !== undefined }),
-          sources: input.sources,
-          database: input.database,
-          views: input.views,
-          timeWindow,
-          ...(input.memberWindows ? { memberWindows: input.memberWindows } : {}),
-        }),
-        parameters: {
-          [START_PARAMETER]: formatLangWatchQLDateTimeParameter(timeWindow.start),
-          [END_PARAMETER]: formatLangWatchQLDateTimeParameter(timeWindow.end),
-          ...(granularitySeconds === undefined
-            ? {}
-            : { [GRANULARITY_PARAMETER]: granularitySeconds }),
+      const execution = await flooredRead.execute({
+        executor: input.executor,
+        request: {
+          sql: scopeLangWatchQL({
+            sql: completenessSql({ plan, isBucketed: granularitySeconds !== undefined }),
+            database: input.database,
+            views: input.views,
+            timeWindow,
+            ...(input.memberWindows ? { memberWindows: input.memberWindows } : {}),
+          }),
+          parameters: {
+            [START_PARAMETER]: formatLangWatchQLDateTimeParameter(timeWindow.start),
+            [END_PARAMETER]: formatLangWatchQLDateTimeParameter(timeWindow.end),
+            ...(granularitySeconds === undefined
+              ? {}
+              : { [GRANULARITY_PARAMETER]: granularitySeconds }),
+          },
+          tenantCapability: input.tenantCapability,
+          projectIds: input.projectIds,
         },
-        tenantCapability: input.tenantCapability,
+        database: input.database,
+        views: input.views,
       });
 
       return {
@@ -172,6 +181,7 @@ function planCompleteness({
   return {
     kind: "countable",
     viewName: reference.viewName,
+    alias: view.name,
     unit: unitOf(view.name),
     timeColumn: timeColumn.name,
     fields,
@@ -204,7 +214,10 @@ function presentSql({
     : `countIf(${priced})`;
 }
 
-/** Catalogue identifiers only, never caller text; bucketed exactly as dashboard templates do. */
+/**
+ * Catalogue identifiers only, never caller text; bucketed exactly as dashboard templates do.
+ * Aliased so the floor can send a bounded read to the view's floored twin from the start.
+ */
 function completenessSql({
   plan,
   isBucketed,
@@ -235,7 +248,7 @@ function completenessSql({
   ];
 
   return (
-    `SELECT ${select.join(", ")} FROM ${plan.viewName} ` +
+    `SELECT ${select.join(", ")} FROM ${plan.viewName} AS ${plan.alias} ` +
     `WHERE ${time} >= {${START_PARAMETER}:DateTime} AND ${time} < {${END_PARAMETER}:DateTime}` +
     (isBucketed ? " GROUP BY bucket" : "")
   );

@@ -22,7 +22,9 @@ const {
   hardRedirectMock,
   searchParamsRef,
   publicEnvRef,
+  sessionRef,
 } = vi.hoisted(() => ({
+  sessionRef: { current: null as { user: { id: string; email: string | null } } | null },
   requestVerificationMock: vi.fn(),
   completeVerificationMock: vi.fn(),
   enrollmentMock: vi.fn(),
@@ -108,7 +110,7 @@ vi.mock("../../../behavior/auth-client.tsx", async (importOriginal) => {
     ...actual,
     signIn: signInMock,
     navigate: navigateMock,
-    useSession: () => ({ data: null }),
+    useSession: () => ({ data: sessionRef.current }),
     authClient: {
       ...actual.authClient,
       passkey: { addPasskey: addPasskeyMock },
@@ -121,6 +123,7 @@ vi.mock("../../../behavior/use-route.ts", () => ({
 }));
 
 import type * as authClientModule from "../../../behavior/auth-client.tsx";
+import { holdAddressProof, readHeldAddressProof } from "../../../behavior/held-address-proof.ts";
 import { _resetTwoStepChallengeForTests } from "../../../model/two-step-challenge.ts";
 import { VerificationFirstSignUp } from "../verification-first-sign-up.tsx";
 
@@ -158,6 +161,7 @@ describe("given the sign-up screen", () => {
     vi.clearAllMocks();
     searchParamsRef.current = new URLSearchParams("");
     publicEnvRef.current = { IS_SAAS: true };
+    sessionRef.current = null;
     requestVerificationMock.mockResolvedValue({ sent: true });
     routeMock.mockResolvedValue(localPicker);
     enrollmentMock.mockResolvedValue({
@@ -170,6 +174,95 @@ describe("given the sign-up screen", () => {
   afterEach(() => {
     cleanup();
     _resetTwoStepChallengeForTests();
+    window.sessionStorage.clear();
+  });
+
+  describe("when sign-up is opened fresh in a tab that holds a proof", () => {
+    /** @scenario "A fresh visit to sign-up starts at the address step" */
+    it("shows the address step and drops the held proof", async () => {
+      holdAddressProof({ email: "sam@acme.com", addressProof: "proof-1" });
+
+      renderScreen();
+
+      expect(await screen.findByLabelText(/email/i)).toBeTruthy();
+      expect(screen.queryByTestId("signup-identifier")).toBeNull();
+      expect(enrollmentMock).not.toHaveBeenCalled();
+      expect(readHeldAddressProof()).toBeNull();
+    });
+  });
+
+  describe("when the create-your-account step is reloaded", () => {
+    beforeEach(() => {
+      const reloadEntry = {
+        type: "reload",
+        name: "",
+        entryType: "navigation",
+        startTime: 0,
+        duration: 0,
+        toJSON: () => ({}),
+      };
+      vi.spyOn(performance, "getEntriesByType").mockReturnValue([reloadEntry]);
+    });
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    /** @scenario "A reload on the create-your-account step stays on it" */
+    it("shows the same step for the same address and asks for no new link", async () => {
+      searchParamsRef.current = new URLSearchParams(
+        "verify=a-token&callbackUrl=%2Finvite%2Faccept",
+      );
+      completeVerificationMock.mockResolvedValue({
+        email: "sam@acme.com",
+        accountCreated: false,
+        accountExists: false,
+        addressProof: "proof-1",
+      });
+      renderScreen();
+      await screen.findByTestId("signup-identifier");
+      cleanup();
+
+      searchParamsRef.current = new URLSearchParams("callbackUrl=%2Finvite%2Faccept");
+      const { container } = renderScreen();
+
+      expect((await screen.findByTestId("signup-identifier")).textContent).toContain(
+        "sam@acme.com",
+      );
+      expect(container.querySelector('input[type="password"]')).not.toBeNull();
+      expect(enrollmentMock).toHaveBeenLastCalledWith({
+        email: "sam@acme.com",
+        addressProof: "proof-1",
+      });
+      expect(completeVerificationMock).toHaveBeenCalledTimes(1);
+      expect(requestVerificationMock).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A held proof the server refuses falls back to the address step" */
+    it("shows the address step and holds nothing once the server refuses the proof", async () => {
+      holdAddressProof({ email: "sam@acme.com", addressProof: "spent-proof" });
+      enrollmentMock.mockRejectedValue({ data: { error: { code: "auth_no_address_to_confirm" } } });
+
+      renderScreen();
+
+      expect(await screen.findByLabelText(/email/i)).toBeTruthy();
+      expect(screen.queryByTestId("signup-identifier")).toBeNull();
+      expect(readHeldAddressProof()).toBeNull();
+    });
+
+    /** @scenario "Creating the account lets go of the held proof" */
+    it("lets go of the proof once the account is created", async () => {
+      holdAddressProof({ email: "sam@acme.com", addressProof: "proof-1" });
+      registerMock.mockResolvedValue({ id: "user_1" });
+      signInMock.mockResolvedValue({ ok: true });
+
+      const { container } = renderScreen();
+      await screen.findByTestId("signup-identifier");
+      await fillPasswordPair(container, "a-good-password");
+      await userEvent.click(screen.getByRole("button", { name: /create account/i }));
+
+      await waitFor(() => expect(registerMock).toHaveBeenCalled());
+      expect(readHeldAddressProof()).toBeNull();
+    });
   });
 
   describe("when sign-up starts with a work address", () => {
@@ -457,6 +550,46 @@ describe("given the sign-up screen", () => {
       expect(routeMock).not.toHaveBeenCalled();
     });
 
+    /** @scenario "A reopened link in a browser signed in to that account goes on" */
+    it("goes on to where the link was taking it when this browser is signed in to the address", async () => {
+      searchParamsRef.current = new URLSearchParams(
+        "verify=a-token&callbackUrl=%2Finvite%2Faccept",
+      );
+      sessionRef.current = { user: { id: "user_1", email: "sam@acme.com" } };
+      completeVerificationMock.mockResolvedValue({
+        email: "sam@acme.com",
+        accountCreated: false,
+        accountExists: true,
+        addressProof: null,
+        signedIn: false,
+      });
+
+      renderScreen();
+
+      expect(await screen.findByTestId("signed-in-handoff")).toHaveTextContent(
+        "You're signed in as sam@acme.com. Taking you to LangWatch.",
+      );
+      expect(hardRedirectMock).toHaveBeenCalledWith("/invite/accept");
+      expect(screen.queryByTestId("account-ready")).toBeNull();
+    });
+
+    it("offers the way in when this browser is signed in to another address", async () => {
+      searchParamsRef.current = new URLSearchParams("verify=a-token");
+      sessionRef.current = { user: { id: "user_2", email: "kim@acme.com" } };
+      completeVerificationMock.mockResolvedValue({
+        email: "sam@acme.com",
+        accountCreated: false,
+        accountExists: true,
+        addressProof: null,
+        signedIn: false,
+      });
+
+      renderScreen();
+
+      expect(await screen.findByTestId("account-ready")).toHaveTextContent(/sam@acme\.com/);
+      expect(hardRedirectMock).not.toHaveBeenCalled();
+    });
+
     /** @scenario Sign-up creates the account and confirms the address afterwards */
     it("offers the way in when the link was reopened and opened no session", async () => {
       searchParamsRef.current = new URLSearchParams("verify=a-token");
@@ -611,6 +744,69 @@ describe("given the sign-up screen", () => {
       expect(screen.queryByTestId("method-picker")).toBeNull();
       expect(container.querySelector('input[type="password"]')).toBeNull();
       expect(completeVerificationMock).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when a link that carries the invitation has been spent", () => {
+    /** @scenario "The spent token leaves the address bar" */
+    it("takes the token off the address bar and keeps the invitation", async () => {
+      const query = "verify=a-token&callbackUrl=%2Finvite%2Faccept%3FinviteCode%3Dabc";
+      window.history.replaceState(null, "", `/auth/signup?${query}`);
+      searchParamsRef.current = new URLSearchParams(query);
+      completeVerificationMock.mockResolvedValue({
+        email: "sam@acme.com",
+        accountCreated: false,
+        accountExists: false,
+        addressProof: "proof-1",
+        signedIn: false,
+      });
+
+      renderScreen();
+
+      await waitFor(() => expect(window.location.search).not.toContain("verify="));
+      expect(new URLSearchParams(window.location.search).get("callbackUrl")).toBe(
+        "/invite/accept?inviteCode=abc",
+      );
+      expect(completeVerificationMock).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when the spend never reached the server", () => {
+    /** @scenario "A spend that never reached the server keeps the token for a reload" */
+    it("leaves the token in the address bar", async () => {
+      const query = "verify=a-token&callbackUrl=%2Finvite%2Faccept%3FinviteCode%3Dabc";
+      window.history.replaceState(null, "", `/auth/signup?${query}`);
+      searchParamsRef.current = new URLSearchParams(query);
+      completeVerificationMock.mockRejectedValue(new TypeError("Failed to fetch"));
+
+      renderScreen();
+
+      await waitFor(() => expect(completeVerificationMock).toHaveBeenCalledTimes(1));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(window.location.search).toContain("verify=a-token");
+    });
+  });
+
+  describe("when a browser already signed in opens a link refused as used", () => {
+    /** @scenario "A dead confirmation link in a browser already signed in goes on" */
+    it("says they are signed in and goes on to where the link was taking them", async () => {
+      sessionRef.current = { user: { id: "user_sam", email: "sam@acme.com" } };
+      searchParamsRef.current = new URLSearchParams(
+        "verify=used-token&callbackUrl=%2Finvite%2Faccept%3FinviteCode%3Dabc",
+      );
+      completeVerificationMock.mockRejectedValue({
+        code: "identity_verification_used",
+        status: 410,
+      });
+
+      renderScreen();
+
+      expect(await screen.findByTestId("signed-in-handoff")).toHaveTextContent(
+        "You're signed in as sam@acme.com. Taking you to LangWatch.",
+      );
+      expect(screen.queryByText("That confirmation link no longer works")).toBeNull();
+      expect(screen.queryByRole("button", { name: /send a new link/i })).toBeNull();
+      expect(hardRedirectMock).toHaveBeenCalledWith("/invite/accept?inviteCode=abc");
     });
   });
 

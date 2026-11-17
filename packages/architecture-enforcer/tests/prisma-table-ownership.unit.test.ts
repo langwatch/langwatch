@@ -422,6 +422,7 @@ describe("Prisma table ownership lint", () => {
         "organization",
         ["authz", "data-privacy", "billing", "entitlement", "licensing"],
       ],
+      ["SeatHold", "organization", ["entitlement", "licensing", "scim"]],
       ["Organization", "organization", ["scim", "entitlement", "billing", "licensing"]],
       ["User", "user", ["billing"]],
       ["OrganizationLicense", "licensing", ["organization"]],

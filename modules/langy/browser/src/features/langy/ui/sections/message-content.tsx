@@ -10,6 +10,7 @@ import type {
 import {
   deriveLangyChoicesLockState,
   githubProgressFromToolParts,
+  isLangyCallStoppedText,
 } from "@langwatch/langy-contract";
 import { findGuidedKickoffParts } from "@langwatch/onboarding-contract";
 import type { UIMessage } from "ai";
@@ -98,7 +99,7 @@ type MessageContentProps = {
   discardedProposals: Set<string>;
   applyingProposals: Set<string>;
   onApply: (proposalId: string, proposal: LangyProposal) => Promise<void>;
-  onDiscard: (proposalId: string) => void;
+  onDiscard: (proposalId: string, proposal: LangyProposal) => void;
   /** True for the in-flight assistant turn — streams tokens with blur reveal. */
   isStreaming?: boolean;
   /**
@@ -234,11 +235,13 @@ function PlainMessage({
   );
 }
 
-/** The last run carrying the reply: a said line, or an answer with prose in it. */
-function lastAnswerRun(runs: LangyTranscriptRun[]): number {
+/** The last run that took a step: activity, a said line, or an answer with prose in it. */
+function lastStepRun(runs: LangyTranscriptRun[]): number {
   return runs.findLastIndex(
     (run) =>
-      run.kind === "say" || (run.kind === "answer" && langyRunText(run.parts).trim().length > 0),
+      run.kind === "activity" ||
+      run.kind === "say" ||
+      (run.kind === "answer" && langyRunText(run.parts).trim().length > 0),
   );
 }
 
@@ -399,6 +402,7 @@ function AssistantMessage(props: MessageContentProps) {
   }
   const view: RunView = {
     isStreaming,
+    interrupted,
     // A RECORDED message is left alone: the relay already ruled on its fences.
     isRecorded: isRecordedMessage(message),
     hasActivity: reading.hasActivity,
@@ -409,7 +413,7 @@ function AssistantMessage(props: MessageContentProps) {
     onVerifyDerivedCard: props.onVerifyDerivedCard,
     reasoningTitles: reading.reasoningTitles,
     lastActivityRunIndex: reading.runs.findLastIndex((run) => run.kind === "activity"),
-    lastAnswerRunIndex: lastAnswerRun(reading.runs),
+    lastStepRunIndex: lastStepRun(reading.runs),
     callCards: callCardsOf({
       props,
       reading,
@@ -516,7 +520,11 @@ function callCardsOf({
         <LangyDerivedCardView
           card={questionPart.card}
           projectSlug={projectSlug}
-          choicesLockState={questionLockState({ part: questionPart, props })}
+          choicesLockState={questionLockState({
+            part: questionPart,
+            props,
+            stopped: isLangyCallStoppedText((part as { errorText?: unknown }).errorText),
+          })}
           onChoiceSelect={props.onChoiceSelect}
         />
       </LangyCardBoundary>
@@ -564,7 +572,7 @@ function ProposalCardOfPart({
         isDiscarded={props.discardedProposals.has(id)}
         isApplying={props.applyingProposals.has(id)}
         onApply={() => void props.onApply(id, proposal)}
-        onDiscard={() => props.onDiscard(id)}
+        onDiscard={() => props.onDiscard(id, proposal)}
       />
     </LangyCardBoundary>
   );
@@ -600,14 +608,18 @@ function AnswerCards({ props }: { props: MessageContentProps }) {
 function questionLockState({
   part,
   props,
+  stopped,
 }: {
   part: { blockId: string; card: LangyDerivedCard };
   props: MessageContentProps;
+  /** The user's Stop ended the call, so its options can no longer be chosen. */
+  stopped: boolean;
 }): LangyChoicesLockState {
-  return (
+  const recorded =
     questionWaitLockState({ blockId: part.blockId, card: part.card, waits: props.questionWaits }) ??
-    deriveLangyChoicesLockState({ blockId: part.blockId, timeline: props.choicesTimeline ?? [] })
-  );
+    deriveLangyChoicesLockState({ blockId: part.blockId, timeline: props.choicesTimeline ?? [] });
+  // An answer given before the Stop keeps its choice; only an unanswered card is superseded.
+  return stopped && recorded.status !== "answered" ? { status: "superseded" } : recorded;
 }
 
 /**
@@ -953,9 +965,11 @@ function SayRun({ parts }: { parts: readonly unknown[] }) {
 type RunView = Omit<Parameters<typeof AnswerRun>[0], "parts" | "isStreaming" | "isRecorded"> & {
   isStreaming: boolean;
   isRecorded: boolean;
+  /** The reader pressed Stop on this turn. */
+  interrupted: boolean;
   reasoningTitles: Parameters<typeof LangyActivityParts>[0]["reasoningTitles"];
   lastActivityRunIndex: number;
-  lastAnswerRunIndex: number;
+  lastStepRunIndex: number;
   /** The cards one call raised, drawn where the call ran. */
   callCards: (part: unknown, key: string) => ReactNode[];
   /** The cumulative PR-flow progress card, drawn once after the last run that moved it on. */
@@ -985,9 +999,9 @@ function renderRun({
             // A call is only ever closed by its own output, so off the streaming
             // turn an open call is an interrupted one.
             live={view.isStreaming}
-            // The turn answered after this run, so a failure inside it is one the
-            // turn recovered from.
-            answeredAfter={index < view.lastAnswerRunIndex}
+            // A failed step keeps its card only when the turn ended on it, unstopped.
+            endsTheTurn={index === view.lastStepRunIndex}
+            interrupted={view.interrupted}
           />
         </LangyCardBoundary>
         {/* A question, a pull request, a proposal, the code access ask or a secret sits

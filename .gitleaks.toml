@@ -603,3 +603,15 @@ description = "LangWatch's public PostHog client key, shipped to every browser o
 targetRules = ["generic-api-key"]
 paths = ['''apps/docs/src/features/shell/browser/posthog\.ts''']
 regexes = ['''^phc_oOlj3H19T2JlGbFXmrGrjSLbDPDNyPKYdIFaTdrkXOY$''']
+
+# `runner_stderr_test.go` plants the made-up value `CAPSECRET-0123456789` in a
+# runner's stderr and asserts it comes out as `[redacted]`; a redaction test
+# needs a secret-shaped value to prove anything, and this one is a credential
+# nowhere. Scoped to that value in that file (`condition = "AND"`, so the path
+# alone allows nothing) and to `generic-api-key` only.
+[[allowlists]]
+description = "Made-up CAPSECRET value in the code-block stderr redaction test"
+condition = "AND"
+targetRules = ["generic-api-key"]
+paths = ['''^services/nlpgo/app/engine/blocks/codeblock/runner_stderr_test\.go$''']
+regexes = ['''^CAPSECRET-0123456789$''']

@@ -94,6 +94,12 @@ Feature: Every catalogued Postgres model is queryable through LangWatchQL
       And a caller with content access reads it
 
     @unit
+    Scenario: LWQL reads a template's OTTL rules only with aiTools:manage
+      Given the derived ingestion templates view
+      When a caller without aiTools:manage queries it
+      Then the OTTL rules column is not readable
+
+    @unit
     Scenario: Identity tables are skipped and person columns stay opaque
       Given the User, Team and Organization models
       When the Postgres catalog is derived

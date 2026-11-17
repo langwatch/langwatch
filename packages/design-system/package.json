@@ -106,6 +106,10 @@
       "types": "./dist/components/display/avatar.d.ts",
       "default": "./src/components/display/avatar.tsx"
     },
+    "./project-avatar": {
+      "types": "./dist/components/display/project-avatar.d.ts",
+      "default": "./src/components/display/project-avatar.tsx"
+    },
     "./presence": {
       "types": "./dist/components/display/presence.d.ts",
       "default": "./src/components/display/presence.tsx"
@@ -173,6 +177,18 @@
     "./langy-mark": {
       "types": "./dist/components/brand/langy-mark.d.ts",
       "default": "./src/components/brand/langy-mark.tsx"
+    },
+    "./feature-mark": {
+      "types": "./dist/components/brand/feature-mark.d.ts",
+      "default": "./src/components/brand/feature-mark.tsx"
+    },
+    "./feature-illustration": {
+      "types": "./dist/components/brand/feature-illustration.d.ts",
+      "default": "./src/components/brand/feature-illustration.tsx"
+    },
+    "./enterprise-badge": {
+      "types": "./dist/components/brand/enterprise-badge.d.ts",
+      "default": "./src/components/brand/enterprise-badge.tsx"
     },
     "./access-state": {
       "types": "./dist/components/states/access-state.d.ts",
@@ -451,6 +467,10 @@
       "types": "./dist/components/display/inline-code.d.ts",
       "default": "./src/components/display/inline-code.tsx"
     },
+    "./highlighted-expression": {
+      "types": "./dist/components/display/highlighted-expression.d.ts",
+      "default": "./src/components/display/highlighted-expression.tsx"
+    },
     "./shortcut-hint": {
       "types": "./dist/components/display/shortcut-hint.d.ts",
       "default": "./src/components/display/shortcut-hint.tsx"
@@ -466,6 +486,10 @@
     "./stat-tile": {
       "types": "./dist/components/values/stat-tile.d.ts",
       "default": "./src/components/values/stat-tile.tsx"
+    },
+    "./daily-bar-chart": {
+      "types": "./dist/components/display/daily-bar-chart.d.ts",
+      "default": "./src/components/display/daily-bar-chart.tsx"
     },
     "./time-series-chart": {
       "types": "./dist/components/display/time-series-chart.d.ts",
@@ -486,6 +510,10 @@
     "./field-editor": {
       "types": "./dist/components/forms/field-editor.d.ts",
       "default": "./src/components/forms/field-editor.tsx"
+    },
+    "./toggle-row": {
+      "types": "./dist/components/forms/toggle-row.d.ts",
+      "default": "./src/components/forms/toggle-row.tsx"
     },
     "./settings-field": {
       "types": "./dist/components/forms/settings-field.d.ts",
@@ -606,6 +634,18 @@
     "./column-picker": {
       "types": "./dist/components/layout/column-picker.d.ts",
       "default": "./src/components/layout/column-picker.tsx"
+    },
+    "./deploy-label-select": {
+      "types": "./dist/components/forms/deploy-label-select.d.ts",
+      "default": "./src/components/forms/deploy-label-select.tsx"
+    },
+    "./deploy-labels-dialog": {
+      "types": "./dist/components/overlays/deploy-labels-dialog.d.ts",
+      "default": "./src/components/overlays/deploy-labels-dialog.tsx"
+    },
+    "./version-list": {
+      "types": "./dist/components/display/version-list.d.ts",
+      "default": "./src/components/display/version-list.tsx"
     }
   },
   "scripts": {

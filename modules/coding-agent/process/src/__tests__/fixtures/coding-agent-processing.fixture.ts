@@ -217,6 +217,14 @@ export class TestModelProviderService implements ModelProviderApi {
     throw new Error("Not used by Coding Agent tests.");
   }
 
+  listDecisionModelsForProject(): Promise<[]> {
+    return Promise.resolve([]);
+  }
+
+  listDecisionModelsForScopes(): Promise<[]> {
+    return Promise.resolve([]);
+  }
+
   findAlternateModel(): Promise<never> {
     throw new Error("Not used by Coding Agent tests.");
   }

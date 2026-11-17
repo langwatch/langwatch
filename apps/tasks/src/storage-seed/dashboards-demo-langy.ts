@@ -35,7 +35,7 @@ const ASKS: readonly {
   {
     question: "Which model costs me the most this month?",
     commands: [
-      "langwatch query run --sql 'SELECT Model, sum(TotalCost) FROM model_usage_by_minute GROUP BY Model' --format json",
+      "langwatch query run 'SELECT Model, sum(TotalCost) FROM model_usage_by_minute GROUP BY Model' --projects <project id> --format json",
     ],
     answer: "gpt-5 costs the most this month, about two thirds of your spend.",
     weight: 0.16,

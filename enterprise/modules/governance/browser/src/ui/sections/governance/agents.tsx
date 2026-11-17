@@ -164,8 +164,10 @@ function useAgentsScreen() {
     rows: sample.active ? SAMPLE_AGENT_ROWS : (agents.data ?? []),
     // Suppress loading/error under sample mode. Use `!orgId` not `!!orgId` to avoid false
     // "no agents registered" before org resolves.
-    isLoading: !sample.active && (!orgId || agents.isLoading),
+    // `isPending`: a read paused offline has no answer yet either.
+    isLoading: !sample.active && (!orgId || agents.isPending),
     error: sample.active ? null : agents.error,
+    retry: () => void agents.refetch(),
   };
 }
 
@@ -254,6 +256,7 @@ function AgentsPane({
   layout,
   sample,
   isLoading,
+  failed,
   noAgents,
   onClearFilters,
 }: {
@@ -262,6 +265,8 @@ function AgentsPane({
   layout: AgentsLayout;
   sample: boolean;
   isLoading: boolean;
+  /** The read failed: the page's alert says so, and an empty pane would claim an answer. */
+  failed: boolean;
   /**
    * What to show when the organization holds no agents, decided by the page
    * (a read this pane doesn't make). Words and press travel together so a
@@ -290,6 +295,10 @@ function AgentsPane({
   if (visible.length > 0) {
     return <AgentsList agents={visible} layout={layout} sample={sample} />;
   }
+
+  // A failed read with nothing already on screen has no rows to stand behind
+  // either empty state: the alert above is the whole answer.
+  if (failed && rows.length === 0) return null;
 
   // Two different nothings, and they must never borrow each other's words.
   // Telling a reader who has ten agents and a narrow filter to go register one
@@ -411,7 +420,7 @@ function AgentsPage() {
     orgId: organization?.id ?? "",
     canManage,
   });
-  const { sample, rows, isLoading, error } = useAgentsScreen();
+  const { sample, rows, isLoading, error, retry } = useAgentsScreen();
   const { filters, setFilter, clearFilters } = useAgentFilters();
   // Gated on the unfiltered set, never the visible one: a reader who filters
   // down to nothing must still have the chip that gets them back. The layout
@@ -472,12 +481,13 @@ function AgentsPage() {
               These agents are an illustration of what this page will hold, nothing here is real.
             </SampleDataBanner>
           )}
-          {/* Above the content rather than in place of it. A failed read leaves
-            the page with no rows, and the pane below already has a sentence
-            for that; what it cannot say is that the emptiness is a failure
-            rather than an answer. `useAgentsScreen` has already decided this
-            is null under sample mode. */}
-          {error ? <HandledErrorAlert error={error} fallbackTitle="Couldn't load agents" /> : null}
+          {/* Above the content. A failed first read leaves the pane blank, not
+            "no agents registered": emptiness after a failure is not an answer.
+            A failed refresh keeps the rows already read under it.
+            `useAgentsScreen` has already decided this is null under sample mode. */}
+          {error ? (
+            <HandledErrorAlert error={error} fallbackTitle="Couldn't load agents" onRetry={retry} />
+          ) : null}
           {/* Under the banner, above the chips. Under the banner because every
             figure on it is invented while sample mode is on, and the banner is
             the page's one claim about the whole screen; above the chips
@@ -503,6 +513,7 @@ function AgentsPage() {
             layout={layout}
             sample={sample.active}
             isLoading={isLoading}
+            failed={!!error}
             noAgents={noAgents}
             onClearFilters={clearFilters}
           />

@@ -90,7 +90,7 @@ configureDailyRun(input: ConfigureInsightDailyRunInput & Reader): Promise<void>;
 
 #### `turnOffDailyRun`
 
-Turns the reader's daily run off for a board; "No thanks" on the offer stores the same.
+Turns the reader's daily run off for a board.
 
 ```typescript
 turnOffDailyRun(input: TurnOffInsightDailyRunInput & Reader): Promise<void>;

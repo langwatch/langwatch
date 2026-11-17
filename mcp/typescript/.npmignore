@@ -21,6 +21,7 @@ tests/
 __tests__/
 vitest.config.js
 vitest.config.ts
+vitest.smoke.config.js
 
 # Build tooling (we ship the prebuilt dist/, no build step at install).
 tsup.config.ts

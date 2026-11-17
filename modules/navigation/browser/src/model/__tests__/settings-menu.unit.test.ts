@@ -6,10 +6,17 @@
 
 import { describe, expect, it } from "vitest";
 
-import { adminMenu, settingsMenu, type SettingsMenuGates } from "../settings-menu.ts";
+import {
+  adminMenu,
+  isSettingsMenuItemActive,
+  isSettingsMenuItemActiveAmong,
+  settingsMenu,
+  type SettingsMenuGates,
+} from "../settings-menu.ts";
 
 const EVERYTHING_CLOSED: SettingsMenuGates = {
   hasPermission: () => false,
+  hasOrganizationPermission: () => false,
   isSaaS: false,
   hasCloudOps: false,
   hosting: "self-hosted",
@@ -17,6 +24,7 @@ const EVERYTHING_CLOSED: SettingsMenuGates = {
   isLiteMember: false,
   hasOpsAccess: false,
   isPlatformAdmin: false,
+  braidsEnabled: false,
 };
 
 function hrefsIn(gates: Partial<SettingsMenuGates>): string[] {
@@ -85,6 +93,11 @@ describe("given the hosted product", () => {
       expect(hrefsIn({ isSaaS: true })).toContain("/settings/subscription");
       expect(hrefsIn({ isSaaS: true })).not.toContain("/settings/license");
     });
+
+    /** @scenario "A Lite Member finds the subscription page in the settings menu on the cloud" */
+    it("offers the subscription page to a lite member too", () => {
+      expect(hrefsIn({ isSaaS: true, isLiteMember: true })).toContain("/settings/subscription");
+    });
   });
 });
 
@@ -110,6 +123,17 @@ describe("given a lite member", () => {
       expect(hrefs).toContain("/settings/model-providers");
       expect(hrefs).not.toContain("/settings/authentication");
     });
+
+    /** @scenario "Billing is not a seat" */
+    it("offers the billing pages to a lite member who holds Billing", () => {
+      const hrefs = hrefsIn({
+        isLiteMember: true,
+        isSaaS: true,
+        hasPermission: (p) => p === "subscription:manage",
+      });
+      expect(hrefs).toContain("/settings/usage");
+      expect(hrefs).toContain("/settings/subscription");
+    });
   });
 });
 
@@ -121,7 +145,7 @@ describe("given an enterprise plan", () => {
       expect(hrefs).not.toContain("/settings/role-bindings");
     });
 
-    it("offers Directory on every plan, in place of Members, Teams, Groups and SCIM", () => {
+    it("offers Users on every plan, in place of Members, Teams, Groups and SCIM", () => {
       for (const enterprisePlan of ["pending", "locked", "included"] as const) {
         const hrefs = hrefsIn({ enterprisePlan });
         expect(hrefs).toContain("/settings/directory");
@@ -161,9 +185,116 @@ describe("given an enterprise plan", () => {
   });
 });
 
+describe("given the People & access group", () => {
+  function accessHrefsIn(gates: Partial<SettingsMenuGates>): string[] {
+    const group = settingsMenu({ ...EVERYTHING_CLOSED, enterprisePlan: "included", ...gates }).find(
+      (candidate) => candidate.id === "settings-access",
+    );
+    return group?.items.map((item) => item.href) ?? [];
+  }
+
+  describe("when the reader may manage the organization", () => {
+    /** @scenario "Teams & projects has its own entry under Users" */
+    it("offers Teams & projects right after Users, on the Users page's teams tab", () => {
+      expect(
+        accessHrefsIn({ hasOrganizationPermission: (p) => p === "organization:manage" }),
+      ).toEqual(["/settings/directory", "/settings/directory?tab=teams", "/settings/roles"]);
+    });
+
+    /** @scenario "Teams & projects asks who may manage the organization the way its tab does" */
+    it("follows the organization-wide answer, not the open project's", () => {
+      expect(
+        accessHrefsIn({
+          hasPermission: () => false,
+          hasOrganizationPermission: (p) => p === "organization:manage",
+        }),
+      ).toContain("/settings/directory?tab=teams");
+      expect(
+        accessHrefsIn({
+          hasPermission: (p) => p === "organization:manage",
+          hasOrganizationPermission: () => false,
+        }),
+      ).not.toContain("/settings/directory?tab=teams");
+    });
+
+    /** @scenario "Teams & projects has its own entry under Users" */
+    it("lights Teams & projects alone on its tab and Users alone elsewhere on the page", () => {
+      const items = settingsMenu({
+        ...EVERYTHING_CLOSED,
+        hasOrganizationPermission: (p) => p === "organization:manage",
+      }).find((group) => group.id === "settings-access")!.items;
+      const marked = (pathname: string, search: string) =>
+        items
+          .filter((item) =>
+            isSettingsMenuItemActiveAmong({ item, siblings: items, pathname, search }),
+          )
+          .map((item) => item.label);
+
+      expect(marked("/settings/directory", "?tab=teams")).toEqual(["Teams & projects"]);
+      expect(marked("/settings/directory", "?tab=groups")).toEqual(["Users"]);
+      expect(marked("/settings/directory", "")).toEqual(["Users"]);
+      expect(marked("/settings/teams/platform", "")).toEqual(["Teams & projects"]);
+    });
+  });
+
+  describe("when the reader may not manage the organization", () => {
+    /** @scenario "Teams & projects is offered only to whoever may manage the organization" */
+    it("offers no Teams & projects entry", () => {
+      expect(accessHrefsIn({ hasPermission: (p) => p === "members:view" })).toEqual([
+        "/settings/directory",
+        "/settings/roles",
+      ]);
+    });
+
+    /** @scenario "A team page lights Users for whoever may not manage the organization" */
+    it("keeps Users lit on a team's own page", () => {
+      const items = settingsMenu({
+        ...EVERYTHING_CLOSED,
+        hasPermission: (p) => p === "team:view",
+      }).find((group) => group.id === "settings-access")!.items;
+
+      expect(
+        items
+          .filter((item) =>
+            isSettingsMenuItemActiveAmong({
+              item,
+              siblings: items,
+              pathname: "/settings/teams/platform",
+              search: "",
+            }),
+          )
+          .map((item) => item.label),
+      ).toEqual(["Users"]);
+    });
+  });
+});
+
+describe("given release_braids is off for the organisation", () => {
+  describe("when the menu is built for an organisation admin on Enterprise", () => {
+    /** @scenario "With release_braids off the settings menu offers no Braids entry" */
+    it("offers no Braids entry, for the project page or the organisation page", () => {
+      const gates = {
+        enterprisePlan: "included",
+        hasPermission: () => true,
+        hasOrganizationPermission: () => true,
+      } as const;
+
+      expect(hrefsIn({ ...gates, braidsEnabled: true })).toContain("/settings/braids");
+      for (const href of ["/settings/braids", "/settings/organization-braids"]) {
+        expect(hrefsIn({ ...gates, braidsEnabled: false })).not.toContain(href);
+      }
+    });
+  });
+});
+
 describe("given a plan that lacks Enterprise", () => {
   function lockedHrefsIn(gates: Partial<SettingsMenuGates>): string[] {
-    return settingsMenu({ ...EVERYTHING_CLOSED, enterprisePlan: "locked", ...gates })
+    return settingsMenu({
+      ...EVERYTHING_CLOSED,
+      enterprisePlan: "locked",
+      braidsEnabled: true,
+      ...gates,
+    })
       .flatMap((group) => group.items)
       .filter((item) => item.isLocked)
       .map((item) => item.href);
@@ -172,18 +303,49 @@ describe("given a plan that lacks Enterprise", () => {
   describe("when the menu is built", () => {
     /** @scenario "A plan without Enterprise sees its entries locked" */
     it("offers the enterprise entries locked", () => {
-      expect(lockedHrefsIn({ hasPermission: () => true })).toEqual([
-        "/settings/audit-log",
-        "/settings/roles",
+      expect(
+        lockedHrefsIn({ hasPermission: () => true, hasOrganizationPermission: () => true }),
+      ).toEqual(["/settings/audit-log", "/settings/roles", "/settings/braids"]);
+    });
+
+    /** @scenario "A branded feature's entries wear its mark" */
+    it("offers Braids once, under Project, marked as the braids feature", () => {
+      const braids = settingsMenu({
+        ...EVERYTHING_CLOSED,
+        enterprisePlan: "locked",
+        braidsEnabled: true,
+        hasPermission: () => true,
+        hasOrganizationPermission: () => true,
+      })
+        .flatMap((group) => group.items)
+        .filter((item) => item.label === "Braids");
+      expect(braids.map((item) => [item.href, item.feature])).toEqual([
+        ["/settings/braids", "braids"],
       ]);
+    });
+
+    /** @scenario "The organization's braids page lights the one Braids entry" */
+    it("lights that one Braids entry on the organization's braids page", () => {
+      const items = settingsMenu({
+        ...EVERYTHING_CLOSED,
+        enterprisePlan: "locked",
+        braidsEnabled: true,
+        hasPermission: () => true,
+        hasOrganizationPermission: () => true,
+      }).flatMap((group) => group.items);
+      const lit = items.filter((item) =>
+        isSettingsMenuItemActive({ item, pathname: "/settings/organization-braids" }),
+      );
+      expect(lit.map((item) => item.href)).toEqual(["/settings/braids"]);
     });
 
     /** @scenario "A plan without Enterprise sees its entries locked" */
     it("still hides an entry the reader lacks the permission for", () => {
-      expect(lockedHrefsIn({})).toEqual(["/settings/roles"]);
+      expect(lockedHrefsIn({})).toEqual(["/settings/roles", "/settings/braids"]);
       expect(lockedHrefsIn({ hasPermission: (p) => p === "auditLog:view" })).toEqual([
         "/settings/audit-log",
         "/settings/roles",
+        "/settings/braids",
       ]);
     });
 
@@ -202,8 +364,11 @@ describe("given a plan that lacks Enterprise", () => {
       }
     });
 
-    it("hides them from a lite member", () => {
-      expect(lockedHrefsIn({ hasPermission: () => true, isLiteMember: true })).toEqual([]);
+    /** @scenario "A Lite Member lists members" */
+    it("keeps Roles & access for a lite member, read-only, and hides the audit log", () => {
+      expect(lockedHrefsIn({ hasPermission: () => true, isLiteMember: true })).toEqual([
+        "/settings/roles",
+      ]);
     });
   });
 });
@@ -285,5 +450,20 @@ describe("given every Settings entry", () => {
       enterprisePlan: "included",
     }).flatMap((group) => group.items.map((item) => item.icon));
     expect(new Set(icons).size).toBe(icons.length);
+  });
+});
+
+describe("given a member on LangWatch Cloud", () => {
+  describe("when the menu is built", () => {
+    /** @scenario "The settings menu names the two billing pages Usage and Plan & billing" */
+    it("names the usage page Usage and the subscription page Plan & billing", () => {
+      const items = settingsMenu({ ...EVERYTHING_CLOSED, isSaaS: true, hosting: "cloud" }).flatMap(
+        (group) => group.items,
+      );
+      const labelOf = (href: string) => items.find((item) => item.href === href)?.label;
+
+      expect(labelOf("/settings/usage")).toBe("Usage");
+      expect(labelOf("/settings/subscription")).toBe("Plan & billing");
+    });
   });
 });

@@ -1,5 +1,10 @@
-import { isModelCallSpan, pickString } from "@langwatch/coding-agent-contract";
-import type { SpanDetail } from "@langwatch/trace-contract";
+import {
+  type CodingAgent,
+  detectCodingAgent,
+  isModelCallSpan,
+  pickString,
+} from "@langwatch/coding-agent-contract";
+import type { SpanDetail, TraceLogRecordDto } from "@langwatch/trace-contract";
 
 /**
  * The handful of facts a coding agent prints above the prompt at session
@@ -7,15 +12,8 @@ import type { SpanDetail } from "@langwatch/trace-contract";
  * resource/span attributes, not the bounded `coding_agent_sessions` fold (ADR-041).
  */
 
-/** Which agent's mark and name the banner draws. */
-type BannerAgent =
-  | "claude_code"
-  | "claude_cowork"
-  | "opencode"
-  | "codex"
-  | "gemini_cli"
-  | "copilot"
-  | "unknown";
+/** Which agent's mark and name the banner draws: one per agent the contract can name. */
+type BannerAgent = CodingAgent;
 
 export interface SessionBanner {
   agent: BannerAgent;
@@ -35,6 +33,7 @@ const SERVICE_NAME_AGENTS: { fragment: string; agent: BannerAgent }[] = [
   { fragment: "codex", agent: "codex" },
   { fragment: "gemini", agent: "gemini_cli" },
   { fragment: "copilot", agent: "copilot" },
+  { fragment: "grok", agent: "grok" },
 ];
 
 /** Span-name namespaces, tested in order; Copilot alone names its call span "chat <model>". */
@@ -69,21 +68,40 @@ function detectBannerAgent({
     const bySpan = SPAN_NAME_AGENTS.find(({ matches }) => matches(span.name));
     if (bySpan) return bySpan.agent;
   }
+  // An agent that names its spans in its own namespace (pi) is named by the contract's registry.
+  for (const span of spans) {
+    const byRegistry = detectCodingAgent({ recordName: span.name });
+    if (byRegistry !== "unknown") return byRegistry;
+  }
   return "unknown";
 }
 
+/** The fields of a trace log record the banner reads, for an agent that sends no spans. */
+export type BannerLogRecord = Pick<
+  TraceLogRecordDto,
+  "timeUnixMs" | "attributes" | "resourceAttributes"
+>;
+
 /**
- * `resourceAttributes` comes from the root-span `resourceInfo` read (same
- * across a session). `spans` supplies the model, per-call not per-resource —
- * the LAST model call's model is what the session ended on.
+ * `resourceAttributes` comes from the root span's `resourceInfo` read, the same across a session.
+ * `spans` supplies the model: the last model call's model is what the session ended on. A
+ * logs-only agent (Grok, ADR-192) has neither, so its log records stand in for both.
  */
 export function deriveSessionBanner({
   resourceAttributes,
   spans,
+  logs = [],
 }: {
   resourceAttributes: Record<string, string>;
   spans: SpanDetail[];
+  logs?: readonly BannerLogRecord[];
 }): SessionBanner {
+  const chronologicalLogs = [...logs].toSorted((a, b) => a.timeUnixMs - b.timeUnixMs);
+  const resource =
+    Object.keys(resourceAttributes).length > 0
+      ? resourceAttributes
+      : logResourceAttributes(chronologicalLogs);
+
   let model: string | null = null;
   // Chronological order is the contract "last model call" depends on — the
   // caller may hand spans in tree order.
@@ -99,18 +117,38 @@ export function deriveSessionBanner({
       pickString(params, "model");
     if (value !== null) model = value;
   }
+  // Grok names the model on every turn record as `model`; the last one is what it ended on.
+  if (model === null) {
+    for (const log of chronologicalLogs) model = str(log.attributes.model) ?? model;
+  }
 
   return {
     agent: detectBannerAgent({
-      serviceName: resourceAttributes["service.name"] ?? "",
+      serviceName: resource["service.name"] ?? "",
       spans,
     }),
-    // Some agents ship service.version already v-prefixed; the banner adds
-    // its own v, so strip one here or it renders "vv24.11.1".
-    version: str(resourceAttributes["service.version"])?.replace(/^v/, "") ?? null,
+    version: bannerVersion(resource["service.version"]),
     model,
-    repo: str(resourceAttributes["project.repo"]),
+    repo: str(resource["project.repo"]),
   };
+}
+
+/** The resource of the first record an agent sent, past any record LangWatch's own CLI posted. */
+function logResourceAttributes(logs: readonly BannerLogRecord[]): Record<string, string> {
+  const fromAgent = logs.find(({ resourceAttributes }) => {
+    const service = (resourceAttributes["service.name"] ?? "").toLowerCase();
+    return SERVICE_NAME_AGENTS.some(({ fragment }) => service.includes(fragment));
+  });
+  return fromAgent?.resourceAttributes ?? logs[0]?.resourceAttributes ?? {};
+}
+
+/**
+ * The version as the agent prints it. The banner adds its own v, so a leading one goes ("vv24"),
+ * as does a build suffix after a space: Grok's "1.0.70 (f50904eaee6c)" prints as 1.0.70.
+ */
+function bannerVersion(value: string | undefined): string | null {
+  const [version = ""] = (str(value) ?? "").split(/\s/);
+  return str(version.replace(/^v/, ""));
 }
 
 function str(value: string | undefined): string | null {

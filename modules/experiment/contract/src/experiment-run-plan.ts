@@ -119,6 +119,11 @@ const experimentRunPlanSchemaDefinition = z.object({
       entry: z.record(z.string(), z.unknown()),
     }),
   ),
+  /**
+   * The board row each run row is written back to, by row id, when the run read a dataset version
+   * other than the board's rows; null for a row the board no longer has. Absent means the same row.
+   */
+  boardRowIndices: z.array(z.number().int().nonnegative().nullable()).optional(),
   /** Phase 1 in ordinal order, then phase 2. */
   cells: z.array(experimentRunPlanCellSchema),
   pinned: experimentRunPinnedVersionsSchema,

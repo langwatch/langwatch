@@ -6,9 +6,10 @@ const logCorrelationSourceSchema = z.enum([
   "wire",
   "claude_synthesized",
   "codex_synthesized",
+  "grok_synthesized",
 ]);
 
-const logProviderKindSchema = z.enum(["generic", "claude_code", "codex"]);
+const logProviderKindSchema = z.enum(["generic", "claude_code", "codex", "grok"]);
 
 /** The trace-fold payload derived from one canonical log record. */
 const logTraceContributionSchemaDefinition = z.object({

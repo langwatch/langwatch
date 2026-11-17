@@ -2,6 +2,7 @@ package migrationorder_test
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -84,36 +85,199 @@ const releasedManifest = `{"release":"3.21.0","previous":"3.20.1","cutAt":"2026-
   {"id":"clickhouse:00101","kind":"schema","mode":"blocking","owner":null,"description":"y"},
   {"id":"topic:seed-clusters","kind":"data","mode":"background","owner":"topic","description":"z"}]}`
 
-// @scenario "A PR changes the file of a code step a release manifest names"
-func TestStepsRefusesAChangeToAReleasedStepFile(t *testing.T) {
-	for _, change := range []string{"modify", "delete", "rename"} {
-		t.Run(change, func(t *testing.T) {
-			root := repoWithStep(t, releasedManifest)
-			switch change {
-			case "modify":
-				writeAndCommit(t, root, stepFile, "export const step = defineMigrationStep({ id: \"topic:seed-clusters\", run });\n")
-			case "delete":
-				gitIn(t, root, "rm", "-q", stepFile)
-				gitIn(t, root, "commit", "-q", "-m", "delete")
-			case "rename":
-				gitIn(t, root, "mv", stepFile, strings.Replace(stepFile, "seed-clusters", "seed", 1))
-				gitIn(t, root, "commit", "-q", "-m", "rename")
+const (
+	seedStep  = "defineMigrationStep({\n  id: \"topic:seed-clusters\",\n  run: seed,\n})"
+	pruneStep = "defineMigrationStep({ id: 'topic:prune-clusters', after: [\"topic:seed-clusters\"], run: prune({ keep: \"(\" }) })"
+)
+
+// twoStepsFile declares both released steps in one module file.
+const twoStepsFile = "export const steps = [\n  " + seedStep + ",\n  " + pruneStep + ",\n];\n"
+
+const twoStepsManifest = `{"release":"3.21.0","steps":[
+  {"id":"topic:seed-clusters","kind":"data","mode":"background","owner":"topic","description":"z"},
+  {"id":"topic:prune-clusters","kind":"data","mode":"background","owner":"topic","description":"z"}]}`
+
+// branchChangingSteps commits twoStepsFile and its manifest on main, branches
+// "feature" and applies change there; it returns the step check's findings.
+func branchChangingSteps(t *testing.T, change func(t *testing.T, root string)) []migrationorder.Finding {
+	t.Helper()
+	root := initRepo(t)
+	writeAndCommit(t, root, stepFile, twoStepsFile)
+	writeAndCommit(t, root, "packages/upgrade/releases/3.21.0.json", twoStepsManifest)
+	gitIn(t, root, "checkout", "-q", "-b", "feature")
+	change(t, root)
+	in, err := migrationorder.Repo{Root: root}.Steps(t.Context(), "main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return migrationorder.CheckSteps(in)
+}
+
+func moveStepFile(t *testing.T, root, content string) {
+	t.Helper()
+	gitIn(t, root, "rm", "-q", stepFile)
+	writeAndCommit(t, root, "modules/topic/process/src/topic.module.ts", content)
+}
+
+// @scenario "A PR changes the declaration of a code step a release manifest names"
+func TestStepsRefusesAChangeToAReleasedDeclaration(t *testing.T) {
+	cases := []struct {
+		name    string
+		content string
+		changed []string
+	}{
+		{"an edit inside one block", strings.Replace(twoStepsFile, "run: seed", "run: seedAgain", 1), []string{"topic:seed-clusters"}},
+		{"an edit inside the other block", strings.Replace(twoStepsFile, "keep: \"(\"", "keep: \")\"", 1), []string{"topic:prune-clusters"}},
+		{"both blocks edited", strings.ReplaceAll(twoStepsFile, "run: ", "run: await "), []string{"topic:prune-clusters", "topic:seed-clusters"}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			findings := branchChangingSteps(t, func(t *testing.T, root string) {
+				t.Helper()
+				writeAndCommit(t, root, stepFile, c.content)
+			})
+			var got []string
+			for _, f := range findings {
+				if f.Entry != stepFile || !strings.Contains(f.Problem, "which release 3.21.0 shipped, and a released step cannot change") {
+					t.Errorf("finding = %+v", f)
+				}
+				if !strings.Contains(f.Fix, "restore the defineMigrationStep block declaring") || !strings.Contains(f.Fix, "git show main:"+stepFile) {
+					t.Errorf("fix = %q, want the base declaration restored", f.Fix)
+				}
+				if id, _, ok := strings.Cut(strings.TrimPrefix(f.Problem, "declares "), ","); ok {
+					got = append(got, id)
+				}
 			}
-			in, err := migrationorder.Repo{Root: root}.Steps(t.Context(), "main")
-			if err != nil {
-				t.Fatal(err)
-			}
-			findings := migrationorder.CheckSteps(in)
-			if len(findings) != 1 || findings[0].Entry != stepFile {
-				t.Fatalf("want one finding for %s, got %+v", stepFile, findings)
-			}
-			if !strings.Contains(findings[0].Problem, "topic:seed-clusters, which release 3.21.0 shipped") {
-				t.Errorf("problem = %q", findings[0].Problem)
-			}
-			if want := "git checkout main -- " + stepFile; findings[0].Fix != want {
-				t.Errorf("fix = %q, want %q", findings[0].Fix, want)
+			slices.Sort(got)
+			if want := c.changed; !slices.Equal(got, want) {
+				t.Errorf("changed steps = %v, want %v", got, want)
 			}
 		})
+	}
+}
+
+// @scenario "A PR removes a code step a release manifest names"
+func TestStepsRefusesRemovingAReleasedStep(t *testing.T) {
+	cases := []struct {
+		name   string
+		change func(t *testing.T, root string)
+	}{
+		{"its block removed from the file", func(t *testing.T, root string) {
+			t.Helper()
+			writeAndCommit(t, root, stepFile, "export const steps = [\n  "+pruneStep+",\n];\n")
+		}},
+		{"its file deleted", func(t *testing.T, root string) {
+			t.Helper()
+			gitIn(t, root, "rm", "-q", stepFile)
+			writeAndCommit(t, root, "modules/topic/process/src/topic.module.ts", "export const steps = ["+pruneStep+"];\n")
+		}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			findings := branchChangingSteps(t, c.change)
+			if len(findings) != 1 || findings[0].Problem != "released step topic:seed-clusters was removed: release 3.21.0 shipped it, and a released step cannot change" {
+				t.Fatalf("want one removal finding for topic:seed-clusters, got %+v", findings)
+			}
+			if findings[0].Entry != stepFile || !strings.Contains(findings[0].Fix, "git show main:"+stepFile) {
+				t.Errorf("finding = %+v", findings[0])
+			}
+		})
+	}
+}
+
+func TestStepsStopsOnAFileItCannotRead(t *testing.T) {
+	root := initRepo(t)
+	writeAndCommit(t, root, stepFile, twoStepsFile)
+	writeAndCommit(t, root, "packages/upgrade/releases/3.21.0.json", twoStepsManifest)
+	gitIn(t, root, "checkout", "-q", "-b", "feature")
+	writeAndCommit(t, root, stepFile, "// unreadable on HEAD\n"+twoStepsFile)
+	blob := strings.TrimSpace(gitOut(t, root, "rev-parse", "HEAD:"+stepFile))
+	if err := os.Remove(filepath.Join(root, ".git", "objects", blob[:2], blob[2:])); err != nil {
+		t.Fatal(err)
+	}
+	in, err := migrationorder.Repo{Root: root}.Steps(t.Context(), "main")
+	if err == nil {
+		t.Fatalf("a HEAD file git cannot read must stop the check, got findings %+v", migrationorder.CheckSteps(in))
+	}
+	if !strings.Contains(err.Error(), "git show HEAD:"+stepFile) {
+		t.Errorf("error does not name the read: %v", err)
+	}
+}
+
+func gitOut(t *testing.T, root string, args ...string) string {
+	t.Helper()
+	out, err := exec.CommandContext(t.Context(), "git", append([]string{"-C", root}, args...)...).Output() //nolint:gosec // test helper driving git with fixed subcommands
+	if err != nil {
+		t.Fatalf("git %v: %v", args, err)
+	}
+	return string(out)
+}
+
+// @scenario "A PR changes the rest of a file declaring a released code step"
+func TestStepsLeavesTheRestOfAReleasedStepFileAlone(t *testing.T) {
+	cases := []struct {
+		name   string
+		change func(t *testing.T, root string)
+	}{
+		{"an unrelated edit in the same file", func(t *testing.T, root string) {
+			t.Helper()
+			writeAndCommit(t, root, stepFile, "import { next } from \"./next\";\n"+strings.Replace(twoStepsFile, "];", "  defineMigrationStep({ id: \"topic:next\", after: [\"topic:prune-clusters\"], run: next }),\n];", 1))
+		}},
+		{"a reformatted block", func(t *testing.T, root string) {
+			t.Helper()
+			writeAndCommit(t, root, stepFile, strings.Replace(twoStepsFile, "\n  run: seed,\n", " run: seed, ", 1))
+		}},
+		{"both steps moved to another file unchanged", func(t *testing.T, root string) {
+			t.Helper()
+			moveStepFile(t, root, "// moved\n"+twoStepsFile)
+		}},
+		{"the file renamed", func(t *testing.T, root string) {
+			t.Helper()
+			gitIn(t, root, "mv", stepFile, strings.Replace(stepFile, "seed-clusters", "seed", 1))
+			gitIn(t, root, "commit", "-q", "-m", "rename")
+		}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if findings := branchChangingSteps(t, c.change); len(findings) != 0 {
+				t.Errorf("want no finding, got %+v", findings)
+			}
+		})
+	}
+}
+
+// @scenario "A released replay step freezes only its own call"
+func TestStepsFreezesOnlyAReleasedReplayStepCall(t *testing.T) {
+	const (
+		moduleFile = "modules/topic/process/src/topic.module.ts"
+		specFile   = "modules/topic/specs/topic-deploy-steps.feature"
+		replay     = "defineProjectionReplayStep({\n  id: \"topic:replay-clusters\",\n  lane: \"clusters\",\n})"
+		module     = "export const steps = [\n  " + replay + ",\n];\n"
+	)
+	findingsAfter := func(t *testing.T, moduleHead, specHead string) []migrationorder.Finding {
+		t.Helper()
+		root := initRepo(t)
+		writeAndCommit(t, root, moduleFile, module)
+		writeAndCommit(t, root, specFile, "Then it declares \"topic:replay-clusters\"\n")
+		writeAndCommit(t, root, "packages/upgrade/releases/3.21.0.json", `{"release":"3.21.0","steps":[
+  {"id":"topic:replay-clusters","kind":"data","mode":"background","owner":"topic","description":"z"}]}`)
+		gitIn(t, root, "checkout", "-q", "-b", "feature")
+		writeAndCommit(t, root, moduleFile, moduleHead)
+		writeAndCommit(t, root, specFile, specHead)
+		in, err := migrationorder.Repo{Root: root}.Steps(t.Context(), "main")
+		if err != nil {
+			t.Fatal(err)
+		}
+		return migrationorder.CheckSteps(in)
+	}
+	newStep := strings.Replace(module, "];", "  defineMigrationStep({ id: \"topic:next\", run: next }),\n];", 1)
+	if findings := findingsAfter(t, newStep, "Then it declares \"topic:replay-clusters\" again\n"); len(findings) != 0 {
+		t.Errorf("a new step beside a released replay step, want no finding, got %+v", findings)
+	}
+	edited := strings.Replace(module, "\"clusters\"", "\"clusters-v2\"", 1)
+	findings := findingsAfter(t, edited, "Then it still declares \"topic:replay-clusters\"\n")
+	if len(findings) != 1 || findings[0].Entry != moduleFile || !strings.Contains(findings[0].Problem, "declares topic:replay-clusters") {
+		t.Errorf("an edited replay call, want one finding on %s, got %+v", moduleFile, findings)
 	}
 }
 

@@ -21,6 +21,7 @@ import { CopilotCanonicaliserService } from "./copilotCanonicaliser.ts";
 import { FallbackCanonicaliserService } from "./fallbackCanonicaliser.ts";
 import { FreshInputCanonicaliserService } from "./freshInputCanonicaliser.ts";
 import { GenAICanonicaliserService } from "./genAiCanonicaliser.ts";
+import { GrokCanonicaliserService } from "./grokCanonicaliser.ts";
 import { HaystackCanonicaliserService } from "./haystackCanonicaliser.ts";
 import { canonicaliseLangWatchIdentity } from "./langwatch/langwatchIdentity.ts";
 import { canonicaliseLangWatchMetadata } from "./langwatch/langwatchMetadata.ts";
@@ -30,6 +31,7 @@ import { LegacyOtelCanonicaliserService } from "./legacyOtelCanonicaliser.ts";
 import { LogfireCanonicaliserService } from "./logfireCanonicaliser.ts";
 import { MastraCanonicaliserService } from "./mastraCanonicaliser.ts";
 import { OpenInferenceCanonicaliserService } from "./openinferenceCanonicaliser.ts";
+import { PiCanonicaliserService } from "./piCanonicaliser.ts";
 import { SpringAICanonicaliserService } from "./springAiCanonicaliser.ts";
 import { StrandsCanonicaliserService } from "./strandsCanonicaliser.ts";
 import { TraceloopCanonicaliserService } from "./traceloopCanonicaliser.ts";
@@ -93,6 +95,10 @@ export function orderedSpanCanonicalisers({
     CodexCanonicaliserService.create({ scopes: codexScopes }),
     // Copilot adds its extras after GenAI establishes the standard attributes.
     CopilotCanonicaliserService.create(),
+    // pi dual-writes the convention keys, so it too runs after GenAI and lifts
+    // only what the conventions cannot name.
+    PiCanonicaliserService.create(),
+    GrokCanonicaliserService.create(),
     SpringAICanonicaliserService.create(),
     StrandsCanonicaliserService.create(),
     LogfireCanonicaliserService.create(),

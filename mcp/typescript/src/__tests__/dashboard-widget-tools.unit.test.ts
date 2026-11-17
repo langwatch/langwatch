@@ -1,7 +1,10 @@
+import { readFileSync } from "node:fs";
+
+import { beforeEach, describe, expect, it, vi } from "vitest";
 /**
  * Digests of the add_dashboard_widget and update_dashboard_widget tools.
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 
 vi.mock("../langwatch-api-dashboards.js", () => ({
   createWidgetOnDashboard: vi.fn(),
@@ -17,6 +20,7 @@ import {
   updateWidgetOnDashboard,
 } from "../langwatch-api-dashboards.js";
 import { LangWatchApiError } from "../langwatch-api.js";
+import { widgetProjectsInput, runQueryProjectsInput } from "../schemas/widget-sources.ts";
 import { handleAddDashboardWidget } from "../tools/add-dashboard-widget.js";
 import { handleListDashboards } from "../tools/list-dashboards.js";
 import { handleUpdateDashboardWidget } from "../tools/update-dashboard-widget.js";
@@ -411,5 +415,106 @@ describe("a widget's sources through the MCP widget tools", () => {
     );
     expect(parse("add_dashboard_widget", { ...add, sources: ["langy", "other"] })).not.toThrow();
     expect(parse("update_dashboard_widget", { ...update, sources: null })).not.toThrow();
+  });
+});
+
+describe("a widget's projects through the MCP widget tools", () => {
+  const QUERY = { name: "turns", sql: "SELECT count() FROM traces" };
+
+  /** @scenario "AC210b Compatibility: the dashboard API, the CLI and the MCP tools read and write projects beside sources" */
+  it("creates a widget whose every query reads the projects the agent names", async () => {
+    await handleAddDashboardWidget({
+      dashboardId: "dash_1",
+      name: "Two projects",
+      code: "export default () => null;",
+      queries: { turns: QUERY.sql },
+      projects: ["A", "B"],
+    });
+
+    expect(mockCreateWidgetOnDashboard).toHaveBeenCalledWith(
+      expect.objectContaining({ queries: [{ ...QUERY, projects: ["A", "B"] }] }),
+    );
+  });
+
+  /** @scenario "AC210b Compatibility: the dashboard API, the CLI and the MCP tools read and write projects beside sources" */
+  it("clears the projects with null, sending the stored queries back", async () => {
+    mockGetWidgetOnDashboard.mockResolvedValue({
+      ...sampleWidget,
+      dashboardId: "dash_1",
+      definition: { ...sampleWidget.definition, queries: [{ ...QUERY, projects: ["A"] }] },
+    });
+    mockUpdateWidgetOnDashboard.mockResolvedValue({ ...sampleWidget, dashboardId: "dash_1" });
+
+    await handleUpdateDashboardWidget({
+      dashboardId: "dash_1",
+      widgetId: "widget_1",
+      projects: null,
+    });
+
+    expect(mockUpdateWidgetOnDashboard).toHaveBeenCalledWith({
+      dashboardId: "dash_1",
+      widgetId: "widget_1",
+      queries: [{ ...QUERY, projects: null }],
+    });
+  });
+});
+
+describe('given a widget tool is sent projects "all"', () => {
+  /** @scenario "QP03i A widget write refuses the word all" */
+  it("says a widget stores project ids, in the words REST gives", () => {
+    const refused = widgetProjectsInput.safeParse("all");
+
+    expect(refused.error?.issues[0]?.message).toBe(
+      'projects holds project ids; "all" is not stored in a widget',
+    );
+  });
+
+  it.each([["all"], ["ALL"], ["All"], [" all "]])(
+    "refuses the string %s with the same message",
+    (word) => {
+      const refused = widgetProjectsInput.safeParse(word);
+
+      expect(refused.error?.issues[0]?.message).toBe(
+        'projects holds project ids; "all" is not stored in a widget',
+      );
+    },
+  );
+
+  it.each([["all"], ["ALL"], [" All "]])(
+    "refuses %s inside the list with the same message",
+    (word) => {
+      const refused = widgetProjectsInput.safeParse(["proj_1", word]);
+
+      expect(refused.error?.issues[0]?.message).toBe(
+        'projects holds project ids; "all" is not stored in a widget',
+      );
+    },
+  );
+
+  it("does not advertise all in the tool's JSON Schema", () => {
+    expect(JSON.stringify(z.toJSONSchema(widgetProjectsInput))).not.toContain("all");
+  });
+});
+
+describe("given run_query's projects input", () => {
+  it.each([["all"], ["ALL"], [" All "], [["A", "B"]]])("accepts %s", (value) => {
+    expect(runQueryProjectsInput.validate(value)).toBe(true);
+  });
+
+  it.each([["everything"], [[]], [[""]], [["p", "ALL"]]])("refuses %s", (value) => {
+    expect(runQueryProjectsInput.validate(value)).toBe(false);
+  });
+});
+
+describe("given run_query's refusal of all inside a list", () => {
+  it("says what the docs say", () => {
+    const docs = readFileSync(
+      new URL("../../../../docs/features/querying-your-data.mdx", import.meta.url),
+      "utf8",
+    );
+    const message = runQueryProjectsInput.safeParse(["p", "all"]).error?.issues[0]?.message;
+
+    expect(message).toBeDefined();
+    expect(docs).toContain(message);
   });
 });

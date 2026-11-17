@@ -167,4 +167,43 @@ describe("TraceLogRecordIOService", () => {
       });
     });
   });
+
+  describe("given a Grok turn's records", () => {
+    /** @scenario A Grok turn's trace shows the prompt as input and the reply as output */
+    it("reads the unwrapped prompt as input and the reply as output", () => {
+      const scopeName = "ai.xai.grok_code";
+      const prompt = service.extractIO(
+        record({
+          scopeName,
+          attributes: {
+            "event.name": "grok_code.user_prompt",
+            prompt: "<user_query>\nAdd a subtract function.\n</user_query>",
+          },
+        }),
+      );
+      const reply = service.extractIO(
+        record({
+          scopeName,
+          attributes: {
+            "event.name": "grok_code.assistant_response",
+            response: "Added subtract().",
+          },
+        }),
+      );
+
+      expect(prompt).toEqual({ input: "Add a subtract function.", output: null });
+      expect(reply).toEqual({ input: null, output: "Added subtract()." });
+    });
+
+    it("reads nothing from a model call record", () => {
+      const result = service.extractIO(
+        record({
+          scopeName: "ai.xai.grok_code",
+          attributes: { "event.name": "grok_code.api_request", input_tokens: "25279" },
+        }),
+      );
+
+      expect(result).toEqual({ input: null, output: null });
+    });
+  });
 });

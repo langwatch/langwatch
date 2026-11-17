@@ -43,6 +43,7 @@ export {
 export {
   MAX_VALIDATION_ISSUES,
   validationMeta,
+  type SchemaPathDescriber,
   type ValidationIssueMeta,
   type ValidationMeta,
 } from "./validation/validationMeta.ts";

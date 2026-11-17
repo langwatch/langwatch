@@ -42,6 +42,7 @@ import type {
 } from "../subscribers/subscriber.types.ts";
 import { toError } from "../utils/errors.ts";
 import { EventUtils } from "../utils/event.utils.ts";
+import { appliedTokenOf } from "./appliedToken.ts";
 import { MAX_APPLIED_EVENT_IDS } from "./foldCache/foldCacheEntry.ts";
 import type { FoldProjectionDefinition, FoldStateRead } from "./foldProjection.types.ts";
 import { FoldProjectionExecutor } from "./foldProjectionExecutor.ts";
@@ -1071,11 +1072,18 @@ export class ProjectionRouter<
       aggregateId: String(missed.aggregateId),
       occurredAtMs: missed.occurredAt,
     });
-    if (!history.some((event) => event.id === missed.id)) {
+    // A history read keeps the first row per idempotency key. A re-send under a held key is in
+    // the log, but the read returns an earlier copy until a merge in the same weekly partition
+    // keeps the newer row, and across partitions it never does. Waiting for the re-send's own id
+    // could then never end, so a held key counts as the log holding it, and the missed event is
+    // folded in at its own position: the rebuild writes what the live lane would have.
+    const held = history.some((event) => event.id === missed.id);
+    const missedToken = appliedTokenOf(missed);
+    if (!held && !history.some((event) => appliedTokenOf(event) === missedToken)) {
       throw new Error(`The log does not yet hold missed event ${missed.id}; retrying the rebuild`);
     }
     let latest: StoredProjection<State> | null = null;
-    for (const event of orderEvents(history)) {
+    for (const event of orderEvents(held ? history : [...history, missed])) {
       latest = applyStateEvent({ projection, latest, event });
     }
     if (!latest) return;

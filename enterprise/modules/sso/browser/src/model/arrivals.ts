@@ -30,7 +30,7 @@ export const ARRIVAL_COPY: Record<ArrivalAnswer, ArrivalAnswerCopy> = {
   },
   approve: {
     label: "They ask, you approve",
-    help: "They keep the account they signed in with, and you answer the request in your Directory.",
+    help: "They keep the account they signed in with, and you answer the request on the Users page.",
   },
   open: {
     label: "They join, on a domain you verified",

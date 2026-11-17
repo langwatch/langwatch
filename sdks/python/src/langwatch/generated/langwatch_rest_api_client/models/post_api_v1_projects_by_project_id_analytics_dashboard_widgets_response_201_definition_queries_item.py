@@ -31,6 +31,7 @@ class PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse201Definition
         sources
             (list[PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse201DefinitionQueriesItemSourcesType0Item] |
             None | Unset):
+        projects (list[str] | None | Unset):
     """
 
     name: str
@@ -44,6 +45,7 @@ class PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse201Definition
         | None
         | Unset
     ) = UNSET
+    projects: list[str] | None | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         name = self.name
@@ -69,6 +71,15 @@ class PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse201Definition
         else:
             sources = self.sources
 
+        projects: list[str] | None | Unset
+        if isinstance(self.projects, Unset):
+            projects = UNSET
+        elif isinstance(self.projects, list):
+            projects = self.projects
+
+        else:
+            projects = self.projects
+
         field_dict: dict[str, Any] = {}
 
         field_dict.update(
@@ -81,6 +92,8 @@ class PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse201Definition
             field_dict["parameters"] = parameters
         if sources is not UNSET:
             field_dict["sources"] = sources
+        if projects is not UNSET:
+            field_dict["projects"] = projects
 
         return field_dict
 
@@ -146,11 +159,29 @@ class PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse201Definition
 
         sources = _parse_sources(d.pop("sources", UNSET))
 
+        def _parse_projects(data: object) -> list[str] | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            try:
+                if not isinstance(data, list):
+                    raise TypeError()
+                projects_type_0 = cast(list[str], data)
+
+                return projects_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(list[str] | None | Unset, data)
+
+        projects = _parse_projects(d.pop("projects", UNSET))
+
         post_api_v1_projects_by_project_id_analytics_dashboard_widgets_response_201_definition_queries_item = cls(
             name=name,
             sql=sql,
             parameters=parameters,
             sources=sources,
+            projects=projects,
         )
 
         return post_api_v1_projects_by_project_id_analytics_dashboard_widgets_response_201_definition_queries_item

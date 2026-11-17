@@ -56,6 +56,16 @@ export class IngestionTemplateService {
     return this.repository.findVisible(input);
   }
 
+  /** One template as a member sees it: OTTL rules stay with `aiTools:manage`, as in the list. */
+  async getByIdForMember(input: {
+    id: string;
+    organizationId: string;
+  }): Promise<IngestionTemplate> {
+    const template = await this.getByIdForOrg(input);
+
+    return { ...template, ottlRules: "" };
+  }
+
   async getByIdForOrg(input: { id: string; organizationId: string }): Promise<IngestionTemplate> {
     const template = await this.repository.findVisible(input);
     if (!template) {

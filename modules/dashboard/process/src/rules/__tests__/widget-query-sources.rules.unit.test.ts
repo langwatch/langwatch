@@ -62,3 +62,26 @@ describe("mergeQuerySources", () => {
     ]);
   });
 });
+
+describe("a query's projects", () => {
+  const storedWithProjects = [{ ...QUERY, projects: ["A", "B"] }];
+
+  /** @scenario "AC210b Compatibility: the dashboard API, the CLI and the MCP tools read and write projects beside sources" */
+  it("keeps the list stored under the name when sent without one, clears it with null", () => {
+    expect(mergeQuerySources({ sent: [QUERY], stored: storedWithProjects })).toEqual([
+      { ...QUERY, projects: ["A", "B"] },
+    ]);
+    expect(
+      mergeQuerySources({ sent: [{ ...QUERY, projects: null }], stored: storedWithProjects }),
+    ).toEqual([QUERY]);
+    expect(
+      mergeQuerySources({ sent: [{ ...QUERY, projects: ["C"] }], stored: storedWithProjects }),
+    ).toEqual([{ ...QUERY, projects: ["C"] }]);
+  });
+
+  /** @scenario "AC210 Compatibility: a widget saved before projects existed reads the board's project" */
+  it("stores no projects on a query that had none", () => {
+    expect(mergeQuerySources({ sent: [QUERY], stored: [QUERY] })).toEqual([QUERY]);
+    expect(withNewQuerySources([QUERY])).toEqual([{ ...QUERY, sources: ["application"] }]);
+  });
+});

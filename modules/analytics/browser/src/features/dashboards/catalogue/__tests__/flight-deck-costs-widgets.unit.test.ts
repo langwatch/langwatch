@@ -25,8 +25,12 @@ describe("given the Flight Deck cockpit widgets", () => {
     }
     expect(code).toContain("<Change ");
     for (const sql of Object.values(queries)) expect(sql).toContain("subtractSeconds(");
-    expect(queries.checks).toContain("NOT e.IsGuardrail");
-    expect(queries.checks).toContain(`e.EvaluatorName != '${OUTCOME_JUDGE}'`);
+    expect(queries.checks).toContain("NOT IsGuardrail");
+    expect(queries.checks).toContain(`EvaluatorName != '${OUTCOME_JUDGE}'`);
+    // One read of the trace evaluations: each verdict carries its trace's time, so no join.
+    expect(queries.checks).toContain("FROM trace_evaluation_metrics");
+    expect(queries.checks).toContain("countIf(TraceOccurredAt >= ");
+    expect(queries.checks).not.toContain("JOIN");
     expect(code).toContain('"Not measured"');
     expect(code).toContain('LW.navigate("onlineEvaluations"');
   });
@@ -42,11 +46,20 @@ describe("given the Flight Deck cockpit widgets", () => {
       build("cost-verdict").queries.outcomes,
     ];
     for (const sql of outcomeQueries) {
-      expect(sql).toContain(`evaluator = '${OUTCOME_JUDGE}'`);
-      expect(sql).toContain("Attributes['metadata.outcome']");
-      expect(sql).toContain("argMax(outcome, sent)");
-      expect(sql).toContain("t.OccurredAt AS at");
+      expect(sql).toContain(`EvaluatorName = '${OUTCOME_JUDGE}'`);
+      expect(sql).toContain("MetadataOutcome AS outcome");
+      expect(sql).toContain(
+        "argMax(r.outcome, toUInt64(r.sent) * 9223372036854775808 + toUInt64(dateDiff('millisecond', toDateTime64(0, 3), r.row_at)) * 1048576 + cityHash64(r.outcome",
+      );
+      expect(sql).not.toContain("Attributes[");
     }
+    // The moved widgets read the judge from the trace evaluations, dated by the trace on the row.
+    const moved = outcomeQueries.filter((sql) => sql?.includes("FROM trace_evaluation_metrics"));
+    expect(moved).toHaveLength(6);
+    for (const sql of moved) expect(sql).toContain("TraceOccurredAt AS row_at");
+    // Only the reasons widget reads a sent reason, from its typed column.
+    expect(build("ck-attention").queries.reasons).toContain("nullIf(MetadataOutcomeReason, '')");
+    expect(build("ck-kpis").queries.outcomes).not.toContain("MetadataOutcomeReason");
   });
 
   /** @scenario "AC22 Flight Deck: Needs attention names the one problem to look at first" */
@@ -71,8 +84,13 @@ describe("given the Flight Deck cockpit widgets", () => {
   /** @scenario "AC23 Flight Deck: Top request my agent cannot serve names a topic, a count and an example" */
   it("names the topic with the most capability-gap conversations and one request", () => {
     const { code, queries } = build("ck-top-ask");
-    expect(queries.gap).toContain("countIf(o.outcome = 'capability_gap') AS gaps");
-    expect(queries.gap).toContain("anyIf(t.input, o.outcome = 'capability_gap') AS example");
+    expect(queries.gap).toContain("countIf(outcome = 'capability_gap') AS gaps");
+    expect(queries.gap).toContain("x.input AS example");
+    // The request's text is read from traces for the shown traces only.
+    expect(queries.gap).toContain("AND TraceId IN (SELECT trace_id FROM (");
+    // Its two copies of the topic list must pick the same trace, so the pick is no `any`.
+    expect(queries.gap).toContain("minIf(g.trace_id, g.gaps > 0) AS trace_id");
+    expect(queries.gap).not.toContain("anyIf(");
     expect(queries.gap).toContain("ORDER BY gaps DESC");
     expect(code).toContain("<TraceLink id={top.trace_id} />");
     expect(code).toContain("conversations asked for something my agent cannot do.");
@@ -100,13 +118,16 @@ describe("given the Flight Deck cockpit widgets", () => {
     expect(queries.trend).toContain("countIf(outcome = 'resolved') AS resolved");
     expect(queries.changes).toContain("arrayJoin(Models)");
     expect(queries.changes).toContain("LastUsedPromptVersionId");
+    expect(queries.changes).toContain("MetadataPromptVersion AS name");
+    expect(queries.changes).not.toContain("Attributes[");
     expect(code).toContain("markers={changes.data.map(markerOf)}");
   });
 
   /** @scenario "AC26 Flight Deck: Task success is the share of calls that got the job done, per language" */
   it("shares resolved calls with an outcome per language", () => {
     const { code, queries } = build("voice-task-success");
-    expect(queries.trend).toContain("Attributes['metadata.language']");
+    expect(queries.trend).toContain(", MetadataLanguage AS language");
+    expect(queries.trend).not.toContain("Attributes[");
     expect(queries.trend).toContain("countIf(outcome = 'resolved') AS done");
     expect(code).toContain('label={"Task success: " + row.language}');
   });
@@ -114,7 +135,7 @@ describe("given the Flight Deck cockpit widgets", () => {
   /** @scenario "AC27 Flight Deck: Accepted, edited or regenerated reads each output's action" */
   it("shares outputs by the action their trace metadata sends", () => {
     const { code, queries } = build("gen-acceptance");
-    expect(queries.actions).toContain("Attributes['metadata.output_action'] AS action");
+    expect(queries.actions).toContain("MetadataOutputAction AS action");
     for (const action of ["accepted", "edited", "regenerated", "dropped"]) {
       expect(code).toContain(`key: "${action}"`);
     }
@@ -147,16 +168,19 @@ describe("given the Running costs widgets", () => {
   it("prices failed traces, loops and recovered retries, each trace once", () => {
     const { code, queries } = build("cost-waste");
     expect(queries.main).toContain("max(ifNull(ParentSpanId, '') = '' AND StatusCode = 2)");
-    expect(queries.main).toContain("sumIf(calls - 1, is_tool AND calls >= 3)");
+    expect(queries.main).toContain("if(any(SpanType = 'tool') AND count() >= 3, count() - 1, 0)");
+    // Trace rows and span groups meet in one grouping; each trace_metrics row counts once.
+    expect(queries.main).toContain("GROUP BY trace\n  HAVING rows > 0");
+    expect(queries.main).toContain("sumIf(rows, failed) AS failed_traces");
     expect(queries.main).toContain("NOT failed AND repeats = 0 AND retries > 0");
-    expect(queries.main).toContain("Origin IN ('', 'application', 'gateway')");
+    expect(queries.main).not.toContain("Origin IN");
     expect(code).toContain('" of production spend"');
   });
 
   /** @scenario "AC31 Running costs: Cost per call shows speech as not priced" */
   it("shows the LLM cost per production call and speech as not priced", () => {
     const { code, queries } = build("voice-cost-per-call");
-    expect(queries.total).toContain("Origin IN ('', 'application', 'gateway')");
+    expect(queries.total).not.toContain("Origin IN");
     expect(code).toContain('value="Not priced"');
   });
 

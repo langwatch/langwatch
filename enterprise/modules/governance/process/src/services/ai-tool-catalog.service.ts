@@ -60,6 +60,25 @@ type AiToolCatalogCollaborators = {
   diagnostics: { warn(message: string, context: Record<string, unknown>): void };
 };
 
+/**
+ * A tile's policy for its tool: a capability is on only when the tool can do it
+ * (`PLATFORM_TOOL_POLICY_DEFAULTS`) and the admin did not turn it off.
+ */
+function tilePolicy({
+  slug,
+  config,
+}: {
+  slug: PlatformToolSlug;
+  config: { allowVk?: unknown; allowOtelDirect?: unknown };
+}): PlatformToolPolicy {
+  const capable = PLATFORM_TOOL_POLICY_DEFAULTS[slug];
+  const adminAllows = (value: unknown): boolean => value === undefined || Boolean(value);
+  return {
+    allowVk: capable.allowVk && adminAllows(config.allowVk),
+    allowOtelDirect: capable.allowOtelDirect && adminAllows(config.allowOtelDirect),
+  };
+}
+
 export class DefaultGovernanceAiToolCatalogService {
   private readonly repository: AiToolCatalogRepository;
 
@@ -282,18 +301,7 @@ export class DefaultGovernanceAiToolCatalogService {
         continue;
       }
 
-      let allowVk = tile.config.allowVk === undefined ? true : Boolean(tile.config.allowVk);
-      let allowOtelDirect =
-        tile.config.allowOtelDirect === undefined ? true : Boolean(tile.config.allowOtelDirect);
-      if (slug === "code") {
-        allowVk = false;
-      }
-
-      if (slug === "cursor") {
-        allowOtelDirect = false;
-      }
-
-      overrides[slug] = { allowVk, allowOtelDirect };
+      overrides[slug] = tilePolicy({ slug, config: tile.config });
     }
 
     return overrides;

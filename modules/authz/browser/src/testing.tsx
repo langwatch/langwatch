@@ -5,12 +5,12 @@
  */
 
 import { UiHostServicesContextProvider } from "@langwatch/browser-host/capabilities";
-import { uiDeclarations } from "@langwatch/browser-host/declarations";
+import { uiDeclarations, type UiDrawerToken } from "@langwatch/browser-host/declarations";
 import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
 import { DesignSystemTestProvider } from "@langwatch/design-system/testing";
 import { ContactSalesToken } from "@langwatch/enterprise-billing-client";
 import { render } from "@testing-library/react";
-import type { ReactElement } from "react";
+import type { ReactElement, ReactNode } from "react";
 
 import {
   AuthzHostApi,
@@ -27,6 +27,8 @@ export class FakeAuthzHost extends AuthzHostApi {
   readonly successes: AuthzSuccessNotice[] = [];
   readonly failures: AuthzFailureNotice[] = [];
   readonly queries: Record<string, string | undefined>[] = [];
+  readonly overlays: { drawer: string; props: unknown }[] = [];
+  closedOverlays = 0;
 
   constructor(
     private readonly options: {
@@ -35,6 +37,7 @@ export class FakeAuthzHost extends AuthzHostApi {
       plan?: AuthzPlanReading;
       query?: Readonly<Record<string, string | undefined>>;
       structure?: AuthzOrganizationStructure;
+      projectSwitcher?: ReactNode;
     } = {},
   ) {
     super();
@@ -64,12 +67,24 @@ export class FakeAuthzHost extends AuthzHostApi {
     this.queries.push({ ...next });
   }
 
+  openOverlay<Props>(drawer: UiDrawerToken<Props>, props?: Partial<Props>): void {
+    this.overlays.push({ drawer: drawer.key, props });
+  }
+
+  closeOverlay(): void {
+    this.closedOverlays += 1;
+  }
+
   succeeded(notice: AuthzSuccessNotice): void {
     this.successes.push(notice);
   }
 
   failed(failure: AuthzFailureNotice): void {
     this.failures.push(failure);
+  }
+
+  projectSwitcher(): ReactNode | null {
+    return this.options.projectSwitcher ?? null;
   }
 }
 

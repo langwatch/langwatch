@@ -448,6 +448,40 @@ export class FakeOrganizationInviteRepository implements OrganizationInviteRepos
         (invite.expiration === null || invite.expiration.epochMilliseconds > now),
     );
   }
+  async hasPendingInviteForEmail({
+    email,
+    organizationId,
+  }: {
+    email: string;
+    organizationId: string;
+  }): Promise<boolean> {
+    const now = nowInstant().epochMilliseconds;
+    return Array.from(this.invitesById.values()).some(
+      (invite) =>
+        invite.organizationId === organizationId &&
+        invite.email.toLowerCase() === email.trim().toLowerCase() &&
+        invite.status === "PENDING" &&
+        (invite.expiration === null || invite.expiration.epochMilliseconds > now),
+    );
+  }
+
+  async deletePaymentPendingInvitesForEmail({
+    email,
+    organizationId,
+  }: {
+    email: string;
+    organizationId: string;
+  }): Promise<number> {
+    const held = Array.from(this.invitesById.values()).filter(
+      (invite) =>
+        invite.organizationId === organizationId &&
+        invite.email.toLowerCase() === email.trim().toLowerCase() &&
+        invite.status === "PAYMENT_PENDING",
+    );
+    for (const invite of held) this.invitesById.delete(invite.id);
+    return held.length;
+  }
+
   findMemberEmails =
     unsupported<OrganizationInviteRepository["findMemberEmails"]>("findMemberEmails");
   findTeamIdsInOrganization = unsupported<
@@ -651,6 +685,14 @@ export class FakeSeatCensus implements OrganizationInviteSeatCensus {
   isViewOnlyCustomRole(): boolean {
     return true;
   }
+
+  withSeatLock<T>({
+    work,
+  }: {
+    work: (lease: { assertHeld(): Promise<void> }) => Promise<T>;
+  }): Promise<T> {
+    return work({ assertHeld: async () => {} });
+  }
 }
 
 /** An unlimited plan, unless a test builds its own `Plan`. */
@@ -662,6 +704,7 @@ export function makePlanProvider(plan: Partial<Plan> = {}): PlanProvider {
     free: true,
     maxMembers: 1_000_000,
     maxMembersLite: 1_000_000,
+    maxMembersDeveloper: 0,
     maxMessagesPerMonth: 1_000_000,
     canPublish: true,
     prices: { USD: 0, EUR: 0 },

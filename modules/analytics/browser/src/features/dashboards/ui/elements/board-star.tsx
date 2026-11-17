@@ -1,7 +1,7 @@
-/** The star that toggles a board in the member's favourites. Presentational. */
+/** The pin that toggles a board in the member's Pinned list. Presentational. */
 
 import { IconButton } from "@langwatch/design-system/primitives";
-import { Star } from "lucide-react";
+import { Pin } from "lucide-react";
 
 export function BoardStar({
   isStarred,
@@ -12,7 +12,7 @@ export function BoardStar({
   onToggle: () => void;
   size?: number;
 }) {
-  const label = isStarred ? "Unstar dashboard" : "Star dashboard";
+  const label = isStarred ? "Unpin dashboard" : "Pin dashboard";
   return (
     <IconButton
       variant="ghost"
@@ -30,7 +30,7 @@ export function BoardStar({
         onToggle();
       }}
     >
-      <Star size={size} fill={isStarred ? "currentColor" : "none"} strokeWidth={1.9} aria-hidden />
+      <Pin size={size} fill={isStarred ? "currentColor" : "none"} strokeWidth={1.9} aria-hidden />
     </IconButton>
   );
 }

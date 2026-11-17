@@ -201,12 +201,19 @@ to an image with the check repairs them within 5 minutes.
 
 **What the LangWatchQL check repairs.** Every 5 minutes the worker's check creates the app-owned
 objects that are missing (engine tables, views, key map, app functions, approved PostgreSQL views)
-and grants the reader SELECT on an approved view that lacks it. It never compares columns, never
-revokes and never creates the reader role, so a changed column or a missing role converges only on
-a deploy: use Ops > Upgrades Retry. Alert on `level=error` with the message "lwql provisioning failed
-creating ClickHouse objects" or "lwql provisioning failed creating PostgreSQL objects". The check runs
+and grants the reader SELECT on an approved view that lacks it. It also replaces a view that lacks
+a column its catalog declares (an extra column is left alone), so a view a deploy left on an older
+definition is repaired within 5 minutes. The comparison is by column name only and a repair rewrites
+the whole view, so during a rollout an older worker can revert a newer deploy's column type,
+expression, dedup or filter change, and the newer worker does not notice. Ship those in two deploys. It never revokes and never creates the reader role, so a
+missing role or a changed column type converges only on a deploy: use Ops > Upgrades Retry. Alert
+on `level=error` with the message "lwql provisioning failed creating ClickHouse objects" or "lwql
+provisioning failed creating PostgreSQL objects". The check runs
 every 5 minutes and logs each failed statement at warn as "lwql reconvergence statement failed",
 which this alert filter does not match.
+
+During a rolling deploy that adds the PostgreSQL schema to the credential digest, old and new workers may
+rebuild each other's engine tables on each check until the last old worker stops; the old form reads `public`.
 
 ## One runner at a time
 

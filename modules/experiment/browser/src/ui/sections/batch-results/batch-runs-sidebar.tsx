@@ -5,6 +5,7 @@ import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
  */
 import {
   Alert,
+  Badge,
   Box,
   Button,
   chakra,
@@ -19,11 +20,17 @@ import { nowInstant } from "@langwatch/time";
 import { FlaskConical, GitCompare, X } from "lucide-react";
 import { useMemo } from "react";
 
+import {
+  agentLabelText,
+  runAgentLabelsOf,
+  type RunTargetLike,
+} from "../../../model/batch-evaluation-results.agent-label.ts";
 import { getRunDisplayName } from "../../../model/batch-evaluation-results.run-display-name.ts";
 import {
   INTERRUPTED_THRESHOLD_MS,
   isRunFinished,
 } from "../../../model/batch-evaluation-results.run-state.ts";
+import { RunConcurrencyBadge } from "../../elements/batch-results/run-concurrency-badge.tsx";
 import { RunDisplayName } from "../../elements/batch-results/run-display-name.tsx";
 import { formatTimeAgo, getColorForString } from "./presentation.tsx";
 
@@ -45,6 +52,10 @@ export type BatchRunSummary = {
   };
   progress?: number | null;
   total?: number | null;
+  /** Cells the run kept in flight; absent for a run that recorded none. */
+  concurrency?: number | null;
+  /** The run's targets as it recorded them, for the agent label each ran at. */
+  targets?: RunTargetLike[] | null;
   summary: {
     datasetCost?: number | null;
     evaluationsCost?: number | null;
@@ -84,6 +95,8 @@ type BatchRunsSidebarProps = {
   onEnterCompareWithRuns?: (runId1: string, runId2: string) => void;
   /** Color map for runs in comparison mode (runId -> color) */
   runColors?: Record<string, string>;
+  /** The dataset version each run read (runId -> version number) */
+  datasetVersions?: Record<string, number>;
 };
 
 /**
@@ -188,6 +201,7 @@ type RunItemProps = {
   isHighlighted: boolean;
   isSelectedForComparison: boolean;
   runColors: Record<string, string>;
+  datasetVersion: number | undefined;
   onClick: (event: React.MouseEvent) => void;
   onToggleSelection?: () => void;
 };
@@ -198,6 +212,7 @@ const RunItem = ({
   isHighlighted,
   isSelectedForComparison,
   runColors,
+  datasetVersion,
   onClick,
   onToggleSelection,
 }: RunItemProps) => {
@@ -232,6 +247,7 @@ const RunItem = ({
       <chakra.button
         type="button"
         onClick={onClick}
+        aria-describedby={run.concurrency ? concurrencyExplanationId(run.runId) : undefined}
         display="flex"
         flexDirection="column"
         alignItems="start"
@@ -273,8 +289,67 @@ const RunItem = ({
           {run.timestamps.createdAt ? formatTimeAgo(run.timestamps.createdAt) : "..."}
           {run.timestamps.stoppedAt && " · stopped"}
           {interrupted && " · interrupted"}
+          {datasetVersion !== undefined && (
+            <chakra.span data-testid={`run-dataset-version-${run.runId}`}>
+              {` · Dataset v${datasetVersion}`}
+            </chakra.span>
+          )}
         </Text>
+        <RunSettingsLine run={run} />
       </chakra.button>
+    </HStack>
+  );
+};
+
+/**
+ * Label badges a run entry shows before folding the rest into "+N", so the narrow sidebar stays
+ * two lines.
+ */
+const MAX_LABEL_BADGES = 2;
+
+const concurrencyExplanationId = (runId: string) => `run-concurrency-explanation-${runId}`;
+
+/**
+ * The agent version each label resolved to and the run's concurrency, as badges, when it recorded
+ * them.
+ */
+const RunSettingsLine = ({ run }: { run: BatchRunSummary }) => {
+  const labels = runAgentLabelsOf(run.targets);
+  if (labels.length === 0 && !run.concurrency) return null;
+  const shown = labels.slice(0, MAX_LABEL_BADGES);
+  const folded = labels.slice(MAX_LABEL_BADGES);
+
+  return (
+    <HStack gap={1} flexWrap="wrap" paddingTop={0.5} maxWidth="full">
+      {shown.map((label) => (
+        <Badge
+          key={label.targetId}
+          size="xs"
+          variant="subtle"
+          maxWidth="full"
+          title={label.targetName}
+          data-testid={`run-agent-label-${run.runId}-${label.targetId}`}
+        >
+          <chakra.span truncate>{agentLabelText(label)}</chakra.span>
+        </Badge>
+      ))}
+      {folded.length > 0 ? (
+        <Badge
+          size="xs"
+          variant="subtle"
+          title={folded.map((label) => `${label.targetName}: ${agentLabelText(label)}`).join("\n")}
+          data-testid={`run-agent-labels-folded-${run.runId}`}
+        >
+          {`+${folded.length}`}
+        </Badge>
+      ) : null}
+      {run.concurrency ? (
+        <RunConcurrencyBadge
+          concurrency={run.concurrency}
+          explanationId={concurrencyExplanationId(run.runId)}
+          testId={`run-concurrency-${run.runId}`}
+        />
+      ) : null}
     </HStack>
   );
 };
@@ -292,6 +367,7 @@ export function BatchRunsSidebar({
   onToggleRunSelection,
   onEnterCompareWithRuns,
   runColors = {},
+  datasetVersions = {},
 }: BatchRunsSidebarProps) {
   const canCompare = runs.length >= 2;
 
@@ -395,6 +471,7 @@ export function BatchRunsSidebar({
                 }
                 isSelectedForComparison={isSelectedForComparison}
                 runColors={runColors}
+                datasetVersion={datasetVersions[run.runId]}
                 onClick={(e) => handleRunClick(run.runId, e)}
                 onToggleSelection={
                   compareMode && onToggleRunSelection

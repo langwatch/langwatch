@@ -1,7 +1,7 @@
 /**
- * The server half of `subscription.*`. Reading takes `organization:view`;
- * anything that changes what the organization pays takes `organization:manage`.
- * Nothing catches: every refusal below is a handled error the shared path maps.
+ * The server half of `subscription.*`. Reading takes `organization:view`, starting a
+ * subscription `subscription:upgrade` (every member); changing a live one, its portal and its
+ * invoices take `subscription:manage`, which administrators and the Billing role hold.
  */
 import {
   defineMiddlewareContext,
@@ -13,6 +13,8 @@ import {
   billingCallerEmailSchema,
   type BillingDisplayInvoice,
   type Currency,
+  type DeveloperSeatQuote,
+  type DeveloperSeats,
   type SubscribablePlan,
   type SubscriptionBillingInterval,
 } from "@langwatch/enterprise-billing-contract";
@@ -49,6 +51,8 @@ export interface BillingSubscriptionApi {
     customerId: string;
     currency?: Currency;
     billingInterval?: SubscriptionBillingInterval;
+    /** Who opened the checkout; given the Billing role when it completes. */
+    startedByUserId?: string;
   }): Promise<{ url: string | null }>;
   createBillingPortalSession(input: {
     customerId: string;
@@ -68,6 +72,17 @@ export interface BillingSubscriptionApi {
     actorEmail: string | null;
   }): Promise<unknown>;
   listInvoices(input: { organizationId: string }): Promise<BillingDisplayInvoice[]>;
+  /** Developer seats the subscription bills, and whether a price is configured to sell more. */
+  developerSeats(input: { organizationId: string }): Promise<DeveloperSeats>;
+  previewDeveloperSeats(input: {
+    organizationId: string;
+    quantity: number;
+  }): Promise<DeveloperSeatQuote>;
+  setDeveloperSeats(input: {
+    organizationId: string;
+    quantity: number;
+    quotedAt?: number;
+  }): Promise<{ success: boolean }>;
 }
 
 export const BillingSubscriptionApi = moduleApi<BillingSubscriptionApi>()("billing");
@@ -87,7 +102,7 @@ export const subscriptionTrpcTransport: TrpcRouterDeclaration<
   typeof subscriptionTrpc
 > = defineTrpcRouter(BillingSubscriptionApi, subscriptionTrpc)
   .procedure("addTeamMemberOrEvents")
-  .withPermission("organization:manage")
+  .withPermission("subscription:manage")
   // Raises the seat and volume lines on a live subscription, priced at the
   // instant the customer was quoted.
   .handle(({ app, input }) =>
@@ -104,15 +119,16 @@ export const subscriptionTrpcTransport: TrpcRouterDeclaration<
 
   .procedure("create")
   .withMiddlewareContext(billingCallerEmailContext)
-  .withPermission("organization:manage")
-  // Starts a checkout for an organization that has no subscription.
-  .handle(async ({ app, input }, email) => {
+  .withPermission("subscription:upgrade")
+  // Starts a checkout; a live subscription is refused, the portal changes that one.
+  .handle(async ({ app, input, actor }, email) => {
     const customerId = await app.getOrCreateCustomerId({
       user: { email },
       organizationId: input.organizationId,
     });
 
     return app.createOrUpdateSubscription({
+      ...(actor.type === "user" ? { startedByUserId: actor.id } : {}),
       organizationId: input.organizationId,
       baseUrl: input.baseUrl,
       plan: input.plan,
@@ -126,7 +142,7 @@ export const subscriptionTrpcTransport: TrpcRouterDeclaration<
 
   .procedure("manage")
   .withMiddlewareContext(billingCallerEmailContext)
-  .withPermission("organization:manage")
+  .withPermission("subscription:manage")
   // A billing-portal session for card, address and cancellation.
   .handle(async ({ app, input }, email) => {
     const customerId = await app.getOrCreateCustomerId({
@@ -142,7 +158,7 @@ export const subscriptionTrpcTransport: TrpcRouterDeclaration<
   })
 
   .procedure("previewProration")
-  .withPermission("organization:manage")
+  .withPermission("subscription:manage")
   // What a seat change costs, before it is confirmed.
   .handle(({ app, input }) =>
     app.previewProration({
@@ -160,7 +176,7 @@ export const subscriptionTrpcTransport: TrpcRouterDeclaration<
 
   .procedure("prospective")
   .withMiddlewareContext(billingCallerEmailContext)
-  .withPermission("organization:manage")
+  .withPermission("subscription:manage")
   // Tells sales an organization asked about a plan that is not self-serve.
   .handle(({ app, input }, email) =>
     app.notifyProspective({
@@ -173,8 +189,31 @@ export const subscriptionTrpcTransport: TrpcRouterDeclaration<
     }),
   )
 
-  .procedure("listInvoices")
+  .procedure("developerSeats")
   .withPermission("organization:view")
+  // Developer seats billed, and whether a configured price sells more.
+  .handle(({ app, input }) => app.developerSeats({ organizationId: input.organizationId }))
+
+  .procedure("previewDeveloperSeats")
+  .withPermission("organization:manage")
+  // What a Developer seat change costs, before it is confirmed.
+  .handle(({ app, input }) =>
+    app.previewDeveloperSeats({ organizationId: input.organizationId, quantity: input.quantity }),
+  )
+
+  .procedure("setDeveloperSeats")
+  .withPermission("organization:manage")
+  // Sets the Developer seat line, priced at the instant the customer was quoted.
+  .handle(({ app, input }) =>
+    app.setDeveloperSeats({
+      organizationId: input.organizationId,
+      quantity: input.quantity,
+      ...(input.quotedAt === undefined ? {} : { quotedAt: input.quotedAt }),
+    }),
+  )
+
+  .procedure("listInvoices")
+  .withPermission("subscription:manage")
   // The organization's invoices, for the billing page.
   .handle(({ app, input }) => app.listInvoices({ organizationId: input.organizationId }))
   .build();

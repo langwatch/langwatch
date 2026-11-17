@@ -1,4 +1,4 @@
-import { nowInstant } from "@langwatch/time";
+import { nowEpochMs } from "@langwatch/time";
 /**
  * Dispatch-eligibility time, customer-supplied (OTLP timeUnixNano). Must clamp
  * against staging clock: too-far-past blocks job, too-far-future hides group.
@@ -56,7 +56,7 @@ export function isUsableReadyScore(score: unknown, nowMs: number): score is numb
  * Fallback clock reading, validated against absolute bound (not relative skew).
  * Pre-NTP clocks pinned to backstop to prevent staging 1970.
  */
-export function fallbackReadyScore(nowMs: number = nowInstant().epochMilliseconds): number {
+export function fallbackReadyScore(nowMs: number = nowEpochMs()): number {
   return isPlausibleReadyScore(nowMs) ? nowMs : MIN_PLAUSIBLE_EPOCH_MS;
 }
 
@@ -66,7 +66,7 @@ export function fallbackReadyScore(nowMs: number = nowInstant().epochMillisecond
  */
 export function resolveReadyScore({
   score,
-  nowMs = nowInstant().epochMilliseconds,
+  nowMs = nowEpochMs(),
 }: {
   score: unknown;
   nowMs?: number;

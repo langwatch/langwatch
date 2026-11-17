@@ -292,6 +292,69 @@ describe("validationMeta", () => {
       const meta = validationMeta(error);
       expect(meta?.issueCount).toBe(2);
       expect(meta?.issues.map((i) => i.code)).toEqual(["invalid_union", "invalid_type"]);
+      expect(meta?.issues.map((i) => i.path)).toEqual(["input", "input.value"]);
+    });
+
+    // A schema-only path is read from the root of the value, so each arm's issues need the
+    // path of the union above them; the describer here just joins what it is handed.
+    const joined = (path: readonly unknown[]) => path.join(".");
+
+    it("reads a nested Zod 4 union's arms relative to each union in turn", () => {
+      const error = {
+        issues: [
+          {
+            code: "invalid_union",
+            path: ["outer"],
+            errors: [
+              [
+                {
+                  code: "invalid_union",
+                  path: ["inner"],
+                  errors: [[{ code: "invalid_type", path: ["leaf"], expected: "string" }]],
+                },
+              ],
+            ],
+          },
+        ],
+      };
+
+      const meta = validationMeta(error, { privacy: "schema-only", schemaPath: joined });
+      expect(meta?.issues.map((i) => i.path)).toEqual(["outer", "outer.inner", "outer.inner.leaf"]);
+    });
+
+    it("reads a nested Zod 3 union's arms as the absolute paths they already are", () => {
+      const error = {
+        issues: [
+          {
+            code: "invalid_union",
+            path: ["outer"],
+            unionErrors: [
+              {
+                issues: [
+                  {
+                    code: "invalid_union",
+                    path: ["outer", "inner"],
+                    unionErrors: [
+                      {
+                        issues: [
+                          {
+                            code: "invalid_type",
+                            path: ["outer", "inner", "leaf"],
+                            expected: "string",
+                          },
+                        ],
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      };
+
+      const meta = validationMeta(error, { privacy: "schema-only", schemaPath: joined });
+      expect(meta?.issues.map((i) => i.path)).toEqual(["outer", "outer.inner", "outer.inner.leaf"]);
     });
   });
 

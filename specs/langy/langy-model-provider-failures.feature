@@ -190,6 +190,36 @@ Feature: A turn that the model provider refused says so
       When the customer reads the card
       Then it says the model has no provider connected in this project
 
+  Rule: A turn an AI gateway spending limit refused says whose limit it is
+
+    When an AI gateway budget blocks the call, the gateway answers 402 with
+    the code "budget_exceeded" and names the budget's scope and window. The
+    turn reaches the panel as a failed agent turn with that reason beneath it.
+    The block holds until the window resets or an admin raises the limit, so
+    another try fails the same way.
+
+    @unit
+    Scenario: A spending limit reads as the limit, not as a failed reply
+      Given a turn that failed because the team's monthly AI gateway budget is spent
+      When the customer reads the card
+      Then the title says the team's monthly AI spending limit is reached
+      And it says when the limit resets and that an admin can raise it
+      And it offers to open the AI gateway budgets
+      And it does not offer to try again
+
+    @unit
+    Scenario: A spending limit with no named scope still reads as a spending limit
+      Given a turn that failed on an AI gateway budget that named no scope or window
+      When the customer reads the card
+      Then the title says the AI spending limit is reached
+      And it does not offer to try again
+
+    @unit
+    Scenario: A spending limit on the live stream reads the same as after a refresh
+      Given a turn whose live stream error carries the gateway's budget reason
+      When the customer reads the card before refreshing
+      Then the card is the spending limit card
+
   Rule: A provider that is not set up says which setting is missing
 
     A third case, apart from a refusal and from having no provider: the

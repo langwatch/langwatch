@@ -32,11 +32,12 @@ function pipeline(): InstantEvalProcessingPipelineDefinition {
       runs: MemoryInstantEvalRunRepository.create(() => AT),
     }),
     dispatch: {
-      executor: { plan: vi.fn(), judgePage: vi.fn(), finish: vi.fn() },
+      executor: { plan: vi.fn(), judgePage: vi.fn(), finish: vi.fn(), billLatePage: vi.fn() },
       commands: () => ({
         recordPlanned: vi.fn(),
         recordPageJudged: vi.fn(),
         recordFinished: vi.fn(),
+        recordLatePageBilled: vi.fn(),
       }),
     },
   });
@@ -118,6 +119,17 @@ const finished = {
   priceUsd: 0.013,
 };
 
+const lateBill = {
+  runId: RUN_ID,
+  page: 3,
+  inputTokens: 0,
+  requests: 4,
+  costNanoUsd: 5000,
+  routedInputTokens: 0,
+  costUsd: 0.000005,
+  priceUsd: 0.0000065,
+};
+
 /** One complete payload per command, so each parses against its own schema. */
 const payloadOf: Record<string, Record<string, unknown>> = {
   requestRun: requestedEvent().data,
@@ -125,12 +137,13 @@ const payloadOf: Record<string, Record<string, unknown>> = {
   recordPageJudged: page(),
   requestCancel: { runId: RUN_ID, requestedByUserId: null },
   recordFinished: finished,
+  recordLatePageBilled: lateBill,
 };
 
 describe("given the pipeline the worker registers", () => {
   describe("when it is built", () => {
-    /** @scenario "The worker mounts one run projection, five commands and the process manager" */
-    it("mounts one run projection, five commands and the process manager", () => {
+    /** @scenario "The worker mounts one run projection, six commands and the process manager" */
+    it("mounts one run projection, six commands and the process manager", () => {
       const built = pipeline();
 
       expect(built.metadata.name).toBe(INSTANT_EVAL_PIPELINE_NAME);
@@ -141,6 +154,7 @@ describe("given the pipeline the worker registers", () => {
         "recordPageJudged",
         "requestCancel",
         "recordFinished",
+        "recordLatePageBilled",
       ]);
       expect([...(built.stateProjections?.keys() ?? [])]).toEqual(["instantEvalRun"]);
       expect([...built.processManagers.keys()]).toEqual([INSTANT_EVAL_PROCESS_NAME]);
@@ -211,6 +225,17 @@ describe("given a run whose events arrive more than once", () => {
       expect(again.idempotencyKey).toBe(first.idempotencyKey);
       expect(first.idempotencyKey).toContain("finished");
     });
+
+    /** @scenario "A routed page that reports after its run finished is billed on its own" */
+    it("keys a late page's bill by its page, so a redelivered bill adds the page once", async () => {
+      const first = await eventOf("recordLatePageBilled", lateBill);
+      const again = await eventOf("recordLatePageBilled", lateBill);
+      const next = await eventOf("recordLatePageBilled", { ...lateBill, page: 4 });
+
+      expect(again.idempotencyKey).toBe(first.idempotencyKey);
+      expect(next.idempotencyKey).not.toBe(first.idempotencyKey);
+      expect(first.idempotencyKey).toContain("late-page-3");
+    });
   });
 });
 
@@ -230,7 +255,7 @@ describe("given two runs of one project judging at the same time", () => {
         }),
       );
 
-      expect(aggregateIds).toEqual([RUN_ID, RUN_ID, RUN_ID, RUN_ID, RUN_ID]);
+      expect(aggregateIds).toEqual([RUN_ID, RUN_ID, RUN_ID, RUN_ID, RUN_ID, RUN_ID]);
     });
 
     it("gives the project one queue lane, so a run's pages never overtake each other", () => {
@@ -246,7 +271,7 @@ describe("given two runs of one project judging at the same time", () => {
         }),
       );
 
-      expect(groupKeys).toEqual([PROJECT_ID, PROJECT_ID, PROJECT_ID, PROJECT_ID, PROJECT_ID]);
+      expect(groupKeys).toEqual(Array.from({ length: 6 }, () => PROJECT_ID));
     });
   });
 });

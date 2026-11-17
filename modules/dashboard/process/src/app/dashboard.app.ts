@@ -11,6 +11,7 @@ import {
   type DashboardWidgetDefinitionInput,
   type LangWatchQLBudgetOverflowMode,
   type LangWatchQLCaller,
+  type LangWatchQLKeyReach,
   type LangWatchQLProtections,
   type LangWatchQLQueryResult,
   type LangWatchQLTimeWindow,
@@ -616,6 +617,7 @@ export class DashboardModule implements DashboardApi {
       dashboardId?: string;
       name: string;
       viewer?: DashboardViewer;
+      keyReach?: LangWatchQLKeyReach;
     } & DashboardWidgetDefinitionInput,
   ): Promise<DashboardWidget> {
     return this.#widgets.createWidget({
@@ -630,6 +632,7 @@ export class DashboardModule implements DashboardApi {
         ...(input.source === undefined ? {} : { source: input.source }),
       },
       viewer: input.viewer,
+      keyReach: input.keyReach,
     });
   }
 
@@ -641,12 +644,14 @@ export class DashboardModule implements DashboardApi {
       onDashboardId?: string;
       name?: string;
       viewer?: DashboardViewer;
+      keyReach?: LangWatchQLKeyReach;
     } & Partial<DashboardWidgetDefinitionInput>,
   ): Promise<DashboardWidget> {
     return this.#widgets.updateWidget({
       projectId: input.projectId,
       id: input.id,
       viewer: input.viewer,
+      keyReach: input.keyReach,
       ...(input.onDashboardId === undefined ? {} : { onDashboardId: input.onDashboardId }),
       input: {
         ...(input.name === undefined ? {} : { name: input.name }),

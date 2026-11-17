@@ -14,9 +14,9 @@ let hovered: HTMLAnchorElement | null = null;
 let hoverTimer: ReturnType<typeof setTimeout> | undefined;
 let observer: IntersectionObserver | null = null;
 
+/* Offline and Save-Data are navigation's call (mayFetchAhead); this caps what is in flight. */
 function allowed() {
-  const saveData = (navigator as { connection?: { saveData?: boolean } }).connection?.saveData;
-  return navigator.onLine && !saveData && inFlight < MAX_IN_FLIGHT;
+  return inFlight < MAX_IN_FLIGHT;
 }
 
 /** Hands a likely destination to navigation, whose cache the click then reuses. */
@@ -64,7 +64,7 @@ document.addEventListener("pointerout", (event) => hoverEnd({ event }), { passiv
 document.addEventListener("focusin", (event) => {
   if (event.target instanceof HTMLAnchorElement) prefetch({ anchor: event.target });
 });
-/** Loads an island once a page holds what it enhances: clips. */
+/** Loads an island once a page holds what it enhances: clips and deferred posters. */
 function enhanceWith({ name, selector }: { name: string; selector: string }) {
   if (!document.querySelector(selector)) return;
   if (document.querySelector(`script[data-island="${name}"]`)) return;
@@ -81,7 +81,7 @@ function enhanceWith({ name, selector }: { name: string; selector: string }) {
 
 function enhance() {
   observeLinks();
-  enhanceWith({ name: "media", selector: "video[data-docs-clip]" });
+  enhanceWith({ name: "media", selector: "video[data-docs-clip], video[data-docs-poster]" });
 }
 
 document.addEventListener("docs:navigated", enhance);

@@ -2,6 +2,7 @@ import type {
   DashboardWidget,
   DashboardWidgetDefinitionInput,
   LangWatchQLBudgetOverflowMode,
+  LangWatchQLKeyReach,
   LangWatchQLProtections,
   LangWatchQLQueryResult,
   LangWatchQLTimeWindow,
@@ -247,6 +248,8 @@ export interface DashboardApi {
       dashboardId?: string;
       name: string;
       viewer?: DashboardViewer;
+      /** The API key writing: the projects a query names must be ones this key can run. */
+      keyReach?: LangWatchQLKeyReach;
     } & DashboardWidgetDefinitionInput,
   ): Promise<DashboardWidget>;
   /** With `onDashboardId`, a widget on any other board, or on none, is not found. */
@@ -257,6 +260,7 @@ export interface DashboardApi {
       onDashboardId?: string;
       name?: string;
       viewer?: DashboardViewer;
+      keyReach?: LangWatchQLKeyReach;
     } & Partial<DashboardWidgetDefinitionInput>,
   ): Promise<DashboardWidget>;
   assignDashboardWidgetToDashboard(input: {

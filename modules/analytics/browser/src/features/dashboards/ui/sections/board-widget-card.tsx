@@ -8,17 +8,24 @@ import { Box } from "@langwatch/design-system/primitives";
 import { GripVertical } from "lucide-react";
 import { useMemo, useState } from "react";
 
+import { useReadableProjects } from "../../../../behavior/use-readable-projects.ts";
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import type { WidgetFace } from "../../../../model/dashboard-widget/widget-completeness.ts";
 import { CHART_GRID_DRAG_HANDLE_CLASS } from "../../../../ui/sections/chart-grid.tsx";
 import { DashboardWidgetFrameOverWindow } from "../../../dashboard-widget/ui/sections/dashboard-widget-frame.tsx";
 import { useWidgetClipboard } from "../../behavior/use-widget-clipboard.ts";
 import { useWidgetCsvExport } from "../../behavior/use-widget-csv-export.ts";
+import { useWidgetViewed } from "../../behavior/use-widget-viewed.ts";
 import type { WidgetSetup } from "../../langy/model/board-langy.ts";
 import type { BoardPeriod } from "../../model/board-period.ts";
 import type { BoardWidget } from "../../model/board-widgets.ts";
 import { WIDGET_EDIT_PERMISSION } from "../../model/dashboards-access.ts";
-import { picksNoSources, widgetSourcesLine } from "../../model/widget-sources.ts";
+import {
+  picksNoSources,
+  widgetCardFooter,
+  widgetProjectsLine,
+  widgetSourcesLine,
+} from "../../model/widget-sources.ts";
 import { AskLangyButton } from "../blocks/ask-langy-button.tsx";
 import { NoSourcesPicked } from "../blocks/no-sources-picked.tsx";
 import { WidgetCardShell, widgetBodyHeightPx } from "../blocks/widget-card-shell.tsx";
@@ -41,12 +48,14 @@ export function BoardWidgetCard({
   dashboardId,
   boardName,
   period,
+  periodKey,
   isWriting,
   langy,
   onEdit,
   onDuplicate,
   onDelete,
   onEmptyChange,
+  onLimitFailureChange,
 }: {
   widget: BoardWidget;
   projectId: string;
@@ -55,6 +64,8 @@ export function BoardWidgetCard({
   /** The board's name, which an exported file is named for. */
   boardName: string;
   period: BoardPeriod;
+  /** The reader's chosen period, such as "1h:auto"; only a new choice restarts the widget. */
+  periodKey: string;
   isWriting: boolean;
   langy?: WidgetCardLangy;
   /**
@@ -66,11 +77,16 @@ export function BoardWidgetCard({
   onDelete?: () => void;
   /** Told whether the card shows none of the widget's data. */
   onEmptyChange?: (empty: boolean) => void;
+  /** Told whether the card's final failure is a resource limit. */
+  onLimitFailureChange?: (limited: boolean) => void;
 }) {
   const host = useAnalyticsHost();
+  const readable = useReadableProjects({ projectId: host.project()?.id ?? "" });
   const clipboard = useWidgetClipboard({ dashboardId });
   const csvExport = useWidgetCsvExport({ board: boardName, widget: widget.name });
+  const viewRef = useWidgetViewed({ widgetSource: widget.definition.source?.kind ?? "unknown" });
   const [face, setFace] = useState<WidgetFace["kind"]>("chart");
+  const [limits, setLimits] = useState("");
   // A widget the reader may not see offers nothing that reads its data: no Langy, alert or report.
   const langyOnData = face === "no_access" ? undefined : langy;
   const canEditCode = face !== "no_access" || host.hasPermission(WIDGET_EDIT_PERMISSION);
@@ -82,9 +98,18 @@ export function BoardWidgetCard({
 
   return (
     <WidgetCardShell
+      viewRef={viewRef}
       name={widget.name}
       description={widget.definition.description}
-      footer={widgetSourcesLine(widget.definition.queries)}
+      footer={widgetCardFooter({
+        sourcesLine: widgetSourcesLine(widget.definition.queries),
+        projectsLine: widgetProjectsLine({
+          queries: widget.definition.queries,
+          boardProjectName: host.project()?.name ?? "",
+          readable,
+        }),
+        limits,
+      })}
       controls={
         <>
           {onEdit && (
@@ -133,9 +158,20 @@ export function BoardWidgetCard({
           maxHeight={widgetBodyHeightPx(widget.placement.rowSpan)}
           timeWindow={timeWindow}
           granularitySeconds={granularitySeconds}
+          periodKey={periodKey}
           onFaceChange={setFace}
+          limitAudience={{
+            kind: "editable",
+            editsDisabled: isWriting,
+            ...(langyOnData && onEdit
+              ? { onEditWithLangy: () => onEdit({ withLangy: true }) }
+              : {}),
+            ...(canEditCode && onEdit ? { onEditCode: () => onEdit({ withLangy: false }) } : {}),
+          }}
+          onLimitsChange={setLimits}
           onExportChange={csvExport.onExportChange}
           onEmptyChange={onEmptyChange}
+          onLimitFailureChange={onLimitFailureChange}
           {...(langy ? { onAskLangyToSetUp: langy.setUpMissing } : {})}
         />
       )}

@@ -3,7 +3,12 @@ import { z } from "zod";
 
 import packageJson from "../package.json" with { type: "json" };
 import { requireApiKey } from "./config.ts";
-import { fetchDocumentation } from "./documentation-fetch.ts";
+import {
+  DOCS_ENDPOINT_FETCH_LIMITS,
+  type DocumentationKind,
+  fetchDocumentation,
+  SharedDocumentationFetcher,
+} from "./documentation-fetch.ts";
 import { createDatasetSchema, datasetColumnDefinitionSchema } from "./schemas/create-dataset.ts";
 import {
   runParametersSchema,
@@ -28,7 +33,11 @@ import {
   triggerActionSchema,
   validateActionParamsForAction,
 } from "./schemas/triggers.ts";
-import { widgetSourcesInput } from "./schemas/widget-sources.ts";
+import {
+  runQueryProjectsInput,
+  widgetProjectsInput,
+  widgetSourcesInput,
+} from "./schemas/widget-sources.ts";
 import { handleExperimentResults } from "./tools/get-experiment-results.ts";
 import { handleExperimentListRuns } from "./tools/list-experiment-runs.ts";
 import { handleExperimentList } from "./tools/list-experiments.ts";
@@ -48,14 +57,46 @@ const modelSchema = z
  * This is used both for stdio mode (single server) and HTTP mode (per-session servers).
  */
 export function createMcpServer(): McpServer {
-  const server = new McpServer({
-    name: "LangWatch",
-    version: packageJson.version,
-  });
+  const server = newLangWatchServer();
 
   registerTools(server);
 
   return server;
+}
+
+let docsEndpointFetcher: SharedDocumentationFetcher | undefined;
+
+/**
+ * A server with only the documentation tools, for callers that present no credential: the
+ * hosted docs endpoint. Nothing it registers reads the config, an API key or a project.
+ */
+export function createDocsMcpServer(): McpServer {
+  const server = newLangWatchServer();
+
+  // One fetcher for every docs server in the process, so its bound and cache hold across callers.
+  const fetcher = (docsEndpointFetcher ??= new SharedDocumentationFetcher({
+    limits: DOCS_ENDPOINT_FETCH_LIMITS,
+  }));
+  registerDocsTools(server, (input) => fetcher.fetch(input));
+
+  return server;
+}
+
+/** Reads one documentation page; `signal` aborts when the client's request goes away. */
+type DocumentationReader = (input: {
+  kind: DocumentationKind;
+  url: string | undefined;
+  signal: AbortSignal;
+}) => Promise<string>;
+
+const fetchDocumentationDirectly: DocumentationReader = ({ kind, url, signal }) =>
+  fetchDocumentation(kind, url, fetch, signal);
+
+function newLangWatchServer(): McpServer {
+  return new McpServer({
+    name: "LangWatch",
+    version: packageJson.version,
+  });
 }
 
 /**
@@ -82,7 +123,8 @@ function withToolLogging<T extends unknown[], R>(
 }
 
 function registerTools(server: McpServer): void {
-  registerDocsTools(server);
+  registerDocsTools(server, fetchDocumentationDirectly);
+  registerReportIssueTool(server);
   registerObservabilityTools(server);
   registerPromptTools(server);
   registerScenarioTools(server);
@@ -105,7 +147,7 @@ function registerTools(server: McpServer): void {
   registerApiKeyTools(server);
 }
 
-function registerDocsTools(server: McpServer): void {
+function registerDocsTools(server: McpServer, readDocumentation: DocumentationReader): void {
   server.tool(
     "fetch_langwatch_docs",
     "Fetches the LangWatch docs for understanding how to implement LangWatch in your codebase. Always use this tool when the user asks for help with LangWatch. Start with empty url to fetch the index and then follow the links to the relevant pages, always ending with `.md` extension",
@@ -117,12 +159,35 @@ function registerDocsTools(server: McpServer): void {
           "The full url of the specific doc page. If not provided, the docs index will be fetched.",
         ),
     },
-    withToolLogging("fetch_langwatch_docs", async ({ url }) => {
-      const text = await fetchDocumentation("langwatch", url);
+    withToolLogging("fetch_langwatch_docs", async ({ url }, extra) => {
+      const text = await readDocumentation({ kind: "langwatch", url, signal: extra.signal });
       return { content: [{ type: "text", text }] };
     }),
   );
 
+  server.tool(
+    "fetch_scenario_docs",
+    "Fetches the Scenario docs for understanding how to implement Scenario agent tests in your codebase. Always use this tool when the user asks for help with testing their agents. Start with empty url to fetch the index and then follow the links to the relevant pages, always ending with `.md` extension",
+    {
+      url: z
+        .string()
+        .optional()
+        .describe(
+          "The full url of the specific doc page. If not provided, the docs index will be fetched.",
+        ),
+    },
+    withToolLogging("fetch_scenario_docs", async ({ url }, extra) => {
+      const text = await readDocumentation({ kind: "scenario", url, signal: extra.signal });
+      return { content: [{ type: "text", text }] };
+    }),
+  );
+}
+
+/**
+ * Works without an API key, but not without the config: the report goes to the configured
+ * endpoint. That is why the docs-only server leaves it out.
+ */
+function registerReportIssueTool(server: McpServer): void {
   server.tool(
     "report_issue",
     "Report an issue to the LangWatch team: anything that did not work, confused you, or took trial and error while using LangWatch (docs, MCP tools, CLI, SDKs, the platform). Use it whenever you struggled, it is how rough edges get fixed for every agent. Ask the user for permission first, then call with user_approved=true. Works without an API key. Put VERBATIM error messages in the summary; optionally attach raw session content. Secrets, API keys, emails and phone numbers are redacted locally before anything is sent.",
@@ -156,23 +221,6 @@ function registerDocsTools(server: McpServer): void {
       return {
         content: [{ type: "text", text: await handleReportIssue(params) }],
       };
-    }),
-  );
-
-  server.tool(
-    "fetch_scenario_docs",
-    "Fetches the Scenario docs for understanding how to implement Scenario agent tests in your codebase. Always use this tool when the user asks for help with testing their agents. Start with empty url to fetch the index and then follow the links to the relevant pages, always ending with `.md` extension",
-    {
-      url: z
-        .string()
-        .optional()
-        .describe(
-          "The full url of the specific doc page. If not provided, the docs index will be fetched.",
-        ),
-    },
-    withToolLogging("fetch_scenario_docs", async ({ url }) => {
-      const text = await fetchDocumentation("scenario", url);
-      return { content: [{ type: "text", text }] };
     }),
   );
 }
@@ -247,6 +295,17 @@ function registerObservabilityTools(server: McpServer): void {
         .optional()
         .describe(
           'Values for the parameters the statement declares, e.g. {"days": 7} for {days:UInt32}',
+        ),
+      projects: runQueryProjectsInput
+        .optional()
+        .describe(
+          'The project ids to read, or the string "all" for every project the key can read (params.dashboard_context_projects lists them). A key that reaches several projects must name them or send "all"; a key that reads one project defaults to it',
+        ),
+      sources: z
+        .array(z.string())
+        .optional()
+        .describe(
+          "The trace sources {dashboard_context_sources:Array(String)} is bound to (default application). Only a statement that reads that parameter is kept to them; a SOURCES_IGNORED diagnostic says it did not",
         ),
     },
     withToolLogging("run_query", async (params) => {
@@ -1061,14 +1120,21 @@ function registerSimulationRunTools(server: McpServer): void {
 function registerEvaluatorTools(server: McpServer): void {
   server.tool(
     "platform_create_evaluator",
-    `Create an evaluator on the LangWatch platform. Useful for setting up LLM-as-judge and other evaluators to use in evaluation notebooks. Call discover_schema({ category: 'evaluators' }) first to see available evaluator types and their settings.`,
+    `Create an evaluator on the LangWatch platform: a built-in one (LLM-as-judge and others), a custom Python code evaluator, or one that wraps a workflow. For a built-in one, call discover_schema({ category: 'evaluators' }) first to see available evaluator types and their settings.`,
     {
       name: z.string().describe("Evaluator name"),
+      type: z
+        .enum(["evaluator", "code", "workflow"])
+        .optional()
+        .describe(
+          'The kind of evaluator: "evaluator" (default, a built-in type), "code" (a custom Python evaluator) or "workflow" (wraps workflowId).',
+        ),
       config: z
         .record(z.string(), z.unknown())
         .describe(
-          'Evaluator config object. Must include "evaluatorType" (e.g. "langevals/llm_boolean") and optional "settings" overrides.',
+          'For a built-in evaluator: "evaluatorType" (e.g. "langevals/llm_boolean") and optional "settings" overrides. For type "code": "code" (a Python class Code with __call__) and "inputs" ([{ identifier, type }]). For type "workflow": {}.',
         ),
+      workflowId: z.string().optional().describe('The workflow a "workflow" evaluator wraps.'),
     },
     withToolLogging("platform_create_evaluator", async (params) => {
       requireApiKey();
@@ -1460,6 +1526,7 @@ function registerDashboardTools(server: McpServer): void {
           "The widget's named LangWatchQL queries: either {name: sql} or an array of {name, sql}. Max 8. Validate each statement with run_query first.",
         ),
       sources: widgetSourcesInput,
+      projects: widgetProjectsInput,
     },
     withToolLogging("add_dashboard_widget", async (params) => {
       requireApiKey();
@@ -1504,6 +1571,7 @@ function registerDashboardTools(server: McpServer): void {
         .optional()
         .describe("What the widget's info tip says: a sentence or two"),
       sources: widgetSourcesInput,
+      projects: widgetProjectsInput,
     },
     withToolLogging("update_dashboard_widget", async (params) => {
       requireApiKey();

@@ -28,6 +28,7 @@ class PatchApiDashboardsByDashboardIdWidgetsByWidgetIdBodyQueriesItem:
         sql (str):
         parameters (list[PatchApiDashboardsByDashboardIdWidgetsByWidgetIdBodyQueriesItemParametersItem] | Unset):
         sources (list[PatchApiDashboardsByDashboardIdWidgetsByWidgetIdBodyQueriesItemSourcesType0Item] | None | Unset):
+        projects (list[str] | None | Unset):
     """
 
     name: str
@@ -36,6 +37,7 @@ class PatchApiDashboardsByDashboardIdWidgetsByWidgetIdBodyQueriesItem:
     sources: list[PatchApiDashboardsByDashboardIdWidgetsByWidgetIdBodyQueriesItemSourcesType0Item] | None | Unset = (
         UNSET
     )
+    projects: list[str] | None | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -62,6 +64,15 @@ class PatchApiDashboardsByDashboardIdWidgetsByWidgetIdBodyQueriesItem:
         else:
             sources = self.sources
 
+        projects: list[str] | None | Unset
+        if isinstance(self.projects, Unset):
+            projects = UNSET
+        elif isinstance(self.projects, list):
+            projects = self.projects
+
+        else:
+            projects = self.projects
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -74,6 +85,8 @@ class PatchApiDashboardsByDashboardIdWidgetsByWidgetIdBodyQueriesItem:
             field_dict["parameters"] = parameters
         if sources is not UNSET:
             field_dict["sources"] = sources
+        if projects is not UNSET:
+            field_dict["projects"] = projects
 
         return field_dict
 
@@ -132,11 +145,29 @@ class PatchApiDashboardsByDashboardIdWidgetsByWidgetIdBodyQueriesItem:
 
         sources = _parse_sources(d.pop("sources", UNSET))
 
+        def _parse_projects(data: object) -> list[str] | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            try:
+                if not isinstance(data, list):
+                    raise TypeError()
+                projects_type_0 = cast(list[str], data)
+
+                return projects_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(list[str] | None | Unset, data)
+
+        projects = _parse_projects(d.pop("projects", UNSET))
+
         patch_api_dashboards_by_dashboard_id_widgets_by_widget_id_body_queries_item = cls(
             name=name,
             sql=sql,
             parameters=parameters,
             sources=sources,
+            projects=projects,
         )
 
         patch_api_dashboards_by_dashboard_id_widgets_by_widget_id_body_queries_item.additional_properties = d

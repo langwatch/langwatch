@@ -12,18 +12,18 @@ vi.mock("react-contextual-analytics", () => ({
   useAnalytics: () => ({ emit: emitMock }),
 }));
 
-import { greetingName } from "../../../model/copy.ts";
+import { firstNameOf } from "../../../model/tour-landing.ts";
 import { HelloScreen } from "../hello-screen.tsx";
 
 afterEach(cleanup);
 
 function renderHello({
-  firstName = "Rogerio",
+  firstName,
   onNext = vi.fn(),
 }: {
-  firstName?: string;
+  firstName: string | undefined;
   onNext?: () => void;
-} = {}) {
+}) {
   render(
     <DesignSystemProvider forcedTheme="light">
       <HelloScreen firstName={firstName} fading={false} onNext={onNext} />
@@ -51,7 +51,7 @@ describe("HelloScreen", () => {
   describe("when the screen opens", () => {
     /** @scenario "Langy greets the user letter by letter and offers Next when the greeting lands" */
     it("types the greeting, keeps Next hidden while typing, then fades Next in", () => {
-      renderHello();
+      renderHello({ firstName: "Rogerio" });
       const line = screen.getByTestId("hello-line");
 
       act(() => {
@@ -75,7 +75,7 @@ describe("HelloScreen", () => {
     });
 
     it("hands the click on Next to the caller", () => {
-      const { onNext } = renderHello();
+      const { onNext } = renderHello({ firstName: "Rogerio" });
       finishTyping();
       act(() => {
         vi.advanceTimersByTime(800);
@@ -89,14 +89,13 @@ describe("HelloScreen", () => {
   });
 
   describe("when the account has no name", () => {
-    /** @scenario A user without a first name is greeted as "there" */
-    it("greets the user as there", () => {
-      expect(greetingName(null)).toBe("there");
-      expect(greetingName("   ")).toBe("there");
-      expect(greetingName("Rogerio Chaves")).toBe("Rogerio");
-      renderHello({ firstName: greetingName(undefined) });
+    /** @scenario A user without a name is greeted without a placeholder */
+    it.each([null, "", "   ", "ada@acme.com"])("greets %j with a bare Hello", (name) => {
+      renderHello({ firstName: firstNameOf(name) });
       finishTyping();
-      expect(screen.getByTestId("hello-line")).toHaveTextContent("Hello there, I'm Langy");
+      const line = screen.getByTestId("hello-line");
+      expect(line).toHaveTextContent(/^Hello, I'm Langy 👋/);
+      expect(line).not.toHaveTextContent(/\bthere\b|ada@acme/i);
     });
   });
 });

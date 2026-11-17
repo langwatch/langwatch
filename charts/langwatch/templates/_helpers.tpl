@@ -1110,6 +1110,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 - name: S3_BUCKET_NAME
   value: {{ .Values.app.dataplane.bucket | quote }}
 {{- include "langwatch.secretOrValue" (dict "envName" "S3_ENDPOINT" "fieldValues" .Values.app.dataplane.providers.awsS3.endpoint) }}
+{{- include "langwatch.secretOrValue" (dict "envName" "S3_REGION" "fieldValues" .Values.app.dataplane.providers.awsS3.region) }}
 {{- include "langwatch.secretOrValue" (dict "envName" "S3_ACCESS_KEY_ID" "fieldValues" .Values.app.dataplane.providers.awsS3.accessKeyId) }}
 {{- include "langwatch.secretOrValue" (dict "envName" "S3_SECRET_ACCESS_KEY" "fieldValues" .Values.app.dataplane.providers.awsS3.secretAccessKey) }}
 {{- include "langwatch.secretOrValue" (dict "envName" "S3_KEY_SALT" "fieldValues" .Values.app.dataplane.providers.awsS3.keySalt) }}
@@ -1156,6 +1157,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 - name: S3_BUCKET_NAME
   value: {{ .Values.app.dataplane.legacyS3ReadBucket | quote }}
 {{- include "langwatch.secretOrValue" (dict "envName" "S3_ENDPOINT" "fieldValues" .Values.app.dataplane.providers.awsS3.endpoint) }}
+{{- include "langwatch.secretOrValue" (dict "envName" "S3_REGION" "fieldValues" .Values.app.dataplane.providers.awsS3.region) }}
 {{- include "langwatch.secretOrValue" (dict "envName" "S3_ACCESS_KEY_ID" "fieldValues" .Values.app.dataplane.providers.awsS3.accessKeyId) }}
 {{- include "langwatch.secretOrValue" (dict "envName" "S3_SECRET_ACCESS_KEY" "fieldValues" .Values.app.dataplane.providers.awsS3.secretAccessKey) }}
 {{- include "langwatch.secretOrValue" (dict "envName" "S3_KEY_SALT" "fieldValues" .Values.app.dataplane.providers.awsS3.keySalt) }}
@@ -1678,16 +1680,23 @@ containers:
     {{- /* Everything the app is given beyond its port and its own address:
            the worker parses the same config over the same modules (Alex,
            2026-09-30), including the Langy pair its turns are dispatched
-           with. app.extraEnvs reaches it too; workers.extraEnvs renders
-           after and so wins a duplicate. */}}
+           with. app.extraEnvs reaches it too, minus any name workers.extraEnvs
+           also sets: a duplicate env name breaks `helm upgrade` (strategic
+           merge patch refuses it), so the workers value is the only one. */}}
     {{- include "langwatch.processEnv" . | nindent 4 }}
     {{- if and (not .Values.workers.enabled) .Values.app.telemetry.metrics.enabled }}
     # Sidecar: the api in this pod holds 9464, so the worker scrapes on 9465 (SIDECAR-METRICS-9465).
     - name: OTEL_EXPORTER_PROMETHEUS_PORT
       value: "9465"
     {{- end }}
-    {{- with .Values.app.extraEnvs}}
-    {{- toYaml . | nindent 4 }}
+    {{- $workerEnvNames := list }}
+    {{- range (default (list) .Values.workers.extraEnvs) }}
+    {{- $workerEnvNames = append $workerEnvNames .name }}
+    {{- end }}
+    {{- range (default (list) .Values.app.extraEnvs) }}
+    {{- if not (has .name $workerEnvNames) }}
+    {{- toYaml (list .) | nindent 4 }}
+    {{- end }}
     {{- end }}
     {{- with .Values.workers.extraEnvs}}
     {{- include "langwatch.assertNoReservedTimeoutEnvs" (dict "envs" . "path" "workers.extraEnvs") }}

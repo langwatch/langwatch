@@ -30,7 +30,7 @@ export function SubscriptionPageHeader({
 }) {
   return (
     <PageLayout.Header>
-      <PageLayout.Heading>Subscription</PageLayout.Heading>
+      <PageLayout.Heading>Plan & billing</PageLayout.Heading>
       <Spacer />
       <HStack gap={4} alignItems="center">
         {showPlanPickers && (

@@ -39,10 +39,6 @@ vi.mock("@langwatch/observability", async (importOriginal) => ({
       logged.push({ fields, message });
     },
   }),
-  validationMeta: (error: { issues: { path: PropertyKey[]; code: string }[] }) => ({
-    issueCount: error.issues.length,
-    issues: error.issues.map((issue) => ({ path: "<redacted>", code: issue.code })),
-  }),
 }));
 
 interface ReviewApi {
@@ -318,7 +314,7 @@ describe("a mounted contract procedure", () => {
 
       expect(record.fields.validation).toEqual({
         issueCount: 1,
-        issues: [{ path: "<redacted>", code: "invalid_type" }],
+        issues: [{ path: "comment", code: "invalid_type", expected: "string" }],
       });
 
       expect(JSON.stringify(record)).not.toContain("annotation-1");
@@ -1263,7 +1259,7 @@ describe("a procedure declared as minting a credential", () => {
     });
     const declaration = defineTrpcRouter(KeysApi, keysContract)
       .procedure("createKey")
-      .mintsCredential("organization:view")
+      .mintsCredential()
       .withPermission("organization:view")
       .handle(() => {
         handle();
@@ -1285,7 +1281,10 @@ describe("a procedure declared as minting a credential", () => {
       handle: () => (ran = true),
     }).createKey({ organizationId: "org-1" });
 
-    await expect(call).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(call).rejects.toMatchObject({
+      code: "FORBIDDEN",
+      cause: { code: "impersonation_cannot_mint_credential" },
+    });
     expect(ran).toBe(false);
   });
 
@@ -1305,7 +1304,7 @@ describe("a procedure declared as minting a credential", () => {
     expect(() =>
       defineTrpcRouter(KeysApi, keysContract)
         .procedure("createKey")
-        .mintsCredential("organization:view")
+        .mintsCredential()
         .withAccess(publicRoute({ reason: "no caller" })),
     ).toThrow(/mints a credential, so it cannot run with no caller/);
   });

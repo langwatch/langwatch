@@ -77,6 +77,16 @@ describe("the Dashboards screens", () => {
         expect(host.navigations).toEqual([]);
       });
     });
+
+    /** @scenario "AC3j The Dashboards pages show no old-Analytics banner when they do not open" */
+    it("shows no old-Analytics banner", () => {
+      renderDashboards({
+        element: <DashboardBoardScreen />,
+        host: hostOpening({ dashboardId: "board-1", flags: FLAG_OFF }),
+      });
+
+      expect(screen.queryByTestId("old-analytics-banner")).toBeNull();
+    });
   });
 
   describe("given the flag has not answered yet", () => {
@@ -144,7 +154,7 @@ describe("the Dashboards screens", () => {
     });
 
     describe("when the member has no My dashboard yet", () => {
-      /** @scenario "AC160b A member with no My dashboard gets one made, starred for them" */
+      /** @scenario "AC160b A member with no My dashboard gets one made, pinned for them" */
       it("makes exactly one and opens it, leaving the star to the server", async () => {
         const server = boardsServer([listed({ id: "team-1", name: "Weekly review" })]);
         const host = hostOpening({ flags: FLAG_ON });
@@ -214,18 +224,6 @@ describe("the Dashboards screens", () => {
           "/test-project/analytics",
         );
       });
-    });
-  });
-
-  describe("given the flag is off", () => {
-    /** @scenario "AC3j The Dashboards pages show no old-Analytics banner when they do not open" */
-    it("shows no old-Analytics banner", () => {
-      renderDashboards({
-        element: <DashboardBoardScreen />,
-        host: hostOpening({ dashboardId: "board-1", flags: FLAG_OFF }),
-      });
-
-      expect(screen.queryByTestId("old-analytics-banner")).toBeNull();
     });
   });
 });

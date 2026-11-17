@@ -4,6 +4,7 @@
 import {
   CLI_KEY_MANAGEMENT_PERMISSIONS,
   cliKeyManagementPermissions,
+  cliPermissionCategories,
   type CliKeyManagementPermission,
 } from "@langwatch/api-key-contract";
 import { InlineCode } from "@langwatch/design-system/inline-code";
@@ -283,6 +284,23 @@ function approvalGates({
   };
 }
 
+/**
+ * The reader's access as one load: the ceiling is the server's answer, so until it lands no
+ * row is held, and nothing may be judged ungrantable yet.
+ */
+function accessLoadState({
+  bindings,
+  ceiling,
+}: {
+  bindings: { isLoading: boolean; isError: boolean };
+  ceiling: { isLoadingCeiling: boolean; isCeilingFailed: boolean };
+}): { isLoading: boolean; isFailed: boolean } {
+  return {
+    isLoading: bindings.isLoading || ceiling.isLoadingCeiling,
+    isFailed: bindings.isError || ceiling.isCeilingFailed,
+  };
+}
+
 export default function CliAuthScreen() {
   const host = useApiKeyHost();
   const reading = host.route();
@@ -341,13 +359,12 @@ export default function CliAuthScreen() {
   const keyPermissions = useCliKeyPermissions({
     organizationId: selectedOrgId,
     selectedScopes: keyScopes.selectedScopes,
-    bindings: myBindings.data,
-    offeredProjects,
     management: requestsManagement,
   });
+  const access = accessLoadState({ bindings: myBindings, ceiling: keyPermissions });
   const management = managementRequestFor({
     requestsManagement,
-    isLoadingBindings: myBindings.isLoading,
+    isLoadingBindings: access.isLoading,
     selectedScopes: keyScopes.selectedScopes,
     userPermissions: keyPermissions.userPermissions,
   });
@@ -356,8 +373,8 @@ export default function CliAuthScreen() {
     selectedOrgId,
     requiresProject,
     selectedProjectId,
-    isLoadingBindings: myBindings.isLoading,
-    isBindingsFailed: myBindings.isError,
+    isLoadingBindings: access.isLoading,
+    isBindingsFailed: access.isFailed,
     scopeCount: keyScopes.selectedScopes.length,
     permissionCount: keyPermissions.permissions.length,
     isManagementBlocked: management.cannotGrant || management.needsOrganization,
@@ -810,6 +827,7 @@ function CliKeyPermissionsField({
             selections={selections}
             userPermissions={userPermissions}
             onChange={onChange}
+            categories={cliPermissionCategories()}
           />
           {permissionCount === 0 && (
             <Text textStyle="xs" color="fg.muted">

@@ -57,7 +57,7 @@ const GROUP_LABEL_STYLE = {
 
 type Favourites = ReturnType<typeof useFavourites>;
 
-/** A row's star, and its Move up / Move down while it sits in the Starred group. */
+/** A row's star, and its Move up / Move down while it sits in the Pinned group. */
 function starActionsFor({
   favourites,
   star,
@@ -66,7 +66,7 @@ function starActionsFor({
 }: {
   favourites: Favourites;
   star: DashboardStar;
-  /** Its place among the shown stars; absent outside the Starred group. */
+  /** Its place among the shown stars; absent outside the Pinned group. */
   index: number | undefined;
   shown: readonly DashboardStar[];
 }): StarActions {
@@ -167,7 +167,7 @@ function CuratedRow({ curated, place, shown, index }: RowPlace & { curated: Cura
   );
 }
 
-/** "Your dashboards", "Starred" and the organization's boards, or their loading or error state. */
+/** "Your dashboards", "Pinned" and the organization's boards, or their loading or error state. */
 function BoardGroups({
   groups,
   place,
@@ -238,8 +238,8 @@ function BoardGroups({
       </RowList>
       {groups.starred.length > 0 && (
         <>
-          <GroupLabel>Starred</GroupLabel>
-          <RowList label="Starred dashboards">{groups.starred.map(starredRow)}</RowList>
+          <GroupLabel>Pinned</GroupLabel>
+          <RowList label="Pinned dashboards">{groups.starred.map(starredRow)}</RowList>
         </>
       )}
       {groups.fromOrganization.length > 0 && (

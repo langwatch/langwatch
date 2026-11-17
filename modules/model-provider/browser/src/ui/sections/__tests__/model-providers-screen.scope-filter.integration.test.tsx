@@ -17,6 +17,8 @@ const { mockState } = vi.hoisted(() => ({
 
 vi.mock("../../../behavior/model-provider-api.ts", () => ({
   modelProviderApi: {
+    // Not answered yet: Evals Preview stays offered, as before the read lands.
+    instantEval: { access: { useQuery: () => ({ data: undefined, isLoading: true }) } },
     useUtils: () => ({
       organization: { getAll: { invalidate: vi.fn() } },
       modelProvider: { invalidate: vi.fn() },

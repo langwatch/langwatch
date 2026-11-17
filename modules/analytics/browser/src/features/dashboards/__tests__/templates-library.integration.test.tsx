@@ -100,12 +100,10 @@ afterEach(cleanup);
 describe("the templates finder", () => {
   describe("given the release_dashboards flag is off", () => {
     /** @scenario "AC100b Templates library: the library is behind the dashboards gate" */
-    /** @scenario "AC3j The Dashboards pages show no old-Analytics banner when they do not open" */
     it("shows the not-found page", () => {
       openLibrary({ flags: { release_dashboards: false } });
 
       expect(screen.getByRole("heading", { name: "This page is not here" })).toBeInTheDocument();
-      expect(screen.queryByTestId("old-analytics-banner")).toBeNull();
     });
   });
 
@@ -114,7 +112,13 @@ describe("the templates finder", () => {
     it("points back to the old Analytics", () => {
       openLibrary();
 
-      expect(screen.getByTestId("old-analytics-banner")).toBeInTheDocument();
+      expect(screen.getByTestId("old-analytics-banner")).toHaveTextContent(
+        "Looking for the old Analytics? It is still here.",
+      );
+      expect(screen.getByRole("link", { name: "Open Analytics" })).toHaveAttribute(
+        "href",
+        "/test-project/analytics",
+      );
     });
 
     /** @scenario "AC3s The Dashboards pages show no old-Analytics banner to a member without analytics:view" */

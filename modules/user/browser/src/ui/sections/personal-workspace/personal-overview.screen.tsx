@@ -1,3 +1,4 @@
+import { useRecordPageOpened } from "@langwatch/auth-client";
 import { Banner } from "@langwatch/design-system/banner";
 import { Card } from "@langwatch/design-system/card";
 import { FormattedDate } from "@langwatch/design-system/formatted-date";
@@ -57,6 +58,7 @@ const fmtPctDelta = (pct: number | null) =>
   pct === null ? null : `${pct >= 0 ? "↑" : "↓"} ${Math.abs(pct)}% vs last month`;
 
 export function PersonalOverviewScreen() {
+  useRecordPageOpened({ page: "me_overview" });
   const ctx = usePersonalContext();
   const spaceInUse = usePersonalSpaceInUse();
   const {

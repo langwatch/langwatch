@@ -31,7 +31,7 @@ None.
 ## Calls
 
 - `withApi(personalWorkspaceApi)`, tRPC contracts: `user.*`.
-- Client packages (package.json): `@langwatch/api-key-client`, `@langwatch/coding-agent-client`, `@langwatch/onboarding-client`.
+- Client packages (package.json): `@langwatch/api-key-client`, `@langwatch/auth-client`, `@langwatch/coding-agent-client`, `@langwatch/onboarding-client`.
 - Host APIs it requires: `PersonalWorkspaceHostApi`.
 - Capabilities: `secureAccountNudge`, `organizationMfaGate`.
 

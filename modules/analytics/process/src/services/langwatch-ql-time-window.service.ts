@@ -28,6 +28,10 @@ import {
 } from "@langwatch/analytics-contract";
 import { Temporal } from "@langwatch/time";
 
+import {
+  bindListParameters,
+  mistypedListParameters,
+} from "../rules/langwatch-ql-reserved-lists.rules.ts";
 import type { LangWatchQLParameter } from "../rules/langwatch-ql-validation-shape.rules.ts";
 
 /** What a statement's reserved names mean for the request about to be made. */
@@ -44,6 +48,8 @@ interface LangWatchQLTimeWindowResolution {
    * period.
    */
   readonly followsTimeWindow: boolean;
+  /** Whether the statement declares {dashboard_context_sources:Array(String)} in its parsed SQL. */
+  readonly followsSources: boolean;
   /**
    * Reserved names the statement declares that no surface value filled, sorted:
    * the window pair when no window was supplied, plus a declared granularity
@@ -63,7 +69,7 @@ function findInjected({
   injected,
 }: {
   parameters: Readonly<Record<string, unknown>> | undefined;
-  injected: Readonly<Record<string, string>>;
+  injected: Readonly<Record<string, unknown>>;
 }): Readonly<Record<string, unknown>> | undefined {
   const merged = { ...parameters, ...injected };
 
@@ -252,6 +258,7 @@ export class LangWatchQLTimeWindowService {
     declared,
     parameters,
     timeWindow,
+    lists,
   }: {
     /** Bound parameters the validated statement declares. */
     readonly declared: readonly LangWatchQLParameter[];
@@ -259,18 +266,22 @@ export class LangWatchQLTimeWindowService {
     readonly parameters?: Readonly<Record<string, unknown>>;
     /** The period the surface is showing, when it has one. */
     readonly timeWindow?: LangWatchQLTimeWindow;
+    /** The lists the surface binds the two list names to, when it binds any. */
+    readonly lists?: Readonly<{ sources: readonly string[]; projects: readonly string[] }>;
   }): LangWatchQLTimeWindowResolution {
     const reserved = declared.filter((parameter) =>
       isLangWatchQLTimeWindowParameter(parameter.name),
     );
-
-    const mistyped = reserved
-      .filter((parameter) => !isLangWatchQLDateTimeParameterType(parameter.type))
-      .map((parameter) => parameter.name)
-      .toSorted();
+    const mistyped = [
+      ...reserved
+        .filter((parameter) => !isLangWatchQLDateTimeParameterType(parameter.type))
+        .map((parameter) => parameter.name),
+      ...mistypedListParameters(declared),
+    ].toSorted();
     if (mistyped.length > 0) {
       throw new LangWatchQLReservedParameterTypeError(mistyped);
     }
+    const { followsSources, bound: listBound } = bindListParameters({ declared, lists });
 
     const supplied = Object.keys(parameters ?? {})
       .filter(isLangWatchQLSurfaceParameter)
@@ -289,9 +300,11 @@ export class LangWatchQLTimeWindowService {
 
     const followsTimeWindow = reserved.length > 0;
     if (!timeWindow) {
+      const unwindowed = findInjected({ parameters, injected: listBound });
       return {
-        ...(parameters ? { parameters } : {}),
+        ...(unwindowed ? { parameters: unwindowed } : {}),
         followsTimeWindow,
+        followsSources,
         awaitingTimeWindow: [
           ...reserved.map((parameter) => parameter.name),
           ...awaitingGranularity,
@@ -305,11 +318,12 @@ export class LangWatchQLTimeWindowService {
         valueFor(parameter.name as LangWatchQLTimeWindowParameter, timeWindow),
       ]),
     );
-    const merged = findInjected({ parameters, injected });
+    const merged = findInjected({ parameters, injected: { ...injected, ...listBound } });
 
     return {
       ...(merged ? { parameters: merged } : {}),
       followsTimeWindow,
+      followsSources,
       awaitingTimeWindow: [...awaitingGranularity].toSorted(),
     };
   }

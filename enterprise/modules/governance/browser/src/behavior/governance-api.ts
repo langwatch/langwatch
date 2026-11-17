@@ -53,6 +53,8 @@ export type GovernanceIngestionSourceView = {
     backfillThrough: string | null;
     hasMore: boolean | null;
   } | null;
+  /** What the adapter refuses about the stored configuration; absent on an older fixture. */
+  configComplaints?: readonly string[];
   lastSuccessAt: string | null;
 };
 

@@ -34,7 +34,15 @@ describe("provider icons", () => {
   describe("given the decision model providers", () => {
     /** @scenario Each decision model provider draws its own brand mark */
     it("draws the LangWatch logo and a mark of each one's own rather than the Custom glyph", () => {
-      const providers = ["inception", "perplexity", "cloudflare", "langwatch"] as const;
+      const providers = [
+        "inception",
+        "perplexity",
+        "cloudflare",
+        "typesafe",
+        "openrouter",
+        "fireworks",
+        "langwatch",
+      ] as const;
       const drawings = [...providers, "custom" as const].map(artworkOf);
 
       expect(artworkOf("langwatch")).toBe([LOGO_PLATE_PATH, LOGO_LINES_PATH].join("|"));
