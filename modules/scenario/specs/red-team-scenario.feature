@@ -114,8 +114,9 @@ Feature: A red team scenario runs an attacker against the agent
   Scenario: The red team report is recorded on the stored run
     Given a finished red team run
     When the child reports the run's red team report
-    Then the run's metadata holds the report under "redTeam"
+    Then the run's metadata holds the report under "redTeam" in its reserved "langwatch" namespace
     And the run's status and other metadata are unchanged
+    And a run written with the report at the metadata root still reads its report
 
   @unit
   Scenario: The processor records the child's red team report on the run

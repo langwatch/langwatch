@@ -46,7 +46,7 @@ import {
   type SimulationTextMessageEndEvent,
   type SimulationTextMessageStartEvent,
   RED_TEAM_REPORT_METADATA_KEY,
-  redTeamRunReportSchema,
+  extractRedTeamRunReport,
   type RedTeamRunReport,
 } from "@langwatch/scenario-contract";
 
@@ -261,9 +261,8 @@ const TERMINAL_STATUSES = new Set([
  * @see modules/scenario/specs/red-team-scenario.feature
  */
 function withRedTeamOutcome(state: SimulationRunStateData): SimulationRunStateData {
-  const raw = parseMetadataObject(state.Metadata)[RED_TEAM_REPORT_METADATA_KEY];
-  const report = redTeamRunReportSchema.safeParse(raw);
-  if (!report.success || report.data.outcome !== "broke") return state;
+  const report = extractRedTeamRunReport(parseMetadataObject(state.Metadata));
+  if (report?.outcome !== "broke") return state;
   return {
     ...state,
     Verdict: state.Verdict === "success" ? "failure" : state.Verdict,
@@ -379,7 +378,7 @@ export class SimulationRunStateFoldProjection
     return state.ScenarioRunId.length > 0;
   }
 
-  /** The stored metadata with the red team run report written under its `redTeam` key. */
+  /** The stored metadata with the red team run report written into its `langwatch` namespace. */
   static withRedTeamReport({
     metadata,
     report,
@@ -387,10 +386,7 @@ export class SimulationRunStateFoldProjection
     metadata: string | null;
     report: RedTeamRunReport;
   }): string {
-    return JSON.stringify({
-      ...parseMetadataObject(metadata),
-      [RED_TEAM_REPORT_METADATA_KEY]: report,
-    });
+    return mergeLangwatchNamespace(metadata, { [RED_TEAM_REPORT_METADATA_KEY]: report });
   }
 
   /**
@@ -847,7 +843,7 @@ export class SimulationRunStateFoldProjection
     };
   }
 
-  /** The red team report lands under metadata `redTeam`; a broke report fails a passed verdict. */
+  /** The red team report lands in `langwatch.redTeam`; a broke report fails a passed verdict. */
   handleSimulationRunRedTeamReportRecorded(
     event: SimulationRunRedTeamReportRecordedEvent,
     state: SimulationRunStateData,

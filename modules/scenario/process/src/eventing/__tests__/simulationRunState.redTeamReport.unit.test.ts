@@ -8,6 +8,7 @@ import { createTenantId } from "@langwatch/eventing";
 import type { FoldProjectionStore } from "@langwatch/eventing";
 import {
   RED_TEAM_REPORT_METADATA_KEY,
+  extractRedTeamRunReport,
   type RedTeamRunReport,
   SIMULATION_EVENT_VERSIONS,
   SIMULATION_RUN_EVENT_TYPES,
@@ -96,14 +97,13 @@ function fold(events: SimulationProcessingEvent[]): SimulationRunStateData {
 
 describe("simulationRunStateFoldProjection red team report", () => {
   /** @scenario "The red team report is recorded on the stored run" */
-  it("writes the report under redTeam and keeps the status and other metadata", () => {
+  it("writes the report under langwatch.redTeam and keeps the status and other metadata", () => {
     const before = fold([queued, finished]);
     const after = foldProjection.apply(before, recorded);
 
     expect(after.Status).toBe(before.Status);
     expect(JSON.parse(after.Metadata ?? "null")).toEqual({
-      langwatch: { targetReferenceId: "agent_1" },
-      [RED_TEAM_REPORT_METADATA_KEY]: report,
+      langwatch: { targetReferenceId: "agent_1", [RED_TEAM_REPORT_METADATA_KEY]: report },
     });
   });
 
@@ -131,7 +131,7 @@ describe("simulationRunStateFoldProjection red team report", () => {
       const state = fold([queued, passed, brokeOnTurn9]);
       expect(state.Status).toBe("FAILED");
       expect(state.Verdict).toBe("failure");
-      expect(JSON.parse(state.Metadata ?? "null").redTeam.brokeAtTurn).toBe(9);
+      expect(JSON.parse(state.Metadata ?? "null").langwatch.redTeam.brokeAtTurn).toBe(9);
     });
 
     /** @scenario "A red team run the attacker broke fails whatever the judge said" */
@@ -153,7 +153,7 @@ describe("simulationRunStateFoldProjection red team report", () => {
       const state = fold([queued, passed, outcomeOnly]);
       expect(state.Status).toBe("FAILED");
       expect(state.Verdict).toBe("failure");
-      expect(JSON.parse(state.Metadata ?? "null").redTeam.brokeAtTurn).toBe(9);
+      expect(JSON.parse(state.Metadata ?? "null").langwatch.redTeam.brokeAtTurn).toBe(9);
     });
 
     it("keeps a passed verdict when the agent held", () => {
@@ -175,6 +175,24 @@ describe("simulationRunStateFoldProjection red team report", () => {
   it("writes the report alone when the run carries no metadata", () => {
     expect(
       JSON.parse(SimulationRunStateFoldProjection.withRedTeamReport({ metadata: null, report })),
-    ).toEqual({ redTeam: report });
+    ).toEqual({ langwatch: { redTeam: report } });
+  });
+
+  it("leaves a user's own root redTeam metadata alone", () => {
+    const written = SimulationRunStateFoldProjection.withRedTeamReport({
+      metadata: JSON.stringify({ redTeam: "user value" }),
+      report,
+    });
+    expect(JSON.parse(written)).toEqual({ redTeam: "user value", langwatch: { redTeam: report } });
+  });
+});
+
+describe("extractRedTeamRunReport", () => {
+  /** @scenario "The red team report is recorded on the stored run" */
+  it("reads the namespaced report, then a root report written before the move", () => {
+    expect(extractRedTeamRunReport({ langwatch: { redTeam: report } })).toEqual(report);
+    expect(extractRedTeamRunReport({ redTeam: report })).toEqual(report);
+    expect(extractRedTeamRunReport({ redTeam: "user value" })).toBeUndefined();
+    expect(extractRedTeamRunReport(null)).toBeUndefined();
   });
 });

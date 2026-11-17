@@ -86,8 +86,23 @@ export interface RedTeamRunReportSchema extends Named<typeof redTeamRunReportSch
 export const redTeamRunReportSchema: RedTeamRunReportSchema = redTeamRunReportSchemaDefinition;
 export type RedTeamRunReport = z.infer<typeof redTeamRunReportSchema>;
 
-/** The run metadata key the report travels under on the scenario run. */
+/** The key the report travels under in the run metadata's reserved `langwatch` namespace. */
 export const RED_TEAM_REPORT_METADATA_KEY = "redTeam";
+
+/**
+ * The red team report a run's metadata carries, or undefined for a standard run or an unreadable
+ * shape. Runs written before the report moved into `langwatch` carry it at the root.
+ */
+export function extractRedTeamRunReport(metadata: unknown): RedTeamRunReport | undefined {
+  if (typeof metadata !== "object" || metadata === null) return undefined;
+  const { langwatch, [RED_TEAM_REPORT_METADATA_KEY]: legacy } = metadata as Record<string, unknown>;
+  const namespaced =
+    typeof langwatch === "object" && langwatch !== null
+      ? (langwatch as Record<string, unknown>)[RED_TEAM_REPORT_METADATA_KEY]
+      : undefined;
+  const parsed = redTeamRunReportSchema.safeParse(namespaced ?? legacy);
+  return parsed.success ? parsed.data : undefined;
+}
 
 export const scenarioAuthorLabelSchema = z.enum(["user", "api", "cli", "langy"]);
 export type ScenarioAuthorLabel = z.infer<typeof scenarioAuthorLabelSchema>;
