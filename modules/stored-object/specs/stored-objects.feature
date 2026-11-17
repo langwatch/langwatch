@@ -23,7 +23,8 @@ Feature: Stored Objects service and API
     And the row contains tenant, object, status, owner, provider-relative identity, byte facts and expiry timestamps
     And StoredObjectRecordRepository is one interface with a Prisma and a memory backend
     And StoredObjectService is a concrete class
-    And no Stored Object event projection, process manager or parallel lifecycle store exists
+    And no Stored Object event, projection, lifecycle process manager or parallel lifecycle store exists
+    And the only pipeline is the scheduled upload reaper, which records no events
 
   @unit @persistence
   Scenario: The memory and Postgres stored-object repositories answer alike
