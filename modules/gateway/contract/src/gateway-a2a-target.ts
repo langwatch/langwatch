@@ -12,9 +12,22 @@ const httpUrlSchema = z
   .url()
   .refine((value) => /^https?:\/\//.test(value), "must be an http or https URL");
 
+/** Headers the gateway sets itself, so a target cannot override them. */
+const RESERVED_HEADER = /^(content-type|content-length|a2a-version|host|traceparent|tracestate)$/i;
+
 const gatewayA2aTargetHeadersSchemaDefinition = z
-  .record(z.string().regex(/^[A-Za-z0-9-]{1,128}$/), z.string().max(4096))
-  .refine((headers) => Object.keys(headers).length <= 20, "at most 20 headers");
+  .record(
+    z.string().regex(/^[A-Za-z0-9-]{1,128}$/),
+    z
+      .string()
+      .max(4096)
+      .regex(/^[^\r\n\0]*$/, "a header value cannot hold a line break"),
+  )
+  .refine((headers) => Object.keys(headers).length <= 20, "at most 20 headers")
+  .refine(
+    (headers) => !Object.keys(headers).some((name) => RESERVED_HEADER.test(name)),
+    "Content-Type, A2A-Version, Host and traceparent are set by the gateway",
+  );
 export interface GatewayA2aTargetHeadersSchema extends Named<
   typeof gatewayA2aTargetHeadersSchemaDefinition
 > {}
