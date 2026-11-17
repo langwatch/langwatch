@@ -21,7 +21,10 @@ export type ClassifierSendHealth = "down" | "up" | "neutral";
 
 export interface ClassifierBreakerState {
   readonly consecutiveFailures: number;
-  /** When it stopped sending, or last let a probe through; null while closed. */
+  /**
+   * When it stopped sending, last let a probe through, or last had a send found down while
+   * stopped (each restarts the probe interval); null while closed.
+   */
   readonly openedAt: number | null;
   /** The number of the probe still unanswered, if any. */
   readonly probeInFlight: number | null;
