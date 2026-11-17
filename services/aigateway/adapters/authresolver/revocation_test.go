@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
@@ -126,8 +127,13 @@ func TestRevocation_FailClosedRefusesUncheckedKey(t *testing.T) {
 	}
 
 	cursor.polledAt.Store(time.Now().Add(-2 * time.Minute).UnixNano())
-	if _, err := svc.Resolve(context.Background(), key); !errors.Is(err, domain.ErrAuthUpstream) {
+	_, err := svc.Resolve(context.Background(), key)
+	if !errors.Is(err, domain.ErrAuthUpstream) {
 		t.Fatalf("want auth_upstream_unavailable once feed and key are both stale, got %v", err)
+	}
+	var refusal herr.E
+	if !errors.As(err, &refusal) || !refusal.Retryable {
+		t.Fatalf("a fail-closed refusal lifts when the control plane answers, so it must be retryable: %v", err)
 	}
 }
 

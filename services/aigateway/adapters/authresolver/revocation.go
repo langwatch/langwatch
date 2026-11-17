@@ -108,7 +108,7 @@ func (s *Service) admit(ctx context.Context, in admitInput) (*domain.Bundle, err
 		s.refuse(in.hash, b.VirtualKeyID, "fail_closed")
 		return nil, herr.New(ctx, domain.ErrAuthUpstream, herr.M{
 			"message": "control plane unreachable and this gateway refuses keys it cannot re-check; retry shortly",
-		})
+		}).WithRetryable(true)
 	}
 	return b, nil
 }
