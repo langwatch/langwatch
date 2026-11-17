@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"strings"
 )
 
 // errEventTooLarge is an SSE event, or one of its lines, over maxEventBytes.
@@ -24,10 +25,11 @@ func (h *Handler) stream(c *call, resp *http.Response) {
 			flusher.Flush()
 		}
 	}
+	var seen streamText
 	err := readEvents(resp.Body, func(event []byte) bool {
 		data := eventData(event)
 		setResultAttrs(c.span, data)
-		if r := h.check(c, DirectionResponse, data); r != nil {
+		if r := h.checkEvent(c, data, &seen); r != nil {
 			c.markRefused(*r)
 			event = c.errorEvent(*r)
 		}
@@ -44,6 +46,38 @@ func (h *Handler) stream(c *call, resp *http.Response) {
 	}
 	c.markRefused(r)
 	write(c.errorEvent(r))
+}
+
+// streamTailBytes is how much earlier streamed text each event is scanned
+// with, so a phrase split across events is seen whole.
+const streamTailBytes = 4 << 10
+
+// streamText keeps the end of the text streamed so far.
+type streamText struct{ tail string }
+
+func (s *streamText) add(texts []string) {
+	s.tail += strings.Join(texts, "")
+	if len(s.tail) > streamTailBytes {
+		s.tail = s.tail[len(s.tail)-streamTailBytes:]
+	}
+}
+
+// checkEvent scans one event's texts plus the event's text joined to the
+// text streamed before it.
+func (h *Handler) checkEvent(c *call, data []byte, seen *streamText) *refusal {
+	if !h.cfg.Scanner.Applies(c.bundle, DirectionResponse) {
+		return nil
+	}
+	p := collectTexts(data)
+	if !p.parsed {
+		return &refuseReplyUnscannable
+	}
+	texts := p.texts
+	if seen.tail != "" && len(p.texts) > 0 {
+		texts = append(append([]string(nil), p.texts...), seen.tail+strings.Join(p.texts, ""))
+	}
+	seen.add(p.texts)
+	return h.checkTexts(c, DirectionResponse, texts)
 }
 
 func (c *call) errorEvent(r refusal) []byte {

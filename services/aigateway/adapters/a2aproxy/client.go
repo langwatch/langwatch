@@ -1,11 +1,13 @@
 package a2aproxy
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
 	"net/http"
 	"net/netip"
+	"strings"
 	"syscall"
 	"time"
 
@@ -26,31 +28,49 @@ var (
 	errAddressBlocked  = errors.New("the A2A agent address is not allowed")
 )
 
+// UpstreamPolicy is the egress rule for A2A targets, the same settings the
+// gateway applies to every other customer endpoint.
+type UpstreamPolicy struct {
+	// BlockLocal refuses non-public addresses (BLOCK_LOCAL_HTTP_CALLS).
+	BlockLocal bool
+	// AllowedHosts may resolve to non-public addresses (ALLOWED_PROXY_HOSTS).
+	AllowedHosts []string
+}
+
 // NewUpstreamClient is the client the proxy calls targets with. Every dial
-// is checked after DNS resolution against pkg/ssrf: cloud metadata,
-// unspecified and link-local addresses are always refused, other non-public
-// addresses when blockLocal is set. Redirects are refused, so the target's
-// upstream headers never follow one to another host.
-func NewUpstreamClient(blockLocal bool) *http.Client {
-	dialer := &net.Dialer{
-		Timeout:   upstreamDialTimeout,
-		KeepAlive: 30 * time.Second,
-		Control: func(_, address string, _ syscall.RawConn) error {
-			return checkDialAddress(address, blockLocal)
-		},
+// is checked after DNS resolution against pkg/ssrf. No environment proxy is
+// used, so the address check always sees the real target. Redirects are
+// refused, so the target's upstream headers never follow one to another host.
+func NewUpstreamClient(policy UpstreamPolicy) *http.Client {
+	allowed := make(map[string]bool, len(policy.AllowedHosts))
+	for _, h := range policy.AllowedHosts {
+		if h = normalizeHost(h); h != "" {
+			allowed[h] = true
+		}
 	}
+	dialerFor := func(blockLocal bool) *net.Dialer {
+		return &net.Dialer{
+			Timeout:   upstreamDialTimeout,
+			KeepAlive: 30 * time.Second,
+			Control: func(_, address string, _ syscall.RawConn) error {
+				return checkDialAddress(address, blockLocal)
+			},
+		}
+	}
+	strict, open := dialerFor(policy.BlockLocal), dialerFor(false)
 	transport := &http.Transport{
-		DialContext:           dialer.DialContext,
+		Proxy: nil,
+		DialContext: func(ctx context.Context, network, address string) (net.Conn, error) {
+			if host, _, err := net.SplitHostPort(address); err == nil && allowed[normalizeHost(host)] {
+				return open.DialContext(ctx, network, address)
+			}
+			return strict.DialContext(ctx, network, address)
+		},
 		TLSHandshakeTimeout:   upstreamTLSTimeout,
 		ResponseHeaderTimeout: upstreamHeaderTimeout,
 		IdleConnTimeout:       90 * time.Second,
 		MaxIdleConnsPerHost:   16,
 		ForceAttemptHTTP2:     true,
-	}
-	// A proxy dials in our place, so the address check would only see the
-	// proxy. Where local egress is blocked, no environment proxy is used.
-	if !blockLocal {
-		transport.Proxy = http.ProxyFromEnvironment
 	}
 	return &http.Client{
 		Transport: transport,
@@ -58,6 +78,10 @@ func NewUpstreamClient(blockLocal bool) *http.Client {
 			return errRedirectRefused
 		},
 	}
+}
+
+func normalizeHost(host string) string {
+	return strings.TrimSuffix(strings.ToLower(strings.TrimSpace(host)), ".")
 }
 
 // checkDialAddress refuses a resolved ip:port the proxy may not reach.

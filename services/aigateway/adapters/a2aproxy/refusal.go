@@ -21,7 +21,6 @@ type refusal struct {
 
 var (
 	refuseInvalidRequest  = refusal{-32600, "a2a_invalid_request", "the body is not a valid A2A request", http.StatusBadRequest}
-	refuseCallerNotAllow  = refusal{-32010, string(domain.A2ACallerNotAllowed), "this virtual key may not call this A2A agent", http.StatusForbidden}
 	refuseTargetBlocked   = refusal{-32011, string(domain.A2ATargetBlocked), "this A2A agent is blocked", http.StatusForbidden}
 	refuseContentBlocked  = refusal{-32012, "a2a_content_blocked", "blocked by a guardrail", http.StatusForbidden}
 	refuseTargetNotFound  = refusal{-32013, "a2a_target_not_found", "no such A2A agent in this project", http.StatusNotFound}
@@ -32,6 +31,9 @@ var (
 	refuseUnscannable     = refusal{-32018, "a2a_content_unscannable", "the content is not JSON the guardrail scan can read", http.StatusUnprocessableEntity}
 	refuseTooLarge        = refusal{-32019, "a2a_payload_too_large", "the request body is over the size limit", http.StatusRequestEntityTooLarge}
 	refuseBusy            = refusal{-32020, "a2a_too_many_requests", "this virtual key has too many A2A calls in flight", http.StatusTooManyRequests}
+	refuseRateLimited     = refusal{-32021, "a2a_rate_limited", "this virtual key is over its rate limit", http.StatusTooManyRequests}
+	refuseBudgetExceeded  = refusal{-32022, "a2a_budget_exceeded", "a budget for this virtual key is used up", http.StatusPaymentRequired}
+	refuseNotHTTPS        = refusal{-32023, "a2a_target_not_https", "this gateway calls A2A agents over https only", http.StatusBadGateway}
 	refuseUnsupported     = refusal{-32601, "a2a_operation_not_supported", "this method and path is not an A2A operation", http.StatusNotFound}
 )
 

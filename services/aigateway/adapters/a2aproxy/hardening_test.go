@@ -292,7 +292,7 @@ func TestUpstreamRedirectIsNotFollowed(t *testing.T) {
 		http.Redirect(w, r, other.URL+"/steal", http.StatusTemporaryRedirect)
 	}
 	req := httptest.NewRequest(http.MethodPost, "http://gw.acme.test/a2a/billing/message:send", strings.NewReader(`{}`))
-	rec := f.serve(req, NewUpstreamClient(false))
+	rec := f.serve(req, NewUpstreamClient(UpstreamPolicy{}))
 
 	assert.Equal(t, http.StatusBadGateway, rec.Code)
 	assert.Equal(t, "a2a_upstream_unreachable", httpError(t, rec))
@@ -303,7 +303,7 @@ func TestUpstreamRedirectIsNotFollowed(t *testing.T) {
 func TestBlockedUpstreamAddressIsNotCalled(t *testing.T) {
 	f := newFixture(t)
 	req := httptest.NewRequest(http.MethodPost, "http://gw.acme.test/a2a/billing/message:send", strings.NewReader(`{}`))
-	rec := f.serve(req, NewUpstreamClient(true))
+	rec := f.serve(req, NewUpstreamClient(UpstreamPolicy{BlockLocal: true}))
 
 	assert.Equal(t, http.StatusBadGateway, rec.Code)
 	assert.Contains(t, rec.Body.String(), "not allowed")

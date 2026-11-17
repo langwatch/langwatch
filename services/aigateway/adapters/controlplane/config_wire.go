@@ -2,6 +2,7 @@ package controlplane
 
 import (
 	"encoding/json"
+	"net/url"
 	"strings"
 	"time"
 
@@ -604,9 +605,12 @@ func buildA2ATargets(wires []a2aTargetWire) []domain.A2ATarget {
 	if len(wires) == 0 {
 		return nil
 	}
-	targets := make([]domain.A2ATarget, len(wires))
-	for i, w := range wires {
-		targets[i] = domain.A2ATarget{
+	targets := make([]domain.A2ATarget, 0, len(wires))
+	for _, w := range wires {
+		if !validA2ATargetWire(w) {
+			continue
+		}
+		targets = append(targets, domain.A2ATarget{
 			Name:            w.Name,
 			AgentName:       w.AgentName,
 			UpstreamURL:     w.UpstreamURL,
@@ -614,10 +618,30 @@ func buildA2ATargets(wires []a2aTargetWire) []domain.A2ATarget {
 			UpstreamHeaders: w.UpstreamHeaders,
 			Blocked:         w.Blocked,
 			BlockReason:     w.BlockReason,
-		}
+		})
 		if w.AllowedVirtualKeyIDs != nil {
-			targets[i].Policy = &domain.A2APolicy{AllowedVirtualKeyIDs: *w.AllowedVirtualKeyIDs}
+			targets[len(targets)-1].Policy = &domain.A2APolicy{AllowedVirtualKeyIDs: *w.AllowedVirtualKeyIDs}
 		}
 	}
 	return targets
+}
+
+// validA2ATargetWire re-checks what the control plane checked at save time:
+// http(s) URLs and header names and values without line breaks. A target
+// that fails is left out, so the gateway never calls it.
+func validA2ATargetWire(w a2aTargetWire) bool {
+	if !httpURL(w.UpstreamURL) || (w.CardURL != "" && !httpURL(w.CardURL)) {
+		return false
+	}
+	for name, value := range w.UpstreamHeaders {
+		if name == "" || strings.ContainsAny(name+value, "\r\n\x00") {
+			return false
+		}
+	}
+	return true
+}
+
+func httpURL(raw string) bool {
+	u, err := url.Parse(raw)
+	return err == nil && (u.Scheme == "http" || u.Scheme == "https") && u.Host != ""
 }

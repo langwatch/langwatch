@@ -67,8 +67,15 @@ func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config) er
 			Registry: a2aproxy.BundleRegistry{},
 			Scanner:  a2aproxy.GuardrailScanner{Evaluator: deps.ControlPlane},
 			Bundle:   httpapi.BundleFromContext,
-			Client:   a2aproxy.NewUpstreamClient(cfg.BlockLocalHTTPCalls),
-			Tracer:   deps.TraceBridge.Tracer(),
+			Client: a2aproxy.NewUpstreamClient(a2aproxy.UpstreamPolicy{
+				BlockLocal:   cfg.BlockLocalHTTPCalls,
+				AllowedHosts: splitAllowedHosts(cfg.AllowedProxyHosts),
+			}),
+			RateLimit:      deps.RateLimiter.Allow,
+			BudgetPrecheck: deps.BudgetChecker.Precheck,
+			RequireHTTPS:   cfg.RequireHTTPSCustomerEndpoints,
+			PublicBaseURL:  cfg.A2APublicBaseURL,
+			Tracer:         deps.TraceBridge.Tracer(),
 		}),
 	})
 

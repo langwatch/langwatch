@@ -164,8 +164,8 @@ func TestCallerMissingFromAllowListIsRefused(t *testing.T) {
 	rec := f.do(http.MethodPost, "/a2a/billing", sendMessage("SendMessage", "hello"))
 
 	code, reason, id := rpcError(t, rec)
-	assert.Equal(t, -32010, code)
-	assert.Equal(t, "a2a_caller_not_allowed", reason)
+	assert.Equal(t, -32013, code)
+	assert.Equal(t, "a2a_target_not_found", reason)
 	assert.Equal(t, "7", id)
 	assert.Empty(t, f.upstreamCalls())
 }
