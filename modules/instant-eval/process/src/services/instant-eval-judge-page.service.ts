@@ -32,6 +32,7 @@ import {
   cutPageAtStop,
   INSTANT_EVAL_CANCEL_POLL_MS,
   pageDeadlineMs,
+  pageOutcomeFor,
   pageStopFor,
   pageStopReason,
   type InstantEvalPageStop,
@@ -254,7 +255,7 @@ export class InstantEvalJudgePageService {
       "Instant Eval page profile",
     );
 
-    return outcomeFor({ input, cut, keyPage, counters, usage: judged.usage, stop });
+    return pageOutcomeFor({ input, cut, keyPage, counters, usage: judged.usage, stop });
   }
 
   /**
@@ -479,45 +480,4 @@ export class InstantEvalJudgePageService {
 /** Whether the page sent rows and every one came back as a refused own-model key. */
 function isEveryRowKeyRefused(usage: InstantEvalJudgeUsage): boolean {
   return usage.requests > 0 && usage.skipped.classifier_key_invalid === usage.requests;
-}
-
-/**
- * Where the next page starts and whether there is one. A page cut short ends
- * where its judging did; one that judged nothing stays where it started, so
- * the next intent asks for the same rows. A cancelled run has no next page.
- */
-function outcomeFor({
-  input,
-  cut,
-  keyPage,
-  counters,
-  usage,
-  stop,
-}: {
-  input: InstantEvalJudgePageInput;
-  cut: ReturnType<typeof cutPageAtStop>;
-  keyPage: InstantEvalKeyPage;
-  counters: InstantEvalPageCounters;
-  usage: InstantEvalJudgeUsage;
-  stop: InstantEvalPageStop | null;
-}): InstantEvalPageOutcome {
-  const resumeFrom = cut.last ?? (cut.isCutShort ? null : keyPage.keys.at(-1));
-  const cursor =
-    resumeFrom === null || resumeFrom === undefined
-      ? { traceId: input.afterTraceId, spanId: input.afterSpanId }
-      : { traceId: resumeFrom.traceId, spanId: resumeFrom.spanId || null };
-  const hasRowsLeft = (cut.isCutShort || keyPage.hasMore) && input.remaining - counters.rows > 0;
-
-  return {
-    ...counters,
-    inputTokens: usage.inputTokens,
-    requests: usage.requests,
-    costNanoUsd: usage.costNanoUsd,
-    routedInputTokens: usage.routedInputTokens,
-    cursor: cursor.traceId,
-    // Empty when the statement has one row per trace, which is what tells the
-    // next key pass to compare the trace alone.
-    cursorSpanId: cursor.spanId,
-    hasNextPage: stop === "cancelled" ? false : hasRowsLeft,
-  };
 }
