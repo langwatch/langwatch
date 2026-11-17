@@ -13,7 +13,7 @@ Feature: Customer.io knows each team's real plan
 
   @unit
   Scenario: A member current in another organization is not told this plan
-    Given an organization with two active members, one of whom is current in another organization
+    Given an organization with two active members, one of whom has their latest current membership in another organization
     When billing's subscription_changed fact for it is delivered
     Then only the other member is identified with the plan
     And the group call still carries the plan to the organization's admin

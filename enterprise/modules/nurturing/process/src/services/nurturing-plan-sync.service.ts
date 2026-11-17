@@ -51,7 +51,7 @@ export class NurturingPlanSyncService {
   async planChanged(signal: SubscriptionChanged): Promise<void> {
     const customerIo = this.dependencies.customerIo;
     if (!customerIo) return;
-    await this.foldAndSend(signal);
+    await this.foldAndSend(signal, customerIo);
   }
 
   /**
@@ -61,7 +61,7 @@ export class NurturingPlanSyncService {
   async planCaughtUp(signal: SubscriptionChanged): Promise<void> {
     const customerIo = this.dependencies.customerIo;
     if (!customerIo) throw new NoCustomerIoChannelError();
-    await this.foldAndSend(signal);
+    await this.foldAndSend(signal, customerIo);
   }
 
   /**
@@ -69,7 +69,10 @@ export class NurturingPlanSyncService {
    * fact, live or catch-up, is not recorded, so its retry sends again unless a fact that beats it
    * landed first.
    */
-  private async foldAndSend(signal: SubscriptionChanged): Promise<void> {
+  private async foldAndSend(
+    signal: SubscriptionChanged,
+    customerIo: Pick<NurturingService, "batchOrThrow">,
+  ): Promise<void> {
     if (signal.memberUserIds.length === 0) return;
     const { organizationId } = signal;
     const fact = {
@@ -79,9 +82,6 @@ export class NurturingPlanSyncService {
     };
     const held = await this.dependencies.plans.findPlan({ organizationId });
     if (!planFactChangesCopy({ held, incoming: fact })) return;
-    const customerIo = this.dependencies.customerIo;
-    // Both callers check the channel first; this only narrows the type.
-    if (!customerIo) throw new NoCustomerIoChannelError();
     for (const request of await this.requestsOf(signal)) await customerIo.batchOrThrow(request);
     await this.dependencies.plans.recordPlan({ organizationId, fact });
   }

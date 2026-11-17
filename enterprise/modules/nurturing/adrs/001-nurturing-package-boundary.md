@@ -104,9 +104,10 @@ the contract and composed by the apps.
 ## Errors
 
 A sink failure is reported and swallowed, as main's fire-and-forget calls were.
-A failed claim throws, and the subscriber is retried. A catch-up
-`subscription_changed` fact throws instead: a refused call, or no Customer.io
-channel (`no_customer_io_channel`), fails its job so it is retried or replayed
+A failed claim throws, and the subscriber is retried. A `subscription_changed`
+fact is not swallowed either. A refused live one gives its claim back and fails
+its job, so it is retried. A catch-up one fails its job on a refused call or on
+no Customer.io channel (`no_customer_io_channel`), so it is retried or replayed
 (https://github.com/langwatch/tasks/issues/1196).
 
 ## Contracts and validation
