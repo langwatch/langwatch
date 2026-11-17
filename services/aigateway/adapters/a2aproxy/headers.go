@@ -19,7 +19,7 @@ var keptResponseHeaders = map[string]bool{
 }
 
 // copyHeader copies the allowed upstream response headers for the caller. A
-// reply that is neither JSON nor an event stream is labelled JSON, so the
+// reply that is neither JSON nor an event stream is sent as JSON, so the
 // gateway never serves an upstream's HTML as its own page.
 func copyHeader(dst, src http.Header) {
 	for k, vs := range src {

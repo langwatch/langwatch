@@ -9,6 +9,7 @@ import {
 } from "@langwatch/gateway-contract";
 import { generate } from "@langwatch/ksuid";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
+import { z } from "zod";
 
 import { GatewayA2aTargetRepository } from "../gateway-a2a-target.repository.ts";
 import type { GatewayPersistenceTransaction } from "../gateway-transaction.repository.ts";
@@ -136,6 +137,17 @@ export class PrismaGatewayA2aTargetRepository extends GatewayA2aTargetRepository
 }
 
 /** Prisma reports the live-name index (`GatewayA2ATarget_live_name_key`) as `P2002`. */
+const uniqueViolationSchema = z.object({
+  code: z.literal("P2002"),
+  meta: z.object({ target: z.unknown().optional() }).optional(),
+});
+
+/** A unique violation on the live-name index; one naming another index is not "name taken". */
 function isUniqueViolation(error: unknown): boolean {
-  return (error as { code?: unknown } | null)?.code === "P2002";
+  const parsed = uniqueViolationSchema.safeParse(error);
+  if (!parsed.success) return false;
+  const target = parsed.data.meta?.target;
+  if (target === undefined) return true;
+  const names = (Array.isArray(target) ? target : [target]).map((name) => JSON.stringify(name));
+  return names.some((name) => name === '"name"' || name.includes("live_name"));
 }
