@@ -40,6 +40,12 @@ Feature: Suite templates
     And the text names "ACME Support", "refund, lookup_order" and "issue a refund above 100 EUR"
 
   @unit
+  Scenario: Applying with only an agent name drops the criteria that name an empty list
+    When the caller applies a template with agent name "ACME Support" and no tools or must never items
+    Then no created criterion names the tools or the must never list
+    And the remaining text says "its tools" and "anything its policy forbids" in their place
+
+  @unit
   Scenario: Each scenario carries its own criteria followed by the template's
     When the caller applies a template that declares template-wide criteria
     Then each created scenario's criteria are its own followed by the template's, without duplicates

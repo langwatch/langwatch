@@ -1043,7 +1043,7 @@ Contract `../contract/src/scenario.trpc.ts:194`, router `src/transport/scenario.
 ```typescript
 // scenarios.create
 type Input = z.infer<typeof scenarioTrpcCreateSchema>; // ../contract/src/scenario.trpc.ts:114
-type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:192
+type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:191
 
 // scenarios.getAll
 // Input: projectSchema, ../contract/src/scenario.trpc.ts:72
@@ -1058,7 +1058,7 @@ interface Input {
   projectId: string;
   id: string;
 }
-type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:192
+type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:191
 
 // scenarios.getByIdIncludingArchived
 type Input = z.infer<typeof scenarioIdSchema>; // ../contract/src/scenario.trpc.ts:80
@@ -1066,11 +1066,11 @@ type Input = z.infer<typeof scenarioIdSchema>; // ../contract/src/scenario.trpc.
 
 // scenarios.update
 type Input = z.infer<typeof scenarioTrpcUpdateSchema>; // ../contract/src/scenario.trpc.ts:145
-type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:192
+type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:191
 
 // scenarios.archive
 type Input = z.infer<typeof scenarioIdSchema>; // ../contract/src/scenario.trpc.ts:80
-type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:192
+type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:191
 
 // scenarios.moveToTestSuite
 // Input: inline, ../contract/src/scenario.trpc.ts:223
@@ -1079,7 +1079,7 @@ interface Input {
   scenarioId: string;
   testSuiteId: string | null;
 }
-type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:192
+type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:191
 
 // scenarios.duplicate
 // Input: inline, ../contract/src/scenario.trpc.ts:232
@@ -1087,7 +1087,7 @@ interface Input {
   projectId: string;
   scenarioId: string;
 }
-type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:192
+type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:191
 
 // scenarios.batchArchive
 // Input: inline, ../contract/src/scenario.trpc.ts:236
@@ -1130,7 +1130,7 @@ interface Input {
   scenarioId: string;
   version: number;
 }
-type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:192
+type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:191
 
 // scenarios.run
 type Input = z.infer<typeof scenarioTrpcRunSchema>; // ../contract/src/scenario.trpc.ts:166

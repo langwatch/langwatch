@@ -5,8 +5,8 @@ import {
 } from "@langwatch/scenario-contract";
 
 /**
- * The red team report a run's metadata carries (under `langwatch`, or at the
- * root for older runs), or null for a standard run or an unreadable shape.
+ * The red team report a run's metadata carries under `langwatch`, or null for
+ * a standard run or an unreadable shape.
  */
 export function redTeamReportOf(metadata: unknown): RedTeamRunReport | null {
   return extractRedTeamRunReport(metadata) ?? null;

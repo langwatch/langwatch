@@ -123,17 +123,16 @@ export const scenarioTemplateMarkerRefusalSchema = z
 export const RED_TEAM_REPORT_METADATA_KEY = "redTeam";
 
 /**
- * The red team report a run's metadata carries, or undefined for a standard run or an unreadable
- * shape. Runs written before the report moved into `langwatch` carry it at the root.
+ * The red team report a run's metadata carries under the reserved `langwatch` namespace, or
+ * undefined for a standard run or an unreadable shape. A root `redTeam` key is caller data.
  */
 export function extractRedTeamRunReport(metadata: unknown): RedTeamRunReport | undefined {
   if (typeof metadata !== "object" || metadata === null) return undefined;
-  const { langwatch, [RED_TEAM_REPORT_METADATA_KEY]: legacy } = metadata as Record<string, unknown>;
-  const namespaced =
-    typeof langwatch === "object" && langwatch !== null
-      ? (langwatch as Record<string, unknown>)[RED_TEAM_REPORT_METADATA_KEY]
-      : undefined;
-  const parsed = redTeamRunReportSchema.safeParse(namespaced ?? legacy);
+  const { langwatch } = metadata as Record<string, unknown>;
+  if (typeof langwatch !== "object" || langwatch === null) return undefined;
+  const parsed = redTeamRunReportSchema.safeParse(
+    (langwatch as Record<string, unknown>)[RED_TEAM_REPORT_METADATA_KEY],
+  );
   return parsed.success ? parsed.data : undefined;
 }
 

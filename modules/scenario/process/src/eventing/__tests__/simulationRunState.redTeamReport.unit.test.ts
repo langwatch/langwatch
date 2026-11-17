@@ -165,6 +165,16 @@ describe("simulationRunStateFoldProjection red team report", () => {
       expect(state.Status).toBe("SUCCESS");
       expect(state.Verdict).toBe("success");
     });
+
+    it("keeps a passed verdict when the caller's own metadata carries a broke report at the root", () => {
+      const callerQueued: SimulationRunQueuedEvent = {
+        ...queued,
+        data: { ...queued.data, metadata: { redTeam: report } },
+      };
+      const state = fold([callerQueued, passed]);
+      expect(state.Status).toBe("SUCCESS");
+      expect(state.Verdict).toBe("success");
+    });
   });
 
   it("folds the same report twice to identical metadata", () => {
@@ -189,10 +199,14 @@ describe("simulationRunStateFoldProjection red team report", () => {
 
 describe("extractRedTeamRunReport", () => {
   /** @scenario "The red team report is recorded on the stored run" */
-  it("reads the namespaced report, then a root report written before the move", () => {
+  it("reads only the report under the langwatch namespace", () => {
     expect(extractRedTeamRunReport({ langwatch: { redTeam: report } })).toEqual(report);
-    expect(extractRedTeamRunReport({ redTeam: report })).toEqual(report);
     expect(extractRedTeamRunReport({ redTeam: "user value" })).toBeUndefined();
     expect(extractRedTeamRunReport(null)).toBeUndefined();
+  });
+
+  it("ignores a well-formed report a caller put at the root of the metadata", () => {
+    expect(extractRedTeamRunReport({ redTeam: report })).toBeUndefined();
+    expect(extractRedTeamRunReport({ redTeam: report, langwatch: {} })).toBeUndefined();
   });
 });

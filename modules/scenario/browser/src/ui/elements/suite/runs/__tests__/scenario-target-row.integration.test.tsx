@@ -137,15 +137,18 @@ describe("<ScenarioTargetRow/>", () => {
         runOf({
           status: ScenarioRunStatus.FAILED,
           metadata: {
-            redTeam: {
-              outcome: "broke",
-              brokeAtTurn: 2,
-              strategy: "crescendo",
-              owaspIds: ["LLM01"],
-              attackGoal: "Leak the refund policy override",
-              maxTurns: 30,
-              turnsUsed: 2,
-              turnScores: [{ turn: 2, score: 9 }],
+            langwatch: {
+              targetReferenceId: "agent_1",
+              redTeam: {
+                outcome: "broke",
+                brokeAtTurn: 2,
+                strategy: "crescendo",
+                owaspIds: ["LLM01"],
+                attackGoal: "Leak the refund policy override",
+                maxTurns: 30,
+                turnsUsed: 2,
+                turnScores: [{ turn: 2, score: 9 }],
+              },
             },
           },
         }),
