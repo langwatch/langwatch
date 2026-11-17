@@ -5,7 +5,7 @@
 import { createHash } from "node:crypto";
 import { Readable } from "node:stream";
 
-import { HandledError } from "@langwatch/handled-error";
+import { HandledError, remediation } from "@langwatch/handled-error";
 import type { Instant } from "@langwatch/time";
 
 import type {
@@ -45,6 +45,36 @@ export class StorageNotWritableError extends HandledError {
       fault: "platform",
     });
     this.name = "StorageNotWritableError";
+  }
+}
+
+/** Storage turned away the credentials this deployment signs with: a wrong key or identity. */
+export class StorageCredentialsRefusedError extends HandledError {
+  declare readonly code: "storage_credentials_refused";
+
+  constructor({ operation, status }: { operation: string; status: string }) {
+    super(
+      "storage_credentials_refused",
+      `Storage refused this deployment's credentials (${operation}: ${status}); ` +
+        "check the account name and key, or the identity",
+      { httpStatus: 500, fault: "platform", ...remediation("storage_credentials_refused") },
+    );
+    this.name = "StorageCredentialsRefusedError";
+  }
+}
+
+/** Storage accepted the identity but it holds no data access to the account or container. */
+export class StoragePermissionDeniedError extends HandledError {
+  declare readonly code: "storage_permission_denied";
+
+  constructor({ operation, status }: { operation: string; status: string }) {
+    super(
+      "storage_permission_denied",
+      `Storage denied the identity data access (${operation}: ${status}); ` +
+        "grant it a data role on the account or container",
+      { httpStatus: 500, fault: "platform", ...remediation("storage_permission_denied") },
+    );
+    this.name = "StoragePermissionDeniedError";
   }
 }
 

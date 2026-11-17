@@ -156,3 +156,17 @@ Feature: The object-storage member
     When S3 stops taking an upload's bytes and never answers, for longer than the idle limit
     Then the write fails with a TimeoutError
     And the connection is closed, so its socket returns to the pool
+
+  @unit @regression
+  Scenario: An Azure refusal of the credentials says to check them, not to grant a role
+    Given object storage on Azure Blob with an account key Azure does not accept
+    When a module writes, reads, checks, removes or probes an object
+    Then the refusal carries the code "storage_credentials_refused", a platform fault
+    And its remediation points at the account name and key or the identity, not a role grant
+
+  @unit @regression
+  Scenario: An Azure refusal for missing data permissions names the role to grant
+    Given object storage on Azure Blob whose identity Azure accepts but lacks data access
+    When a module reads or checks an object
+    Then the refusal carries the code "storage_permission_denied", a platform fault
+    And its remediation names the "Storage Blob Data Contributor" role to grant
