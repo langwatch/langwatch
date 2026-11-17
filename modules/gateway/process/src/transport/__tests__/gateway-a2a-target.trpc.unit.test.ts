@@ -13,6 +13,7 @@ import {
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
+import { a2aTargetToDto } from "../../rules/gateway-a2a-target.rules.ts";
 import { gatewayA2aTargetTrpcTransport } from "../gateway-a2a-target.trpc.ts";
 
 type Handler = (args: { input: unknown; actor: { type: "user"; id: string } }) => Promise<unknown>;
@@ -43,12 +44,13 @@ function target(overrides: Partial<GatewayA2aTargetResource> = {}): GatewayA2aTa
 
 function fakeApp() {
   return {
-    assertOrganizationExists: vi.fn(async () => undefined),
-    listA2aTargets: vi.fn(async () => [target()]),
-    createA2aTarget: vi.fn(async () => target()),
-    updateA2aTarget: vi.fn(async () => target({ agentName: "Renamed" })),
-    setA2aTargetBlocked: vi.fn(async () => target({ blocked: true, blockReason: "incident" })),
-    archiveA2aTarget: vi.fn(async () => target({ archivedAt: new Date() })),
+    listA2aTargets: vi.fn(async () => [a2aTargetToDto(target())]),
+    createA2aTarget: vi.fn(async () => a2aTargetToDto(target())),
+    updateA2aTarget: vi.fn(async () => a2aTargetToDto(target({ agentName: "Renamed" }))),
+    setA2aTargetBlocked: vi.fn(async () =>
+      a2aTargetToDto(target({ blocked: true, blockReason: "incident" })),
+    ),
+    archiveA2aTarget: vi.fn(async () => a2aTargetToDto(target({ archivedAt: new Date() }))),
   };
 }
 
@@ -105,7 +107,6 @@ describe("the gatewayA2aTargets tRPC declaration", () => {
         actor,
       });
 
-      expect(app.assertOrganizationExists).toHaveBeenCalledWith(ORG_ID);
       expect(result).toEqual([
         expect.objectContaining({
           name: "billing-agent",
@@ -162,14 +163,13 @@ describe("the gatewayA2aTargets tRPC declaration", () => {
   });
 
   describe("given an organization that does not exist", () => {
-    it("refuses before touching any target", async () => {
+    it("passes the coded organization refusal through", async () => {
       const app = fakeApp();
-      app.assertOrganizationExists.mockRejectedValueOnce(new GatewayOrganizationNotFoundError());
+      app.listA2aTargets.mockRejectedValueOnce(new GatewayOrganizationNotFoundError());
 
       await expect(
         mounted(app).handlers.list!({ input: { organizationId: "org_missing" }, actor }),
       ).rejects.toMatchObject({ code: "not_found" });
-      expect(app.listA2aTargets).not.toHaveBeenCalled();
     });
   });
 });
