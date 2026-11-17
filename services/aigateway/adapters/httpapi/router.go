@@ -95,6 +95,10 @@ type RouterDeps struct {
 	// VoiceRelay relays vendor voice sockets for clients on the WebSocket
 	// transport. Optional; when nil the socket routes are not mounted.
 	VoiceRelay *voicesession.Manager
+	// A2A proxies agent-to-agent calls under /a2a/{target}
+	// (specs/ai-gateway/a2a-proxy.feature). Optional; when nil the route is
+	// not mounted.
+	A2A http.Handler
 }
 
 // WebhookRelay hands one vendor delivery to the control plane byte for byte.
@@ -238,6 +242,13 @@ func NewRouter(deps RouterDeps) http.Handler {
 	// swaps our VK secret for the real x-goog-api-key on the way out.
 	// Any path under /v1beta (including :countTokens, :batchEmbedContents,
 	// cachedContents/*) is accepted by the same handler.
+	if deps.A2A != nil {
+		r.Route("/a2a", func(a2a chi.Router) {
+			a2a.Use(AuthMiddleware(deps.App.Auth()))
+			a2a.Handle("/*", deps.A2A)
+		})
+	}
+
 	r.Route("/v1beta", func(v1beta chi.Router) {
 		v1beta.Use(AuthMiddleware(deps.App.Auth()))
 		v1beta.Use(DispatchMetaMiddleware())
