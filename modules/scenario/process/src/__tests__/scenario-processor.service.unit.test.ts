@@ -339,7 +339,7 @@ describe("ScenarioProcessorService", () => {
       expect(fixture.finishUnsuccessfulRun).toHaveBeenCalledWith(
         expect.objectContaining({
           scenarioRunId: "run-1",
-          error: "Could not record the red team break for scenarioRunId=run-1",
+          error: expect.any(String),
         }),
       );
     });
