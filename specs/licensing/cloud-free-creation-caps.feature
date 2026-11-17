@@ -10,10 +10,12 @@ Feature: Cloud Free plan caps scenarios, simulations and custom evaluators
   evaluations (monitors) are not evaluators and stay uncapped.
 
   The scenario cap counts every live scenario except those a suite template apply
-  created. A scenario a member adds to a template's suite, and a copy of a
-  template scenario, count like any other. A template's scenarios are bounded by
-  its suite instead: a template apply is refused once the organization's live
-  suites reach the simulations cap, before anything is written. Only the
+  created while they sit in that template's own live suite. A scenario a member
+  adds to a template's suite, a copy of a template scenario and one moved to
+  another suite count like any other; archiving a suite archives its scenarios. A template's
+  scenarios are bounded by its suite instead: a template apply is refused once the
+  organization's live suites reach the simulations cap, or once its counted
+  scenarios already exceed the scenario cap, before anything is written. Only the
   template apply marks a scenario as template-made; a create request cannot.
 
   Only creating one more is refused. An organization already above a cap keeps
@@ -111,6 +113,14 @@ Feature: Cloud Free plan caps scenarios, simulations and custom evaluators
     When it applies a suite template
     Then the request fails with limit type "scenarioSets", current 3 and max 3
     And no suite or scenario is written
+
+  @unit
+  Scenario: A template scenario moved out of its suite counts against the scenario cap
+    Given an organization on cloud Free at 3 of 3 counted scenarios
+    And it applied a suite template
+    When it moves a template scenario to its own suite and archives the template suite
+    Then the moved scenario is counted and the archived suite's scenarios are not live
+    And the next template apply is refused with limit type "scenarios"
 
   @unit
   Scenario: A scenario create request cannot mark itself as template-made

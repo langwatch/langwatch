@@ -54,11 +54,6 @@ export class ScenarioCreationCapService {
     if (current >= cap.max) throw new LimitExceededError("scenarios", current, cap.max);
   }
 
-  /**
-   * A suite template's scenarios skip the scenario cap, so the suite it makes is what the Free plan
-   * bounds: the organization's live suites against the simulations cap.
-   * @throws LimitExceededError (`scenarioSets`) once the organization's suites reach the cap.
-   */
   /** Only a suite a template apply makes counts against the suite cap. */
   async assertTestSuiteCreationAllowed(input: {
     projectId: string;
@@ -68,15 +63,31 @@ export class ScenarioCreationCapService {
     await this.assertTemplateSuiteCreationAllowed({ projectId: input.projectId });
   }
 
+  /**
+   * A template's scenarios skip the scenario cap only inside their own live suite, so a template
+   * apply is bounded twice: live suites against the simulations cap, and scenarios counted
+   * elsewhere (moved to another suite) must not already exceed the scenario cap.
+   * @throws LimitExceededError (`scenarioSets` or `scenarios`)
+   */
   async assertTemplateSuiteCreationAllowed(input: { projectId: string }): Promise<void> {
     const organizationId = await this.deps.projects.getOrganizationId(input.projectId);
     const plan = await this.deps.plans.getActivePlan({ organizationId });
-    const cap = planCreationCap({ plan, limitType: "scenarioSets" });
-    if (!cap.capped) return;
+    const suiteCap = planCreationCap({ plan, limitType: "scenarioSets" });
+    const scenarioCap = planCreationCap({ plan, limitType: "scenarios" });
+    if (!suiteCap.capped && !scenarioCap.capped) return;
 
     const projectIds = await this.deps.projects.listIdsByOrganization({ organizationId });
-    const current = await this.deps.scenarios.countActiveTestSuitesByProjects({ projectIds });
-    if (current >= cap.max) throw new LimitExceededError("scenarioSets", current, cap.max);
+    if (suiteCap.capped) {
+      const suites = await this.deps.scenarios.countActiveTestSuitesByProjects({ projectIds });
+      if (suites >= suiteCap.max)
+        throw new LimitExceededError("scenarioSets", suites, suiteCap.max);
+    }
+    if (scenarioCap.capped) {
+      const scenarios = await this.deps.scenarios.countActiveByProjects({ projectIds });
+      if (scenarios > scenarioCap.max) {
+        throw new LimitExceededError("scenarios", scenarios, scenarioCap.max);
+      }
+    }
   }
 
   /**

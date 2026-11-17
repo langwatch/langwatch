@@ -141,7 +141,11 @@ describe("ScenarioModule on the cloud Free scenario cap", () => {
   describe("given an organization with 2 active scenarios and an applied template", () => {
     async function withAppliedTemplate() {
       const { app, repositories } = await organizationAtTheScenarioCap({ scenarios: 2 });
-      const suite = await app.createTestSuite({ projectId: "project-1", name: "OWASP LLM" });
+      const suite = await app.createTestSuite({
+        projectId: "project-1",
+        name: "OWASP LLM",
+        templateId: "owasp-llm",
+      });
       const scenario = (name: string) => ({
         projectId: "project-1",
         name,
@@ -190,6 +194,55 @@ describe("ScenarioModule on the cloud Free scenario cap", () => {
       await app.duplicate(source, BY);
 
       await expect(app.duplicate(source, BY)).rejects.toMatchObject(LIMIT_SHAPE);
+    });
+  });
+
+  describe("given an organization at 3/3 that applies, moves out, archives and applies again", () => {
+    /** @scenario A template scenario moved out of its suite counts against the scenario cap */
+    it("counts the moved scenarios and refuses the next template apply", async () => {
+      const { app, repositories } = await organizationAtTheScenarioCap({ scenarios: 3 });
+      const counted = () =>
+        repositories.scenarios.countActiveByProjects({ projectIds: ["project-1", "project-2"] });
+      const own = await app.createTestSuite({ projectId: "project-1", name: "Mine" });
+      const suite = await app.createTestSuite({
+        projectId: "project-1",
+        name: "Support agent",
+        templateId: "support-agent",
+      });
+      const applied = [];
+      for (const name of ["Refund", "Escalation"]) {
+        applied.push(
+          await app.create(
+            {
+              projectId: "project-1",
+              name,
+              situation: "A user asks",
+              criteria: [],
+              labels: [],
+              testSuiteId: suite.id,
+            },
+            BY,
+            { sourceTemplateId: "support-agent" },
+          ),
+        );
+      }
+      expect(await counted()).toBe(3);
+
+      await app.moveToTestSuite({
+        scenarioId: applied[0]!.id,
+        projectId: "project-1",
+        testSuiteId: own.id,
+      });
+      expect(await counted()).toBe(4);
+      await app.archiveTestSuite({ projectId: "project-1", testSuiteId: suite.id });
+      expect(await counted()).toBe(4);
+
+      await expect(
+        app.createTestSuite({ projectId: "project-1", name: "Again", templateId: "support-agent" }),
+      ).rejects.toMatchObject({
+        code: "resource_limit_exceeded",
+        meta: { limitType: "scenarios", current: 4, max: 3 },
+      });
     });
   });
 

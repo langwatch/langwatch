@@ -201,9 +201,18 @@ export class PrismaScenarioRepository extends ScenarioRepository {
 
   async countActiveByProjects(input: { projectIds: string[] }): Promise<number> {
     if (input.projectIds.length === 0) return 0;
-    return this.database.scenario.count({
-      where: { projectId: { in: input.projectIds }, archivedAt: null, sourceTemplateId: null },
-    });
+    const where = { projectId: { in: input.projectIds }, archivedAt: null };
+    const [plain, templateMade] = await Promise.all([
+      this.database.scenario.count({ where: { ...where, sourceTemplateId: null } }),
+      this.database.scenario.findMany({
+        where: { ...where, sourceTemplateId: { not: null } },
+        select: {
+          sourceTemplateId: true,
+          testSuite: { select: { templateId: true, archivedAt: true } },
+        },
+      }),
+    ]);
+    return plain + templateMade.filter((row) => !isInItsTemplateSuite(row)).length;
   }
 
   async countActiveTestSuitesByProjects(input: { projectIds: string[] }): Promise<number> {
@@ -877,4 +886,16 @@ export class PrismaScenarioRepository extends ScenarioRepository {
   private isRecordNotFound(error: unknown): boolean {
     return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025";
   }
+}
+
+/** A template scenario is exempt from the scenario cap only while it sits in its own live template suite. */
+function isInItsTemplateSuite(row: {
+  sourceTemplateId: string | null;
+  testSuite: { templateId: string | null; archivedAt: Date | null } | null;
+}): boolean {
+  return (
+    row.testSuite !== null &&
+    row.testSuite.archivedAt === null &&
+    row.testSuite.templateId === row.sourceTemplateId
+  );
 }

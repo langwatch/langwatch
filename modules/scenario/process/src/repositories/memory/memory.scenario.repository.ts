@@ -47,13 +47,13 @@ export class MemoryScenarioRepository extends ScenarioRepository {
     return sealed;
   }
 
-  private readonly templateSourcedIds = new Set<string>();
+  private readonly sourceTemplateIds = new Map<string, string>();
 
   async create(
     input: ScenarioCreateInput & { id: string; actor: ScenarioActor; sourceTemplateId?: string },
   ): Promise<Scenario> {
     const { actor: _, sourceTemplateId, ...scenarioInput } = input;
-    if (sourceTemplateId) this.templateSourcedIds.add(input.id);
+    if (sourceTemplateId) this.sourceTemplateIds.set(input.id, sourceTemplateId);
     const row: Scenario = {
       ...scenarioInput,
       parameters: scenarioInput.parameters ?? null,
@@ -122,6 +122,17 @@ export class MemoryScenarioRepository extends ScenarioRepository {
     );
   }
 
+  #isInItsTemplateSuite(row: Scenario): boolean {
+    const sourceTemplateId = this.sourceTemplateIds.get(row.id);
+    const suite = row.testSuiteId === null ? undefined : this.testSuites.get(row.testSuiteId);
+    return (
+      sourceTemplateId !== undefined &&
+      suite !== undefined &&
+      suite.archivedAt === null &&
+      suite.templateId === sourceTemplateId
+    );
+  }
+
   countActiveByProjects(input: { projectIds: string[] }): Promise<number> {
     const projectIds = new Set(input.projectIds);
     return Promise.resolve(
@@ -129,7 +140,7 @@ export class MemoryScenarioRepository extends ScenarioRepository {
         (row) =>
           projectIds.has(row.projectId) &&
           row.archivedAt === null &&
-          !this.templateSourcedIds.has(row.id),
+          !this.#isInItsTemplateSuite(row),
       ).length,
     );
   }
@@ -341,7 +352,14 @@ export class MemoryScenarioRepository extends ScenarioRepository {
     if (!testSuite || testSuite.projectId !== input.projectId)
       throw new ScenarioTestSuiteNotFoundError();
 
-    const archived = { ...testSuite, archivedAt: testSuite.archivedAt ?? toDate(input.archivedAt) };
+    if (testSuite.archivedAt) return testSuite;
+    const archivedAt = toDate(input.archivedAt);
+    for (const row of this.rows.values()) {
+      if (row.testSuiteId === testSuite.id && row.archivedAt === null) {
+        this.rows.set(row.id, { ...row, archivedAt });
+      }
+    }
+    const archived = { ...testSuite, archivedAt };
     this.testSuites.set(archived.id, archived);
     return archived;
   }
