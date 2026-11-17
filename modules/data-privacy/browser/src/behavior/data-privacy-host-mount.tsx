@@ -22,6 +22,7 @@ import {
   type PrivacyRouteReading,
   type PrivacySuccessNotice,
 } from "../model/data-privacy-host.ts";
+import { licenceOf, mayReadPlan } from "../model/privacy-licence.ts";
 import { dataPrivacyApi } from "./data-privacy-api.ts";
 
 class HostServiceDataPrivacyHost extends DataPrivacyHostApi {
@@ -70,20 +71,6 @@ class HostServiceDataPrivacyHost extends DataPrivacyHostApi {
   }
 }
 
-/** The plan read as a licence: a disabled or failed read is unknown, never "not licensed". */
-function licenceOf({
-  mayRead,
-  plan,
-}: {
-  mayRead: boolean;
-  plan: { isLoading: boolean; data: { type: string } | undefined };
-}): PrivacyLicence {
-  if (!mayRead) return "unknown";
-  if (plan.isLoading) return "loading";
-  if (!plan.data) return "unknown";
-  return plan.data.type === "ENTERPRISE" ? "enterprise" : "none";
-}
-
 /**
  * The mount the declaration names: one provider above the routed tree, so a
  * peer's screen reading this port finds it too. Default-exported because that
@@ -96,12 +83,16 @@ export default function DataPrivacyHostMount({ children }: { children?: ReactNod
   const { organizationId, projectId } = uiScope.activeScope();
   const teamId = uiScope.scopeHost()?.team()?.id;
   // Self-hosted only: the PII redaction model there comes with the Enterprise licence.
-  const mayReadPlan = !isSaaS && !!organizationId && session.hasPermission("organization:view");
+  const mayRead = mayReadPlan({
+    isSaaS,
+    organizationId: organizationId ?? void 0,
+    canViewOrganization: session.hasPermission("organization:view"),
+  });
   const plan = dataPrivacyApi.plan.getActivePlan.useQuery(
     { organizationId: organizationId ?? "" },
-    { enabled: mayReadPlan, retry: false },
+    { enabled: mayRead, retry: false },
   );
-  const licence = licenceOf({ mayRead: mayReadPlan, plan });
+  const licence = licenceOf({ mayRead, plan });
   const mayManageLicence = session.hasPermission("organization:manage");
 
   const host = useMemo(

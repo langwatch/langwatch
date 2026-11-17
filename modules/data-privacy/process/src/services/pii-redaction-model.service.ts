@@ -88,7 +88,7 @@ export class PiiRedactionModelService {
     model: PresidioRedactionService;
     featureFlags: FeatureFlagApi;
     scopes: DataPrivacyProjectScopeService;
-    /** Self-hosted, the model comes with the Enterprise licence (#9669); Cloud prices it. */
+    /** Self-hosted, the model comes with the Enterprise license; Cloud prices it. */
     selfHosted: boolean;
     entitlements: Pick<EntitlementApi, "getActivePlan">;
     spend: PiiRedactionSpendService;

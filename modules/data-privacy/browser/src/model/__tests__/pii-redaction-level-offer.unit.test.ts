@@ -43,7 +43,7 @@ describe("given the deployment and the PII redaction model flags", () => {
         mayManageLicence,
       });
 
-    /** @scenario The Strict offer on a self-hosted deployment follows the licence and the model flag */
+    /** @scenario The Strict offer on a self-hosted deployment follows the license and the model flag */
     it("offers the model, never priced, only with an Enterprise licence and the flag on", () => {
       expect(selfHosted({ licence: "enterprise", modelFlag: true })).toEqual({
         kind: "model",
@@ -80,17 +80,15 @@ describe("given the deployment and the PII redaction model flags", () => {
       });
     });
 
-    it("offers nothing while the plan is not answered yet, and no advert when it is unknown", () => {
+    it("offers nothing while the plan is not answered yet or cannot be read", () => {
       expect(selfHosted({ licence: "loading", modelFlag: true })).toBeNull();
-      expect(selfHosted({ licence: "unknown", modelFlag: true })).toEqual({
-        kind: "rule-based",
-        note: "plain",
-      });
+      expect(selfHosted({ licence: "unknown", modelFlag: true })).toBeNull();
     });
 
-    it("never names LangWatch Cloud in a self-hosted note", () => {
+    it("never names LangWatch Cloud in a self-hosted note, and spells license as the app does", () => {
       for (const note of Object.values(STRICT_RULE_BASED_NOTES)) {
         expect(note).not.toMatch(/cloud/i);
+        expect(note).not.toMatch(/licence/i);
       }
     });
   });

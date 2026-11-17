@@ -40,7 +40,12 @@ export function PiiRedactionModelPrice({
           </VStack>
         }
       >
-        <IconButton aria-label="How Strict is billed" size="2xs" variant="ghost" color="fg.muted">
+        <IconButton
+          aria-label={licensed ? "What your license includes" : "How Strict is billed"}
+          size="2xs"
+          variant="ghost"
+          color="fg.muted"
+        >
           <Info size={13} />
         </IconButton>
       </Tooltip>

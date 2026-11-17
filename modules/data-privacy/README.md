@@ -62,9 +62,11 @@ organization.
   drawer shows what a level runs and stores. A pick writes only the PII level of the organization
   rule through `setForScope`; Strict at a price and replacing Custom ask first. The browser cannot
   see `PII_REDACTION_MODEL_ENDPOINT`, so the flag is the gate: on self-hosted the Helm chart forces
-  it exactly when it sets the endpoint, and the page then offers the model as included, as the
-  ledger records it; with it off the drawer says Strict is rule-based
-  (`specs/pii-redaction-level-picker.feature`).
+  it exactly when it sets the endpoint. Self-hosted, the model needs an Enterprise license as well:
+  licensed with the flag, the page offers it as included with the license, as the ledger records
+  it; licensed without the flag, the drawer says to ask for it to be turned on; unlicensed, the
+  server keeps Strict on Presidio and the drawer advertises the license
+  (`specs/pii-redaction-level-picker.feature`, `specs/span-pii-redaction.feature`).
 
 - **Strict only.** Only a batch whose project's resolved privacy policy is `strict` can reach the
   model. A custom level, even one that selects every analysis-service entity, and a batch whose

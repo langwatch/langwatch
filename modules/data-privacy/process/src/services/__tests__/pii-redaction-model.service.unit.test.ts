@@ -342,21 +342,34 @@ describe("PiiRedactionModelService", () => {
       });
 
       it("logs the organization once a minute, not once per batch", async () => {
-        const { analysis, presidio, usage, fallbacks } = setup({
-          selfHosted: true,
-          planType: "OPEN_SOURCE",
-        });
-        presidio.answerWith(anonymized("call <PERSON>"));
-        presidio.answerWith(anonymized("call <PERSON>"));
+        vi.useFakeTimers();
+        try {
+          const { analysis, presidio, usage, fallbacks } = setup({
+            selfHosted: true,
+            planType: "OPEN_SOURCE",
+          });
+          for (let batch = 0; batch < 3; batch++) presidio.answerWith(anonymized("call <PERSON>"));
+          const outcomes = () => usage.map((line) => [line.level, line.fields.outcome]);
 
-        await analysis.clearPresidio(strictBatch());
-        await analysis.clearPresidio(strictBatch());
+          await analysis.clearPresidio(strictBatch());
+          await vi.advanceTimersByTimeAsync(59_999);
+          await analysis.clearPresidio(strictBatch());
+          expect(outcomes()).toEqual([["info", "not_licensed"]]);
+          expect(usage[0]?.fields).toMatchObject({
+            organizationId: ORGANIZATION_ID,
+            spansFound: 0,
+          });
 
-        expect(fallbacks).toEqual(["not_licensed", "not_licensed"]);
-        expect(usage.map((line) => [line.level, line.fields.outcome])).toEqual([
-          ["info", "not_licensed"],
-        ]);
-        expect(usage[0]?.fields).toMatchObject({ organizationId: ORGANIZATION_ID, spansFound: 0 });
+          await vi.advanceTimersByTimeAsync(1);
+          await analysis.clearPresidio(strictBatch());
+          expect(outcomes()).toEqual([
+            ["info", "not_licensed"],
+            ["info", "not_licensed"],
+          ]);
+          expect(fallbacks).toEqual(["not_licensed", "not_licensed", "not_licensed"]);
+        } finally {
+          vi.useRealTimers();
+        }
       });
     });
 
@@ -376,19 +389,26 @@ describe("PiiRedactionModelService", () => {
     });
 
     /** @scenario "A self-hosted organization's plan is read once a minute" */
-    it("reads the organization's plan once for batches within a minute", async () => {
-      const { analysis, memoryModel, planReads } = setup({ selfHosted: true });
-      memoryModel.answerWith(anonymized("call <PERSON>"));
-      memoryModel.answerWith(anonymized("call <PERSON>"));
-      memoryModel.answerWith(anonymized("call <PERSON>"));
+    it("reads the organization's plan once a minute, sharing a read in flight", async () => {
+      vi.useFakeTimers();
+      try {
+        const { analysis, memoryModel, planReads } = setup({ selfHosted: true });
+        for (let batch = 0; batch < 4; batch++) memoryModel.answerWith(anonymized("call <PERSON>"));
 
-      await Promise.all([
-        analysis.clearPresidio(strictBatch()),
-        analysis.clearPresidio(strictBatch()),
-      ]);
-      await analysis.clearPresidio(strictBatch());
+        await Promise.all([
+          analysis.clearPresidio(strictBatch()),
+          analysis.clearPresidio(strictBatch()),
+        ]);
+        await vi.advanceTimersByTimeAsync(59_999);
+        await analysis.clearPresidio(strictBatch());
+        expect(planReads).toEqual([ORGANIZATION_ID]);
 
-      expect(planReads).toEqual([ORGANIZATION_ID]);
+        await vi.advanceTimersByTimeAsync(1);
+        await analysis.clearPresidio(strictBatch());
+        expect(planReads).toEqual([ORGANIZATION_ID, ORGANIZATION_ID]);
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it("sends the batch to Presidio as a routing error when the plan cannot be read", async () => {

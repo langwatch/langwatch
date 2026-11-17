@@ -47,11 +47,11 @@ export const STRICT_BILLING_NOTE =
   "Pay as you go, no quota or plan. Every span the model answers is billed by the characters sent, even when it finds nothing. Spans that fall back to the rule-based detector are free. Essential stays included.";
 export const STRICT_FREE_NOTE = "Strict has no charge for your organization.";
 const STRICT_LICENSED_NOTE =
-  "Strict is included with your Enterprise licence, with no usage price.";
+  "Strict is included with your Enterprise license, with no usage price.";
 
-/** Why Strict is included: the organization's free list on Cloud, the licence self-hosted. */
+/** Why Strict is included: the organization's free list on Cloud, the license self-hosted. */
 export function includedFor({ licensed }: { licensed: boolean }): string {
-  return licensed ? "with your Enterprise licence" : "for your organization";
+  return licensed ? "with your Enterprise license" : "for your organization";
 }
 
 export function strictFreeNote({ licensed }: { licensed: boolean }): string {
@@ -62,14 +62,13 @@ const STRICT_RULE_BASED = "Strict here uses the rule-based detector.";
 
 /** Self-hosted Strict without the model: why, and what to do. Never names LangWatch Cloud. */
 export const STRICT_RULE_BASED_NOTES = {
-  plain: STRICT_RULE_BASED,
-  "turn-on": `${STRICT_RULE_BASED} Your Enterprise licence includes the ${PII_REDACTION_MODEL_NAME}: turn it on with piiRedactionModel.enabled in the Helm chart.`,
-  licence: `${STRICT_RULE_BASED} The ${PII_REDACTION_MODEL_NAME} comes with an Enterprise licence.`,
+  "turn-on": `${STRICT_RULE_BASED} Your Enterprise license includes the ${PII_REDACTION_MODEL_NAME}: ask whoever runs your deployment to turn it on.`,
+  licence: `${STRICT_RULE_BASED} The ${PII_REDACTION_MODEL_NAME} comes with an Enterprise license.`,
 } as const;
 export type StrictRuleBasedNote = keyof typeof STRICT_RULE_BASED_NOTES;
 
 export const ACTIVATE_LICENCE_LINK = { href: "/settings/license", label: "Activate a license" };
-export const ASK_ADMIN_FOR_LICENCE = "Ask your organization admin about an Enterprise licence.";
+export const ASK_ADMIN_FOR_LICENCE = "Ask your organization admin about an Enterprise license.";
 export const STRICT_BILLED_NOTE =
   "Strict is billed from the next trace. Projects or teams with their own Strict rule keep it when the organization moves to Essential.";
 
@@ -80,14 +79,14 @@ export const STRICT_BILLED_NOTE =
 export type PiiRedactionModelOffer =
   | { kind: "model"; free: boolean; licensed?: boolean }
   | { kind: "rule-based"; note: Exclude<StrictRuleBasedNote, "licence"> }
-  /** `activate`: this reader may activate a licence, so the advert links there. */
+  /** `activate`: this reader may activate a license, so the advert links there. */
   | { kind: "rule-based"; note: "licence"; activate: boolean }
   | null;
 
 /**
  * The Strict offer: on Cloud the flag gates the model and the free list prices it. Self-hosted it
- * comes with the Enterprise licence, never priced: licensed with the flag, the model; licensed
- * without it, how to turn it on; unlicensed, the advert; unanswered, nothing; unreadable, a note.
+ * comes with the Enterprise license, never priced: licensed with the flag, the model; licensed
+ * without it, ask for it; unlicensed, the advert; a plan unanswered or unreadable, nothing.
  */
 export function piiRedactionModelOfferOf({
   isSaaS,
@@ -103,8 +102,7 @@ export function piiRedactionModelOfferOf({
   mayManageLicence: boolean;
 }): PiiRedactionModelOffer {
   if (isSaaS) return modelFlag ? { kind: "model", free: freeFlag } : null;
-  if (licence === "loading") return null;
-  if (licence === "unknown") return { kind: "rule-based", note: "plain" };
+  if (licence === "loading" || licence === "unknown") return null;
   if (licence === "none")
     return { kind: "rule-based", note: "licence", activate: mayManageLicence };
   return modelFlag

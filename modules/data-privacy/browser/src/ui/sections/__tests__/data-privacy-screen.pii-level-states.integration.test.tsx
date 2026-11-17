@@ -12,6 +12,7 @@ import DataPrivacyScreen from "../data-privacy-screen.tsx";
 import {
   api,
   confirmStrict,
+  effectivePii,
   levelRadio,
   noPickerOrPrice,
   organizationRuleWith,
@@ -127,7 +128,7 @@ describe("given the Data Privacy page", () => {
   });
 
   describe("when the deployment is self-hosted and the organization has no Enterprise licence", () => {
-    /** @scenario A self-hosted deployment without an Enterprise licence advertises the licence */
+    /** @scenario A self-hosted deployment without an Enterprise license advertises the license */
     it("shows no picker or price, and the drawer advertises the licence", async () => {
       api.snapshot = snapshotWith({ rules: [projectRuleWith({ pii: { level: "strict" } })] });
       page({
@@ -138,9 +139,10 @@ describe("given the Data Privacy page", () => {
       });
 
       noPickerOrPrice();
+      expect(effectivePii()).toBe("PII redactionEssential");
       const advert = await screen.findByTestId("pii-redaction-model-licence-advert");
       expect(advert.textContent).toContain(
-        "Strict here uses the rule-based detector. The LangWatch PII Redaction Model comes with an Enterprise licence.",
+        "Strict here uses the rule-based detector. The LangWatch PII Redaction Model comes with an Enterprise license.",
       );
       expect(within(advert).getByRole("link", { name: "Activate a license" })).toHaveAttribute(
         "href",
@@ -161,7 +163,7 @@ describe("given the Data Privacy page", () => {
 
       const advert = await screen.findByTestId("pii-redaction-model-licence-advert");
       expect(advert.textContent).toContain(
-        "Ask your organization admin about an Enterprise licence.",
+        "Ask your organization admin about an Enterprise license.",
       );
       expect(within(advert).queryByRole("link")).toBeNull();
     });
@@ -173,7 +175,7 @@ describe("given the Data Privacy page", () => {
       page({ flagOn: true, isSaaS: false, licence: "enterprise" });
 
       expect(screen.getByTestId("pii-redaction-model-price").textContent).toBe(
-        "Includedwith your Enterprise licence",
+        "Includedwith your Enterprise license",
       );
       expect(screen.queryByText(/\$0\.50/)).toBeNull();
       expect(screen.queryByText(/Strict here uses the rule-based detector/)).toBeNull();
@@ -194,7 +196,7 @@ describe("given the Data Privacy page", () => {
       noPickerOrPrice();
       expect(
         await screen.findByText(
-          "Strict here uses the rule-based detector. Your Enterprise licence includes the LangWatch PII Redaction Model: turn it on with piiRedactionModel.enabled in the Helm chart.",
+          "Strict here uses the rule-based detector. Your Enterprise license includes the LangWatch PII Redaction Model: ask whoever runs your deployment to turn it on.",
         ),
       ).toBeInTheDocument();
       expect(screen.queryByTestId("pii-redaction-model-licence-advert")).toBeNull();
