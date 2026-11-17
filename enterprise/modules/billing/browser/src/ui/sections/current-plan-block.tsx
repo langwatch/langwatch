@@ -10,6 +10,7 @@ import { MeterBar } from "@langwatch/design-system/meter-bar";
 import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { SettingList, SettingRow, StatusChip } from "@langwatch/design-system/settings-card";
 import { Info } from "lucide-react";
+import type { ReactNode } from "react";
 
 import {
   type FixedSeats,
@@ -55,12 +56,14 @@ function EventUsageRow({ usage }: { usage: PlanEventUsage }) {
 }
 
 function PlanActions({
+  paymentAction,
   onUpgrade,
   isUpgradeLoading,
   onManageSubscription,
   isManageLoading,
   contactSalesUrl,
 }: {
+  paymentAction?: ReactNode;
   onUpgrade?: () => void;
   isUpgradeLoading?: boolean;
   onManageSubscription?: () => void;
@@ -69,6 +72,7 @@ function PlanActions({
 }) {
   return (
     <HStack gap={2} width="full" justify="flex-end" data-testid="current-plan-actions">
+      {paymentAction}
       {onUpgrade && (
         <Button
           data-testid="current-plan-upgrade-button"
@@ -144,6 +148,7 @@ export function CurrentPlanBlock({
   upgradeRequired,
   isOverPlanSeats,
   onUserCountClick,
+  paymentAction,
   onUpgrade,
   isUpgradeLoading,
   onManageSubscription,
@@ -163,6 +168,8 @@ export function CurrentPlanBlock({
   /** Above the plan's seats: the upgrade-required chip turns to the danger tone. */
   isOverPlanSeats?: boolean;
   onUserCountClick?: () => void;
+  /** While an invoice is unpaid: the way to pay it, which takes the upgrade's place. */
+  paymentAction?: ReactNode;
   onUpgrade?: () => void;
   isUpgradeLoading?: boolean;
   onManageSubscription?: () => void;
@@ -176,7 +183,7 @@ export function CurrentPlanBlock({
   // Fixed seats carry their own "Contact us" link, so the card has no second one.
   const salesUrl = fixedSeats ? undefined : contactSalesUrl;
   const isOverSeats = maxSeats != null && userCount > maxSeats;
-  const hasActions = Boolean(onUpgrade || onManageSubscription || salesUrl);
+  const hasActions = Boolean(paymentAction || onUpgrade || onManageSubscription || salesUrl);
   return (
     <Card
       data-testid="current-plan-block"
@@ -203,6 +210,7 @@ export function CurrentPlanBlock({
       footer={
         hasActions ? (
           <PlanActions
+            paymentAction={paymentAction}
             onUpgrade={onUpgrade}
             isUpgradeLoading={isUpgradeLoading}
             onManageSubscription={onManageSubscription}
