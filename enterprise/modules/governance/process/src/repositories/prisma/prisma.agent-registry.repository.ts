@@ -11,6 +11,7 @@ import {
   type AgentStopWebhookEventType,
   agentStopViewSchema,
 } from "@langwatch/enterprise-governance-contract";
+import { createLogger } from "@langwatch/observability";
 import { skipTenantCheck } from "@langwatch/prisma-client";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import { toDate, type Instant } from "@langwatch/time";
@@ -23,8 +24,11 @@ import {
 } from "../../features/registry/rules/registry-reconcile.rules.ts";
 import {
   AgentRegistryRepository,
+  type RegistryEntryPage,
   type RegistryEntryPosition,
 } from "../agent-registry.repository.ts";
+
+const logger = createLogger("langwatch:governance:prisma-agent-registry-repository");
 
 /** A reconcile reads the sources first, so the lock is held only for the read-plan-write. */
 const REGISTRY_TRANSACTION_TIMEOUT_MS = 30_000;
@@ -69,6 +73,19 @@ function eventOf(row: EventRow): AgentRegistryEvent {
 
 function entryOf(value: Prisma.JsonValue): AgentRegistryEntry {
   return agentRegistryEntrySchema.parse(value);
+}
+
+/** A list skips an entry this release cannot read (a newer release's source) instead of failing. */
+function readableEntriesOf(rows: { id: string; entry: Prisma.JsonValue }[]): AgentRegistryEntry[] {
+  return rows.flatMap((row) => {
+    const parsed = agentRegistryEntrySchema.safeParse(row.entry);
+    if (parsed.success) return [parsed.data];
+    logger.warn(
+      { entryId: row.id, paths: parsed.error.issues.map((issue) => issue.path.join(".")) },
+      "Skipped an agent registry entry this release cannot read",
+    );
+    return [];
+  });
 }
 
 const eventTypeSchema = z.enum(AGENT_REGISTRY_EVENT_TYPES);
@@ -217,11 +234,11 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`agent-registry:${organizationId
   }): Promise<AgentRegistryEntry[]> {
     const rows = await this.prisma.agentRegistryEntry.findMany({
       where: { organizationId, ...(status ? { status } : {}) },
-      select: { entry: true },
+      select: { id: true, entry: true },
       orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
       take: limit,
     });
-    return rows.map((row) => entryOf(row.entry));
+    return readableEntriesOf(rows);
   }
 
   async listEntries({
@@ -236,7 +253,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`agent-registry:${organizationId
     after?: RegistryEntryPosition;
     updatedSince?: Instant;
     status?: AgentRegistryStatus;
-  }): Promise<{ entries: AgentRegistryEntry[]; hasMore: boolean }> {
+  }): Promise<RegistryEntryPage> {
     const afterAt = after ? new Date(after.updatedAt) : undefined;
     const rows = await this.prisma.agentRegistryEntry.findMany({
       where: {
@@ -249,13 +266,16 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`agent-registry:${organizationId
             }
           : {}),
       },
-      select: { entry: true },
+      select: { id: true, updatedAt: true, entry: true },
       orderBy: [{ updatedAt: "asc" }, { id: "asc" }],
       take: limit + 1,
     });
+    const page = rows.slice(0, limit);
+    const last = page.at(-1);
     return {
-      entries: rows.slice(0, limit).map((row) => entryOf(row.entry)),
+      entries: readableEntriesOf(page),
       hasMore: rows.length > limit,
+      ...(last ? { last: { updatedAt: last.updatedAt.toISOString(), id: last.id } } : {}),
     };
   }
 

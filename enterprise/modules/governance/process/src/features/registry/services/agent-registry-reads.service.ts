@@ -71,18 +71,16 @@ export class AgentRegistryReadsService {
     updatedSince?: string;
     status?: AgentRegistryStatus;
   }): Promise<AgentRegistryPage> {
-    const { entries, hasMore } = await this.deps.registry.listEntries({
+    const { entries, hasMore, last } = await this.deps.registry.listEntries({
       organizationId,
       limit,
       ...(cursor ? { after: decodeCursor(cursor) } : {}),
       ...(updatedSince ? { updatedSince: Temporal.Instant.from(updatedSince) } : {}),
       ...(status ? { status } : {}),
     });
-    const last = entries.at(-1);
     return {
       data: entries,
-      next_cursor:
-        hasMore && last ? encodeCursor({ updatedAt: last.updated_at, id: last.id }) : null,
+      next_cursor: hasMore && last ? encodeCursor(last) : null,
     };
   }
 

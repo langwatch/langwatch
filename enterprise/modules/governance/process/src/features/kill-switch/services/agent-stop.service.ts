@@ -410,9 +410,8 @@ export class AgentStopService {
         ...(after ? { after } : {}),
       });
       ids.push(...page.entries.map((entry) => entry.id));
-      const last = page.entries.at(-1);
-      hasMore = page.hasMore && last !== undefined;
-      if (last) after = { updatedAt: last.updated_at, id: last.id };
+      hasMore = page.hasMore && page.last !== undefined;
+      after = page.last;
     }
     return ids;
   }

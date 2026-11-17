@@ -18,6 +18,7 @@ import {
 } from "../../features/registry/rules/registry-reconcile.rules.ts";
 import {
   AgentRegistryRepository,
+  type RegistryEntryPage,
   type RegistryEntryPosition,
 } from "../agent-registry.repository.ts";
 
@@ -121,7 +122,7 @@ export class MemoryAgentRegistryRepository extends AgentRegistryRepository {
     after?: RegistryEntryPosition;
     updatedSince?: Instant;
     status?: AgentRegistryStatus;
-  }): Promise<{ entries: AgentRegistryEntry[]; hasMore: boolean }> {
+  }): Promise<RegistryEntryPage> {
     const matching = this.entriesOf(organizationId)
       .filter((entry) => !status || entry.status === status)
       .filter(
@@ -132,7 +133,13 @@ export class MemoryAgentRegistryRepository extends AgentRegistryRepository {
           !after || byPosition(entry, { ...entry, updated_at: after.updatedAt, id: after.id }) > 0,
       )
       .toSorted(byPosition);
-    return { entries: matching.slice(0, limit), hasMore: matching.length > limit };
+    const entries = matching.slice(0, limit);
+    const last = entries.at(-1);
+    return {
+      entries,
+      hasMore: matching.length > limit,
+      ...(last ? { last: { updatedAt: last.updated_at, id: last.id } } : {}),
+    };
   }
 
   async getEntry({

@@ -17,6 +17,16 @@ import type {
 /** Keyset position in the entry listing: ascending by last material change, then id. */
 export type RegistryEntryPosition = { updatedAt: string; id: string };
 
+/**
+ * `last` is the position of the last row read, readable or not, so a page of entries another
+ * release wrote (an unknown source after a rollback) is skipped rather than read again.
+ */
+export type RegistryEntryPage = {
+  entries: AgentRegistryEntry[];
+  hasMore: boolean;
+  last?: RegistryEntryPosition;
+};
+
 /** The agent registry and its append-only change feed (specs/agent-registry.feature). */
 export abstract class AgentRegistryRepository {
   /**
@@ -44,7 +54,7 @@ export abstract class AgentRegistryRepository {
     after?: RegistryEntryPosition;
     updatedSince?: Instant;
     status?: AgentRegistryStatus;
-  }): Promise<{ entries: AgentRegistryEntry[]; hasMore: boolean }>;
+  }): Promise<RegistryEntryPage>;
   /** Throws `agent_registry_entry_not_found` when the organisation holds no such entry. */
   abstract getEntry(input: { organizationId: string; id: string }): Promise<AgentRegistryEntry>;
   abstract findEventsAfter(input: {

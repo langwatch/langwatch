@@ -149,6 +149,14 @@ Feature: Agent registry with ARD discovery and change events
     Then the first page holds versions 1 and 2 with a cursor
     And the page after that cursor holds version 3 and no cursor
 
+  @integration
+  Scenario: An entry another release wrote with a source this release does not know is left out of every list
+    Given the registry holds two agents
+    And one entry carries a source this release does not know, as after a rollback
+    When the registry lists its entries, in one page or one entry at a time
+    Then the list holds the other agent and pages to its end
+    And the read does not fail
+
   @unit
   Scenario: A source that cannot be read removes nothing
     Given the registry holds active agents

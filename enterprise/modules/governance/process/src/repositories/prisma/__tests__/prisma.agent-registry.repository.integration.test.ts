@@ -215,6 +215,32 @@ describe.skipIf(!connection)("PrismaAgentRegistryRepository", () => {
       expect(recent.entries.map((entry) => entry.version)).toEqual([2, 2]);
     });
 
+    /** @scenario An entry another release wrote with a source this release does not know is left out of every list */
+    it("leaves an entry with an unknown source out of every list and pages past it", async () => {
+      const organizationId = await seeded();
+      const [alpha] = (await repository().findEntries({ organizationId, limit: 100 })).filter(
+        (entry) => entry.name === "alpha",
+      );
+      if (!alpha) throw new Error("alpha not seeded");
+      await prisma().agentRegistryEntry.updateMany({
+        where: { organizationId, id: alpha.id },
+        data: { entry: JSON.parse(JSON.stringify({ ...alpha, source: "a_newer_release_source" })) },
+      });
+
+      const listed = await repository().findEntries({ organizationId, limit: 100 });
+      expect(listed.map((entry) => entry.name)).toEqual(["beta"]);
+
+      const names: string[] = [];
+      let page = await repository().listEntries({ organizationId, limit: 1 });
+      for (let reads = 1; ; reads++) {
+        names.push(...page.entries.map((entry) => entry.name));
+        if (!page.hasMore || !page.last || reads > 3) break;
+        page = await repository().listEntries({ organizationId, limit: 1, after: page.last });
+      }
+      expect(names).toEqual(["beta"]);
+      expect(page.hasMore).toBe(false);
+    });
+
     it("lists undelivered events after the baseline until their fan-out is marked", async () => {
       const organizationId = await seeded();
 
