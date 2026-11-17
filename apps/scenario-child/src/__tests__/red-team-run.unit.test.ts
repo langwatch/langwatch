@@ -5,15 +5,22 @@
  */
 import * as ScenarioRunner from "@langwatch/scenario";
 import type { ChildProcessJobData, RedTeamConfig } from "@langwatch/scenario-contract";
+import { generateText } from "ai";
+import { MockLanguageModelV3 } from "ai/test";
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  addOpeningUserTurn,
   buildRedTeamRunReport,
   getRedTeamRunConfig,
   readRedTeamTurnScores,
   redTeamTotalTurns,
 } from "../rules/red-team-run.rules.ts";
-import { buildRedTeamCast, redTeamScript } from "../services/scenario-child-execution.service.ts";
+import {
+  buildRedTeamCast,
+  redTeamScript,
+  withOpeningUserTurn,
+} from "../services/scenario-child-execution.service.ts";
 
 class TargetAgent extends ScenarioRunner.AgentAdapter {
   role = ScenarioRunner.AgentRole.AGENT;
@@ -286,5 +293,37 @@ describe("redTeamScript", () => {
       turnsRun: progress.turnsRun,
     });
     expect(report).toMatchObject({ outcome: "held", turnsUsed: 2, maxTurns: 50 });
+  });
+});
+
+describe("withOpeningUserTurn", () => {
+  it("sends a user turn after a system-only attacker prompt", async () => {
+    const model = new MockLanguageModelV3({
+      doGenerate: async () => ({
+        content: [{ type: "text", text: "attack" }],
+        finishReason: { unified: "stop", raw: undefined },
+        usage: {
+          inputTokens: { total: 1, noCache: 1, cacheRead: 0, cacheWrite: 0 },
+          outputTokens: { total: 1, text: 1, reasoning: 0 },
+        },
+        warnings: [],
+      }),
+    });
+    await generateText({
+      model: withOpeningUserTurn(model),
+      messages: [{ role: "system", content: "You are the attacker." }],
+    });
+    expect(model.doGenerateCalls[0]?.prompt.map((message) => message.role)).toEqual([
+      "system",
+      "user",
+    ]);
+  });
+
+  it("leaves a prompt that already has a conversation as it is", () => {
+    const prompt = [
+      { role: "system" as const, content: "rules" },
+      { role: "user" as const, content: [{ type: "text" as const, text: "hi" }] },
+    ];
+    expect(addOpeningUserTurn(prompt)).toBe(prompt);
   });
 });

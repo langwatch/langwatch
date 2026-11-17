@@ -1,3 +1,4 @@
+import type { LanguageModelV3Prompt } from "@ai-sdk/provider";
 import {
   RED_TEAM_BREAK_SCORE,
   RED_TEAM_DEFAULT_MAX_TURNS,
@@ -101,3 +102,9 @@ export function buildRedTeamRunReport({
 
 /** Turns stop this long before the child timeout, so the judge and the report still fit. */
 export const RED_TEAM_TIME_MARGIN_MS = 2 * 60 * 1000;
+
+/** A prompt holding only system messages, with one user turn added so every provider accepts it. */
+export function addOpeningUserTurn(prompt: LanguageModelV3Prompt): LanguageModelV3Prompt {
+  if (prompt.some((message) => message.role !== "system")) return prompt;
+  return [...prompt, { role: "user", content: [{ type: "text", text: "Begin." }] }];
+}

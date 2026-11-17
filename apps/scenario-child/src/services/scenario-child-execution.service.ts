@@ -19,6 +19,7 @@ import {
 } from "@langwatch/scenario-contract";
 import { nowInstant } from "@langwatch/time";
 import { type TracerProvider, trace } from "@opentelemetry/api";
+import { wrapLanguageModel } from "ai";
 
 import {
   type ConnectedCallRun,
@@ -39,6 +40,7 @@ import {
 } from "../rules/agent-first-script.rules.ts";
 import { buildCallerVoiceSimulatorConfig } from "../rules/caller-voice-simulator.rules.ts";
 import {
+  addOpeningUserTurn,
   buildRedTeamRunReport,
   getRedTeamRunConfig,
   isRedTeamRun,
@@ -244,6 +246,25 @@ export function redTeamScript({
 }
 
 /**
+ * The attacker opens its first turn with only a system prompt, which Gemini refuses as empty
+ * contents; a prompt with no user or assistant message gains one user turn.
+ */
+export function withOpeningUserTurn(
+  model: ScenarioRunner.RedTeamAgentConfig["model"],
+): ScenarioRunner.RedTeamAgentConfig["model"] {
+  return wrapLanguageModel({
+    model,
+    middleware: {
+      specificationVersion: "v3",
+      transformParams: async ({ params }) => ({
+        ...params,
+        prompt: addOpeningUserTurn(params.prompt),
+      }),
+    },
+  });
+}
+
+/**
  * A red team run's cast: the attacker plays the user with the simulator's model for attacks and
  * its plan, the judge holds the scenario criteria, and the marathon script runs the turn budget.
  */
@@ -268,11 +289,12 @@ export function buildRedTeamCast({
   const turnsEndAt =
     nowInstant().epochMilliseconds + CHILD_PROCESS.TIMEOUT_MS - RED_TEAM_TIME_MARGIN_MS;
   const isOutOfTime = () => nowInstant().epochMilliseconds >= turnsEndAt;
+  const attackerModel = withOpeningUserTurn(simulatorModel);
   const attackerConfig = {
     target: config.attackGoal,
     totalTurns,
-    model: simulatorModel,
-    metapromptModel: simulatorModel,
+    model: attackerModel,
+    metapromptModel: attackerModel,
     successScore: RED_TEAM_BREAK_SCORE,
   };
   const attacker =
