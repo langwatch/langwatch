@@ -36,6 +36,8 @@ describe("InlineCopyButton reset timer", () => {
     const { unmount } = await copyOnce();
 
     unmount();
+    // Checked before advancing: an uncleared timer would have fired by 2000 ms.
+    expect(vi.getTimerCount()).toBe(0);
     await act(async () => {
       await vi.advanceTimersByTimeAsync(2000);
     });
