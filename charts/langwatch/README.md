@@ -77,7 +77,7 @@ All overlays live in `examples/overlays/`:
 
 Organizations on the Strict PII level can have their PII analysis done by the PII redaction model instead of Presidio, as on LangWatch Cloud. With `piiRedactionModel.enabled: true` the chart runs the model as a Deployment and Service and sets `PII_REDACTION_MODEL_ENDPOINT` on the app and the workers.
 
-It is off by default, in every profile, until the public image `langwatch/pii-redaction-model` is published ([ISSUE_URL](ISSUE_URL)).
+It is off by default, in every profile, until the public image `langwatch/pii-redaction-model` is published ([https://github.com/langwatch/langwatch/issues/9647](https://github.com/langwatch/langwatch/issues/9647)).
 
 - **Image.** One public multi-arch image, versioned with the chart. `piiRedactionModel.imagePullSecrets` is optional, for a private mirror.
 - **Sizing.** 7Gi memory request and limit, 2 CPU request and 4 CPU limit per replica; `size-prod` and `size-ha` run 2 replicas when it is on. Measured memory and throughput: [Sizing & Scaling](https://docs.langwatch.ai/self-hosting/configuration/sizing-and-scaling#pii-redaction-model).
