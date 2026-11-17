@@ -171,11 +171,13 @@ export class GatewayInternalKeyResolutionService {
       return refuse(statusRejection.status, { ...statusRejection });
     }
 
-    // A token minted inside a rotation grace ends with it, so a gateway that
-    // cached the old secret asks again when the grace ends.
+    // A token minted for the old secret inside a rotation grace ends with it, so
+    // a gateway that cached the old secret asks again when the grace ends.
     const now = nowInstant().epochMilliseconds;
     const graceEnd =
-      vk.previousSecretValidUntil && vk.previousSecretValidUntil.epochMilliseconds > now
+      vk.presentedPreviousSecret &&
+      vk.previousSecretValidUntil &&
+      vk.previousSecretValidUntil.epochMilliseconds > now
         ? vk.previousSecretValidUntil
         : null;
     const [notAfter] = [vk.expiresAt, graceEnd]

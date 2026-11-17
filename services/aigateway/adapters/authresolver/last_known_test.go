@@ -52,6 +52,7 @@ func TestResolve_EvictedByBudgetChange_ConfigTimeout_ServesLastKnown(t *testing.
 	warns := logs.FilterMessage("auth_cache_serve_last_known").All()
 	require.Len(t, warns, 1)
 	assert.Equal(t, "vk_busy", warns[0].ContextMap()["vk_id"])
+	assert.Nil(t, svc.lastKnownFor(h), "the fallback moves into L1, so it cannot serve again after L1 ends")
 
 	callsBefore := fetcher.calls.Load()
 	fetchesBefore := fetcher.fetches.Load()

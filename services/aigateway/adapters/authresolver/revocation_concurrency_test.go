@@ -162,7 +162,7 @@ func TestRevocation_DenialDuringConfirmationIsKept(t *testing.T) {
 	time.Sleep(time.Millisecond)
 	svc.deny("vk_twice", ChangeKindVirtualKeyDisabled)
 
-	d, kept := svc.liftDenialBefore("vk_twice", confirmationStart)
+	d, kept := svc.liftDenialBefore("vk_twice", confirmationStart, "confirmation")
 	if !kept || d.kind != ChangeKindVirtualKeyDisabled {
 		t.Fatalf("the newer denial must survive, got kept=%v kind=%q", kept, d.kind)
 	}

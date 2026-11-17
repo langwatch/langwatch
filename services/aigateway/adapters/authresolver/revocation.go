@@ -21,6 +21,10 @@ import (
 // confirmed before it can still be cached, so the oldest can go first.
 const denySetSize = 1 << 16
 
+// maxDeniedCredentialsPerKey bounds the credentials remembered per denied key:
+// a key carries its current and previous secret, so a few slots are plenty.
+const maxDeniedCredentialsPerKey = 8
+
 // denial records that every confirmation of a virtual key started before at is
 // void. kind is the change-feed event that caused it.
 type denial struct {
@@ -118,10 +122,7 @@ func (s *Service) recheckDenied(key domain.PresentedKey, h [64]byte, vkID string
 	if err != nil {
 		return
 	}
-	if _, kept := s.liftDenialBefore(vkID, answer.authStart); kept {
-		return
-	}
-	s.logger.Info("auth_cache_denial_cleared", zap.String("vk_id", vkID), zap.String("source", "recheck"))
+	s.liftDenialBefore(vkID, answer.authStart, "recheck")
 }
 
 // authFrom stamps when the confirming control-plane call began. Call it before
@@ -162,26 +163,30 @@ func (s *Service) deny(vkID, kind string) {
 // clearDenial lifts vkID's denial and forgets the credentials that carried
 // it. A re-enable, a confirmation that began after the denial, or a
 // background recheck calls it.
-func (s *Service) clearDenial(vkID string) {
+func (s *Service) clearDenial(vkID, source string) {
 	s.denyMu.Lock()
 	defer s.denyMu.Unlock()
-	s.clearDenialLocked(vkID)
+	if s.clearDenialLocked(vkID) {
+		s.logger.Info("auth_cache_denial_cleared", zap.String("vk_id", vkID), zap.String("source", source))
+	}
 }
 
-func (s *Service) clearDenialLocked(vkID string) {
-	s.denied.Remove(vkID)
-	for _, h := range s.deniedByVK[vkID] {
+// clearDenialLocked reports whether vkID was denied.
+func (s *Service) clearDenialLocked(vkID string) bool {
+	was := s.denied.Remove(vkID)
+	for h := range s.deniedByVK[vkID] {
 		if v, ok := s.deniedKeys.Peek(h); ok && v == vkID {
 			s.deniedKeys.Remove(h)
 		}
 	}
 	delete(s.deniedByVK, vkID)
+	return was
 }
 
 // liftDenialBefore lifts vkID's denial when it is older than a confirmation
 // that began at start. A newer denial is kept and returned, checked and
 // cleared under one lock so a denial landing in between is never lost.
-func (s *Service) liftDenialBefore(vkID string, start time.Time) (denial, bool) {
+func (s *Service) liftDenialBefore(vkID string, start time.Time, source string) (denial, bool) {
 	s.denyMu.Lock()
 	defer s.denyMu.Unlock()
 	d, ok := s.denied.Peek(vkID)
@@ -192,18 +197,28 @@ func (s *Service) liftDenialBefore(vkID string, start time.Time) (denial, bool) 
 		return d, true
 	}
 	s.clearDenialLocked(vkID)
+	s.logger.Info("auth_cache_denial_cleared", zap.String("vk_id", vkID), zap.String("source", source))
 	return denial{}, false
 }
 
-// rememberDenied maps credentials to the denied key they carried. The index
-// drops keys that left the revocation list once it outgrows the list.
+// rememberDenied maps credentials to the denied key they carried, each once and
+// at most maxDeniedCredentialsPerKey per key. The index drops keys that left
+// the revocation list once it outgrows the list.
 func (s *Service) rememberDenied(vkID string, hashes ...[64]byte) {
 	s.denyMu.Lock()
 	defer s.denyMu.Unlock()
+	set := s.deniedByVK[vkID]
+	if set == nil {
+		set = map[[64]byte]struct{}{}
+		s.deniedByVK[vkID] = set
+	}
 	for _, h := range hashes {
+		if _, seen := set[h]; !seen && len(set) >= maxDeniedCredentialsPerKey {
+			continue
+		}
+		set[h] = struct{}{}
 		s.deniedKeys.Add(h, vkID)
 	}
-	s.deniedByVK[vkID] = append(s.deniedByVK[vkID], hashes...)
 	if len(s.deniedByVK) > denySetSize {
 		for id := range s.deniedByVK {
 			if !s.denied.Contains(id) {
@@ -243,7 +258,7 @@ func (s *Service) admit(ctx context.Context, h [64]byte, in served) (*domain.Bun
 	b, authStart := in.bundle, in.authStart
 	if b.VirtualKeyID != "" {
 		if _, ok := s.denied.Peek(b.VirtualKeyID); ok {
-			if d, kept := s.liftDenialBefore(b.VirtualKeyID, authStart); kept {
+			if d, kept := s.liftDenialBefore(b.VirtualKeyID, authStart, "confirmation"); kept {
 				s.dropAndCountDenied(h, b.VirtualKeyID, denialReason(d.kind))
 				return nil, denialError(ctx, d.kind)
 			}

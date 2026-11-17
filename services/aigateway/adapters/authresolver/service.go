@@ -167,7 +167,7 @@ type Service struct {
 	// denyMu orders denials against lifting them; deniedByVK lists the
 	// credentials each denied key carried, so a re-enable walks only those.
 	denyMu     sync.Mutex
-	deniedByVK map[string][][64]byte
+	deniedByVK map[string]map[[64]byte]struct{}
 	// reconfirms holds the fail-closed key re-check running per credential.
 	reconfirmMu sync.Mutex
 	reconfirms  map[[64]byte]*reconfirmCall
@@ -681,7 +681,7 @@ func New(opts Options) (*Service, error) {
 		hardGrace:        opts.HardGrace,
 		configTTL:        opts.ConfigTTL,
 		stopCh:           make(chan struct{}),
-		deniedByVK:       map[string][][64]byte{},
+		deniedByVK:       map[string]map[[64]byte]struct{}{},
 		reconfirms:       map[[64]byte]*reconfirmCall{},
 	}, nil
 }
@@ -1015,6 +1015,7 @@ func (s *Service) serveLastKnown(h [64]byte, in lastKnownServe) *served {
 		)
 		return &served{bundle: bundle, authStart: authStart, stale: gatewaymetrics.StaleServeLastKnown}
 	}
+	s.lastKnown.Remove(h)
 	s.logger.Warn("auth_cache_serve_last_known",
 		zap.String("vk_id", bundle.VirtualKeyID),
 		zap.Duration("config_age", now.Sub(confirmedAt)),
@@ -1373,7 +1374,7 @@ func (s *Service) waitUnlessStopping(ctx context.Context, d time.Duration) bool 
 func (s *Service) applyChange(organizationID string, ch CacheChange) {
 	keepLastKnown := !revokesKey(ch.Kind)
 	if ch.Kind == ChangeKindVirtualKeyEnabled && ch.VirtualKeyID != "" {
-		s.clearDenial(ch.VirtualKeyID)
+		s.clearDenial(ch.VirtualKeyID, "re_enable")
 	}
 	if deniesKey(ch.Kind) && ch.VirtualKeyID != "" {
 		// Deny before evicting: a refresh racing this event either finds the

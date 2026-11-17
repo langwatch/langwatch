@@ -133,6 +133,7 @@ import {
   type GatewaySpendDay,
   type GatewayInternalSpendCommandRecord,
   type GatewayInternalSpendSubmission,
+  type GatewayPresentedVirtualKey,
   type GatewayVirtualKeyRecord,
   GatewayBudgetNotFoundError,
   GatewayCacheRuleNotFoundError,
@@ -1528,7 +1529,7 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     return this.#internalDoor;
   }
 
-  findVirtualKeyBySecret(secret: string): Promise<GatewayVirtualKeyRecord | null> {
+  findVirtualKeyBySecret(secret: string): Promise<GatewayPresentedVirtualKey | null> {
     return this.#internalProtocol.findVirtualKeyBySecret(secret);
   }
 
