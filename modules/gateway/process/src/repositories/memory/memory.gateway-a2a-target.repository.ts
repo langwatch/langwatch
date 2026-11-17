@@ -31,6 +31,14 @@ export class MemoryGatewayA2aTargetRepository extends GatewayA2aTargetRepository
       }));
   }
 
+  async findByProject(input: {
+    organizationId: string;
+    projectId: string;
+  }): Promise<GatewayA2aTargetResource[]> {
+    const all = await this.findAll(input.organizationId);
+    return all.filter((row) => row.projectId === input.projectId);
+  }
+
   async findById(input: {
     id: string;
     organizationId: string;

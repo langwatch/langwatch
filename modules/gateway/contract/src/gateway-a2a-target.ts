@@ -182,3 +182,30 @@ export interface SetGatewayA2aTargetBlockedInputSchema extends Named<
 export const setGatewayA2aTargetBlockedInputSchema: SetGatewayA2aTargetBlockedInputSchema =
   setGatewayA2aTargetBlockedInputSchemaDefinition;
 export type SetGatewayA2aTargetBlockedInput = z.infer<typeof setGatewayA2aTargetBlockedInputSchema>;
+
+/** A project admin's edit: the target must belong to that project. */
+const updateProjectGatewayA2aTargetInputSchemaDefinition = z.object({
+  ...updateGatewayA2aTargetInputSchemaDefinition.omit({ organizationId: true }).shape,
+  projectId: z.string(),
+});
+export interface UpdateProjectGatewayA2aTargetInputSchema extends Named<
+  typeof updateProjectGatewayA2aTargetInputSchemaDefinition
+> {}
+export const updateProjectGatewayA2aTargetInputSchema: UpdateProjectGatewayA2aTargetInputSchema =
+  updateProjectGatewayA2aTargetInputSchemaDefinition;
+export type UpdateProjectGatewayA2aTargetInput = z.input<
+  typeof updateProjectGatewayA2aTargetInputSchema
+>;
+
+const setProjectGatewayA2aTargetBlockedInputSchemaDefinition = z.object({
+  ...setGatewayA2aTargetBlockedInputSchemaDefinition.omit({ organizationId: true }).shape,
+  projectId: z.string(),
+});
+export interface SetProjectGatewayA2aTargetBlockedInputSchema extends Named<
+  typeof setProjectGatewayA2aTargetBlockedInputSchemaDefinition
+> {}
+export const setProjectGatewayA2aTargetBlockedInputSchema: SetProjectGatewayA2aTargetBlockedInputSchema =
+  setProjectGatewayA2aTargetBlockedInputSchemaDefinition;
+export type SetProjectGatewayA2aTargetBlockedInput = z.infer<
+  typeof setProjectGatewayA2aTargetBlockedInputSchema
+>;

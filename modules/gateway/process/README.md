@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`GatewayApi`)
 
-Peers call these through the token, declared at `../contract/src/gateway.api.ts:578`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/gateway.api.ts:580`; nothing else in this package is public.
 It extends `GatewayInternalProtocol`.
 
 #### `internalDoor`
@@ -329,6 +329,32 @@ setA2aTargetBlocked(input: SetGatewayA2aTargetBlockedInput): Promise<GatewayA2aT
 
 ```typescript
 archiveA2aTarget(input: { id: string; organizationId: string }): Promise<GatewayA2aTargetDto>;
+```
+
+#### `listProjectA2aTargets`
+
+The project's own targets; org-wide ones stay with the organization.
+
+```typescript
+listProjectA2aTargets(input: { projectId: string }): Promise<GatewayA2aTargetDto[]>;
+```
+
+#### `updateProjectA2aTarget`
+
+```typescript
+updateProjectA2aTarget(input: UpdateProjectGatewayA2aTargetInput): Promise<GatewayA2aTargetDto>;
+```
+
+#### `setProjectA2aTargetBlocked`
+
+```typescript
+setProjectA2aTargetBlocked(input: SetProjectGatewayA2aTargetBlockedInput): Promise<GatewayA2aTargetDto>;
+```
+
+#### `archiveProjectA2aTarget`
+
+```typescript
+archiveProjectA2aTarget(input: { id: string; projectId: string }): Promise<GatewayA2aTargetDto>;
 ```
 
 #### `listGuardrails`
@@ -1441,26 +1467,30 @@ type Response = z.infer<typeof gatewayEndUserSpendResponseSchema>; // ../contrac
 
 ### `gatewayA2aTargets`
 
-Contract `../contract/src/gateway-a2a-target.trpc.ts:14`, router `src/transport/gateway-a2a-target.trpc.ts:8`.
+Contract `../contract/src/gateway-a2a-target.trpc.ts:20`, router `src/transport/gateway-a2a-target.trpc.ts:8`.
 
-| Procedure                      | Kind     | Gate                            | Input            | Output                      |
-| ------------------------------ | -------- | ------------------------------- | ---------------- | --------------------------- |
-| `gatewayA2aTargets.list`       | query    | Permission `virtualKeys:view`   | inline           | inline                      |
-| `gatewayA2aTargets.create`     | mutation | Permission `virtualKeys:manage` | inline           | `gatewayA2aTargetDtoSchema` |
-| `gatewayA2aTargets.update`     | mutation | Permission `virtualKeys:manage` | inline           | `gatewayA2aTargetDtoSchema` |
-| `gatewayA2aTargets.setBlocked` | mutation | Permission `virtualKeys:manage` | inline           | `gatewayA2aTargetDtoSchema` |
-| `gatewayA2aTargets.delete`     | mutation | Permission `virtualKeys:manage` | `targetIdSchema` | `gatewayA2aTargetDtoSchema` |
+| Procedure                                | Kind     | Gate                            | Input                   | Output                      |
+| ---------------------------------------- | -------- | ------------------------------- | ----------------------- | --------------------------- |
+| `gatewayA2aTargets.list`                 | query    | Permission `virtualKeys:view`   | inline                  | inline                      |
+| `gatewayA2aTargets.create`               | mutation | Permission `virtualKeys:manage` | inline                  | `gatewayA2aTargetDtoSchema` |
+| `gatewayA2aTargets.update`               | mutation | Permission `virtualKeys:manage` | inline                  | `gatewayA2aTargetDtoSchema` |
+| `gatewayA2aTargets.setBlocked`           | mutation | Permission `virtualKeys:manage` | inline                  | `gatewayA2aTargetDtoSchema` |
+| `gatewayA2aTargets.delete`               | mutation | Permission `virtualKeys:manage` | `targetIdSchema`        | `gatewayA2aTargetDtoSchema` |
+| `gatewayA2aTargets.listForProject`       | query    | Permission `virtualKeys:view`   | inline                  | inline                      |
+| `gatewayA2aTargets.updateForProject`     | mutation | Permission `virtualKeys:manage` | inline                  | `gatewayA2aTargetDtoSchema` |
+| `gatewayA2aTargets.setBlockedForProject` | mutation | Permission `virtualKeys:manage` | inline                  | `gatewayA2aTargetDtoSchema` |
+| `gatewayA2aTargets.deleteForProject`     | mutation | Permission `virtualKeys:manage` | `projectTargetIdSchema` | `gatewayA2aTargetDtoSchema` |
 
 ```typescript
 // gatewayA2aTargets.list
-// Input: inline, ../contract/src/gateway-a2a-target.trpc.ts:16
+// Input: inline, ../contract/src/gateway-a2a-target.trpc.ts:22
 interface Input {
   organizationId: string;
 }
-// Output: gatewayA2aTargetDtoSchema.array() (inline, ../contract/src/gateway-a2a-target.trpc.ts:17)
+// Output: gatewayA2aTargetDtoSchema.array() (inline, ../contract/src/gateway-a2a-target.trpc.ts:23)
 
 // gatewayA2aTargets.create
-// Input: inline, ../contract/src/gateway-a2a-target.trpc.ts:20
+// Input: inline, ../contract/src/gateway-a2a-target.trpc.ts:26
 interface Input {
   organizationId: string;
   projectId: string | null;
@@ -1473,10 +1503,10 @@ interface Input {
   blocked?: boolean;
   blockReason?: string | null;
 }
-type Output = z.infer<typeof gatewayA2aTargetDtoSchema>; // ../contract/src/gateway-a2a-target.ts:110
+type Output = z.infer<typeof gatewayA2aTargetDtoSchema>; // ../contract/src/gateway-a2a-target.ts:123
 
 // gatewayA2aTargets.update
-// Input: inline, ../contract/src/gateway-a2a-target.trpc.ts:24
+// Input: inline, ../contract/src/gateway-a2a-target.trpc.ts:30
 interface Input {
   id: string;
   organizationId: string;
@@ -1488,25 +1518,65 @@ interface Input {
   blocked?: boolean;
   blockReason?: string | null;
 }
-type Output = z.infer<typeof gatewayA2aTargetDtoSchema>; // ../contract/src/gateway-a2a-target.ts:110
+type Output = z.infer<typeof gatewayA2aTargetDtoSchema>; // ../contract/src/gateway-a2a-target.ts:123
 
 // gatewayA2aTargets.setBlocked
-// Input: inline, ../contract/src/gateway-a2a-target.trpc.ts:28
+// Input: inline, ../contract/src/gateway-a2a-target.trpc.ts:34
 interface Input {
   id: string;
   organizationId: string;
   blocked: boolean;
   blockReason: string | null;
 }
-type Output = z.infer<typeof gatewayA2aTargetDtoSchema>; // ../contract/src/gateway-a2a-target.ts:110
+type Output = z.infer<typeof gatewayA2aTargetDtoSchema>; // ../contract/src/gateway-a2a-target.ts:123
 
 // gatewayA2aTargets.delete
-// Input: targetIdSchema, ../contract/src/gateway-a2a-target.trpc.ts:12
+// Input: targetIdSchema, ../contract/src/gateway-a2a-target.trpc.ts:17
 interface Input {
   organizationId: string;
   id: string;
 }
-type Output = z.infer<typeof gatewayA2aTargetDtoSchema>; // ../contract/src/gateway-a2a-target.ts:110
+type Output = z.infer<typeof gatewayA2aTargetDtoSchema>; // ../contract/src/gateway-a2a-target.ts:123
+
+// gatewayA2aTargets.listForProject
+// Input: inline, ../contract/src/gateway-a2a-target.trpc.ts:42
+interface Input {
+  projectId: string;
+}
+// Output: gatewayA2aTargetDtoSchema.array() (inline, ../contract/src/gateway-a2a-target.trpc.ts:43)
+
+// gatewayA2aTargets.updateForProject
+// Input: inline, ../contract/src/gateway-a2a-target.trpc.ts:46
+interface Input {
+  id: string;
+  agentName?: string;
+  cardUrl?: string;
+  upstreamUrl?: string;
+  upstreamHeaders?: Record<string, string>;
+  allowedVirtualKeyIds?: string[] | null;
+  blocked?: boolean;
+  blockReason?: string | null;
+  projectId: string;
+}
+type Output = z.infer<typeof gatewayA2aTargetDtoSchema>; // ../contract/src/gateway-a2a-target.ts:123
+
+// gatewayA2aTargets.setBlockedForProject
+// Input: inline, ../contract/src/gateway-a2a-target.trpc.ts:50
+interface Input {
+  id: string;
+  blocked: boolean;
+  blockReason: string | null;
+  projectId: string;
+}
+type Output = z.infer<typeof gatewayA2aTargetDtoSchema>; // ../contract/src/gateway-a2a-target.ts:123
+
+// gatewayA2aTargets.deleteForProject
+// Input: projectTargetIdSchema, ../contract/src/gateway-a2a-target.trpc.ts:18
+interface Input {
+  projectId: string;
+  id: string;
+}
+type Output = z.infer<typeof gatewayA2aTargetDtoSchema>; // ../contract/src/gateway-a2a-target.ts:123
 ```
 
 ### `gatewayBudgets`
@@ -1921,9 +1991,9 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                          | Environment variable                    | Declared at                            |
 | ------ | ----------------------------- | --------------------------------------- | -------------------------------------- |
-| secret | `internalSecret`              | `LW_GATEWAY_INTERNAL_SECRET`            | `src/app/gateway.app.ts:1175`          |
-| secret | `jwtSecret`                   | `LW_GATEWAY_JWT_SECRET`                 | `src/app/gateway.app.ts:1176`          |
-| secret | `virtualKeyPepper`            | `LW_VIRTUAL_KEY_PEPPER`                 | `src/app/gateway.app.ts:1177`          |
+| secret | `internalSecret`              | `LW_GATEWAY_INTERNAL_SECRET`            | `src/app/gateway.app.ts:1177`          |
+| secret | `jwtSecret`                   | `LW_GATEWAY_JWT_SECRET`                 | `src/app/gateway.app.ts:1178`          |
+| secret | `virtualKeyPepper`            | `LW_VIRTUAL_KEY_PEPPER`                 | `src/app/gateway.app.ts:1179`          |
 | config | `spendSettlementGraceMs`      | `LW_SPEND_SETTLEMENT_GRACE_MS`          | `../contract/src/gateway.config.ts:27` |
 | config | `internalUrl`                 | `LW_GATEWAY_INTERNAL_URL`               | `../contract/src/gateway.config.ts:29` |
 | config | `controlPlaneUrl`             | `GATEWAY_CONTROL_PLANE_URL`             | `../contract/src/gateway.config.ts:31` |

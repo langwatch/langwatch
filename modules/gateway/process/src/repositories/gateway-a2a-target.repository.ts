@@ -16,6 +16,11 @@ export abstract class GatewayA2aTargetRepository {
     organizationId: string,
     options?: { headers?: boolean },
   ): Promise<GatewayA2aTargetResource[]>;
+  /** Live targets scoped to one project, without the org-wide ones. */
+  abstract findByProject(input: {
+    organizationId: string;
+    projectId: string;
+  }): Promise<GatewayA2aTargetResource[]>;
   abstract findById(input: {
     id: string;
     organizationId: string;

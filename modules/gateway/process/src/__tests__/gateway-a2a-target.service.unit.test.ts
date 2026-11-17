@@ -26,6 +26,39 @@ function service(changeEvents = MemoryGatewayChangeEventsRepository.create()) {
 }
 
 describe("GatewayA2aTargetService", () => {
+  /** @scenario "a project admin manages the project's own targets" */
+  it("lets a project manage only its own targets", async () => {
+    const targets = service();
+    const own = await targets.create({ ...base, projectId: "p1", name: "billing" });
+    const other = await targets.create({ ...base, projectId: "p2", name: "billing" });
+    const orgWide = await targets.create({ ...base, projectId: null, name: "shared" });
+    const scope = { organizationId: base.organizationId, projectId: "p1" };
+
+    expect((await targets.listForProject(scope)).map((t) => t.id)).toEqual([own.id]);
+    await expect(
+      targets.updateForProject({ ...scope, id: own.id, agentName: "Renamed", actorUserId: "u1" }),
+    ).resolves.toMatchObject({ agentName: "Renamed" });
+    await expect(
+      targets.setBlockedForProject({
+        ...scope,
+        id: own.id,
+        blocked: true,
+        blockReason: "incident",
+        actorUserId: "u1",
+      }),
+    ).resolves.toMatchObject({ blocked: true, blockReason: "incident" });
+    for (const foreign of [other, orgWide]) {
+      await expect(
+        targets.updateForProject({ ...scope, id: foreign.id, agentName: "x", actorUserId: "u1" }),
+      ).rejects.toThrow(GatewayA2aTargetNotFoundError);
+      await expect(targets.archiveForProject({ ...scope, id: foreign.id })).rejects.toThrow(
+        GatewayA2aTargetNotFoundError,
+      );
+    }
+    await targets.archiveForProject({ ...scope, id: own.id });
+    expect(await targets.listForProject(scope)).toEqual([]);
+  });
+
   it("refuses a second target with the same name in the same scope", async () => {
     const targets = service();
     await targets.create({ ...base, projectId: "p1", name: "billing" });

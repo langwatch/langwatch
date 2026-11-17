@@ -37,4 +37,28 @@ export const gatewayA2aTargetTrpcTransport: TrpcRouterDeclaration<
   .handle(({ app, input }) => {
     return app.archiveA2aTarget({ id: input.id, organizationId: input.organizationId });
   })
+
+  .procedure("listForProject")
+  .withPermission("virtualKeys:view", { via: "projectId" })
+  .handle(({ app, input }) => {
+    return app.listProjectA2aTargets({ projectId: input.projectId });
+  })
+
+  .procedure("updateForProject")
+  .withPermission("virtualKeys:manage", { via: "projectId" })
+  .handle(({ app, input, actor }) => {
+    return app.updateProjectA2aTarget({ ...input, actorUserId: actor.id });
+  })
+
+  .procedure("setBlockedForProject")
+  .withPermission("virtualKeys:manage", { via: "projectId" })
+  .handle(({ app, input, actor }) => {
+    return app.setProjectA2aTargetBlocked({ ...input, actorUserId: actor.id });
+  })
+
+  .procedure("deleteForProject")
+  .withPermission("virtualKeys:manage", { via: "projectId" })
+  .handle(({ app, input }) => {
+    return app.archiveProjectA2aTarget({ id: input.id, projectId: input.projectId });
+  })
   .build();

@@ -62,6 +62,53 @@ export class GatewayA2aTargetService {
     return this.repository.findAll(organizationId);
   }
 
+  listForProject(input: {
+    organizationId: string;
+    projectId: string;
+  }): Promise<GatewayA2aTargetResource[]> {
+    return this.repository.findByProject(input);
+  }
+
+  async updateForProject(
+    input: UpdateGatewayA2aTargetInput & { projectId: string },
+  ): Promise<GatewayA2aTargetResource> {
+    const { projectId, ...update } = input;
+    await this.requireProjectTarget({ ...update, projectId });
+    return this.update(update);
+  }
+
+  async setBlockedForProject(input: {
+    id: string;
+    organizationId: string;
+    projectId: string;
+    blocked: boolean;
+    blockReason: string | null;
+    actorUserId: string;
+  }): Promise<GatewayA2aTargetResource> {
+    const { projectId, ...blocked } = input;
+    await this.requireProjectTarget({ ...blocked, projectId });
+    return this.setBlocked(blocked);
+  }
+
+  async archiveForProject(input: {
+    id: string;
+    organizationId: string;
+    projectId: string;
+  }): Promise<GatewayA2aTargetResource> {
+    await this.requireProjectTarget(input);
+    return this.archive({ id: input.id, organizationId: input.organizationId });
+  }
+
+  /** Another project's target and an org-wide one read as not found to a project admin. */
+  private async requireProjectTarget(input: {
+    id: string;
+    organizationId: string;
+    projectId: string;
+  }): Promise<void> {
+    const target = await this.repository.findById(input);
+    if (!target || target.projectId !== input.projectId) throw new GatewayA2aTargetNotFoundError();
+  }
+
   async create(input: CreateGatewayA2aTargetInput): Promise<GatewayA2aTargetResource> {
     const parsed = createGatewayA2aTargetInputSchema.parse(input);
     const existing = await this.repository.findAll(parsed.organizationId);
