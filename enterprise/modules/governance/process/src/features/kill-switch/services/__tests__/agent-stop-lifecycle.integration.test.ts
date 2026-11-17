@@ -171,6 +171,30 @@ describe("AgentStopService lifecycle requests", () => {
       expect(harness.virtualKeyCalls.map((call) => call.action)).toEqual(["disable", "enable"]);
     });
 
+    /** @scenario "A restore asked while a drop's revert is redelivered still settles that revert" */
+    it("lets the redelivered drop revert enable the key and settle the restore", async () => {
+      const key = (await harness.stopOf(view.id)).targets.find(
+        (target) => target.target.kind === "gateway_virtual_key",
+      );
+      if (!key) throw new Error("the stop holds no virtual key");
+      harness.recordRefusals.set(key.id, 1);
+      await harness.stops.setPlan({
+        organizationId: ORG,
+        agentId: AGENT_ID,
+        targets: harness.fullPlan.filter((target) => target.kind !== "gateway_virtual_key"),
+      });
+      await vi.waitFor(() => expect(harness.virtualKeyCalls).toHaveLength(2));
+      await harness.stops.restore({ organizationId: ORG, stopId: view.id, caller: PERSON });
+
+      await vi.waitFor(
+        async () => expect((await harness.stopOf(view.id)).status).toBe("restored"),
+        { timeout: 40_000, interval: 200 },
+      );
+      const restored = await harness.stopOf(view.id);
+      expect(restored.targets.map((target) => target.id)).not.toContain(key.id);
+      expect(harness.keyStatuses.get(VIRTUAL_KEY_ID)).toBe("ACTIVE");
+    });
+
     /** @scenario "A stop whose plan lost every target closes as restored" */
     it("restores the stop once every target was dropped and reverted", async () => {
       await harness.stops.setPlan({ organizationId: ORG, agentId: AGENT_ID, targets: [] });

@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 import {
   type AgentStopRecord,
   approvedStop,
+  isRevertSuperseded,
   requestedStop,
   restoreRequestedStop,
   targetAppliedStop,
@@ -232,6 +233,57 @@ describe("targetsDroppedStop", () => {
       expect(aliasReverted.status).toBe("restoring");
       expect(keyReverted.status).toBe("restored");
       expect(keyReverted.targets.map((target) => target.id)).toEqual([ALIAS.id]);
+    });
+
+    /** @scenario "A restore asked while a drop's revert is redelivered still settles that revert" */
+    it("keeps the drop's revert live after the restore round advanced", () => {
+      const quarantined = applied(applied(requested({ targets: [KEY, ALIAS] }), KEY.id), ALIAS.id);
+      const restoring = restoreRequestedStop({
+        stop: drop(quarantined, [KEY.id]),
+        data: {
+          stopId: STOP_ID,
+          organizationId: ORG,
+          requestedByUserId: "user-ops",
+          requestedByApiKeyId: null,
+          requestId: "restore-1",
+        },
+        at: 4_000,
+      });
+      const dropRevert = { stop: restoring, targetId: KEY.id, restoreRound: 0 };
+
+      expect(restoring.restoreRound).toBe(1);
+      expect(isRevertSuperseded({ ...dropRevert, dropId: "drop-1" })).toBe(false);
+      expect(isRevertSuperseded({ ...dropRevert, dropId: "drop-0" })).toBe(true);
+      expect(isRevertSuperseded({ ...dropRevert, dropId: undefined })).toBe(true);
+    });
+
+    it("leaves a drop's revert to the restore round once that restore took the target over", () => {
+      const quarantined = applied(applied(requested({ targets: [KEY, ALIAS] }), KEY.id), ALIAS.id);
+      const failed = targetRevertFailedStop({
+        stop: drop(quarantined, [KEY.id]),
+        data: { ...outcome(KEY.id), errorCode: "provider_unavailable", dropId: "drop-1" },
+        at: 3_500,
+      });
+      const restoring = restoreRequestedStop({
+        stop: failed,
+        data: {
+          stopId: STOP_ID,
+          organizationId: ORG,
+          requestedByUserId: "user-ops",
+          requestedByApiKeyId: null,
+          requestId: "restore-1",
+        },
+        at: 4_000,
+      });
+
+      expect(
+        isRevertSuperseded({
+          stop: restoring,
+          targetId: KEY.id,
+          restoreRound: 0,
+          dropId: "drop-1",
+        }),
+      ).toBe(true);
     });
   });
 });

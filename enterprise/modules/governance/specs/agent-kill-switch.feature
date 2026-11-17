@@ -532,6 +532,13 @@ Feature: Agent kill switch: stop a misbehaving agent where it runs, with approva
     Then the virtual key is enabled again and leaves the stop once reverted
     And the stop stays quarantined on its other targets, and its restore leaves the key alone
 
+  @unit @integration
+  Scenario: A restore asked while a drop's revert is redelivered still settles that revert
+    Given a quarantined stop whose plan dropped the virtual key, and the key's revert is redelivered
+    When a restore is asked before the redelivered revert runs
+    Then the redelivered revert still enables the key and the key leaves the stop
+    And the stop is "restored", never left "restoring" on the dropped key
+
   @unit
   Scenario: An apply in flight for a dropped target is reverted once it lands
     Given a stop whose virtual key apply is in flight

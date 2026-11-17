@@ -722,7 +722,8 @@ export function isApplySuperseded({
 
 /**
  * Whether the stop already moved past this revert: a later restore, a retry or close after its
- * round, or, for a plan drop, the target left or a later drop took it over. A lagging row is not.
+ * round, or, for a plan drop, the target left or no longer carries that drop. A restore does not
+ * end a drop's revert, which still settles the target. A lagging row is not past it.
  */
 export function isRevertSuperseded({
   stop,
@@ -735,9 +736,15 @@ export function isRevertSuperseded({
   restoreRound: number;
   dropId: string | undefined;
 }): boolean {
-  if (stop.restoreRound !== restoreRound) return stop.restoreRound > restoreRound;
-  if (dropId === undefined) return stop.status !== "restoring" && stop.status !== "restore_failed";
+  if (stop.restoreRound < restoreRound) return false;
+  if (dropId === undefined) {
+    if (stop.restoreRound > restoreRound) return true;
+    return stop.status !== "restoring" && stop.status !== "restore_failed";
+  }
   if (stop.status === "restored") return true;
   const target = stop.targets.find((held) => held.id === targetId);
-  return !target || (target.dropId !== undefined && target.dropId !== dropId);
+  if (!target) return true;
+  // A later restore that took the target over strips its drop: then only that round answers it.
+  if (stop.restoreRound > restoreRound) return target.dropId !== dropId;
+  return target.dropId !== undefined && target.dropId !== dropId;
 }
