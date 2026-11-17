@@ -21,6 +21,9 @@ from ...models.put_api_governance_agents_by_id_stop_plan_response_403 import (
 from ...models.put_api_governance_agents_by_id_stop_plan_response_404 import (
     PutApiGovernanceAgentsByIdStopPlanResponse404,
 )
+from ...models.put_api_governance_agents_by_id_stop_plan_response_409 import (
+    PutApiGovernanceAgentsByIdStopPlanResponse409,
+)
 from ...models.put_api_governance_agents_by_id_stop_plan_response_422 import (
     PutApiGovernanceAgentsByIdStopPlanResponse422,
 )
@@ -60,6 +63,7 @@ def _parse_response(
     | PutApiGovernanceAgentsByIdStopPlanResponse401
     | PutApiGovernanceAgentsByIdStopPlanResponse403
     | PutApiGovernanceAgentsByIdStopPlanResponse404
+    | PutApiGovernanceAgentsByIdStopPlanResponse409
     | PutApiGovernanceAgentsByIdStopPlanResponse422
     | PutApiGovernanceAgentsByIdStopPlanResponse500
     | None
@@ -89,6 +93,11 @@ def _parse_response(
 
         return response_404
 
+    if response.status_code == 409:
+        response_409 = PutApiGovernanceAgentsByIdStopPlanResponse409.from_dict(response.json())
+
+        return response_409
+
     if response.status_code == 422:
         response_422 = PutApiGovernanceAgentsByIdStopPlanResponse422.from_dict(response.json())
 
@@ -113,6 +122,7 @@ def _build_response(
     | PutApiGovernanceAgentsByIdStopPlanResponse401
     | PutApiGovernanceAgentsByIdStopPlanResponse403
     | PutApiGovernanceAgentsByIdStopPlanResponse404
+    | PutApiGovernanceAgentsByIdStopPlanResponse409
     | PutApiGovernanceAgentsByIdStopPlanResponse422
     | PutApiGovernanceAgentsByIdStopPlanResponse500
 ]:
@@ -138,6 +148,7 @@ def sync_detailed(
     | PutApiGovernanceAgentsByIdStopPlanResponse401
     | PutApiGovernanceAgentsByIdStopPlanResponse403
     | PutApiGovernanceAgentsByIdStopPlanResponse404
+    | PutApiGovernanceAgentsByIdStopPlanResponse409
     | PutApiGovernanceAgentsByIdStopPlanResponse422
     | PutApiGovernanceAgentsByIdStopPlanResponse500
 ]:
@@ -145,9 +156,10 @@ def sync_detailed(
 
      Replaces every target at once; an empty list clears the plan. Each target must name what the
     organisation holds: a Databricks governance source, a stored AWS connection or a gateway virtual
-    key. Anything else is a 422 `agent_stop_target_invalid` naming the target's position. A target
-    removed from the plan also leaves the agent's open stop, so it no longer holds that stop or its
-    restore from finishing; a restore leaves it as it is.
+    key. Anything else is a 422 `agent_stop_target_invalid` naming the target's position. Send
+    `expectedVersion` with the `version` you read to refuse the save (409 `agent_stop_plan_conflict`)
+    when someone else saved the plan since. A target removed from the plan also leaves the agent's open
+    stop, so it no longer holds that stop or its restore from finishing; a restore leaves it as it is.
 
     Args:
         agent_id (str):
@@ -158,7 +170,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PutApiGovernanceAgentsByIdStopPlanResponse200 | PutApiGovernanceAgentsByIdStopPlanResponse400 | PutApiGovernanceAgentsByIdStopPlanResponse401 | PutApiGovernanceAgentsByIdStopPlanResponse403 | PutApiGovernanceAgentsByIdStopPlanResponse404 | PutApiGovernanceAgentsByIdStopPlanResponse422 | PutApiGovernanceAgentsByIdStopPlanResponse500]
+        Response[PutApiGovernanceAgentsByIdStopPlanResponse200 | PutApiGovernanceAgentsByIdStopPlanResponse400 | PutApiGovernanceAgentsByIdStopPlanResponse401 | PutApiGovernanceAgentsByIdStopPlanResponse403 | PutApiGovernanceAgentsByIdStopPlanResponse404 | PutApiGovernanceAgentsByIdStopPlanResponse409 | PutApiGovernanceAgentsByIdStopPlanResponse422 | PutApiGovernanceAgentsByIdStopPlanResponse500]
     """
 
     kwargs = _get_kwargs(
@@ -184,6 +196,7 @@ def sync(
     | PutApiGovernanceAgentsByIdStopPlanResponse401
     | PutApiGovernanceAgentsByIdStopPlanResponse403
     | PutApiGovernanceAgentsByIdStopPlanResponse404
+    | PutApiGovernanceAgentsByIdStopPlanResponse409
     | PutApiGovernanceAgentsByIdStopPlanResponse422
     | PutApiGovernanceAgentsByIdStopPlanResponse500
     | None
@@ -192,9 +205,10 @@ def sync(
 
      Replaces every target at once; an empty list clears the plan. Each target must name what the
     organisation holds: a Databricks governance source, a stored AWS connection or a gateway virtual
-    key. Anything else is a 422 `agent_stop_target_invalid` naming the target's position. A target
-    removed from the plan also leaves the agent's open stop, so it no longer holds that stop or its
-    restore from finishing; a restore leaves it as it is.
+    key. Anything else is a 422 `agent_stop_target_invalid` naming the target's position. Send
+    `expectedVersion` with the `version` you read to refuse the save (409 `agent_stop_plan_conflict`)
+    when someone else saved the plan since. A target removed from the plan also leaves the agent's open
+    stop, so it no longer holds that stop or its restore from finishing; a restore leaves it as it is.
 
     Args:
         agent_id (str):
@@ -205,7 +219,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PutApiGovernanceAgentsByIdStopPlanResponse200 | PutApiGovernanceAgentsByIdStopPlanResponse400 | PutApiGovernanceAgentsByIdStopPlanResponse401 | PutApiGovernanceAgentsByIdStopPlanResponse403 | PutApiGovernanceAgentsByIdStopPlanResponse404 | PutApiGovernanceAgentsByIdStopPlanResponse422 | PutApiGovernanceAgentsByIdStopPlanResponse500
+        PutApiGovernanceAgentsByIdStopPlanResponse200 | PutApiGovernanceAgentsByIdStopPlanResponse400 | PutApiGovernanceAgentsByIdStopPlanResponse401 | PutApiGovernanceAgentsByIdStopPlanResponse403 | PutApiGovernanceAgentsByIdStopPlanResponse404 | PutApiGovernanceAgentsByIdStopPlanResponse409 | PutApiGovernanceAgentsByIdStopPlanResponse422 | PutApiGovernanceAgentsByIdStopPlanResponse500
     """
 
     return sync_detailed(
@@ -226,6 +240,7 @@ async def asyncio_detailed(
     | PutApiGovernanceAgentsByIdStopPlanResponse401
     | PutApiGovernanceAgentsByIdStopPlanResponse403
     | PutApiGovernanceAgentsByIdStopPlanResponse404
+    | PutApiGovernanceAgentsByIdStopPlanResponse409
     | PutApiGovernanceAgentsByIdStopPlanResponse422
     | PutApiGovernanceAgentsByIdStopPlanResponse500
 ]:
@@ -233,9 +248,10 @@ async def asyncio_detailed(
 
      Replaces every target at once; an empty list clears the plan. Each target must name what the
     organisation holds: a Databricks governance source, a stored AWS connection or a gateway virtual
-    key. Anything else is a 422 `agent_stop_target_invalid` naming the target's position. A target
-    removed from the plan also leaves the agent's open stop, so it no longer holds that stop or its
-    restore from finishing; a restore leaves it as it is.
+    key. Anything else is a 422 `agent_stop_target_invalid` naming the target's position. Send
+    `expectedVersion` with the `version` you read to refuse the save (409 `agent_stop_plan_conflict`)
+    when someone else saved the plan since. A target removed from the plan also leaves the agent's open
+    stop, so it no longer holds that stop or its restore from finishing; a restore leaves it as it is.
 
     Args:
         agent_id (str):
@@ -246,7 +262,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PutApiGovernanceAgentsByIdStopPlanResponse200 | PutApiGovernanceAgentsByIdStopPlanResponse400 | PutApiGovernanceAgentsByIdStopPlanResponse401 | PutApiGovernanceAgentsByIdStopPlanResponse403 | PutApiGovernanceAgentsByIdStopPlanResponse404 | PutApiGovernanceAgentsByIdStopPlanResponse422 | PutApiGovernanceAgentsByIdStopPlanResponse500]
+        Response[PutApiGovernanceAgentsByIdStopPlanResponse200 | PutApiGovernanceAgentsByIdStopPlanResponse400 | PutApiGovernanceAgentsByIdStopPlanResponse401 | PutApiGovernanceAgentsByIdStopPlanResponse403 | PutApiGovernanceAgentsByIdStopPlanResponse404 | PutApiGovernanceAgentsByIdStopPlanResponse409 | PutApiGovernanceAgentsByIdStopPlanResponse422 | PutApiGovernanceAgentsByIdStopPlanResponse500]
     """
 
     kwargs = _get_kwargs(
@@ -270,6 +286,7 @@ async def asyncio(
     | PutApiGovernanceAgentsByIdStopPlanResponse401
     | PutApiGovernanceAgentsByIdStopPlanResponse403
     | PutApiGovernanceAgentsByIdStopPlanResponse404
+    | PutApiGovernanceAgentsByIdStopPlanResponse409
     | PutApiGovernanceAgentsByIdStopPlanResponse422
     | PutApiGovernanceAgentsByIdStopPlanResponse500
     | None
@@ -278,9 +295,10 @@ async def asyncio(
 
      Replaces every target at once; an empty list clears the plan. Each target must name what the
     organisation holds: a Databricks governance source, a stored AWS connection or a gateway virtual
-    key. Anything else is a 422 `agent_stop_target_invalid` naming the target's position. A target
-    removed from the plan also leaves the agent's open stop, so it no longer holds that stop or its
-    restore from finishing; a restore leaves it as it is.
+    key. Anything else is a 422 `agent_stop_target_invalid` naming the target's position. Send
+    `expectedVersion` with the `version` you read to refuse the save (409 `agent_stop_plan_conflict`)
+    when someone else saved the plan since. A target removed from the plan also leaves the agent's open
+    stop, so it no longer holds that stop or its restore from finishing; a restore leaves it as it is.
 
     Args:
         agent_id (str):
@@ -291,7 +309,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PutApiGovernanceAgentsByIdStopPlanResponse200 | PutApiGovernanceAgentsByIdStopPlanResponse400 | PutApiGovernanceAgentsByIdStopPlanResponse401 | PutApiGovernanceAgentsByIdStopPlanResponse403 | PutApiGovernanceAgentsByIdStopPlanResponse404 | PutApiGovernanceAgentsByIdStopPlanResponse422 | PutApiGovernanceAgentsByIdStopPlanResponse500
+        PutApiGovernanceAgentsByIdStopPlanResponse200 | PutApiGovernanceAgentsByIdStopPlanResponse400 | PutApiGovernanceAgentsByIdStopPlanResponse401 | PutApiGovernanceAgentsByIdStopPlanResponse403 | PutApiGovernanceAgentsByIdStopPlanResponse404 | PutApiGovernanceAgentsByIdStopPlanResponse409 | PutApiGovernanceAgentsByIdStopPlanResponse422 | PutApiGovernanceAgentsByIdStopPlanResponse500
     """
 
     return (

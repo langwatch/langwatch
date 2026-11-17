@@ -17,6 +17,7 @@ from ..models.post_api_governance_agents_by_id_stop_response_202_data_status imp
 from ..models.post_api_governance_agents_by_id_stop_response_202_data_trigger import (
     PostApiGovernanceAgentsByIdStopResponse202DataTrigger,
 )
+from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
     from ..models.post_api_governance_agents_by_id_stop_response_202_data_requested_by import (
@@ -51,6 +52,7 @@ class PostApiGovernanceAgentsByIdStopResponse202Data:
         quarantined_at (None | str):
         restore_requested_at (None | str):
         restored_at (None | str):
+        last_request_id (str | Unset):
     """
 
     id: str
@@ -70,6 +72,7 @@ class PostApiGovernanceAgentsByIdStopResponse202Data:
     quarantined_at: None | str
     restore_requested_at: None | str
     restored_at: None | str
+    last_request_id: str | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         id = self.id
@@ -115,6 +118,8 @@ class PostApiGovernanceAgentsByIdStopResponse202Data:
         restored_at: None | str
         restored_at = self.restored_at
 
+        last_request_id = self.last_request_id
+
         field_dict: dict[str, Any] = {}
 
         field_dict.update(
@@ -138,6 +143,8 @@ class PostApiGovernanceAgentsByIdStopResponse202Data:
                 "restoredAt": restored_at,
             }
         )
+        if last_request_id is not UNSET:
+            field_dict["lastRequestId"] = last_request_id
 
         return field_dict
 
@@ -220,6 +227,8 @@ class PostApiGovernanceAgentsByIdStopResponse202Data:
 
         restored_at = _parse_restored_at(d.pop("restoredAt"))
 
+        last_request_id = d.pop("lastRequestId", UNSET)
+
         post_api_governance_agents_by_id_stop_response_202_data = cls(
             id=id,
             agent_id=agent_id,
@@ -238,6 +247,7 @@ class PostApiGovernanceAgentsByIdStopResponse202Data:
             quarantined_at=quarantined_at,
             restore_requested_at=restore_requested_at,
             restored_at=restored_at,
+            last_request_id=last_request_id,
         )
 
         return post_api_governance_agents_by_id_stop_response_202_data

@@ -17,6 +17,7 @@ from ..models.get_api_governance_agent_stops_response_200_data_item_status impor
 from ..models.get_api_governance_agent_stops_response_200_data_item_trigger import (
     GetApiGovernanceAgentStopsResponse200DataItemTrigger,
 )
+from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
     from ..models.get_api_governance_agent_stops_response_200_data_item_requested_by import (
@@ -51,6 +52,7 @@ class GetApiGovernanceAgentStopsResponse200DataItem:
         quarantined_at (None | str):
         restore_requested_at (None | str):
         restored_at (None | str):
+        last_request_id (str | Unset):
     """
 
     id: str
@@ -70,6 +72,7 @@ class GetApiGovernanceAgentStopsResponse200DataItem:
     quarantined_at: None | str
     restore_requested_at: None | str
     restored_at: None | str
+    last_request_id: str | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         id = self.id
@@ -115,6 +118,8 @@ class GetApiGovernanceAgentStopsResponse200DataItem:
         restored_at: None | str
         restored_at = self.restored_at
 
+        last_request_id = self.last_request_id
+
         field_dict: dict[str, Any] = {}
 
         field_dict.update(
@@ -138,6 +143,8 @@ class GetApiGovernanceAgentStopsResponse200DataItem:
                 "restoredAt": restored_at,
             }
         )
+        if last_request_id is not UNSET:
+            field_dict["lastRequestId"] = last_request_id
 
         return field_dict
 
@@ -220,6 +227,8 @@ class GetApiGovernanceAgentStopsResponse200DataItem:
 
         restored_at = _parse_restored_at(d.pop("restoredAt"))
 
+        last_request_id = d.pop("lastRequestId", UNSET)
+
         get_api_governance_agent_stops_response_200_data_item = cls(
             id=id,
             agent_id=agent_id,
@@ -238,6 +247,7 @@ class GetApiGovernanceAgentStopsResponse200DataItem:
             quarantined_at=quarantined_at,
             restore_requested_at=restore_requested_at,
             restored_at=restored_at,
+            last_request_id=last_request_id,
         )
 
         return get_api_governance_agent_stops_response_200_data_item

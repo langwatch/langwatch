@@ -9649,6 +9649,16 @@ from .put_api_governance_agents_by_id_stop_plan_response_404_meta import (
 from .put_api_governance_agents_by_id_stop_plan_response_404_trace import (
     PutApiGovernanceAgentsByIdStopPlanResponse404Trace,
 )
+from .put_api_governance_agents_by_id_stop_plan_response_409 import PutApiGovernanceAgentsByIdStopPlanResponse409
+from .put_api_governance_agents_by_id_stop_plan_response_409_fault import (
+    PutApiGovernanceAgentsByIdStopPlanResponse409Fault,
+)
+from .put_api_governance_agents_by_id_stop_plan_response_409_meta import (
+    PutApiGovernanceAgentsByIdStopPlanResponse409Meta,
+)
+from .put_api_governance_agents_by_id_stop_plan_response_409_trace import (
+    PutApiGovernanceAgentsByIdStopPlanResponse409Trace,
+)
 from .put_api_governance_agents_by_id_stop_plan_response_422 import PutApiGovernanceAgentsByIdStopPlanResponse422
 from .put_api_governance_agents_by_id_stop_plan_response_422_fault import (
     PutApiGovernanceAgentsByIdStopPlanResponse422Fault,
@@ -15625,6 +15635,10 @@ __all__ = (
     "PutApiGovernanceAgentsByIdStopPlanResponse404Fault",
     "PutApiGovernanceAgentsByIdStopPlanResponse404Meta",
     "PutApiGovernanceAgentsByIdStopPlanResponse404Trace",
+    "PutApiGovernanceAgentsByIdStopPlanResponse409",
+    "PutApiGovernanceAgentsByIdStopPlanResponse409Fault",
+    "PutApiGovernanceAgentsByIdStopPlanResponse409Meta",
+    "PutApiGovernanceAgentsByIdStopPlanResponse409Trace",
     "PutApiGovernanceAgentsByIdStopPlanResponse422",
     "PutApiGovernanceAgentsByIdStopPlanResponse422Fault",
     "PutApiGovernanceAgentsByIdStopPlanResponse422Meta",

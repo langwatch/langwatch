@@ -41,6 +41,8 @@ class PostApiGovernanceAgentStopsByIdRestoreResponse202DataTargetsItem:
         already_stopped (bool | Unset):
         gone (bool | Unset):
         kept_disabled (bool | Unset):
+        dropped (bool | Unset):
+        drop_id (str | Unset):
     """
 
     id: str
@@ -57,6 +59,8 @@ class PostApiGovernanceAgentStopsByIdRestoreResponse202DataTargetsItem:
     already_stopped: bool | Unset = UNSET
     gone: bool | Unset = UNSET
     kept_disabled: bool | Unset = UNSET
+    dropped: bool | Unset = UNSET
+    drop_id: str | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         from ..models.post_api_governance_agent_stops_by_id_restore_response_202_data_targets_item_target_type_0 import (
@@ -95,6 +99,10 @@ class PostApiGovernanceAgentStopsByIdRestoreResponse202DataTargetsItem:
 
         kept_disabled = self.kept_disabled
 
+        dropped = self.dropped
+
+        drop_id = self.drop_id
+
         field_dict: dict[str, Any] = {}
 
         field_dict.update(
@@ -114,6 +122,10 @@ class PostApiGovernanceAgentStopsByIdRestoreResponse202DataTargetsItem:
             field_dict["gone"] = gone
         if kept_disabled is not UNSET:
             field_dict["keptDisabled"] = kept_disabled
+        if dropped is not UNSET:
+            field_dict["dropped"] = dropped
+        if drop_id is not UNSET:
+            field_dict["dropId"] = drop_id
 
         return field_dict
 
@@ -198,6 +210,10 @@ class PostApiGovernanceAgentStopsByIdRestoreResponse202DataTargetsItem:
 
         kept_disabled = d.pop("keptDisabled", UNSET)
 
+        dropped = d.pop("dropped", UNSET)
+
+        drop_id = d.pop("dropId", UNSET)
+
         post_api_governance_agent_stops_by_id_restore_response_202_data_targets_item = cls(
             id=id,
             label=label,
@@ -209,6 +225,8 @@ class PostApiGovernanceAgentStopsByIdRestoreResponse202DataTargetsItem:
             already_stopped=already_stopped,
             gone=gone,
             kept_disabled=kept_disabled,
+            dropped=dropped,
+            drop_id=drop_id,
         )
 
         return post_api_governance_agent_stops_by_id_restore_response_202_data_targets_item

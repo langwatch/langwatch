@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING, Any, TypeVar
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
+from ..types import UNSET, Unset
+
 if TYPE_CHECKING:
     from ..models.put_api_governance_agents_by_id_stop_plan_body_targets_item_type_0 import (
         PutApiGovernanceAgentsByIdStopPlanBodyTargetsItemType0,
@@ -28,6 +30,7 @@ class PutApiGovernanceAgentsByIdStopPlanBody:
         targets (list[PutApiGovernanceAgentsByIdStopPlanBodyTargetsItemType0 |
             PutApiGovernanceAgentsByIdStopPlanBodyTargetsItemType1 |
             PutApiGovernanceAgentsByIdStopPlanBodyTargetsItemType2]):
+        expected_version (int | Unset):
     """
 
     targets: list[
@@ -35,6 +38,7 @@ class PutApiGovernanceAgentsByIdStopPlanBody:
         | PutApiGovernanceAgentsByIdStopPlanBodyTargetsItemType1
         | PutApiGovernanceAgentsByIdStopPlanBodyTargetsItemType2
     ]
+    expected_version: int | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -57,6 +61,8 @@ class PutApiGovernanceAgentsByIdStopPlanBody:
 
             targets.append(targets_item)
 
+        expected_version = self.expected_version
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -64,6 +70,8 @@ class PutApiGovernanceAgentsByIdStopPlanBody:
                 "targets": targets,
             }
         )
+        if expected_version is not UNSET:
+            field_dict["expectedVersion"] = expected_version
 
         return field_dict
 
@@ -117,8 +125,11 @@ class PutApiGovernanceAgentsByIdStopPlanBody:
 
             targets.append(targets_item)
 
+        expected_version = d.pop("expectedVersion", UNSET)
+
         put_api_governance_agents_by_id_stop_plan_body = cls(
             targets=targets,
+            expected_version=expected_version,
         )
 
         put_api_governance_agents_by_id_stop_plan_body.additional_properties = d

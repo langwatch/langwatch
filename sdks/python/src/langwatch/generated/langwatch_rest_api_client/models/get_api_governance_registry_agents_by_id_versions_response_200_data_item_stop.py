@@ -17,6 +17,7 @@ from ..models.get_api_governance_registry_agents_by_id_versions_response_200_dat
 from ..models.get_api_governance_registry_agents_by_id_versions_response_200_data_item_stop_trigger import (
     GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemStopTrigger,
 )
+from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
     from ..models.get_api_governance_registry_agents_by_id_versions_response_200_data_item_stop_requested_by import (
@@ -51,6 +52,7 @@ class GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemStop:
         quarantined_at (None | str):
         restore_requested_at (None | str):
         restored_at (None | str):
+        last_request_id (str | Unset):
     """
 
     id: str
@@ -70,6 +72,7 @@ class GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemStop:
     quarantined_at: None | str
     restore_requested_at: None | str
     restored_at: None | str
+    last_request_id: str | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         id = self.id
@@ -115,6 +118,8 @@ class GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemStop:
         restored_at: None | str
         restored_at = self.restored_at
 
+        last_request_id = self.last_request_id
+
         field_dict: dict[str, Any] = {}
 
         field_dict.update(
@@ -138,6 +143,8 @@ class GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemStop:
                 "restoredAt": restored_at,
             }
         )
+        if last_request_id is not UNSET:
+            field_dict["lastRequestId"] = last_request_id
 
         return field_dict
 
@@ -224,6 +231,8 @@ class GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemStop:
 
         restored_at = _parse_restored_at(d.pop("restoredAt"))
 
+        last_request_id = d.pop("lastRequestId", UNSET)
+
         get_api_governance_registry_agents_by_id_versions_response_200_data_item_stop = cls(
             id=id,
             agent_id=agent_id,
@@ -242,6 +251,7 @@ class GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemStop:
             quarantined_at=quarantined_at,
             restore_requested_at=restore_requested_at,
             restored_at=restored_at,
+            last_request_id=last_request_id,
         )
 
         return get_api_governance_registry_agents_by_id_versions_response_200_data_item_stop

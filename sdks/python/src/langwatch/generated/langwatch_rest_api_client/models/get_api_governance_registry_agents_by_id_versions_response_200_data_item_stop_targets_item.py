@@ -41,6 +41,8 @@ class GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemStopTargetsIt
         already_stopped (bool | Unset):
         gone (bool | Unset):
         kept_disabled (bool | Unset):
+        dropped (bool | Unset):
+        drop_id (str | Unset):
     """
 
     id: str
@@ -57,6 +59,8 @@ class GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemStopTargetsIt
     already_stopped: bool | Unset = UNSET
     gone: bool | Unset = UNSET
     kept_disabled: bool | Unset = UNSET
+    dropped: bool | Unset = UNSET
+    drop_id: str | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         from ..models.get_api_governance_registry_agents_by_id_versions_response_200_data_item_stop_targets_item_target_type_0 import (
@@ -99,6 +103,10 @@ class GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemStopTargetsIt
 
         kept_disabled = self.kept_disabled
 
+        dropped = self.dropped
+
+        drop_id = self.drop_id
+
         field_dict: dict[str, Any] = {}
 
         field_dict.update(
@@ -118,6 +126,10 @@ class GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemStopTargetsIt
             field_dict["gone"] = gone
         if kept_disabled is not UNSET:
             field_dict["keptDisabled"] = kept_disabled
+        if dropped is not UNSET:
+            field_dict["dropped"] = dropped
+        if drop_id is not UNSET:
+            field_dict["dropId"] = drop_id
 
         return field_dict
 
@@ -208,6 +220,10 @@ class GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemStopTargetsIt
 
         kept_disabled = d.pop("keptDisabled", UNSET)
 
+        dropped = d.pop("dropped", UNSET)
+
+        drop_id = d.pop("dropId", UNSET)
+
         get_api_governance_registry_agents_by_id_versions_response_200_data_item_stop_targets_item = cls(
             id=id,
             label=label,
@@ -219,6 +235,8 @@ class GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemStopTargetsIt
             already_stopped=already_stopped,
             gone=gone,
             kept_disabled=kept_disabled,
+            dropped=dropped,
+            drop_id=drop_id,
         )
 
         return get_api_governance_registry_agents_by_id_versions_response_200_data_item_stop_targets_item

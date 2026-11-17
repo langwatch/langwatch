@@ -155,9 +155,10 @@ def sync_detailed(
 ]:
     """Approve a pending stop
 
-     Approves a stop waiting for a decision; its targets are then applied. A stop that is no longer
-    pending is a 409 `agent_stop_not_pending`; the key that requested the stop cannot approve it (409
-    `agent_stop_self_approval`).
+     Approves a stop waiting for a decision; its targets are then applied. Send `expectedTargetIds` with
+    the stop's target ids you reviewed to refuse the approval (409 `agent_stop_plan_changed`) when its
+    targets changed since. A stop that is no longer pending is a 409 `agent_stop_not_pending`; the key
+    that requested the stop cannot approve it (409 `agent_stop_self_approval`).
 
     Args:
         stop_id (str):
@@ -201,9 +202,10 @@ def sync(
 ):
     """Approve a pending stop
 
-     Approves a stop waiting for a decision; its targets are then applied. A stop that is no longer
-    pending is a 409 `agent_stop_not_pending`; the key that requested the stop cannot approve it (409
-    `agent_stop_self_approval`).
+     Approves a stop waiting for a decision; its targets are then applied. Send `expectedTargetIds` with
+    the stop's target ids you reviewed to refuse the approval (409 `agent_stop_plan_changed`) when its
+    targets changed since. A stop that is no longer pending is a 409 `agent_stop_not_pending`; the key
+    that requested the stop cannot approve it (409 `agent_stop_self_approval`).
 
     Args:
         stop_id (str):
@@ -241,9 +243,10 @@ async def asyncio_detailed(
 ]:
     """Approve a pending stop
 
-     Approves a stop waiting for a decision; its targets are then applied. A stop that is no longer
-    pending is a 409 `agent_stop_not_pending`; the key that requested the stop cannot approve it (409
-    `agent_stop_self_approval`).
+     Approves a stop waiting for a decision; its targets are then applied. Send `expectedTargetIds` with
+    the stop's target ids you reviewed to refuse the approval (409 `agent_stop_plan_changed`) when its
+    targets changed since. A stop that is no longer pending is a 409 `agent_stop_not_pending`; the key
+    that requested the stop cannot approve it (409 `agent_stop_self_approval`).
 
     Args:
         stop_id (str):
@@ -285,9 +288,10 @@ async def asyncio(
 ):
     """Approve a pending stop
 
-     Approves a stop waiting for a decision; its targets are then applied. A stop that is no longer
-    pending is a 409 `agent_stop_not_pending`; the key that requested the stop cannot approve it (409
-    `agent_stop_self_approval`).
+     Approves a stop waiting for a decision; its targets are then applied. Send `expectedTargetIds` with
+    the stop's target ids you reviewed to refuse the approval (409 `agent_stop_plan_changed`) when its
+    targets changed since. A stop that is no longer pending is a 409 `agent_stop_not_pending`; the key
+    that requested the stop cannot approve it (409 `agent_stop_self_approval`).
 
     Args:
         stop_id (str):

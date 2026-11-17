@@ -27625,6 +27625,53 @@
       ]
     },
     {
+      "name": "AgentStopPlan",
+      "tableName": "AgentStopPlan",
+      "documentation": "One agent's stop plan version: bumped by every save, so a save over a plan someone else saved\nsince it was read is refused. No row means the plan was never saved (version 0).",
+      "primaryKey": [
+        "organizationId",
+        "agentId"
+      ],
+      "fields": [
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "agentId",
+          "columnName": "agentId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "The AgentRegistryEntry the plan belongs to."
+        },
+        {
+          "name": "version",
+          "columnName": "version",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "updatedAt",
+          "columnName": "updatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
       "name": "GovernanceAwsConnection",
       "tableName": "GovernanceAwsConnection",
       "documentation": "An AWS credential a Bedrock kill switch target signs with: a static key pair, a role to assume,\nor both. The secret access key and the external id are stored sealed.",

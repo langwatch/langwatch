@@ -18549,6 +18549,30 @@ func (e PutApiGovernanceAgentsByIdStopPlan404JSONResponseBodyFault) Valid() bool
 	}
 }
 
+// Defines values for PutApiGovernanceAgentsByIdStopPlan409JSONResponseBodyFault.
+const (
+	PutApiGovernanceAgentsByIdStopPlan409JSONResponseBodyFaultCustomer         PutApiGovernanceAgentsByIdStopPlan409JSONResponseBodyFault = "customer"
+	PutApiGovernanceAgentsByIdStopPlan409JSONResponseBodyFaultPlatform         PutApiGovernanceAgentsByIdStopPlan409JSONResponseBodyFault = "platform"
+	PutApiGovernanceAgentsByIdStopPlan409JSONResponseBodyFaultPresumedPlatform PutApiGovernanceAgentsByIdStopPlan409JSONResponseBodyFault = "presumed_platform"
+	PutApiGovernanceAgentsByIdStopPlan409JSONResponseBodyFaultProvider         PutApiGovernanceAgentsByIdStopPlan409JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PutApiGovernanceAgentsByIdStopPlan409JSONResponseBodyFault enum.
+func (e PutApiGovernanceAgentsByIdStopPlan409JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PutApiGovernanceAgentsByIdStopPlan409JSONResponseBodyFaultCustomer:
+		return true
+	case PutApiGovernanceAgentsByIdStopPlan409JSONResponseBodyFaultPlatform:
+		return true
+	case PutApiGovernanceAgentsByIdStopPlan409JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PutApiGovernanceAgentsByIdStopPlan409JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PutApiGovernanceAgentsByIdStopPlan422JSONResponseBodyFault.
 const (
 	PutApiGovernanceAgentsByIdStopPlan422JSONResponseBodyFaultCustomer         PutApiGovernanceAgentsByIdStopPlan422JSONResponseBodyFault = "customer"
@@ -32429,22 +32453,22 @@ func (e GetApiV1QuerySchema403JSONResponseBodyFault) Valid() bool {
 
 // Defines values for GetApiV1QuerySchema500JSONResponseBodyFault.
 const (
-	GetApiV1QuerySchema500JSONResponseBodyFaultCustomer         GetApiV1QuerySchema500JSONResponseBodyFault = "customer"
-	GetApiV1QuerySchema500JSONResponseBodyFaultPlatform         GetApiV1QuerySchema500JSONResponseBodyFault = "platform"
-	GetApiV1QuerySchema500JSONResponseBodyFaultPresumedPlatform GetApiV1QuerySchema500JSONResponseBodyFault = "presumed_platform"
-	GetApiV1QuerySchema500JSONResponseBodyFaultProvider         GetApiV1QuerySchema500JSONResponseBodyFault = "provider"
+	Customer         GetApiV1QuerySchema500JSONResponseBodyFault = "customer"
+	Platform         GetApiV1QuerySchema500JSONResponseBodyFault = "platform"
+	PresumedPlatform GetApiV1QuerySchema500JSONResponseBodyFault = "presumed_platform"
+	Provider         GetApiV1QuerySchema500JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiV1QuerySchema500JSONResponseBodyFault enum.
 func (e GetApiV1QuerySchema500JSONResponseBodyFault) Valid() bool {
 	switch e {
-	case GetApiV1QuerySchema500JSONResponseBodyFaultCustomer:
+	case Customer:
 		return true
-	case GetApiV1QuerySchema500JSONResponseBodyFaultPlatform:
+	case Platform:
 		return true
-	case GetApiV1QuerySchema500JSONResponseBodyFaultPresumedPlatform:
+	case PresumedPlatform:
 		return true
-	case GetApiV1QuerySchema500JSONResponseBodyFaultProvider:
+	case Provider:
 		return true
 	default:
 		return false
@@ -52199,7 +52223,8 @@ type GetApiGovernanceAgentStops500JSONResponseBodyFault string
 
 // PostApiGovernanceAgentStopsByIdApproveJSONBody defines parameters for PostApiGovernanceAgentStopsByIdApprove.
 type PostApiGovernanceAgentStopsByIdApproveJSONBody struct {
-	Note *string `json:"note,omitempty"`
+	ExpectedTargetIds *[]string `json:"expectedTargetIds,omitempty"`
+	Note              *string   `json:"note,omitempty"`
 }
 
 // PostApiGovernanceAgentStopsByIdApprove200JSONResponseBodyDataApproval defines parameters for PostApiGovernanceAgentStopsByIdApprove.
@@ -52702,7 +52727,8 @@ type GetApiGovernanceAgentsByIdStopPlan500JSONResponseBodyFault string
 
 // PutApiGovernanceAgentsByIdStopPlanJSONBody defines parameters for PutApiGovernanceAgentsByIdStopPlan.
 type PutApiGovernanceAgentsByIdStopPlanJSONBody struct {
-	Targets []PutApiGovernanceAgentsByIdStopPlanJSONBody_Targets_Item `json:"targets"`
+	ExpectedVersion *int                                                      `json:"expectedVersion,omitempty"`
+	Targets         []PutApiGovernanceAgentsByIdStopPlanJSONBody_Targets_Item `json:"targets"`
 }
 
 // PutApiGovernanceAgentsByIdStopPlanJSONBodyTargets0 defines parameters for PutApiGovernanceAgentsByIdStopPlan.
@@ -52788,6 +52814,9 @@ type PutApiGovernanceAgentsByIdStopPlan403JSONResponseBodyFault string
 
 // PutApiGovernanceAgentsByIdStopPlan404JSONResponseBodyFault defines parameters for PutApiGovernanceAgentsByIdStopPlan.
 type PutApiGovernanceAgentsByIdStopPlan404JSONResponseBodyFault string
+
+// PutApiGovernanceAgentsByIdStopPlan409JSONResponseBodyFault defines parameters for PutApiGovernanceAgentsByIdStopPlan.
+type PutApiGovernanceAgentsByIdStopPlan409JSONResponseBodyFault string
 
 // PutApiGovernanceAgentsByIdStopPlan422JSONResponseBodyFault defines parameters for PutApiGovernanceAgentsByIdStopPlan.
 type PutApiGovernanceAgentsByIdStopPlan422JSONResponseBodyFault string
@@ -178186,6 +178215,7 @@ type GetApiGovernanceAgentStopsResponse struct {
 			DecidedAt       *string                                                   `json:"decidedAt"`
 			DecidedByUserId *string                                                   `json:"decidedByUserId"`
 			Id              string                                                    `json:"id"`
+			LastRequestId   *string                                                   `json:"lastRequestId,omitempty"`
 			QuarantinedAt   *string                                                   `json:"quarantinedAt"`
 			Reason          string                                                    `json:"reason"`
 			RequestedAt     string                                                    `json:"requestedAt"`
@@ -178201,6 +178231,8 @@ type GetApiGovernanceAgentStopsResponse struct {
 			Targets            []struct {
 				AlreadyStopped *bool                                                             `json:"alreadyStopped,omitempty"`
 				AppliedAt      *string                                                           `json:"appliedAt"`
+				DropId         *string                                                           `json:"dropId,omitempty"`
+				Dropped        *bool                                                             `json:"dropped,omitempty"`
 				ErrorCode      *string                                                           `json:"errorCode"`
 				Gone           *bool                                                             `json:"gone,omitempty"`
 				Id             string                                                            `json:"id"`
@@ -178346,6 +178378,7 @@ type PostApiGovernanceAgentStopsByIdApproveResponse struct {
 			DecidedAt       *string                                                               `json:"decidedAt"`
 			DecidedByUserId *string                                                               `json:"decidedByUserId"`
 			Id              string                                                                `json:"id"`
+			LastRequestId   *string                                                               `json:"lastRequestId,omitempty"`
 			QuarantinedAt   *string                                                               `json:"quarantinedAt"`
 			Reason          string                                                                `json:"reason"`
 			RequestedAt     string                                                                `json:"requestedAt"`
@@ -178361,6 +178394,8 @@ type PostApiGovernanceAgentStopsByIdApproveResponse struct {
 			Targets            []struct {
 				AlreadyStopped *bool                                                                         `json:"alreadyStopped,omitempty"`
 				AppliedAt      *string                                                                       `json:"appliedAt"`
+				DropId         *string                                                                       `json:"dropId,omitempty"`
+				Dropped        *bool                                                                         `json:"dropped,omitempty"`
 				ErrorCode      *string                                                                       `json:"errorCode"`
 				Gone           *bool                                                                         `json:"gone,omitempty"`
 				Id             string                                                                        `json:"id"`
@@ -178543,6 +178578,7 @@ type PostApiGovernanceAgentStopsByIdDenyResponse struct {
 			DecidedAt       *string                                                            `json:"decidedAt"`
 			DecidedByUserId *string                                                            `json:"decidedByUserId"`
 			Id              string                                                             `json:"id"`
+			LastRequestId   *string                                                            `json:"lastRequestId,omitempty"`
 			QuarantinedAt   *string                                                            `json:"quarantinedAt"`
 			Reason          string                                                             `json:"reason"`
 			RequestedAt     string                                                             `json:"requestedAt"`
@@ -178558,6 +178594,8 @@ type PostApiGovernanceAgentStopsByIdDenyResponse struct {
 			Targets            []struct {
 				AlreadyStopped *bool                                                                      `json:"alreadyStopped,omitempty"`
 				AppliedAt      *string                                                                    `json:"appliedAt"`
+				DropId         *string                                                                    `json:"dropId,omitempty"`
+				Dropped        *bool                                                                      `json:"dropped,omitempty"`
 				ErrorCode      *string                                                                    `json:"errorCode"`
 				Gone           *bool                                                                      `json:"gone,omitempty"`
 				Id             string                                                                     `json:"id"`
@@ -178740,6 +178778,7 @@ type PostApiGovernanceAgentStopsByIdRestoreResponse struct {
 			DecidedAt       *string                                                               `json:"decidedAt"`
 			DecidedByUserId *string                                                               `json:"decidedByUserId"`
 			Id              string                                                                `json:"id"`
+			LastRequestId   *string                                                               `json:"lastRequestId,omitempty"`
 			QuarantinedAt   *string                                                               `json:"quarantinedAt"`
 			Reason          string                                                                `json:"reason"`
 			RequestedAt     string                                                                `json:"requestedAt"`
@@ -178755,6 +178794,8 @@ type PostApiGovernanceAgentStopsByIdRestoreResponse struct {
 			Targets            []struct {
 				AlreadyStopped *bool                                                                         `json:"alreadyStopped,omitempty"`
 				AppliedAt      *string                                                                       `json:"appliedAt"`
+				DropId         *string                                                                       `json:"dropId,omitempty"`
+				Dropped        *bool                                                                         `json:"dropped,omitempty"`
 				ErrorCode      *string                                                                       `json:"errorCode"`
 				Gone           *bool                                                                         `json:"gone,omitempty"`
 				Id             string                                                                        `json:"id"`
@@ -178937,6 +178978,7 @@ type PostApiGovernanceAgentStopsByIdRetryResponse struct {
 			DecidedAt       *string                                                             `json:"decidedAt"`
 			DecidedByUserId *string                                                             `json:"decidedByUserId"`
 			Id              string                                                              `json:"id"`
+			LastRequestId   *string                                                             `json:"lastRequestId,omitempty"`
 			QuarantinedAt   *string                                                             `json:"quarantinedAt"`
 			Reason          string                                                              `json:"reason"`
 			RequestedAt     string                                                              `json:"requestedAt"`
@@ -178952,6 +178994,8 @@ type PostApiGovernanceAgentStopsByIdRetryResponse struct {
 			Targets            []struct {
 				AlreadyStopped *bool                                                                       `json:"alreadyStopped,omitempty"`
 				AppliedAt      *string                                                                     `json:"appliedAt"`
+				DropId         *string                                                                     `json:"dropId,omitempty"`
+				Dropped        *bool                                                                       `json:"dropped,omitempty"`
 				ErrorCode      *string                                                                     `json:"errorCode"`
 				Gone           *bool                                                                       `json:"gone,omitempty"`
 				Id             string                                                                      `json:"id"`
@@ -179134,6 +179178,7 @@ type GetApiGovernanceAgentsByIdStopResponse struct {
 			DecidedAt       *string                                                       `json:"decidedAt"`
 			DecidedByUserId *string                                                       `json:"decidedByUserId"`
 			Id              string                                                        `json:"id"`
+			LastRequestId   *string                                                       `json:"lastRequestId,omitempty"`
 			QuarantinedAt   *string                                                       `json:"quarantinedAt"`
 			Reason          string                                                        `json:"reason"`
 			RequestedAt     string                                                        `json:"requestedAt"`
@@ -179149,6 +179194,8 @@ type GetApiGovernanceAgentsByIdStopResponse struct {
 			Targets            []struct {
 				AlreadyStopped *bool                                                                 `json:"alreadyStopped,omitempty"`
 				AppliedAt      *string                                                               `json:"appliedAt"`
+				DropId         *string                                                               `json:"dropId,omitempty"`
+				Dropped        *bool                                                                 `json:"dropped,omitempty"`
 				ErrorCode      *string                                                               `json:"errorCode"`
 				Gone           *bool                                                                 `json:"gone,omitempty"`
 				Id             string                                                                `json:"id"`
@@ -179312,6 +179359,7 @@ type PostApiGovernanceAgentsByIdStopResponse struct {
 			DecidedAt       *string                                                        `json:"decidedAt"`
 			DecidedByUserId *string                                                        `json:"decidedByUserId"`
 			Id              string                                                         `json:"id"`
+			LastRequestId   *string                                                        `json:"lastRequestId,omitempty"`
 			QuarantinedAt   *string                                                        `json:"quarantinedAt"`
 			Reason          string                                                         `json:"reason"`
 			RequestedAt     string                                                         `json:"requestedAt"`
@@ -179327,6 +179375,8 @@ type PostApiGovernanceAgentsByIdStopResponse struct {
 			Targets            []struct {
 				AlreadyStopped *bool                                                                  `json:"alreadyStopped,omitempty"`
 				AppliedAt      *string                                                                `json:"appliedAt"`
+				DropId         *string                                                                `json:"dropId,omitempty"`
+				Dropped        *bool                                                                  `json:"dropped,omitempty"`
 				ErrorCode      *string                                                                `json:"errorCode"`
 				Gone           *bool                                                                  `json:"gone,omitempty"`
 				Id             string                                                                 `json:"id"`
@@ -179510,6 +179560,7 @@ type GetApiGovernanceAgentsByIdStopPlanResponse struct {
 				Target GetApiGovernanceAgentsByIdStopPlan200JSONResponseBody_Data_Targets_Target `json:"target"`
 			} `json:"targets"`
 			UpdatedAt *string `json:"updatedAt"`
+			Version   int     `json:"version"`
 		} `json:"data"`
 	}
 	JSON400 *struct {
@@ -179664,6 +179715,7 @@ type PutApiGovernanceAgentsByIdStopPlanResponse struct {
 				Target PutApiGovernanceAgentsByIdStopPlan200JSONResponseBody_Data_Targets_Target `json:"target"`
 			} `json:"targets"`
 			UpdatedAt *string `json:"updatedAt"`
+			Version   int     `json:"version"`
 		} `json:"data"`
 	}
 	JSON400 *struct {
@@ -179727,6 +179779,25 @@ type PutApiGovernanceAgentsByIdStopPlanResponse struct {
 		Code      string                                                      `json:"code"`
 		DocsUrl   *string                                                     `json:"docs_url,omitempty"`
 		Fault     *PutApiGovernanceAgentsByIdStopPlan404JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                      `json:"message"`
+		Meta      *map[string]interface{}                                     `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                              `json:"reasons,omitempty"`
+		Retryable bool                                                        `json:"retryable"`
+		SpanId    *string                                                     `json:"span_id,omitempty"`
+		Tips      *[]string                                                   `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON409 *struct {
+		Code      string                                                      `json:"code"`
+		DocsUrl   *string                                                     `json:"docs_url,omitempty"`
+		Fault     *PutApiGovernanceAgentsByIdStopPlan409JSONResponseBodyFault `json:"fault,omitempty"`
 		Message   string                                                      `json:"message"`
 		Meta      *map[string]interface{}                                     `json:"meta,omitempty"`
 		Reasons   *[]interface{}                                              `json:"reasons,omitempty"`
@@ -180633,6 +180704,7 @@ type GetApiGovernanceRegistryAgentsByIdVersionsResponse struct {
 				DecidedAt       *string                                                                       `json:"decidedAt"`
 				DecidedByUserId *string                                                                       `json:"decidedByUserId"`
 				Id              string                                                                        `json:"id"`
+				LastRequestId   *string                                                                       `json:"lastRequestId,omitempty"`
 				QuarantinedAt   *string                                                                       `json:"quarantinedAt"`
 				Reason          string                                                                        `json:"reason"`
 				RequestedAt     string                                                                        `json:"requestedAt"`
@@ -180648,6 +180720,8 @@ type GetApiGovernanceRegistryAgentsByIdVersionsResponse struct {
 				Targets            []struct {
 					AlreadyStopped *bool                                                                                  `json:"alreadyStopped,omitempty"`
 					AppliedAt      *string                                                                                `json:"appliedAt"`
+					DropId         *string                                                                                `json:"dropId,omitempty"`
+					Dropped        *bool                                                                                  `json:"dropped,omitempty"`
 					ErrorCode      *string                                                                                `json:"errorCode"`
 					Gone           *bool                                                                                  `json:"gone,omitempty"`
 					Id             string                                                                                 `json:"id"`
@@ -181215,6 +181289,7 @@ type GetApiGovernanceRegistryEventsResponse struct {
 				DecidedAt       *string                                                           `json:"decidedAt"`
 				DecidedByUserId *string                                                           `json:"decidedByUserId"`
 				Id              string                                                            `json:"id"`
+				LastRequestId   *string                                                           `json:"lastRequestId,omitempty"`
 				QuarantinedAt   *string                                                           `json:"quarantinedAt"`
 				Reason          string                                                            `json:"reason"`
 				RequestedAt     string                                                            `json:"requestedAt"`
@@ -181230,6 +181305,8 @@ type GetApiGovernanceRegistryEventsResponse struct {
 				Targets            []struct {
 					AlreadyStopped *bool                                                                      `json:"alreadyStopped,omitempty"`
 					AppliedAt      *string                                                                    `json:"appliedAt"`
+					DropId         *string                                                                    `json:"dropId,omitempty"`
+					Dropped        *bool                                                                      `json:"dropped,omitempty"`
 					ErrorCode      *string                                                                    `json:"errorCode"`
 					Gone           *bool                                                                      `json:"gone,omitempty"`
 					Id             string                                                                     `json:"id"`
@@ -214426,6 +214503,7 @@ func ParseGetApiGovernanceAgentStopsResponse(rsp *http.Response) (*GetApiGoverna
 				DecidedAt       *string                                                   `json:"decidedAt"`
 				DecidedByUserId *string                                                   `json:"decidedByUserId"`
 				Id              string                                                    `json:"id"`
+				LastRequestId   *string                                                   `json:"lastRequestId,omitempty"`
 				QuarantinedAt   *string                                                   `json:"quarantinedAt"`
 				Reason          string                                                    `json:"reason"`
 				RequestedAt     string                                                    `json:"requestedAt"`
@@ -214441,6 +214519,8 @@ func ParseGetApiGovernanceAgentStopsResponse(rsp *http.Response) (*GetApiGoverna
 				Targets            []struct {
 					AlreadyStopped *bool                                                             `json:"alreadyStopped,omitempty"`
 					AppliedAt      *string                                                           `json:"appliedAt"`
+					DropId         *string                                                           `json:"dropId,omitempty"`
+					Dropped        *bool                                                             `json:"dropped,omitempty"`
 					ErrorCode      *string                                                           `json:"errorCode"`
 					Gone           *bool                                                             `json:"gone,omitempty"`
 					Id             string                                                            `json:"id"`
@@ -214612,6 +214692,7 @@ func ParsePostApiGovernanceAgentStopsByIdApproveResponse(rsp *http.Response) (*P
 				DecidedAt       *string                                                               `json:"decidedAt"`
 				DecidedByUserId *string                                                               `json:"decidedByUserId"`
 				Id              string                                                                `json:"id"`
+				LastRequestId   *string                                                               `json:"lastRequestId,omitempty"`
 				QuarantinedAt   *string                                                               `json:"quarantinedAt"`
 				Reason          string                                                                `json:"reason"`
 				RequestedAt     string                                                                `json:"requestedAt"`
@@ -214627,6 +214708,8 @@ func ParsePostApiGovernanceAgentStopsByIdApproveResponse(rsp *http.Response) (*P
 				Targets            []struct {
 					AlreadyStopped *bool                                                                         `json:"alreadyStopped,omitempty"`
 					AppliedAt      *string                                                                       `json:"appliedAt"`
+					DropId         *string                                                                       `json:"dropId,omitempty"`
+					Dropped        *bool                                                                         `json:"dropped,omitempty"`
 					ErrorCode      *string                                                                       `json:"errorCode"`
 					Gone           *bool                                                                         `json:"gone,omitempty"`
 					Id             string                                                                        `json:"id"`
@@ -214847,6 +214930,7 @@ func ParsePostApiGovernanceAgentStopsByIdDenyResponse(rsp *http.Response) (*Post
 				DecidedAt       *string                                                            `json:"decidedAt"`
 				DecidedByUserId *string                                                            `json:"decidedByUserId"`
 				Id              string                                                             `json:"id"`
+				LastRequestId   *string                                                            `json:"lastRequestId,omitempty"`
 				QuarantinedAt   *string                                                            `json:"quarantinedAt"`
 				Reason          string                                                             `json:"reason"`
 				RequestedAt     string                                                             `json:"requestedAt"`
@@ -214862,6 +214946,8 @@ func ParsePostApiGovernanceAgentStopsByIdDenyResponse(rsp *http.Response) (*Post
 				Targets            []struct {
 					AlreadyStopped *bool                                                                      `json:"alreadyStopped,omitempty"`
 					AppliedAt      *string                                                                    `json:"appliedAt"`
+					DropId         *string                                                                    `json:"dropId,omitempty"`
+					Dropped        *bool                                                                      `json:"dropped,omitempty"`
 					ErrorCode      *string                                                                    `json:"errorCode"`
 					Gone           *bool                                                                      `json:"gone,omitempty"`
 					Id             string                                                                     `json:"id"`
@@ -215082,6 +215168,7 @@ func ParsePostApiGovernanceAgentStopsByIdRestoreResponse(rsp *http.Response) (*P
 				DecidedAt       *string                                                               `json:"decidedAt"`
 				DecidedByUserId *string                                                               `json:"decidedByUserId"`
 				Id              string                                                                `json:"id"`
+				LastRequestId   *string                                                               `json:"lastRequestId,omitempty"`
 				QuarantinedAt   *string                                                               `json:"quarantinedAt"`
 				Reason          string                                                                `json:"reason"`
 				RequestedAt     string                                                                `json:"requestedAt"`
@@ -215097,6 +215184,8 @@ func ParsePostApiGovernanceAgentStopsByIdRestoreResponse(rsp *http.Response) (*P
 				Targets            []struct {
 					AlreadyStopped *bool                                                                         `json:"alreadyStopped,omitempty"`
 					AppliedAt      *string                                                                       `json:"appliedAt"`
+					DropId         *string                                                                       `json:"dropId,omitempty"`
+					Dropped        *bool                                                                         `json:"dropped,omitempty"`
 					ErrorCode      *string                                                                       `json:"errorCode"`
 					Gone           *bool                                                                         `json:"gone,omitempty"`
 					Id             string                                                                        `json:"id"`
@@ -215317,6 +215406,7 @@ func ParsePostApiGovernanceAgentStopsByIdRetryResponse(rsp *http.Response) (*Pos
 				DecidedAt       *string                                                             `json:"decidedAt"`
 				DecidedByUserId *string                                                             `json:"decidedByUserId"`
 				Id              string                                                              `json:"id"`
+				LastRequestId   *string                                                             `json:"lastRequestId,omitempty"`
 				QuarantinedAt   *string                                                             `json:"quarantinedAt"`
 				Reason          string                                                              `json:"reason"`
 				RequestedAt     string                                                              `json:"requestedAt"`
@@ -215332,6 +215422,8 @@ func ParsePostApiGovernanceAgentStopsByIdRetryResponse(rsp *http.Response) (*Pos
 				Targets            []struct {
 					AlreadyStopped *bool                                                                       `json:"alreadyStopped,omitempty"`
 					AppliedAt      *string                                                                     `json:"appliedAt"`
+					DropId         *string                                                                     `json:"dropId,omitempty"`
+					Dropped        *bool                                                                       `json:"dropped,omitempty"`
 					ErrorCode      *string                                                                     `json:"errorCode"`
 					Gone           *bool                                                                       `json:"gone,omitempty"`
 					Id             string                                                                      `json:"id"`
@@ -215552,6 +215644,7 @@ func ParseGetApiGovernanceAgentsByIdStopResponse(rsp *http.Response) (*GetApiGov
 				DecidedAt       *string                                                       `json:"decidedAt"`
 				DecidedByUserId *string                                                       `json:"decidedByUserId"`
 				Id              string                                                        `json:"id"`
+				LastRequestId   *string                                                       `json:"lastRequestId,omitempty"`
 				QuarantinedAt   *string                                                       `json:"quarantinedAt"`
 				Reason          string                                                        `json:"reason"`
 				RequestedAt     string                                                        `json:"requestedAt"`
@@ -215567,6 +215660,8 @@ func ParseGetApiGovernanceAgentsByIdStopResponse(rsp *http.Response) (*GetApiGov
 				Targets            []struct {
 					AlreadyStopped *bool                                                                 `json:"alreadyStopped,omitempty"`
 					AppliedAt      *string                                                               `json:"appliedAt"`
+					DropId         *string                                                               `json:"dropId,omitempty"`
+					Dropped        *bool                                                                 `json:"dropped,omitempty"`
 					ErrorCode      *string                                                               `json:"errorCode"`
 					Gone           *bool                                                                 `json:"gone,omitempty"`
 					Id             string                                                                `json:"id"`
@@ -215762,6 +215857,7 @@ func ParsePostApiGovernanceAgentsByIdStopResponse(rsp *http.Response) (*PostApiG
 				DecidedAt       *string                                                        `json:"decidedAt"`
 				DecidedByUserId *string                                                        `json:"decidedByUserId"`
 				Id              string                                                         `json:"id"`
+				LastRequestId   *string                                                        `json:"lastRequestId,omitempty"`
 				QuarantinedAt   *string                                                        `json:"quarantinedAt"`
 				Reason          string                                                         `json:"reason"`
 				RequestedAt     string                                                         `json:"requestedAt"`
@@ -215777,6 +215873,8 @@ func ParsePostApiGovernanceAgentsByIdStopResponse(rsp *http.Response) (*PostApiG
 				Targets            []struct {
 					AlreadyStopped *bool                                                                  `json:"alreadyStopped,omitempty"`
 					AppliedAt      *string                                                                `json:"appliedAt"`
+					DropId         *string                                                                `json:"dropId,omitempty"`
+					Dropped        *bool                                                                  `json:"dropped,omitempty"`
 					ErrorCode      *string                                                                `json:"errorCode"`
 					Gone           *bool                                                                  `json:"gone,omitempty"`
 					Id             string                                                                 `json:"id"`
@@ -215998,6 +216096,7 @@ func ParseGetApiGovernanceAgentsByIdStopPlanResponse(rsp *http.Response) (*GetAp
 					Target GetApiGovernanceAgentsByIdStopPlan200JSONResponseBody_Data_Targets_Target `json:"target"`
 				} `json:"targets"`
 				UpdatedAt *string `json:"updatedAt"`
+				Version   int     `json:"version"`
 			} `json:"data"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -216184,6 +216283,7 @@ func ParsePutApiGovernanceAgentsByIdStopPlanResponse(rsp *http.Response) (*PutAp
 					Target PutApiGovernanceAgentsByIdStopPlan200JSONResponseBody_Data_Targets_Target `json:"target"`
 				} `json:"targets"`
 				UpdatedAt *string `json:"updatedAt"`
+				Version   int     `json:"version"`
 			} `json:"data"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -216290,6 +216390,31 @@ func ParsePutApiGovernanceAgentsByIdStopPlanResponse(rsp *http.Response) (*PutAp
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest struct {
+			Code      string                                                      `json:"code"`
+			DocsUrl   *string                                                     `json:"docs_url,omitempty"`
+			Fault     *PutApiGovernanceAgentsByIdStopPlan409JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                      `json:"message"`
+			Meta      *map[string]interface{}                                     `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                              `json:"reasons,omitempty"`
+			Retryable bool                                                        `json:"retryable"`
+			SpanId    *string                                                     `json:"span_id,omitempty"`
+			Tips      *[]string                                                   `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
 		var dest struct {
@@ -217383,6 +217508,7 @@ func ParseGetApiGovernanceRegistryAgentsByIdVersionsResponse(rsp *http.Response)
 					DecidedAt       *string                                                                       `json:"decidedAt"`
 					DecidedByUserId *string                                                                       `json:"decidedByUserId"`
 					Id              string                                                                        `json:"id"`
+					LastRequestId   *string                                                                       `json:"lastRequestId,omitempty"`
 					QuarantinedAt   *string                                                                       `json:"quarantinedAt"`
 					Reason          string                                                                        `json:"reason"`
 					RequestedAt     string                                                                        `json:"requestedAt"`
@@ -217398,6 +217524,8 @@ func ParseGetApiGovernanceRegistryAgentsByIdVersionsResponse(rsp *http.Response)
 					Targets            []struct {
 						AlreadyStopped *bool                                                                                  `json:"alreadyStopped,omitempty"`
 						AppliedAt      *string                                                                                `json:"appliedAt"`
+						DropId         *string                                                                                `json:"dropId,omitempty"`
+						Dropped        *bool                                                                                  `json:"dropped,omitempty"`
 						ErrorCode      *string                                                                                `json:"errorCode"`
 						Gone           *bool                                                                                  `json:"gone,omitempty"`
 						Id             string                                                                                 `json:"id"`
@@ -218043,6 +218171,7 @@ func ParseGetApiGovernanceRegistryEventsResponse(rsp *http.Response) (*GetApiGov
 					DecidedAt       *string                                                           `json:"decidedAt"`
 					DecidedByUserId *string                                                           `json:"decidedByUserId"`
 					Id              string                                                            `json:"id"`
+					LastRequestId   *string                                                           `json:"lastRequestId,omitempty"`
 					QuarantinedAt   *string                                                           `json:"quarantinedAt"`
 					Reason          string                                                            `json:"reason"`
 					RequestedAt     string                                                            `json:"requestedAt"`
@@ -218058,6 +218187,8 @@ func ParseGetApiGovernanceRegistryEventsResponse(rsp *http.Response) (*GetApiGov
 					Targets            []struct {
 						AlreadyStopped *bool                                                                      `json:"alreadyStopped,omitempty"`
 						AppliedAt      *string                                                                    `json:"appliedAt"`
+						DropId         *string                                                                    `json:"dropId,omitempty"`
+						Dropped        *bool                                                                      `json:"dropped,omitempty"`
 						ErrorCode      *string                                                                    `json:"errorCode"`
 						Gone           *bool                                                                      `json:"gone,omitempty"`
 						Id             string                                                                     `json:"id"`

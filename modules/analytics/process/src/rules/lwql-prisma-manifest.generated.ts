@@ -2673,6 +2673,12 @@ export interface LwqlPrismaRows {
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
   };
+  readonly AgentStopPlan: {
+    readonly organizationId: "String";
+    readonly agentId: "String";
+    readonly version: "Int";
+    readonly updatedAt: "DateTime";
+  };
   readonly GovernanceAwsConnection: {
     readonly id: "String";
     readonly organizationId: "String";
