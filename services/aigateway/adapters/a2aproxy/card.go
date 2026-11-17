@@ -71,7 +71,7 @@ func (h *Handler) fetchCard(c *call, target domain.A2ATarget) (map[string]any, b
 // A url outside the upstream base becomes the proxy base itself.
 func rewriteCard(card map[string]any, upstream, proxy string) {
 	rewrite := func(u string) string {
-		if suffix, ok := strings.CutPrefix(u, upstream); ok && (suffix == "" || strings.HasPrefix(suffix, "/")) {
+		if suffix, ok := strings.CutPrefix(u, upstream); ok && (suffix == "" || strings.HasPrefix(suffix, "/")) && plainSuffix(suffix) {
 			return proxy + suffix
 		}
 		return proxy
@@ -85,6 +85,39 @@ func rewriteCard(card map[string]any, upstream, proxy string) {
 			}
 		}
 	}
+}
+
+// plainSuffix is false for a path that could climb out of the target's base
+// once a client resolves it: dot segments, escapes and backslashes.
+func plainSuffix(suffix string) bool {
+	if strings.ContainsAny(suffix, "%\\") {
+		return false
+	}
+	for _, seg := range strings.Split(suffix, "/") {
+		if seg == "." || seg == ".." {
+			return false
+		}
+	}
+	return true
+}
+
+// rewriteReplyCard rewrites the card in an extended Agent Card reply, bare
+// (HTTP+JSON) or as a JSON-RPC result. A reply it cannot read is unchanged.
+func rewriteReplyCard(body []byte, upstream, proxy string) []byte {
+	var reply map[string]any
+	if json.Unmarshal(body, &reply) != nil {
+		return body
+	}
+	card := reply
+	if result, ok := reply["result"].(map[string]any); ok {
+		card = result
+	}
+	rewriteCard(card, upstream, proxy)
+	out, err := json.Marshal(reply)
+	if err != nil {
+		return body
+	}
+	return out
 }
 
 func rewriteURL(m map[string]any, rewrite func(string) string) {

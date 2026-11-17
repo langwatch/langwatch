@@ -199,7 +199,39 @@ func TestHopByHopAndCookieHeadersAreDropped(t *testing.T) {
 	dst := http.Header{}
 	copyHeader(dst, src)
 
-	assert.Equal(t, http.Header{"X-Kept": {"v"}, "Content-Type": {"v"}}, dst)
+	assert.Equal(t, http.Header{"Content-Type": {"application/json"}, "X-Content-Type-Options": {"nosniff"}}, dst)
+
+	src = http.Header{"Content-Type": {"text/event-stream"}, "Access-Control-Allow-Origin": {"*"}, "Www-Authenticate": {"Basic"}, "A2a-Version": {"1.0"}}
+	dst = http.Header{}
+	copyHeader(dst, src)
+	assert.Equal(t, http.Header{"Content-Type": {"text/event-stream"}, "A2a-Version": {"1.0"}, "X-Content-Type-Options": {"nosniff"}}, dst)
+}
+
+func TestCardURLWithDotSegmentsBecomesTheProxyBase(t *testing.T) {
+	card := map[string]any{
+		"url": "https://up.acme.test/a2a/../../v1/chat/completions",
+		"supportedInterfaces": []any{
+			map[string]any{"url": "https://up.acme.test/a2a/%2e%2e/v1"},
+			map[string]any{"url": "https://up.acme.test/a2a/jsonrpc"},
+		},
+	}
+	rewriteCard(card, "https://up.acme.test/a2a", "https://gw/a2a/billing")
+	assert.Equal(t, "https://gw/a2a/billing", card["url"])
+	ifaces := card["supportedInterfaces"].([]any)
+	assert.Equal(t, "https://gw/a2a/billing", ifaces[0].(map[string]any)["url"])
+	assert.Equal(t, "https://gw/a2a/billing/jsonrpc", ifaces[1].(map[string]any)["url"])
+}
+
+func TestExtendedCardReplyIsRewritten(t *testing.T) {
+	f := newFixture(t)
+	f.reply = func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"jsonrpc":"2.0","id":7,"result":{"name":"Billing","url":"`+f.upstream.URL+`/a2a","supportedInterfaces":[{"url":"`+f.upstream.URL+`/a2a/rest"}]}}`)
+	}
+	rec := f.do(http.MethodPost, "/a2a/billing", `{"jsonrpc":"2.0","id":7,"method":"GetExtendedAgentCard"}`)
+
+	assert.NotContains(t, rec.Body.String(), f.upstream.URL)
+	assert.Contains(t, rec.Body.String(), "http://gw.acme.test/a2a/billing/rest")
 }
 
 // @scenario "an overlong streamed event ends the stream with an error event"
