@@ -6,13 +6,13 @@ The server half of [gateway](../README.md). The AI Gateway: virtual keys, gatewa
 
 ## Installation
 
-`defineProcessModule("gateway").withRepositories(gatewayRepositories).withChannels(gatewayChannels).withApi(GatewayModule).withTransports(agentCacheRest, elevenLabsWebhookRest, gatewayInternalRest, gatewayBudgetTrpcTransport, gatewayCacheRuleTrpcTransport, gatewayGuardrailTrpcTransport, gatewayPlatformRest, gatewaySpendRest, gatewaySpendEventTrpcTransport, gatewayUsageTrpcTransport, virtualKeyTrpcTransport).withEventing(gatewayGovernanceEventsEventing).withEventing(gatewaySpendEventing).withEventing(gatewayRealtimeSessionEventing).withEventing(gatewayPulledUsageLedgerEventing).withEventing(gatewayInstantEvalJudgeSpendEventing).withEventing(gatewayPiiRedactionSpendEventing).withEventing(gatewayConnectManagedKeyEventing).withTasks(…).provideMiddlewareBindings(…).provideMiddlewareContext(…).withIdIndexes(GATEWAY_ID_INDEXES, …)`, `src/gateway.module.ts:48`.
+`defineProcessModule("gateway").withRepositories(gatewayRepositories).withChannels(gatewayChannels).withApi(GatewayModule).withTransports(agentCacheRest, elevenLabsWebhookRest, gatewayInternalRest, gatewayBudgetTrpcTransport, gatewayA2aTargetTrpcTransport, gatewayCacheRuleTrpcTransport, gatewayGuardrailTrpcTransport, gatewayPlatformRest, gatewaySpendRest, gatewaySpendEventTrpcTransport, gatewayUsageTrpcTransport, virtualKeyTrpcTransport).withEventing(gatewayGovernanceEventsEventing).withEventing(gatewaySpendEventing).withEventing(gatewayRealtimeSessionEventing).withEventing(gatewayPulledUsageLedgerEventing).withEventing(gatewayInstantEvalJudgeSpendEventing).withEventing(gatewayPiiRedactionSpendEventing).withEventing(gatewayConnectManagedKeyEventing).withTasks(…).provideMiddlewareBindings(…).provideMiddlewareContext(…).withIdIndexes(GATEWAY_ID_INDEXES, …)`, `src/gateway.module.ts:49`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
 ## Module API (`GatewayApi`)
 
-Peers call these through the token, declared at `../contract/src/gateway.api.ts:580`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/gateway.api.ts:578`; nothing else in this package is public.
 It extends `GatewayInternalProtocol`.
 
 #### `internalDoor`
@@ -295,6 +295,40 @@ updateCacheRule(input: UpdateGatewayCacheRuleInput): Promise<GatewayCacheRuleRes
 
 ```typescript
 archiveCacheRule(input: ArchiveGatewayCacheRuleInput): Promise<GatewayCacheRuleResource>;
+```
+
+#### `listA2aTargets`
+
+Org-wide and project-scoped A2A targets of the organization.
+
+```typescript
+listA2aTargets(organizationId: string): Promise<GatewayA2aTargetResource[]>;
+```
+
+#### `createA2aTarget`
+
+```typescript
+createA2aTarget(input: CreateGatewayA2aTargetInput): Promise<GatewayA2aTargetResource>;
+```
+
+#### `updateA2aTarget`
+
+```typescript
+updateA2aTarget(input: UpdateGatewayA2aTargetInput): Promise<GatewayA2aTargetResource>;
+```
+
+#### `setA2aTargetBlocked`
+
+The kill switch for one target: the gateway refuses calls to a blocked target.
+
+```typescript
+setA2aTargetBlocked(input: SetGatewayA2aTargetBlockedInput): Promise<GatewayA2aTargetResource>;
+```
+
+#### `archiveA2aTarget`
+
+```typescript
+archiveA2aTarget(input: { id: string; organizationId: string; }): Promise<GatewayA2aTargetResource>;
 ```
 
 #### `listGuardrails`
@@ -1405,6 +1439,76 @@ type Response = z.infer<typeof gatewayEndUserSpendResponseSchema>; // ../contrac
 
 ## tRPC transport
 
+### `gatewayA2aTargets`
+
+Contract `../contract/src/gateway-a2a-target.trpc.ts:14`, router `src/transport/gateway-a2a-target.trpc.ts:10`.
+
+| Procedure                      | Kind     | Gate                            | Input            | Output                      |
+| ------------------------------ | -------- | ------------------------------- | ---------------- | --------------------------- |
+| `gatewayA2aTargets.list`       | query    | Permission `virtualKeys:view`   | inline           | inline                      |
+| `gatewayA2aTargets.create`     | mutation | Permission `virtualKeys:manage` | inline           | `gatewayA2aTargetDtoSchema` |
+| `gatewayA2aTargets.update`     | mutation | Permission `virtualKeys:manage` | inline           | `gatewayA2aTargetDtoSchema` |
+| `gatewayA2aTargets.setBlocked` | mutation | Permission `virtualKeys:manage` | inline           | `gatewayA2aTargetDtoSchema` |
+| `gatewayA2aTargets.delete`     | mutation | Permission `virtualKeys:manage` | `targetIdSchema` | `gatewayA2aTargetDtoSchema` |
+
+```typescript
+// gatewayA2aTargets.list
+// Input: inline, ../contract/src/gateway-a2a-target.trpc.ts:16
+interface Input {
+  organizationId: string;
+}
+// Output: gatewayA2aTargetDtoSchema.array() (inline, ../contract/src/gateway-a2a-target.trpc.ts:17)
+
+// gatewayA2aTargets.create
+// Input: inline, ../contract/src/gateway-a2a-target.trpc.ts:20
+interface Input {
+  organizationId: string;
+  projectId: string | null;
+  name: string;
+  agentName: string;
+  cardUrl: string;
+  upstreamUrl: string;
+  upstreamHeaders?: Record<string, string>;
+  allowedVirtualKeyIds?: string[] | null;
+  blocked?: boolean;
+  blockReason?: string | null;
+}
+type Output = z.infer<typeof gatewayA2aTargetDtoSchema>; // ../contract/src/gateway-a2a-target.ts:110
+
+// gatewayA2aTargets.update
+// Input: inline, ../contract/src/gateway-a2a-target.trpc.ts:24
+interface Input {
+  id: string;
+  organizationId: string;
+  agentName?: string;
+  cardUrl?: string;
+  upstreamUrl?: string;
+  upstreamHeaders?: Record<string, string>;
+  allowedVirtualKeyIds?: string[] | null;
+  blocked?: boolean;
+  blockReason?: string | null;
+}
+type Output = z.infer<typeof gatewayA2aTargetDtoSchema>; // ../contract/src/gateway-a2a-target.ts:110
+
+// gatewayA2aTargets.setBlocked
+// Input: inline, ../contract/src/gateway-a2a-target.trpc.ts:28
+interface Input {
+  id: string;
+  organizationId: string;
+  blocked: boolean;
+  blockReason: string | null;
+}
+type Output = z.infer<typeof gatewayA2aTargetDtoSchema>; // ../contract/src/gateway-a2a-target.ts:110
+
+// gatewayA2aTargets.delete
+// Input: targetIdSchema, ../contract/src/gateway-a2a-target.trpc.ts:12
+interface Input {
+  organizationId: string;
+  id: string;
+}
+type Output = z.infer<typeof gatewayA2aTargetDtoSchema>; // ../contract/src/gateway-a2a-target.ts:110
+```
+
 ### `gatewayBudgets`
 
 Contract `../contract/src/features/budget/gateway-budget.trpc.ts:25`, router `src/transport/gateway-budget.trpc.ts:78`.
@@ -1817,9 +1921,9 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                          | Environment variable                    | Declared at                            |
 | ------ | ----------------------------- | --------------------------------------- | -------------------------------------- |
-| secret | `internalSecret`              | `LW_GATEWAY_INTERNAL_SECRET`            | `src/app/gateway.app.ts:1163`          |
-| secret | `jwtSecret`                   | `LW_GATEWAY_JWT_SECRET`                 | `src/app/gateway.app.ts:1164`          |
-| secret | `virtualKeyPepper`            | `LW_VIRTUAL_KEY_PEPPER`                 | `src/app/gateway.app.ts:1165`          |
+| secret | `internalSecret`              | `LW_GATEWAY_INTERNAL_SECRET`            | `src/app/gateway.app.ts:1173`          |
+| secret | `jwtSecret`                   | `LW_GATEWAY_JWT_SECRET`                 | `src/app/gateway.app.ts:1174`          |
+| secret | `virtualKeyPepper`            | `LW_VIRTUAL_KEY_PEPPER`                 | `src/app/gateway.app.ts:1175`          |
 | config | `spendSettlementGraceMs`      | `LW_SPEND_SETTLEMENT_GRACE_MS`          | `../contract/src/gateway.config.ts:27` |
 | config | `internalUrl`                 | `LW_GATEWAY_INTERNAL_URL`               | `../contract/src/gateway.config.ts:29` |
 | config | `controlPlaneUrl`             | `GATEWAY_CONTROL_PLANE_URL`             | `../contract/src/gateway.config.ts:31` |
