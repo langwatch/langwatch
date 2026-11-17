@@ -63,7 +63,7 @@ func readEvents(r io.Reader, fn func(event []byte) bool) error {
 	for {
 		blank, err := lr.readLine(&event)
 		if err != nil {
-			return finishEvents(err, &event, fn)
+			return finishEvents(err)
 		}
 		if blank && event.Len() > 0 {
 			event.WriteByte('\n')
@@ -77,17 +77,13 @@ func readEvents(r io.Reader, fn func(event []byte) bool) error {
 
 var utf8BOM = []byte{0xEF, 0xBB, 0xBF}
 
-// finishEvents hands over the last event of a body that ended without a
-// blank line. Any error other than the end of the body is returned.
-func finishEvents(err error, event *bytes.Buffer, fn func(event []byte) bool) error {
-	if !errors.Is(err, io.EOF) {
-		return err
+// finishEvents ends the read. At the end of the body an event without its
+// blank line is dropped, as SSE decoding does; any other error is returned.
+func finishEvents(err error) error {
+	if errors.Is(err, io.EOF) {
+		return nil
 	}
-	if event.Len() > 0 {
-		event.WriteByte('\n')
-		fn(event.Bytes())
-	}
-	return nil
+	return err
 }
 
 // lineReader reads SSE lines ended by CR, LF or CRLF. After a CR it skips
@@ -105,9 +101,6 @@ func (lr *lineReader) readLine(event *bytes.Buffer) (blank bool, err error) {
 	for {
 		b, err := lr.next()
 		if err != nil {
-			if lineLen > 0 && errors.Is(err, io.EOF) {
-				return endLine(event, lineLen), nil
-			}
 			return false, err
 		}
 		switch {
