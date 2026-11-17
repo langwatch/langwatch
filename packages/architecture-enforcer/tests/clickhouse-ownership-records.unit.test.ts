@@ -233,6 +233,25 @@ describe("ClickHouse ownership records", () => {
       expect(world.messages()).toEqual([]);
     });
 
+    /** @scenario "A reserved table shared with a reader that no longer reads it is reported" */
+    it("reports a shared reader of a reserved table that does not read it", () => {
+      const world = fixture({
+        ...RESERVED,
+        shared: [
+          ...RESERVED.shared,
+          { table: "eval_results", owner: "instant-eval", readers: ["experiment"], reason: "x" },
+        ],
+      });
+      world.write(
+        "packages/clickhouse-migrations/migrations/00005_eval_results.sql",
+        create("eval_results"),
+      );
+
+      expect(world.messages()).toEqual([
+        "Table eval_results is shared with experiment, which no longer reads it. Delete the reader.",
+      ]);
+    });
+
     /** @scenario "A reserved table's owner is its named writer" */
     it("lists the named writer as its owner", () => {
       expect(reserved().owners().get("eval_results")).toBe("instant-eval");

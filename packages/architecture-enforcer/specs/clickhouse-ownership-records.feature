@@ -67,6 +67,14 @@ Feature: ClickHouse ownership records and named exceptions
     Then the policy reports nothing
 
   @unit @architecture
+  Scenario: A reserved table shared with a reader that no longer reads it is reported
+    Given the policy records eval_results as reserved for instant-eval
+    And instant-eval shares eval_results for reading with experiment
+    And experiment does not read eval_results
+    When the policy runs
+    Then the policy asks for experiment to be deleted from the declaration
+
+  @unit @architecture
   Scenario: A reserved table's owner is its named writer
     Given the policy records eval_results as reserved for instant-eval
     When the table owners are listed
