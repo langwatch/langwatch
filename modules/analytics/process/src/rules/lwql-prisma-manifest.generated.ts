@@ -1741,6 +1741,8 @@ export interface LwqlPrismaRows {
     readonly fields: "Json?";
     readonly callerVoice: "Json?";
     readonly testSuiteId: "String?";
+    readonly kind: "String";
+    readonly redTeam: "Json?";
     readonly version: "Int";
     readonly lastUpdatedById: "String?";
     readonly archivedAt: "DateTime?";
@@ -1775,6 +1777,8 @@ export interface LwqlPrismaRows {
     readonly scope: "Json?";
     readonly fields: "Json?";
     readonly evaluators: "Json?";
+    readonly templateId: "String?";
+    readonly templateVersion: "Int?";
     readonly archivedAt: "DateTime?";
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";

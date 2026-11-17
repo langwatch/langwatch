@@ -4606,6 +4606,11 @@ model Scenario {
   // See specs/suites/test-suite-membership-invariant.feature.
   testSuiteId     String?
   testSuite       SimulationSuite?  @relation("TestSuiteScenarios", fields: [testSuiteId], references: [id], onDelete: SetNull)
+  // "standard" | "red_team" (scenarioKindSchema in the scenario contract). A
+  // red team scenario runs an attacker in place of the user simulator and
+  // carries its config in redTeam. See modules/scenario/contract/src/red-team.ts.
+  kind            String            @default("standard")
+  redTeam         Json?
   // Counts one up on every save of the editable fields. Each number has a
   // ScenarioVersion row holding the state as saved; the unique constraint
   // there is what keeps two concurrent saves from sharing a number. See
@@ -4704,6 +4709,10 @@ model SimulationSuite {
   // reads as none. See server/scenarios/evaluator-attachments.ts.
   evaluators         Json?
   testSuiteScenarios Scenario[] @relation("TestSuiteScenarios")
+  // The suite template this test suite was created from, and its version.
+  // Null for a suite built by hand. See modules/suite/specs/suite-templates.feature.
+  templateId         String?
+  templateVersion    Int?
   archivedAt         DateTime?
   createdAt          DateTime   @default(now())
   updatedAt          DateTime   @default(now()) @updatedAt

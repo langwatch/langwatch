@@ -2210,6 +2210,8 @@ export const prismaModelFieldCatalogue = {
     "callerVoice",
     "testSuiteId",
     "testSuite",
+    "kind",
+    "redTeam",
     "version",
     "versions",
     "lastUpdatedById",
@@ -2249,6 +2251,8 @@ export const prismaModelFieldCatalogue = {
     "fields",
     "evaluators",
     "testSuiteScenarios",
+    "templateId",
+    "templateVersion",
     "archivedAt",
     "createdAt",
     "updatedAt"

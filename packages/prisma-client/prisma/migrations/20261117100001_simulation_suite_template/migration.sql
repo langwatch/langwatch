@@ -1,0 +1,1 @@
+ALTER TABLE "SimulationSuite" ADD COLUMN IF NOT EXISTS "templateId" TEXT, ADD COLUMN IF NOT EXISTS "templateVersion" INTEGER;
