@@ -55,7 +55,7 @@ describe("PrismaNurturingOrganizationMemberRepository.findMembershipsOfUsers", (
   });
 
   describe("when no user is named", () => {
-    it("reads nothing, since the guard refuses an empty list", async () => {
+    it("makes no query and returns nothing", async () => {
       const { members, reads } = repositoryOverStub();
 
       expect(await members.findMembershipsOfUsers({ userIds: [] })).toEqual([]);

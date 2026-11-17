@@ -22,7 +22,7 @@ type PlanSyncDependencies = Readonly<{
   customerIo: Pick<NurturingService, "batch" | "batchOrThrow"> | undefined;
   /** The admin who carries the company call, from nurturing's own copy. */
   admins: Pick<NurturingMemberFactsService, "adminOf">;
-  /** Nurturing's member copy, the one the usage sync reads: whose latest organization is whose. */
+  /** The same member copy the usage sync reads, read here by person: whose latest org is whose. */
   members: Pick<NurturingOrganizationMemberRepository, "findMembershipsOfUsers">;
 }>;
 

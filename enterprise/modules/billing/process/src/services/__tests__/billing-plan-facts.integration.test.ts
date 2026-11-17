@@ -12,7 +12,7 @@ import {
 import type { LicenseStatus, LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import type { EventingCommandSender } from "@langwatch/eventing";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { Temporal } from "@langwatch/time";
+import { type Instant, Temporal } from "@langwatch/time";
 import type Stripe from "stripe";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -50,7 +50,7 @@ function recorder<Payload>(kept: Payload[] = []): EventingCommandSender<Payload>
  * its lifecycle service and a real announcer on clock `now`, recording the subscription_changed
  * facts.
  */
-function billingOver(held: readonly Held[], now: () => Temporal.Instant = () => AT) {
+function billingOver(held: readonly Held[], now: () => Instant = () => AT) {
   const store = MemoryBillingStore.create();
   store.organizations.set("org-1", {
     id: "org-1",

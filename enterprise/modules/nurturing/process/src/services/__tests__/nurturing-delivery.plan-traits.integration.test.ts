@@ -178,6 +178,7 @@ describe("NurturingDeliveryService, delivering billing's subscription_changed fa
   });
 
   describe("when a member's only row in the copy is a current one in another organization", () => {
+    /** @scenario "A member current in another organization is not told this plan" */
     it("does not identify that member, though the copy holds no row of theirs here", async () => {
       const members = await memberCopyOf({ organizationId: "org-1", userIds: ["user-1"] });
       await members.recordMembershipChange({

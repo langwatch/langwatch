@@ -145,7 +145,7 @@ Feature: Customer.io knows each team's real plan
 
   # --- AC Coverage Map ---
   # AC 1: "started subscription: plan on members and company"          -> Scenario: A started subscription tells Customer.io the plan on members and company
-  #        -> Scenario: A member current in another organization is not told this plan (evidence: two linked tests)
+  #        -> Scenario: A member current in another organization is not told this plan
   # AC 2: "paid-to-paid shows new plan, never free"                    -> Scenario: A paid-to-paid change shows the new plan and never free (evidence: two linked tests)
   # AC 3: "last cancel returns to free; remaining sub keeps plan; pending is not paid" (evidence: two linked tests)
   #        -> Scenario: Cancelling the last active subscription returns the organization to free
