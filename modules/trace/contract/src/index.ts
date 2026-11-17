@@ -14,6 +14,7 @@ export * from "./features/ingest/derive-trace-origin.ts";
 export * from "./features/ingest/derive-trace-status.ts";
 export * from "./trace.ts";
 export * from "./trace-view.contract.ts";
+export * from "./agent-call-graph.contract.ts";
 export * from "./features/list/trace-explorer.contract.ts";
 export * from "./features/attribute/trace-canonicalisation.ts";
 export * from "./features/ingest/trace-ingress.events.ts";

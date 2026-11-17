@@ -2,6 +2,7 @@ import type { Authorization, PrincipalRef } from "@langwatch/authorization";
 import type { InstantEvalRunReference } from "@langwatch/instant-eval-contract";
 import { moduleApi } from "@langwatch/module";
 
+import type { AgentCallGraph } from "./agent-call-graph.contract.ts";
 import type { ConversationView } from "./conversation/conversation-steps.ts";
 import type { TraceAgentSeen } from "./features/analytics/trace-agent-traffic.ts";
 import type {
@@ -385,6 +386,8 @@ export interface TraceApi extends TraceOtlpIngestApi {
   readSpanTreeForViewer(input: TraceDrawerReadInput): Promise<SpanTreeNode[]>;
   /** Every span's detail, protected and described by its owner (ADR-201 §5). */
   readSpansFullForViewer(input: TraceDrawerReadInput): Promise<SpanDetail[]>;
+  /** Agents in one trace, the calls between them and each agent's tokens and cost. */
+  readAgentCallGraphForViewer(input: TraceDrawerReadInput): Promise<AgentCallGraph>;
   /** The resource pane, each braided span's resources gated by its owner. */
   readSpanResourcesForViewer(input: TraceDrawerReadInput): Promise<TraceResourceInfoDto>;
   /** The drawer timeline, each braided span's events protected by its owner. */

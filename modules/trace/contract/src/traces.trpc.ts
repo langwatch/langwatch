@@ -8,6 +8,7 @@ import { defineTrpcContract, type Named } from "@langwatch/module";
 import { resolveRequestBound } from "@langwatch/plans";
 import { z } from "zod";
 
+import { agentCallGraphSchema } from "./agent-call-graph.contract.ts";
 import {
   braidActivityInputSchema,
   braidActivitySchema,
@@ -581,6 +582,17 @@ export const tracesTrpc = defineTrpcContract("traces")
     }),
   )
   .withOutput(tracesSpanDetailsSchema)
+
+  /** Agents in the trace and the calls between them, A2A hops included. */
+  .query("agentCallGraph")
+  .withInput(
+    z.object({
+      projectId: z.string(),
+      traceId: z.string(),
+      ...spanReadHintShape,
+    }),
+  )
+  .withOutput(agentCallGraphSchema)
 
   .query("spanDetail")
   .withInput(

@@ -621,6 +621,12 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
       app.readSpansFullForViewer({ ...input, authorization, viewerUserId: actor.id }),
     )
 
+    .procedure("agentCallGraph")
+    .withPermission("traces:view")
+    .handle(({ app, input, authorization, actor }) =>
+      app.readAgentCallGraphForViewer({ ...input, authorization, viewerUserId: actor.id }),
+    )
+
     .procedure("spanDetail")
     .withPermission("traces:view")
     .handle(({ app, input, authorization, actor }) =>

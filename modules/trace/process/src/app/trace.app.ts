@@ -213,6 +213,7 @@ import {
   type TraceHeader,
   type TraceDrawerReadInput,
   type TraceResourceInfoDto,
+  type AgentCallGraph,
   type OwnedSpan,
   type TraceAgentSeen,
 } from "@langwatch/trace-contract";
@@ -3092,6 +3093,10 @@ export class TraceModule implements TraceApi, CollectorApp {
 
   readSpansFullForViewer(input: TraceDrawerReadInput): Promise<SpanDetail[]> {
     return this.#drawer.spansFull(input);
+  }
+
+  readAgentCallGraphForViewer(input: TraceDrawerReadInput): Promise<AgentCallGraph> {
+    return this.#drawer.agentCallGraph(input);
   }
 
   readSpanResourcesForViewer(input: TraceDrawerReadInput): Promise<TraceResourceInfoDto> {
