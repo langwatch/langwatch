@@ -109,6 +109,25 @@ describe("the OCSF SIEM REST family", () => {
     });
   });
 
+  describe("given a since or until before 1970", () => {
+    /** @scenario A since or until before 1970 is a validation error on every stream */
+    it("answers 422 validation_error on every stream", async () => {
+      const { get } = await buildApi();
+      const early = "0001-01-01T00:00:00Z";
+
+      const paths = ["events", "traces", "audit"].flatMap((stream) => [
+        `/api/governance/ocsf/${stream}?since=${early}`,
+        `/api/governance/ocsf/${stream}?until=${early}`,
+      ]);
+
+      for (const path of paths) {
+        const answer = await get(path);
+        expect(answer.status).toBe(422);
+        expect(await answer.json()).toMatchObject({ code: "validation_error" });
+      }
+    });
+  });
+
   describe("given each project holds one trace", () => {
     /** @scenario The project traces stream walks every project and resumes from its cursor */
     it("returns both traces and ends with a cursor for the next window", async () => {
