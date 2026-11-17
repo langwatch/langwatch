@@ -10,7 +10,11 @@ import { PROJECT_ID_PAGE_LIMIT, type ProjectApi } from "@langwatch/project-contr
 import { Task } from "@langwatch/task";
 
 import { lwqlAppFunctionNames } from "../features/app-functions/rules/langwatch-ql-app-function-catalog.rules.ts";
-import { canProvisionAppFunctions } from "../features/app-functions/rules/langwatch-ql-app-function-store.rules.ts";
+import {
+  APP_FUNCTION_KEEPER_STORE_PATH,
+  canProvisionAppFunctions,
+  readAppFunctionStoreProbe,
+} from "../features/app-functions/rules/langwatch-ql-app-function-store.rules.ts";
 import {
   LangWatchQLCollectionBindingService,
   type LwqlAccessModelMode,
@@ -173,20 +177,9 @@ export function fillLwqlProjectKeys({
   });
 }
 
-/** The replica layout that decides whether a `CREATE FUNCTION` reaches every replica. */
-async function readAppFunctionLayout(repository: LangWatchQLProvisioningRepository) {
-  const [replicas, setting] = await Promise.all([
-    repository.queryRows(
-      "SELECT toString(max(total_replicas)) AS max_total_replicas FROM system.replicas",
-    ),
-    repository.queryRows(
-      "SELECT value FROM system.server_settings WHERE name = 'user_defined_zookeeper_path'",
-    ),
-  ]);
-  return {
-    maxTotalReplicas: Number(replicas[0]?.max_total_replicas ?? "0") || 0,
-    userDefinedZookeeperPath: typeof setting[0]?.value === "string" ? setting[0].value : "",
-  };
+/** The replicas and the Keeper store that decide whether a `CREATE FUNCTION` reaches every one. */
+function readAppFunctionLayout(repository: LangWatchQLProvisioningRepository) {
+  return readAppFunctionStoreProbe({ queryRows: (sql) => repository.queryRows(sql) });
 }
 
 async function appFunctionsProvisionable(
@@ -197,13 +190,13 @@ async function appFunctionsProvisionable(
     if (canProvisionAppFunctions(probe)) return true;
     logger.error(
       { maxTotalReplicas: probe.maxTotalReplicas },
-      "lwql self-provisioning skipped the app functions: this ClickHouse has more than one replica and no user_defined_zookeeper_path, so a CREATE FUNCTION would reach one replica only. Set user_defined_zookeeper_path in the server config and redeploy; LangWatchQL app functions stay refused until then",
+      `lwql self-provisioning skipped the app functions: this ClickHouse has more than one replica and Keeper holds no SQL function store at ${APP_FUNCTION_KEEPER_STORE_PATH}, so a CREATE FUNCTION would reach one replica only. Set user_defined_zookeeper_path to ${APP_FUNCTION_KEEPER_STORE_PATH} in the server config of every replica and restart; LangWatchQL app functions stay refused until then`,
     );
     return false;
   } catch (error) {
     logger.error(
       { error: clickHouseErrorSummary(error) },
-      "lwql self-provisioning could not read the replica layout from system.replicas and system.server_settings; the app functions are left out until it can",
+      "lwql self-provisioning could not read the replica layout from system.replicas or the function store from system.zookeeper; the app functions are left out until it can",
     );
     return false;
   }
