@@ -89,8 +89,7 @@ function brokeRun(): ScenarioRunData {
     name: "LLM07 System Prompt Leakage",
     status: ScenarioRunStatus.FAILED,
     metadata: {
-      langwatch: { targetReferenceId: "agent_shop", targetType: "connected" },
-      redTeam: BROKE,
+      langwatch: { targetReferenceId: "agent_shop", targetType: "connected", redTeam: BROKE },
     } as ScenarioRunData["metadata"],
     results: {
       verdict: SimulationVerdict.FAILURE,

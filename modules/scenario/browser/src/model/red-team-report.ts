@@ -1,19 +1,15 @@
 import {
-  RED_TEAM_REPORT_METADATA_KEY,
+  extractRedTeamRunReport,
   type RedTeamOutcome,
   type RedTeamRunReport,
-  redTeamRunReportSchema,
 } from "@langwatch/scenario-contract";
 
 /**
- * The red team report a run's metadata carries, or null for a standard run or
- * an unreadable shape. The one place that reads the raw `redTeam` key.
+ * The red team report a run's metadata carries (under `langwatch`, or at the
+ * root for older runs), or null for a standard run or an unreadable shape.
  */
 export function redTeamReportOf(metadata: unknown): RedTeamRunReport | null {
-  if (typeof metadata !== "object" || metadata === null) return null;
-  const raw = (metadata as Record<string, unknown>)[RED_TEAM_REPORT_METADATA_KEY];
-  const parsed = redTeamRunReportSchema.safeParse(raw);
-  return parsed.success ? parsed.data : null;
+  return extractRedTeamRunReport(metadata) ?? null;
 }
 
 export const RED_TEAM_OUTCOME_LABELS: Record<RedTeamOutcome, string> = {
