@@ -32,7 +32,7 @@ describe("s3RegionFor() on a host whose metadata names another region", () => {
     expect(askBucket).toHaveBeenCalledTimes(1);
   });
 
-  describe("when the bucket cannot be asked, as from a subnet with no route to AWS's global endpoint", () => {
+  describe("when the bucket cannot be asked, as from a subnet with no route to AWS", () => {
     /** @scenario "The host's region is the last resort when the bucket cannot be asked" */
     it("falls back to the host's region, as releases before 3.24 did", async () => {
       const askBucket = vi.fn(async () => ({ kind: "unknown" as const }));

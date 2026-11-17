@@ -106,7 +106,10 @@ describe("s3RegionFor()", () => {
         now: () => now,
       });
 
-      await expect(resolve(region)).rejects.toMatchObject({ code: "s3_region_not_found" });
+      await expect(resolve(region)).rejects.toMatchObject({
+        code: "s3_region_not_found",
+        message: expect.stringMatching(/S3_REGION.*app\.dataplane\.providers\.awsS3\.region/),
+      });
       now += 1_000;
       await expect(resolve(region)).rejects.toMatchObject({ code: "s3_region_not_found" });
       expect(askBucket).toHaveBeenCalledTimes(1);
@@ -116,9 +119,10 @@ describe("s3RegionFor()", () => {
       expect(askBucket).toHaveBeenCalledTimes(2);
     });
 
-    it("treats a failed question as not found", async () => {
+    it("treats a failed question as not found, keeping why it failed", async () => {
+      const timeout = new Error("connect ETIMEDOUT");
       const askBucket = vi.fn(async (): Promise<S3BucketRegionAnswer> => {
-        throw new Error("connect ETIMEDOUT");
+        throw timeout;
       });
       const region = s3RegionFor({
         bucket: "objects",
@@ -127,7 +131,23 @@ describe("s3RegionFor()", () => {
         hostRegion: unset,
       });
 
-      await expect(resolve(region)).rejects.toMatchObject({ code: "s3_region_not_found" });
+      await expect(resolve(region)).rejects.toMatchObject({
+        code: "s3_region_not_found",
+        cause: timeout,
+      });
+    });
+
+    it("keeps the refusal AWS answered with", async () => {
+      const refusal = new Error("Forbidden");
+      const askBucket = asking([{ kind: "unknown", cause: refusal }]);
+      const region = s3RegionFor({
+        bucket: "objects",
+        askBucket,
+        configured: unset,
+        hostRegion: unset,
+      });
+
+      await expect(resolve(region)).rejects.toMatchObject({ cause: refusal });
     });
   });
 
@@ -137,7 +157,10 @@ describe("s3RegionFor()", () => {
       const askBucket = asking([{ kind: "missing" }]);
       const region = s3RegionFor({ bucket: "objects", askBucket, configured: unset });
 
-      await expect(resolve(region)).rejects.toMatchObject({ code: "s3_bucket_not_found" });
+      await expect(resolve(region)).rejects.toMatchObject({
+        code: "s3_bucket_not_found",
+        message: expect.stringMatching(/"objects".*S3_BUCKET_NAME.*GovCloud or China.*S3_REGION/),
+      });
     });
   });
 });

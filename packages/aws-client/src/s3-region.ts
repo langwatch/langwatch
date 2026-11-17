@@ -33,9 +33,9 @@ export function s3RegionOf({
 export type S3BucketRegionAnswer =
   | { kind: "found"; region: string }
   | { kind: "missing" }
-  | { kind: "unknown" };
+  | { kind: "unknown"; cause?: unknown };
 
-/** AWS's global endpoint knows no such bucket: a wrong name, or one in GovCloud or China. */
+/** AWS's us-east-1 endpoint knows no such bucket: a wrong name, or one in GovCloud or China. */
 export class S3BucketNotFoundError extends Error {
   readonly code = "s3_bucket_not_found";
 
@@ -52,10 +52,11 @@ export class S3BucketNotFoundError extends Error {
 export class S3RegionNotFoundError extends Error {
   readonly code = "s3_region_not_found";
 
-  constructor(bucket: string) {
+  constructor(bucket: string, options?: { cause?: unknown }) {
     super(
       `Could not find the AWS region of S3 bucket "${bucket}". Set S3_REGION ` +
         "(Helm: app.dataplane.providers.awsS3.region) to the bucket's region.",
+      options,
     );
     this.name = "S3RegionNotFoundError";
   }
@@ -110,12 +111,15 @@ async function lookUpRegion({
 }): Promise<FoundRegion> {
   const fromSetting = await configured();
   if (fromSetting) return { region: fromSetting, lasting: true };
-  const answer = await askBucket().catch((): S3BucketRegionAnswer => ({ kind: "unknown" }));
+  const answer = await askBucket().catch((cause: unknown): S3BucketRegionAnswer => ({
+    kind: "unknown",
+    cause,
+  }));
   if (answer.kind === "found") return { region: answer.region, lasting: true };
   if (answer.kind === "missing") throw new S3BucketNotFoundError(bucket);
   const fromHost = await hostRegion();
   if (fromHost) return { region: fromHost, lasting: false };
-  throw new S3RegionNotFoundError(bucket);
+  throw new S3RegionNotFoundError(bucket, { cause: answer.cause });
 }
 
 /** Shares one lookup between concurrent calls; keeps a lasting region, the rest for a pause. */

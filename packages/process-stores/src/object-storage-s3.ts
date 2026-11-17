@@ -107,7 +107,7 @@ async function askOnce(account: ObjectStorageAccount): Promise<S3BucketRegionAns
   }
 }
 
-/** AWS's global endpoint, one attempt, the store's timeouts: it only asks where a bucket lives. */
+/** AWS's us-east-1 endpoint, one attempt, the store's timeouts: it only asks where a bucket is. */
 function bucketRegionClient(account: ObjectStorageAccount): S3Client {
   const credentials = credentialsOf(account);
   return new S3Client({
@@ -132,10 +132,11 @@ export async function bucketRegionOf({
     const region = answer.BucketRegion ?? (await client.config.region());
     return { kind: "found", region };
   } catch (error) {
-    if (!(error instanceof S3ServiceException)) return { kind: "unknown" };
+    if (!(error instanceof S3ServiceException)) return { kind: "unknown", cause: error };
     const named = error.$response?.headers?.["x-amz-bucket-region"]?.trim();
     if (named) return { kind: "found", region: named };
-    return error.$metadata.httpStatusCode === 404 ? { kind: "missing" } : { kind: "unknown" };
+    if (error.$metadata.httpStatusCode === 404) return { kind: "missing" };
+    return { kind: "unknown", cause: error };
   }
 }
 

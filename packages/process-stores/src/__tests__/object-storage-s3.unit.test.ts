@@ -196,13 +196,26 @@ describe("given a question about where a bucket lives", () => {
   });
 
   describe("when AWS cannot be reached", () => {
-    it("answers unknown", async () => {
+    it("answers unknown, carrying why", async () => {
+      const timeout = new Error("connect ETIMEDOUT");
       const client = answering(() => {
-        throw new Error("connect ETIMEDOUT");
+        throw timeout;
       });
 
       await expect(bucketRegionOf({ client, bucket: "objects" })).resolves.toEqual({
         kind: "unknown",
+        cause: timeout,
+      });
+    });
+  });
+
+  describe("when AWS refuses and names no region", () => {
+    it("answers unknown, carrying the refusal", async () => {
+      const client = answering(refusal(403, {}));
+
+      await expect(bucketRegionOf({ client, bucket: "objects" })).resolves.toMatchObject({
+        kind: "unknown",
+        cause: { name: "Forbidden" },
       });
     });
   });
