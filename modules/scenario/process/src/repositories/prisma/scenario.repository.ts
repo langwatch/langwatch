@@ -888,7 +888,7 @@ export class PrismaScenarioRepository extends ScenarioRepository {
   }
 }
 
-/** A template scenario is exempt from the scenario cap only while it sits in its own live template suite. */
+/** A template scenario skips the scenario cap only while it sits in its own live template suite. */
 function isInItsTemplateSuite(row: {
   sourceTemplateId: string | null;
   testSuite: { templateId: string | null; archivedAt: Date | null } | null;

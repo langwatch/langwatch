@@ -3,6 +3,7 @@ import { moduleApi } from "@langwatch/module";
 import type {
   EvaluatorAttachment,
   RunActor,
+  ScenarioActor,
   ScenarioCaller,
   ScenarioTestSuite,
   ScenarioTestSuiteCreateInput,
@@ -72,6 +73,7 @@ export interface SuiteApi {
   applyTemplate(
     input: ApplySuiteTemplateTrpcInput,
     by: ScenarioCaller,
+    author?: ScenarioActor,
   ): Promise<AppliedSuiteTemplate>;
   update(
     input: UpdateSuiteCommand,

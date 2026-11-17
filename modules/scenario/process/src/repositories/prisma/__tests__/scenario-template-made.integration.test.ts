@@ -89,7 +89,7 @@ function templateScenario(name: string, testSuiteId: string) {
     labels: [],
     testSuiteId,
     lastUpdatedById: null,
-    actor: { userId: null, label: "API key" },
+    actor: { userId: null, label: "api" },
     sourceTemplateId: "support-agent",
   });
 }
@@ -154,7 +154,7 @@ describe.skipIf(!databaseUrl)("template-made scenarios", () => {
       const version = await database().scenarioVersion.findFirstOrThrow({
         where: { scenarioId: created.id },
       });
-      expect(version).toMatchObject({ authorId: null, authorLabel: "API key" });
+      expect(version).toMatchObject({ authorId: null, authorLabel: "api" });
     });
   });
 
