@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`TraceApi`)
 
-Peers call these through the token, declared at `../contract/src/trace.api.ts:201`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/trace.api.ts:202`; nothing else in this package is public.
 It extends `TraceOtlpIngestApi`.
 
 #### `extractInlineMediaFromEvent`
@@ -63,6 +63,14 @@ Where the span widgets' history starts, from the span_analytics replay's recorde
 
 ```typescript
 getSpanAnalyticsFloor(): Promise<SpanAnalyticsFloor>;
+```
+
+#### `getManagedPromptVersionFloor`
+
+Where `LastUsedPromptVersionId` is known from, read from the managed prompt version replay's ledger row. Read-only; a failed step or an unreadable ledger answers `unknown`, never throws.
+
+```typescript
+getManagedPromptVersionFloor(): Promise<TraceManagedPromptVersionFloor>;
 ```
 
 #### `renderSpanMessages`

@@ -78,6 +78,7 @@ import {
   type SharedTraceDto,
   type Span,
   type SpanAnalyticsFloor,
+  type TraceManagedPromptVersionFloor,
   type SpanDetail,
   type BraidActivity,
   type BraidAttributeKeys,
@@ -427,6 +428,7 @@ import {
 } from "../services/trace-month-ids-migration.service.ts";
 import { TraceOffloadResolutionBatchService } from "../services/trace-offload-resolution-batch.service.ts";
 import { TraceOffloadResolutionService } from "../services/trace-offload-resolution.service.ts";
+import { TraceManagedPromptVersionFloorService } from "../services/trace-managed-prompt-version-floor.service.ts";
 import { TracePreconditionSampleService } from "../services/trace-precondition-sample.service.ts";
 import { TraceProcessingCommandsService } from "../services/trace-processing-commands.service.ts";
 import type { TraceProcessingCommands } from "../services/trace-processing-commands.service.ts";
@@ -1052,6 +1054,9 @@ export class TraceModule implements TraceApi, CollectorApp {
     app.#usageCount = setup.repositories.usageCount;
     app.#agentTraffic = setup.repositories.agentTraffic;
     app.#spanAnalyticsFloor = setup.repositories.spanAnalyticsFloor;
+    app.#managedPromptVersionFloor = TraceManagedPromptVersionFloorService.create({
+      ledger: setup.repositories.managedPromptVersionLedger,
+    });
     app.#preconditionSamples = TracePreconditionSampleService.create({
       traces: app,
       evaluators: setup.dependencies.evaluators,
@@ -1427,6 +1432,7 @@ export class TraceModule implements TraceApi, CollectorApp {
   #usageCount: TraceUsageCountRepository | null = null;
   #agentTraffic: TraceAgentTrafficRepository | null = null;
   #spanAnalyticsFloor: SpanAnalyticsFloorRepository | null = null;
+  #managedPromptVersionFloor = TraceManagedPromptVersionFloorService.create({ ledger: null });
   #preconditionSamples: TracePreconditionSampleService | null = null;
 
   readPreconditionSampleTraces(
@@ -1766,6 +1772,10 @@ export class TraceModule implements TraceApi, CollectorApp {
   async getSpanAnalyticsFloor(): Promise<SpanAnalyticsFloor> {
     const records = this.#spanAnalyticsFloor ? await this.#spanAnalyticsFloor.findReplayStep() : [];
     return spanAnalyticsFloorOf(records);
+  }
+
+  getManagedPromptVersionFloor(): Promise<TraceManagedPromptVersionFloor> {
+    return this.#managedPromptVersionFloor.getFloor();
   }
 
   async renderSpanMessages(input: {

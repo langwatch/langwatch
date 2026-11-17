@@ -29,6 +29,7 @@ import {
 } from "../clickhouse/trace-summary.repository.ts";
 import { TraceUsageCountClickHouseRepository } from "../clickhouse/trace-usage-count.repository.ts";
 import type { TraceRepositories } from "../trace.repositories.ts";
+import { PrismaManagedPromptVersionLedgerRepository } from "./prisma.managed-prompt-version-ledger.repository.ts";
 import { PrismaSpanAnalyticsFloorRepository } from "./prisma.span-analytics-floor.repository.ts";
 import { PrismaTraceAnnotationScoresRepository } from "./prisma.trace-annotation-scores.repository.ts";
 import { PrismaTraceAnnotationsRepository } from "./prisma.trace-annotations.repository.ts";
@@ -82,6 +83,9 @@ export class PostgresTraceRepositories {
       }),
       spanAnalytics: SpanAnalyticsClickHouseRepository.create({ resolveClient: traceClickHouse }),
       spanAnalyticsFloor: PrismaSpanAnalyticsFloorRepository.create(members.prisma),
+      managedPromptVersionLedger: PrismaManagedPromptVersionLedgerRepository.create({
+        prisma: members.prisma,
+      }),
       spanStorage: SpanStorageClickHouseRepository.create(storage),
       spanTree: ClickHouseTraceSpanRepository.create(storage),
       braidReads: ClickHouseTraceBraidReadsRepository.create({ clickhouse }),

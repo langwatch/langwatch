@@ -103,6 +103,32 @@ Feature: Stock trace widgets read the light trace table
       Then the 121-day trace reads its managed prompt version
       And the 123-day trace reads ''
 
+    @unit @integration
+    Scenario: A widget reading the managed version says history is rebuilding until the replay is done
+      Given a widget whose query reads LastUsedPromptVersionId
+      And the ledger holds no managed prompt version replay row, or a pending or running one
+      When the widget is shown for any period
+      Then the widget shows "Prompt version history is still being rebuilt"
+      And its body is never mounted, so its queries never run
+
+    @unit @integration
+    Scenario: A period reaching before the replay's start says from when versions are known
+      Given a widget whose query reads LastUsedPromptVersionId
+      And the managed prompt version replay is done with a recorded since
+      When the widget's period, with the period before it, starts before that since
+      Then the widget shows "Prompt versions known from" and the since's day
+      And its body is never mounted
+      But a period whose previous period starts at or after the since shows the body
+
+    @unit @integration
+    Scenario: A replay that failed after its retries shows the history as unknown, never the rows
+      Given a widget whose query reads LastUsedPromptVersionId
+      And the managed prompt version replay's ledger row is failed, or the ledger cannot be read
+      When the widget is shown
+      Then the floor read answers unknown rather than an error
+      And the widget shows "Prompt version history unknown"
+      And its body is never mounted
+
   Rule: The moved widgets render on the app
 
     # Checked by hand on a local stack with seeded traces; see the PR.

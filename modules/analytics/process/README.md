@@ -352,16 +352,17 @@ type Response = z.infer<typeof queryReferenceSchema>; // ../contract/src/feature
 
 ### `analytics.lwql`
 
-Contract `../contract/src/features/lwql/analytics-lwql.trpc.ts:134`, router `src/transport/analytics-lwql.trpc.ts:85`.
+Contract `../contract/src/features/lwql/analytics-lwql.trpc.ts:153`, router `src/transport/analytics-lwql.trpc.ts:85`.
 
-| Procedure                         | Kind     | Gate                        | Input                    | Output                          |
-| --------------------------------- | -------- | --------------------------- | ------------------------ | ------------------------------- |
-| `analytics.lwql.availability`     | query    | Permission `analytics:view` | `lwqlProjectScopeSchema` | `langWatchQLAvailabilitySchema` |
-| `analytics.lwql.schema`           | query    | Permission `analytics:view` | `lwqlProjectScopeSchema` | `langWatchQLSchema`             |
-| `analytics.lwql.validate`         | query    | Permission `analytics:view` | `lwqlRunRequestSchema`   | `lwqlValidationResultSchema`    |
-| `analytics.lwql.spanDataFloor`    | query    | Permission `analytics:view` | `lwqlProjectScopeSchema` | `lwqlSpanDataFloorSchema`       |
-| `analytics.lwql.readableProjects` | query    | Permission `analytics:view` | `lwqlProjectScopeSchema` | `lwqlReadableProjectsSchema`    |
-| `analytics.lwql.query`            | mutation | Permission `analytics:view` | `lwqlQueryRequestSchema` | `langWatchQLQueryResultSchema`  |
+| Procedure                                  | Kind     | Gate                        | Input                    | Output                                |
+| ------------------------------------------ | -------- | --------------------------- | ------------------------ | ------------------------------------- |
+| `analytics.lwql.availability`              | query    | Permission `analytics:view` | `lwqlProjectScopeSchema` | `langWatchQLAvailabilitySchema`       |
+| `analytics.lwql.schema`                    | query    | Permission `analytics:view` | `lwqlProjectScopeSchema` | `langWatchQLSchema`                   |
+| `analytics.lwql.validate`                  | query    | Permission `analytics:view` | `lwqlRunRequestSchema`   | `lwqlValidationResultSchema`          |
+| `analytics.lwql.spanDataFloor`             | query    | Permission `analytics:view` | `lwqlProjectScopeSchema` | `lwqlSpanDataFloorSchema`             |
+| `analytics.lwql.managedPromptVersionFloor` | query    | Permission `analytics:view` | `lwqlProjectScopeSchema` | `lwqlManagedPromptVersionFloorSchema` |
+| `analytics.lwql.readableProjects`          | query    | Permission `analytics:view` | `lwqlProjectScopeSchema` | `lwqlReadableProjectsSchema`          |
+| `analytics.lwql.query`                     | mutation | Permission `analytics:view` | `lwqlQueryRequestSchema` | `langWatchQLQueryResultSchema`        |
 
 ```typescript
 // analytics.lwql.availability
@@ -399,6 +400,15 @@ type Input = z.infer<typeof lwqlProjectScopeSchema>; // ../contract/src/features
 interface Output {
   from: string | null;
   rebuilding: boolean;
+}
+
+// analytics.lwql.managedPromptVersionFloor
+type Input = z.infer<typeof lwqlProjectScopeSchema>; // ../contract/src/features/lwql/analytics-lwql.trpc.ts:25
+// Output: lwqlManagedPromptVersionFloorSchema, ../contract/src/features/lwql/analytics-lwql.trpc.ts:147
+interface Output {
+  from: string | null;
+  rebuilding: boolean;
+  unknown: boolean;
 }
 
 // analytics.lwql.readableProjects

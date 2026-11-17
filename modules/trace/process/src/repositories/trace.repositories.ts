@@ -10,6 +10,7 @@ import type { TraceClusteringSampleRepository } from "../features/topic/reposito
 import type { TraceTopicNamesReadRepository } from "../features/topic/repositories/trace-topic-names.repository.ts";
 import type { TraceClickHouse } from "./clickhouse/clickhouse.trace-member-client.repository.ts";
 import type { LogRecordStorageRepository } from "./log-record-storage.repository.ts";
+import type { ManagedPromptVersionLedgerRepository } from "./managed-prompt-version-ledger.repository.ts";
 import type { SessionGroupsRepository } from "./session-groups.repository.ts";
 import type { SpanAnalyticsFloorRepository } from "./span-analytics-floor.repository.ts";
 import type { SpanAnalyticsRepository } from "./span-analytics.repository.ts";
@@ -56,6 +57,8 @@ export interface TraceRepositories {
   readonly spanAnalytics: SpanAnalyticsRepository;
   /** The span_analytics replay step's ledger row: where the span widgets' history starts. */
   readonly spanAnalyticsFloor: SpanAnalyticsFloorRepository;
+  /** The managed prompt version replay's ledger row: where LastUsedPromptVersionId is known. */
+  readonly managedPromptVersionLedger: ManagedPromptVersionLedgerRepository;
   /** The two folds' warm state; without it a fold reads back a lossy row mid-trace. */
   readonly summaryFoldCache: TraceSummaryFoldCacheRepository;
   readonly analyticsFoldCache: TraceAnalyticsFoldCacheRepository;
