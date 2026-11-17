@@ -40,7 +40,8 @@ export abstract class DiscoveredAgentRepository {
   }): Promise<void>;
   /**
    * The source's presence for agents its listing at `listedAt` did not name is marked gone at that
-   * instant; an agent leaves the reads only once every source that listed it marked it gone.
+   * instant, moving an earlier absence forward; an agent leaves the reads only once every source
+   * that listed it marked it gone.
    */
   abstract markUnlistedGone(input: {
     organizationId: string;

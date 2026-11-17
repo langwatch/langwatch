@@ -106,7 +106,7 @@ export class MemoryDiscoveredAgentRepository extends DiscoveredAgentRepository {
       const isUnlisted =
         listing.organizationId === organizationId &&
         listing.ingestionSourceId === ingestionSourceId &&
-        listing.goneAt === null &&
+        (listing.goneAt === null || Temporal.Instant.compare(listing.goneAt, listedAt) < 0) &&
         Temporal.Instant.compare(listing.lastListedAt, listedAt) < 0;
       if (!isUnlisted) continue;
       listing.goneAt = listedAt;

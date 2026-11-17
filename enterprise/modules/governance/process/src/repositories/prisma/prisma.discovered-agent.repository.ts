@@ -135,7 +135,12 @@ export class PrismaDiscoveredAgentRepository extends DiscoveredAgentRepository {
   }): Promise<{ marked: number }> {
     const at = toDate(listedAt);
     const { count } = await this.prisma.discoveredAgentListing.updateMany({
-      where: { organizationId, ingestionSourceId, goneAt: null, lastListedAt: { lt: at } },
+      where: {
+        organizationId,
+        ingestionSourceId,
+        lastListedAt: { lt: at },
+        OR: [{ goneAt: null }, { goneAt: { lt: at } }],
+      },
       data: { goneAt: at },
     });
     return { marked: count };

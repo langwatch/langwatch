@@ -13829,7 +13829,7 @@ The identity behind the connection needs this policy:
 }
 ```
 
-`bedrock-agentcore:GetAgentRuntime` is required: LangWatch reads each runtime's details, and if AWS refuses that read the whole listing fails, Bedrock agents included. `bedrock-agentcore:ListTagsForResource` is only needed to read runtime tags. Without it, runtimes are still listed.
+Every action above is required. LangWatch reads each agent's and runtime's details and tags, and if AWS refuses any of those reads the whole listing fails, Bedrock agents included.
 
 If the connection assumes a role, the role's trust policy lets the identity LangWatch runs as assume it, and only with your external id. Replace the principal with that identity's ARN and the external id with the one you set on the connection:
 

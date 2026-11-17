@@ -286,8 +286,8 @@ describe("PrismaDiscoveredAgentRepository source presence", () => {
           where: {
             organizationId,
             ingestionSourceId: "source_1",
-            goneAt: null,
             lastListedAt: { lt: SEPT_5 },
+            OR: [{ goneAt: null }, { goneAt: { lt: SEPT_5 } }],
           },
           data: { goneAt: SEPT_5 },
         },
