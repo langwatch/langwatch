@@ -30,6 +30,14 @@ import type {
 const RED_TEAM_REPORT_WRITE_ATTEMPTS = 3;
 const RED_TEAM_REPORT_RETRY_DELAY_MS = 200;
 
+/** Every write of a broke outcome failed: the run must not finish as passed. */
+export class RedTeamBreakNotRecordedError extends Error {
+  constructor(scenarioRunId: string) {
+    super(`Could not record the red team break for scenarioRunId=${scenarioRunId}`);
+    this.name = "RedTeamBreakNotRecordedError";
+  }
+}
+
 const logger = createLogger("langwatch:scenarios:processor");
 
 export class ScenarioProcessorService implements ScenarioExecutionRunner {
@@ -361,9 +369,9 @@ export class ScenarioProcessorService implements ScenarioExecutionRunner {
     const childDurationMs = nowInstant().epochMilliseconds - childStartedAt;
 
     if (result.success) {
-      this.options.metrics.completed(durationMs);
-      await this.handleSucceeded({ jobData, result, jobLogger });
       await this.recordHooks({ jobData, result, jobLogger });
+      await this.handleSucceeded({ jobData, result, jobLogger });
+      this.options.metrics.completed(durationMs);
       jobLogger.info({ success: true, durationMs, childDurationMs }, "Scenario job completed");
 
       return;
@@ -425,8 +433,8 @@ export class ScenarioProcessorService implements ScenarioExecutionRunner {
 
   /**
    * What a job that ran to the end records: the connected agent instance the child named, and
-   * whether the call was cut at the maximum duration. Each is independent, and a record that
-   * cannot be written never fails a job that already succeeded.
+   * whether the call was cut at the maximum duration. Each is independent; only a red team break
+   * that cannot be written at all fails the job, after the other records were tried.
    */
   async handleSucceeded(input: {
     jobData: ExecutionJobData;
@@ -451,8 +459,9 @@ export class ScenarioProcessorService implements ScenarioExecutionRunner {
       }
     }
 
+    let breakNotRecorded: RedTeamBreakNotRecordedError | null = null;
     if (input.result.redTeam) {
-      await this.recordRedTeamReportWithRetry({
+      breakNotRecorded = await this.recordRedTeamReportWithRetry({
         projectId,
         scenarioRunId,
         report: input.result.redTeam,
@@ -470,21 +479,23 @@ export class ScenarioProcessorService implements ScenarioExecutionRunner {
         );
       }
     }
+    if (breakNotRecorded) throw breakNotRecorded;
   }
 
   /**
    * The report is the only record of a break. When the full report cannot be written, a broke
-   * outcome is written again without its turn scores, so the run still folds to FAILED.
+   * outcome is written again without its turn scores, so the run still folds to FAILED. When that
+   * fails too, the error is returned: the job fails and the run finishes unsuccessful.
    */
   private async recordRedTeamReportWithRetry(input: {
     projectId: string;
     scenarioRunId: string;
     report: NonNullable<ScenarioExecutionResult["redTeam"]>;
     jobLogger: Logger;
-  }): Promise<void> {
+  }): Promise<RedTeamBreakNotRecordedError | null> {
     const { jobLogger, report, ...run } = input;
     const full = await this.writeRedTeamReport({ ...run, report });
-    if (full.isWritten) return;
+    if (full.isWritten) return null;
     jobLogger.error(
       {
         err: full.error,
@@ -493,7 +504,7 @@ export class ScenarioProcessorService implements ScenarioExecutionRunner {
       },
       "Could not record the red team run's report",
     );
-    if (report.outcome !== "broke") return;
+    if (report.outcome !== "broke") return null;
     const outcomeOnly = await this.writeRedTeamReport({
       ...run,
       report: { ...report, turnScores: [] },
@@ -503,12 +514,13 @@ export class ScenarioProcessorService implements ScenarioExecutionRunner {
         { scenarioRunId: run.scenarioRunId },
         "Recorded the red team break without its turn scores",
       );
-      return;
+      return null;
     }
     jobLogger.error(
       { err: outcomeOnly.error, scenarioRunId: run.scenarioRunId },
-      "Could not record the red team break: the run may read as passed",
+      "Could not record the red team break: failing the job",
     );
+    return new RedTeamBreakNotRecordedError(run.scenarioRunId);
   }
 
   private async writeRedTeamReport(input: {

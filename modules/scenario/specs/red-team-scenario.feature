@@ -110,14 +110,24 @@ Feature: A red team scenario runs an attacker against the agent
     Then the report is recorded on a later attempt
 
   @unit
-  Scenario: A red team report that cannot be written is logged and never fails the job
-    Given a red team run whose child returned a report
+  Scenario: A held red team report that cannot be written is logged and never fails the job
+    Given a red team run the attacker did not break
+    And every record write is refused
+    When the job finishes
+    Then the report was tried 3 times
+    And an error names the run
+    And the job does not fail
+
+  @unit
+  Scenario: A broke red team run whose report cannot be written at all fails the job
+    Given a red team run the attacker broke
     And every record write is refused
     When the job finishes
     Then the full report was tried 3 times
     And the break without its turn scores was tried 3 times
-    And an error says the run may read as passed
-    And the job does not fail
+    And the other records of the run were still tried
+    And the run finishes unsuccessful, not passed
+    And the job fails
 
   @unit
   Scenario: A broke red team run whose report cannot be written still records the break

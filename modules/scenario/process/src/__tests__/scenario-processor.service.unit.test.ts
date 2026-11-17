@@ -23,7 +23,10 @@ import {
   ScenarioExecutionPoolService,
   type ExecutionJobData,
 } from "../services/scenario-execution-pool.service.ts";
-import { ScenarioProcessorService } from "../services/scenario-processor.service.ts";
+import {
+  RedTeamBreakNotRecordedError,
+  ScenarioProcessorService,
+} from "../services/scenario-processor.service.ts";
 
 const job = (id: string): ExecutionJobData => ({
   projectId: "project-1",
@@ -261,29 +264,106 @@ describe("ScenarioProcessorService", () => {
       });
     });
 
-    /** @scenario "A red team report that cannot be written is logged and never fails the job" */
-    it("logs an error after every attempt is refused and never fails the job", async () => {
+    /** @scenario "A broke red team run whose report cannot be written at all fails the job" */
+    it("fails the job after the full report and the break are each refused 3 times", async () => {
       const fixture = processorFixture();
-      const recordRedTeamReport = vi.fn(() => Promise.reject(new Error("store down")));
+      const recordRedTeamReport = vi.fn().mockRejectedValue(new Error("store down"));
+      fixture.execution.recordRedTeamReport = recordRedTeamReport;
+      const recordCutAtLimit = vi.fn().mockResolvedValue(undefined);
+      fixture.execution.recordCutAtLimit = recordCutAtLimit;
+      const { logger, lines } = createTestLogger();
+
+      await expect(
+        fixture.processor.handleSucceeded({
+          jobData: job("run-1"),
+          result: { success: true, redTeam: report, isCutAtLimit: true },
+          jobLogger: logger,
+        }),
+      ).rejects.toBeInstanceOf(RedTeamBreakNotRecordedError);
+
+      expect(recordRedTeamReport).toHaveBeenCalledTimes(6);
+      expect(recordCutAtLimit).toHaveBeenCalledOnce();
+      expect(
+        lines.findLine("error", "Could not record the red team break: failing the job"),
+      ).toMatchObject({ scenarioRunId: "run-1" });
+    });
+
+    /** @scenario "A broke red team run whose report cannot be written at all fails the job" */
+    it("finishes the run unsuccessful and rejects the job when the break is never written", async () => {
+      const fixture = processorFixture();
+      const session = new TestChildSession();
+      const start = vi.fn().mockReturnValue(session);
+      fixture.childProcesses.start = start;
+      fixture.execution.prepare = vi.fn().mockReturnValue({
+        childEnvironment: Promise.resolve(null),
+        result: Promise.resolve({
+          success: true,
+          resolvedModels: null,
+          telemetry: { endpoint: "https://app.langwatch.ai", apiKey: "project-key" },
+          data: {
+            context: {
+              projectId: "project-1",
+              scenarioId: "scenario-voice",
+              setId: "set-1",
+              batchRunId: "batch-1",
+            },
+            scenario: {
+              id: "scenario-voice",
+              name: "Voice",
+              situation: "Calls the agent",
+              criteria: [],
+              labels: ["voice"],
+            },
+            parameters: {},
+            adapterData: {
+              type: "voice",
+              agentId: "agent-1",
+              voiceTarget: { transport: "elevenlabs_convai", agentId: "el-1", credential: null },
+              callerEnv: { OPENAI_API_KEY: "sk-caller-openai" },
+              maxCallSeconds: 300,
+            },
+            simulatorModelParams: { model: "openai/simulator", api_key: "key" },
+            judgeModelParams: { model: "openai/judge", api_key: "key" },
+            nlpServiceUrl: "http://nlp",
+            target: { type: "voice", referenceId: "agent-1" },
+          },
+        } satisfies ScenarioExecutionPrefetchResult),
+      });
+      session.execute.mockResolvedValue({ success: true, redTeam: report });
+      fixture.execution.recordRedTeamReport = vi.fn().mockRejectedValue(new Error("store down"));
+
+      await expect(fixture.processor.execute(job("run-1"))).rejects.toBeInstanceOf(
+        RedTeamBreakNotRecordedError,
+      );
+
+      expect(fixture.finishUnsuccessfulRun).toHaveBeenCalledWith(
+        expect.objectContaining({
+          scenarioRunId: "run-1",
+          error: "Could not record the red team break for scenarioRunId=run-1",
+        }),
+      );
+    });
+
+    /** @scenario "A held red team report that cannot be written is logged and never fails the job" */
+    it("logs a held report that cannot be written and never fails the job", async () => {
+      const fixture = processorFixture();
+      const recordRedTeamReport = vi.fn().mockRejectedValue(new Error("store down"));
       fixture.execution.recordRedTeamReport = recordRedTeamReport;
       const { logger, lines } = createTestLogger();
 
       await expect(
         fixture.processor.handleSucceeded({
           jobData: job("run-1"),
-          result: { success: true, redTeam: report },
+          result: { success: true, redTeam: { ...report, outcome: "held" } },
           jobLogger: logger,
         }),
       ).resolves.toBeUndefined();
 
-      expect(recordRedTeamReport).toHaveBeenCalledTimes(6);
+      expect(recordRedTeamReport).toHaveBeenCalledTimes(3);
       expect(lines.findLine("error", "Could not record the red team run's report")).toMatchObject({
         scenarioRunId: "run-1",
         attempts: 3,
       });
-      expect(
-        lines.findLine("error", "Could not record the red team break: the run may read as passed"),
-      ).toMatchObject({ scenarioRunId: "run-1" });
     });
   });
 
