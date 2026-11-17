@@ -267,10 +267,20 @@ func (s *Service) reconfirm(ctx context.Context, key domain.PresentedKey, h [64]
 		s.dropRejected(h, cfgErr)
 		return served{}, cfgErr
 	}
-	if e, ok := s.l1.Peek(h); ok && !bundle.KeyExpired(start) {
+	if bundle.KeyExpired(time.Now()) {
+		return served{}, herr.New(ctx, domain.ErrKeyExpired, herr.M{"message": domain.KeyExpiredMessage})
+	}
+	if e, ok := s.l1.Peek(h); ok && servableEntry(e) {
 		return s.keepCachedConfig(h, e, served{bundle: bundle, authStart: start}), nil
 	}
 	return served{}, errConfigUnavailable(ctx, cfgErr)
+}
+
+// servableEntry reports whether e may still serve its config: fresh, or
+// stale inside its hard cap.
+func servableEntry(e *entry) bool {
+	state := classifyEntry(e)
+	return state == entryFresh || state == entryStale
 }
 
 // keepCachedConfig re-stores e with the fresh key answer and e's config,

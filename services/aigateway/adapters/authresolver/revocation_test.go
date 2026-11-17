@@ -494,3 +494,51 @@ func TestRevocation_FailClosedRecheckRejectionEvicts(t *testing.T) {
 		t.Fatal("a rejected key must leave the last-known store")
 	}
 }
+
+// @scenario "the old secret ends when the control plane refuses it after the grace"
+func TestRevocation_OldSecretEndsWhenGraceEnds(t *testing.T) {
+	res := &hookResolver{bundle: orgBundle("vk_rot", time.Now().Add(time.Hour))}
+	svc, _ := newService(t, Options{Resolver: res, ConfigFetcher: res})
+	key := domain.PresentedKey{Token: "vk-lw-old-secret"}
+	svc.applyChange("org_1", CacheChange{Kind: ChangeKindVirtualKeyRotated, VirtualKeyID: "vk_rot"})
+	svc.storeL1(hashKey(key), orgBundle("vk_rot", time.Now().Add(-time.Minute)), "")
+	res.bundle, res.err = nil, herr.New(context.Background(), domain.ErrInvalidAPIKey, nil)
+
+	if _, err := svc.Resolve(context.Background(), key); !errors.Is(err, domain.ErrInvalidAPIKey) {
+		t.Fatalf("the old secret past its grace must be refused, got %v", err)
+	}
+	if _, ok := svc.l1.Peek(hashKey(key)); ok {
+		t.Fatal("the refused old secret must leave the cache")
+	}
+}
+
+// @scenario "fail closed refuses a key that expired during its re-check"
+func TestRevocation_FailClosedRecheckRefusesExpiredKey(t *testing.T) {
+	expired := orgBundle("vk_exp", time.Now().Add(time.Hour))
+	expired.VirtualKeyExpiresAt = time.Now().Add(-time.Millisecond)
+	res := &hookResolver{bundle: expired, cfgErr: errControlPlaneDown}
+	svc, _ := newService(t, Options{Resolver: res, ConfigFetcher: res, FailClosedAfter: time.Minute})
+	key := domain.PresentedKey{Token: "vk-lw-exp"}
+	staleKeyCheck(t, svc, key, "vk_exp")
+
+	if _, err := svc.Resolve(context.Background(), key); !errors.Is(err, domain.ErrKeyExpired) {
+		t.Fatalf("want virtual_key_expired, got %v", err)
+	}
+}
+
+// @scenario "fail closed does not serve cached config past its hard cap"
+func TestRevocation_FailClosedRecheckSkipsDeadEntry(t *testing.T) {
+	res := &hookResolver{bundle: orgBundle("vk_dead", time.Now().Add(time.Hour)), cfgErr: errControlPlaneDown}
+	svc, _ := newService(t, Options{Resolver: res, ConfigFetcher: res, FailClosedAfter: time.Minute})
+	key := domain.PresentedKey{Token: "vk-lw-dead"}
+	staleKeyCheck(t, svc, key, "vk_dead")
+	res.during = func() {
+		dead := svc.newEntry(orgBundle("vk_dead", time.Now().Add(-time.Hour)), "")
+		dead.hardExpiresAt = time.Now().Add(-time.Second)
+		svc.publishL1(hashKey(key), dead)
+	}
+
+	if _, err := svc.Resolve(context.Background(), key); !errors.Is(err, domain.ErrAuthUpstream) {
+		t.Fatalf("an entry past its hard cap must not serve, got %v", err)
+	}
+}

@@ -353,6 +353,25 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       Then a resolve with the old secret still serves the key
 
     @unit
+    Scenario: the old secret ends when the control plane refuses it after the grace
+      Given a cached old secret past its JWT expiry after a rotation
+      When the control plane refuses the old secret at the end of the grace
+      Then the request with the old secret gets invalid_api_key
+      And the cached copy is gone
+
+    @unit
+    Scenario: fail closed refuses a key that expired during its re-check
+      Given a cached key past the fail-closed limit
+      When the re-check confirms the key but its expiry passes before the config fetch fails
+      Then the request gets virtual_key_expired
+
+    @unit
+    Scenario: fail closed does not serve cached config past its hard cap
+      Given a cached key past the fail-closed limit and past its hard cap
+      When the re-check confirms the key and the config fetch fails
+      Then the request gets a retryable config error, not the cached config
+
+    @unit
     Scenario: a revoked key is refused while the control plane is down
       Given a cached key past its JWT expiry
       When the change feed revokes it
