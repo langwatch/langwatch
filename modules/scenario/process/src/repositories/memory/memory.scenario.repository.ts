@@ -114,7 +114,8 @@ export class MemoryScenarioRepository extends ScenarioRepository {
     const projectIds = new Set(input.projectIds);
     return Promise.resolve(
       [...this.rows.values()].filter(
-        (row) => projectIds.has(row.projectId) && row.archivedAt === null,
+        (row) =>
+          projectIds.has(row.projectId) && row.archivedAt === null && row.testSuiteId === null,
       ).length,
     );
   }

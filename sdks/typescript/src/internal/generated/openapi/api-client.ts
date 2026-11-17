@@ -14825,6 +14825,7 @@ export interface operations {
                     "application/json": {
                         error: string;
                         message?: string;
+                        code: string;
                     };
                 };
             };
@@ -14922,6 +14923,7 @@ export interface operations {
                     "application/json": {
                         error: string;
                         message?: string;
+                        code: string;
                     };
                 };
             };
@@ -14965,6 +14967,7 @@ export interface operations {
                     "application/json": {
                         error: string;
                         message?: string;
+                        code: string;
                     };
                 };
             };
@@ -15095,6 +15098,7 @@ export interface operations {
                     "application/json": {
                         error: string;
                         message?: string;
+                        code: string;
                     };
                 };
             };
@@ -15231,6 +15235,7 @@ export interface operations {
                     "application/json": {
                         error: string;
                         message?: string;
+                        code: string;
                     };
                 };
             };

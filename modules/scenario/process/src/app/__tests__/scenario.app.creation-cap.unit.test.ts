@@ -44,9 +44,9 @@ const CLOUD_FREE: Plan = {
 const BY = { id: "user-1", label: "user" } as const;
 
 /** An organization on cloud Free whose two projects already hold 3 active scenarios. */
-async function organizationAtTheScenarioCap() {
+async function organizationAtTheScenarioCap({ scenarios = 3 }: { scenarios?: number } = {}) {
   const repositories = MemoryScenarioRepositories.create();
-  for (let index = 0; index < 3; index++) {
+  for (let index = 0; index < scenarios; index++) {
     await repositories.scenarios.create({
       id: `scenario-${index}`,
       projectId: index === 0 ? "project-2" : "project-1",
@@ -85,7 +85,7 @@ async function organizationAtTheScenarioCap() {
     secrets: scenarioTestSecrets,
   });
 
-  return { app };
+  return { app, repositories };
 }
 
 const LIMIT_SHAPE = {
@@ -125,8 +125,9 @@ describe("ScenarioModule on the cloud Free scenario cap", () => {
     });
 
     /** @scenario A scenario a suite template creates is not counted against the scenario cap */
-    it("creates a template scenario over the cap", async () => {
+    it("creates a scenario filed in a test suite over the cap", async () => {
       const { app } = await organizationAtTheScenarioCap();
+      const suite = await app.createTestSuite({ projectId: "project-1", name: "OWASP LLM" });
 
       const created = await app.create(
         {
@@ -135,9 +136,9 @@ describe("ScenarioModule on the cloud Free scenario cap", () => {
           situation: "An attacker hides instructions",
           criteria: [],
           labels: [],
+          testSuiteId: suite.id,
         },
         BY,
-        { countsTowardScenarioCap: false },
       );
 
       expect(created.name).toBe("LLM01 Prompt Injection");
@@ -153,6 +154,32 @@ describe("ScenarioModule on the cloud Free scenario cap", () => {
       );
 
       expect(updated.name).toBe("Renamed");
+    });
+  });
+
+  describe("given an organization with 2 test suites and no scenario outside one", () => {
+    /** @scenario A template applied on Free leaves later creates in its suite unrefused */
+    it("refuses neither the 10 template scenarios nor a later one in the suite", async () => {
+      const { app, repositories } = await organizationAtTheScenarioCap({ scenarios: 0 });
+      await app.createTestSuite({ projectId: "project-1", name: "Suite A" });
+      await app.createTestSuite({ projectId: "project-2", name: "Suite B" });
+      const template = await app.createTestSuite({ projectId: "project-1", name: "OWASP LLM" });
+      const scenario = (name: string) => ({
+        projectId: "project-1",
+        name,
+        situation: "An attacker hides instructions",
+        criteria: [],
+        labels: [],
+        testSuiteId: template.id,
+      });
+
+      for (let index = 1; index <= 10; index++) await app.create(scenario(`LLM${index}`), BY);
+      const later = await app.create(scenario("Custom attack"), BY);
+
+      expect(later.testSuiteId).toBe(template.id);
+      await expect(
+        repositories.scenarios.countActiveByProjects({ projectIds: ["project-1", "project-2"] }),
+      ).resolves.toBe(0);
     });
   });
 });

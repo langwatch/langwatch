@@ -185516,6 +185516,7 @@ type ApplySuiteTemplateResponse struct {
 		SuiteId     string   `json:"suiteId"`
 	}
 	JSON404 *struct {
+		Code    string  `json:"code"`
 		Error   string  `json:"error"`
 		Message *string `json:"message,omitempty"`
 	}
@@ -185556,6 +185557,7 @@ type ArchiveTestSuiteResponse struct {
 		Id string `json:"id"`
 	}
 	JSON404 *struct {
+		Code    string  `json:"code"`
 		Error   string  `json:"error"`
 		Message *string `json:"message,omitempty"`
 	}
@@ -185650,6 +185652,7 @@ type GetTestSuiteResponse struct {
 		UpdatedAt string `json:"updatedAt"`
 	}
 	JSON404 *struct {
+		Code    string  `json:"code"`
 		Error   string  `json:"error"`
 		Message *string `json:"message,omitempty"`
 	}
@@ -185735,6 +185738,7 @@ type UpdateTestSuiteResponse struct {
 		UpdatedAt string `json:"updatedAt"`
 	}
 	JSON404 *struct {
+		Code    string  `json:"code"`
 		Error   string  `json:"error"`
 		Message *string `json:"message,omitempty"`
 	}
@@ -185823,6 +185827,7 @@ type RunTestSuiteResponse struct {
 		} `json:"skippedArchived"`
 	}
 	JSON404 *struct {
+		Code    string  `json:"code"`
 		Error   string  `json:"error"`
 		Message *string `json:"message,omitempty"`
 	}
@@ -220984,6 +220989,7 @@ func ParseApplySuiteTemplateResponse(rsp *http.Response) (*ApplySuiteTemplateRes
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest struct {
+			Code    string  `json:"code"`
 			Error   string  `json:"error"`
 			Message *string `json:"message,omitempty"`
 		}
@@ -221026,6 +221032,7 @@ func ParseArchiveTestSuiteResponse(rsp *http.Response) (*ArchiveTestSuiteRespons
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest struct {
+			Code    string  `json:"code"`
 			Error   string  `json:"error"`
 			Message *string `json:"message,omitempty"`
 		}
@@ -221122,6 +221129,7 @@ func ParseGetTestSuiteResponse(rsp *http.Response) (*GetTestSuiteResponse, error
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest struct {
+			Code    string  `json:"code"`
 			Error   string  `json:"error"`
 			Message *string `json:"message,omitempty"`
 		}
@@ -221209,6 +221217,7 @@ func ParseUpdateTestSuiteResponse(rsp *http.Response) (*UpdateTestSuiteResponse,
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest struct {
+			Code    string  `json:"code"`
 			Error   string  `json:"error"`
 			Message *string `json:"message,omitempty"`
 		}
@@ -221299,6 +221308,7 @@ func ParseRunTestSuiteResponse(rsp *http.Response) (*RunTestSuiteResponse, error
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest struct {
+			Code    string  `json:"code"`
 			Error   string  `json:"error"`
 			Message *string `json:"message,omitempty"`
 		}

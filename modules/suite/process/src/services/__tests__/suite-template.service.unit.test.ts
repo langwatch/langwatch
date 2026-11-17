@@ -136,8 +136,10 @@ describe("SuiteTemplateService", () => {
         by,
       );
       expect(applied.scenarioIds).toHaveLength(10);
-      for (const call of create.mock.calls)
-        expect(call[2]).toEqual({ countsTowardScenarioCap: false });
+      for (const call of create.mock.calls) {
+        expect(call[0]).toMatchObject({ testSuiteId: expect.any(String) });
+        expect(call).toHaveLength(2);
+      }
     });
   });
 

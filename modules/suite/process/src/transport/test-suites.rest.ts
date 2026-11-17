@@ -1,5 +1,4 @@
 import {
-  badRequestSchema,
   defineRestRouter,
   documentedResponses,
   MANAGEMENT_API_VERSION,
@@ -24,6 +23,7 @@ import {
   testSuiteIdParamsSchema,
   testSuiteListQuerySchema,
   testSuiteArchiveResultSchema,
+  testSuiteNotFoundWireSchema,
 } from "@langwatch/suite-contract";
 import { z } from "zod";
 
@@ -38,7 +38,7 @@ import {
   toRunItemsWire,
 } from "../rules/suite-wire-v1.rules.ts";
 
-const notFound = documentedResponses({ 404: badRequestSchema });
+const notFound = documentedResponses({ 404: testSuiteNotFoundWireSchema });
 
 /** What a route knows about the project and the person behind the credential. */
 type ProjectContext = z.output<typeof projectRequestContext.schema>;

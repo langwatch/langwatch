@@ -38,9 +38,9 @@ export class SuiteTemplateService {
   }
 
   /**
-   * Checks the plan cap for every scenario before writing anything, then creates the test suite
-   * and files each filled scenario in it.
-   * @throws SuiteTemplateNotFoundError, LimitExceededError (`scenarios`)
+   * Validates every filled scenario before writing anything, then creates the test suite and
+   * files each scenario in it. Filed scenarios never count against the Free scenario cap.
+   * @throws SuiteTemplateNotFoundError
    */
   async applyTemplate(
     input: ApplySuiteTemplateTrpcInput,
@@ -66,7 +66,6 @@ export class SuiteTemplateService {
       const created = await this.options.scenarios.create(
         { ...scenario, projectId: parsed.projectId, testSuiteId: suite.id },
         by,
-        { countsTowardScenarioCap: false },
       );
       scenarioIds.push(created.id);
     }

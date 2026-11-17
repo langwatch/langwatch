@@ -701,9 +701,8 @@ export class ScenarioModule implements ScenarioApi {
   async create(
     input: Omit<ScenarioCreateInput, "lastUpdatedById">,
     by: ScenarioCaller,
-    options: { countsTowardScenarioCap?: boolean } = {},
   ): Promise<Scenario> {
-    if (options.countsTowardScenarioCap !== false) {
+    if (!input.testSuiteId) {
       await this.#dependencies.creationCaps.assertScenarioCreationAllowed({
         projectId: input.projectId,
         operatorId: by.label === "user" ? by.id : undefined,

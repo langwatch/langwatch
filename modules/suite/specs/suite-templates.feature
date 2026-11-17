@@ -54,7 +54,7 @@ Feature: Suite templates
     Given the organization's plan caps scenarios and has fewer free slots than the template's scenarios
     When the caller applies the template
     Then the test suite and every template scenario are created
-    And the scenarios are created outside the per-scenario cap
+    And every scenario is filed in the new test suite, which the scenario cap never counts
 
   # The Free plan limits test suites, not scenarios: a template is one suite, and
   # running it counts once against the simulation (suite) cap at run start.

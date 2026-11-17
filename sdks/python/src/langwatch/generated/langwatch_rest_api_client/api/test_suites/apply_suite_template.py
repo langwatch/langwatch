@@ -76,8 +76,7 @@ def sync_detailed(
 
      Create a test suite from a template, with one scenario per template scenario filled from the fit:
     the agent's name, its tools and what it must never do. The suite name defaults to the template
-    title. An unknown
-    template id answers 404 suite_template_not_found.
+    title. An unknown template id answers 404 suite_template_not_found.
 
     Args:
         template_id (str):
@@ -113,8 +112,7 @@ def sync(
 
      Create a test suite from a template, with one scenario per template scenario filled from the fit:
     the agent's name, its tools and what it must never do. The suite name defaults to the template
-    title. An unknown
-    template id answers 404 suite_template_not_found.
+    title. An unknown template id answers 404 suite_template_not_found.
 
     Args:
         template_id (str):
@@ -145,8 +143,7 @@ async def asyncio_detailed(
 
      Create a test suite from a template, with one scenario per template scenario filled from the fit:
     the agent's name, its tools and what it must never do. The suite name defaults to the template
-    title. An unknown
-    template id answers 404 suite_template_not_found.
+    title. An unknown template id answers 404 suite_template_not_found.
 
     Args:
         template_id (str):
@@ -180,8 +177,7 @@ async def asyncio(
 
      Create a test suite from a template, with one scenario per template scenario filled from the fit:
     the agent's name, its tools and what it must never do. The suite name defaults to the template
-    title. An unknown
-    template id answers 404 suite_template_not_found.
+    title. An unknown template id answers 404 suite_template_not_found.
 
     Args:
         template_id (str):

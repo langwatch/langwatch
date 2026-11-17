@@ -196,7 +196,7 @@ export class PrismaScenarioRepository extends ScenarioRepository {
   async countActiveByProjects(input: { projectIds: string[] }): Promise<number> {
     if (input.projectIds.length === 0) return 0;
     return this.database.scenario.count({
-      where: { projectId: { in: input.projectIds }, archivedAt: null },
+      where: { projectId: { in: input.projectIds }, archivedAt: null, testSuiteId: null },
     });
   }
 

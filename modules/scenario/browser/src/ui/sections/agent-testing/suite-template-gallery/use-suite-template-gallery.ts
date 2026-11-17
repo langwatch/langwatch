@@ -10,7 +10,7 @@ import { scenarioClient } from "@langwatch/scenario-client";
 import type { AppliedSuiteTemplate, SuiteTemplate } from "@langwatch/suite-contract";
 
 import { api } from "../../../../behavior/scenario-api.ts";
-import type { SuiteTemplateCreateRequest } from "./suite-template-gallery-dialog.tsx";
+import type { SuiteTemplateCreateRequest } from "./use-suite-template-wizard.ts";
 
 export type SuiteTemplateGalleryModel = {
   templates: SuiteTemplate[] | undefined;

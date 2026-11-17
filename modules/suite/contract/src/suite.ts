@@ -461,3 +461,15 @@ export interface ApplySuiteTemplateBodySchema extends Named<
 /** The apply request body: the fit and an optional suite name; the template comes from the path. */
 export const applySuiteTemplateBodySchema: ApplySuiteTemplateBodySchema =
   applySuiteTemplateBodySchemaDefinition;
+
+/** The 404 a test-suites route sends: the flat error plus its cause, e.g. `suite_not_found`. */
+const testSuiteNotFoundWireSchemaDefinition = z.object({
+  error: z.string(),
+  message: z.string().optional(),
+  code: z.string(),
+});
+export interface TestSuiteNotFoundWireSchema extends Named<
+  typeof testSuiteNotFoundWireSchemaDefinition
+> {}
+export const testSuiteNotFoundWireSchema: TestSuiteNotFoundWireSchema =
+  testSuiteNotFoundWireSchemaDefinition;

@@ -10,9 +10,10 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SuiteRailAddMenu } from "../../suite-rail/suite-rail-add-menu.tsx";
-import { AGENT_NAME_REQUIRED, TEMPLATES_LOAD_FAILED } from "../suite-template-gallery-dialog.tsx";
+import { TEMPLATES_LOAD_FAILED } from "../suite-template-gallery-dialog.tsx";
 import { SuiteTemplateGallery } from "../suite-template-gallery.tsx";
 import { TEMPLATE_CREATE_FAILED } from "../use-suite-template-gallery.ts";
+import { AGENT_NAME_REQUIRED } from "../use-suite-template-wizard.ts";
 
 const mockTemplatesQuery = vi.hoisted(() => vi.fn());
 const mockApply = vi.hoisted(() => vi.fn());

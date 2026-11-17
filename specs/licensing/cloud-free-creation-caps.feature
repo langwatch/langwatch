@@ -9,6 +9,10 @@ Feature: Cloud Free plan caps scenarios, simulations and custom evaluators
   whatever its kind (built-in configuration, code or workflow). Online
   evaluations (monitors) are not evaluators and stay uncapped.
 
+  The scenario cap counts only scenarios outside any test suite. Free caps test
+  suites (3 per organization, as scenario sets at run start); the scenarios
+  filed in a suite, a template's included, never count against the scenario cap.
+
   Only creating one more is refused. An organization already above a cap keeps
   everything it has and can still edit and run it. A refusal carries the limit
   type, the current count and the cap, and in the app it opens the upgrade
@@ -90,11 +94,19 @@ Feature: Cloud Free plan caps scenarios, simulations and custom evaluators
     When a member saves a new scenario
     Then the request fails as FORBIDDEN with limit type "scenarios", current 3 and max 3
 
-  @integration
+  @unit
   Scenario: A scenario a suite template creates is not counted against the scenario cap
     Given an organization on cloud Free with 3 active scenarios
     When a suite template creates its scenarios
     Then every template scenario is created
+
+  @unit
+  Scenario: A template applied on Free leaves later creates in its suite unrefused
+    Given an organization on cloud Free with 2 test suites
+    When it applies a 10-scenario suite template
+    And a member then creates a scenario in that template's suite
+    Then neither is refused for scenario count
+    And the scenario cap still counts 0 scenarios outside a suite
 
   @integration
   Scenario: An organization over the scenario cap can still edit its scenarios

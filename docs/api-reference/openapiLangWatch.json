@@ -119340,10 +119340,14 @@
                     },
                     "message": {
                       "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
                     }
                   },
                   "required": [
-                    "error"
+                    "error",
+                    "code"
                   ],
                   "additionalProperties": false
                 }
@@ -119675,10 +119679,14 @@
                     },
                     "message": {
                       "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
                     }
                   },
                   "required": [
-                    "error"
+                    "error",
+                    "code"
                   ],
                   "additionalProperties": false
                 }
@@ -119930,10 +119938,14 @@
                     },
                     "message": {
                       "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
                     }
                   },
                   "required": [
-                    "error"
+                    "error",
+                    "code"
                   ],
                   "additionalProperties": false
                 }
@@ -120157,10 +120169,14 @@
                     },
                     "message": {
                       "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
                     }
                   },
                   "required": [
-                    "error"
+                    "error",
+                    "code"
                   ],
                   "additionalProperties": false
                 }
@@ -120436,10 +120452,14 @@
                     },
                     "message": {
                       "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
                     }
                   },
                   "required": [
-                    "error"
+                    "error",
+                    "code"
                   ],
                   "additionalProperties": false
                 }
