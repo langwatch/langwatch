@@ -304,13 +304,15 @@ describe("the braid dialog", () => {
         await screen.findByTestId("braid-condition-check", {}, { timeout: 2000 }),
       ).toHaveAttribute("role", "alert");
       const orAt = CONDITION.length + 1;
-      expect(monacoRecorded.markers).toEqual([
-        expect.objectContaining({
-          message: expect.stringContaining("isn't supported."),
-          startColumn: orAt + 1,
-          endColumn: orAt + 3,
-        }),
-      ]);
+      await waitFor(() =>
+        expect(monacoRecorded.markers).toEqual([
+          expect.objectContaining({
+            message: expect.stringContaining("isn't supported."),
+            startColumn: orAt + 1,
+            endColumn: orAt + 3,
+          }),
+        ]),
+      );
       expect(screen.getByTestId("braid-save")).toBeDisabled();
 
       expect(screen.queryByTestId("braid-viewers")).toBeNull();

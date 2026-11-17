@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import type { GovernanceOcsfExportRow } from "@langwatch/enterprise-governance-contract";
+import type { ProcessStore } from "@langwatch/eventing";
 import type { Instant } from "@langwatch/time";
 
 import type { ActivityMonitorRepository } from "./activity-monitor.repository.ts";
@@ -10,6 +11,7 @@ import type { AiToolCatalogRepository } from "./ai-tool-catalog.repository.ts";
 import type { AnomalyRuleRepository } from "./anomaly-rule.repository.ts";
 import type {
   OcsfEventBatchWriter,
+  OcsfIngestOrderedReader,
   OcsfSeatReportReader,
 } from "./clickhouse/clickhouse.ocsf-events.repository.ts";
 import type { CostAttributionPolicyRepository } from "./cost-attribution-policy.repository.ts";
@@ -65,6 +67,8 @@ export interface AnomalySpendReader {
   }): Promise<{ currentSpend: number; baselineSpend: number }>;
 }
 
+export type { OcsfIngestOrderedReader };
+
 export interface GovernanceOcsfEventsReader {
   findAll(input: {
     tenantId: string;
@@ -98,12 +102,16 @@ export type GovernanceOcsfEventInput = {
  * written one row at a time is a page of round trips.
  */
 export interface GovernanceOcsfEventSink {
-  insertEvents(rows: GovernanceOcsfEventInput[]): Promise<void>;
+  insertEvents(rows: GovernanceOcsfEvent[]): Promise<void>;
 }
 
 export type GovernanceOcsfEvent = {
   tenantId: string;
   eventId: string;
+  /** OCSF class of an event pushed in from another source; LangWatch's own rows are 6003. */
+  classUid?: number;
+  categoryUid?: number;
+  typeUid?: number;
   traceId: string;
   sourceId: string;
   sourceType: string;
@@ -156,6 +164,8 @@ export interface GovernanceRepositories {
   /** The per-charge record the drift check holds the rollup against. */
   readonly costCharges: GovernanceCostChargeRepository;
   readonly ocsfEvents: GovernanceClickHouseRepositories["ocsfEvents"];
+  /** Where a process without a pipeline queues OCSF pushes; the memory tier has none. */
+  readonly ocsfPushIntents?: Pick<ProcessStore, "appendIntents">;
   /** The push receivers' per-caller throttle. */
   readonly rateLimits: GovernanceRateLimitRepository;
   /** The `governance_kpis` rows the spend-spike evaluator reads and the trace pull writes. */
@@ -177,7 +187,8 @@ export interface GovernanceClickHouseRepositories {
   readonly ocsfEvents: GovernanceOcsfEventsReader &
     GovernanceOcsfEventWriter &
     OcsfEventBatchWriter &
-    OcsfSeatReportReader;
+    OcsfSeatReportReader &
+    OcsfIngestOrderedReader;
 }
 
 /**
@@ -212,3 +223,36 @@ interface GovernanceClickHouseTenantClient {
 export type GovernanceClickHouseTenantResolver = (
   tenantId: string,
 ) => Promise<GovernanceClickHouseTenantClient>;
+
+/**
+ * The OCSF schema version stamped on every governance_ocsf_events row (migration 00028).
+ * SIEM consumers filter on it; bump it with the RawOcsfJson shape.
+ */
+export const OCSF_STORED_SCHEMA_VERSION = "1.1.0";
+export const OCSF_API_ACTIVITY_CLASS_UID = 6003;
+export const OCSF_APPLICATION_ACTIVITY_CATEGORY_UID = 6;
+
+/** A stored event as the export reads it; LangWatch's own rows default to API Activity. */
+export function governanceOcsfExportRowOf(row: GovernanceOcsfEvent): GovernanceOcsfExportRow {
+  const classUid = row.classUid ?? OCSF_API_ACTIVITY_CLASS_UID;
+  return {
+    eventId: row.eventId,
+    ocsfSchemaVersion: OCSF_STORED_SCHEMA_VERSION,
+    traceId: row.traceId,
+    sourceId: row.sourceId,
+    sourceType: row.sourceType,
+    classUid,
+    categoryUid: row.categoryUid ?? OCSF_APPLICATION_ACTIVITY_CATEGORY_UID,
+    activityId: row.activityId,
+    typeUid: row.typeUid ?? classUid * 100 + row.activityId,
+    severityId: row.severityId,
+    eventTimeMs: row.eventTime.epochMilliseconds,
+    actorUserId: row.actorUserId,
+    actorEmail: row.actorEmail,
+    actorEnduserId: row.actorEnduserId,
+    actionName: row.actionName,
+    targetName: row.targetName,
+    anomalyAlertId: row.anomalyAlertId,
+    rawOcsfJson: row.rawOcsfJson,
+  };
+}

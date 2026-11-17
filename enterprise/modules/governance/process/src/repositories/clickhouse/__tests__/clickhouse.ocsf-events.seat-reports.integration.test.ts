@@ -203,4 +203,23 @@ describe.skipIf(!enabled)("the seat read against a real ClickHouse", () => {
       expect(after).toEqual(before);
     });
   });
+  it("leaves out a seat report pushed in from another source", async () => {
+    const tenantId = `gov-pushed-${run}`;
+    await repository.insertEvents([
+      {
+        ...seatReport({
+          tenantId,
+          eventId: "pushed",
+          day: "2026-11-10",
+          seatsBought: 9999,
+          seatsAssigned: 8888,
+        }),
+        sourceType: "ocsf_push",
+      },
+    ]);
+
+    expect(
+      await repository.findLatestSeatReports({ tenantId, actionName: SEAT_REPORT_ACTION }),
+    ).toEqual([]);
+  });
 });

@@ -130,20 +130,25 @@ export class ClickHouseImportStoredObjectMigration {
       return "unchanged";
     }
     const now = this.now();
-    await this.options.records.upsert(
-      this.importedRecord({
-        row,
-        projectId,
-        id,
-        sha256,
-        mediaType,
-        audience,
-        fingerprint,
-        current,
-        now,
-        address,
-      }),
-    );
+    const imported = this.importedRecord({
+      row,
+      projectId,
+      id,
+      sha256,
+      mediaType,
+      audience,
+      fingerprint,
+      current,
+      now,
+      address,
+    });
+    if (!current) {
+      await this.options.records.upsert(imported);
+      return "imported";
+    }
+    // A row a delete or another import moved since the read is left as that writer left it.
+    const moved = await this.options.records.transition({ expected: current, next: imported });
+    if (!moved) return "unchanged";
     return "imported";
   }
 

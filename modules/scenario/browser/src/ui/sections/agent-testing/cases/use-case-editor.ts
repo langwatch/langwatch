@@ -17,6 +17,7 @@ import {
   type ScenarioFieldValues,
   type ScenarioParameterDefinition,
   type SuiteFieldDefinition,
+  type RedTeamConfig,
 } from "@langwatch/scenario-contract";
 import { type MutableRefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -170,6 +171,8 @@ export type CaseEditorState = {
   save: (options: { shouldRunAfterSave: boolean }) => void;
   /** The optional blocks the chips of the dialog open. */
   customize: CaseCustomizeBlocks;
+  /** The attack a red team scenario runs, or null for a standard one. */
+  redTeam: RedTeamConfig | null;
 };
 
 /**
@@ -581,5 +584,6 @@ export function useCaseEditor({
     problem,
     save,
     customize,
+    redTeam: scenario?.kind === "red_team" ? (scenario.redTeam ?? null) : null,
   };
 }

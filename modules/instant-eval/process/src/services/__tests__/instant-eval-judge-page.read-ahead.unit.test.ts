@@ -162,6 +162,7 @@ async function pipeline({
     },
     cancellation,
     budget: { assertWithinBudget: async () => undefined },
+    gatewayBudget: { assertWithinGatewayBudget: async () => undefined },
     readAhead,
     now: () => AT.epochMilliseconds,
   });

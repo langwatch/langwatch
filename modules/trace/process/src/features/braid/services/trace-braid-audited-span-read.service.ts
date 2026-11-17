@@ -218,6 +218,27 @@ export class TraceBraidAuditedSpanReadService {
     });
   }
 
+  /** A trace's spans and their resource rows, audited once for both. */
+  async readSpansWithResources(
+    params: SpanReadParams<"getSpansByTraceId"> & SpanReadParams<"getSpanResourcesByTraceId">,
+  ): Promise<{
+    spans: SpanReadResult<"getSpansByTraceId">;
+    resources: SpanReadResult<"getSpanResourcesByTraceId">;
+  }> {
+    const [spans, resources] = await Promise.all([
+      this.#spans.getSpansByTraceId(params),
+      this.#spans.getSpanResourcesByTraceId(params),
+    ]);
+    return this.#audited({
+      authorization: params.authorization,
+      ownerProjectIds: [
+        ...OWNERS_OF.getSpansByTraceId({ params, result: spans }),
+        ...OWNERS_OF.getSpanResourcesByTraceId({ params, result: resources }),
+      ],
+      result: { spans, resources },
+    });
+  }
+
   async readSpanTreePage(
     input: SpanTreeInput & { authorization: Authorization },
   ): Promise<SpanTreePage> {

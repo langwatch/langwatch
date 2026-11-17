@@ -5,7 +5,10 @@
  */
 
 import { sealAuthorization, type Actor, type Authorization } from "@langwatch/authorization";
-import { InstantEvalNotEnabledError } from "@langwatch/instant-eval-contract";
+import {
+  InstantEvalGatewayBudgetExceededError,
+  InstantEvalNotEnabledError,
+} from "@langwatch/instant-eval-contract";
 import { Temporal } from "@langwatch/time";
 import { FilterParseError, type LangWatchQLTraceFilter } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
@@ -141,6 +144,7 @@ function harness(
     peers?: Partial<InstantEvalRunPeers>;
     createFailure?: Error;
     releaseFailure?: Error;
+    gatewayRefusal?: Error;
   } = {},
 ) {
   const statements = new RecordingStatements();
@@ -149,6 +153,7 @@ function harness(
   const cancelled: { runId: string; requestedByUserId?: string }[] = [];
   const sampled: { runId: string; rows: number; lwqlKey: string }[] = [];
   const minted: Actor[] = [];
+  const gatewayChecked: { projectId: string; inFlightUsd?: number }[] = [];
 
   const peers: InstantEvalRunPeers = {
     isEnabled: async () => true,
@@ -168,6 +173,12 @@ function harness(
       statements,
       creates,
       budget,
+      gatewayBudget: {
+        assertWithinGatewayBudget: async (input) => {
+          gatewayChecked.push(input);
+          if (options.gatewayRefusal) throw options.gatewayRefusal;
+        },
+      },
       estimates: { estimateRun: async () => ESTIMATE },
       cancellations: {
         cancelRun: async (input) => {
@@ -204,7 +215,7 @@ function harness(
     now: () => NOW,
   });
 
-  return { service, statements, creates, budget, cancelled, sampled, minted };
+  return { service, statements, creates, budget, cancelled, sampled, minted, gatewayChecked };
 }
 
 describe("creating a run", () => {
@@ -280,6 +291,28 @@ describe("creating a run", () => {
     await service.createRun({ projectId: "project-1", actor: ACTOR, input: { sql: "SELECT 1" } });
 
     expect(budget.reserved).toEqual([]);
+  });
+
+  /** @scenario "A run is refused once a blocking budget is reached" */
+  it("refuses a run a blocking gateway budget stops, before anything is held or queued", async () => {
+    const { service, statements, budget, creates, gatewayChecked } = harness({
+      standing: PAID,
+      gatewayRefusal: new InstantEvalGatewayBudgetExceededError({
+        budgetId: "budget-1",
+        scope: "project",
+        window: "month",
+        limitUsd: 5,
+        spentUsd: 5,
+      }),
+    });
+
+    await expect(
+      service.createRun({ projectId: "project-1", actor: ACTOR, input: { sql: "SELECT 1" } }),
+    ).rejects.toMatchObject({ code: "instant_eval_gateway_budget_exceeded", httpStatus: 402 });
+    expect(gatewayChecked).toEqual([{ projectId: "project-1" }]);
+    expect(statements.accepted).toEqual([]);
+    expect(budget.reserved).toEqual([]);
+    expect(creates.created).toEqual([]);
   });
 
   it("releases the hold when the run is never queued", async () => {

@@ -12,6 +12,7 @@ import { pipeline } from "node:stream/promises";
 
 import { toDate, type Instant } from "@langwatch/time";
 
+import type { ObjectStorageUploads } from "./config.ts";
 import type {
   Clock,
   DownloadFacts,
@@ -30,6 +31,8 @@ import {
   digestOf,
   measureBody,
   secondsUntil,
+  StorageCredentialsRefusedError,
+  StoragePermissionDeniedError,
   StoredObjectNotFoundError,
   type ObjectBackend,
 } from "./object-storage-backend.ts";
@@ -180,16 +183,19 @@ async function textOf(response: IncomingMessage): Promise<string> {
   return Buffer.concat(chunks).toString("utf8");
 }
 
+/** Azure's codes for a key or token it did not accept (learn.microsoft.com, Blob error codes). */
+const CREDENTIAL_REFUSALS = new Set(["AuthenticationFailed", "InvalidAuthenticationInfo"]);
+
 async function refusal(response: IncomingMessage, operation: string): Promise<Error> {
+  const header = response.headers["x-ms-error-code"];
   const body = await textOf(response).catch(() => "");
-  const code = body.match(/<Code>([^<]+)<\/Code>/)?.[1];
+  const code =
+    (typeof header === "string" ? header : undefined) ?? body.match(/<Code>([^<]+)<\/Code>/)?.[1];
   const status = `${response.statusCode ?? "no status"}${code ? ` ${code}` : ""}`;
-  if (response.statusCode === 403) {
-    return new Error(
-      `Azure Blob ${operation} was denied (${status}): grant the identity ` +
-        '"Storage Blob Data Contributor" on the account or container.',
-    );
+  if (response.statusCode === 401 || (code !== undefined && CREDENTIAL_REFUSALS.has(code))) {
+    return new StorageCredentialsRefusedError({ operation, status });
   }
+  if (response.statusCode === 403) return new StoragePermissionDeniedError({ operation, status });
   return new Error(`Azure Blob ${operation} failed: ${status}.`);
 }
 
@@ -414,6 +420,8 @@ function signBlobDownload(
 export function azureBackend(options: {
   credentials: AzureCredentials;
   clock: Clock;
+  /** `through-langwatch` hands out the process's own route and signs no SAS. */
+  uploads?: ObjectStorageUploads;
 }): ObjectBackend {
   const place = azurePlace(options.credentials, options.clock);
   const { accountName, container } = options.credentials;
@@ -424,7 +432,10 @@ export function azureBackend(options: {
     exists: (at) => blobExists(place, at),
     digest: async (at) => digestOf(await readBlob(place, at)),
     remove: (at) => removeBlob(place, at),
-    signUpload: (at, facts) => signBlobUpload(place, at, facts),
+    signUpload: async (at, facts) =>
+      options.uploads === "through-langwatch"
+        ? { kind: "through-process" }
+        : signBlobUpload(place, at, facts),
     signDownload: (at, facts) => signBlobDownload(place, at, facts),
     probe: () => probeContainer(place),
   };

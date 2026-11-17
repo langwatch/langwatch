@@ -428,7 +428,13 @@ export class SuiteService {
   private static testSuiteToSuite(testSuite: ScenarioTestSuite): Suite {
     // Drop test-suite-only fields before strict parsing; passing the whole row caused
     // `unrecognized_keys` across reads.
-    const { fields: _fields, evaluators: _evaluators, ...suite } = testSuite;
+    const {
+      fields: _fields,
+      evaluators: _evaluators,
+      templateId: _templateId,
+      templateVersion: _templateVersion,
+      ...suite
+    } = testSuite;
 
     return suiteSchema.parse(suite);
   }
