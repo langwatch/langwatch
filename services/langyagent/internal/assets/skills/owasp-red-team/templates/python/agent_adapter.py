@@ -6,7 +6,9 @@ import scenario
 async def call_agent(messages: list) -> scenario.AgentReturnTypes:
     """Run your agent on the conversation so far and return its reply.
 
-    `messages` is the OpenAI-style message list of the whole conversation.
+    `messages` is the OpenAI chat message list of the whole conversation, so an
+    agent on the `openai` SDK takes it as is. A sync agent runs in a thread:
+    `return await asyncio.to_thread(respond, list(messages))`.
     Return a string, one message dict, or the list of new messages. Return the
     tool call and tool result messages too: the judge needs them to see tool use.
     """

@@ -3,11 +3,11 @@
 // One id: npx vitest run owasp-pack.test.ts -t LLM01
 import { openai } from "@ai-sdk/openai";
 import scenario from "@langwatch/scenario";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 import { owaspTargetAdapter } from "./agent-adapter";
 import { ATTACKS } from "./owasp-attacks";
-import { AGENT, MODEL, SET_ID, TOTAL_TURNS } from "./owasp.config";
+import { AGENT, MODEL, SET_ID, TOTAL_TURNS, assertConfigFilled } from "./owasp.config";
 
 // gpt-6 models accept only the default temperature while reasoning is on.
 const TEMPERATURE = 1;
@@ -15,6 +15,8 @@ const TEMPERATURE = 1;
 const ATTACK_TIMEOUT_MS = 20 * 60_000;
 
 describe(`OWASP red team pack: ${AGENT.name}`, () => {
+  beforeAll(() => assertConfigFilled());
+
   it.each(ATTACKS)(
     "$id $title",
     async (attack) => {
@@ -29,8 +31,11 @@ describe(`OWASP red team pack: ${AGENT.name}`, () => {
         successScore: undefined,
       });
 
+      const name = `${attack.id} ${attack.title}: ${AGENT.name}`;
       const result = await scenario.run({
-        name: `${attack.id} ${attack.title}: ${AGENT.name}`,
+        // The id groups every run of one OWASP attack in LangWatch.
+        id: name,
+        name,
         description: `An attacker targets ${AGENT.name}. ${AGENT.description}`,
         agents: [
           owaspTargetAdapter,
@@ -45,7 +50,9 @@ describe(`OWASP red team pack: ${AGENT.name}`, () => {
         setId: SET_ID,
       });
 
-      expect(result.success, `${attack.id} ${attack.title}: ${result.reasoning}`).toBe(true);
+      // The result has no turn index: open the run in LangWatch to see where it broke.
+      const unmet = result.unmetCriteria.join("; ");
+      expect(result.success, `${name}. Unmet: ${unmet}. ${result.reasoning ?? ""}`).toBe(true);
     },
     ATTACK_TIMEOUT_MS,
   );

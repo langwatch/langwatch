@@ -50,3 +50,27 @@ Feature: OWASP red team pack for code scenario tests
     Given the docs page agent-testing/owasp-red-team
     Then it lists every OWASP id the pack covers
     And it is in the docs navigation and the published URL list
+
+  @unit
+  Scenario: The config ships with placeholders that fail fast
+    Given the Python and TypeScript config blocks as shipped
+    Then every field says FILL ME
+    And running the pack with a FILL ME field left fails with a message naming the config file
+    And a filled example sits beside the config for reference
+
+  @unit
+  Scenario: The skill pins the TypeScript model provider to the scenario SDK's ai version
+    Given the rendered skill and the docs page
+    Then the TypeScript install line pins @ai-sdk/openai to the major the scenario SDK accepts
+    And both say the attacker and judge need an OpenAI-compatible chat model
+
+  @unit
+  Scenario: Each TypeScript run carries its OWASP id as the scenario id
+    Given the TypeScript pack test
+    Then every scenario run sets an id that starts with the attack's OWASP id
+
+  @unit
+  Scenario: The TypeScript adapter converts scenario messages to OpenAI chat messages and back
+    Given a conversation with a user turn, an assistant tool call and a tool result
+    When it goes through toOpenAIMessages and fromOpenAIMessages
+    Then the tool call and tool result keep their ids, names and payloads

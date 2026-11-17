@@ -45,17 +45,19 @@ It follows the [OWASP red team recipe](https://github.com/langwatch/skills/tree/
 ## Apply it by hand
 
 1. Copy the [Python pack](https://github.com/langwatch/skills/tree/main/recipes/owasp-red-team/templates/python) or the [TypeScript pack](https://github.com/langwatch/skills/tree/main/recipes/owasp-red-team/templates/typescript) into one test folder.
-2. In `agent_adapter.py` or `agent-adapter.ts`, make `call_agent` or `callAgent` call your real agent and return its reply, tool calls included.
-3. In `owasp_config.py` or `owasp.config.ts`, fill in the config block. You describe the agent's name and job, its tools, the tools that change data, what it must never do and the data it must never disclose. The pack builds every attack goal and judge criterion from this one block.
+2. In `agent_adapter.py` or `agent-adapter.ts`, make `call_agent` or `callAgent` call your real agent and return its reply, tool calls included. If your TypeScript agent takes OpenAI chat messages, use `toOpenAIMessages` and `fromOpenAIMessages` from the same file.
+3. In `owasp_config.py` or `owasp.config.ts`, fill in the config block. You describe the agent's name and job, its tools, the tools that change data, what it must never do and the data it must never disclose. The pack builds every attack goal and judge criterion from this one block. Every field ships as `FILL ME`, and the pack refuses to run until you fill them all.
 
 ## Run it
 
 Install the test dependencies if your repo does not have them yet:
 
 ```bash
-pip install langwatch-scenario pytest pytest-asyncio     # Python
-npm install -D @langwatch/scenario vitest @ai-sdk/openai  # TypeScript
+pip install "langwatch-scenario>=1.6" pytest pytest-asyncio         # Python
+npm install -D @langwatch/scenario@^1.7 vitest @ai-sdk/openai@^3     # TypeScript
 ```
+
+Keep `@ai-sdk/openai` on 3.x: `@langwatch/scenario` 1.7 refuses 4.x models. The attacker and the judge need an OpenAI-compatible chat model, set with `OWASP_MODEL`. Gemini fails as attacker or judge in the current SDK. Your agent can use any model.
 
 Set `LANGWATCH_API_KEY` and `OPENAI_API_KEY`, then run:
 
@@ -70,4 +72,4 @@ To read the results:
 
 1. In LangWatch, open Simulations.
 2. Pick the `owasp-red-team` set: it holds one run per OWASP id.
-3. Open a run to read the conversation and the judge's verdict on each criterion.
+3. Open a run to read the conversation and the judge's verdict on each criterion. The test output names the unmet criteria but not the turn, so find the first agent reply that breaks one here.

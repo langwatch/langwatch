@@ -9,8 +9,18 @@ import { describe, expect, it } from "vitest";
 import { listNativeSkills, listPublishedSkills, renderSkill } from "../_compiler/native.ts";
 import { listSkillAssets } from "../_lib/feature-skills.ts";
 import { sync } from "../_publish/sync.ts";
+import {
+  fromOpenAIMessages,
+  toOpenAIMessages,
+  type ScenarioMessage,
+} from "../recipes/owasp-red-team/templates/typescript/agent-adapter.ts";
 import { ATTACKS } from "../recipes/owasp-red-team/templates/typescript/owasp-attacks.ts";
-import { AGENT } from "../recipes/owasp-red-team/templates/typescript/owasp.config.ts";
+import {
+  AGENT,
+  EXAMPLE_AGENT,
+  FILL_ME,
+  assertConfigFilled,
+} from "../recipes/owasp-red-team/templates/typescript/owasp.config.ts";
 
 // Backs specs/skills/owasp-red-team.feature: the Python and TypeScript packs,
 // their one config block, the skill and the docs page stay in step.
@@ -20,6 +30,7 @@ const skillsRoot = path.resolve(__dirname, "..");
 const repoRoot = path.resolve(skillsRoot, "..");
 const recipeDir = path.join(skillsRoot, "recipes", "owasp-red-team");
 const pythonDir = path.join(recipeDir, "templates", "python");
+const typescriptDir = path.join(recipeDir, "templates", "typescript");
 
 const OFFICIAL_TITLES: Record<string, string> = {
   "LLM01:2025": "Prompt Injection",
@@ -37,6 +48,9 @@ const OFFICIAL_TITLES: Record<string, string> = {
 
 interface PythonPack {
   config_keys: string[];
+  config_values: Record<string, unknown>;
+  example_keys: string[];
+  fill_error: string;
   attacks: { id: string; title: string; strategy: string; goal: string; criteria: string[] }[];
   name: string;
 }
@@ -45,13 +59,21 @@ const PYTHON_DUMP = `
 import json, sys
 sys.path.insert(0, sys.argv[1])
 from owasp_attacks import ATTACKS
-from owasp_config import AGENT
+from owasp_config import AGENT, EXAMPLE_AGENT, assert_config_filled
+try:
+    assert_config_filled()
+    fill_error = ""
+except RuntimeError as e:
+    fill_error = str(e)
 print(json.dumps({
     "config_keys": list(AGENT.keys()),
-    "name": AGENT["name"],
+    "config_values": AGENT,
+    "example_keys": list(EXAMPLE_AGENT.keys()),
+    "fill_error": fill_error,
+    "name": EXAMPLE_AGENT["name"],
     "attacks": [
         {"id": a["id"], "title": a["title"], "strategy": a["strategy"],
-         "goal": a["goal"](AGENT), "criteria": a["criteria"](AGENT)}
+         "goal": a["goal"](EXAMPLE_AGENT), "criteria": a["criteria"](EXAMPLE_AGENT)}
         for a in ATTACKS
     ],
 }))
@@ -117,13 +139,13 @@ describe("OWASP red team pack", () => {
     const py = pythonPack();
     for (const attack of ATTACKS) {
       expect(attack.title).toBe(OFFICIAL_TITLES[attack.id]);
-      expect(attack.goal(AGENT)).toContain(AGENT.name);
-      expect(attack.criteria(AGENT).length).toBeGreaterThanOrEqual(2);
+      expect(attack.goal(EXAMPLE_AGENT)).toContain(EXAMPLE_AGENT.name);
+      expect(attack.criteria(EXAMPLE_AGENT).length).toBeGreaterThanOrEqual(2);
       const pyAttack = py.attacks.find((a) => a.id === attack.id)!;
       expect(pyAttack.title).toBe(attack.title);
       expect(pyAttack.strategy).toBe(attack.strategy);
-      expect(pyAttack.goal).toBe(attack.goal(AGENT));
-      expect(pyAttack.criteria).toEqual(attack.criteria(AGENT));
+      expect(pyAttack.goal).toBe(attack.goal(EXAMPLE_AGENT));
+      expect(pyAttack.criteria).toEqual(attack.criteria(EXAMPLE_AGENT));
     }
   });
 
@@ -131,8 +153,10 @@ describe("OWASP red team pack", () => {
   it("reads one config block with the same keys in both languages", () => {
     const py = pythonPack();
     expect(py.config_keys).toEqual(Object.keys(AGENT));
-    expect(py.name).toBe(AGENT.name);
-    const renamed = { ...AGENT, name: "Renamed agent under test" };
+    expect(py.example_keys).toEqual(Object.keys(AGENT));
+    expect(Object.keys(EXAMPLE_AGENT)).toEqual(Object.keys(AGENT));
+    expect(py.name).toBe(EXAMPLE_AGENT.name);
+    const renamed = { ...EXAMPLE_AGENT, name: "Renamed agent under test" };
     for (const attack of ATTACKS)
       expect(attack.goal(renamed)).toContain("Renamed agent under test");
   });
@@ -140,7 +164,13 @@ describe("OWASP red team pack", () => {
   /** @scenario "The Python template files compile" */
   it("compiles every Python template file", () => {
     const files = fs.readdirSync(pythonDir).filter((f) => f.endsWith(".py"));
-    expect(files).toHaveLength(4);
+    expect(files.toSorted()).toEqual([
+      "agent_adapter.py",
+      "conftest.py",
+      "owasp_attacks.py",
+      "owasp_config.py",
+      "test_owasp_pack.py",
+    ]);
     const out = fs.mkdtempSync(path.join(os.tmpdir(), "owasp-pycompile-"));
     try {
       const script =
@@ -190,5 +220,99 @@ describe("OWASP red team pack", () => {
       "utf8",
     );
     expect(urls.split("\n")).toContain("/agent-testing/owasp-red-team");
+  });
+  /** @scenario "The config ships with placeholders that fail fast" */
+  it("ships a FILL ME config that refuses to run, with a filled example beside it", () => {
+    for (const value of Object.values(AGENT))
+      expect(Array.isArray(value) ? value : [value]).toEqual([FILL_ME]);
+    expect(() => assertConfigFilled()).toThrow(/owasp\.config\.ts.*name, description/);
+    expect(() => assertConfigFilled(EXAMPLE_AGENT)).not.toThrow();
+    expect(() => assertConfigFilled({ ...EXAMPLE_AGENT, tools: [FILL_ME] })).toThrow(/tools/);
+    const py = pythonPack();
+    for (const value of Object.values(py.config_values))
+      expect(Array.isArray(value) ? value : [value]).toEqual([FILL_ME]);
+    expect(py.fill_error).toMatch(/owasp_config\.py.*name, description/);
+    const pyTest = fs.readFileSync(path.join(pythonDir, "test_owasp_pack.py"), "utf8");
+    expect(pyTest).toContain("assert_config_filled()");
+    expect(fs.readFileSync(path.join(pythonDir, "conftest.py"), "utf8")).toContain(
+      '"markers", "agent_test',
+    );
+    const tsTest = fs.readFileSync(path.join(typescriptDir, "owasp-pack.test.ts"), "utf8");
+    expect(tsTest).toContain("beforeAll(() => assertConfigFilled())");
+  });
+
+  /** @scenario "The skill pins the TypeScript model provider to the scenario SDK's ai version" */
+  it("pins @ai-sdk/openai to 3.x and asks for an OpenAI-compatible attacker model", () => {
+    const rendered = renderSkill(owaspSkill());
+    const page = fs.readFileSync(
+      path.join(repoRoot, "docs", "agent-testing", "owasp-red-team.mdx"),
+      "utf8",
+    );
+    for (const text of [rendered, page]) {
+      expect(text).toContain("@ai-sdk/openai@^3");
+      expect(text).not.toMatch(/npm install[^\n]*@ai-sdk\/openai(?!@)/);
+      expect(text).toContain("OpenAI-compatible chat model");
+    }
+  });
+
+  /** @scenario "Each TypeScript run carries its OWASP id as the scenario id" */
+  it("sets the scenario id of every TypeScript run from the OWASP id", () => {
+    const tsTest = fs.readFileSync(path.join(typescriptDir, "owasp-pack.test.ts"), "utf8");
+    expect(tsTest).toContain("const name = `${attack.id} ${attack.title}: ${AGENT.name}`;");
+    expect(tsTest).toMatch(/scenario\.run\(\{[^}]*\bid: name,/);
+  });
+
+  /** @scenario "The TypeScript adapter converts scenario messages to OpenAI chat messages and back" */
+  it("round trips a tool call through the OpenAI message helpers", () => {
+    const conversation: ScenarioMessage[] = [
+      { role: "system", content: "ignored" },
+      { role: "user", content: "Where is order 42?" },
+    ];
+    expect(toOpenAIMessages({ messages: conversation })).toEqual([
+      { role: "user", content: "Where is order 42?" },
+    ]);
+    const agentTurn = fromOpenAIMessages({
+      messages: [
+        {
+          role: "assistant",
+          content: null,
+          tool_calls: [
+            {
+              id: "c1",
+              type: "function",
+              function: { name: "lookup_order", arguments: '{"id":42}' },
+            },
+          ],
+        },
+        { role: "tool", tool_call_id: "c1", content: '{"status":"shipped"}' },
+        { role: "assistant", content: "It shipped." },
+      ],
+    });
+    expect(agentTurn[1]).toEqual({
+      role: "tool",
+      content: [
+        {
+          type: "tool-result",
+          toolCallId: "c1",
+          toolName: "lookup_order",
+          output: { type: "json", value: { status: "shipped" } },
+        },
+      ],
+    });
+    expect(toOpenAIMessages({ messages: agentTurn })).toEqual([
+      {
+        role: "assistant",
+        content: "",
+        tool_calls: [
+          {
+            id: "c1",
+            type: "function",
+            function: { name: "lookup_order", arguments: '{"id":42}' },
+          },
+        ],
+      },
+      { role: "tool", tool_call_id: "c1", content: '{"status":"shipped"}' },
+      { role: "assistant", content: "It shipped." },
+    ]);
   });
 });
