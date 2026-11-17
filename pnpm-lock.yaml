@@ -7330,6 +7330,9 @@ importers:
       '@langwatch/data-privacy-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/entitlement-contract':
+        specifier: workspace:*
+        version: link:../../entitlement/contract
       '@langwatch/evaluation-contract':
         specifier: workspace:*
         version: link:../../evaluation/contract

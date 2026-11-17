@@ -5,6 +5,7 @@ import {
   type ResolvedDataPrivacy,
 } from "@langwatch/data-privacy-contract";
 import { type PiiRedactionSpendPricedEventData } from "@langwatch/data-privacy-contract/pii-redaction-spend";
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import {
   LangevalsPiiDetectionError,
   type PiiDetectionOutcome,
@@ -160,6 +161,9 @@ function setup({
   model,
   modelTimeoutMs = 60_000,
   presidioChannel,
+  selfHosted = false,
+  planType = "ENTERPRISE",
+  planFails = false,
 }: {
   modelConfigured?: boolean;
   allowlisted?: boolean;
@@ -167,6 +171,9 @@ function setup({
   model?: PresidioChannel;
   modelTimeoutMs?: number;
   presidioChannel?: PresidioChannel;
+  selfHosted?: boolean;
+  planType?: string;
+  planFails?: boolean;
 } = {}) {
   const presidio = MemoryPresidioChannel.create({ endpoint: "http://langevals:5562" });
   const memoryModel = MemoryPresidioChannel.create(
@@ -180,6 +187,15 @@ function setup({
       flagReads.push({ key, target });
       if (flagFails) throw new Error("flag store unreachable");
       return allowlisted;
+    },
+  });
+
+  const planReads: string[] = [];
+  const entitlements = createApiFixture<EntitlementApi>({
+    getActivePlan: async ({ organizationId }) => {
+      planReads.push(organizationId);
+      if (planFails) throw new Error("licence store unreachable");
+      return { planSource: "license", type: planType, name: planType, free: false } as never;
     },
   });
 
@@ -228,6 +244,8 @@ function setup({
       }),
       featureFlags,
       scopes: DataPrivacyProjectScopeService.create({ repository }),
+      selfHosted,
+      entitlements,
       spend,
       metrics: { modelFellBack: (reason) => fallbacks.push(reason) },
       log: {
@@ -249,6 +267,7 @@ function setup({
     memoryModel,
     dlp,
     flagReads,
+    planReads,
     scopeReads,
     failNextScopeRead,
     sent,
@@ -303,6 +322,112 @@ function spanWith(value: string): OtlpSpan {
 }
 
 describe("PiiRedactionModelService", () => {
+  describe("given a self-hosted deployment that names the model, with its flag forced on", () => {
+    describe("when the organization's active plan is not Enterprise", () => {
+      /** @scenario "A self-hosted organization without an Enterprise licence keeps the Presidio path" */
+      it("sends the batch to Presidio, counts it not_licensed and prices nothing", async () => {
+        const { analysis, presidio, memoryModel, sent, fallbacks, priced } = setup({
+          selfHosted: true,
+          planType: "OPEN_SOURCE",
+        });
+        presidio.answerWith(anonymized("call <PERSON>"));
+
+        const cleared = await analysis.clearPresidio(strictBatch());
+
+        expect(cleared).toEqual(["call [PERSON]"]);
+        expect(sent(memoryModel)).toHaveLength(0);
+        expect(sent(presidio)).toHaveLength(1);
+        expect(fallbacks).toEqual(["not_licensed"]);
+        expect(priced).toEqual([]);
+      });
+
+      it("logs the organization once a minute, not once per batch", async () => {
+        const { analysis, presidio, usage, fallbacks } = setup({
+          selfHosted: true,
+          planType: "OPEN_SOURCE",
+        });
+        presidio.answerWith(anonymized("call <PERSON>"));
+        presidio.answerWith(anonymized("call <PERSON>"));
+
+        await analysis.clearPresidio(strictBatch());
+        await analysis.clearPresidio(strictBatch());
+
+        expect(fallbacks).toEqual(["not_licensed", "not_licensed"]);
+        expect(usage.map((line) => [line.level, line.fields.outcome])).toEqual([
+          ["info", "not_licensed"],
+        ]);
+        expect(usage[0]?.fields).toMatchObject({ organizationId: ORGANIZATION_ID, spansFound: 0 });
+      });
+    });
+
+    describe("when the organization's active plan is Enterprise", () => {
+      /** @scenario "A self-hosted organization with an Enterprise licence goes to the PII redaction model" */
+      it("sends the batch to the model and leaves Presidio uncalled", async () => {
+        const { analysis, presidio, memoryModel, sent, planReads } = setup({ selfHosted: true });
+        memoryModel.answerWith(anonymized("call <PERSON>"));
+
+        const cleared = await analysis.clearPresidio(strictBatch());
+
+        expect(cleared).toEqual(["call [PERSON]"]);
+        expect(sent(memoryModel)).toHaveLength(1);
+        expect(sent(presidio)).toHaveLength(0);
+        expect(planReads).toEqual([ORGANIZATION_ID]);
+      });
+    });
+
+    /** @scenario "A self-hosted organization's plan is read once a minute" */
+    it("reads the organization's plan once for batches within a minute", async () => {
+      const { analysis, memoryModel, planReads } = setup({ selfHosted: true });
+      memoryModel.answerWith(anonymized("call <PERSON>"));
+      memoryModel.answerWith(anonymized("call <PERSON>"));
+      memoryModel.answerWith(anonymized("call <PERSON>"));
+
+      await Promise.all([
+        analysis.clearPresidio(strictBatch()),
+        analysis.clearPresidio(strictBatch()),
+      ]);
+      await analysis.clearPresidio(strictBatch());
+
+      expect(planReads).toEqual([ORGANIZATION_ID]);
+    });
+
+    it("sends the batch to Presidio as a routing error when the plan cannot be read", async () => {
+      const { analysis, presidio, memoryModel, sent, fallbacks } = setup({
+        selfHosted: true,
+        planFails: true,
+      });
+      presidio.answerWith(anonymized("call <PERSON>"));
+
+      await analysis.clearPresidio(strictBatch());
+
+      expect(sent(memoryModel)).toHaveLength(0);
+      expect(sent(presidio)).toHaveLength(1);
+      expect(fallbacks).toEqual(["routing_error"]);
+    });
+
+    it("never reads the plan when the flag is off for the organization", async () => {
+      const { analysis, presidio, planReads } = setup({ selfHosted: true, allowlisted: false });
+      presidio.answerWith(anonymized("call <PERSON>"));
+
+      await analysis.clearPresidio(strictBatch());
+
+      expect(planReads).toEqual([]);
+    });
+  });
+
+  describe("given LangWatch Cloud and an allowlisted organization on a plan other than Enterprise", () => {
+    /** @scenario "LangWatch Cloud routes the model without reading the plan" */
+    it("sends the batch to the model and never reads the plan", async () => {
+      const { analysis, memoryModel, sent, planReads } = setup({ planType: "LAUNCH" });
+      memoryModel.answerWith(anonymized("call <PERSON>"));
+
+      await analysis.clearPresidio(strictBatch());
+
+      expect(sent(memoryModel)).toHaveLength(1);
+      expect(planReads).toEqual([]);
+    });
+  });
+
   describe("given an organization allowlisted for the model", () => {
     /** @scenario "An allowlisted organization's strict analysis goes to the PII redaction model" */
     it("sends the batch to the model and leaves Presidio uncalled", async () => {

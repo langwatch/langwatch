@@ -21,7 +21,7 @@ Data privacy: per-scope rules and the PII redaction level a project runs at.
 | Postgres table                 | `DataPrivacyPolicy`                                                                                                                                                                                                                                            | `process/src/repositories/prisma/prisma.data-privacy.repository.ts:15`           |
 | Postgres, accessed not claimed | `Department`, `Group`, `Organization`, `OrganizationUser`, `Project`, `Team`                                                                                                                                                                                   | `process/src/repositories/prisma/prisma.data-privacy-directory.repository.ts:17` |
 | Stores required                |                                                                                                                                                                                                                                                                | `process/src/channels/http/http.data-privacy.channels.ts:18`                     |
-| Secrets                        | `googleApplicationCredentials` (GOOGLE_APPLICATION_CREDENTIALS), `requestIdKey` (API_KEY_PEPPER), `requestIdKeyFallback` (CREDENTIALS_SECRET), `requestIdKeyLastFallback` (NEXTAUTH_SECRET)                                                                    | `process/src/app/data-privacy.app.ts:140`                                        |
+| Secrets                        | `googleApplicationCredentials` (GOOGLE_APPLICATION_CREDENTIALS), `requestIdKey` (API_KEY_PEPPER), `requestIdKeyFallback` (CREDENTIALS_SECRET), `requestIdKeyLastFallback` (NEXTAUTH_SECRET)                                                                    | `process/src/app/data-privacy.app.ts:142`                                        |
 | Config                         | `googleDlpDisabled` (LANGWATCH_DISABLE_GOOGLE_DLP), `enforcement` (LANGWATCH_DATA_PRIVACY_ENFORCEMENT), `nodeEnvironment` (NODE_ENV), `langevalsEndpoint` (LANGEVALS_ENDPOINT), `piiRedactionModelEndpoint` (PII_REDACTION_MODEL_ENDPOINT), `isSaas` (IS_SAAS) | `contract/src/data-privacy.config.ts:11`                                         |
 
 Anything else data-privacy needs belongs to another module and is reached through its `*Api`.
@@ -30,6 +30,7 @@ Anything else data-privacy needs belongs to another module and is reached throug
 
 | Name           | Token            | Module                                    |
 | -------------- | ---------------- | ----------------------------------------- |
+| `entitlements` | `EntitlementApi` | [entitlement](../entitlement/README.md)   |
 | `featureFlags` | `FeatureFlagApi` | [feature-flag](../feature-flag/README.md) |
 | `permissions`  | `AuthzApi`       | [authz](../authz/README.md)               |
 

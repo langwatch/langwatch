@@ -35,7 +35,8 @@ export type PiiRedactionModelFallbackReason =
   | "throttled"
   | "error"
   | "breaker_open"
-  | "routing_error";
+  | "routing_error"
+  | "not_licensed";
 
 /** External PII analysis counts and durations, pushed over OTLP. */
 export class PiiAnalysisMetricsOtelService {
