@@ -6,6 +6,8 @@ import type { Named } from "@langwatch/module";
  */
 import { z } from "zod";
 
+import { virtualKeyPurposeSchema } from "./gateway.rows.ts";
+
 export const GATEWAY_BUDGET_CROSSING_EVENT_TYPE = "lw.governance.budget_crossing" as const;
 export const GATEWAY_VK_LIFECYCLE_EVENT_TYPE = "lw.governance.vk_lifecycle" as const;
 
@@ -17,9 +19,6 @@ export const vkLifecycleActionSchema = z.enum([
   "revoked",
 ]);
 export type VkLifecycleAction = z.infer<typeof vkLifecycleActionSchema>;
-
-/** `VirtualKey.purpose` (gateway.rows.ts): only a USER key has a person behind it. */
-export const vkLifecyclePurposeSchema = z.enum(["USER", "LANGY", "CONNECT"]);
 
 const recordVkLifecycleCommandDataSchemaDefinition = z.object({
   tenantId: z.string().min(1),
@@ -35,7 +34,7 @@ const recordVkLifecycleCommandDataSchemaDefinition = z.object({
   /** `VirtualKey.principalUserId`: the person the key acts for. */
   principal_user_id: z.string().min(1).nullish(),
   /** `VirtualKey.purpose`; null reads as USER. */
-  purpose: vkLifecyclePurposeSchema.nullish(),
+  purpose: virtualKeyPurposeSchema.nullish(),
   /** Unix ms of the mutation. */
   occurred_at: z.number().int().positive(),
 });

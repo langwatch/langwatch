@@ -18,9 +18,9 @@ type GatewayKeyDeliveryDependencies = Readonly<{
 }>;
 
 /**
- * Sends a gateway key signal's calls one after the other, each under its own claim inside the
- * signal's: a retry after the identify went and the track failed sends the track alone. A
- * refused call gives back its claim and the signal's, then fails the delivery so its job retries.
+ * Sends a gateway key signal's calls in order, each claimed by type and recipient inside the
+ * signal's claim: a retry after the identify went sends the track alone, or both to a new person.
+ * A refused call gives back its claim and the signal's, then fails the delivery so its job retries.
  */
 export class NurturingGatewayKeyDeliveryService {
   static create(dependencies: GatewayKeyDeliveryDependencies): NurturingGatewayKeyDeliveryService {
@@ -43,7 +43,7 @@ export class NurturingGatewayKeyDeliveryService {
     deliveredClaim,
   }: Readonly<{ call: CioBatchCall; deliveredClaim: string }>): Promise<void> {
     const { claims, customerIo, windowSeconds } = this.dependencies;
-    const callClaim = `${deliveredClaim}:${call.type}`;
+    const callClaim = `${deliveredClaim}:${call.type}:${call.userId}`;
     let claimed = false;
     try {
       claimed = await claims.claim(callClaim, windowSeconds);

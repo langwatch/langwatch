@@ -104,6 +104,13 @@ Feature: Customer.io hears when a person's gateway key is created and when its b
     And the retry sends the track and no second identify
 
   @unit
+  Scenario: A retry that picks another recipient identifies them too
+    Given Customer.io took the holder's identify and refused the track of a created key
+    And the holder is then disabled while the creator is a current member
+    When the fact is retried
+    Then the creator is identified with has_virtual_key and tracked virtual_key_created
+
+  @unit
   Scenario: The same fact delivered twice sends each call once
     Given a created key and a budget crossing
     When each fact is delivered twice
@@ -128,6 +135,12 @@ Feature: Customer.io hears when a person's gateway key is created and when its b
     When that person is erased, twice
     Then no key copy names them, and a redelivered older fact naming them writes nothing back
 
+  @integration
+  Scenario: A fact stamped before an erasure never names the erased holder again
+    Given nurturing's key copy in Postgres naming a person as holder, stamped T1
+    When that person is erased, then a fact naming them stamped T2 lands, T1 < T2 < the erasure
+    Then the key copy still names no holder
+
   # --- AC Coverage Map (langwatch/tasks#1200) ---
   # AC 1: "null purpose counts as USER"          -> unit only: nurturing-virtual-key.rules.unit.test.ts
   # AC 2: "CONNECT and LANGY send nothing"       -> Scenario: CONNECT and LANGY keys send nothing
@@ -148,10 +161,12 @@ Feature: Customer.io hears when a person's gateway key is created and when its b
   # AC 13: "uncopied key warns"                  -> Scenario: A crossing for a key nurturing never copied sends nothing and warns
   # AC 14: "crossing recipient chain"            -> Scenario: The key's holder hears it first, then its creator, then the organization's admin
   # AC 15: "failure retries, no second success"  -> Scenario: A refused Customer.io call is retried without repeating the call that went
+  #                                               -> Scenario: A retry that picks another recipient identifies them too
   # AC 16: "idempotency, memory and Redis"       -> Scenario: The same fact delivered twice sends each call once
   #                                               -> Scenario: The same fact delivered twice sends each call once over Redis claims
   # AC 17: "erasure falls to the admin"          -> Scenario: An erased person's key falls to the organization's admin
   #                                               -> Scenario: An erased person is cleared from every key copy in Postgres
+  #                                               -> Scenario: A fact stamped before an erasure never names the erased holder again
   # AC 18: "forbidden fields in payloads"        -> unit only: nurturing.pipeline.gateway-facts.unit.test.ts greps every captured request
   # AC 19: "webhook envelope test unchanged"     -> unit only: the file is not in the diff
   # AC 20: "ADR-001 and READMEs"                 -> adrs/001-nurturing-package-boundary.md; READMEs from CI's printed diff

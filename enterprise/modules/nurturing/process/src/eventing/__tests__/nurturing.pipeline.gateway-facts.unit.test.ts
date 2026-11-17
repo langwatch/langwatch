@@ -297,6 +297,19 @@ describe("gateway's key facts in nurturing", () => {
     });
   });
 
+  describe("when the key's holder has no row in nurturing's member copy", () => {
+    it("falls back to the admin and warns with the organization and key, never a person's id", async () => {
+      const facts = await gatewayFactsOver();
+
+      await facts.deliverFact(created());
+
+      expect(callsOf(facts.sent)).toEqual([["track", ADMIN_USER_ID, "virtual_key_created"]]);
+      const line = facts.logLines.findLine("warn", "no row in nurturing's member copy");
+      expect(line).toMatchObject({ organizationId: ORGANIZATION_ID, virtualKeyId: "vk_1" });
+      expect(JSON.stringify(line)).not.toMatch(/user-/);
+    });
+  });
+
   describe("when no one matches and the organization has no copied admin", () => {
     /** @scenario "The key's holder hears it first, then its creator, then the organization's admin" */
     it("sends nothing and logs the dropped fact at debug level", async () => {
@@ -366,6 +379,29 @@ describe("gateway's key facts in nurturing", () => {
       expect(callsOf(facts.sent)).toEqual([
         ["identify", "user-holder", null],
         ["track", "user-holder", "virtual_key_created"],
+      ]);
+    });
+  });
+
+  describe("when the holder's identify went and the track was refused, and the retry finds the holder disabled", () => {
+    /** @scenario "A retry that picks another recipient identifies them too" */
+    it("identifies and tracks the creator on the retry, the holder's identify not standing in", async () => {
+      const facts = await gatewayFactsOver();
+      await facts.joined("user-holder");
+      await facts.joined("user-creator");
+      facts.refusing.add("track");
+
+      await expect(facts.deliverFact(created())).rejects.toThrow(
+        "Customer.io /batch failed: HTTP 500",
+      );
+      await facts.disabled("user-holder");
+      facts.refusing.clear();
+      await facts.deliverFact(created());
+
+      expect(callsOf(facts.sent)).toEqual([
+        ["identify", "user-holder", null],
+        ["identify", "user-creator", null],
+        ["track", "user-creator", "virtual_key_created"],
       ]);
     });
   });

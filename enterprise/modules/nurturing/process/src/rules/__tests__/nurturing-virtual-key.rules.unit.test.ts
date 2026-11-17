@@ -138,14 +138,37 @@ describe("isPersonKey", () => {
 describe("forgetPersonOnKey", () => {
   describe("given a key its erased holder also created", () => {
     /** @scenario "An erased person's key falls to the organization's admin" */
-    it("names neither of them and keeps the holder's stamp", () => {
+    it("names neither of them and moves the holder's stamp to the erasure", () => {
       const key = foldAll([fact({ actorUserId: "user-jane", principalUserId: "user-jane" })]);
 
-      expect(forgetPersonOnKey({ key, userId: "user-jane" })).toMatchObject({
+      expect(forgetPersonOnKey({ key, userId: "user-jane", erasedAt: 3_000 })).toMatchObject({
         creatorUserId: null,
         principalUserId: null,
-        principalUserIdAt: 1_000,
+        principalUserIdAt: 3_000,
       });
+    });
+  });
+
+  describe("given a fact naming the erased holder, stamped after their stamp but before the erasure", () => {
+    /** @scenario "A fact stamped before an erasure never names the erased holder again" */
+    it("folds in naming no one, so the late fact cannot write them back", () => {
+      const key = foldAll([fact({ principalUserId: "user-jane", occurredAt: 1_000 })]);
+      const forgotten = forgetPersonOnKey({ key, userId: "user-jane", erasedAt: 3_000 });
+
+      const late = foldVirtualKeyFact({
+        held: forgotten,
+        fact: fact({ action: "rotated", principalUserId: "user-jane", occurredAt: 2_000 }),
+      });
+
+      expect(late).toMatchObject({ principalUserId: null, principalUserIdAt: 3_000 });
+    });
+  });
+
+  describe("given a key the erased person neither holds nor made", () => {
+    it("leaves its holder and stamp as they were", () => {
+      const key = foldAll([fact({})]);
+
+      expect(forgetPersonOnKey({ key, userId: "user-jane", erasedAt: 3_000 })).toEqual(key);
     });
   });
 });

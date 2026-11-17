@@ -9,6 +9,7 @@ import { ZodError } from "zod";
 import {
   recordBudgetCrossingCommandDataSchema,
   recordVkLifecycleCommandDataSchema,
+  virtualKeyPurposeSchema,
 } from "../index.ts";
 
 /** A lifecycle fact exactly as gateway stored one before the person and purpose fields. */
@@ -62,6 +63,16 @@ describe("gateway's governance facts", () => {
 
       expect(parsed).toMatchObject(storedCrossing);
       expect(parsed.period_ends_at_ms ?? null).toBeNull();
+    });
+  });
+
+  describe("when a lifecycle fact names each purpose a key row can hold", () => {
+    it("parses every one, the fact and the row reading one purpose schema", () => {
+      for (const purpose of virtualKeyPurposeSchema.options) {
+        const parsed = recordVkLifecycleCommandDataSchema.parse({ ...storedLifecycle, purpose });
+
+        expect(parsed.purpose).toBe(purpose);
+      }
     });
   });
 

@@ -126,15 +126,23 @@ export function foldVirtualKeyFact({ held, fact }: KeyFold): NurturingVirtualKey
   };
 }
 
-/** An erased account taken out of a key's copy: neither its creator nor its holder any more. */
+/**
+ * An erased account taken out of a key's copy: neither its creator nor its holder any more. A
+ * cleared holder's stamp moves to the erasure, so no fact stamped before it can write them back.
+ */
 export function forgetPersonOnKey({
   key,
   userId,
-}: Readonly<{ key: NurturingVirtualKey; userId: string }>): NurturingVirtualKey {
+  erasedAt,
+}: Readonly<{ key: NurturingVirtualKey; userId: string; erasedAt: number }>): NurturingVirtualKey {
+  const heldBy = key.principalUserId === userId;
   return {
     ...key,
     creatorUserId: key.creatorUserId === userId ? null : key.creatorUserId,
-    principalUserId: key.principalUserId === userId ? null : key.principalUserId,
+    principalUserId: heldBy ? null : key.principalUserId,
+    principalUserIdAt: heldBy
+      ? Math.max(key.principalUserIdAt ?? 0, erasedAt)
+      : key.principalUserIdAt,
   };
 }
 

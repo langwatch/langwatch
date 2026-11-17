@@ -164,4 +164,25 @@ describe.skipIf(!databaseUrl)("given nurturing's key copy in Postgres", () => {
       ).resolves.toMatchObject([{ principalUserId: "user-first", creatorUserId: null }]);
     });
   });
+
+  describe("when a fact stamped after the holder's stamp but before their erasure lands after it", () => {
+    /** @scenario "A fact stamped before an erasure never names the erased holder again" */
+    it("keeps the holder cleared, in Postgres as in the memory twin", async () => {
+      const lateErased = `test-nurturing-key-late-erased-${run}`;
+      const virtualKeyId = keyId("late");
+      const stamped = (occurredAt: number) =>
+        fact({ virtualKeyId, action: "rotated", principalUserId: lateErased, occurredAt });
+      const twin = MemoryNurturingVirtualKeyRepository.create();
+      // T1 < T2 < now: both stamps are in 1970, the erasure's is the clock's.
+      for (const repository of [keys, twin]) {
+        await repository.recordKeyFact({ fact: stamped(1_000) });
+        await repository.forgetUser({ userId: lateErased });
+        await repository.recordKeyFact({ fact: stamped(2_000) });
+      }
+      const where = { organizationId: firstOrganization, virtualKeyId };
+
+      await expect(keys.findKey(where)).resolves.toMatchObject([{ principalUserId: null }]);
+      await expect(twin.findKey(where)).resolves.toMatchObject([{ principalUserId: null }]);
+    });
+  });
 });

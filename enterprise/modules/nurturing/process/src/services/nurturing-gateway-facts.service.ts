@@ -55,6 +55,7 @@ export class NurturingGatewayFactsService {
     const virtualKeyId = data.virtual_key_id;
     const userId = await this.recipientOf({
       organizationId: data.organization_id,
+      virtualKeyId,
       holders: [data.principal_user_id ?? null, data.actor_user_id ?? null],
     });
     if (!userId) return this.noRecipient({ virtualKeyId, fact: "virtual_key_created" });
@@ -79,6 +80,7 @@ export class NurturingGatewayFactsService {
     if (!isPersonKey(key.purpose) || !isLiveKey(key)) return;
     const userId = await this.recipientOf({
       organizationId,
+      virtualKeyId,
       holders: [key.principalUserId, key.creatorUserId],
     });
     if (!userId) return this.noRecipient({ virtualKeyId, fact: "key_budget_threshold" });
@@ -98,15 +100,28 @@ export class NurturingGatewayFactsService {
   /** The key's holder, its creator or the organization's admin, whoever is a current member. */
   private async recipientOf({
     organizationId,
+    virtualKeyId,
     holders,
   }: Readonly<{
     organizationId: string;
+    virtualKeyId: string;
     holders: readonly (string | null)[];
   }>): Promise<string | null> {
     const admin = await this.dependencies.admins.adminOf({ organizationId });
     const people = [...holders, admin.kind === "admin" ? admin.userId : null];
     const userIds = people.filter((userId): userId is string => userId !== null);
     const memberships = await this.dependencies.members.findMembershipsOfUsers({ userIds });
+    const hasRow = (userId: string) =>
+      memberships.some(
+        (membership) =>
+          membership.organizationId === organizationId && membership.userId === userId,
+      );
+    if (holders.some((userId) => userId !== null && !hasRow(userId))) {
+      this.dependencies.logger.warn(
+        { organizationId, virtualKeyId, reason: "holder_not_in_member_copy" },
+        "a key holder has no row in nurturing's member copy; the fact may pass them over",
+      );
+    }
     return pickKeyRecipient({ organizationId, holders, memberships, admin });
   }
 

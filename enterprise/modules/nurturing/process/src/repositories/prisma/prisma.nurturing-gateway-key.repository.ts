@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { vkLifecyclePurposeSchema } from "@langwatch/gateway-contract";
+import { virtualKeyPurposeSchema } from "@langwatch/gateway-contract";
 import { PrismaRepository, skipTenantCheck } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
@@ -12,7 +12,7 @@ import type { NurturingVirtualKeyRepository } from "../nurturing-gateway-key.rep
 type NurturingVirtualKeyDatabase = Pick<PrismaClient, "nurturingVirtualKey" | "$executeRaw">;
 
 /** A purpose column holds gateway's own values; anything else is a corrupt row, not a USER. */
-const storedPurposeSchema = vkLifecyclePurposeSchema.nullable();
+const storedPurposeSchema = virtualKeyPurposeSchema.nullable();
 
 const timeOf = (at: Date | null) => at?.getTime() ?? null;
 
@@ -113,7 +113,11 @@ export class PrismaNurturingVirtualKeyRepository
     return [key];
   }
 
-  /** The stamps stay, so a redelivered older fact naming the account cannot write it back. */
+  /**
+   * A cleared holder's stamp moves to now, so no fact gateway stamped before the erasure, however
+   * late it lands, can write the account back. The creator needs no stamp: it is written only while
+   * `keyCreatedAt` is null, and a created fact set both.
+   */
   async forgetUser({ userId }: Readonly<{ userId: string }>): Promise<void> {
     await this.#database.$executeRaw`${skipTenantCheck({
       // An erased account holds no key in any organization: its rows go by user, in every one.
@@ -123,7 +127,11 @@ export class PrismaNurturingVirtualKeyRepository
          SET "creatorUserId" = CASE WHEN "creatorUserId" = ${userId} THEN NULL
                                     ELSE "creatorUserId" END,
              "principalUserId" = CASE WHEN "principalUserId" = ${userId} THEN NULL
-                                      ELSE "principalUserId" END
+                                      ELSE "principalUserId" END,
+             "principalUserIdAt" = CASE WHEN "principalUserId" = ${userId}
+                                        THEN GREATEST("principalUserIdAt",
+                                                      (now() AT TIME ZONE 'UTC')::timestamp(3))
+                                        ELSE "principalUserIdAt" END
        WHERE "creatorUserId" = ${userId} OR "principalUserId" = ${userId}`;
   }
 }

@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import { nowEpochMs } from "@langwatch/time";
+
 import {
   foldVirtualKeyFact,
   forgetPersonOnKey,
@@ -36,8 +38,9 @@ export class MemoryNurturingVirtualKeyRepository implements NurturingVirtualKeyR
   }
 
   async forgetUser({ userId }: Readonly<{ userId: string }>): Promise<void> {
+    const erasedAt = nowEpochMs();
     for (const [virtualKeyId, key] of this.#keys) {
-      this.#keys.set(virtualKeyId, forgetPersonOnKey({ key, userId }));
+      this.#keys.set(virtualKeyId, forgetPersonOnKey({ key, userId, erasedAt }));
     }
   }
 }
