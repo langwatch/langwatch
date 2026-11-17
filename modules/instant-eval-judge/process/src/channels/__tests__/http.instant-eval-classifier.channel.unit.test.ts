@@ -45,13 +45,17 @@ const TOO_LARGE = { detail: { error_type: "max_tokens_exceeded" } };
 let agent: MockAgent;
 let waits: number[];
 
-function judge(limiter: InstantEvalRateLimiter = MemoryInstantEvalRateLimiter.create()) {
+function judge(
+  limiter: InstantEvalRateLimiter = MemoryInstantEvalRateLimiter.create(),
+  now?: () => number,
+) {
   const channel = HttpInstantEvalClassifierChannel.create({
     apiKey: "test-key",
     dispatcher: agent,
     sleep: async (ms: number) => {
       waits.push(ms);
     },
+    ...(now ? { now } : {}),
   });
   return {
     classify: (request: Omit<InstantEvalClassifyRequest, "limiter">, signal?: AbortSignal) =>
@@ -202,17 +206,9 @@ describe("given a judge that is down for every send", () => {
   const TEXTS = 5;
 
   function judgeAt(clock: { now: number }) {
-    const limiter = MemoryInstantEvalRateLimiter.create();
-    const channel = HttpInstantEvalClassifierChannel.create({
-      apiKey: "test-key",
-      dispatcher: agent,
-      sleep: async (ms: number) => {
-        waits.push(ms);
-      },
-      now: () => clock.now,
-    });
+    const { classify } = judge(undefined, () => clock.now);
     return (text: string, signal?: AbortSignal) =>
-      channel.classify({ projectId: "project-1", text, questions: [QUESTION], limiter }, signal);
+      classify({ projectId: "project-1", text, questions: [QUESTION] }, signal);
   }
 
   describe("when texts are classified one after another", () => {
@@ -360,15 +356,8 @@ describe("given a judge that is down for every send", () => {
 
 describe("given a judge that rate limits or refuses every send", () => {
   function judgeAtZero() {
-    const limiter = MemoryInstantEvalRateLimiter.create();
-    const channel = HttpInstantEvalClassifierChannel.create({
-      apiKey: "test-key",
-      dispatcher: agent,
-      sleep: async () => {},
-      now: () => 0,
-    });
-    return (text: string) =>
-      channel.classify({ projectId: "project-1", text, questions: [QUESTION], limiter });
+    const { classify } = judge(undefined, () => 0);
+    return (text: string) => classify({ projectId: "project-1", text, questions: [QUESTION] });
   }
 
   describe.each([429, 529])("when every send is answered %i", (status) => {

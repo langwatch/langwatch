@@ -121,6 +121,26 @@ describe("the classifier breaker", () => {
     expect(allows(older, probeEveryMs * 5)).toBe(false);
   });
 
+  /** @scenario "A cancelled probe does not stop the next one" */
+  it("keeps the newer probe reserved when a stale probe comes back", () => {
+    const first = classifierBreakerAllowsSend({
+      state: after(downs(openAfterFailures)),
+      now: probeEveryMs,
+    });
+    const reopened = after(["up", ...downs(openAfterFailures)], first.state, probeEveryMs);
+    const second = classifierBreakerAllowsSend({ state: reopened, now: probeEveryMs * 2 });
+    const stale = recordClassifierSend({
+      state: second.state,
+      health: "neutral",
+      now: probeEveryMs * 2,
+      probe: first.probe,
+    });
+
+    expect(second.probe).toBe(2);
+    expect(stale.probeInFlight).toBe(2);
+    expect(allows(stale, probeEveryMs * 5)).toBe(false);
+  });
+
   /** @scenario "Rate limits and permanent refusals never stop sends" */
   it("neither opens nor resets on rate limits and permanent refusals", () => {
     expect(allows(after(Array.from({ length: 100 }, () => "neutral")), 0)).toBe(true);
