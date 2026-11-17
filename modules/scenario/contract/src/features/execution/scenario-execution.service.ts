@@ -1,3 +1,4 @@
+import type { RedTeamRunReport } from "../../red-team.ts";
 import type { RunParameterValues } from "../../scenario.parameters.ts";
 import type { ResolvedRunModels } from "../run/run-models.ts";
 import type { RunSecretCiphertext } from "../run/run-parameters.ts";
@@ -125,5 +126,11 @@ export abstract class ScenarioExecutionService {
     projectId: string;
     scenarioRunId: string;
     hooks: ScenarioRunHooks;
+  }): Promise<void>;
+  /** Records a red team run's held or broke report on the run's metadata. */
+  abstract recordRedTeamReport(input: {
+    projectId: string;
+    scenarioRunId: string;
+    report: RedTeamRunReport;
   }): Promise<void>;
 }

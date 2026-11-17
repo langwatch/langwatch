@@ -75,6 +75,13 @@ Feature: A red team scenario runs an attacker against the agent
     And anything that is not a turn score is left out
 
   @unit
+  Scenario: The red team report is recorded on the stored run
+    Given a finished red team run
+    When the child reports the run's red team report
+    Then the run's metadata holds the report under "redTeam"
+    And the run's status and other metadata are unchanged
+
+  @unit
   Scenario: A red team run with an unreadable attack config fails with a clear error
     Given a red team job whose attack config was missing or unreadable
     When the runner builds the run's cast

@@ -446,6 +446,18 @@ export class ScenarioProcessorService implements ScenarioExecutionRunner {
       }
     }
 
+    if (input.result.redTeam) {
+      try {
+        await this.options.execution.recordRedTeamReport({
+          projectId,
+          scenarioRunId,
+          report: input.result.redTeam,
+        });
+      } catch (error) {
+        jobLogger.warn({ err: error, scenarioRunId }, "Could not record the red team run's report");
+      }
+    }
+
     if (input.result.isCutAtLimit) {
       try {
         await this.options.execution.recordCutAtLimit({ projectId, scenarioRunId });

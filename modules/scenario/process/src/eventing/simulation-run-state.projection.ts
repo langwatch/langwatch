@@ -21,6 +21,7 @@ import {
   SimulationRunDeletedEventSchema,
   SimulationRunEvaluatedEventSchema,
   SimulationRunHooksRecordedEventSchema,
+  SimulationRunRedTeamReportRecordedEventSchema,
   SimulationRunFinishedEventSchema,
   SimulationRunMetricsComputedEventSchema,
   SimulationRunQueuedEventSchema,
@@ -37,12 +38,15 @@ import {
   type SimulationRunDeletedEvent,
   type SimulationRunEvaluatedEvent,
   type SimulationRunHooksRecordedEvent,
+  type SimulationRunRedTeamReportRecordedEvent,
   type SimulationRunFinishedEvent,
   type SimulationRunMetricsComputedEvent,
   type SimulationRunQueuedEvent,
   type SimulationRunStartedEvent,
   type SimulationTextMessageEndEvent,
   type SimulationTextMessageStartEvent,
+  RED_TEAM_REPORT_METADATA_KEY,
+  type RedTeamRunReport,
 } from "@langwatch/scenario-contract";
 
 const projectionLogger = createLogger("simulationRunState.foldProjection");
@@ -305,6 +309,7 @@ const simulationRunEvents = [
   SimulationRunAgentInstanceRecordedEventSchema,
   SimulationRunCutAtLimitRecordedEventSchema,
   SimulationRunHooksRecordedEventSchema,
+  SimulationRunRedTeamReportRecordedEventSchema,
   SimulationRunDeletedEventSchema,
 ] as const;
 
@@ -362,6 +367,19 @@ export class SimulationRunStateFoldProjection
    * `langwatch` namespace, mirroring `withAgentInstance`. The marker is
    * always `true`, so folding it twice produces byte-identical metadata.
    */
+  static withRedTeamReport({
+    metadata,
+    report,
+  }: {
+    metadata: string | null;
+    report: RedTeamRunReport;
+  }): string {
+    return JSON.stringify({
+      ...parseMetadataObject(metadata),
+      [RED_TEAM_REPORT_METADATA_KEY]: report,
+    });
+  }
+
   static withCutAtLimit(metadata: string | null): string {
     return mergeLangwatchNamespace(metadata, { isCutAtLimit: true });
   }
@@ -808,6 +826,21 @@ export class SimulationRunStateFoldProjection
       ...state,
       ScenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
       Metadata: SimulationRunStateFoldProjection.withCutAtLimit(state.Metadata),
+    };
+  }
+
+  /** The red team report lands under metadata `redTeam`; status, verdict and finish time stay. */
+  handleSimulationRunRedTeamReportRecorded(
+    event: SimulationRunRedTeamReportRecordedEvent,
+    state: SimulationRunStateData,
+  ): SimulationRunStateData {
+    return {
+      ...state,
+      ScenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
+      Metadata: SimulationRunStateFoldProjection.withRedTeamReport({
+        metadata: state.Metadata,
+        report: event.data.report,
+      }),
     };
   }
 
