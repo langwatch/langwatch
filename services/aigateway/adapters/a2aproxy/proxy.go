@@ -29,6 +29,8 @@ const (
 	maxBodyBytes  = 1 << 20
 	maxEventBytes = 1 << 20
 	cardPath      = "/.well-known/agent-card.json"
+	// legacyCardPath is where A2A v0.2 agents publish their card.
+	legacyCardPath = "/.well-known/agent.json"
 )
 
 // Binding names follow a2a.protocol.binding values.
@@ -171,14 +173,14 @@ func parseCall(w http.ResponseWriter, r *http.Request) (*call, *refusal) {
 	c := &call{w: w, r: r, ctx: r.Context(), binding: bindingHTTPJSON, span: trace.SpanFromContext(context.Background())}
 	name, rest, decoded, pathErr := splitPath(r)
 	c.name, c.rest = name, rest
-	c.isCard = decoded == cardPath && r.Method == http.MethodGet
+	c.isCard = (decoded == cardPath || decoded == legacyCardPath) && r.Method == http.MethodGet
 	method, known := restMethod(r.Method, decoded)
 	c.method = method
 	if (decoded == "" || decoded == "/") && r.Method == http.MethodPost {
 		c.binding, known = bindingJSONRPC, true
 	}
 	if pathErr != nil {
-		return c, &refuseInvalidRequest
+		return c, &refuseInvalidPath
 	}
 	if !known {
 		return c, &refuseUnsupported
@@ -202,6 +204,9 @@ func parseCall(w http.ResponseWriter, r *http.Request) (*call, *refusal) {
 		return c, &refuseInvalidRequest
 	}
 	c.id, c.method = env.ID, env.Method
+	if !jsonRPCMethods[env.Method] {
+		return c, &refuseUnsupported
+	}
 	return c, nil
 }
 
@@ -340,7 +345,7 @@ func (h *Handler) forward(c *call, target domain.A2ATarget) {
 		return
 	}
 	if c.method == "GetExtendedAgentCard" {
-		respBody = rewriteReplyCard(respBody, strings.TrimSuffix(target.UpstreamURL, "/"), proxyBase(h.cfg.PublicBaseURL, c.r, target.Name))
+		respBody = rewriteReplyCard(respBody, target.UpstreamURL, proxyBase(h.cfg.PublicBaseURL, c.r, target.Name))
 	}
 	copyHeader(c.w.Header(), resp.Header)
 	c.w.WriteHeader(resp.StatusCode)
@@ -360,10 +365,7 @@ func upstreamRefusal(err error) refusal {
 }
 
 func newUpstreamRequest(c *call, target domain.A2ATarget) (*http.Request, error) {
-	upstreamURL := strings.TrimSuffix(target.UpstreamURL, "/") + c.rest
-	if c.r.URL.RawQuery != "" {
-		upstreamURL += "?" + c.r.URL.RawQuery
-	}
+	upstreamURL := upstreamEndpoint(target.UpstreamURL, c.rest, c.r.URL.RawQuery)
 	req, err := http.NewRequestWithContext(c.ctx, c.r.Method, upstreamURL, bytes.NewReader(c.body))
 	if err != nil {
 		return nil, err

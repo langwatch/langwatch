@@ -25,7 +25,7 @@ func (h *Handler) serveCard(c *call, target domain.A2ATarget) {
 			c.span.SetAttributes(attribute.String(attrAgentName, name))
 		}
 	}
-	rewriteCard(card, strings.TrimSuffix(target.UpstreamURL, "/"), proxyBase(h.cfg.PublicBaseURL, c.r, target.Name))
+	rewriteCard(card, target.UpstreamURL, proxyBase(h.cfg.PublicBaseURL, c.r, target.Name))
 	out, _ := json.Marshal(card)
 	c.w.Header().Set("Content-Type", "application/json")
 	c.w.WriteHeader(http.StatusOK)
@@ -36,7 +36,7 @@ func (h *Handler) serveCard(c *call, target domain.A2ATarget) {
 func (h *Handler) fetchCard(c *call, target domain.A2ATarget) (map[string]any, bool) {
 	cardURL := target.CardURL
 	if cardURL == "" {
-		cardURL = strings.TrimSuffix(target.UpstreamURL, "/") + cardPath
+		cardURL = upstreamEndpoint(target.UpstreamURL, cardPath, "")
 	}
 	req, err := http.NewRequestWithContext(c.ctx, http.MethodGet, cardURL, nil)
 	if err != nil {
@@ -66,39 +66,32 @@ func (h *Handler) fetchCard(c *call, target domain.A2ATarget) (map[string]any, b
 	return card, true
 }
 
-// rewriteCard swaps the upstream base for the proxy base in the card's url
-// and every interface url (v1.0 supportedInterfaces, v0.3 additionalInterfaces).
-// A url outside the upstream base becomes the proxy base itself.
+// rewriteCard points the card at the proxy. The proxy serves one endpoint per
+// target, the upstream URL, so the card's url becomes the proxy base, an
+// interface at the upstream URL does too, and every other interface (another
+// path or host the proxy does not serve) is dropped.
 func rewriteCard(card map[string]any, upstream, proxy string) {
-	rewrite := func(u string) string {
-		if suffix, ok := strings.CutPrefix(u, upstream); ok && (suffix == "" || strings.HasPrefix(suffix, "/")) && plainSuffix(suffix) {
-			return proxy + suffix
-		}
-		return proxy
-	}
-	rewriteURL(card, rewrite)
+	card["url"] = proxy
 	for _, key := range []string{"supportedInterfaces", "additionalInterfaces"} {
-		list, _ := card[key].([]any)
+		list, isList := card[key].([]any)
+		if !isList {
+			continue
+		}
+		kept := make([]any, 0, len(list))
 		for _, item := range list {
-			if iface, ok := item.(map[string]any); ok {
-				rewriteURL(iface, rewrite)
+			iface, ok := item.(map[string]any)
+			if u, _ := iface["url"].(string); ok && sameEndpoint(u, upstream) {
+				iface["url"] = proxy
+				kept = append(kept, iface)
 			}
 		}
+		card[key] = kept
 	}
 }
 
-// plainSuffix is false for a path that could climb out of the target's base
-// once a client resolves it: dot segments, escapes and backslashes.
-func plainSuffix(suffix string) bool {
-	if strings.ContainsAny(suffix, "%\\") {
-		return false
-	}
-	for _, seg := range strings.Split(suffix, "/") {
-		if seg == "." || seg == ".." {
-			return false
-		}
-	}
-	return true
+// sameEndpoint reports whether u names the upstream endpoint itself.
+func sameEndpoint(u, upstream string) bool {
+	return strings.TrimSuffix(u, "/") == strings.TrimSuffix(upstream, "/")
 }
 
 // rewriteReplyCard rewrites the card in an extended Agent Card reply, bare
@@ -118,12 +111,6 @@ func rewriteReplyCard(body []byte, upstream, proxy string) []byte {
 		return body
 	}
 	return out
-}
-
-func rewriteURL(m map[string]any, rewrite func(string) string) {
-	if u, ok := m["url"].(string); ok {
-		m["url"] = rewrite(u)
-	}
 }
 
 func proxyBase(public string, r *http.Request, target string) string {

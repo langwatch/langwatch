@@ -21,6 +21,7 @@ type refusal struct {
 
 var (
 	refuseInvalidRequest  = refusal{-32600, "a2a_invalid_request", "the body is not a valid A2A request", http.StatusBadRequest}
+	refuseInvalidPath     = refusal{-32600, "a2a_invalid_request", "the A2A path is not allowed", http.StatusBadRequest}
 	refuseTargetBlocked   = refusal{-32011, string(domain.A2ATargetBlocked), "this A2A agent is blocked", http.StatusForbidden}
 	refuseContentBlocked  = refusal{-32012, "a2a_content_blocked", "blocked by a guardrail", http.StatusForbidden}
 	refuseTargetNotFound  = refusal{-32013, "a2a_target_not_found", "no such A2A agent in this project", http.StatusNotFound}
@@ -34,7 +35,7 @@ var (
 	refuseRateLimited     = refusal{-32021, "a2a_rate_limited", "this virtual key is over its rate limit", http.StatusTooManyRequests}
 	refuseBudgetExceeded  = refusal{-32022, "a2a_budget_exceeded", "a budget for this virtual key is used up", http.StatusPaymentRequired}
 	refuseNotHTTPS        = refusal{-32023, "a2a_target_not_https", "this gateway calls A2A agents over https only", http.StatusBadGateway}
-	refuseUnsupported     = refusal{-32601, "a2a_operation_not_supported", "this method and path is not an A2A operation", http.StatusNotFound}
+	refuseUnsupported     = refusal{-32601, "a2a_operation_not_supported", "this method and path, or this JSON-RPC method, is not an A2A operation", http.StatusNotFound}
 )
 
 // Reply-side variants: the upstream sent something the proxy will not relay.

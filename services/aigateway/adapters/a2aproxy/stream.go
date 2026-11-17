@@ -27,9 +27,12 @@ func (h *Handler) stream(c *call, resp *http.Response) {
 	}
 	var seen streamText
 	err := readEvents(resp.Body, func(event []byte) bool {
-		data := eventData(event)
-		setResultAttrs(c.span, data)
-		if r := h.checkEvent(c, data, &seen); r != nil {
+		event = sseFields(event)
+		if len(event) == 0 {
+			return true
+		}
+		setResultAttrs(c.span, eventData(event))
+		if r := h.checkEvent(c, event, &seen); r != nil {
 			c.markRefused(*r)
 			event = c.errorEvent(*r)
 		}
@@ -64,14 +67,15 @@ func (s *streamText) add(texts []string) {
 
 // checkEvent scans one event's texts plus the event's text joined to the
 // text streamed before it.
-func (h *Handler) checkEvent(c *call, data []byte, seen *streamText) *refusal {
+func (h *Handler) checkEvent(c *call, event []byte, seen *streamText) *refusal {
 	if !h.cfg.Scanner.Applies(c.bundle, DirectionResponse) {
 		return nil
 	}
-	p := collectTexts(data)
+	p := collectTexts(eventData(event))
 	if !p.parsed {
 		return &refuseReplyUnscannable
 	}
+	p.texts = append(p.texts, fieldValues(event)...)
 	texts := p.texts
 	if seen.tail != "" && len(p.texts) > 0 {
 		texts = append(append([]string(nil), p.texts...), seen.tail+strings.Join(p.texts, ""))
@@ -191,4 +195,36 @@ func eventData(event []byte) []byte {
 		}
 	}
 	return data.Bytes()
+}
+
+// sseFields keeps the data, event, id and retry lines of one event and drops
+// comments and any other line, so nothing reaches the caller unscanned. An
+// event left with no line is empty.
+func sseFields(event []byte) []byte {
+	var out bytes.Buffer
+	for _, line := range bytes.Split(event, []byte("\n")) {
+		name, _, _ := bytes.Cut(line, []byte(":"))
+		switch string(name) {
+		case "data", "event", "id", "retry":
+			out.Write(line)
+			out.WriteByte('\n')
+		}
+	}
+	if out.Len() == 0 {
+		return nil
+	}
+	out.WriteByte('\n')
+	return out.Bytes()
+}
+
+// fieldValues returns the values of an event's event and id lines.
+func fieldValues(event []byte) []string {
+	var out []string
+	for _, line := range bytes.Split(event, []byte("\n")) {
+		name, v, _ := bytes.Cut(line, []byte(":"))
+		if (string(name) == "event" || string(name) == "id") && len(bytes.TrimSpace(v)) > 0 {
+			out = append(out, string(bytes.TrimSpace(v)))
+		}
+	}
+	return out
 }

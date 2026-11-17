@@ -52,7 +52,7 @@ func restMethod(httpMethod, rest string) (string, bool) {
 	get, post := httpMethod == http.MethodGet, httpMethod == http.MethodPost
 	task, isTask := strings.CutPrefix(rest, "/tasks/")
 	switch {
-	case get && rest == cardPath:
+	case get && (rest == cardPath || rest == legacyCardPath):
 		return "GetAgentCard", true
 	case get && rest == "/extendedAgentCard":
 		return "GetExtendedAgentCard", true
@@ -110,4 +110,32 @@ func pushConfigMethod(httpMethod, sub string) (string, bool) {
 		return "DeleteTaskPushNotificationConfig", true
 	}
 	return httpMethod + " " + sub, false
+}
+
+// jsonRPCMethods are the A2A JSON-RPC methods: the v1.0 names and the v0.3
+// names. Any other method is refused before it reaches the upstream.
+var jsonRPCMethods = map[string]bool{
+	"SendMessage": true, "SendStreamingMessage": true, "GetTask": true, "ListTasks": true,
+	"CancelTask": true, "SubscribeToTask": true, "CreateTaskPushNotificationConfig": true,
+	"GetTaskPushNotificationConfig": true, "ListTaskPushNotificationConfig": true,
+	"DeleteTaskPushNotificationConfig": true, "GetExtendedAgentCard": true,
+	"message/send": true, "message/stream": true, "tasks/get": true, "tasks/list": true,
+	"tasks/cancel": true, "tasks/resubscribe": true, "tasks/pushNotificationConfig/set": true,
+	"tasks/pushNotificationConfig/get": true, "tasks/pushNotificationConfig/list": true,
+	"tasks/pushNotificationConfig/delete": true, "agent/getAuthenticatedExtendedCard": true,
+}
+
+// upstreamEndpoint appends the escaped rest of the path to the upstream URL's
+// path, keeping the upstream's own query and adding the caller's after it.
+func upstreamEndpoint(base, rest, query string) string {
+	base, _, _ = strings.Cut(base, "#")
+	base, baseQuery, _ := strings.Cut(base, "?")
+	out := strings.TrimSuffix(base, "/") + rest
+	if out == "" || !strings.Contains(strings.TrimPrefix(strings.TrimPrefix(out, "https://"), "http://"), "/") {
+		out += "/"
+	}
+	if q := strings.Trim(baseQuery+"&"+query, "&"); q != "" {
+		out += "?" + q
+	}
+	return out
 }
