@@ -117,4 +117,34 @@ describe("AgentStopClaimService", () => {
       expect(late).toBe("sent");
     });
   });
+
+  describe("when a decision's command was sent", () => {
+    /** @scenario "A sent decision is never taken over as abandoned" */
+    it("refuses every later decision however long after", async () => {
+      const { service } = laggingClaims();
+      await service.claim({ organizationId: ORG, agentId: AGENT_ID, stopId: "stop-1", at: 0 });
+      const decide = {
+        organizationId: ORG,
+        stopId: "stop-1",
+        status: "pending_approval" as const,
+      };
+      await service.withDecision({
+        ...decide,
+        decision: "approve",
+        at: 1_000,
+        send: async () => "sent",
+      });
+
+      const late = await service
+        .withDecision({
+          ...decide,
+          decision: "deny",
+          at: 1_000 + ABANDONED_CLAIM_MS * 10,
+          send: async () => "sent",
+        })
+        .catch((error: { code?: string }) => error.code);
+
+      expect(late).toBe("agent_stop_not_pending");
+    });
+  });
 });

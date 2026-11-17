@@ -103,15 +103,34 @@ export class MemoryAgentStopClaimRepository extends AgentStopClaimRepository {
     organizationId,
     stopId,
     decision,
+    takenAt,
   }: {
     organizationId: string;
     stopId: string;
     decision: AgentStopClaimDecision;
+    takenAt: number;
   }): Promise<void> {
     const claim = this.claimOfStop(organizationId, stopId);
-    if (claim?.decision !== decision) return;
+    if (claim?.decision !== decision || claim.decisionTakenAt !== takenAt) return;
     claim.decision = null;
     claim.decisionTakenAt = null;
+  }
+
+  async markDecisionSent({
+    organizationId,
+    stopId,
+    decision,
+    takenAt,
+  }: {
+    organizationId: string;
+    stopId: string;
+    decision: AgentStopClaimDecision;
+    takenAt: number;
+  }): Promise<void> {
+    const claim = this.claimOfStop(organizationId, stopId);
+    if (claim?.decision === decision && claim.decisionTakenAt === takenAt) {
+      claim.decisionTakenAt = null;
+    }
   }
 
   private claimOfStop(organizationId: string, stopId: string): HeldClaim | undefined {

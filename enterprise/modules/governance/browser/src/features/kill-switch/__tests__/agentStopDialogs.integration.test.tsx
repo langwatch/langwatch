@@ -252,7 +252,7 @@ describe("the stop plan of an agent", () => {
   });
 
   /** @scenario "The stop plan dialog takes no edit while a save runs" */
-  it("ignores target edits while the save and its re-read run", async () => {
+  it("turns Add and Remove off while the save and its re-read run", async () => {
     answerMutation("governanceKillSwitch.setPlan", () => SUPPORT_BOT_PLAN);
     const { dialog } = await openPlanDialog();
     await within(dialog).findAllByTestId("stop-plan-target");
@@ -260,8 +260,9 @@ describe("the stop plan of an agent", () => {
 
     await userEvent.click(within(dialog).getByRole("button", { name: "Save plan" }));
     await waitFor(() => expect(trpcDouble.invalidated).toContain("governanceKillSwitch.plan"));
-    await userEvent.click(within(dialog).getByRole("button", { name: "Remove Support key" }));
 
+    expect(within(dialog).getByRole("button", { name: "Remove Support key" })).toBeDisabled();
+    expect(within(dialog).getByRole("button", { name: "Add target" })).toBeDisabled();
     expect(within(dialog).getAllByTestId("stop-plan-target")).toHaveLength(2);
   });
 

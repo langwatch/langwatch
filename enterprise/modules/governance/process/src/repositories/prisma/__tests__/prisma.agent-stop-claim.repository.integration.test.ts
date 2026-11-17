@@ -165,6 +165,75 @@ describe.skipIf(!connection)("the kill switch claim and prior state repositories
     });
   });
 
+  describe("when a decision was taken over by another holder", () => {
+    /** @scenario "A decision left by a process that died before sending it is taken over once abandoned" */
+    it("ignores the first holder's late release and mark, and keeps the new holder", async () => {
+      const organizationId = newOrganization();
+      const { request } = await stopServiceOf(organizationId);
+      const opened = await request();
+      const claims = PrismaAgentStopClaimRepository.create(prisma());
+      const first = Date.parse("2026-11-16T10:00:00Z");
+      const second = first + 10;
+      const key = { organizationId, stopId: opened.id };
+      await claims.takeDecision({
+        ...key,
+        decision: "deny",
+        takenAt: first,
+        abandonedBefore: first,
+      });
+      await claims.takeDecision({
+        ...key,
+        decision: "deny",
+        takenAt: second,
+        abandonedBefore: first + 1,
+      });
+
+      await claims.releaseDecision({ ...key, decision: "deny", takenAt: first });
+      await claims.markDecisionSent({ ...key, decision: "deny", takenAt: first });
+
+      expect(
+        await claims.takeDecision({
+          ...key,
+          decision: "approve",
+          takenAt: second + 1,
+          abandonedBefore: second,
+        }),
+      ).toBe(false);
+      expect(
+        await claims.takeDecision({
+          ...key,
+          decision: "approve",
+          takenAt: second + 2,
+          abandonedBefore: second + 1,
+        }),
+      ).toBe(true);
+    });
+  });
+
+  describe("when a decision's command was sent", () => {
+    /** @scenario "A sent decision is never taken over as abandoned" */
+    it("refuses every later decision however old the first is", async () => {
+      const organizationId = newOrganization();
+      const { request } = await stopServiceOf(organizationId);
+      const opened = await request();
+      const claims = PrismaAgentStopClaimRepository.create(prisma());
+      const takenAt = Date.parse("2026-11-16T10:00:00Z");
+      const key = { organizationId, stopId: opened.id };
+      await claims.takeDecision({ ...key, decision: "approve", takenAt, abandonedBefore: takenAt });
+
+      await claims.markDecisionSent({ ...key, decision: "approve", takenAt });
+
+      expect(
+        await claims.takeDecision({
+          ...key,
+          decision: "deny",
+          takenAt: takenAt + 1,
+          abandonedBefore: takenAt + 1_000_000,
+        }),
+      ).toBe(false);
+    });
+  });
+
   describe("when an abandoned claim is taken over while its request is marked sent", () => {
     /** @scenario "A claim marked sent is never taken over as abandoned" */
     it("refuses the takeover of a sent claim and keeps the sent stop's claim", async () => {

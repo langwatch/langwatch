@@ -34,8 +34,9 @@ export abstract class AgentStopClaimRepository {
     sentAt: number;
   }): Promise<void>;
   /**
-   * Takes the stop's one decision at `takenAt`; false when another approve or deny holds it. A
-   * decision taken before `abandonedBefore` whose command never landed is taken over.
+   * Takes the stop's one decision at `takenAt`, which is also its holder's token; false when
+   * another approve or deny holds it. A decision still in flight (never marked sent) and taken
+   * before `abandonedBefore` is taken over.
    */
   abstract takeDecision(input: {
     organizationId: string;
@@ -44,11 +45,19 @@ export abstract class AgentStopClaimRepository {
     takenAt: number;
     abandonedBefore: number;
   }): Promise<boolean>;
-  /** Gives the decision back when its command was never sent. */
+  /** Gives the decision back when its command was never sent, only while `takenAt` holds it. */
   abstract releaseDecision(input: {
     organizationId: string;
     stopId: string;
     decision: AgentStopClaimDecision;
+    takenAt: number;
+  }): Promise<void>;
+  /** Marks the decision held by `takenAt` sent; from then on it is never taken over. */
+  abstract markDecisionSent(input: {
+    organizationId: string;
+    stopId: string;
+    decision: AgentStopClaimDecision;
+    takenAt: number;
   }): Promise<void>;
   /**
    * Hands the claim from `fromStopId` to `toStopId`, unsent and undecided; false when moved first,

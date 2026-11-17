@@ -212,6 +212,51 @@ describe("the Restore dialog when the agent's open stop changes under it", () =>
   });
 });
 
+describe("a Restore that completes after its stop was replaced", () => {
+  /** @scenario "A late Restore completion leaves the dialog opened after it" */
+  it("leaves the Restore dialog of the newer stop open", async () => {
+    let openStop = QUARANTINED;
+    let finish: () => void = () => undefined;
+    answerAgentsPage({ summaries: [summary({ agentId: "a1", openStop: QUARANTINED })] });
+    answerQuery("governanceKillSwitch.summaries", () => [summary({ agentId: "a1", openStop })]);
+    answerMutation(
+      "governanceKillSwitch.restore",
+      () =>
+        new Promise((resolve) => {
+          finish = () => resolve({ ...QUARANTINED, status: "restoring" });
+        }),
+    );
+    const reread = () =>
+      act(async () => {
+        await Promise.all(
+          [...(trpcDouble.mounted.get("governanceKillSwitch.summaries") ?? [])].map((read) =>
+            read(),
+          ),
+        );
+      });
+    renderAgentsPage({ permissions: MANAGER });
+    await openActions("support-bot");
+    await userEvent.click(await screen.findByRole("menuitem", { name: /Restore/ }));
+    const first = await screen.findByRole("dialog", { name: "Restore support-bot?" });
+    await userEvent.click(within(first).getByRole("button", { name: "Restore agent" }));
+    openStop = { ...QUARANTINED, id: "stop-3" };
+    await reread();
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Restore support-bot?" })).toBeNull(),
+    );
+
+    await openActions("support-bot");
+    await userEvent.click(await screen.findByRole("menuitem", { name: /Restore/ }));
+    await screen.findByRole("dialog", { name: "Restore support-bot?" });
+    await act(async () => {
+      finish();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+
+    expect(screen.getByRole("dialog", { name: "Restore support-bot?" })).toBeInTheDocument();
+  });
+});
+
 describe("the Agents page when a kill switch read fails", () => {
   const unavailable = () => {
     throw handledError({ code: "service_unavailable", httpStatus: 503 });

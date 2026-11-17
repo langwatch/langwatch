@@ -5,15 +5,17 @@ import { Trash2 } from "lucide-react";
 
 import { describeStopTarget, STOP_TARGET_KIND_LABELS } from "../../model/kill-switch-copy.ts";
 
-/** The targets of a stop plan draft, each with its Remove button. */
+/** The targets of a stop plan draft, each with its Remove button, off while `disabled`. */
 export function StopPlanTargetList({
   targets,
   labelOf,
   onRemove,
+  disabled,
 }: {
   targets: readonly AgentStopTarget[];
   labelOf: (target: AgentStopTarget) => string;
   onRemove: (index: number) => void;
+  disabled: boolean;
 }) {
   return (
     <VStack align="stretch" gap={2} data-testid="stop-plan-targets">
@@ -42,6 +44,7 @@ export function StopPlanTargetList({
               variant="ghost"
               colorPalette="red"
               aria-label={`Remove ${labelOf(target)}`}
+              disabled={disabled}
               onClick={() => onRemove(index)}
             >
               <Trash2 size={14} />

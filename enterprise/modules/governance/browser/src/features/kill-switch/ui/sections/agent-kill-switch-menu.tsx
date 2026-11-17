@@ -27,7 +27,8 @@ function stopUnavailableReason({
 
 /**
  * The kill switch actions of one agent row, and the dialog the picked action opens. Restore is
- * bound to the stop open when it was picked; once that stop is no longer open the dialog goes.
+ * bound to the stop open when it was picked; once that stop is no longer open the dialog goes, and
+ * each dialog closes only itself.
  */
 export function AgentKillSwitchMenu({
   organizationId,
@@ -45,8 +46,10 @@ export function AgentKillSwitchMenu({
     stopId: string | null;
   } | null>(null);
   const openStop = summary.openStop;
-  const close = () => setDialog(null);
   const pick = (action: KillSwitchAction) => setDialog({ action, stopId: openStop?.id ?? null });
+  // A late close from an older dialog leaves the one picked after it open.
+  const opened = dialog;
+  const close = () => setDialog((current) => (current === opened ? null : current));
   const dialogProps = { organizationId, agentName, open: true, onClose: close };
 
   return (

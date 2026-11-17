@@ -85,8 +85,9 @@ export class AgentStopClaimService {
 
   /**
    * Runs `send` holding the stop's one decision, so a concurrent approve and deny cannot both be
-   * sent. The loser is refused `agent_stop_not_pending`; a failed send gives the decision back. A
-   * decision left by a process that died before sending is taken over once abandoned.
+   * sent. The loser is refused `agent_stop_not_pending`; a failed send gives the decision back and
+   * a sent one is marked so. A decision left in flight by a process that died before sending is
+   * taken over once abandoned; `at` is the holder's token for the release and the mark.
    */
   async withDecision<T>({
     organizationId,
@@ -113,12 +114,16 @@ export class AgentStopClaimService {
     if (!taken) {
       throw new AgentStopNotPendingError({ stopId, status });
     }
+    const held = { organizationId, stopId, decision, takenAt: at };
+    let sent: T;
     try {
-      return await send();
+      sent = await send();
     } catch (error) {
-      await this.deps.claims.releaseDecision({ organizationId, stopId, decision });
+      await this.deps.claims.releaseDecision(held);
       throw error;
     }
+    await this.deps.claims.markDecisionSent(held);
+    return sent;
   }
 
   /** `closed`: its stop closed. `abandoned`: never sent and too old. `held`: still open. */

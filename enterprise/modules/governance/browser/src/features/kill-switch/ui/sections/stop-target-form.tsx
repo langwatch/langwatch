@@ -146,15 +146,20 @@ const KIND_OPTIONS: Option[] = AGENT_STOP_TARGET_KINDS.map((kind) => ({
   label: STOP_TARGET_KIND_LABELS[kind],
 }));
 
-/** One new plan target of any kind, checked against the contract before it joins the plan. */
+/**
+ * One new plan target of any kind, checked against the contract before it joins the plan. Add is
+ * off while `disabled`, so a typed target is never cleared by an add that does not land.
+ */
 export function StopTargetForm({
   databricksSources,
   awsConnections,
   onAdd,
+  disabled,
 }: {
   databricksSources: readonly Option[];
   awsConnections: readonly Option[];
   onAdd: (target: AgentStopTarget) => void;
+  disabled: boolean;
 }) {
   const draft = useStopTargetDraft({ onAdd });
 
@@ -179,7 +184,7 @@ export function StopTargetForm({
         </Text>
       ) : null}
       <HStack justify="end">
-        <Button size="sm" variant="outline" onClick={draft.add}>
+        <Button size="sm" variant="outline" onClick={draft.add} disabled={disabled}>
           Add target
         </Button>
       </HStack>

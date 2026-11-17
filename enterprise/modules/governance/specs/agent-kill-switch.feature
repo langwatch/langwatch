@@ -159,6 +159,13 @@ Feature: Agent kill switch: stop a misbehaving agent where it runs, with approva
     Then it is refused
     When another decision arrives after the first is abandoned
     Then it takes the decision
+    And the first process's late release or sent mark leaves the new decision in place
+
+  @integration @unit
+  Scenario: A sent decision is never taken over as abandoned
+    Given a decision on a pending stop was taken and its command was sent
+    When another decision arrives long after the first would count as abandoned
+    Then it is refused with code "agent_stop_not_pending"
 
   @integration
   Scenario: A stop of an agent with no stop plan is refused
@@ -367,6 +374,13 @@ Feature: Agent kill switch: stop a misbehaving agent where it runs, with approva
     Then the dialog goes away and nothing is restored
 
   @integration
+  Scenario: A late Restore completion leaves the dialog opened after it
+    Given a Restore was confirmed and its stop was replaced before it completed
+    And the Restore dialog was opened for the newer stop
+    When the first Restore completes
+    Then the dialog opened after it stays open
+
+  @integration
   Scenario: The stop plan dialog shows a failed source or connection read with Retry
     Given the Databricks sources of the organisation fail to load
     When a person opens the stop plan of "support-bot"
@@ -375,8 +389,9 @@ Feature: Agent kill switch: stop a misbehaving agent where it runs, with approva
   @integration
   Scenario: The stop plan dialog takes no edit while a save runs
     Given a person saved the stop plan of "support-bot"
-    When they remove a target before the save and its re-read finish
-    Then the plan keeps its targets
+    When the save and its re-read have not finished
+    Then Add target and each Remove are off
+    And the plan keeps its targets
 
   @integration
   Scenario: The AWS connection form refuses a connection the contract would refuse

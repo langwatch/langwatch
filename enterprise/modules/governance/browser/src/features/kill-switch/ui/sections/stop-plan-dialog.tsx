@@ -40,6 +40,7 @@ function StopPlanEditorBody({
         targets={targets}
         labelOf={editor.labelOf}
         onRemove={(index) => editor.setTargets(targets.filter((_, at) => at !== index))}
+        disabled={editor.isSaving}
       />
       <Separator />
       {targets.length >= AGENT_STOP_PLAN_TARGETS_MAX ? (
@@ -54,6 +55,7 @@ function StopPlanEditorBody({
             label: connection.name,
           }))}
           onAdd={(target) => editor.setTargets([...targets, target])}
+          disabled={editor.isSaving}
         />
       )}
       <Separator />

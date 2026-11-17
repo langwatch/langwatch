@@ -108,14 +108,33 @@ export class PrismaAgentStopClaimRepository extends AgentStopClaimRepository {
     organizationId,
     stopId,
     decision,
+    takenAt,
   }: {
     organizationId: string;
     stopId: string;
     decision: AgentStopClaimDecision;
+    takenAt: number;
   }): Promise<void> {
     await this.prisma.agentStopClaim.updateMany({
-      where: { organizationId, stopId, decision },
+      where: { organizationId, stopId, decision, decisionTakenAt: new Date(takenAt) },
       data: { decision: null, decisionTakenAt: null },
+    });
+  }
+
+  async markDecisionSent({
+    organizationId,
+    stopId,
+    decision,
+    takenAt,
+  }: {
+    organizationId: string;
+    stopId: string;
+    decision: AgentStopClaimDecision;
+    takenAt: number;
+  }): Promise<void> {
+    await this.prisma.agentStopClaim.updateMany({
+      where: { organizationId, stopId, decision, decisionTakenAt: new Date(takenAt) },
+      data: { decisionTakenAt: null },
     });
   }
 
