@@ -8,6 +8,10 @@ from .api_key_info import ApiKeyInfo
 from .api_key_info_role_bindings_item import ApiKeyInfoRoleBindingsItem
 from .api_key_info_role_bindings_item_role import ApiKeyInfoRoleBindingsItemRole
 from .api_key_info_role_bindings_item_scope_type import ApiKeyInfoRoleBindingsItemScopeType
+from .apply_suite_template_body import ApplySuiteTemplateBody
+from .apply_suite_template_body_fit import ApplySuiteTemplateBodyFit
+from .apply_suite_template_response_201 import ApplySuiteTemplateResponse201
+from .apply_suite_template_response_404 import ApplySuiteTemplateResponse404
 from .approve_langy_control_request_body import ApproveLangyControlRequestBody
 from .approve_langy_control_request_body_workspace import ApproveLangyControlRequestBodyWorkspace
 from .approve_langy_control_request_response_200 import ApproveLangyControlRequestResponse200
@@ -3934,6 +3938,15 @@ from .list_run_plans_response_200_item_targets_item_scenario_mappings_additional
 from .list_run_plans_response_200_item_targets_item_type import ListRunPlansResponse200ItemTargetsItemType
 from .list_scim_tokens_response_200 import ListScimTokensResponse200
 from .list_scim_tokens_response_200_tokens_item import ListScimTokensResponse200TokensItem
+from .list_suite_templates_response_200_item import ListSuiteTemplatesResponse200Item
+from .list_suite_templates_response_200_item_kind import ListSuiteTemplatesResponse200ItemKind
+from .list_suite_templates_response_200_item_scenarios_item import ListSuiteTemplatesResponse200ItemScenariosItem
+from .list_suite_templates_response_200_item_scenarios_item_attack import (
+    ListSuiteTemplatesResponse200ItemScenariosItemAttack,
+)
+from .list_suite_templates_response_200_item_scenarios_item_attack_strategy import (
+    ListSuiteTemplatesResponse200ItemScenariosItemAttackStrategy,
+)
 from .list_test_suites_response_200_item import ListTestSuitesResponse200Item
 from .list_test_suites_response_200_item_evaluators_item import ListTestSuitesResponse200ItemEvaluatorsItem
 from .list_test_suites_response_200_item_evaluators_item_mappings import (
@@ -9909,6 +9922,10 @@ __all__ = (
     "ApiKeyInfoRoleBindingsItem",
     "ApiKeyInfoRoleBindingsItemRole",
     "ApiKeyInfoRoleBindingsItemScopeType",
+    "ApplySuiteTemplateBody",
+    "ApplySuiteTemplateBodyFit",
+    "ApplySuiteTemplateResponse201",
+    "ApplySuiteTemplateResponse404",
     "ApproveLangyControlRequestBody",
     "ApproveLangyControlRequestBodyWorkspace",
     "ApproveLangyControlRequestResponse200",
@@ -12083,6 +12100,11 @@ __all__ = (
     "ListRunPlansResponse200ItemTargetsItemType",
     "ListScimTokensResponse200",
     "ListScimTokensResponse200TokensItem",
+    "ListSuiteTemplatesResponse200Item",
+    "ListSuiteTemplatesResponse200ItemKind",
+    "ListSuiteTemplatesResponse200ItemScenariosItem",
+    "ListSuiteTemplatesResponse200ItemScenariosItemAttack",
+    "ListSuiteTemplatesResponse200ItemScenariosItemAttackStrategy",
     "ListTestSuitesResponse200Item",
     "ListTestSuitesResponse200ItemEvaluatorsItem",
     "ListTestSuitesResponse200ItemEvaluatorsItemMappings",

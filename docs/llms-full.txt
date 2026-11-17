@@ -80825,6 +80825,15 @@ openapi: "PATCH /api/v1/teams/{teamId}"
 
 ---
 
+# FILE: ./api-reference/test-suites/apply-a-suite-template.mdx
+
+---
+title: "Apply a suite template"
+openapi: "POST /api/v1/test-suites/templates/{templateId}/apply"
+---
+
+---
+
 # FILE: ./api-reference/test-suites/create-test-suites.mdx
 
 ---
@@ -80839,6 +80848,15 @@ openapi: "POST /api/v1/test-suites"
 ---
 title: "Archive a test suite"
 openapi: "DELETE /api/v1/test-suites/{id}"
+---
+
+---
+
+# FILE: ./api-reference/test-suites/list-suite-templates.mdx
+
+---
+title: "List suite templates"
+openapi: "GET /api/v1/test-suites/templates"
 ---
 
 ---

@@ -33606,6 +33606,42 @@ func (e CreateTestSuite201JSONResponseBodyFieldsType) Valid() bool {
 	}
 }
 
+// Defines values for ListSuiteTemplates200JSONResponseBodyKind.
+const (
+	Archetype   ListSuiteTemplates200JSONResponseBodyKind = "archetype"
+	RedTeamPack ListSuiteTemplates200JSONResponseBodyKind = "red_team_pack"
+)
+
+// Valid indicates whether the value is a known member of the ListSuiteTemplates200JSONResponseBodyKind enum.
+func (e ListSuiteTemplates200JSONResponseBodyKind) Valid() bool {
+	switch e {
+	case Archetype:
+		return true
+	case RedTeamPack:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListSuiteTemplates200JSONResponseBodyScenariosAttackStrategy.
+const (
+	Crescendo ListSuiteTemplates200JSONResponseBodyScenariosAttackStrategy = "crescendo"
+	Goat      ListSuiteTemplates200JSONResponseBodyScenariosAttackStrategy = "goat"
+)
+
+// Valid indicates whether the value is a known member of the ListSuiteTemplates200JSONResponseBodyScenariosAttackStrategy enum.
+func (e ListSuiteTemplates200JSONResponseBodyScenariosAttackStrategy) Valid() bool {
+	switch e {
+	case Crescendo:
+		return true
+	case Goat:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ArchiveTestSuite200JSONResponseBodyArchived.
 const (
 	ArchiveTestSuite200JSONResponseBodyArchivedTrue ArchiveTestSuite200JSONResponseBodyArchived = true
@@ -55637,6 +55673,22 @@ type CreateTestSuite201JSONResponseBody_Evaluators_Mappings_AdditionalProperties
 // CreateTestSuite201JSONResponseBodyFieldsType defines parameters for CreateTestSuite.
 type CreateTestSuite201JSONResponseBodyFieldsType string
 
+// ListSuiteTemplates200JSONResponseBodyKind defines parameters for ListSuiteTemplates.
+type ListSuiteTemplates200JSONResponseBodyKind string
+
+// ListSuiteTemplates200JSONResponseBodyScenariosAttackStrategy defines parameters for ListSuiteTemplates.
+type ListSuiteTemplates200JSONResponseBodyScenariosAttackStrategy string
+
+// ApplySuiteTemplateJSONBody defines parameters for ApplySuiteTemplate.
+type ApplySuiteTemplateJSONBody struct {
+	Fit struct {
+		AgentName string    `json:"agentName"`
+		MustNever *[]string `json:"mustNever,omitempty"`
+		Tools     *[]string `json:"tools,omitempty"`
+	} `json:"fit"`
+	Name *string `json:"name,omitempty"`
+}
+
 // ArchiveTestSuite200JSONResponseBodyArchived defines parameters for ArchiveTestSuite.
 type ArchiveTestSuite200JSONResponseBodyArchived bool
 
@@ -59624,6 +59676,9 @@ type PostApiTeamsByIdMembersJSONRequestBody PostApiTeamsByIdMembersJSONBody
 
 // CreateTestSuiteJSONRequestBody defines body for CreateTestSuite for application/json ContentType.
 type CreateTestSuiteJSONRequestBody CreateTestSuiteJSONBody
+
+// ApplySuiteTemplateJSONRequestBody defines body for ApplySuiteTemplate for application/json ContentType.
+type ApplySuiteTemplateJSONRequestBody ApplySuiteTemplateJSONBody
 
 // UpdateTestSuiteJSONRequestBody defines body for UpdateTestSuite for application/json ContentType.
 type UpdateTestSuiteJSONRequestBody UpdateTestSuiteJSONBody
@@ -131345,6 +131400,14 @@ type ClientInterface interface {
 
 	CreateTestSuite(ctx context.Context, body CreateTestSuiteJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListSuiteTemplates request
+	ListSuiteTemplates(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ApplySuiteTemplateWithBody request with any body
+	ApplySuiteTemplateWithBody(ctx context.Context, templateId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	ApplySuiteTemplate(ctx context.Context, templateId string, body ApplySuiteTemplateJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ArchiveTestSuite request
 	ArchiveTestSuite(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -137946,6 +138009,42 @@ func (c *Client) CreateTestSuiteWithBody(ctx context.Context, contentType string
 
 func (c *Client) CreateTestSuite(ctx context.Context, body CreateTestSuiteJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCreateTestSuiteRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ListSuiteTemplates(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListSuiteTemplatesRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ApplySuiteTemplateWithBody(ctx context.Context, templateId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewApplySuiteTemplateRequestWithBody(c.Server, templateId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ApplySuiteTemplate(ctx context.Context, templateId string, body ApplySuiteTemplateJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewApplySuiteTemplateRequest(c.Server, templateId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -155870,6 +155969,80 @@ func NewCreateTestSuiteRequestWithBody(server string, contentType string, body i
 	return req, nil
 }
 
+// NewListSuiteTemplatesRequest generates requests for ListSuiteTemplates
+func NewListSuiteTemplatesRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/test-suites/templates")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewApplySuiteTemplateRequest calls the generic ApplySuiteTemplate builder with application/json body
+func NewApplySuiteTemplateRequest(server string, templateId string, body ApplySuiteTemplateJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewApplySuiteTemplateRequestWithBody(server, templateId, "application/json", bodyReader)
+}
+
+// NewApplySuiteTemplateRequestWithBody generates requests for ApplySuiteTemplate with any type of body
+func NewApplySuiteTemplateRequestWithBody(server string, templateId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "templateId", templateId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/test-suites/templates/%s/apply", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewArchiveTestSuiteRequest generates requests for ArchiveTestSuite
 func NewArchiveTestSuiteRequest(server string, id string) (*http.Request, error) {
 	var err error
@@ -159217,6 +159390,14 @@ type ClientWithResponsesInterface interface {
 	CreateTestSuiteWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateTestSuiteResponse, error)
 
 	CreateTestSuiteWithResponse(ctx context.Context, body CreateTestSuiteJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateTestSuiteResponse, error)
+
+	// ListSuiteTemplatesWithResponse request
+	ListSuiteTemplatesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListSuiteTemplatesResponse, error)
+
+	// ApplySuiteTemplateWithBodyWithResponse request with any body
+	ApplySuiteTemplateWithBodyWithResponse(ctx context.Context, templateId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ApplySuiteTemplateResponse, error)
+
+	ApplySuiteTemplateWithResponse(ctx context.Context, templateId string, body ApplySuiteTemplateJSONRequestBody, reqEditors ...RequestEditorFn) (*ApplySuiteTemplateResponse, error)
 
 	// ArchiveTestSuiteWithResponse request
 	ArchiveTestSuiteWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*ArchiveTestSuiteResponse, error)
@@ -185275,6 +185456,95 @@ func (r CreateTestSuiteResponse) ContentType() string {
 	return ""
 }
 
+type ListSuiteTemplatesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *[]struct {
+		Criteria    []string                                  `json:"criteria"`
+		Description string                                    `json:"description"`
+		Id          string                                    `json:"id"`
+		Kind        ListSuiteTemplates200JSONResponseBodyKind `json:"kind"`
+		Scenarios   []struct {
+			Attack *struct {
+				AttackGoal string                                                       `json:"attackGoal"`
+				MaxTurns   int                                                          `json:"maxTurns"`
+				OwaspIds   []string                                                     `json:"owaspIds"`
+				Strategy   ListSuiteTemplates200JSONResponseBodyScenariosAttackStrategy `json:"strategy"`
+			} `json:"attack,omitempty"`
+			Criteria  []string `json:"criteria"`
+			Key       string   `json:"key"`
+			Labels    []string `json:"labels"`
+			Name      string   `json:"name"`
+			Situation string   `json:"situation"`
+		} `json:"scenarios"`
+		Title   string `json:"title"`
+		Version int    `json:"version"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r ListSuiteTemplatesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListSuiteTemplatesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListSuiteTemplatesResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ApplySuiteTemplateResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON201      *struct {
+		Name        string   `json:"name"`
+		ScenarioIds []string `json:"scenarioIds"`
+		Slug        string   `json:"slug"`
+		SuiteId     string   `json:"suiteId"`
+	}
+	JSON404 *struct {
+		Error   string  `json:"error"`
+		Message *string `json:"message,omitempty"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r ApplySuiteTemplateResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ApplySuiteTemplateResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ApplySuiteTemplateResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type ArchiveTestSuiteResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -191919,6 +192189,32 @@ func (c *ClientWithResponses) CreateTestSuiteWithResponse(ctx context.Context, b
 		return nil, err
 	}
 	return ParseCreateTestSuiteResponse(rsp)
+}
+
+// ListSuiteTemplatesWithResponse request returning *ListSuiteTemplatesResponse
+func (c *ClientWithResponses) ListSuiteTemplatesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListSuiteTemplatesResponse, error) {
+	rsp, err := c.ListSuiteTemplates(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListSuiteTemplatesResponse(rsp)
+}
+
+// ApplySuiteTemplateWithBodyWithResponse request with arbitrary body returning *ApplySuiteTemplateResponse
+func (c *ClientWithResponses) ApplySuiteTemplateWithBodyWithResponse(ctx context.Context, templateId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ApplySuiteTemplateResponse, error) {
+	rsp, err := c.ApplySuiteTemplateWithBody(ctx, templateId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseApplySuiteTemplateResponse(rsp)
+}
+
+func (c *ClientWithResponses) ApplySuiteTemplateWithResponse(ctx context.Context, templateId string, body ApplySuiteTemplateJSONRequestBody, reqEditors ...RequestEditorFn) (*ApplySuiteTemplateResponse, error) {
+	rsp, err := c.ApplySuiteTemplate(ctx, templateId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseApplySuiteTemplateResponse(rsp)
 }
 
 // ArchiveTestSuiteWithResponse request returning *ArchiveTestSuiteResponse
@@ -220608,6 +220904,93 @@ func ParseCreateTestSuiteResponse(rsp *http.Response) (*CreateTestSuiteResponse,
 			return nil, err
 		}
 		response.JSON201 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListSuiteTemplatesResponse parses an HTTP response from a ListSuiteTemplatesWithResponse call
+func ParseListSuiteTemplatesResponse(rsp *http.Response) (*ListSuiteTemplatesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListSuiteTemplatesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest []struct {
+			Criteria    []string                                  `json:"criteria"`
+			Description string                                    `json:"description"`
+			Id          string                                    `json:"id"`
+			Kind        ListSuiteTemplates200JSONResponseBodyKind `json:"kind"`
+			Scenarios   []struct {
+				Attack *struct {
+					AttackGoal string                                                       `json:"attackGoal"`
+					MaxTurns   int                                                          `json:"maxTurns"`
+					OwaspIds   []string                                                     `json:"owaspIds"`
+					Strategy   ListSuiteTemplates200JSONResponseBodyScenariosAttackStrategy `json:"strategy"`
+				} `json:"attack,omitempty"`
+				Criteria  []string `json:"criteria"`
+				Key       string   `json:"key"`
+				Labels    []string `json:"labels"`
+				Name      string   `json:"name"`
+				Situation string   `json:"situation"`
+			} `json:"scenarios"`
+			Title   string `json:"title"`
+			Version int    `json:"version"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseApplySuiteTemplateResponse parses an HTTP response from a ApplySuiteTemplateWithResponse call
+func ParseApplySuiteTemplateResponse(rsp *http.Response) (*ApplySuiteTemplateResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ApplySuiteTemplateResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest struct {
+			Name        string   `json:"name"`
+			ScenarioIds []string `json:"scenarioIds"`
+			Slug        string   `json:"slug"`
+			SuiteId     string   `json:"suiteId"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest struct {
+			Error   string  `json:"error"`
+			Message *string `json:"message,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
 
 	}
 
