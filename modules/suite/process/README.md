@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Callable capability exposed by the composed Suite application.
 
-Peers call these through the token, declared at `../contract/src/suite.api.ts:36`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/suite.api.ts:37`; nothing else in this package is public.
 
 #### `listByIds`
 
@@ -101,7 +101,7 @@ listTemplates(input: { projectId: string }): Promise<SuiteTemplate[]>;
 Creates a test suite from a template fitted to the agent, with every scenario filed in it.
 
 ```typescript
-applyTemplate(input: ApplySuiteTemplateTrpcInput, by: ScenarioCaller): Promise<AppliedSuiteTemplate>;
+applyTemplate(input: ApplySuiteTemplateTrpcInput, by: ScenarioCaller, author?: ScenarioActor): Promise<AppliedSuiteTemplate>;
 ```
 
 #### `update`
@@ -515,7 +515,7 @@ interface Response {
 
 Read one test suite
 
-Permission `scenarios:view`. Declared at `src/transport/test-suites.rest.ts:314`.
+Permission `scenarios:view`. Declared at `src/transport/test-suites.rest.ts:319`.
 
 Answers at `/api/v1/test-suites/:id`.
 
@@ -531,7 +531,7 @@ type Response = z.infer<typeof testSuiteDetailWireSchema>; // src/rules/suite-wi
 
 Edit a test suite: its name, the fields it declares, the evaluators attached to it. Send only what changes. The slug is kept on a rename, so links and run history stay where they are.
 
-Permission `scenarios:update`. Declared at `src/transport/test-suites.rest.ts:335`.
+Permission `scenarios:update`. Declared at `src/transport/test-suites.rest.ts:340`.
 
 Answers at `/api/v1/test-suites/:id`.
 
@@ -545,7 +545,7 @@ type Response = z.infer<typeof testSuiteWireSchema>; // src/rules/suite-wire-v1.
 
 Archive a test suite. The scenarios filed in it are archived with it, in one step, because the suite is where they live.
 
-Permission `scenarios:manage`. Declared at `src/transport/test-suites.rest.ts:358`.
+Permission `scenarios:manage`. Declared at `src/transport/test-suites.rest.ts:363`.
 
 Answers at `/api/v1/test-suites/:id`.
 
@@ -562,7 +562,7 @@ interface Response {
 
 Run a test suite
 
-Permission `scenarios:create`. Declared at `src/transport/test-suites.rest.ts:382`.
+Permission `scenarios:create`. Declared at `src/transport/test-suites.rest.ts:387`.
 
 Answers at `/api/v1/test-suites/:id/run`.
 
@@ -689,7 +689,7 @@ Contract `../contract/src/suite.trpc.ts:110`, router `src/transport/test-suite.t
 ```typescript
 // suites.testSuites.create
 type Input = z.infer<typeof createTestSuiteTrpcInputSchema>; // ../contract/src/suite-trpc.schemas.ts:199
-type Output = z.infer<typeof scenarioTestSuiteSchema>; // ../../scenario/contract/src/scenario.ts:177
+type Output = z.infer<typeof scenarioTestSuiteSchema>; // ../../scenario/contract/src/scenario.ts:225
 
 // suites.testSuites.getAll
 // Input: suiteProjectInputSchema, ../contract/src/suite-trpc.schemas.ts:27
@@ -705,11 +705,11 @@ interface Input {
   testSuiteId: string;
   name: string;
 }
-type Output = z.infer<typeof scenarioTestSuiteSchema>; // ../../scenario/contract/src/scenario.ts:177
+type Output = z.infer<typeof scenarioTestSuiteSchema>; // ../../scenario/contract/src/scenario.ts:225
 
 // suites.testSuites.update
 type Input = z.infer<typeof updateTestSuiteTrpcInputSchema>; // ../contract/src/suite-trpc.schemas.ts:222
-type Output = z.infer<typeof scenarioTestSuiteSchema>; // ../../scenario/contract/src/scenario.ts:177
+type Output = z.infer<typeof scenarioTestSuiteSchema>; // ../../scenario/contract/src/scenario.ts:225
 
 // suites.testSuites.archive
 // Input: testSuiteTrpcIdInputSchema, ../contract/src/suite-trpc.schemas.ts:39
@@ -717,7 +717,7 @@ interface Input {
   projectId: string;
   testSuiteId: string;
 }
-type Output = z.infer<typeof scenarioTestSuiteSchema>; // ../../scenario/contract/src/scenario.ts:177
+type Output = z.infer<typeof scenarioTestSuiteSchema>; // ../../scenario/contract/src/scenario.ts:225
 
 // suites.testSuites.listTemplates
 type Input = z.infer<typeof suiteProjectInputSchema>; // ../contract/src/suite-trpc.schemas.ts:27

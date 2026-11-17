@@ -3,6 +3,7 @@
  * @see specs/scenarios/simulation-runner.feature (Worker-Based Execution scenarios)
  */
 
+import type { LanguageModelV3 } from "@ai-sdk/provider";
 import type { AgentHooks } from "@langwatch/agent-contract";
 import type { Logger } from "@langwatch/observability";
 import * as ScenarioRunner from "@langwatch/scenario";
@@ -249,9 +250,7 @@ export function redTeamScript({
  * The attacker opens its first turn with only a system prompt, which Gemini refuses as empty
  * contents; a prompt with no user or assistant message gains one user turn.
  */
-export function withOpeningUserTurn(
-  model: ScenarioRunner.RedTeamAgentConfig["model"],
-): ScenarioRunner.RedTeamAgentConfig["model"] {
+export function withOpeningUserTurn(model: LanguageModelV3): LanguageModelV3 {
   return wrapLanguageModel({
     model,
     middleware: {
@@ -276,7 +275,7 @@ export function buildRedTeamCast({
 }: {
   adapter: ScenarioRunner.AgentAdapter;
   scenario: ChildProcessJobData["scenario"];
-  simulatorModel: ScenarioRunner.RedTeamAgentConfig["model"];
+  simulatorModel: LanguageModelV3;
   judge: ScenarioRunner.AgentAdapter;
 }): {
   agents: ScenarioRunner.AgentAdapter[];
