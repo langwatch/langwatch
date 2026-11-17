@@ -68,13 +68,7 @@ export function sqlOf({ form, label }: { form: Form; label: QueryLabel }): strin
 }
 
 /** Fails if any run was refused or carries a server exception code. */
-export function expectAnswered({
-  runs,
-  context,
-}: {
-  runs: readonly Run[];
-  context: string;
-}): void {
+export function expectAnswered({ runs, context }: { runs: readonly Run[]; context: string }): void {
   for (const run of runs) {
     expect(run.refusal, `${context}: ${described(runs)}`).toBeUndefined();
     expect(run.exceptionCode, `${context}: ${described(runs)}`).toBe(0);
@@ -82,13 +76,7 @@ export function expectAnswered({
 }
 
 /** Fails unless every run ended with exactly the server's `code`. */
-export function expectRefused({
-  runs,
-  code,
-}: {
-  runs: readonly Run[];
-  code: number;
-}): void {
+export function expectRefused({ runs, code }: { runs: readonly Run[]; code: number }): void {
   expect(runs.map((run) => run.exceptionCode), described(runs)).toEqual(runs.map(() => code));
 }
 
