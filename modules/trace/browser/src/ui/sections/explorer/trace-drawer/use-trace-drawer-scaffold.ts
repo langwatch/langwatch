@@ -2,6 +2,7 @@ import { getTopDrawer, useDrawer } from "@langwatch/browser-host/drawer";
 import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
 import { type RefObject, useCallback, useEffect, useMemo, useRef } from "react";
 
+import { type AgentsTab, useAgentsTab } from "../../../../behavior/explorer/use-agents-tab.ts";
 import { guardTraceEditExit } from "../../../../behavior/explorer/utils/trace-edit-mode.ts";
 import { api } from "../../../../behavior/trace-api.ts";
 import { useTraceDrawer } from "../../../../behavior/trace-drawer.ts";
@@ -14,7 +15,6 @@ import { useTraceDrawerShortcuts } from "../../../../features/trace-drawer/behav
 import { useTraceHeader } from "../../../../features/trace-drawer/behavior/use-trace-header.ts";
 import { TRACE_DRAWER_NAME } from "../../../../model/trace-drawer-params.ts";
 import { useTraceRefresh } from "../hooks/use-trace-refresh.ts";
-import { useAgentsTab } from "./use-agents-tab.ts";
 
 interface TraceDrawerScaffold {
   traceId: string | undefined;
@@ -28,6 +28,7 @@ interface TraceDrawerScaffold {
   spanTreeQuery: ReturnType<typeof useSpanTreeWithCaptured>["corrected"];
   canGoBack: boolean;
   showsAgents: boolean;
+  agentsTab: AgentsTab;
   goBackInTraceHistory: () => void;
   handleClose: () => void;
   drawerContentRef: RefObject<HTMLDivElement | null>;
@@ -146,7 +147,12 @@ export function useTraceDrawerScaffold(): TraceDrawerScaffold {
 
   const { navigateToTrace, goBack: goBackInTraceHistory, canGoBack } = useTraceDrawerNavigation();
   const isAgentsTabOpen = useTraceDrawer((s) => s.vizTab === "agents");
-  const { showsAgents } = useAgentsTab({ traceId, spanTree, isAgentsTabOpen });
+  const agentsTab = useAgentsTab({
+    spanTree,
+    isSpanTreeLoading: isLoading || spanTreeQuery.isLoading,
+    isAgentsTabOpen,
+  });
+  const { showsAgents } = agentsTab;
   // The header's refresh, again here so R works while the header spins; memoised per trace.
   const { refresh: refreshActiveTrace } = useTraceRefresh(traceId ?? "");
 
@@ -185,6 +191,7 @@ export function useTraceDrawerScaffold(): TraceDrawerScaffold {
     spanTreeQuery,
     canGoBack,
     showsAgents,
+    agentsTab,
     goBackInTraceHistory,
     handleClose,
     drawerContentRef,

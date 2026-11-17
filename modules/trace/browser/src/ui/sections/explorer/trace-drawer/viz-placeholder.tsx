@@ -10,12 +10,7 @@ import {
 } from "@langwatch/design-system/primitives";
 import { shortcutAriaKeys } from "@langwatch/design-system/shortcut-hint";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import type {
-  AgentCallGraph,
-  BraidedOwner,
-  SpanTreeNode,
-  TraceHeader,
-} from "@langwatch/trace-contract";
+import type { BraidedOwner, SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
 import { lazy, Suspense, useEffect, useMemo, useRef } from "react";
 import {
   LuChartGantt,
@@ -33,6 +28,7 @@ import {
 import { useShallow } from "zustand/react/shallow";
 
 import { useVizHeight } from "../../../../behavior/explorer/trace-drawer/use-viz-height.ts";
+import type { AgentsTab } from "../../../../behavior/explorer/use-agents-tab.ts";
 import { useOverflowVisibility } from "../../../../behavior/explorer/use-overflow-visibility.ts";
 // PeerCursorOverlay used to wrap just the viz pane (scoped to the
 // active viz tab). It was lifted to the drawer level (TraceDrawerShell)
@@ -45,15 +41,15 @@ import {
 } from "../../../../behavior/presence/presence-store.ts";
 import { useTraceDrawer } from "../../../../behavior/trace-drawer.ts";
 import { drawerShortcut } from "../../../../features/trace-drawer/behavior/trace-drawer-shortcut-table.ts";
+import { a2aSpanIdsOf } from "../../../../model/agent-call-graph-layout.ts";
 import type { VizTab } from "../../../../model/trace-drawer-params.ts";
-import { AgentCallGraphView } from "../../../blocks/agent-call-graph/agent-call-graph-view.tsx";
+import { AgentCallGraphPane } from "../../../blocks/agent-call-graph/agent-call-graph-pane.tsx";
 import { SequenceSkeleton } from "../../../blocks/sequence/sequence-skeleton.tsx";
 import { TopologySkeleton } from "../../../blocks/sequence/topology-skeleton.tsx";
 import { OverflowMenu } from "../../../elements/explorer/shared/overflow-menu.tsx";
 import { PresenceMarker } from "../../../elements/presence/presence-marker.tsx";
 import { FlameView } from "../../flame/flame-view.tsx";
 import { spanTypeColor } from "../utils/span-type-color.ts";
-import { useAgentsTab } from "./use-agents-tab.ts";
 import { WaterfallView } from "./waterfall-view/index.ts";
 
 // SequenceView pulls in `mermaid` (~1MB+ — d3, dagre, several parsers).
@@ -69,6 +65,8 @@ interface VizPlaceholderProps {
   trace: TraceHeader | null;
   spans: SpanTreeNode[];
   isLoading?: boolean;
+  /** The drawer's Agents tab; without one (a shared trace) the tab stays hidden. */
+  agentsTab?: AgentsTab;
   selectedSpanId: string | null;
   onSelectSpan: (spanId: string) => void;
   onClearSpan: () => void;
@@ -385,12 +383,21 @@ function ResizeHandle({ onStart }: { onStart: (e: React.MouseEvent | React.Touch
   );
 }
 
+const NO_AGENTS_TAB: AgentsTab = {
+  showsAgents: false,
+  isSettled: true,
+  graph: undefined,
+  isGraphError: false,
+  retryGraph: () => undefined,
+};
+
 export function VizPlaceholder({
   vizTab,
   onVizTabChange,
   trace,
   spans,
   isLoading = false,
+  agentsTab = NO_AGENTS_TAB,
   selectedSpanId,
   onSelectSpan,
   onClearSpan,
@@ -416,16 +423,8 @@ export function VizPlaceholder({
   const detailCollapsed = useTraceDrawer((s) => s.paneState.spanDetail.collapsed);
   const togglePaneCollapsed = useTraceDrawer((s) => s.togglePaneCollapsed);
 
-  const {
-    graph: agentCallGraph,
-    showsAgents,
-    isSettled: isAgentGraphSettled,
-    a2aSpanIds,
-  } = useAgentsTab({
-    traceId: trace?.traceId,
-    spanTree: spans,
-    isAgentsTabOpen: vizTab === "agents",
-  });
+  const { showsAgents, isSettled: isAgentGraphSettled } = agentsTab;
+  const a2aSpanIds = useMemo(() => a2aSpanIdsOf({ spans }), [spans]);
   const hidesAgentsTab = vizTab === "agents" && !showsAgents;
   const effectiveVizTab: VizTab = hidesAgentsTab ? "waterfall" : vizTab;
   useEffect(() => {
@@ -509,7 +508,7 @@ export function VizPlaceholder({
               onSelectSpan={onSelectSpan}
               promptSpanIds={promptSpanIds}
               a2aSpanIds={a2aSpanIds}
-              agentCallGraph={agentCallGraph}
+              agentsTab={agentsTab}
               selectedSpanId={selectedSpanId}
               spans={spans}
               vizTab={effectiveVizTab}
@@ -638,7 +637,7 @@ function VizBody({
   onSelectSpan,
   promptSpanIds,
   a2aSpanIds,
-  agentCallGraph,
+  agentsTab,
   selectedSpanId,
   spans,
   vizTab,
@@ -650,7 +649,7 @@ function VizBody({
   onSelectSpan: (spanId: string) => void;
   promptSpanIds: Set<string>;
   a2aSpanIds: ReadonlySet<string>;
-  agentCallGraph: AgentCallGraph | undefined;
+  agentsTab: AgentsTab;
   selectedSpanId: string | null;
   spans: SpanTreeNode[];
   vizTab: VizTab;
@@ -679,8 +678,15 @@ function VizBody({
       </Suspense>
     );
   }
-  if (vizTab === "agents" && agentCallGraph) {
-    return <AgentCallGraphView graph={agentCallGraph} onSelectSpan={onSelectSpan} />;
+  if (vizTab === "agents") {
+    return (
+      <AgentCallGraphPane
+        graph={agentsTab.graph}
+        isError={agentsTab.isGraphError}
+        onRetry={agentsTab.retryGraph}
+        onSelectSpan={onSelectSpan}
+      />
+    );
   }
   if (vizTab === "flame") {
     return (

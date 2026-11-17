@@ -2,8 +2,8 @@ import type { AgentCallGraph } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import {
+  a2aSpanIdsOf,
   hasMultipleAgents,
-  isAgentCallSpanName,
   layerAgentCallGraph,
   mayHaveSeveralAgents,
 } from "../agent-call-graph-layout.ts";
@@ -73,27 +73,49 @@ describe("layerAgentCallGraph", () => {
   });
 });
 
+function spanOf(
+  spanId: string,
+  marks: { agentName?: string | null; isA2aCall?: boolean | null } = {},
+) {
+  return { spanId, ...marks };
+}
+
 describe("mayHaveSeveralAgents", () => {
   /** @scenario "The drawer reads the call graph only for a trace that may hold several agents" */
-  it("stays off for one service with no agent call span", () => {
+  it("stays off for one named agent and no A2A call", () => {
     expect(
       mayHaveSeveralAgents({
-        spanNames: ["chat", "tool"],
-        serviceNames: ["api", "api", undefined],
+        spans: [spanOf("a", { agentName: "Planner" }), spanOf("b", { agentName: "Planner" })],
       }),
     ).toBe(false);
+    expect(mayHaveSeveralAgents({ spans: [spanOf("a"), spanOf("b", { isA2aCall: false })] })).toBe(
+      false,
+    );
   });
 
   /** @scenario "The drawer reads the call graph only for a trace that may hold several agents" */
-  it("turns on for two services or a span naming an agent call", () => {
-    expect(mayHaveSeveralAgents({ spanNames: ["chat"], serviceNames: ["api", "partner"] })).toBe(
+  it("turns on for two agents in one service or a span marked as an A2A call", () => {
+    expect(
+      mayHaveSeveralAgents({
+        spans: [spanOf("a", { agentName: "Planner" }), spanOf("b", { agentName: "Researcher" })],
+      }),
+    ).toBe(true);
+    expect(mayHaveSeveralAgents({ spans: [spanOf("a"), spanOf("b", { isA2aCall: true })] })).toBe(
       true,
     );
-    expect(
-      mayHaveSeveralAgents({ spanNames: ["invoke_agent Researcher"], serviceNames: ["api"] }),
-    ).toBe(true);
-    expect(isAgentCallSpanName("a2a.server SendMessage")).toBe(true);
-    expect(isAgentCallSpanName("a2a.v1.A2AService/SendMessage")).toBe(true);
-    expect(isAgentCallSpanName("chat gpt-5")).toBe(false);
+  });
+});
+
+describe("a2aSpanIdsOf", () => {
+  /** @scenario "The span tree labels only the spans the server marked as A2A calls" */
+  it("takes the server's A2A marks and ignores agent invocation names", () => {
+    const ids = a2aSpanIdsOf({
+      spans: [
+        spanOf("client", { isA2aCall: true }),
+        spanOf("local", { agentName: "Planner", isA2aCall: false }),
+        spanOf("plain"),
+      ],
+    });
+    expect([...ids]).toEqual(["client"]);
   });
 });

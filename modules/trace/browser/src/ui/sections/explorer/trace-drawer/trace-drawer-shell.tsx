@@ -49,6 +49,7 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
     spanTreeQuery,
     canGoBack,
     showsAgents,
+    agentsTab,
     goBackInTraceHistory,
     handleClose,
     drawerContentRef,
@@ -169,6 +170,7 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
             isLoading={isLoading}
             isPlaceholder={isPlaceholder}
             isSpansLoading={spanTreeQuery.isLoading}
+            agentsTab={agentsTab}
             onClose={handleClose}
           />
         </Drawer.Body>

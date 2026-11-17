@@ -81,14 +81,48 @@ Feature: Agent call graph across A2A hops
 
     @unit
     Scenario: The drawer reads the call graph only for a trace that may hold several agents
-      Given a trace with one service and no span named as an agent call
+      Given a span tree naming one agent at most and holding no A2A call
       Then the Agents tab is hidden and the call graph is not read
-      Given a trace with two services, or a span named invoke_agent or as an A2A call
+      Given a span tree naming two agents, even in one service, or holding an A2A call
       Then the Agents tab shows, and the graph is read when the tab opens
 
     @integration
+    Scenario: The agent call graph is read only once the Agents tab opens
+      Given a trace whose Agents tab shows
+      When the Agents tab is closed
+      Then the call graph read is not enabled
+      When the Agents tab opens
+      Then the call graph is read
+
+    @integration
+    Scenario: A shared trace shows no Agents tab
+      Given a read-only shared trace naming two agents
+      Then the Agents tab is hidden and the call graph is not read
+
+    @integration
+    Scenario: The Agents tab stays open while the span tree loads and after a failed read
+      Given the Agents tab is open
+      When the span tree is still loading
+      Then the tab does not switch back to the waterfall
+      When the call graph read fails
+      Then the tab stays and shows the failure
+
+    @integration
+    Scenario: The Agents pane shows a loading state and an error state with a retry
+      Given the Agents tab is open
+      When the call graph is loading
+      Then the pane shows a loading state, not the waterfall
+      When the call graph read fails
+      Then the pane shows the failure with a retry
+
+    @unit
+    Scenario: The span tree labels only the spans the server marked as A2A calls
+      Given span tree nodes the server marked as A2A calls and a local invoke_agent span
+      Then only the marked spans carry the A2A label
+
+    @integration
     Scenario: An A2A span is labelled in the span tree
-      Given a span marked as an A2A call
+      Given a span the server marked as an A2A call
       When the span tree renders
       Then its row carries an A2A label and other rows do not
 

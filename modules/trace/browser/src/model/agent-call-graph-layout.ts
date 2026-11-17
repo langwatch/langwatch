@@ -1,27 +1,24 @@
-import type { AgentCallGraph, AgentCallGraphNode } from "@langwatch/trace-contract";
+import type { AgentCallGraph, AgentCallGraphNode, SpanTreeNode } from "@langwatch/trace-contract";
+
+type AgentMarks = Pick<SpanTreeNode, "spanId" | "agentName" | "isA2aCall">;
+
+/** From the span tree alone: two agents named, or a span the server marked as an A2A call. */
+export function mayHaveSeveralAgents({ spans }: { spans: readonly AgentMarks[] }): boolean {
+  const names = new Set<string>();
+  for (const span of spans) {
+    if (span.isA2aCall) return true;
+    if (span.agentName) names.add(span.agentName);
+    if (names.size > 1) return true;
+  }
+  return false;
+}
+
+/** The span ids the server marked as A2A calls, for the span tree's label. */
+export function a2aSpanIdsOf({ spans }: { spans: readonly AgentMarks[] }): ReadonlySet<string> {
+  return new Set(spans.filter((span) => span.isA2aCall).map((span) => span.spanId));
+}
 
 /** A graph worth drawing has more than one agent. */
-/** Span names of an agent call: `invoke_agent <name>`, `a2a.*` or an A2A method. */
-const AGENT_CALL_NAME =
-  /^(?:invoke_agent\b|a2a[.\s]|.*A2AService\/|(?:SendMessage|SendStreamingMessage|message\/send|message\/stream)\b)/i;
-
-/** True when a span tree row reads as an agent invocation or an A2A call. */
-export function isAgentCallSpanName(name: string): boolean {
-  return AGENT_CALL_NAME.test(name.trim());
-}
-
-/** From data the drawer already holds: more than one service, or a span naming an agent call. */
-export function mayHaveSeveralAgents({
-  spanNames,
-  serviceNames,
-}: {
-  spanNames: readonly string[];
-  serviceNames: readonly (string | undefined)[];
-}): boolean {
-  if (new Set(serviceNames.filter((name) => name)).size > 1) return true;
-  return spanNames.some(isAgentCallSpanName);
-}
-
 export function hasMultipleAgents({
   graph,
 }: {
