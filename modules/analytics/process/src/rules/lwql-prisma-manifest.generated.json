@@ -21466,6 +21466,52 @@
       ]
     },
     {
+      "name": "NurturingOrganizationPlan",
+      "tableName": "NurturingOrganizationPlan",
+      "documentation": "Each organization's plan, folded from billing's subscription_changed facts: nurturing's own\ncopy. The newest fact wins, and a real fact wins a tie over a catch-up; Customer.io hears a\nfact only when it changes this row.",
+      "primaryKey": [
+        "organizationId"
+      ],
+      "fields": [
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "plan",
+          "columnName": "plan",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "occurredAt",
+          "columnName": "occurredAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "fromCatchUp",
+          "columnName": "fromCatchUp",
+          "type": "Boolean",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
       "name": "NurturingOrganization",
       "tableName": "NurturingOrganization",
       "documentation": "Nurturing's read model per organization: its admin and its milestone counts.\n`seeded` marks an organization learned from the project backfill: its first_* already happened.",
