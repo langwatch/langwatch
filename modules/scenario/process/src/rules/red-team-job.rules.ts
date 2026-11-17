@@ -15,3 +15,10 @@ export function scenarioRunKindFields(stored: object): Pick<ScenarioConfig, "kin
   const redTeam = parseRedTeamConfig("redTeam" in stored ? stored.redTeam : undefined);
   return redTeam ? { kind: "red_team", redTeam } : { kind: "red_team" };
 }
+
+/** The child environment flag a red team run needs; nothing for any other run. */
+export function redTeamRunEnvironment(config: Pick<ScenarioConfig, "kind">): {
+  runsRedTeam?: true;
+} {
+  return config.kind === "red_team" ? { runsRedTeam: true } : {};
+}

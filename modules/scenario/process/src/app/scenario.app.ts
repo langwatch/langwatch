@@ -1265,6 +1265,8 @@ export interface ScenarioChildEnvironment {
   callerEnv?: Record<string, string>;
   /** The target declares scenario hooks, which only the Node child calls (ADR-180). */
   callsHooks?: boolean;
+  /** The scenario is a red team attack, which only the Node child plays. */
+  runsRedTeam?: boolean;
 }
 
 export interface ScenarioChildExecutionSession {

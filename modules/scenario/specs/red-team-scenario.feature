@@ -21,6 +21,13 @@ Feature: A red team scenario runs an attacker against the agent
     Then the scenario config carries kind "standard" and no attack config
 
   @unit
+  Scenario: A red team run starts on the Node child whatever the Go runner flag says
+    Given the project's Go runner flag is on and its binary is on disk
+    When a run of a red team scenario starts
+    Then the Node scenario child is spawned
+    And the flag is not read
+
+  @unit
   Scenario: A red team run plays the attacker in place of the user simulator
     Given a red team job with strategy "crescendo"
     When the runner builds the run's cast

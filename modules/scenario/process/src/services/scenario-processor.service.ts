@@ -15,6 +15,7 @@ import {
   type ScenarioChildBootstrap,
   type ScenarioChildExecutionSession,
 } from "../app/scenario.app.ts";
+import { redTeamRunEnvironment } from "../rules/red-team-job.rules.ts";
 import { isCustomerActionablePrefetchFailure } from "../rules/scenario-prefetch-failure.rules.ts";
 import {
   capRunHooks,
@@ -238,6 +239,7 @@ export class ScenarioProcessorService implements ScenarioExecutionRunner {
             ? { callerEnv: prefetch.data.adapterData.callerEnv }
             : {}),
           ...hookCallsEnvironment(prefetch.data.adapterData),
+          ...redTeamRunEnvironment(prefetch.data.scenario),
         },
       });
     }
