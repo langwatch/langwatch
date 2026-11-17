@@ -463,6 +463,12 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       Then the gateway makes one key check and refuses them all
 
     @unit
+    Scenario: a cache refresh keeps the pace of fail closed re-checks
+      Given fail closed just re-checked a cached key with the control plane
+      When a config refresh replaces the key's cache entry
+      Then the next request inside the re-check interval does not re-check the key again
+
+    @unit
     Scenario: fail closed keeps the cached config when only the config fetch fails
       Given fail closed is on and a cached key whose last key check is older than the limit
       And the control plane confirms the key but its config fetch fails
@@ -941,3 +947,17 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       When the change feed reports a config change for the first key before the answers arrive
       Then the first key's answer is not cached
       And the second key's answer is cached
+
+    @unit @regression
+    Scenario: a change during an outage refetch keeps the last known fallback
+      Given a key evicted by a change-feed event is served from its last known config during an outage
+      When a config change for the key lands while the refetch is in flight
+      Then the request is still answered from the last known config
+      And the last known config stays available for the next request
+      And the restored entry is not cached
+
+    @unit @regression
+    Scenario: a rotation during an outage refetch drops the last known fallback
+      Given a key evicted by a change-feed event is served from its last known config during an outage
+      When the key is rotated while the refetch is in flight
+      Then the last known config is not served

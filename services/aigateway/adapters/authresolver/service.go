@@ -970,8 +970,18 @@ func (s *Service) serveLastKnown(h [64]byte, in lastKnownServe) *served {
 		authStartedAt:      authStart,
 	}
 	if !s.publishFetched(h, restored, in.since) {
-		s.lastKnown.Remove(h)
-		return nil
+		if s.revokedSince(bundle, in.since) {
+			s.lastKnown.Remove(h)
+			return nil
+		}
+		// A change that keeps the fallback landed during the refetch: serve
+		// the copy without caching it, so the next request asks again.
+		s.logger.Warn("auth_cache_serve_last_known",
+			zap.String("vk_id", bundle.VirtualKeyID),
+			zap.Bool("cached", false),
+			zap.Error(cause),
+		)
+		return &served{bundle: bundle, authStart: authStart, stale: "last_known"}
 	}
 	s.logger.Warn("auth_cache_serve_last_known",
 		zap.String("vk_id", bundle.VirtualKeyID),
@@ -1511,7 +1521,7 @@ func evictReason(kind string) string {
 // keepLastKnown sets the evicted entries aside as the outage fallback; a key
 // the change made unusable passes false, which also drops any fallback held.
 func (s *Service) evictWhere(match func(*domain.Bundle) bool, scope evictScope) {
-	s.recordInvalidation(invalidation{keys: scope.guard}, func() { s.evictMatching(match, scope) })
+	s.recordInvalidation(invalidation{keys: scope.guard, revokes: !scope.keepLastKnown}, func() { s.evictMatching(match, scope) })
 }
 
 // evictMatching is the L1 walk of evictWhere, run under the invalidation lock.

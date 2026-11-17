@@ -18,6 +18,7 @@ type invalidationGuard struct {
 	mu      sync.Mutex
 	gen     uint64
 	evicted *stampSet
+	revoked *stampSet
 	budget  *stampSet
 }
 
@@ -44,18 +45,24 @@ func newInvalidationGuard(size int) (*invalidationGuard, error) {
 	if err != nil {
 		return nil, err
 	}
+	revoked, err := newStampSet(size)
+	if err != nil {
+		return nil, err
+	}
 	budget, err := newStampSet(size)
 	if err != nil {
 		return nil, err
 	}
-	return &invalidationGuard{evicted: evicted, budget: budget}, nil
+	return &invalidationGuard{evicted: evicted, revoked: revoked, budget: budget}, nil
 }
 
 // invalidation is one change event: the identities it reached (none means
-// every bundle) and whether it evicts them or only marks their budget behind.
+// every bundle), whether it evicts them or only marks their budget behind, and
+// whether it makes the key unusable so no outage fallback may survive it.
 type invalidation struct {
 	keys       []string
 	budgetOnly bool
+	revokes    bool
 }
 
 func keyScope(id string) string        { return "vk:" + id }
@@ -92,11 +99,17 @@ func (s *Service) recordInvalidation(ev invalidation, apply func()) {
 	if ev.budgetOnly {
 		set = g.budget
 	}
-	if len(ev.keys) == 0 {
-		set.epoch = g.gen
+	sets := []*stampSet{set}
+	if ev.revokes {
+		sets = append(sets, g.revoked)
 	}
-	for _, k := range ev.keys {
-		set.stamps.Add(k, g.gen)
+	for _, t := range sets {
+		if len(ev.keys) == 0 {
+			t.epoch = g.gen
+		}
+		for _, k := range ev.keys {
+			t.stamps.Add(k, g.gen)
+		}
 	}
 	apply()
 }
@@ -131,6 +144,20 @@ func (s *Service) publishFetched(h [64]byte, stored *entry, since uint64) bool {
 	if g.budget.reachedSince(keys, since) {
 		stored.budgetChanges = 1
 	}
+	if cur, ok := s.l1.Peek(h); ok {
+		// The re-check pacing is per key, so a replacement keeps the claim.
+		stored.reconfirmAt.Store(max(stored.reconfirmAt.Load(), cur.reconfirmAt.Load()))
+	}
 	s.publishL1(h, stored)
 	return true
+}
+
+// revokedSince reports whether an event after since made the bundle's key
+// unusable (revoke, disable, rotation), as opposed to a change that keeps the
+// outage fallback.
+func (s *Service) revokedSince(b *domain.Bundle, since uint64) bool {
+	g := s.invalidations
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return g.revoked.reachedSince(guardKeys(b), since)
 }

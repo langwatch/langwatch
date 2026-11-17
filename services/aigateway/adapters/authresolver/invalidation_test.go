@@ -165,3 +165,15 @@ func TestInvalidation_EvictAllAndOverflowBumpTheEpoch(t *testing.T) {
 	assert.False(t, svc.publishFetched(h, bundle(), since), "an identity pushed out of the guard counts as reaching every bundle")
 	assert.True(t, svc.publishFetched(h, bundle(), svc.fetchGeneration()), "a fetch after the overflow publishes")
 }
+
+// @scenario "a cache refresh keeps the pace of fail closed re-checks"
+func TestInvalidation_ReplacementKeepsTheReconfirmClaim(t *testing.T) {
+	svc, _ := newService(t, Options{Resolver: &fakeResolver{}})
+	h := hashKey(domain.PresentedKey{Token: "vk-lw-paced"})
+	bundle := func() *entry { return svc.newEntry(orgBundle("vk_paced", time.Now().Add(10*time.Minute)), "") }
+	require.True(t, svc.publishFetched(h, bundle(), svc.fetchGeneration()))
+	require.True(t, svc.claimReconfirm(h))
+
+	require.True(t, svc.publishFetched(h, bundle(), svc.fetchGeneration()))
+	assert.False(t, svc.claimReconfirm(h), "a replaced entry inside the interval must not start a second re-check")
+}

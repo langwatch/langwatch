@@ -297,3 +297,41 @@ func TestRefresh_ConfigFetchFindsKeyDeleted_EvictsAtOnce(t *testing.T) {
 		assert.False(t, ok, "a deleted key is evicted by the background refresh too")
 	})
 }
+
+// refetchAcrossChange returns a key's last known entry and the generation a
+// refetch captured before kind landed for that key.
+func refetchAcrossChange(t *testing.T, svc *Service, h [64]byte, vkID, kind string) (*entry, uint64) {
+	t.Helper()
+	budgetCreated(svc)
+	old := svc.lastKnownFor(h)
+	require.NotNil(t, old)
+	since := svc.fetchGeneration()
+	svc.applyChange("org-1", CacheChange{Kind: kind, VirtualKeyID: vkID})
+	return old, since
+}
+
+// @scenario "a change during an outage refetch keeps the last known fallback"
+func TestServeLastKnown_ChangeMidRefetchKeepsTheFallback(t *testing.T) {
+	fetcher := &fakeConfigFetcher{}
+	svc, _ := newService(t, Options{Resolver: &fetcher.fakeResolver, ConfigFetcher: fetcher})
+	h := seedServedKey(t, svc, "vk-lw-midchange", "vk_midchange")
+	old, since := refetchAcrossChange(t, svc, h, "vk_midchange", ChangeKindVirtualKeyConfigUpdate)
+
+	got := svc.serveLastKnown(h, lastKnownServe{old: old, cause: context.DeadlineExceeded, since: since})
+	require.NotNil(t, got, "a config change does not end the outage fallback")
+	assert.Equal(t, "cred-known-good", got.bundle.Credentials[0].ID)
+	assert.NotNil(t, svc.lastKnownFor(h), "the fallback stays for the next request")
+	_, inL1 := svc.l1.Peek(h)
+	assert.False(t, inL1, "the copy read before the change is not cached")
+}
+
+// @scenario "a rotation during an outage refetch drops the last known fallback"
+func TestServeLastKnown_RotationMidRefetchDropsTheFallback(t *testing.T) {
+	fetcher := &fakeConfigFetcher{}
+	svc, _ := newService(t, Options{Resolver: &fetcher.fakeResolver, ConfigFetcher: fetcher})
+	h := seedServedKey(t, svc, "vk-lw-midrotate", "vk_midrotate")
+	old, since := refetchAcrossChange(t, svc, h, "vk_midrotate", ChangeKindVirtualKeyRotated)
+
+	assert.Nil(t, svc.serveLastKnown(h, lastKnownServe{old: old, cause: context.DeadlineExceeded, since: since}))
+	assert.Nil(t, svc.lastKnownFor(h))
+}
