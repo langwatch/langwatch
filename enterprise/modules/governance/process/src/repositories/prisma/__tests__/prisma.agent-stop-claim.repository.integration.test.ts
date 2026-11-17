@@ -127,12 +127,65 @@ describe.skipIf(!connection)("the kill switch claim and prior state repositories
       const opened = await request();
       const claims = PrismaAgentStopClaimRepository.create(prisma());
 
-      const taken = await Promise.all([
-        claims.takeDecision({ organizationId, stopId: opened.id, decision: "approve" }),
-        claims.takeDecision({ organizationId, stopId: opened.id, decision: "deny" }),
-      ]);
+      const decide = (decision: "approve" | "deny") =>
+        claims.takeDecision({
+          organizationId,
+          stopId: opened.id,
+          decision,
+          takenAt: Date.now(),
+          abandonedBefore: Date.now() - 60_000,
+        });
+
+      const taken = await Promise.all([decide("approve"), decide("deny")]);
 
       expect(taken.filter(Boolean)).toHaveLength(1);
+    });
+  });
+
+  describe("when a decision was taken and its command never landed", () => {
+    /** @scenario "A decision left by a process that died before sending it is taken over once abandoned" */
+    it("refuses another decision until the first is abandoned, then lets it take over", async () => {
+      const organizationId = newOrganization();
+      const { request } = await stopServiceOf(organizationId);
+      const opened = await request();
+      const claims = PrismaAgentStopClaimRepository.create(prisma());
+      const takenAt = Date.parse("2026-11-16T10:00:00Z");
+      const decide = ({ at, abandonedBefore }: { at: number; abandonedBefore: number }) =>
+        claims.takeDecision({
+          organizationId,
+          stopId: opened.id,
+          decision: "deny",
+          takenAt: at,
+          abandonedBefore,
+        });
+
+      expect(await decide({ at: takenAt, abandonedBefore: takenAt - 1 })).toBe(true);
+      expect(await decide({ at: takenAt + 1, abandonedBefore: takenAt })).toBe(false);
+      expect(await decide({ at: takenAt + 2, abandonedBefore: takenAt + 1 })).toBe(true);
+    });
+  });
+
+  describe("when an abandoned claim is taken over while its request is marked sent", () => {
+    /** @scenario "A claim marked sent is never taken over as abandoned" */
+    it("refuses the takeover of a sent claim and keeps the sent stop's claim", async () => {
+      const organizationId = newOrganization();
+      const claims = PrismaAgentStopClaimRepository.create(prisma());
+      const stopId = `agentstop-${ns}-sent`;
+      await claims.create({ organizationId, agentId: AGENT_ID, stopId, claimedAt: 1 });
+      await claims.markSent({ organizationId, agentId: AGENT_ID, stopId, sentAt: 2 });
+      const takeover = {
+        organizationId,
+        agentId: AGENT_ID,
+        fromStopId: stopId,
+        toStopId: `agentstop-${ns}-next`,
+        claimedAt: 3,
+      };
+
+      expect(await claims.swap({ ...takeover, onlyIfUnsent: true })).toBe(false);
+      expect(
+        (await claims.findClaims({ organizationId, agentId: AGENT_ID })).map((c) => c.stopId),
+      ).toEqual([stopId]);
+      expect(await claims.swap({ ...takeover, onlyIfUnsent: false })).toBe(true);
     });
   });
 
@@ -158,11 +211,14 @@ describe.skipIf(!connection)("the kill switch claim and prior state repositories
       const states = PrismaAgentStopTargetPriorStateRepository.create(prisma());
       const key = { organizationId, stopId: `agentstop-${ns}-prior`, targetId: "target-vk" };
 
-      const first = await states.recordOnce({ ...key, wasStopped: false, recordedAt: 1 });
-      const second = await states.recordOnce({ ...key, wasStopped: true, recordedAt: 2 });
+      const answers = await Promise.all([
+        states.recordOnce({ ...key, wasStopped: false, recordedAt: 1 }),
+        states.recordOnce({ ...key, wasStopped: true, recordedAt: 2 }),
+      ]);
 
-      expect([first, second]).toEqual([false, false]);
-      expect(await states.findPriorStates(key)).toEqual([false]);
+      const persisted = await states.findPriorStates(key);
+      expect(persisted).toHaveLength(1);
+      expect(answers).toEqual([persisted[0], persisted[0]]);
     });
   });
 });

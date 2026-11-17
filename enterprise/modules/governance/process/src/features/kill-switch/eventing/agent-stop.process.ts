@@ -96,13 +96,22 @@ export interface AgentStopIntentExecutors {
  * credential with no owner acts as a stable service principal named after the key, as the gateway
  * does for an ownerless key.
  */
+function actorPairOf({
+  stop,
+  restoring,
+}: {
+  stop: AgentStopRecord;
+  restoring: boolean;
+}): [string | null, string | null] {
+  if (restoring) return [stop.restoredByUserId, stop.restoredByApiKeyId];
+  if (stop.decidedByUserId !== null || stop.decidedByApiKeyId !== null) {
+    return [stop.decidedByUserId, stop.decidedByApiKeyId];
+  }
+  return [stop.requestedByUserId, stop.requestedByApiKeyId];
+}
+
 function actorUserIdOf({ stop, restoring }: { stop: AgentStopRecord; restoring: boolean }): string {
-  const [person, key] = restoring
-    ? [stop.restoredByUserId, stop.restoredByApiKeyId]
-    : [
-        stop.decidedByUserId ?? stop.requestedByUserId,
-        stop.decidedByApiKeyId ?? stop.requestedByApiKeyId,
-      ];
+  const [person, key] = actorPairOf({ stop, restoring });
   if (person) return person;
   return key ? `svc_${key}` : `svc_${stop.id}`;
 }

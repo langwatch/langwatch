@@ -27,7 +27,7 @@ A Bedrock alias that already rejects invocations, or a virtual key that is alrea
 
 Databricks stops only endpoints that serve custom models and have no update in progress. A stopped endpoint answers `400` to queries.
 
-Bedrock has no conditional update for an alias: a stop reads the alias and writes back its name, description and routing right after. A deployment to the same alias between those two calls is overwritten, so avoid deploying an alias while you stop it.
+Bedrock has no conditional update for an alias: a stop or a restore reads the alias and writes back its name, description and routing right after. A deployment to the same alias between those two calls is overwritten, so avoid deploying an alias while you stop or restore it.
 
 ## Approval
 

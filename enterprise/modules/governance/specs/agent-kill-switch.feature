@@ -147,6 +147,20 @@ Feature: Agent kill switch: stop a misbehaving agent where it runs, with approva
     Then it is refused with code "agent_stop_already_open"
 
   @integration
+  Scenario: A claim marked sent is never taken over as abandoned
+    Given a request's claim is old enough to count as abandoned
+    And its request is marked sent before another request takes the claim over
+    Then the takeover is refused and the sent stop keeps its claim
+
+  @integration
+  Scenario: A decision left by a process that died before sending it is taken over once abandoned
+    Given a decision on a pending stop was taken and its command never landed
+    When another decision arrives before the first is abandoned
+    Then it is refused
+    When another decision arrives after the first is abandoned
+    Then it takes the decision
+
+  @integration
   Scenario: A stop of an agent with no stop plan is refused
     Given "support-bot" has no stop plan
     When a stop is requested
@@ -204,6 +218,8 @@ Feature: Agent kill switch: stop a misbehaving agent where it runs, with approva
   Scenario: A retried apply after a successful platform call still counts the change as the stop's own
     Given the stop disabled the virtual key and set the Bedrock alias to reject invocations
     And the apply intents are delivered again before their outcome was recorded
+    Then the redelivery finds the virtual key disabled and does not call the gateway again
+    And a gateway refusal on the redelivery does not record the target failed
     When the stop is restored
     Then the virtual key is enabled and the Bedrock alias accepts invocations again
 
@@ -249,6 +265,12 @@ Feature: Agent kill switch: stop a misbehaving agent where it runs, with approva
     Given a person stopped "support-bot"
     When an API key with no owner restores it
     Then the gateway enables the virtual key as the key's service principal
+
+  @integration
+  Scenario: A stop acts as the credential that decided it
+    Given an API key with an owner requested a stop of "support-bot" that waits for an approval
+    When an API key with no owner approves it
+    Then the gateway disables the virtual key as the approving key's service principal
 
   # Audit
 
@@ -337,6 +359,24 @@ Feature: Agent kill switch: stop a misbehaving agent where it runs, with approva
   Scenario: The AWS connection form adds a key pair or a role to assume
     When a person adds an AWS connection with an access key pair, or switches to a role to assume
     Then only the fields of the chosen kind are sent, trimmed
+
+  @integration
+  Scenario: The Restore dialog restores only the stop it was opened for
+    Given a person opened Restore for the quarantined stop of "support-bot"
+    When the agent's open stop becomes another stop before they confirm
+    Then the dialog goes away and nothing is restored
+
+  @integration
+  Scenario: The stop plan dialog shows a failed source or connection read with Retry
+    Given the Databricks sources of the organisation fail to load
+    When a person opens the stop plan of "support-bot"
+    Then the dialog says the sources did not load, instead of offering none, and Retry reads them again
+
+  @integration
+  Scenario: The stop plan dialog takes no edit while a save runs
+    Given a person saved the stop plan of "support-bot"
+    When they remove a target before the save and its re-read finish
+    Then the plan keeps its targets
 
   @integration
   Scenario: The AWS connection form refuses a connection the contract would refuse

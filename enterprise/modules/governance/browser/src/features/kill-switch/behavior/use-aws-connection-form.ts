@@ -48,6 +48,7 @@ export function useAwsConnectionForm({
   const [credential, setCredential] = useState<Credential>("keys");
   const [form, setForm] = useState(EMPTY_FORM);
   const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const toaster = useGovernanceToaster();
   const showErrorToast = useShowErrorToast();
   const refresh = useKillSwitchRefresh({ organizationId });
@@ -61,12 +62,16 @@ export function useAwsConnectionForm({
     },
   });
 
+  const isSaving = create.isPending || submitting;
+  /** Cancel stays shut until the create and its re-read finish, so `onDone` closes this form only. */
   const submit = async () => {
+    if (isSaving) return;
     const parsed = connectionInput({ credential, form });
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message ?? "Check the connection's fields.");
       return;
     }
+    setSubmitting(true);
     try {
       await create.mutateAsync({ organizationId, connection: parsed.data });
       toaster.create({ title: "AWS connection added", type: "success" });
@@ -74,6 +79,8 @@ export function useAwsConnectionForm({
       onDone();
     } catch (failure) {
       showErrorToast({ error: failure, fallbackTitle: "Couldn't add the AWS connection" });
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -82,5 +89,5 @@ export function useAwsConnectionForm({
     setError(null);
   };
 
-  return { credential, pickCredential, field, error, submit, isSaving: create.isPending };
+  return { credential, pickCredential, field, error, submit, isSaving };
 }

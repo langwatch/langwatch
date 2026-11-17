@@ -87,7 +87,7 @@ export function AwsConnectionForm({
         </Text>
       ) : null}
       <HStack justify="end" gap={2}>
-        <Button size="sm" variant="ghost" onClick={onDone}>
+        <Button size="sm" variant="ghost" disabled={form.isSaving} onClick={onDone}>
           Cancel
         </Button>
         <Button

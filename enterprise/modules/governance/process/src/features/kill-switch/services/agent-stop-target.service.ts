@@ -163,8 +163,9 @@ export class AgentStopTargetService implements AgentStopIntentExecutors {
 
   /**
    * Stops a key or alias unless it was already stopped before this stop first touched it. The
-   * prior state is read and recorded once, so a retry after a successful call (live state now
-   * stopped) still counts the change as the stop's own and the restore reverts it.
+   * prior state is recorded once, so a retry after a successful call still counts the change as
+   * the stop's own; a retry that finds it stopped does not call the platform again, so a later
+   * platform refusal cannot turn an applied change into a failure the restore would skip.
    */
   private async stopUnlessAlreadyStopped({
     intent,
@@ -181,15 +182,18 @@ export class AgentStopTargetService implements AgentStopIntentExecutors {
       targetId: intent.target.id,
     };
     const [recorded] = await this.deps.priorStates.findPriorStates(key);
-    const wasStopped =
-      recorded ??
-      (await this.deps.priorStates.recordOnce({
+    if (recorded === undefined) {
+      const wasStopped = await this.deps.priorStates.recordOnce({
         ...key,
         wasStopped: await isStopped(),
         recordedAt: this.deps.now(),
-      }));
-    if (wasStopped) return { changed: false };
-    await stop();
+      });
+      if (wasStopped) return { changed: false };
+      await stop();
+      return { changed: true };
+    }
+    if (recorded) return { changed: false };
+    if (!(await isStopped())) await stop();
     return { changed: true };
   }
 

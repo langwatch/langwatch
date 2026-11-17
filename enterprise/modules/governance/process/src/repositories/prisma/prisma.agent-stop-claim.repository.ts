@@ -81,10 +81,14 @@ export class PrismaAgentStopClaimRepository extends AgentStopClaimRepository {
     organizationId,
     stopId,
     decision,
+    takenAt,
+    abandonedBefore,
   }: {
     organizationId: string;
     stopId: string;
     decision: AgentStopClaimDecision;
+    takenAt: number;
+    abandonedBefore: number;
   }): Promise<boolean> {
     const count = await this.prisma.$executeRaw`
       ${skipTenantCheck({
@@ -92,10 +96,10 @@ export class PrismaAgentStopClaimRepository extends AgentStopClaimRepository {
         SKIP_TENANT_CHECK: true,
       })}
       UPDATE "AgentStopClaim"
-         SET "decision" = ${decision}
+         SET "decision" = ${decision}, "decisionTakenAt" = ${new Date(takenAt)}
        WHERE "organizationId" = ${organizationId}
          AND "stopId" = ${stopId}
-         AND "decision" IS NULL
+         AND ("decision" IS NULL OR "decisionTakenAt" < ${new Date(abandonedBefore)})
     `;
     return count === 1;
   }
@@ -111,7 +115,7 @@ export class PrismaAgentStopClaimRepository extends AgentStopClaimRepository {
   }): Promise<void> {
     await this.prisma.agentStopClaim.updateMany({
       where: { organizationId, stopId, decision },
-      data: { decision: null },
+      data: { decision: null, decisionTakenAt: null },
     });
   }
 
@@ -121,12 +125,14 @@ export class PrismaAgentStopClaimRepository extends AgentStopClaimRepository {
     fromStopId,
     toStopId,
     claimedAt,
+    onlyIfUnsent,
   }: {
     organizationId: string;
     agentId: string;
     fromStopId: string;
     toStopId: string;
     claimedAt: number;
+    onlyIfUnsent: boolean;
   }): Promise<boolean> {
     const count = await this.prisma.$executeRaw`
       ${skipTenantCheck({
@@ -135,10 +141,11 @@ export class PrismaAgentStopClaimRepository extends AgentStopClaimRepository {
       })}
       UPDATE "AgentStopClaim"
          SET "stopId" = ${toStopId}, "claimedAt" = ${new Date(claimedAt)},
-             "sentAt" = NULL, "decision" = NULL
+             "sentAt" = NULL, "decision" = NULL, "decisionTakenAt" = NULL
        WHERE "organizationId" = ${organizationId}
          AND "agentId" = ${agentId}
          AND "stopId" = ${fromStopId}
+         AND (${!onlyIfUnsent} OR "sentAt" IS NULL)
     `;
     return count === 1;
   }

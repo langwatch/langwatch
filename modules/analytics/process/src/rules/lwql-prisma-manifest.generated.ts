@@ -2720,6 +2720,7 @@ export interface LwqlPrismaRows {
     readonly claimedAt: "DateTime";
     readonly sentAt: "DateTime?";
     readonly decision: "String?";
+    readonly decisionTakenAt: "DateTime?";
   };
   readonly AgentStopTargetPriorState: {
     readonly organizationId: "String";

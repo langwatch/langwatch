@@ -27971,7 +27971,7 @@
     {
       "name": "AgentStopClaim",
       "tableName": "AgentStopClaim",
-      "documentation": "The one open stop an agent may have: the api takes this row before it sends a stop's request,\nso two requests at once cannot both open one. A later request takes it over once the stop it\nnames has closed.\n`sentAt` is set once the request command was sent: from then on the claim passes on only after\nits stop closed, never on age. `decision` is taken by the one approve or deny that wins.",
+      "documentation": "The one open stop an agent may have: the api takes this row before it sends a stop's request,\nso two requests at once cannot both open one. A later request takes it over once the stop it\nnames has closed.\n`sentAt` is set once the request command was sent: from then on the claim passes on only after\nits stop closed, never on age. `decision` is taken by the one approve or deny that wins, at\n`decisionTakenAt`; one whose command never landed is taken over once abandoned.",
       "primaryKey": [
         "organizationId",
         "agentId"
@@ -28026,6 +28026,15 @@
           "name": "decision",
           "columnName": "decision",
           "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "decisionTakenAt",
+          "columnName": "decisionTakenAt",
+          "type": "DateTime",
           "kind": "scalar",
           "isList": false,
           "isOptional": true,

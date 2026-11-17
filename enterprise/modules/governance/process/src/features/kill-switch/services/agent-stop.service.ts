@@ -326,6 +326,7 @@ export class AgentStopService {
       stopId,
       status: current.status,
       decision: approve ? "approve" : "deny",
+      at,
       send: () =>
         this.deps.send(approve ? "approve" : "deny", {
           tenantId: organizationId,

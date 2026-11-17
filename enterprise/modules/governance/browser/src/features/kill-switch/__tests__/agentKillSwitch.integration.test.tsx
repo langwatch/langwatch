@@ -187,6 +187,31 @@ describe("the Agents page with stops of its agents", () => {
   });
 });
 
+describe("the Restore dialog when the agent's open stop changes under it", () => {
+  /** @scenario "The Restore dialog restores only the stop it was opened for" */
+  it("goes away instead of retargeting another stop", async () => {
+    let openStop = QUARANTINED;
+    answerAgentsPage({ summaries: [summary({ agentId: "a1", openStop: QUARANTINED })] });
+    answerQuery("governanceKillSwitch.summaries", () => [summary({ agentId: "a1", openStop })]);
+    renderAgentsPage({ permissions: MANAGER });
+    await openActions("support-bot");
+    await userEvent.click(await screen.findByRole("menuitem", { name: /Restore/ }));
+    await screen.findByRole("dialog", { name: "Restore support-bot?" });
+
+    openStop = { ...QUARANTINED, id: "stop-3" };
+    await act(async () => {
+      await Promise.all(
+        [...(trpcDouble.mounted.get("governanceKillSwitch.summaries") ?? [])].map((read) => read()),
+      );
+    });
+
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Restore support-bot?" })).toBeNull(),
+    );
+    expect(trpcDouble.calls).toEqual([]);
+  });
+});
+
 describe("the Agents page when a kill switch read fails", () => {
   const unavailable = () => {
     throw handledError({ code: "service_unavailable", httpStatus: 503 });

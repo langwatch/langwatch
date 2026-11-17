@@ -3256,7 +3256,8 @@ export const prismaModelFieldCatalogue = {
     "stopId",
     "claimedAt",
     "sentAt",
-    "decision"
+    "decision",
+    "decisionTakenAt"
   ],
   "AgentStopTargetPriorState": [
     "organizationId",

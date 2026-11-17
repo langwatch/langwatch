@@ -2,7 +2,8 @@
 /**
  * An agent's stop plan as a draft: what it reads, the edits, and the save that replaces the
  * plan whole. Nothing is editable or saved until the plan read succeeded, so a failed read can
- * never save an empty plan. Spec: enterprise/modules/governance/specs/agent-kill-switch.feature
+ * never save an empty plan; nothing is editable while a save and its re-read run, so no edit is
+ * lost when the draft clears. Spec: enterprise/modules/governance/specs/agent-kill-switch.feature
  */
 import {
   type AgentStopTarget,
@@ -15,6 +16,12 @@ import { useGovernanceToaster, useShowErrorToast } from "../../../behavior/gover
 import { describeStopTarget } from "../model/kill-switch-copy.ts";
 import { useKillSwitchRefresh } from "./use-kill-switch.ts";
 
+/** A lookup that failed with nothing to show: its error and retry, never an empty list. */
+function lookupFailure(read: { data?: unknown; error: unknown; refetch: () => unknown }) {
+  if (read.data !== undefined || !read.error) return null;
+  return { error: read.error, retry: () => void read.refetch() };
+}
+
 export function useStopPlanEditor({
   organizationId,
   agentId,
@@ -25,6 +32,7 @@ export function useStopPlanEditor({
   open: boolean;
 }) {
   const [draft, setDraft] = useState<AgentStopTarget[] | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const toaster = useGovernanceToaster();
   const showErrorToast = useShowErrorToast();
   const refresh = useKillSwitchRefresh({ organizationId });
@@ -41,9 +49,11 @@ export function useStopPlanEditor({
     saved.find((row) => JSON.stringify(row.target) === JSON.stringify(target))?.label ??
     describeStopTarget(target);
 
-  /** Resolves true once the plan was saved. */
+  const isSaving = save.isPending || submitting;
+  /** Resolves true once the plan was saved and read again. */
   const submit = async (): Promise<boolean> => {
-    if (!loaded || save.isPending) return false;
+    if (!loaded || isSaving) return false;
+    setSubmitting(true);
     try {
       await save.mutateAsync({ organizationId, agentId, targets });
       toaster.create({ title: "Stop plan saved", type: "success" });
@@ -53,6 +63,8 @@ export function useStopPlanEditor({
     } catch (error) {
       showErrorToast({ error, fallbackTitle: "Couldn't save the stop plan" });
       return false;
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -63,10 +75,12 @@ export function useStopPlanEditor({
     retry: () => void plan.refetch(),
     targets,
     labelOf,
-    setTargets: (next: AgentStopTarget[]) => setDraft(next),
+    setTargets: (next: AgentStopTarget[]) => setDraft((current) => (isSaving ? current : next)),
     discard: () => setDraft(null),
     submit,
-    isSaving: save.isPending,
+    isSaving,
+    sourcesFailure: lookupFailure(sources),
+    connectionsFailure: lookupFailure(connections),
     databricksSources: (sources.data ?? [])
       .filter((source) => source.sourceType === DATABRICKS_GENIE_ADAPTER_ID)
       .map((source) => ({ value: source.id, label: source.name })),

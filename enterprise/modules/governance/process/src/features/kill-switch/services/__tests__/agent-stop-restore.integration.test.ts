@@ -214,4 +214,25 @@ describe("AgentStopService restore", () => {
       await harness.eventing.close();
     });
   });
+
+  describe("when an ownerless API key approves a stop a keyed person requested", () => {
+    /** @scenario "A stop acts as the credential that decided it" */
+    it("disables the virtual key as the approving key's service principal", async () => {
+      const harness = await killSwitchHarness();
+      await harness.setFullPlan();
+      const view = await request(harness, MACHINE, "high");
+      await settled(harness, view.id, "pending_approval");
+
+      await harness.stops.approveStop({
+        organizationId: ORG,
+        stopId: view.id,
+        caller: { userId: null, apiKeyId: "key-approver" },
+      });
+      await settled(harness, view.id, "quarantined");
+
+      const disable = harness.virtualKeyCalls.find((call) => call.action === "disable");
+      expect(disable?.input.actorUserId).toBe("svc_key-approver");
+      await harness.eventing.close();
+    });
+  });
 });

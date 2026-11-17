@@ -74,6 +74,7 @@ describe("AgentStopClaimService", () => {
         stopId: "stop-1",
         status: "pending_approval" as const,
         decision: "approve" as const,
+        at: 0,
       };
 
       const failed = await service
@@ -85,6 +86,35 @@ describe("AgentStopClaimService", () => {
 
       expect(failed).toBe("failed");
       expect(await service.withDecision({ ...decide, send: async () => "sent" })).toBe("sent");
+    });
+  });
+
+  describe("when a decision was taken and never sent", () => {
+    /** @scenario "A decision left by a process that died before sending it is taken over once abandoned" */
+    it("refuses the next decision until the first is abandoned, then accepts it", async () => {
+      const { service } = laggingClaims();
+      await service.claim({ organizationId: ORG, agentId: AGENT_ID, stopId: "stop-1", at: 0 });
+      const decide = {
+        organizationId: ORG,
+        stopId: "stop-1",
+        status: "pending_approval" as const,
+        decision: "deny" as const,
+      };
+      const neverSent = new Promise<string>(() => undefined);
+      void service.withDecision({ ...decide, at: 1_000, send: () => neverSent });
+      await Promise.resolve();
+
+      const early = await service
+        .withDecision({ ...decide, at: 2_000, send: async () => "sent" })
+        .catch((error: { code?: string }) => error.code);
+      const late = await service.withDecision({
+        ...decide,
+        at: 1_000 + ABANDONED_CLAIM_MS + 1,
+        send: async () => "sent",
+      });
+
+      expect(early).toBe("agent_stop_not_pending");
+      expect(late).toBe("sent");
     });
   });
 });

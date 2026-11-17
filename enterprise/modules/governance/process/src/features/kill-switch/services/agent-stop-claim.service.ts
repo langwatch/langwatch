@@ -15,7 +15,10 @@ import type {
 import type { AgentStopRepository } from "../../../repositories/agent-stop.repository.ts";
 import { isOpenStatus } from "../rules/agent-stop.rules.ts";
 
-/** A claim whose request was never sent and whose stop never reached the projection is abandoned this long after. */
+/**
+ * A claim whose request was never sent and whose stop never reached the projection, or a decision
+ * whose command never landed on a stop still pending, is abandoned this long after it was taken.
+ */
 export const ABANDONED_CLAIM_MS = 15 * 60 * 1000;
 
 interface AgentStopClaimDependencies {
@@ -54,13 +57,15 @@ export class AgentStopClaimService {
       if (await this.deps.claims.create({ ...claim, stopId })) return;
       throw new AgentStopAlreadyOpenError({ agentId, stopId: "unknown" });
     }
-    if (!(await this.isReleased({ organizationId, held, at }))) {
+    const released = await this.releaseOf({ organizationId, held, at });
+    if (released === "held") {
       throw new AgentStopAlreadyOpenError({ agentId, stopId: held.stopId });
     }
     const swapped = await this.deps.claims.swap({
       ...claim,
       fromStopId: held.stopId,
       toStopId: stopId,
+      onlyIfUnsent: released === "abandoned",
     });
     if (!swapped) throw new AgentStopAlreadyOpenError({ agentId, stopId: held.stopId });
   }
@@ -80,22 +85,32 @@ export class AgentStopClaimService {
 
   /**
    * Runs `send` holding the stop's one decision, so a concurrent approve and deny cannot both be
-   * sent. The loser is refused `agent_stop_not_pending`; a failed send gives the decision back.
+   * sent. The loser is refused `agent_stop_not_pending`; a failed send gives the decision back. A
+   * decision left by a process that died before sending is taken over once abandoned.
    */
   async withDecision<T>({
     organizationId,
     stopId,
     status,
     decision,
+    at,
     send,
   }: {
     organizationId: string;
     stopId: string;
     status: AgentStopStatus;
     decision: AgentStopClaimDecision;
+    at: number;
     send: () => Promise<T>;
   }): Promise<T> {
-    if (!(await this.deps.claims.takeDecision({ organizationId, stopId, decision }))) {
+    const taken = await this.deps.claims.takeDecision({
+      organizationId,
+      stopId,
+      decision,
+      takenAt: at,
+      abandonedBefore: at - ABANDONED_CLAIM_MS,
+    });
+    if (!taken) {
       throw new AgentStopNotPendingError({ stopId, status });
     }
     try {
@@ -106,7 +121,8 @@ export class AgentStopClaimService {
     }
   }
 
-  private async isReleased({
+  /** `closed`: its stop closed. `abandoned`: never sent and too old. `held`: still open. */
+  private async releaseOf({
     organizationId,
     held,
     at,
@@ -114,13 +130,15 @@ export class AgentStopClaimService {
     organizationId: string;
     held: AgentStopClaim;
     at: number;
-  }): Promise<boolean> {
+  }): Promise<"closed" | "abandoned" | "held"> {
     try {
       const stop = await this.deps.stops.getStop({ organizationId, stopId: held.stopId });
-      return !isOpenStatus(stop.status);
+      return isOpenStatus(stop.status) ? "held" : "closed";
     } catch (error) {
       if (!(error instanceof AgentStopNotFoundError)) throw error;
-      return held.sentAt === null && at - held.claimedAt > ABANDONED_CLAIM_MS;
+      return held.sentAt === null && at - held.claimedAt > ABANDONED_CLAIM_MS
+        ? "abandoned"
+        : "held";
     }
   }
 }

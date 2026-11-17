@@ -25,7 +25,10 @@ function stopUnavailableReason({
   return null;
 }
 
-/** The kill switch actions of one agent row, and the dialog the picked action opens. */
+/**
+ * The kill switch actions of one agent row, and the dialog the picked action opens. Restore is
+ * bound to the stop open when it was picked; once that stop is no longer open the dialog goes.
+ */
 export function AgentKillSwitchMenu({
   organizationId,
   agentName,
@@ -37,9 +40,13 @@ export function AgentKillSwitchMenu({
   summary: AgentKillSwitchSummary;
   canManage: boolean;
 }) {
-  const [dialog, setDialog] = useState<KillSwitchAction | null>(null);
+  const [dialog, setDialog] = useState<{
+    action: KillSwitchAction;
+    stopId: string | null;
+  } | null>(null);
   const openStop = summary.openStop;
   const close = () => setDialog(null);
+  const pick = (action: KillSwitchAction) => setDialog({ action, stopId: openStop?.id ?? null });
   const dialogProps = { organizationId, agentName, open: true, onClose: close };
 
   return (
@@ -49,13 +56,13 @@ export function AgentKillSwitchMenu({
         restorable={openStop !== null && isRestorableStop(openStop.status)}
         stopUnavailableReason={stopUnavailableReason({ summary, canManage })}
         manageHint={canManage ? null : "Needs governance:manage"}
-        onPick={setDialog}
+        onPick={pick}
       />
-      {dialog === "stop" && <StopAgentDialog agentId={summary.agentId} {...dialogProps} />}
-      {dialog === "restore" && openStop && (
-        <RestoreAgentDialog stopId={openStop.id} {...dialogProps} />
+      {dialog?.action === "stop" && <StopAgentDialog agentId={summary.agentId} {...dialogProps} />}
+      {dialog?.action === "restore" && dialog.stopId !== null && openStop?.id === dialog.stopId && (
+        <RestoreAgentDialog stopId={dialog.stopId} {...dialogProps} />
       )}
-      {dialog === "plan" && <StopPlanDialog agentId={summary.agentId} {...dialogProps} />}
+      {dialog?.action === "plan" && <StopPlanDialog agentId={summary.agentId} {...dialogProps} />}
     </>
   );
 }

@@ -19,9 +19,23 @@ function StopPlanEditorBody({
   organizationId: string;
   editor: Editor;
 }) {
-  const { targets, awsConnections } = editor;
+  const { targets, awsConnections, sourcesFailure, connectionsFailure } = editor;
   return (
     <VStack align="stretch" gap={5}>
+      {sourcesFailure && (
+        <HandledErrorAlert
+          error={sourcesFailure.error}
+          fallbackTitle="Couldn't load the Databricks sources"
+          onRetry={sourcesFailure.retry}
+        />
+      )}
+      {connectionsFailure && (
+        <HandledErrorAlert
+          error={connectionsFailure.error}
+          fallbackTitle="Couldn't load the AWS connections"
+          onRetry={connectionsFailure.retry}
+        />
+      )}
       <StopPlanTargetList
         targets={targets}
         labelOf={editor.labelOf}

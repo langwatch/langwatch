@@ -6,7 +6,10 @@ import {
   AgentStopClaimRepository,
 } from "../agent-stop-claim.repository.ts";
 
-type HeldClaim = AgentStopClaim & { decision: AgentStopClaimDecision | null };
+type HeldClaim = AgentStopClaim & {
+  decision: AgentStopClaimDecision | null;
+  decisionTakenAt: number | null;
+};
 
 export class MemoryAgentStopClaimRepository extends AgentStopClaimRepository {
   private readonly claims = new Map<string, HeldClaim>();
@@ -36,7 +39,13 @@ export class MemoryAgentStopClaimRepository extends AgentStopClaimRepository {
   }): Promise<boolean> {
     const key = this.key(organizationId, agentId);
     if (this.claims.has(key)) return false;
-    this.claims.set(key, { stopId, claimedAt, sentAt: null, decision: null });
+    this.claims.set(key, {
+      stopId,
+      claimedAt,
+      sentAt: null,
+      decision: null,
+      decisionTakenAt: null,
+    });
     return true;
   }
 
@@ -72,14 +81,21 @@ export class MemoryAgentStopClaimRepository extends AgentStopClaimRepository {
     organizationId,
     stopId,
     decision,
+    takenAt,
+    abandonedBefore,
   }: {
     organizationId: string;
     stopId: string;
     decision: AgentStopClaimDecision;
+    takenAt: number;
+    abandonedBefore: number;
   }): Promise<boolean> {
     const claim = this.claimOfStop(organizationId, stopId);
-    if (!claim || claim.decision !== null) return false;
+    if (!claim) return false;
+    const abandoned = claim.decisionTakenAt !== null && claim.decisionTakenAt < abandonedBefore;
+    if (claim.decision !== null && !abandoned) return false;
     claim.decision = decision;
+    claim.decisionTakenAt = takenAt;
     return true;
   }
 
@@ -93,7 +109,9 @@ export class MemoryAgentStopClaimRepository extends AgentStopClaimRepository {
     decision: AgentStopClaimDecision;
   }): Promise<void> {
     const claim = this.claimOfStop(organizationId, stopId);
-    if (claim?.decision === decision) claim.decision = null;
+    if (claim?.decision !== decision) return;
+    claim.decision = null;
+    claim.decisionTakenAt = null;
   }
 
   private claimOfStop(organizationId: string, stopId: string): HeldClaim | undefined {
@@ -110,16 +128,26 @@ export class MemoryAgentStopClaimRepository extends AgentStopClaimRepository {
     fromStopId,
     toStopId,
     claimedAt,
+    onlyIfUnsent,
   }: {
     organizationId: string;
     agentId: string;
     fromStopId: string;
     toStopId: string;
     claimedAt: number;
+    onlyIfUnsent: boolean;
   }): Promise<boolean> {
     const key = this.key(organizationId, agentId);
-    if (this.claims.get(key)?.stopId !== fromStopId) return false;
-    this.claims.set(key, { stopId: toStopId, claimedAt, sentAt: null, decision: null });
+    const held = this.claims.get(key);
+    if (held?.stopId !== fromStopId) return false;
+    if (onlyIfUnsent && held.sentAt !== null) return false;
+    this.claims.set(key, {
+      stopId: toStopId,
+      claimedAt,
+      sentAt: null,
+      decision: null,
+      decisionTakenAt: null,
+    });
     return true;
   }
 

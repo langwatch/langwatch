@@ -230,6 +230,41 @@ describe("the stop plan of an agent", () => {
     expect(await screen.findByRole("option", { name: "Databricks prod" })).toBeInTheDocument();
   });
 
+  /** @scenario "The stop plan dialog shows a failed source or connection read with Retry" */
+  it("says the Databricks sources did not load instead of offering none, and reads them on Retry", async () => {
+    answerQuery("governanceAgents.syncSources", unavailable);
+    const { dialog } = await openPlanDialog();
+
+    const alert = await within(dialog).findByText("Couldn't load the Databricks sources");
+    expect(alert).toBeInTheDocument();
+    const reads = trpcDouble.reads.filter((read) => read === "governanceAgents.syncSources");
+    answerQuery("governanceAgents.syncSources", () => []);
+    const retry = within(dialog).getAllByRole("button", { name: "Try again" }).at(0);
+    if (!retry) throw new Error("no Try again button");
+    await userEvent.click(retry);
+
+    await waitFor(() =>
+      expect(within(dialog).queryByText("Couldn't load the Databricks sources")).toBeNull(),
+    );
+    expect(
+      trpcDouble.reads.filter((read) => read === "governanceAgents.syncSources").length,
+    ).toBeGreaterThan(reads.length);
+  });
+
+  /** @scenario "The stop plan dialog takes no edit while a save runs" */
+  it("ignores target edits while the save and its re-read run", async () => {
+    answerMutation("governanceKillSwitch.setPlan", () => SUPPORT_BOT_PLAN);
+    const { dialog } = await openPlanDialog();
+    await within(dialog).findAllByTestId("stop-plan-target");
+    answerQuery("governanceKillSwitch.plan", neverAnswers);
+
+    await userEvent.click(within(dialog).getByRole("button", { name: "Save plan" }));
+    await waitFor(() => expect(trpcDouble.invalidated).toContain("governanceKillSwitch.plan"));
+    await userEvent.click(within(dialog).getByRole("button", { name: "Remove Support key" }));
+
+    expect(within(dialog).getAllByTestId("stop-plan-target")).toHaveLength(2);
+  });
+
   it("refuses a target with an empty field and says why", async () => {
     const { dialog } = await openPlanDialog();
 
@@ -315,6 +350,25 @@ describe("the stop plan of an agent", () => {
           },
         },
       ]);
+    });
+
+    /** @scenario "The AWS connection form adds a key pair or a role to assume" */
+    it("keeps Cancel shut until the connections are read again", async () => {
+      answerMutation("governanceKillSwitch.createAwsConnection", () => CREATED);
+      const form = await openConnectionForm();
+      await userEvent.type(within(form).getByLabelText("Access key id"), "AKIAACMEEXAMPLE0001");
+      await userEvent.type(
+        within(form).getByLabelText("Secret access key"),
+        "acme-secret-access-key-0001",
+      );
+      answerQuery("governanceKillSwitch.awsConnections", neverAnswers);
+
+      await submit(form);
+
+      await waitFor(() =>
+        expect(trpcDouble.invalidated).toContain("governanceKillSwitch.awsConnections"),
+      );
+      expect(within(form).getByRole("button", { name: "Cancel" })).toBeDisabled();
     });
 
     /** @scenario "The AWS connection form refuses a connection the contract would refuse" */

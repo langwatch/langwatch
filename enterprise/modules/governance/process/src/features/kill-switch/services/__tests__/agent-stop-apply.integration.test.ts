@@ -145,6 +145,7 @@ describe("AgentStopTargetService", () => {
       await harness.setFullPlan();
       const view = await request(harness, PERSON, "critical");
       const stop = await settled(harness, view.id, "quarantined");
+      harness.keyRefusals.set("disable", "virtual_key_unavailable");
       const context = {
         processName: "agentStop",
         projectId: ORG,
@@ -172,6 +173,8 @@ describe("AgentStopTargetService", () => {
     it("keeps the key and the alias as changed by the stop, so the restore reverts both", async () => {
       const { harness, stopId } = await retriedAfterSuccess();
       expect(harness.keyStatuses.get(VIRTUAL_KEY_ID)).toBe("DISABLED");
+      expect(harness.virtualKeyCalls.filter((call) => call.action === "disable")).toHaveLength(1);
+      harness.keyRefusals.delete("disable");
 
       await harness.stops.restore({ organizationId: ORG, stopId, caller: PERSON });
       const restored = await settled(harness, stopId, "restored");

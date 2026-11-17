@@ -40,6 +40,7 @@ export function useStopRequest({
   open: boolean;
 }) {
   const [planChanged, setPlanChanged] = useState<unknown>(null);
+  const [submitting, setSubmitting] = useState(false);
   const toaster = useGovernanceToaster();
   const showErrorToast = useShowErrorToast();
   const refresh = useKillSwitchRefresh({ organizationId });
@@ -51,9 +52,11 @@ export function useStopRequest({
   const shown = plan.data && !plan.isError ? plan.data : null;
   const retry = () => void plan.refetch();
 
-  /** Resolves true once the stop was sent; false when it was refused or not sent. */
+  const isStopping = stop.isPending || submitting;
+  /** Resolves true once the stop was sent and re-read; false when it was refused or not sent. */
   const requestStop = async ({ reason }: { reason: string }): Promise<boolean> => {
-    if (!shown || plan.isFetching || stop.isPending) return false;
+    if (!shown || plan.isFetching || isStopping) return false;
+    setSubmitting(true);
     try {
       await stop.mutateAsync({
         organizationId,
@@ -72,6 +75,8 @@ export function useStopRequest({
       }
       showErrorToast({ error, fallbackTitle: "Couldn't stop the agent" });
       return false;
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -84,7 +89,7 @@ export function useStopRequest({
     },
     planChanged,
     confirmBlockedReason: confirmBlockedReason({ shown: !!shown, ...plan }),
-    isStopping: stop.isPending,
+    isStopping,
     requestStop,
     reset: () => setPlanChanged(null),
   };
