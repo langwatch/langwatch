@@ -8,6 +8,7 @@ import {
   REFUSED_BEFORE_ROUTING,
 } from "./client-error.ts";
 import { NOT_HANDLED_DRAINING, NOT_HANDLED_HEADER } from "./not-handled.ts";
+import { REQUEST_BODY_TIMEOUT_MS } from "./request-body-deadline.ts";
 
 /** The kubelet's path; answered in the thread from the heartbeat, never proxied. */
 export const LIVENESS_PATH = "/healthz";
@@ -32,9 +33,11 @@ export const PUBLIC_LISTENER_TIMEOUTS = {
   /** Above the 60s idle reuse of ALB and nginx, so Node never closes a socket a proxy reuses. */
   keepAliveTimeout: 65_000,
   headersTimeout: 66_000,
-  /** Two hours, not Node's 300s: a 5 GiB upload at about 6 Mbit/s, still bounding a slow body. */
-  requestTimeout: 2 * 60 * 60_000,
+  /** Node's 300s; a listener whose routes declare a longer body allowance raises it to theirs. */
+  requestTimeout: REQUEST_BODY_TIMEOUT_MS,
 } as const;
+/** A door proxying to another listener never cuts a body first: the listener behind it decides. */
+export const PROXY_DOOR_REQUEST_TIMEOUT_MS = 2 * 60 * 60_000;
 /** The listener's timeouts as read back; `timeout` (idle socket) stays Node's default, off. */
 export type ListenerTimeouts = Readonly<{
   keepAliveTimeout: number;
@@ -253,10 +256,10 @@ const answerFailed = (req, res) => {
   if (!String(req.headers.accept || "").includes("text/html")) return answerUpgrading(req, res);
   answerConsole(res, 503, hasSession(req) ? consoleHold.consolePage : consoleHold.loginPage);
 };
-const unavailable = (res, body) => {
+const unavailable = (res, body, headers) => {
   if (res.destroyed || res.writableEnded) return;
   if (res.headersSent) return res.destroy();
-  res.writeHead(503, { "Content-Type": "text/plain" }).end(body);
+  res.writeHead(503, { "Content-Type": "text/plain", ...headers }).end(body);
 };
 const server = http.createServer((req, res) => {
   if (req.url === workerData.livenessPath && !proxiesLiveness) {
@@ -290,7 +293,7 @@ server.on("clientError", (error, socket) => {
   }
   if (!socket.writable) return socket.destroy();
   const status = workerData.clientErrorStatusLines[code] || "400 Bad Request";
-  socket.end("HTTP/1.1 " + status + "\\r\\nConnection: close\\r\\n\\r\\n");
+  socket.end("HTTP/1.1 " + status + "\\r\\nConnection: close\\r\\n\\r\\n", () => socket.destroy());
 });
 // The thread owns its client's connection, so the main thread's hop-by-hop headers stay behind.
 const endToEnd = (headers) =>
@@ -314,12 +317,14 @@ const proxy = (req, res) => {
     if (reply.headers[workerData.notHandledHeader] === workerData.notHandledDraining) {
       headers.connection = "close";
     }
+    // Answered before the client's body arrived (a cut, a refusal): the rest is not read here either.
+    if (!req.complete) headers.connection = "close";
     res.writeHead(reply.statusCode ?? 502, headers);
     reply.pipe(res);
   });
   upstream.on("error", () => {
     clearInterval(timer);
-    unavailable(res, "main thread did not answer");
+    unavailable(res, "main thread did not answer", req.complete ? {} : { connection: "close" });
   });
   req.pipe(upstream);
 };
@@ -341,7 +346,7 @@ server.on("upgrade", (req, socket, head) => {
   upstream.on("error", () => socket.destroy());
   socket.on("error", () => upstream.destroy());
 });
-// PUBLIC_LISTENER_TIMEOUTS: a proxy's idle reuse outlived, two hours for a request body.
+// PUBLIC_LISTENER_TIMEOUTS: a proxy's idle reuse outlived; the request body bound is the caller's.
 Object.assign(server, workerData.listenerTimeouts);
 const deadline = Date.now() + workerData.handoverMs;
 const bind = () => server.listen(workerData.port);
@@ -457,6 +462,7 @@ export async function startLivenessThread({
   logger,
   stallBudgetMs = HEARTBEAT_STALL_BUDGET_MS,
   proxyTimeoutMs = MAIN_THREAD_PROXY_TIMEOUT_MS,
+  requestTimeoutMs,
 }: {
   port: number;
   heartbeat: SharedArrayBuffer;
@@ -467,6 +473,8 @@ export async function startLivenessThread({
   logger: LivenessLogger;
   stallBudgetMs?: number;
   proxyTimeoutMs?: number;
+  /** Node's `requestTimeout` on the public port: the listener's own, or a door's two hours. */
+  requestTimeoutMs: number;
 }): Promise<LivenessThread> {
   const thread = new Worker(LIVENESS_THREAD_SOURCE, {
     eval: true,
@@ -491,7 +499,7 @@ export async function startLivenessThread({
       hopByHopHeaders: HOP_BY_HOP_HEADERS,
       notHandledHeader: NOT_HANDLED_HEADER,
       notHandledDraining: NOT_HANDLED_DRAINING,
-      listenerTimeouts: PUBLIC_LISTENER_TIMEOUTS,
+      listenerTimeouts: { ...PUBLIC_LISTENER_TIMEOUTS, requestTimeout: requestTimeoutMs },
     },
   });
   // The main loop keeps its own loopback listener, which is what holds the process open.

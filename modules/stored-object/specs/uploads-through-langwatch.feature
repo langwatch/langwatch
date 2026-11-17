@@ -78,10 +78,18 @@ Feature: Uploads through LangWatch when browsers cannot reach the bucket
       And the client is never told it is available when it is not
 
     @unit
-    Scenario: The api allows an upload body up to two hours
+    Scenario: The api allows a body up to two hours on the upload route only
       When the api's HTTP listener starts
-      Then a request body may take up to two hours instead of Node's five minutes
+      Then a request body sent to LangWatch's signed upload route may take up to two hours
+      And a request body sent to any other route is cut after Node's five minutes
+      And the worker's and the tasks' listeners keep Node's five minutes on every route
       And no idle-connection cut is added, so quiet event streams stay open
+
+    @unit
+    Scenario: A door in front of the api closes a client whose body the api cut
+      Given a door in front of the api's listener: the liveness thread every booted process has, or the npx server's boot door
+      When the api answers before the client's request body has fully arrived
+      Then the door relays the answer and closes the client's connection
 
   Rule: Uploads nobody confirmed are cleaned up
 
@@ -101,6 +109,14 @@ Feature: Uploads through LangWatch when browsers cannot reach the bucket
       And the deployment names no public base URL
       When the storage checkup runs
       Then it fails with code "direct_upload_unavailable"
+
+    @unit
+    Scenario: The storage checkup reads where uploads go from the account's setting
+      Given an account set to upload through LangWatch, or one set to upload directly
+      When the storage checkup runs
+      Then it learns where the project's uploads go from that account's upload setting
+      And an account set to upload through LangWatch signs no upload, so no signing key is fetched
+      And an account set to upload directly signs one throwaway upload, proving it can sign one
 
   Rule: The chart routes uploads through an Ingress sized for files
 
