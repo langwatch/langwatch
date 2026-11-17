@@ -38525,13 +38525,12 @@ Install the LangWatch skills and ask your coding agent:
 Red team my agent against the OWASP Top 10 for LLM and agentic applications
 ```
 
-It follows the [OWASP red team recipe](https://github.com/langwatch/skills/tree/main/recipes/owasp-red-team). Expect it to:
+It follows the [OWASP red team recipe](https://github.com/langwatch/skills/tree/main/recipes/owasp-red-team). When it finishes, you have:
 
-- detect your language
-- copy the Python or TypeScript pack into your tests
-- connect the pack to your agent
-- fill in the config from your system prompt and tools
-- run one attack, then the full pack
+- the pack in your tests, in the language your repo uses
+- an adapter that calls your agent
+- a config filled in from your system prompt and tools
+- the results of one attack, then of the full pack
 
 ## Apply it by hand
 
@@ -38540,6 +38539,13 @@ It follows the [OWASP red team recipe](https://github.com/langwatch/skills/tree/
 3. In `owasp_config.py` or `owasp.config.ts`, fill in the config block. You describe the agent's name and job, its tools, the tools that change data, what it must never do and the data it must never disclose. The pack builds every attack goal and judge criterion from this one block.
 
 ## Run it
+
+Install the test dependencies if your repo does not have them yet:
+
+```bash
+pip install langwatch-scenario pytest pytest-asyncio     # Python
+npm install -D @langwatch/scenario vitest @ai-sdk/openai  # TypeScript
+```
 
 Set `LANGWATCH_API_KEY` and `OPENAI_API_KEY`, then run:
 
@@ -62891,7 +62897,7 @@ Every attack goal and judge criterion is built from these fields, so do not edit
 
 ## Step 5: Run
 
-Set `LANGWATCH_API_KEY` (results go to that project) and the model key for the attacker and judge (`OPENAI_API_KEY` by default; change `MODEL` in the config for another provider). `OWASP_TURNS` sets attacker turns per attack: the default 10 keeps a run cheap, use 30 before a release.
+Set `LANGWATCH_API_KEY` (results go to that project) and the model key for the attacker and judge (`OPENAI_API_KEY` by default). For another provider in Python, change `MODEL` in the config. In TypeScript, also swap the `openai` import and factory in `owasp-pack.test.ts` for that provider's AI SDK package. `OWASP_TURNS` sets attacker turns per attack: the default 10 keeps a run cheap, use 30 before a release.
 
 ```bash
 # Python, from the folder with the pack

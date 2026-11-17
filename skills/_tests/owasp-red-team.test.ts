@@ -58,7 +58,9 @@ print(json.dumps({
 `;
 
 function pythonPack(): PythonPack {
-  const out = execFileSync("python3", ["-I", "-c", PYTHON_DUMP, pythonDir], { encoding: "utf8" });
+  const out = execFileSync("python3", ["-I", "-B", "-c", PYTHON_DUMP, pythonDir], {
+    encoding: "utf8",
+  });
   return JSON.parse(out) as PythonPack;
 }
 

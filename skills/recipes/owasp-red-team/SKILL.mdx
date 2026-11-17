@@ -79,7 +79,7 @@ Every attack goal and judge criterion is built from these fields, so do not edit
 
 ## Step 5: Run
 
-Set `LANGWATCH_API_KEY` (results go to that project) and the model key for the attacker and judge (`OPENAI_API_KEY` by default; change `MODEL` in the config for another provider). `OWASP_TURNS` sets attacker turns per attack: the default 10 keeps a run cheap, use 30 before a release.
+Set `LANGWATCH_API_KEY` (results go to that project) and the model key for the attacker and judge (`OPENAI_API_KEY` by default). For another provider in Python, change `MODEL` in the config. In TypeScript, also swap the `openai` import and factory in `owasp-pack.test.ts` for that provider's AI SDK package. `OWASP_TURNS` sets attacker turns per attack: the default 10 keeps a run cheap, use 30 before a release.
 
 ```bash
 # Python, from the folder with the pack

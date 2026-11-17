@@ -35,13 +35,12 @@ Install the LangWatch skills and ask your coding agent:
 Red team my agent against the OWASP Top 10 for LLM and agentic applications
 ```
 
-It follows the [OWASP red team recipe](https://github.com/langwatch/skills/tree/main/recipes/owasp-red-team). Expect it to:
+It follows the [OWASP red team recipe](https://github.com/langwatch/skills/tree/main/recipes/owasp-red-team). When it finishes, you have:
 
-- detect your language
-- copy the Python or TypeScript pack into your tests
-- connect the pack to your agent
-- fill in the config from your system prompt and tools
-- run one attack, then the full pack
+- the pack in your tests, in the language your repo uses
+- an adapter that calls your agent
+- a config filled in from your system prompt and tools
+- the results of one attack, then of the full pack
 
 ## Apply it by hand
 
@@ -50,6 +49,13 @@ It follows the [OWASP red team recipe](https://github.com/langwatch/skills/tree/
 3. In `owasp_config.py` or `owasp.config.ts`, fill in the config block. You describe the agent's name and job, its tools, the tools that change data, what it must never do and the data it must never disclose. The pack builds every attack goal and judge criterion from this one block.
 
 ## Run it
+
+Install the test dependencies if your repo does not have them yet:
+
+```bash
+pip install langwatch-scenario pytest pytest-asyncio     # Python
+npm install -D @langwatch/scenario vitest @ai-sdk/openai  # TypeScript
+```
 
 Set `LANGWATCH_API_KEY` and `OPENAI_API_KEY`, then run:
 

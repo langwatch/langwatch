@@ -16,4 +16,13 @@ void describe("stripMarkup", () => {
   void it("drops an image with its alt text", () => {
     assert.equal(stripMarkup("See ![a chart](https://example.com/a.png) here."), "See  here.");
   });
+
+  /** @scenario "A link with brackets or parentheses keeps only its text" */
+  void it("handles brackets in the label and parentheses in the URL", () => {
+    assert.equal(
+      stripMarkup("Use [`items[0]`](https://github.com/langwatch/x)."),
+      "Use `items[0]`.",
+    );
+    assert.equal(stripMarkup("[Guide](https://example.com/a(b)/langwatch) now"), "Guide now");
+  });
 });

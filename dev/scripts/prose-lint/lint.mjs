@@ -198,7 +198,7 @@ function founderUnitsIn(paragraphs) {
   for (const p of paragraphs) {
     const founderLines = p.text
       .split("\n")
-      .map((l) => l.replace(/\s+/g, " ").trim())
+      .map((l) => stripMarkup(l).replace(/\s+/g, " ").trim())
       .filter(isFounder);
     for (const u of p.units) {
       const onFounderLine = isFounder(u) || founderLines.some((l) => l.includes(u));
@@ -362,7 +362,47 @@ export function stripMarkup(s) {
     previous = text;
     text = text.replace(/<!--[\s\S]*?(?:-->|$)/g, "");
   } while (text !== previous);
-  return text.replace(/!\[[^\]]*\]\([^)]*\)/g, "").replace(/\[([^\]]*)\]\([^)]*\)/g, "$1");
+  return stripLinks(text);
+}
+
+// Walks `[label](url)` and `![alt](url)` with nested brackets and balanced
+// parentheses, which a regex cannot match.
+function stripLinks(text) {
+  let out = "";
+  let i = 0;
+  while (i < text.length) {
+    const link = readLink(text, i);
+    if (link) {
+      out += link.keep;
+      i = link.end;
+    } else {
+      out += text[i];
+      i += 1;
+    }
+  }
+  return out;
+}
+
+function readLink(text, start) {
+  const isImage = text[start] === "!" && text[start + 1] === "[";
+  const open = isImage ? start + 1 : start;
+  if (text[open] !== "[") return null;
+  const labelEnd = closingIndex({ text, from: open, open: "[", close: "]" });
+  if (labelEnd < 0 || text[labelEnd + 1] !== "(") return null;
+  const urlEnd = closingIndex({ text, from: labelEnd + 1, open: "(", close: ")" });
+  if (urlEnd < 0) return null;
+  const keep = isImage ? "" : stripLinks(text.slice(open + 1, labelEnd));
+  return { keep, end: urlEnd + 1 };
+}
+
+function closingIndex({ text, from, open, close }) {
+  let depth = 0;
+  for (let i = from; i < text.length; i += 1) {
+    if (text[i] === "\\") i += 1;
+    else if (text[i] === open) depth += 1;
+    else if (text[i] === close && --depth === 0) return i;
+  }
+  return -1;
 }
 
 function stripInlineCode(s) {

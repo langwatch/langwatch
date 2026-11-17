@@ -13,3 +13,9 @@ Feature: prose-lint reads link text, not link targets
     Given a sentence with a markdown image
     When the linter strips markup
     Then neither the alt text nor the URL stays
+
+  @unit
+  Scenario: A link with brackets or parentheses keeps only its text
+    Given a link whose label holds brackets or whose URL holds parentheses
+    When the linter strips markup
+    Then only the link text stays
