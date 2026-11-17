@@ -16,10 +16,7 @@ import {
 } from "../../../services/langwatch-ql-access-model.service.ts";
 import { LangWatchQLSqlTextService } from "../../../services/langwatch-ql-sql-text.service.ts";
 import type { PostgresApprovedViewJoin } from "../../lwql-catalogue/rules/lwql-tenant-paths.rules.ts";
-import {
-  LWQL_SCOPED_READER_GROUP,
-  lwqlOrgRoleName,
-} from "../rules/lwql-scoped-view.rules.ts";
+import { LWQL_SCOPED_READER_GROUP, lwqlOrgRoleName } from "../rules/lwql-scoped-view.rules.ts";
 
 const accessModel = LangWatchQLAccessModelService.create();
 
