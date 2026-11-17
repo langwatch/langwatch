@@ -306,7 +306,7 @@ export class InstantEvalGatewayBudgetExceededError extends HandledError {
     readonly limitUsd: number;
     readonly spentUsd: number;
   }) {
-    const owner = GATEWAY_BUDGET_OWNERS[scope] ?? "A";
+    const owner = Object.hasOwn(GATEWAY_BUDGET_OWNERS, scope) ? GATEWAY_BUDGET_OWNERS[scope] : "A";
     super(
       "instant_eval_gateway_budget_exceeded",
       `${owner} gateway budget is used up. Raise or remove it under AI Gateway, Budgets to keep judging.`,

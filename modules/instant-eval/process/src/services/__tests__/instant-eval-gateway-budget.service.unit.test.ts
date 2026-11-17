@@ -50,19 +50,12 @@ function checkAgainst(budget: ProjectBudget | undefined) {
   return { asked, checkBudget };
 }
 
-function serviceWith({
-  budget,
-  isOwnDecisionModel = false,
-}: {
-  budget?: ProjectBudget;
-  isOwnDecisionModel?: boolean;
-}) {
+function serviceWith({ budget }: { budget?: ProjectBudget }) {
   const { asked, checkBudget } = checkAgainst(budget);
   const service = InstantEvalGatewayBudgetService.create({
     peers: {
       findSpendAttribution: async () => ({ organizationId: "org-1", teamId: "team-1" }),
       checkBudget,
-      isOwnDecisionModel: async () => isOwnDecisionModel,
     },
   });
 
@@ -87,24 +80,6 @@ describe("given a project budget set to block", () => {
         httpStatus: 402,
         meta: { budgetId: "budget-1", scope: "project", window: "month", limitUsd: 5, spentUsd: 5 },
       });
-    });
-
-    it("asks for the project under a key no key budget names, with no person or provider", async () => {
-      const { service, asked } = serviceWith({});
-
-      await service.assertWithinGatewayBudget({ projectId: "project-1" });
-
-      expect(asked).toEqual([
-        {
-          organizationId: "org-1",
-          teamId: "team-1",
-          projectId: "project-1",
-          virtualKeyId: "_instant_eval_:project:project-1",
-          principalUserId: null,
-          providerKey: null,
-          projectedCostUsd: 0,
-        },
-      ]);
     });
   });
 
@@ -157,7 +132,6 @@ describe("given a per-end-user budget on the project set to block", () => {
             ],
             scopes: [],
           }),
-          isOwnDecisionModel: async () => false,
         },
       });
 
@@ -183,20 +157,23 @@ describe("given a project budget set to warn", () => {
   });
 });
 
-describe("given a project on its own decision model", () => {
-  describe("when its blocking budget is reached", () => {
-    /** @scenario "A run on the project's own decision model is not checked" */
-    it("never asks the gateway, whose ledger does not carry that cost", async () => {
-      const { service, asked } = serviceWith({
-        budget: { limitUsd: 5, spentUsd: 5, onBreach: "BLOCK" },
-        isOwnDecisionModel: true,
-      });
+describe("given a project with no budget reached", () => {
+  it("asks for the project under a key no key budget names, with no person or provider", async () => {
+    const { service, asked } = serviceWith({});
 
-      await expect(
-        service.assertWithinGatewayBudget({ projectId: "project-1" }),
-      ).resolves.toBeUndefined();
-      expect(asked).toEqual([]);
-    });
+    await service.assertWithinGatewayBudget({ projectId: "project-1" });
+
+    expect(asked).toEqual([
+      {
+        organizationId: "org-1",
+        teamId: "team-1",
+        projectId: "project-1",
+        virtualKeyId: "_instant_eval_:project:project-1",
+        principalUserId: null,
+        providerKey: null,
+        projectedCostUsd: 0,
+      },
+    ]);
   });
 });
 
@@ -210,7 +187,6 @@ describe("given a project with no team", () => {
           asked.push(input);
           return { decision: "allow", warnings: [], blockReason: null, blockedBy: [], scopes: [] };
         },
-        isOwnDecisionModel: async () => false,
       },
     });
 

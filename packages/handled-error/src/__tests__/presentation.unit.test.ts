@@ -1326,6 +1326,27 @@ describe("budget_exceeded", () => {
   });
 });
 
+describe("instant_eval_gateway_budget_exceeded", () => {
+  const stopped = (meta: Record<string, unknown>) =>
+    explainHandledError(
+      shape({ code: "instant_eval_gateway_budget_exceeded", httpStatus: 402, meta }),
+    );
+
+  describe("when the refusal names a known scope", () => {
+    it("names whose budget stopped the run", () => {
+      expect(stopped({ scope: "team" }).title).toBe(
+        "Your team's gateway budget stopped Instant Evals",
+      );
+    });
+  });
+
+  describe("when the scope is one the registry does not name", () => {
+    it("keeps the plain headline and never echoes the value", () => {
+      expect(stopped({ scope: "toString" }).title).toBe("A gateway budget stopped Instant Evals");
+    });
+  });
+});
+
 describe("provider_refused", () => {
   const refused = (status: number) =>
     explainHandledError(
