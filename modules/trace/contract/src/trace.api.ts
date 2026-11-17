@@ -137,8 +137,7 @@ import type {
   TracesConversationContext,
   TracesSessionsPage,
 } from "./trace.responses.ts";
-import type { OwnedSpan } from "./trace.spans.ts";
-import type { NormalizedSpan } from "./trace.spans.ts";
+import type { NormalizedSpan, OwnedSpan } from "./trace.spans.ts";
 import type { SpanTreeNode, SpanTreePage } from "./trace.ts";
 import type { TraceSessionGroupsInput } from "./traces.trpc.ts";
 
