@@ -379,11 +379,7 @@ export class SimulationRunStateFoldProjection
     return state.ScenarioRunId.length > 0;
   }
 
-  /**
-   * The stored metadata with the call-limit cutoff flag written into its
-   * `langwatch` namespace, mirroring `withAgentInstance`. The marker is
-   * always `true`, so folding it twice produces byte-identical metadata.
-   */
+  /** The stored metadata with the red team run report written under its `redTeam` key. */
   static withRedTeamReport({
     metadata,
     report,
@@ -397,6 +393,11 @@ export class SimulationRunStateFoldProjection
     });
   }
 
+  /**
+   * The stored metadata with the call-limit cutoff flag written into its
+   * `langwatch` namespace, mirroring `withAgentInstance`. The marker is
+   * always `true`, so folding it twice produces byte-identical metadata.
+   */
   static withCutAtLimit(metadata: string | null): string {
     return mergeLangwatchNamespace(metadata, { isCutAtLimit: true });
   }

@@ -1,11 +1,11 @@
 /**
- * The gallery wizard's state: the step, the chosen template and the fit, reset each time the
- * dialog opens, and the create request built from them.
+ * The gallery wizard's state: the step, the chosen template and the fit, and the create request
+ * built from them. The gallery mounts only while open, so each opening starts from fresh state.
  * @see modules/scenario/specs/suite-template-gallery.feature
  */
 
 import type { SuiteTemplate, SuiteTemplateFit, SuiteTemplateKind } from "@langwatch/suite-contract";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 export type SuiteTemplateCreateRequest = {
   templateId: string;
@@ -29,23 +29,13 @@ function withPendingTool({ tools, draft }: { tools: string[]; draft: string }): 
   return tool && !tools.includes(tool) ? [...tools, tool] : tools;
 }
 
-function useSuiteTemplateFit({ open }: { open: boolean }) {
+function useSuiteTemplateFit() {
   const [agentName, setAgentName] = useState("");
   const [tools, setTools] = useState<string[]>([]);
   const [toolDraft, setToolDraft] = useState("");
   const [mustNever, setMustNever] = useState("");
   const [suiteName, setSuiteName] = useState("");
   const [agentNameProblem, setAgentNameProblem] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    setAgentName("");
-    setTools([]);
-    setToolDraft("");
-    setMustNever("");
-    setSuiteName("");
-    setAgentNameProblem(null);
-  }, [open]);
 
   /** The create fields for a template, or null after flagging a missing agent name. */
   const toRequest = (templateId: string): SuiteTemplateCreateRequest | null => {
@@ -87,24 +77,16 @@ function useSuiteTemplateFit({ open }: { open: boolean }) {
 }
 
 export function useSuiteTemplateWizard({
-  open,
   isCreating,
   onCreate,
 }: {
-  open: boolean;
   isCreating: boolean;
   onCreate: (request: SuiteTemplateCreateRequest) => void;
 }) {
   const [tab, setTab] = useState<SuiteTemplateKind>("archetype");
   const [step, setStep] = useState<SuiteTemplateStep>("browse");
   const [chosen, setChosen] = useState<SuiteTemplate | null>(null);
-  const { toRequest, ...fit } = useSuiteTemplateFit({ open });
-
-  useEffect(() => {
-    if (!open) return;
-    setStep("browse");
-    setChosen(null);
-  }, [open]);
+  const { toRequest, ...fit } = useSuiteTemplateFit();
 
   const submit = () => {
     if (!chosen || isCreating) return;

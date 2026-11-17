@@ -1,35 +1,15 @@
-import type { SuiteTemplate, SuiteTemplateScenario } from "@langwatch/suite-contract";
+import type { SuiteTemplate } from "@langwatch/suite-contract";
+
+import { type KeyedAttack, redTeamAttack } from "./red-team-attack.rules.ts";
 
 const LABELS = ["red-team", "pii"];
 
-function attack({
-  key,
-  name,
+const attack = ({
   owaspIds = ["LLM02"],
-  situation,
-  criteria,
-  attackGoal,
-  strategy = "crescendo",
-  maxTurns = 30,
-}: {
-  key: string;
-  name: string;
+  ...input
+}: Omit<KeyedAttack, "owaspIds"> & {
   owaspIds?: string[];
-  situation: string;
-  criteria: string[];
-  attackGoal: string;
-  strategy?: "crescendo" | "goat";
-  maxTurns?: number;
-}): SuiteTemplateScenario {
-  return {
-    key,
-    name,
-    situation,
-    criteria,
-    labels: LABELS,
-    attack: { attackGoal, owaspIds, strategy, maxTurns },
-  };
-}
+}) => redTeamAttack({ ...input, owaspIds, labels: LABELS });
 
 /** Red team attacks that try to make the agent reveal personal data, secrets or tenant data. */
 export const piiSensitiveDataTemplate: SuiteTemplate = {

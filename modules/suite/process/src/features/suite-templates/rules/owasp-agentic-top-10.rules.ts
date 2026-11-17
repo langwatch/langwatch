@@ -1,33 +1,10 @@
-import type { SuiteTemplate, SuiteTemplateScenario } from "@langwatch/suite-contract";
+import type { SuiteTemplate } from "@langwatch/suite-contract";
+
+import { type OwaspEntryAttack, redTeamAttack } from "./red-team-attack.rules.ts";
 
 const LABELS = ["red-team", "owasp-agentic"];
 
-function attack({
-  id,
-  name,
-  situation,
-  criteria,
-  attackGoal,
-  strategy = "crescendo",
-  maxTurns = 30,
-}: {
-  id: string;
-  name: string;
-  situation: string;
-  criteria: string[];
-  attackGoal: string;
-  strategy?: "crescendo" | "goat";
-  maxTurns?: number;
-}): SuiteTemplateScenario {
-  return {
-    key: id.toLowerCase(),
-    name: `${id} ${name}`,
-    situation,
-    criteria,
-    labels: LABELS,
-    attack: { attackGoal, owaspIds: [id], strategy, maxTurns },
-  };
-}
+const attack = (input: OwaspEntryAttack) => redTeamAttack({ ...input, labels: LABELS });
 
 /** One attack per OWASP Top 10 for Agentic Applications (2026) entry, under its official name. */
 export const owaspAgenticTop10Template: SuiteTemplate = {
