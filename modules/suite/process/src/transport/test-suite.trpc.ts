@@ -31,7 +31,7 @@ export const testSuiteTrpcTransport: TrpcRouterDeclaration<SuiteApi, typeof test
     .handle(({ app, input }) => app.archiveTestSuite(input))
 
     .procedure("listTemplates")
-    .withPermission("scenarios:manage")
+    .withPermission("scenarios:view")
     .handle(({ app, input }) => app.listTemplates(input))
 
     .procedure("applyTemplate")
