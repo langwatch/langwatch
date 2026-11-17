@@ -61,4 +61,38 @@ export class LwqlKeyMapService {
     };
     await target.repository.insertRow({ row, sourceDatabase: target.sourceDatabase });
   }
+
+  /**
+   * Whether the project's key-map row is there to read through, writing it first when missing.
+   * False, never a throw, when it cannot be: a read without the row sees zero rows, not an error.
+   */
+  async ensureProject(input: { projectId: string }): Promise<boolean> {
+    const { target, projects } = this.deps;
+    if (!target) return false;
+
+    try {
+      const project = await projects.findById(input.projectId);
+      if (!project?.lwqlKey) return false;
+
+      const row: LwqlKeyMapRow = {
+        KeyHash: lwqlCapability.tenantCapability({ secret: project.lwqlKey }),
+        TenantId: project.id,
+      };
+      const hashes = await target.repository.findKeyHashes({
+        tenantId: project.id,
+        sourceDatabase: target.sourceDatabase,
+      });
+      if (hashes.includes(row.KeyHash)) return true;
+
+      await target.repository.insertRow({ row, sourceDatabase: target.sourceDatabase });
+      logger.warn({ projectId: project.id }, "wrote a missing LangWatchQL key-map row");
+      return true;
+    } catch (error) {
+      logger.error(
+        { projectId: input.projectId, error },
+        "could not ensure the project's LangWatchQL key-map row",
+      );
+      return false;
+    }
+  }
 }

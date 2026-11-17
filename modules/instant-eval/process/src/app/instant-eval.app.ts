@@ -380,6 +380,7 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
           isEnabled: (input) => access.isEnabled(input),
           isReleased: (input) => access.isReleased(input),
           isQueryIdentityAvailable: () => analytics.isLangWatchQLAvailable(),
+          ensureQueryTenant: (input) => analytics.ensureLwqlKeyMapRow(input),
           resolveCaller: (input) => InstantEvalModule.callerOf({ analytics, ...input }),
           getPlan: async ({ projectId }) => {
             const plan = await plans.getActivePlan({

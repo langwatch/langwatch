@@ -278,6 +278,16 @@ Feature: The Instant Eval run over REST, one LWQL statement, judged as a job
     Then it fails with instant_eval_not_enabled
     And it does not report the run as missing
 
+  # The restricted identity finds a project's tenant only through the LangWatchQL key map.
+  # A project with no row there reads zero rows and no error, so the gap is closed up front.
+  @unit
+  Scenario: A project with no key-map row is given one before it runs, or is refused
+    Given a project whose LangWatchQL key map holds no row for it
+    When a run or an estimate is requested
+    Then the row is written before anything is read
+    And when the row cannot be written, the request is refused with instant_eval_not_enabled
+    And the run is never created to finish with zero rows
+
   @unit
   Scenario: A query identity ClickHouse refuses to log in answers as not enabled
     Given a deployment whose LangWatchQL identity exists but cannot authenticate

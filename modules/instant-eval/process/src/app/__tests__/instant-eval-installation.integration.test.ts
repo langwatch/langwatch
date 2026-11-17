@@ -219,6 +219,7 @@ function installation({
           isLangWatchQLAvailable: () => true,
           langWatchQLDatabase: () => "analytics",
           resolveApiKeyRunCaller: async () => ({ id: PROJECT, lwqlKey: "key" }),
+          ensureLwqlKeyMapRow: async () => true,
           resolveApiKeyProtections: async () => ({ catalogue: { permissions: [] } }),
           resolveRunCaller: async () => ({
             project: { id: PROJECT, lwqlKey: "key" },
