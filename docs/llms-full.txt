@@ -45244,7 +45244,7 @@ The estimate counts the rows exactly, measures the text of fifty rows spread acr
 
 Without a paid plan, your organization can spend 1 USD on Instant Evals in total, across all of its projects. Run `estimate` to see what is left, as `freeBudgetRemainingUsd`. Once you pass the budget, a new run or a judged `langwatch query` is refused with `instant_eval_free_budget_exhausted`, carrying `spentUsd` and `budgetUsd`, until you upgrade the organization. If a run is under way when the budget runs out, it stops there and you keep the verdicts it wrote.
 
-A paid plan has no free budget: it is billed monthly for what was judged, up to the row cap. A gateway budget you set on the project, the team or the organization still applies, and stops a run when it is reached.
+A paid plan has no free budget: it is billed monthly for what was judged, up to the row cap. A gateway budget set to block on the project, the team or the organization still applies: once it is reached, a new run or a judged query is refused with `instant_eval_gateway_budget_exceeded`, and a run under way stops there and keeps the verdicts it wrote.
 
 ## Where the spend shows up
 
@@ -78278,6 +78278,8 @@ GROUP BY TraceId, ConversationId
 `priceUsd` is what the run costs you and `costUsd` is what it costs us. One classification is made per row, carrying every question the statement asks, so a statement with four eval columns still sends one request per row.
 
 An organization without a paid plan also gets `freeBudgetRemainingUsd`, what is left of its $1 free budget. Once that is spent, a new run and a judged query answer `402` with `instant_eval_free_budget_exhausted`, carrying `spentUsd` and `budgetUsd` in `meta`, until the organization upgrades. The rate is on [Pricing](/pricing#instant-evals).
+
+On any plan, a [gateway budget](/ai-gateway/budgets) set to block on the project, its team or the organization also applies. Once it is reached, a new run and a judged query answer `402` with `instant_eval_gateway_budget_exceeded`, carrying `budgetId`, `scope`, `window`, `limitUsd` and `spentUsd` in `meta`. A run under way stops before its next page and keeps the verdicts it wrote. A budget set to warn never refuses, and a project on its own decision model is not checked.
 
 ## Row Limits
 
