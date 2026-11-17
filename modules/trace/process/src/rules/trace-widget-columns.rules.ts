@@ -21,6 +21,13 @@ export const SPAN_ANALYTICS_REPLAY_STEP_ID = "trace:replay-span-analytics";
 /** How far back the replays reach: the stock widgets' longest period (60 days), plus two. */
 export const WIDGET_COLUMNS_REPLAY_HOURS = 62 * 24;
 
+/** The replay step that refolds trace_analytics rows so they carry LastUsedPromptVersionId. */
+export const MANAGED_PROMPT_VERSION_REPLAY_STEP_ID =
+  "trace:replay-trace-analytics-managed-prompt-version";
+
+/** How far back that replay reaches: att-change's 60-day period and the 60 before it, plus two. */
+export const MANAGED_VERSION_REPLAY_HOURS = 122 * 24;
+
 /** `trace_analytics` metadata column → the `metadata.*` keys it reads, first non-empty wins. */
 const TRACE_ANALYTICS_METADATA_KEYS = {
   // goose 00126: MATERIALIZED from the same key until the contract step (ADR-006).

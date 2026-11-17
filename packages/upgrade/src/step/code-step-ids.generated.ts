@@ -66,6 +66,7 @@ export type CodeStepId =
   | "trace:send-month-trace-ids"
   | "trace:record-evaluation-outcomes"
   | "trace:replay-trace-evaluation-analytics"
+  | "trace:replay-trace-analytics-managed-prompt-version"
   | "trace:fill-id-indexes"
   | "user:record-created-facts"
   | "user:lower-case-stored-addresses"

@@ -95,6 +95,14 @@ Feature: Stock trace widgets read the light trace table
       And its peak on the large project is at most 2.2 times its peak on the small one
       And its peak on the large project is within 10% of the project with no older history
 
+    @integration
+    Scenario: A trace folded before the column existed reads its version after the replay
+      Given a trace 121 days old, folded before the column existed
+      And a trace 123 days old, folded before the column existed
+      When the managed prompt version replay has run
+      Then the 121-day trace reads its managed prompt version
+      And the 123-day trace reads ''
+
   Rule: The moved widgets render on the app
 
     # Checked by hand on a local stack with seeded traces; see the PR.
