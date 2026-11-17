@@ -28,6 +28,8 @@
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-bedrock-agent": "catalog:",
+    "@aws-sdk/client-bedrock-agentcore-control": "catalog:",
     "@aws-sdk/client-s3": "catalog:",
     "@langwatch/agent-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
@@ -53,6 +55,7 @@
     "@langwatch/metric-contract": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/module": "workspace:*",
+    "@langwatch/notification-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/otlp": "workspace:*",

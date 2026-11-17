@@ -3786,6 +3786,10 @@ const presentations = {
   },
 
   // ---- governance ----
+  governance_aws_connection_not_found: {
+    title: "AWS connection not found",
+    describe: () => "No AWS connection in this organisation has that id.",
+  },
   agent_registry_entry_not_found: {
     title: "Agent not found in the registry",
     describe: () => "No agent in this organisation's registry has that id.",

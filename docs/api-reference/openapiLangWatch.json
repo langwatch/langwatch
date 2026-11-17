@@ -76413,6 +76413,9 @@
                               "langwatch",
                               "databricks",
                               "copilot_studio",
+                              "aws",
+                              "gcp",
+                              "ard",
                               "traffic"
                             ]
                           },
@@ -76445,6 +76448,38 @@
                           },
                           "shadow": {
                             "type": "boolean"
+                          },
+                          "dormant": {
+                            "type": "boolean"
+                          },
+                          "posture": {
+                            "type": "string",
+                            "enum": [
+                              "governed",
+                              "shadow",
+                              "dormant"
+                            ]
+                          },
+                          "platform": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "labels": {
+                            "type": "object",
+                            "propertyNames": {
+                              "type": "string"
+                            },
+                            "additionalProperties": {
+                              "type": "string"
+                            }
+                          },
+                          "owner_label": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
                           },
                           "version": {
                             "type": "integer",
@@ -76676,6 +76711,11 @@
                           "description",
                           "status",
                           "shadow",
+                          "dormant",
+                          "posture",
+                          "platform",
+                          "labels",
+                          "owner_label",
                           "version",
                           "source_version",
                           "project_id",
@@ -77121,7 +77161,7 @@
             }
           }
         },
-        "description": "Every agent LangWatch sees for the organisation: agents defined in its projects, agents a governance source listed (Databricks Genie, Copilot Studio) and agents its traces name in `gen_ai.agent.name`. Ordered by last change, oldest first; pass `next_cursor` back as `cursor`. `updated_since` returns only entries changed at or after that instant.",
+        "description": "Every agent LangWatch sees for the organisation: agents defined in its projects, agents a governance source listed (Databricks Genie, Copilot Studio, AWS Bedrock, Google Vertex AI, an ARD registry) and agents its traces name in `gen_ai.agent.name`. Ordered by last change, oldest first; pass `next_cursor` back as `cursor`. `updated_since` returns only entries changed at or after that instant. `posture` returns only `governed`, `shadow` or `dormant` entries.",
         "summary": "List the organisation's agent registry",
         "tags": [
           "Governance / Agent Registry"
@@ -77178,6 +77218,18 @@
                 "removed"
               ]
             }
+          },
+          {
+            "in": "query",
+            "name": "posture",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "governed",
+                "shadow",
+                "dormant"
+              ]
+            }
           }
         ]
       }
@@ -77205,6 +77257,9 @@
                             "langwatch",
                             "databricks",
                             "copilot_studio",
+                            "aws",
+                            "gcp",
+                            "ard",
                             "traffic"
                           ]
                         },
@@ -77237,6 +77292,38 @@
                         },
                         "shadow": {
                           "type": "boolean"
+                        },
+                        "dormant": {
+                          "type": "boolean"
+                        },
+                        "posture": {
+                          "type": "string",
+                          "enum": [
+                            "governed",
+                            "shadow",
+                            "dormant"
+                          ]
+                        },
+                        "platform": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "labels": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
+                        "owner_label": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
                         },
                         "version": {
                           "type": "integer",
@@ -77468,6 +77555,11 @@
                         "description",
                         "status",
                         "shadow",
+                        "dormant",
+                        "posture",
+                        "platform",
+                        "labels",
+                        "owner_label",
                         "version",
                         "source_version",
                         "project_id",
@@ -78102,6 +78194,9 @@
                                   "langwatch",
                                   "databricks",
                                   "copilot_studio",
+                                  "aws",
+                                  "gcp",
+                                  "ard",
                                   "traffic"
                                 ]
                               },
@@ -78134,6 +78229,38 @@
                               },
                               "shadow": {
                                 "type": "boolean"
+                              },
+                              "dormant": {
+                                "type": "boolean"
+                              },
+                              "posture": {
+                                "type": "string",
+                                "enum": [
+                                  "governed",
+                                  "shadow",
+                                  "dormant"
+                                ]
+                              },
+                              "platform": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "labels": {
+                                "type": "object",
+                                "propertyNames": {
+                                  "type": "string"
+                                },
+                                "additionalProperties": {
+                                  "type": "string"
+                                }
+                              },
+                              "owner_label": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
                               },
                               "version": {
                                 "type": "integer",
@@ -78365,6 +78492,11 @@
                               "description",
                               "status",
                               "shadow",
+                              "dormant",
+                              "posture",
+                              "platform",
+                              "labels",
+                              "owner_label",
                               "version",
                               "source_version",
                               "project_id",
@@ -79039,6 +79171,9 @@
                                   "langwatch",
                                   "databricks",
                                   "copilot_studio",
+                                  "aws",
+                                  "gcp",
+                                  "ard",
                                   "traffic"
                                 ]
                               },
@@ -79071,6 +79206,38 @@
                               },
                               "shadow": {
                                 "type": "boolean"
+                              },
+                              "dormant": {
+                                "type": "boolean"
+                              },
+                              "posture": {
+                                "type": "string",
+                                "enum": [
+                                  "governed",
+                                  "shadow",
+                                  "dormant"
+                                ]
+                              },
+                              "platform": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "labels": {
+                                "type": "object",
+                                "propertyNames": {
+                                  "type": "string"
+                                },
+                                "additionalProperties": {
+                                  "type": "string"
+                                }
+                              },
+                              "owner_label": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
                               },
                               "version": {
                                 "type": "integer",
@@ -79302,6 +79469,11 @@
                               "description",
                               "status",
                               "shadow",
+                              "dormant",
+                              "posture",
+                              "platform",
+                              "labels",
+                              "owner_label",
                               "version",
                               "source_version",
                               "project_id",
@@ -80260,6 +80432,9 @@
                                   "langwatch",
                                   "databricks",
                                   "copilot_studio",
+                                  "aws",
+                                  "gcp",
+                                  "ard",
                                   "traffic"
                                 ]
                               },
@@ -80292,6 +80467,38 @@
                               },
                               "shadow": {
                                 "type": "boolean"
+                              },
+                              "dormant": {
+                                "type": "boolean"
+                              },
+                              "posture": {
+                                "type": "string",
+                                "enum": [
+                                  "governed",
+                                  "shadow",
+                                  "dormant"
+                                ]
+                              },
+                              "platform": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "labels": {
+                                "type": "object",
+                                "propertyNames": {
+                                  "type": "string"
+                                },
+                                "additionalProperties": {
+                                  "type": "string"
+                                }
+                              },
+                              "owner_label": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
                               },
                               "version": {
                                 "type": "integer",
@@ -80523,6 +80730,11 @@
                               "description",
                               "status",
                               "shadow",
+                              "dormant",
+                              "posture",
+                              "platform",
+                              "labels",
+                              "owner_label",
                               "version",
                               "source_version",
                               "project_id",
@@ -80990,6 +81202,9 @@
                                   "langwatch",
                                   "databricks",
                                   "copilot_studio",
+                                  "aws",
+                                  "gcp",
+                                  "ard",
                                   "traffic"
                                 ]
                               },
@@ -81022,6 +81237,38 @@
                               },
                               "shadow": {
                                 "type": "boolean"
+                              },
+                              "dormant": {
+                                "type": "boolean"
+                              },
+                              "posture": {
+                                "type": "string",
+                                "enum": [
+                                  "governed",
+                                  "shadow",
+                                  "dormant"
+                                ]
+                              },
+                              "platform": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "labels": {
+                                "type": "object",
+                                "propertyNames": {
+                                  "type": "string"
+                                },
+                                "additionalProperties": {
+                                  "type": "string"
+                                }
+                              },
+                              "owner_label": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
                               },
                               "version": {
                                 "type": "integer",
@@ -81253,6 +81500,11 @@
                               "description",
                               "status",
                               "shadow",
+                              "dormant",
+                              "posture",
+                              "platform",
+                              "labels",
+                              "owner_label",
                               "version",
                               "source_version",
                               "project_id",
@@ -81806,6 +82058,874 @@
                 },
                 "required": [
                   "query"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/governance/registry/settings": {
+      "get": {
+        "operationId": "getApiGovernanceRegistrySettings",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "dormant_after_days": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 365
+                        }
+                      },
+                      "required": [
+                        "dormant_after_days"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "span_id": {
+                      "type": "string"
+                    },
+                    "trace": {
+                      "type": "object",
+                      "properties": {
+                        "traceId": {
+                          "type": "string"
+                        },
+                        "spanId": {
+                          "type": "string"
+                        },
+                        "traceUrl": {
+                          "type": "string"
+                        },
+                        "logsUrl": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docs_url": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "enum": [
+                        "customer",
+                        "platform",
+                        "provider",
+                        "presumed_platform"
+                      ]
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "span_id": {
+                      "type": "string"
+                    },
+                    "trace": {
+                      "type": "object",
+                      "properties": {
+                        "traceId": {
+                          "type": "string"
+                        },
+                        "spanId": {
+                          "type": "string"
+                        },
+                        "traceUrl": {
+                          "type": "string"
+                        },
+                        "logsUrl": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docs_url": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "enum": [
+                        "customer",
+                        "platform",
+                        "provider",
+                        "presumed_platform"
+                      ]
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "span_id": {
+                      "type": "string"
+                    },
+                    "trace": {
+                      "type": "object",
+                      "properties": {
+                        "traceId": {
+                          "type": "string"
+                        },
+                        "spanId": {
+                          "type": "string"
+                        },
+                        "traceUrl": {
+                          "type": "string"
+                        },
+                        "logsUrl": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docs_url": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "enum": [
+                        "customer",
+                        "platform",
+                        "provider",
+                        "presumed_platform"
+                      ]
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "span_id": {
+                      "type": "string"
+                    },
+                    "trace": {
+                      "type": "object",
+                      "properties": {
+                        "traceId": {
+                          "type": "string"
+                        },
+                        "spanId": {
+                          "type": "string"
+                        },
+                        "traceUrl": {
+                          "type": "string"
+                        },
+                        "logsUrl": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docs_url": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "enum": [
+                        "customer",
+                        "platform",
+                        "provider",
+                        "presumed_platform"
+                      ]
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "The organisation's dormancy window: the days without a trace after which a listed agent reads as `dormant`. 30 until the organisation saves another value.",
+        "summary": "Get the registry settings",
+        "tags": [
+          "Governance / Agent Registry"
+        ],
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "organization_api_key"
+          ],
+          "permissions": [
+            "governance:view"
+          ]
+        }
+      },
+      "put": {
+        "operationId": "putApiGovernanceRegistrySettings",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "dormant_after_days": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 365
+                        }
+                      },
+                      "required": [
+                        "dormant_after_days"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "span_id": {
+                      "type": "string"
+                    },
+                    "trace": {
+                      "type": "object",
+                      "properties": {
+                        "traceId": {
+                          "type": "string"
+                        },
+                        "spanId": {
+                          "type": "string"
+                        },
+                        "traceUrl": {
+                          "type": "string"
+                        },
+                        "logsUrl": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docs_url": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "enum": [
+                        "customer",
+                        "platform",
+                        "provider",
+                        "presumed_platform"
+                      ]
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "span_id": {
+                      "type": "string"
+                    },
+                    "trace": {
+                      "type": "object",
+                      "properties": {
+                        "traceId": {
+                          "type": "string"
+                        },
+                        "spanId": {
+                          "type": "string"
+                        },
+                        "traceUrl": {
+                          "type": "string"
+                        },
+                        "logsUrl": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docs_url": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "enum": [
+                        "customer",
+                        "platform",
+                        "provider",
+                        "presumed_platform"
+                      ]
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "span_id": {
+                      "type": "string"
+                    },
+                    "trace": {
+                      "type": "object",
+                      "properties": {
+                        "traceId": {
+                          "type": "string"
+                        },
+                        "spanId": {
+                          "type": "string"
+                        },
+                        "traceUrl": {
+                          "type": "string"
+                        },
+                        "logsUrl": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docs_url": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "enum": [
+                        "customer",
+                        "platform",
+                        "provider",
+                        "presumed_platform"
+                      ]
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "span_id": {
+                      "type": "string"
+                    },
+                    "trace": {
+                      "type": "object",
+                      "properties": {
+                        "traceId": {
+                          "type": "string"
+                        },
+                        "spanId": {
+                          "type": "string"
+                        },
+                        "traceUrl": {
+                          "type": "string"
+                        },
+                        "logsUrl": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docs_url": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "enum": [
+                        "customer",
+                        "platform",
+                        "provider",
+                        "presumed_platform"
+                      ]
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "span_id": {
+                      "type": "string"
+                    },
+                    "trace": {
+                      "type": "object",
+                      "properties": {
+                        "traceId": {
+                          "type": "string"
+                        },
+                        "spanId": {
+                          "type": "string"
+                        },
+                        "traceUrl": {
+                          "type": "string"
+                        },
+                        "logsUrl": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docs_url": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "enum": [
+                        "customer",
+                        "platform",
+                        "provider",
+                        "presumed_platform"
+                      ]
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "Sets the organisation's dormancy window, 1 to 365 days. The next reconcile applies it to every listed agent. Needs `ingestionSources:manage`.",
+        "summary": "Save the registry settings",
+        "tags": [
+          "Governance / Agent Registry"
+        ],
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "organization_api_key"
+          ],
+          "permissions": [
+            "ingestionSources:manage"
+          ]
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "dormant_after_days": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 365
+                  }
+                },
+                "required": [
+                  "dormant_after_days"
                 ]
               }
             }

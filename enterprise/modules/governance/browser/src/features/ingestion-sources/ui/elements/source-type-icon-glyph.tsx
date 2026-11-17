@@ -3,6 +3,7 @@ import {
   AWSIcon,
   CustomIcon,
   DatabricksIcon,
+  GoogleCloud,
   IconGlyph,
   MicrosoftIcon,
   OpenAIIcon,
@@ -23,6 +24,7 @@ const MONOCHROME_SOURCE_ICONS = new Set<SourceType>([
   "openai_compliance",
   "openai_admin",
   "http_custom",
+  "ard_registry",
 ]);
 
 const iconForSourceType = (sourceType: SourceType): ReactNode => {
@@ -45,7 +47,11 @@ const iconForSourceType = (sourceType: SourceType): ReactNode => {
     case "databricks_genie":
       return <DatabricksIcon />;
     case "s3_custom":
+    case "aws_bedrock_agents":
       return <AWSIcon />;
+    case "gcp_vertex_agent_engine":
+      return <GoogleCloud />;
+    case "ard_registry":
     case "http_custom":
       return <CustomIcon />;
     // A source type added to the catalogue before it has a mark renders the

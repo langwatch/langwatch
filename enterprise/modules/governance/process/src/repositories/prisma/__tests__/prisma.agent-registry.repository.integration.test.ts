@@ -32,6 +32,10 @@ function draft(name: string): RegistryDraft {
     source: "langwatch",
     management: "managed",
     shadow: false,
+    dormant: false,
+    platform: null,
+    labels: {},
+    owner_label: null,
     kind: "connected",
     name,
     description: null,
@@ -239,6 +243,48 @@ describe.skipIf(!connection)("PrismaAgentRegistryRepository", () => {
       });
 
       expect(entries.map((entry) => entry.name)).toEqual(["gamma"]);
+    });
+  });
+
+  describe("given a governed, a shadow, a dormant and a pre-posture entry", () => {
+    /** @scenario "The registry list filters by posture" */
+    it("filters by posture, reading an entry stored without the posture fields as governed", async () => {
+      const organizationId = newOrganization();
+      await reconcile({
+        organizationId,
+        drafts: [
+          draft("governed"),
+          { ...draft("shadow"), source: "traffic", management: "observed", shadow: true },
+          { ...draft("dormant"), dormant: true },
+          draft("legacy"),
+        ],
+        at: "2026-11-10T00:00:00Z",
+      });
+      const legacy = await prisma().agentRegistryEntry.findFirstOrThrow({
+        where: { organizationId, sourceKey: "langwatch:legacy" },
+        select: { id: true, entry: true },
+      });
+      const {
+        dormant: _dormant,
+        posture: _posture,
+        platform: _platform,
+        labels: _labels,
+        owner_label: _ownerLabel,
+        ...stored
+      } = legacy.entry as Record<string, unknown>;
+      await prisma().agentRegistryEntry.updateMany({
+        where: { organizationId, id: legacy.id },
+        data: { entry: JSON.parse(JSON.stringify(stored)) },
+      });
+
+      const names = async (posture: "governed" | "shadow" | "dormant") =>
+        (await repository().listEntries({ organizationId, limit: 10, posture })).entries
+          .map((entry) => `${entry.name}:${entry.posture}`)
+          .toSorted();
+
+      expect(await names("governed")).toEqual(["governed:governed", "legacy:governed"]);
+      expect(await names("shadow")).toEqual(["shadow:shadow"]);
+      expect(await names("dormant")).toEqual(["dormant:dormant"]);
     });
   });
 });

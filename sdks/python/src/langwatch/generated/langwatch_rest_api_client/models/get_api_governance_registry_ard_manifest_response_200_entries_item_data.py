@@ -8,6 +8,9 @@ from attrs import define as _attrs_define
 from ..models.get_api_governance_registry_ard_manifest_response_200_entries_item_data_management import (
     GetApiGovernanceRegistryArdManifestResponse200EntriesItemDataManagement,
 )
+from ..models.get_api_governance_registry_ard_manifest_response_200_entries_item_data_posture import (
+    GetApiGovernanceRegistryArdManifestResponse200EntriesItemDataPosture,
+)
 from ..models.get_api_governance_registry_ard_manifest_response_200_entries_item_data_source import (
     GetApiGovernanceRegistryArdManifestResponse200EntriesItemDataSource,
 )
@@ -18,6 +21,9 @@ from ..models.get_api_governance_registry_ard_manifest_response_200_entries_item
 if TYPE_CHECKING:
     from ..models.get_api_governance_registry_ard_manifest_response_200_entries_item_data_endpoints_item import (
         GetApiGovernanceRegistryArdManifestResponse200EntriesItemDataEndpointsItem,
+    )
+    from ..models.get_api_governance_registry_ard_manifest_response_200_entries_item_data_labels import (
+        GetApiGovernanceRegistryArdManifestResponse200EntriesItemDataLabels,
     )
     from ..models.get_api_governance_registry_ard_manifest_response_200_entries_item_data_model_type_0 import (
         GetApiGovernanceRegistryArdManifestResponse200EntriesItemDataModelType0,
@@ -45,6 +51,11 @@ class GetApiGovernanceRegistryArdManifestResponse200EntriesItemData:
         description (None | str):
         status (GetApiGovernanceRegistryArdManifestResponse200EntriesItemDataStatus):
         shadow (bool):
+        dormant (bool):
+        posture (GetApiGovernanceRegistryArdManifestResponse200EntriesItemDataPosture):
+        platform (None | str):
+        labels (GetApiGovernanceRegistryArdManifestResponse200EntriesItemDataLabels):
+        owner_label (None | str):
         version (int):
         source_version (None | str):
         project_id (None | str):
@@ -69,6 +80,11 @@ class GetApiGovernanceRegistryArdManifestResponse200EntriesItemData:
     description: None | str
     status: GetApiGovernanceRegistryArdManifestResponse200EntriesItemDataStatus
     shadow: bool
+    dormant: bool
+    posture: GetApiGovernanceRegistryArdManifestResponse200EntriesItemDataPosture
+    platform: None | str
+    labels: GetApiGovernanceRegistryArdManifestResponse200EntriesItemDataLabels
+    owner_label: None | str
     version: int
     source_version: None | str
     project_id: None | str
@@ -108,6 +124,18 @@ class GetApiGovernanceRegistryArdManifestResponse200EntriesItemData:
         status = self.status.value
 
         shadow = self.shadow
+
+        dormant = self.dormant
+
+        posture = self.posture.value
+
+        platform: None | str
+        platform = self.platform
+
+        labels = self.labels.to_dict()
+
+        owner_label: None | str
+        owner_label = self.owner_label
 
         version = self.version
 
@@ -169,6 +197,11 @@ class GetApiGovernanceRegistryArdManifestResponse200EntriesItemData:
                 "description": description,
                 "status": status,
                 "shadow": shadow,
+                "dormant": dormant,
+                "posture": posture,
+                "platform": platform,
+                "labels": labels,
+                "owner_label": owner_label,
                 "version": version,
                 "source_version": source_version,
                 "project_id": project_id,
@@ -192,6 +225,9 @@ class GetApiGovernanceRegistryArdManifestResponse200EntriesItemData:
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         from ..models.get_api_governance_registry_ard_manifest_response_200_entries_item_data_endpoints_item import (
             GetApiGovernanceRegistryArdManifestResponse200EntriesItemDataEndpointsItem,
+        )
+        from ..models.get_api_governance_registry_ard_manifest_response_200_entries_item_data_labels import (
+            GetApiGovernanceRegistryArdManifestResponse200EntriesItemDataLabels,
         )
         from ..models.get_api_governance_registry_ard_manifest_response_200_entries_item_data_model_type_0 import (
             GetApiGovernanceRegistryArdManifestResponse200EntriesItemDataModelType0,
@@ -224,6 +260,26 @@ class GetApiGovernanceRegistryArdManifestResponse200EntriesItemData:
         status = GetApiGovernanceRegistryArdManifestResponse200EntriesItemDataStatus(d.pop("status"))
 
         shadow = d.pop("shadow")
+
+        dormant = d.pop("dormant")
+
+        posture = GetApiGovernanceRegistryArdManifestResponse200EntriesItemDataPosture(d.pop("posture"))
+
+        def _parse_platform(data: object) -> None | str:
+            if data is None:
+                return data
+            return cast(None | str, data)
+
+        platform = _parse_platform(d.pop("platform"))
+
+        labels = GetApiGovernanceRegistryArdManifestResponse200EntriesItemDataLabels.from_dict(d.pop("labels"))
+
+        def _parse_owner_label(data: object) -> None | str:
+            if data is None:
+                return data
+            return cast(None | str, data)
+
+        owner_label = _parse_owner_label(d.pop("owner_label"))
 
         version = d.pop("version")
 
@@ -336,6 +392,11 @@ class GetApiGovernanceRegistryArdManifestResponse200EntriesItemData:
             description=description,
             status=status,
             shadow=shadow,
+            dormant=dormant,
+            posture=posture,
+            platform=platform,
+            labels=labels,
+            owner_label=owner_label,
             version=version,
             source_version=source_version,
             project_id=project_id,

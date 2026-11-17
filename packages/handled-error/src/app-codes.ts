@@ -329,6 +329,7 @@ export const APP_ERROR_CODES = [
   "github_pr_not_mapped",
   "github_rate_limited",
   "github_repo_not_accessible",
+  "governance_aws_connection_not_found",
   "grant_exceeds_caller_permissions",
   "grant_expiry_in_past",
   "grant_limit_reached",

@@ -7348,22 +7348,39 @@ model DiscoveredPerson {
 /// Copilot bots, OpenAI projects - plus whatever provider-native metadata the
 /// source published. Discovering an agent grants it nothing either.
 model DiscoveredAgent {
-  id             String   @id @default(nanoid())
-  organizationId String
-  provider       String
+  id                String    @id @default(nanoid())
+  organizationId    String
+  provider          String
   /// Genie space / Copilot bot / OpenAI project id, verbatim.
-  rawAgentId     String
-  displayText    String
+  rawAgentId        String
+  displayText       String
   /// Workspace, plan, and kin - provider-native descriptive fields only. Never
   /// credentials: this row is read by admin screens, not by any pull path.
-  metadata       Json
-  firstSeenAt    DateTime
-  lastSeenAt     DateTime
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @default(now()) @updatedAt
+  metadata          Json
+  firstSeenAt       DateTime
+  lastSeenAt        DateTime
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @default(now()) @updatedAt
 
   @@unique([organizationId, provider, rawAgentId])
   @@index([organizationId, lastSeenAt])
+}
+
+/// One source's presence fact for one discovered agent. An agent is gone only when every
+/// source that listed it marked it gone; an agent no source listed (older sightings) never is.
+model DiscoveredAgentListing {
+  id                String    @id @default(nanoid())
+  organizationId    String
+  ingestionSourceId String
+  discoveredAgentId String
+  lastListedAt      DateTime
+  /// Set when this source's listing stopped naming the agent; cleared when it names it again.
+  goneAt            DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @default(now()) @updatedAt
+
+  @@unique([ingestionSourceId, discoveredAgentId])
+  @@index([organizationId, discoveredAgentId])
 }
 
 /// One agent in the organisation's governance registry, from any source governance reads
@@ -7414,6 +7431,30 @@ model AgentRegistryEvent {
 model AgentRegistryBaseline {
   organizationId String   @id
   baselinedAt    DateTime
+}
+
+/// An organisation's agent registry settings. No row reads as the defaults.
+model AgentRegistrySettings {
+  organizationId   String   @id
+  /// Days without traffic after which a listed agent reads as dormant.
+  dormantAfterDays Int      @default(30)
+  updatedAt        DateTime @default(now()) @updatedAt
+}
+
+/// An AWS credential a Bedrock kill switch target signs with: a static key pair, a role to assume,
+/// or both. The secret access key and the external id are stored sealed.
+model GovernanceAwsConnection {
+  id                       String   @id
+  organizationId           String
+  name                     String
+  accessKeyId              String?
+  encryptedSecretAccessKey String?
+  roleArn                  String?
+  encryptedExternalId      String?
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @default(now()) @updatedAt
+
+  @@index([organizationId])
 }
 
 /// The dated match table: "`user_abc123` on Anthropic is platform user #42,

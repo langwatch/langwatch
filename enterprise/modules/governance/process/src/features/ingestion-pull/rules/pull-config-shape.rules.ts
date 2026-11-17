@@ -3,9 +3,15 @@
 import {
   ANTHROPIC_ADMIN_ADAPTER_ID,
   anthropicAdminPullConfigSchema,
+  ARD_REGISTRY_ADAPTER_ID,
+  ardRegistryPullConfigSchema,
+  AWS_BEDROCK_AGENTS_ADAPTER_ID,
+  awsBedrockAgentsPullConfigSchema,
   copilotStudioDataversePullConfigSchema,
   DATABRICKS_GENIE_ADAPTER_ID,
   databricksGeniePullConfigSchema,
+  GCP_VERTEX_AGENT_ENGINE_ADAPTER_ID,
+  gcpVertexAgentEnginePullConfigSchema,
   OPENAI_ADMIN_ADAPTER_ID,
   openaiAdminPullConfigSchema,
 } from "@langwatch/enterprise-governance-contract";
@@ -22,20 +28,39 @@ const PULL_CONFIG_SCHEMAS: ReadonlyMap<string, z.ZodType> = new Map<string, z.Zo
   [DATABRICKS_GENIE_ADAPTER_ID, databricksGeniePullConfigSchema],
   [ANTHROPIC_ADMIN_ADAPTER_ID, anthropicAdminPullConfigSchema],
   [OPENAI_ADMIN_ADAPTER_ID, openaiAdminPullConfigSchema],
+  [AWS_BEDROCK_AGENTS_ADAPTER_ID, awsBedrockAgentsPullConfigSchema],
+  [GCP_VERTEX_AGENT_ENGINE_ADAPTER_ID, gcpVertexAgentEnginePullConfigSchema],
+  [ARD_REGISTRY_ADAPTER_ID, ardRegistryPullConfigSchema],
 ]);
+
+type RequiredCredentials = {
+  /** What the form calls the credentials as a whole, and how to ask for all of them at once. */
+  ask: string;
+  fields: readonly (readonly [string, string])[];
+};
 
 /**
  * The credentials an adapter cannot sign in without, by the form's name for each. The config
  * schemas leave `credentials` out because the stored form is sealed, so this is checked apart.
  */
-const REQUIRED_CREDENTIALS: ReadonlyMap<string, readonly (readonly [string, string])[]> = new Map([
+const REQUIRED_CREDENTIALS: ReadonlyMap<string, RequiredCredentials> = new Map([
   [
     COPILOT_STUDIO_DATAVERSE_ADAPTER_ID,
-    [
-      ["tenantId", "tenant ID"],
-      ["clientId", "client ID"],
-      ["clientSecret", "client secret"],
-    ],
+    {
+      ask: "App registration: enter the tenant ID, client ID and client secret together",
+      fields: [
+        ["tenantId", "tenant ID"],
+        ["clientId", "client ID"],
+        ["clientSecret", "client secret"],
+      ],
+    },
+  ],
+  [
+    GCP_VERTEX_AGENT_ENGINE_ADAPTER_ID,
+    {
+      ask: "Service account: paste the service account key JSON",
+      fields: [["serviceAccountJson", "service account key"]],
+    },
   ],
 ]);
 
@@ -48,6 +73,11 @@ const FIELD_LABELS: Readonly<Record<string, string>> = {
   spaceIds: "Space IDs",
   warehouseId: "Warehouse ID",
   report: "Report",
+  awsConnectionId: "AWS connection",
+  regions: "Regions",
+  targets: "Projects and locations",
+  registryUrl: "Registry address",
+  searchUrl: "Search endpoint",
   bucketWidth: "Bucket width",
   startingAt: "Read history from",
   schedule: "Pull schedule",
@@ -75,6 +105,27 @@ export function findPullConfigComplaints(
   });
 }
 
+/** The same complaints keyed by the configuration field each is about, for a form to place. */
+export function findPullConfigFieldErrors(
+  parserConfig: Record<string, unknown> | null | undefined,
+): Record<string, string[]> {
+  const adapter = parserConfig?.adapter;
+  if (typeof adapter !== "string") return {};
+  const schema = PULL_CONFIG_SCHEMAS.get(adapter);
+  if (!schema) return {};
+
+  const parsed = schema.safeParse(parserConfig);
+  if (parsed.success) return {};
+
+  const fieldErrors: Record<string, string[]> = {};
+  for (const issue of parsed.error.issues) {
+    const [field] = issue.path;
+    if (typeof field !== "string") continue;
+    (fieldErrors[field] ??= []).push(issue.message);
+  }
+  return fieldErrors;
+}
+
 /**
  * What is missing from the credentials a save sends, for an adapter that cannot sign in without
  * them. Read only where the save sends credentials of its own (a create, or an edit replacing
@@ -92,7 +143,7 @@ export function findPullCredentialComplaints(
   const sent = new Map<string, unknown>(
     credentials !== null && typeof credentials === "object" ? Object.entries(credentials) : [],
   );
-  const missing = required
+  const missing = required.fields
     .filter(([key]) => {
       const value = sent.get(key);
       return typeof value !== "string" || value.trim().length === 0;
@@ -100,9 +151,7 @@ export function findPullCredentialComplaints(
     .map(([, label]) => label);
   if (missing.length === 0) return [];
 
-  return [
-    `App registration: enter the tenant ID, client ID and client secret together; missing ${joinLabels(missing)}.`,
-  ];
+  return [`${required.ask}; missing ${joinLabels(missing)}.`];
 }
 
 function joinLabels(labels: readonly string[]): string {

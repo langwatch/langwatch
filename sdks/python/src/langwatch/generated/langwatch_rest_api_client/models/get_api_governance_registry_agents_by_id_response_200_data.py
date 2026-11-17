@@ -8,6 +8,9 @@ from attrs import define as _attrs_define
 from ..models.get_api_governance_registry_agents_by_id_response_200_data_management import (
     GetApiGovernanceRegistryAgentsByIdResponse200DataManagement,
 )
+from ..models.get_api_governance_registry_agents_by_id_response_200_data_posture import (
+    GetApiGovernanceRegistryAgentsByIdResponse200DataPosture,
+)
 from ..models.get_api_governance_registry_agents_by_id_response_200_data_source import (
     GetApiGovernanceRegistryAgentsByIdResponse200DataSource,
 )
@@ -18,6 +21,9 @@ from ..models.get_api_governance_registry_agents_by_id_response_200_data_status 
 if TYPE_CHECKING:
     from ..models.get_api_governance_registry_agents_by_id_response_200_data_endpoints_item import (
         GetApiGovernanceRegistryAgentsByIdResponse200DataEndpointsItem,
+    )
+    from ..models.get_api_governance_registry_agents_by_id_response_200_data_labels import (
+        GetApiGovernanceRegistryAgentsByIdResponse200DataLabels,
     )
     from ..models.get_api_governance_registry_agents_by_id_response_200_data_model_type_0 import (
         GetApiGovernanceRegistryAgentsByIdResponse200DataModelType0,
@@ -45,6 +51,11 @@ class GetApiGovernanceRegistryAgentsByIdResponse200Data:
         description (None | str):
         status (GetApiGovernanceRegistryAgentsByIdResponse200DataStatus):
         shadow (bool):
+        dormant (bool):
+        posture (GetApiGovernanceRegistryAgentsByIdResponse200DataPosture):
+        platform (None | str):
+        labels (GetApiGovernanceRegistryAgentsByIdResponse200DataLabels):
+        owner_label (None | str):
         version (int):
         source_version (None | str):
         project_id (None | str):
@@ -69,6 +80,11 @@ class GetApiGovernanceRegistryAgentsByIdResponse200Data:
     description: None | str
     status: GetApiGovernanceRegistryAgentsByIdResponse200DataStatus
     shadow: bool
+    dormant: bool
+    posture: GetApiGovernanceRegistryAgentsByIdResponse200DataPosture
+    platform: None | str
+    labels: GetApiGovernanceRegistryAgentsByIdResponse200DataLabels
+    owner_label: None | str
     version: int
     source_version: None | str
     project_id: None | str
@@ -108,6 +124,18 @@ class GetApiGovernanceRegistryAgentsByIdResponse200Data:
         status = self.status.value
 
         shadow = self.shadow
+
+        dormant = self.dormant
+
+        posture = self.posture.value
+
+        platform: None | str
+        platform = self.platform
+
+        labels = self.labels.to_dict()
+
+        owner_label: None | str
+        owner_label = self.owner_label
 
         version = self.version
 
@@ -169,6 +197,11 @@ class GetApiGovernanceRegistryAgentsByIdResponse200Data:
                 "description": description,
                 "status": status,
                 "shadow": shadow,
+                "dormant": dormant,
+                "posture": posture,
+                "platform": platform,
+                "labels": labels,
+                "owner_label": owner_label,
                 "version": version,
                 "source_version": source_version,
                 "project_id": project_id,
@@ -192,6 +225,9 @@ class GetApiGovernanceRegistryAgentsByIdResponse200Data:
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         from ..models.get_api_governance_registry_agents_by_id_response_200_data_endpoints_item import (
             GetApiGovernanceRegistryAgentsByIdResponse200DataEndpointsItem,
+        )
+        from ..models.get_api_governance_registry_agents_by_id_response_200_data_labels import (
+            GetApiGovernanceRegistryAgentsByIdResponse200DataLabels,
         )
         from ..models.get_api_governance_registry_agents_by_id_response_200_data_model_type_0 import (
             GetApiGovernanceRegistryAgentsByIdResponse200DataModelType0,
@@ -224,6 +260,26 @@ class GetApiGovernanceRegistryAgentsByIdResponse200Data:
         status = GetApiGovernanceRegistryAgentsByIdResponse200DataStatus(d.pop("status"))
 
         shadow = d.pop("shadow")
+
+        dormant = d.pop("dormant")
+
+        posture = GetApiGovernanceRegistryAgentsByIdResponse200DataPosture(d.pop("posture"))
+
+        def _parse_platform(data: object) -> None | str:
+            if data is None:
+                return data
+            return cast(None | str, data)
+
+        platform = _parse_platform(d.pop("platform"))
+
+        labels = GetApiGovernanceRegistryAgentsByIdResponse200DataLabels.from_dict(d.pop("labels"))
+
+        def _parse_owner_label(data: object) -> None | str:
+            if data is None:
+                return data
+            return cast(None | str, data)
+
+        owner_label = _parse_owner_label(d.pop("owner_label"))
 
         version = d.pop("version")
 
@@ -330,6 +386,11 @@ class GetApiGovernanceRegistryAgentsByIdResponse200Data:
             description=description,
             status=status,
             shadow=shadow,
+            dormant=dormant,
+            posture=posture,
+            platform=platform,
+            labels=labels,
+            owner_label=owner_label,
             version=version,
             source_version=source_version,
             project_id=project_id,

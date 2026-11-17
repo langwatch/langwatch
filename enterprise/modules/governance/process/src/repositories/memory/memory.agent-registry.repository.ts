@@ -4,6 +4,7 @@ import {
   AgentRegistryEntryNotFoundError,
   type AgentRegistryEntry,
   type AgentRegistryEvent,
+  type AgentRegistryPosture,
   type AgentRegistryStatus,
 } from "@langwatch/enterprise-governance-contract";
 import { Temporal, type Instant } from "@langwatch/time";
@@ -107,21 +108,45 @@ export class MemoryAgentRegistryRepository extends AgentRegistryRepository {
       .slice(0, limit);
   }
 
+  async findActiveWithSourceKeys({
+    organizationId,
+    limit,
+    afterSourceKey,
+  }: {
+    organizationId: string;
+    limit: number;
+    afterSourceKey?: string;
+  }): Promise<{ sourceKey: string; entry: AgentRegistryEntry }[]> {
+    return this.rows
+      .filter(
+        (row) =>
+          row.organizationId === organizationId &&
+          row.entry.status === "active" &&
+          (afterSourceKey === undefined || row.sourceKey > afterSourceKey),
+      )
+      .toSorted((a, b) => Number(a.sourceKey > b.sourceKey) - Number(a.sourceKey < b.sourceKey))
+      .slice(0, limit)
+      .map((row) => ({ sourceKey: row.sourceKey, entry: structuredClone(row.entry) }));
+  }
+
   async listEntries({
     organizationId,
     limit,
     after,
     updatedSince,
     status,
+    posture,
   }: {
     organizationId: string;
     limit: number;
     after?: RegistryEntryPosition;
     updatedSince?: Instant;
     status?: AgentRegistryStatus;
+    posture?: AgentRegistryPosture;
   }): Promise<{ entries: AgentRegistryEntry[]; hasMore: boolean }> {
     const matching = this.entriesOf(organizationId)
       .filter((entry) => !status || entry.status === status)
+      .filter((entry) => !posture || entry.posture === posture)
       .filter(
         (entry) => !updatedSince || epochMsOf(entry.updated_at) >= updatedSince.epochMilliseconds,
       )

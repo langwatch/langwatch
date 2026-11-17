@@ -9,12 +9,17 @@ import type { TraceApi, TraceAgentSeen } from "@langwatch/trace-contract";
 import type { WebhookApi, WebhookEndpointView } from "@langwatch/webhook-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import type { AgentRegistryDeliveryIntent } from "../../features/registry/eventing/agent-registry-delivery.process.ts";
+import type {
+  AgentRegistryAlertIntent,
+  AgentRegistryDeliveryIntent,
+} from "../../features/registry/eventing/agent-registry-delivery.process.ts";
 import { AgentRegistryReadsService } from "../../features/registry/services/agent-registry-reads.service.ts";
 import {
   type AgentRegistryDeliveryOutbox,
+  type AgentRegistryFanOut,
   AgentRegistryService,
 } from "../../features/registry/services/agent-registry.service.ts";
+import { MemoryAgentRegistrySettingsRepository } from "../../repositories/memory/memory.agent-registry-settings.repository.ts";
 import { MemoryAgentRegistryRepository } from "../../repositories/memory/memory.agent-registry.repository.ts";
 import { MemoryGovernanceRepositories } from "../../repositories/memory/memory.governance.repositories.ts";
 
@@ -64,14 +69,16 @@ const AGENT_STORE_DOWN = new Error("agent store unavailable");
 
 class RecordingOutbox implements AgentRegistryDeliveryOutbox {
   readonly intents: AgentRegistryDeliveryIntent[] = [];
+  readonly alerts: AgentRegistryAlertIntent[] = [];
   failNext = false;
 
-  async record(intents: readonly AgentRegistryDeliveryIntent[]): Promise<void> {
+  async record({ deliveries, alerts }: AgentRegistryFanOut): Promise<void> {
     if (this.failNext) {
       this.failNext = false;
       throw OUTBOX_DOWN;
     }
-    this.intents.push(...intents);
+    this.intents.push(...deliveries);
+    this.alerts.push(...alerts);
   }
 }
 
@@ -140,7 +147,9 @@ function setup({
     organizations: createApiFixture<OrganizationApi>({
       findMembersWithDepartments: async () => [],
       listAllIds: async () => ({ ids: organizationIds, next: null }),
+      findAdministrators: async () => [],
     }),
+    settings: MemoryAgentRegistrySettingsRepository.create(),
     traces: createApiFixture<TraceApi>({ findAgentsSeen: async () => traffic }),
     webhooks: createApiFixture<WebhookApi>({ getAll: async () => endpoints }),
     entitlements: {

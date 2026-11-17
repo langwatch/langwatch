@@ -19,6 +19,8 @@ catalog:
   '@ai-sdk/anthropic': ^3.0.44
   '@ai-sdk/openai': ^3.0.79
   '@ai-sdk/openai-compatible': ^2.0.55
+  '@aws-sdk/client-bedrock-agent': ^3.1080.0
+  '@aws-sdk/client-bedrock-agentcore-control': ^3.1080.0
   '@aws-sdk/client-cloudwatch-logs': ^3.1080.0
   '@aws-sdk/client-lambda': ^3.1080.0
   '@aws-sdk/client-s3': ^3.1080.0

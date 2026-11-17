@@ -8,7 +8,7 @@ import {
 export class GovernanceValidationError extends ValidationError {
   constructor(
     message: string,
-    readonly meta: { formErrors: string[] },
+    readonly meta: { formErrors: string[]; fieldErrors?: Record<string, string[]> },
   ) {
     super(message, { meta });
     this.name = "GovernanceValidationError";
@@ -359,5 +359,16 @@ export class IngestionReceiverUnavailableError extends HandledError {
       fault: "platform",
     });
     this.name = "IngestionReceiverUnavailableError";
+  }
+}
+
+export class GovernanceAwsConnectionNotFoundError extends NotFoundError {
+  constructor(id: string) {
+    super(
+      "governance_aws_connection_not_found",
+      { resource: "AWS connection", id },
+      remediation("governance_aws_connection_not_found"),
+    );
+    this.name = "GovernanceAwsConnectionNotFoundError";
   }
 }

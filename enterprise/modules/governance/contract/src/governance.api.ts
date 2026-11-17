@@ -94,6 +94,8 @@ import type {
 import type {
   IngestionSourceCreateInput,
   IngestionSourceUpdateInput,
+  TestAgentListingInput,
+  TestAgentListingResult,
 } from "./features/ingestion/ingestion-sources.trpc.ts";
 import type {
   ArchiveIngestionTemplateInput,
@@ -107,6 +109,10 @@ import type {
   QuarantineFillInput,
   QuarantineFillStats,
 } from "./features/ingestion/quarantine-fill.ts";
+import type {
+  AwsConnectionInput,
+  AwsConnectionView,
+} from "./features/kill-switch/agent-kill-switch.ts";
 import type { PersonaResolution } from "./features/personal/persona-home.ts";
 import type { GovernanceBudgetOverviewForUser } from "./features/personal/personal-budget-overview.ts";
 import type {
@@ -121,10 +127,12 @@ import type {
   ArdSearchRequest,
   ArdSearchResponse,
 } from "./features/registry/agent-registry-ard.ts";
+import type { AgentRegistrySettings } from "./features/registry/agent-registry-settings.ts";
 import type {
   AgentRegistryEntry,
   AgentRegistryEventPage,
   AgentRegistryPage,
+  AgentRegistryPosture,
   AgentRegistryStatus,
 } from "./features/registry/agent-registry.ts";
 import type {
@@ -407,6 +415,22 @@ export interface GovernanceRestApi {
   }): Promise<IngestionSourceDto>;
   ingestionSourceValidateOttl(input: { statements: string[] }): Promise<OttlValidationResult>;
   ingestionSourceOttlStarter(input: { sourceType: string }): OttlStarterTemplate;
+  /** Lists the provider's agents for an unsaved configuration, recording nothing. */
+  ingestionSourceTestAgentListing(input: TestAgentListingInput): Promise<TestAgentListingResult>;
+  /** Lists a saved source's agents, recording nothing; another organisation's source is a 404. */
+  ingestionSourceTestAgentListingForSource(input: {
+    organizationId: string;
+    sourceId: string;
+  }): Promise<TestAgentListingResult>;
+  findAwsConnections(input: { organizationId: string }): Promise<AwsConnectionView[]>;
+  createAwsConnection(input: {
+    organizationId: string;
+    connection: AwsConnectionInput;
+  }): Promise<AwsConnectionView>;
+  deleteAwsConnection(input: {
+    organizationId: string;
+    connectionId: string;
+  }): Promise<{ deleted: boolean }>;
   governanceSetupState(input: { organizationId: string }): Promise<GovernanceSetupState>;
   governanceResolveHome(
     input: { organizationId: string },
@@ -483,6 +507,7 @@ export interface GovernanceRestApi {
     cursor?: string;
     updatedSince?: string;
     status?: AgentRegistryStatus;
+    posture?: AgentRegistryPosture;
   }): Promise<AgentRegistryPage>;
   /** Throws `agent_registry_entry_not_found` for an id outside the organisation. */
   getRegistryAgent(input: { organizationId: string; id: string }): Promise<AgentRegistryEntry>;
@@ -504,6 +529,12 @@ export interface GovernanceRestApi {
     organizationId: string;
     request: ArdSearchRequest;
   }): Promise<ArdSearchResponse>;
+  /** The organisation's dormancy window; 30 days until it saves one. */
+  getRegistrySettings(input: { organizationId: string }): Promise<AgentRegistrySettings>;
+  saveRegistrySettings(input: {
+    organizationId: string;
+    dormantAfterDays: number;
+  }): Promise<AgentRegistrySettings>;
 }
 
 export const GovernanceRestApi = moduleApi<GovernanceRestApi>()("governance");
