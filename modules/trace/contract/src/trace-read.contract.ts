@@ -270,7 +270,7 @@ const agentCallGraphEdgeSchema = z.object({
   firstSpanId: z.string(),
 });
 
-/** A span recognised as an A2A call, so the span tree can label it. */
+/** What the A2A classifier reads off a span it recognises as an A2A call. */
 const a2aSpanMarkSchema = z.object({
   spanId: z.string(),
   role: z.enum(["client", "server", "unknown"]),
@@ -283,7 +283,6 @@ const a2aSpanMarkSchema = z.object({
 const agentCallGraphSchemaDefinition = z.object({
   nodes: z.array(agentCallGraphNodeSchema),
   edges: z.array(agentCallGraphEdgeSchema),
-  a2aSpans: z.array(a2aSpanMarkSchema),
 });
 export interface AgentCallGraphSchema extends Named<typeof agentCallGraphSchemaDefinition> {}
 export const agentCallGraphSchema: AgentCallGraphSchema = agentCallGraphSchemaDefinition;
