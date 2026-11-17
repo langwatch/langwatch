@@ -630,7 +630,7 @@ func TestRevocation_FailClosedTreatsNeverPolledFeedAsSilent(t *testing.T) {
 	}
 }
 
-// @scenario "fail closed re-checks a key before refusing it"
+// @scenario "a stale config serve counts the refresh as the fail closed key check"
 func TestRevocation_ConfigFailureStaleServeKeepsFreshKeyCheck(t *testing.T) {
 	res := &hookResolver{bundle: orgBundle("vk_stalecfg", time.Now().Add(time.Hour)), cfgErr: errControlPlaneDown}
 	svc, _ := newService(t, Options{Resolver: res, ConfigFetcher: res, FailClosedAfter: time.Minute})

@@ -485,6 +485,14 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       And no fail closed refusal is counted
 
     @unit
+    Scenario: a stale config serve counts the refresh as the fail closed key check
+      Given fail closed is on and the change feed has gone silent
+      And a cached key whose last key check is older than the limit
+      When the cache refresh confirms the key but its config fetch fails
+      Then the request is served with the cached config
+      And the key is checked once, not again for admission
+
+    @unit
     Scenario: fail closed evicts a key its re-check rejects
       Given fail closed is on and a cached key whose last key check is older than the limit
       When the re-check answers that the key is revoked
