@@ -131,7 +131,7 @@ describe.skipIf(!connection)("the kill switch plan and AWS connection repositori
 
       expect(JSON.stringify(row)).not.toContain("acme-secret-two");
       expect(JSON.stringify(row)).not.toContain("acme-external-id");
-      expect(stored.hasExternalId).toBe(true);
+      expect(stored.externalId).toBe("acme-external-id");
       expect(await awsConnections().getCredentials({ organizationId, id: stored.id })).toEqual({
         accessKeyId: "AKIAACMEEXAMPLE0002",
         secretAccessKey: "acme-secret-two",

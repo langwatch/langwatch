@@ -2,14 +2,15 @@
 
 import type { AuditLogIntent } from "@langwatch/audit-log-contract";
 
-/** What a read answers about a connection: never the secret access key or the external id. */
+/** What a read answers about a connection: never the secret access key. */
 export type GovernanceAwsConnectionRecord = {
   id: string;
   organizationId: string;
   name: string;
   accessKeyId: string | null;
   roleArn: string | null;
-  hasExternalId: boolean;
+  /** Opened from its seal: the role's trust policy names it, so a read shows it. */
+  externalId: string | null;
   createdAt: string;
 };
 

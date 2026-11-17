@@ -21,7 +21,7 @@ Each agent has a stop plan: the targets a stop acts on. Set it on the Agents pag
 | Amazon Bedrock agent alias | `UpdateAgentAlias` with `aliasInvocationState: REJECT_INVOCATIONS` | `UpdateAgentAlias` with `aliasInvocationState: ACCEPT_INVOCATIONS` |
 | Gateway virtual key | Disables the key; requests answer `virtual_key_disabled` | Enables the key |
 
-A Databricks target uses the workspace and credentials of a Databricks [ingestion source](/ai-governance/ingestion-sources/index). A Bedrock target uses an AWS connection you add under **AWS connections** on the same screen: an access key pair, a role ARN to assume (with an external id), or both. The secret access key and the external id are stored encrypted and are never shown again.
+A Databricks target uses the workspace and credentials of a Databricks [ingestion source](/ai-governance/ingestion-sources/index). A Bedrock target uses an AWS connection you add under **AWS connections** on the same screen: an access key pair, a role ARN to assume, or both. The secret access key is stored encrypted and is never shown again.
 
 A Bedrock alias that already rejects invocations, or a virtual key that is already disabled, when the stop starts is left as it is, and a restore leaves it that way too. A Databricks endpoint is always stopped, and a restore starts it again even if it was stopped before: Databricks reports a stopped endpoint and one still deploying the same way, as not ready.
 
@@ -139,4 +139,17 @@ The AWS connection needs this policy, scoped to the aliases in your stop plans:
 }
 ```
 
-With a role ARN, the role's trust policy must let the connection's principal call `sts:AssumeRole`, with the external id as a condition when you set one.
+With a role ARN, the role's trust policy must let the connection's principal call `sts:AssumeRole`, and it must require the connection's external id. LangWatch generates the external id when you add the connection and shows it on the connection's row. You can't choose it, so another organisation can't reuse your role through LangWatch.
+
+Add the external id as a condition on the trust policy statement:
+
+```json
+{
+  "Effect": "Allow",
+  "Principal": { "AWS": "<principal that signs for LangWatch>" },
+  "Action": "sts:AssumeRole",
+  "Condition": { "StringEquals": { "sts:ExternalId": "<external id shown on the connection>" } }
+}
+```
+
+LangWatch sends the external id on every `AssumeRole` call. A role connection with no external id is refused with `aws_external_id_missing` before any call to AWS. To fix it, add the connection again and update the trust policy with the new external id.

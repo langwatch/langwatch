@@ -114,6 +114,13 @@ export class HttpBedrockAgentAliasChannel implements BedrockAgentAliasChannel {
         message: "The AWS connection holds neither an access key pair nor a role to assume",
       });
     }
+    if (credentials.roleArn && !credentials.externalId) {
+      throw new KillSwitchPlatformError({
+        code: "aws_external_id_missing",
+        message:
+          "The AWS connection's role has no external id. Add the connection again so LangWatch generates one, then put it in the role's trust policy",
+      });
+    }
     return new BedrockAgentClient(
       this.#aws.build({
         region,

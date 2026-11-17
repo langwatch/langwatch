@@ -45,10 +45,10 @@ function CredentialFields({
           placeholder="arn:aws:iam::123456789012:role/langwatch-kill-switch"
           {...field("roleArn")}
         />
-      </Field.Root>
-      <Field.Root>
-        <Field.Label>External id</Field.Label>
-        <Input aria-label="External id" {...field("externalId")} />
+        <Field.HelperText>
+          LangWatch generates the external id when you add the connection. Put it in the role&apos;s
+          trust policy.
+        </Field.HelperText>
       </Field.Root>
     </>
   );

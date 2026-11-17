@@ -17,7 +17,7 @@ function connectionDetail(connection: AwsConnectionView): string {
   const parts: string[] = [];
   if (connection.accessKeyIdLastFour) parts.push(`Key ending ${connection.accessKeyIdLastFour}`);
   if (connection.roleArn) parts.push(`Role ${connection.roleArn}`);
-  if (connection.hasExternalId) parts.push("external id set");
+  if (connection.externalId) parts.push(`External id ${connection.externalId}`);
   return parts.join(" · ");
 }
 

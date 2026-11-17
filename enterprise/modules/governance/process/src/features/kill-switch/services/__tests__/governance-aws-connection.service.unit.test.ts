@@ -18,6 +18,7 @@ function connectionService(
   plans = MemoryAgentStopPlanRepository.create(),
   stops = MemoryAgentStopRepository.create(),
   audit: RecordAuditLogCommand[] = [],
+  newExternalId?: () => string,
 ) {
   const auditLog = createApiFixture<AuditLogApi>({
     record: async (command) => {
@@ -30,6 +31,7 @@ function connectionService(
     plans,
     stops,
     audit: KillSwitchAuditService.create({ auditLog, outbox: () => undefined }),
+    ...(newExternalId ? { newExternalId } : {}),
   });
 }
 
@@ -58,7 +60,7 @@ describe("GovernanceAwsConnectionService", () => {
         name: "ACME production",
         accessKeyIdLastFour: "0001",
         roleArn: null,
-        hasExternalId: false,
+        externalId: null,
         createdAt: view.createdAt,
       });
       const listed = await service.findConnections({ organizationId: ORG });
@@ -69,31 +71,42 @@ describe("GovernanceAwsConnectionService", () => {
     });
   });
 
-  describe("when a connection names only a role and an external id", () => {
+  describe("when a connection names only a role and the caller sends its own external id", () => {
     /** @scenario "An AWS connection may name a role to assume instead of a key pair" */
-    it("stores it with no key pair and the external id sealed", async () => {
+    it("ignores the caller's id and seals one LangWatch generates", async () => {
       const repository = MemoryGovernanceAwsConnectionRepository.create();
-      const service = connectionService(repository);
+      const service = connectionService(
+        repository,
+        undefined,
+        undefined,
+        undefined,
+        () => "langwatch-generated-0001",
+      );
+      const callerChosen = {
+        name: "ACME role",
+        roleArn: "arn:aws:iam::123456789012:role/langwatch-kill-switch",
+        externalId: "acme-chosen-id",
+      };
 
       const view = await service.createConnection({
         organizationId: ORG,
         userId: "user-ops",
-        connection: {
-          name: "ACME role",
-          roleArn: "arn:aws:iam::123456789012:role/langwatch-kill-switch",
-          externalId: "acme-external-id",
-        },
+        connection: callerChosen,
       });
 
       expect(view).toMatchObject({
         accessKeyIdLastFour: null,
         roleArn: "arn:aws:iam::123456789012:role/langwatch-kill-switch",
-        hasExternalId: true,
+        externalId: "langwatch-generated-0001",
+      });
+      expect(await repository.getCredentials({ organizationId: ORG, id: view.id })).toMatchObject({
+        externalId: "langwatch-generated-0001",
       });
       const [row] = repository.storedRows();
       expect(row?.accessKeyId).toBeNull();
       expect(row?.encryptedSecretAccessKey).toBeNull();
-      expect(row?.encryptedExternalId).not.toContain("acme-external-id");
+      expect(row?.encryptedExternalId).not.toContain("langwatch-generated-0001");
+      expect(JSON.stringify(row)).not.toContain("acme-chosen-id");
     });
   });
 

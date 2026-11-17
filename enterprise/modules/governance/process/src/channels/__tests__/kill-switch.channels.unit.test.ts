@@ -3,7 +3,8 @@
  * Bedrock channel's refusal to sign as the deployment itself.
  * Spec: enterprise/modules/governance/specs/agent-kill-switch.feature
  */
-import { describe, expect, it } from "vitest";
+import { AwsClientConfiguration } from "@langwatch/aws-client";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { GovernanceHttpClient, GovernanceHttpResponse } from "../governance-http.channel.ts";
 import { HttpBedrockAgentAliasChannel } from "../http/http.bedrock-agent-alias.channel.ts";
@@ -91,6 +92,66 @@ describe("HttpBedrockAgentAliasChannel", () => {
         .catch((thrown: unknown) => thrown);
 
       expect(error).toMatchObject({ code: "aws_connection_incomplete" });
+    });
+  });
+
+  describe("when the connection names a role with no external id", () => {
+    it("refuses before any call, so AssumeRole is never sent without one", async () => {
+      const build = vi.spyOn(AwsClientConfiguration.prototype, "build");
+
+      const error = await HttpBedrockAgentAliasChannel.create()
+        .setInvocationState({
+          credentials: {
+            accessKeyId: null,
+            secretAccessKey: null,
+            roleArn: "arn:aws:iam::123456789012:role/kill-switch",
+            externalId: null,
+          },
+          region: "eu-west-1",
+          agentId: "AGENT00001",
+          agentAliasId: "ALIAS00001",
+          state: "REJECT_INVOCATIONS",
+        })
+        .catch((thrown: unknown) => thrown);
+
+      expect(error).toMatchObject({ code: "aws_external_id_missing" });
+      expect(build).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the connection names a role and its external id", () => {
+    afterEach(() => vi.restoreAllMocks());
+
+    it("assumes the role with that external id", async () => {
+      const build = vi.spyOn(AwsClientConfiguration.prototype, "build").mockImplementation(
+        ({ region }) =>
+          ({
+            region,
+            endpoint: "http://127.0.0.1:9",
+            credentials: { accessKeyId: "AKIATESTONLY0000", secretAccessKey: "test-only-secret" },
+            maxAttempts: 1,
+          }) as ReturnType<AwsClientConfiguration["build"]>,
+      );
+
+      await HttpBedrockAgentAliasChannel.create()
+        .setInvocationState({
+          credentials: {
+            accessKeyId: null,
+            secretAccessKey: null,
+            roleArn: "arn:aws:iam::123456789012:role/kill-switch",
+            externalId: "langwatch-generated-0001",
+          },
+          region: "eu-west-1",
+          agentId: "AGENT00001",
+          agentAliasId: "ALIAS00001",
+          state: "REJECT_INVOCATIONS",
+        })
+        .catch(() => undefined);
+
+      expect(build.mock.calls[0]?.[0].assumeRole).toMatchObject({
+        roleArn: "arn:aws:iam::123456789012:role/kill-switch",
+        externalId: "langwatch-generated-0001",
+      });
     });
   });
 });

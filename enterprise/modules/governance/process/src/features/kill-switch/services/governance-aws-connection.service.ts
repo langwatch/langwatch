@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { randomBytes } from "node:crypto";
+
 import type { AuditLogIntent } from "@langwatch/audit-log-contract";
 import {
   AGENT_STOP_OPEN_STATUSES,
@@ -25,6 +27,7 @@ interface GovernanceAwsConnectionDependencies {
   stops: Pick<AgentStopRepository, "findAllByStatuses">;
   audit: Pick<KillSwitchAuditService, "intentOf">;
   newId: () => string;
+  newExternalId: () => string;
 }
 
 /** The audit target of a connection write; the row never carries the secret or external id. */
@@ -37,7 +40,7 @@ function viewOfAwsConnection(record: GovernanceAwsConnectionRecord): AwsConnecti
     name: record.name,
     accessKeyIdLastFour: record.accessKeyId ? record.accessKeyId.slice(-4) : null,
     roleArn: record.roleArn,
-    hasExternalId: record.hasExternalId,
+    externalId: record.externalId,
     createdAt: record.createdAt,
   };
 }
@@ -49,7 +52,8 @@ const STOP_STATUSES_HOLDING_CONNECTIONS = [
 
 /**
  * The AWS connections a Bedrock kill switch target signs with: a key pair, a role to assume, or
- * both. The repository seals the secret access key and the external id before they are stored. A
+ * both. A role always gets an external id LangWatch generates, never one the caller picks. The
+ * repository seals the secret access key and the external id before they are stored. A
  * connection a plan target or an unrestored stop still names cannot be deleted. Adding and removing
  * one writes an audit row.
  */
@@ -58,11 +62,13 @@ export class GovernanceAwsConnectionService {
 
   static create({
     newId = () => generate("awsconn").toString(),
+    newExternalId = () => `langwatch-${randomBytes(24).toString("base64url")}`,
     ...deps
-  }: Omit<GovernanceAwsConnectionDependencies, "newId"> & {
+  }: Omit<GovernanceAwsConnectionDependencies, "newId" | "newExternalId"> & {
     newId?: () => string;
+    newExternalId?: () => string;
   }): GovernanceAwsConnectionService {
-    return new GovernanceAwsConnectionService({ ...deps, newId });
+    return new GovernanceAwsConnectionService({ ...deps, newId, newExternalId });
   }
 
   async createConnection({
@@ -76,6 +82,8 @@ export class GovernanceAwsConnectionService {
   }): Promise<AwsConnectionView> {
     const input = awsConnectionInputSchema.parse(connection);
     const id = this.deps.newId();
+    // Confused deputy guard: only LangWatch picks the id the role's trust policy must match.
+    const externalId = input.roleArn ? this.deps.newExternalId() : null;
     const record = await this.deps.connections.create({
       id,
       organizationId,
@@ -83,7 +91,7 @@ export class GovernanceAwsConnectionService {
       accessKeyId: input.accessKeyId ?? null,
       secretAccessKey: input.secretAccessKey ?? null,
       roleArn: input.roleArn ?? null,
-      externalId: input.externalId ?? null,
+      externalId,
       audit: this.auditOf({
         action: "governance.agent.aws_connection_created",
         organizationId,
@@ -94,7 +102,7 @@ export class GovernanceAwsConnectionService {
           name: input.name,
           accessKeyIdLastFour: input.accessKeyId ? input.accessKeyId.slice(-4) : null,
           roleArn: input.roleArn ?? null,
-          hasExternalId: Boolean(input.externalId),
+          hasExternalId: externalId !== null,
         },
       }),
     });

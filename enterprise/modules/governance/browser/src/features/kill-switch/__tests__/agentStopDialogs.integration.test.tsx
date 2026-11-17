@@ -283,7 +283,7 @@ describe("the stop plan of an agent", () => {
       name: "Bedrock prod",
       accessKeyIdLastFour: null,
       roleArn: null,
-      hasExternalId: false,
+      externalId: null,
       createdAt: "2026-11-16T00:00:00.000Z",
     };
     const openConnectionForm = async () => {
@@ -325,7 +325,7 @@ describe("the stop plan of an agent", () => {
     });
 
     /** @scenario "The AWS connection form adds a key pair or a role to assume" */
-    it("sends a role ARN with its external id and no key pair", async () => {
+    it("sends a role ARN with no key pair and no external id, which LangWatch generates", async () => {
       answerMutation("governanceKillSwitch.createAwsConnection", () => CREATED);
       const form = await openConnectionForm();
 
@@ -335,7 +335,7 @@ describe("the stop plan of an agent", () => {
         within(form).getByLabelText("Role ARN"),
         "arn:aws:iam::123456789012:role/langwatch-kill-switch",
       );
-      await userEvent.type(within(form).getByLabelText("External id"), "acme-external");
+      expect(within(form).queryByLabelText("External id")).toBeNull();
       await submit(form);
 
       expect(trpcDouble.calls).toEqual([
@@ -346,7 +346,6 @@ describe("the stop plan of an agent", () => {
             connection: {
               name: "Bedrock prod",
               roleArn: "arn:aws:iam::123456789012:role/langwatch-kill-switch",
-              externalId: "acme-external",
             },
           },
         },
@@ -405,7 +404,7 @@ describe("the stop plan of an agent", () => {
         name: "Bedrock prod",
         accessKeyIdLastFour: "WXYZ",
         roleArn: null,
-        hasExternalId: false,
+        externalId: null,
         createdAt: "2026-11-01T00:00:00.000Z",
       },
     ]);

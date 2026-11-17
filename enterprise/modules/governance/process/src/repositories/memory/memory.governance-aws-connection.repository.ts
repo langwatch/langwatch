@@ -26,14 +26,14 @@ type MemoryAwsConnectionRow = {
   createdAt: string;
 };
 
-function recordOf(row: MemoryAwsConnectionRow): GovernanceAwsConnectionRecord {
+function recordOf(row: MemoryAwsConnectionRow, cipher: Encryption): GovernanceAwsConnectionRecord {
   return {
     id: row.id,
     organizationId: row.organizationId,
     name: row.name,
     accessKeyId: row.accessKeyId,
     roleArn: row.roleArn,
-    hasExternalId: row.encryptedExternalId !== null,
+    externalId: row.encryptedExternalId === null ? null : cipher.decrypt(row.encryptedExternalId),
     createdAt: row.createdAt,
   };
 }
@@ -95,7 +95,7 @@ export class MemoryGovernanceAwsConnectionRepository extends GovernanceAwsConnec
     };
     this.commitAudit(input.audit);
     this.rows.push(row);
-    return recordOf(row);
+    return recordOf(row, this.cipher);
   }
 
   async findAll({
@@ -103,7 +103,9 @@ export class MemoryGovernanceAwsConnectionRepository extends GovernanceAwsConnec
   }: {
     organizationId: string;
   }): Promise<GovernanceAwsConnectionRecord[]> {
-    return this.rows.filter((row) => row.organizationId === organizationId).map(recordOf);
+    return this.rows
+      .filter((row) => row.organizationId === organizationId)
+      .map((row) => recordOf(row, this.cipher));
   }
 
   async findByIds({
@@ -115,7 +117,7 @@ export class MemoryGovernanceAwsConnectionRepository extends GovernanceAwsConnec
   }): Promise<GovernanceAwsConnectionRecord[]> {
     return this.rows
       .filter((row) => row.organizationId === organizationId && ids.includes(row.id))
-      .map(recordOf);
+      .map((row) => recordOf(row, this.cipher));
   }
 
   async getCredentials({

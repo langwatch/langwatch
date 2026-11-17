@@ -20,6 +20,17 @@ function mount({ holdsRegistry }: { holdsRegistry: boolean }) {
       requests.push(input);
       return { id: "agentstop_1" } as AgentStopView;
     },
+    createAwsConnection: async (input) => {
+      requests.push(input);
+      return {
+        id: "awsconn_1",
+        name: input.connection.name,
+        accessKeyIdLastFour: null,
+        roleArn: input.connection.roleArn ?? null,
+        externalId: "langwatch-generated-0001",
+        createdAt: "2026-11-17T00:00:00.000Z",
+      };
+    },
   });
   const router = governanceTrpcRuntime({
     ...governanceTrpcMembers({ permits: () => true, asked }),
@@ -77,6 +88,28 @@ describe("the governanceKillSwitch tRPC namespace", () => {
           caller: { userId: "user_1", apiKeyId: null },
         },
       ]);
+    });
+  });
+
+  describe("when a caller sends its own external id for a role", () => {
+    it("strips it at the door, so the application never sees a caller-chosen id", async () => {
+      const { caller, requests } = mount({ holdsRegistry: true });
+      const connection = {
+        name: "ACME role",
+        roleArn: "arn:aws:iam::123456789012:role/kill-switch",
+        externalId: "acme-chosen-id",
+      };
+
+      const view = await caller.createAwsConnection({ organizationId: "org_1", connection });
+
+      expect(requests).toEqual([
+        {
+          organizationId: "org_1",
+          connection: { name: "ACME role", roleArn: "arn:aws:iam::123456789012:role/kill-switch" },
+          userId: "user_1",
+        },
+      ]);
+      expect(view.externalId).toBe("langwatch-generated-0001");
     });
   });
 });

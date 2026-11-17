@@ -17,7 +17,6 @@ const EMPTY_FORM = {
   accessKeyId: "",
   secretAccessKey: "",
   roleArn: "",
-  externalId: "",
 };
 export type ConnectionFields = typeof EMPTY_FORM;
 export type ConnectionFieldBinding = {
@@ -34,7 +33,7 @@ function connectionInput({ credential, form }: { credential: Credential; form: C
           accessKeyId: optional(form.accessKeyId),
           secretAccessKey: optional(form.secretAccessKey),
         }
-      : { name: form.name, roleArn: optional(form.roleArn), externalId: optional(form.externalId) },
+      : { name: form.name, roleArn: optional(form.roleArn) },
   );
 }
 

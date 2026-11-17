@@ -26,22 +26,25 @@ const RECORD_SELECT = {
   createdAt: true,
 } as const;
 
-function recordOf(row: {
-  id: string;
-  organizationId: string;
-  name: string;
-  accessKeyId: string | null;
-  roleArn: string | null;
-  encryptedExternalId: string | null;
-  createdAt: Date;
-}): GovernanceAwsConnectionRecord {
+function recordOf(
+  row: {
+    id: string;
+    organizationId: string;
+    name: string;
+    accessKeyId: string | null;
+    roleArn: string | null;
+    encryptedExternalId: string | null;
+    createdAt: Date;
+  },
+  cipher: Encryption,
+): GovernanceAwsConnectionRecord {
   return {
     id: row.id,
     organizationId: row.organizationId,
     name: row.name,
     accessKeyId: row.accessKeyId,
     roleArn: row.roleArn,
-    hasExternalId: row.encryptedExternalId !== null,
+    externalId: row.encryptedExternalId === null ? null : cipher.decrypt(row.encryptedExternalId),
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -111,7 +114,7 @@ export class PrismaGovernanceAwsConnectionRepository extends GovernanceAwsConnec
         select: RECORD_SELECT,
       });
       await this.appendAudit({ audit: input.audit, transaction });
-      return recordOf(row);
+      return recordOf(row, this.cipher);
     });
   }
 
@@ -125,7 +128,7 @@ export class PrismaGovernanceAwsConnectionRepository extends GovernanceAwsConnec
       orderBy: { createdAt: "asc" },
       select: RECORD_SELECT,
     });
-    return rows.map(recordOf);
+    return rows.map((row) => recordOf(row, this.cipher));
   }
 
   async findByIds({
@@ -140,7 +143,7 @@ export class PrismaGovernanceAwsConnectionRepository extends GovernanceAwsConnec
       where: { organizationId, id: { in: [...ids] } },
       select: RECORD_SELECT,
     });
-    return rows.map(recordOf);
+    return rows.map((row) => recordOf(row, this.cipher));
   }
 
   async getCredentials({
