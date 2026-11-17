@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/langwatch/langwatch/compare/clickhouse-serverless-image@v0.5.0...clickhouse-serverless-image@v0.5.0) (2026-11-17)
+
+
+### Miscellaneous
+
+* **clickhouse-serverless-image:** Synchronize clickhouse-serverless versions
+
 ## [0.5.0](https://github.com/langwatch/langwatch/compare/clickhouse-serverless-image@v0.4.0...clickhouse-serverless-image@v0.5.0) (2026-11-16)
 
 
