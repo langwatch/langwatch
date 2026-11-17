@@ -31,6 +31,30 @@ export const RED_TEAM_BREAK_SCORE = 9;
 export const owaspIdSchema = z.string().regex(/^(LLM(0[1-9]|10)|ASI(0[1-9]|10))$/);
 export type OwaspId = z.infer<typeof owaspIdSchema>;
 
+/** Official names of the OWASP Top 10 for LLM Applications 2025 and Agentic Applications 2026. */
+export const OWASP_CATEGORIES: Readonly<Record<string, string>> = {
+  LLM01: "Prompt Injection",
+  LLM02: "Sensitive Information Disclosure",
+  LLM03: "Supply Chain",
+  LLM04: "Data and Model Poisoning",
+  LLM05: "Improper Output Handling",
+  LLM06: "Excessive Agency",
+  LLM07: "System Prompt Leakage",
+  LLM08: "Vector and Embedding Weaknesses",
+  LLM09: "Misinformation",
+  LLM10: "Unbounded Consumption",
+  ASI01: "Agent Goal Hijack",
+  ASI02: "Tool Misuse and Exploitation",
+  ASI03: "Identity and Privilege Abuse",
+  ASI04: "Agentic Supply Chain Vulnerabilities",
+  ASI05: "Unexpected Code Execution (RCE)",
+  ASI06: "Memory & Context Poisoning",
+  ASI07: "Insecure Inter-Agent Communication",
+  ASI08: "Cascading Failures",
+  ASI09: "Human-Agent Trust Exploitation",
+  ASI10: "Rogue Agents",
+};
+
 const redTeamConfigSchemaDefinition = z
   .object({
     attackGoal: z.string().trim().min(1).max(4000),
@@ -85,6 +109,15 @@ const redTeamRunReportSchemaDefinition = z
 export interface RedTeamRunReportSchema extends Named<typeof redTeamRunReportSchemaDefinition> {}
 export const redTeamRunReportSchema: RedTeamRunReportSchema = redTeamRunReportSchemaDefinition;
 export type RedTeamRunReport = z.infer<typeof redTeamRunReportSchema>;
+
+/**
+ * `sourceTemplateId` is written only by a suite template apply. A create input lists it so a
+ * caller naming it is refused by name instead of having it dropped.
+ */
+export const scenarioTemplateMarkerRefusalSchema = z
+  .never({ error: "sourceTemplateId is set only by applying a suite template" })
+  .optional()
+  .describe("Refused: only applying a suite template marks a scenario with its template.");
 
 /** The key the report travels under in the run metadata's reserved `langwatch` namespace. */
 export const RED_TEAM_REPORT_METADATA_KEY = "redTeam";

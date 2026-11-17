@@ -301,6 +301,7 @@ export class SuiteModule implements SuiteApi {
   readonly #runItems: SuiteRunItemCommandsService;
   readonly #runPlans: RunPlanReadService;
   readonly #connectedTargets: ConnectedTargetService;
+  readonly #templates: SuiteTemplateService;
 
   private constructor(
     dependencies: SuiteAppDependencies & {
@@ -317,6 +318,7 @@ export class SuiteModule implements SuiteApi {
     this.#runItems = runItems;
     this.#runPlans = runPlans;
     this.#dependencies = rest;
+    this.#templates = SuiteTemplateService.create({ scenarios: rest.scenarios });
     this.#connectedTargets = ConnectedTargetService.create({
       agents: rest.agents,
       owners: AgentOwnerNamesService.create(rest.agents),
@@ -489,7 +491,7 @@ export class SuiteModule implements SuiteApi {
   }
 
   async listTemplates(_input: { projectId: string }): Promise<SuiteTemplate[]> {
-    return SuiteTemplateService.create({ scenarios: this.#dependencies.scenarios }).listTemplates();
+    return this.#templates.listTemplates();
   }
 
   applyTemplate(
@@ -497,11 +499,7 @@ export class SuiteModule implements SuiteApi {
     by: ScenarioCaller,
     author?: ScenarioActor,
   ): Promise<AppliedSuiteTemplate> {
-    return SuiteTemplateService.create({ scenarios: this.#dependencies.scenarios }).applyTemplate(
-      input,
-      by,
-      author,
-    );
+    return this.#templates.applyTemplate(input, by, author);
   }
 
   /**

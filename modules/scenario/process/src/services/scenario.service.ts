@@ -1,3 +1,4 @@
+import { TestSuiteLimitExceededError } from "@langwatch/enterprise-licensing-contract";
 import {
   ScenarioNotFoundError,
   ScenarioRedTeamConfigError,
@@ -47,7 +48,7 @@ import {
 } from "@langwatch/scenario-contract";
 
 import type { ScenarioClock, ScenarioTestSuiteId, ScenarioId } from "../app/scenario.app.ts";
-import type { ScenarioRepository } from "../repositories/scenario.repository.ts";
+import type { ScenarioRepository, TestSuiteCap } from "../repositories/scenario.repository.ts";
 import { ScenarioRunCancellationService } from "./scenario-run-cancellation.service.ts";
 import { ScenarioRunSecretsService } from "./scenario-run-secrets.service.ts";
 
@@ -321,13 +322,20 @@ export class ScenarioService {
     return { archived: result.archived, failed };
   }
 
-  createTestSuite(input: ScenarioTestSuiteCreateInput): Promise<ScenarioTestSuite> {
+  /** @throws TestSuiteLimitExceededError when the suite cap is reached under its lock. */
+  async createTestSuite(
+    input: ScenarioTestSuiteCreateInput,
+    cap?: TestSuiteCap,
+  ): Promise<ScenarioTestSuite> {
     const parsed = scenarioTestSuiteCreateInputSchema.parse(input);
+    const id = this.options.testSuiteIds.next();
+    if (!cap) return this.options.repository.createTestSuite({ ...parsed, id });
 
-    return this.options.repository.createTestSuite({
-      ...parsed,
-      id: this.options.testSuiteIds.next(),
-    });
+    const result = await this.options.repository.createCappedTestSuite({ ...parsed, id, cap });
+    if ("current" in result) {
+      throw new TestSuiteLimitExceededError(result.current, cap.max);
+    }
+    return result.testSuite;
   }
 
   findTestSuite(input: ScenarioTestSuiteIdInput): Promise<ScenarioTestSuite | null> {

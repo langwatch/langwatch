@@ -34,6 +34,9 @@ export interface ScenarioPlanRecord {
   targets: unknown;
 }
 
+/** The suite cap a template suite's write must stay under, over its organization's projects. */
+export type TestSuiteCap = { organizationId: string; projectIds: string[]; max: number };
+
 export abstract class ScenarioRepository {
   abstract create(
     input: ScenarioCreateInput & { id: string; actor: ScenarioActor; sourceTemplateId?: string },
@@ -48,8 +51,15 @@ export abstract class ScenarioRepository {
   abstract count(input: { projectId: string }): Promise<number>;
   /** Live scenarios no template apply created: the ones the Free scenario cap counts. */
   abstract countActiveByProjects(input: { projectIds: string[] }): Promise<number>;
-  /** Live test suites across the projects: what the Free suite cap counts on a template apply. */
+  /**
+   * Live test suites the Free suite cap counts: template-made or holding a live scenario, never a
+   * project's Default suite.
+   */
   abstract countActiveTestSuitesByProjects(input: { projectIds: string[] }): Promise<number>;
+  /** Counts and creates under one organization lock, so concurrent applies cannot both pass. */
+  abstract createCappedTestSuite(
+    input: ScenarioTestSuiteCreateInput & { id: string; cap: TestSuiteCap },
+  ): Promise<{ testSuite: ScenarioTestSuite } | { current: number }>;
   abstract update(input: ScenarioUpdateInput & { actor: ScenarioActor }): Promise<Scenario>;
   abstract findVersions(
     input: ScenarioVersionListInput & { take: number },

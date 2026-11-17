@@ -652,11 +652,14 @@ export class ScenarioModule implements ScenarioApi {
 
   /** A suite a template apply makes passes the Free suite cap before anything is written. */
   async createTestSuite(input: ScenarioTestSuiteCreateInput): Promise<ScenarioTestSuite> {
-    await this.#dependencies.creationCaps.assertTestSuiteCreationAllowed({
+    const cap = await this.#dependencies.creationCaps.testSuiteCreationCap({
       projectId: input.projectId,
       templateId: input.templateId,
     });
-    return this.#dependencies.scenarios.createTestSuite(input);
+    return this.#dependencies.scenarios.createTestSuite(
+      input,
+      cap.kind === "capped" ? cap.cap : undefined,
+    );
   }
 
   updateTestSuite(input: ScenarioTestSuiteUpdateInput): Promise<ScenarioTestSuite> {

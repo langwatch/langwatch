@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import {
   Prisma,
   type PrismaClient,
@@ -50,7 +51,11 @@ import {
   DEFAULT_SUITE_SLUG,
   pickFreeSuiteSlug,
 } from "../../rules/default-suite.rules.ts";
-import { ScenarioRepository, type ScenarioPlanRecord } from "../scenario.repository.ts";
+import {
+  ScenarioRepository,
+  type ScenarioPlanRecord,
+  type TestSuiteCap,
+} from "../scenario.repository.ts";
 
 type ScenarioWriteInput = ScenarioUpdateInput & { actor: ScenarioActor };
 
@@ -68,6 +73,30 @@ function slugify(value: string): string {
 function mapScenario(row: unknown): Scenario {
   const { sourceTemplateId: _, ...scenario } = row as Record<string, unknown>;
   return scenarioSchema.parse(scenario);
+}
+
+function testSuiteData({
+  input,
+  slug,
+}: {
+  input: ScenarioTestSuiteCreateInput & { id: string };
+  slug: string;
+}) {
+  return {
+    id: input.id,
+    projectId: input.projectId,
+    name: input.name,
+    slug,
+    kind: "test_suite",
+    scenarioIds: [],
+    targets: [],
+    repeatCount: 1,
+    labels: [],
+    fields: input.fields ?? [],
+    evaluators: input.evaluators ?? [],
+    templateId: input.templateId ?? null,
+    templateVersion: input.templateVersion ?? null,
+  };
 }
 
 function mapTestSuite(row: unknown): ScenarioTestSuite {
@@ -216,9 +245,58 @@ export class PrismaScenarioRepository extends ScenarioRepository {
   }
 
   async countActiveTestSuitesByProjects(input: { projectIds: string[] }): Promise<number> {
-    if (input.projectIds.length === 0) return 0;
-    return this.database.simulationSuite.count({
-      where: { projectId: { in: input.projectIds }, kind: "test_suite", archivedAt: null },
+    return this.countCappedTestSuites(this.database, input.projectIds);
+  }
+
+  async createCappedTestSuite(
+    input: ScenarioTestSuiteCreateInput & { id: string; cap: TestSuiteCap },
+  ): Promise<{ testSuite: ScenarioTestSuite } | { current: number }> {
+    const { cap, ...suite } = input;
+    const baseSlug = slugify(suite.name);
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        return await this.database.$transaction(async (transaction) => {
+          await transaction.$executeRaw` ${skipTenantCheck({
+            // Transaction-scoped advisory lock; the organization is in the lock key.
+            SKIP_TENANT_CHECK: true,
+          })}
+SELECT pg_advisory_xact_lock(hashtextextended(${`scenario-suite-cap:${cap.organizationId}`}, 0))`;
+          const current = await this.countCappedTestSuites(transaction, cap.projectIds);
+          if (current >= cap.max) return { current };
+          const taken = await transaction.simulationSuite.findMany({
+            where: { projectId: suite.projectId, slug: { startsWith: baseSlug } },
+            select: { slug: true },
+          });
+          const slug = pickFreeSuiteSlug({
+            baseSlug,
+            takenSlugs: taken.map((row) => row.slug),
+            randomSuffix: () => randomBytes(3).toString("hex"),
+          });
+          const row = await transaction.simulationSuite.create({
+            data: testSuiteData({ input: suite, slug }),
+          });
+          return { testSuite: mapTestSuite(row) };
+        });
+      } catch (error) {
+        if (!this.isSlugConflict(error)) throw error;
+      }
+    }
+    throw new ScenarioTestSuiteSlugUnavailableError(suite.name);
+  }
+
+  private countCappedTestSuites(
+    database: Prisma.TransactionClient,
+    projectIds: string[],
+  ): Promise<number> {
+    if (projectIds.length === 0) return Promise.resolve(0);
+    return database.simulationSuite.count({
+      where: {
+        projectId: { in: projectIds },
+        kind: "test_suite",
+        archivedAt: null,
+        NOT: { templateId: null, name: { equals: DEFAULT_SUITE_NAME, mode: "insensitive" } },
+        OR: [{ templateId: { not: null } }, { testSuiteScenarios: { some: { archivedAt: null } } }],
+      },
     });
   }
 
@@ -455,21 +533,7 @@ export class PrismaScenarioRepository extends ScenarioRepository {
       const slug = suffix === 0 ? baseSlug : `${baseSlug}-${suffix + 1}`;
       try {
         const row = await this.database.simulationSuite.create({
-          data: {
-            id: input.id,
-            projectId: input.projectId,
-            name: input.name,
-            slug,
-            kind: "test_suite",
-            scenarioIds: [],
-            targets: [],
-            repeatCount: 1,
-            labels: [],
-            fields: input.fields ?? [],
-            evaluators: input.evaluators ?? [],
-            templateId: input.templateId ?? null,
-            templateVersion: input.templateVersion ?? null,
-          },
+          data: testSuiteData({ input, slug }),
         });
         return mapTestSuite(row);
       } catch (error) {

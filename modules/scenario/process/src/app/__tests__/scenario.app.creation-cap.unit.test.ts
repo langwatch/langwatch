@@ -251,7 +251,7 @@ describe("ScenarioModule on the cloud Free scenario cap", () => {
     it("refuses a template suite with the simulations limit shape and writes nothing", async () => {
       const { app, repositories } = await organizationAtTheScenarioCap({ scenarios: 0 });
       for (const name of ["One", "Two", "Three"]) {
-        await app.createTestSuite({ projectId: "project-1", name });
+        await app.createTestSuite({ projectId: "project-1", name, templateId: "support-agent" });
       }
 
       await expect(
@@ -273,6 +273,21 @@ describe("ScenarioModule on the cloud Free scenario cap", () => {
 
       await expect(
         app.createTestSuite({ projectId: "project-1", name: "OWASP", templateId: "owasp-llm" }),
+      ).resolves.toMatchObject({ templateId: "owasp-llm" });
+    });
+
+    /** @scenario The suite cap skips the Default suite and blank suites */
+    it("lets a template suite through beside each project's Default suite and blank suites", async () => {
+      const { app } = await organizationAtTheScenarioCap({ scenarios: 0 });
+      for (const projectId of ["project-1", "project-2"]) {
+        await app.createTestSuite({ projectId, name: "Default" });
+        await app.createTestSuite({ projectId, name: `Blank ${projectId}` });
+      }
+      await app.createTestSuite({ projectId: "project-1", name: "One", templateId: "pii" });
+      await app.createTestSuite({ projectId: "project-2", name: "Two", templateId: "pii" });
+
+      await expect(
+        app.createTestSuite({ projectId: "project-1", name: "Three", templateId: "owasp-llm" }),
       ).resolves.toMatchObject({ templateId: "owasp-llm" });
     });
   });

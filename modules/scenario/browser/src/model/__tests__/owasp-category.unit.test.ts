@@ -30,11 +30,11 @@ describe("owaspCategoryName", () => {
     expect(owaspCategoryLabel({ id: "LLM07" })).toBe("LLM07 System Prompt Leakage");
   });
 
-  it("treats a label as repeating a name that differs only by an aside or an ampersand", () => {
-    expect(owaspLabelRepeatsName({ id: "ASI05", name: "ASI05 Unexpected Code Execution" })).toBe(
-      true,
-    );
-    expect(owaspLabelRepeatsName({ id: "ASI06", name: "ASI06 Memory and Context Poisoning" })).toBe(
+  it("treats a label as repeating a name with the same official title", () => {
+    expect(
+      owaspLabelRepeatsName({ id: "ASI05", name: "ASI05 Unexpected Code Execution (RCE)" }),
+    ).toBe(true);
+    expect(owaspLabelRepeatsName({ id: "ASI06", name: "ASI06 Memory & Context Poisoning" })).toBe(
       true,
     );
     expect(owaspLabelRepeatsName({ id: "LLM07", name: "LLM07 Leak the system prompt" })).toBe(

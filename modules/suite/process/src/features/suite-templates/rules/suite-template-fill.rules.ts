@@ -36,10 +36,24 @@ export type FilledTemplateScenario = {
 
 const PLACEHOLDER = /\{\{(agentName|tools|mustNever)\}\}/g;
 
+/** The most characters the tool list fills, so the largest fit keeps attack goals under the cap. */
+const TOOLS_TEXT_BUDGET = 1500;
+
+function toolsText({ tools }: { tools: string[] }): string {
+  const shown: string[] = [];
+  for (const tool of tools) {
+    if ([...shown, tool].join(", ").length > TOOLS_TEXT_BUDGET) break;
+    shown.push(tool);
+  }
+  const hidden = tools.length - shown.length;
+  return hidden > 0 ? `${shown.join(", ")} and ${hidden} more` : shown.join(", ");
+}
+
 function fillText({ text, fit }: { text: string; fit: SuiteTemplateFit }): string {
   return text.replace(PLACEHOLDER, (_, name: string) => {
     if (name === "agentName") return fit.agentName;
-    if (name === "tools") return fit.tools.length > 0 ? fit.tools.join(", ") : "its tools";
+    if (name === "tools")
+      return fit.tools.length > 0 ? toolsText({ tools: fit.tools }) : "its tools";
     return fit.mustNever.length > 0 ? fit.mustNever.join("; ") : "anything its policy forbids";
   });
 }

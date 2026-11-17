@@ -5,10 +5,12 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import { ScenarioEventType, type SimulationService } from "@langwatch/scenario-contract";
 import { nowInstant } from "@langwatch/time";
 
-import type { ScenarioRepository } from "../repositories/scenario.repository.ts";
+import type { ScenarioRepository, TestSuiteCap } from "../repositories/scenario.repository.ts";
 import { isCountedScenarioSet } from "../rules/scenario-set-cap.rules.ts";
 
 const logger = createLogger("langwatch:scenario:creation-cap");
+
+type TestSuiteCreationCap = { kind: "uncapped" } | { kind: "capped"; cap: TestSuiteCap };
 
 /** Main's 30-second usage window for the known scenario sets. */
 const SCENARIO_SET_CACHE_TTL_MS = 30_000;
@@ -16,7 +18,7 @@ const SCENARIO_SET_CACHE_TTL_MS = 30_000;
 type ScenarioCreationCapDependencies = Readonly<{
   plans: Pick<EntitlementApi, "getActivePlan">;
   projects: Pick<ProjectApi, "getOrganizationId" | "listIdsByOrganization">;
-  scenarios: Pick<ScenarioRepository, "countActiveByProjects" | "countActiveTestSuitesByProjects">;
+  scenarios: Pick<ScenarioRepository, "countActiveByProjects">;
   simulations: Pick<SimulationService, "getDistinctExternalSetIds">;
 }>;
 
@@ -54,40 +56,31 @@ export class ScenarioCreationCapService {
     if (current >= cap.max) throw new LimitExceededError("scenarios", current, cap.max);
   }
 
-  /** Only a suite a template apply makes counts against the suite cap. */
-  async assertTestSuiteCreationAllowed(input: {
+  /**
+   * A template's scenarios skip the scenario cap inside their own suite, so a template apply is
+   * bounded twice: by the suite cap this returns for the locked write, and by counted scenarios.
+   * @throws LimitExceededError (`scenarios`) when counted scenarios already exceed the cap.
+   */
+  async testSuiteCreationCap(input: {
     projectId: string;
     templateId?: string | undefined;
-  }): Promise<void> {
-    if (!input.templateId) return;
-    await this.assertTemplateSuiteCreationAllowed({ projectId: input.projectId });
-  }
-
-  /**
-   * A template's scenarios skip the scenario cap only inside their own live suite, so a template
-   * apply is bounded twice: live suites against the simulations cap, and scenarios counted
-   * elsewhere (moved to another suite) must not already exceed the scenario cap.
-   * @throws LimitExceededError (`scenarioSets` or `scenarios`)
-   */
-  async assertTemplateSuiteCreationAllowed(input: { projectId: string }): Promise<void> {
+  }): Promise<TestSuiteCreationCap> {
+    if (!input.templateId) return { kind: "uncapped" };
     const organizationId = await this.deps.projects.getOrganizationId(input.projectId);
     const plan = await this.deps.plans.getActivePlan({ organizationId });
     const suiteCap = planCreationCap({ plan, limitType: "scenarioSets" });
     const scenarioCap = planCreationCap({ plan, limitType: "scenarios" });
-    if (!suiteCap.capped && !scenarioCap.capped) return;
+    if (!suiteCap.capped && !scenarioCap.capped) return { kind: "uncapped" };
 
     const projectIds = await this.deps.projects.listIdsByOrganization({ organizationId });
-    if (suiteCap.capped) {
-      const suites = await this.deps.scenarios.countActiveTestSuitesByProjects({ projectIds });
-      if (suites >= suiteCap.max)
-        throw new LimitExceededError("scenarioSets", suites, suiteCap.max);
-    }
     if (scenarioCap.capped) {
       const scenarios = await this.deps.scenarios.countActiveByProjects({ projectIds });
       if (scenarios > scenarioCap.max) {
         throw new LimitExceededError("scenarios", scenarios, scenarioCap.max);
       }
     }
+    if (!suiteCap.capped) return { kind: "uncapped" };
+    return { kind: "capped", cap: { organizationId, projectIds, max: suiteCap.max } };
   }
 
   /**

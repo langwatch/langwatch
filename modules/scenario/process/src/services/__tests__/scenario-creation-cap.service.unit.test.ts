@@ -44,9 +44,9 @@ function capsWith({
       getOrganizationId: async () => "organization-1",
       listIdsByOrganization: async () => ["project-1", "project-2"],
     },
-    scenarios: createApiFixture<
-      Pick<ScenarioRepository, "countActiveByProjects" | "countActiveTestSuitesByProjects">
-    >({ countActiveByProjects, countActiveTestSuitesByProjects: async () => 0 }),
+    scenarios: createApiFixture<Pick<ScenarioRepository, "countActiveByProjects">>({
+      countActiveByProjects,
+    }),
     simulations: { getDistinctExternalSetIds },
   });
   return { service, countActiveByProjects, getDistinctExternalSetIds };

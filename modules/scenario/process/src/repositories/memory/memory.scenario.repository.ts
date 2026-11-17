@@ -28,7 +28,11 @@ import {
 import { fromDate, type Instant, Temporal, toDate } from "@langwatch/time";
 
 import { DEFAULT_SUITE_NAME } from "../../rules/default-suite.rules.ts";
-import { ScenarioRepository, type ScenarioPlanRecord } from "../scenario.repository.ts";
+import {
+  ScenarioRepository,
+  type ScenarioPlanRecord,
+  type TestSuiteCap,
+} from "../scenario.repository.ts";
 
 export class MemoryScenarioRepository extends ScenarioRepository {
   static create(): MemoryScenarioRepository {
@@ -117,9 +121,28 @@ export class MemoryScenarioRepository extends ScenarioRepository {
     const projectIds = new Set(input.projectIds);
     return Promise.resolve(
       [...this.testSuites.values()].filter(
-        (testSuite) => projectIds.has(testSuite.projectId) && testSuite.archivedAt === null,
+        (testSuite) =>
+          projectIds.has(testSuite.projectId) &&
+          testSuite.archivedAt === null &&
+          !(
+            testSuite.templateId === null &&
+            testSuite.name.toLowerCase() === DEFAULT_SUITE_NAME.toLowerCase()
+          ) &&
+          (testSuite.templateId !== null ||
+            [...this.rows.values()].some(
+              (row) => row.testSuiteId === testSuite.id && row.archivedAt === null,
+            )),
       ).length,
     );
+  }
+
+  async createCappedTestSuite(
+    input: ScenarioTestSuiteCreateInput & { id: string; cap: TestSuiteCap },
+  ): Promise<{ testSuite: ScenarioTestSuite } | { current: number }> {
+    const { cap, ...suite } = input;
+    const current = await this.countActiveTestSuitesByProjects({ projectIds: cap.projectIds });
+    if (current >= cap.max) return { current };
+    return { testSuite: await this.createTestSuite(suite) };
   }
 
   #isInItsTemplateSuite(row: Scenario): boolean {

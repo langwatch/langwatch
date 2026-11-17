@@ -120,3 +120,15 @@ Feature: Suite templates
   Scenario: Applying an unknown template over REST answers 404
     When the caller sends POST /api/v1/test-suites/templates/no-such-template/apply
     Then the response is 404 with code "suite_template_not_found"
+
+  @unit
+  Scenario: The largest fit keeps every attack goal under its cap
+    Given a fit with the longest agent name and the most and longest tools allowed
+    When every template is filled with it
+    Then every attack goal passes the red team config schema
+
+  @unit
+  Scenario: An attack that needs more than a chat says what it needs
+    Given the OWASP packs
+    Then the memory, peer agent, planted result and retrieval attacks name what they need in their situation
+    And the consumption attack's criteria carry a threshold a judge can check
